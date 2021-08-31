@@ -2,6 +2,7 @@ package codespaces
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -32,13 +33,12 @@ func UnusedPort() (int, error) {
 }
 
 // NewPortForwarder returns a new port forwarder for traffic between
-// the Live Share client and the specified local port (which must be
-// available).
+// the Live Share client and the specified local and remote ports.
 //
 // The session name is used (along with the port) to generate
 // names for streams, and may appear in error messages.
-func NewPortForwarder(ctx context.Context, client *liveshare.Client, sessionName string, localPort int) (*liveshare.PortForwarder, error) {
-	if localPort == 0 {
+func NewPortForwarder(ctx context.Context, client *liveshare.Client, sessionName string, localSSHPort, remoteSSHPort int) (*liveshare.PortForwarder, error) {
+	if localSSHPort == 0 {
 		return nil, fmt.Errorf("a local port must be provided")
 	}
 
@@ -47,12 +47,38 @@ func NewPortForwarder(ctx context.Context, client *liveshare.Client, sessionName
 		return nil, fmt.Errorf("new liveshare server: %v", err)
 	}
 
-	// TODO(josebalius): This port won't always be 2222
-	if err := server.StartSharing(ctx, sessionName, 2222); err != nil {
+	if err := server.StartSharing(ctx, "sshd", remoteSSHPort); err != nil {
 		return nil, fmt.Errorf("sharing sshd port: %v", err)
 	}
 
-	return liveshare.NewPortForwarder(client, server, localPort), nil
+	return liveshare.NewPortForwarder(client, server, localSSHPort), nil
+}
+
+// StartSSHServer installs (if necessary) and starts the SSH in the codespace.
+// It returns the remote port where it is running, the user to log in with, or an error if something failed.
+func StartSSHServer(ctx context.Context, client *liveshare.Client, log logger) (serverPort int, user string, err error) {
+	log.Println("Fetching SSH details...")
+
+	sshServer, err := liveshare.NewSSHServer(client)
+	if err != nil {
+		return 0, "", fmt.Errorf("error creating live share: %v", err)
+	}
+
+	sshServerStartResult, err := sshServer.StartRemoteServer(ctx)
+	if err != nil {
+		return 0, "", fmt.Errorf("error starting live share: %v", err)
+	}
+
+	if !sshServerStartResult.Result {
+		return 0, "", errors.New(sshServerStartResult.Message)
+	}
+
+	portInt, err := strconv.Atoi(sshServerStartResult.ServerPort)
+	if err != nil {
+		return 0, "", fmt.Errorf("error parsing port: %v", err)
+	}
+
+	return portInt, sshServerStartResult.User, nil
 }
 
 // Shell runs an interactive secure shell over an existing

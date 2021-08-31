@@ -65,11 +65,11 @@ func delete_(codespaceName string) error {
 
 	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
-		return fmt.Errorf("get or choose codespace: %v", err)
+		return fmt.Errorf("get or choose Codespace: %v", err)
 	}
 
 	if err := apiClient.DeleteCodespace(ctx, user, token, codespace.Name); err != nil {
-		return fmt.Errorf("error deleting codespace: %v", err)
+		return fmt.Errorf("error deleting Codespace: %v", err)
 	}
 
 	log.Println("Codespace deleted.")
@@ -89,17 +89,17 @@ func deleteAll() error {
 
 	codespaces, err := apiClient.ListCodespaces(ctx, user)
 	if err != nil {
-		return fmt.Errorf("error getting codespaces: %v", err)
+		return fmt.Errorf("error getting Codespaces: %v", err)
 	}
 
 	for _, c := range codespaces {
 		token, err := apiClient.GetCodespaceToken(ctx, user.Login, c.Name)
 		if err != nil {
-			return fmt.Errorf("error getting codespace token: %v", err)
+			return fmt.Errorf("error getting Codespace token: %v", err)
 		}
 
 		if err := apiClient.DeleteCodespace(ctx, user, token, c.Name); err != nil {
-			return fmt.Errorf("error deleting codespace: %v", err)
+			return fmt.Errorf("error deleting Codespace: %v", err)
 		}
 
 		log.Printf("Codespace deleted: %s\n", c.Name)
@@ -120,7 +120,7 @@ func deleteByRepo(repo string) error {
 
 	codespaces, err := apiClient.ListCodespaces(ctx, user)
 	if err != nil {
-		return fmt.Errorf("error getting codespaces: %v", err)
+		return fmt.Errorf("error getting Codespaces: %v", err)
 	}
 
 	var deleted bool
@@ -132,18 +132,18 @@ func deleteByRepo(repo string) error {
 
 		token, err := apiClient.GetCodespaceToken(ctx, user.Login, c.Name)
 		if err != nil {
-			return fmt.Errorf("error getting codespace token: %v", err)
+			return fmt.Errorf("error getting Codespace token: %v", err)
 		}
 
 		if err := apiClient.DeleteCodespace(ctx, user, token, c.Name); err != nil {
-			return fmt.Errorf("error deleting codespace: %v", err)
+			return fmt.Errorf("error deleting Codespace: %v", err)
 		}
 
 		log.Printf("Codespace deleted: %s\n", c.Name)
 	}
 
 	if !deleted {
-		return fmt.Errorf("No codespace was found for repository: %s", repo)
+		return fmt.Errorf("No Codespace was found for repository: %s", repo)
 	}
 
 	return list(&listOptions{})

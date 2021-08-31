@@ -51,20 +51,25 @@ func logs(ctx context.Context, tail bool, codespaceName string) error {
 
 	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
-		return fmt.Errorf("get or choose codespace: %v", err)
+		return fmt.Errorf("get or choose Codespace: %v", err)
 	}
 
 	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
-		return fmt.Errorf("connecting to liveshare: %v", err)
+		return fmt.Errorf("connecting to Live Share: %v", err)
 	}
 
-	port, err := codespaces.UnusedPort()
+	localSSHPort, err := codespaces.UnusedPort()
 	if err != nil {
 		return err
 	}
 
-	tunnel, err := codespaces.NewPortForwarder(ctx, lsclient, "sshd", port)
+	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, lsclient, log)
+	if err != nil {
+		return fmt.Errorf("error getting ssh server details: %v", err)
+	}
+
+	tunnel, err := codespaces.NewPortForwarder(ctx, lsclient, "sshd", localSSHPort, remoteSSHServerPort)
 	if err != nil {
 		return fmt.Errorf("make ssh tunnel: %v", err)
 	}
@@ -74,9 +79,9 @@ func logs(ctx context.Context, tail bool, codespaceName string) error {
 		cmdType = "tail -f"
 	}
 
-	dst := fmt.Sprintf("%s@localhost", getSSHUser(codespace))
+	dst := fmt.Sprintf("%s@localhost", sshUser)
 	cmd := codespaces.NewRemoteCommand(
-		ctx, port, dst, fmt.Sprintf("%s /workspaces/.codespaces/.persistedshare/creation.log", cmdType),
+		ctx, localSSHPort, dst, fmt.Sprintf("%s /workspaces/.codespaces/.persistedshare/creation.log", cmdType),
 	)
 
 	// Error channels are buffered so that neither sending goroutine gets stuck.

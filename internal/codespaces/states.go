@@ -37,20 +37,25 @@ type PostCreateState struct {
 func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, user *api.User, codespace *api.Codespace, poller func([]PostCreateState)) error {
 	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespace.Name)
 	if err != nil {
-		return fmt.Errorf("getting codespace token: %v", err)
+		return fmt.Errorf("getting Codespace token: %v", err)
 	}
 
 	lsclient, err := ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
-		return fmt.Errorf("connect to liveshare: %v", err)
+		return fmt.Errorf("connect to Live Share: %v", err)
 	}
 
-	port, err := UnusedPort()
+	localSSHPort, err := UnusedPort()
 	if err != nil {
 		return err
 	}
 
-	fwd, err := NewPortForwarder(ctx, lsclient, "sshd", port)
+	remoteSSHServerPort, sshUser, err := StartSSHServer(ctx, lsclient, log)
+	if err != nil {
+		return fmt.Errorf("error getting ssh server details: %v", err)
+	}
+
+	fwd, err := NewPortForwarder(ctx, lsclient, "sshd", localSSHPort, remoteSSHServerPort)
 	if err != nil {
 		return fmt.Errorf("creating port forwarder: %v", err)
 	}
@@ -72,7 +77,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 			return fmt.Errorf("connection failed: %v", err)
 
 		case <-t.C:
-			states, err := getPostCreateOutput(ctx, port, codespace)
+			states, err := getPostCreateOutput(ctx, localSSHPort, codespace, sshUser)
 			if err != nil {
 				return fmt.Errorf("get post create output: %v", err)
 			}
@@ -82,9 +87,9 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 	}
 }
 
-func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Codespace) ([]PostCreateState, error) {
+func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Codespace, user string) ([]PostCreateState, error) {
 	cmd := NewRemoteCommand(
-		ctx, tunnelPort, sshDestination(codespace),
+		ctx, tunnelPort, fmt.Sprintf("%s@localhost", user),
 		"cat /workspaces/.codespaces/shared/postCreateOutput.json",
 	)
 	stdout := new(bytes.Buffer)
@@ -100,13 +105,4 @@ func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Cod
 	}
 
 	return output.Steps, nil
-}
-
-// TODO(josebalius): this won't be needed soon
-func sshDestination(codespace *api.Codespace) string {
-	user := "codespace"
-	if codespace.RepositoryNWO == "github/github" {
-		user = "root"
-	}
-	return user + "@localhost"
 }

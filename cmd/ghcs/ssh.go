@@ -38,7 +38,7 @@ func init() {
 	rootCmd.AddCommand(newSSHCmd())
 }
 
-func ssh(ctx context.Context, sshProfile, codespaceName string, sshServerPort int) error {
+func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPort int) error {
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -53,17 +53,22 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, sshServerPort in
 
 	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
-		return fmt.Errorf("get or choose codespace: %v", err)
+		return fmt.Errorf("get or choose Codespace: %v", err)
 	}
 
 	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
-		return fmt.Errorf("error connecting to liveshare: %v", err)
+		return fmt.Errorf("error connecting to Live Share: %v", err)
+	}
+
+	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, lsclient, log)
+	if err != nil {
+		return fmt.Errorf("error getting ssh server details: %v", err)
 	}
 
 	terminal, err := liveshare.NewTerminal(lsclient)
 	if err != nil {
-		return fmt.Errorf("error creating liveshare terminal: %v", err)
+		return fmt.Errorf("error creating Live Share terminal: %v", err)
 	}
 
 	log.Print("Preparing SSH...")
@@ -73,30 +78,29 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, sshServerPort in
 			return fmt.Errorf("error getting container id: %v", err)
 		}
 
-		if err := setupSSH(ctx, log, terminal, containerID, codespace.RepositoryName); err != nil {
+		if err := setupEnv(ctx, log, terminal, containerID, codespace.RepositoryName, sshUser); err != nil {
 			return fmt.Errorf("error creating ssh server: %v", err)
 		}
 	}
 	log.Print("\n")
 
 	usingCustomPort := true
-	if sshServerPort == 0 {
+	if localSSHServerPort == 0 {
 		usingCustomPort = false // suppress log of command line in Shell
-		port, err := codespaces.UnusedPort()
+		localSSHServerPort, err = codespaces.UnusedPort()
 		if err != nil {
 			return err
 		}
-		sshServerPort = port
 	}
 
-	tunnel, err := codespaces.NewPortForwarder(ctx, lsclient, "sshd", sshServerPort)
+	tunnel, err := codespaces.NewPortForwarder(ctx, lsclient, "sshd", localSSHServerPort, remoteSSHServerPort)
 	if err != nil {
 		return fmt.Errorf("make ssh tunnel: %v", err)
 	}
 
 	connectDestination := sshProfile
 	if connectDestination == "" {
-		connectDestination = fmt.Sprintf("%s@localhost", getSSHUser(codespace))
+		connectDestination = fmt.Sprintf("%s@localhost", sshUser)
 	}
 
 	tunnelClosed := make(chan error)
@@ -106,7 +110,7 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, sshServerPort in
 
 	shellClosed := make(chan error)
 	go func() {
-		shellClosed <- codespaces.Shell(ctx, log, sshServerPort, connectDestination, usingCustomPort)
+		shellClosed <- codespaces.Shell(ctx, log, localSSHServerPort, connectDestination, usingCustomPort)
 	}()
 
 	log.Println("Ready...")
@@ -153,8 +157,8 @@ func getContainerID(ctx context.Context, logger *output.Logger, terminal *livesh
 	return containerID, nil
 }
 
-func setupSSH(ctx context.Context, logger *output.Logger, terminal *liveshare.Terminal, containerID, repositoryName string) error {
-	setupBashProfileCmd := fmt.Sprintf(`echo "cd /workspaces/%v; export $(cat /workspaces/.codespaces/shared/.env | xargs); exec /bin/zsh;" > /home/codespace/.bash_profile`, repositoryName)
+func setupEnv(ctx context.Context, logger *output.Logger, terminal *liveshare.Terminal, containerID, repositoryName, containerUser string) error {
+	setupBashProfileCmd := fmt.Sprintf(`echo "cd /workspaces/%v; export $(cat /workspaces/.codespaces/shared/.env | xargs); exec /bin/zsh;" > /home/%v/.bash_profile`, repositoryName, containerUser)
 
 	logger.Print(".")
 	compositeCommand := []string{setupBashProfileCmd}
@@ -173,11 +177,4 @@ func setupSSH(ctx context.Context, logger *output.Logger, terminal *liveshare.Te
 	}
 
 	return nil
-}
-
-func getSSHUser(codespace *api.Codespace) string {
-	if codespace.RepositoryNWO == "github/github" {
-		return "root"
-	}
-	return "codespace"
 }
