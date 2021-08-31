@@ -266,6 +266,20 @@ func createRun(opts *CreateOptions) error {
 			return err
 		}
 
+		var useStack bool
+		err = prompt.SurveyAskOne(
+			&survey.Confirm{
+				Message: "Initialize this repository using a stack?",
+				Default: false,
+			}, &useStack)
+		if err != nil {
+			return err
+		}
+
+		if useStack {
+			return stackFlow(opts)
+		}
+
 		// GitIgnore and License templates not added when a template repository
 		// is passed, or when the confirm flag is set.
 		if opts.Template == "" && opts.IO.CanPrompt() && !opts.ConfirmSubmit {
@@ -426,6 +440,11 @@ func createRun(opts *CreateOptions) error {
 		return nil
 	}
 	fmt.Fprintln(opts.IO.Out, "Discarding...")
+	return nil
+}
+
+func stackFlow(opts *CreateOptions) error {
+	fmt.Printf("DBG %#v\n", opts)
 	return nil
 }
 
