@@ -75,7 +75,7 @@ func TestClientJoin(t *testing.T) {
 		livesharetest.WithRelaySAS(connection.RelaySAS),
 	)
 	if err != nil {
-		t.Errorf("error creating liveshare server: %v", err)
+		t.Errorf("error creating Live Share server: %v", err)
 	}
 	defer server.Close()
 	connection.RelayEndpoint = "sb" + strings.TrimPrefix(server.URL(), "https")
