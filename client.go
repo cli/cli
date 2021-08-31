@@ -64,7 +64,7 @@ func (c *Client) Join(ctx context.Context) (err error) {
 		return fmt.Errorf("error connecting to ssh session: %v", err)
 	}
 
-	c.rpc = newRpcClient(c.ssh)
+	c.rpc = newRPCClient(c.ssh)
 	c.rpc.connect(ctx)
 
 	_, err = c.joinWorkspace(ctx)

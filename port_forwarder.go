@@ -48,10 +48,9 @@ func (l *PortForwarder) Start(ctx context.Context) error {
 	case err := <-l.errCh:
 		return err
 	case <-ctx.Done():
+		// TODO ctx.Error?
 		return ln.Close()
 	}
-
-	return nil
 }
 
 func (l *PortForwarder) StartWithConn(ctx context.Context, conn io.ReadWriteCloser) error {
