@@ -2,6 +2,7 @@ package codespaces
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -14,7 +15,7 @@ import (
 	"github.com/github/go-liveshare"
 )
 
-func MakeSSHTunnel(ctx context.Context, lsclient *liveshare.Client, serverPort int) (int, <-chan error, error) {
+func MakeSSHTunnel(ctx context.Context, lsclient *liveshare.Client, localSSHPort int, remoteSSHPort int) (int, <-chan error, error) {
 	tunnelClosed := make(chan error)
 
 	server, err := liveshare.NewServer(lsclient)
@@ -24,12 +25,11 @@ func MakeSSHTunnel(ctx context.Context, lsclient *liveshare.Client, serverPort i
 
 	rand.Seed(time.Now().Unix())
 	port := rand.Intn(9999-2000) + 2000 // improve this obviously
-	if serverPort != 0 {
-		port = serverPort
+	if localSSHPort != 0 {
+		port = localSSHPort
 	}
 
-	// TODO(josebalius): This port won't always be 2222
-	if err := server.StartSharing(ctx, "sshd", 2222); err != nil {
+	if err := server.StartSharing(ctx, "sshd", remoteSSHPort); err != nil {
 		return 0, nil, fmt.Errorf("sharing sshd port: %v", err)
 	}
 
@@ -43,6 +43,33 @@ func MakeSSHTunnel(ctx context.Context, lsclient *liveshare.Client, serverPort i
 	}()
 
 	return port, tunnelClosed, nil
+}
+
+// StartSSHServer installs (if necessary) and starts the SSH in the codespace.
+// It returns the remote port where it is running, the user to log in with, or an error if something failed.
+func StartSSHServer(ctx context.Context, client *liveshare.Client, log logger) (serverPort int, user string, err error) {
+	log.Println("Fetching SSH details...")
+
+	sshServer, err := liveshare.NewSSHServer(client)
+	if err != nil {
+		return 0, "", fmt.Errorf("error creating live share: %v", err)
+	}
+
+	sshServerStartResult, err := sshServer.StartRemoteServer(ctx)
+	if err != nil {
+		return 0, "", fmt.Errorf("error starting live share: %v", err)
+	}
+
+	if !sshServerStartResult.Result {
+		return 0, "", errors.New(sshServerStartResult.Message)
+	}
+
+	portInt, err := strconv.Atoi(sshServerStartResult.ServerPort)
+	if err != nil {
+		return 0, "", fmt.Errorf("error parsing port: %v", err)
+	}
+
+	return portInt, sshServerStartResult.User, nil
 }
 
 func makeSSHArgs(port int, dst, cmd string) ([]string, []string) {

@@ -58,6 +58,11 @@ func ssh(sshProfile, codespaceName string, sshServerPort int) error {
 		return fmt.Errorf("error connecting to liveshare: %v", err)
 	}
 
+	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, lsclient, log)
+	if err != nil {
+		return fmt.Errorf("error getting ssh server details: %v", err)
+	}
+
 	terminal, err := liveshare.NewTerminal(lsclient)
 	if err != nil {
 		return fmt.Errorf("error creating liveshare terminal: %v", err)
@@ -70,20 +75,20 @@ func ssh(sshProfile, codespaceName string, sshServerPort int) error {
 			return fmt.Errorf("error getting container id: %v", err)
 		}
 
-		if err := setupSSH(ctx, log, terminal, containerID, codespace.RepositoryName); err != nil {
+		if err := setupEnv(ctx, log, terminal, containerID, codespace.RepositoryName, sshUser); err != nil {
 			return fmt.Errorf("error creating ssh server: %v", err)
 		}
 	}
 	log.Print("\n")
 
-	tunnelPort, tunnelClosed, err := codespaces.MakeSSHTunnel(ctx, lsclient, sshServerPort)
+	tunnelPort, tunnelClosed, err := codespaces.MakeSSHTunnel(ctx, lsclient, sshServerPort, remoteSSHServerPort)
 	if err != nil {
 		return fmt.Errorf("make ssh tunnel: %v", err)
 	}
 
 	connectDestination := sshProfile
 	if connectDestination == "" {
-		connectDestination = fmt.Sprintf("%s@localhost", getSSHUser(codespace))
+		connectDestination = fmt.Sprintf("%s@localhost", sshUser)
 	}
 
 	usingCustomPort := tunnelPort == sshServerPort
@@ -135,8 +140,8 @@ func getContainerID(ctx context.Context, logger *output.Logger, terminal *livesh
 	return containerID, nil
 }
 
-func setupSSH(ctx context.Context, logger *output.Logger, terminal *liveshare.Terminal, containerID, repositoryName string) error {
-	setupBashProfileCmd := fmt.Sprintf(`echo "cd /workspaces/%v; export $(cat /workspaces/.codespaces/shared/.env | xargs); exec /bin/zsh;" > /home/codespace/.bash_profile`, repositoryName)
+func setupEnv(ctx context.Context, logger *output.Logger, terminal *liveshare.Terminal, containerID, repositoryName, containerUser string) error {
+	setupBashProfileCmd := fmt.Sprintf(`echo "cd /workspaces/%v; export $(cat /workspaces/.codespaces/shared/.env | xargs); exec /bin/zsh;" > /home/%v/.bash_profile`, repositoryName, containerUser)
 
 	logger.Print(".")
 	compositeCommand := []string{setupBashProfileCmd}
@@ -155,11 +160,4 @@ func setupSSH(ctx context.Context, logger *output.Logger, terminal *liveshare.Te
 	}
 
 	return nil
-}
-
-func getSSHUser(codespace *api.Codespace) string {
-	if codespace.RepositoryNWO == "github/github" {
-		return "root"
-	}
-	return "codespace"
 }
