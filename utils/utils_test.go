@@ -3,6 +3,8 @@ package utils
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFuzzyAgo(t *testing.T) {
@@ -60,4 +62,9 @@ func TestFuzzyAgoAbbr(t *testing.T) {
 			t.Errorf("unexpected fuzzy duration abbr value: %s for %s", fuzzy, createdAt)
 		}
 	}
+}
+
+func TestHas(t *testing.T) {
+	assert.True(t, Has("foo", []string{"foo", "bar"}))
+	assert.False(t, Has("zing", []string{"foo", "bar"}))
 }
