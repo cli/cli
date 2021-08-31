@@ -24,7 +24,7 @@ func newSSHCmd() *cobra.Command {
 		Short: "SSH into a Codespace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return ssh(sshProfile, codespaceName, sshServerPort)
+			return ssh(context.Background(), sshProfile, codespaceName, sshServerPort)
 		},
 	}
 
@@ -39,9 +39,12 @@ func init() {
 	rootCmd.AddCommand(newSSHCmd())
 }
 
-func ssh(sshProfile, codespaceName string, sshServerPort int) error {
+func ssh(ctx context.Context, sshProfile, codespaceName string, sshServerPort int) error {
+	// Ensure all child tasks (e.g. port forwarding) terminate before return.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
-	ctx := context.Background()
 	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	user, err := apiClient.GetUser(ctx)

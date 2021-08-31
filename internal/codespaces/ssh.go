@@ -8,21 +8,19 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/github/go-liveshare"
 )
 
-// StartPortForwarding starts LiveShare port forwarding of traffic of
-// the specified protocol (e.g. "sshd") between the LiveShare client
-// and the specified local port, or, if zero, a port chosen at random;
-// the effective port number is returned.  Forwarding continues in the
-// background until an error is encountered (including cancellation of
-// the context). Therefore clients must cancel the context
+// StartPortForwarding starts LiveShare port forwarding of traffic
+// between the LiveShare client and the specified local port, or, if
+// zero, a port chosen at random; the effective port number is
+// returned.  Forwarding continues in the background until an error is
+// encountered (including cancellation of the context). Therefore
+// clients must cancel the context.
 //
-// REVIEWERS: where is the set of legal values of protocol defined?
-// It appears to be: "whatever is supported by the LiveShare service's
-// serverSharing.startSharing method". Where is that defined?
+// The session name is used (along with the port) to generate
+// names for streams, and may appear in error messages.
 //
 // TODO(adonovan): simplify API concurrency from API. Either:
 // 1) return a stop function so that clients don't forget to stop forwarding.
@@ -34,22 +32,19 @@ import (
 //    and has NewRemoteCommand as a method. It will need a Stop method,
 //    and an Error method for querying whether the session has failed
 //    asynchronously.
-func StartPortForwarding(ctx context.Context, lsclient *liveshare.Client, protocol string, localPort int) (int, <-chan error, error) {
+func StartPortForwarding(ctx context.Context, lsclient *liveshare.Client, sessionName string, localPort int) (int, <-chan error, error) {
 	server, err := liveshare.NewServer(lsclient)
 	if err != nil {
 		return 0, nil, fmt.Errorf("new liveshare server: %v", err)
 	}
 
 	if localPort == 0 {
-		// improve this obviously
-		// REVIEWERS: any reason not to use the global PRNG?
-		rng := rand.New(rand.NewSource(time.Now().Unix()))
-		localPort = rng.Intn(9999-2000) + 2000
-		// TODO(adonovan): loop if port is taken?
+		localPort = rand.Intn(9999-2000) + 2000
+		// TODO(adonovan): retry if port is taken?
 	}
 
 	// TODO(josebalius): This port won't always be 2222
-	if err := server.StartSharing(ctx, protocol, 2222); err != nil {
+	if err := server.StartSharing(ctx, sessionName, 2222); err != nil {
 		return 0, nil, fmt.Errorf("sharing sshd port: %v", err)
 	}
 
@@ -90,8 +85,11 @@ func NewRemoteCommand(ctx context.Context, tunnelPort int, destination, command 
 	return cmd
 }
 
+// newSSHCommand populates an exec.Cmd to run a command (or if blank,
+// an interactive shell) over ssh.
 func newSSHCommand(ctx context.Context, port int, dst, command string) (*exec.Cmd, []string) {
 	connArgs := []string{"-p", strconv.Itoa(port), "-o", "NoHostAuthenticationForLocalhost=yes"}
+	// TODO(adonovan): eliminate X11 and X11Trust flags where unneeded.
 	cmdArgs := append([]string{dst, "-X", "-Y", "-C"}, connArgs...) // X11, X11Trust, Compression
 
 	// An empty command enables port forwarding but not execution.
