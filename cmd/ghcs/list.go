@@ -46,7 +46,7 @@ func list(opts *listOptions) error {
 
 	codespaces, err := apiClient.ListCodespaces(ctx, user)
 	if err != nil {
-		return fmt.Errorf("error getting codespaces: %v", err)
+		return fmt.Errorf("error getting Codespaces: %v", err)
 	}
 
 	table := output.NewTable(os.Stdout, opts.asJSON)

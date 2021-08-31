@@ -52,7 +52,7 @@ func code(codespaceName string, useInsiders bool) error {
 			if err == codespaces.ErrNoCodespaces {
 				return err
 			}
-			return fmt.Errorf("error choosing codespace: %v", err)
+			return fmt.Errorf("error choosing Codespace: %v", err)
 		}
 		codespaceName = codespace.Name
 	}

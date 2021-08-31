@@ -37,12 +37,12 @@ type PostCreateState struct {
 func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, user *api.User, codespace *api.Codespace, poller func([]PostCreateState)) error {
 	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespace.Name)
 	if err != nil {
-		return fmt.Errorf("getting codespace token: %v", err)
+		return fmt.Errorf("getting Codespace token: %v", err)
 	}
 
 	lsclient, err := ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
-		return fmt.Errorf("connect to liveshare: %v", err)
+		return fmt.Errorf("connect to Live Share: %v", err)
 	}
 
 	tunnelPort, connClosed, err := MakeSSHTunnel(ctx, lsclient, 0)

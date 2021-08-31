@@ -13,13 +13,13 @@ import (
 )
 
 var (
-	ErrNoCodespaces = errors.New("You have no codespaces.")
+	ErrNoCodespaces = errors.New("You have no Codespaces.")
 )
 
 func ChooseCodespace(ctx context.Context, apiClient *api.API, user *api.User) (*api.Codespace, error) {
 	codespaces, err := apiClient.ListCodespaces(ctx, user)
 	if err != nil {
-		return nil, fmt.Errorf("error getting codespaces: %v", err)
+		return nil, fmt.Errorf("error getting Codespaces: %v", err)
 	}
 
 	if len(codespaces) == 0 {
@@ -77,9 +77,9 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 	var startedCodespace bool
 	if codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
 		startedCodespace = true
-		log.Print("Starting your codespace...")
+		log.Print("Starting your Codespace...")
 		if err := apiClient.StartCodespace(ctx, token, codespace); err != nil {
-			return nil, fmt.Errorf("error starting codespace: %v", err)
+			return nil, fmt.Errorf("error starting Codespace: %v", err)
 		}
 	}
 
@@ -93,12 +93,12 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 		}
 
 		if retries == 30 {
-			return nil, errors.New("timed out while waiting for the codespace to start")
+			return nil, errors.New("timed out while waiting for the Codespace to start")
 		}
 
 		codespace, err = apiClient.GetCodespace(ctx, token, userLogin, codespace.Name)
 		if err != nil {
-			return nil, fmt.Errorf("error getting codespace: %v", err)
+			return nil, fmt.Errorf("error getting Codespace: %v", err)
 		}
 	}
 
@@ -106,7 +106,7 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 		fmt.Print("\n")
 	}
 
-	log.Println("Connecting to your codespace...")
+	log.Println("Connecting to your Codespace...")
 
 	lsclient, err := liveshare.NewClient(
 		liveshare.WithConnection(liveshare.Connection{
@@ -117,11 +117,11 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 		}),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error creating live share: %v", err)
+		return nil, fmt.Errorf("error creating Live Share: %v", err)
 	}
 
 	if err := lsclient.Join(ctx); err != nil {
-		return nil, fmt.Errorf("error joining liveshare client: %v", err)
+		return nil, fmt.Errorf("error joining Live Share client: %v", err)
 	}
 
 	return lsclient, nil
@@ -134,23 +134,23 @@ func GetOrChooseCodespace(ctx context.Context, apiClient *api.API, user *api.Use
 			if err == ErrNoCodespaces {
 				return nil, "", err
 			}
-			return nil, "", fmt.Errorf("choosing codespace: %v", err)
+			return nil, "", fmt.Errorf("choosing Codespace: %v", err)
 		}
 		codespaceName = codespace.Name
 
 		token, err = apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
 		if err != nil {
-			return nil, "", fmt.Errorf("getting codespace token: %v", err)
+			return nil, "", fmt.Errorf("getting Codespace token: %v", err)
 		}
 	} else {
 		token, err = apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
 		if err != nil {
-			return nil, "", fmt.Errorf("getting codespace token for given codespace: %v", err)
+			return nil, "", fmt.Errorf("getting Codespace token for given codespace: %v", err)
 		}
 
 		codespace, err = apiClient.GetCodespace(ctx, token, user.Login, codespaceName)
 		if err != nil {
-			return nil, "", fmt.Errorf("getting full codespace details: %v", err)
+			return nil, "", fmt.Errorf("getting full Codespace details: %v", err)
 		}
 	}
 
