@@ -33,45 +33,36 @@ func (r *rpcClient) do(ctx context.Context, method string, args, result interfac
 	return waiter.Wait(ctx, result)
 }
 
+type rpcHandlerFunc = func(*jsonrpc2.Request)
+
 type rpcHandler struct {
-	mutex         sync.Mutex
-	eventHandlers map[string][]chan *jsonrpc2.Request
+	handlersMu sync.Mutex
+	handlers   map[string][]rpcHandlerFunc
 }
 
 func newRPCHandler() *rpcHandler {
 	return &rpcHandler{
-		eventHandlers: make(map[string][]chan *jsonrpc2.Request),
+		handlers: make(map[string][]rpcHandlerFunc),
 	}
 }
 
-// TODO: document obligations around chan. It appears to be used for at most one request.
-func (r *rpcHandler) registerEventHandler(eventMethod string) <-chan *jsonrpc2.Request {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	ch := make(chan *jsonrpc2.Request)
-	r.eventHandlers[eventMethod] = append(r.eventHandlers[eventMethod], ch)
-	return ch
+// registerEventHandler registers a handler for the specified event.
+// After the next occurrence of the event, the handler will be called,
+// once, in its own goroutine.
+func (r *rpcHandler) registerEventHandler(eventMethod string, h rpcHandlerFunc) {
+	r.handlersMu.Lock()
+	r.handlers[eventMethod] = append(r.handlers[eventMethod], h)
+	r.handlersMu.Unlock()
 }
 
+// Handle calls all registered handlers for the request, concurrently, each in its own goroutine.
 func (r *rpcHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
-	r.mutex.Lock()
-	handlers := r.eventHandlers[req.Method]
-	r.eventHandlers[req.Method] = nil
-	r.mutex.Unlock()
+	r.handlersMu.Lock()
+	handlers := r.handlers[req.Method]
+	r.handlers[req.Method] = nil
+	r.handlersMu.Unlock()
 
-	if len(handlers) > 0 {
-		go func() {
-			// Broadcast the request to each handler in sequence.
-			// TODO rethink this. needs function call.
-			for _, handler := range handlers {
-				select {
-				case handler <- req:
-				case <-ctx.Done():
-					// TODO: ctx.Err
-					break
-				}
-			}
-		}()
+	for _, h := range handlers {
+		go h(req)
 	}
 }
