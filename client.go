@@ -69,7 +69,7 @@ func (c *Client) Join(ctx context.Context) (err error) {
 
 	_, err = c.joinWorkspace(ctx)
 	if err != nil {
-		return fmt.Errorf("error joining liveshare workspace: %v", err)
+		return fmt.Errorf("error joining Live Share workspace: %v", err)
 	}
 
 	return nil

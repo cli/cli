@@ -64,10 +64,7 @@ func TestPortForwarderStart(t *testing.T) {
 		if err := server.StartSharing(ctx, "http", 8000); err != nil {
 			done <- fmt.Errorf("start sharing: %v", err)
 		}
-		if err := pf.Start(ctx); err != nil {
-			done <- err
-		}
-		done <- nil
+		done <- pf.Forward(ctx)
 	}()
 
 	go func() {
