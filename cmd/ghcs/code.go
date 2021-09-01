@@ -17,7 +17,7 @@ func newCodeCmd() *cobra.Command {
 
 	codeCmd := &cobra.Command{
 		Use:   "code [<codespace>]",
-		Short: "Open a Codespace in VS Code",
+		Short: "Open a codespace in VS Code",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var codespaceName string
@@ -52,14 +52,14 @@ func code(codespaceName string, useInsiders bool) error {
 			if err == codespaces.ErrNoCodespaces {
 				return err
 			}
-			return fmt.Errorf("error choosing Codespace: %v", err)
+			return fmt.Errorf("error choosing codespace: %v", err)
 		}
 		codespaceName = codespace.Name
 	}
 
 	url := vscodeProtocolURL(codespaceName, useInsiders)
 	if err := open.Run(url); err != nil {
-		return fmt.Errorf("error opening vscode URL %s: %s. (Is VSCode installed?)", url, err)
+		return fmt.Errorf("error opening vscode URL %s: %s. (Is VS Code installed?)", url, err)
 	}
 
 	return nil

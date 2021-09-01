@@ -27,7 +27,7 @@ func newCreateCmd() *cobra.Command {
 
 	createCmd := &cobra.Command{
 		Use:   "create",
-		Short: "Create a Codespace",
+		Short: "Create a codespace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return create(opts)
@@ -69,12 +69,12 @@ func create(opts *createOptions) error {
 
 	locationResult := <-locationCh
 	if locationResult.Err != nil {
-		return fmt.Errorf("error getting Codespace region location: %v", locationResult.Err)
+		return fmt.Errorf("error getting codespace region location: %v", locationResult.Err)
 	}
 
 	userResult := <-userCh
 	if userResult.Err != nil {
-		return fmt.Errorf("error getting Codespace user: %v", userResult.Err)
+		return fmt.Errorf("error getting codespace user: %v", userResult.Err)
 	}
 
 	machine, err := getMachineName(ctx, opts.machine, userResult.User, repository, branch, locationResult.Location, apiClient)
@@ -85,11 +85,11 @@ func create(opts *createOptions) error {
 		return errors.New("There are no available machine types for this repository")
 	}
 
-	log.Println("Creating your Codespace...")
+	log.Println("Creating your codespace...")
 
 	codespace, err := apiClient.CreateCodespace(ctx, userResult.User, repository, machine, branch, locationResult.Location)
 	if err != nil {
-		return fmt.Errorf("error creating Codespace: %v", err)
+		return fmt.Errorf("error creating codespace: %v", err)
 	}
 
 	if opts.showStatus {
@@ -154,7 +154,7 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient *api.API, use
 	}
 
 	if err := codespaces.PollPostCreateStates(ctx, log, apiClient, user, codespace, poller); err != nil {
-		return fmt.Errorf("failed to poll state changes from Codespace: %v", err)
+		return fmt.Errorf("failed to poll state changes from codespace: %v", err)
 	}
 
 	return nil
@@ -228,7 +228,7 @@ func getBranchName(branch string) (string, error) {
 func getMachineName(ctx context.Context, machine string, user *api.User, repo *api.Repository, branch, location string, apiClient *api.API) (string, error) {
 	skus, err := apiClient.GetCodespacesSKUs(ctx, user, repo, branch, location)
 	if err != nil {
-		return "", fmt.Errorf("error getting Codespace SKUs: %v", err)
+		return "", fmt.Errorf("error getting codespace SKUs: %v", err)
 	}
 
 	// if user supplied a machine type, it must be valid

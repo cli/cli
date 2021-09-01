@@ -282,7 +282,7 @@ func (a *API) StartCodespace(ctx context.Context, token string, codespace *Codes
 			// HTTP 503 with error code 7 (EnvironmentNotShutdown) is benign.
 			// Ignore it.
 		} else {
-			return fmt.Errorf("failed to start Codespace: %s", b)
+			return fmt.Errorf("failed to start codespace: %s", b)
 		}
 	}
 
