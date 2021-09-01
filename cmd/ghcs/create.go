@@ -77,7 +77,7 @@ func create(opts *createOptions) error {
 		return fmt.Errorf("error getting Codespace user: %v", userResult.Err)
 	}
 
-	machine, err := getMachineName(ctx, opts.machine, userResult.User, repository, locationResult.Location, apiClient)
+	machine, err := getMachineName(ctx, opts.machine, userResult.User, repository, branch, locationResult.Location, apiClient)
 	if err != nil {
 		return fmt.Errorf("error getting machine type: %v", err)
 	}
@@ -225,8 +225,8 @@ func getBranchName(branch string) (string, error) {
 }
 
 // getMachineName prompts the user to select the machine type, or validates the machine if non-empty.
-func getMachineName(ctx context.Context, machine string, user *api.User, repo *api.Repository, location string, apiClient *api.API) (string, error) {
-	skus, err := apiClient.GetCodespacesSKUs(ctx, user, repo, location)
+func getMachineName(ctx context.Context, machine string, user *api.User, repo *api.Repository, branch, location string, apiClient *api.API) (string, error) {
+	skus, err := apiClient.GetCodespacesSKUs(ctx, user, repo, branch, location)
 	if err != nil {
 		return "", fmt.Errorf("error getting Codespace SKUs: %v", err)
 	}
@@ -248,6 +248,10 @@ func getMachineName(ctx context.Context, machine string, user *api.User, repo *a
 		return "", fmt.Errorf("there is no such machine for the repository: %s\nAvailable machines: %v", machine, availableSKUs)
 	} else if len(skus) == 0 {
 		return "", nil
+	}
+
+	if len(skus) == 1 {
+		return skus[0].Name, nil // VS Code does not prompt for SKU if there is only one, this makes us consistent with that behavior
 	}
 
 	skuNames := make([]string, 0, len(skus))
