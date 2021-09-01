@@ -307,7 +307,7 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 		g.Go(func() error {
 			log.Println("Forwarding port: " + srcstr + " ==> " + strconv.Itoa(pp.dst))
 			portForwarder := liveshare.NewPortForwarder(lsclient, server, pp.dst)
-			if err := portForwarder.Start(gctx); err != nil {
+			if err := portForwarder.Forward(gctx); err != nil {
 				return fmt.Errorf("error forwarding port: %v", err)
 			}
 

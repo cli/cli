@@ -105,7 +105,7 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 
 	tunnelClosed := make(chan error)
 	go func() {
-		tunnelClosed <- tunnel.Start(ctx) // error is always non-nil
+		tunnelClosed <- tunnel.Forward(ctx) // error is always non-nil
 	}()
 
 	shellClosed := make(chan error)

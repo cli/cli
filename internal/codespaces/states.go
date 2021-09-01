@@ -62,7 +62,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 
 	tunnelClosed := make(chan error, 1) // buffered to avoid sender stuckness
 	go func() {
-		tunnelClosed <- fwd.Start(ctx) // error is non-nil
+		tunnelClosed <- fwd.Forward(ctx) // error is non-nil
 	}()
 
 	t := time.NewTicker(1 * time.Second)
