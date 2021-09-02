@@ -27,9 +27,9 @@ func NewPortForwarder(session *Session, name string, remotePort int) *PortForwar
 }
 
 // ForwardToLocalPort forwards traffic between the container's remote
-// port and a local TCP port.  It accepts and handles TCP connections
-// on the local until it encounters the first error, which may include
-// context cancellation. Its result is non-nil.
+// port and a local TCP port.  It accepts and handles connections on
+// the local port until it encounters the first error, which may
+// include context cancellation. Its error result is always non-nil.
 func (fwd *PortForwarder) ForwardToLocalPort(ctx context.Context, localPort int) (err error) {
 	id, err := fwd.shareRemotePort(ctx)
 	if err != nil {
