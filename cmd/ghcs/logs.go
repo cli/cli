@@ -88,7 +88,7 @@ func logs(ctx context.Context, tail bool, codespaceName string) error {
 
 	tunnelClosed := make(chan error, 1)
 	go func() {
-		tunnelClosed <- tunnel.Start(ctx) // error is non-nil
+		tunnelClosed <- tunnel.Forward(ctx) // error is non-nil
 	}()
 
 	cmdDone := make(chan error, 1)
