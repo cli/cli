@@ -20,7 +20,7 @@ func TestNewPortForwarder(t *testing.T) {
 		t.Errorf("create mock client: %v", err)
 	}
 	defer testServer.Close()
-	pf := NewPortForwarder(session, "ssh", 81, 80)
+	pf := NewPortForwarder(session, "ssh", 80)
 	if pf == nil {
 		t.Error("port forwarder is nil")
 	}
@@ -52,7 +52,7 @@ func TestPortForwarderStart(t *testing.T) {
 	done := make(chan error)
 	go func() {
 		const name, local, remote = "ssh", 8000, 8000
-		done <- NewPortForwarder(session, name, local, remote).Forward(ctx)
+		done <- NewPortForwarder(session, name, remote).ForwardToLocalPort(ctx, local)
 	}()
 
 	go func() {

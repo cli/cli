@@ -7,42 +7,36 @@ import (
 	"net"
 )
 
-// A PortForwarder forwards TCP traffic between a local TCP port and a LiveShare session.
+// A PortForwarder forwards TCP traffic over a LiveShare session from a port on a remote
+// container to a local destination such as a network port or Go reader/writer.
 type PortForwarder struct {
-	session               *Session
-	name                  string
-	localPort, remotePort int
+	session    *Session
+	name       string
+	remotePort int
 }
 
-// NewPortForwarder creates a new PortForwarder that forwards traffic
-// between the local port and the container's remote port over the
-// specified Live Share session. The name describes the purpose of the
-// remote port or service.
-//
-// TODO(adonovan): the localPort param is redundant wrt ForwardWithConn.
-// Simpler: do away with the NewPortForwarder type altogether:
-//
-// - ForwardToLocalPort(ctx, session, name, remote, local)
-// - ForwardToConnection(ctx, session, name, remote, conn)
-func NewPortForwarder(session *Session, name string, localPort, remotePort int) *PortForwarder {
+// NewPortForwarder returns a new PortForwarder for the specified
+// remote port and Live Share session. The name describes the purpose
+// of the remote port or service.
+func NewPortForwarder(session *Session, name string, remotePort int) *PortForwarder {
 	return &PortForwarder{
 		session:    session,
 		name:       name,
-		localPort:  localPort,
 		remotePort: remotePort,
 	}
 }
 
-// Forward enables port forwarding. It accepts and handles TCP
-// connections until it encounters the first error, which may include
+// ForwardToLocalPort forwards traffic between the container's remote
+// port and a local TCP port.  It accepts and handles TCP connections
+// on the local until it encounters the first error, which may include
 // context cancellation. Its result is non-nil.
-func (fwd *PortForwarder) Forward(ctx context.Context) (err error) {
+func (fwd *PortForwarder) ForwardToLocalPort(ctx context.Context, localPort int) (err error) {
 	id, err := fwd.shareRemotePort(ctx)
 	if err != nil {
 		return err
 	}
 
-	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", fwd.localPort))
+	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", localPort))
 	if err != nil {
 		return fmt.Errorf("error listening on TCP port: %v", err)
 	}
@@ -76,8 +70,9 @@ func (fwd *PortForwarder) Forward(ctx context.Context) (err error) {
 	return awaitError(ctx, errc)
 }
 
-// ForwardWithConn handles port forwarding for a single connection.
-func (fwd *PortForwarder) ForwardWithConn(ctx context.Context, conn io.ReadWriteCloser) error {
+// Forward forwards traffic between the container's remote port and
+// the specified read/write stream. On return, the stream is closed.
+func (fwd *PortForwarder) Forward(ctx context.Context, conn io.ReadWriteCloser) error {
 	id, err := fwd.shareRemotePort(ctx)
 	if err != nil {
 		conn.Close()
