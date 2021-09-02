@@ -13,17 +13,7 @@ import (
 	"github.com/sourcegraph/jsonrpc2"
 )
 
-func TestNewServerWithNotJoinedClient(t *testing.T) {
-	client, err := NewClient()
-	if err != nil {
-		t.Errorf("error creating new client: %v", err)
-	}
-	if _, err := NewServer(client); err == nil {
-		t.Error("expected error")
-	}
-}
-
-func makeMockJoinedClient(opts ...livesharetest.ServerOption) (*livesharetest.Server, *Client, error) {
+func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server, *Session, error) {
 	connection := Connection{
 		SessionID:    "session-id",
 		SessionToken: "session-token",
@@ -47,25 +37,11 @@ func makeMockJoinedClient(opts ...livesharetest.ServerOption) (*livesharetest.Se
 		return nil, nil, fmt.Errorf("error creating new client: %v", err)
 	}
 	ctx := context.Background()
-	if err := client.Join(ctx); err != nil {
-		return nil, nil, fmt.Errorf("error joining client: %v", err)
-	}
-	return testServer, client, nil
-}
-
-func TestNewServer(t *testing.T) {
-	testServer, client, err := makeMockJoinedClient()
-	defer testServer.Close()
+	session, err := client.JoinWorkspace(ctx)
 	if err != nil {
-		t.Errorf("error creating mock joined client: %v", err)
+		return nil, nil, fmt.Errorf("error joining workspace: %v", err)
 	}
-	server, err := NewServer(client)
-	if err != nil {
-		t.Errorf("error creating new server: %v", err)
-	}
-	if server == nil {
-		t.Error("server is nil")
-	}
+	return testServer, session, nil
 }
 
 func TestServerStartSharing(t *testing.T) {
@@ -95,25 +71,21 @@ func TestServerStartSharing(t *testing.T) {
 		}
 		return Port{StreamName: "stream-name", StreamCondition: "stream-condition"}, nil
 	}
-	testServer, client, err := makeMockJoinedClient(
+	testServer, session, err := makeMockSession(
 		livesharetest.WithService("serverSharing.startSharing", startSharing),
 	)
 	defer testServer.Close()
 	if err != nil {
-		t.Errorf("error creating mock joined client: %v", err)
-	}
-	server, err := NewServer(client)
-	if err != nil {
-		t.Errorf("error creating new server: %v", err)
+		t.Errorf("error creating mock session: %v", err)
 	}
 	ctx := context.Background()
 
 	done := make(chan error)
 	go func() {
-		if err := server.StartSharing(ctx, serverProtocol, serverPort); err != nil {
+		if err := session.StartSharing(ctx, serverProtocol, serverPort); err != nil {
 			done <- fmt.Errorf("error sharing server: %v", err)
 		}
-		if server.streamName == "" || server.streamCondition == "" {
+		if session.streamName == "" || session.streamCondition == "" {
 			done <- errors.New("stream name or condition is blank")
 		}
 		done <- nil
@@ -136,23 +108,19 @@ func TestServerGetSharedServers(t *testing.T) {
 		StreamCondition: "stream-condition",
 	}
 	getSharedServers := func(req *jsonrpc2.Request) (interface{}, error) {
-		return Ports{&sharedServer}, nil
+		return []*Port{&sharedServer}, nil
 	}
-	testServer, client, err := makeMockJoinedClient(
+	testServer, session, err := makeMockSession(
 		livesharetest.WithService("serverSharing.getSharedServers", getSharedServers),
 	)
 	if err != nil {
-		t.Errorf("error creating new mock client: %v", err)
+		t.Errorf("error creating mock session: %v", err)
 	}
 	defer testServer.Close()
-	server, err := NewServer(client)
-	if err != nil {
-		t.Errorf("error creating new server: %v", err)
-	}
 	ctx := context.Background()
 	done := make(chan error)
 	go func() {
-		ports, err := server.GetSharedServers(ctx)
+		ports, err := session.GetSharedServers(ctx)
 		if err != nil {
 			done <- fmt.Errorf("error getting shared servers: %v", err)
 		}
@@ -206,25 +174,17 @@ func TestServerUpdateSharedVisibility(t *testing.T) {
 		}
 		return nil, nil
 	}
-	testServer, client, err := makeMockJoinedClient(
+	testServer, session, err := makeMockSession(
 		livesharetest.WithService("serverSharing.updateSharedServerVisibility", updateSharedVisibility),
 	)
 	if err != nil {
-		t.Errorf("creating new mock client: %v", err)
+		t.Errorf("creating mock session: %v", err)
 	}
 	defer testServer.Close()
-	server, err := NewServer(client)
-	if err != nil {
-		t.Errorf("creating server: %v", err)
-	}
 	ctx := context.Background()
 	done := make(chan error)
 	go func() {
-		if err := server.UpdateSharedVisibility(ctx, 80, true); err != nil {
-			done <- err
-			return
-		}
-		done <- nil
+		done <- session.UpdateSharedVisibility(ctx, 80, true)
 	}()
 	select {
 	case err := <-testServer.Err():

@@ -2,7 +2,6 @@ package liveshare
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 
@@ -10,17 +9,11 @@ import (
 )
 
 type Terminal struct {
-	client *Client
+	session *Session
 }
 
-func NewTerminal(client *Client) (*Terminal, error) {
-	if !client.hasJoined() {
-		return nil, errors.New("client must join before creating terminal")
-	}
-
-	return &Terminal{
-		client: client,
-	}, nil
+func NewTerminal(session *Session) *Terminal {
+	return &Terminal{session: session}
 }
 
 type TerminalCommand struct {
@@ -71,14 +64,14 @@ func (t TerminalCommand) Run(ctx context.Context) (io.ReadCloser, error) {
 		ReadOnlyForGuests: false,
 	}
 
-	terminalStarted := t.terminal.client.rpc.handler.registerEventHandler("terminal.terminalStarted")
+	terminalStarted := t.terminal.session.rpc.handler.registerEventHandler("terminal.terminalStarted")
 	var result startTerminalResult
-	if err := t.terminal.client.rpc.do(ctx, "terminal.startTerminal", &args, &result); err != nil {
+	if err := t.terminal.session.rpc.do(ctx, "terminal.startTerminal", &args, &result); err != nil {
 		return nil, fmt.Errorf("error making terminal.startTerminal call: %v", err)
 	}
 	<-terminalStarted
 
-	channel, err := t.terminal.client.openStreamingChannel(ctx, result.StreamName, result.StreamCondition)
+	channel, err := t.terminal.session.openStreamingChannel(ctx, result.StreamName, result.StreamCondition)
 	if err != nil {
 		return nil, fmt.Errorf("error opening streaming channel: %v", err)
 	}
@@ -101,8 +94,8 @@ func (t terminalReadCloser) Read(b []byte) (int, error) {
 }
 
 func (t terminalReadCloser) Close() error {
-	terminalStopped := t.terminalCommand.terminal.client.rpc.handler.registerEventHandler("terminal.terminalStopped")
-	if err := t.terminalCommand.terminal.client.rpc.do(context.Background(), "terminal.stopTerminal", []int{t.terminalID}, nil); err != nil {
+	terminalStopped := t.terminalCommand.terminal.session.rpc.handler.registerEventHandler("terminal.terminalStopped")
+	if err := t.terminalCommand.terminal.session.rpc.do(context.Background(), "terminal.stopTerminal", []int{t.terminalID}, nil); err != nil {
 		return fmt.Errorf("error making terminal.stopTerminal call: %v", err)
 	}
 

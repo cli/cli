@@ -2,25 +2,16 @@ package liveshare
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 )
 
-// A Server represents the liveshare host and container server
-type Server struct {
-	client                      *Client
+// A Session represents the session between a connected Live Share client and server.
+type Session struct {
+	ssh                         *sshSession
+	rpc                         *rpcClient
 	port                        int
 	streamName, streamCondition string
-}
-
-// NewServer creates a new Server with a given Client
-func NewServer(client *Client) (*Server, error) {
-	if !client.hasJoined() {
-		return nil, errors.New("client must join before creating server")
-	}
-
-	return &Server{client: client}, nil
 }
 
 // Port represents an open port on the container
@@ -37,11 +28,11 @@ type Port struct {
 }
 
 // StartSharing tells the liveshare host to start sharing the port from the container
-func (s *Server) StartSharing(ctx context.Context, protocol string, port int) error {
+func (s *Session) StartSharing(ctx context.Context, protocol string, port int) error {
 	s.port = port
 
 	var response Port
-	if err := s.client.rpc.do(ctx, "serverSharing.startSharing", []interface{}{
+	if err := s.rpc.do(ctx, "serverSharing.startSharing", []interface{}{
 		port, protocol, fmt.Sprintf("http://localhost:%s", strconv.Itoa(port)),
 	}, &response); err != nil {
 		return err
@@ -53,13 +44,10 @@ func (s *Server) StartSharing(ctx context.Context, protocol string, port int) er
 	return nil
 }
 
-// Ports is a slice of Port pointers
-type Ports []*Port
-
 // GetSharedServers returns a list of available/open ports from the container
-func (s *Server) GetSharedServers(ctx context.Context) (Ports, error) {
-	var response Ports
-	if err := s.client.rpc.do(ctx, "serverSharing.getSharedServers", []string{}, &response); err != nil {
+func (s *Session) GetSharedServers(ctx context.Context) ([]*Port, error) {
+	var response []*Port
+	if err := s.rpc.do(ctx, "serverSharing.getSharedServers", []string{}, &response); err != nil {
 		return nil, err
 	}
 
@@ -68,8 +56,8 @@ func (s *Server) GetSharedServers(ctx context.Context) (Ports, error) {
 
 // UpdateSharedVisibility controls port permissions and whether it can be accessed publicly
 // via the Browse URL
-func (s *Server) UpdateSharedVisibility(ctx context.Context, port int, public bool) error {
-	if err := s.client.rpc.do(ctx, "serverSharing.updateSharedServerVisibility", []interface{}{port, public}, nil); err != nil {
+func (s *Session) UpdateSharedVisibility(ctx context.Context, port int, public bool) error {
+	if err := s.rpc.do(ctx, "serverSharing.updateSharedServerVisibility", []interface{}{port, public}, nil); err != nil {
 		return err
 	}
 

@@ -15,16 +15,12 @@ import (
 )
 
 func TestNewPortForwarder(t *testing.T) {
-	testServer, client, err := makeMockJoinedClient()
+	testServer, session, err := makeMockSession()
 	if err != nil {
 		t.Errorf("create mock client: %v", err)
 	}
 	defer testServer.Close()
-	server, err := NewServer(client)
-	if err != nil {
-		t.Errorf("create new server: %v", err)
-	}
-	pf := NewPortForwarder(client, server, 80)
+	pf := NewPortForwarder(session, 80)
 	if pf == nil {
 		t.Error("port forwarder is nil")
 	}
@@ -40,27 +36,22 @@ func TestPortForwarderStart(t *testing.T) {
 	}
 
 	stream := bytes.NewBufferString("stream-data")
-	testServer, client, err := makeMockJoinedClient(
+	testServer, session, err := makeMockSession(
 		livesharetest.WithService("serverSharing.startSharing", serverSharing),
 		livesharetest.WithService("streamManager.getStream", getStream),
 		livesharetest.WithStream("stream-id", stream),
 	)
 	if err != nil {
-		t.Errorf("create mock client: %v", err)
+		t.Errorf("create mock session: %v", err)
 	}
 	defer testServer.Close()
 
-	server, err := NewServer(client)
-	if err != nil {
-		t.Errorf("create new server: %v", err)
-	}
-
 	ctx, _ := context.WithCancel(context.Background())
-	pf := NewPortForwarder(client, server, 8000)
+	pf := NewPortForwarder(session, 8000)
 	done := make(chan error)
 
 	go func() {
-		if err := server.StartSharing(ctx, "http", 8000); err != nil {
+		if err := session.StartSharing(ctx, "http", 8000); err != nil {
 			done <- fmt.Errorf("start sharing: %v", err)
 		}
 		done <- pf.Forward(ctx)

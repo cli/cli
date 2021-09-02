@@ -21,6 +21,7 @@ func newRpcClient(conn io.ReadWriteCloser) *rpcClient {
 
 func (r *rpcClient) connect(ctx context.Context) {
 	stream := jsonrpc2.NewBufferedStream(r.conn, jsonrpc2.VSCodeObjectCodec{})
+	// TODO(adonovan): fix: ensure r.Conn is eventually Closed!
 	r.Conn = jsonrpc2.NewConn(ctx, stream, r.handler)
 }
 
