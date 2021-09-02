@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 
 	"github.com/github/ghcs/api"
@@ -60,10 +61,13 @@ func logs(ctx context.Context, tail bool, codespaceName string) error {
 		return fmt.Errorf("connecting to Live Share: %v", err)
 	}
 
-	localSSHPort, err := codespaces.UnusedPort()
+	// Ensure local port is listening before client (getPostCreateOutput) connects.
+	listen, err := liveshare.Listen(0) // zero => arbitrary
 	if err != nil {
 		return err
 	}
+	defer listen.Close()
+	localPort := listen.Addr().(*net.TCPAddr).Port
 
 	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, session, log)
 	if err != nil {
@@ -77,7 +81,7 @@ func logs(ctx context.Context, tail bool, codespaceName string) error {
 
 	dst := fmt.Sprintf("%s@localhost", sshUser)
 	cmd := codespaces.NewRemoteCommand(
-		ctx, localSSHPort, dst, fmt.Sprintf("%s /workspaces/.codespaces/.persistedshare/creation.log", cmdType),
+		ctx, localPort, dst, fmt.Sprintf("%s /workspaces/.codespaces/.persistedshare/creation.log", cmdType),
 	)
 
 	// Error channels are buffered so that neither sending goroutine gets stuck.
@@ -85,7 +89,7 @@ func logs(ctx context.Context, tail bool, codespaceName string) error {
 	tunnelClosed := make(chan error, 1)
 	go func() {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
-		tunnelClosed <- fwd.ForwardToLocalPort(ctx, localSSHPort) // error is non-nil
+		tunnelClosed <- fwd.ForwardToLocalPort(ctx, listen) // error is non-nil
 	}()
 
 	cmdDone := make(chan error, 1)

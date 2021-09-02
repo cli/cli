@@ -277,11 +277,18 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 	defer cancel()
 	for _, pair := range portPairs {
 		pair := pair
-		log.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
-		name := fmt.Sprintf("share-%d", pair.remote)
+
 		go func() {
+			listen, err := liveshare.Listen(pair.local)
+			if err != nil {
+				errc <- err
+				return
+			}
+			defer listen.Close()
+			log.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
+			name := fmt.Sprintf("share-%d", pair.remote)
 			fwd := liveshare.NewPortForwarder(session, name, pair.remote)
-			errc <- fwd.ForwardToLocalPort(ctx, pair.local) // error always non-nil
+			errc <- fwd.ForwardToLocalPort(ctx, listen) // error always non-nil
 		}()
 	}
 

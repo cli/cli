@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 
@@ -81,14 +82,15 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 	}
 	log.Print("\n")
 
-	usingCustomPort := true
-	if localSSHServerPort == 0 {
-		usingCustomPort = false // suppress log of command line in Shell
-		localSSHServerPort, err = codespaces.UnusedPort()
-		if err != nil {
-			return err
-		}
+	usingCustomPort := localSSHServerPort != 0 // suppress log of command line in Shell
+
+	// Ensure local port is listening before client (Shell) connects.
+	listen, err := liveshare.Listen(localSSHServerPort)
+	if err != nil {
+		return err
 	}
+	defer listen.Close()
+	localSSHServerPort = listen.Addr().(*net.TCPAddr).Port
 
 	connectDestination := sshProfile
 	if connectDestination == "" {
@@ -98,7 +100,7 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 	tunnelClosed := make(chan error)
 	go func() {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
-		tunnelClosed <- fwd.ForwardToLocalPort(ctx, localSSHServerPort) // error is always non-nil
+		tunnelClosed <- fwd.ForwardToLocalPort(ctx, listen) // error is always non-nil
 	}()
 
 	shellClosed := make(chan error)
