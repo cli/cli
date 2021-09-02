@@ -7,13 +7,16 @@ import (
 
 // A Session represents the session between a connected Live Share client and server.
 type Session struct {
-	ssh                         *sshSession
-	rpc                         *rpcClient
-	port                        int
+	ssh *sshSession
+	rpc *rpcClient
+
+	// TODO(adonovan): fix: avoid data race of state accessed by
+	// multiple calls to StartSharing and concurrent calls to
+	// PortForwarder. Perhaps combine the two operations in the API?
 	streamName, streamCondition string
 }
 
-// Port represents an open port on the container
+// Port describes a port exposed by the container.
 type Port struct {
 	SourcePort                       int    `json:"sourcePort"`
 	DestinationPort                  int    `json:"destinationPort"`
@@ -31,8 +34,6 @@ type Port struct {
 // StartSharing tells the Live Share host to start sharing the specified port from the container.
 // The sessionName describes the purpose of the port or service.
 func (s *Session) StartSharing(ctx context.Context, sessionName string, port int) error {
-	s.port = port
-
 	var response Port
 	if err := s.rpc.do(ctx, "serverSharing.startSharing", []interface{}{
 		port, sessionName, fmt.Sprintf("http://localhost:%d", port),
@@ -46,7 +47,8 @@ func (s *Session) StartSharing(ctx context.Context, sessionName string, port int
 	return nil
 }
 
-// GetSharedServers returns a list of available/open ports from the container
+// GetSharedServers returns a description of each container port
+// shared by a prior call to StartSharing by some client.
 func (s *Session) GetSharedServers(ctx context.Context) ([]*Port, error) {
 	var response []*Port
 	if err := s.rpc.do(ctx, "serverSharing.getSharedServers", []string{}, &response); err != nil {
