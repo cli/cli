@@ -9,11 +9,6 @@ import (
 type Session struct {
 	ssh *sshSession
 	rpc *rpcClient
-
-	// TODO(adonovan): fix: avoid data race of state accessed by
-	// multiple calls to StartSharing and concurrent calls to
-	// PortForwarder. Perhaps combine the two operations in the API?
-	streamName, streamCondition string
 }
 
 // Port describes a port exposed by the container.
@@ -31,20 +26,17 @@ type Port struct {
 	// TODO(adonovan): fix possible typo in field name, and audit others.
 }
 
-// StartSharing tells the Live Share host to start sharing the specified port from the container.
-// The sessionName describes the purpose of the port or service.
-func (s *Session) StartSharing(ctx context.Context, sessionName string, port int) error {
+// startSharing tells the Live Share host to start sharing the specified port from the container.
+// The sessionName describes the purpose of the remote port or service.
+// It returns an identifier that can be used to open an SSH channel to the remote port.
+func (s *Session) startSharing(ctx context.Context, sessionName string, port int) (channelID, error) {
+	args := []interface{}{port, sessionName, fmt.Sprintf("http://localhost:%d", port)}
 	var response Port
-	if err := s.rpc.do(ctx, "serverSharing.startSharing", []interface{}{
-		port, sessionName, fmt.Sprintf("http://localhost:%d", port),
-	}, &response); err != nil {
-		return err
+	if err := s.rpc.do(ctx, "serverSharing.startSharing", args, &response); err != nil {
+		return channelID{}, err
 	}
 
-	s.streamName = response.StreamName
-	s.streamCondition = response.StreamCondition
-
-	return nil
+	return channelID{response.StreamName, response.StreamCondition}, nil
 }
 
 // GetSharedServers returns a description of each container port

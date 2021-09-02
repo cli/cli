@@ -75,7 +75,7 @@ func (t TerminalCommand) Run(ctx context.Context) (io.ReadCloser, error) {
 	}
 	<-started
 
-	channel, err := t.terminal.session.openStreamingChannel(ctx, result.StreamName, result.StreamCondition)
+	channel, err := t.terminal.session.openStreamingChannel(ctx, channelID{result.StreamName, result.StreamCondition})
 	if err != nil {
 		return nil, fmt.Errorf("error opening streaming channel: %v", err)
 	}

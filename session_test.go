@@ -82,10 +82,11 @@ func TestServerStartSharing(t *testing.T) {
 
 	done := make(chan error)
 	go func() {
-		if err := session.StartSharing(ctx, serverProtocol, serverPort); err != nil {
+		streamID, err := session.startSharing(ctx, serverProtocol, serverPort)
+		if err != nil {
 			done <- fmt.Errorf("error sharing server: %v", err)
 		}
-		if session.streamName == "" || session.streamCondition == "" {
+		if streamID.name == "" || streamID.condition == "" {
 			done <- errors.New("stream name or condition is blank")
 		}
 		done <- nil
