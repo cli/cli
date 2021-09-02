@@ -55,7 +55,8 @@ func TestPortForwarderStart(t *testing.T) {
 		t.Errorf("create new server: %v", err)
 	}
 
-	ctx, _ := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	pf := NewPortForwarder(client, server, 8000)
 	done := make(chan error)
 
