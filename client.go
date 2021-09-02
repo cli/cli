@@ -86,6 +86,12 @@ type joinWorkspaceResult struct {
 	SessionNumber int `json:"sessionNumber"`
 }
 
+// A channelID is an identifier for an exposed port on a remote
+// container that may be used to open an SSH channel to it.
+type channelID struct {
+	name, condition string
+}
+
 func (c *Client) joinWorkspace(ctx context.Context, rpc *rpcClient) (*joinWorkspaceResult, error) {
 	args := joinWorkspaceArgs{
 		ID:                      c.connection.SessionID,
@@ -104,8 +110,11 @@ func (c *Client) joinWorkspace(ctx context.Context, rpc *rpcClient) (*joinWorksp
 	return &result, nil
 }
 
-func (s *Session) openStreamingChannel(ctx context.Context, streamName, condition string) (ssh.Channel, error) {
-	args := getStreamArgs{streamName, condition}
+func (s *Session) openStreamingChannel(ctx context.Context, id channelID) (ssh.Channel, error) {
+	args := getStreamArgs{
+		StreamName: id.name,
+		Condition:  id.condition,
+	}
 	var streamID string
 	if err := s.rpc.do(ctx, "streamManager.getStream", args, &streamID); err != nil {
 		return nil, fmt.Errorf("error getting stream id: %v", err)

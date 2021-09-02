@@ -20,7 +20,7 @@ func TestNewPortForwarder(t *testing.T) {
 		t.Errorf("create mock client: %v", err)
 	}
 	defer testServer.Close()
-	pf := NewPortForwarder(session, 80)
+	pf := NewPortForwarder(session, "ssh", 81, 80)
 	if pf == nil {
 		t.Error("port forwarder is nil")
 	}
@@ -48,14 +48,11 @@ func TestPortForwarderStart(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	pf := NewPortForwarder(session, 8000)
-	done := make(chan error)
 
+	done := make(chan error)
 	go func() {
-		if err := session.StartSharing(ctx, "http", 8000); err != nil {
-			done <- fmt.Errorf("start sharing: %v", err)
-		}
-		done <- pf.Forward(ctx)
+		const name, local, remote = "ssh", 8000, 8000
+		done <- NewPortForwarder(session, name, local, remote).Forward(ctx)
 	}()
 
 	go func() {
