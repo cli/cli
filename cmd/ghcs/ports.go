@@ -312,7 +312,7 @@ func getPortPairs(ports []string) ([]portPair, error) {
 			return pp, fmt.Errorf("convert local port to int: %v", err)
 		}
 
-		pp = append(pp, portPair{local, remote})
+		pp = append(pp, portPair{remote, local})
 	}
 
 	return pp, nil
