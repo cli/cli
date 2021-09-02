@@ -28,7 +28,7 @@ func newSSHCmd() *cobra.Command {
 	}
 
 	sshCmd.Flags().StringVarP(&sshProfile, "profile", "", "", "The `name` of the SSH profile to use")
-	sshCmd.Flags().IntVarP(&sshServerPort, "server-port", "", 0, "SSH server port number")
+	sshCmd.Flags().IntVarP(&sshServerPort, "server-port", "", 0, "SSH server port number (0 => pick unused)")
 	sshCmd.Flags().StringVarP(&codespaceName, "codespace", "c", "", "The `name` of the Codespace to use")
 
 	return sshCmd
@@ -90,10 +90,7 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 		}
 	}
 
-	tunnel, err := codespaces.NewPortForwarder(ctx, session, "sshd", localSSHServerPort, remoteSSHServerPort)
-	if err != nil {
-		return fmt.Errorf("make ssh tunnel: %v", err)
-	}
+	tunnel := liveshare.NewPortForwarder(session, "sshd", localSSHServerPort, remoteSSHServerPort)
 
 	connectDestination := sshProfile
 	if connectDestination == "" {

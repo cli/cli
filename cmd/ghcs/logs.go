@@ -8,6 +8,7 @@ import (
 	"github.com/github/ghcs/api"
 	"github.com/github/ghcs/cmd/ghcs/output"
 	"github.com/github/ghcs/internal/codespaces"
+	"github.com/github/go-liveshare"
 	"github.com/spf13/cobra"
 )
 
@@ -54,7 +55,7 @@ func logs(ctx context.Context, tail bool, codespaceName string) error {
 		return fmt.Errorf("get or choose Codespace: %v", err)
 	}
 
-	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("connecting to Live Share: %v", err)
 	}
@@ -64,15 +65,12 @@ func logs(ctx context.Context, tail bool, codespaceName string) error {
 		return err
 	}
 
-	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, lsclient, log)
+	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, session, log)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %v", err)
 	}
 
-	tunnel, err := codespaces.NewPortForwarder(ctx, lsclient, "sshd", localSSHPort, remoteSSHServerPort)
-	if err != nil {
-		return fmt.Errorf("make ssh tunnel: %v", err)
-	}
+	tunnel := liveshare.NewPortForwarder(session, "sshd", localSSHPort, remoteSSHServerPort)
 
 	cmdType := "cat"
 	if tail {

@@ -32,27 +32,6 @@ func UnusedPort() (int, error) {
 	return l.Addr().(*net.TCPAddr).Port, nil
 }
 
-// NewPortForwarder returns a new port forwarder that forwards traffic between
-// the specified local and remote ports over the provided Live Share session.
-//
-// The session name is used (along with the port) to generate
-// names for streams, and may appear in error messages.
-func NewPortForwarder(ctx context.Context, session *liveshare.Session, sessionName string, localSSHPort, remoteSSHPort int) (*liveshare.PortForwarder, error) {
-	if localSSHPort == 0 {
-		return nil, fmt.Errorf("a local port must be provided")
-	}
-
-	// TODO(adonovan): fix data race on Session between
-	// StartSharing and NewPortForwarder. Perhaps combine the
-	// operations in go-liveshare?
-
-	if err := session.StartSharing(ctx, "sshd", remoteSSHPort); err != nil {
-		return nil, fmt.Errorf("sharing sshd port: %v", err)
-	}
-
-	return liveshare.NewPortForwarder(session, localSSHPort), nil
-}
-
 // StartSSHServer installs (if necessary) and starts the SSH in the codespace.
 // It returns the remote port where it is running, the user to log in with, or an error if something failed.
 func StartSSHServer(ctx context.Context, session *liveshare.Session, log logger) (serverPort int, user string, err error) {

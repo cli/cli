@@ -16,7 +16,6 @@ import (
 	"github.com/github/go-liveshare"
 	"github.com/muhammadmuzzammil1998/jsonc"
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 )
 
 // portOptions represents the options accepted by the ports command.
@@ -232,7 +231,7 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 // port pairs from the codespace to localhost.
 func newPortsForwardCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "forward <codespace> <source-port>:<destination-port>",
+		Use:   "forward <codespace> <remote-port>:<local-port>",
 		Short: "Forward ports",
 		Args:  cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -271,63 +270,48 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 		return fmt.Errorf("error connecting to Live Share: %v", err)
 	}
 
-	g, gctx := errgroup.WithContext(ctx)
-	for _, portPair := range portPairs {
-		pp := portPair
-
-		// TODO(adonovan): fix data race on Session between
-		// StartSharing and NewPortForwarder.
-		srcstr := strconv.Itoa(portPair.src)
-		if err := session.StartSharing(gctx, "share-"+srcstr, pp.src); err != nil {
-			return fmt.Errorf("start sharing port: %v", err)
-		}
-
-		g.Go(func() error {
-			log.Println("Forwarding port: " + srcstr + " ==> " + strconv.Itoa(pp.dst))
-			portForwarder := liveshare.NewPortForwarder(session, pp.dst)
-			if err := portForwarder.Forward(gctx); err != nil {
-				return fmt.Errorf("error forwarding port: %v", err)
-			}
-
-			return nil
-		})
+	// Run forwarding of all ports concurrently, aborting all of
+	// them at the first failure, including cancellation of the context.
+	errc := make(chan error, len(portPairs))
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	for _, pair := range portPairs {
+		log.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
+		name := fmt.Sprintf("share-%d", pair.remote)
+		fwd := liveshare.NewPortForwarder(session, name, pair.remote, pair.local)
+		go func() {
+			errc <- fwd.Forward(ctx) // error always non-nil
+		}()
 	}
 
-	// TODO(adonovan): fix: the waits for _all_ goroutines to terminate.
-	// If there are multiple ports, one long-lived successful connection
-	// will hide errors from any that fail.
-	if err := g.Wait(); err != nil {
-		return err
-	}
-
-	return nil
+	return <-errc // first error
 }
 
 type portPair struct {
-	src, dst int
+	remote, local int
 }
 
-// getPortPairs parses a list of strings of form "%d:%d" into pairs of numbers.
+// getPortPairs parses a list of strings of form "%d:%d" into pairs of (remote, local) numbers.
 func getPortPairs(ports []string) ([]portPair, error) {
 	pp := make([]portPair, 0, len(ports))
 
 	for _, portString := range ports {
 		parts := strings.Split(portString, ":")
 		if len(parts) < 2 {
-			return nil, fmt.Errorf("port pair: '%v' is not valid", portString)
+			return nil, fmt.Errorf("port pair: %q is not valid", portString)
 		}
 
-		srcp, err := strconv.Atoi(parts[0])
+		remote, err := strconv.Atoi(parts[0])
 		if err != nil {
-			return pp, fmt.Errorf("convert source port to int: %v", err)
+			return pp, fmt.Errorf("convert remote port to int: %v", err)
 		}
 
-		dstp, err := strconv.Atoi(parts[1])
+		local, err := strconv.Atoi(parts[1])
 		if err != nil {
-			return pp, fmt.Errorf("convert dest port to int: %v", err)
+			return pp, fmt.Errorf("convert local port to int: %v", err)
 		}
 
-		pp = append(pp, portPair{srcp, dstp})
+		pp = append(pp, portPair{local, remote})
 	}
 
 	return pp, nil

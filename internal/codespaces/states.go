@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/github/ghcs/api"
+	"github.com/github/go-liveshare"
 )
 
 // PostCreateStateStatus is a string value representing the different statuses a state can have.
@@ -55,14 +56,10 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 		return fmt.Errorf("error getting ssh server details: %v", err)
 	}
 
-	fwd, err := NewPortForwarder(ctx, session, "sshd", localSSHPort, remoteSSHServerPort)
-	if err != nil {
-		return fmt.Errorf("creating port forwarder: %v", err)
-	}
-
 	tunnelClosed := make(chan error, 1) // buffered to avoid sender stuckness
 	go func() {
-		tunnelClosed <- fwd.Forward(ctx) // error is non-nil
+		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
+		tunnelClosed <- fwd.ForwardToLocalPort(ctx, localSSHPort) // error is non-nil
 	}()
 
 	t := time.NewTicker(1 * time.Second)
