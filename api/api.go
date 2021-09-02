@@ -282,7 +282,7 @@ func (a *API) StartCodespace(ctx context.Context, token string, codespace *Codes
 			// HTTP 503 with error code 7 (EnvironmentNotShutdown) is benign.
 			// Ignore it.
 		} else {
-			return fmt.Errorf("failed to start Codespace: %s", b)
+			return fmt.Errorf("failed to start codespace: %s", b)
 		}
 	}
 
@@ -330,7 +330,7 @@ type SKU struct {
 func (a *API) GetCodespacesSKUs(ctx context.Context, user *User, repository *Repository, branch, location string) ([]*SKU, error) {
 	req, err := http.NewRequest(http.MethodGet, githubAPI+"/vscs_internal/user/"+user.Login+"/skus", nil)
 	if err != nil {
-		return nil, fmt.Errorf("err creating request: %v", err)
+		return nil, fmt.Errorf("error creating request: %v", err)
 	}
 
 	q := req.URL.Query()

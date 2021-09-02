@@ -35,14 +35,14 @@ func newPortsCmd() *cobra.Command {
 
 	portsCmd := &cobra.Command{
 		Use:   "ports",
-		Short: "List ports in a Codespace",
+		Short: "List ports in a codespace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return ports(opts)
 		},
 	}
 
-	portsCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "The `name` of the Codespace to use")
+	portsCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "The `name` of the codespace to use")
 	portsCmd.Flags().BoolVar(&opts.asJSON, "json", false, "Output as JSON")
 
 	portsCmd.AddCommand(newPortsPublicCmd())
@@ -71,7 +71,7 @@ func ports(opts *portsOptions) error {
 		if err == codespaces.ErrNoCodespaces {
 			return err
 		}
-		return fmt.Errorf("error choosing Codespace: %v", err)
+		return fmt.Errorf("error choosing codespace: %v", err)
 	}
 
 	devContainerCh := getDevContainer(ctx, apiClient, codespace)
@@ -211,12 +211,12 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 
 	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
 	if err != nil {
-		return fmt.Errorf("error getting Codespace token: %v", err)
+		return fmt.Errorf("error getting codespace token: %v", err)
 	}
 
 	codespace, err := apiClient.GetCodespace(ctx, token, user.Login, codespaceName)
 	if err != nil {
-		return fmt.Errorf("error getting Codespace: %v", err)
+		return fmt.Errorf("error getting codespace: %v", err)
 	}
 
 	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
@@ -277,12 +277,12 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 
 	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
 	if err != nil {
-		return fmt.Errorf("error getting Codespace token: %v", err)
+		return fmt.Errorf("error getting codespace token: %v", err)
 	}
 
 	codespace, err := apiClient.GetCodespace(ctx, token, user.Login, codespaceName)
 	if err != nil {
-		return fmt.Errorf("error getting Codespace: %v", err)
+		return fmt.Errorf("error getting codespace: %v", err)
 	}
 
 	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)

@@ -19,7 +19,7 @@ func newListCmd() *cobra.Command {
 
 	listCmd := &cobra.Command{
 		Use:   "list",
-		Short: "List your Codespaces",
+		Short: "List your codespaces",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return list(opts)
@@ -46,7 +46,7 @@ func list(opts *listOptions) error {
 
 	codespaces, err := apiClient.ListCodespaces(ctx, user)
 	if err != nil {
-		return fmt.Errorf("error getting Codespaces: %v", err)
+		return fmt.Errorf("error getting codespaces: %v", err)
 	}
 
 	table := output.NewTable(os.Stdout, opts.asJSON)
