@@ -16,7 +16,6 @@ import (
 	"github.com/github/go-liveshare"
 	"github.com/muhammadmuzzammil1998/jsonc"
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 )
 
 // portOptions represents the options accepted by the ports command.
@@ -76,15 +75,15 @@ func ports(opts *portsOptions) error {
 
 	devContainerCh := getDevContainer(ctx, apiClient, codespace)
 
-	liveShareClient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %v", err)
 	}
 
 	log.Println("Loading ports...")
-	ports, err := getPorts(ctx, liveShareClient)
+	ports, err := session.GetSharedServers(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting ports: %v", err)
+		return fmt.Errorf("error getting ports of shared servers: %v", err)
 	}
 
 	devContainerResult := <-devContainerCh
@@ -114,20 +113,6 @@ func ports(opts *portsOptions) error {
 	table.Render()
 
 	return nil
-}
-
-func getPorts(ctx context.Context, lsclient *liveshare.Client) (liveshare.Ports, error) {
-	server, err := liveshare.NewServer(lsclient)
-	if err != nil {
-		return nil, fmt.Errorf("error creating server: %v", err)
-	}
-
-	ports, err := server.GetSharedServers(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error getting shared servers: %v", err)
-	}
-
-	return ports, nil
 }
 
 type devContainerResult struct {
@@ -219,14 +204,9 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 		return fmt.Errorf("error getting codespace: %v", err)
 	}
 
-	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %v", err)
-	}
-
-	server, err := liveshare.NewServer(lsclient)
-	if err != nil {
-		return fmt.Errorf("error creating server: %v", err)
 	}
 
 	port, err := strconv.Atoi(sourcePort)
@@ -234,7 +214,7 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 		return fmt.Errorf("error reading port number: %v", err)
 	}
 
-	if err := server.UpdateSharedVisibility(ctx, port, public); err != nil {
+	if err := session.UpdateSharedVisibility(ctx, port, public); err != nil {
 		return fmt.Errorf("error update port to public: %v", err)
 	}
 
@@ -251,7 +231,7 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 // port pairs from the codespace to localhost.
 func newPortsForwardCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "forward <codespace> <source-port>:<destination-port>",
+		Use:   "forward <codespace> <remote-port>:<local-port>",
 		Short: "Forward ports",
 		Args:  cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -285,68 +265,54 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 		return fmt.Errorf("error getting codespace: %v", err)
 	}
 
-	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %v", err)
 	}
 
-	server, err := liveshare.NewServer(lsclient)
-	if err != nil {
-		return fmt.Errorf("error creating server: %v", err)
+	// Run forwarding of all ports concurrently, aborting all of
+	// them at the first failure, including cancellation of the context.
+	errc := make(chan error, len(portPairs))
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	for _, pair := range portPairs {
+		pair := pair
+		log.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
+		name := fmt.Sprintf("share-%d", pair.remote)
+		go func() {
+			fwd := liveshare.NewPortForwarder(session, name, pair.remote)
+			errc <- fwd.ForwardToLocalPort(ctx, pair.local) // error always non-nil
+		}()
 	}
 
-	g, gctx := errgroup.WithContext(ctx)
-	for _, portPair := range portPairs {
-		pp := portPair
-
-		srcstr := strconv.Itoa(portPair.src)
-		if err := server.StartSharing(gctx, "share-"+srcstr, pp.src); err != nil {
-			return fmt.Errorf("start sharing port: %v", err)
-		}
-
-		g.Go(func() error {
-			log.Println("Forwarding port: " + srcstr + " ==> " + strconv.Itoa(pp.dst))
-			portForwarder := liveshare.NewPortForwarder(lsclient, server, pp.dst)
-			if err := portForwarder.Forward(gctx); err != nil {
-				return fmt.Errorf("error forwarding port: %v", err)
-			}
-
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return err
-	}
-
-	return nil
+	return <-errc // first error
 }
 
 type portPair struct {
-	src, dst int
+	remote, local int
 }
 
-// getPortPairs parses a list of strings of form "%d:%d" into pairs of numbers.
+// getPortPairs parses a list of strings of form "%d:%d" into pairs of (remote, local) numbers.
 func getPortPairs(ports []string) ([]portPair, error) {
 	pp := make([]portPair, 0, len(ports))
 
 	for _, portString := range ports {
 		parts := strings.Split(portString, ":")
 		if len(parts) < 2 {
-			return nil, fmt.Errorf("port pair: '%v' is not valid", portString)
+			return nil, fmt.Errorf("port pair: %q is not valid", portString)
 		}
 
-		srcp, err := strconv.Atoi(parts[0])
+		remote, err := strconv.Atoi(parts[0])
 		if err != nil {
-			return pp, fmt.Errorf("convert source port to int: %v", err)
+			return pp, fmt.Errorf("convert remote port to int: %v", err)
 		}
 
-		dstp, err := strconv.Atoi(parts[1])
+		local, err := strconv.Atoi(parts[1])
 		if err != nil {
-			return pp, fmt.Errorf("convert dest port to int: %v", err)
+			return pp, fmt.Errorf("convert local port to int: %v", err)
 		}
 
-		pp = append(pp, portPair{srcp, dstp})
+		pp = append(pp, portPair{remote, local})
 	}
 
 	return pp, nil

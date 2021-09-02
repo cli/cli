@@ -28,7 +28,7 @@ func newSSHCmd() *cobra.Command {
 	}
 
 	sshCmd.Flags().StringVarP(&sshProfile, "profile", "", "", "The `name` of the SSH profile to use")
-	sshCmd.Flags().IntVarP(&sshServerPort, "server-port", "", 0, "SSH server port number")
+	sshCmd.Flags().IntVarP(&sshServerPort, "server-port", "", 0, "SSH server port number (0 => pick unused)")
 	sshCmd.Flags().StringVarP(&codespaceName, "codespace", "c", "", "The `name` of the codespace to use")
 
 	return sshCmd
@@ -56,20 +56,17 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 		return fmt.Errorf("get or choose codespace: %v", err)
 	}
 
-	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %v", err)
 	}
 
-	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, lsclient, log)
+	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, session, log)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %v", err)
 	}
 
-	terminal, err := liveshare.NewTerminal(lsclient)
-	if err != nil {
-		return fmt.Errorf("error creating Live Share terminal: %v", err)
-	}
+	terminal := liveshare.NewTerminal(session)
 
 	log.Print("Preparing SSH...")
 	if sshProfile == "" {
@@ -93,11 +90,6 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 		}
 	}
 
-	tunnel, err := codespaces.NewPortForwarder(ctx, lsclient, "sshd", localSSHServerPort, remoteSSHServerPort)
-	if err != nil {
-		return fmt.Errorf("make ssh tunnel: %v", err)
-	}
-
 	connectDestination := sshProfile
 	if connectDestination == "" {
 		connectDestination = fmt.Sprintf("%s@localhost", sshUser)
@@ -105,7 +97,8 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 
 	tunnelClosed := make(chan error)
 	go func() {
-		tunnelClosed <- tunnel.Forward(ctx) // error is always non-nil
+		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
+		tunnelClosed <- fwd.ForwardToLocalPort(ctx, localSSHServerPort) // error is always non-nil
 	}()
 
 	shellClosed := make(chan error)

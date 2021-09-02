@@ -32,37 +32,12 @@ func UnusedPort() (int, error) {
 	return l.Addr().(*net.TCPAddr).Port, nil
 }
 
-// NewPortForwarder returns a new port forwarder for traffic between
-// the Live Share client and the specified local and remote ports.
-//
-// The session name is used (along with the port) to generate
-// names for streams, and may appear in error messages.
-func NewPortForwarder(ctx context.Context, client *liveshare.Client, sessionName string, localSSHPort, remoteSSHPort int) (*liveshare.PortForwarder, error) {
-	if localSSHPort == 0 {
-		return nil, fmt.Errorf("a local port must be provided")
-	}
-
-	server, err := liveshare.NewServer(client)
-	if err != nil {
-		return nil, fmt.Errorf("new liveshare server: %v", err)
-	}
-
-	if err := server.StartSharing(ctx, "sshd", remoteSSHPort); err != nil {
-		return nil, fmt.Errorf("sharing sshd port: %v", err)
-	}
-
-	return liveshare.NewPortForwarder(client, server, localSSHPort), nil
-}
-
 // StartSSHServer installs (if necessary) and starts the SSH in the codespace.
 // It returns the remote port where it is running, the user to log in with, or an error if something failed.
-func StartSSHServer(ctx context.Context, client *liveshare.Client, log logger) (serverPort int, user string, err error) {
+func StartSSHServer(ctx context.Context, session *liveshare.Session, log logger) (serverPort int, user string, err error) {
 	log.Println("Fetching SSH details...")
 
-	sshServer, err := liveshare.NewSSHServer(client)
-	if err != nil {
-		return 0, "", fmt.Errorf("error creating live share: %v", err)
-	}
+	sshServer := session.SSHServer()
 
 	sshServerStartResult, err := sshServer.StartRemoteServer(ctx)
 	if err != nil {

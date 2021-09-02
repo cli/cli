@@ -73,7 +73,7 @@ func connectionReady(codespace *api.Codespace) bool {
 		codespace.Environment.State == api.CodespaceEnvironmentStateAvailable
 }
 
-func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, userLogin, token string, codespace *api.Codespace) (client *liveshare.Client, err error) {
+func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, userLogin, token string, codespace *api.Codespace) (*liveshare.Session, error) {
 	var startedCodespace bool
 	if codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
 		startedCodespace = true
@@ -96,6 +96,7 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 			return nil, errors.New("timed out while waiting for the codespace to start")
 		}
 
+		var err error
 		codespace, err = apiClient.GetCodespace(ctx, token, userLogin, codespace.Name)
 		if err != nil {
 			return nil, fmt.Errorf("error getting codespace: %v", err)
@@ -117,14 +118,10 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 		}),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error creating Live Share: %v", err)
+		return nil, fmt.Errorf("error creating Live Share client: %v", err)
 	}
 
-	if err := lsclient.Join(ctx); err != nil {
-		return nil, fmt.Errorf("error joining Live Share client: %v", err)
-	}
-
-	return lsclient, nil
+	return lsclient.JoinWorkspace(ctx)
 }
 
 func GetOrChooseCodespace(ctx context.Context, apiClient *api.API, user *api.User, codespaceName string) (codespace *api.Codespace, token string, err error) {
