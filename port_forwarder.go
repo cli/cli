@@ -18,6 +18,12 @@ type PortForwarder struct {
 // between the local port and the container's remote port over the
 // specified Live Share session. The name describes the purpose of the
 // remote port or service.
+//
+// TODO(adonovan): the localPort param is redundant wrt ForwardWithConn.
+// Simpler: do away with the NewPortForwarder type altogether:
+//
+// - ForwardToLocalPort(ctx, session, name, remote, local)
+// - ForwardToConnection(ctx, session, name, remote, conn)
 func NewPortForwarder(session *Session, name string, localPort, remotePort int) *PortForwarder {
 	return &PortForwarder{
 		session:    session,
@@ -74,6 +80,7 @@ func (fwd *PortForwarder) Forward(ctx context.Context) (err error) {
 func (fwd *PortForwarder) ForwardWithConn(ctx context.Context, conn io.ReadWriteCloser) error {
 	id, err := fwd.shareRemotePort(ctx)
 	if err != nil {
+		conn.Close()
 		return err
 	}
 
