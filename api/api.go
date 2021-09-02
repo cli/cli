@@ -279,7 +279,7 @@ func (a *API) StartCodespace(ctx context.Context, token string, codespace *Codes
 			b = append(b[:97], "..."...)
 		}
 		if strings.TrimSpace(string(b)) == "7" {
-			// NON HTTP 200 with error code 7 (EnvironmentNotShutdown) is benign.
+			// Non-HTTP 200 with error code 7 (EnvironmentNotShutdown) is benign.
 			// Ignore it.
 		} else {
 			return fmt.Errorf("failed to start codespace: %s", b)
