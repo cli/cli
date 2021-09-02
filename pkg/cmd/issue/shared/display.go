@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/api"
-	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/text"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/v2/api"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/text"
+	"github.com/cli/cli/v2/utils"
 )
 
 func PrintIssues(io *iostreams.IOStreams, prefix string, totalCount int, issues []api.Issue) {
