@@ -330,7 +330,7 @@ type SKU struct {
 func (a *API) GetCodespacesSKUs(ctx context.Context, user *User, repository *Repository, branch, location string) ([]*SKU, error) {
 	req, err := http.NewRequest(http.MethodGet, githubAPI+"/vscs_internal/user/"+user.Login+"/skus", nil)
 	if err != nil {
-		return nil, fmt.Errorf("err creating request: %v", err)
+		return nil, fmt.Errorf("error creating request: %v", err)
 	}
 
 	q := req.URL.Query()

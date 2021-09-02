@@ -228,7 +228,7 @@ func getBranchName(branch string) (string, error) {
 func getMachineName(ctx context.Context, machine string, user *api.User, repo *api.Repository, branch, location string, apiClient *api.API) (string, error) {
 	skus, err := apiClient.GetCodespacesSKUs(ctx, user, repo, branch, location)
 	if err != nil {
-		return "", fmt.Errorf("error getting codespace SKUs: %v", err)
+		return "", fmt.Errorf("error requesting machine instance types: %v", err)
 	}
 
 	// if user supplied a machine type, it must be valid
