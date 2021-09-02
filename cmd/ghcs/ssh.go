@@ -158,7 +158,7 @@ func getContainerID(ctx context.Context, logger *output.Logger, terminal *livesh
 }
 
 func setupEnv(ctx context.Context, logger *output.Logger, terminal *liveshare.Terminal, containerID, repositoryName, containerUser string) error {
-	setupBashProfileCmd := fmt.Sprintf(`echo "export $(cat /workspaces/.codespaces/shared/.env | xargs); exec /bin/zsh;" > /home/%v/.bash_profile`, repositoryName, containerUser)
+	setupBashProfileCmd := fmt.Sprintf(`echo "export $(cat /workspaces/.codespaces/shared/.env | xargs); exec /bin/zsh;" > /home/%v/.bash_profile`, containerUser)
 
 	logger.Print(".")
 	compositeCommand := []string{setupBashProfileCmd}
