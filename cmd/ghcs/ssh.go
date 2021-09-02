@@ -56,20 +56,17 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 		return fmt.Errorf("get or choose Codespace: %v", err)
 	}
 
-	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %v", err)
 	}
 
-	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, lsclient, log)
+	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, session, log)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %v", err)
 	}
 
-	terminal, err := liveshare.NewTerminal(lsclient)
-	if err != nil {
-		return fmt.Errorf("error creating Live Share terminal: %v", err)
-	}
+	terminal := liveshare.NewTerminal(session)
 
 	log.Print("Preparing SSH...")
 	if sshProfile == "" {
@@ -93,7 +90,7 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 		}
 	}
 
-	tunnel, err := codespaces.NewPortForwarder(ctx, lsclient, "sshd", localSSHServerPort, remoteSSHServerPort)
+	tunnel, err := codespaces.NewPortForwarder(ctx, session, "sshd", localSSHServerPort, remoteSSHServerPort)
 	if err != nil {
 		return fmt.Errorf("make ssh tunnel: %v", err)
 	}
@@ -105,7 +102,7 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 
 	tunnelClosed := make(chan error)
 	go func() {
-		tunnelClosed <- tunnel.Start(ctx) // error is always non-nil
+		tunnelClosed <- tunnel.Forward(ctx) // error is always non-nil
 	}()
 
 	shellClosed := make(chan error)

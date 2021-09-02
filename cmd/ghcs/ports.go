@@ -76,15 +76,15 @@ func ports(opts *portsOptions) error {
 
 	devContainerCh := getDevContainer(ctx, apiClient, codespace)
 
-	liveShareClient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %v", err)
 	}
 
 	log.Println("Loading ports...")
-	ports, err := getPorts(ctx, liveShareClient)
+	ports, err := session.GetSharedServers(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting ports: %v", err)
+		return fmt.Errorf("error getting ports of shared servers: %v", err)
 	}
 
 	devContainerResult := <-devContainerCh
@@ -114,20 +114,6 @@ func ports(opts *portsOptions) error {
 	table.Render()
 
 	return nil
-}
-
-func getPorts(ctx context.Context, lsclient *liveshare.Client) (liveshare.Ports, error) {
-	server, err := liveshare.NewServer(lsclient)
-	if err != nil {
-		return nil, fmt.Errorf("error creating server: %v", err)
-	}
-
-	ports, err := server.GetSharedServers(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error getting shared servers: %v", err)
-	}
-
-	return ports, nil
 }
 
 type devContainerResult struct {
@@ -219,14 +205,9 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 		return fmt.Errorf("error getting Codespace: %v", err)
 	}
 
-	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %v", err)
-	}
-
-	server, err := liveshare.NewServer(lsclient)
-	if err != nil {
-		return fmt.Errorf("error creating server: %v", err)
 	}
 
 	port, err := strconv.Atoi(sourcePort)
@@ -234,7 +215,7 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 		return fmt.Errorf("error reading port number: %v", err)
 	}
 
-	if err := server.UpdateSharedVisibility(ctx, port, public); err != nil {
+	if err := session.UpdateSharedVisibility(ctx, port, public); err != nil {
 		return fmt.Errorf("error update port to public: %v", err)
 	}
 
@@ -285,29 +266,26 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 		return fmt.Errorf("error getting Codespace: %v", err)
 	}
 
-	lsclient, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %v", err)
-	}
-
-	server, err := liveshare.NewServer(lsclient)
-	if err != nil {
-		return fmt.Errorf("error creating server: %v", err)
 	}
 
 	g, gctx := errgroup.WithContext(ctx)
 	for _, portPair := range portPairs {
 		pp := portPair
 
+		// TODO(adonovan): fix data race on Session between
+		// StartSharing and NewPortForwarder.
 		srcstr := strconv.Itoa(portPair.src)
-		if err := server.StartSharing(gctx, "share-"+srcstr, pp.src); err != nil {
+		if err := session.StartSharing(gctx, "share-"+srcstr, pp.src); err != nil {
 			return fmt.Errorf("start sharing port: %v", err)
 		}
 
 		g.Go(func() error {
 			log.Println("Forwarding port: " + srcstr + " ==> " + strconv.Itoa(pp.dst))
-			portForwarder := liveshare.NewPortForwarder(lsclient, server, pp.dst)
-			if err := portForwarder.Start(gctx); err != nil {
+			portForwarder := liveshare.NewPortForwarder(session, pp.dst)
+			if err := portForwarder.Forward(gctx); err != nil {
 				return fmt.Errorf("error forwarding port: %v", err)
 			}
 
@@ -315,6 +293,9 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 		})
 	}
 
+	// TODO(adonovan): fix: the waits for _all_ goroutines to terminate.
+	// If there are multiple ports, one long-lived successful connection
+	// will hide errors from any that fail.
 	if err := g.Wait(); err != nil {
 		return err
 	}
