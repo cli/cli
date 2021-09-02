@@ -7,20 +7,17 @@ import (
 	"net"
 )
 
-// A PortForwarder forwards TCP traffic between a port on a remote
-// LiveShare host and a local port.
+// A PortForwarder forwards TCP traffic between a local TCP port and a LiveShare session.
 type PortForwarder struct {
-	client *Client
-	server *Server
-	port   int
+	session *Session
+	port    int
 }
 
-// NewPortForwarder creates a new PortForwarder that connects a given client, server and port.
-func NewPortForwarder(client *Client, server *Server, port int) *PortForwarder {
+// NewPortForwarder creates a new PortForwarder for a given Live Share session and local TCP port.
+func NewPortForwarder(session *Session, port int) *PortForwarder {
 	return &PortForwarder{
-		client: client,
-		server: server,
-		port:   port,
+		session: session,
+		port:    port,
 	}
 }
 
@@ -87,7 +84,7 @@ func awaitError(ctx context.Context, errc <-chan error) error {
 func (l *PortForwarder) handleConnection(ctx context.Context, conn io.ReadWriteCloser) (err error) {
 	defer safeClose(conn, &err)
 
-	channel, err := l.client.openStreamingChannel(ctx, l.server.streamName, l.server.streamCondition)
+	channel, err := l.session.openStreamingChannel(ctx, l.session.streamName, l.session.streamCondition)
 	if err != nil {
 		return fmt.Errorf("error opening streaming channel for new connection: %v", err)
 	}

@@ -8,13 +8,10 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// A Client capable of joining a liveshare connection
+// A Client capable of joining a Live Share workspace.
 type Client struct {
 	connection Connection
 	tlsConfig  *tls.Config
-
-	ssh *sshSession
-	rpc *rpcClient
 }
 
 // A ClientOption is a function that modifies a client
@@ -52,31 +49,26 @@ func WithTLSConfig(tlsConfig *tls.Config) ClientOption {
 	}
 }
 
-// Join is a method that joins the client to the liveshare session
-func (c *Client) Join(ctx context.Context) (err error) {
+// JoinWorkspace connects the client to the server's Live Share
+// workspace and returns a session representing their connection.
+func (c *Client) JoinWorkspace(ctx context.Context) (*Session, error) {
 	clientSocket := newSocket(c.connection, c.tlsConfig)
 	if err := clientSocket.connect(ctx); err != nil {
-		return fmt.Errorf("error connecting websocket: %v", err)
+		return nil, fmt.Errorf("error connecting websocket: %v", err)
 	}
 
-	c.ssh = newSshSession(c.connection.SessionToken, clientSocket)
-	if err := c.ssh.connect(ctx); err != nil {
-		return fmt.Errorf("error connecting to ssh session: %v", err)
+	ssh := newSSHSession(c.connection.SessionToken, clientSocket)
+	if err := ssh.connect(ctx); err != nil {
+		return nil, fmt.Errorf("error connecting to ssh session: %v", err)
 	}
 
-	c.rpc = newRPCClient(c.ssh)
-	c.rpc.connect(ctx)
-
-	_, err = c.joinWorkspace(ctx)
-	if err != nil {
-		return fmt.Errorf("error joining Live Share workspace: %v", err)
+	rpc := newRPCClient(ssh)
+	rpc.connect(ctx)
+	if _, err := c.joinWorkspace(ctx, rpc); err != nil {
+		return nil, fmt.Errorf("error joining Live Share workspace: %v", err)
 	}
 
-	return nil
-}
-
-func (c *Client) hasJoined() bool {
-	return c.ssh != nil && c.rpc != nil
+	return &Session{ssh: ssh, rpc: rpc}, nil
 }
 
 type clientCapabilities struct {
@@ -94,7 +86,7 @@ type joinWorkspaceResult struct {
 	SessionNumber int `json:"sessionNumber"`
 }
 
-func (c *Client) joinWorkspace(ctx context.Context) (*joinWorkspaceResult, error) {
+func (c *Client) joinWorkspace(ctx context.Context, rpc *rpcClient) (*joinWorkspaceResult, error) {
 	args := joinWorkspaceArgs{
 		ID:                      c.connection.SessionID,
 		ConnectionMode:          "local",
@@ -105,21 +97,21 @@ func (c *Client) joinWorkspace(ctx context.Context) (*joinWorkspaceResult, error
 	}
 
 	var result joinWorkspaceResult
-	if err := c.rpc.do(ctx, "workspace.joinWorkspace", &args, &result); err != nil {
+	if err := rpc.do(ctx, "workspace.joinWorkspace", &args, &result); err != nil {
 		return nil, fmt.Errorf("error making workspace.joinWorkspace call: %v", err)
 	}
 
 	return &result, nil
 }
 
-func (c *Client) openStreamingChannel(ctx context.Context, streamName, condition string) (ssh.Channel, error) {
+func (s *Session) openStreamingChannel(ctx context.Context, streamName, condition string) (ssh.Channel, error) {
 	args := getStreamArgs{streamName, condition}
 	var streamID string
-	if err := c.rpc.do(ctx, "streamManager.getStream", args, &streamID); err != nil {
+	if err := s.rpc.do(ctx, "streamManager.getStream", args, &streamID); err != nil {
 		return nil, fmt.Errorf("error getting stream id: %v", err)
 	}
 
-	channel, reqs, err := c.ssh.conn.OpenChannel("session", nil)
+	channel, reqs, err := s.ssh.conn.OpenChannel("session", nil)
 	if err != nil {
 		return nil, fmt.Errorf("error opening ssh channel for transport: %v", err)
 	}

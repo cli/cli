@@ -2,18 +2,14 @@ package liveshare
 
 import (
 	"context"
-	"errors"
 )
 
 type SSHServer struct {
-	client *Client
+	session *Session
 }
 
-func NewSSHServer(client *Client) (*SSHServer, error) {
-	if !client.hasJoined() {
-		return nil, errors.New("client must join before creating server")
-	}
-	return &SSHServer{client: client}, nil
+func (session *Session) SSHServer() *SSHServer {
+	return &SSHServer{session: session}
 }
 
 type SSHServerStartResult struct {
@@ -23,12 +19,12 @@ type SSHServerStartResult struct {
 	Message    string `json:"message"`
 }
 
-func (s *SSHServer) StartRemoteServer(ctx context.Context) (SSHServerStartResult, error) {
+func (s *SSHServer) StartRemoteServer(ctx context.Context) (*SSHServerStartResult, error) {
 	var response SSHServerStartResult
 
-	if err := s.client.rpc.do(ctx, "ISshServerHostService.startRemoteServer", []string{}, &response); err != nil {
-		return response, err
+	if err := s.session.rpc.do(ctx, "ISshServerHostService.startRemoteServer", []string{}, &response); err != nil {
+		return nil, err
 	}
 
-	return response, nil
+	return &response, nil
 }

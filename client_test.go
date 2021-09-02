@@ -43,7 +43,7 @@ func TestNewClientWithInvalidConnection(t *testing.T) {
 	}
 }
 
-func TestClientJoin(t *testing.T) {
+func TestJoinSession(t *testing.T) {
 	connection := Connection{
 		SessionID:    "session-id",
 		SessionToken: "session-token",
@@ -90,10 +90,12 @@ func TestClientJoin(t *testing.T) {
 
 	done := make(chan error)
 	go func() {
-		if err := client.Join(ctx); err != nil {
-			done <- fmt.Errorf("error joining client: %v", err)
+		session, err := client.JoinWorkspace(ctx)
+		if err != nil {
+			done <- fmt.Errorf("error joining workspace: %v", err)
 			return
 		}
+		_ = session
 
 		done <- nil
 	}()
