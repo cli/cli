@@ -28,13 +28,14 @@ type Port struct {
 	// TODO(adonovan): fix possible typo in field name, and audit others.
 }
 
-// StartSharing tells the liveshare host to start sharing the port from the container
-func (s *Session) StartSharing(ctx context.Context, protocol string, port int) error {
+// StartSharing tells the Live Share host to start sharing the specified port from the container.
+// The sessionName describes the purpose of the port or service.
+func (s *Session) StartSharing(ctx context.Context, sessionName string, port int) error {
 	s.port = port
 
 	var response Port
 	if err := s.rpc.do(ctx, "serverSharing.startSharing", []interface{}{
-		port, protocol, fmt.Sprintf("http://localhost:%d", port),
+		port, sessionName, fmt.Sprintf("http://localhost:%d", port),
 	}, &response); err != nil {
 		return err
 	}

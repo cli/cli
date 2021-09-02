@@ -62,7 +62,7 @@ func (c *Client) JoinWorkspace(ctx context.Context) (*Session, error) {
 		return nil, fmt.Errorf("error connecting to ssh session: %v", err)
 	}
 
-	rpc := newRpcClient(ssh)
+	rpc := newRPCClient(ssh)
 	rpc.connect(ctx)
 	if _, err := c.joinWorkspace(ctx, rpc); err != nil {
 		return nil, fmt.Errorf("error joining Live Share workspace: %v", err)

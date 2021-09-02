@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/sourcegraph/jsonrpc2"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -64,12 +65,15 @@ func (t TerminalCommand) Run(ctx context.Context) (io.ReadCloser, error) {
 		ReadOnlyForGuests: false,
 	}
 
-	terminalStarted := t.terminal.session.rpc.handler.registerEventHandler("terminal.terminalStarted")
+	started := make(chan struct{})
+	t.terminal.session.rpc.handler.registerEventHandler("terminal.terminalStarted", func(*jsonrpc2.Request) {
+		close(started)
+	})
 	var result startTerminalResult
 	if err := t.terminal.session.rpc.do(ctx, "terminal.startTerminal", &args, &result); err != nil {
 		return nil, fmt.Errorf("error making terminal.startTerminal call: %v", err)
 	}
-	<-terminalStarted
+	<-started
 
 	channel, err := t.terminal.session.openStreamingChannel(ctx, result.StreamName, result.StreamCondition)
 	if err != nil {
@@ -94,7 +98,10 @@ func (t terminalReadCloser) Read(b []byte) (int, error) {
 }
 
 func (t terminalReadCloser) Close() error {
-	terminalStopped := t.terminalCommand.terminal.session.rpc.handler.registerEventHandler("terminal.terminalStopped")
+	stopped := make(chan struct{})
+	t.terminalCommand.terminal.session.rpc.handler.registerEventHandler("terminal.terminalStopped", func(*jsonrpc2.Request) {
+		close(stopped)
+	})
 	if err := t.terminalCommand.terminal.session.rpc.do(context.Background(), "terminal.stopTerminal", []int{t.terminalID}, nil); err != nil {
 		return fmt.Errorf("error making terminal.stopTerminal call: %v", err)
 	}
@@ -103,7 +110,7 @@ func (t terminalReadCloser) Close() error {
 		return fmt.Errorf("error closing channel: %v", err)
 	}
 
-	<-terminalStopped
+	<-stopped
 
 	return nil
 }

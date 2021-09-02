@@ -15,7 +15,7 @@ type rpcClient struct {
 	handler *rpcHandler
 }
 
-func newRpcClient(conn io.ReadWriteCloser) *rpcClient {
+func newRPCClient(conn io.ReadWriteCloser) *rpcClient {
 	return &rpcClient{conn: conn, handler: newRPCHandler()}
 }
 
@@ -25,54 +25,45 @@ func (r *rpcClient) connect(ctx context.Context) {
 	r.Conn = jsonrpc2.NewConn(ctx, stream, r.handler)
 }
 
-func (r *rpcClient) do(ctx context.Context, method string, args interface{}, result interface{}) error {
+func (r *rpcClient) do(ctx context.Context, method string, args, result interface{}) error {
 	waiter, err := r.Conn.DispatchCall(ctx, method, args)
 	if err != nil {
-		return fmt.Errorf("error on dispatch call: %v", err)
+		return fmt.Errorf("error dispatching %q call: %v", method, err)
 	}
 
 	return waiter.Wait(ctx, result)
 }
 
+type rpcHandlerFunc = func(*jsonrpc2.Request)
+
 type rpcHandler struct {
-	mutex         sync.RWMutex
-	eventHandlers map[string][]chan *jsonrpc2.Request
+	handlersMu sync.Mutex
+	handlers   map[string][]rpcHandlerFunc
 }
 
 func newRPCHandler() *rpcHandler {
 	return &rpcHandler{
-		eventHandlers: make(map[string][]chan *jsonrpc2.Request),
+		handlers: make(map[string][]rpcHandlerFunc),
 	}
 }
 
-func (r *rpcHandler) registerEventHandler(eventMethod string) <-chan *jsonrpc2.Request {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-
-	ch := make(chan *jsonrpc2.Request)
-	if _, ok := r.eventHandlers[eventMethod]; !ok {
-		r.eventHandlers[eventMethod] = []chan *jsonrpc2.Request{ch}
-	} else {
-		r.eventHandlers[eventMethod] = append(r.eventHandlers[eventMethod], ch)
-	}
-	return ch
+// registerEventHandler registers a handler for the specified event.
+// After the next occurrence of the event, the handler will be called,
+// once, in its own goroutine.
+func (r *rpcHandler) registerEventHandler(eventMethod string, h rpcHandlerFunc) {
+	r.handlersMu.Lock()
+	r.handlers[eventMethod] = append(r.handlers[eventMethod], h)
+	r.handlersMu.Unlock()
 }
 
+// Handle calls all registered handlers for the request, concurrently, each in its own goroutine.
 func (r *rpcHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
+	r.handlersMu.Lock()
+	handlers := r.handlers[req.Method]
+	r.handlers[req.Method] = nil
+	r.handlersMu.Unlock()
 
-	if handlers, ok := r.eventHandlers[req.Method]; ok {
-		go func() {
-			for _, handler := range handlers {
-				select {
-				case handler <- req:
-				case <-ctx.Done():
-					break
-				}
-			}
-
-			r.eventHandlers[req.Method] = []chan *jsonrpc2.Request{}
-		}()
+	for _, h := range handlers {
+		go h(req)
 	}
 }
