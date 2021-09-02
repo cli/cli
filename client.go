@@ -86,11 +86,11 @@ type joinWorkspaceResult struct {
 	SessionNumber int `json:"sessionNumber"`
 }
 
-func (client *Client) joinWorkspace(ctx context.Context, rpc *rpcClient) (*joinWorkspaceResult, error) {
+func (c *Client) joinWorkspace(ctx context.Context, rpc *rpcClient) (*joinWorkspaceResult, error) {
 	args := joinWorkspaceArgs{
-		ID:                      client.connection.SessionID,
+		ID:                      c.connection.SessionID,
 		ConnectionMode:          "local",
-		JoiningUserSessionToken: client.connection.SessionToken,
+		JoiningUserSessionToken: c.connection.SessionToken,
 		ClientCapabilities: clientCapabilities{
 			IsNonInteractive: false,
 		},
@@ -104,14 +104,14 @@ func (client *Client) joinWorkspace(ctx context.Context, rpc *rpcClient) (*joinW
 	return &result, nil
 }
 
-func (session *Session) openStreamingChannel(ctx context.Context, streamName, condition string) (ssh.Channel, error) {
+func (s *Session) openStreamingChannel(ctx context.Context, streamName, condition string) (ssh.Channel, error) {
 	args := getStreamArgs{streamName, condition}
 	var streamID string
-	if err := session.rpc.do(ctx, "streamManager.getStream", args, &streamID); err != nil {
+	if err := s.rpc.do(ctx, "streamManager.getStream", args, &streamID); err != nil {
 		return nil, fmt.Errorf("error getting stream id: %v", err)
 	}
 
-	channel, reqs, err := session.ssh.conn.OpenChannel("session", nil)
+	channel, reqs, err := s.ssh.conn.OpenChannel("session", nil)
 	if err != nil {
 		return nil, fmt.Errorf("error opening ssh channel for transport: %v", err)
 	}

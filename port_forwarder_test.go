@@ -46,7 +46,8 @@ func TestPortForwarderStart(t *testing.T) {
 	}
 	defer testServer.Close()
 
-	ctx, _ := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	pf := NewPortForwarder(session, 8000)
 	done := make(chan error)
 

@@ -3,7 +3,6 @@ package liveshare
 import (
 	"context"
 	"fmt"
-	"strconv"
 )
 
 // A Session represents the session between a connected Live Share client and server.
@@ -25,6 +24,8 @@ type Port struct {
 	IsPublic                         bool   `json:"isPublic"`
 	IsTCPServerConnectionEstablished bool   `json:"isTCPServerConnectionEstablished"`
 	HasTSLHandshakePassed            bool   `json:"hasTSLHandshakePassed"`
+	// ^^^
+	// TODO(adonovan): fix possible typo in field name, and audit others.
 }
 
 // StartSharing tells the liveshare host to start sharing the port from the container
@@ -33,7 +34,7 @@ func (s *Session) StartSharing(ctx context.Context, protocol string, port int) e
 
 	var response Port
 	if err := s.rpc.do(ctx, "serverSharing.startSharing", []interface{}{
-		port, protocol, fmt.Sprintf("http://localhost:%s", strconv.Itoa(port)),
+		port, protocol, fmt.Sprintf("http://localhost:%d", port),
 	}, &response); err != nil {
 		return err
 	}
