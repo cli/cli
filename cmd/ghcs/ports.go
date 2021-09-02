@@ -276,6 +276,7 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	for _, pair := range portPairs {
+		pair := pair
 		log.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
 		name := fmt.Sprintf("share-%d", pair.remote)
 		go func() {
