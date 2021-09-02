@@ -279,7 +279,7 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 		pair := pair
 
 		go func() {
-			listen, err := liveshare.Listen(pair.local)
+			listen, err := liveshare.ListenTCP(pair.local)
 			if err != nil {
 				errc <- err
 				return
@@ -288,7 +288,7 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 			log.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
 			name := fmt.Sprintf("share-%d", pair.remote)
 			fwd := liveshare.NewPortForwarder(session, name, pair.remote)
-			errc <- fwd.ForwardToLocalPort(ctx, listen) // error always non-nil
+			errc <- fwd.ForwardToListener(ctx, listen) // error always non-nil
 		}()
 	}
 
@@ -319,7 +319,7 @@ func getPortPairs(ports []string) ([]portPair, error) {
 			return pp, fmt.Errorf("convert local port to int: %v", err)
 		}
 
-		pp = append(pp, portPair{local, remote})
+		pp = append(pp, portPair{remote, local})
 	}
 
 	return pp, nil

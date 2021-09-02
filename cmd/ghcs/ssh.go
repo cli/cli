@@ -85,7 +85,7 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 	usingCustomPort := localSSHServerPort != 0 // suppress log of command line in Shell
 
 	// Ensure local port is listening before client (Shell) connects.
-	listen, err := liveshare.Listen(localSSHServerPort)
+	listen, err := liveshare.ListenTCP(localSSHServerPort)
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 	tunnelClosed := make(chan error)
 	go func() {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
-		tunnelClosed <- fwd.ForwardToLocalPort(ctx, listen) // error is always non-nil
+		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // error is always non-nil
 	}()
 
 	shellClosed := make(chan error)

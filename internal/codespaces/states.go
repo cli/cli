@@ -48,7 +48,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 	}
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
-	listen, err := liveshare.Listen(0)
+	listen, err := liveshare.ListenTCP(0)
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 	tunnelClosed := make(chan error, 1) // buffered to avoid sender stuckness
 	go func() {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
-		tunnelClosed <- fwd.ForwardToLocalPort(ctx, listen) // error is non-nil
+		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // error is non-nil
 	}()
 
 	t := time.NewTicker(1 * time.Second)

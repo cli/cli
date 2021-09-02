@@ -62,7 +62,7 @@ func logs(ctx context.Context, tail bool, codespaceName string) error {
 	}
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
-	listen, err := liveshare.Listen(0) // zero => arbitrary
+	listen, err := liveshare.ListenTCP(0) // zero => arbitrary
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func logs(ctx context.Context, tail bool, codespaceName string) error {
 	tunnelClosed := make(chan error, 1)
 	go func() {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
-		tunnelClosed <- fwd.ForwardToLocalPort(ctx, listen) // error is non-nil
+		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // error is non-nil
 	}()
 
 	cmdDone := make(chan error, 1)
