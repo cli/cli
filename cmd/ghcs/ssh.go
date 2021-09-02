@@ -20,7 +20,7 @@ func newSSHCmd() *cobra.Command {
 
 	sshCmd := &cobra.Command{
 		Use:   "ssh",
-		Short: "SSH into a Codespace",
+		Short: "SSH into a codespace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return ssh(context.Background(), sshProfile, codespaceName, sshServerPort)
@@ -29,7 +29,7 @@ func newSSHCmd() *cobra.Command {
 
 	sshCmd.Flags().StringVarP(&sshProfile, "profile", "", "", "The `name` of the SSH profile to use")
 	sshCmd.Flags().IntVarP(&sshServerPort, "server-port", "", 0, "SSH server port number (0 => pick unused)")
-	sshCmd.Flags().StringVarP(&codespaceName, "codespace", "c", "", "The `name` of the Codespace to use")
+	sshCmd.Flags().StringVarP(&codespaceName, "codespace", "c", "", "The `name` of the codespace to use")
 
 	return sshCmd
 }
@@ -53,7 +53,7 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 
 	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
-		return fmt.Errorf("get or choose Codespace: %v", err)
+		return fmt.Errorf("get or choose codespace: %v", err)
 	}
 
 	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
@@ -151,7 +151,7 @@ func getContainerID(ctx context.Context, logger *output.Logger, terminal *livesh
 }
 
 func setupEnv(ctx context.Context, logger *output.Logger, terminal *liveshare.Terminal, containerID, repositoryName, containerUser string) error {
-	setupBashProfileCmd := fmt.Sprintf(`echo "cd /workspaces/%v; export $(cat /workspaces/.codespaces/shared/.env | xargs); exec /bin/zsh;" > /home/%v/.bash_profile`, repositoryName, containerUser)
+	setupBashProfileCmd := fmt.Sprintf(`echo "export $(cat /workspaces/.codespaces/shared/.env | xargs); exec /bin/zsh;" > /home/%v/.bash_profile`, containerUser)
 
 	logger.Print(".")
 	compositeCommand := []string{setupBashProfileCmd}

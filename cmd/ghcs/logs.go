@@ -17,7 +17,7 @@ func newLogsCmd() *cobra.Command {
 
 	logsCmd := &cobra.Command{
 		Use:   "logs [<codespace>]",
-		Short: "Access Codespace logs",
+		Short: "Access codespace logs",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var codespaceName string
@@ -52,7 +52,7 @@ func logs(ctx context.Context, tail bool, codespaceName string) error {
 
 	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
-		return fmt.Errorf("get or choose Codespace: %v", err)
+		return fmt.Errorf("get or choose codespace: %v", err)
 	}
 
 	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
