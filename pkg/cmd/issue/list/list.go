@@ -57,7 +57,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Example: heredoc.Doc(`
 			$ gh issue list -l "bug" -l "help wanted"
 			$ gh issue list -A monalisa
-			$ gh issue list -a @me
+			$ gh issue list -a "@me"
 			$ gh issue list --web
 			$ gh issue list --milestone "The big 1.0"
 			$ gh issue list --search "error no:assignee sort:created-asc"

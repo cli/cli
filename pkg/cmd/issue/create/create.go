@@ -62,7 +62,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh issue create --label "bug,help wanted"
 			$ gh issue create --label bug --label "help wanted"
 			$ gh issue create --assignee monalisa,hubot
-			$ gh issue create --assignee @me
+			$ gh issue create --assignee "@me"
 			$ gh issue create --project "Roadmap"
 		`),
 		Args: cmdutil.NoArgsQuoteReminder,

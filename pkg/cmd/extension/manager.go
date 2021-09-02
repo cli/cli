@@ -268,7 +268,7 @@ func (m *Manager) Create(name string) error {
 	}
 
 	fileTmpl := heredoc.Docf(`
-		#!/bin/bash
+		#!/usr/bin/env bash
 		set -e
 
 		echo "Hello %[1]s!"

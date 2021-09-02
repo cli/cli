@@ -51,10 +51,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Short: "List and filter pull requests in this repository",
 		Example: heredoc.Doc(`
 			List PRs authored by you
-			$ gh pr list --author @me
+			$ gh pr list --author "@me"
 
 			List PRs assigned to you
-			$ gh pr list --assignee @me
+			$ gh pr list --assignee "@me"
 
 			List PRs by label, combining multiple labels with AND
 			$ gh pr list --label bug --label "priority 1"
