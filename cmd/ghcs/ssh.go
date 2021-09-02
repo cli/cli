@@ -90,8 +90,6 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 		}
 	}
 
-	tunnel := liveshare.NewPortForwarder(session, "sshd", localSSHServerPort, remoteSSHServerPort)
-
 	connectDestination := sshProfile
 	if connectDestination == "" {
 		connectDestination = fmt.Sprintf("%s@localhost", sshUser)
@@ -99,7 +97,8 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 
 	tunnelClosed := make(chan error)
 	go func() {
-		tunnelClosed <- tunnel.Forward(ctx) // error is always non-nil
+		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
+		tunnelClosed <- fwd.ForwardToLocalPort(ctx, localSSHServerPort) // error is always non-nil
 	}()
 
 	shellClosed := make(chan error)

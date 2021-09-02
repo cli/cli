@@ -70,8 +70,6 @@ func logs(ctx context.Context, tail bool, codespaceName string) error {
 		return fmt.Errorf("error getting ssh server details: %v", err)
 	}
 
-	tunnel := liveshare.NewPortForwarder(session, "sshd", localSSHPort, remoteSSHServerPort)
-
 	cmdType := "cat"
 	if tail {
 		cmdType = "tail -f"
@@ -86,7 +84,8 @@ func logs(ctx context.Context, tail bool, codespaceName string) error {
 
 	tunnelClosed := make(chan error, 1)
 	go func() {
-		tunnelClosed <- tunnel.Forward(ctx) // error is non-nil
+		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
+		tunnelClosed <- fwd.ForwardToLocalPort(ctx, localSSHPort) // error is non-nil
 	}()
 
 	cmdDone := make(chan error, 1)

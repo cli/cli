@@ -278,9 +278,9 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 	for _, pair := range portPairs {
 		log.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
 		name := fmt.Sprintf("share-%d", pair.remote)
-		fwd := liveshare.NewPortForwarder(session, name, pair.remote, pair.local)
 		go func() {
-			errc <- fwd.Forward(ctx) // error always non-nil
+			fwd := liveshare.NewPortForwarder(session, name, pair.remote)
+			errc <- fwd.ForwardToLocalPort(ctx, pair.local) // error always non-nil
 		}()
 	}
 
