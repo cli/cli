@@ -16,6 +16,7 @@ import (
 	"github.com/github/go-liveshare"
 	"github.com/muhammadmuzzammil1998/jsonc"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 // portOptions represents the options accepted by the ports command.
@@ -272,27 +273,22 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 
 	// Run forwarding of all ports concurrently, aborting all of
 	// them at the first failure, including cancellation of the context.
-	errc := make(chan error, len(portPairs))
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	group, ctx := errgroup.WithContext(ctx)
 	for _, pair := range portPairs {
 		pair := pair
-
-		go func() {
+		group.Go(func() error {
 			listen, err := liveshare.ListenTCP(pair.local)
 			if err != nil {
-				errc <- err
-				return
+				return nil
 			}
 			defer listen.Close()
 			log.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
 			name := fmt.Sprintf("share-%d", pair.remote)
 			fwd := liveshare.NewPortForwarder(session, name, pair.remote)
-			errc <- fwd.ForwardToListener(ctx, listen) // error always non-nil
-		}()
+			return fwd.ForwardToListener(ctx, listen) // error always non-nil
+		})
 	}
-
-	return <-errc // first error
+	return group.Wait() // first error
 }
 
 type portPair struct {
