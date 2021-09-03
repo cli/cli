@@ -16,6 +16,7 @@ func newLogsCmd() *cobra.Command {
 	var (
 		codespace string
 		tail      bool
+		follow    bool
 	)
 
 	log := output.NewLogger(os.Stdout, os.Stderr, false)
@@ -29,12 +30,17 @@ func newLogsCmd() *cobra.Command {
 				log.Println("<codespace> argument is deprecated. Use --codespace instead.")
 				codespace = args[0]
 			}
-			return logs(context.Background(), log, codespace, tail)
+			if tail {
+				log.Println("--tail flag is deprecated. Use --follow instead.")
+				follow = true
+			}
+			return logs(context.Background(), log, codespace, follow)
 		},
 	}
 
 	logsCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
-	logsCmd.Flags().BoolVarP(&tail, "tail", "t", false, "Tail the logs")
+	logsCmd.Flags().BoolVarP(&tail, "tail", "t", false, "Tail the logs (deprecated, use --follow)")
+	logsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Tail and follow the logs")
 
 	return logsCmd
 }
