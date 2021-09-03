@@ -49,7 +49,7 @@ func init() {
 	rootCmd.AddCommand(newLogsCmd())
 }
 
-func logs(ctx context.Context, log *output.Logger, codespaceName string, tail bool) error {
+func logs(ctx context.Context, log *output.Logger, codespaceName string, follow bool) error {
 	// Ensure all child tasks (port forwarding, remote exec) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -82,7 +82,7 @@ func logs(ctx context.Context, log *output.Logger, codespaceName string, tail bo
 	}
 
 	cmdType := "cat"
-	if tail {
+	if follow {
 		cmdType = "tail -f"
 	}
 
