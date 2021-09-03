@@ -13,21 +13,27 @@ import (
 )
 
 func newLogsCmd() *cobra.Command {
-	var tail bool
+	var (
+		codespace string
+		tail      bool
+	)
+
+	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	logsCmd := &cobra.Command{
-		Use:   "logs [<codespace>]",
+		Use:   "logs",
 		Short: "Access codespace logs",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var codespaceName string
 			if len(args) > 0 {
-				codespaceName = args[0]
+				log.Println("<codespace> argument is deprecated. Use --codespace instead.")
+				codespace = args[0]
 			}
-			return logs(context.Background(), tail, codespaceName)
+			return logs(context.Background(), log, codespace, tail)
 		},
 	}
 
+	logsCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
 	logsCmd.Flags().BoolVarP(&tail, "tail", "t", false, "Tail the logs")
 
 	return logsCmd
@@ -37,13 +43,12 @@ func init() {
 	rootCmd.AddCommand(newLogsCmd())
 }
 
-func logs(ctx context.Context, tail bool, codespaceName string) error {
+func logs(ctx context.Context, log *output.Logger, codespaceName string, tail bool) error {
 	// Ensure all child tasks (port forwarding, remote exec) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
-	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
