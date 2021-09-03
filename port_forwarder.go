@@ -26,13 +26,6 @@ func NewPortForwarder(session *Session, name string, remotePort int) *PortForwar
 	}
 }
 
-// ListenTCP calls listen on the chosen local TCP port. Zero picks an
-// arbitrary port. It is provided for the convenience of callers of
-// ForwardToListener.
-func ListenTCP(port int) (net.Listener, error) {
-	return net.Listen("tcp", fmt.Sprintf(":%d", port))
-}
-
 // ForwardToListener forwards traffic between the container's remote
 // port and a local port, which must already be listening for
 // connections. (Accepting a listener rather than a port number avoids
@@ -121,7 +114,15 @@ func (fwd *PortForwarder) handleConnection(ctx context.Context, id channelID, co
 	if err != nil {
 		return fmt.Errorf("error opening streaming channel for new connection: %v", err)
 	}
-	defer safeClose(channel, &err)
+	// Ideally we would call safeClose again, but (*ssh.channel).Close
+	// appears to have a bug that causes it return io.EOF spuriously
+	// if its peer closed first; see github.com/golang/go/issues/38115.
+	defer func() {
+		closeErr := channel.Close()
+		if err == nil && closeErr != io.EOF {
+			err = closeErr
+		}
+	}()
 
 	errs := make(chan error, 2)
 	copyConn := func(w io.Writer, r io.Reader) {
