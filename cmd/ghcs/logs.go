@@ -63,7 +63,7 @@ func logs(ctx context.Context, tail bool, codespaceName string) error {
 	}
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
-	listen, err := liveshare.ListenTCP(0) // zero => arbitrary
+	listen, err := net.Listen("tcp", ":0") // arbitrary port
 	if err != nil {
 		return err
 	}

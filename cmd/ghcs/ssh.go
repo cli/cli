@@ -86,7 +86,7 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 	usingCustomPort := localSSHServerPort != 0 // suppress log of command line in Shell
 
 	// Ensure local port is listening before client (Shell) connects.
-	listen, err := liveshare.ListenTCP(localSSHServerPort)
+	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", localSSHServerPort))
 	if err != nil {
 		return err
 	}

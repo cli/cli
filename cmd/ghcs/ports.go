@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -277,7 +278,7 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 	for _, pair := range portPairs {
 		pair := pair
 		group.Go(func() error {
-			listen, err := liveshare.ListenTCP(pair.local)
+			listen, err := net.Listen("tcp", fmt.Sprintf(":%d", pair.local))
 			if err != nil {
 				return nil
 			}

@@ -48,7 +48,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 	}
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
-	listen, err := liveshare.ListenTCP(0)
+	listen, err := net.Listen("tcp", ":0") // arbitrary port
 	if err != nil {
 		return err
 	}
