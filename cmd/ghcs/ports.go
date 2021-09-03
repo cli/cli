@@ -280,7 +280,7 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 		group.Go(func() error {
 			listen, err := net.Listen("tcp", fmt.Sprintf(":%d", pair.local))
 			if err != nil {
-				return nil
+				return err
 			}
 			defer listen.Close()
 			log.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
