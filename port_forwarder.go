@@ -26,23 +26,24 @@ func NewPortForwarder(session *Session, name string, remotePort int) *PortForwar
 	}
 }
 
-// ListenTCP calls listen on the chosen local TCP port. Zero picks an arbitrary port.
-// It is provided for the convenience of callers of ForwardToLocalPort.
-func Listen(port int) (net.Listener, error) {
+// ListenTCP calls listen on the chosen local TCP port. Zero picks an
+// arbitrary port. It is provided for the convenience of callers of
+// ForwardToListener.
+func ListenTCP(port int) (net.Listener, error) {
 	return net.Listen("tcp", fmt.Sprintf(":%d", port))
 }
 
-// ForwardToLocalPort forwards traffic between the container's remote
-// port and a local TCP port, which must already be listening for
+// ForwardToListener forwards traffic between the container's remote
+// port and a local port, which must already be listening for
 // connections. (Accepting a listener rather than a port number avoids
 // races against other processes opening ports, and against a client
 // connecting to the socket prematurely.)
 //
-// ForwardToLocalPort accepts and handles connections on the local
-// port until it encounters the first error, which may include context
+// ForwardToListener accepts and handles connections on the local port
+// until it encounters the first error, which may include context
 // cancellation. Its error result is always non-nil. The caller is
 // responsible for closing the listening port.
-func (fwd *PortForwarder) ForwardToLocalPort(ctx context.Context, listen net.Listener) (err error) {
+func (fwd *PortForwarder) ForwardToListener(ctx context.Context, listen net.Listener) (err error) {
 	id, err := fwd.shareRemotePort(ctx)
 	if err != nil {
 		return err

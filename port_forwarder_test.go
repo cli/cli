@@ -46,7 +46,7 @@ func TestPortForwarderStart(t *testing.T) {
 	}
 	defer testServer.Close()
 
-	listen, err := Listen(8000) // local port
+	listen, err := ListenTCP(8000) // local port
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func TestPortForwarderStart(t *testing.T) {
 	done := make(chan error)
 	go func() {
 		const name, remote = "ssh", 8000
-		done <- NewPortForwarder(session, name, remote).ForwardToLocalPort(ctx, listen)
+		done <- NewPortForwarder(session, name, remote).ForwardToListener(ctx, listen)
 	}()
 
 	go func() {
