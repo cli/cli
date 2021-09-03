@@ -69,6 +69,20 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 		&cobra.Command{
 			Use:   "install <repo>",
 			Short: "Install a gh extension from a repository",
+			Long: heredoc.Doc(`
+				GitHub CLI extensions are installed from a repository.
+				
+				The <repo> argument accepts the short form of the repo ("owner/repo") or the
+				full repository URL. If the full repository URL is not used, gh will install
+				the extension using the hostname to which gh is currently authenticated.
+				
+				Using the full repository URL allows GitHub Enterprise users to install
+				extensions from public GitHub.
+
+				Examples:
+				gh extension install owner/repo
+				gh extension install https://github.com/owner/repo
+			`),
 			Args:  cmdutil.MinimumArgs(1, "must specify a repository to install from"),
 			RunE: func(cmd *cobra.Command, args []string) error {
 				if args[0] == "." {
