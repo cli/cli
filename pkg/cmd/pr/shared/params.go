@@ -154,6 +154,7 @@ type FilterOptions struct {
 	Labels     []string
 	Author     string
 	BaseBranch string
+	HeadBranch string
 	Mention    string
 	Milestone  string
 	Search     string
@@ -175,6 +176,9 @@ func (opts *FilterOptions) IsDefault() bool {
 		return false
 	}
 	if opts.BaseBranch != "" {
+		return false
+	}
+	if opts.HeadBranch != "" {
 		return false
 	}
 	if opts.Mention != "" {
@@ -231,6 +235,9 @@ func SearchQueryBuild(options FilterOptions) string {
 	}
 	if options.BaseBranch != "" {
 		q.SetBaseBranch(options.BaseBranch)
+	}
+	if options.HeadBranch != "" {
+		q.SetHeadBranch(options.HeadBranch)
 	}
 	if options.Mention != "" {
 		q.Mentions(options.Mention)
