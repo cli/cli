@@ -224,11 +224,32 @@ func TestManager_Upgrade_Force(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, heredoc.Docf(
 		`
-		[git -C %s --git-dir=%s fetch origin HEAD]
-		[git -C %s --git-dir=%s reset --hard origin/HEAD]
+		[git -C %[1]s --git-dir=%[2]s fetch origin HEAD]
+		[git -C %[1]s --git-dir=%[2]s reset --hard origin/HEAD]
 		`,
 		extensionDir,
 		gitDir,
+	), stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
+func TestManager_Upgrade_Shallow(t *testing.T) {
+	tempDir := t.TempDir()
+	extensionDir := filepath.Join(tempDir, "extensions", "gh-remote")
+	gitDir := filepath.Join(tempDir, "extensions", "gh-remote", ".git")
+
+	assert.NoError(t, stubShallowExtension(filepath.Join(tempDir, "extensions", "gh-remote", "gh-remote")))
+
+	io, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, nil, io)
+
+	err := m.Upgrade("remote", true)
+	assert.NoError(t, err)
+	assert.Equal(t, heredoc.Docf(
+		`
+		[git -C %[1]s --git-dir=%[2]s fetch origin HEAD --depth=1]
+		[git -C %[1]s --git-dir=%[2]s reset --hard origin/HEAD]
+		`,
 		extensionDir,
 		gitDir,
 	), stdout.String())
@@ -482,6 +503,23 @@ func stubExtension(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
 	}
+	f, err := os.OpenFile(path, os.O_CREATE, 0755)
+	if err != nil {
+		return err
+	}
+	return f.Close()
+}
+
+func stubShallowExtension(path string) error {
+	gitdir := filepath.Join(filepath.Dir(path), ".git")
+	if err := os.MkdirAll(gitdir, 0755); err != nil {
+		return err
+	}
+	s, err := os.OpenFile(filepath.Join(gitdir, "shallow"), os.O_CREATE, 0755)
+	if err != nil {
+		return err
+	}
+	defer s.Close()
 	f, err := os.OpenFile(path, os.O_CREATE, 0755)
 	if err != nil {
 		return err
