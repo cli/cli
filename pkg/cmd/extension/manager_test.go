@@ -347,7 +347,7 @@ func TestManager_Install_git(t *testing.T) {
 
 	err := m.Install(repo)
 	assert.NoError(t, err)
-	assert.Equal(t, fmt.Sprintf("[git clone https://github.com/owner/gh-some-ext.git %s]\n", filepath.Join(tempDir, "extensions", "gh-some-ext")), stdout.String())
+	assert.Equal(t, fmt.Sprintf("[git clone --depth=1 https://github.com/owner/gh-some-ext.git %s]\n", filepath.Join(tempDir, "extensions", "gh-some-ext")), stdout.String())
 	assert.Equal(t, "", stderr.String())
 }
 

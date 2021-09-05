@@ -359,7 +359,8 @@ func (m *Manager) installGit(cloneURL string, stdout, stderr io.Writer) error {
 	name := strings.TrimSuffix(path.Base(cloneURL), ".git")
 	targetDir := filepath.Join(m.installDir(), name)
 
-	externalCmd := m.newCommand(exe, "clone", cloneURL, targetDir)
+	// Create a shallow clone for faster installs. Users can `git fetch --unshallow` if they want a complete repo.
+	externalCmd := m.newCommand(exe, "clone", "--depth=1", cloneURL, targetDir)
 	externalCmd.Stdout = stdout
 	externalCmd.Stderr = stderr
 	return externalCmd.Run()
@@ -395,6 +396,7 @@ func (m *Manager) Upgrade(name string, force bool) error {
 			continue
 		}
 
+		// Attempt to upgrade based on a manifest first.
 		binManifestPath := filepath.Join(filepath.Dir(f.Path()), manifestName)
 		if _, e := os.Stat(binManifestPath); e == nil {
 			err = m.upgradeBin(f)
@@ -418,12 +420,25 @@ func (m *Manager) Upgrade(name string, force bool) error {
 func (m *Manager) upgradeGit(ext extensions.Extension, exe string, force bool) error {
 	var cmds []*exec.Cmd
 	dir := filepath.Dir(ext.Path())
-	if force {
-		fetchCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "fetch", "origin", "HEAD")
-		resetCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "reset", "--hard", "origin/HEAD")
+	gitdir := filepath.Join(dir, ".git")
+
+	// If repo is shallow run the same commands as force.
+	var shallowArgs []string
+	if _, err := os.Stat(filepath.Join(gitdir, "shallow")); !os.IsNotExist(err) {
+		shallowArgs = []string{"--depth=1"}
+	}
+
+	if force || len(shallowArgs) > 0 {
+		fetchArgs := []string{"-C", dir, "--git-dir=" + gitdir, "fetch", "origin", "HEAD"}
+		// Only perform shallow fetch for already-shallow repos.
+		if len(shallowArgs) > 0 {
+			fetchArgs = append(fetchArgs, shallowArgs...)
+		}
+		fetchCmd := m.newCommand(exe, fetchArgs...)
+		resetCmd := m.newCommand(exe, "-C", dir, "--git-dir="+gitdir, "reset", "--hard", "origin/HEAD")
 		cmds = []*exec.Cmd{fetchCmd, resetCmd}
 	} else {
-		pullCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "pull", "--ff-only")
+		pullCmd := m.newCommand(exe, "-C", dir, "--git-dir="+gitdir, "pull", "--ff-only")
 		cmds = []*exec.Cmd{pullCmd}
 	}
 
