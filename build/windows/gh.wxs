@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<?ifndef ProductVersion?>
+<?error ProductVersion property not defined?>
+<?endif?>
+
+<!-- Define a unique UpgradeCode per platform -->
+<?define UpgradeCode=8CFB9531-B959-4E1B-AA2E-4AF0FFCC4AF4?>
+
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <Product Id="*" Name="GitHub CLI" Version="$(var.ProductVersion)" Language="1033" Manufacturer="GitHub, Inc." UpgradeCode="$(var.UpgradeCode)">
+        <Package Compressed="yes" InstallerVersion="200" InstallScope="perMachine"/>
+        <MediaTemplate EmbedCab="yes"/>
+
+        <!-- Remove older product(s) early but within the transaction -->
+        <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="A newer version of !(bind.property.ProductName) is already installed."/>
+
+        <!-- Upgrade older x86 products -->
+        <Upgrade Id="7C0A5736-5B8E-4176-B350-613FA2D8A1B3">
+            <UpgradeVersion Maximum="$(var.ProductVersion)" Property="OLDERX86VERSIONDETECTED"/>
+        </Upgrade>
+
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <Directory Id="ProgramFiles64Folder" Name="Program Files">
+                <Directory Id="INSTALLDIR" Name="GitHub CLI"/>
+            </Directory>
+        </Directory>
+
+        <!-- Restore the INSTALLDIR if previously persisted to the registry -->
+        <Property Id="INSTALLDIR">
+            <RegistrySearch Id="InstallDir" Root="HKLM" Key="SOFTWARE\GitHub\CLI" Name="InstallDir" Type="directory"/>
+        </Property>
+
+        <Feature Id="DefaultFeature" ConfigurableDirectory="INSTALLDIR">
+            <!-- @Guid will be automatically and durably assigned based on key path -->
+            <Component Directory="INSTALLDIR">
+                <File Name="gh.exe"/>
+            </Component>
+
+            <!-- Persist the INSTALLDIR and restore it in subsequent installs -->
+            <Component Directory="INSTALLDIR">
+                <RegistryValue Root="HKLM" Key="SOFTWARE\GitHub\CLI" Name="InstallDir" Type="string" Value="[INSTALLDIR]"/>
+            </Component>
+
+            <Component Id="Env" Guid="94FAAC3D-4478-431C-8497-FBA55DCFB249" Directory="TARGETDIR">
+                <Environment Id="Path" Action="set" Name="PATH" Part="last" System="yes" Value="[INSTALLDIR]"/>
+            </Component>
+        </Feature>
+
+        <!-- Broadcast environment variable changes -->
+        <CustomActionRef Id="WixBroadcastEnvironmentChange" />
+
+        <!-- Use WixUI showing license and allowing user-specified INSTALLDIR -->
+        <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR"/>
+        <UIRef Id="WixUI_InstallDir"/>
+        <WixVariable Id="WixUILicenseRtf" Value="LICENSE.rtf"/>
+    </Product>
+</Wix>
