@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
-        <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+        <Configuration>Release</Configuration>
         <Platform Condition="'$(Platform)' == ''">x64</Platform>
         <ProductVersion Condition="'$(ProductVersion)' == ''">0.1.0</ProductVersion>
         <OutputName Condition="'$(OutputName)' == ''">$(MSBuildProjectName)</OutputName>
         <OutputType>package</OutputType>
-        <RepoPath>$(MSBuildProjectDirectory)\..\..</RepoPath>
-        <OutputPath>$(RepoPath)\bin\$(Platform)\$(Configuration)\</OutputPath>
-        <IntermediateOutputPath>$(RepoPath)\bin\obj\$(Platform)\$(Configuration)\</IntermediateOutputPath>
+        <RepoPath>$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory)\..\..))</RepoPath>
+        <OutputPath Condition="'$(OutputPath)' == ''">$(RepoPath)bin\$(Platform)\</OutputPath>
+        <IntermediateOutputPath>$(RepoPath)bin\obj\$(Platform)\</IntermediateOutputPath>
         <DefineConstants>
             $(DefineConstants);
             ProductVersion=$(ProductVersion);
@@ -31,5 +31,9 @@
         <WixExtension Include="WixUIExtension"/>
         <WixExtension Include="WixUtilExtension"/>
     </ItemGroup>
+    <Target Name="SetStepOutput" AfterTargets="Build" Condition="'$(GITHUB_ACTIONS)' != ''">
+        <!-- Make sure the correct target path is always set as the step output -->
+        <Message Importance="high" Text="::set-output name=msi::$(TargetPath)"/>
+    </Target>
     <Import Project="$(WixTargetsPath)"/>
 </Project>
