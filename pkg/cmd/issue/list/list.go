@@ -151,9 +151,9 @@ func listRun(opts *ListOptions) error {
 		filterOptions.Fields = opts.Exporter.Fields()
 	}
 
-	listResult, listErr := issueList(httpClient, baseRepo, filterOptions, opts.LimitResults)
-	if listErr != nil && listErr != api.ErrSearchAPIMaxLimit {
-		return listErr
+	listResult, err := issueList(httpClient, baseRepo, filterOptions, opts.LimitResults)
+	if err != nil {
+		return err
 	}
 
 	err = opts.IO.StartPager()
@@ -166,16 +166,12 @@ func listRun(opts *ListOptions) error {
 		return opts.Exporter.Write(opts.IO, listResult.Issues)
 	}
 
+	if listResult.SearchCapped {
+		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
+	}
 	if isTerminal {
 		title := prShared.ListHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, !filterOptions.IsDefault())
-		out := fmt.Sprintf("\n%s\n", title)
-
-		if listErr == api.ErrSearchAPIMaxLimit {
-			icon := opts.IO.ColorScheme().WarningIcon()
-			out = fmt.Sprintf("%s%s warning: %s\n", out, icon, listErr.Error())
-		}
-
-		fmt.Fprintf(opts.IO.Out, "%s\n", out)
+		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
 	issueShared.PrintIssues(opts.IO, "", len(listResult.Issues), listResult.Issues)

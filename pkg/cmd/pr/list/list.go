@@ -151,9 +151,9 @@ func listRun(opts *ListOptions) error {
 		return opts.Browser.Browse(openURL)
 	}
 
-	listResult, listErr := listPullRequests(httpClient, baseRepo, filters, opts.LimitResults)
-	if listErr != nil && listErr != api.ErrSearchAPIMaxLimit {
-		return listErr
+	listResult, err := listPullRequests(httpClient, baseRepo, filters, opts.LimitResults)
+	if err != nil {
+		return err
 	}
 
 	err = opts.IO.StartPager()
@@ -166,16 +166,12 @@ func listRun(opts *ListOptions) error {
 		return opts.Exporter.Write(opts.IO, listResult.PullRequests)
 	}
 
+	if listResult.SearchCapped {
+		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
+	}
 	if opts.IO.IsStdoutTTY() {
 		title := shared.ListHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, !filters.IsDefault())
-		out := fmt.Sprintf("\n%s\n", title)
-
-		if listErr == api.ErrSearchAPIMaxLimit {
-			icon := opts.IO.ColorScheme().WarningIcon()
-			out = fmt.Sprintf("%s%s warning: %s\n", out, icon, listErr.Error())
-		}
-
-		fmt.Fprintln(opts.IO.Out, out)
+		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
 	cs := opts.IO.ColorScheme()

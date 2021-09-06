@@ -26,6 +26,7 @@ type PullRequestsPayload struct {
 type PullRequestAndTotalCount struct {
 	TotalCount   int
 	PullRequests []PullRequest
+	SearchCapped bool
 }
 
 type PullRequest struct {

@@ -130,9 +130,9 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	listResult, listErr := listRepos(httpClient, host, opts.Limit, opts.Owner, filter)
-	if listErr != nil {
-		return listErr
+	listResult, err := listRepos(httpClient, host, opts.Limit, opts.Owner, filter)
+	if err != nil {
+		return err
 	}
 
 	if err := opts.IO.StartPager(); err != nil {
@@ -171,17 +171,13 @@ func listRun(opts *ListOptions) error {
 		tp.EndRow()
 	}
 
+	if listResult.FromSearch && opts.Limit > 1000 {
+		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
+	}
 	if opts.IO.IsStdoutTTY() {
 		hasFilters := filter.Visibility != "" || filter.Fork || filter.Source || filter.Language != "" || filter.Topic != ""
 		title := listHeader(listResult.Owner, len(listResult.Repositories), listResult.TotalCount, hasFilters)
-		out := fmt.Sprintf("\n%s\n", title)
-
-		if listErr == api.ErrSearchAPIMaxLimit {
-			icon := opts.IO.ColorScheme().WarningIcon()
-			out = fmt.Sprintf("%s%s warning: %s\n", out, icon, listErr.Error())
-		}
-
-		fmt.Fprintln(opts.IO.Out, out)
+		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
 	return tp.Render()

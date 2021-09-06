@@ -144,17 +144,6 @@ func Test_listPullRequests(t *testing.T) {
 					}))
 			},
 		},
-		{
-			name: "with labels and limit above 1000",
-			args: args{
-				repo:  ghrepo.New("OWNER", "REPO"),
-				limit: 2000,
-				filters: prShared.FilterOptions{
-					Labels: []string{"hello", "one world"},
-				},
-			},
-			wantErr: true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
