@@ -5,9 +5,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/githubsearch"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/githubsearch"
 	"github.com/google/shlex"
 )
 

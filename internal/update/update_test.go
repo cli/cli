@@ -7,8 +7,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/pkg/httpmock"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/pkg/httpmock"
 )
 
 func TestCheckForUpdate(t *testing.T) {

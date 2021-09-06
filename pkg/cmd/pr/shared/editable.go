@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/set"
-	"github.com/cli/cli/pkg/surveyext"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/set"
+	"github.com/cli/cli/v2/pkg/surveyext"
 )
 
 type Editable struct {

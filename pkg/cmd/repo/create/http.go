@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/cli/cli/api"
+	"github.com/cli/cli/v2/api"
 )
 
 // repoCreateInput is input parameters for the repoCreate method

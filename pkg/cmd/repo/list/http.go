@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/pkg/githubsearch"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/pkg/githubsearch"
 	"github.com/shurcooL/githubv4"
 )
 

@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/secret/shared"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/secret/shared"
 )
 
 type SecretPayload struct {

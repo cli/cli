@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/internal/httpunix"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/httpunix"
+	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 var timezoneNames = map[int]string{
