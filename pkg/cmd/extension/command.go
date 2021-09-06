@@ -30,6 +30,8 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			will be forwarded to the %[1]sgh-<extname>%[1]s executable of the extension.
 
 			An extension cannot override any of the core gh commands.
+
+			See the list of available extensions at <https://github.com/topics/gh-extension>
 		`, "`"),
 		Aliases: []string{"extensions"},
 	}
@@ -67,23 +69,25 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			},
 		},
 		&cobra.Command{
-			Use:   "install <repo>",
+			Use:   "install <repository>",
 			Short: "Install a gh extension from a repository",
 			Long: heredoc.Doc(`
-				GitHub CLI extensions are installed from a repository.
+				Install a GitHub repository locally as a GitHub CLI extension.
 				
-				The <repo> argument accepts the short form of the repo ("owner/repo") or the
-				full repository URL. If the full repository URL is not used, gh will install
-				the extension using the hostname to which gh is currently authenticated.
+				The repository argument can be specified in "owner/repo" format as well as a full URL.
+				The URL format is useful when the repository is not hosted on github.com.
 				
-				Using the full repository URL allows GitHub Enterprise users to install
-				extensions from public GitHub.
+				To install an extension in development from the current directory, use "." as the
+				value of the repository argument.
 
-				Examples:
-				gh extension install owner/repo
-				gh extension install https://github.com/owner/repo
+				See the list of available extensions at <https://github.com/topics/gh-extension>
 			`),
-			Args:  cmdutil.MinimumArgs(1, "must specify a repository to install from"),
+			Example: heredoc.Doc(`
+				$ gh extension install owner/gh-extension
+				$ gh extension install https://git.example.com/owner/gh-extension
+				$ gh extension install .
+			`),
+			Args: cmdutil.MinimumArgs(1, "must specify a repository to install from"),
 			RunE: func(cmd *cobra.Command, args []string) error {
 				if args[0] == "." {
 					wd, err := os.Getwd()
