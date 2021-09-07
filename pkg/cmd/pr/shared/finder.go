@@ -317,10 +317,8 @@ func findForBranch(httpClient *http.Client, repo ghrepo.Interface, baseBranch, h
 	})
 
 	for _, pr := range prs {
-		if pr.HeadLabel() == headBranch && (baseBranch == "" || pr.BaseRefName == baseBranch) {
-			if pr.State == "OPEN" || resp.Repository.DefaultBranchRef.Name != headBranch {
-				return &pr, nil
-			}
+		if pr.HeadLabel() == headBranch && (baseBranch == "" || pr.BaseRefName == baseBranch) && (pr.State == "OPEN" || resp.Repository.DefaultBranchRef.Name != headBranch) {
+			return &pr, nil
 		}
 	}
 
