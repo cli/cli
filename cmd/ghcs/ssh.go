@@ -13,7 +13,6 @@ import (
 	"github.com/github/ghcs/internal/codespaces"
 	"github.com/github/go-liveshare"
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 )
 
 func newSSHCmd() *cobra.Command {
@@ -99,19 +98,26 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 	}
 
 	log.Println("Ready...")
-	group, ctx := errgroup.WithContext(ctx)
-	group.Go(func() error {
+	tunnelClosed := make(chan error, 1)
+	go func() {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
-		err := fwd.ForwardToListener(ctx, listen) // always non-nil
+		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // always non-nil
+	}()
+
+	shellClosed := make(chan error, 1)
+	go func() {
+		shellClosed <- codespaces.Shell(ctx, log, localSSHServerPort, connectDestination, usingCustomPort)
+	}()
+
+	select {
+	case err := <-tunnelClosed:
 		return fmt.Errorf("tunnel closed: %v", err)
-	})
-	group.Go(func() error {
-		if err := codespaces.Shell(ctx, log, localSSHServerPort, connectDestination, usingCustomPort); err != nil {
+	case err := <-shellClosed:
+		if err != nil {
 			return fmt.Errorf("shell closed: %v", err)
 		}
 		return nil // success
-	})
-	return group.Wait()
+	}
 }
 
 func getContainerID(ctx context.Context, logger *output.Logger, terminal *liveshare.Terminal) (string, error) {
