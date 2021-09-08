@@ -11,7 +11,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
-func IssueOrPullRequestFromArg(apiClient *api.Client, baseRepoFn func() (ghrepo.Interface, error), arg string) (*api.Issue, ghrepo.Interface, error) {
+func IssueFromArg(apiClient *api.Client, baseRepoFn func() (ghrepo.Interface, error), arg string, includePullRequestsArg ...bool) (*api.Issue, ghrepo.Interface, error) {
 	issueNumber, baseRepo := issueMetadataFromURL(arg)
 
 	if issueNumber == 0 {
@@ -30,30 +30,8 @@ func IssueOrPullRequestFromArg(apiClient *api.Client, baseRepoFn func() (ghrepo.
 		}
 	}
 
-	issue, err := issueFromNumber(apiClient, baseRepo, issueNumber, true)
-	return issue, baseRepo, err
-}
-
-func IssueFromArg(apiClient *api.Client, baseRepoFn func() (ghrepo.Interface, error), arg string) (*api.Issue, ghrepo.Interface, error) {
-	issueNumber, baseRepo := issueMetadataFromURL(arg)
-
-	if issueNumber == 0 {
-		var err error
-		issueNumber, err = strconv.Atoi(strings.TrimPrefix(arg, "#"))
-		if err != nil {
-			return nil, nil, fmt.Errorf("invalid issue format: %q", arg)
-		}
-	}
-
-	if baseRepo == nil {
-		var err error
-		baseRepo, err = baseRepoFn()
-		if err != nil {
-			return nil, nil, fmt.Errorf("could not determine base repo: %w", err)
-		}
-	}
-
-	issue, err := issueFromNumber(apiClient, baseRepo, issueNumber, false)
+	includePullRequests := len(includePullRequestsArg) > 0 && includePullRequestsArg[0]
+	issue, err := issueFromNumber(apiClient, baseRepo, issueNumber, includePullRequests)
 	return issue, baseRepo, err
 }
 

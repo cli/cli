@@ -330,13 +330,13 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int, includePul
 		}
 	}`
 
-	query := `
+	issueQuery := `
 	query IssueByNumber($owner: String!, $repo: String!, $issue_number: Int!) {
 		repository(owner: $owner, name: $repo) {
 			hasIssuesEnabled
 			issue(number: $issue_number) {
 				__typename 
-				` + issueFields + ` 
+				` + issueFields + `
 			}
 		}
 	}`
@@ -348,14 +348,13 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int, includePul
 	}
 
 	var resp response
-	var err error
 
+	query := issueQuery
 	if includePullRequests {
-		err = client.GraphQL(repo.RepoHost(), issueOrPullRequestQuery, variables, &resp)
-	} else {
-		err = client.GraphQL(repo.RepoHost(), query, variables, &resp)
+		query = issueOrPullRequestQuery
 	}
 
+	err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
 	if err != nil {
 		return nil, err
 	}

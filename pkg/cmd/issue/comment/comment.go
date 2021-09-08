@@ -69,7 +69,7 @@ func retrieveIssue(httpClient func() (*http.Client, error),
 		}
 		apiClient := api.NewClientFromHTTP(httpClient)
 
-		issue, repo, err := issueShared.IssueOrPullRequestFromArg(apiClient, baseRepo, selector)
+		issue, repo, err := issueShared.IssueFromArg(apiClient, baseRepo, selector, true)
 		if err != nil {
 			return nil, nil, err
 		}

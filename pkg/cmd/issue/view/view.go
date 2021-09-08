@@ -129,7 +129,7 @@ func viewRun(opts *ViewOptions) error {
 
 func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, loadComments bool) (*api.Issue, error) {
 	apiClient := api.NewClientFromHTTP(client)
-	issue, repo, err := issueShared.IssueOrPullRequestFromArg(apiClient, baseRepoFn, selector)
+	issue, repo, err := issueShared.IssueFromArg(apiClient, baseRepoFn, selector, true)
 	if err != nil {
 		return issue, err
 	}
@@ -230,14 +230,11 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 	}
 
 	// Footer
-	switch issue.TypeName {
-	case api.IssueTypeName:
-		fmt.Fprintf(out, cs.Gray("View this issue on GitHub: %s\n"), issue.URL)
-	case api.PullRequestTypeName:
-		fmt.Fprintf(out, cs.Gray("View this pull request on GitHub: %s\n"), issue.URL)
-	default:
-		fmt.Fprintf(out, cs.Gray("View this issue on GitHub: %s\n"), issue.URL)
+	typeName := "issue"
+	if issue.TypeName == api.PullRequestTypeName {
+		typeName = "pull request"
 	}
+	fmt.Fprintf(out, cs.Gray("View this %s on GitHub: %s\n"), typeName, issue.URL)
 
 	return nil
 }
