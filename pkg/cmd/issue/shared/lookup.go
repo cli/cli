@@ -11,6 +11,29 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
+func IssueOrPullRequestFromArg(apiClient *api.Client, baseRepoFn func() (ghrepo.Interface, error), arg string) (*api.Issue, ghrepo.Interface, error) {
+	issueNumber, baseRepo := issueMetadataFromURL(arg)
+
+	if issueNumber == 0 {
+		var err error
+		issueNumber, err = strconv.Atoi(strings.TrimPrefix(arg, "#"))
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid issue format: %q", arg)
+		}
+	}
+
+	if baseRepo == nil {
+		var err error
+		baseRepo, err = baseRepoFn()
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not determine base repo: %w", err)
+		}
+	}
+
+	issue, err := issueFromNumber(apiClient, baseRepo, issueNumber, true)
+	return issue, baseRepo, err
+}
+
 func IssueFromArg(apiClient *api.Client, baseRepoFn func() (ghrepo.Interface, error), arg string) (*api.Issue, ghrepo.Interface, error) {
 	issueNumber, baseRepo := issueMetadataFromURL(arg)
 
@@ -30,7 +53,7 @@ func IssueFromArg(apiClient *api.Client, baseRepoFn func() (ghrepo.Interface, er
 		}
 	}
 
-	issue, err := issueFromNumber(apiClient, baseRepo, issueNumber)
+	issue, err := issueFromNumber(apiClient, baseRepo, issueNumber, false)
 	return issue, baseRepo, err
 }
 
@@ -56,6 +79,6 @@ func issueMetadataFromURL(s string) (int, ghrepo.Interface) {
 	return issueNumber, repo
 }
 
-func issueFromNumber(apiClient *api.Client, repo ghrepo.Interface, issueNumber int) (*api.Issue, error) {
-	return api.IssueByNumber(apiClient, repo, issueNumber)
+func issueFromNumber(apiClient *api.Client, repo ghrepo.Interface, issueNumber int, includePullRequests bool) (*api.Issue, error) {
+	return api.IssueByNumber(apiClient, repo, issueNumber, includePullRequests)
 }

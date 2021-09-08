@@ -20,7 +20,15 @@ type IssuesAndTotalCount struct {
 	TotalCount int
 }
 
+type IssueOrPullRequestType string
+
+const (
+	IssueTypeName       IssueOrPullRequestType = "Issue"
+	PullRequestTypeName IssueOrPullRequestType = "PullRequest"
+)
+
 type Issue struct {
+	TypeName       IssueOrPullRequestType `json:"__typename"`
 	ID             string
 	Number         int
 	Title          string
@@ -105,8 +113,8 @@ type Owner struct {
 
 type Author struct {
 	// adding these breaks generated GraphQL requests
-	//ID    string `json:"id,omitempty"`
-	//Name  string `json:"name,omitempty"`
+	// ID    string `json:"id,omitempty"`
+	// Name  string `json:"name,omitempty"`
 	Login string `json:"login"`
 }
 
@@ -229,89 +237,106 @@ func IssueStatus(client *Client, repo ghrepo.Interface, options IssueStatusOptio
 	return &payload, nil
 }
 
-func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, error) {
+func IssueByNumber(client *Client, repo ghrepo.Interface, number int, includePullRequests bool) (*Issue, error) {
 	type response struct {
 		Repository struct {
-			Issue            Issue
-			HasIssuesEnabled bool
+			Issue              Issue
+			IssueOrPullRequest Issue
+			HasIssuesEnabled   bool
 		}
 	}
+
+	issueFields := `
+	id
+	title
+	state
+	body
+	author {
+		login
+	}
+	comments(last: 1) {
+		nodes {
+			author {
+				login
+			}
+			authorAssociation
+			body
+			createdAt
+			includesCreatedEdit
+			isMinimized
+			minimizedReason
+			reactionGroups {
+				content
+				users {
+					totalCount
+				}
+			}
+		}
+		totalCount
+	}
+	number
+	url
+	createdAt
+	assignees(first: 100) {
+		nodes {
+			id
+			name
+			login
+		}
+		totalCount
+	}
+	labels(first: 100) {
+		nodes {
+			id
+			name
+			description
+			color
+		}
+		totalCount
+	}
+	projectCards(first: 100) {
+		nodes {
+			project {
+				name
+			}
+			column {
+				name
+			}
+		}
+		totalCount
+	}
+	milestone {
+		number
+		title
+		description
+		dueOn
+	}
+	reactionGroups {
+		content
+		users {
+			totalCount
+		}
+	}`
+
+	issueOrPullRequestQuery := `
+	query IssueByNumber($owner: String!, $repo: String!, $issue_number: Int!) {
+		repository(owner: $owner, name: $repo) {
+			hasIssuesEnabled
+			issueOrPullRequest(number: $issue_number) {
+				__typename
+				... on Issue { ` + issueFields + ` }
+				... on PullRequest { ` + issueFields + ` }
+			}
+		}
+	}`
 
 	query := `
 	query IssueByNumber($owner: String!, $repo: String!, $issue_number: Int!) {
 		repository(owner: $owner, name: $repo) {
 			hasIssuesEnabled
 			issue(number: $issue_number) {
-				id
-				title
-				state
-				body
-				author {
-					login
-				}
-				comments(last: 1) {
-					nodes {
-						author {
-							login
-						}
-						authorAssociation
-						body
-						createdAt
-						includesCreatedEdit
-						isMinimized
-						minimizedReason
-						reactionGroups {
-							content
-							users {
-								totalCount
-							}
-						}
-					}
-					totalCount
-				}
-				number
-				url
-				createdAt
-				assignees(first: 100) {
-					nodes {
-						id
-						name
-						login
-					}
-					totalCount
-				}
-				labels(first: 100) {
-					nodes {
-						id
-						name
-						description
-						color
-					}
-					totalCount
-				}
-				projectCards(first: 100) {
-					nodes {
-						project {
-							name
-						}
-						column {
-							name
-						}
-					}
-					totalCount
-				}
-				milestone {
-					number
-					title
-					description
-					dueOn
-				}
-				reactionGroups {
-					content
-					users {
-						totalCount
-					}
-				}
+				__typename 
+				` + issueFields + ` 
 			}
 		}
 	}`
@@ -323,14 +348,24 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 	}
 
 	var resp response
-	err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
+	var err error
+
+	if includePullRequests {
+		err = client.GraphQL(repo.RepoHost(), issueOrPullRequestQuery, variables, &resp)
+	} else {
+		err = client.GraphQL(repo.RepoHost(), query, variables, &resp)
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
 	if !resp.Repository.HasIssuesEnabled {
-
 		return nil, &IssuesDisabledError{fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))}
+	}
+
+	if includePullRequests {
+		return &resp.Repository.IssueOrPullRequest, nil
 	}
 
 	return &resp.Repository.Issue, nil
@@ -353,7 +388,6 @@ func IssueClose(client *Client, repo ghrepo.Interface, issue Issue) error {
 
 	gql := graphQLClient(client.http, repo.RepoHost())
 	err := gql.MutateNamed(context.Background(), "IssueClose", &mutation, variables)
-
 	if err != nil {
 		return err
 	}
