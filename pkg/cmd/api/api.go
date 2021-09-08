@@ -213,7 +213,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringSliceVarP(&opts.Previews, "preview", "p", nil, "Opt into GitHub API previews")
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response headers in the output")
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
-	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request")
+	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request (use \"-\" to read from stdin)")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
 	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format the response using a Go template")
 	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
