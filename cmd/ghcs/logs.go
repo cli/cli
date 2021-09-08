@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 
 	"github.com/github/ghcs/api"
@@ -10,6 +11,7 @@ import (
 	"github.com/github/ghcs/internal/codespaces"
 	"github.com/github/go-liveshare"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 func newLogsCmd() *cobra.Command {
@@ -71,10 +73,13 @@ func logs(ctx context.Context, log *output.Logger, codespaceName string, follow 
 		return fmt.Errorf("connecting to Live Share: %v", err)
 	}
 
-	localSSHPort, err := codespaces.UnusedPort()
+	// Ensure local port is listening before client (getPostCreateOutput) connects.
+	listen, err := net.Listen("tcp", ":0") // arbitrary port
 	if err != nil {
 		return err
 	}
+	defer listen.Close()
+	localPort := listen.Addr().(*net.TCPAddr).Port
 
 	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, session, log)
 	if err != nil {
@@ -88,30 +93,15 @@ func logs(ctx context.Context, log *output.Logger, codespaceName string, follow 
 
 	dst := fmt.Sprintf("%s@localhost", sshUser)
 	cmd := codespaces.NewRemoteCommand(
-		ctx, localSSHPort, dst, fmt.Sprintf("%s /workspaces/.codespaces/.persistedshare/creation.log", cmdType),
+		ctx, localPort, dst, fmt.Sprintf("%s /workspaces/.codespaces/.persistedshare/creation.log", cmdType),
 	)
 
-	// Error channels are buffered so that neither sending goroutine gets stuck.
-
-	tunnelClosed := make(chan error, 1)
-	go func() {
+	group, ctx := errgroup.WithContext(ctx)
+	group.Go(func() error {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
-		tunnelClosed <- fwd.ForwardToLocalPort(ctx, localSSHPort) // error is non-nil
-	}()
-
-	cmdDone := make(chan error, 1)
-	go func() {
-		cmdDone <- cmd.Run()
-	}()
-
-	select {
-	case err := <-tunnelClosed:
+		err := fwd.ForwardToListener(ctx, listen) // error is non-nil
 		return fmt.Errorf("connection closed: %v", err)
-
-	case err := <-cmdDone:
-		if err != nil {
-			return fmt.Errorf("error retrieving logs: %v", err)
-		}
-		return nil // success
-	}
+	})
+	group.Go(cmd.Run)
+	return group.Wait()
 }

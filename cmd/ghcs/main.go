@@ -19,8 +19,9 @@ func main() {
 var version = "DEV"
 
 var rootCmd = &cobra.Command{
-	Use:          "ghcs",
-	SilenceUsage: true, // don't print usage message after each error (see #80)
+	Use:           "ghcs",
+	SilenceUsage:  true,  // don't print usage message after each error (see #80)
+	SilenceErrors: false, // print errors automatically so that main need not
 	Long: `Unofficial CLI tool to manage GitHub Codespaces.
 
 Running commands requires the GITHUB_TOKEN environment variable to be set to a
@@ -43,5 +44,4 @@ func explainError(w io.Writer, err error) {
 		fmt.Fprintln(w, "Make sure to enable SSO for your organizations after creating the token.")
 		return
 	}
-	fmt.Fprintf(w, "%v\n", err)
 }

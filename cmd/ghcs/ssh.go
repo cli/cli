@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/github/ghcs/internal/codespaces"
 	"github.com/github/go-liveshare"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 func newSSHCmd() *cobra.Command {
@@ -81,42 +83,35 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 	}
 	log.Print("\n")
 
-	usingCustomPort := true
-	if localSSHServerPort == 0 {
-		usingCustomPort = false // suppress log of command line in Shell
-		localSSHServerPort, err = codespaces.UnusedPort()
-		if err != nil {
-			return err
-		}
+	usingCustomPort := localSSHServerPort != 0 // suppress log of command line in Shell
+
+	// Ensure local port is listening before client (Shell) connects.
+	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", localSSHServerPort))
+	if err != nil {
+		return err
 	}
+	defer listen.Close()
+	localSSHServerPort = listen.Addr().(*net.TCPAddr).Port
 
 	connectDestination := sshProfile
 	if connectDestination == "" {
 		connectDestination = fmt.Sprintf("%s@localhost", sshUser)
 	}
 
-	tunnelClosed := make(chan error)
-	go func() {
-		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
-		tunnelClosed <- fwd.ForwardToLocalPort(ctx, localSSHServerPort) // error is always non-nil
-	}()
-
-	shellClosed := make(chan error)
-	go func() {
-		shellClosed <- codespaces.Shell(ctx, log, localSSHServerPort, connectDestination, usingCustomPort)
-	}()
-
 	log.Println("Ready...")
-	select {
-	case err := <-tunnelClosed:
+	group, ctx := errgroup.WithContext(ctx)
+	group.Go(func() error {
+		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
+		err := fwd.ForwardToListener(ctx, listen) // always non-nil
 		return fmt.Errorf("tunnel closed: %v", err)
-
-	case err := <-shellClosed:
-		if err != nil {
+	})
+	group.Go(func() error {
+		if err := codespaces.Shell(ctx, log, localSSHServerPort, connectDestination, usingCustomPort); err != nil {
 			return fmt.Errorf("shell closed: %v", err)
 		}
 		return nil // success
-	}
+	})
+	return group.Wait()
 }
 
 func getContainerID(ctx context.Context, logger *output.Logger, terminal *liveshare.Terminal) (string, error) {

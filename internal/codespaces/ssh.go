@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"os"
 	"os/exec"
 	"strconv"
@@ -12,25 +11,6 @@ import (
 
 	"github.com/github/go-liveshare"
 )
-
-// UnusedPort returns the number of a local TCP port that is currently
-// unbound, or an error if none was available.
-//
-// Use of this function carries an inherent risk of a time-of-check to
-// time-of-use race against other processes.
-func UnusedPort() (int, error) {
-	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
-	if err != nil {
-		return 0, fmt.Errorf("internal error while choosing port: %v", err)
-	}
-
-	l, err := net.ListenTCP("tcp", addr)
-	if err != nil {
-		return 0, fmt.Errorf("choosing available port: %v", err)
-	}
-	defer l.Close()
-	return l.Addr().(*net.TCPAddr).Port, nil
-}
 
 // StartSSHServer installs (if necessary) and starts the SSH in the codespace.
 // It returns the remote port where it is running, the user to log in with, or an error if something failed.
