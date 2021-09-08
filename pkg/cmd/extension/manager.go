@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -15,9 +16,11 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/findsh"
 	"github.com/cli/safeexec"
+	"gopkg.in/yaml.v3"
 )
 
 type Manager struct {
@@ -25,6 +28,7 @@ type Manager struct {
 	lookPath   func(string) (string, error)
 	findSh     func() (string, error)
 	newCommand func(string, ...string) *exec.Cmd
+	platform   func() string
 }
 
 func NewManager() *Manager {
@@ -33,6 +37,9 @@ func NewManager() *Manager {
 		lookPath:   safeexec.LookPath,
 		findSh:     findsh.Find,
 		newCommand: exec.Command,
+		platform: func() string {
+			return fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH)
+		},
 	}
 }
 
@@ -172,7 +179,80 @@ func (m *Manager) InstallLocal(dir string) error {
 	return makeSymlink(dir, targetLink)
 }
 
-func (m *Manager) Install(cloneURL string, stdout, stderr io.Writer) error {
+type BinManifest struct {
+	Owner string
+	Name  string
+	Host  string
+	// TODO I may end up not using this; just thinking ahead to local installs
+	Path string
+}
+
+func (m *Manager) InstallBin(client *http.Client, repo ghrepo.Interface) error {
+	var r *release
+	r, err := fetchLatestRelease(client, repo)
+	if err != nil {
+		return err
+	}
+
+	suffix := m.platform()
+	var asset *releaseAsset
+	for _, a := range r.Assets {
+		if strings.HasSuffix(a.Name, suffix) {
+			asset = &a
+			break
+		}
+	}
+
+	if asset == nil {
+		return fmt.Errorf("%s unsupported for %s. Open an issue: `gh issue create -R%s/%s -t'Support %s'`",
+			repo.RepoName(),
+			suffix, repo.RepoOwner(), repo.RepoName(), suffix)
+	}
+
+	name := repo.RepoName()
+	targetDir := filepath.Join(m.installDir(), name)
+	// TODO clean this up if function errs?
+	err = os.MkdirAll(targetDir, 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create installation directory: %w", err)
+	}
+
+	binPath := filepath.Join(targetDir, name)
+
+	err = downloadAsset(client, *asset, binPath)
+	if err != nil {
+		return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
+	}
+
+	manifest := BinManifest{
+		Name:  name,
+		Owner: repo.RepoOwner(),
+		Host:  repo.RepoHost(),
+		Path:  binPath,
+	}
+
+	bs, err := yaml.Marshal(manifest)
+	if err != nil {
+		return fmt.Errorf("failed to serialize manifest: %w", err)
+	}
+
+	manifestPath := filepath.Join(targetDir, "manifest.yml")
+
+	f, err := os.OpenFile(manifestPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open manifest for writing: %w", err)
+	}
+	defer f.Close()
+
+	_, err = f.Write(bs)
+	if err != nil {
+		return fmt.Errorf("failed write manifest file: %w", err)
+	}
+
+	return nil
+}
+
+func (m *Manager) InstallGit(cloneURL string, stdout, stderr io.Writer) error {
 	exe, err := m.lookPath("git")
 	if err != nil {
 		return err

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,7 +12,10 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 )
 
 func TestHelperProcess(t *testing.T) {
@@ -38,6 +42,9 @@ func newTestManager(dir string) *Manager {
 			cmd := exec.Command(args[0], args[1:]...)
 			cmd.Env = []string{"GH_WANT_HELPER_PROCESS=1"}
 			return cmd
+		},
+		platform: func() string {
+			return "amiga-arm64"
 		},
 	}
 }
@@ -190,16 +197,64 @@ func TestManager_Upgrade_NoExtensions(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 }
 
-func TestManager_Install(t *testing.T) {
+func TestManager_InstallGit(t *testing.T) {
 	tempDir := t.TempDir()
 	m := newTestManager(tempDir)
 
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
-	err := m.Install("https://github.com/owner/gh-some-ext.git", stdout, stderr)
+	err := m.InstallGit("https://github.com/owner/gh-some-ext.git", stdout, stderr)
 	assert.NoError(t, err)
 	assert.Equal(t, fmt.Sprintf("[git clone https://github.com/owner/gh-some-ext.git %s]\n", filepath.Join(tempDir, "extensions", "gh-some-ext")), stdout.String())
 	assert.Equal(t, "", stderr.String())
+}
+
+func TestManager_InstallBin(t *testing.T) {
+	repo := ghrepo.NewWithHost("owner", "gh-bin-ext", "example.com")
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+	client := http.Client{Transport: &reg}
+
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-amiga-arm64",
+						APIURL: "https://example.com/release/cool",
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "release/cool"),
+		httpmock.StringResponse("FAKE BINARY"))
+
+	tempDir := t.TempDir()
+	m := newTestManager(tempDir)
+
+	err := m.InstallBin(&client, repo)
+	assert.NoError(t, err)
+
+	manifest, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/manifest.yml"))
+	assert.NoError(t, err)
+
+	var bm BinManifest
+	err = yaml.Unmarshal(manifest, &bm)
+	assert.NoError(t, err)
+
+	assert.Equal(t, BinManifest{
+		Name:  "gh-bin-ext",
+		Owner: "owner",
+		Host:  "example.com",
+		Path:  filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext"),
+	}, bm)
+
+	fakeBin, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext"))
+	assert.NoError(t, err)
+
+	assert.Equal(t, "FAKE BINARY", string(fakeBin))
 }
 
 func TestManager_Create(t *testing.T) {

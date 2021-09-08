@@ -2,6 +2,9 @@ package extensions
 
 import (
 	"io"
+	"net/http"
+
+	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
 //go:generate moq -rm -out extension_mock.go . Extension
@@ -16,7 +19,8 @@ type Extension interface {
 //go:generate moq -rm -out manager_mock.go . ExtensionManager
 type ExtensionManager interface {
 	List(includeMetadata bool) []Extension
-	Install(url string, stdout, stderr io.Writer) error
+	InstallGit(url string, stdout, stderr io.Writer) error
+	InstallBin(client *http.Client, repo ghrepo.Interface) error
 	InstallLocal(dir string) error
 	Upgrade(name string, force bool, stdout, stderr io.Writer) error
 	Remove(name string) error

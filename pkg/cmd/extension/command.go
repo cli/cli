@@ -3,10 +3,13 @@ package extension
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -102,7 +105,30 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return err
 				}
 				if err := checkValidExtension(cmd.Root(), m, repo.RepoName()); err != nil {
+					// TODO i feel like this should check for a gh-foo script
 					return err
+				}
+
+				client, err := f.HttpClient()
+				if err != nil {
+					return fmt.Errorf("could not make http client: %w", err)
+				}
+				client = api.NewCachedClient(client, time.Second*30)
+
+				isBin, err := isBinExtension(client, repo)
+				if err != nil {
+					return fmt.Errorf("could not check for binary extension: %w", err)
+				}
+				if isBin {
+					return m.InstallBin(client, repo)
+				}
+
+				hs, err := hasScript(client, repo)
+				if err != nil {
+					return err
+				}
+				if !hs {
+					return errors.New("extension is uninstallable: missing executable")
 				}
 
 				cfg, err := f.Config()
@@ -110,7 +136,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return err
 				}
 				protocol, _ := cfg.Get(repo.RepoHost(), "git_protocol")
-				return m.Install(ghrepo.FormatRemoteURL(repo, protocol), io.Out, io.ErrOut)
+				return m.InstallGit(ghrepo.FormatRemoteURL(repo, protocol), io.Out, io.ErrOut)
 			},
 		},
 		func() *cobra.Command {
@@ -218,6 +244,26 @@ func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, 
 	}
 
 	return nil
+}
+
+func isBinExtension(client *http.Client, repo ghrepo.Interface) (isBin bool, err error) {
+	hs, err := hasScript(client, repo)
+	if err != nil || hs {
+		return
+	}
+
+	_, err = fetchLatestRelease(client, repo)
+	if err != nil {
+		httpErr, ok := err.(api.HTTPError)
+		if ok && httpErr.StatusCode == 404 {
+			err = nil
+			return
+		}
+		return
+	}
+
+	isBin = true
+	return
 }
 
 func normalizeExtensionSelector(n string) string {
