@@ -29,11 +29,11 @@ func newLogsCmd() *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
-				log.Println("<codespace> argument is deprecated. Use --codespace instead.")
+				log.Errorln("<codespace> argument is deprecated. Use --codespace instead.")
 				codespace = args[0]
 			}
 			if tail {
-				log.Println("--tail flag is deprecated. Use --follow instead.")
+				log.Errorln("--tail flag is deprecated. Use --follow instead.")
 				follow = true
 			}
 			return logs(context.Background(), log, codespace, follow)
