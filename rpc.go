@@ -6,6 +6,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/sourcegraph/jsonrpc2"
 )
 
@@ -26,6 +27,9 @@ func (r *rpcClient) connect(ctx context.Context) {
 }
 
 func (r *rpcClient) do(ctx context.Context, method string, args, result interface{}) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, method)
+	defer span.Finish()
+
 	waiter, err := r.Conn.DispatchCall(ctx, method, args)
 	if err != nil {
 		return fmt.Errorf("error dispatching %q call: %v", method, err)

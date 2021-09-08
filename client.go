@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 
+	"github.com/opentracing/opentracing-go"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -52,6 +53,9 @@ func WithTLSConfig(tlsConfig *tls.Config) ClientOption {
 // JoinWorkspace connects the client to the server's Live Share
 // workspace and returns a session representing their connection.
 func (c *Client) JoinWorkspace(ctx context.Context) (*Session, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "Client.JoinWorkspace")
+	defer span.Finish()
+
 	clientSocket := newSocket(c.connection, c.tlsConfig)
 	if err := clientSocket.connect(ctx); err != nil {
 		return nil, fmt.Errorf("error connecting websocket: %v", err)
@@ -119,6 +123,9 @@ func (s *Session) openStreamingChannel(ctx context.Context, id channelID) (ssh.C
 	if err := s.rpc.do(ctx, "streamManager.getStream", args, &streamID); err != nil {
 		return nil, fmt.Errorf("error getting stream id: %v", err)
 	}
+
+	span, ctx := opentracing.StartSpanFromContext(ctx, "Session.OpenChannel+SendRequest")
+	defer span.Finish()
 
 	channel, reqs, err := s.ssh.conn.OpenChannel("session", nil)
 	if err != nil {

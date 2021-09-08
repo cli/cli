@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+
+	"github.com/opentracing/opentracing-go"
 )
 
 // A PortForwarder forwards TCP traffic over a LiveShare session from a port on a remote
@@ -108,6 +110,9 @@ func awaitError(ctx context.Context, errc <-chan error) error {
 
 // handleConnection handles forwarding for a single accepted connection, then closes it.
 func (fwd *PortForwarder) handleConnection(ctx context.Context, id channelID, conn io.ReadWriteCloser) (err error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "PortForwarder.handleConnection")
+	defer span.Finish()
+
 	defer safeClose(conn, &err)
 
 	channel, err := fwd.session.openStreamingChannel(ctx, id)
