@@ -18,6 +18,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/opentracing/opentracing-go"
 )
 
 const githubAPI = "https://api.github.com"
@@ -42,7 +44,7 @@ func (a *API) GetUser(ctx context.Context) (*User, error) {
 	}
 
 	a.setHeaders(req)
-	resp, err := a.client.Do(req)
+	resp, err := a.do(ctx, req, "/user")
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %v", err)
 	}
@@ -87,7 +89,7 @@ func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error
 	}
 
 	a.setHeaders(req)
-	resp, err := a.client.Do(req)
+	resp, err := a.do(ctx, req, "/repos/*")
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %v", err)
 	}
@@ -146,7 +148,7 @@ func (a *API) ListCodespaces(ctx context.Context, user *User) ([]*Codespace, err
 	}
 
 	a.setHeaders(req)
-	resp, err := a.client.Do(req)
+	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces")
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %v", err)
 	}
@@ -194,7 +196,7 @@ func (a *API) GetCodespaceToken(ctx context.Context, ownerLogin, codespaceName s
 	}
 
 	a.setHeaders(req)
-	resp, err := a.client.Do(req)
+	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces/*/token")
 	if err != nil {
 		return "", fmt.Errorf("error making request: %v", err)
 	}
@@ -228,7 +230,7 @@ func (a *API) GetCodespace(ctx context.Context, token, owner, codespace string) 
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := a.client.Do(req)
+	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces/*")
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %v", err)
 	}
@@ -262,7 +264,7 @@ func (a *API) StartCodespace(ctx context.Context, token string, codespace *Codes
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := a.client.Do(req)
+	resp, err := a.do(ctx, req, "/vscs_internal/proxy/environments/*/start")
 	if err != nil {
 		return fmt.Errorf("error making request: %v", err)
 	}
@@ -299,7 +301,7 @@ func (a *API) GetCodespaceRegionLocation(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("error creating request: %v", err)
 	}
 
-	resp, err := a.client.Do(req)
+	resp, err := a.do(ctx, req, req.URL.String())
 	if err != nil {
 		return "", fmt.Errorf("error making request: %v", err)
 	}
@@ -340,7 +342,7 @@ func (a *API) GetCodespacesSKUs(ctx context.Context, user *User, repository *Rep
 	req.URL.RawQuery = q.Encode()
 
 	a.setHeaders(req)
-	resp, err := a.client.Do(req)
+	resp, err := a.do(ctx, req, "/vscs_internal/user/*/skus")
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %v", err)
 	}
@@ -384,7 +386,7 @@ func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repos
 	}
 
 	a.setHeaders(req)
-	resp, err := a.client.Do(req)
+	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces")
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %v", err)
 	}
@@ -414,7 +416,7 @@ func (a *API) DeleteCodespace(ctx context.Context, user *User, token, codespaceN
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := a.client.Do(req)
+	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces/*")
 	if err != nil {
 		return fmt.Errorf("error making request: %v", err)
 	}
@@ -446,7 +448,7 @@ func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Cod
 	req.URL.RawQuery = q.Encode()
 
 	a.setHeaders(req)
-	resp, err := a.client.Do(req)
+	resp, err := a.do(ctx, req, "/repos/*/contents/*")
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %v", err)
 	}
@@ -476,6 +478,13 @@ func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Cod
 	}
 
 	return decoded, nil
+}
+
+func (a *API) do(ctx context.Context, req *http.Request, spanName string) (*http.Response, error) {
+	// TODO(adonovan): use NewRequestWithContext(ctx) and drop ctx parameter.
+	span, ctx := opentracing.StartSpanFromContext(ctx, spanName)
+	defer span.Finish()
+	return a.client.Do(req)
 }
 
 func (a *API) setHeaders(req *http.Request) {

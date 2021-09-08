@@ -4,8 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
+	"strconv"
+	"strings"
 
+	"github.com/lightstep/lightstep-tracer-go"
+	"github.com/opentracing/opentracing-go"
 	"github.com/spf13/cobra"
 )
 
@@ -18,22 +23,33 @@ func main() {
 
 var version = "DEV"
 
-var rootCmd = &cobra.Command{
-	Use:           "ghcs",
-	SilenceUsage:  true,  // don't print usage message after each error (see #80)
-	SilenceErrors: false, // print errors automatically so that main need not
-	Long: `Unofficial CLI tool to manage GitHub Codespaces.
+var rootCmd = newRootCmd()
+
+func newRootCmd() *cobra.Command {
+	var lightstep string
+
+	root := &cobra.Command{
+		Use:           "ghcs",
+		SilenceUsage:  true,  // don't print usage message after each error (see #80)
+		SilenceErrors: false, // print errors automatically so that main need not
+		Long: `Unofficial CLI tool to manage GitHub Codespaces.
 
 Running commands requires the GITHUB_TOKEN environment variable to be set to a
 token to access the GitHub API with.`,
-	Version: version,
+		Version: version,
 
-	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if os.Getenv("GITHUB_TOKEN") == "" {
-			return tokenError
-		}
-		return nil
-	},
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if os.Getenv("GITHUB_TOKEN") == "" {
+				return tokenError
+			}
+			initLightstep(lightstep)
+			return nil
+		},
+	}
+
+	root.PersistentFlags().StringVar(&lightstep, "lightstep", "", "Lightstep tracing endpoint (service:token@host:port)")
+
+	return root
 }
 
 var tokenError = errors.New("GITHUB_TOKEN is missing")
@@ -44,4 +60,54 @@ func explainError(w io.Writer, err error) {
 		fmt.Fprintln(w, "Make sure to enable SSO for your organizations after creating the token.")
 		return
 	}
+}
+
+// initLightstep parses the --lightstep=service:token@host:port flag and
+// enables tracing if non-empty.
+func initLightstep(config string) {
+	if config == "" {
+		return
+	}
+
+	cut := func(s, sep string) (pre, post string) {
+		if i := strings.Index(s, sep); i >= 0 {
+			return s[:i], s[i+len(sep):]
+		}
+		return s, ""
+	}
+
+	// Parse service:password@host:port.
+	serviceToken, hostPort := cut(config, "@")
+	service, token := cut(serviceToken, ":")
+	host, port := cut(hostPort, ":")
+	portI, err := strconv.Atoi(port)
+	if err != nil {
+		log.Fatalf("invalid lightstep configuration: %s", config)
+	}
+
+	// View at https://app.lightstep.com/github-prod/service-directory/ghcs/deployments
+	// --lightstep=ghcs:dhhPgaoavzIHz3tJMnj3Oz88Md2VC4HpwcZ8mpoWwwuOwcfU3x+K70lLhJJAXsk63T3bWfPXGgrAwTMQxLY=@lightstep-collector.service.iad.github.net:443
+	// From https://app.lightstep.com/github-prod/project ghcs
+
+	opentracing.SetGlobalTracer(lightstep.NewTracer(lightstep.Options{
+		AccessToken: token,
+		Collector: lightstep.Endpoint{
+			Host:      host,
+			Port:      portI,
+			Plaintext: false,
+		},
+		Tags: opentracing.Tags{
+			lightstep.ComponentNameKey: service,
+		},
+	}))
+
+	// Report failure to record traces.
+	lightstep.SetGlobalEventHandler(func(ev lightstep.Event) {
+		switch ev := ev.(type) {
+		case lightstep.EventStatusReport, lightstep.MetricEventStatusReport:
+			// ignore
+		default:
+			log.Printf("[trace] %s", ev)
+		}
+	})
 }
