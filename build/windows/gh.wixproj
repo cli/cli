@@ -13,6 +13,7 @@
             $(DefineConstants);
             ProductVersion=$(ProductVersion);
         </DefineConstants>
+        <SuppressIces Condition="'$(Platform)' == 'arm' Or '$(Platform)' == 'arm64'">ICE39</SuppressIces>
         <DefineSolutionProperties>false</DefineSolutionProperties>
         <WixTargetsPath Condition="'$(WixTargetsPath)' == ''">$(MSBuildExtensionsPath)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
     </PropertyGroup>

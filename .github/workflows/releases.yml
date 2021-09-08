@@ -132,8 +132,7 @@ jobs:
           ZIP_FILE: ${{ steps.download_exe.outputs.zip }}
         run: |
           name="$(basename "$ZIP_FILE" ".zip")"
-          printf "::set-output name=msi::%s\n" "$name.msi"
-          msbuild .\build\windows\gh.wixproj /p:SourceDir="$PWD" /p:OutputPath="$PWD" /p:OutputName="$name" /p:ProductVersion="${GITHUB_REF#refs/tags/}"
+          msbuild .\build\windows\gh.wixproj /p:SourceDir="$PWD" /p:OutputPath="$PWD" /p:OutputName="$name" /p:ProductVersion="${GITHUB_REF#refs/tags/v}"
       - name: Obtain signing cert
         id: obtain_cert
         env:
