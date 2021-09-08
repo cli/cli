@@ -76,13 +76,13 @@ func initLightstep(config string) {
 		return s, ""
 	}
 
-	// Parse service:password@host:port.
+	// Parse service:token@host:port.
 	serviceToken, hostPort := cut(config, "@")
 	service, token := cut(serviceToken, ":")
 	host, port := cut(hostPort, ":")
 	portI, err := strconv.Atoi(port)
 	if err != nil {
-		log.Fatalf("invalid lightstep configuration: %s", config)
+		log.Fatalf("invalid Lightstep configuration: %s", config)
 	}
 
 	opentracing.SetGlobalTracer(lightstep.NewTracer(lightstep.Options{

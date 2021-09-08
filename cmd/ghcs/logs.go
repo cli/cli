@@ -11,7 +11,6 @@ import (
 	"github.com/github/ghcs/internal/codespaces"
 	"github.com/github/go-liveshare"
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 )
 
 func newLogsCmd() *cobra.Command {
@@ -85,12 +84,25 @@ func logs(ctx context.Context, tail bool, codespaceName string) error {
 		ctx, localPort, dst, fmt.Sprintf("%s /workspaces/.codespaces/.persistedshare/creation.log", cmdType),
 	)
 
-	group, ctx := errgroup.WithContext(ctx)
-	group.Go(func() error {
+	tunnelClosed := make(chan error, 1)
+	go func() {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
-		err := fwd.ForwardToListener(ctx, listen) // error is non-nil
+		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // error is non-nil
+	}()
+
+	cmdDone := make(chan error, 1)
+	go func() {
+		cmdDone <- cmd.Run()
+	}()
+
+	select {
+	case err := <-tunnelClosed:
 		return fmt.Errorf("connection closed: %v", err)
-	})
-	group.Go(cmd.Run)
-	return group.Wait()
+	case err := <-cmdDone:
+		if err != nil {
+			return fmt.Errorf("error retrieving logs: %v", err)
+		}
+
+		return nil // success
+	}
 }
