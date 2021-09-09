@@ -33,9 +33,7 @@ func NewPortForwarder(session *Session, name string, remotePort int) *PortForwar
 // connecting to the socket prematurely.)
 //
 // ForwardToListener accepts and handles connections on the local port
-// until it encounters the first error, which may include context
-// cancellation. Its error result is always non-nil. The caller is
-// responsible for closing the listening port.
+// until the context is cancelled. The caller is responsible for closing the listening port.
 func (fwd *PortForwarder) ForwardToListener(ctx context.Context, listen net.Listener) (err error) {
 	id, err := fwd.shareRemotePort(ctx)
 	if err != nil {
@@ -124,21 +122,14 @@ func (fwd *PortForwarder) handleConnection(ctx context.Context, id channelID, co
 		}
 	}()
 
-	errs := make(chan error, 2)
-	copyConn := func(w io.Writer, r io.Reader) {
-		_, err := io.Copy(w, r)
-		errs <- err
-	}
-	go copyConn(conn, channel)
-	go copyConn(channel, conn)
+	// Bi-directional copy of data.
+	// If any individual connection has an error, we can safely ignore them
+	// and defer to connection clients to handle data loss as necessary.
+	go io.Copy(conn, channel)
+	go io.Copy(channel, conn)
 
-	// await result
-	for i := 0; i < 2; i++ {
-		if err := <-errs; err != nil && err != io.EOF {
-			return fmt.Errorf("tunnel connection: %v", err)
-		}
-	}
-	return nil
+	<-ctx.Done()
+	return ctx.Err()
 }
 
 // safeClose reports the error (to *err) from closing the stream only
