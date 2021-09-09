@@ -22,15 +22,14 @@ func newSSHCmd() *cobra.Command {
 	sshCmd := &cobra.Command{
 		Use:   "ssh",
 		Short: "SSH into a codespace",
-		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return ssh(context.Background(), sshProfile, codespaceName, sshServerPort)
 		},
 	}
 
-	sshCmd.Flags().StringVarP(&sshProfile, "profile", "", "", "The `name` of the SSH profile to use")
+	sshCmd.Flags().StringVarP(&sshProfile, "profile", "", "", "Name of the SSH profile to use")
 	sshCmd.Flags().IntVarP(&sshServerPort, "server-port", "", 0, "SSH server port number (0 => pick unused)")
-	sshCmd.Flags().StringVarP(&codespaceName, "codespace", "c", "", "The `name` of the codespace to use")
+	sshCmd.Flags().StringVarP(&codespaceName, "codespace", "c", "", "Name of the codespace")
 
 	return sshCmd
 }
@@ -67,10 +66,10 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 		return fmt.Errorf("error getting ssh server details: %v", err)
 	}
 
-	terminal := liveshare.NewTerminal(session)
-
 	log.Print("Preparing SSH...")
 	if sshProfile == "" {
+		terminal := liveshare.NewTerminal(session)
+
 		containerID, err := getContainerID(ctx, log, terminal)
 		if err != nil {
 			return fmt.Errorf("error getting container id: %v", err)
