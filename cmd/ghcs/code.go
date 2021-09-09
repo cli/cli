@@ -27,7 +27,7 @@ func newCodeCmd() *cobra.Command {
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
-				log.Println("<codespace> argument is deprecated. Use --codespace instead.")
+				log.Errorln("<codespace> argument is deprecated. Use --codespace instead.")
 				codespace = args[0]
 			}
 			return code(codespace, useInsiders)
