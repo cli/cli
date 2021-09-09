@@ -5,6 +5,7 @@ import (
 	repoCloneCmd "github.com/cli/cli/v2/pkg/cmd/repo/clone"
 	repoCreateCmd "github.com/cli/cli/v2/pkg/cmd/repo/create"
 	creditsCmd "github.com/cli/cli/v2/pkg/cmd/repo/credits"
+	deployKeyCmd "github.com/cli/cli/v2/pkg/cmd/repo/deploy-key"
 	repoForkCmd "github.com/cli/cli/v2/pkg/cmd/repo/fork"
 	gardenCmd "github.com/cli/cli/v2/pkg/cmd/repo/garden"
 	repoListCmd "github.com/cli/cli/v2/pkg/cmd/repo/list"
@@ -23,6 +24,7 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 			$ gh repo create
 			$ gh repo clone cli/cli
 			$ gh repo view --web
+			$ gh repo deploy-key list
 		`),
 		Annotations: map[string]string{
 			"IsCore": "true",
@@ -42,6 +44,7 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(repoSyncCmd.NewCmdSync(f, nil))
 	cmd.AddCommand(creditsCmd.NewCmdRepoCredits(f, nil))
 	cmd.AddCommand(gardenCmd.NewCmdGarden(f, nil))
+	cmd.AddCommand(deployKeyCmd.NewCmdDeployKeys(f))
 
 	return cmd
 }
