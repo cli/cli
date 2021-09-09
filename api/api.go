@@ -124,6 +124,16 @@ type Codespace struct {
 type CodespaceEnvironment struct {
 	State      string                         `json:"state"`
 	Connection CodespaceEnvironmentConnection `json:"connection"`
+	GitStatus  CodespaceEnvironmentGitStatus  `json:"gitStatus"`
+}
+
+type CodespaceEnvironmentGitStatus struct {
+	Ahead                int    `json:"ahead"`
+	Behind               int    `json:"behind"`
+	Branch               string `json:"branch"`
+	Commit               string `json:"commit"`
+	HasUnpushedChanges   bool   `json:"hasUnpushedChanges"`
+	HasUncommitedChanges bool   `json:"hasUncommitedChanges"`
 }
 
 const (
