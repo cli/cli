@@ -42,8 +42,7 @@ token to access the GitHub API with.`,
 			if os.Getenv("GITHUB_TOKEN") == "" {
 				return tokenError
 			}
-			initLightstep(lightstep)
-			return nil
+			return initLightstep(lightstep)
 		},
 	}
 
@@ -64,9 +63,9 @@ func explainError(w io.Writer, err error) {
 
 // initLightstep parses the --lightstep=service:token@host:port flag and
 // enables tracing if non-empty.
-func initLightstep(config string) {
+func initLightstep(config string) error {
 	if config == "" {
-		return
+		return nil
 	}
 
 	cut := func(s, sep string) (pre, post string) {
@@ -82,7 +81,7 @@ func initLightstep(config string) {
 	host, port := cut(hostPort, ":")
 	portI, err := strconv.Atoi(port)
 	if err != nil {
-		log.Fatalf("invalid Lightstep configuration: %s", config)
+		return fmt.Errorf("invalid Lightstep configuration: %s", config)
 	}
 
 	opentracing.SetGlobalTracer(lightstep.NewTracer(lightstep.Options{
@@ -106,4 +105,6 @@ func initLightstep(config string) {
 			log.Printf("[trace] %s", ev)
 		}
 	})
+
+	return nil
 }
