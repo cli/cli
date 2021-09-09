@@ -67,9 +67,9 @@ func ports(opts *portsOptions) error {
 		return fmt.Errorf("error getting user: %v", err)
 	}
 
-	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, opts.codespaceName)
+	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, opts.codespaceName)
 	if err != nil {
-		if err == codespaces.ErrNoCodespaces {
+		if err == errNoCodespaces {
 			return err
 		}
 		return fmt.Errorf("error choosing codespace: %v", err)
