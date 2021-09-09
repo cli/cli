@@ -53,10 +53,25 @@ func list(opts *listOptions) error {
 	table.SetHeader([]string{"Name", "Repository", "Branch", "State", "Created At"})
 	for _, codespace := range codespaces {
 		table.Append([]string{
-			codespace.Name, codespace.RepositoryNWO, codespace.Branch, codespace.Environment.State, codespace.CreatedAt,
+			codespace.Name,
+			codespace.RepositoryNWO,
+			branch(codespace),
+			codespace.Environment.State,
+			codespace.CreatedAt,
 		})
 	}
 
 	table.Render()
 	return nil
+}
+
+func branch(codespace *api.Codespace) string {
+	name := codespace.Branch
+	gitStatus := codespace.Environment.GitStatus
+
+	if gitStatus.HasUncommitedChanges || gitStatus.HasUnpushedChanges {
+		name += "*"
+	}
+
+	return name
 }
