@@ -484,6 +484,7 @@ func (a *API) do(ctx context.Context, req *http.Request, spanName string) (*http
 	// TODO(adonovan): use NewRequestWithContext(ctx) and drop ctx parameter.
 	span, ctx := opentracing.StartSpanFromContext(ctx, spanName)
 	defer span.Finish()
+	req = req.WithContext(ctx)
 	return a.client.Do(req)
 }
 
