@@ -61,9 +61,9 @@ func ports(codespaceName string, asJSON bool) error {
 		return fmt.Errorf("error getting user: %v", err)
 	}
 
-	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, codespaceName)
+	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
-		if err == codespaces.ErrNoCodespaces {
+		if err == errNoCodespaces {
 			return err
 		}
 		return fmt.Errorf("error choosing codespace: %v", err)
@@ -157,7 +157,7 @@ func getDevContainer(ctx context.Context, apiClient *api.API, codespace *api.Cod
 
 // newPortsPublicCmd returns a Cobra "ports public" subcommand, which makes a given port public.
 func newPortsPublicCmd() *cobra.Command {
-	newPortsPublicCmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "public <port>",
 		Short: "Mark port as public",
 		Args:  cobra.MinimumNArgs(1),
@@ -181,13 +181,11 @@ func newPortsPublicCmd() *cobra.Command {
 			return updatePortVisibility(log, codespace, port, true)
 		},
 	}
-
-	return newPortsPublicCmd
 }
 
 // newPortsPrivateCmd returns a Cobra "ports private" subcommand, which makes a given port private.
 func newPortsPrivateCmd() *cobra.Command {
-	newPortsPrivateCmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "private <port>",
 		Short: "Mark port as private",
 		Args:  cobra.MinimumNArgs(1),
@@ -211,8 +209,6 @@ func newPortsPrivateCmd() *cobra.Command {
 			return updatePortVisibility(log, codespace, port, false)
 		},
 	}
-
-	return newPortsPrivateCmd
 }
 
 func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, public bool) error {
@@ -224,9 +220,9 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 		return fmt.Errorf("error getting user: %v", err)
 	}
 
-	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, codespaceName)
+	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
-		if err == codespaces.ErrNoCodespaces {
+		if err == errNoCodespaces {
 			return err
 		}
 		return fmt.Errorf("error getting codespace: %v", err)
@@ -258,7 +254,7 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 // NewPortsForwardCmd returns a Cobra "ports forward" subcommand, which forwards a set of
 // port pairs from the codespace to localhost.
 func newPortsForwardCmd() *cobra.Command {
-	newPortsForwardCmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "forward <remote-port>:<local-port>...",
 		Short: "Forward ports",
 		Args:  cobra.MinimumNArgs(1),
@@ -284,8 +280,6 @@ func newPortsForwardCmd() *cobra.Command {
 			return forwardPorts(log, codespace, ports)
 		},
 	}
-
-	return newPortsForwardCmd
 }
 
 func forwardPorts(log *output.Logger, codespaceName string, ports []string) error {
@@ -302,9 +296,9 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 		return fmt.Errorf("error getting user: %v", err)
 	}
 
-	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, codespaceName)
+	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
-		if err == codespaces.ErrNoCodespaces {
+		if err == errNoCodespaces {
 			return err
 		}
 		return fmt.Errorf("error getting codespace: %v", err)

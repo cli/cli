@@ -4,61 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/github/ghcs/api"
 	"github.com/github/go-liveshare"
 )
-
-var (
-	ErrNoCodespaces = errors.New("You have no codespaces.")
-)
-
-func ChooseCodespace(ctx context.Context, apiClient *api.API, user *api.User) (*api.Codespace, error) {
-	codespaces, err := apiClient.ListCodespaces(ctx, user)
-	if err != nil {
-		return nil, fmt.Errorf("error getting codespaces: %v", err)
-	}
-
-	if len(codespaces) == 0 {
-		return nil, ErrNoCodespaces
-	}
-
-	sort.Slice(codespaces, func(i, j int) bool {
-		return codespaces[i].CreatedAt > codespaces[j].CreatedAt
-	})
-
-	codespacesByName := make(map[string]*api.Codespace)
-	codespacesNames := make([]string, 0, len(codespaces))
-	for _, codespace := range codespaces {
-		codespacesByName[codespace.Name] = codespace
-		codespacesNames = append(codespacesNames, codespace.Name)
-	}
-
-	sshSurvey := []*survey.Question{
-		{
-			Name: "codespace",
-			Prompt: &survey.Select{
-				Message: "Choose codespace:",
-				Options: codespacesNames,
-				Default: codespacesNames[0],
-			},
-			Validate: survey.Required,
-		},
-	}
-
-	answers := struct {
-		Codespace string
-	}{}
-	if err := survey.Ask(sshSurvey, &answers); err != nil {
-		return nil, fmt.Errorf("error getting answers: %v", err)
-	}
-
-	codespace := codespacesByName[answers.Codespace]
-	return codespace, nil
-}
 
 type logger interface {
 	Print(v ...interface{}) (int, error)
@@ -122,36 +72,4 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 	}
 
 	return lsclient.JoinWorkspace(ctx)
-}
-
-// GetOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
-// It then fetches the codespace token and the codespace record.
-func GetOrChooseCodespace(ctx context.Context, apiClient *api.API, user *api.User, codespaceName string) (codespace *api.Codespace, token string, err error) {
-	if codespaceName == "" {
-		codespace, err = ChooseCodespace(ctx, apiClient, user)
-		if err != nil {
-			if err == ErrNoCodespaces {
-				return nil, "", err
-			}
-			return nil, "", fmt.Errorf("choosing codespace: %v", err)
-		}
-		codespaceName = codespace.Name
-
-		token, err = apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
-		if err != nil {
-			return nil, "", fmt.Errorf("getting codespace token: %v", err)
-		}
-	} else {
-		token, err = apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
-		if err != nil {
-			return nil, "", fmt.Errorf("getting codespace token for given codespace: %v", err)
-		}
-
-		codespace, err = apiClient.GetCodespace(ctx, token, user.Login, codespaceName)
-		if err != nil {
-			return nil, "", fmt.Errorf("getting full codespace details: %v", err)
-		}
-	}
-
-	return codespace, token, nil
 }
