@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 
@@ -81,36 +82,36 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 	}
 	log.Print("\n")
 
-	usingCustomPort := true
-	if localSSHServerPort == 0 {
-		usingCustomPort = false // suppress log of command line in Shell
-		localSSHServerPort, err = codespaces.UnusedPort()
-		if err != nil {
-			return err
-		}
+	usingCustomPort := localSSHServerPort != 0 // suppress log of command line in Shell
+
+	// Ensure local port is listening before client (Shell) connects.
+	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", localSSHServerPort))
+	if err != nil {
+		return err
 	}
+	defer listen.Close()
+	localSSHServerPort = listen.Addr().(*net.TCPAddr).Port
 
 	connectDestination := sshProfile
 	if connectDestination == "" {
 		connectDestination = fmt.Sprintf("%s@localhost", sshUser)
 	}
 
-	tunnelClosed := make(chan error)
+	log.Println("Ready...")
+	tunnelClosed := make(chan error, 1)
 	go func() {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
-		tunnelClosed <- fwd.ForwardToLocalPort(ctx, localSSHServerPort) // error is always non-nil
+		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // always non-nil
 	}()
 
-	shellClosed := make(chan error)
+	shellClosed := make(chan error, 1)
 	go func() {
 		shellClosed <- codespaces.Shell(ctx, log, localSSHServerPort, connectDestination, usingCustomPort)
 	}()
 
-	log.Println("Ready...")
 	select {
 	case err := <-tunnelClosed:
 		return fmt.Errorf("tunnel closed: %v", err)
-
 	case err := <-shellClosed:
 		if err != nil {
 			return fmt.Errorf("shell closed: %v", err)

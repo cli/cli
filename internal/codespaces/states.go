@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -46,10 +47,12 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 		return fmt.Errorf("connect to Live Share: %v", err)
 	}
 
-	localSSHPort, err := UnusedPort()
+	// Ensure local port is listening before client (getPostCreateOutput) connects.
+	listen, err := net.Listen("tcp", ":0") // arbitrary port
 	if err != nil {
 		return err
 	}
+	localPort := listen.Addr().(*net.TCPAddr).Port
 
 	remoteSSHServerPort, sshUser, err := StartSSHServer(ctx, session, log)
 	if err != nil {
@@ -59,7 +62,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 	tunnelClosed := make(chan error, 1) // buffered to avoid sender stuckness
 	go func() {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
-		tunnelClosed <- fwd.ForwardToLocalPort(ctx, localSSHPort) // error is non-nil
+		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // error is non-nil
 	}()
 
 	t := time.NewTicker(1 * time.Second)
@@ -74,7 +77,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 			return fmt.Errorf("connection failed: %v", err)
 
 		case <-t.C:
-			states, err := getPostCreateOutput(ctx, localSSHPort, codespace, sshUser)
+			states, err := getPostCreateOutput(ctx, localPort, codespace, sshUser)
 			if err != nil {
 				return fmt.Errorf("get post create output: %v", err)
 			}
