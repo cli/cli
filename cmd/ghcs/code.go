@@ -7,27 +7,34 @@ import (
 	"os"
 
 	"github.com/github/ghcs/api"
+	"github.com/github/ghcs/cmd/ghcs/output"
 	"github.com/github/ghcs/internal/codespaces"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/spf13/cobra"
 )
 
 func newCodeCmd() *cobra.Command {
-	useInsiders := false
+	var (
+		codespace   string
+		useInsiders bool
+	)
+
+	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	codeCmd := &cobra.Command{
-		Use:   "code [<codespace>]",
+		Use:   "code",
 		Short: "Open a codespace in VS Code",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var codespaceName string
 			if len(args) > 0 {
-				codespaceName = args[0]
+				log.Errorln("<codespace> argument is deprecated. Use --codespace instead.")
+				codespace = args[0]
 			}
-			return code(codespaceName, useInsiders)
+			return code(codespace, useInsiders)
 		},
 	}
 
+	codeCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
 	codeCmd.Flags().BoolVar(&useInsiders, "insiders", false, "Use the insiders version of VS Code")
 
 	return codeCmd

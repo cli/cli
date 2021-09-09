@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/github/go-liveshare"
 	"github.com/muhammadmuzzammil1998/jsonc"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 // newPortsCmd returns a Cobra "ports" command that displays a table of available ports,
@@ -307,20 +309,22 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 
 	// Run forwarding of all ports concurrently, aborting all of
 	// them at the first failure, including cancellation of the context.
-	errc := make(chan error, len(portPairs))
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
+	group, ctx := errgroup.WithContext(ctx)
 	for _, pair := range portPairs {
 		pair := pair
-		log.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
-		name := fmt.Sprintf("share-%d", pair.remote)
-		go func() {
+		group.Go(func() error {
+			listen, err := net.Listen("tcp", fmt.Sprintf(":%d", pair.local))
+			if err != nil {
+				return err
+			}
+			defer listen.Close()
+			log.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
+			name := fmt.Sprintf("share-%d", pair.remote)
 			fwd := liveshare.NewPortForwarder(session, name, pair.remote)
-			errc <- fwd.ForwardToLocalPort(ctx, pair.local) // error always non-nil
-		}()
+			return fwd.ForwardToListener(ctx, listen) // error always non-nil
+		})
 	}
-
-	return <-errc // first error
+	return group.Wait() // first error
 }
 
 type portPair struct {
