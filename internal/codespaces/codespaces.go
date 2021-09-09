@@ -124,6 +124,8 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 	return lsclient.JoinWorkspace(ctx)
 }
 
+// GetOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
+// It then fetches the codespace token and the codespace record.
 func GetOrChooseCodespace(ctx context.Context, apiClient *api.API, user *api.User, codespaceName string) (codespace *api.Codespace, token string, err error) {
 	if codespaceName == "" {
 		codespace, err = ChooseCodespace(ctx, apiClient, user)
