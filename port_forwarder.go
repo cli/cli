@@ -122,7 +122,7 @@ func (fwd *PortForwarder) handleConnection(ctx context.Context, id channelID, co
 		}
 	}()
 
-	// Bi-directional copy of data.
+	// bi-directional copy of data.
 	errs := make(chan error, 2)
 	copyConn := func(w io.Writer, r io.Reader) {
 		_, err := io.Copy(w, r)
@@ -131,20 +131,18 @@ func (fwd *PortForwarder) handleConnection(ctx context.Context, id channelID, co
 	go copyConn(conn, channel)
 	go copyConn(channel, conn)
 
-	// wait until context is cancelled or we've received two io.EOF
-Loop:
-	for i := 0; i < 2; i++ {
+	// wait until context is cancelled or both copies are done
+	for i := 0; ; {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case err := <-errs:
-			if err != nil && err != io.EOF {
-				break Loop // non-EOF errors stop connection handling
+		case <-errs:
+			i++
+			if i == 2 {
+				return nil
 			}
 		}
 	}
-
-	return nil
 }
 
 // safeClose reports the error (to *err) from closing the stream only
