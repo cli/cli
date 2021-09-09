@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -216,9 +216,26 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL:   "https://github.com/ravocean/angur/tree/trunk/path/to/file.txt#L32",
 		},
 		{
+			name: "file with line range",
+			opts: BrowseOptions{
+				SelectorArg: "path/to/file.txt:32-40",
+			},
+			baseRepo:      ghrepo.New("ravocean", "angur"),
+			defaultBranch: "trunk",
+			expectedURL:   "https://github.com/ravocean/angur/tree/trunk/path/to/file.txt#L32-L40",
+		},
+		{
 			name: "file with invalid line number",
 			opts: BrowseOptions{
 				SelectorArg: "path/to/file.txt:32:32",
+			},
+			baseRepo: ghrepo.New("ttran112", "ttrain211"),
+			wantsErr: true,
+		},
+		{
+			name: "file with invalid line range",
+			opts: BrowseOptions{
+				SelectorArg: "path/to/file.txt:32-abc",
 			},
 			baseRepo: ghrepo.New("ttran112", "ttrain211"),
 			wantsErr: true,

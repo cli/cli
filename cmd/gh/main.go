@@ -13,18 +13,18 @@ import (
 
 	surveyCore "github.com/AlecAivazis/survey/v2/core"
 	"github.com/AlecAivazis/survey/v2/terminal"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/build"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/internal/update"
-	"github.com/cli/cli/pkg/cmd/alias/expand"
-	"github.com/cli/cli/pkg/cmd/factory"
-	"github.com/cli/cli/pkg/cmd/root"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/build"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/internal/update"
+	"github.com/cli/cli/v2/pkg/cmd/alias/expand"
+	"github.com/cli/cli/v2/pkg/cmd/factory"
+	"github.com/cli/cli/v2/pkg/cmd/root"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/utils"
 	"github.com/cli/safeexec"
 	"github.com/mattn/go-colorable"
 	"github.com/mgutz/ansi"
@@ -217,13 +217,15 @@ func mainRun() exitCode {
 
 		if strings.Contains(err.Error(), "Incorrect function") {
 			fmt.Fprintln(stderr, "You appear to be running in MinTTY without pseudo terminal support.")
-			fmt.Fprintln(stderr, "To learn about workarounds for this error, run: gh help mintty")
+			fmt.Fprintln(stderr, "To learn about workarounds for this error, run:  gh help mintty")
 			return exitError
 		}
 
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 401 {
-			fmt.Fprintln(stderr, "hint: try authenticating with `gh auth login`")
+			fmt.Fprintln(stderr, "Try authenticating with:  gh auth login")
+		} else if strings.Contains(err.Error(), "Resource protected by organization SAML enforcement") {
+			fmt.Fprintln(stderr, "Try re-authenticating with:  gh auth refresh")
 		}
 
 		return exitError

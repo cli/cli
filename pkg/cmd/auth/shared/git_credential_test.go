@@ -3,7 +3,7 @@ package shared
 import (
 	"testing"
 
-	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/v2/internal/run"
 )
 
 func TestGitCredentialSetup_configureExisting(t *testing.T) {

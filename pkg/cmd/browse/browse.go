@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
@@ -169,12 +169,28 @@ func parseFileArg(fileArg string) (string, error) {
 	if len(arr) > 2 {
 		return "", fmt.Errorf("invalid use of colon\nUse 'gh browse --help' for more information about browse\n")
 	}
+
 	if len(arr) > 1 {
-		if !isNumber(arr[1]) {
-			return "", fmt.Errorf("invalid line number after colon\nUse 'gh browse --help' for more information about browse\n")
+		out := arr[0] + "#L"
+		lineRange := strings.Split(arr[1], "-")
+
+		if len(lineRange) > 0 {
+			if !isNumber(lineRange[0]) {
+				return "", fmt.Errorf("invalid line number after colon\nUse 'gh browse --help' for more information about browse\n")
+			}
+			out += lineRange[0]
 		}
-		return arr[0] + "#L" + arr[1], nil
+
+		if len(lineRange) > 1 {
+			if !isNumber(lineRange[1]) {
+				return "", fmt.Errorf("invalid line range after colon\nUse 'gh browse --help' for more information about browse\n")
+			}
+			out += "-L" + lineRange[1]
+		}
+
+		return out, nil
 	}
+
 	return arr[0], nil
 }
 

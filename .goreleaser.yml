@@ -15,7 +15,7 @@ builds:
       binary: bin/gh
       main: ./cmd/gh
       ldflags:
-        - -s -w -X github.com/cli/cli/internal/build.Version={{.Version}} -X github.com/cli/cli/internal/build.Date={{time "2006-01-02"}}
+        - -s -w -X github.com/cli/cli/v2/internal/build.Version={{.Version}} -X github.com/cli/cli/v2/internal/build.Date={{time "2006-01-02"}}
         - -X main.updaterEnabled=cli/cli
     id: macos
     goos: [darwin]

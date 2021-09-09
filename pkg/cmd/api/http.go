@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghinstance"
 )
 
 func httpRequest(client *http.Client, hostname string, method string, p string, params interface{}, headers []string) (*http.Response, error) {

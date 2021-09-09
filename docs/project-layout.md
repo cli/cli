@@ -24,7 +24,7 @@ commands is:
 pkg/cmd/<command>/<subcommand>/<subcommand>.go
 ```
 Following the above example, the main implementation for the `gh issue list` command, including its help
-text, is in [pkg/cmd/issue/view/view.go](../pkg/cmd/issue/view/view.go)
+text, is in [pkg/cmd/issue/list/list.go](../pkg/cmd/issue/list/list.go)
 
 Other help topics not specific to any command, for example `gh help environment`, are found in
 [pkg/cmd/root/help_topic.go](../pkg/cmd/root/help_topic.go).
