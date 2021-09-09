@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/github/ghcs/api"
-	"github.com/github/ghcs/internal/codespaces"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/spf13/cobra"
 )
@@ -47,9 +46,9 @@ func code(codespaceName string, useInsiders bool) error {
 	}
 
 	if codespaceName == "" {
-		codespace, err := codespaces.ChooseCodespace(ctx, apiClient, user)
+		codespace, err := chooseCodespace(ctx, apiClient, user)
 		if err != nil {
-			if err == codespaces.ErrNoCodespaces {
+			if err == errNoCodespaces {
 				return err
 			}
 			return fmt.Errorf("error choosing codespace: %v", err)

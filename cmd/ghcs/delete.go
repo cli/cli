@@ -8,7 +8,6 @@ import (
 
 	"github.com/github/ghcs/api"
 	"github.com/github/ghcs/cmd/ghcs/output"
-	"github.com/github/ghcs/internal/codespaces"
 	"github.com/spf13/cobra"
 )
 
@@ -63,7 +62,7 @@ func delete_(codespaceName string) error {
 		return fmt.Errorf("error getting user: %v", err)
 	}
 
-	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, codespaceName)
+	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
 		return fmt.Errorf("get or choose codespace: %v", err)
 	}

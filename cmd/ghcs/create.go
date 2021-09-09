@@ -286,8 +286,3 @@ func getMachineName(ctx context.Context, machine string, user *api.User, repo *a
 
 	return machine, nil
 }
-
-// ask asks survery questions using standard options.
-func ask(qs []*survey.Question, response interface{}) error {
-	return survey.Ask(qs, response, survey.WithShowCursor(true))
-}
