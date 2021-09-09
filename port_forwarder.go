@@ -33,7 +33,9 @@ func NewPortForwarder(session *Session, name string, remotePort int) *PortForwar
 // connecting to the socket prematurely.)
 //
 // ForwardToListener accepts and handles connections on the local port
-// until the context is cancelled. The caller is responsible for closing the listening port.
+// until it encounters the first error, which may include context
+// cancellation. Its error result is always non-nil. The caller is
+// responsible for closing the listening port.
 func (fwd *PortForwarder) ForwardToListener(ctx context.Context, listen net.Listener) (err error) {
 	id, err := fwd.shareRemotePort(ctx)
 	if err != nil {
