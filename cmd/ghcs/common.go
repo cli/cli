@@ -6,9 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/github/ghcs/api"
 	"golang.org/x/term"
 )
@@ -97,5 +99,16 @@ func ask(qs []*survey.Question, response interface{}) error {
 	if !hasTTY {
 		return fmt.Errorf("no terminal")
 	}
-	return survey.Ask(qs, response, survey.WithShowCursor(true))
+	err := survey.Ask(qs, response, survey.WithShowCursor(true))
+	// The survey package temporarily clears the terminal's ISIG mode bit
+	// (see tcsetattr(3)) so the QUIT button (Ctrl-C) is reported as
+	// ASCII \x03 (ETX) instead of delivering SIGINT to the application.
+	// So we have to serve ourselves the SIGINT.
+	//
+	// https://github.com/AlecAivazis/survey/#why-isnt-sending-a-sigint-aka-ctrl-c-signal-working
+	if err == terminal.InterruptErr {
+		self, _ := os.FindProcess(os.Getpid())
+		_ = self.Signal(os.Interrupt) // assumes POSIX
+	}
+	return err
 }
