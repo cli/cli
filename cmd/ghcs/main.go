@@ -21,7 +21,7 @@ func main() {
 	}
 }
 
-var version = "DEV"
+var version = "DEV" // Replaced in the release build process (by GoReleaser or Homebrew) by the git tag version number.
 
 var rootCmd = newRootCmd()
 
