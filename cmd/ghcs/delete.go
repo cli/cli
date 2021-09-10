@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -12,34 +13,57 @@ import (
 )
 
 func newDeleteCmd() *cobra.Command {
+	var (
+		codespace     string
+		allCodespaces bool
+		repo          string
+	)
+
+	log := output.NewLogger(os.Stdout, os.Stderr, false)
+
 	deleteCmd := &cobra.Command{
-		Use:   "delete [<codespace>]",
+		Use:   "delete",
 		Short: "Delete a codespace",
-		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var codespaceName string
 			if len(args) > 0 {
-				codespaceName = args[0]
+				log.Errorln("<codespace> argument is deprecated. Use --codespace instead.")
+				codespace = args[0]
 			}
-			return delete_(codespaceName)
+
+			switch {
+			case allCodespaces && repo != "":
+				return errors.New("both --all and --repo is not supported.")
+			case allCodespaces:
+				return deleteAll(log)
+			case repo != "":
+				return deleteByRepo(log, repo)
+			default:
+				return delete_(log, codespace)
+			}
 		},
 	}
 
+	deleteCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
+	deleteCmd.Flags().BoolVar(&allCodespaces, "all", false, "Delete all codespaces")
+	deleteCmd.Flags().StringVarP(&repo, "repo", "r", "", "Delete all codespaces for a repository")
+
 	deleteAllCmd := &cobra.Command{
 		Use:   "all",
-		Short: "Delete all codespaces for the current user",
+		Short: "(Deprecated) Delete all codespaces for the current user",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deleteAll()
+			log.Errorln("all command is deprecated. Use --all instead.")
+			return deleteAll(log)
 		},
 	}
 
 	deleteByRepoCmd := &cobra.Command{
 		Use:   "repo <repo>",
-		Short: "Delete all codespaces for a repository",
+		Short: "(Deprecated) Delete all codespaces for a repository",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return deleteByRepo(args[0])
+			log.Errorln("repo command is deprecated. Use --repo instead.")
+			return deleteByRepo(log, args[0])
 		},
 	}
 
@@ -52,10 +76,9 @@ func init() {
 	rootCmd.AddCommand(newDeleteCmd())
 }
 
-func delete_(codespaceName string) error {
+func delete_(log *output.Logger, codespaceName string) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
-	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
@@ -76,10 +99,9 @@ func delete_(codespaceName string) error {
 	return list(&listOptions{})
 }
 
-func deleteAll() error {
+func deleteAll(log *output.Logger) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
-	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
@@ -107,10 +129,9 @@ func deleteAll() error {
 	return list(&listOptions{})
 }
 
-func deleteByRepo(repo string) error {
+func deleteByRepo(log *output.Logger, repo string) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
-	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
