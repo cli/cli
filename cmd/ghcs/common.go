@@ -61,6 +61,8 @@ func chooseCodespace(ctx context.Context, apiClient *api.API, user *api.User) (*
 	return codespace, nil
 }
 
+// getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
+// It then fetches the codespace token and the codespace record.
 func getOrChooseCodespace(ctx context.Context, apiClient *api.API, user *api.User, codespaceName string) (codespace *api.Codespace, token string, err error) {
 	if codespaceName == "" {
 		codespace, err = chooseCodespace(ctx, apiClient, user)
