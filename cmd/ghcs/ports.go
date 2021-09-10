@@ -63,6 +63,7 @@ func ports(codespaceName string, asJSON bool) error {
 
 	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
+		// TODO(josebalius): remove special handling of this error here and it other places
 		if err == errNoCodespaces {
 			return err
 		}
