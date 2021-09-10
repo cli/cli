@@ -62,7 +62,7 @@ func logs(ctx context.Context, log *output.Logger, codespaceName string, follow 
 		return fmt.Errorf("getting user: %v", err)
 	}
 
-	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, codespaceName)
+	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
 		return fmt.Errorf("get or choose codespace: %v", err)
 	}

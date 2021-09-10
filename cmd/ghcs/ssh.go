@@ -1,12 +1,10 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"net"
 	"os"
-	"strings"
 
 	"github.com/github/ghcs/api"
 	"github.com/github/ghcs/cmd/ghcs/output"
@@ -51,7 +49,7 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 		return fmt.Errorf("error getting user: %v", err)
 	}
 
-	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, codespaceName)
+	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
 		return fmt.Errorf("get or choose codespace: %v", err)
 	}
@@ -65,21 +63,6 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %v", err)
 	}
-
-	log.Print("Preparing SSH...")
-	if sshProfile == "" {
-		terminal := liveshare.NewTerminal(session)
-
-		containerID, err := getContainerID(ctx, log, terminal)
-		if err != nil {
-			return fmt.Errorf("error getting container id: %v", err)
-		}
-
-		if err := setupEnv(ctx, log, terminal, containerID, codespace.RepositoryName, sshUser); err != nil {
-			return fmt.Errorf("error creating ssh server: %v", err)
-		}
-	}
-	log.Print("\n")
 
 	usingCustomPort := localSSHServerPort != 0 // suppress log of command line in Shell
 
@@ -117,57 +100,4 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 		}
 		return nil // success
 	}
-}
-
-func getContainerID(ctx context.Context, logger *output.Logger, terminal *liveshare.Terminal) (string, error) {
-	logger.Print(".")
-
-	cmd := terminal.NewCommand(
-		"/",
-		"/usr/bin/docker ps -aq --filter label=Type=codespaces --filter status=running",
-	)
-
-	stream, err := cmd.Run(ctx)
-	if err != nil {
-		return "", fmt.Errorf("error running command: %v", err)
-	}
-
-	logger.Print(".")
-	scanner := bufio.NewScanner(stream)
-	scanner.Scan()
-
-	logger.Print(".")
-	containerID := scanner.Text()
-	if err := scanner.Err(); err != nil {
-		return "", fmt.Errorf("error scanning stream: %v", err)
-	}
-
-	logger.Print(".")
-	if err := stream.Close(); err != nil {
-		return "", fmt.Errorf("error closing stream: %v", err)
-	}
-
-	return containerID, nil
-}
-
-func setupEnv(ctx context.Context, logger *output.Logger, terminal *liveshare.Terminal, containerID, repositoryName, containerUser string) error {
-	setupBashProfileCmd := fmt.Sprintf(`echo "export $(cat /workspaces/.codespaces/shared/.env | xargs); exec /bin/zsh;" > /home/%v/.bash_profile`, containerUser)
-
-	logger.Print(".")
-	compositeCommand := []string{setupBashProfileCmd}
-	cmd := terminal.NewCommand(
-		"/",
-		fmt.Sprintf("/usr/bin/docker exec -t %s /bin/bash -c '"+strings.Join(compositeCommand, "; ")+"'", containerID),
-	)
-	stream, err := cmd.Run(ctx)
-	if err != nil {
-		return fmt.Errorf("error running command: %v", err)
-	}
-
-	logger.Print(".")
-	if err := stream.Close(); err != nil {
-		return fmt.Errorf("error closing stream: %v", err)
-	}
-
-	return nil
 }

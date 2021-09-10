@@ -20,31 +20,25 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// portOptions represents the options accepted by the ports command.
-type portsOptions struct {
-	// CodespaceName is the name of the codespace, optional.
-	codespaceName string
-
-	// AsJSON dictates whether the command returns a json output or not, optional.
-	asJSON bool
-}
-
 // newPortsCmd returns a Cobra "ports" command that displays a table of available ports,
 // according to the specified flags.
 func newPortsCmd() *cobra.Command {
-	opts := &portsOptions{}
+	var (
+		codespace string
+		asJSON    bool
+	)
 
 	portsCmd := &cobra.Command{
 		Use:   "ports",
 		Short: "List ports in a codespace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return ports(opts)
+			return ports(codespace, asJSON)
 		},
 	}
 
-	portsCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "The `name` of the codespace to use")
-	portsCmd.Flags().BoolVar(&opts.asJSON, "json", false, "Output as JSON")
+	portsCmd.PersistentFlags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
+	portsCmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 
 	portsCmd.AddCommand(newPortsPublicCmd())
 	portsCmd.AddCommand(newPortsPrivateCmd())
@@ -57,19 +51,20 @@ func init() {
 	rootCmd.AddCommand(newPortsCmd())
 }
 
-func ports(opts *portsOptions) error {
+func ports(codespaceName string, asJSON bool) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
-	log := output.NewLogger(os.Stdout, os.Stderr, opts.asJSON)
+	log := output.NewLogger(os.Stdout, os.Stderr, asJSON)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting user: %v", err)
 	}
 
-	codespace, token, err := codespaces.GetOrChooseCodespace(ctx, apiClient, user, opts.codespaceName)
+	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
-		if err == codespaces.ErrNoCodespaces {
+		// TODO(josebalius): remove special handling of this error here and it other places
+		if err == errNoCodespaces {
 			return err
 		}
 		return fmt.Errorf("error choosing codespace: %v", err)
@@ -94,7 +89,7 @@ func ports(opts *portsOptions) error {
 		_, _ = log.Errorf("Failed to get port names: %v\n", devContainerResult.err.Error())
 	}
 
-	table := output.NewTable(os.Stdout, opts.asJSON)
+	table := output.NewTable(os.Stdout, asJSON)
 	table.SetHeader([]string{"Label", "Port", "Public", "Browse URL"})
 	for _, port := range ports {
 		sourcePort := strconv.Itoa(port.SourcePort)
@@ -164,12 +159,27 @@ func getDevContainer(ctx context.Context, apiClient *api.API, codespace *api.Cod
 // newPortsPublicCmd returns a Cobra "ports public" subcommand, which makes a given port public.
 func newPortsPublicCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "public <codespace> <port>",
+		Use:   "public <port>",
 		Short: "Mark port as public",
-		Args:  cobra.ExactArgs(2),
+		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			codespace, err := cmd.Flags().GetString("codespace")
+			if err != nil {
+				// should only happen if flag is not defined
+				// or if the flag is not of string type
+				// since it's a persistent flag that we control it should never happen
+				return fmt.Errorf("get codespace flag: %v", err)
+			}
+
 			log := output.NewLogger(os.Stdout, os.Stderr, false)
-			return updatePortVisibility(log, args[0], args[1], true)
+
+			port := args[0]
+			if len(args) > 1 {
+				log.Errorln("<codespace> argument is deprecated. Use --codespace instead.")
+				codespace, port = args[0], args[1]
+			}
+
+			return updatePortVisibility(log, codespace, port, true)
 		},
 	}
 }
@@ -177,12 +187,27 @@ func newPortsPublicCmd() *cobra.Command {
 // newPortsPrivateCmd returns a Cobra "ports private" subcommand, which makes a given port private.
 func newPortsPrivateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "private <codespace> <port>",
+		Use:   "private <port>",
 		Short: "Mark port as private",
-		Args:  cobra.ExactArgs(2),
+		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			codespace, err := cmd.Flags().GetString("codespace")
+			if err != nil {
+				// should only happen if flag is not defined
+				// or if the flag is not of string type
+				// since it's a persistent flag that we control it should never happen
+				return fmt.Errorf("get codespace flag: %v", err)
+			}
+
 			log := output.NewLogger(os.Stdout, os.Stderr, false)
-			return updatePortVisibility(log, args[0], args[1], false)
+
+			port := args[0]
+			if len(args) > 1 {
+				log.Errorln("<codespace> argument is deprecated. Use --codespace instead.")
+				codespace, port = args[0], args[1]
+			}
+
+			return updatePortVisibility(log, codespace, port, false)
 		},
 	}
 }
@@ -196,13 +221,11 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 		return fmt.Errorf("error getting user: %v", err)
 	}
 
-	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
+	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
-		return fmt.Errorf("error getting codespace token: %v", err)
-	}
-
-	codespace, err := apiClient.GetCodespace(ctx, token, user.Login, codespaceName)
-	if err != nil {
+		if err == errNoCodespaces {
+			return err
+		}
 		return fmt.Errorf("error getting codespace: %v", err)
 	}
 
@@ -233,12 +256,29 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 // port pairs from the codespace to localhost.
 func newPortsForwardCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "forward <codespace> <remote-port>:<local-port>",
+		Use:   "forward <remote-port>:<local-port>...",
 		Short: "Forward ports",
-		Args:  cobra.MinimumNArgs(2),
+		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			codespace, err := cmd.Flags().GetString("codespace")
+			if err != nil {
+				// should only happen if flag is not defined
+				// or if the flag is not of string type
+				// since it's a persistent flag that we control it should never happen
+				return fmt.Errorf("get codespace flag: %v", err)
+			}
+
 			log := output.NewLogger(os.Stdout, os.Stderr, false)
-			return forwardPorts(log, args[0], args[1:])
+
+			ports := args[0:]
+			if len(args) > 1 && !strings.Contains(args[0], ":") {
+				// assume this is a codespace name
+				log.Errorln("<codespace> argument is deprecated. Use --codespace instead.")
+				codespace = args[0]
+				ports = args[1:]
+			}
+
+			return forwardPorts(log, codespace, ports)
 		},
 	}
 }
@@ -257,13 +297,11 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 		return fmt.Errorf("error getting user: %v", err)
 	}
 
-	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
+	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
-		return fmt.Errorf("error getting codespace token: %v", err)
-	}
-
-	codespace, err := apiClient.GetCodespace(ctx, token, user.Login, codespaceName)
-	if err != nil {
+		if err == errNoCodespaces {
+			return err
+		}
 		return fmt.Errorf("error getting codespace: %v", err)
 	}
 
