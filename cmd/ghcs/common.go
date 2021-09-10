@@ -109,7 +109,7 @@ func ask(qs []*survey.Question, response interface{}) error {
 	// ASCII \x03 (ETX) instead of delivering SIGINT to the application.
 	// So we have to serve ourselves the SIGINT.
 	//
-	// https://github.com/AlecAivazis/survey/#why-isnt-sending-a-sigint-aka-ctrl-c-signal-working
+	// https://github.com/AlecAivazis/survey/#why-isnt-ctrl-c-working
 	if err == terminal.InterruptErr {
 		self, _ := os.FindProcess(os.Getpid())
 		_ = self.Signal(os.Interrupt) // assumes POSIX
