@@ -93,7 +93,9 @@ func getOrChooseCodespace(ctx context.Context, apiClient *api.API, user *api.Use
 	return codespace, token, nil
 }
 
-var hasTTY = term.IsTerminal(0) && term.IsTerminal(1) // is process connected to a terminal?
+// hasTTY indicates whether the process connected to a terminal.
+// It is not portable to assume stdin/stdout are fds 0 and 1.
+var hasTTY = term.IsTerminal(os.Stdin.Fd()) && term.IsTerminal(os.Stdout.Fd())
 
 // ask asks survey questions on the terminal, using standard options.
 // It fails unless hasTTY, but ideally callers should avoid calling it in that case.
