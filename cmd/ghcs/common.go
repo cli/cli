@@ -111,6 +111,10 @@ func ask(qs []*survey.Question, response interface{}) error {
 	if err == terminal.InterruptErr {
 		self, _ := os.FindProcess(os.Getpid())
 		_ = self.Signal(os.Interrupt) // assumes POSIX
+
+		// Suspend the goroutine, to avoid a race between
+		// return from main and async delivery of INT signal.
+		select {}
 	}
 	return err
 }
