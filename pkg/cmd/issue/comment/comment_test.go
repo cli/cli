@@ -281,7 +281,7 @@ func mockIssueFromNumber(_ *testing.T, reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`query IssueByNumber\b`),
 		httpmock.StringResponse(`
-			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+			{ "data": { "repository": { "hasIssuesEnabled": true, "issueOrPullRequest": {
 				"number": 123,
 				"url": "https://github.com/OWNER/REPO/issues/123"
 			} } } }`),

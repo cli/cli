@@ -2,7 +2,7 @@
   "data": {
     "repository": {
       "hasIssuesEnabled": true,
-      "issue": {
+      "issueOrPullRequest": {
         "number": 123,
         "body": "some body",
         "title": "some title",

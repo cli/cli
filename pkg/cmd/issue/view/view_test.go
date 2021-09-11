@@ -69,7 +69,7 @@ func TestIssueView_web(t *testing.T) {
 	reg.Register(
 		httpmock.GraphQL(`query IssueByNumber\b`),
 		httpmock.StringResponse(`
-			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+			{ "data": { "repository": { "hasIssuesEnabled": true, "issueOrPullRequest": {
 				"number": 123,
 				"url": "https://github.com/OWNER/REPO/issues/123"
 			} } } }
