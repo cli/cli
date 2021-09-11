@@ -225,6 +225,24 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL:   "https://github.com/ravocean/angur/tree/trunk/path/to/file.txt#L32-L40",
 		},
 		{
+			name: "invalid default branch",
+			opts: BrowseOptions{
+				SelectorArg: "chocolate-pecan-pie.txt",
+			},
+			baseRepo:      ghrepo.New("andrewhsu", "recipies"),
+			defaultBranch: "",
+			wantsErr:      true,
+		},
+		{
+			name: "file with invalid line number after colon",
+			opts: BrowseOptions{
+				SelectorArg: "laptime-notes.txt:w-9",
+			},
+			baseRepo:      ghrepo.New("andrewhsu", "sonoma-raceway"),
+			defaultBranch: "main",
+			wantsErr:      true,
+		},
+		{
 			name: "file with invalid line number",
 			opts: BrowseOptions{
 				SelectorArg: "path/to/file.txt:32:32",
