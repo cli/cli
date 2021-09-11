@@ -135,21 +135,23 @@ func runBrowse(opts *BrowseOptions) error {
 		if isNumber(opts.SelectorArg) {
 			url += "/issues/" + opts.SelectorArg
 		} else {
-			fileArg, err := parseFileArg(opts.SelectorArg)
-			if err != nil {
-				return err
-			}
+
+			var branchName string
 			if opts.Branch != "" {
-				url += "/tree/" + opts.Branch + "/"
+				branchName = opts.Branch
 			} else {
 				apiClient := api.NewClientFromHTTP(httpClient)
-				branchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
+				branchName, err = api.RepoDefaultBranch(apiClient, baseRepo)
 				if err != nil {
 					return err
 				}
-				url += "/tree/" + branchName + "/"
 			}
-			url += fileArg
+
+			path, err := genPath(opts.SelectorArg, branchName)
+			if err != nil {
+				return err
+			}
+			url += path
 		}
 	}
 
@@ -164,34 +166,58 @@ func runBrowse(opts *BrowseOptions) error {
 	}
 }
 
-func parseFileArg(fileArg string) (string, error) {
-	arr := strings.Split(fileArg, ":")
+// genPath constructs the path portion of the url with leading "/" for the browser to open.
+func genPath(fileArg, branchName string) (string, error) {
+	sb := strings.Builder{} // for building the path string return value
+
+	arr := strings.Split(fileArg, ":") // look for line number or range by splitting on delimiter
 	if len(arr) > 2 {
 		return "", fmt.Errorf("invalid use of colon\nUse 'gh browse --help' for more information about browse\n")
 	}
 
-	if len(arr) > 1 {
-		out := arr[0] + "#L"
-		lineRange := strings.Split(arr[1], "-")
+	filename := arr[0]
+	if len(arr) > 1 { // expecting a line number and possibly range
+		if strings.HasSuffix(filename, ".md") || strings.HasSuffix(filename, ".markdown") {
+			// build path with "blob" instead of "tree" so "plain" param will work
+			sb.WriteString("/blob/")
+			sb.WriteString(branchName)
+			sb.WriteString("/")
+			sb.WriteString(filename)
+			sb.WriteString("?plain=1") // param to disable markdown rendering so we can highlight line number
+		} else {
+			// not a markdown file, so build path with "tree"
+			sb.WriteString("/tree/")
+			sb.WriteString(branchName)
+			sb.WriteString("/")
+			sb.WriteString(filename)
+		}
 
-		if len(lineRange) > 0 {
-			if !isNumber(lineRange[0]) {
+		// build fragment for line number and possibly range
+		sb.WriteString("#L")
+		lines := strings.Split(arr[1], "-") // look for line range by splitting on delimiter
+		if len(lines) > 0 {
+			if !isNumber(lines[0]) {
 				return "", fmt.Errorf("invalid line number after colon\nUse 'gh browse --help' for more information about browse\n")
 			}
-			out += lineRange[0]
+			sb.WriteString(lines[0]) // build line number
 		}
 
-		if len(lineRange) > 1 {
-			if !isNumber(lineRange[1]) {
+		if len(lines) > 1 {
+			if !isNumber(lines[1]) {
 				return "", fmt.Errorf("invalid line range after colon\nUse 'gh browse --help' for more information about browse\n")
 			}
-			out += "-L" + lineRange[1]
+			// build line range
+			sb.WriteString("-L")
+			sb.WriteString(lines[1])
 		}
-
-		return out, nil
+	} else { // no line number or range found in fileArg
+		sb.WriteString("/tree/")
+		sb.WriteString(branchName)
+		sb.WriteString("/")
+		sb.WriteString(filename)
 	}
 
-	return arr[0], nil
+	return sb.String(), nil
 }
 
 func isNumber(arg string) bool {
