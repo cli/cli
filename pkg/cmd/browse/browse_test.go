@@ -229,16 +229,18 @@ func Test_runBrowse(t *testing.T) {
 			opts: BrowseOptions{
 				SelectorArg: "path/to/file.txt:32:32",
 			},
-			baseRepo: ghrepo.New("ttran112", "ttrain211"),
-			wantsErr: true,
+			baseRepo:      ghrepo.New("ttran112", "ttrain211"),
+			defaultBranch: "main",
+			wantsErr:      true,
 		},
 		{
 			name: "file with invalid line range",
 			opts: BrowseOptions{
 				SelectorArg: "path/to/file.txt:32-abc",
 			},
-			baseRepo: ghrepo.New("ttran112", "ttrain211"),
-			wantsErr: true,
+			baseRepo:      ghrepo.New("ttran112", "ttrain211"),
+			defaultBranch: "main",
+			wantsErr:      true,
 		},
 		{
 			name: "branch with issue number",
