@@ -10,8 +10,12 @@ import (
 	"github.com/cli/cli/v2/pkg/githubsearch"
 )
 
+func shouldUseSearch(filters prShared.FilterOptions) bool {
+	return filters.Draft || filters.NonDraft || filters.Author != "" || filters.Assignee != "" || filters.Search != "" || len(filters.Labels) > 0
+}
+
 func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.PullRequestAndTotalCount, error) {
-	if filters.Author != "" || filters.Assignee != "" || filters.Search != "" || len(filters.Labels) > 0 {
+	if shouldUseSearch(filters) {
 		return searchPullRequests(httpClient, repo, filters, limit)
 	}
 
@@ -175,6 +179,12 @@ func searchPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters 
 	}
 	if filters.BaseBranch != "" {
 		q.SetBaseBranch(filters.BaseBranch)
+	}
+
+	if filters.Draft {
+		q.SetDraft(true)
+	} else if filters.NonDraft {
+		q.SetDraft(false)
 	}
 
 	pageLimit := min(limit, 100)

@@ -186,6 +186,52 @@ func TestPRList_filteringAssigneeLabels(t *testing.T) {
 	}
 }
 
+func TestPRList_bothNonDraftAndDraft(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	_, err := runCommand(http, true, `--draft --non-draft`)
+	if err == nil || err.Error() != "specify only one of `--draft` or `--non-draft`" {
+		t.Fatal(err)
+	}
+}
+
+func TestPRList_filteringDraft(t *testing.T) {
+	tests := []struct {
+		name          string
+		cli           string
+		expectedQuery string
+	}{{
+		"draft",
+		"--draft",
+		`repo:OWNER/REPO is:pr is:open draft:true`,
+	},
+		{
+			"non-draft",
+			"--non-draft",
+			`repo:OWNER/REPO is:pr is:open draft:false`,
+		}}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			http := initFakeHTTP()
+			defer http.Verify(t)
+
+			http.Register(
+				httpmock.GraphQL(`query PullRequestSearch\b`),
+				httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
+					assert.Equal(t, test.expectedQuery, params["q"].(string))
+				}))
+
+			_, err := runCommand(http, true, test.cli)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+
+}
+
 func TestPRList_withInvalidLimitFlag(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
@@ -197,18 +243,43 @@ func TestPRList_withInvalidLimitFlag(t *testing.T) {
 }
 
 func TestPRList_web(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
+	tests := []struct {
+		name               string
+		cli                string
+		expectedBrowserURL string
+	}{{
+		"test",
+		"-a peter -l bug -l docs -L 10 -s merged -B trunk",
+		"https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk",
+	},
+		{
+			"draft",
+			"--draft",
+			"https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Aopen+draft%3Atrue",
+		},
+		{
+			"non-draft",
+			"--non-draft",
+			"https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Aopen+draft%3Afalse",
+		}}
 
-	_, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			http := initFakeHTTP()
+			defer http.Verify(t)
 
-	output, err := runCommand(http, true, "--web -a peter -l bug -l docs -L 10 -s merged -B trunk")
-	if err != nil {
-		t.Errorf("error running command `pr list` with `--web` flag: %v", err)
+			_, cmdTeardown := run.Stub()
+			defer cmdTeardown(t)
+
+			output, err := runCommand(http, true, "--web "+test.cli)
+			if err != nil {
+				t.Errorf("error running command `pr list` with `--web` flag: %v", err)
+			}
+
+			assert.Equal(t, "", output.String())
+			assert.Equal(t, "Opening github.com/OWNER/REPO/pulls in your browser.\n", output.Stderr())
+			assert.Equal(t, test.expectedBrowserURL, output.BrowsedURL)
+		})
 	}
 
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/pulls in your browser.\n", output.Stderr())
-	assert.Equal(t, "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk", output.BrowsedURL)
 }

@@ -54,6 +54,7 @@ type Query struct {
 	forkState  string
 	visibility string
 	isArchived *bool
+	isDraft    *bool
 }
 
 func (q *Query) InRepository(nameWithOwner string) {
@@ -139,6 +140,10 @@ func (q *Query) SetArchived(isArchived bool) {
 	q.isArchived = &isArchived
 }
 
+func (q *Query) SetDraft(isDraft bool) {
+	q.isDraft = &isDraft
+}
+
 func (q *Query) String() string {
 	var qs string
 
@@ -197,6 +202,9 @@ func (q *Query) String() string {
 	}
 	if q.headBranch != "" {
 		qs += fmt.Sprintf("head:%s ", quote(q.headBranch))
+	}
+	if q.isDraft != nil {
+		qs += fmt.Sprintf("draft:%v ", *q.isDraft)
 	}
 
 	if q.sort != "" {
