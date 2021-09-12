@@ -50,6 +50,16 @@ var configOptions = []ConfigOption{
 		Description:  "the terminal pager program to send standard output to",
 		DefaultValue: "",
 	},
+	{
+		Key:          "http_unix_socket",
+		Description:  "the path to a unix socket through which to make HTTP connection",
+		DefaultValue: "",
+	},
+	{
+		Key:          "browser",
+		Description:  "the web browser to use for opening URLs",
+		DefaultValue: "",
+	},
 }
 
 func ConfigOptions() []ConfigOption {
@@ -178,6 +188,24 @@ func NewBlankRoot() *yaml.Node {
 								Value: "pr checkout",
 							},
 						},
+					},
+					{
+						HeadComment: "The path to a unix socket through which send HTTP connections. If blank, HTTP traffic will be handled by net/http.DefaultTransport.",
+						Kind:        yaml.ScalarNode,
+						Value:       "http_unix_socket",
+					},
+					{
+						Kind:  yaml.ScalarNode,
+						Value: "",
+					},
+					{
+						HeadComment: "What web browser gh should use when opening URLs. If blank, will refer to environment.",
+						Kind:        yaml.ScalarNode,
+						Value:       "browser",
+					},
+					{
+						Kind:  yaml.ScalarNode,
+						Value: "",
 					},
 				},
 			},

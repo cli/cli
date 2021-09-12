@@ -123,6 +123,9 @@ func watchRun(opts *WatchOptions) error {
 
 	if run.Status == shared.Completed {
 		fmt.Fprintf(out, "Run %s (%s) has already completed with '%s'\n", cs.Bold(run.Name), cs.Cyanf("%d", run.ID), run.Conclusion)
+		if opts.ExitStatus && run.Conclusion != shared.Success {
+			return cmdutil.SilentError
+		}
 		return nil
 	}
 
@@ -132,9 +135,10 @@ func watchRun(opts *WatchOptions) error {
 		prNumber = fmt.Sprintf(" #%d", number)
 	}
 
-	opts.IO.EnableVirtualTerminalProcessing()
-	// clear entire screen
-	fmt.Fprintf(out, "\x1b[2J")
+	if err := opts.IO.EnableVirtualTerminalProcessing(); err == nil {
+		// clear entire screen
+		fmt.Fprintf(out, "\x1b[2J")
+	}
 
 	annotationCache := map[int64][]shared.Annotation{}
 

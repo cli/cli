@@ -51,10 +51,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Short: "List and filter pull requests in this repository",
 		Example: heredoc.Doc(`
 			List PRs authored by you
-			$ gh pr list --author @me
+			$ gh pr list --author "@me"
 
 			List PRs assigned to you
-			$ gh pr list --assignee @me
+			$ gh pr list --assignee "@me"
 
 			List PRs by label, combining multiple labels with AND
 			$ gh pr list --label bug --label "priority 1"
@@ -84,6 +84,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the browser to list the pull requests")
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of items to fetch")
 	cmd.Flags().StringVarP(&opts.State, "state", "s", "open", "Filter by state: {open|closed|merged|all}")
+	_ = cmd.RegisterFlagCompletionFunc("state", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"open", "closed", "merged", "all"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().StringVarP(&opts.BaseBranch, "base", "B", "", "Filter by base branch")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by labels")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
@@ -160,7 +163,7 @@ func listRun(opts *ListOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
-		return opts.Exporter.Write(opts.IO.Out, listResult.PullRequests, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO, listResult.PullRequests)
 	}
 
 	if opts.IO.IsStdoutTTY() {

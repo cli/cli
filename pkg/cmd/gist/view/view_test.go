@@ -450,7 +450,6 @@ func Test_promptGists(t *testing.T) {
 	}
 
 	io, _, _, _ := iostreams.Test()
-	cs := iostreams.NewColorScheme(io.ColorEnabled(), io.ColorSupport256())
 
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}
@@ -472,7 +471,7 @@ func Test_promptGists(t *testing.T) {
 		as.StubOne(tt.gistIndex)
 
 		t.Run(tt.name, func(t *testing.T) {
-			gistID, err := promptGists(client, ghinstance.Default(), cs)
+			gistID, err := promptGists(client, ghinstance.Default(), io.ColorScheme())
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantOut, gistID)
 			reg.Verify(t)

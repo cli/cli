@@ -2,6 +2,7 @@ package create
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -48,6 +49,8 @@ type CreateOptions struct {
 
 	// maximum number of simultaneous uploads
 	Concurrency int
+
+	DiscussionCategory string
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -92,9 +95,16 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			Upload a release asset with a display label
 			$ gh release create v1.2.3 '/path/to/asset.zip#My display label'
+
+			Create a release and start a discussion
+			$ gh release create v1.2.3 --discussion-category "General"
 		`),
 		Args: cmdutil.MinimumArgs(1, "could not create: no tag name provided"),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Flags().Changed("discussion-category") && opts.Draft {
+				return errors.New("Discussions for draft releases not supported")
+			}
+
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
@@ -132,6 +142,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Name, "title", "t", "", "Release title")
 	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file`")
+	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion of the specified category")
 
 	return cmd
 }
@@ -268,6 +279,13 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
+	if opts.Draft && len(opts.DiscussionCategory) > 0 {
+		return fmt.Errorf(
+			"%s Discussions not supported with draft releases",
+			opts.IO.ColorScheme().FailureIcon(),
+		)
+	}
+
 	params := map[string]interface{}{
 		"tag_name":   opts.TagName,
 		"draft":      opts.Draft,
@@ -277,6 +295,9 @@ func createRun(opts *CreateOptions) error {
 	}
 	if opts.Target != "" {
 		params["target_commitish"] = opts.Target
+	}
+	if opts.DiscussionCategory != "" {
+		params["discussion_category_name"] = opts.DiscussionCategory
 	}
 
 	hasAssets := len(opts.Assets) > 0

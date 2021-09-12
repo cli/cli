@@ -57,7 +57,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Example: heredoc.Doc(`
 			$ gh issue list -l "bug" -l "help wanted"
 			$ gh issue list -A monalisa
-			$ gh issue list -a @me
+			$ gh issue list -a "@me"
 			$ gh issue list --web
 			$ gh issue list --milestone "The big 1.0"
 			$ gh issue list --search "error no:assignee sort:created-asc"
@@ -82,6 +82,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by labels")
 	cmd.Flags().StringVarP(&opts.State, "state", "s", "open", "Filter by state: {open|closed|all}")
+	_ = cmd.RegisterFlagCompletionFunc("state", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"open", "closed", "all"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of issues to fetch")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVar(&opts.Mention, "mention", "", "Filter by mention")
@@ -160,7 +163,7 @@ func listRun(opts *ListOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
-		return opts.Exporter.Write(opts.IO.Out, listResult.Issues, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO, listResult.Issues)
 	}
 
 	if isTerminal {

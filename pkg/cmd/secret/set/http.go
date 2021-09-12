@@ -130,17 +130,7 @@ func mapRepoNameToID(client *api.Client, host, orgName string, repositoryNames [
 		DatabaseID int `json:"databaseId"`
 	})
 
-	err := client.GraphQL(host, query, nil, &graphqlResult)
-
-	gqlErr, isGqlErr := err.(*api.GraphQLErrorResponse)
-	if isGqlErr {
-		for _, ge := range gqlErr.Errors {
-			if ge.Type == "NOT_FOUND" {
-				return nil, fmt.Errorf("could not find %s/%s", orgName, ge.Path[0])
-			}
-		}
-	}
-	if err != nil {
+	if err := client.GraphQL(host, query, nil, &graphqlResult); err != nil {
 		return nil, fmt.Errorf("failed to look up repositories: %w", err)
 	}
 

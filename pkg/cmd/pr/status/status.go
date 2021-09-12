@@ -119,7 +119,7 @@ func statusRun(opts *StatusOptions) error {
 		if prPayload.CurrentPR != nil {
 			data["currentBranch"] = prPayload.CurrentPR
 		}
-		return opts.Exporter.Write(opts.IO.Out, data, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO, data)
 	}
 
 	out := opts.IO.Out

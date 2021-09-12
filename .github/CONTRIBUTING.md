@@ -23,8 +23,7 @@ Please avoid:
 ## Building the project
 
 Prerequisites:
-- Go 1.13+ for building the binary
-- Go 1.15+ for running the test suite
+- Go 1.16+
 
 Build with:
 * Unix-like systems: `make`
