@@ -99,7 +99,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if opts.Exporter != nil {
-		return opts.Exporter.Write(opts.IO.Out, runs, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO, runs)
 	}
 
 	tp := utils.NewTablePrinter(opts.IO)

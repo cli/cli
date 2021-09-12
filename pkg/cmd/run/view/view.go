@@ -231,7 +231,7 @@ func runView(opts *ViewOptions) error {
 	}
 
 	if opts.Exporter != nil {
-		return opts.Exporter.Write(opts.IO.Out, run, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO, run)
 	}
 
 	if opts.Web {
