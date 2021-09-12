@@ -176,16 +176,6 @@ func TestPRList_filteringAssignee(t *testing.T) {
 	}
 }
 
-func TestPRList_filteringAssigneeLabels(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	_, err := runCommand(http, true, `-l one,two -a hubot`)
-	if err == nil && err.Error() != "multiple labels with --assignee are not supported" {
-		t.Fatal(err)
-	}
-}
-
 func TestPRList_bothNonDraftAndDraft(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
