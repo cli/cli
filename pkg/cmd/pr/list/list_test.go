@@ -191,9 +191,8 @@ func TestPRList_bothNonDraftAndDraft(t *testing.T) {
 	defer http.Verify(t)
 
 	_, err := runCommand(http, true, `--draft --non-draft`)
-	if err == nil || err.Error() != "specify only one of `--draft` or `--non-draft`" {
-		t.Fatal(err)
-	}
+	assert.NotNil(t, err)
+	assert.Equal(t, err.Error(), "specify only one of `--draft` or `--non-draft`")
 }
 
 func TestPRList_filteringDraft(t *testing.T) {
@@ -238,9 +237,8 @@ func TestPRList_withInvalidLimitFlag(t *testing.T) {
 	defer http.Verify(t)
 
 	_, err := runCommand(http, true, `--limit=0`)
-	if err == nil && err.Error() != "invalid limit: 0" {
-		t.Errorf("error running command `issue list`: %v", err)
-	}
+	assert.NotNil(t, err)
+	assert.Equal(t, err.Error(), "invalid value for --limit: 0")
 }
 
 func TestPRList_web(t *testing.T) {
