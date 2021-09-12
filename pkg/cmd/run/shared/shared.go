@@ -45,14 +45,15 @@ type Level string
 
 var RunFields = []string{
 	"name",
-	"commitMsg",
+	"headBranch",
+	"headSha",
 	"createdAt",
 	"updatedAt",
 	"status",
 	"conclusion",
 	"event",
-	"id",
-	"workflowId",
+	"databaseId",
+	"workflowDatabaseId",
 	"url",
 }
 
@@ -104,8 +105,10 @@ func (r *Run) ExportData(fields []string) *map[string]interface{} {
 
 	for _, f := range fields {
 		switch f {
-		case "commitMsg":
-			data[f] = r.CommitMsg()
+		case "databaseId":
+			data[f] = r.ID
+		case "workflowDatabaseId":
+			data[f] = r.WorkflowID
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()
