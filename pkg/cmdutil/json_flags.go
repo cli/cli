@@ -77,9 +77,6 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 		if c.Parent() != nil {
 			return c.Parent().FlagErrorFunc()(c, e)
 		}
-		if e == pflag.ErrHelp {
-			return e
-		}
 		return e
 	})
 }
