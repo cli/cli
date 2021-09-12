@@ -201,11 +201,12 @@ func TestPRList_filteringDraft(t *testing.T) {
 		name          string
 		cli           string
 		expectedQuery string
-	}{{
-		"draft",
-		"--draft",
-		`repo:OWNER/REPO is:pr is:open draft:true`,
-	},
+	}{
+		{
+			"draft",
+			"--draft",
+			`repo:OWNER/REPO is:pr is:open draft:true`,
+		},
 		{
 			"non-draft",
 			"--non-draft",
@@ -247,11 +248,12 @@ func TestPRList_web(t *testing.T) {
 		name               string
 		cli                string
 		expectedBrowserURL string
-	}{{
-		"test",
-		"-a peter -l bug -l docs -L 10 -s merged -B trunk",
-		"https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk",
-	},
+	}{
+		{
+			"test",
+			"-a peter -l bug -l docs -L 10 -s merged -B trunk",
+			"https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk",
+		},
 		{
 			"draft",
 			"--draft",
