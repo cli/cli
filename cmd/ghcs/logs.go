@@ -16,7 +16,6 @@ import (
 func newLogsCmd() *cobra.Command {
 	var (
 		codespace string
-		tail      bool
 		follow    bool
 	)
 
@@ -27,20 +26,11 @@ func newLogsCmd() *cobra.Command {
 		Short: "Access codespace logs",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) > 0 {
-				log.Errorln("<codespace> argument is deprecated. Use --codespace instead.")
-				codespace = args[0]
-			}
-			if tail {
-				log.Errorln("--tail flag is deprecated. Use --follow instead.")
-				follow = true
-			}
 			return logs(context.Background(), log, codespace, follow)
 		},
 	}
 
 	logsCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
-	logsCmd.Flags().BoolVarP(&tail, "tail", "t", false, "Tail the logs (deprecated, use --follow)")
 	logsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Tail and follow the logs")
 
 	return logsCmd

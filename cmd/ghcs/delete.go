@@ -25,11 +25,6 @@ func newDeleteCmd() *cobra.Command {
 		Use:   "delete",
 		Short: "Delete a codespace",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) > 0 {
-				log.Errorln("<codespace> argument is deprecated. Use --codespace instead.")
-				codespace = args[0]
-			}
-
 			switch {
 			case allCodespaces && repo != "":
 				return errors.New("both --all and --repo is not supported.")
@@ -46,28 +41,6 @@ func newDeleteCmd() *cobra.Command {
 	deleteCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
 	deleteCmd.Flags().BoolVar(&allCodespaces, "all", false, "Delete all codespaces")
 	deleteCmd.Flags().StringVarP(&repo, "repo", "r", "", "Delete all codespaces for a repository")
-
-	deleteAllCmd := &cobra.Command{
-		Use:   "all",
-		Short: "(Deprecated) Delete all codespaces for the current user",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			log.Errorln("all command is deprecated. Use --all instead.")
-			return deleteAll(log)
-		},
-	}
-
-	deleteByRepoCmd := &cobra.Command{
-		Use:   "repo <repo>",
-		Short: "(Deprecated) Delete all codespaces for a repository",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			log.Errorln("repo command is deprecated. Use --repo instead.")
-			return deleteByRepo(log, args[0])
-		},
-	}
-
-	deleteCmd.AddCommand(deleteAllCmd, deleteByRepoCmd)
 
 	return deleteCmd
 }
