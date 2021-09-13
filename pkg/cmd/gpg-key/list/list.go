@@ -75,34 +75,34 @@ func listRun(opts *ListOptions) error {
 
 	t := utils.NewTablePrinter(opts.IO)
 	cs := opts.IO.ColorScheme()
+	now := time.Now()
 
 	for _, gpgKey := range gpgKeys {
+		t.AddField(gpgKey.Emails.String(), nil, nil)
+
 		t.AddField(gpgKey.KeyId, nil, nil)
 
+		createdAt := gpgKey.CreatedAt.Format(time.RFC3339)
+		if t.IsTTY() {
+			createdAt = "Created " + utils.FuzzyAgoAbbr(now, gpgKey.CreatedAt)
+		}
+		t.AddField(createdAt, nil, cs.Gray)
+
 		expiresAt := gpgKey.ExpiresAt.Format(time.RFC3339)
-		if gpgKey.ExpiresAt.IsZero() {
-			expiresAt = "Never"
+		if t.IsTTY() {
+			if gpgKey.ExpiresAt.IsZero() {
+				expiresAt = "Never expires"
+			} else {
+				expiresAt = "Expires " + gpgKey.ExpiresAt.Format("2006-01-02")
+			}
 		}
 		t.AddField(expiresAt, nil, cs.Gray)
 
-		t.AddField(gpgKey.PublicKey, truncateMiddle, nil)
+		if !t.IsTTY() {
+			t.AddField(gpgKey.PublicKey, nil, nil)
+		}
 		t.EndRow()
 	}
 
 	return t.Render()
-}
-
-func truncateMiddle(maxWidth int, t string) string {
-	if len(t) <= maxWidth {
-		return t
-	}
-
-	ellipsis := "..."
-	if maxWidth < len(ellipsis)+2 {
-		return t[0:maxWidth]
-	}
-
-	halfWidth := (maxWidth - len(ellipsis)) / 2
-	remainder := (maxWidth - len(ellipsis)) % 2
-	return t[0:halfWidth+remainder] + ellipsis + t[len(t)-halfWidth:]
 }

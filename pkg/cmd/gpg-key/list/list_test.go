@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/internal/config"
 	"github.com/cli/cli/pkg/httpmock"
 	"github.com/cli/cli/pkg/iostreams"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestListRun(t *testing.T) {
@@ -22,69 +22,17 @@ func TestListRun(t *testing.T) {
 		wantErr    bool
 	}{
 		{
-			name: "list tty",
-			opts: ListOptions{
-				HTTPClient: func() (*http.Client, error) {
-					expiresAt, _ := time.Parse(time.RFC3339, "2021-06-11T15:44:24+01:00")
-					reg := &httpmock.Registry{}
-					reg.Register(
-						httpmock.REST("GET", "user/gpg_keys"),
-						httpmock.StringResponse(fmt.Sprintf(`[
-							{
-								"id": 1234,
-								"key_id": "ABCDEF1234567890",
-								"public_key": "xJMEWfoofoofoo",
-								"expires_at": "%[1]s"
-							},
-							{
-								"id": 5678,
-								"key_id": "1234567890ABCDEF",
-								"public_key": "xJMEWbarbarbar",
-								"expires_at": "%[1]s"
-							}
-						]`, expiresAt.Format(time.RFC3339))),
-					)
-					return &http.Client{Transport: reg}, nil
-				},
-			},
-			isTTY: true,
-			wantStdout: heredoc.Doc(`
-				ABCDEF1234567890  2021-06-11T15:44:24+01:00  xJMEWfoofoofoo
-				1234567890ABCDEF  2021-06-11T15:44:24+01:00  xJMEWbarbarbar
-			`),
+			name:       "list tty",
+			opts:       ListOptions{HTTPClient: mockGPGResponse},
+			isTTY:      true,
+			wantStdout: "johnny@test.com      ABCDEF1234567890  Created Jun 11, 2020  Expires 2099-01-01\nmonalisa@github.com  1234567890ABCDEF  Created Jan 11, 2021  Never expires\n",
 			wantStderr: "",
 		},
 		{
-			name: "list non-tty",
-			opts: ListOptions{
-				HTTPClient: func() (*http.Client, error) {
-					expiresAt, _ := time.Parse(time.RFC3339, "2021-06-11T15:44:24+01:00")
-					reg := &httpmock.Registry{}
-					reg.Register(
-						httpmock.REST("GET", "user/gpg_keys"),
-						httpmock.StringResponse(fmt.Sprintf(`[
-							{
-								"id": 1234,
-								"key_id": "ABCDEF1234567890",
-								"public_key": "xJMEWfoofoofoo",
-								"expires_at": "%[1]s"
-							},
-							{
-								"id": 5678,
-								"key_id": "1234567890ABCDEF",
-								"public_key": "xJMEWbarbarbar",
-								"expires_at": "%[1]s"
-							}
-						]`, expiresAt.Format(time.RFC3339))),
-					)
-					return &http.Client{Transport: reg}, nil
-				},
-			},
-			isTTY: false,
-			wantStdout: heredoc.Doc(`
-				ABCDEF1234567890	2021-06-11T15:44:24+01:00	xJMEWfoofoofoo
-				1234567890ABCDEF	2021-06-11T15:44:24+01:00	xJMEWbarbarbar
-			`),
+			name:       "list non-tty",
+			opts:       ListOptions{HTTPClient: mockGPGResponse},
+			isTTY:      false,
+			wantStdout: "johnny@test.com\tABCDEF1234567890\t2020-06-11T15:44:24+01:00\t2099-01-01T15:44:24+01:00\txJMEWfoofoofoo\nmonalisa@github.com\t1234567890ABCDEF\t2021-01-11T15:44:24+01:00\t0001-01-01T00:00:00Z\txJMEWbarbarbar\n",
 			wantStderr: "",
 		},
 		{
@@ -111,23 +59,50 @@ func TestListRun(t *testing.T) {
 			io.SetStdoutTTY(tt.isTTY)
 			io.SetStdinTTY(tt.isTTY)
 			io.SetStderrTTY(tt.isTTY)
-
 			opts := tt.opts
 			opts.IO = io
 			opts.Config = func() (config.Config, error) { return config.NewBlankConfig(), nil }
-
 			err := listRun(&opts)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("linRun() return error: %v", err)
-				return
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
 			}
-
-			if stdout.String() != tt.wantStdout {
-				t.Errorf("wants stdout %q, got %q", tt.wantStdout, stdout.String())
-			}
-			if stderr.String() != tt.wantStderr {
-				t.Errorf("wants stderr %q, got %q", tt.wantStderr, stderr.String())
-			}
+			assert.Equal(t, tt.wantStdout, stdout.String())
+			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
+}
+
+func mockGPGResponse() (*http.Client, error) {
+	ca1, _ := time.Parse(time.RFC3339, "2020-06-11T15:44:24+01:00")
+	ea1, _ := time.Parse(time.RFC3339, "2099-01-01T15:44:24+01:00")
+	ca2, _ := time.Parse(time.RFC3339, "2021-01-11T15:44:24+01:00")
+	ea2 := time.Time{}
+	reg := &httpmock.Registry{}
+	reg.Register(
+		httpmock.REST("GET", "user/gpg_keys"),
+		httpmock.StringResponse(fmt.Sprintf(`[
+			{
+				"id": 1234,
+				"key_id": "ABCDEF1234567890",
+				"public_key": "xJMEWfoofoofoo",
+				"emails": [{"email": "johnny@test.com"}],
+				"created_at": "%[1]s",
+				"expires_at": "%[2]s"
+			},
+			{
+				"id": 5678,
+				"key_id": "1234567890ABCDEF",
+				"public_key": "xJMEWbarbarbar",
+				"emails": [{"email": "monalisa@github.com"}],
+				"created_at": "%[3]s",
+				"expires_at": "%[4]s"
+			}
+		]`, ca1.Format(time.RFC3339),
+			ea1.Format(time.RFC3339),
+			ca2.Format(time.RFC3339),
+			ea2.Format(time.RFC3339))),
+	)
+	return &http.Client{Transport: reg}, nil
 }

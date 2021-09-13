@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/api"
@@ -14,9 +15,26 @@ import (
 
 var scopesError = errors.New("insufficient OAuth scopes")
 
+type emails []email
+
+type email struct {
+	Email    string `json:email`
+	Verified bool   `json:verified`
+}
+
+func (es emails) String() string {
+	s := []string{}
+	for _, e := range es {
+		s = append(s, e.Email)
+	}
+	return strings.Join(s, ", ")
+}
+
 type gpgKey struct {
-	KeyId       string `json:"key_id"`
-	PublicKey   string `json:"public_key"`
+	KeyId     string    `json:"key_id"`
+	PublicKey string    `json:"public_key"`
+	Emails    emails    `json:emails"`
+	CreatedAt time.Time `json:"created_at"`
 	ExpiresAt time.Time `json:"expires_at"`
 }
 

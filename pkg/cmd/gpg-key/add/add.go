@@ -35,7 +35,7 @@ func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				if opts.IO.IsStdoutTTY() && opts.IO.IsStdinTTY() {
-					return &cmdutil.FlagError{Err: errors.New("GPG public key file missing")}
+					return &cmdutil.FlagError{Err: errors.New("GPG key file missing")}
 				}
 				opts.KeyFile = "-"
 			} else {
@@ -94,7 +94,7 @@ func runAdd(opts *AddOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.ErrOut, "%s GPG public key added to your account\n", cs.SuccessIcon())
+		fmt.Fprintf(opts.IO.ErrOut, "%s GPG key added to your account\n", cs.SuccessIcon())
 	}
 	return nil
 }

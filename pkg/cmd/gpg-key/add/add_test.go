@@ -38,5 +38,5 @@ func Test_runAdd(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
-	assert.Equal(t, "✓ GPG public key added to your account\n", stderr.String())
+	assert.Equal(t, "✓ GPG key added to your account\n", stderr.String())
 }

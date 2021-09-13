@@ -118,7 +118,7 @@ func TestListRun(t *testing.T) {
 
 			err := listRun(&opts)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("linRun() return error: %v", err)
+				t.Errorf("listRun() return error: %v", err)
 				return
 			}
 
