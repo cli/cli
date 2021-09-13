@@ -225,42 +225,6 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL:   "https://github.com/ravocean/angur/blob/trunk/path/to/file.txt?plain=1#L32-L40",
 		},
 		{
-			name: "file.md with line number",
-			opts: BrowseOptions{
-				SelectorArg: "path/to/file.md:42",
-			},
-			baseRepo:      ghrepo.New("andrewhsu", "covfefe"),
-			defaultBranch: "main",
-			expectedURL:   "https://github.com/andrewhsu/covfefe/blob/main/path/to/file.md?plain=1#L42",
-		},
-		{
-			name: "file.md with line range",
-			opts: BrowseOptions{
-				SelectorArg: "path/to/file.md:1-415",
-			},
-			baseRepo:      ghrepo.New("andrewhsu", "covfefe"),
-			defaultBranch: "main",
-			expectedURL:   "https://github.com/andrewhsu/covfefe/blob/main/path/to/file.md?plain=1#L1-L415",
-		},
-		{
-			name: "file.markdown with line number",
-			opts: BrowseOptions{
-				SelectorArg: "path/to/file.markdown:888",
-			},
-			baseRepo:      ghrepo.New("andrewhsu", "covfefe"),
-			defaultBranch: "main",
-			expectedURL:   "https://github.com/andrewhsu/covfefe/blob/main/path/to/file.markdown?plain=1#L888",
-		},
-		{
-			name: "file.markdown with line range",
-			opts: BrowseOptions{
-				SelectorArg: "path/to/file.markdown:5-6",
-			},
-			baseRepo:      ghrepo.New("andrewhsu", "covfefe"),
-			defaultBranch: "main",
-			expectedURL:   "https://github.com/andrewhsu/covfefe/blob/main/path/to/file.markdown?plain=1#L5-L6",
-		},
-		{
 			name: "invalid default branch",
 			opts: BrowseOptions{
 				SelectorArg: "chocolate-pecan-pie.txt",
