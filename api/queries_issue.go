@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -16,8 +16,9 @@ type IssuesPayload struct {
 }
 
 type IssuesAndTotalCount struct {
-	Issues     []Issue
-	TotalCount int
+	Issues       []Issue
+	TotalCount   int
+	SearchCapped bool
 }
 
 type Issue struct {

@@ -10,13 +10,13 @@ import (
 	"text/template"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/markdown"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -138,7 +138,7 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
-		return opts.Exporter.Write(opts.IO.Out, repo, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO, repo)
 	}
 
 	fullName := ghrepo.FullName(toView)

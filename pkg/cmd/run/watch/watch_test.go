@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/run/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/run/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -191,6 +191,21 @@ func TestWatchRun(t *testing.T) {
 			wantOut: "Run failed (1234) has already completed with 'failure'\n",
 		},
 		{
+			name: "already completed, exit status",
+			opts: &WatchOptions{
+				RunID:      "1234",
+				ExitStatus: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+			},
+			wantOut: "Run failed (1234) has already completed with 'failure'\n",
+			wantErr: true,
+			errMsg:  "SilentError",
+		},
+		{
 			name: "prompt, no in progress runs",
 			tty:  true,
 			opts: &WatchOptions{
@@ -307,13 +322,8 @@ func TestWatchRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := watchRun(tt.opts)
 			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Equal(t, tt.errMsg, err.Error())
-				if !tt.opts.ExitStatus {
-					return
-				}
-			}
-			if !tt.opts.ExitStatus {
+				assert.EqualError(t, err, tt.errMsg)
+			} else {
 				assert.NoError(t, err)
 			}
 			assert.Equal(t, tt.wantOut, stdout.String())

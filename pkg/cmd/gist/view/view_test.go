@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/pkg/cmd/gist/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -450,7 +450,6 @@ func Test_promptGists(t *testing.T) {
 	}
 
 	io, _, _, _ := iostreams.Test()
-	cs := iostreams.NewColorScheme(io.ColorEnabled(), io.ColorSupport256())
 
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}
@@ -472,7 +471,7 @@ func Test_promptGists(t *testing.T) {
 		as.StubOne(tt.gistIndex)
 
 		t.Run(tt.name, func(t *testing.T) {
-			gistID, err := promptGists(client, ghinstance.Default(), cs)
+			gistID, err := promptGists(client, ghinstance.Default(), io.ColorScheme())
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantOut, gistID)
 			reg.Verify(t)

@@ -14,12 +14,12 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/pkg/cmd/gist/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -58,7 +58,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			Gists can be created from one or multiple files. Alternatively, pass "-" as
 			file name to read from standard input.
 
-			By default, gists are private; use '--public' to make publicly listed ones.
+			By default, gists are secret; use '--public' to make publicly listed ones.
 		`),
 		Example: heredoc.Doc(`
 			# publish file 'hello.py' as a public gist
@@ -97,7 +97,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 	cmd.Flags().StringVarP(&opts.Description, "desc", "d", "", "A description for this gist")
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser with created gist")
-	cmd.Flags().BoolVarP(&opts.Public, "public", "p", false, "List the gist publicly (default: private)")
+	cmd.Flags().BoolVarP(&opts.Public, "public", "p", false, "List the gist publicly (default: secret)")
 	cmd.Flags().StringVarP(&opts.FilenameOverride, "filename", "f", "", "Provide a filename to be used when reading from STDIN")
 	return cmd
 }

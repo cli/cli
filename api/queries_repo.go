@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -187,6 +188,11 @@ type IssueLabel struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Color       string `json:"color"`
+}
+
+type License struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
 }
 
 // RepoOwner is the login name of the owner
@@ -434,14 +440,17 @@ func InitRepoHostname(repo *Repository, hostname string) *Repository {
 	return repo
 }
 
-// repositoryV3 is the repository result from GitHub API v3
+// RepositoryV3 is the repository result from GitHub API v3
 type repositoryV3 struct {
-	NodeID    string
+	NodeID    string `json:"node_id"`
 	Name      string
 	CreatedAt time.Time `json:"created_at"`
 	Owner     struct {
 		Login string
 	}
+	Private bool
+	HTMLUrl string `json:"html_url"`
+	Parent  *repositoryV3
 }
 
 // ForkRepo forks the repository on GitHub and returns the new repository
@@ -1108,4 +1117,25 @@ func ProjectNamesToPaths(client *Client, repo ghrepo.Interface, projectNames []s
 		return paths, err
 	}
 	return ProjectsToPaths(projects, projectNames)
+}
+
+func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, path string, body io.Reader) (*Repository, error) {
+	var responsev3 repositoryV3
+	err := apiClient.REST(hostname, method, path, body, &responsev3)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &Repository{
+		Name:      responsev3.Name,
+		CreatedAt: responsev3.CreatedAt,
+		Owner: RepositoryOwner{
+			Login: responsev3.Owner.Login,
+		},
+		ID:        responsev3.NodeID,
+		hostname:  hostname,
+		URL:       responsev3.HTMLUrl,
+		IsPrivate: responsev3.Private,
+	}, nil
 }

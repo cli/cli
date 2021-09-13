@@ -1,14 +1,14 @@
 package shared
 
 import (
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"reflect"
 	"testing"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/httpmock"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/stretchr/testify/assert"
 )
 
 func Test_listURLWithQuery(t *testing.T) {
@@ -190,5 +190,58 @@ func Test_QueryHasStateClause(t *testing.T) {
 	for _, tt := range tests {
 		gotState := QueryHasStateClause(tt.searchQuery)
 		assert.Equal(t, tt.hasState, gotState)
+	}
+}
+
+func Test_WithPrAndIssueQueryParams(t *testing.T) {
+	type args struct {
+		baseURL string
+		state   IssueMetadataState
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "blank",
+			args: args{
+				baseURL: "",
+				state:   IssueMetadataState{},
+			},
+			want: "?body=",
+		},
+		{
+			name: "no values",
+			args: args{
+				baseURL: "http://example.com/hey",
+				state:   IssueMetadataState{},
+			},
+			want: "http://example.com/hey?body=",
+		},
+		{
+			name: "title and body",
+			args: args{
+				baseURL: "http://example.com/hey",
+				state: IssueMetadataState{
+					Title: "my title",
+					Body:  "my bodeh",
+				},
+			},
+			want: "http://example.com/hey?body=my+bodeh&title=my+title",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := WithPrAndIssueQueryParams(nil, nil, tt.args.baseURL, tt.args.state)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("WithPrAndIssueQueryParams() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("WithPrAndIssueQueryParams() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

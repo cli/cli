@@ -23,6 +23,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -45,11 +46,11 @@ var tasks = map[string]func(string) error{
 		}
 
 		ldflags := os.Getenv("GO_LDFLAGS")
-		ldflags = fmt.Sprintf("-X github.com/cli/cli/internal/build.Version=%s %s", version(), ldflags)
-		ldflags = fmt.Sprintf("-X github.com/cli/cli/internal/build.Date=%s %s", date(), ldflags)
+		ldflags = fmt.Sprintf("-X github.com/cli/cli/v2/internal/build.Version=%s %s", version(), ldflags)
+		ldflags = fmt.Sprintf("-X github.com/cli/cli/v2/internal/build.Date=%s %s", date(), ldflags)
 		if oauthSecret := os.Getenv("GH_OAUTH_CLIENT_SECRET"); oauthSecret != "" {
-			ldflags = fmt.Sprintf("-X github.com/cli/cli/internal/authflow.oauthClientSecret=%s %s", oauthSecret, ldflags)
-			ldflags = fmt.Sprintf("-X github.com/cli/cli/internal/authflow.oauthClientID=%s %s", os.Getenv("GH_OAUTH_CLIENT_ID"), ldflags)
+			ldflags = fmt.Sprintf("-X github.com/cli/cli/v2/internal/authflow.oauthClientSecret=%s %s", oauthSecret, ldflags)
+			ldflags = fmt.Sprintf("-X github.com/cli/cli/v2/internal/authflow.oauthClientID=%s %s", os.Getenv("GH_OAUTH_CLIENT_ID"), ldflags)
 		}
 
 		return run("go", "build", "-trimpath", "-ldflags", ldflags, "-o", exe, "./cmd/gh")
@@ -136,8 +137,14 @@ func date() string {
 
 func sourceFilesLaterThan(t time.Time) bool {
 	foundLater := false
-	_ = filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			// Ignore errors that occur when the project contains a symlink to a filesystem or volume that
+			// Windows doesn't have access to.
+			if path != "." && isAccessDenied(err) {
+				fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
+				return nil
+			}
 			return err
 		}
 		if foundLater {
@@ -151,6 +158,9 @@ func sourceFilesLaterThan(t time.Time) bool {
 			}
 		}
 		if info.IsDir() {
+			if name := filepath.Base(path); name == "vendor" || name == "node_modules" {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if path == "go.mod" || path == "go.sum" || (strings.HasSuffix(path, ".go") && !strings.HasSuffix(path, "_test.go")) {
@@ -160,7 +170,16 @@ func sourceFilesLaterThan(t time.Time) bool {
 		}
 		return nil
 	})
+	if err != nil {
+		panic(err)
+	}
 	return foundLater
+}
+
+func isAccessDenied(err error) bool {
+	var pe *os.PathError
+	// we would use `syscall.ERROR_ACCESS_DENIED` if this script supported build tags
+	return errors.As(err, &pe) && strings.Contains(pe.Err.Error(), "Access is denied")
 }
 
 func rmrf(targets ...string) error {

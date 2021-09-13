@@ -6,8 +6,8 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/test"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/test"
 	"github.com/stretchr/testify/assert"
 )
 

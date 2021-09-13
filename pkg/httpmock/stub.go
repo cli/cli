@@ -100,6 +100,17 @@ func FileResponse(filename string) Responder {
 	}
 }
 
+func RESTPayload(responseStatus int, responseBody string, cb func(payload map[string]interface{})) Responder {
+	return func(req *http.Request) (*http.Response, error) {
+		bodyData := make(map[string]interface{})
+		err := decodeJSONBody(req, &bodyData)
+		if err != nil {
+			return nil, err
+		}
+		cb(bodyData)
+		return httpResponse(responseStatus, req, bytes.NewBufferString(responseBody)), nil
+	}
+}
 func GraphQLMutation(body string, cb func(map[string]interface{})) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		var bodyData struct {

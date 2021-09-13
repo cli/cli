@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -118,8 +119,7 @@ func TestAddJSONFlags(t *testing.T) {
 
 func Test_exportFormat_Write(t *testing.T) {
 	type args struct {
-		data         interface{}
-		colorEnabled bool
+		data interface{}
 	}
 	tests := []struct {
 		name     string
@@ -132,8 +132,7 @@ func Test_exportFormat_Write(t *testing.T) {
 			name:     "regular JSON output",
 			exporter: exportFormat{},
 			args: args{
-				data:         map[string]string{"name": "hubot"},
-				colorEnabled: false,
+				data: map[string]string{"name": "hubot"},
 			},
 			wantW:   "{\"name\":\"hubot\"}\n",
 			wantErr: false,
@@ -142,8 +141,7 @@ func Test_exportFormat_Write(t *testing.T) {
 			name:     "call ExportData",
 			exporter: exportFormat{fields: []string{"field1", "field2"}},
 			args: args{
-				data:         &exportableItem{"item1"},
-				colorEnabled: false,
+				data: &exportableItem{"item1"},
 			},
 			wantW:   "{\"field1\":\"item1:field1\",\"field2\":\"item1:field2\"}\n",
 			wantErr: false,
@@ -156,7 +154,6 @@ func Test_exportFormat_Write(t *testing.T) {
 					"s1": []exportableItem{{"i1"}, {"i2"}},
 					"s2": []exportableItem{{"i3"}},
 				},
-				colorEnabled: false,
 			},
 			wantW:   "{\"s1\":[{\"f1\":\"i1:f1\",\"f2\":\"i1:f2\"},{\"f1\":\"i2:f1\",\"f2\":\"i2:f2\"}],\"s2\":[{\"f1\":\"i3:f1\",\"f2\":\"i3:f2\"}]}\n",
 			wantErr: false,
@@ -165,8 +162,7 @@ func Test_exportFormat_Write(t *testing.T) {
 			name:     "with jq filter",
 			exporter: exportFormat{filter: ".name"},
 			args: args{
-				data:         map[string]string{"name": "hubot"},
-				colorEnabled: false,
+				data: map[string]string{"name": "hubot"},
 			},
 			wantW:   "hubot\n",
 			wantErr: false,
@@ -175,8 +171,7 @@ func Test_exportFormat_Write(t *testing.T) {
 			name:     "with Go template",
 			exporter: exportFormat{template: "{{.name}}"},
 			args: args{
-				data:         map[string]string{"name": "hubot"},
-				colorEnabled: false,
+				data: map[string]string{"name": "hubot"},
 			},
 			wantW:   "hubot",
 			wantErr: false,
@@ -185,7 +180,10 @@ func Test_exportFormat_Write(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &bytes.Buffer{}
-			if err := tt.exporter.Write(w, tt.args.data, tt.args.colorEnabled); (err != nil) != tt.wantErr {
+			io := &iostreams.IOStreams{
+				Out: w,
+			}
+			if err := tt.exporter.Write(io, tt.args.data); (err != nil) != tt.wantErr {
 				t.Errorf("exportFormat.Write() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}

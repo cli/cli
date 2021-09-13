@@ -12,15 +12,15 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
-	"github.com/cli/cli/test"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -257,10 +257,11 @@ func TestPrMerge(t *testing.T) {
 	shared.RunCommandFinder(
 		"1",
 		&api.PullRequest{
-			ID:     "THE-ID",
-			Number: 1,
-			State:  "OPEN",
-			Title:  "The title of the PR",
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -288,6 +289,36 @@ func TestPrMerge(t *testing.T) {
 	}
 }
 
+func TestPrMerge_blocked(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "BLOCKED",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	output, err := runCommand(http, "master", true, "pr merge 1 --merge")
+	assert.EqualError(t, err, "SilentError")
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Docf(`
+		X Pull request #1 is not mergeable: the base branch policy prohibits the merge.
+		To have the pull request merged after all the requirements have been met, add the %[1]s--auto%[1]s flag.
+		To use administrator privileges to immediately merge the pull request, add the %[1]s--admin%[1]s flag.
+		`, "`"), output.Stderr())
+}
+
 func TestPrMerge_nontty(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
@@ -295,10 +326,11 @@ func TestPrMerge_nontty(t *testing.T) {
 	shared.RunCommandFinder(
 		"1",
 		&api.PullRequest{
-			ID:     "THE-ID",
-			Number: 1,
-			State:  "OPEN",
-			Title:  "The title of the PR",
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -330,10 +362,11 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 	shared.RunCommandFinder(
 		"1",
 		&api.PullRequest{
-			ID:     "THE-ID",
-			Number: 1,
-			State:  "OPEN",
-			Title:  "The title of the PR",
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -368,11 +401,12 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	shared.RunCommandFinder(
 		"",
 		&api.PullRequest{
-			ID:          "PR_10",
-			Number:      10,
-			State:       "OPEN",
-			Title:       "Blueberries are a good fruit",
-			HeadRefName: "blueberries",
+			ID:               "PR_10",
+			Number:           10,
+			State:            "OPEN",
+			Title:            "Blueberries are a good fruit",
+			HeadRefName:      "blueberries",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -414,11 +448,12 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 	shared.RunCommandFinder(
 		"blueberries",
 		&api.PullRequest{
-			ID:          "PR_10",
-			Number:      10,
-			State:       "OPEN",
-			Title:       "Blueberries are a good fruit",
-			HeadRefName: "blueberries",
+			ID:               "PR_10",
+			Number:           10,
+			State:            "OPEN",
+			Title:            "Blueberries are a good fruit",
+			HeadRefName:      "blueberries",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -457,15 +492,16 @@ func Test_nonDivergingPullRequest(t *testing.T) {
 	defer http.Verify(t)
 
 	pr := &api.PullRequest{
-		ID:     "PR_10",
-		Number: 10,
-		Title:  "Blueberries are a good fruit",
-		State:  "OPEN",
+		ID:               "PR_10",
+		Number:           10,
+		Title:            "Blueberries are a good fruit",
+		State:            "OPEN",
+		MergeStateStatus: "CLEAN",
 	}
 	stubCommit(pr, "COMMITSHA1")
 
 	prFinder := shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "master"))
-	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeable", "headRepositoryOwner", "headRefName"})
+	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName"})
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
@@ -495,15 +531,16 @@ func Test_divergingPullRequestWarning(t *testing.T) {
 	defer http.Verify(t)
 
 	pr := &api.PullRequest{
-		ID:     "PR_10",
-		Number: 10,
-		Title:  "Blueberries are a good fruit",
-		State:  "OPEN",
+		ID:               "PR_10",
+		Number:           10,
+		Title:            "Blueberries are a good fruit",
+		State:            "OPEN",
+		MergeStateStatus: "CLEAN",
 	}
 	stubCommit(pr, "COMMITSHA1")
 
 	prFinder := shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "master"))
-	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeable", "headRepositoryOwner", "headRefName"})
+	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName"})
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
@@ -536,10 +573,11 @@ func Test_pullRequestWithoutCommits(t *testing.T) {
 	shared.RunCommandFinder(
 		"",
 		&api.PullRequest{
-			ID:     "PR_10",
-			Number: 10,
-			Title:  "Blueberries are a good fruit",
-			State:  "OPEN",
+			ID:               "PR_10",
+			Number:           10,
+			Title:            "Blueberries are a good fruit",
+			State:            "OPEN",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -572,10 +610,11 @@ func TestPrMerge_rebase(t *testing.T) {
 	shared.RunCommandFinder(
 		"2",
 		&api.PullRequest{
-			ID:     "THE-ID",
-			Number: 2,
-			Title:  "The title of the PR",
-			State:  "OPEN",
+			ID:               "THE-ID",
+			Number:           2,
+			Title:            "The title of the PR",
+			State:            "OPEN",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -610,10 +649,11 @@ func TestPrMerge_squash(t *testing.T) {
 	shared.RunCommandFinder(
 		"3",
 		&api.PullRequest{
-			ID:     "THE-ID",
-			Number: 3,
-			Title:  "The title of the PR",
-			State:  "OPEN",
+			ID:               "THE-ID",
+			Number:           3,
+			Title:            "The title of the PR",
+			State:            "OPEN",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -647,11 +687,12 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	shared.RunCommandFinder(
 		"4",
 		&api.PullRequest{
-			ID:          "THE-ID",
-			Number:      4,
-			State:       "MERGED",
-			HeadRefName: "blueberries",
-			BaseRefName: "master",
+			ID:               "THE-ID",
+			Number:           4,
+			State:            "MERGED",
+			HeadRefName:      "blueberries",
+			BaseRefName:      "master",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -684,6 +725,7 @@ func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
 			Number:              4,
 			State:               "MERGED",
 			HeadRepositoryOwner: api.Owner{Login: "monalisa"},
+			MergeStateStatus:    "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -707,10 +749,11 @@ func TestPRMerge_interactive(t *testing.T) {
 	shared.RunCommandFinder(
 		"",
 		&api.PullRequest{
-			ID:          "THE-ID",
-			Number:      3,
-			Title:       "It was the best of times",
-			HeadRefName: "blueberries",
+			ID:               "THE-ID",
+			Number:           3,
+			Title:            "It was the best of times",
+			HeadRefName:      "blueberries",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -757,10 +800,11 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 	shared.RunCommandFinder(
 		"",
 		&api.PullRequest{
-			ID:          "THE-ID",
-			Number:      3,
-			Title:       "It was the best of times",
-			HeadRefName: "blueberries",
+			ID:               "THE-ID",
+			Number:           3,
+			Title:            "It was the best of times",
+			HeadRefName:      "blueberries",
+			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -859,7 +903,7 @@ func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
 		InteractiveMode: true,
 		Finder: shared.NewMockFinder(
 			"https://github.com/OWNER/REPO/pull/123",
-			&api.PullRequest{ID: "THE-ID", Number: 123, Title: "title"},
+			&api.PullRequest{ID: "THE-ID", Number: 123, Title: "title", MergeStateStatus: "CLEAN"},
 			ghrepo.New("OWNER", "REPO"),
 		),
 	})
@@ -875,7 +919,7 @@ func TestPRMerge_interactiveCancelled(t *testing.T) {
 
 	shared.RunCommandFinder(
 		"",
-		&api.PullRequest{ID: "THE-ID", Number: 123},
+		&api.PullRequest{ID: "THE-ID", Number: 123, MergeStateStatus: "CLEAN"},
 		ghrepo.New("OWNER", "REPO"),
 	)
 
@@ -947,7 +991,7 @@ func TestMergeRun_autoMerge(t *testing.T) {
 		MergeMethod:     PullRequestMergeMethodSquash,
 		Finder: shared.NewMockFinder(
 			"https://github.com/OWNER/REPO/pull/123",
-			&api.PullRequest{ID: "THE-ID", Number: 123},
+			&api.PullRequest{ID: "THE-ID", Number: 123, MergeStateStatus: "BLOCKED"},
 			ghrepo.New("OWNER", "REPO"),
 		),
 	})
@@ -955,6 +999,44 @@ func TestMergeRun_autoMerge(t *testing.T) {
 
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "✓ Pull request #123 will be automatically merged via squash when all requirements are met\n", stderr.String())
+}
+
+func TestMergeRun_autoMerge_directMerge(t *testing.T) {
+	io, _, stdout, stderr := iostreams.Test()
+	io.SetStdoutTTY(true)
+	io.SetStderrTTY(true)
+
+	tr := initFakeHTTP()
+	defer tr.Verify(t)
+	tr.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
+		}))
+
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	err := mergeRun(&MergeOptions{
+		IO: io,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: tr}, nil
+		},
+		SelectorArg:     "https://github.com/OWNER/REPO/pull/123",
+		AutoMergeEnable: true,
+		MergeMethod:     PullRequestMergeMethodMerge,
+		Finder: shared.NewMockFinder(
+			"https://github.com/OWNER/REPO/pull/123",
+			&api.PullRequest{ID: "THE-ID", Number: 123, MergeStateStatus: "CLEAN"},
+			ghrepo.New("OWNER", "REPO"),
+		),
+	})
+	assert.NoError(t, err)
+
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "✓ Merged pull request #123 ()\n", stderr.String())
 }
 
 func TestMergeRun_disableAutoMerge(t *testing.T) {

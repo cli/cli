@@ -44,7 +44,7 @@ func TestInheritEnv(t *testing.T) {
 			baseConfig: ``,
 			hostname:   "github.com",
 			wants: wants{
-				hosts:     []string(nil),
+				hosts:     []string{},
 				token:     "",
 				source:    ".config.gh.config.yml",
 				writeable: true,
@@ -104,7 +104,7 @@ func TestInheritEnv(t *testing.T) {
 			GITHUB_ENTERPRISE_TOKEN: "ENTOKEN",
 			hostname:                "example.org",
 			wants: wants{
-				hosts:     []string(nil),
+				hosts:     []string{},
 				token:     "ENTOKEN",
 				source:    "GITHUB_ENTERPRISE_TOKEN",
 				writeable: false,
@@ -116,7 +116,7 @@ func TestInheritEnv(t *testing.T) {
 			GH_ENTERPRISE_TOKEN: "ENTOKEN",
 			hostname:            "example.org",
 			wants: wants{
-				hosts:     []string(nil),
+				hosts:     []string{},
 				token:     "ENTOKEN",
 				source:    "GH_ENTERPRISE_TOKEN",
 				writeable: false,
@@ -221,7 +221,7 @@ func TestInheritEnv(t *testing.T) {
 			GITHUB_ENTERPRISE_TOKEN: "GITHUBTOKEN",
 			hostname:                "example.org",
 			wants: wants{
-				hosts:     []string(nil),
+				hosts:     []string{},
 				token:     "GHTOKEN",
 				source:    "GH_ENTERPRISE_TOKEN",
 				writeable: false,

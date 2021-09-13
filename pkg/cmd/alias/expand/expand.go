@@ -3,14 +3,13 @@ package expand
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
+	"os/exec"
 	"regexp"
 	"runtime"
 	"strings"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/safeexec"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/findsh"
 	"github.com/google/shlex"
 )
 
@@ -80,27 +79,15 @@ func ExpandAlias(cfg config.Config, args []string, findShFunc func() (string, er
 }
 
 func findSh() (string, error) {
-	shPath, err := safeexec.LookPath("sh")
-	if err == nil {
-		return shPath, nil
-	}
-
-	if runtime.GOOS == "windows" {
-		winNotFoundErr := errors.New("unable to locate sh to execute the shell alias with. The sh.exe interpreter is typically distributed with Git for Windows.")
-		// We can try and find a sh executable in a Git for Windows install
-		gitPath, err := safeexec.LookPath("git")
-		if err != nil {
-			return "", winNotFoundErr
+	shPath, err := findsh.Find()
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			if runtime.GOOS == "windows" {
+				return "", errors.New("unable to locate sh to execute the shell alias with. The sh.exe interpreter is typically distributed with Git for Windows.")
+			}
+			return "", errors.New("unable to locate sh to execute shell alias with")
 		}
-
-		shPath = filepath.Join(filepath.Dir(gitPath), "..", "bin", "sh.exe")
-		_, err = os.Stat(shPath)
-		if err != nil {
-			return "", winNotFoundErr
-		}
-
-		return shPath, nil
+		return "", err
 	}
-
-	return "", errors.New("unable to locate sh to execute shell alias with")
+	return shPath, nil
 }

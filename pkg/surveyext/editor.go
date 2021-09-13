@@ -35,6 +35,8 @@ type GhEditor struct {
 	*survey.Editor
 	EditorCommand string
 	BlankAllowed  bool
+
+	lookPath func(string) ([]string, []string, error)
 }
 
 func (e *GhEditor) editorCommand() string {
@@ -136,7 +138,11 @@ func (e *GhEditor) prompt(initialValue string, config *survey.PromptConfig) (int
 	}
 
 	stdio := e.Stdio()
-	text, err := Edit(e.editorCommand(), e.FileName, initialValue, stdio.In, stdio.Out, stdio.Err, cursor)
+	lookPath := e.lookPath
+	if lookPath == nil {
+		lookPath = defaultLookPath
+	}
+	text, err := edit(e.editorCommand(), e.FileName, initialValue, stdio.In, stdio.Out, stdio.Err, cursor, lookPath)
 	if err != nil {
 		return "", err
 	}

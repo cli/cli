@@ -15,7 +15,7 @@ builds:
       binary: bin/gh
       main: ./cmd/gh
       ldflags:
-        - -s -w -X github.com/cli/cli/internal/build.Version={{.Version}} -X github.com/cli/cli/internal/build.Date={{time "2006-01-02"}}
+        - -s -w -X github.com/cli/cli/v2/internal/build.Version={{.Version}} -X github.com/cli/cli/v2/internal/build.Date={{time "2006-01-02"}}
         - -X main.updaterEnabled=cli/cli
     id: macos
     goos: [darwin]
@@ -57,12 +57,13 @@ nfpms:
   - license: MIT
     maintainer: GitHub
     homepage: https://github.com/cli/cli
-    bindir: /usr
+    bindir: /usr/bin
     dependencies:
       - git
     description: GitHub’s official command line tool.
     formats:
       - deb
       - rpm
-    files:
-      "./share/man/man1/gh*.1": "/usr/share/man/man1"
+    contents:
+      - src: "./share/man/man1/gh*.1"
+        dst: "/usr/share/man/man1"

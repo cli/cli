@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/v2/internal/run"
 )
 
 var remoteRE = regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)

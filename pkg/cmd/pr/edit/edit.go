@@ -6,12 +6,12 @@ import (
 	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	shared "github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	shared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -55,7 +55,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			$ gh pr edit 23 --title "I found a bug" --body "Nothing works"
 			$ gh pr edit 23 --add-label "bug,help wanted" --remove-label "core"
 			$ gh pr edit 23 --add-reviewer monalisa,hubot  --remove-reviewer myorg/team-name
-			$ gh pr edit 23 --add-assignee @me --remove-assignee monalisa,hubot
+			$ gh pr edit 23 --add-assignee "@me" --remove-assignee monalisa,hubot
 			$ gh pr edit 23 --add-project "Roadmap" --remove-project v1,v2
 			$ gh pr edit 23 --milestone "Version 1"
 		`),

@@ -17,14 +17,14 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/export"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/jsoncolor"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/export"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/jsoncolor"
 	"github.com/spf13/cobra"
 )
 
@@ -294,6 +294,8 @@ func apiRun(opts *ApiOptions) error {
 		host = opts.Hostname
 	}
 
+	template := export.NewTemplate(opts.IO, opts.Template)
+
 	hasNextPage := true
 	for hasNextPage {
 		resp, err := httpRequest(httpClient, host, method, requestPath, requestBody, requestHeaders)
@@ -301,7 +303,7 @@ func apiRun(opts *ApiOptions) error {
 			return err
 		}
 
-		endCursor, err := processResponse(resp, opts, headersOutputStream)
+		endCursor, err := processResponse(resp, opts, headersOutputStream, &template)
 		if err != nil {
 			return err
 		}
@@ -324,10 +326,10 @@ func apiRun(opts *ApiOptions) error {
 		}
 	}
 
-	return nil
+	return template.End()
 }
 
-func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream io.Writer) (endCursor string, err error) {
+func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream io.Writer, template *export.Template) (endCursor string, err error) {
 	if opts.ShowResponseHeaders {
 		fmt.Fprintln(headersOutputStream, resp.Proto, resp.Status)
 		printHeaders(headersOutputStream, resp.Header, opts.IO.ColorEnabled())
@@ -365,7 +367,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 		}
 	} else if opts.Template != "" {
 		// TODO: reuse parsed template across pagination invocations
-		err = export.ExecuteTemplate(opts.IO.Out, responseBody, opts.Template, opts.IO.ColorEnabled())
+		err = template.Execute(responseBody)
 		if err != nil {
 			return
 		}
