@@ -1,9 +1,9 @@
 package key
 
 import (
-	cmdAdd "github.com/cli/cli/pkg/cmd/gpg-key/add"
-	cmdList "github.com/cli/cli/pkg/cmd/gpg-key/list"
-	"github.com/cli/cli/pkg/cmdutil"
+	cmdAdd "github.com/cli/cli/v2/pkg/cmd/gpg-key/add"
+	cmdList "github.com/cli/cli/v2/pkg/cmd/gpg-key/list"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
 

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghinstance"
 )
 
 var scopesError = errors.New("insufficient OAuth scopes")
@@ -18,8 +18,7 @@ var scopesError = errors.New("insufficient OAuth scopes")
 type emails []email
 
 type email struct {
-	Email    string `json:email`
-	Verified bool   `json:verified`
+	Email string `json:"email"`
 }
 
 func (es emails) String() string {
@@ -33,7 +32,7 @@ func (es emails) String() string {
 type gpgKey struct {
 	KeyId     string    `json:"key_id"`
 	PublicKey string    `json:"public_key"`
-	Emails    emails    `json:emails"`
+	Emails    emails    `json:"emails"`
 	CreatedAt time.Time `json:"created_at"`
 	ExpiresAt time.Time `json:"expires_at"`
 }

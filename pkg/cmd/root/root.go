@@ -14,6 +14,7 @@ import (
 	extensionCmd "github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	gistCmd "github.com/cli/cli/v2/pkg/cmd/gist"
+	gpgKeyCmd "github.com/cli/cli/v2/pkg/cmd/gpg-key"
 	issueCmd "github.com/cli/cli/v2/pkg/cmd/issue"
 	prCmd "github.com/cli/cli/v2/pkg/cmd/pr"
 	releaseCmd "github.com/cli/cli/v2/pkg/cmd/release"
