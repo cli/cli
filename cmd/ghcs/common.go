@@ -93,7 +93,9 @@ func getOrChooseCodespace(ctx context.Context, apiClient *api.API, user *api.Use
 	return codespace, token, nil
 }
 
-var hasTTY = term.IsTerminal(0) && term.IsTerminal(1) // is process connected to a terminal?
+// hasTTY indicates whether the process connected to a terminal.
+// It is not portable to assume stdin/stdout are fds 0 and 1.
+var hasTTY = term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
 
 // ask asks survey questions on the terminal, using standard options.
 // It fails unless hasTTY, but ideally callers should avoid calling it in that case.
@@ -107,7 +109,7 @@ func ask(qs []*survey.Question, response interface{}) error {
 	// ASCII \x03 (ETX) instead of delivering SIGINT to the application.
 	// So we have to serve ourselves the SIGINT.
 	//
-	// https://github.com/AlecAivazis/survey/#why-isnt-sending-a-sigint-aka-ctrl-c-signal-working
+	// https://github.com/AlecAivazis/survey/#why-isnt-ctrl-c-working
 	if err == terminal.InterruptErr {
 		self, _ := os.FindProcess(os.Getpid())
 		_ = self.Signal(os.Interrupt) // assumes POSIX
