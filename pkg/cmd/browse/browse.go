@@ -177,20 +177,12 @@ func genPath(fileArg, branchName string) (string, error) {
 
 	filename := arr[0]
 	if len(arr) > 1 { // expecting a line number and possibly range
-		if strings.HasSuffix(filename, ".md") || strings.HasSuffix(filename, ".markdown") {
-			// build path with "blob" instead of "tree" so "plain" param will work
-			sb.WriteString("/blob/")
-			sb.WriteString(branchName)
-			sb.WriteString("/")
-			sb.WriteString(filename)
-			sb.WriteString("?plain=1") // param to disable markdown rendering so we can highlight line number
-		} else {
-			// not a markdown file, so build path with "tree"
-			sb.WriteString("/tree/")
-			sb.WriteString(branchName)
-			sb.WriteString("/")
-			sb.WriteString(filename)
-		}
+		// build path with "blob" instead of "tree" so "plain" param will work
+		sb.WriteString("/blob/")
+		sb.WriteString(branchName)
+		sb.WriteString("/")
+		sb.WriteString(filename)
+		sb.WriteString("?plain=1") // param to disable markdown rendering so we can highlight line number
 
 		// build fragment for line number and possibly range
 		sb.WriteString("#L")

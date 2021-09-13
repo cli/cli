@@ -213,7 +213,7 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:      ghrepo.New("ravocean", "angur"),
 			defaultBranch: "trunk",
-			expectedURL:   "https://github.com/ravocean/angur/tree/trunk/path/to/file.txt#L32",
+			expectedURL:   "https://github.com/ravocean/angur/blob/trunk/path/to/file.txt?plain=1#L32",
 		},
 		{
 			name: "file with line range",
@@ -222,7 +222,7 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:      ghrepo.New("ravocean", "angur"),
 			defaultBranch: "trunk",
-			expectedURL:   "https://github.com/ravocean/angur/tree/trunk/path/to/file.txt#L32-L40",
+			expectedURL:   "https://github.com/ravocean/angur/blob/trunk/path/to/file.txt?plain=1#L32-L40",
 		},
 		{
 			name: "file.md with line number",
@@ -314,7 +314,7 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("github", "ThankYouGitHub"),
 			wantsErr:    false,
-			expectedURL: "https://github.com/github/ThankYouGitHub/tree/first-browse-pull/browse.go#L32",
+			expectedURL: "https://github.com/github/ThankYouGitHub/blob/first-browse-pull/browse.go?plain=1#L32",
 		},
 		{
 			name: "no browser with branch file and line number",
@@ -325,7 +325,7 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("mislav", "will_paginate"),
 			wantsErr:    false,
-			expectedURL: "https://github.com/mislav/will_paginate/tree/3-0-stable/init.rb#L6",
+			expectedURL: "https://github.com/mislav/will_paginate/blob/3-0-stable/init.rb?plain=1#L6",
 		},
 	}
 
