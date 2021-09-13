@@ -33,7 +33,7 @@ jobs:
           repository: github/cli.github.com
           path: site
           fetch-depth: 0
-          token: ${{secrets.SITE_GITHUB_TOKEN}}
+          ssh-key: ${{secrets.SITE_SSH_KEY}}
       - name: Update site man pages
         env:
           GIT_COMMITTER_NAME: cli automation
