@@ -172,14 +172,7 @@ func newPortsPublicCmd() *cobra.Command {
 			}
 
 			log := output.NewLogger(os.Stdout, os.Stderr, false)
-
-			port := args[0]
-			if len(args) > 1 {
-				log.Errorln("<codespace> argument is deprecated. Use --codespace instead.")
-				codespace, port = args[0], args[1]
-			}
-
-			return updatePortVisibility(log, codespace, port, true)
+			return updatePortVisibility(log, codespace, args[0], true)
 		},
 	}
 }
@@ -200,14 +193,7 @@ func newPortsPrivateCmd() *cobra.Command {
 			}
 
 			log := output.NewLogger(os.Stdout, os.Stderr, false)
-
-			port := args[0]
-			if len(args) > 1 {
-				log.Errorln("<codespace> argument is deprecated. Use --codespace instead.")
-				codespace, port = args[0], args[1]
-			}
-
-			return updatePortVisibility(log, codespace, port, false)
+			return updatePortVisibility(log, codespace, args[0], false)
 		},
 	}
 }
@@ -269,16 +255,7 @@ func newPortsForwardCmd() *cobra.Command {
 			}
 
 			log := output.NewLogger(os.Stdout, os.Stderr, false)
-
-			ports := args[0:]
-			if len(args) > 1 && !strings.Contains(args[0], ":") {
-				// assume this is a codespace name
-				log.Errorln("<codespace> argument is deprecated. Use --codespace instead.")
-				codespace = args[0]
-				ports = args[1:]
-			}
-
-			return forwardPorts(log, codespace, ports)
+			return forwardPorts(log, codespace, args)
 		},
 	}
 }
