@@ -182,7 +182,7 @@ func searchPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters 
 		"q": q.String(),
 	}
 
-	res := api.PullRequestAndTotalCount{}
+	res := api.PullRequestAndTotalCount{SearchCapped: limit > 1000}
 	var check = make(map[int]struct{})
 	client := api.NewClientFromHTTP(httpClient)
 
