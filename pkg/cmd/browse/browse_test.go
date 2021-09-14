@@ -238,27 +238,32 @@ func Test_runBrowse(t *testing.T) {
 			opts: BrowseOptions{
 				SelectorArg: "laptime-notes.txt:w-9",
 			},
-			baseRepo:      ghrepo.New("andrewhsu", "sonoma-raceway"),
-			defaultBranch: "main",
-			wantsErr:      true,
+			baseRepo: ghrepo.New("andrewhsu", "sonoma-raceway"),
+			wantsErr: true,
+		},
+		{
+			name: "file with invalid file format",
+			opts: BrowseOptions{
+				SelectorArg: "path/to/file.txt:32:32",
+			},
+			baseRepo: ghrepo.New("ttran112", "ttrain211"),
+			wantsErr: true,
 		},
 		{
 			name: "file with invalid line number",
 			opts: BrowseOptions{
-				SelectorArg: "path/to/file.txt:32:32",
+				SelectorArg: "path/to/file.txt:32a",
 			},
-			baseRepo:      ghrepo.New("ttran112", "ttrain211"),
-			defaultBranch: "main",
-			wantsErr:      true,
+			baseRepo: ghrepo.New("ttran112", "ttrain211"),
+			wantsErr: true,
 		},
 		{
 			name: "file with invalid line range",
 			opts: BrowseOptions{
 				SelectorArg: "path/to/file.txt:32-abc",
 			},
-			baseRepo:      ghrepo.New("ttran112", "ttrain211"),
-			defaultBranch: "main",
-			wantsErr:      true,
+			baseRepo: ghrepo.New("ttran112", "ttrain211"),
+			wantsErr: true,
 		},
 		{
 			name: "branch with issue number",
