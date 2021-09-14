@@ -81,7 +81,7 @@ func runAdd(opts *AddOptions) error {
 		return err
 	}
 
-	err = GPGKeyUpload(httpClient, hostname, keyReader)
+	err = gpgKeyUpload(httpClient, hostname, keyReader)
 	if err != nil {
 		if errors.Is(err, scopesError) {
 			cs := opts.IO.ColorScheme()

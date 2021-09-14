@@ -79,8 +79,8 @@ func listRun(opts *ListOptions) error {
 
 	for _, gpgKey := range gpgKeys {
 		t.AddField(gpgKey.Emails.String(), nil, nil)
-
 		t.AddField(gpgKey.KeyId, nil, nil)
+		t.AddField(gpgKey.PublicKey, truncateMiddle, nil)
 
 		createdAt := gpgKey.CreatedAt.Format(time.RFC3339)
 		if t.IsTTY() {
@@ -98,11 +98,23 @@ func listRun(opts *ListOptions) error {
 		}
 		t.AddField(expiresAt, nil, cs.Gray)
 
-		if !t.IsTTY() {
-			t.AddField(gpgKey.PublicKey, nil, nil)
-		}
 		t.EndRow()
 	}
 
 	return t.Render()
+}
+
+func truncateMiddle(maxWidth int, t string) string {
+	if len(t) <= maxWidth {
+		return t
+	}
+
+	ellipsis := "..."
+	if maxWidth < len(ellipsis)+2 {
+		return t[0:maxWidth]
+	}
+
+	halfWidth := (maxWidth - len(ellipsis)) / 2
+	remainder := (maxWidth - len(ellipsis)) % 2
+	return t[0:halfWidth+remainder] + ellipsis + t[len(t)-halfWidth:]
 }

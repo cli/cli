@@ -25,14 +25,14 @@ func TestListRun(t *testing.T) {
 			name:       "list tty",
 			opts:       ListOptions{HTTPClient: mockGPGResponse},
 			isTTY:      true,
-			wantStdout: "johnny@test.com      ABCDEF1234567890  Created Jun 11, 2020  Expires 2099-01-01\nmonalisa@github.com  1234567890ABCDEF  Created Jan 11, 2021  Never expires\n",
+			wantStdout: "johnny@test.com      ABCDEF12345...  xJMEW...oofoo  Created Ju...  Expires 20...\nmonalisa@github.com  1234567890A...  xJMEW...arbar  Created Ja...  Never expires\n",
 			wantStderr: "",
 		},
 		{
 			name:       "list non-tty",
 			opts:       ListOptions{HTTPClient: mockGPGResponse},
 			isTTY:      false,
-			wantStdout: "johnny@test.com\tABCDEF1234567890\t2020-06-11T15:44:24+01:00\t2099-01-01T15:44:24+01:00\txJMEWfoofoofoo\nmonalisa@github.com\t1234567890ABCDEF\t2021-01-11T15:44:24+01:00\t0001-01-01T00:00:00Z\txJMEWbarbarbar\n",
+			wantStdout: "johnny@test.com\tABCDEF1234567890\txJMEWfoofoofoo\t2020-06-11T15:44:24+01:00\t2099-01-01T15:44:24+01:00\nmonalisa@github.com\t1234567890ABCDEF\txJMEWbarbarbar\t2021-01-11T15:44:24+01:00\t0001-01-01T00:00:00Z\n",
 			wantStderr: "",
 		},
 		{

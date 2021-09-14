@@ -14,7 +14,7 @@ import (
 
 var scopesError = errors.New("insufficient OAuth scopes")
 
-func GPGKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader) error {
+func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader) error {
 	url := ghinstance.RESTPrefix(hostname) + "user/gpg_keys"
 
 	keyBytes, err := ioutil.ReadAll(keyFile)
