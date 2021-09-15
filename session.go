@@ -3,6 +3,7 @@ package liveshare
 import (
 	"context"
 	"fmt"
+	"strconv"
 )
 
 // A Session represents the session between a connected Live Share client and server.
@@ -58,4 +59,30 @@ func (s *Session) UpdateSharedVisibility(ctx context.Context, port int, public b
 	}
 
 	return nil
+}
+
+// StartsSSHServer starts an SSH server in the container, installing sshd if necessary,
+// and returns the port on which it listens and the user name clients should provide.
+func (s *Session) StartSSHServer(ctx context.Context) (int, string, error) {
+	var response struct {
+		Result     bool   `json:"result"`
+		ServerPort string `json:"serverPort"`
+		User       string `json:"user"`
+		Message    string `json:"message"`
+	}
+
+	if err := s.rpc.do(ctx, "ISshServerHostService.startRemoteServer", []string{}, &response); err != nil {
+		return 0, "", err
+	}
+
+	if !response.Result {
+		return 0, "", fmt.Errorf("failed to start server: %s", response.Message)
+	}
+
+	port, err := strconv.Atoi(response.ServerPort)
+	if err != nil {
+		return 0, "", fmt.Errorf("failed to parse port: %w", err)
+	}
+
+	return port, response.User, nil
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/opentracing/opentracing-go"
 )
 
-// A PortForwarder forwards TCP traffic over a LiveShare session from a port on a remote
+// A PortForwarder forwards TCP traffic over a Live Share session from a port on a remote
 // container to a local destination such as a network port or Go reader/writer.
 type PortForwarder struct {
 	session    *Session
