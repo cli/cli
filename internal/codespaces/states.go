@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/github/ghcs/api"
+	"github.com/github/ghcs/internal/api"
 	"github.com/github/go-liveshare"
 )
 

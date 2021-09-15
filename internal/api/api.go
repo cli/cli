@@ -1,4 +1,3 @@
-// TODO(adonovan): rename to package codespaces, and codespaces.Client.
 package api
 
 // For descriptions of service interfaces, see:
@@ -6,6 +5,24 @@ package api
 // - https://docs.github.com/en/rest/reference/repos (for api.github.com)
 // - https://github.com/github/github/blob/master/app/api/codespaces.rb (for vscs_internal)
 // TODO(adonovan): replace the last link with a public doc URL when available.
+
+// TODO(adonovan): a possible reorganization would be to split this
+// file into three internal packages, one per backend service, and to
+// rename api.API to github.Client:
+//
+// - github.GetUser(github.Client)
+// - github.GetRepository(Client)
+// - github.ReadFile(Client, nwo, branch, path) // was GetCodespaceRepositoryContents
+// - codespaces.Create(Client, user, repo, sku, branch, location)
+// - codespaces.Delete(Client, user, token, name)
+// - codespaces.Get(Client, token, owner, name)
+// - codespaces.GetMachineTypes(Client, user, repo, branch, location)
+// - codespaces.GetToken(Client, login, name)
+// - codespaces.List(Client, user)
+// - codespaces.Start(Client, token, codespace)
+// - visualstudio.GetRegionLocation(http.Client) // no dependency on github
+//
+// This would make the meaning of each operation clearer.
 
 import (
 	"bytes"

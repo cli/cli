@@ -9,8 +9,8 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/fatih/camelcase"
-	"github.com/github/ghcs/api"
 	"github.com/github/ghcs/cmd/ghcs/output"
+	"github.com/github/ghcs/internal/api"
 	"github.com/github/ghcs/internal/codespaces"
 	"github.com/spf13/cobra"
 )
