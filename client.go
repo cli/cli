@@ -115,6 +115,10 @@ func (c *Client) joinWorkspace(ctx context.Context, rpc *rpcClient) (*joinWorksp
 }
 
 func (s *Session) openStreamingChannel(ctx context.Context, id channelID) (ssh.Channel, error) {
+	type getStreamArgs struct {
+		StreamName string `json:"streamName"`
+		Condition  string `json:"condition"`
+	}
 	args := getStreamArgs{
 		StreamName: id.name,
 		Condition:  id.condition,
