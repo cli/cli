@@ -54,7 +54,8 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 	}
 	localPort := listen.Addr().(*net.TCPAddr).Port
 
-	remoteSSHServerPort, sshUser, err := StartSSHServer(ctx, session, log)
+	log.Println("Fetching SSH Details...")
+	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %v", err)
 	}
