@@ -61,10 +61,9 @@ func (s *Session) UpdateSharedVisibility(ctx context.Context, port int, public b
 	return nil
 }
 
-// StartSSHServer starts the SSHD server and returns the user and port for which to authenticate with.
-// If there is no SSHD server installed on the server, it will attempt to install it. The installation
-// process can take upwards of 20+ seconds.
-func (s *Session) StartSSHServer(ctx context.Context) (string, int64, error) {
+// StartsSSHServer starts an SSH server in the container, installing sshd if necessary,
+// and returns the port on which it listens and the user name clients should provide.
+func (s *Session) StartSSHServer(ctx context.Context) (int, string, error) {
 	var response struct {
 		Result     bool   `json:"result"`
 		ServerPort string `json:"serverPort"`
@@ -73,17 +72,17 @@ func (s *Session) StartSSHServer(ctx context.Context) (string, int64, error) {
 	}
 
 	if err := s.rpc.do(ctx, "ISshServerHostService.startRemoteServer", []string{}, &response); err != nil {
-		return "", 0, err
+		return 0, "", err
 	}
 
 	if !response.Result {
-		return "", 0, fmt.Errorf("failed to start server: %s", response.Message)
+		return 0, "", fmt.Errorf("failed to start server: %s", response.Message)
 	}
 
-	port, err := strconv.ParseInt(response.ServerPort, 10, 64)
+	port, err := strconv.Atoi(response.ServerPort)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to parse port: %w", err)
+		return 0, "", fmt.Errorf("failed to parse port: %w", err)
 	}
 
-	return response.User, port, nil
+	return port, response.User, nil
 }
