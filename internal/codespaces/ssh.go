@@ -5,7 +5,21 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 )
+
+// Shell runs an interactive secure shell over an existing
+// port-forwarding session. It runs until the shell is terminated
+// (including by cancellation of the context).
+func Shell(ctx context.Context, log logger, port int, destination string, usingCustomPort bool) error {
+	cmd, connArgs := newSSHCommand(ctx, port, destination, "")
+
+	if usingCustomPort {
+		log.Println("Connection Details: ssh " + destination + " " + strings.Join(connArgs, " "))
+	}
+
+	return cmd.Run()
+}
 
 // NewRemoteCommand returns an exec.Cmd that will securely run a shell
 // command on the remote machine.
