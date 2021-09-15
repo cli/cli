@@ -39,7 +39,7 @@ func StartSSHServer(ctx context.Context, session *liveshare.Session, log logger)
 // Shell runs an interactive secure shell over an existing
 // port-forwarding session. It runs until the shell is terminated
 // (including by cancellation of the context).
-func Shell(ctx context.Context, log logger, port int, destination string, usingCustomPort bool) error {
+func Shell(ctx context.Context, log logger, sshArgs []string, port int, destination string, usingCustomPort bool) error {
 	cmd, connArgs := newSSHCommand(ctx, port, destination, "")
 
 	if usingCustomPort {
