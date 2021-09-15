@@ -11,7 +11,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
-	"github.com/github/ghcs/api"
+	"github.com/github/ghcs/internal/api"
 	"golang.org/x/term"
 )
 
