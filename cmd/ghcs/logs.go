@@ -70,7 +70,8 @@ func logs(ctx context.Context, log *output.Logger, codespaceName string, follow 
 	defer listen.Close()
 	localPort := listen.Addr().(*net.TCPAddr).Port
 
-	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, session, log)
+	log.Println("Fetching SSH Details...")
+	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %v", err)
 	}

@@ -59,7 +59,8 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 		return fmt.Errorf("error connecting to Live Share: %v", err)
 	}
 
-	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, session, log)
+	log.Println("Fetching SSH Details...")
+	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %v", err)
 	}
