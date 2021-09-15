@@ -153,7 +153,12 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient *api.API, use
 		}
 	}
 
-	if err := codespaces.PollPostCreateStates(ctx, log, apiClient, user, codespace, poller); err != nil {
+	err := codespaces.PollPostCreateStates(ctx, log, apiClient, user, codespace, poller)
+	if err != nil {
+		if errors.Is(err, context.Canceled) && breakNextState {
+			return nil // we cancelled the context to stop polling, we can ignore the error
+		}
+
 		return fmt.Errorf("failed to poll state changes from codespace: %v", err)
 	}
 
