@@ -32,9 +32,14 @@ func NewRemoteCommand(ctx context.Context, tunnelPort int, destination, command 
 // an interactive shell) over ssh.
 func newSSHCommand(ctx context.Context, port int, dst, command string) (*exec.Cmd, []string) {
 	connArgs := []string{"-p", strconv.Itoa(port), "-o", "NoHostAuthenticationForLocalhost=yes"}
-	// TODO(adonovan): eliminate X11 and X11Trust flags where unneeded.
-	cmdArgs := append([]string{dst, "-X", "-Y", "-C"}, connArgs...) // X11, X11Trust, Compression
 
+	cmdArgs := []string{dst, "-C"} // Always use Compression
+	if command == "" {
+		// if we are in a shell send X11 and X11Trust
+		cmdArgs = append(cmdArgs, "-X", "-Y")
+	}
+
+	cmdArgs = append(cmdArgs, connArgs...)
 	if command != "" {
 		cmdArgs = append(cmdArgs, command)
 	}

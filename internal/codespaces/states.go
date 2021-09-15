@@ -39,12 +39,12 @@ type PostCreateState struct {
 func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, user *api.User, codespace *api.Codespace, poller func([]PostCreateState)) error {
 	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespace.Name)
 	if err != nil {
-		return fmt.Errorf("getting codespace token: %v", err)
+		return fmt.Errorf("getting codespace token: %w", err)
 	}
 
 	session, err := ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
-		return fmt.Errorf("connect to Live Share: %v", err)
+		return fmt.Errorf("connect to Live Share: %w", err)
 	}
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
@@ -57,7 +57,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 	log.Println("Fetching SSH Details...")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting ssh server details: %v", err)
+		return fmt.Errorf("error getting ssh server details: %w", err)
 	}
 
 	tunnelClosed := make(chan error, 1) // buffered to avoid sender stuckness
@@ -75,12 +75,12 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 			return ctx.Err()
 
 		case err := <-tunnelClosed:
-			return fmt.Errorf("connection failed: %v", err)
+			return fmt.Errorf("connection failed: %w", err)
 
 		case <-t.C:
 			states, err := getPostCreateOutput(ctx, localPort, codespace, sshUser)
 			if err != nil {
-				return fmt.Errorf("get post create output: %v", err)
+				return fmt.Errorf("get post create output: %w", err)
 			}
 
 			poller(states)
@@ -96,13 +96,13 @@ func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Cod
 	stdout := new(bytes.Buffer)
 	cmd.Stdout = stdout
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("run command: %v", err)
+		return nil, fmt.Errorf("run command: %w", err)
 	}
 	var output struct {
 		Steps []PostCreateState `json:"steps"`
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &output); err != nil {
-		return nil, fmt.Errorf("unmarshal output: %v", err)
+		return nil, fmt.Errorf("unmarshal output: %w", err)
 	}
 
 	return output.Steps, nil
