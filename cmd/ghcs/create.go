@@ -55,31 +55,31 @@ func create(opts *createOptions) error {
 
 	repo, err := getRepoName(opts.repo)
 	if err != nil {
-		return fmt.Errorf("error getting repository name: %v", err)
+		return fmt.Errorf("error getting repository name: %w", err)
 	}
 	branch, err := getBranchName(opts.branch)
 	if err != nil {
-		return fmt.Errorf("error getting branch name: %v", err)
+		return fmt.Errorf("error getting branch name: %w", err)
 	}
 
 	repository, err := apiClient.GetRepository(ctx, repo)
 	if err != nil {
-		return fmt.Errorf("error getting repository: %v", err)
+		return fmt.Errorf("error getting repository: %w", err)
 	}
 
 	locationResult := <-locationCh
 	if locationResult.Err != nil {
-		return fmt.Errorf("error getting codespace region location: %v", locationResult.Err)
+		return fmt.Errorf("error getting codespace region location: %w", locationResult.Err)
 	}
 
 	userResult := <-userCh
 	if userResult.Err != nil {
-		return fmt.Errorf("error getting codespace user: %v", userResult.Err)
+		return fmt.Errorf("error getting codespace user: %w", userResult.Err)
 	}
 
 	machine, err := getMachineName(ctx, opts.machine, userResult.User, repository, branch, locationResult.Location, apiClient)
 	if err != nil {
-		return fmt.Errorf("error getting machine type: %v", err)
+		return fmt.Errorf("error getting machine type: %w", err)
 	}
 	if machine == "" {
 		return errors.New("There are no available machine types for this repository")
@@ -89,7 +89,7 @@ func create(opts *createOptions) error {
 
 	codespace, err := apiClient.CreateCodespace(ctx, userResult.User, repository, machine, branch, locationResult.Location)
 	if err != nil {
-		return fmt.Errorf("error creating codespace: %v", err)
+		return fmt.Errorf("error creating codespace: %w", err)
 	}
 
 	if opts.showStatus {
@@ -154,7 +154,7 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient *api.API, use
 	}
 
 	if err := codespaces.PollPostCreateStates(ctx, log, apiClient, user, codespace, poller); err != nil {
-		return fmt.Errorf("failed to poll state changes from codespace: %v", err)
+		return fmt.Errorf("failed to poll state changes from codespace: %w", err)
 	}
 
 	return nil
@@ -228,7 +228,7 @@ func getBranchName(branch string) (string, error) {
 func getMachineName(ctx context.Context, machine string, user *api.User, repo *api.Repository, branch, location string, apiClient *api.API) (string, error) {
 	skus, err := apiClient.GetCodespacesSKUs(ctx, user, repo, branch, location)
 	if err != nil {
-		return "", fmt.Errorf("error requesting machine instance types: %v", err)
+		return "", fmt.Errorf("error requesting machine instance types: %w", err)
 	}
 
 	// if user supplied a machine type, it must be valid
@@ -278,7 +278,7 @@ func getMachineName(ctx context.Context, machine string, user *api.User, repo *a
 
 	var skuAnswers struct{ SKU string }
 	if err := ask(skuSurvey, &skuAnswers); err != nil {
-		return "", fmt.Errorf("error getting SKU: %v", err)
+		return "", fmt.Errorf("error getting SKU: %w", err)
 	}
 
 	sku := skuByName[skuAnswers.SKU]

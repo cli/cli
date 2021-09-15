@@ -21,7 +21,7 @@ func StartSSHServer(ctx context.Context, session *liveshare.Session, log logger)
 
 	sshServerStartResult, err := sshServer.StartRemoteServer(ctx)
 	if err != nil {
-		return 0, "", fmt.Errorf("error starting live share: %v", err)
+		return 0, "", fmt.Errorf("error starting live share: %w", err)
 	}
 
 	if !sshServerStartResult.Result {
@@ -30,7 +30,7 @@ func StartSSHServer(ctx context.Context, session *liveshare.Session, log logger)
 
 	portInt, err := strconv.Atoi(sshServerStartResult.ServerPort)
 	if err != nil {
-		return 0, "", fmt.Errorf("error parsing port: %v", err)
+		return 0, "", fmt.Errorf("error parsing port: %w", err)
 	}
 
 	return portInt, sshServerStartResult.User, nil

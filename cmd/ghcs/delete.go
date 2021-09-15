@@ -55,16 +55,16 @@ func delete_(log *output.Logger, codespaceName string) error {
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting user: %v", err)
+		return fmt.Errorf("error getting user: %w", err)
 	}
 
 	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
-		return fmt.Errorf("get or choose codespace: %v", err)
+		return fmt.Errorf("get or choose codespace: %w", err)
 	}
 
 	if err := apiClient.DeleteCodespace(ctx, user, token, codespace.Name); err != nil {
-		return fmt.Errorf("error deleting codespace: %v", err)
+		return fmt.Errorf("error deleting codespace: %w", err)
 	}
 
 	log.Println("Codespace deleted.")
@@ -78,22 +78,22 @@ func deleteAll(log *output.Logger) error {
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting user: %v", err)
+		return fmt.Errorf("error getting user: %w", err)
 	}
 
 	codespaces, err := apiClient.ListCodespaces(ctx, user)
 	if err != nil {
-		return fmt.Errorf("error getting codespaces: %v", err)
+		return fmt.Errorf("error getting codespaces: %w", err)
 	}
 
 	for _, c := range codespaces {
 		token, err := apiClient.GetCodespaceToken(ctx, user.Login, c.Name)
 		if err != nil {
-			return fmt.Errorf("error getting codespace token: %v", err)
+			return fmt.Errorf("error getting codespace token: %w", err)
 		}
 
 		if err := apiClient.DeleteCodespace(ctx, user, token, c.Name); err != nil {
-			return fmt.Errorf("error deleting codespace: %v", err)
+			return fmt.Errorf("error deleting codespace: %w", err)
 		}
 
 		log.Printf("Codespace deleted: %s\n", c.Name)
@@ -108,12 +108,12 @@ func deleteByRepo(log *output.Logger, repo string) error {
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting user: %v", err)
+		return fmt.Errorf("error getting user: %w", err)
 	}
 
 	codespaces, err := apiClient.ListCodespaces(ctx, user)
 	if err != nil {
-		return fmt.Errorf("error getting codespaces: %v", err)
+		return fmt.Errorf("error getting codespaces: %w", err)
 	}
 
 	var deleted bool
@@ -125,11 +125,11 @@ func deleteByRepo(log *output.Logger, repo string) error {
 
 		token, err := apiClient.GetCodespaceToken(ctx, user.Login, c.Name)
 		if err != nil {
-			return fmt.Errorf("error getting codespace token: %v", err)
+			return fmt.Errorf("error getting codespace token: %w", err)
 		}
 
 		if err := apiClient.DeleteCodespace(ctx, user, token, c.Name); err != nil {
-			return fmt.Errorf("error deleting codespace: %v", err)
+			return fmt.Errorf("error deleting codespace: %w", err)
 		}
 
 		log.Printf("Codespace deleted: %s\n", c.Name)
