@@ -82,9 +82,12 @@ func logs(ctx context.Context, log *output.Logger, codespaceName string, follow 
 	}
 
 	dst := fmt.Sprintf("%s@localhost", sshUser)
-	cmd := codespaces.NewRemoteCommand(
+	cmd, err := codespaces.NewRemoteCommand(
 		ctx, localPort, dst, fmt.Sprintf("%s /workspaces/.codespaces/.persistedshare/creation.log", cmdType),
 	)
+	if err != nil {
+		return fmt.Errorf("remote command: %w", err)
+	}
 
 	tunnelClosed := make(chan error, 1)
 	go func() {

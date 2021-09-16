@@ -89,10 +89,14 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 }
 
 func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Codespace, user string) ([]PostCreateState, error) {
-	cmd := NewRemoteCommand(
+	cmd, err := NewRemoteCommand(
 		ctx, tunnelPort, fmt.Sprintf("%s@localhost", user),
 		"cat /workspaces/.codespaces/shared/postCreateOutput.json",
 	)
+	if err != nil {
+		return nil, fmt.Errorf("remote command: %w", err)
+	}
+
 	stdout := new(bytes.Buffer)
 	cmd.Stdout = stdout
 	if err := cmd.Run(); err != nil {

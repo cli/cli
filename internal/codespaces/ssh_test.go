@@ -48,7 +48,11 @@ func TestParseSSHArgs(t *testing.T) {
 	}
 
 	for _, tcase := range testCases {
-		args, command := parseSSHArgs(tcase.Args)
+		args, command, err := parseSSHArgs(tcase.Args)
+		if err != nil {
+			t.Errorf("received unexpected error: %w", err)
+		}
+
 		if len(args) != len(tcase.ParsedArgs) {
 			t.Fatalf("args do not match length of expected args. %#v, got '%d', expected: '%d'", tcase, len(args), len(tcase.ParsedArgs))
 		}
@@ -60,5 +64,12 @@ func TestParseSSHArgs(t *testing.T) {
 		if command != tcase.Command {
 			t.Fatalf("command does not match expected command. %v, got: '%s', expected: '%s'", tcase, command, tcase.Command)
 		}
+	}
+}
+
+func TestParseSSHArgsError(t *testing.T) {
+	_, _, err := parseSSHArgs([]string{"-X", "test", "-Y"})
+	if err == nil {
+		t.Error("expected an error for invalid args")
 	}
 }
