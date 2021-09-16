@@ -54,7 +54,7 @@ func TestListCodespaces(t *testing.T) {
 
 }
 
-func TestCleanupUnusedCodespaces(t *testing.T) {
+func TestDeleteCodespacesByAge(t *testing.T) {
 	type args struct {
 		codespaces    []*Codespace
 		thresholdDays int
