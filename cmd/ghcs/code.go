@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/github/ghcs/api"
+	"github.com/github/ghcs/internal/api"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/spf13/cobra"
 )

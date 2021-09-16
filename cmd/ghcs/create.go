@@ -9,8 +9,8 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/fatih/camelcase"
-	"github.com/github/ghcs/api"
 	"github.com/github/ghcs/cmd/ghcs/output"
+	"github.com/github/ghcs/internal/api"
 	"github.com/github/ghcs/internal/codespaces"
 	"github.com/spf13/cobra"
 )
@@ -105,12 +105,16 @@ func create(opts *createOptions) error {
 	return nil
 }
 
+// showStatus polls the codespace for a list of post create states and their status. It will keep polling
+// until all states have finished. Once all states have finished, we poll once more to check if any new
+// states have been introduced and stop polling otherwise.
 func showStatus(ctx context.Context, log *output.Logger, apiClient *api.API, user *api.User, codespace *api.Codespace) error {
 	var lastState codespaces.PostCreateState
 	var breakNextState bool
 
 	finishedStates := make(map[string]bool)
 	ctx, stopPolling := context.WithCancel(ctx)
+	defer stopPolling()
 
 	poller := func(states []codespaces.PostCreateState) {
 		var inProgress bool
@@ -153,7 +157,12 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient *api.API, use
 		}
 	}
 
-	if err := codespaces.PollPostCreateStates(ctx, log, apiClient, user, codespace, poller); err != nil {
+	err := codespaces.PollPostCreateStates(ctx, log, apiClient, user, codespace, poller)
+	if err != nil {
+		if errors.Is(err, context.Canceled) && breakNextState {
+			return nil // we cancelled the context to stop polling, we can ignore the error
+		}
+
 		return fmt.Errorf("failed to poll state changes from codespace: %w", err)
 	}
 

@@ -6,8 +6,8 @@ import (
 	"net"
 	"os"
 
-	"github.com/github/ghcs/api"
 	"github.com/github/ghcs/cmd/ghcs/output"
+	"github.com/github/ghcs/internal/api"
 	"github.com/github/ghcs/internal/codespaces"
 	"github.com/github/go-liveshare"
 	"github.com/spf13/cobra"
@@ -70,7 +70,8 @@ func logs(ctx context.Context, log *output.Logger, codespaceName string, follow 
 	defer listen.Close()
 	localPort := listen.Addr().(*net.TCPAddr).Port
 
-	remoteSSHServerPort, sshUser, err := codespaces.StartSSHServer(ctx, session, log)
+	log.Println("Fetching SSH Details...")
+	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}

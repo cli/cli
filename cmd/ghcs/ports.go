@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/github/ghcs/api"
 	"github.com/github/ghcs/cmd/ghcs/output"
+	"github.com/github/ghcs/internal/api"
 	"github.com/github/ghcs/internal/codespaces"
 	"github.com/github/go-liveshare"
 	"github.com/muhammadmuzzammil1998/jsonc"
