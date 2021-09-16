@@ -210,12 +210,12 @@ func deleteWithThreshold(log *output.Logger, keepThresholdDays int) error {
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting user: %v", err)
+		return fmt.Errorf("error getting user: %w", err)
 	}
 
 	codespaces, err := apiClient.ListCodespaces(ctx, user)
 	if err != nil {
-		return fmt.Errorf("error getting codespaces: %v", err)
+		return fmt.Errorf("error getting codespaces: %w", err)
 	}
 
 	codespacesToDelete, err := apiClient.FilterCodespacesToDelete(codespaces, keepThresholdDays)
@@ -226,11 +226,11 @@ func deleteWithThreshold(log *output.Logger, keepThresholdDays int) error {
 	for _, c := range codespacesToDelete {
 		token, err := apiClient.GetCodespaceToken(ctx, user.Login, c.Name)
 		if err != nil {
-			return fmt.Errorf("error getting codespace token: %v", err)
+			return fmt.Errorf("error getting codespace token: %w", err)
 		}
 
 		if err := apiClient.DeleteCodespace(ctx, user, token, c.Name); err != nil {
-			return fmt.Errorf("error deleting codespace: %v", err)
+			return fmt.Errorf("error deleting codespace: %w", err)
 		}
 
 		log.Printf("Codespace deleted: %s\n", c.Name)
