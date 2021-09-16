@@ -19,7 +19,7 @@ If anything feels off, or if you feel that some functionality is missing, please
 
 ### macOS
 
-`gh` is available via [Homebrew][], [MacPorts][], [Conda][], and as a downloadable binary from the [releases page][].
+`gh` is available via [Homebrew][https://brew.sh/], [MacPorts][], [Conda][], and as a downloadable binary from the [releases page][].
 
 #### Homebrew
 
@@ -35,7 +35,7 @@ If anything feels off, or if you feel that some functionality is missing, please
 
 #### Conda
 
-| Install:                                 | Upgrade:                                |
+| Install:                                 | Update:                                 |
 |------------------------------------------|-----------------------------------------|
 | `conda install gh --channel conda-forge` | `conda update gh --channel conda-forge` |
 
@@ -59,7 +59,7 @@ For instructions on specific distributions and package managers, see [Linux & BS
 
 #### scoop
 
-| Install:           | Upgrade:           |
+| Install:           | Update:            |
 | ------------------ | ------------------ |
 | `scoop install gh` | `scoop update gh`  |
 
