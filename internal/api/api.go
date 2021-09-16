@@ -51,7 +51,11 @@ type API struct {
 }
 
 func New(token string) *API {
-	return &API{token, &http.Client{}, githubAPI}
+	return &API{
+		token:     token,
+		client:    &http.Client{},
+		githubAPI: githubAPI,
+	}
 }
 
 type User struct {
