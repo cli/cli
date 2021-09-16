@@ -134,7 +134,7 @@ func syncLocalRepo(opts *SyncOptions) error {
 		}
 	}
 
-	// Git fetch might require input from user, so do it before starting progess indicator.
+	// Git fetch might require input from user, so do it before starting progress indicator.
 	if err := opts.Git.Fetch(remote, fmt.Sprintf("refs/heads/%s", opts.Branch)); err != nil {
 		return err
 	}
