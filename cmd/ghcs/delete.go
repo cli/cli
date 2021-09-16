@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/github/ghcs/cmd/ghcs/output"
 	"github.com/github/ghcs/internal/api"
 	"github.com/spf13/cobra"
@@ -17,10 +18,10 @@ func newDeleteCmd() *cobra.Command {
 		codespace     string
 		allCodespaces bool
 		repo          string
+		force         bool
 	)
 
 	log := output.NewLogger(os.Stdout, os.Stderr, false)
-
 	deleteCmd := &cobra.Command{
 		Use:   "delete",
 		Short: "Delete a codespace",
@@ -29,11 +30,11 @@ func newDeleteCmd() *cobra.Command {
 			case allCodespaces && repo != "":
 				return errors.New("both --all and --repo is not supported.")
 			case allCodespaces:
-				return deleteAll(log)
+				return deleteAll(log, force)
 			case repo != "":
-				return deleteByRepo(log, repo)
+				return deleteByRepo(log, repo, force)
 			default:
-				return delete_(log, codespace)
+				return delete_(log, codespace, force)
 			}
 		},
 	}
@@ -41,6 +42,7 @@ func newDeleteCmd() *cobra.Command {
 	deleteCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
 	deleteCmd.Flags().BoolVar(&allCodespaces, "all", false, "Delete all codespaces")
 	deleteCmd.Flags().StringVarP(&repo, "repo", "r", "", "Delete all codespaces for a repository")
+	deleteCmd.Flags().BoolVarP(&force, "force", "f", false, "Delete codespaces with unsaved changes without confirmation")
 
 	return deleteCmd
 }
@@ -49,7 +51,7 @@ func init() {
 	rootCmd.AddCommand(newDeleteCmd())
 }
 
-func delete_(log *output.Logger, codespaceName string) error {
+func delete_(log *output.Logger, codespaceName string, force bool) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 
@@ -63,6 +65,15 @@ func delete_(log *output.Logger, codespaceName string) error {
 		return fmt.Errorf("get or choose codespace: %w", err)
 	}
 
+	confirmed, err := confirmDeletion(codespace, force)
+	if err != nil {
+		return fmt.Errorf("deletion could not be confirmed: %w", err)
+	}
+
+	if !confirmed {
+		return nil
+	}
+
 	if err := apiClient.DeleteCodespace(ctx, user, token, codespace.Name); err != nil {
 		return fmt.Errorf("error deleting codespace: %w", err)
 	}
@@ -72,7 +83,7 @@ func delete_(log *output.Logger, codespaceName string) error {
 	return list(&listOptions{})
 }
 
-func deleteAll(log *output.Logger) error {
+func deleteAll(log *output.Logger, force bool) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 
@@ -87,6 +98,15 @@ func deleteAll(log *output.Logger) error {
 	}
 
 	for _, c := range codespaces {
+		confirmed, err := confirmDeletion(c, force)
+		if err != nil {
+			return fmt.Errorf("deletion could not be confirmed: %w", err)
+		}
+
+		if !confirmed {
+			continue
+		}
+
 		token, err := apiClient.GetCodespaceToken(ctx, user.Login, c.Name)
 		if err != nil {
 			return fmt.Errorf("error getting codespace token: %w", err)
@@ -102,7 +122,7 @@ func deleteAll(log *output.Logger) error {
 	return list(&listOptions{})
 }
 
-func deleteByRepo(log *output.Logger, repo string) error {
+func deleteByRepo(log *output.Logger, repo string, force bool) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 
@@ -121,6 +141,16 @@ func deleteByRepo(log *output.Logger, repo string) error {
 		if !strings.EqualFold(c.RepositoryNWO, repo) {
 			continue
 		}
+
+		confirmed, err := confirmDeletion(c, force)
+		if err != nil {
+			return fmt.Errorf("deletion could not be confirmed: %w", err)
+		}
+
+		if !confirmed {
+			continue
+		}
+
 		deleted = true
 
 		token, err := apiClient.GetCodespaceToken(ctx, user.Login, c.Name)
@@ -140,4 +170,32 @@ func deleteByRepo(log *output.Logger, repo string) error {
 	}
 
 	return list(&listOptions{})
+}
+
+func confirmDeletion(codespace *api.Codespace, force bool) (bool, error) {
+	gs := codespace.Environment.GitStatus
+	hasUnsavedChanges := gs.HasUncommitedChanges || gs.HasUnpushedChanges
+	if force || !hasUnsavedChanges {
+		return true, nil
+	}
+	if !hasTTY {
+		return false, fmt.Errorf("codespace %s has unsaved changes (use --force to override)", codespace.Name)
+	}
+
+	var confirmed struct {
+		Confirmed bool
+	}
+	q := []*survey.Question{
+		{
+			Name: "confirmed",
+			Prompt: &survey.Confirm{
+				Message: fmt.Sprintf("Codespace %s has unsaved changes. OK to delete?", codespace.Name),
+			},
+		},
+	}
+	if err := ask(q, &confirmed); err != nil {
+		return false, fmt.Errorf("failed to prompt: %w", err)
+	}
+
+	return confirmed.Confirmed, nil
 }

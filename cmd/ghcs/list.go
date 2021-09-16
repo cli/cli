@@ -55,7 +55,7 @@ func list(opts *listOptions) error {
 		table.Append([]string{
 			codespace.Name,
 			codespace.RepositoryNWO,
-			branch(codespace),
+			codespace.Name + dirtyStar(codespace.Environment.GitStatus),
 			codespace.Environment.State,
 			codespace.CreatedAt,
 		})
@@ -65,13 +65,10 @@ func list(opts *listOptions) error {
 	return nil
 }
 
-func branch(codespace *api.Codespace) string {
-	name := codespace.Branch
-	gitStatus := codespace.Environment.GitStatus
-
-	if gitStatus.HasUncommitedChanges || gitStatus.HasUnpushedChanges {
-		name += "*"
+func dirtyStar(status api.CodespaceEnvironmentGitStatus) string {
+	if status.HasUncommitedChanges || status.HasUnpushedChanges {
+		return "*"
 	}
 
-	return name
+	return ""
 }
