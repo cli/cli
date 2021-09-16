@@ -35,19 +35,23 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/opentracing/opentracing-go"
 )
 
 const githubAPI = "https://api.github.com"
 
+var now func() time.Time = time.Now
+
 type API struct {
-	token  string
-	client *http.Client
+	token     string
+	client    *http.Client
+	githubAPI string
 }
 
 func New(token string) *API {
-	return &API{token, &http.Client{}}
+	return &API{token, &http.Client{}, githubAPI}
 }
 
 type User struct {
@@ -55,7 +59,7 @@ type User struct {
 }
 
 func (a *API) GetUser(ctx context.Context) (*User, error) {
-	req, err := http.NewRequest(http.MethodGet, githubAPI+"/user", nil)
+	req, err := http.NewRequest(http.MethodGet, a.githubAPI+"/user", nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -100,7 +104,7 @@ type Repository struct {
 }
 
 func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error) {
-	req, err := http.NewRequest(http.MethodGet, githubAPI+"/repos/"+strings.ToLower(nwo), nil)
+	req, err := http.NewRequest(http.MethodGet, a.githubAPI+"/repos/"+strings.ToLower(nwo), nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -133,6 +137,7 @@ type Codespace struct {
 	Name           string               `json:"name"`
 	GUID           string               `json:"guid"`
 	CreatedAt      string               `json:"created_at"`
+	LastUsedAt     string               `json:"last_used_at"`
 	Branch         string               `json:"branch"`
 	RepositoryName string               `json:"repository_name"`
 	RepositoryNWO  string               `json:"repository_nwo"`
@@ -168,7 +173,7 @@ type CodespaceEnvironmentConnection struct {
 
 func (a *API) ListCodespaces(ctx context.Context, user *User) ([]*Codespace, error) {
 	req, err := http.NewRequest(
-		http.MethodGet, githubAPI+"/vscs_internal/user/"+user.Login+"/codespaces", nil,
+		http.MethodGet, a.githubAPI+"/vscs_internal/user/"+user.Login+"/codespaces", nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
@@ -215,7 +220,7 @@ func (a *API) GetCodespaceToken(ctx context.Context, ownerLogin, codespaceName s
 
 	req, err := http.NewRequest(
 		http.MethodPost,
-		githubAPI+"/vscs_internal/user/"+ownerLogin+"/codespaces/"+codespaceName+"/token",
+		a.githubAPI+"/vscs_internal/user/"+ownerLogin+"/codespaces/"+codespaceName+"/token",
 		bytes.NewBuffer(reqBody),
 	)
 	if err != nil {
@@ -249,7 +254,7 @@ func (a *API) GetCodespaceToken(ctx context.Context, ownerLogin, codespaceName s
 func (a *API) GetCodespace(ctx context.Context, token, owner, codespace string) (*Codespace, error) {
 	req, err := http.NewRequest(
 		http.MethodGet,
-		githubAPI+"/vscs_internal/user/"+owner+"/codespaces/"+codespace,
+		a.githubAPI+"/vscs_internal/user/"+owner+"/codespaces/"+codespace,
 		nil,
 	)
 	if err != nil {
@@ -283,7 +288,7 @@ func (a *API) GetCodespace(ctx context.Context, token, owner, codespace string) 
 func (a *API) StartCodespace(ctx context.Context, token string, codespace *Codespace) error {
 	req, err := http.NewRequest(
 		http.MethodPost,
-		githubAPI+"/vscs_internal/proxy/environments/"+codespace.GUID+"/start",
+		a.githubAPI+"/vscs_internal/proxy/environments/"+codespace.GUID+"/start",
 		nil,
 	)
 	if err != nil {
@@ -357,7 +362,7 @@ type SKU struct {
 }
 
 func (a *API) GetCodespacesSKUs(ctx context.Context, user *User, repository *Repository, branch, location string) ([]*SKU, error) {
-	req, err := http.NewRequest(http.MethodGet, githubAPI+"/vscs_internal/user/"+user.Login+"/skus", nil)
+	req, err := http.NewRequest(http.MethodGet, a.githubAPI+"/vscs_internal/user/"+user.Login+"/skus", nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -407,7 +412,7 @@ func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repos
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, githubAPI+"/vscs_internal/user/"+user.Login+"/codespaces", bytes.NewBuffer(requestBody))
+	req, err := http.NewRequest(http.MethodPost, a.githubAPI+"/vscs_internal/user/"+user.Login+"/codespaces", bytes.NewBuffer(requestBody))
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -437,7 +442,7 @@ func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repos
 }
 
 func (a *API) DeleteCodespace(ctx context.Context, user *User, token, codespaceName string) error {
-	req, err := http.NewRequest(http.MethodDelete, githubAPI+"/vscs_internal/user/"+user.Login+"/codespaces/"+codespaceName, nil)
+	req, err := http.NewRequest(http.MethodDelete, a.githubAPI+"/vscs_internal/user/"+user.Login+"/codespaces/"+codespaceName, nil)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
@@ -465,7 +470,7 @@ type getCodespaceRepositoryContentsResponse struct {
 }
 
 func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Codespace, path string) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodGet, githubAPI+"/repos/"+codespace.RepositoryNWO+"/contents/"+path, nil)
+	req, err := http.NewRequest(http.MethodGet, a.githubAPI+"/repos/"+codespace.RepositoryNWO+"/contents/"+path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -505,6 +510,24 @@ func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Cod
 	}
 
 	return decoded, nil
+}
+
+func (a *API) FilterCodespacesToDelete(codespaces []*Codespace, keepThresholdDays int) ([]*Codespace, error) {
+	if keepThresholdDays < 0 {
+		return nil, fmt.Errorf("invalid value for threshold: %d", keepThresholdDays)
+	}
+	codespacesToDelete := []*Codespace{}
+	for _, codespace := range codespaces {
+		// get a date from a string representation
+		t, err := time.Parse(time.RFC3339, codespace.LastUsedAt)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing last used at date: %v", err)
+		}
+		if t.Before(now().AddDate(0, 0, -keepThresholdDays)) && codespace.Environment.State == "Shutdown" {
+			codespacesToDelete = append(codespacesToDelete, codespace)
+		}
+	}
+	return codespacesToDelete, nil
 }
 
 func (a *API) do(ctx context.Context, req *http.Request, spanName string) (*http.Response, error) {

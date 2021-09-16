@@ -15,10 +15,11 @@ import (
 
 func newDeleteCmd() *cobra.Command {
 	var (
-		codespace     string
-		allCodespaces bool
-		repo          string
-		force         bool
+		codespace         string
+		allCodespaces     bool
+		repo              string
+		force             bool
+		keepThresholdDays int
 	)
 
 	log := output.NewLogger(os.Stdout, os.Stderr, false)
@@ -29,6 +30,8 @@ func newDeleteCmd() *cobra.Command {
 			switch {
 			case allCodespaces && repo != "":
 				return errors.New("both --all and --repo is not supported.")
+			case allCodespaces && keepThresholdDays != 0:
+				return deleteWithThreshold(log, keepThresholdDays)
 			case allCodespaces:
 				return deleteAll(log, force)
 			case repo != "":
@@ -43,6 +46,7 @@ func newDeleteCmd() *cobra.Command {
 	deleteCmd.Flags().BoolVar(&allCodespaces, "all", false, "Delete all codespaces")
 	deleteCmd.Flags().StringVarP(&repo, "repo", "r", "", "Delete all codespaces for a repository")
 	deleteCmd.Flags().BoolVarP(&force, "force", "f", false, "Delete codespaces with unsaved changes without confirmation")
+	deleteCmd.Flags().IntVar(&keepThresholdDays, "days", 0, "Value of threshold for codespaces to keep")
 
 	return deleteCmd
 }
@@ -198,4 +202,39 @@ func confirmDeletion(codespace *api.Codespace, force bool) (bool, error) {
 	}
 
 	return confirmed.Confirmed, nil
+}
+
+func deleteWithThreshold(log *output.Logger, keepThresholdDays int) error {
+	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	ctx := context.Background()
+
+	user, err := apiClient.GetUser(ctx)
+	if err != nil {
+		return fmt.Errorf("error getting user: %v", err)
+	}
+
+	codespaces, err := apiClient.ListCodespaces(ctx, user)
+	if err != nil {
+		return fmt.Errorf("error getting codespaces: %v", err)
+	}
+
+	codespacesToDelete, err := apiClient.FilterCodespacesToDelete(codespaces, keepThresholdDays)
+	if err != nil {
+		return err
+	}
+
+	for _, c := range codespacesToDelete {
+		token, err := apiClient.GetCodespaceToken(ctx, user.Login, c.Name)
+		if err != nil {
+			return fmt.Errorf("error getting codespace token: %v", err)
+		}
+
+		if err := apiClient.DeleteCodespace(ctx, user, token, c.Name); err != nil {
+			return fmt.Errorf("error deleting codespace: %v", err)
+		}
+
+		log.Printf("Codespace deleted: %s\n", c.Name)
+	}
+
+	return list(&listOptions{})
 }
