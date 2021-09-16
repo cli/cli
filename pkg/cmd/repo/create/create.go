@@ -251,7 +251,7 @@ func createRun(opts *CreateOptions) error {
 		if !isVisibilityPassed {
 			newVisibility, err := getVisibility()
 			if err != nil {
-				return nil
+				return err
 			}
 			visibility = newVisibility
 		}
