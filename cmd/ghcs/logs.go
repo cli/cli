@@ -49,17 +49,17 @@ func logs(ctx context.Context, log *output.Logger, codespaceName string, follow 
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
-		return fmt.Errorf("getting user: %v", err)
+		return fmt.Errorf("getting user: %w", err)
 	}
 
 	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
-		return fmt.Errorf("get or choose codespace: %v", err)
+		return fmt.Errorf("get or choose codespace: %w", err)
 	}
 
 	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
-		return fmt.Errorf("connecting to Live Share: %v", err)
+		return fmt.Errorf("connecting to Live Share: %w", err)
 	}
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
@@ -73,7 +73,7 @@ func logs(ctx context.Context, log *output.Logger, codespaceName string, follow 
 	log.Println("Fetching SSH Details...")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting ssh server details: %v", err)
+		return fmt.Errorf("error getting ssh server details: %w", err)
 	}
 
 	cmdType := "cat"
@@ -99,10 +99,10 @@ func logs(ctx context.Context, log *output.Logger, codespaceName string, follow 
 
 	select {
 	case err := <-tunnelClosed:
-		return fmt.Errorf("connection closed: %v", err)
+		return fmt.Errorf("connection closed: %w", err)
 	case err := <-cmdDone:
 		if err != nil {
-			return fmt.Errorf("error retrieving logs: %v", err)
+			return fmt.Errorf("error retrieving logs: %w", err)
 		}
 
 		return nil // success

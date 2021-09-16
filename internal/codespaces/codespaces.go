@@ -29,7 +29,7 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 		startedCodespace = true
 		log.Print("Starting your codespace...")
 		if err := apiClient.StartCodespace(ctx, token, codespace); err != nil {
-			return nil, fmt.Errorf("error starting codespace: %v", err)
+			return nil, fmt.Errorf("error starting codespace: %w", err)
 		}
 	}
 
@@ -49,7 +49,7 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 		var err error
 		codespace, err = apiClient.GetCodespace(ctx, token, userLogin, codespace.Name)
 		if err != nil {
-			return nil, fmt.Errorf("error getting codespace: %v", err)
+			return nil, fmt.Errorf("error getting codespace: %w", err)
 		}
 	}
 
@@ -68,7 +68,7 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 		}),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error creating Live Share client: %v", err)
+		return nil, fmt.Errorf("error creating Live Share client: %w", err)
 	}
 
 	return lsclient.JoinWorkspace(ctx)

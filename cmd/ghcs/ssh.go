@@ -46,23 +46,23 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting user: %v", err)
+		return fmt.Errorf("error getting user: %w", err)
 	}
 
 	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
-		return fmt.Errorf("get or choose codespace: %v", err)
+		return fmt.Errorf("get or choose codespace: %w", err)
 	}
 
 	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
-		return fmt.Errorf("error connecting to Live Share: %v", err)
+		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
 
 	log.Println("Fetching SSH Details...")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting ssh server details: %v", err)
+		return fmt.Errorf("error getting ssh server details: %w", err)
 	}
 
 	usingCustomPort := localSSHServerPort != 0 // suppress log of command line in Shell
@@ -94,10 +94,10 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 
 	select {
 	case err := <-tunnelClosed:
-		return fmt.Errorf("tunnel closed: %v", err)
+		return fmt.Errorf("tunnel closed: %w", err)
 	case err := <-shellClosed:
 		if err != nil {
-			return fmt.Errorf("shell closed: %v", err)
+			return fmt.Errorf("shell closed: %w", err)
 		}
 		return nil // success
 	}
