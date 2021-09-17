@@ -14,6 +14,7 @@ func TestParseSSHArgs(t *testing.T) {
 	}
 
 	testCases := []testCase{
+		{}, // empty test case
 		{
 			Args:       []string{"-X", "-Y"},
 			ParsedArgs: []string{"-X", "-Y"},
@@ -58,6 +59,11 @@ func TestParseSSHArgs(t *testing.T) {
 			Args:       []string{"-v", "echo", "-n", "test"},
 			ParsedArgs: []string{"-v"},
 			Command:    []string{"echo", "-n", "test"},
+		},
+		{
+			Args:       []string{"-v", "echo", "-b", "test"},
+			ParsedArgs: []string{"-v"},
+			Command:    []string{"echo", "-b", "test"},
 		},
 		{
 			Args:       []string{"-b"},
