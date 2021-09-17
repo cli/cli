@@ -48,7 +48,7 @@ func newDeleteCmd() *cobra.Command {
 }
 
 func delete_(log *output.Logger, codespaceName string, force bool) error {
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 	ctx := context.Background()
 
 	user, err := apiClient.GetUser(ctx)
@@ -80,7 +80,7 @@ func delete_(log *output.Logger, codespaceName string, force bool) error {
 }
 
 func deleteAll(log *output.Logger, force bool) error {
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 	ctx := context.Background()
 
 	user, err := apiClient.GetUser(ctx)
@@ -119,7 +119,7 @@ func deleteAll(log *output.Logger, force bool) error {
 }
 
 func deleteByRepo(log *output.Logger, repo string, force bool) error {
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 	ctx := context.Background()
 
 	user, err := apiClient.GetUser(ctx)

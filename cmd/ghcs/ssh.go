@@ -37,7 +37,7 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	user, err := apiClient.GetUser(ctx)

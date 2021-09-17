@@ -32,7 +32,7 @@ func newListCmd() *cobra.Command {
 }
 
 func list(opts *listOptions) error {
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 	ctx := context.Background()
 
 	user, err := apiClient.GetUser(ctx)

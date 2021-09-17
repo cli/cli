@@ -48,7 +48,7 @@ func newPortsCmd() *cobra.Command {
 }
 
 func ports(codespaceName string, asJSON bool) error {
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 	ctx := context.Background()
 	log := output.NewLogger(os.Stdout, os.Stderr, asJSON)
 
@@ -196,7 +196,7 @@ func newPortsPrivateCmd() *cobra.Command {
 
 func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, public bool) error {
 	ctx := context.Background()
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
@@ -258,7 +258,7 @@ func newPortsForwardCmd() *cobra.Command {
 
 func forwardPorts(log *output.Logger, codespaceName string, ports []string) error {
 	ctx := context.Background()
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 
 	portPairs, err := getPortPairs(ports)
 	if err != nil {

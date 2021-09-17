@@ -44,7 +44,7 @@ func newCreateCmd() *cobra.Command {
 
 func create(opts *createOptions) error {
 	ctx := context.Background()
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 	locationCh := getLocation(ctx, apiClient)
 	userCh := getUser(ctx, apiClient)
 	log := output.NewLogger(os.Stdout, os.Stderr, false)

@@ -41,7 +41,7 @@ func logs(ctx context.Context, log *output.Logger, codespaceName string, follow 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
