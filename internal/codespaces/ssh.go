@@ -64,16 +64,11 @@ func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 	return cmd, connArgs, nil
 }
 
-// parseSSHArgs parses SSH arguments into two distinct slices of flags
-// and command. It returns an error if flags are found after a command
-// or if a unary flag is provided without an argument.
+// parseSSHArgs parses SSH arguments into two distinct slices of flags and command.
+// It returns an error if a unary flag is provided without an argument.
 func parseSSHArgs(args []string) (cmdArgs []string, command []string, err error) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
-		if command != nil {
-			command = append(command, arg)
-			continue
-		}
 
 		if strings.HasPrefix(arg, "-") {
 			cmdArgs = append(cmdArgs, arg)
@@ -84,9 +79,12 @@ func parseSSHArgs(args []string) (cmdArgs []string, command []string, err error)
 
 				cmdArgs = append(cmdArgs, args[i])
 			}
-		} else {
-			command = append(command, arg)
+			continue
 		}
+
+		// if we've started parsing the command, append all further args to it
+		command = append(command, args[i:]...)
+		break
 	}
 
 	return cmdArgs, command, nil

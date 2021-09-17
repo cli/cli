@@ -69,7 +69,7 @@ func TestParseSSHArgs(t *testing.T) {
 
 	for _, tcase := range testCases {
 		args, command, err := parseSSHArgs(tcase.Args)
-		if err != nil && !tcase.Error {
+		if !tcase.Error && err != nil {
 			t.Errorf("unexpected error: %v on test case: %#v", err, tcase)
 			continue
 		}
