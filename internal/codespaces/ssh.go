@@ -70,21 +70,20 @@ func parseSSHArgs(args []string) (cmdArgs, command []string, err error) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 
-		if strings.HasPrefix(arg, "-") {
-			cmdArgs = append(cmdArgs, arg)
-			if len(arg) == 2 && strings.Contains("bcDeFIiLlmOopRSWw", arg[1:2]) {
-				if i++; i == len(args) {
-					return nil, nil, fmt.Errorf("ssh flag: %s requires an argument", arg)
-				}
-
-				cmdArgs = append(cmdArgs, args[i])
-			}
-			continue
+		// if we've started parsing the command, set it to the rest of the args
+		if !strings.HasPrefix(arg, "-") {
+			command = args[i:]
+			break
 		}
 
-		// if we've started parsing the command, set it to the rest of the args
-		command = args[i:]
-		break
+		cmdArgs = append(cmdArgs, arg)
+		if len(arg) == 2 && strings.Contains("bcDeFIiLlmOopRSWw", arg[1:2]) {
+			if i++; i == len(args) {
+				return nil, nil, fmt.Errorf("ssh flag: %s requires an argument", arg)
+			}
+
+			cmdArgs = append(cmdArgs, args[i])
+		}
 	}
 
 	return cmdArgs, command, nil

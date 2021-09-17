@@ -10,7 +10,7 @@ func TestParseSSHArgs(t *testing.T) {
 		Args       []string
 		ParsedArgs []string
 		Command    []string
-		Error      bool
+		Error      string
 	}
 
 	testCases := []testCase{
@@ -69,19 +69,26 @@ func TestParseSSHArgs(t *testing.T) {
 			Args:       []string{"-b"},
 			ParsedArgs: nil,
 			Command:    nil,
-			Error:      true,
+			Error:      "ssh flag: -b requires an argument",
 		},
 	}
 
 	for _, tcase := range testCases {
 		args, command, err := parseSSHArgs(tcase.Args)
-		if !tcase.Error && err != nil {
-			t.Errorf("unexpected error: %v on test case: %#v", err, tcase)
+		if tcase.Error != "" {
+			if err == nil {
+				t.Errorf("expected error and got nil: %#v", tcase)
+			}
+
+			if err.Error() != tcase.Error {
+				t.Errorf("error does not match expected error, got: '%s', expected: '%s'", err.Error(), tcase.Error)
+			}
+
 			continue
 		}
 
-		if tcase.Error && err == nil {
-			t.Errorf("expected error and got nil: %#v", tcase)
+		if err != nil {
+			t.Errorf("unexpected error: %v on test case: %#v", err, tcase)
 			continue
 		}
 
