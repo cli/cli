@@ -29,7 +29,7 @@ func newDeleteCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch {
 			case allCodespaces && repo != "":
-				return errors.New("both --all and --repo is not supported.")
+				return errors.New("both --all and --repo is not supported")
 			case allCodespaces:
 				return deleteAll(log, force)
 			case repo != "":
@@ -178,7 +178,7 @@ func deleteByRepo(log *output.Logger, repo string, force bool) error {
 		}()
 	}
 	if !found {
-		return fmt.Errorf("No codespace was found for repository: %s", repo)
+		return fmt.Errorf("no codespace was found for repository: %s", repo)
 	}
 	wg.Wait()
 

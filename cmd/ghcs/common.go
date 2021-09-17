@@ -15,7 +15,7 @@ import (
 	"golang.org/x/term"
 )
 
-var errNoCodespaces = errors.New("You have no codespaces.")
+var errNoCodespaces = errors.New("you have no codespaces")
 
 func chooseCodespace(ctx context.Context, apiClient *api.API, user *api.User) (*api.Codespace, error) {
 	codespaces, err := apiClient.ListCodespaces(ctx, user)

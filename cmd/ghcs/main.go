@@ -40,7 +40,7 @@ token to access the GitHub API with.`,
 
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if os.Getenv("GITHUB_TOKEN") == "" {
-				return tokenError
+				return errTokenMissing
 			}
 			return initLightstep(lightstep)
 		},
@@ -51,10 +51,10 @@ token to access the GitHub API with.`,
 	return root
 }
 
-var tokenError = errors.New("GITHUB_TOKEN is missing")
+var errTokenMissing = errors.New("GITHUB_TOKEN is missing")
 
 func explainError(w io.Writer, err error) {
-	if errors.Is(err, tokenError) {
+	if errors.Is(err, errTokenMissing) {
 		fmt.Fprintln(w, "The GITHUB_TOKEN environment variable is required. Create a Personal Access Token at https://github.com/settings/tokens/new?scopes=repo")
 		fmt.Fprintln(w, "Make sure to enable SSO for your organizations after creating the token.")
 		return
