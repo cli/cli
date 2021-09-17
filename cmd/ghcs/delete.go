@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/github/ghcs/cmd/ghcs/output"
 	"github.com/github/ghcs/internal/api"
 	"github.com/spf13/cobra"
 )
+
+var now func() time.Time = time.Now
 
 func newDeleteCmd() *cobra.Command {
 	var (
@@ -30,10 +33,8 @@ func newDeleteCmd() *cobra.Command {
 			switch {
 			case allCodespaces && repo != "":
 				return errors.New("both --all and --repo is not supported.")
-			case allCodespaces && keepThresholdDays != 0:
-				return deleteWithThreshold(log, keepThresholdDays)
 			case allCodespaces:
-				return deleteAll(log, force)
+				return deleteAll(log, force, keepThresholdDays)
 			case repo != "":
 				return deleteByRepo(log, repo, force)
 			default:
@@ -87,7 +88,7 @@ func delete_(log *output.Logger, codespaceName string, force bool) error {
 	return list(&listOptions{})
 }
 
-func deleteAll(log *output.Logger, force bool) error {
+func deleteAll(log *output.Logger, force bool, keepThresholdDays int) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 
@@ -101,7 +102,12 @@ func deleteAll(log *output.Logger, force bool) error {
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}
 
-	for _, c := range codespaces {
+	codespacesToDelete, err := filterCodespacesToDelete(codespaces, keepThresholdDays)
+	if err != nil {
+		return err
+	}
+
+	for _, c := range codespacesToDelete {
 		confirmed, err := confirmDeletion(c, force)
 		if err != nil {
 			return fmt.Errorf("deletion could not be confirmed: %w", err)
@@ -204,37 +210,20 @@ func confirmDeletion(codespace *api.Codespace, force bool) (bool, error) {
 	return confirmed.Confirmed, nil
 }
 
-func deleteWithThreshold(log *output.Logger, keepThresholdDays int) error {
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
-	ctx := context.Background()
-
-	user, err := apiClient.GetUser(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting user: %w", err)
+func filterCodespacesToDelete(codespaces []*api.Codespace, keepThresholdDays int) ([]*api.Codespace, error) {
+	if keepThresholdDays < 0 {
+		return nil, fmt.Errorf("invalid value for threshold: %d", keepThresholdDays)
 	}
-
-	codespaces, err := apiClient.ListCodespaces(ctx, user)
-	if err != nil {
-		return fmt.Errorf("error getting codespaces: %w", err)
-	}
-
-	codespacesToDelete, err := apiClient.FilterCodespacesToDelete(codespaces, keepThresholdDays)
-	if err != nil {
-		return err
-	}
-
-	for _, c := range codespacesToDelete {
-		token, err := apiClient.GetCodespaceToken(ctx, user.Login, c.Name)
+	codespacesToDelete := []*api.Codespace{}
+	for _, codespace := range codespaces {
+		// get a date from a string representation
+		t, err := time.Parse(time.RFC3339, codespace.LastUsedAt)
 		if err != nil {
-			return fmt.Errorf("error getting codespace token: %w", err)
+			return nil, fmt.Errorf("error parsing last used at date: %w", err)
 		}
-
-		if err := apiClient.DeleteCodespace(ctx, user, token, c.Name); err != nil {
-			return fmt.Errorf("error deleting codespace: %w", err)
+		if t.Before(now().AddDate(0, 0, -keepThresholdDays)) && codespace.Environment.State == "Shutdown" {
+			codespacesToDelete = append(codespacesToDelete, codespace)
 		}
-
-		log.Printf("Codespace deleted: %s\n", c.Name)
 	}
-
-	return list(&listOptions{})
+	return codespacesToDelete, nil
 }

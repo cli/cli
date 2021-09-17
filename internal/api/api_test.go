@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 )
 
 func TestListCodespaces(t *testing.T) {
@@ -52,104 +51,4 @@ func TestListCodespaces(t *testing.T) {
 		t.Fatalf("expected testcodespace, got %s", codespaces[0].Name)
 	}
 
-}
-
-func TestDeleteCodespacesByAge(t *testing.T) {
-	type args struct {
-		codespaces    []*Codespace
-		thresholdDays int
-	}
-	tests := []struct {
-		name    string
-		now     time.Time
-		args    args
-		wantErr bool
-		deleted []*Codespace
-	}{
-		{
-			name: "no codespaces is to be deleted",
-
-			args: args{
-				codespaces: []*Codespace{
-					{
-						Name:       "testcodespace",
-						CreatedAt:  "2021-08-09T10:10:24+02:00",
-						LastUsedAt: "2021-08-09T13:10:24+02:00",
-						Environment: CodespaceEnvironment{
-							State: "Shutdown",
-						},
-					},
-				},
-				thresholdDays: 1,
-			},
-			now:     time.Date(2021, 8, 9, 20, 10, 24, 0, time.UTC),
-			deleted: []*Codespace{},
-		},
-		{
-			name: "one codespace is to be deleted",
-
-			args: args{
-				codespaces: []*Codespace{
-					{
-						Name:       "testcodespace",
-						CreatedAt:  "2021-08-09T10:10:24+02:00",
-						LastUsedAt: "2021-08-09T13:10:24+02:00",
-						Environment: CodespaceEnvironment{
-							State: "Shutdown",
-						},
-					},
-				},
-				thresholdDays: 1,
-			},
-			now: time.Date(2021, 8, 15, 20, 12, 24, 0, time.UTC),
-			deleted: []*Codespace{
-				{
-					Name:       "testcodespace",
-					CreatedAt:  "2021-08-09T10:10:24+02:00",
-					LastUsedAt: "2021-08-09T13:10:24+02:00",
-				},
-			},
-		},
-		{
-			name: "threshold is invalid",
-
-			args: args{
-				codespaces: []*Codespace{
-					{
-						Name:       "testcodespace",
-						CreatedAt:  "2021-08-09T10:10:24+02:00",
-						LastUsedAt: "2021-08-09T13:10:24+02:00",
-						Environment: CodespaceEnvironment{
-							State: "Shutdown",
-						},
-					},
-				},
-				thresholdDays: -1,
-			},
-			now:     time.Date(2021, 8, 15, 20, 12, 24, 0, time.UTC),
-			wantErr: true,
-			deleted: []*Codespace{},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-
-			now = func() time.Time {
-				return tt.now
-			}
-
-			a := &API{
-				token:  "testtoken",
-				client: &http.Client{},
-			}
-			codespaces, err := a.FilterCodespacesToDelete(tt.args.codespaces, tt.args.thresholdDays)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("API.CleanupUnusedCodespaces() error = %v, wantErr %v", err, tt.wantErr)
-			}
-
-			if len(codespaces) != len(tt.deleted) {
-				t.Errorf("expected %d deleted codespaces, got %d", len(tt.deleted), len(codespaces))
-			}
-		})
-	}
 }

@@ -31,18 +31,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/opentracing/opentracing-go"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/opentracing/opentracing-go"
 )
 
 const githubAPI = "https://api.github.com"
-
-var now func() time.Time = time.Now
 
 type API struct {
 	token     string
@@ -514,24 +510,6 @@ func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Cod
 	}
 
 	return decoded, nil
-}
-
-func (a *API) FilterCodespacesToDelete(codespaces []*Codespace, keepThresholdDays int) ([]*Codespace, error) {
-	if keepThresholdDays < 0 {
-		return nil, fmt.Errorf("invalid value for threshold: %d", keepThresholdDays)
-	}
-	codespacesToDelete := []*Codespace{}
-	for _, codespace := range codespaces {
-		// get a date from a string representation
-		t, err := time.Parse(time.RFC3339, codespace.LastUsedAt)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing last used at date: %w", err)
-		}
-		if t.Before(now().AddDate(0, 0, -keepThresholdDays)) && codespace.Environment.State == "Shutdown" {
-			codespacesToDelete = append(codespacesToDelete, codespace)
-		}
-	}
-	return codespacesToDelete, nil
 }
 
 func (a *API) do(ctx context.Context, req *http.Request, spanName string) (*http.Response, error) {
