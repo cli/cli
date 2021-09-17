@@ -176,15 +176,6 @@ func TestPRList_filteringAssignee(t *testing.T) {
 	}
 }
 
-func TestPRList_bothNonDraftAndDraft(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	_, err := runCommand(http, true, `--draft --non-draft`)
-	assert.NotNil(t, err)
-	assert.Equal(t, err.Error(), "specify only one of `--draft` or `--non-draft`")
-}
-
 func TestPRList_filteringDraft(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -193,12 +184,12 @@ func TestPRList_filteringDraft(t *testing.T) {
 	}{
 		{
 			"draft",
-			"--draft",
+			"--draft=1",
 			`repo:OWNER/REPO is:pr is:open draft:true`,
 		},
 		{
 			"non-draft",
-			"--non-draft",
+			"--draft=false",
 			`repo:OWNER/REPO is:pr is:open draft:false`,
 		}}
 
@@ -244,14 +235,15 @@ func TestPRList_web(t *testing.T) {
 		},
 		{
 			"draft",
-			"--draft",
+			"--draft=true",
 			"https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Aopen+draft%3Atrue",
 		},
 		{
 			"non-draft",
-			"--non-draft",
+			"--draft=0",
 			"https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Aopen+draft%3Afalse",
-		}}
+		},
+	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

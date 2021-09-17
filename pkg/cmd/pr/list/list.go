@@ -37,15 +37,16 @@ type ListOptions struct {
 	Author     string
 	Assignee   string
 	Search     string
-	Draft      bool
-	NonDraft   bool
+	Draft      *bool
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
+	draft := false
 	opts := &ListOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
+		Draft:      &draft,
 	}
 
 	cmd := &cobra.Command{
@@ -76,8 +77,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return &cmdutil.FlagError{Err: fmt.Errorf("invalid value for --limit: %v", opts.LimitResults)}
 			}
 
-			if opts.Draft && opts.NonDraft {
-				return &cmdutil.FlagError{Err: fmt.Errorf("specify only one of `--draft` or `--non-draft`")}
+			if !cmd.Flags().Changed("draft") {
+				opts.Draft = nil
 			}
 
 			if runF != nil {
@@ -98,8 +99,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
-	cmd.Flags().BoolVar(&opts.Draft, "draft", false, "Show drafts only")
-	cmd.Flags().BoolVar(&opts.NonDraft, "non-draft", false, "Show non-drafts only")
+	cmd.Flags().BoolVar(opts.Draft, "draft", false, "Filter by draft/non-draft")
 
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
@@ -142,7 +142,6 @@ func listRun(opts *ListOptions) error {
 		BaseBranch: opts.BaseBranch,
 		Search:     opts.Search,
 		Draft:      opts.Draft,
-		NonDraft:   opts.NonDraft,
 		Fields:     defaultFields,
 	}
 	if opts.Exporter != nil {

@@ -16,6 +16,9 @@ func Test_listURLWithQuery(t *testing.T) {
 		listURL string
 		options FilterOptions
 	}
+	draft := true
+	noDraft := false
+
 	tests := []struct {
 		name    string
 		args    args
@@ -39,10 +42,9 @@ func Test_listURLWithQuery(t *testing.T) {
 			args: args{
 				listURL: "https://example.com/path",
 				options: FilterOptions{
-					Entity:   "pr",
-					State:    "open",
-					Draft:    true,
-					NonDraft: true, // shouldn't impact anything - we always prefer `draft`
+					Entity: "pr",
+					State:  "open",
+					Draft:  &draft,
 				},
 			},
 			want:    "https://example.com/path?q=is%3Apr+is%3Aopen+draft%3Atrue",
@@ -53,10 +55,9 @@ func Test_listURLWithQuery(t *testing.T) {
 			args: args{
 				listURL: "https://example.com/path",
 				options: FilterOptions{
-					Entity:   "pr",
-					State:    "open",
-					Draft:    false,
-					NonDraft: true,
+					Entity: "pr",
+					State:  "open",
+					Draft:  &noDraft,
 				},
 			},
 			want:    "https://example.com/path?q=is%3Apr+is%3Aopen+draft%3Afalse",
