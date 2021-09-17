@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/github/ghcs/api"
 	"github.com/github/ghcs/cmd/ghcs/output"
+	"github.com/github/ghcs/internal/api"
 	"github.com/github/ghcs/internal/codespaces"
 	"github.com/github/go-liveshare"
 	"github.com/muhammadmuzzammil1998/jsonc"
@@ -58,7 +58,7 @@ func ports(codespaceName string, asJSON bool) error {
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting user: %v", err)
+		return fmt.Errorf("error getting user: %w", err)
 	}
 
 	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
@@ -67,20 +67,20 @@ func ports(codespaceName string, asJSON bool) error {
 		if err == errNoCodespaces {
 			return err
 		}
-		return fmt.Errorf("error choosing codespace: %v", err)
+		return fmt.Errorf("error choosing codespace: %w", err)
 	}
 
 	devContainerCh := getDevContainer(ctx, apiClient, codespace)
 
 	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
-		return fmt.Errorf("error connecting to Live Share: %v", err)
+		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
 
 	log.Println("Loading ports...")
 	ports, err := session.GetSharedServers(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting ports of shared servers: %v", err)
+		return fmt.Errorf("error getting ports of shared servers: %w", err)
 	}
 
 	devContainerResult := <-devContainerCh
@@ -130,7 +130,7 @@ func getDevContainer(ctx context.Context, apiClient *api.API, codespace *api.Cod
 	go func() {
 		contents, err := apiClient.GetCodespaceRepositoryContents(ctx, codespace, ".devcontainer/devcontainer.json")
 		if err != nil {
-			ch <- devContainerResult{nil, fmt.Errorf("error getting content: %v", err)}
+			ch <- devContainerResult{nil, fmt.Errorf("error getting content: %w", err)}
 			return
 		}
 
@@ -147,7 +147,7 @@ func getDevContainer(ctx context.Context, apiClient *api.API, codespace *api.Cod
 
 		var container devContainer
 		if err := json.Unmarshal(convertedJSON, &container); err != nil {
-			ch <- devContainerResult{nil, fmt.Errorf("error unmarshaling: %v", err)}
+			ch <- devContainerResult{nil, fmt.Errorf("error unmarshaling: %w", err)}
 			return
 		}
 
@@ -168,7 +168,7 @@ func newPortsPublicCmd() *cobra.Command {
 				// should only happen if flag is not defined
 				// or if the flag is not of string type
 				// since it's a persistent flag that we control it should never happen
-				return fmt.Errorf("get codespace flag: %v", err)
+				return fmt.Errorf("get codespace flag: %w", err)
 			}
 
 			log := output.NewLogger(os.Stdout, os.Stderr, false)
@@ -189,7 +189,7 @@ func newPortsPrivateCmd() *cobra.Command {
 				// should only happen if flag is not defined
 				// or if the flag is not of string type
 				// since it's a persistent flag that we control it should never happen
-				return fmt.Errorf("get codespace flag: %v", err)
+				return fmt.Errorf("get codespace flag: %w", err)
 			}
 
 			log := output.NewLogger(os.Stdout, os.Stderr, false)
@@ -204,7 +204,7 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting user: %v", err)
+		return fmt.Errorf("error getting user: %w", err)
 	}
 
 	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
@@ -212,21 +212,21 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 		if err == errNoCodespaces {
 			return err
 		}
-		return fmt.Errorf("error getting codespace: %v", err)
+		return fmt.Errorf("error getting codespace: %w", err)
 	}
 
 	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
-		return fmt.Errorf("error connecting to Live Share: %v", err)
+		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
 
 	port, err := strconv.Atoi(sourcePort)
 	if err != nil {
-		return fmt.Errorf("error reading port number: %v", err)
+		return fmt.Errorf("error reading port number: %w", err)
 	}
 
 	if err := session.UpdateSharedVisibility(ctx, port, public); err != nil {
-		return fmt.Errorf("error update port to public: %v", err)
+		return fmt.Errorf("error update port to public: %w", err)
 	}
 
 	state := "PUBLIC"
@@ -251,7 +251,7 @@ func newPortsForwardCmd() *cobra.Command {
 				// should only happen if flag is not defined
 				// or if the flag is not of string type
 				// since it's a persistent flag that we control it should never happen
-				return fmt.Errorf("get codespace flag: %v", err)
+				return fmt.Errorf("get codespace flag: %w", err)
 			}
 
 			log := output.NewLogger(os.Stdout, os.Stderr, false)
@@ -266,12 +266,12 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 
 	portPairs, err := getPortPairs(ports)
 	if err != nil {
-		return fmt.Errorf("get port pairs: %v", err)
+		return fmt.Errorf("get port pairs: %w", err)
 	}
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting user: %v", err)
+		return fmt.Errorf("error getting user: %w", err)
 	}
 
 	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
@@ -279,12 +279,12 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 		if err == errNoCodespaces {
 			return err
 		}
-		return fmt.Errorf("error getting codespace: %v", err)
+		return fmt.Errorf("error getting codespace: %w", err)
 	}
 
 	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
-		return fmt.Errorf("error connecting to Live Share: %v", err)
+		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
 
 	// Run forwarding of all ports concurrently, aborting all of
@@ -323,12 +323,12 @@ func getPortPairs(ports []string) ([]portPair, error) {
 
 		remote, err := strconv.Atoi(parts[0])
 		if err != nil {
-			return pp, fmt.Errorf("convert remote port to int: %v", err)
+			return pp, fmt.Errorf("convert remote port to int: %w", err)
 		}
 
 		local, err := strconv.Atoi(parts[1])
 		if err != nil {
-			return pp, fmt.Errorf("convert local port to int: %v", err)
+			return pp, fmt.Errorf("convert local port to int: %w", err)
 		}
 
 		pp = append(pp, portPair{remote, local})

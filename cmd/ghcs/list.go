@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/github/ghcs/api"
 	"github.com/github/ghcs/cmd/ghcs/output"
+	"github.com/github/ghcs/internal/api"
 	"github.com/spf13/cobra"
 )
 
@@ -41,12 +41,12 @@ func list(opts *listOptions) error {
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting user: %v", err)
+		return fmt.Errorf("error getting user: %w", err)
 	}
 
 	codespaces, err := apiClient.ListCodespaces(ctx, user)
 	if err != nil {
-		return fmt.Errorf("error getting codespaces: %v", err)
+		return fmt.Errorf("error getting codespaces: %w", err)
 	}
 
 	table := output.NewTable(os.Stdout, opts.asJSON)
@@ -55,7 +55,7 @@ func list(opts *listOptions) error {
 		table.Append([]string{
 			codespace.Name,
 			codespace.RepositoryNWO,
-			branch(codespace),
+			codespace.Name + dirtyStar(codespace.Environment.GitStatus),
 			codespace.Environment.State,
 			codespace.CreatedAt,
 		})
@@ -65,13 +65,10 @@ func list(opts *listOptions) error {
 	return nil
 }
 
-func branch(codespace *api.Codespace) string {
-	name := codespace.Branch
-	gitStatus := codespace.Environment.GitStatus
-
-	if gitStatus.HasUncommitedChanges || gitStatus.HasUnpushedChanges {
-		name += "*"
+func dirtyStar(status api.CodespaceEnvironmentGitStatus) string {
+	if status.HasUncommitedChanges || status.HasUnpushedChanges {
+		return "*"
 	}
 
-	return name
+	return ""
 }

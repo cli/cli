@@ -11,7 +11,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
-	"github.com/github/ghcs/api"
+	"github.com/github/ghcs/internal/api"
 	"golang.org/x/term"
 )
 
@@ -20,7 +20,7 @@ var errNoCodespaces = errors.New("You have no codespaces.")
 func chooseCodespace(ctx context.Context, apiClient *api.API, user *api.User) (*api.Codespace, error) {
 	codespaces, err := apiClient.ListCodespaces(ctx, user)
 	if err != nil {
-		return nil, fmt.Errorf("error getting codespaces: %v", err)
+		return nil, fmt.Errorf("error getting codespaces: %w", err)
 	}
 
 	if len(codespaces) == 0 {
@@ -54,7 +54,7 @@ func chooseCodespace(ctx context.Context, apiClient *api.API, user *api.User) (*
 		Codespace string
 	}
 	if err := ask(sshSurvey, &answers); err != nil {
-		return nil, fmt.Errorf("error getting answers: %v", err)
+		return nil, fmt.Errorf("error getting answers: %w", err)
 	}
 
 	codespace := codespacesByName[answers.Codespace]
@@ -70,23 +70,23 @@ func getOrChooseCodespace(ctx context.Context, apiClient *api.API, user *api.Use
 			if err == errNoCodespaces {
 				return nil, "", err
 			}
-			return nil, "", fmt.Errorf("choosing codespace: %v", err)
+			return nil, "", fmt.Errorf("choosing codespace: %w", err)
 		}
 		codespaceName = codespace.Name
 
 		token, err = apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
 		if err != nil {
-			return nil, "", fmt.Errorf("getting codespace token: %v", err)
+			return nil, "", fmt.Errorf("getting codespace token: %w", err)
 		}
 	} else {
 		token, err = apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
 		if err != nil {
-			return nil, "", fmt.Errorf("getting codespace token for given codespace: %v", err)
+			return nil, "", fmt.Errorf("getting codespace token for given codespace: %w", err)
 		}
 
 		codespace, err = apiClient.GetCodespace(ctx, token, user.Login, codespaceName)
 		if err != nil {
-			return nil, "", fmt.Errorf("getting full codespace details: %v", err)
+			return nil, "", fmt.Errorf("getting full codespace details: %w", err)
 		}
 	}
 

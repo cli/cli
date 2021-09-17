@@ -1,4 +1,3 @@
-// TODO(adonovan): rename to package codespaces, and codespaces.Client.
 package api
 
 // For descriptions of service interfaces, see:
@@ -6,6 +5,24 @@ package api
 // - https://docs.github.com/en/rest/reference/repos (for api.github.com)
 // - https://github.com/github/github/blob/master/app/api/codespaces.rb (for vscs_internal)
 // TODO(adonovan): replace the last link with a public doc URL when available.
+
+// TODO(adonovan): a possible reorganization would be to split this
+// file into three internal packages, one per backend service, and to
+// rename api.API to github.Client:
+//
+// - github.GetUser(github.Client)
+// - github.GetRepository(Client)
+// - github.ReadFile(Client, nwo, branch, path) // was GetCodespaceRepositoryContents
+// - codespaces.Create(Client, user, repo, sku, branch, location)
+// - codespaces.Delete(Client, user, token, name)
+// - codespaces.Get(Client, token, owner, name)
+// - codespaces.GetMachineTypes(Client, user, repo, branch, location)
+// - codespaces.GetToken(Client, login, name)
+// - codespaces.List(Client, user)
+// - codespaces.Start(Client, token, codespace)
+// - visualstudio.GetRegionLocation(http.Client) // no dependency on github
+//
+// This would make the meaning of each operation clearer.
 
 import (
 	"bytes"
@@ -40,19 +57,19 @@ type User struct {
 func (a *API) GetUser(ctx context.Context) (*User, error) {
 	req, err := http.NewRequest(http.MethodGet, githubAPI+"/user", nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %v", err)
+		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
 	a.setHeaders(req)
 	resp, err := a.do(ctx, req, "/user")
 	if err != nil {
-		return nil, fmt.Errorf("error making request: %v", err)
+		return nil, fmt.Errorf("error making request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %v", err)
+		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -61,7 +78,7 @@ func (a *API) GetUser(ctx context.Context) (*User, error) {
 
 	var response User
 	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
 
 	return &response, nil
@@ -72,7 +89,7 @@ func jsonErrorResponse(b []byte) error {
 		Message string `json:"message"`
 	}
 	if err := json.Unmarshal(b, &response); err != nil {
-		return fmt.Errorf("error unmarshaling error response: %v", err)
+		return fmt.Errorf("error unmarshaling error response: %w", err)
 	}
 
 	return errors.New(response.Message)
@@ -85,19 +102,19 @@ type Repository struct {
 func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error) {
 	req, err := http.NewRequest(http.MethodGet, githubAPI+"/repos/"+strings.ToLower(nwo), nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %v", err)
+		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
 	a.setHeaders(req)
 	resp, err := a.do(ctx, req, "/repos/*")
 	if err != nil {
-		return nil, fmt.Errorf("error making request: %v", err)
+		return nil, fmt.Errorf("error making request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %v", err)
+		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -106,7 +123,7 @@ func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error
 
 	var response Repository
 	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
 
 	return &response, nil
@@ -154,19 +171,19 @@ func (a *API) ListCodespaces(ctx context.Context, user *User) ([]*Codespace, err
 		http.MethodGet, githubAPI+"/vscs_internal/user/"+user.Login+"/codespaces", nil,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %v", err)
+		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
 	a.setHeaders(req)
 	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces")
 	if err != nil {
-		return nil, fmt.Errorf("error making request: %v", err)
+		return nil, fmt.Errorf("error making request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %v", err)
+		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -177,7 +194,7 @@ func (a *API) ListCodespaces(ctx context.Context, user *User) ([]*Codespace, err
 		Codespaces []*Codespace `json:"codespaces"`
 	}
 	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
 	return response.Codespaces, nil
 }
@@ -193,7 +210,7 @@ type getCodespaceTokenResponse struct {
 func (a *API) GetCodespaceToken(ctx context.Context, ownerLogin, codespaceName string) (string, error) {
 	reqBody, err := json.Marshal(getCodespaceTokenRequest{true})
 	if err != nil {
-		return "", fmt.Errorf("error preparing request body: %v", err)
+		return "", fmt.Errorf("error preparing request body: %w", err)
 	}
 
 	req, err := http.NewRequest(
@@ -202,19 +219,19 @@ func (a *API) GetCodespaceToken(ctx context.Context, ownerLogin, codespaceName s
 		bytes.NewBuffer(reqBody),
 	)
 	if err != nil {
-		return "", fmt.Errorf("error creating request: %v", err)
+		return "", fmt.Errorf("error creating request: %w", err)
 	}
 
 	a.setHeaders(req)
 	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces/*/token")
 	if err != nil {
-		return "", fmt.Errorf("error making request: %v", err)
+		return "", fmt.Errorf("error making request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("error reading response body: %v", err)
+		return "", fmt.Errorf("error reading response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -223,7 +240,7 @@ func (a *API) GetCodespaceToken(ctx context.Context, ownerLogin, codespaceName s
 
 	var response getCodespaceTokenResponse
 	if err := json.Unmarshal(b, &response); err != nil {
-		return "", fmt.Errorf("error unmarshaling response: %v", err)
+		return "", fmt.Errorf("error unmarshaling response: %w", err)
 	}
 
 	return response.RepositoryToken, nil
@@ -236,19 +253,19 @@ func (a *API) GetCodespace(ctx context.Context, token, owner, codespace string) 
 		nil,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %v", err)
+		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces/*")
 	if err != nil {
-		return nil, fmt.Errorf("error making request: %v", err)
+		return nil, fmt.Errorf("error making request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %v", err)
+		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -257,7 +274,7 @@ func (a *API) GetCodespace(ctx context.Context, token, owner, codespace string) 
 
 	var response Codespace
 	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
 
 	return &response, nil
@@ -270,19 +287,19 @@ func (a *API) StartCodespace(ctx context.Context, token string, codespace *Codes
 		nil,
 	)
 	if err != nil {
-		return fmt.Errorf("error creating request: %v", err)
+		return fmt.Errorf("error creating request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := a.do(ctx, req, "/vscs_internal/proxy/environments/*/start")
 	if err != nil {
-		return fmt.Errorf("error making request: %v", err)
+		return fmt.Errorf("error making request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("error reading response body: %v", err)
+		return fmt.Errorf("error reading response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -308,18 +325,18 @@ type getCodespaceRegionLocationResponse struct {
 func (a *API) GetCodespaceRegionLocation(ctx context.Context) (string, error) {
 	req, err := http.NewRequest(http.MethodGet, "https://online.visualstudio.com/api/v1/locations", nil)
 	if err != nil {
-		return "", fmt.Errorf("error creating request: %v", err)
+		return "", fmt.Errorf("error creating request: %w", err)
 	}
 
 	resp, err := a.do(ctx, req, req.URL.String())
 	if err != nil {
-		return "", fmt.Errorf("error making request: %v", err)
+		return "", fmt.Errorf("error making request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("error reading response body: %v", err)
+		return "", fmt.Errorf("error reading response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -328,7 +345,7 @@ func (a *API) GetCodespaceRegionLocation(ctx context.Context) (string, error) {
 
 	var response getCodespaceRegionLocationResponse
 	if err := json.Unmarshal(b, &response); err != nil {
-		return "", fmt.Errorf("error unmarshaling response: %v", err)
+		return "", fmt.Errorf("error unmarshaling response: %w", err)
 	}
 
 	return response.Current, nil
@@ -342,7 +359,7 @@ type SKU struct {
 func (a *API) GetCodespacesSKUs(ctx context.Context, user *User, repository *Repository, branch, location string) ([]*SKU, error) {
 	req, err := http.NewRequest(http.MethodGet, githubAPI+"/vscs_internal/user/"+user.Login+"/skus", nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %v", err)
+		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
 	q := req.URL.Query()
@@ -354,13 +371,13 @@ func (a *API) GetCodespacesSKUs(ctx context.Context, user *User, repository *Rep
 	a.setHeaders(req)
 	resp, err := a.do(ctx, req, "/vscs_internal/user/*/skus")
 	if err != nil {
-		return nil, fmt.Errorf("error making request: %v", err)
+		return nil, fmt.Errorf("error making request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %v", err)
+		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -371,7 +388,7 @@ func (a *API) GetCodespacesSKUs(ctx context.Context, user *User, repository *Rep
 		SKUs []*SKU `json:"skus"`
 	}
 	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
 
 	return response.SKUs, nil
@@ -387,24 +404,24 @@ type createCodespaceRequest struct {
 func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repository, sku, branch, location string) (*Codespace, error) {
 	requestBody, err := json.Marshal(createCodespaceRequest{repository.ID, branch, location, sku})
 	if err != nil {
-		return nil, fmt.Errorf("error marshaling request: %v", err)
+		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
 
 	req, err := http.NewRequest(http.MethodPost, githubAPI+"/vscs_internal/user/"+user.Login+"/codespaces", bytes.NewBuffer(requestBody))
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %v", err)
+		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
 	a.setHeaders(req)
 	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces")
 	if err != nil {
-		return nil, fmt.Errorf("error making request: %v", err)
+		return nil, fmt.Errorf("error making request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %v", err)
+		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
 	if resp.StatusCode > http.StatusAccepted {
@@ -413,7 +430,7 @@ func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repos
 
 	var response Codespace
 	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
 
 	return &response, nil
@@ -422,20 +439,20 @@ func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repos
 func (a *API) DeleteCodespace(ctx context.Context, user *User, token, codespaceName string) error {
 	req, err := http.NewRequest(http.MethodDelete, githubAPI+"/vscs_internal/user/"+user.Login+"/codespaces/"+codespaceName, nil)
 	if err != nil {
-		return fmt.Errorf("error creating request: %v", err)
+		return fmt.Errorf("error creating request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces/*")
 	if err != nil {
-		return fmt.Errorf("error making request: %v", err)
+		return fmt.Errorf("error making request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode > http.StatusAccepted {
 		b, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return fmt.Errorf("error reading response body: %v", err)
+			return fmt.Errorf("error reading response body: %w", err)
 		}
 		return jsonErrorResponse(b)
 	}
@@ -450,7 +467,7 @@ type getCodespaceRepositoryContentsResponse struct {
 func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Codespace, path string) ([]byte, error) {
 	req, err := http.NewRequest(http.MethodGet, githubAPI+"/repos/"+codespace.RepositoryNWO+"/contents/"+path, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %v", err)
+		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
 	q := req.URL.Query()
@@ -460,7 +477,7 @@ func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Cod
 	a.setHeaders(req)
 	resp, err := a.do(ctx, req, "/repos/*/contents/*")
 	if err != nil {
-		return nil, fmt.Errorf("error making request: %v", err)
+		return nil, fmt.Errorf("error making request: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -470,7 +487,7 @@ func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Cod
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %v", err)
+		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -479,12 +496,12 @@ func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Cod
 
 	var response getCodespaceRepositoryContentsResponse
 	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
 
 	decoded, err := base64.StdEncoding.DecodeString(response.Content)
 	if err != nil {
-		return nil, fmt.Errorf("error decoding content: %v", err)
+		return nil, fmt.Errorf("error decoding content: %w", err)
 	}
 
 	return decoded, nil

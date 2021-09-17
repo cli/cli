@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/github/ghcs/api"
+	"github.com/github/ghcs/internal/api"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/spf13/cobra"
 )
@@ -42,7 +42,7 @@ func code(codespaceName string, useInsiders bool) error {
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
-		return fmt.Errorf("error getting user: %v", err)
+		return fmt.Errorf("error getting user: %w", err)
 	}
 
 	if codespaceName == "" {
@@ -51,7 +51,7 @@ func code(codespaceName string, useInsiders bool) error {
 			if err == errNoCodespaces {
 				return err
 			}
-			return fmt.Errorf("error choosing codespace: %v", err)
+			return fmt.Errorf("error choosing codespace: %w", err)
 		}
 		codespaceName = codespace.Name
 	}
