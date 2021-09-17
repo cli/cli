@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -32,7 +33,7 @@ func newDeleteCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch {
 			case allCodespaces && repo != "":
-				return errors.New("both --all and --repo is not supported.")
+				return errors.New("both --all and --repo is not supported")
 			case allCodespaces:
 				return deleteAll(log, force, keepThresholdDays)
 			case repo != "":
@@ -146,37 +147,58 @@ func deleteByRepo(log *output.Logger, repo string, force bool) error {
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}
 
-	var deleted bool
-	for _, c := range codespaces {
-		if !strings.EqualFold(c.RepositoryNWO, repo) {
-			continue
-		}
-
-		confirmed, err := confirmDeletion(c, force)
-		if err != nil {
-			return fmt.Errorf("deletion could not be confirmed: %w", err)
-		}
-
-		if !confirmed {
-			continue
-		}
-
-		deleted = true
-
-		token, err := apiClient.GetCodespaceToken(ctx, user.Login, c.Name)
+	delete := func(name string) error {
+		token, err := apiClient.GetCodespaceToken(ctx, user.Login, name)
 		if err != nil {
 			return fmt.Errorf("error getting codespace token: %w", err)
 		}
 
-		if err := apiClient.DeleteCodespace(ctx, user, token, c.Name); err != nil {
+		if err := apiClient.DeleteCodespace(ctx, user, token, name); err != nil {
 			return fmt.Errorf("error deleting codespace: %w", err)
 		}
 
-		log.Printf("Codespace deleted: %s\n", c.Name)
+		return nil
 	}
 
-	if !deleted {
-		return fmt.Errorf("No codespace was found for repository: %s", repo)
+	// Perform deletions in parallel, for performance,
+	// and to ensure all are attempted even if any one fails.
+	var (
+		found bool
+		mu    sync.Mutex // guards errs, logger
+		errs  []error
+		wg    sync.WaitGroup
+	)
+	for _, c := range codespaces {
+		if !strings.EqualFold(c.RepositoryNWO, repo) {
+			continue
+		}
+		found = true
+		c := c
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := delete(c.Name)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				errs = append(errs, err)
+			} else {
+				log.Printf("Codespace deleted: %s\n", c.Name)
+			}
+		}()
+	}
+	if !found {
+		return fmt.Errorf("no codespace was found for repository: %s", repo)
+	}
+	wg.Wait()
+
+	// Return first error, plus count of others.
+	if errs != nil {
+		err := errs[0]
+		if others := len(errs) - 1; others > 0 {
+			err = fmt.Errorf("%w (+%d more)", err, others)
+		}
+		return err
 	}
 
 	return list(&listOptions{})

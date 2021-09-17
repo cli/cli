@@ -82,7 +82,7 @@ func create(opts *createOptions) error {
 		return fmt.Errorf("error getting machine type: %w", err)
 	}
 	if machine == "" {
-		return errors.New("There are no available machine types for this repository")
+		return errors.New("there are no available machine types for this repository")
 	}
 
 	log.Println("Creating your codespace...")
