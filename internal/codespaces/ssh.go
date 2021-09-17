@@ -66,7 +66,7 @@ func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 
 // parseSSHArgs parses SSH arguments into two distinct slices of flags and command.
 // It returns an error if a unary flag is provided without an argument.
-func parseSSHArgs(args []string) (cmdArgs []string, command []string, err error) {
+func parseSSHArgs(args []string) (cmdArgs, command []string, err error) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 
