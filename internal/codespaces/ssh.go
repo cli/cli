@@ -82,8 +82,8 @@ func parseSSHArgs(args []string) (cmdArgs []string, command []string, err error)
 			continue
 		}
 
-		// if we've started parsing the command, append all further args to it
-		command = append(command, args[i:]...)
+		// if we've started parsing the command, set it to the rest of the args
+		command = args[i:]
 		break
 	}
 
