@@ -46,7 +46,7 @@ func newDeleteCmd() *cobra.Command {
 	deleteCmd.Flags().BoolVar(&allCodespaces, "all", false, "Delete all codespaces")
 	deleteCmd.Flags().StringVarP(&repo, "repo", "r", "", "Delete all codespaces for a repository")
 	deleteCmd.Flags().BoolVarP(&force, "force", "f", false, "Delete codespaces with unsaved changes without confirmation")
-	deleteCmd.Flags().IntVar(&keepThresholdDays, "days", 0, "Minimum number of days that a codespace has to have to be deleted. Only shutdown codespaces will be considered for deletion.")
+	deleteCmd.Flags().IntVar(&keepThresholdDays, "days", 0, "Minimum number of days since the codespace was created")
 
 	return deleteCmd
 }
