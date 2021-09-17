@@ -1,12 +1,16 @@
 package codespaces
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func TestParseSSHArgs(t *testing.T) {
 	type testCase struct {
 		Args       []string
 		ParsedArgs []string
 		Command    []string
+		Error      bool
 	}
 
 	testCases := []testCase{
@@ -50,37 +54,39 @@ func TestParseSSHArgs(t *testing.T) {
 			ParsedArgs: []string{"-L", "-l"},
 			Command:    nil,
 		},
+		{
+			Args:       []string{"-v", "echo", "-n", "test"},
+			ParsedArgs: []string{"-v"},
+			Command:    []string{"echo", "-n", "test"},
+		},
+		{
+			Args:       []string{"-b"},
+			ParsedArgs: nil,
+			Command:    nil,
+			Error:      true,
+		},
 	}
 
 	for _, tcase := range testCases {
 		args, command, err := parseSSHArgs(tcase.Args)
-		if err != nil {
-			t.Errorf("received unexpected error: %w", err)
+		if err != nil && !tcase.Error {
+			t.Errorf("unexpected error: %v on test case: %#v", err, tcase)
+			continue
 		}
 
-		if len(args) != len(tcase.ParsedArgs) {
-			t.Fatalf("args do not match length of expected args. %#v, got '%d'", tcase, len(args))
-		}
-		if len(command) != len(tcase.Command) {
-			t.Fatalf("command dooes not match length of expected command. %#v, got '%d'", tcase, len(command))
+		if tcase.Error && err == nil {
+			t.Errorf("expected error and got nil: %#v", tcase)
+			continue
 		}
 
-		for i, arg := range args {
-			if arg != tcase.ParsedArgs[i] {
-				t.Fatalf("arg does not match expected parsed arg. %v, got '%s'", tcase, arg)
-			}
+		argsStr, parsedArgsStr := fmt.Sprintf("%s", args), fmt.Sprintf("%s", tcase.ParsedArgs)
+		if argsStr != parsedArgsStr {
+			t.Errorf("args do not match parsed args. got: '%s', expected: '%s'", argsStr, parsedArgsStr)
 		}
-		for i, c := range command {
-			if c != tcase.Command[i] {
-				t.Fatalf("command does not match expected command. %v, got: '%v'", tcase, command)
-			}
-		}
-	}
-}
 
-func TestParseSSHArgsError(t *testing.T) {
-	_, _, err := parseSSHArgs([]string{"-X", "test", "-Y"})
-	if err == nil {
-		t.Error("expected an error for invalid args")
+		commandStr, parsedCommandStr := fmt.Sprintf("%s", command), fmt.Sprintf("%s", tcase.Command)
+		if commandStr != parsedCommandStr {
+			t.Errorf("command does not match parsed command. got: '%s', expected: '%s'", commandStr, parsedCommandStr)
+		}
 	}
 }

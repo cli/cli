@@ -67,23 +67,19 @@ func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 // parseSSHArgs parses SSH arguments into two distinct slices of flags
 // and command. It returns an error if flags are found after a command
 // or if a unary flag is provided without an argument.
-func parseSSHArgs(args []string) ([]string, []string, error) {
-	var (
-		cmdArgs []string
-		command []string
-	)
-
+func parseSSHArgs(args []string) (cmdArgs []string, command []string, err error) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
-		if strings.HasPrefix(arg, "-") {
-			if command != nil {
-				return nil, nil, fmt.Errorf("invalid flag after command: %s", arg)
-			}
+		if command != nil {
+			command = append(command, arg)
+			continue
+		}
 
+		if strings.HasPrefix(arg, "-") {
 			cmdArgs = append(cmdArgs, arg)
-			if strings.Contains("bcDeFIiLlmOopRSWw", arg[1:2]) {
+			if len(arg) == 2 && strings.Contains("bcDeFIiLlmOopRSWw", arg[1:2]) {
 				if i++; i == len(args) {
-					return nil, nil, fmt.Errorf("invalid unary flag without argument: %s", arg)
+					return nil, nil, fmt.Errorf("ssh flag: %s requires an argument", arg)
 				}
 
 				cmdArgs = append(cmdArgs, args[i])
