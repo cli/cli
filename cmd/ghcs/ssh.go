@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 import (
 	"context"
@@ -30,10 +30,6 @@ func newSSHCmd() *cobra.Command {
 	sshCmd.Flags().StringVarP(&codespaceName, "codespace", "c", "", "Name of the codespace")
 
 	return sshCmd
-}
-
-func init() {
-	rootCmd.AddCommand(newSSHCmd())
 }
 
 func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPort int) error {

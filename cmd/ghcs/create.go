@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 import (
 	"context"
@@ -40,10 +40,6 @@ func newCreateCmd() *cobra.Command {
 	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
 
 	return createCmd
-}
-
-func init() {
-	rootCmd.AddCommand(newCreateCmd())
 }
 
 func create(opts *createOptions) error {

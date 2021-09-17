@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 import (
 	"context"
@@ -30,10 +30,6 @@ func newCodeCmd() *cobra.Command {
 	codeCmd.Flags().BoolVar(&useInsiders, "insiders", false, "Use the insiders version of VS Code")
 
 	return codeCmd
-}
-
-func init() {
-	rootCmd.AddCommand(newCodeCmd())
 }
 
 func code(codespaceName string, useInsiders bool) error {

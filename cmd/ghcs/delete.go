@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 import (
 	"context"
@@ -45,10 +45,6 @@ func newDeleteCmd() *cobra.Command {
 	deleteCmd.Flags().BoolVarP(&force, "force", "f", false, "Delete codespaces with unsaved changes without confirmation")
 
 	return deleteCmd
-}
-
-func init() {
-	rootCmd.AddCommand(newDeleteCmd())
 }
 
 func delete_(log *output.Logger, codespaceName string, force bool) error {

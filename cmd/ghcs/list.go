@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 import (
 	"context"
@@ -29,10 +29,6 @@ func newListCmd() *cobra.Command {
 	listCmd.Flags().BoolVar(&opts.asJSON, "json", false, "Output as JSON")
 
 	return listCmd
-}
-
-func init() {
-	rootCmd.AddCommand(newListCmd())
 }
 
 func list(opts *listOptions) error {

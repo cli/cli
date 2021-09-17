@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 import (
 	"context"
@@ -34,10 +34,6 @@ func newLogsCmd() *cobra.Command {
 	logsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Tail and follow the logs")
 
 	return logsCmd
-}
-
-func init() {
-	rootCmd.AddCommand(newLogsCmd())
 }
 
 func logs(ctx context.Context, log *output.Logger, codespaceName string, follow bool) error {

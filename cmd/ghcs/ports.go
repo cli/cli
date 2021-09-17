@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 import (
 	"bytes"
@@ -45,10 +45,6 @@ func newPortsCmd() *cobra.Command {
 	portsCmd.AddCommand(newPortsForwardCmd())
 
 	return portsCmd
-}
-
-func init() {
-	rootCmd.AddCommand(newPortsCmd())
 }
 
 func ports(codespaceName string, asJSON bool) error {
