@@ -191,7 +191,7 @@ func deleteByRepo(log *output.Logger, repo string, force bool) error {
 		return err
 	}
 
-	return list(&listOptions{})
+	return nil
 }
 
 func confirmDeletion(codespace *api.Codespace, force bool) (bool, error) {
