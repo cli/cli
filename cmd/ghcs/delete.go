@@ -150,7 +150,8 @@ func deleteByRepo(log *output.Logger, repo string, force bool) error {
 		return nil
 	}
 
-	// Perform deletions in parallel.
+	// Perform deletions in parallel, for performance,
+	// and to ensure all are attempted even if any one fails.
 	var (
 		found bool
 		mu    sync.Mutex // guards errs, logger
