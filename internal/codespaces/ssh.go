@@ -45,15 +45,15 @@ func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 	// the flags and their arities.
 	cmdArgs, command, err := parseSSHArgs(cmdArgs)
 	if err != nil {
-		return nil, []string{}, err
+		return nil, nil, err
 	}
 
 	cmdArgs = append(cmdArgs, connArgs...)
 	cmdArgs = append(cmdArgs, "-C") // Compression
 	cmdArgs = append(cmdArgs, dst)  // user@host
 
-	if command != "" {
-		cmdArgs = append(cmdArgs, command)
+	if command != nil {
+		cmdArgs = append(cmdArgs, command...)
 	}
 
 	cmd := exec.CommandContext(ctx, "ssh", cmdArgs...)
@@ -64,33 +64,34 @@ func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 	return cmd, connArgs, nil
 }
 
-var sshArgumentFlags = "-b-c-D-e-F-I-i-L-l-m-O-o-p-R-S-W-w"
-
-func parseSSHArgs(sshArgs []string) ([]string, string, error) {
+// parseSSHArgs parses SSH arguments into two distinct slices of flags
+// and command. It returns an error if flags are found after a command
+// or if a unary flag is provided without an argument.
+func parseSSHArgs(args []string) ([]string, []string, error) {
 	var (
-		cmdArgs      []string
-		command      []string
-		flagArgument bool
+		cmdArgs []string
+		command []string
 	)
 
-	for _, arg := range sshArgs {
-		switch {
-		case strings.HasPrefix(arg, "-"):
-			if len(command) > 0 {
-				return []string{}, "", fmt.Errorf("invalid flag after command: %s", arg)
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if strings.HasPrefix(arg, "-") {
+			if command != nil {
+				return nil, nil, fmt.Errorf("invalid flag after command: %s", arg)
 			}
 
 			cmdArgs = append(cmdArgs, arg)
-			if strings.Contains(sshArgumentFlags, arg) {
-				flagArgument = true
+			if strings.Contains("bcDeFIiLlmOopRSWw", arg[1:2]) {
+				if i++; i == len(args) {
+					return nil, nil, fmt.Errorf("invalid unary flag without argument: %s", arg)
+				}
+
+				cmdArgs = append(cmdArgs, args[i])
 			}
-		case flagArgument:
-			cmdArgs = append(cmdArgs, arg)
-			flagArgument = false
-		default:
+		} else {
 			command = append(command, arg)
 		}
 	}
 
-	return cmdArgs, strings.Join(command, " "), nil
+	return cmdArgs, command, nil
 }
