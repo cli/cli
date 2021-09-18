@@ -70,9 +70,8 @@
         <!-- Broadcast environment variable changes -->
         <CustomActionRef Id="WixBroadcastEnvironmentChange" />
 
-        <!-- Use WixUI showing license and allowing user-specified INSTALLDIR -->
+        <!-- Use customized WixUI_InstallDir that removes WixUI_LicenseAgreementDlg -->
         <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR"/>
-        <UIRef Id="WixUI_InstallDir"/>
-        <WixVariable Id="WixUILicenseRtf" Value="LICENSE.rtf"/>
+        <UIRef Id="GitHubCLI_InstallDir"/>
     </Product>
 </Wix>
