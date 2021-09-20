@@ -20,7 +20,6 @@ func newRPCClient(conn io.ReadWriteCloser) *rpcClient {
 
 func (r *rpcClient) connect(ctx context.Context) {
 	stream := jsonrpc2.NewBufferedStream(r.conn, jsonrpc2.VSCodeObjectCodec{})
-	// TODO(adonovan): fix: ensure r.Conn is eventually Closed!
 	r.Conn = jsonrpc2.NewConn(ctx, stream, nullHandler{})
 }
 
@@ -30,7 +29,7 @@ func (r *rpcClient) do(ctx context.Context, method string, args, result interfac
 
 	waiter, err := r.Conn.DispatchCall(ctx, method, args)
 	if err != nil {
-		return fmt.Errorf("error dispatching %q call: %v", method, err)
+		return fmt.Errorf("error dispatching %q call: %w", method, err)
 	}
 
 	return waiter.Wait(ctx, result)

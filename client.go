@@ -58,18 +58,18 @@ func (c *Client) JoinWorkspace(ctx context.Context) (*Session, error) {
 
 	clientSocket := newSocket(c.connection, c.tlsConfig)
 	if err := clientSocket.connect(ctx); err != nil {
-		return nil, fmt.Errorf("error connecting websocket: %v", err)
+		return nil, fmt.Errorf("error connecting websocket: %w", err)
 	}
 
 	ssh := newSSHSession(c.connection.SessionToken, clientSocket)
 	if err := ssh.connect(ctx); err != nil {
-		return nil, fmt.Errorf("error connecting to ssh session: %v", err)
+		return nil, fmt.Errorf("error connecting to ssh session: %w", err)
 	}
 
 	rpc := newRPCClient(ssh)
 	rpc.connect(ctx)
 	if _, err := c.joinWorkspace(ctx, rpc); err != nil {
-		return nil, fmt.Errorf("error joining Live Share workspace: %v", err)
+		return nil, fmt.Errorf("error joining Live Share workspace: %w", err)
 	}
 
 	return &Session{ssh: ssh, rpc: rpc}, nil
@@ -108,7 +108,7 @@ func (c *Client) joinWorkspace(ctx context.Context, rpc *rpcClient) (*joinWorksp
 
 	var result joinWorkspaceResult
 	if err := rpc.do(ctx, "workspace.joinWorkspace", &args, &result); err != nil {
-		return nil, fmt.Errorf("error making workspace.joinWorkspace call: %v", err)
+		return nil, fmt.Errorf("error making workspace.joinWorkspace call: %w", err)
 	}
 
 	return &result, nil
@@ -125,7 +125,7 @@ func (s *Session) openStreamingChannel(ctx context.Context, id channelID) (ssh.C
 	}
 	var streamID string
 	if err := s.rpc.do(ctx, "streamManager.getStream", args, &streamID); err != nil {
-		return nil, fmt.Errorf("error getting stream id: %v", err)
+		return nil, fmt.Errorf("error getting stream id: %w", err)
 	}
 
 	span, ctx := opentracing.StartSpanFromContext(ctx, "Session.OpenChannel+SendRequest")
@@ -133,13 +133,13 @@ func (s *Session) openStreamingChannel(ctx context.Context, id channelID) (ssh.C
 
 	channel, reqs, err := s.ssh.conn.OpenChannel("session", nil)
 	if err != nil {
-		return nil, fmt.Errorf("error opening ssh channel for transport: %v", err)
+		return nil, fmt.Errorf("error opening ssh channel for transport: %w", err)
 	}
 	go ssh.DiscardRequests(reqs)
 
 	requestType := fmt.Sprintf("stream-transport-%s", streamID)
 	if _, err = channel.SendRequest(requestType, true, nil); err != nil {
-		return nil, fmt.Errorf("error sending channel request: %v", err)
+		return nil, fmt.Errorf("error sending channel request: %w", err)
 	}
 
 	return channel, nil

@@ -12,6 +12,20 @@ type Session struct {
 	rpc *rpcClient
 }
 
+// Close should be called by users to clean up RPC and SSH resources whenever the session
+// is no longer active.
+func (s *Session) Close() error {
+	if err := s.rpc.Close(); err != nil {
+		return fmt.Errorf("failed to close RPC conn: %w", err)
+	}
+
+	if err := s.ssh.Close(); err != nil {
+		return fmt.Errorf("failed to close SSH conn: %w", err)
+	}
+
+	return nil
+}
+
 // Port describes a port exposed by the container.
 type Port struct {
 	SourcePort                       int    `json:"sourcePort"`
@@ -22,9 +36,7 @@ type Port struct {
 	BrowseURL                        string `json:"browseUrl"`
 	IsPublic                         bool   `json:"isPublic"`
 	IsTCPServerConnectionEstablished bool   `json:"isTCPServerConnectionEstablished"`
-	HasTSLHandshakePassed            bool   `json:"hasTSLHandshakePassed"`
-	// ^^^
-	// TODO(adonovan): fix possible typo in field name, and audit others.
+	HasTLSHandshakePassed            bool   `json:"hasTLSHandshakePassed"`
 }
 
 // startSharing tells the Live Share host to start sharing the specified port from the container.

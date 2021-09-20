@@ -36,24 +36,24 @@ func (s *sshSession) connect(ctx context.Context) error {
 
 	sshClientConn, chans, reqs, err := ssh.NewClientConn(s.socket, "", &clientConfig)
 	if err != nil {
-		return fmt.Errorf("error creating ssh client connection: %v", err)
+		return fmt.Errorf("error creating ssh client connection: %w", err)
 	}
 	s.conn = sshClientConn
 
 	sshClient := ssh.NewClient(sshClientConn, chans, reqs)
 	s.Session, err = sshClient.NewSession()
 	if err != nil {
-		return fmt.Errorf("error creating ssh client session: %v", err)
+		return fmt.Errorf("error creating ssh client session: %w", err)
 	}
 
 	s.reader, err = s.Session.StdoutPipe()
 	if err != nil {
-		return fmt.Errorf("error creating ssh session reader: %v", err)
+		return fmt.Errorf("error creating ssh session reader: %w", err)
 	}
 
 	s.writer, err = s.Session.StdinPipe()
 	if err != nil {
-		return fmt.Errorf("error creating ssh session writer: %v", err)
+		return fmt.Errorf("error creating ssh session writer: %w", err)
 	}
 
 	return nil

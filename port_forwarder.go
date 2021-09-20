@@ -92,7 +92,7 @@ func (fwd *PortForwarder) Forward(ctx context.Context, conn io.ReadWriteCloser) 
 func (fwd *PortForwarder) shareRemotePort(ctx context.Context) (channelID, error) {
 	id, err := fwd.session.startSharing(ctx, fwd.name, fwd.remotePort)
 	if err != nil {
-		err = fmt.Errorf("failed to share remote port %d: %v", fwd.remotePort, err)
+		err = fmt.Errorf("failed to share remote port %d: %w", fwd.remotePort, err)
 	}
 	return id, nil
 }
@@ -115,7 +115,7 @@ func (fwd *PortForwarder) handleConnection(ctx context.Context, id channelID, co
 
 	channel, err := fwd.session.openStreamingChannel(ctx, id)
 	if err != nil {
-		return fmt.Errorf("error opening streaming channel for new connection: %v", err)
+		return fmt.Errorf("error opening streaming channel for new connection: %w", err)
 	}
 	// Ideally we would call safeClose again, but (*ssh.channel).Close
 	// appears to have a bug that causes it return io.EOF spuriously
