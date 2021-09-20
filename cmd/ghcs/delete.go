@@ -37,7 +37,7 @@ func newDeleteCmd() *cobra.Command {
 			case allCodespaces:
 				return deleteAll(log, force, keepThresholdDays)
 			case repo != "":
-				return deleteByRepo(log, repo, keepThresholdDays)
+				return deleteByRepo(log, repo, force, keepThresholdDays)
 			default:
 				return delete_(log, codespace, force)
 			}
@@ -133,7 +133,7 @@ func deleteAll(log *output.Logger, force bool, keepThresholdDays int) error {
 	return list(&listOptions{})
 }
 
-func deleteByRepo(log *output.Logger, repo string, keepThresholdDays int) error {
+func deleteByRepo(log *output.Logger, repo string, force bool, keepThresholdDays int) error {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 
