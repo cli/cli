@@ -36,7 +36,7 @@ type PostCreateState struct {
 // PollPostCreateStates watches for state changes in a codespace,
 // and calls the supplied poller for each batch of state changes.
 // It runs until it encounters an error, including cancellation of the context.
-func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, user *api.User, codespace *api.Codespace, poller func([]PostCreateState)) error {
+func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, user *api.User, codespace *api.Codespace, poller func([]PostCreateState)) (err error) {
 	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespace.Name)
 	if err != nil {
 		return fmt.Errorf("getting codespace token: %w", err)
@@ -46,6 +46,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 	if err != nil {
 		return fmt.Errorf("connect to Live Share: %w", err)
 	}
+	defer CloseSession(session, &err)
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
 	listen, err := net.Listen("tcp", ":0") // arbitrary port

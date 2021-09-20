@@ -40,7 +40,7 @@ func init() {
 	rootCmd.AddCommand(newLogsCmd())
 }
 
-func logs(ctx context.Context, log *output.Logger, codespaceName string, follow bool) error {
+func logs(ctx context.Context, log *output.Logger, codespaceName string, follow bool) (err error) {
 	// Ensure all child tasks (port forwarding, remote exec) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -61,6 +61,7 @@ func logs(ctx context.Context, log *output.Logger, codespaceName string, follow 
 	if err != nil {
 		return fmt.Errorf("connecting to Live Share: %w", err)
 	}
+	defer codespaces.CloseSession(session, &err)
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
 	listen, err := net.Listen("tcp", ":0") // arbitrary port

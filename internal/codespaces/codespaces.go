@@ -73,3 +73,11 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 
 	return lsclient.JoinWorkspace(ctx)
 }
+
+// CloseSession closes the Live Share session and assigns the error to the pointer if it is nil.
+func CloseSession(session *liveshare.Session, err *error) {
+	closeErr := session.Close()
+	if *err == nil {
+		*err = closeErr
+	}
+}

@@ -36,7 +36,7 @@ func init() {
 	rootCmd.AddCommand(newSSHCmd())
 }
 
-func ssh(ctx context.Context, sshArgs []string, sshProfile, codespaceName string, localSSHServerPort int) error {
+func ssh(ctx context.Context, sshArgs []string, sshProfile, codespaceName string, localSSHServerPort int) (err error) {
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -58,6 +58,7 @@ func ssh(ctx context.Context, sshArgs []string, sshProfile, codespaceName string
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
+	defer codespaces.CloseSession(session, &err)
 
 	log.Println("Fetching SSH Details...")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
