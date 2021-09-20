@@ -16,6 +16,7 @@ type Session struct {
 // is no longer active.
 func (s *Session) Close() error {
 	if err := s.rpc.Close(); err != nil {
+		s.ssh.Close() // close SSH and ignore error
 		return fmt.Errorf("failed to close RPC conn: %w", err)
 	}
 
