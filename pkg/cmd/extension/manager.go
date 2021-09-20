@@ -204,7 +204,7 @@ func (m *Manager) InstallBin(client *http.Client, repo ghrepo.Interface) error {
 	}
 
 	if asset == nil {
-		return fmt.Errorf("%s unsupported for %s. Open an issue: `gh issue create -R%s/%s -t'Support %s'`",
+		return fmt.Errorf("%s unsupported for %s. Open an issue: `gh issue create -R %s/%s -t'Support %s'`",
 			repo.RepoName(),
 			suffix, repo.RepoOwner(), repo.RepoName(), suffix)
 	}
