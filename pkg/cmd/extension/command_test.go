@@ -41,6 +41,9 @@ func TestNewCmdExtension(t *testing.T) {
 			args: []string{"install", "owner/gh-some-ext"},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.REST("GET", "repos/owner/gh-some-ext/releases/latest"),
+					httpmock.StatusStringResponse(404, "nope"))
+				reg.Register(
 					httpmock.REST("GET", "repos/owner/gh-some-ext/contents/gh-some-ext"),
 					httpmock.StringResponse("a script"))
 			},
@@ -65,11 +68,10 @@ func TestNewCmdExtension(t *testing.T) {
 			args: []string{"install", "owner/gh-bin-ext"},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/owner/gh-bin-ext/contents/gh-bin-ext"),
-					httpmock.StatusStringResponse(404, "no"))
-				reg.Register(
 					httpmock.REST("GET", "repos/owner/gh-bin-ext/releases/latest"),
-					httpmock.StringResponse("{}"))
+					httpmock.JSONResponse(release{
+						Assets: []releaseAsset{
+							{Name: "gh-foo-windows-amd64"}}}))
 			},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
 				em.ListFunc = func(bool) []extensions.Extension {
