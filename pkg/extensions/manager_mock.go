@@ -31,12 +31,6 @@ var _ ExtensionManager = &ExtensionManagerMock{}
 // 			InstallFunc: func(client *http.Client, interfaceMoqParam ghrepo.Interface, iOStreams *iostreams.IOStreams, configMoqParam config.Config) error {
 // 				panic("mock out the Install method")
 // 			},
-// 			InstallBinFunc: func(client *http.Client, interfaceMoqParam ghrepo.Interface) error {
-// 				panic("mock out the InstallBin method")
-// 			},
-// 			InstallGitFunc: func(s string, writer1 io.Writer, writer2 io.Writer) error {
-// 				panic("mock out the InstallGit method")
-// 			},
 // 			InstallLocalFunc: func(dir string) error {
 // 				panic("mock out the InstallLocal method")
 // 			},
@@ -64,12 +58,6 @@ type ExtensionManagerMock struct {
 
 	// InstallFunc mocks the Install method.
 	InstallFunc func(client *http.Client, interfaceMoqParam ghrepo.Interface, iOStreams *iostreams.IOStreams, configMoqParam config.Config) error
-
-	// InstallBinFunc mocks the InstallBin method.
-	InstallBinFunc func(client *http.Client, interfaceMoqParam ghrepo.Interface) error
-
-	// InstallGitFunc mocks the InstallGit method.
-	InstallGitFunc func(s string, writer1 io.Writer, writer2 io.Writer) error
 
 	// InstallLocalFunc mocks the InstallLocal method.
 	InstallLocalFunc func(dir string) error
@@ -112,22 +100,6 @@ type ExtensionManagerMock struct {
 			// ConfigMoqParam is the configMoqParam argument value.
 			ConfigMoqParam config.Config
 		}
-		// InstallBin holds details about calls to the InstallBin method.
-		InstallBin []struct {
-			// Client is the client argument value.
-			Client *http.Client
-			// InterfaceMoqParam is the interfaceMoqParam argument value.
-			InterfaceMoqParam ghrepo.Interface
-		}
-		// InstallGit holds details about calls to the InstallGit method.
-		InstallGit []struct {
-			// S is the s argument value.
-			S string
-			// Writer1 is the writer1 argument value.
-			Writer1 io.Writer
-			// Writer2 is the writer2 argument value.
-			Writer2 io.Writer
-		}
 		// InstallLocal holds details about calls to the InstallLocal method.
 		InstallLocal []struct {
 			// Dir is the dir argument value.
@@ -158,8 +130,6 @@ type ExtensionManagerMock struct {
 	lockCreate       sync.RWMutex
 	lockDispatch     sync.RWMutex
 	lockInstall      sync.RWMutex
-	lockInstallBin   sync.RWMutex
-	lockInstallGit   sync.RWMutex
 	lockInstallLocal sync.RWMutex
 	lockList         sync.RWMutex
 	lockRemove       sync.RWMutex
@@ -280,80 +250,6 @@ func (mock *ExtensionManagerMock) InstallCalls() []struct {
 	mock.lockInstall.RLock()
 	calls = mock.calls.Install
 	mock.lockInstall.RUnlock()
-	return calls
-}
-
-// InstallBin calls InstallBinFunc.
-func (mock *ExtensionManagerMock) InstallBin(client *http.Client, interfaceMoqParam ghrepo.Interface) error {
-	if mock.InstallBinFunc == nil {
-		panic("ExtensionManagerMock.InstallBinFunc: method is nil but ExtensionManager.InstallBin was just called")
-	}
-	callInfo := struct {
-		Client            *http.Client
-		InterfaceMoqParam ghrepo.Interface
-	}{
-		Client:            client,
-		InterfaceMoqParam: interfaceMoqParam,
-	}
-	mock.lockInstallBin.Lock()
-	mock.calls.InstallBin = append(mock.calls.InstallBin, callInfo)
-	mock.lockInstallBin.Unlock()
-	return mock.InstallBinFunc(client, interfaceMoqParam)
-}
-
-// InstallBinCalls gets all the calls that were made to InstallBin.
-// Check the length with:
-//     len(mockedExtensionManager.InstallBinCalls())
-func (mock *ExtensionManagerMock) InstallBinCalls() []struct {
-	Client            *http.Client
-	InterfaceMoqParam ghrepo.Interface
-} {
-	var calls []struct {
-		Client            *http.Client
-		InterfaceMoqParam ghrepo.Interface
-	}
-	mock.lockInstallBin.RLock()
-	calls = mock.calls.InstallBin
-	mock.lockInstallBin.RUnlock()
-	return calls
-}
-
-// InstallGit calls InstallGitFunc.
-func (mock *ExtensionManagerMock) InstallGit(s string, writer1 io.Writer, writer2 io.Writer) error {
-	if mock.InstallGitFunc == nil {
-		panic("ExtensionManagerMock.InstallGitFunc: method is nil but ExtensionManager.InstallGit was just called")
-	}
-	callInfo := struct {
-		S       string
-		Writer1 io.Writer
-		Writer2 io.Writer
-	}{
-		S:       s,
-		Writer1: writer1,
-		Writer2: writer2,
-	}
-	mock.lockInstallGit.Lock()
-	mock.calls.InstallGit = append(mock.calls.InstallGit, callInfo)
-	mock.lockInstallGit.Unlock()
-	return mock.InstallGitFunc(s, writer1, writer2)
-}
-
-// InstallGitCalls gets all the calls that were made to InstallGit.
-// Check the length with:
-//     len(mockedExtensionManager.InstallGitCalls())
-func (mock *ExtensionManagerMock) InstallGitCalls() []struct {
-	S       string
-	Writer1 io.Writer
-	Writer2 io.Writer
-} {
-	var calls []struct {
-		S       string
-		Writer1 io.Writer
-		Writer2 io.Writer
-	}
-	mock.lockInstallGit.RLock()
-	calls = mock.calls.InstallGit
-	mock.lockInstallGit.RUnlock()
 	return calls
 }
 

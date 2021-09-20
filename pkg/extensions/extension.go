@@ -22,8 +22,6 @@ type Extension interface {
 type ExtensionManager interface {
 	List(includeMetadata bool) []Extension
 	Install(*http.Client, ghrepo.Interface, *iostreams.IOStreams, config.Config) error
-	InstallBin(*http.Client, ghrepo.Interface) error
-	InstallGit(string, io.Writer, io.Writer) error
 	InstallLocal(dir string) error
 	Upgrade(name string, force bool, stdout, stderr io.Writer) error
 	Remove(name string) error

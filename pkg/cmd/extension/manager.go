@@ -195,7 +195,7 @@ func (m *Manager) Install(client *http.Client, repo ghrepo.Interface, io *iostre
 		return fmt.Errorf("could not check for binary extension: %w", err)
 	}
 	if isBin {
-		return m.InstallBin(client, repo)
+		return m.installBin(client, repo)
 	}
 
 	hs, err := hasScript(client, repo)
@@ -208,10 +208,10 @@ func (m *Manager) Install(client *http.Client, repo ghrepo.Interface, io *iostre
 	}
 
 	protocol, _ := cfg.Get(repo.RepoHost(), "git_protocol")
-	return m.InstallGit(ghrepo.FormatRemoteURL(repo, protocol), io.Out, io.ErrOut)
+	return m.installGit(ghrepo.FormatRemoteURL(repo, protocol), io.Out, io.ErrOut)
 }
 
-func (m *Manager) InstallBin(client *http.Client, repo ghrepo.Interface) error {
+func (m *Manager) installBin(client *http.Client, repo ghrepo.Interface) error {
 	var r *release
 	r, err := fetchLatestRelease(client, repo)
 	if err != nil {
@@ -276,7 +276,7 @@ func (m *Manager) InstallBin(client *http.Client, repo ghrepo.Interface) error {
 	return nil
 }
 
-func (m *Manager) InstallGit(cloneURL string, stdout, stderr io.Writer) error {
+func (m *Manager) installGit(cloneURL string, stdout, stderr io.Writer) error {
 	exe, err := m.lookPath("git")
 	if err != nil {
 		return err
