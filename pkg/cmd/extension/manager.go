@@ -185,6 +185,7 @@ type BinManifest struct {
 	Name  string
 	Host  string
 	// TODO I may end up not using this; just thinking ahead to local installs
+	// TODO track version
 	Path string
 }
 

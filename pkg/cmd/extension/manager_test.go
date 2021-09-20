@@ -12,8 +12,10 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
@@ -197,19 +199,40 @@ func TestManager_Upgrade_NoExtensions(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 }
 
-func TestManager_InstallGit(t *testing.T) {
+func TestManager_Install_git(t *testing.T) {
 	tempDir := t.TempDir()
 	m := newTestManager(tempDir)
 
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	err := m.InstallGit("https://github.com/owner/gh-some-ext.git", stdout, stderr)
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+	client := http.Client{Transport: &reg}
+
+	reg.Register(
+		httpmock.REST("GET", "repos/owner/gh-some-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Assets: []releaseAsset{
+					{
+						Name:   "not-a-binary",
+						APIURL: "https://example.com/release/cool",
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "repos/owner/gh-some-ext/contents/gh-some-ext"),
+		httpmock.StringResponse("script"))
+
+	io, _, stdout, stderr := iostreams.Test()
+
+	repo := ghrepo.New("owner", "gh-some-ext")
+
+	err := m.Install(&client, repo, io, config.NewBlankConfig())
 	assert.NoError(t, err)
 	assert.Equal(t, fmt.Sprintf("[git clone https://github.com/owner/gh-some-ext.git %s]\n", filepath.Join(tempDir, "extensions", "gh-some-ext")), stdout.String())
 	assert.Equal(t, "", stderr.String())
 }
 
-func TestManager_InstallBin(t *testing.T) {
+func TestManager_Install_binary(t *testing.T) {
 	repo := ghrepo.NewWithHost("owner", "gh-bin-ext", "example.com")
 
 	reg := httpmock.Registry{}
@@ -228,13 +251,26 @@ func TestManager_InstallBin(t *testing.T) {
 				},
 			}))
 	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-windows-amd64",
+						APIURL: "https://example.com/release/cool",
+					},
+				},
+			}))
+	reg.Register(
 		httpmock.REST("GET", "release/cool"),
 		httpmock.StringResponse("FAKE BINARY"))
 
 	tempDir := t.TempDir()
 	m := newTestManager(tempDir)
 
-	err := m.InstallBin(&client, repo)
+	io, _, _, _ := iostreams.Test()
+
+	err := m.Install(&client, repo, io, config.NewBlankConfig())
 	assert.NoError(t, err)
 
 	manifest, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/manifest.yml"))
