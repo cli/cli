@@ -19,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/findsh"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/safeexec"
 	"gopkg.in/yaml.v3"
 )
@@ -185,6 +186,28 @@ type BinManifest struct {
 	Host  string
 	// TODO I may end up not using this; just thinking ahead to local installs
 	Path string
+}
+
+func (m *Manager) Install(client *http.Client, repo ghrepo.Interface, io *iostreams.IOStreams, cfg config.Config) error {
+	isBin, err := isBinExtension(client, repo)
+	if err != nil {
+		return fmt.Errorf("could not check for binary extension: %w", err)
+	}
+	if isBin {
+		return m.InstallBin(client, repo)
+	}
+
+	hs, err := hasScript(client, repo)
+	if err != nil {
+		return err
+	}
+	if !hs {
+		// TODO open an issue hint, here?
+		return errors.New("extension is uninstallable: missing executable")
+	}
+
+	protocol, _ := cfg.Get(repo.RepoHost(), "git_protocol")
+	return m.InstallGit(ghrepo.FormatRemoteURL(repo, protocol), io.Out, io.ErrOut)
 }
 
 func (m *Manager) InstallBin(client *http.Client, repo ghrepo.Interface) error {

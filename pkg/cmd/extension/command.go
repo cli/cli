@@ -105,38 +105,20 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return err
 				}
 				if err := checkValidExtension(cmd.Root(), m, repo.RepoName()); err != nil {
-					// TODO i feel like this should check for a gh-foo script
 					return err
 				}
-
 				client, err := f.HttpClient()
 				if err != nil {
 					return fmt.Errorf("could not make http client: %w", err)
 				}
 				client = api.NewCachedClient(client, time.Second*30)
 
-				isBin, err := isBinExtension(client, repo)
-				if err != nil {
-					return fmt.Errorf("could not check for binary extension: %w", err)
-				}
-				if isBin {
-					return m.InstallBin(client, repo)
-				}
-
-				hs, err := hasScript(client, repo)
-				if err != nil {
-					return err
-				}
-				if !hs {
-					return errors.New("extension is uninstallable: missing executable")
-				}
-
 				cfg, err := f.Config()
 				if err != nil {
 					return err
 				}
-				protocol, _ := cfg.Get(repo.RepoHost(), "git_protocol")
-				return m.InstallGit(ghrepo.FormatRemoteURL(repo, protocol), io.Out, io.ErrOut)
+
+				return m.Install(client, repo, io, cfg)
 			},
 		},
 		func() *cobra.Command {

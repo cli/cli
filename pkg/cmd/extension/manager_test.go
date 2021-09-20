@@ -44,7 +44,7 @@ func newTestManager(dir string) *Manager {
 			return cmd
 		},
 		platform: func() string {
-			return "amiga-arm64"
+			return "windows-amd64"
 		},
 	}
 }
@@ -222,7 +222,7 @@ func TestManager_InstallBin(t *testing.T) {
 			release{
 				Assets: []releaseAsset{
 					{
-						Name:   "gh-bin-ext-amiga-arm64",
+						Name:   "gh-bin-ext-windows-amd64",
 						APIURL: "https://example.com/release/cool",
 					},
 				},
