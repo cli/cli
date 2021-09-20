@@ -13,6 +13,7 @@ package api
 // - github.GetUser(github.Client)
 // - github.GetRepository(Client)
 // - github.ReadFile(Client, nwo, branch, path) // was GetCodespaceRepositoryContents
+// - github.AuthorizedKeys(Client, user)
 // - codespaces.Create(Client, user, repo, sku, branch, location)
 // - codespaces.Delete(Client, user, token, name)
 // - codespaces.Get(Client, token, owner, name)
@@ -505,6 +506,31 @@ func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Cod
 	}
 
 	return decoded, nil
+}
+
+// AuthorizedKeys returns the public keys (in ~/.ssh/authorized_keys
+// format) registered by the specified GitHub user.
+func (a *API) AuthorizedKeys(ctx context.Context, user string) ([]byte, error) {
+	url := fmt.Sprintf("https://github.com/%s.keys", user)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := a.do(ctx, req, "/user.keys")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned %s", resp.Status)
+	}
+	return b, nil
 }
 
 func (a *API) do(ctx context.Context, req *http.Request, spanName string) (*http.Response, error) {

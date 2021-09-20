@@ -49,6 +49,23 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 		return fmt.Errorf("error getting user: %w", err)
 	}
 
+	// Check whether the user has registered any SSH keys.
+	// See https://github.com/github/ghcs/issues/166#issuecomment-921769703
+	checkAuthKeys := func(user string) error {
+		keys, err := apiClient.AuthorizedKeys(ctx, user)
+		if err != nil {
+			return fmt.Errorf("failed to read GitHub-authorized SSH keys for %s: %w", user, err)
+		}
+		if len(keys) == 0 {
+			return fmt.Errorf("user %s has no GitHub-authorized SSH keys", user)
+		}
+		return nil // success
+	}
+	authkeys := make(chan error, 1)
+	go func() {
+		authkeys <- checkAuthKeys(user.Login)
+	}()
+
 	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
 		return fmt.Errorf("get or choose codespace: %w", err)
@@ -57,6 +74,10 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
+	}
+
+	if err := <-authkeys; err != nil {
+		return err
 	}
 
 	log.Println("Fetching SSH Details...")
