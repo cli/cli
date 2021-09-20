@@ -28,7 +28,6 @@ func TestNewCmdExtension(t *testing.T) {
 	tests := []struct {
 		name         string
 		args         []string
-		httpStubs    func(*httpmock.Registry)
 		managerStubs func(em *extensions.ExtensionManagerMock) func(*testing.T)
 		isTTY        bool
 		wantErr      bool
@@ -37,53 +36,19 @@ func TestNewCmdExtension(t *testing.T) {
 		wantStderr   string
 	}{
 		{
-			name: "install a git extension",
+			name: "install an extension",
 			args: []string{"install", "owner/gh-some-ext"},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("GET", "repos/owner/gh-some-ext/releases/latest"),
-					httpmock.StatusStringResponse(404, "nope"))
-				reg.Register(
-					httpmock.REST("GET", "repos/owner/gh-some-ext/contents/gh-some-ext"),
-					httpmock.StringResponse("a script"))
-			},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
 				em.ListFunc = func(bool) []extensions.Extension {
 					return []extensions.Extension{}
 				}
-				em.InstallGitFunc = func(s string, out, errOut io.Writer) error {
+				em.InstallFunc = func(_ *http.Client, _ ghrepo.Interface, _ *iostreams.IOStreams, _ config.Config) error {
 					return nil
 				}
 				return func(t *testing.T) {
-					installCalls := em.InstallGitCalls()
+					installCalls := em.InstallCalls()
 					assert.Equal(t, 1, len(installCalls))
-					assert.Equal(t, "https://github.com/owner/gh-some-ext.git", installCalls[0].URL)
-					listCalls := em.ListCalls()
-					assert.Equal(t, 1, len(listCalls))
-				}
-			},
-		},
-		{
-			name: "install a binary extension",
-			args: []string{"install", "owner/gh-bin-ext"},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("GET", "repos/owner/gh-bin-ext/releases/latest"),
-					httpmock.JSONResponse(release{
-						Assets: []releaseAsset{
-							{Name: "gh-foo-windows-amd64"}}}))
-			},
-			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.ListFunc = func(bool) []extensions.Extension {
-					return []extensions.Extension{}
-				}
-				em.InstallBinFunc = func(_ *http.Client, _ ghrepo.Interface) error {
-					return nil
-				}
-				return func(t *testing.T) {
-					installCalls := em.InstallBinCalls()
-					assert.Equal(t, 1, len(installCalls))
-					assert.Equal(t, "gh-bin-ext", installCalls[0].Repo.RepoName())
+					assert.Equal(t, "gh-some-ext", installCalls[0].InterfaceMoqParam.RepoName())
 					listCalls := em.ListCalls()
 					assert.Equal(t, 1, len(listCalls))
 				}
@@ -322,10 +287,6 @@ func TestNewCmdExtension(t *testing.T) {
 			reg := httpmock.Registry{}
 			defer reg.Verify(t)
 			client := http.Client{Transport: &reg}
-
-			if tt.httpStubs != nil {
-				tt.httpStubs(&reg)
-			}
 
 			f := cmdutil.Factory{
 				Config: func() (config.Config, error) {
