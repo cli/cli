@@ -11,7 +11,7 @@ import (
 )
 
 func shouldUseSearch(filters prShared.FilterOptions) bool {
-	return filters.Draft != nil || filters.Author != "" || filters.Assignee != "" || filters.Search != "" || len(filters.Labels) > 0
+	return filters.Draft != "" || filters.Author != "" || filters.Assignee != "" || filters.Search != "" || len(filters.Labels) > 0
 }
 
 func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.PullRequestAndTotalCount, error) {
@@ -181,8 +181,8 @@ func searchPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters 
 		q.SetBaseBranch(filters.BaseBranch)
 	}
 
-	if filters.Draft != nil {
-		q.SetDraft(*filters.Draft)
+	if filters.Draft != "" {
+		q.SetDraft(filters.Draft)
 	}
 
 	pageLimit := min(limit, 100)

@@ -37,17 +37,17 @@ type ListOptions struct {
 	Author     string
 	Assignee   string
 	Search     string
-	Draft      *bool
+	Draft      string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
-	draft := false
 	opts := &ListOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
-		Draft:      &draft,
 	}
+
+	var draft bool
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -77,8 +77,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return &cmdutil.FlagError{Err: fmt.Errorf("invalid value for --limit: %v", opts.LimitResults)}
 			}
 
-			if !cmd.Flags().Changed("draft") {
-				opts.Draft = nil
+			if cmd.Flags().Changed("draft") {
+				opts.Draft = strconv.FormatBool(draft)
 			}
 
 			if runF != nil {
@@ -99,7 +99,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
-	cmd.Flags().BoolVar(opts.Draft, "draft", false, "Filter by draft/non-draft")
+	cmd.Flags().BoolVarP(&draft, "draft", "d", false, "Filter by draft state")
 
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 

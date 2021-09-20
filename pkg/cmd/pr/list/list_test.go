@@ -183,15 +183,16 @@ func TestPRList_filteringDraft(t *testing.T) {
 		expectedQuery string
 	}{
 		{
-			"draft",
-			"--draft=1",
-			`repo:OWNER/REPO is:pr is:open draft:true`,
+			name:          "draft",
+			cli:           "--draft",
+			expectedQuery: `repo:OWNER/REPO is:pr is:open draft:true`,
 		},
 		{
-			"non-draft",
-			"--draft=false",
-			`repo:OWNER/REPO is:pr is:open draft:false`,
-		}}
+			name:          "non-draft",
+			cli:           "--draft=false",
+			expectedQuery: `repo:OWNER/REPO is:pr is:open draft:false`,
+		},
+	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -210,16 +211,13 @@ func TestPRList_filteringDraft(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func TestPRList_withInvalidLimitFlag(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
-
 	_, err := runCommand(http, true, `--limit=0`)
-	assert.NotNil(t, err)
-	assert.Equal(t, err.Error(), "invalid value for --limit: 0")
+	assert.EqualError(t, err, "invalid value for --limit: 0")
 }
 
 func TestPRList_web(t *testing.T) {
@@ -229,19 +227,19 @@ func TestPRList_web(t *testing.T) {
 		expectedBrowserURL string
 	}{
 		{
-			"test",
-			"-a peter -l bug -l docs -L 10 -s merged -B trunk",
-			"https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk",
+			name:               "filters",
+			cli:                "-a peter -l bug -l docs -L 10 -s merged -B trunk",
+			expectedBrowserURL: "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk",
 		},
 		{
-			"draft",
-			"--draft=true",
-			"https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Aopen+draft%3Atrue",
+			name:               "draft",
+			cli:                "--draft=true",
+			expectedBrowserURL: "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Aopen+draft%3Atrue",
 		},
 		{
-			"non-draft",
-			"--draft=0",
-			"https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Aopen+draft%3Afalse",
+			name:               "non-draft",
+			cli:                "--draft=0",
+			expectedBrowserURL: "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Aopen+draft%3Afalse",
 		},
 	}
 
@@ -263,5 +261,4 @@ func TestPRList_web(t *testing.T) {
 			assert.Equal(t, test.expectedBrowserURL, output.BrowsedURL)
 		})
 	}
-
 }
