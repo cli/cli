@@ -261,7 +261,7 @@ func filterCodespacesToDelete(codespaces []*api.Codespace, keepThresholdDays int
 		if err != nil {
 			return nil, fmt.Errorf("error parsing last used at date: %w", err)
 		}
-		if t.Before(now().AddDate(0, 0, -keepThresholdDays)) && codespace.Environment.State == "Shutdown" {
+		if t.Before(now().AddDate(0, 0, -keepThresholdDays)) {
 			codespacesToDelete = append(codespacesToDelete, codespace)
 		}
 	}
