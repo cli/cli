@@ -15,16 +15,14 @@ type Session struct {
 // Close should be called by users to clean up RPC and SSH resources whenever the session
 // is no longer active.
 func (s *Session) Close() error {
-	if err := s.rpc.Close(); err != nil {
+	// Closing the RPC conn closes the underlying stream (SSH)
+	// So we only need to close once
+	err := s.rpc.Close()
+	if err != nil {
 		s.ssh.Close() // close SSH and ignore error
-		return fmt.Errorf("failed to close RPC conn: %w", err)
 	}
 
-	if err := s.ssh.Close(); err != nil {
-		return fmt.Errorf("failed to close SSH conn: %w", err)
-	}
-
-	return nil
+	return err
 }
 
 // Port describes a port exposed by the container.
