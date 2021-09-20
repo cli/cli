@@ -22,7 +22,10 @@ func chooseCodespace(ctx context.Context, apiClient *api.API, user *api.User) (*
 	if err != nil {
 		return nil, fmt.Errorf("error getting codespaces: %w", err)
 	}
+	return chooseCodespaceFromList(ctx, codespaces)
+}
 
+func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (*api.Codespace, error) {
 	if len(codespaces) == 0 {
 		return nil, errNoCodespaces
 	}
