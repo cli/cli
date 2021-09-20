@@ -177,6 +177,19 @@ func deleteByRepo(log *output.Logger, repo string, keepThresholdDays int) error 
 		if !strings.EqualFold(c.RepositoryNWO, repo) {
 			continue
 		}
+
+		confirmed, err := confirmDeletion(c, force)
+		if err != nil {
+			mu.Lock()
+			errs = append(errs, fmt.Errorf("deletion could not be confirmed: %w", err))
+			mu.Unlock()
+			continue
+		}
+
+		if !confirmed {
+			continue
+		}
+
 		found = true
 		c := c
 		wg.Add(1)
@@ -206,7 +219,7 @@ func deleteByRepo(log *output.Logger, repo string, keepThresholdDays int) error 
 		return err
 	}
 
-	return list(&listOptions{})
+	return nil
 }
 
 func confirmDeletion(codespace *api.Codespace, force bool) (bool, error) {
