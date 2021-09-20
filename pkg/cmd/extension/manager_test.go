@@ -254,6 +254,7 @@ func TestManager_Install_binary(t *testing.T) {
 		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
 		httpmock.JSONResponse(
 			release{
+				Tag: "v1.0.1",
 				Assets: []releaseAsset{
 					{
 						Name:   "gh-bin-ext-windows-amd64",
@@ -276,14 +277,15 @@ func TestManager_Install_binary(t *testing.T) {
 	manifest, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/manifest.yml"))
 	assert.NoError(t, err)
 
-	var bm BinManifest
+	var bm binManifest
 	err = yaml.Unmarshal(manifest, &bm)
 	assert.NoError(t, err)
 
-	assert.Equal(t, BinManifest{
+	assert.Equal(t, binManifest{
 		Name:  "gh-bin-ext",
 		Owner: "owner",
 		Host:  "example.com",
+		Tag:   "v1.0.1",
 		Path:  filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext"),
 	}, bm)
 

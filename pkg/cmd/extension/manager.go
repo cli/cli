@@ -180,12 +180,12 @@ func (m *Manager) InstallLocal(dir string) error {
 	return makeSymlink(dir, targetLink)
 }
 
-type BinManifest struct {
+type binManifest struct {
 	Owner string
 	Name  string
 	Host  string
+	Tag   string
 	// TODO I may end up not using this; just thinking ahead to local installs
-	// TODO track version
 	Path string
 }
 
@@ -248,11 +248,12 @@ func (m *Manager) installBin(client *http.Client, repo ghrepo.Interface) error {
 		return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
 	}
 
-	manifest := BinManifest{
+	manifest := binManifest{
 		Name:  name,
 		Owner: repo.RepoOwner(),
 		Host:  repo.RepoHost(),
 		Path:  binPath,
+		Tag:   r.Tag,
 	}
 
 	bs, err := yaml.Marshal(manifest)

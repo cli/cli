@@ -47,6 +47,7 @@ type releaseAsset struct {
 }
 
 type release struct {
+	Tag    string `json:"tag_name"`
 	Assets []releaseAsset
 }
 
