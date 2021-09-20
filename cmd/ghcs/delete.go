@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/github/ghcs/cmd/ghcs/output"
@@ -132,7 +133,27 @@ func deleteByRepo(log *output.Logger, repo string, force bool) error {
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}
 
-	var deleted bool
+	delete := func(name string) error {
+		token, err := apiClient.GetCodespaceToken(ctx, user.Login, name)
+		if err != nil {
+			return fmt.Errorf("error getting codespace token: %w", err)
+		}
+
+		if err := apiClient.DeleteCodespace(ctx, user, token, name); err != nil {
+			return fmt.Errorf("error deleting codespace: %w", err)
+		}
+
+		return nil
+	}
+
+	// Perform deletions in parallel, for performance,
+	// and to ensure all are attempted even if any one fails.
+	var (
+		found bool
+		mu    sync.Mutex // guards errs, logger
+		errs  []error
+		wg    sync.WaitGroup
+	)
 	for _, c := range codespaces {
 		if !strings.EqualFold(c.RepositoryNWO, repo) {
 			continue
@@ -140,32 +161,46 @@ func deleteByRepo(log *output.Logger, repo string, force bool) error {
 
 		confirmed, err := confirmDeletion(c, force)
 		if err != nil {
-			return fmt.Errorf("deletion could not be confirmed: %w", err)
+			mu.Lock()
+			errs = append(errs, fmt.Errorf("deletion could not be confirmed: %w", err))
+			mu.Unlock()
+			continue
 		}
 
 		if !confirmed {
 			continue
 		}
 
-		deleted = true
-
-		token, err := apiClient.GetCodespaceToken(ctx, user.Login, c.Name)
-		if err != nil {
-			return fmt.Errorf("error getting codespace token: %w", err)
-		}
-
-		if err := apiClient.DeleteCodespace(ctx, user, token, c.Name); err != nil {
-			return fmt.Errorf("error deleting codespace: %w", err)
-		}
-
-		log.Printf("Codespace deleted: %s\n", c.Name)
+		found = true
+		c := c
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := delete(c.Name)
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				errs = append(errs, err)
+			} else {
+				log.Printf("Codespace deleted: %s\n", c.Name)
+			}
+		}()
 	}
-
-	if !deleted {
+	if !found {
 		return fmt.Errorf("no codespace was found for repository: %s", repo)
 	}
+	wg.Wait()
 
-	return list(&listOptions{})
+	// Return first error, plus count of others.
+	if errs != nil {
+		err := errs[0]
+		if others := len(errs) - 1; others > 0 {
+			err = fmt.Errorf("%w (+%d more)", err, others)
+		}
+		return err
+	}
+
+	return nil
 }
 
 func confirmDeletion(codespace *api.Codespace, force bool) (bool, error) {

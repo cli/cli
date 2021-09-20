@@ -51,7 +51,7 @@ func list(opts *listOptions) error {
 		table.Append([]string{
 			codespace.Name,
 			codespace.RepositoryNWO,
-			codespace.Name + dirtyStar(codespace.Environment.GitStatus),
+			codespace.Branch + dirtyStar(codespace.Environment.GitStatus),
 			codespace.Environment.State,
 			codespace.CreatedAt,
 		})
