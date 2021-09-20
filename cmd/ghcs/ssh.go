@@ -18,10 +18,10 @@ func newSSHCmd() *cobra.Command {
 	var sshServerPort int
 
 	sshCmd := &cobra.Command{
-		Use:   "ssh",
+		Use:   "ssh [flags] [--] [ssh-flags] [command]",
 		Short: "SSH into a codespace",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return ssh(context.Background(), sshProfile, codespaceName, sshServerPort)
+			return ssh(context.Background(), args, sshProfile, codespaceName, sshServerPort)
 		},
 	}
 
@@ -36,7 +36,7 @@ func init() {
 	rootCmd.AddCommand(newSSHCmd())
 }
 
-func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPort int) error {
+func ssh(ctx context.Context, sshArgs []string, sshProfile, codespaceName string, localSSHServerPort int) error {
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -89,7 +89,7 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 
 	shellClosed := make(chan error, 1)
 	go func() {
-		shellClosed <- codespaces.Shell(ctx, log, localSSHServerPort, connectDestination, usingCustomPort)
+		shellClosed <- codespaces.Shell(ctx, log, sshArgs, localSSHServerPort, connectDestination, usingCustomPort)
 	}()
 
 	select {
