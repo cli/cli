@@ -232,6 +232,50 @@ func TestManager_Install_git(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 }
 
+func TestManager_Install_binary_unsupported(t *testing.T) {
+	repo := ghrepo.NewWithHost("owner", "gh-bin-ext", "example.com")
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+	client := http.Client{Transport: &reg}
+
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-linux-amd64",
+						APIURL: "https://example.com/release/cool",
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Tag: "v1.0.1",
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-linux-amd64",
+						APIURL: "https://example.com/release/cool",
+					},
+				},
+			}))
+
+	tempDir := t.TempDir()
+	m := newTestManager(tempDir)
+
+	io, _, _, _ := iostreams.Test()
+
+	err := m.Install(&client, repo, io, config.NewBlankConfig())
+	assert.Error(t, err)
+
+	errText := "gh-bin-ext unsupported for windows-amd64. Open an issue: `gh issue create -R owner/gh-bin-ext -t'Support windows-amd64'`"
+
+	assert.Equal(t, errText, err.Error())
+}
+
 func TestManager_Install_binary(t *testing.T) {
 	repo := ghrepo.NewWithHost("owner", "gh-bin-ext", "example.com")
 
