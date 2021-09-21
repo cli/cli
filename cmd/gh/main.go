@@ -217,15 +217,13 @@ func mainRun() exitCode {
 
 		if strings.Contains(err.Error(), "Incorrect function") {
 			fmt.Fprintln(stderr, "You appear to be running in MinTTY without pseudo terminal support.")
-			fmt.Fprintln(stderr, "To learn about workarounds for this error, run:  gh help mintty")
+			fmt.Fprintln(stderr, "To learn about workarounds for this error, run: gh help mintty")
 			return exitError
 		}
 
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 401 {
-			fmt.Fprintln(stderr, "Try authenticating with:  gh auth login")
-		} else if strings.Contains(err.Error(), "Resource protected by organization SAML enforcement") {
-			fmt.Fprintln(stderr, "Try re-authenticating with:  gh auth refresh")
+			fmt.Fprintln(stderr, "hint: try authenticating with `gh auth login`")
 		}
 
 		return exitError
