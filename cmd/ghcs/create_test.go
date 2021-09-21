@@ -37,18 +37,13 @@ func TestPollForCodespace(t *testing.T) {
 	user := &api.User{Login: "test"}
 	tmpCodespace := &api.Codespace{Name: "tmp-codespace"}
 	codespaceToken := "codespace-token"
+	ctx := context.Background()
 
-	ctxTimeout := 1 * time.Second
-	exceedTime := 2 * time.Second
-	exceedProvisioningTime := false
+	pollInterval := 50 * time.Millisecond
+	pollTimeout := 100 * time.Millisecond
 
 	api := &mockAPIClient{
 		getCodespaceToken: func(ctx context.Context, userLogin, codespace string) (string, error) {
-			if exceedProvisioningTime {
-				ticker := time.NewTicker(exceedTime)
-				defer ticker.Stop()
-				<-ticker.C
-			}
 			if userLogin != user.Login {
 				return "", fmt.Errorf("user does not match, got: %s, expected: %s", userLogin, user.Login)
 			}
@@ -71,10 +66,7 @@ func TestPollForCodespace(t *testing.T) {
 		},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
-	defer cancel()
-
-	codespace, err := pollForCodespace(ctx, api, logger, user, tmpCodespace)
+	codespace, err := pollForCodespace(ctx, api, logger, pollTimeout, pollInterval, user.Login, tmpCodespace.Name)
 	if err != nil {
 		t.Error(err)
 	}
@@ -82,12 +74,10 @@ func TestPollForCodespace(t *testing.T) {
 		t.Errorf("returned codespace does not match, got: %s, expected: %s", codespace.Name, tmpCodespace.Name)
 	}
 
-	exceedProvisioningTime = true
-	ctx, cancel = context.WithTimeout(ctx, ctxTimeout)
-	defer cancel()
-
-	_, err = pollForCodespace(ctx, api, logger, user, tmpCodespace)
-	if err == nil {
+	// swap the durations to trigger a timeout
+	pollTimeout, pollInterval = pollInterval, pollTimeout
+	_, err = pollForCodespace(ctx, api, logger, pollTimeout, pollInterval, user.Login, tmpCodespace.Name)
+	if err != context.DeadlineExceeded {
 		t.Error("expected context deadline exceeded error, got nil")
 	}
 }
