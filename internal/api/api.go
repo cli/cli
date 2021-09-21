@@ -32,11 +32,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/opentracing/opentracing-go"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/opentracing/opentracing-go"
 )
 
 const githubAPI = "https://api.github.com"
@@ -172,9 +173,9 @@ type CodespaceEnvironmentConnection struct {
 	RelaySAS      string `json:"relaySas"`
 }
 
-func (a *API) ListCodespaces(ctx context.Context, user *User) ([]*Codespace, error) {
+func (a *API) ListCodespaces(ctx context.Context, user string) ([]*Codespace, error) {
 	req, err := http.NewRequest(
-		http.MethodGet, a.githubAPI+"/vscs_internal/user/"+user.Login+"/codespaces", nil,
+		http.MethodGet, a.githubAPI+"/vscs_internal/user/"+user+"/codespaces", nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
@@ -442,8 +443,13 @@ func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repos
 	return &response, nil
 }
 
-func (a *API) DeleteCodespace(ctx context.Context, user *User, token, codespaceName string) error {
-	req, err := http.NewRequest(http.MethodDelete, a.githubAPI+"/vscs_internal/user/"+user.Login+"/codespaces/"+codespaceName, nil)
+func (a *API) DeleteCodespace(ctx context.Context, user string, codespaceName string) error {
+	token, err := a.GetCodespaceToken(ctx, user, codespaceName)
+	if err != nil {
+		return fmt.Errorf("error getting codespace token: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, a.githubAPI+"/vscs_internal/user/"+user+"/codespaces/"+codespaceName, nil)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}

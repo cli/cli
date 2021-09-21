@@ -2,13 +2,13 @@ package ghcs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/github/ghcs/cmd/ghcs/output"
 	"github.com/github/ghcs/internal/api"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -17,19 +17,32 @@ import (
 type deleteOptions struct {
 	deleteAll     bool
 	skipConfirm   bool
-	isInteractive bool
 	codespaceName string
 	repoFilter    string
 	keepDays      uint16
+
+	isInteractive bool
 	now           func() time.Time
-	apiClient     *api.API
+	apiClient     apiClient
+	prompter      prompter
+}
+
+type prompter interface {
+	Confirm(message string) (bool, error)
+}
+
+type apiClient interface {
+	GetUser(ctx context.Context) (*api.User, error)
+	ListCodespaces(ctx context.Context, user string) ([]*api.Codespace, error)
+	DeleteCodespace(ctx context.Context, user, name string) error
 }
 
 func newDeleteCmd() *cobra.Command {
 	opts := deleteOptions{
-		apiClient:     api.New(os.Getenv("GITHUB_TOKEN")),
-		now:           time.Now,
 		isInteractive: hasTTY,
+		now:           time.Now,
+		apiClient:     api.New(os.Getenv("GITHUB_TOKEN")),
+		prompter:      &surveyPrompter{},
 	}
 
 	deleteCmd := &cobra.Command{
@@ -37,15 +50,10 @@ func newDeleteCmd() *cobra.Command {
 		Short: "Delete a codespace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// switch {
-			// case allCodespaces && repo != "":
-			// 	return errors.New("both --all and --repo is not supported")
-			// case allCodespaces:
-			// 	return deleteAll(log, force, keepThresholdDays)
-			// case repo != "":
-			// 	return deleteByRepo(log, repo, force, keepThresholdDays)
-			log := output.NewLogger(os.Stdout, os.Stderr, false)
-			return delete(context.Background(), log, opts)
+			if opts.deleteAll && opts.repoFilter != "" {
+				return errors.New("both --all and --repo is not supported")
+			}
+			return delete(context.Background(), opts)
 		},
 	}
 
@@ -58,13 +66,13 @@ func newDeleteCmd() *cobra.Command {
 	return deleteCmd
 }
 
-func delete(ctx context.Context, log *output.Logger, opts deleteOptions) error {
+func delete(ctx context.Context, opts deleteOptions) error {
 	user, err := opts.apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting user: %w", err)
 	}
 
-	codespaces, err := opts.apiClient.ListCodespaces(ctx, user)
+	codespaces, err := opts.apiClient.ListCodespaces(ctx, user.Login)
 	if err != nil {
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}
@@ -78,7 +86,7 @@ func delete(ctx context.Context, log *output.Logger, opts deleteOptions) error {
 		nameFilter = c.Name
 	}
 
-	var codespacesToDelete []*api.Codespace
+	codespacesToDelete := make([]*api.Codespace, 0, len(codespaces))
 	lastUpdatedCutoffTime := opts.now().AddDate(0, 0, -int(opts.keepDays))
 	for _, c := range codespaces {
 		if nameFilter != "" && c.Name != nameFilter {
@@ -97,9 +105,9 @@ func delete(ctx context.Context, log *output.Logger, opts deleteOptions) error {
 			}
 		}
 		if nameFilter == "" || !opts.skipConfirm {
-			confirmed, err := confirmDeletion(c)
+			confirmed, err := confirmDeletion(opts.prompter, c, opts.isInteractive)
 			if err != nil {
-				return fmt.Errorf("deletion could not be confirmed: %w", err)
+				return fmt.Errorf("unable to confirm: %w", err)
 			}
 			if !confirmed {
 				continue
@@ -112,11 +120,7 @@ func delete(ctx context.Context, log *output.Logger, opts deleteOptions) error {
 	for _, c := range codespacesToDelete {
 		codespaceName := c.Name
 		g.Go(func() error {
-			token, err := opts.apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
-			if err != nil {
-				return fmt.Errorf("error getting codespace token: %w", err)
-			}
-			if err := opts.apiClient.DeleteCodespace(ctx, user, token, codespaceName); err != nil {
+			if err := opts.apiClient.DeleteCodespace(ctx, user.Login, codespaceName); err != nil {
 				return fmt.Errorf("error deleting codespace: %w", err)
 			}
 			return nil
@@ -126,16 +130,21 @@ func delete(ctx context.Context, log *output.Logger, opts deleteOptions) error {
 	return g.Wait()
 }
 
-func confirmDeletion(codespace *api.Codespace) (bool, error) {
+func confirmDeletion(p prompter, codespace *api.Codespace, isInteractive bool) (bool, error) {
 	gs := codespace.Environment.GitStatus
 	hasUnsavedChanges := gs.HasUncommitedChanges || gs.HasUnpushedChanges
 	if !hasUnsavedChanges {
 		return true, nil
 	}
-	if !hasTTY {
+	if !isInteractive {
 		return false, fmt.Errorf("codespace %s has unsaved changes (use --force to override)", codespace.Name)
 	}
+	return p.Confirm(fmt.Sprintf("Codespace %s has unsaved changes. OK to delete?", codespace.Name))
+}
 
+type surveyPrompter struct{}
+
+func (p *surveyPrompter) Confirm(message string) (bool, error) {
 	var confirmed struct {
 		Confirmed bool
 	}
@@ -143,7 +152,7 @@ func confirmDeletion(codespace *api.Codespace) (bool, error) {
 		{
 			Name: "confirmed",
 			Prompt: &survey.Confirm{
-				Message: fmt.Sprintf("Codespace %s has unsaved changes. OK to delete?", codespace.Name),
+				Message: message,
 			},
 		},
 	}

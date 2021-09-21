@@ -40,7 +40,7 @@ func list(opts *listOptions) error {
 		return fmt.Errorf("error getting user: %w", err)
 	}
 
-	codespaces, err := apiClient.ListCodespaces(ctx, user)
+	codespaces, err := apiClient.ListCodespaces(ctx, user.Login)
 	if err != nil {
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}
