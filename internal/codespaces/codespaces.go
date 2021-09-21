@@ -23,6 +23,8 @@ func connectionReady(codespace *api.Codespace) bool {
 		codespace.Environment.State == api.CodespaceEnvironmentStateAvailable
 }
 
+// ConnectToLiveshare creates a Live Share client and joins the Live Share session.
+// It will start the Codespace if it is not already running, it will time out after 60 seconds if fails to start.
 func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, userLogin, token string, codespace *api.Codespace) (*liveshare.Session, error) {
 	var startedCodespace bool
 	if codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
@@ -75,9 +77,10 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 }
 
 // CloseSession closes the Live Share session and assigns the error to the pointer if it is nil.
+// It is meant to be called using defer with a named return argument for the error.
 func CloseSession(session *liveshare.Session, err *error) {
 	closeErr := session.Close()
-	if *err == nil {
-		*err = closeErr
+	if *err == nil && closeErr != nil {
+		*err = fmt.Errorf("failed to close Live Share session: %w", closeErr)
 	}
 }
