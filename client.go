@@ -13,68 +13,65 @@ package liveshare
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
+	"net/url"
+	"strings"
 
 	"github.com/opentracing/opentracing-go"
 	"golang.org/x/crypto/ssh"
 )
 
-// A client capable of joining a Live Share workspace.
-type client struct {
-	connection Connection
-	tlsConfig  *tls.Config
+// An Options specifies Live Share connection parameters.
+type Options struct {
+	SessionID     string
+	SessionToken  string // token for SSH session
+	RelaySAS      string
+	RelayEndpoint string
+	TLSConfig     *tls.Config // (optional)
 }
 
-// An Option updates the initial configuration state of a Live Share connection.
-type Option func(*client) error
-
-// WithConnection is a Option that accepts a Connection.
-//
-// TODO(adonovan): WithConnection is not optional, so it should not be
-// not an Option. We should make Connection a mandatory parameter of
-// Connect, at which point, why not just merge
-// client+Option+Connection, rename it to Options, do away with the
-// function mechanism, and express TLS config (etc) as public fields
-// of Options with sensible zero values, like websocket.Dialer, etc?
-func WithConnection(connection Connection) Option {
-	return func(cli *client) error {
-		if err := connection.validate(); err != nil {
-			return err
-		}
-
-		cli.connection = connection
-		return nil
+// uri returns a websocket URL for the specified options.
+func (opts *Options) uri(action string) (string, error) {
+	if opts.SessionID == "" {
+		return "", errors.New("SessionID is required")
 	}
-}
-
-// WithTLSConfig returns a Connect option that sets the TLS configuration.
-func WithTLSConfig(tlsConfig *tls.Config) Option {
-	return func(cli *client) error {
-		cli.tlsConfig = tlsConfig
-		return nil
+	if opts.RelaySAS == "" {
+		return "", errors.New("RelaySAS is required")
 	}
+	if opts.RelayEndpoint == "" {
+		return "", errors.New("RelayEndpoint is required")
+	}
+
+	sas := url.QueryEscape(opts.RelaySAS)
+	uri := opts.RelayEndpoint
+	uri = strings.Replace(uri, "sb:", "wss:", -1)
+	uri = strings.Replace(uri, ".net/", ".net:443/$hc/", 1)
+	uri = uri + "?sb-hc-action=" + action + "&sb-hc-token=" + sas
+	return uri, nil
 }
 
 // Connect connects to a Live Share workspace specified by the
 // options, and returns a session representing the connection.
 // The caller must call the session's Close method to end the session.
-func Connect(ctx context.Context, opts ...Option) (*Session, error) {
-	cli := new(client)
-	for _, opt := range opts {
-		if err := opt(cli); err != nil {
-			return nil, fmt.Errorf("error applying Live Share connect option: %w", err)
-		}
+func Connect(ctx context.Context, opts Options) (*Session, error) {
+	uri, err := opts.uri("connect")
+	if err != nil {
+		return nil, err
 	}
 
 	span, ctx := opentracing.StartSpanFromContext(ctx, "Connect")
 	defer span.Finish()
 
-	sock := newSocket(cli.connection, cli.tlsConfig)
+	sock := newSocket(uri, opts.TLSConfig)
 	if err := sock.connect(ctx); err != nil {
 		return nil, fmt.Errorf("error connecting websocket: %w", err)
 	}
 
-	ssh := newSSHSession(cli.connection.SessionToken, sock)
+	if opts.SessionToken == "" {
+		return nil, errors.New("SessionToken is required")
+	}
+	ssh := newSSHSession(opts.SessionToken, sock)
 	if err := ssh.connect(ctx); err != nil {
 		return nil, fmt.Errorf("error connecting to ssh session: %w", err)
 	}
@@ -83,9 +80,9 @@ func Connect(ctx context.Context, opts ...Option) (*Session, error) {
 	rpc.connect(ctx)
 
 	args := joinWorkspaceArgs{
-		ID:                      cli.connection.SessionID,
+		ID:                      opts.SessionID,
 		ConnectionMode:          "local",
-		JoiningUserSessionToken: cli.connection.SessionToken,
+		JoiningUserSessionToken: opts.SessionToken,
 		ClientCapabilities: clientCapabilities{
 			IsNonInteractive: false,
 		},

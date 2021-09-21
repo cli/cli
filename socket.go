@@ -19,8 +19,8 @@ type socket struct {
 	reader io.Reader
 }
 
-func newSocket(clientConn Connection, tlsConfig *tls.Config) *socket {
-	return &socket{addr: clientConn.uri("connect"), tlsConfig: tlsConfig}
+func newSocket(uri string, tlsConfig *tls.Config) *socket {
+	return &socket{addr: uri, tlsConfig: tlsConfig}
 }
 
 func (s *socket) connect(ctx context.Context) error {

@@ -14,25 +14,23 @@ import (
 )
 
 func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server, *Session, error) {
-	connection := Connection{
-		SessionID:    "session-id",
-		SessionToken: "session-token",
-		RelaySAS:     "relay-sas",
-	}
 	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
 		return joinWorkspaceResult{1}, nil
 	}
+	const sessionToken = "session-token"
 	opts = append(
 		opts,
-		livesharetest.WithPassword(connection.SessionToken),
+		livesharetest.WithPassword(sessionToken),
 		livesharetest.WithService("workspace.joinWorkspace", joinWorkspace),
 	)
-	testServer, err := livesharetest.NewServer(
-		opts...,
-	)
-	connection.RelayEndpoint = "sb" + strings.TrimPrefix(testServer.URL(), "https")
-	tlsConfig := WithTLSConfig(&tls.Config{InsecureSkipVerify: true})
-	session, err := Connect(context.Background(), WithConnection(connection), tlsConfig)
+	testServer, err := livesharetest.NewServer(opts...)
+	session, err := Connect(context.Background(), Options{
+		SessionID:     "session-id",
+		SessionToken:  sessionToken,
+		RelayEndpoint: "sb" + strings.TrimPrefix(testServer.URL(), "https"),
+		RelaySAS:      "relay-sas",
+		TLSConfig:     &tls.Config{InsecureSkipVerify: true},
+	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("error connecting to Live Share: %v", err)
 	}

@@ -14,7 +14,7 @@ import (
 )
 
 func TestConnect(t *testing.T) {
-	connection := Connection{
+	opts := Options{
 		SessionID:    "session-id",
 		SessionToken: "session-token",
 		RelaySAS:     "relay-sas",
@@ -24,13 +24,13 @@ func TestConnect(t *testing.T) {
 		if err := json.Unmarshal(*req.Params, &joinWorkspaceReq); err != nil {
 			return nil, fmt.Errorf("error unmarshaling req: %v", err)
 		}
-		if joinWorkspaceReq.ID != connection.SessionID {
+		if joinWorkspaceReq.ID != opts.SessionID {
 			return nil, errors.New("connection session id does not match")
 		}
 		if joinWorkspaceReq.ConnectionMode != "local" {
 			return nil, errors.New("connection mode is not local")
 		}
-		if joinWorkspaceReq.JoiningUserSessionToken != connection.SessionToken {
+		if joinWorkspaceReq.JoiningUserSessionToken != opts.SessionToken {
 			return nil, errors.New("connection user token does not match")
 		}
 		if joinWorkspaceReq.ClientCapabilities.IsNonInteractive != false {
@@ -40,23 +40,23 @@ func TestConnect(t *testing.T) {
 	}
 
 	server, err := livesharetest.NewServer(
-		livesharetest.WithPassword(connection.SessionToken),
+		livesharetest.WithPassword(opts.SessionToken),
 		livesharetest.WithService("workspace.joinWorkspace", joinWorkspace),
-		livesharetest.WithRelaySAS(connection.RelaySAS),
+		livesharetest.WithRelaySAS(opts.RelaySAS),
 	)
 	if err != nil {
 		t.Errorf("error creating Live Share server: %v", err)
 	}
 	defer server.Close()
-	connection.RelayEndpoint = "sb" + strings.TrimPrefix(server.URL(), "https")
+	opts.RelayEndpoint = "sb" + strings.TrimPrefix(server.URL(), "https")
 
 	ctx := context.Background()
 
-	tlsConfig := WithTLSConfig(&tls.Config{InsecureSkipVerify: true})
+	opts.TLSConfig = &tls.Config{InsecureSkipVerify: true}
 
 	done := make(chan error)
 	go func() {
-		_, err := Connect(ctx, WithConnection(connection), tlsConfig) // ignore session
+		_, err := Connect(ctx, opts) // ignore session
 		done <- err
 	}()
 
