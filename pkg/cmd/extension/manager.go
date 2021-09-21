@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/extensions"
@@ -30,9 +31,12 @@ type Manager struct {
 	findSh     func() (string, error)
 	newCommand func(string, ...string) *exec.Cmd
 	platform   func() string
+	client     *http.Client
+	config     config.Config
+	io         *iostreams.IOStreams
 }
 
-func NewManager() *Manager {
+func NewManager(io *iostreams.IOStreams) *Manager {
 	return &Manager{
 		dataDir:    config.DataDir,
 		lookPath:   safeexec.LookPath,
@@ -42,6 +46,14 @@ func NewManager() *Manager {
 			return fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH)
 		},
 	}
+}
+
+func (m *Manager) SetConfig(cfg config.Config) {
+	m.config = cfg
+}
+
+func (m *Manager) SetClient(client *http.Client) {
+	m.client = client
 }
 
 func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) (bool, error) {
@@ -189,16 +201,16 @@ type binManifest struct {
 	Path string
 }
 
-func (m *Manager) Install(client *http.Client, repo ghrepo.Interface, io *iostreams.IOStreams, cfg config.Config) error {
-	isBin, err := isBinExtension(client, repo)
+func (m *Manager) Install(repo ghrepo.Interface) error {
+	isBin, err := isBinExtension(m.client, repo)
 	if err != nil {
 		return fmt.Errorf("could not check for binary extension: %w", err)
 	}
 	if isBin {
-		return m.installBin(client, repo)
+		return m.installBin(repo)
 	}
 
-	hs, err := hasScript(client, repo)
+	hs, err := hasScript(m.client, repo)
 	if err != nil {
 		return err
 	}
@@ -207,13 +219,13 @@ func (m *Manager) Install(client *http.Client, repo ghrepo.Interface, io *iostre
 		return errors.New("extension is uninstallable: missing executable")
 	}
 
-	protocol, _ := cfg.Get(repo.RepoHost(), "git_protocol")
-	return m.installGit(ghrepo.FormatRemoteURL(repo, protocol), io.Out, io.ErrOut)
+	protocol, _ := m.config.Get(repo.RepoHost(), "git_protocol")
+	return m.installGit(ghrepo.FormatRemoteURL(repo, protocol), m.io.Out, m.io.ErrOut)
 }
 
-func (m *Manager) installBin(client *http.Client, repo ghrepo.Interface) error {
+func (m *Manager) installBin(repo ghrepo.Interface) error {
 	var r *release
-	r, err := fetchLatestRelease(client, repo)
+	r, err := fetchLatestRelease(m.client, repo)
 	if err != nil {
 		return err
 	}
@@ -243,7 +255,7 @@ func (m *Manager) installBin(client *http.Client, repo ghrepo.Interface) error {
 
 	binPath := filepath.Join(targetDir, name)
 
-	err = downloadAsset(client, *asset, binPath)
+	err = downloadAsset(m.client, *asset, binPath)
 	if err != nil {
 		return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
 	}
@@ -450,4 +462,78 @@ func readPathFromFile(path string) (string, error) {
 	b := make([]byte, 1024)
 	n, err := f.Read(b)
 	return strings.TrimSpace(string(b[:n])), err
+}
+
+func isBinExtension(client *http.Client, repo ghrepo.Interface) (isBin bool, err error) {
+	var r *release
+	r, err = fetchLatestRelease(client, repo)
+	if err != nil {
+		httpErr, ok := err.(api.HTTPError)
+		if ok && httpErr.StatusCode == 404 {
+			err = nil
+			return
+		}
+		return
+	}
+
+	for _, a := range r.Assets {
+		dists := possibleDists()
+		for _, d := range dists {
+			if strings.HasSuffix(a.Name, d) {
+				isBin = true
+				break
+			}
+		}
+	}
+
+	return
+}
+
+func possibleDists() []string {
+	return []string{
+		"aix-ppc64",
+		"android-386",
+		"android-amd64",
+		"android-arm",
+		"android-arm64",
+		"darwin-amd64",
+		"darwin-arm64",
+		"dragonfly-amd64",
+		"freebsd-386",
+		"freebsd-amd64",
+		"freebsd-arm",
+		"freebsd-arm64",
+		"illumos-amd64",
+		"ios-amd64",
+		"ios-arm64",
+		"js-wasm",
+		"linux-386",
+		"linux-amd64",
+		"linux-arm",
+		"linux-arm64",
+		"linux-mips",
+		"linux-mips64",
+		"linux-mips64le",
+		"linux-mipsle",
+		"linux-ppc64",
+		"linux-ppc64le",
+		"linux-riscv64",
+		"linux-s390x",
+		"netbsd-386",
+		"netbsd-amd64",
+		"netbsd-arm",
+		"netbsd-arm64",
+		"openbsd-386",
+		"openbsd-amd64",
+		"openbsd-arm",
+		"openbsd-arm64",
+		"openbsd-mips64",
+		"plan9-386",
+		"plan9-amd64",
+		"plan9-arm",
+		"solaris-amd64",
+		"windows-386",
+		"windows-amd64",
+		"windows-arm",
+	}
 }

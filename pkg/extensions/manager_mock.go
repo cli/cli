@@ -4,11 +4,8 @@
 package extensions
 
 import (
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/pkg/iostreams"
 	"io"
-	"net/http"
 	"sync"
 )
 
@@ -28,7 +25,7 @@ var _ ExtensionManager = &ExtensionManagerMock{}
 // 			DispatchFunc: func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (bool, error) {
 // 				panic("mock out the Dispatch method")
 // 			},
-// 			InstallFunc: func(client *http.Client, interfaceMoqParam ghrepo.Interface, iOStreams *iostreams.IOStreams, configMoqParam config.Config) error {
+// 			InstallFunc: func(interfaceMoqParam ghrepo.Interface) error {
 // 				panic("mock out the Install method")
 // 			},
 // 			InstallLocalFunc: func(dir string) error {
@@ -57,7 +54,7 @@ type ExtensionManagerMock struct {
 	DispatchFunc func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (bool, error)
 
 	// InstallFunc mocks the Install method.
-	InstallFunc func(client *http.Client, interfaceMoqParam ghrepo.Interface, iOStreams *iostreams.IOStreams, configMoqParam config.Config) error
+	InstallFunc func(interfaceMoqParam ghrepo.Interface) error
 
 	// InstallLocalFunc mocks the InstallLocal method.
 	InstallLocalFunc func(dir string) error
@@ -91,14 +88,8 @@ type ExtensionManagerMock struct {
 		}
 		// Install holds details about calls to the Install method.
 		Install []struct {
-			// Client is the client argument value.
-			Client *http.Client
 			// InterfaceMoqParam is the interfaceMoqParam argument value.
 			InterfaceMoqParam ghrepo.Interface
-			// IOStreams is the iOStreams argument value.
-			IOStreams *iostreams.IOStreams
-			// ConfigMoqParam is the configMoqParam argument value.
-			ConfigMoqParam config.Config
 		}
 		// InstallLocal holds details about calls to the InstallLocal method.
 		InstallLocal []struct {
@@ -211,41 +202,29 @@ func (mock *ExtensionManagerMock) DispatchCalls() []struct {
 }
 
 // Install calls InstallFunc.
-func (mock *ExtensionManagerMock) Install(client *http.Client, interfaceMoqParam ghrepo.Interface, iOStreams *iostreams.IOStreams, configMoqParam config.Config) error {
+func (mock *ExtensionManagerMock) Install(interfaceMoqParam ghrepo.Interface) error {
 	if mock.InstallFunc == nil {
 		panic("ExtensionManagerMock.InstallFunc: method is nil but ExtensionManager.Install was just called")
 	}
 	callInfo := struct {
-		Client            *http.Client
 		InterfaceMoqParam ghrepo.Interface
-		IOStreams         *iostreams.IOStreams
-		ConfigMoqParam    config.Config
 	}{
-		Client:            client,
 		InterfaceMoqParam: interfaceMoqParam,
-		IOStreams:         iOStreams,
-		ConfigMoqParam:    configMoqParam,
 	}
 	mock.lockInstall.Lock()
 	mock.calls.Install = append(mock.calls.Install, callInfo)
 	mock.lockInstall.Unlock()
-	return mock.InstallFunc(client, interfaceMoqParam, iOStreams, configMoqParam)
+	return mock.InstallFunc(interfaceMoqParam)
 }
 
 // InstallCalls gets all the calls that were made to Install.
 // Check the length with:
 //     len(mockedExtensionManager.InstallCalls())
 func (mock *ExtensionManagerMock) InstallCalls() []struct {
-	Client            *http.Client
 	InterfaceMoqParam ghrepo.Interface
-	IOStreams         *iostreams.IOStreams
-	ConfigMoqParam    config.Config
 } {
 	var calls []struct {
-		Client            *http.Client
 		InterfaceMoqParam ghrepo.Interface
-		IOStreams         *iostreams.IOStreams
-		ConfigMoqParam    config.Config
 	}
 	mock.lockInstall.RLock()
 	calls = mock.calls.Install

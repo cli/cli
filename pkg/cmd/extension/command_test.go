@@ -42,7 +42,7 @@ func TestNewCmdExtension(t *testing.T) {
 				em.ListFunc = func(bool) []extensions.Extension {
 					return []extensions.Extension{}
 				}
-				em.InstallFunc = func(_ *http.Client, _ ghrepo.Interface, _ *iostreams.IOStreams, _ config.Config) error {
+				em.InstallFunc = func(_ ghrepo.Interface) error {
 					return nil
 				}
 				return func(t *testing.T) {
