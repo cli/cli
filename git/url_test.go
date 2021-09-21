@@ -29,8 +29,23 @@ func TestIsURL(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "git with extension",
+			url:  "git://example.com/owner/repo.git",
+			want: true,
+		},
+		{
+			name: "git+ssh",
+			url:  "git+ssh://git@example.com/owner/repo.git",
+			want: true,
+		},
+		{
 			name: "https",
 			url:  "https://example.com/owner/repo.git",
+			want: true,
+		},
+		{
+			name: "git+https",
+			url:  "git+https://example.com/owner/repo.git",
 			want: true,
 		},
 		{
@@ -116,6 +131,16 @@ func TestParseURL(t *testing.T) {
 			url:  "git+ssh://example.com/owner/repo.git",
 			want: url{
 				Scheme: "ssh",
+				User:   "",
+				Host:   "example.com",
+				Path:   "/owner/repo.git",
+			},
+		},
+		{
+			name: "git+https",
+			url:  "git+https://example.com/owner/repo.git",
+			want: url{
+				Scheme: "https",
 				User:   "",
 				Host:   "example.com",
 				Path:   "/owner/repo.git",
