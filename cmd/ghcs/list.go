@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 import (
 	"context"
@@ -31,12 +31,8 @@ func newListCmd() *cobra.Command {
 	return listCmd
 }
 
-func init() {
-	rootCmd.AddCommand(newListCmd())
-}
-
 func list(opts *listOptions) error {
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 	ctx := context.Background()
 
 	user, err := apiClient.GetUser(ctx)

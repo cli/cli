@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 import (
 	"context"
@@ -32,22 +32,23 @@ func newSSHCmd() *cobra.Command {
 	return sshCmd
 }
 
-func init() {
-	rootCmd.AddCommand(newSSHCmd())
-}
-
-func ssh(ctx context.Context, sshArgs []string, sshProfile, codespaceName string, localSSHServerPort int) error {
+func ssh(ctx context.Context, sshArgs []string, sshProfile, codespaceName string, localSSHServerPort int) (err error) {
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting user: %w", err)
 	}
+
+	authkeys := make(chan error, 1)
+	go func() {
+		authkeys <- checkAuthorizedKeys(ctx, apiClient, user.Login)
+	}()
 
 	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
@@ -57,6 +58,11 @@ func ssh(ctx context.Context, sshArgs []string, sshProfile, codespaceName string
 	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
+	}
+	defer safeClose(session, &err)
+
+	if err := <-authkeys; err != nil {
+		return err
 	}
 
 	log.Println("Fetching SSH Details...")

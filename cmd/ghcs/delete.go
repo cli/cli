@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 import (
 	"context"
@@ -27,6 +27,9 @@ func newDeleteCmd() *cobra.Command {
 		Use:   "delete",
 		Short: "Delete a codespace",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				return fmt.Errorf("delete: unexpected positional arguments")
+			}
 			switch {
 			case allCodespaces && repo != "":
 				return errors.New("both --all and --repo is not supported")
@@ -48,12 +51,8 @@ func newDeleteCmd() *cobra.Command {
 	return deleteCmd
 }
 
-func init() {
-	rootCmd.AddCommand(newDeleteCmd())
-}
-
 func delete_(log *output.Logger, codespaceName string, force bool) error {
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 	ctx := context.Background()
 
 	user, err := apiClient.GetUser(ctx)
@@ -85,7 +84,7 @@ func delete_(log *output.Logger, codespaceName string, force bool) error {
 }
 
 func deleteAll(log *output.Logger, force bool) error {
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 	ctx := context.Background()
 
 	user, err := apiClient.GetUser(ctx)
@@ -124,7 +123,7 @@ func deleteAll(log *output.Logger, force bool) error {
 }
 
 func deleteByRepo(log *output.Logger, repo string, force bool) error {
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 	ctx := context.Background()
 
 	user, err := apiClient.GetUser(ctx)

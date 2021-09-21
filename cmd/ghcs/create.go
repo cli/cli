@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 import (
 	"context"
@@ -43,13 +43,9 @@ func newCreateCmd() *cobra.Command {
 	return createCmd
 }
 
-func init() {
-	rootCmd.AddCommand(newCreateCmd())
-}
-
 func create(opts *createOptions) error {
 	ctx := context.Background()
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 	locationCh := getLocation(ctx, apiClient)
 	userCh := getUser(ctx, apiClient)
 	log := output.NewLogger(os.Stdout, os.Stderr, false)
