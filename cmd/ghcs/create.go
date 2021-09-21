@@ -92,13 +92,19 @@ func create(opts *createOptions) error {
 		ctx, userResult.User, repository, machine, branch, locationResult.Location,
 	)
 	if err != nil {
+		// This error is returned by the API when the initial creation fails with a retryable error.
+		// A retryable error means that GitHub will retry to re-create Codespace and clients should poll
+		// the API and attempt to fetch the Codespace for the next two minutes.
 		if err == api.ErrCreateAsyncRetry {
-			createRetryCtx, cancelRetry := context.WithTimeout(ctx, 2*time.Minute)
-			defer cancelRetry()
+			log.Print("Switching to async provisioning...")
+			pollctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+			defer cancel()
 
-			codespace, err = pollForProvisionedCodespace(createRetryCtx, codespace)
+			codespace, err = pollForCodespace(pollctx, apiClient, log, userResult.User, codespace)
+			log.Print("\n")
+
 			if err != nil {
-				return fmt.Errorf("error creating codespace after retry: %w", err)
+				return fmt.Errorf("error creating codespace with async provisioning: %s: %w", codespace.Name, err)
 			}
 		}
 
@@ -118,8 +124,40 @@ func create(opts *createOptions) error {
 	return nil
 }
 
-func pollForProvisionedCodespace(ctx context.Context, provisioningCodespace *api.Codespace) (*api.Codespace, error) {
-	return nil, nil
+type apiClient interface {
+	GetCodespaceToken(context.Context, string, string) (string, error)
+	GetCodespace(context.Context, string, string, string) (*api.Codespace, error)
+}
+
+// pollForCodespace polls the Codespaces API every second fetching the codespace.
+// If it succeeds at fetching the codespace, we consider the codespace provisioned.
+// Context should be cancelled to stop polling.
+func pollForCodespace(
+	ctx context.Context, client apiClient, log *output.Logger, user *api.User, provisioningCodespace *api.Codespace,
+) (*api.Codespace, error) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-ticker.C:
+			log.Print(".")
+			token, err := client.GetCodespaceToken(ctx, user.Login, provisioningCodespace.Name)
+			if err != nil {
+				// Do nothing. We expect this to fail until the codespace is provisioned
+				continue
+			}
+
+			codespace, err := client.GetCodespace(ctx, token, user.Login, provisioningCodespace.Name)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get codespace: %w", err)
+			}
+
+			return codespace, nil
+		}
+	}
 }
 
 // showStatus polls the codespace for a list of post create states and their status. It will keep polling
