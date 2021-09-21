@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 import (
 	"bytes"
@@ -47,11 +47,7 @@ func newPortsCmd() *cobra.Command {
 	return portsCmd
 }
 
-func init() {
-	rootCmd.AddCommand(newPortsCmd())
-}
-
-func ports(codespaceName string, asJSON bool) error {
+func ports(codespaceName string, asJSON bool) (err error) {
 	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
 	ctx := context.Background()
 	log := output.NewLogger(os.Stdout, os.Stderr, asJSON)
@@ -76,6 +72,7 @@ func ports(codespaceName string, asJSON bool) error {
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
+	defer safeClose(session, &err)
 
 	log.Println("Loading ports...")
 	ports, err := session.GetSharedServers(ctx)
@@ -198,9 +195,9 @@ func newPortsPrivateCmd() *cobra.Command {
 	}
 }
 
-func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, public bool) error {
+func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, public bool) (err error) {
 	ctx := context.Background()
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
@@ -219,6 +216,7 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
+	defer safeClose(session, &err)
 
 	port, err := strconv.Atoi(sourcePort)
 	if err != nil {
@@ -260,9 +258,9 @@ func newPortsForwardCmd() *cobra.Command {
 	}
 }
 
-func forwardPorts(log *output.Logger, codespaceName string, ports []string) error {
+func forwardPorts(log *output.Logger, codespaceName string, ports []string) (err error) {
 	ctx := context.Background()
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 
 	portPairs, err := getPortPairs(ports)
 	if err != nil {
@@ -286,6 +284,7 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) erro
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
+	defer safeClose(session, &err)
 
 	// Run forwarding of all ports concurrently, aborting all of
 	// them at the first failure, including cancellation of the context.

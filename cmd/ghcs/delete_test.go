@@ -1,9 +1,10 @@
-package main
+package ghcs
 
 import (
-	"github.com/github/ghcs/internal/api"
 	"testing"
 	"time"
+
+	"github.com/github/ghcs/internal/api"
 )
 
 func TestFilterCodespacesToDelete(t *testing.T) {

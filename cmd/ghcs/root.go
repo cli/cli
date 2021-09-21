@@ -1,9 +1,8 @@
-package main
+package ghcs
 
 import (
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"strconv"
@@ -14,18 +13,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func main() {
-	if err := rootCmd.Execute(); err != nil {
-		explainError(os.Stderr, err)
-		os.Exit(1)
-	}
-}
-
 var version = "DEV" // Replaced in the release build process (by GoReleaser or Homebrew) by the git tag version number.
 
-var rootCmd = newRootCmd()
+// GithubToken is a temporary stopgap to make the token configurable by apps that import this package
+var GithubToken = os.Getenv("GITHUB_TOKEN")
 
-func newRootCmd() *cobra.Command {
+func NewRootCmd() *cobra.Command {
 	var lightstep string
 
 	root := &cobra.Command{
@@ -40,7 +33,7 @@ token to access the GitHub API with.`,
 
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if os.Getenv("GITHUB_TOKEN") == "" {
-				return errTokenMissing
+				return ErrTokenMissing
 			}
 			return initLightstep(lightstep)
 		},
@@ -48,18 +41,18 @@ token to access the GitHub API with.`,
 
 	root.PersistentFlags().StringVar(&lightstep, "lightstep", "", "Lightstep tracing endpoint (service:token@host:port)")
 
+	root.AddCommand(newCodeCmd())
+	root.AddCommand(newCreateCmd())
+	root.AddCommand(newDeleteCmd())
+	root.AddCommand(newListCmd())
+	root.AddCommand(newLogsCmd())
+	root.AddCommand(newPortsCmd())
+	root.AddCommand(newSSHCmd())
+
 	return root
 }
 
-var errTokenMissing = errors.New("GITHUB_TOKEN is missing")
-
-func explainError(w io.Writer, err error) {
-	if errors.Is(err, errTokenMissing) {
-		fmt.Fprintln(w, "The GITHUB_TOKEN environment variable is required. Create a Personal Access Token at https://github.com/settings/tokens/new?scopes=repo")
-		fmt.Fprintln(w, "Make sure to enable SSO for your organizations after creating the token.")
-		return
-	}
-}
+var ErrTokenMissing = errors.New("GITHUB_TOKEN is missing")
 
 // initLightstep parses the --lightstep=service:token@host:port flag and
 // enables tracing if non-empty.

@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 import (
 	"context"
@@ -35,6 +35,7 @@ func newDeleteCmd() *cobra.Command {
 	deleteCmd := &cobra.Command{
 		Use:   "delete",
 		Short: "Delete a codespace",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// switch {
 			// case allCodespaces && repo != "":
@@ -55,10 +56,6 @@ func newDeleteCmd() *cobra.Command {
 	deleteCmd.Flags().Uint16Var(&opts.keepDays, "days", 0, "Delete codespaces older than `N` days")
 
 	return deleteCmd
-}
-
-func init() {
-	rootCmd.AddCommand(newDeleteCmd())
 }
 
 func delete(ctx context.Context, log *output.Logger, opts deleteOptions) error {

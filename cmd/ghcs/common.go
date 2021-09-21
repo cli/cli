@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 // This file defines functions common to the entire ghcs command set.
 
@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 
@@ -96,6 +97,12 @@ func getOrChooseCodespace(ctx context.Context, apiClient *api.API, user *api.Use
 	return codespace, token, nil
 }
 
+func safeClose(closer io.Closer, err *error) {
+	if closeErr := closer.Close(); *err == nil {
+		*err = closeErr
+	}
+}
+
 // hasTTY indicates whether the process connected to a terminal.
 // It is not portable to assume stdin/stdout are fds 0 and 1.
 var hasTTY = term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
@@ -122,4 +129,18 @@ func ask(qs []*survey.Question, response interface{}) error {
 		select {}
 	}
 	return err
+}
+
+// checkAuthorizedKeys reports an error if the user has not registered any SSH keys;
+// see https://github.com/github/ghcs/issues/166#issuecomment-921769703.
+// The check is not required for security but it improves the error message.
+func checkAuthorizedKeys(ctx context.Context, client *api.API, user string) error {
+	keys, err := client.AuthorizedKeys(ctx, user)
+	if err != nil {
+		return fmt.Errorf("failed to read GitHub-authorized SSH keys for %s: %w", user, err)
+	}
+	if len(keys) == 0 {
+		return fmt.Errorf("user %s has no GitHub-authorized SSH keys", user)
+	}
+	return nil // success
 }
