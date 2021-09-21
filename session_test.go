@@ -32,14 +32,9 @@ func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server,
 	)
 	connection.RelayEndpoint = "sb" + strings.TrimPrefix(testServer.URL(), "https")
 	tlsConfig := WithTLSConfig(&tls.Config{InsecureSkipVerify: true})
-	client, err := NewClient(WithConnection(connection), tlsConfig)
+	session, err := Connect(context.Background(), WithConnection(connection), tlsConfig)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error creating new client: %v", err)
-	}
-	ctx := context.Background()
-	session, err := client.JoinWorkspace(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error joining workspace: %v", err)
+		return nil, nil, fmt.Errorf("error connecting to Live Share: %v", err)
 	}
 	return testServer, session, nil
 }

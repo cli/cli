@@ -13,37 +13,7 @@ import (
 	"github.com/sourcegraph/jsonrpc2"
 )
 
-func TestNewClient(t *testing.T) {
-	client, err := NewClient()
-	if err != nil {
-		t.Errorf("error creating new client: %v", err)
-	}
-	if client == nil {
-		t.Error("client is nil")
-	}
-}
-
-func TestNewClientValidConnection(t *testing.T) {
-	connection := Connection{"1", "2", "3", "4"}
-
-	client, err := NewClient(WithConnection(connection))
-	if err != nil {
-		t.Errorf("error creating new client: %v", err)
-	}
-	if client == nil {
-		t.Error("client is nil")
-	}
-}
-
-func TestNewClientWithInvalidConnection(t *testing.T) {
-	connection := Connection{}
-
-	if _, err := NewClient(WithConnection(connection)); err == nil {
-		t.Error("err is nil")
-	}
-}
-
-func TestJoinSession(t *testing.T) {
+func TestConnect(t *testing.T) {
 	connection := Connection{
 		SessionID:    "session-id",
 		SessionToken: "session-token",
@@ -83,21 +53,11 @@ func TestJoinSession(t *testing.T) {
 	ctx := context.Background()
 
 	tlsConfig := WithTLSConfig(&tls.Config{InsecureSkipVerify: true})
-	client, err := NewClient(WithConnection(connection), tlsConfig)
-	if err != nil {
-		t.Errorf("error creating new client: %v", err)
-	}
 
 	done := make(chan error)
 	go func() {
-		session, err := client.JoinWorkspace(ctx)
-		if err != nil {
-			done <- fmt.Errorf("error joining workspace: %v", err)
-			return
-		}
-		_ = session
-
-		done <- nil
+		_, err := Connect(ctx, WithConnection(connection), tlsConfig) // ignore session
+		done <- err
 	}()
 
 	select {

@@ -1,3 +1,13 @@
+// Package liveshare is a Go client library for the Visual Studio Live Share
+// service, which provides collaborative, distibuted editing and debugging.
+// See https://docs.microsoft.com/en-us/visualstudio/liveshare for an overview.
+//
+// It provides the ability for a Go program to connect to a Live Share
+// workspace (Connect), to expose a TCP port on a remote host
+// (UpdateSharedVisibility), to start an SSH server listening on an
+// exposed port (StartSSHServer), and to forward connections between
+// the remote port and a local listening TCP port (ForwardToListener)
+// or a local Go reader/writer (Forward).
 package liveshare
 
 import (
@@ -9,66 +19,79 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// A Client capable of joining a Live Share workspace.
-type Client struct {
+// A client capable of joining a Live Share workspace.
+type client struct {
 	connection Connection
 	tlsConfig  *tls.Config
 }
 
-// A ClientOption is a function that modifies a client
-type ClientOption func(*Client) error
+// An Option updates the initial configuration state of a Live Share connection.
+type Option func(*client) error
 
-// NewClient accepts a range of options, applies them and returns a client
-func NewClient(opts ...ClientOption) (*Client, error) {
-	client := new(Client)
-
-	for _, o := range opts {
-		if err := o(client); err != nil {
-			return nil, err
-		}
-	}
-
-	return client, nil
-}
-
-// WithConnection is a ClientOption that accepts a Connection
-func WithConnection(connection Connection) ClientOption {
-	return func(c *Client) error {
+// WithConnection is a Option that accepts a Connection.
+//
+// TODO(adonovan): WithConnection is not optional, so it should not be
+// not an Option. We should make Connection a mandatory parameter of
+// Connect, at which point, why not just merge
+// client+Option+Connection, rename it to Options, do away with the
+// function mechanism, and express TLS config (etc) as public fields
+// of Options with sensible zero values, like websocket.Dialer, etc?
+func WithConnection(connection Connection) Option {
+	return func(cli *client) error {
 		if err := connection.validate(); err != nil {
 			return err
 		}
 
-		c.connection = connection
+		cli.connection = connection
 		return nil
 	}
 }
 
-func WithTLSConfig(tlsConfig *tls.Config) ClientOption {
-	return func(c *Client) error {
-		c.tlsConfig = tlsConfig
+// WithTLSConfig returns a Connect option that sets the TLS configuration.
+func WithTLSConfig(tlsConfig *tls.Config) Option {
+	return func(cli *client) error {
+		cli.tlsConfig = tlsConfig
 		return nil
 	}
 }
 
-// JoinWorkspace connects the client to the server's Live Share
-// workspace and returns a session representing their connection.
-func (c *Client) JoinWorkspace(ctx context.Context) (*Session, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "Client.JoinWorkspace")
+// Connect connects to a Live Share workspace specified by the
+// options, and returns a session representing the connection.
+// The caller must call the session's Close method to end the session.
+func Connect(ctx context.Context, opts ...Option) (*Session, error) {
+	cli := new(client)
+	for _, opt := range opts {
+		if err := opt(cli); err != nil {
+			return nil, fmt.Errorf("error applying Live Share connect option: %w", err)
+		}
+	}
+
+	span, ctx := opentracing.StartSpanFromContext(ctx, "Connect")
 	defer span.Finish()
 
-	clientSocket := newSocket(c.connection, c.tlsConfig)
-	if err := clientSocket.connect(ctx); err != nil {
+	sock := newSocket(cli.connection, cli.tlsConfig)
+	if err := sock.connect(ctx); err != nil {
 		return nil, fmt.Errorf("error connecting websocket: %w", err)
 	}
 
-	ssh := newSSHSession(c.connection.SessionToken, clientSocket)
+	ssh := newSSHSession(cli.connection.SessionToken, sock)
 	if err := ssh.connect(ctx); err != nil {
 		return nil, fmt.Errorf("error connecting to ssh session: %w", err)
 	}
 
 	rpc := newRPCClient(ssh)
 	rpc.connect(ctx)
-	if _, err := c.joinWorkspace(ctx, rpc); err != nil {
+
+	args := joinWorkspaceArgs{
+		ID:                      cli.connection.SessionID,
+		ConnectionMode:          "local",
+		JoiningUserSessionToken: cli.connection.SessionToken,
+		ClientCapabilities: clientCapabilities{
+			IsNonInteractive: false,
+		},
+	}
+	var result joinWorkspaceResult
+	if err := rpc.do(ctx, "workspace.joinWorkspace", &args, &result); err != nil {
 		return nil, fmt.Errorf("error joining Live Share workspace: %w", err)
 	}
 
@@ -94,24 +117,6 @@ type joinWorkspaceResult struct {
 // container that may be used to open an SSH channel to it.
 type channelID struct {
 	name, condition string
-}
-
-func (c *Client) joinWorkspace(ctx context.Context, rpc *rpcClient) (*joinWorkspaceResult, error) {
-	args := joinWorkspaceArgs{
-		ID:                      c.connection.SessionID,
-		ConnectionMode:          "local",
-		JoiningUserSessionToken: c.connection.SessionToken,
-		ClientCapabilities: clientCapabilities{
-			IsNonInteractive: false,
-		},
-	}
-
-	var result joinWorkspaceResult
-	if err := rpc.do(ctx, "workspace.joinWorkspace", &args, &result); err != nil {
-		return nil, fmt.Errorf("error making workspace.joinWorkspace call: %w", err)
-	}
-
-	return &result, nil
 }
 
 func (s *Session) openStreamingChannel(ctx context.Context, id channelID) (ssh.Channel, error) {
