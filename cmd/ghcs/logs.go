@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 import (
 	"context"
@@ -36,16 +36,12 @@ func newLogsCmd() *cobra.Command {
 	return logsCmd
 }
 
-func init() {
-	rootCmd.AddCommand(newLogsCmd())
-}
-
 func logs(ctx context.Context, log *output.Logger, codespaceName string, follow bool) (err error) {
 	// Ensure all child tasks (port forwarding, remote exec) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {

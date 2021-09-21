@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 import (
 	"bytes"
@@ -45,10 +45,6 @@ func newPortsCmd() *cobra.Command {
 	portsCmd.AddCommand(newPortsForwardCmd())
 
 	return portsCmd
-}
-
-func init() {
-	rootCmd.AddCommand(newPortsCmd())
 }
 
 func ports(codespaceName string, asJSON bool) (err error) {
@@ -201,7 +197,7 @@ func newPortsPrivateCmd() *cobra.Command {
 
 func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, public bool) (err error) {
 	ctx := context.Background()
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
@@ -264,7 +260,7 @@ func newPortsForwardCmd() *cobra.Command {
 
 func forwardPorts(log *output.Logger, codespaceName string, ports []string) (err error) {
 	ctx := context.Background()
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 
 	portPairs, err := getPortPairs(ports)
 	if err != nil {

@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 // This file defines functions common to the entire ghcs command set.
 
