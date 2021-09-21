@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 import (
 	"context"
@@ -36,21 +36,22 @@ func newLogsCmd() *cobra.Command {
 	return logsCmd
 }
 
-func init() {
-	rootCmd.AddCommand(newLogsCmd())
-}
-
-func logs(ctx context.Context, log *output.Logger, codespaceName string, follow bool) error {
+func logs(ctx context.Context, log *output.Logger, codespaceName string, follow bool) (err error) {
 	// Ensure all child tasks (port forwarding, remote exec) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("getting user: %w", err)
 	}
+
+	authkeys := make(chan error, 1)
+	go func() {
+		authkeys <- checkAuthorizedKeys(ctx, apiClient, user.Login)
+	}()
 
 	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
@@ -60,6 +61,11 @@ func logs(ctx context.Context, log *output.Logger, codespaceName string, follow 
 	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("connecting to Live Share: %w", err)
+	}
+	defer safeClose(session, &err)
+
+	if err := <-authkeys; err != nil {
+		return err
 	}
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
@@ -82,9 +88,12 @@ func logs(ctx context.Context, log *output.Logger, codespaceName string, follow 
 	}
 
 	dst := fmt.Sprintf("%s@localhost", sshUser)
-	cmd := codespaces.NewRemoteCommand(
+	cmd, err := codespaces.NewRemoteCommand(
 		ctx, localPort, dst, fmt.Sprintf("%s /workspaces/.codespaces/.persistedshare/creation.log", cmdType),
 	)
+	if err != nil {
+		return fmt.Errorf("remote command: %w", err)
+	}
 
 	tunnelClosed := make(chan error, 1)
 	go func() {

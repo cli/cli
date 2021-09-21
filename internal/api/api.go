@@ -13,6 +13,7 @@ package api
 // - github.GetUser(github.Client)
 // - github.GetRepository(Client)
 // - github.ReadFile(Client, nwo, branch, path) // was GetCodespaceRepositoryContents
+// - github.AuthorizedKeys(Client, user)
 // - codespaces.Create(Client, user, repo, sku, branch, location)
 // - codespaces.Delete(Client, user, token, name)
 // - codespaces.Get(Client, token, owner, name)
@@ -31,11 +32,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/opentracing/opentracing-go"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/opentracing/opentracing-go"
 )
 
 const githubAPI = "https://api.github.com"
@@ -171,9 +173,9 @@ type CodespaceEnvironmentConnection struct {
 	RelaySAS      string `json:"relaySas"`
 }
 
-func (a *API) ListCodespaces(ctx context.Context, user *User) ([]*Codespace, error) {
+func (a *API) ListCodespaces(ctx context.Context, user string) ([]*Codespace, error) {
 	req, err := http.NewRequest(
-		http.MethodGet, a.githubAPI+"/vscs_internal/user/"+user.Login+"/codespaces", nil,
+		http.MethodGet, a.githubAPI+"/vscs_internal/user/"+user+"/codespaces", nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
@@ -441,8 +443,13 @@ func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repos
 	return &response, nil
 }
 
-func (a *API) DeleteCodespace(ctx context.Context, user *User, token, codespaceName string) error {
-	req, err := http.NewRequest(http.MethodDelete, a.githubAPI+"/vscs_internal/user/"+user.Login+"/codespaces/"+codespaceName, nil)
+func (a *API) DeleteCodespace(ctx context.Context, user string, codespaceName string) error {
+	token, err := a.GetCodespaceToken(ctx, user, codespaceName)
+	if err != nil {
+		return fmt.Errorf("error getting codespace token: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, a.githubAPI+"/vscs_internal/user/"+user+"/codespaces/"+codespaceName, nil)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
@@ -510,6 +517,31 @@ func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Cod
 	}
 
 	return decoded, nil
+}
+
+// AuthorizedKeys returns the public keys (in ~/.ssh/authorized_keys
+// format) registered by the specified GitHub user.
+func (a *API) AuthorizedKeys(ctx context.Context, user string) ([]byte, error) {
+	url := fmt.Sprintf("https://github.com/%s.keys", user)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := a.do(ctx, req, "/user.keys")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned %s", resp.Status)
+	}
+	return b, nil
 }
 
 func (a *API) do(ctx context.Context, req *http.Request, spanName string) (*http.Response, error) {

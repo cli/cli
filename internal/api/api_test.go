@@ -10,10 +10,6 @@ import (
 )
 
 func TestListCodespaces(t *testing.T) {
-	user := &User{
-		Login: "testuser",
-	}
-
 	codespaces := []*Codespace{
 		{
 			Name:       "testcodespace",
@@ -38,7 +34,7 @@ func TestListCodespaces(t *testing.T) {
 		token:     "faketoken",
 	}
 	ctx := context.TODO()
-	codespaces, err := api.ListCodespaces(ctx, user)
+	codespaces, err := api.ListCodespaces(ctx, "testuser")
 	if err != nil {
 		t.Fatal(err)
 	}

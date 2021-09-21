@@ -1,4 +1,4 @@
-package main
+package ghcs
 
 import (
 	"context"
@@ -31,12 +31,8 @@ func newListCmd() *cobra.Command {
 	return listCmd
 }
 
-func init() {
-	rootCmd.AddCommand(newListCmd())
-}
-
 func list(opts *listOptions) error {
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 	ctx := context.Background()
 
 	user, err := apiClient.GetUser(ctx)
@@ -44,7 +40,7 @@ func list(opts *listOptions) error {
 		return fmt.Errorf("error getting user: %w", err)
 	}
 
-	codespaces, err := apiClient.ListCodespaces(ctx, user)
+	codespaces, err := apiClient.ListCodespaces(ctx, user.Login)
 	if err != nil {
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}

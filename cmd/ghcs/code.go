@@ -1,10 +1,9 @@
-package main
+package ghcs
 
 import (
 	"context"
 	"fmt"
 	"net/url"
-	"os"
 
 	"github.com/github/ghcs/internal/api"
 	"github.com/skratchdot/open-golang/open"
@@ -32,12 +31,8 @@ func newCodeCmd() *cobra.Command {
 	return codeCmd
 }
 
-func init() {
-	rootCmd.AddCommand(newCodeCmd())
-}
-
 func code(codespaceName string, useInsiders bool) error {
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
+	apiClient := api.New(GithubToken)
 	ctx := context.Background()
 
 	user, err := apiClient.GetUser(ctx)
