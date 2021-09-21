@@ -401,6 +401,8 @@ type createCodespaceRequest struct {
 	SkuName      string `json:"sku_name"`
 }
 
+var ErrCreateAsyncRetry = errors.New("initial creation failed, retrying async")
+
 func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repository, sku, branch, location string) (*Codespace, error) {
 	requestBody, err := json.Marshal(createCodespaceRequest{repository.ID, branch, location, sku})
 	if err != nil {
@@ -424,8 +426,11 @@ func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repos
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
-	if resp.StatusCode > http.StatusAccepted {
+	switch {
+	case resp.StatusCode > http.StatusAccepted:
 		return nil, jsonErrorResponse(b)
+	case resp.StatusCode == http.StatusAccepted:
+		return nil, ErrCreateAsyncRetry
 	}
 
 	var response Codespace

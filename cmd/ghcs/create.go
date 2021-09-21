@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/fatih/camelcase"
@@ -87,8 +88,20 @@ func create(opts *createOptions) error {
 
 	log.Println("Creating your codespace...")
 
-	codespace, err := apiClient.CreateCodespace(ctx, userResult.User, repository, machine, branch, locationResult.Location)
+	codespace, err := apiClient.CreateCodespace(
+		ctx, userResult.User, repository, machine, branch, locationResult.Location,
+	)
 	if err != nil {
+		if err == api.ErrCreateAsyncRetry {
+			createRetryCtx, cancelRetry := context.WithTimeout(ctx, 2*time.Minute)
+			defer cancelRetry()
+
+			codespace, err = pollForProvisionedCodespace(createRetryCtx, codespace)
+			if err != nil {
+				return fmt.Errorf("error creating codespace after retry: %w", err)
+			}
+		}
+
 		return fmt.Errorf("error creating codespace: %w", err)
 	}
 
@@ -103,6 +116,10 @@ func create(opts *createOptions) error {
 	fmt.Fprintln(os.Stdout, codespace.Name)
 
 	return nil
+}
+
+func pollForProvisionedCodespace(ctx context.Context, provisioningCodespace *api.Codespace) (*api.Codespace, error) {
+	return nil, nil
 }
 
 // showStatus polls the codespace for a list of post create states and their status. It will keep polling
