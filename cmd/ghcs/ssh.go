@@ -58,7 +58,7 @@ func ssh(ctx context.Context, sshArgs []string, sshProfile, codespaceName string
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
-	defer codespaces.CloseSession(session, &err)
+	defer safeClose(session, &err)
 
 	log.Println("Fetching SSH Details...")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)

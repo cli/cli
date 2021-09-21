@@ -46,7 +46,11 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient *api.API, u
 	if err != nil {
 		return fmt.Errorf("connect to Live Share: %w", err)
 	}
-	defer CloseSession(session, &err)
+	defer func() {
+		if closeErr := session.Close(); err == nil {
+			err = closeErr
+		}
+	}()
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
 	listen, err := net.Listen("tcp", ":0") // arbitrary port

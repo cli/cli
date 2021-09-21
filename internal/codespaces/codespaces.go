@@ -75,12 +75,3 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, use
 
 	return lsclient.JoinWorkspace(ctx)
 }
-
-// CloseSession closes the Live Share session and assigns the error to the pointer if it is nil.
-// It is meant to be called using defer with a named return argument for the error.
-func CloseSession(session *liveshare.Session, err *error) {
-	closeErr := session.Close()
-	if *err == nil && closeErr != nil {
-		*err = fmt.Errorf("failed to close Live Share session: %w", closeErr)
-	}
-}

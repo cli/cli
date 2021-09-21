@@ -76,7 +76,7 @@ func ports(codespaceName string, asJSON bool) (err error) {
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
-	defer codespaces.CloseSession(session, &err)
+	defer safeClose(session, &err)
 
 	log.Println("Loading ports...")
 	ports, err := session.GetSharedServers(ctx)
@@ -220,7 +220,7 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
-	defer codespaces.CloseSession(session, &err)
+	defer safeClose(session, &err)
 
 	port, err := strconv.Atoi(sourcePort)
 	if err != nil {
@@ -288,7 +288,7 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) (err
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
-	defer codespaces.CloseSession(session, &err)
+	defer safeClose(session, &err)
 
 	// Run forwarding of all ports concurrently, aborting all of
 	// them at the first failure, including cancellation of the context.

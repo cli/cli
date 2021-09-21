@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 
@@ -91,6 +92,12 @@ func getOrChooseCodespace(ctx context.Context, apiClient *api.API, user *api.Use
 	}
 
 	return codespace, token, nil
+}
+
+func safeClose(closer io.Closer, err *error) {
+	if closeErr := closer.Close(); *err == nil {
+		*err = closeErr
+	}
 }
 
 // hasTTY indicates whether the process connected to a terminal.
