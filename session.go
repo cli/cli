@@ -17,12 +17,12 @@ type Session struct {
 func (s *Session) Close() error {
 	// Closing the RPC conn closes the underlying stream (SSH)
 	// So we only need to close once
-	err := s.rpc.Close()
-	if err != nil {
+	if err := s.rpc.Close(); err != nil {
 		s.ssh.Close() // close SSH and ignore error
+		return fmt.Errorf("error while closing Live Share session: %w", err)
 	}
 
-	return err
+	return nil
 }
 
 // Port describes a port exposed by the container.
