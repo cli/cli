@@ -49,21 +49,9 @@ func ssh(ctx context.Context, sshProfile, codespaceName string, localSSHServerPo
 		return fmt.Errorf("error getting user: %w", err)
 	}
 
-	// Check whether the user has registered any SSH keys.
-	// See https://github.com/github/ghcs/issues/166#issuecomment-921769703
-	checkAuthKeys := func(user string) error {
-		keys, err := apiClient.AuthorizedKeys(ctx, user)
-		if err != nil {
-			return fmt.Errorf("failed to read GitHub-authorized SSH keys for %s: %w", user, err)
-		}
-		if len(keys) == 0 {
-			return fmt.Errorf("user %s has no GitHub-authorized SSH keys", user)
-		}
-		return nil // success
-	}
 	authkeys := make(chan error, 1)
 	go func() {
-		authkeys <- checkAuthKeys(user.Login)
+		authkeys <- checkAuthorizedKeys(ctx, apiClient, user.Login)
 	}()
 
 	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
