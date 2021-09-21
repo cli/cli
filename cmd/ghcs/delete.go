@@ -27,6 +27,9 @@ func newDeleteCmd() *cobra.Command {
 		Use:   "delete",
 		Short: "Delete a codespace",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				return fmt.Errorf("delete: unexpected positional arguments")
+			}
 			switch {
 			case allCodespaces && repo != "":
 				return errors.New("both --all and --repo is not supported")
