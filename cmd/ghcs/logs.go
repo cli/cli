@@ -52,6 +52,11 @@ func logs(ctx context.Context, log *output.Logger, codespaceName string, follow 
 		return fmt.Errorf("getting user: %w", err)
 	}
 
+	authkeys := make(chan error, 1)
+	go func() {
+		authkeys <- checkAuthorizedKeys(ctx, apiClient, user.Login)
+	}()
+
 	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
 	if err != nil {
 		return fmt.Errorf("get or choose codespace: %w", err)
@@ -60,6 +65,10 @@ func logs(ctx context.Context, log *output.Logger, codespaceName string, follow 
 	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("connecting to Live Share: %w", err)
+	}
+
+	if err := <-authkeys; err != nil {
+		return err
 	}
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
