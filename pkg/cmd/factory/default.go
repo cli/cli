@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/context"
@@ -161,7 +162,8 @@ func extensionManager(f *cmdutil.Factory) *extension.Manager {
 	if err != nil {
 		return em
 	}
-	em.SetClient(client)
+
+	em.SetClient(api.NewCachedClient(client, time.Second*30))
 
 	return em
 }
