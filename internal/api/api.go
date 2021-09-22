@@ -209,6 +209,8 @@ type getCodespaceTokenResponse struct {
 	RepositoryToken string `json:"repository_token"`
 }
 
+// ErrNotProvisioned is returned by GetCodespacesToken to indicate that the
+// creation of a codespace is not yet complete and that the caller should try again.
 var ErrNotProvisioned = errors.New("codespace not provisioned")
 
 func (a *API) GetCodespaceToken(ctx context.Context, ownerLogin, codespaceName string) (string, error) {
@@ -420,26 +422,17 @@ func (a *API) CreateCodespace(ctx context.Context, log logger, params *CreateCod
 	codespace, err := a.startCreate(
 		ctx, params.User, params.RepositoryID, params.Machine, params.Branch, params.Location,
 	)
-	if err != nil {
-		// errProvisioningInProgress indicates that codespace creation did not complete
-		// within the GitHub API RPC time limit (10s), so it continues asynchronously.
-		// We must poll the server to discover the outcome.
-		if err == errProvisioningInProgress {
-			pollTimeout := 2 * time.Minute
-			pollInterval := 1 * time.Second
-			log.Print(".")
-			codespace, err = pollForCodespace(ctx, a, log, pollTimeout, pollInterval, params.User, codespace.Name)
-			log.Print("\n")
-
-			if err != nil {
-				return nil, fmt.Errorf("error creating codespace with async provisioning: %s: %w", codespace.Name, err)
-			}
-		}
-
-		return nil, err
+	if err != errProvisioningInProgress {
+		return codespace, err
 	}
 
-	return codespace, nil
+	// errProvisioningInProgress indicates that codespace creation did not complete
+	// within the GitHub API RPC time limit (10s), so it continues asynchronously.
+	// We must poll the server to discover the outcome.
+	pollTimeout := 2 * time.Minute
+	pollInterval := 1 * time.Second
+
+	return pollForCodespace(ctx, a, log, pollTimeout, pollInterval, params.User, codespace.Name)
 }
 
 type apiClient interface {
@@ -472,7 +465,12 @@ func pollForCodespace(ctx context.Context, client apiClient, log logger, duratio
 				return nil, fmt.Errorf("failed to get codespace token: %w", err)
 			}
 
-			return client.GetCodespace(ctx, token, user, name)
+			codespace, err := client.GetCodespace(ctx, token, user, name)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get codespace: %w", err)
+			}
+
+			return codespace, nil
 		}
 	}
 }
