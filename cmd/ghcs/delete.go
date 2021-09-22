@@ -27,10 +27,12 @@ type deleteOptions struct {
 	prompter      prompter
 }
 
+//go:generate moq -fmt goimports -rm -out mock_prompter.go . prompter
 type prompter interface {
 	Confirm(message string) (bool, error)
 }
 
+//go:generate moq -fmt goimports -rm -out mock_api.go . apiClient
 type apiClient interface {
 	GetUser(ctx context.Context) (*api.User, error)
 	ListCodespaces(ctx context.Context, user string) ([]*api.Codespace, error)
@@ -57,9 +59,9 @@ func newDeleteCmd() *cobra.Command {
 		},
 	}
 
-	deleteCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "Delete codespace by `name`")
+	deleteCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "The `name` of the codespace to delete")
 	deleteCmd.Flags().BoolVar(&opts.deleteAll, "all", false, "Delete all codespaces")
-	deleteCmd.Flags().StringVarP(&opts.repoFilter, "repo", "r", "", "Delete codespaces for a repository")
+	deleteCmd.Flags().StringVarP(&opts.repoFilter, "repo", "r", "", "Delete codespaces for a `repository`")
 	deleteCmd.Flags().BoolVarP(&opts.skipConfirm, "force", "f", false, "Skip confirmation for codespaces that contain unsaved changes")
 	deleteCmd.Flags().Uint16Var(&opts.keepDays, "days", 0, "Delete codespaces older than `N` days")
 
@@ -114,6 +116,10 @@ func delete(ctx context.Context, opts deleteOptions) error {
 			}
 		}
 		codespacesToDelete = append(codespacesToDelete, c)
+	}
+
+	if len(codespacesToDelete) == 0 {
+		return errors.New("no codespaces to delete")
 	}
 
 	g := errgroup.Group{}
