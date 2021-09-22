@@ -319,7 +319,7 @@ func TestManager_Install_binary(t *testing.T) {
 	err := m.Install(repo)
 	assert.NoError(t, err)
 
-	manifest, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/manifest.yml"))
+	manifest, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext", manifestName))
 	assert.NoError(t, err)
 
 	var bm binManifest

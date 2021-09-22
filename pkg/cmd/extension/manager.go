@@ -105,6 +105,7 @@ func (m *Manager) List(includeMetadata bool) []extensions.Extension {
 }
 
 func (m *Manager) list(includeMetadata bool) ([]extensions.Extension, error) {
+	// TODO need to fix this to work with binary extensions before upgrade will work
 	dir := m.installDir()
 	entries, err := ioutil.ReadDir(dir)
 	if err != nil {
@@ -273,7 +274,7 @@ func (m *Manager) installBin(repo ghrepo.Interface) error {
 		return fmt.Errorf("failed to serialize manifest: %w", err)
 	}
 
-	manifestPath := filepath.Join(targetDir, "manifest.yml")
+	manifestPath := filepath.Join(targetDir, manifestName)
 
 	f, err := os.OpenFile(manifestPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
@@ -334,25 +335,68 @@ func (m *Manager) Upgrade(name string, force bool) error {
 			continue
 		}
 
-		var cmds []*exec.Cmd
-		dir := filepath.Dir(f.Path())
-		if force {
-			fetchCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "fetch", "origin", "HEAD")
-			resetCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "reset", "--hard", "origin/HEAD")
-			cmds = []*exec.Cmd{fetchCmd, resetCmd}
-		} else {
-			pullCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "pull", "--ff-only")
-			cmds = []*exec.Cmd{pullCmd}
+		_, err := os.Stat(filepath.Join(f.Path(), manifestName))
+		if err == nil {
+			// TODO is there any need for a "forced" binary upgrade?
+			err = m.upgradeBin(f)
+			someUpgraded = true
+			continue
 		}
-		if e := runCmds(cmds, m.io.Out, m.io.ErrOut); e != nil {
+
+		if e := m.upgradeGit(f, exe, force); e != nil {
 			err = e
 		}
 		someUpgraded = true
 	}
+
 	if err == nil && !someUpgraded {
 		err = fmt.Errorf("no extension matched %q", name)
 	}
+
 	return err
+}
+
+func (m *Manager) upgradeGit(ext extensions.Extension, exe string, force bool) error {
+	var cmds []*exec.Cmd
+	dir := filepath.Dir(ext.Path())
+	if force {
+		fetchCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "fetch", "origin", "HEAD")
+		resetCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "reset", "--hard", "origin/HEAD")
+		cmds = []*exec.Cmd{fetchCmd, resetCmd}
+	} else {
+		pullCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "pull", "--ff-only")
+		cmds = []*exec.Cmd{pullCmd}
+	}
+
+	return runCmds(cmds, m.io.Out, m.io.ErrOut)
+}
+
+func (m *Manager) upgradeBin(ext extensions.Extension) error {
+	manifestPath := filepath.Join(ext.Path(), manifestName)
+	manifest, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return fmt.Errorf("could not open %s for reading: %w", manifestPath, err)
+	}
+
+	var bm binManifest
+	err = yaml.Unmarshal(manifest, &bm)
+	if err != nil {
+		return fmt.Errorf("could not parse %s: %w", manifestPath, err)
+	}
+	repo := ghrepo.NewWithHost(bm.Owner, bm.Name, bm.Host)
+	var r *release
+
+	r, err = fetchLatestRelease(m.client, repo)
+	if err != nil {
+		return fmt.Errorf("failed to get release info for %s: %w", ghrepo.FullName(repo), err)
+	}
+
+	if bm.Tag == r.Tag {
+		return nil
+	}
+
+	// TODO will this work?
+	return m.installBin(repo)
 }
 
 func (m *Manager) Remove(name string) error {
