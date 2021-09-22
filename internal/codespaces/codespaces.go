@@ -99,11 +99,10 @@ func Provision(ctx context.Context, log logger, client apiClient, params *Provis
 		// This error is returned by the API when the initial creation fails with a retryable error.
 		// A retryable error means that GitHub will retry to re-create Codespace and clients should poll
 		// the API and attempt to fetch the Codespace for the next two minutes.
-		if err == api.ErrCreateAsyncRetry {
-			log.Print("Switching to async provisioning...")
-
+		if err == api.ErrProvisioningInProgress {
 			pollTimeout := 2 * time.Minute
 			pollInterval := 1 * time.Second
+			log.Print(".")
 			codespace, err = pollForCodespace(ctx, client, log, pollTimeout, pollInterval, params.User.Login, codespace.Name)
 			log.Print("\n")
 

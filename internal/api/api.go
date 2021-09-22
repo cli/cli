@@ -409,7 +409,7 @@ type createCodespaceRequest struct {
 	SkuName      string `json:"sku_name"`
 }
 
-var ErrCreateAsyncRetry = errors.New("initial creation failed, retrying async")
+var ErrProvisioningInProgress = errors.New("provisioning in progress")
 
 func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repository, sku, branch, location string) (*Codespace, error) {
 	requestBody, err := json.Marshal(createCodespaceRequest{repository.ID, branch, location, sku})
@@ -442,7 +442,7 @@ func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repos
 		// being retried. For clients this means that they must implement a polling strategy
 		// to check for the codespace existence for the next two minutes. We return an error
 		// here so callers can detect and handle this condition.
-		return nil, ErrCreateAsyncRetry
+		return nil, ErrProvisioningInProgress
 	}
 
 	var response Codespace
