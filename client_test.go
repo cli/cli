@@ -13,38 +13,8 @@ import (
 	"github.com/sourcegraph/jsonrpc2"
 )
 
-func TestNewClient(t *testing.T) {
-	client, err := NewClient()
-	if err != nil {
-		t.Errorf("error creating new client: %v", err)
-	}
-	if client == nil {
-		t.Error("client is nil")
-	}
-}
-
-func TestNewClientValidConnection(t *testing.T) {
-	connection := Connection{"1", "2", "3", "4"}
-
-	client, err := NewClient(WithConnection(connection))
-	if err != nil {
-		t.Errorf("error creating new client: %v", err)
-	}
-	if client == nil {
-		t.Error("client is nil")
-	}
-}
-
-func TestNewClientWithInvalidConnection(t *testing.T) {
-	connection := Connection{}
-
-	if _, err := NewClient(WithConnection(connection)); err == nil {
-		t.Error("err is nil")
-	}
-}
-
-func TestJoinSession(t *testing.T) {
-	connection := Connection{
+func TestConnect(t *testing.T) {
+	opts := Options{
 		SessionID:    "session-id",
 		SessionToken: "session-token",
 		RelaySAS:     "relay-sas",
@@ -54,13 +24,13 @@ func TestJoinSession(t *testing.T) {
 		if err := json.Unmarshal(*req.Params, &joinWorkspaceReq); err != nil {
 			return nil, fmt.Errorf("error unmarshaling req: %v", err)
 		}
-		if joinWorkspaceReq.ID != connection.SessionID {
+		if joinWorkspaceReq.ID != opts.SessionID {
 			return nil, errors.New("connection session id does not match")
 		}
 		if joinWorkspaceReq.ConnectionMode != "local" {
 			return nil, errors.New("connection mode is not local")
 		}
-		if joinWorkspaceReq.JoiningUserSessionToken != connection.SessionToken {
+		if joinWorkspaceReq.JoiningUserSessionToken != opts.SessionToken {
 			return nil, errors.New("connection user token does not match")
 		}
 		if joinWorkspaceReq.ClientCapabilities.IsNonInteractive != false {
@@ -70,34 +40,24 @@ func TestJoinSession(t *testing.T) {
 	}
 
 	server, err := livesharetest.NewServer(
-		livesharetest.WithPassword(connection.SessionToken),
+		livesharetest.WithPassword(opts.SessionToken),
 		livesharetest.WithService("workspace.joinWorkspace", joinWorkspace),
-		livesharetest.WithRelaySAS(connection.RelaySAS),
+		livesharetest.WithRelaySAS(opts.RelaySAS),
 	)
 	if err != nil {
 		t.Errorf("error creating Live Share server: %v", err)
 	}
 	defer server.Close()
-	connection.RelayEndpoint = "sb" + strings.TrimPrefix(server.URL(), "https")
+	opts.RelayEndpoint = "sb" + strings.TrimPrefix(server.URL(), "https")
 
 	ctx := context.Background()
 
-	tlsConfig := WithTLSConfig(&tls.Config{InsecureSkipVerify: true})
-	client, err := NewClient(WithConnection(connection), tlsConfig)
-	if err != nil {
-		t.Errorf("error creating new client: %v", err)
-	}
+	opts.TLSConfig = &tls.Config{InsecureSkipVerify: true}
 
 	done := make(chan error)
 	go func() {
-		session, err := client.JoinWorkspace(ctx)
-		if err != nil {
-			done <- fmt.Errorf("error joining workspace: %v", err)
-			return
-		}
-		_ = session
-
-		done <- nil
+		_, err := Connect(ctx, opts) // ignore session
+		done <- err
 	}()
 
 	select {
