@@ -402,8 +402,8 @@ func (a *API) GetCodespacesSKUs(ctx context.Context, user *User, repository *Rep
 	return response.SKUs, nil
 }
 
-// ProvisionCodespaceParams are the required parameters for provisioning a Codespace.
-type ProvisionCodespaceParams struct {
+// CreateCodespaceParams are the required parameters for provisioning a Codespace.
+type CreateCodespaceParams struct {
 	User                      string
 	RepositoryID              int
 	Branch, Machine, Location string
@@ -416,7 +416,7 @@ type logger interface {
 
 // CreateCodespace creates a codespace with the given parameters and returns a non-nil error if it
 // fails to create.
-func (a *API) CreateCodespace(ctx context.Context, log logger, params *ProvisionCodespaceParams) (*Codespace, error) {
+func (a *API) CreateCodespace(ctx context.Context, log logger, params *CreateCodespaceParams) (*Codespace, error) {
 	codespace, err := a.startCreate(
 		ctx, params.User, params.RepositoryID, params.Machine, params.Branch, params.Location,
 	)
