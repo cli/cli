@@ -135,8 +135,12 @@ func pollForCodespace(ctx context.Context, client apiClient, log logger, duratio
 			log.Print(".")
 			token, err := client.GetCodespaceToken(ctx, user, name)
 			if err != nil {
-				// Do nothing. We expect this to fail until the codespace is provisioned
-				continue
+				if err == api.ErrNotProvisioned {
+					// Do nothing. We expect this to fail until the codespace is provisioned
+					continue
+				}
+
+				return nil, fmt.Errorf("failed to get codespace token: %w", err)
 			}
 
 			return client.GetCodespace(ctx, token, user, name)

@@ -208,6 +208,8 @@ type getCodespaceTokenResponse struct {
 	RepositoryToken string `json:"repository_token"`
 }
 
+var ErrNotProvisioned = errors.New("codespace not provisioned")
+
 func (a *API) GetCodespaceToken(ctx context.Context, ownerLogin, codespaceName string) (string, error) {
 	reqBody, err := json.Marshal(getCodespaceTokenRequest{true})
 	if err != nil {
@@ -236,6 +238,11 @@ func (a *API) GetCodespaceToken(ctx context.Context, ownerLogin, codespaceName s
 	}
 
 	if resp.StatusCode != http.StatusOK {
+
+		if resp.StatusCode == http.StatusUnprocessableEntity {
+			return "", ErrNotProvisioned
+		}
+
 		return "", jsonErrorResponse(b)
 	}
 
