@@ -24,7 +24,7 @@ func newLogsCmd() *cobra.Command {
 	logsCmd := &cobra.Command{
 		Use:   "logs",
 		Short: "Access codespace logs",
-		Args:  cobra.NoArgs,
+		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return logs(context.Background(), log, codespace, follow)
 		},

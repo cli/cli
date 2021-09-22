@@ -50,7 +50,7 @@ func newDeleteCmd() *cobra.Command {
 	deleteCmd := &cobra.Command{
 		Use:   "delete",
 		Short: "Delete a codespace",
-		Args:  cobra.NoArgs,
+		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.deleteAll && opts.repoFilter != "" {
 				return errors.New("both --all and --repo is not supported")

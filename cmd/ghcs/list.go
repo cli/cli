@@ -20,7 +20,7 @@ func newListCmd() *cobra.Command {
 	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List your codespaces",
-		Args:  cobra.NoArgs,
+		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return list(opts)
 		},

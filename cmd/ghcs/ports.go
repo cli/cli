@@ -31,7 +31,7 @@ func newPortsCmd() *cobra.Command {
 	portsCmd := &cobra.Command{
 		Use:   "ports",
 		Short: "List ports in a codespace",
-		Args:  cobra.NoArgs,
+		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return ports(codespace, asJSON)
 		},
