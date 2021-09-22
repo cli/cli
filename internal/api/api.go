@@ -239,7 +239,6 @@ func (a *API) GetCodespaceToken(ctx context.Context, ownerLogin, codespaceName s
 	}
 
 	if resp.StatusCode != http.StatusOK {
-
 		if resp.StatusCode == http.StatusUnprocessableEntity {
 			return "", ErrNotProvisioned
 		}
@@ -405,8 +404,8 @@ func (a *API) GetCodespacesSKUs(ctx context.Context, user *User, repository *Rep
 
 // ProvisionCodespaceParams are the required parameters for provisioning a Codespace.
 type ProvisionCodespaceParams struct {
-	User                      *User
-	Repository                *Repository
+	User                      string
+	RepositoryID              int
 	Branch, Machine, Location string
 }
 
@@ -415,21 +414,21 @@ type logger interface {
 	Println(v ...interface{}) (int, error)
 }
 
-// ProvisionCodespace creates a codespace with the given parameters and handles polling in the case
-// of initial creation failures.
-func (a *API) ProvisionCodespace(ctx context.Context, log logger, params *ProvisionCodespaceParams) (*Codespace, error) {
-	codespace, err := a.createCodespace(
-		ctx, params.User, params.Repository, params.Machine, params.Branch, params.Location,
+// CreateCodespace creates a codespace with the given parameters and returns a non-nil error if it
+// fails to create.
+func (a *API) CreateCodespace(ctx context.Context, log logger, params *ProvisionCodespaceParams) (*Codespace, error) {
+	codespace, err := a.startCreate(
+		ctx, params.User, params.RepositoryID, params.Machine, params.Branch, params.Location,
 	)
 	if err != nil {
-		// This error is returned by the API when the initial creation fails with a retryable error.
-		// A retryable error means that GitHub will retry to re-create Codespace and clients should poll
-		// the API and attempt to fetch the Codespace for the next two minutes.
+		// errProvisioningInProgress indicates that codespace creation did not complete
+		// within the GitHub API RPC time limit (10s), so it continues asynchronously.
+		// We must poll the server to discover the outcome.
 		if err == errProvisioningInProgress {
 			pollTimeout := 2 * time.Minute
 			pollInterval := 1 * time.Second
 			log.Print(".")
-			codespace, err = pollForCodespace(ctx, a, log, pollTimeout, pollInterval, params.User.Login, codespace.Name)
+			codespace, err = pollForCodespace(ctx, a, log, pollTimeout, pollInterval, params.User, codespace.Name)
 			log.Print("\n")
 
 			if err != nil {
@@ -487,13 +486,17 @@ type createCodespaceRequest struct {
 
 var errProvisioningInProgress = errors.New("provisioning in progress")
 
-func (a *API) createCodespace(ctx context.Context, user *User, repository *Repository, sku, branch, location string) (*Codespace, error) {
-	requestBody, err := json.Marshal(createCodespaceRequest{repository.ID, branch, location, sku})
+// startCreate starts the creation of a codespace.
+// It may return success or an error, or errProvisioningInProgress indicating that the operation
+// did not complete before the GitHub API's time limit for RPCs (10s), in which case the caller
+// must poll the server to learn the outcome.
+func (a *API) startCreate(ctx context.Context, user string, repository int, sku, branch, location string) (*Codespace, error) {
+	requestBody, err := json.Marshal(createCodespaceRequest{repository, branch, location, sku})
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, githubAPI+"/vscs_internal/user/"+user.Login+"/codespaces", bytes.NewBuffer(requestBody))
+	req, err := http.NewRequest(http.MethodPost, githubAPI+"/vscs_internal/user/"+user+"/codespaces", bytes.NewBuffer(requestBody))
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -514,11 +517,7 @@ func (a *API) createCodespace(ctx context.Context, user *User, repository *Repos
 	case resp.StatusCode > http.StatusAccepted:
 		return nil, jsonErrorResponse(b)
 	case resp.StatusCode == http.StatusAccepted:
-		// When the API returns a 202, it means that the initial creation failed but it is
-		// being retried. For clients this means that they must implement a polling strategy
-		// to check for the codespace existence for the next two minutes. We return an error
-		// here so callers can detect and handle this condition.
-		return nil, errProvisioningInProgress
+		return nil, errProvisioningInProgress // RPC finished before result of creation known
 	}
 
 	var response Codespace
