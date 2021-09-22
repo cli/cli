@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -103,14 +101,10 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				if err != nil {
 					return err
 				}
+
 				if err := checkValidExtension(cmd.Root(), m, repo.RepoName()); err != nil {
 					return err
 				}
-				client, err := f.HttpClient()
-				if err != nil {
-					return fmt.Errorf("could not make http client: %w", err)
-				}
-				client = api.NewCachedClient(client, time.Second*30)
 
 				return m.Install(repo)
 			},
