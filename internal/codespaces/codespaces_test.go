@@ -1,4 +1,4 @@
-package ghcs
+package codespaces
 
 import (
 	"context"
@@ -12,8 +12,17 @@ import (
 )
 
 type mockAPIClient struct {
+	createCodespace   func(context.Context, *api.User, *api.Repository, string, string, string) (*api.Codespace, error)
 	getCodespaceToken func(context.Context, string, string) (string, error)
 	getCodespace      func(context.Context, string, string, string) (*api.Codespace, error)
+}
+
+func (m *mockAPIClient) CreateCodespace(ctx context.Context, user *api.User, repo *api.Repository, machine, branch, location string) (*api.Codespace, error) {
+	if m.createCodespace == nil {
+		return nil, errors.New("mock api client CreateCodespace not implemented")
+	}
+
+	return m.createCodespace(ctx, user, repo, machine, branch, location)
 }
 
 func (m *mockAPIClient) GetCodespaceToken(ctx context.Context, userLogin, codespaceName string) (string, error) {

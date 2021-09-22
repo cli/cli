@@ -431,6 +431,10 @@ func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repos
 	case resp.StatusCode > http.StatusAccepted:
 		return nil, jsonErrorResponse(b)
 	case resp.StatusCode == http.StatusAccepted:
+		// When the API returns a 202, it means that the initial creation failed but it is
+		// being retried. For clients this means that they must implement a polling strategy
+		// to check for the codespace existence for the next two minutes. We return an error
+		// here so callers can detect and handle this condition.
 		return nil, ErrCreateAsyncRetry
 	}
 
