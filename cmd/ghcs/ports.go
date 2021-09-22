@@ -123,7 +123,7 @@ type portAttribute struct {
 }
 
 func getDevContainer(ctx context.Context, apiClient *api.API, codespace *api.Codespace) <-chan devContainerResult {
-	ch := make(chan devContainerResult)
+	ch := make(chan devContainerResult, 1)
 	go func() {
 		contents, err := apiClient.GetCodespaceRepositoryContents(ctx, codespace, ".devcontainer/devcontainer.json")
 		if err != nil {
