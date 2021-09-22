@@ -59,7 +59,7 @@ func newDeleteCmd() *cobra.Command {
 		},
 	}
 
-	deleteCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "The `name` of the codespace to delete")
+	deleteCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "Name of the codespace")
 	deleteCmd.Flags().BoolVar(&opts.deleteAll, "all", false, "Delete all codespaces")
 	deleteCmd.Flags().StringVarP(&opts.repoFilter, "repo", "r", "", "Delete codespaces for a `repository`")
 	deleteCmd.Flags().BoolVarP(&opts.skipConfirm, "force", "f", false, "Skip confirmation for codespaces that contain unsaved changes")
