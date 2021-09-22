@@ -108,11 +108,11 @@ func TestManager_Upgrade_AllExtensions(t *testing.T) {
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-two", "gh-two")))
 	assert.NoError(t, stubLocalExtension(tempDir, filepath.Join(tempDir, "extensions", "gh-local", "gh-local")))
 
-	m := newTestManager(tempDir, nil, nil)
+	io, _, stdout, stderr := iostreams.Test()
 
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	err := m.Upgrade("", false, stdout, stderr)
+	m := newTestManager(tempDir, nil, io)
+
+	err := m.Upgrade("", false)
 	assert.NoError(t, err)
 
 	assert.Equal(t, heredoc.Docf(
@@ -133,11 +133,11 @@ func TestManager_Upgrade_RemoteExtension(t *testing.T) {
 	tempDir := t.TempDir()
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-remote", "gh-remote")))
 
-	m := newTestManager(tempDir, nil, nil)
+	io, _, stdout, stderr := iostreams.Test()
 
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	err := m.Upgrade("remote", false, stdout, stderr)
+	m := newTestManager(tempDir, nil, io)
+
+	err := m.Upgrade("remote", false)
 	assert.NoError(t, err)
 	assert.Equal(t, heredoc.Docf(
 		`
@@ -153,11 +153,10 @@ func TestManager_Upgrade_LocalExtension(t *testing.T) {
 	tempDir := t.TempDir()
 	assert.NoError(t, stubLocalExtension(tempDir, filepath.Join(tempDir, "extensions", "gh-local", "gh-local")))
 
-	m := newTestManager(tempDir, nil, nil)
+	io, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, nil, io)
 
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	err := m.Upgrade("local", false, stdout, stderr)
+	err := m.Upgrade("local", false)
 	assert.EqualError(t, err, "local extensions can not be upgraded")
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
@@ -170,11 +169,10 @@ func TestManager_Upgrade_Force(t *testing.T) {
 
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-remote", "gh-remote")))
 
-	m := newTestManager(tempDir, nil, nil)
+	io, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, nil, io)
 
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	err := m.Upgrade("remote", true, stdout, stderr)
+	err := m.Upgrade("remote", true)
 	assert.NoError(t, err)
 	assert.Equal(t, heredoc.Docf(
 		`
@@ -192,11 +190,10 @@ func TestManager_Upgrade_Force(t *testing.T) {
 func TestManager_Upgrade_NoExtensions(t *testing.T) {
 	tempDir := t.TempDir()
 
-	m := newTestManager(tempDir, nil, nil)
+	io, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, nil, io)
 
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	err := m.Upgrade("", false, stdout, stderr)
+	err := m.Upgrade("", false)
 	assert.EqualError(t, err, "no extensions installed")
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())

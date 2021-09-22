@@ -306,7 +306,7 @@ func (m *Manager) installGit(cloneURL string, stdout, stderr io.Writer) error {
 
 var localExtensionUpgradeError = errors.New("local extensions can not be upgraded")
 
-func (m *Manager) Upgrade(name string, force bool, stdout, stderr io.Writer) error {
+func (m *Manager) Upgrade(name string, force bool) error {
 	exe, err := m.lookPath("git")
 	if err != nil {
 		return err
@@ -320,14 +320,14 @@ func (m *Manager) Upgrade(name string, force bool, stdout, stderr io.Writer) err
 	someUpgraded := false
 	for _, f := range exts {
 		if name == "" {
-			fmt.Fprintf(stdout, "[%s]: ", f.Name())
+			fmt.Fprintf(m.io.Out, "[%s]: ", f.Name())
 		} else if f.Name() != name {
 			continue
 		}
 
 		if f.IsLocal() {
 			if name == "" {
-				fmt.Fprintf(stdout, "%s\n", localExtensionUpgradeError)
+				fmt.Fprintf(m.io.Out, "%s\n", localExtensionUpgradeError)
 			} else {
 				err = localExtensionUpgradeError
 			}
@@ -344,7 +344,7 @@ func (m *Manager) Upgrade(name string, force bool, stdout, stderr io.Writer) err
 			pullCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "pull", "--ff-only")
 			cmds = []*exec.Cmd{pullCmd}
 		}
-		if e := runCmds(cmds, stdout, stderr); e != nil {
+		if e := runCmds(cmds, m.io.Out, m.io.ErrOut); e != nil {
 			err = e
 		}
 		someUpgraded = true

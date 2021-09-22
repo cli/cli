@@ -1,7 +1,6 @@
 package extension
 
 import (
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -94,7 +93,7 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "upgrade an extension",
 			args: []string{"upgrade", "hello"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.UpgradeFunc = func(name string, force bool, out, errOut io.Writer) error {
+				em.UpgradeFunc = func(name string, force bool) error {
 					return nil
 				}
 				return func(t *testing.T) {
@@ -108,7 +107,7 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "upgrade an extension gh-prefix",
 			args: []string{"upgrade", "gh-hello"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.UpgradeFunc = func(name string, force bool, out, errOut io.Writer) error {
+				em.UpgradeFunc = func(name string, force bool) error {
 					return nil
 				}
 				return func(t *testing.T) {
@@ -122,7 +121,7 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "upgrade an extension full name",
 			args: []string{"upgrade", "monalisa/gh-hello"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.UpgradeFunc = func(name string, force bool, out, errOut io.Writer) error {
+				em.UpgradeFunc = func(name string, force bool) error {
 					return nil
 				}
 				return func(t *testing.T) {
@@ -136,7 +135,7 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "upgrade all",
 			args: []string{"upgrade", "--all"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.UpgradeFunc = func(name string, force bool, out, errOut io.Writer) error {
+				em.UpgradeFunc = func(name string, force bool) error {
 					return nil
 				}
 				return func(t *testing.T) {
