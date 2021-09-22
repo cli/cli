@@ -1,4 +1,4 @@
-package codespaces
+package api
 
 import (
 	"context"
@@ -8,21 +8,11 @@ import (
 	"time"
 
 	"github.com/github/ghcs/cmd/ghcs/output"
-	"github.com/github/ghcs/internal/api"
 )
 
 type mockAPIClient struct {
-	createCodespace   func(context.Context, *api.User, *api.Repository, string, string, string) (*api.Codespace, error)
 	getCodespaceToken func(context.Context, string, string) (string, error)
-	getCodespace      func(context.Context, string, string, string) (*api.Codespace, error)
-}
-
-func (m *mockAPIClient) CreateCodespace(ctx context.Context, user *api.User, repo *api.Repository, machine, branch, location string) (*api.Codespace, error) {
-	if m.createCodespace == nil {
-		return nil, errors.New("mock api client CreateCodespace not implemented")
-	}
-
-	return m.createCodespace(ctx, user, repo, machine, branch, location)
+	getCodespace      func(context.Context, string, string, string) (*Codespace, error)
 }
 
 func (m *mockAPIClient) GetCodespaceToken(ctx context.Context, userLogin, codespaceName string) (string, error) {
@@ -33,7 +23,7 @@ func (m *mockAPIClient) GetCodespaceToken(ctx context.Context, userLogin, codesp
 	return m.getCodespaceToken(ctx, userLogin, codespaceName)
 }
 
-func (m *mockAPIClient) GetCodespace(ctx context.Context, token, userLogin, codespaceName string) (*api.Codespace, error) {
+func (m *mockAPIClient) GetCodespace(ctx context.Context, token, userLogin, codespaceName string) (*Codespace, error) {
 	if m.getCodespace == nil {
 		return nil, errors.New("mock api client GetCodespace not implemented")
 	}
@@ -43,8 +33,8 @@ func (m *mockAPIClient) GetCodespace(ctx context.Context, token, userLogin, code
 
 func TestPollForCodespace(t *testing.T) {
 	logger := output.NewLogger(nil, nil, false)
-	user := &api.User{Login: "test"}
-	tmpCodespace := &api.Codespace{Name: "tmp-codespace"}
+	user := &User{Login: "test"}
+	tmpCodespace := &Codespace{Name: "tmp-codespace"}
 	codespaceToken := "codespace-token"
 	ctx := context.Background()
 
@@ -61,7 +51,7 @@ func TestPollForCodespace(t *testing.T) {
 			}
 			return codespaceToken, nil
 		},
-		getCodespace: func(ctx context.Context, token, userLogin, codespace string) (*api.Codespace, error) {
+		getCodespace: func(ctx context.Context, token, userLogin, codespace string) (*Codespace, error) {
 			if token != codespaceToken {
 				return nil, fmt.Errorf("token does not match, got: %s, expected: %s", token, codespaceToken)
 			}

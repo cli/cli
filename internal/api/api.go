@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/opentracing/opentracing-go"
 )
@@ -402,6 +403,81 @@ func (a *API) GetCodespacesSKUs(ctx context.Context, user *User, repository *Rep
 	return response.SKUs, nil
 }
 
+// ProvisionCodespaceParams are the required parameters for provisioning a Codespace.
+type ProvisionCodespaceParams struct {
+	User                      *User
+	Repository                *Repository
+	Branch, Machine, Location string
+}
+
+type logger interface {
+	Print(v ...interface{}) (int, error)
+	Println(v ...interface{}) (int, error)
+}
+
+// ProvisionCodespace creates a codespace with the given parameters and handles polling in the case
+// of initial creation failures.
+func (a *API) ProvisionCodespace(ctx context.Context, log logger, params *ProvisionCodespaceParams) (*Codespace, error) {
+	codespace, err := a.createCodespace(
+		ctx, params.User, params.Repository, params.Machine, params.Branch, params.Location,
+	)
+	if err != nil {
+		// This error is returned by the API when the initial creation fails with a retryable error.
+		// A retryable error means that GitHub will retry to re-create Codespace and clients should poll
+		// the API and attempt to fetch the Codespace for the next two minutes.
+		if err == errProvisioningInProgress {
+			pollTimeout := 2 * time.Minute
+			pollInterval := 1 * time.Second
+			log.Print(".")
+			codespace, err = pollForCodespace(ctx, a, log, pollTimeout, pollInterval, params.User.Login, codespace.Name)
+			log.Print("\n")
+
+			if err != nil {
+				return nil, fmt.Errorf("error creating codespace with async provisioning: %s: %w", codespace.Name, err)
+			}
+		}
+
+		return nil, err
+	}
+
+	return codespace, nil
+}
+
+type apiClient interface {
+	GetCodespaceToken(ctx context.Context, userLogin, codespaceName string) (string, error)
+	GetCodespace(ctx context.Context, token, userLogin, codespaceName string) (*Codespace, error)
+}
+
+// pollForCodespace polls the Codespaces GET endpoint on a given interval for a specified duration.
+// If it succeeds at fetching the codespace, we consider the codespace provisioned.
+func pollForCodespace(ctx context.Context, client apiClient, log logger, duration, interval time.Duration, user, name string) (*Codespace, error) {
+	ctx, cancel := context.WithTimeout(ctx, duration)
+	defer cancel()
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-ticker.C:
+			log.Print(".")
+			token, err := client.GetCodespaceToken(ctx, user, name)
+			if err != nil {
+				if err == ErrNotProvisioned {
+					// Do nothing. We expect this to fail until the codespace is provisioned
+					continue
+				}
+
+				return nil, fmt.Errorf("failed to get codespace token: %w", err)
+			}
+
+			return client.GetCodespace(ctx, token, user, name)
+		}
+	}
+}
+
 type createCodespaceRequest struct {
 	RepositoryID int    `json:"repository_id"`
 	Ref          string `json:"ref"`
@@ -409,9 +485,9 @@ type createCodespaceRequest struct {
 	SkuName      string `json:"sku_name"`
 }
 
-var ErrProvisioningInProgress = errors.New("provisioning in progress")
+var errProvisioningInProgress = errors.New("provisioning in progress")
 
-func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repository, sku, branch, location string) (*Codespace, error) {
+func (a *API) createCodespace(ctx context.Context, user *User, repository *Repository, sku, branch, location string) (*Codespace, error) {
 	requestBody, err := json.Marshal(createCodespaceRequest{repository.ID, branch, location, sku})
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
@@ -442,7 +518,7 @@ func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repos
 		// being retried. For clients this means that they must implement a polling strategy
 		// to check for the codespace existence for the next two minutes. We return an error
 		// here so callers can detect and handle this condition.
-		return nil, ErrProvisioningInProgress
+		return nil, errProvisioningInProgress
 	}
 
 	var response Codespace

@@ -83,7 +83,7 @@ func create(opts *createOptions) error {
 
 	log.Println("Creating your codespace...")
 
-	codespace, err := codespaces.Provision(ctx, log, apiClient, &codespaces.ProvisionParams{
+	codespace, err := apiClient.ProvisionCodespace(ctx, log, &api.ProvisionCodespaceParams{
 		User:       userResult.User,
 		Repository: repository,
 		Branch:     branch,
