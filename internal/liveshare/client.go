@@ -130,8 +130,9 @@ func (s *Session) openStreamingChannel(ctx context.Context, id channelID) (ssh.C
 		return nil, fmt.Errorf("error getting stream id: %w", err)
 	}
 
-	span, _ := opentracing.StartSpanFromContext(ctx, "Session.OpenChannel+SendRequest")
+	span, ctx := opentracing.StartSpanFromContext(ctx, "Session.OpenChannel+SendRequest")
 	defer span.Finish()
+	_ = ctx // ctx is not currently used
 
 	channel, reqs, err := s.ssh.conn.OpenChannel("session", nil)
 	if err != nil {
