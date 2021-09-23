@@ -71,7 +71,7 @@ func TestServerStartSharing(t *testing.T) {
 	testServer, session, err := makeMockSession(
 		livesharetest.WithService("serverSharing.startSharing", startSharing),
 	)
-	defer testServer.Close() //nolint:stylecheck // httptest.Server does not return errors on Close()
+	defer testServer.Close() //nolint - httptest.Server does not return errors on Close()
 
 	if err != nil {
 		t.Errorf("error creating mock session: %w", err)
