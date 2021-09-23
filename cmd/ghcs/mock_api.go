@@ -10,10 +10,6 @@ import (
 	"github.com/github/ghcs/internal/api"
 )
 
-// Ensure, that apiClientMock does implement apiClient.
-// If this is not the case, regenerate this file with moq.
-var _ apiClient = &apiClientMock{}
-
 // apiClientMock is a mock implementation of apiClient.
 //
 // 	func TestSomethingThatUsesapiClient(t *testing.T) {
@@ -22,6 +18,12 @@ var _ apiClient = &apiClientMock{}
 // 		mockedapiClient := &apiClientMock{
 // 			DeleteCodespaceFunc: func(ctx context.Context, user string, name string) error {
 // 				panic("mock out the DeleteCodespace method")
+// 			},
+// 			GetCodespaceFunc: func(ctx context.Context, token string, user string, name string) (*api.Codespace, error) {
+// 				panic("mock out the GetCodespace method")
+// 			},
+// 			GetCodespaceTokenFunc: func(ctx context.Context, user string, name string) (string, error) {
+// 				panic("mock out the GetCodespaceToken method")
 // 			},
 // 			GetUserFunc: func(ctx context.Context) (*api.User, error) {
 // 				panic("mock out the GetUser method")
@@ -39,6 +41,12 @@ type apiClientMock struct {
 	// DeleteCodespaceFunc mocks the DeleteCodespace method.
 	DeleteCodespaceFunc func(ctx context.Context, user string, name string) error
 
+	// GetCodespaceFunc mocks the GetCodespace method.
+	GetCodespaceFunc func(ctx context.Context, token string, user string, name string) (*api.Codespace, error)
+
+	// GetCodespaceTokenFunc mocks the GetCodespaceToken method.
+	GetCodespaceTokenFunc func(ctx context.Context, user string, name string) (string, error)
+
 	// GetUserFunc mocks the GetUser method.
 	GetUserFunc func(ctx context.Context) (*api.User, error)
 
@@ -49,6 +57,26 @@ type apiClientMock struct {
 	calls struct {
 		// DeleteCodespace holds details about calls to the DeleteCodespace method.
 		DeleteCodespace []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// User is the user argument value.
+			User string
+			// Name is the name argument value.
+			Name string
+		}
+		// GetCodespace holds details about calls to the GetCodespace method.
+		GetCodespace []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Token is the token argument value.
+			Token string
+			// User is the user argument value.
+			User string
+			// Name is the name argument value.
+			Name string
+		}
+		// GetCodespaceToken holds details about calls to the GetCodespaceToken method.
+		GetCodespaceToken []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// User is the user argument value.
@@ -69,9 +97,11 @@ type apiClientMock struct {
 			User string
 		}
 	}
-	lockDeleteCodespace sync.RWMutex
-	lockGetUser         sync.RWMutex
-	lockListCodespaces  sync.RWMutex
+	lockDeleteCodespace   sync.RWMutex
+	lockGetCodespace      sync.RWMutex
+	lockGetCodespaceToken sync.RWMutex
+	lockGetUser           sync.RWMutex
+	lockListCodespaces    sync.RWMutex
 }
 
 // DeleteCodespace calls DeleteCodespaceFunc.
@@ -110,6 +140,88 @@ func (mock *apiClientMock) DeleteCodespaceCalls() []struct {
 	mock.lockDeleteCodespace.RLock()
 	calls = mock.calls.DeleteCodespace
 	mock.lockDeleteCodespace.RUnlock()
+	return calls
+}
+
+// GetCodespace calls GetCodespaceFunc.
+func (mock *apiClientMock) GetCodespace(ctx context.Context, token string, user string, name string) (*api.Codespace, error) {
+	if mock.GetCodespaceFunc == nil {
+		panic("apiClientMock.GetCodespaceFunc: method is nil but apiClient.GetCodespace was just called")
+	}
+	callInfo := struct {
+		Ctx   context.Context
+		Token string
+		User  string
+		Name  string
+	}{
+		Ctx:   ctx,
+		Token: token,
+		User:  user,
+		Name:  name,
+	}
+	mock.lockGetCodespace.Lock()
+	mock.calls.GetCodespace = append(mock.calls.GetCodespace, callInfo)
+	mock.lockGetCodespace.Unlock()
+	return mock.GetCodespaceFunc(ctx, token, user, name)
+}
+
+// GetCodespaceCalls gets all the calls that were made to GetCodespace.
+// Check the length with:
+//     len(mockedapiClient.GetCodespaceCalls())
+func (mock *apiClientMock) GetCodespaceCalls() []struct {
+	Ctx   context.Context
+	Token string
+	User  string
+	Name  string
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Token string
+		User  string
+		Name  string
+	}
+	mock.lockGetCodespace.RLock()
+	calls = mock.calls.GetCodespace
+	mock.lockGetCodespace.RUnlock()
+	return calls
+}
+
+// GetCodespaceToken calls GetCodespaceTokenFunc.
+func (mock *apiClientMock) GetCodespaceToken(ctx context.Context, user string, name string) (string, error) {
+	if mock.GetCodespaceTokenFunc == nil {
+		panic("apiClientMock.GetCodespaceTokenFunc: method is nil but apiClient.GetCodespaceToken was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		User string
+		Name string
+	}{
+		Ctx:  ctx,
+		User: user,
+		Name: name,
+	}
+	mock.lockGetCodespaceToken.Lock()
+	mock.calls.GetCodespaceToken = append(mock.calls.GetCodespaceToken, callInfo)
+	mock.lockGetCodespaceToken.Unlock()
+	return mock.GetCodespaceTokenFunc(ctx, user, name)
+}
+
+// GetCodespaceTokenCalls gets all the calls that were made to GetCodespaceToken.
+// Check the length with:
+//     len(mockedapiClient.GetCodespaceTokenCalls())
+func (mock *apiClientMock) GetCodespaceTokenCalls() []struct {
+	Ctx  context.Context
+	User string
+	Name string
+} {
+	var calls []struct {
+		Ctx  context.Context
+		User string
+		Name string
+	}
+	mock.lockGetCodespaceToken.RLock()
+	calls = mock.calls.GetCodespaceToken
+	mock.lockGetCodespaceToken.RUnlock()
 	return calls
 }
 

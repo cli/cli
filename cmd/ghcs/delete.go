@@ -28,14 +28,16 @@ type deleteOptions struct {
 	prompter      prompter
 }
 
-//go:generate moq -fmt goimports -rm -out mock_prompter.go . prompter
+//go:generate moq -fmt goimports -rm -skip-ensure -out mock_prompter.go . prompter
 type prompter interface {
 	Confirm(message string) (bool, error)
 }
 
-//go:generate moq -fmt goimports -rm -out mock_api.go . apiClient
+//go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
 type apiClient interface {
 	GetUser(ctx context.Context) (*api.User, error)
+	GetCodespaceToken(ctx context.Context, user, name string) (string, error)
+	GetCodespace(ctx context.Context, token, user, name string) (*api.Codespace, error)
 	ListCodespaces(ctx context.Context, user string) ([]*api.Codespace, error)
 	DeleteCodespace(ctx context.Context, user, name string) error
 }
@@ -80,18 +82,34 @@ func delete(ctx context.Context, log logger, opts deleteOptions) error {
 		return fmt.Errorf("error getting user: %w", err)
 	}
 
-	codespaces, err := opts.apiClient.ListCodespaces(ctx, user.Login)
-	if err != nil {
-		return fmt.Errorf("error getting codespaces: %w", err)
-	}
-
+	var codespaces []*api.Codespace
 	nameFilter := opts.codespaceName
-	if nameFilter == "" && !opts.deleteAll && opts.repoFilter == "" {
-		c, err := chooseCodespaceFromList(ctx, codespaces)
+	if nameFilter == "" {
+		codespaces, err = opts.apiClient.ListCodespaces(ctx, user.Login)
 		if err != nil {
-			return fmt.Errorf("error choosing codespace: %w", err)
+			return fmt.Errorf("error getting codespaces: %w", err)
 		}
-		nameFilter = c.Name
+
+		if !opts.deleteAll && opts.repoFilter == "" {
+			c, err := chooseCodespaceFromList(ctx, codespaces)
+			if err != nil {
+				return fmt.Errorf("error choosing codespace: %w", err)
+			}
+			nameFilter = c.Name
+		}
+	} else {
+		// TODO: this token is discarded and then re-requested later in DeleteCodespace
+		token, err := opts.apiClient.GetCodespaceToken(ctx, user.Login, nameFilter)
+		if err != nil {
+			return fmt.Errorf("error getting codespace token: %w", err)
+		}
+
+		codespace, err := opts.apiClient.GetCodespace(ctx, token, user.Login, nameFilter)
+		if err != nil {
+			return fmt.Errorf("error fetching codespace information: %w", err)
+		}
+
+		codespaces = []*api.Codespace{codespace}
 	}
 
 	codespacesToDelete := make([]*api.Codespace, 0, len(codespaces))
@@ -112,7 +130,7 @@ func delete(ctx context.Context, log logger, opts deleteOptions) error {
 				continue
 			}
 		}
-		if nameFilter == "" || !opts.skipConfirm {
+		if !opts.skipConfirm {
 			confirmed, err := confirmDeletion(opts.prompter, c, opts.isInteractive)
 			if err != nil {
 				return fmt.Errorf("unable to confirm: %w", err)
@@ -133,7 +151,7 @@ func delete(ctx context.Context, log logger, opts deleteOptions) error {
 		codespaceName := c.Name
 		g.Go(func() error {
 			if err := opts.apiClient.DeleteCodespace(ctx, user.Login, codespaceName); err != nil {
-				log.Errorf("error deleting codespace %q: %v", codespaceName, err)
+				_, _ = log.Errorf("error deleting codespace %q: %v", codespaceName, err)
 				return err
 			}
 			return nil

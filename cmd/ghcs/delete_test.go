@@ -32,9 +32,6 @@ func TestDelete(t *testing.T) {
 			},
 			codespaces: []*api.Codespace{
 				{
-					Name: "monalisa-spoonknife-123",
-				},
-				{
 					Name: "hubot-robawt-abc",
 				},
 			},
@@ -130,18 +127,36 @@ func TestDelete(t *testing.T) {
 				GetUserFunc: func(_ context.Context) (*api.User, error) {
 					return user, nil
 				},
-				ListCodespacesFunc: func(_ context.Context, userLogin string) ([]*api.Codespace, error) {
-					if userLogin != user.Login {
-						return nil, fmt.Errorf("unexpected user %q", userLogin)
-					}
-					return tt.codespaces, nil
-				},
 				DeleteCodespaceFunc: func(_ context.Context, userLogin, name string) error {
 					if userLogin != user.Login {
 						return fmt.Errorf("unexpected user %q", userLogin)
 					}
 					return nil
 				},
+			}
+			if tt.opts.codespaceName == "" {
+				apiMock.ListCodespacesFunc = func(_ context.Context, userLogin string) ([]*api.Codespace, error) {
+					if userLogin != user.Login {
+						return nil, fmt.Errorf("unexpected user %q", userLogin)
+					}
+					return tt.codespaces, nil
+				}
+			} else {
+				apiMock.GetCodespaceTokenFunc = func(_ context.Context, userLogin, name string) (string, error) {
+					if userLogin != user.Login {
+						return "", fmt.Errorf("unexpected user %q", userLogin)
+					}
+					return "CS_TOKEN", nil
+				}
+				apiMock.GetCodespaceFunc = func(_ context.Context, token, userLogin, name string) (*api.Codespace, error) {
+					if userLogin != user.Login {
+						return nil, fmt.Errorf("unexpected user %q", userLogin)
+					}
+					if token != "CS_TOKEN" {
+						return nil, fmt.Errorf("unexpected token %q", token)
+					}
+					return tt.codespaces[0], nil
+				}
 			}
 			opts := tt.opts
 			opts.apiClient = apiMock

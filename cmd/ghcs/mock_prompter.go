@@ -7,10 +7,6 @@ import (
 	"sync"
 )
 
-// Ensure, that prompterMock does implement prompter.
-// If this is not the case, regenerate this file with moq.
-var _ prompter = &prompterMock{}
-
 // prompterMock is a mock implementation of prompter.
 //
 // 	func TestSomethingThatUsesprompter(t *testing.T) {
