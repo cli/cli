@@ -36,7 +36,7 @@ func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server,
 		TLSConfig:     &tls.Config{InsecureSkipVerify: true},
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("error connecting to Live Share: %v", err)
+		return nil, nil, fmt.Errorf("error connecting to Live Share: %w", err)
 	}
 	return testServer, session, nil
 }
@@ -46,7 +46,7 @@ func TestServerStartSharing(t *testing.T) {
 	startSharing := func(req *jsonrpc2.Request) (interface{}, error) {
 		var args []interface{}
 		if err := json.Unmarshal(*req.Params, &args); err != nil {
-			return nil, fmt.Errorf("error unmarshaling request: %v", err)
+			return nil, fmt.Errorf("error unmarshaling request: %w", err)
 		}
 		if len(args) < 3 {
 			return nil, errors.New("not enough arguments to start sharing")
@@ -63,7 +63,7 @@ func TestServerStartSharing(t *testing.T) {
 		}
 		if browseURL, ok := args[2].(string); !ok {
 			return nil, errors.New("browse url is not a string")
-		} else if browseURL != fmt.Sprintf("http://localhost:%v", serverPort) {
+		} else if browseURL != fmt.Sprintf("http://localhost:%d", serverPort) {
 			return nil, errors.New("browseURL does not match expected")
 		}
 		return Port{StreamName: "stream-name", StreamCondition: "stream-condition"}, nil
@@ -74,7 +74,7 @@ func TestServerStartSharing(t *testing.T) {
 	defer testServer.Close()
 
 	if err != nil {
-		t.Errorf("error creating mock session: %v", err)
+		t.Errorf("error creating mock session: %w", err)
 	}
 	ctx := context.Background()
 
@@ -82,7 +82,7 @@ func TestServerStartSharing(t *testing.T) {
 	go func() {
 		streamID, err := session.startSharing(ctx, serverProtocol, serverPort)
 		if err != nil {
-			done <- fmt.Errorf("error sharing server: %v", err)
+			done <- fmt.Errorf("error sharing server: %w", err)
 		}
 		if streamID.name == "" || streamID.condition == "" {
 			done <- errors.New("stream name or condition is blank")
@@ -92,10 +92,10 @@ func TestServerStartSharing(t *testing.T) {
 
 	select {
 	case err := <-testServer.Err():
-		t.Errorf("error from server: %v", err)
+		t.Errorf("error from server: %w", err)
 	case err := <-done:
 		if err != nil {
-			t.Errorf("error from client: %v", err)
+			t.Errorf("error from client: %w", err)
 		}
 	}
 }
@@ -113,7 +113,7 @@ func TestServerGetSharedServers(t *testing.T) {
 		livesharetest.WithService("serverSharing.getSharedServers", getSharedServers),
 	)
 	if err != nil {
-		t.Errorf("error creating mock session: %v", err)
+		t.Errorf("error creating mock session: %w", err)
 	}
 	defer testServer.Close()
 	ctx := context.Background()
@@ -121,7 +121,7 @@ func TestServerGetSharedServers(t *testing.T) {
 	go func() {
 		ports, err := session.GetSharedServers(ctx)
 		if err != nil {
-			done <- fmt.Errorf("error getting shared servers: %v", err)
+			done <- fmt.Errorf("error getting shared servers: %w", err)
 		}
 		if len(ports) < 1 {
 			done <- errors.New("not enough ports returned")
@@ -140,10 +140,10 @@ func TestServerGetSharedServers(t *testing.T) {
 
 	select {
 	case err := <-testServer.Err():
-		t.Errorf("error from server: %v", err)
+		t.Errorf("error from server: %w", err)
 	case err := <-done:
 		if err != nil {
-			t.Errorf("error from client: %v", err)
+			t.Errorf("error from client: %w", err)
 		}
 	}
 }
@@ -152,7 +152,7 @@ func TestServerUpdateSharedVisibility(t *testing.T) {
 	updateSharedVisibility := func(rpcReq *jsonrpc2.Request) (interface{}, error) {
 		var req []interface{}
 		if err := json.Unmarshal(*rpcReq.Params, &req); err != nil {
-			return nil, fmt.Errorf("unmarshal req: %v", err)
+			return nil, fmt.Errorf("unmarshal req: %w", err)
 		}
 		if len(req) < 2 {
 			return nil, errors.New("request arguments is less than 2")
@@ -177,7 +177,7 @@ func TestServerUpdateSharedVisibility(t *testing.T) {
 		livesharetest.WithService("serverSharing.updateSharedServerVisibility", updateSharedVisibility),
 	)
 	if err != nil {
-		t.Errorf("creating mock session: %v", err)
+		t.Errorf("creating mock session: %w", err)
 	}
 	defer testServer.Close()
 	ctx := context.Background()
@@ -187,10 +187,10 @@ func TestServerUpdateSharedVisibility(t *testing.T) {
 	}()
 	select {
 	case err := <-testServer.Err():
-		t.Errorf("error from server: %v", err)
+		t.Errorf("error from server: %w", err)
 	case err := <-done:
 		if err != nil {
-			t.Errorf("error from client: %v", err)
+			t.Errorf("error from client: %w", err)
 		}
 	}
 }
