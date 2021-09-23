@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/github/ghcs/internal/api"
-	"github.com/github/go-liveshare"
+	"github.com/github/ghcs/internal/liveshare"
 )
 
 type logger interface {

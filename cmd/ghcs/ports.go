@@ -14,7 +14,7 @@ import (
 	"github.com/github/ghcs/cmd/ghcs/output"
 	"github.com/github/ghcs/internal/api"
 	"github.com/github/ghcs/internal/codespaces"
-	"github.com/github/go-liveshare"
+	"github.com/github/ghcs/internal/liveshare"
 	"github.com/muhammadmuzzammil1998/jsonc"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"

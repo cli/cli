@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	livesharetest "github.com/github/go-liveshare/test"
+	livesharetest "github.com/github/ghcs/internal/liveshare/test"
 	"github.com/sourcegraph/jsonrpc2"
 )
 
