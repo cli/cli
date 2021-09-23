@@ -101,16 +101,12 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				if err != nil {
 					return err
 				}
+
 				if err := checkValidExtension(cmd.Root(), m, repo.RepoName()); err != nil {
 					return err
 				}
 
-				cfg, err := f.Config()
-				if err != nil {
-					return err
-				}
-				protocol, _ := cfg.Get(repo.RepoHost(), "git_protocol")
-				return m.Install(ghrepo.FormatRemoteURL(repo, protocol), io.Out, io.ErrOut)
+				return m.Install(repo)
 			},
 		},
 		func() *cobra.Command {

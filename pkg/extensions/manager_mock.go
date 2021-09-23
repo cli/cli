@@ -4,6 +4,7 @@
 package extensions
 
 import (
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"io"
 	"sync"
 )
@@ -24,7 +25,7 @@ var _ ExtensionManager = &ExtensionManagerMock{}
 // 			DispatchFunc: func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (bool, error) {
 // 				panic("mock out the Dispatch method")
 // 			},
-// 			InstallFunc: func(url string, stdout io.Writer, stderr io.Writer) error {
+// 			InstallFunc: func(interfaceMoqParam ghrepo.Interface) error {
 // 				panic("mock out the Install method")
 // 			},
 // 			InstallLocalFunc: func(dir string) error {
@@ -53,7 +54,7 @@ type ExtensionManagerMock struct {
 	DispatchFunc func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (bool, error)
 
 	// InstallFunc mocks the Install method.
-	InstallFunc func(url string, stdout io.Writer, stderr io.Writer) error
+	InstallFunc func(interfaceMoqParam ghrepo.Interface) error
 
 	// InstallLocalFunc mocks the InstallLocal method.
 	InstallLocalFunc func(dir string) error
@@ -87,12 +88,8 @@ type ExtensionManagerMock struct {
 		}
 		// Install holds details about calls to the Install method.
 		Install []struct {
-			// URL is the url argument value.
-			URL string
-			// Stdout is the stdout argument value.
-			Stdout io.Writer
-			// Stderr is the stderr argument value.
-			Stderr io.Writer
+			// InterfaceMoqParam is the interfaceMoqParam argument value.
+			InterfaceMoqParam ghrepo.Interface
 		}
 		// InstallLocal holds details about calls to the InstallLocal method.
 		InstallLocal []struct {
@@ -205,37 +202,29 @@ func (mock *ExtensionManagerMock) DispatchCalls() []struct {
 }
 
 // Install calls InstallFunc.
-func (mock *ExtensionManagerMock) Install(url string, stdout io.Writer, stderr io.Writer) error {
+func (mock *ExtensionManagerMock) Install(interfaceMoqParam ghrepo.Interface) error {
 	if mock.InstallFunc == nil {
 		panic("ExtensionManagerMock.InstallFunc: method is nil but ExtensionManager.Install was just called")
 	}
 	callInfo := struct {
-		URL    string
-		Stdout io.Writer
-		Stderr io.Writer
+		InterfaceMoqParam ghrepo.Interface
 	}{
-		URL:    url,
-		Stdout: stdout,
-		Stderr: stderr,
+		InterfaceMoqParam: interfaceMoqParam,
 	}
 	mock.lockInstall.Lock()
 	mock.calls.Install = append(mock.calls.Install, callInfo)
 	mock.lockInstall.Unlock()
-	return mock.InstallFunc(url, stdout, stderr)
+	return mock.InstallFunc(interfaceMoqParam)
 }
 
 // InstallCalls gets all the calls that were made to Install.
 // Check the length with:
 //     len(mockedExtensionManager.InstallCalls())
 func (mock *ExtensionManagerMock) InstallCalls() []struct {
-	URL    string
-	Stdout io.Writer
-	Stderr io.Writer
+	InterfaceMoqParam ghrepo.Interface
 } {
 	var calls []struct {
-		URL    string
-		Stdout io.Writer
-		Stderr io.Writer
+		InterfaceMoqParam ghrepo.Interface
 	}
 	mock.lockInstall.RLock()
 	calls = mock.calls.Install

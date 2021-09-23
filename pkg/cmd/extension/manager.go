@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -14,10 +15,14 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/findsh"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/safeexec"
+	"gopkg.in/yaml.v3"
 )
 
 type Manager struct {
@@ -25,15 +30,30 @@ type Manager struct {
 	lookPath   func(string) (string, error)
 	findSh     func() (string, error)
 	newCommand func(string, ...string) *exec.Cmd
+	platform   func() string
+	client     *http.Client
+	config     config.Config
+	io         *iostreams.IOStreams
 }
 
-func NewManager() *Manager {
+func NewManager(io *iostreams.IOStreams) *Manager {
 	return &Manager{
 		dataDir:    config.DataDir,
 		lookPath:   safeexec.LookPath,
 		findSh:     findsh.Find,
 		newCommand: exec.Command,
+		platform: func() string {
+			return fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH)
+		},
 	}
+}
+
+func (m *Manager) SetConfig(cfg config.Config) {
+	m.config = cfg
+}
+
+func (m *Manager) SetClient(client *http.Client) {
+	m.client = client
 }
 
 func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) (bool, error) {
@@ -172,7 +192,104 @@ func (m *Manager) InstallLocal(dir string) error {
 	return makeSymlink(dir, targetLink)
 }
 
-func (m *Manager) Install(cloneURL string, stdout, stderr io.Writer) error {
+type binManifest struct {
+	Owner string
+	Name  string
+	Host  string
+	Tag   string
+	// TODO I may end up not using this; just thinking ahead to local installs
+	Path string
+}
+
+func (m *Manager) Install(repo ghrepo.Interface) error {
+	isBin, err := isBinExtension(m.client, repo)
+	if err != nil {
+		return fmt.Errorf("could not check for binary extension: %w", err)
+	}
+	if isBin {
+		return m.installBin(repo)
+	}
+
+	hs, err := hasScript(m.client, repo)
+	if err != nil {
+		return err
+	}
+	if !hs {
+		// TODO open an issue hint, here?
+		return errors.New("extension is uninstallable: missing executable")
+	}
+
+	protocol, _ := m.config.Get(repo.RepoHost(), "git_protocol")
+	return m.installGit(ghrepo.FormatRemoteURL(repo, protocol), m.io.Out, m.io.ErrOut)
+}
+
+func (m *Manager) installBin(repo ghrepo.Interface) error {
+	var r *release
+	r, err := fetchLatestRelease(m.client, repo)
+	if err != nil {
+		return err
+	}
+
+	suffix := m.platform()
+	var asset *releaseAsset
+	for _, a := range r.Assets {
+		if strings.HasSuffix(a.Name, suffix) {
+			asset = &a
+			break
+		}
+	}
+
+	if asset == nil {
+		return fmt.Errorf("%s unsupported for %s. Open an issue: `gh issue create -R %s/%s -t'Support %s'`",
+			repo.RepoName(),
+			suffix, repo.RepoOwner(), repo.RepoName(), suffix)
+	}
+
+	name := repo.RepoName()
+	targetDir := filepath.Join(m.installDir(), name)
+	// TODO clean this up if function errs?
+	err = os.MkdirAll(targetDir, 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create installation directory: %w", err)
+	}
+
+	binPath := filepath.Join(targetDir, name)
+
+	err = downloadAsset(m.client, *asset, binPath)
+	if err != nil {
+		return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
+	}
+
+	manifest := binManifest{
+		Name:  name,
+		Owner: repo.RepoOwner(),
+		Host:  repo.RepoHost(),
+		Path:  binPath,
+		Tag:   r.Tag,
+	}
+
+	bs, err := yaml.Marshal(manifest)
+	if err != nil {
+		return fmt.Errorf("failed to serialize manifest: %w", err)
+	}
+
+	manifestPath := filepath.Join(targetDir, "manifest.yml")
+
+	f, err := os.OpenFile(manifestPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open manifest for writing: %w", err)
+	}
+	defer f.Close()
+
+	_, err = f.Write(bs)
+	if err != nil {
+		return fmt.Errorf("failed write manifest file: %w", err)
+	}
+
+	return nil
+}
+
+func (m *Manager) installGit(cloneURL string, stdout, stderr io.Writer) error {
 	exe, err := m.lookPath("git")
 	if err != nil {
 		return err
@@ -345,4 +462,78 @@ func readPathFromFile(path string) (string, error) {
 	b := make([]byte, 1024)
 	n, err := f.Read(b)
 	return strings.TrimSpace(string(b[:n])), err
+}
+
+func isBinExtension(client *http.Client, repo ghrepo.Interface) (isBin bool, err error) {
+	var r *release
+	r, err = fetchLatestRelease(client, repo)
+	if err != nil {
+		httpErr, ok := err.(api.HTTPError)
+		if ok && httpErr.StatusCode == 404 {
+			err = nil
+			return
+		}
+		return
+	}
+
+	for _, a := range r.Assets {
+		dists := possibleDists()
+		for _, d := range dists {
+			if strings.HasSuffix(a.Name, d) {
+				isBin = true
+				break
+			}
+		}
+	}
+
+	return
+}
+
+func possibleDists() []string {
+	return []string{
+		"aix-ppc64",
+		"android-386",
+		"android-amd64",
+		"android-arm",
+		"android-arm64",
+		"darwin-amd64",
+		"darwin-arm64",
+		"dragonfly-amd64",
+		"freebsd-386",
+		"freebsd-amd64",
+		"freebsd-arm",
+		"freebsd-arm64",
+		"illumos-amd64",
+		"ios-amd64",
+		"ios-arm64",
+		"js-wasm",
+		"linux-386",
+		"linux-amd64",
+		"linux-arm",
+		"linux-arm64",
+		"linux-mips",
+		"linux-mips64",
+		"linux-mips64le",
+		"linux-mipsle",
+		"linux-ppc64",
+		"linux-ppc64le",
+		"linux-riscv64",
+		"linux-s390x",
+		"netbsd-386",
+		"netbsd-amd64",
+		"netbsd-arm",
+		"netbsd-arm64",
+		"openbsd-386",
+		"openbsd-amd64",
+		"openbsd-arm",
+		"openbsd-arm64",
+		"openbsd-mips64",
+		"plan9-386",
+		"plan9-amd64",
+		"plan9-arm",
+		"solaris-amd64",
+		"windows-386",
+		"windows-amd64",
+		"windows-arm",
+	}
 }
