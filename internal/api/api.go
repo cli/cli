@@ -429,24 +429,10 @@ func (a *API) CreateCodespace(ctx context.Context, log logger, params *CreateCod
 	// errProvisioningInProgress indicates that codespace creation did not complete
 	// within the GitHub API RPC time limit (10s), so it continues asynchronously.
 	// We must poll the server to discover the outcome.
-	pollTimeout := 2 * time.Minute
-	pollInterval := 1 * time.Second
-
-	return pollForCodespace(ctx, a, log, pollTimeout, pollInterval, params.User, codespace.Name)
-}
-
-type apiClient interface {
-	GetCodespaceToken(ctx context.Context, userLogin, codespaceName string) (string, error)
-	GetCodespace(ctx context.Context, token, userLogin, codespaceName string) (*Codespace, error)
-}
-
-// pollForCodespace polls the Codespaces GET endpoint on a given interval for a specified duration.
-// If it succeeds at fetching the codespace, we consider the codespace provisioned.
-func pollForCodespace(ctx context.Context, client apiClient, log logger, duration, interval time.Duration, user, name string) (*Codespace, error) {
-	ctx, cancel := context.WithTimeout(ctx, duration)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
-	ticker := time.NewTicker(interval)
+	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -455,7 +441,7 @@ func pollForCodespace(ctx context.Context, client apiClient, log logger, duratio
 			return nil, ctx.Err()
 		case <-ticker.C:
 			log.Print(".")
-			token, err := client.GetCodespaceToken(ctx, user, name)
+			token, err := a.GetCodespaceToken(ctx, params.User, codespace.Name)
 			if err != nil {
 				if err == ErrNotProvisioned {
 					// Do nothing. We expect this to fail until the codespace is provisioned
@@ -465,7 +451,7 @@ func pollForCodespace(ctx context.Context, client apiClient, log logger, duratio
 				return nil, fmt.Errorf("failed to get codespace token: %w", err)
 			}
 
-			codespace, err := client.GetCodespace(ctx, token, user, name)
+			codespace, err = a.GetCodespace(ctx, token, params.User, codespace.Name)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get codespace: %w", err)
 			}
