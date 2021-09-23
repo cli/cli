@@ -23,8 +23,8 @@ func connectionReady(codespace *api.Codespace) bool {
 		codespace.Environment.State == api.CodespaceEnvironmentStateAvailable
 }
 
-// ConnectToLiveshare creates a Live Share client and joins the Live Share session.
-// It will start the Codespace if it is not already running, it will time out after 60 seconds if fails to start.
+// ConnectToLiveshare waits for a Codespace to become running,
+// and connects to it using a Live Share session.
 func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, userLogin, token string, codespace *api.Codespace) (*liveshare.Session, error) {
 	var startedCodespace bool
 	if codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
