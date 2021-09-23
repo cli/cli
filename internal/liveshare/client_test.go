@@ -22,7 +22,7 @@ func TestConnect(t *testing.T) {
 	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
 		var joinWorkspaceReq joinWorkspaceArgs
 		if err := json.Unmarshal(*req.Params, &joinWorkspaceReq); err != nil {
-			return nil, fmt.Errorf("error unmarshaling req: %v", err)
+			return nil, fmt.Errorf("error unmarshaling req: %w", err)
 		}
 		if joinWorkspaceReq.ID != opts.SessionID {
 			return nil, errors.New("connection session id does not match")
@@ -45,7 +45,7 @@ func TestConnect(t *testing.T) {
 		livesharetest.WithRelaySAS(opts.RelaySAS),
 	)
 	if err != nil {
-		t.Errorf("error creating Live Share server: %v", err)
+		t.Errorf("error creating Live Share server: %w", err)
 	}
 	defer server.Close()
 	opts.RelayEndpoint = "sb" + strings.TrimPrefix(server.URL(), "https")
@@ -62,10 +62,10 @@ func TestConnect(t *testing.T) {
 
 	select {
 	case err := <-server.Err():
-		t.Errorf("error from server: %v", err)
+		t.Errorf("error from server: %w", err)
 	case err := <-done:
 		if err != nil {
-			t.Errorf("error from client: %v", err)
+			t.Errorf("error from client: %w", err)
 		}
 	}
 }

@@ -59,7 +59,7 @@ func (s *socketConn) Write(b []byte) (int, error) {
 
 	n, err := w.Write(b)
 	if err != nil {
-		return 0, fmt.Errorf("error writing: %v", err)
+		return 0, fmt.Errorf("error writing: %w", err)
 	}
 
 	if err := w.Close(); err != nil {

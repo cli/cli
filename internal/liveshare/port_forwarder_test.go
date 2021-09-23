@@ -17,7 +17,7 @@ import (
 func TestNewPortForwarder(t *testing.T) {
 	testServer, session, err := makeMockSession()
 	if err != nil {
-		t.Errorf("create mock client: %v", err)
+		t.Errorf("create mock client: %w", err)
 	}
 	defer testServer.Close()
 	pf := NewPortForwarder(session, "ssh", 80)
@@ -42,7 +42,7 @@ func TestPortForwarderStart(t *testing.T) {
 		livesharetest.WithStream("stream-id", stream),
 	)
 	if err != nil {
-		t.Errorf("create mock session: %v", err)
+		t.Errorf("create mock session: %w", err)
 	}
 	defer testServer.Close()
 
@@ -73,23 +73,23 @@ func TestPortForwarderStart(t *testing.T) {
 		}
 		b := make([]byte, len("stream-data"))
 		if _, err := conn.Read(b); err != nil && err != io.EOF {
-			done <- fmt.Errorf("reading stream: %v", err)
+			done <- fmt.Errorf("reading stream: %w", err)
 		}
 		if string(b) != "stream-data" {
-			done <- fmt.Errorf("stream data is not expected value, got: %v", string(b))
+			done <- fmt.Errorf("stream data is not expected value, got: %s", string(b))
 		}
 		if _, err := conn.Write([]byte("new-data")); err != nil {
-			done <- fmt.Errorf("writing to stream: %v", err)
+			done <- fmt.Errorf("writing to stream: %w", err)
 		}
 		done <- nil
 	}()
 
 	select {
 	case err := <-testServer.Err():
-		t.Errorf("error from server: %v", err)
+		t.Errorf("error from server: %w", err)
 	case err := <-done:
 		if err != nil {
-			t.Errorf("error from client: %v", err)
+			t.Errorf("error from client: %w", err)
 		}
 	}
 }
