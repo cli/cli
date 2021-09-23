@@ -156,7 +156,7 @@ func TestDelete(t *testing.T) {
 				},
 			}
 
-			err := delete(context.Background(), opts)
+			err := delete(context.Background(), nil, opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("delete() error = %v, wantErr %v", err, tt.wantErr)
 			}

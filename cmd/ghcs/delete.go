@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/github/ghcs/cmd/ghcs/output"
 	"github.com/github/ghcs/internal/api"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -55,7 +56,8 @@ func newDeleteCmd() *cobra.Command {
 			if opts.deleteAll && opts.repoFilter != "" {
 				return errors.New("both --all and --repo is not supported")
 			}
-			return delete(context.Background(), opts)
+			log := output.NewLogger(cmd.OutOrStdout(), cmd.ErrOrStderr(), !opts.isInteractive)
+			return delete(context.Background(), log, opts)
 		},
 	}
 
@@ -68,7 +70,11 @@ func newDeleteCmd() *cobra.Command {
 	return deleteCmd
 }
 
-func delete(ctx context.Context, opts deleteOptions) error {
+type logger interface {
+	Errorf(format string, v ...interface{}) (int, error)
+}
+
+func delete(ctx context.Context, log logger, opts deleteOptions) error {
 	user, err := opts.apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting user: %w", err)
@@ -127,13 +133,17 @@ func delete(ctx context.Context, opts deleteOptions) error {
 		codespaceName := c.Name
 		g.Go(func() error {
 			if err := opts.apiClient.DeleteCodespace(ctx, user.Login, codespaceName); err != nil {
-				return fmt.Errorf("error deleting codespace: %w", err)
+				log.Errorf("error deleting codespace %q: %v", codespaceName, err)
+				return err
 			}
 			return nil
 		})
 	}
 
-	return g.Wait()
+	if err := g.Wait(); err != nil {
+		return errors.New("some codespaces failed to delete")
+	}
+	return nil
 }
 
 func confirmDeletion(p prompter, codespace *api.Codespace, isInteractive bool) (bool, error) {
