@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/github/ghcs/internal/api"
-	"github.com/github/go-liveshare"
+	"github.com/github/ghcs/internal/liveshare"
 )
 
 // PostCreateStateStatus is a string value representing the different statuses a state can have.
