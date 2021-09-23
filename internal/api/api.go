@@ -461,7 +461,7 @@ func (a *API) CreateCodespace(ctx context.Context, log logger, params *CreateCod
 	}
 }
 
-type createCodespaceRequest struct {
+type startCreateRequest struct {
 	RepositoryID int    `json:"repository_id"`
 	Ref          string `json:"ref"`
 	Location     string `json:"location"`
@@ -475,7 +475,7 @@ var errProvisioningInProgress = errors.New("provisioning in progress")
 // did not complete before the GitHub API's time limit for RPCs (10s), in which case the caller
 // must poll the server to learn the outcome.
 func (a *API) startCreate(ctx context.Context, user string, repository int, sku, branch, location string) (*Codespace, error) {
-	requestBody, err := json.Marshal(createCodespaceRequest{repository, branch, location, sku})
+	requestBody, err := json.Marshal(startCreateRequest{repository, branch, location, sku})
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
