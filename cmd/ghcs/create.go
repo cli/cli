@@ -172,7 +172,7 @@ type getUserResult struct {
 
 // getUser fetches the user record associated with the GITHUB_TOKEN
 func getUser(ctx context.Context, apiClient *api.API) <-chan getUserResult {
-	ch := make(chan getUserResult)
+	ch := make(chan getUserResult, 1)
 	go func() {
 		user, err := apiClient.GetUser(ctx)
 		ch <- getUserResult{user, err}
@@ -187,7 +187,7 @@ type locationResult struct {
 
 // getLocation fetches the closest Codespace datacenter region/location to the user.
 func getLocation(ctx context.Context, apiClient *api.API) <-chan locationResult {
-	ch := make(chan locationResult)
+	ch := make(chan locationResult, 1)
 	go func() {
 		location, err := apiClient.GetCodespaceRegionLocation(ctx)
 		ch <- locationResult{location, err}
