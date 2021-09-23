@@ -71,11 +71,7 @@ func TestServerStartSharing(t *testing.T) {
 	testServer, session, err := makeMockSession(
 		livesharetest.WithService("serverSharing.startSharing", startSharing),
 	)
-	defer func() {
-		if err := testServer.Close(); err != nil {
-			t.Errorf("failed to close test server: %w", err)
-		}
-	}()
+	defer testServer.Close()
 
 	if err != nil {
 		t.Errorf("error creating mock session: %v", err)

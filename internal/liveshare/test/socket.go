@@ -28,7 +28,7 @@ func (s *socketConn) Read(b []byte) (int, error) {
 	if s.reader == nil {
 		msgType, r, err := s.Conn.NextReader()
 		if err != nil {
-			return 0, fmt.Errorf("error getting next reader: %v", err)
+			return 0, fmt.Errorf("error getting next reader: %w", err)
 		}
 		if msgType != websocket.BinaryMessage {
 			return 0, fmt.Errorf("invalid message type")
@@ -54,7 +54,7 @@ func (s *socketConn) Write(b []byte) (int, error) {
 
 	w, err := s.Conn.NextWriter(websocket.BinaryMessage)
 	if err != nil {
-		return 0, fmt.Errorf("error getting next writer: %v", err)
+		return 0, fmt.Errorf("error getting next writer: %w", err)
 	}
 
 	n, err := w.Write(b)
@@ -63,7 +63,7 @@ func (s *socketConn) Write(b []byte) (int, error) {
 	}
 
 	if err := w.Close(); err != nil {
-		return 0, fmt.Errorf("error closing writer: %v", err)
+		return 0, fmt.Errorf("error closing writer: %w", err)
 	}
 
 	return n, nil

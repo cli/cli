@@ -138,6 +138,9 @@ var upgrader = websocket.Upgrader{}
 
 func makeConnection(server *Server) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
 		if server.relaySAS != "" {
 			// validate the sas key
 			sasParam := req.URL.Query().Get("sb-hc-token")
@@ -167,13 +170,13 @@ func makeConnection(server *Server) http.HandlerFunc {
 				server.errCh <- fmt.Errorf("error accepting new channel: %w", err)
 				return
 			}
-			go handleNewRequests(server, ch, reqs)
+			go handleNewRequests(ctx, server, ch, reqs)
 			go handleNewChannel(server, ch)
 		}
 	}
 }
 
-func handleNewRequests(server *Server, channel ssh.Channel, reqs <-chan *ssh.Request) {
+func handleNewRequests(ctx context.Context, server *Server, channel ssh.Channel, reqs <-chan *ssh.Request) {
 	for req := range reqs {
 		if req.WantReply {
 			if err := req.Reply(true, nil); err != nil {
@@ -181,16 +184,16 @@ func handleNewRequests(server *Server, channel ssh.Channel, reqs <-chan *ssh.Req
 			}
 		}
 		if strings.HasPrefix(req.Type, "stream-transport") {
-			forwardStream(server, req.Type, channel)
+			forwardStream(ctx, server, req.Type, channel)
 		}
 	}
 }
 
-func forwardStream(server *Server, streamName string, channel ssh.Channel) {
+func forwardStream(ctx context.Context, server *Server, streamName string, channel ssh.Channel) {
 	simpleStreamName := strings.TrimPrefix(streamName, "stream-transport-")
 	stream, found := server.streams[simpleStreamName]
 	if !found {
-		server.errCh <- fmt.Errorf("stream '%w' not found", simpleStreamName)
+		server.errCh <- fmt.Errorf("stream '%s' not found", simpleStreamName)
 		return
 	}
 
@@ -205,8 +208,7 @@ func forwardStream(server *Server, streamName string, channel ssh.Channel) {
 	go copy(stream, channel)
 	go copy(channel, stream)
 
-	for {
-	}
+	<-ctx.Done() // TODO(josebalius): improve this
 }
 
 func handleNewChannel(server *Server, channel ssh.Channel) {
