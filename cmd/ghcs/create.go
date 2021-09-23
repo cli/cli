@@ -81,9 +81,15 @@ func create(opts *createOptions) error {
 		return errors.New("there are no available machine types for this repository")
 	}
 
-	log.Println("Creating your codespace...")
-
-	codespace, err := apiClient.CreateCodespace(ctx, userResult.User, repository, machine, branch, locationResult.Location)
+	log.Print("Creating your codespace...")
+	codespace, err := apiClient.CreateCodespace(ctx, log, &api.CreateCodespaceParams{
+		User:         userResult.User.Login,
+		RepositoryID: repository.ID,
+		Branch:       branch,
+		Machine:      machine,
+		Location:     locationResult.Location,
+	})
+	log.Print("\n")
 	if err != nil {
 		return fmt.Errorf("error creating codespace: %w", err)
 	}

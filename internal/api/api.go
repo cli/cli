@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/opentracing/opentracing-go"
 )
@@ -208,6 +209,10 @@ type getCodespaceTokenResponse struct {
 	RepositoryToken string `json:"repository_token"`
 }
 
+// ErrNotProvisioned is returned by GetCodespacesToken to indicate that the
+// creation of a codespace is not yet complete and that the caller should try again.
+var ErrNotProvisioned = errors.New("codespace not provisioned")
+
 func (a *API) GetCodespaceToken(ctx context.Context, ownerLogin, codespaceName string) (string, error) {
 	reqBody, err := json.Marshal(getCodespaceTokenRequest{true})
 	if err != nil {
@@ -236,6 +241,10 @@ func (a *API) GetCodespaceToken(ctx context.Context, ownerLogin, codespaceName s
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusUnprocessableEntity {
+			return "", ErrNotProvisioned
+		}
+
 		return "", jsonErrorResponse(b)
 	}
 
@@ -395,20 +404,83 @@ func (a *API) GetCodespacesSKUs(ctx context.Context, user *User, repository *Rep
 	return response.SKUs, nil
 }
 
-type createCodespaceRequest struct {
+// CreateCodespaceParams are the required parameters for provisioning a Codespace.
+type CreateCodespaceParams struct {
+	User                      string
+	RepositoryID              int
+	Branch, Machine, Location string
+}
+
+type logger interface {
+	Print(v ...interface{}) (int, error)
+	Println(v ...interface{}) (int, error)
+}
+
+// CreateCodespace creates a codespace with the given parameters and returns a non-nil error if it
+// fails to create.
+func (a *API) CreateCodespace(ctx context.Context, log logger, params *CreateCodespaceParams) (*Codespace, error) {
+	codespace, err := a.startCreate(
+		ctx, params.User, params.RepositoryID, params.Machine, params.Branch, params.Location,
+	)
+	if err != errProvisioningInProgress {
+		return codespace, err
+	}
+
+	// errProvisioningInProgress indicates that codespace creation did not complete
+	// within the GitHub API RPC time limit (10s), so it continues asynchronously.
+	// We must poll the server to discover the outcome.
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-ticker.C:
+			log.Print(".")
+			token, err := a.GetCodespaceToken(ctx, params.User, codespace.Name)
+			if err != nil {
+				if err == ErrNotProvisioned {
+					// Do nothing. We expect this to fail until the codespace is provisioned
+					continue
+				}
+
+				return nil, fmt.Errorf("failed to get codespace token: %w", err)
+			}
+
+			codespace, err = a.GetCodespace(ctx, token, params.User, codespace.Name)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get codespace: %w", err)
+			}
+
+			return codespace, nil
+		}
+	}
+}
+
+type startCreateRequest struct {
 	RepositoryID int    `json:"repository_id"`
 	Ref          string `json:"ref"`
 	Location     string `json:"location"`
 	SkuName      string `json:"sku_name"`
 }
 
-func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repository, sku, branch, location string) (*Codespace, error) {
-	requestBody, err := json.Marshal(createCodespaceRequest{repository.ID, branch, location, sku})
+var errProvisioningInProgress = errors.New("provisioning in progress")
+
+// startCreate starts the creation of a codespace.
+// It may return success or an error, or errProvisioningInProgress indicating that the operation
+// did not complete before the GitHub API's time limit for RPCs (10s), in which case the caller
+// must poll the server to learn the outcome.
+func (a *API) startCreate(ctx context.Context, user string, repository int, sku, branch, location string) (*Codespace, error) {
+	requestBody, err := json.Marshal(startCreateRequest{repository, branch, location, sku})
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, githubAPI+"/vscs_internal/user/"+user.Login+"/codespaces", bytes.NewBuffer(requestBody))
+	req, err := http.NewRequest(http.MethodPost, githubAPI+"/vscs_internal/user/"+user+"/codespaces", bytes.NewBuffer(requestBody))
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -425,8 +497,11 @@ func (a *API) CreateCodespace(ctx context.Context, user *User, repository *Repos
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
-	if resp.StatusCode > http.StatusAccepted {
+	switch {
+	case resp.StatusCode > http.StatusAccepted:
 		return nil, jsonErrorResponse(b)
+	case resp.StatusCode == http.StatusAccepted:
+		return nil, errProvisioningInProgress // RPC finished before result of creation known
 	}
 
 	var response Codespace
