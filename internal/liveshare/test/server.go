@@ -44,7 +44,7 @@ Bq5TLNIbUzPVNVwRcGjUYpOhKU6EIw8phTJOvxnUC+g6MVqBP8U=
 
 type Server struct {
 	password string
-	services map[string]RpcHandleFunc
+	services map[string]RPCHandleFunc
 	relaySAS string
 	streams  map[string]io.ReadWriter
 
@@ -67,7 +67,7 @@ func NewServer(opts ...ServerOption) (*Server, error) {
 	}
 	privateKey, err := ssh.ParsePrivateKey([]byte(sshPrivateKey))
 	if err != nil {
-		return nil, fmt.Errorf("error parsing key: %v", err)
+		return nil, fmt.Errorf("error parsing key: %w", err)
 	}
 	server.sshConfig.AddHostKey(privateKey)
 
@@ -85,10 +85,10 @@ func WithPassword(password string) ServerOption {
 	}
 }
 
-func WithService(serviceName string, handler RpcHandleFunc) ServerOption {
+func WithService(serviceName string, handler RPCHandleFunc) ServerOption {
 	return func(s *Server) error {
 		if s.services == nil {
-			s.services = make(map[string]RpcHandleFunc)
+			s.services = make(map[string]RPCHandleFunc)
 		}
 
 		s.services[serviceName] = handler
@@ -148,7 +148,7 @@ func makeConnection(server *Server) http.HandlerFunc {
 		}
 		c, err := upgrader.Upgrade(w, req, nil)
 		if err != nil {
-			server.errCh <- fmt.Errorf("error upgrading connection: %v", err)
+			server.errCh <- fmt.Errorf("error upgrading connection: %w", err)
 			return
 		}
 		defer c.Close()
@@ -156,7 +156,7 @@ func makeConnection(server *Server) http.HandlerFunc {
 		socketConn := newSocketConn(c)
 		_, chans, reqs, err := ssh.NewServerConn(socketConn, server.sshConfig)
 		if err != nil {
-			server.errCh <- fmt.Errorf("error creating new ssh conn: %v", err)
+			server.errCh <- fmt.Errorf("error creating new ssh conn: %w", err)
 			return
 		}
 		go ssh.DiscardRequests(reqs)
@@ -164,7 +164,7 @@ func makeConnection(server *Server) http.HandlerFunc {
 		for newChannel := range chans {
 			ch, reqs, err := newChannel.Accept()
 			if err != nil {
-				server.errCh <- fmt.Errorf("error accepting new channel: %v", err)
+				server.errCh <- fmt.Errorf("error accepting new channel: %w", err)
 				return
 			}
 			go handleNewRequests(server, ch, reqs)
@@ -177,7 +177,7 @@ func handleNewRequests(server *Server, channel ssh.Channel, reqs <-chan *ssh.Req
 	for req := range reqs {
 		if req.WantReply {
 			if err := req.Reply(true, nil); err != nil {
-				server.errCh <- fmt.Errorf("error replying to channel request: %v", err)
+				server.errCh <- fmt.Errorf("error replying to channel request: %w", err)
 			}
 		}
 		if strings.HasPrefix(req.Type, "stream-transport") {
@@ -190,14 +190,14 @@ func forwardStream(server *Server, streamName string, channel ssh.Channel) {
 	simpleStreamName := strings.TrimPrefix(streamName, "stream-transport-")
 	stream, found := server.streams[simpleStreamName]
 	if !found {
-		server.errCh <- fmt.Errorf("stream '%v' not found", simpleStreamName)
+		server.errCh <- fmt.Errorf("stream '%w' not found", simpleStreamName)
 		return
 	}
 
 	copy := func(dst io.Writer, src io.Reader) {
 		if _, err := io.Copy(dst, src); err != nil {
 			fmt.Println(err)
-			server.errCh <- fmt.Errorf("io copy: %v", err)
+			server.errCh <- fmt.Errorf("io copy: %w", err)
 			return
 		}
 	}
@@ -211,33 +211,33 @@ func forwardStream(server *Server, streamName string, channel ssh.Channel) {
 
 func handleNewChannel(server *Server, channel ssh.Channel) {
 	stream := jsonrpc2.NewBufferedStream(channel, jsonrpc2.VSCodeObjectCodec{})
-	jsonrpc2.NewConn(context.Background(), stream, newRpcHandler(server))
+	jsonrpc2.NewConn(context.Background(), stream, newRPCHandler(server))
 }
 
-type RpcHandleFunc func(req *jsonrpc2.Request) (interface{}, error)
+type RPCHandleFunc func(req *jsonrpc2.Request) (interface{}, error)
 
 type rpcHandler struct {
 	server *Server
 }
 
-func newRpcHandler(server *Server) *rpcHandler {
+func newRPCHandler(server *Server) *rpcHandler {
 	return &rpcHandler{server}
 }
 
 func (r *rpcHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
 	handler, found := r.server.services[req.Method]
 	if !found {
-		r.server.errCh <- fmt.Errorf("RPC Method: '%v' not serviced", req.Method)
+		r.server.errCh <- fmt.Errorf("RPC Method: '%s' not serviced", req.Method)
 		return
 	}
 
 	result, err := handler(req)
 	if err != nil {
-		r.server.errCh <- fmt.Errorf("error handling: '%v': %v", req.Method, err)
+		r.server.errCh <- fmt.Errorf("error handling: '%s': %w", req.Method, err)
 		return
 	}
 
 	if err := conn.Reply(ctx, req.ID, result); err != nil {
-		r.server.errCh <- fmt.Errorf("error replying: %v", err)
+		r.server.errCh <- fmt.Errorf("error replying: %w", err)
 	}
 }

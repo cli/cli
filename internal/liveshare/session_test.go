@@ -24,6 +24,10 @@ func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server,
 		livesharetest.WithService("workspace.joinWorkspace", joinWorkspace),
 	)
 	testServer, err := livesharetest.NewServer(opts...)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error creating server: %w", err)
+	}
+
 	session, err := Connect(context.Background(), Options{
 		SessionID:     "session-id",
 		SessionToken:  sessionToken,
@@ -67,7 +71,12 @@ func TestServerStartSharing(t *testing.T) {
 	testServer, session, err := makeMockSession(
 		livesharetest.WithService("serverSharing.startSharing", startSharing),
 	)
-	defer testServer.Close()
+	defer func() {
+		if err := testServer.Close(); err != nil {
+			t.Errorf("failed to close test server: %w", err)
+		}
+	}()
+
 	if err != nil {
 		t.Errorf("error creating mock session: %v", err)
 	}
