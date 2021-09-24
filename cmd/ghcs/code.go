@@ -19,7 +19,7 @@ func newCodeCmd() *cobra.Command {
 	codeCmd := &cobra.Command{
 		Use:   "code",
 		Short: "Open a codespace in VS Code",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return code(codespace, useInsiders)
 		},

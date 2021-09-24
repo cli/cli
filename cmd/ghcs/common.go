@@ -13,6 +13,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/github/ghcs/internal/api"
+	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
 
@@ -143,4 +144,13 @@ func checkAuthorizedKeys(ctx context.Context, client *api.API, user string) erro
 		return fmt.Errorf("user %s has no GitHub-authorized SSH keys", user)
 	}
 	return nil // success
+}
+
+var ErrTooManyArgs = errors.New("the command accepts no arguments")
+
+func noArgsConstraint(cmd *cobra.Command, args []string) error {
+	if len(args) > 0 {
+		return ErrTooManyArgs
+	}
+	return nil
 }

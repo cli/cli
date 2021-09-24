@@ -28,7 +28,7 @@ func newCreateCmd() *cobra.Command {
 	createCmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a codespace",
-		Args:  cobra.NoArgs,
+		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return create(opts)
 		},

@@ -31,7 +31,7 @@ func newPortsCmd() *cobra.Command {
 	portsCmd := &cobra.Command{
 		Use:   "ports",
 		Short: "List ports in a codespace",
-		Args:  cobra.NoArgs,
+		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return ports(codespace, asJSON)
 		},
@@ -158,7 +158,7 @@ func newPortsPublicCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "public <port>",
 		Short: "Mark port as public",
-		Args:  cobra.MinimumNArgs(1),
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			codespace, err := cmd.Flags().GetString("codespace")
 			if err != nil {
@@ -179,7 +179,7 @@ func newPortsPrivateCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "private <port>",
 		Short: "Mark port as private",
-		Args:  cobra.MinimumNArgs(1),
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			codespace, err := cmd.Flags().GetString("codespace")
 			if err != nil {
