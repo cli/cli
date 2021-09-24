@@ -38,8 +38,6 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
-
-		MainExecutable: f.Executable,
 	}
 
 	var tokenStdin bool
@@ -103,6 +101,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 				}
 			}
 
+			opts.MainExecutable = f.Executable()
 			if runF != nil {
 				return runF(opts)
 			}

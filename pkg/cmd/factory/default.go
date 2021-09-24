@@ -19,12 +19,17 @@ import (
 )
 
 func New(appVersion string) *cmdutil.Factory {
+	var exe string
 	f := &cmdutil.Factory{
-		Config:     configFunc(),     // No factory dependencies
-		Branch:     branchFunc(),     // No factory dependencies
-		Executable: executable("gh"), // No factory dependencies
-
-		ExtensionManager: extension.NewManager(),
+		Config: configFunc(), // No factory dependencies
+		Branch: branchFunc(), // No factory dependencies
+		Executable: func() string {
+			if exe != "" {
+				return exe
+			}
+			exe = executable("gh")
+			return exe
+		},
 	}
 
 	f.IOStreams = ioStreams(f)                   // Depends on Config
