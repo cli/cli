@@ -27,5 +27,5 @@ type Factory struct {
 	ExtensionManager extensions.ExtensionManager
 
 	// Executable is the path to the currently invoked gh binary
-	Executable func() string
+	Executable string
 }

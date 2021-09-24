@@ -36,6 +36,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			_, err := authflow.AuthFlowWithConfig(cfg, io, hostname, "", scopes)
 			return err
 		},
+		MainExecutable: f.Executable,
 	}
 
 	cmd := &cobra.Command{
@@ -61,7 +62,6 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 				return &cmdutil.FlagError{Err: errors.New("--hostname required when not running interactively")}
 			}
 
-			opts.MainExecutable = f.Executable()
 			if runF != nil {
 				return runF(opts)
 			}
@@ -129,9 +129,7 @@ func refreshRun(opts *RefreshOptions) error {
 
 	var additionalScopes []string
 
-	credentialFlow := &shared.GitCredentialFlow{
-		Executable: opts.MainExecutable,
-	}
+	credentialFlow := &shared.GitCredentialFlow{}
 	gitProtocol, _ := cfg.Get(hostname, "git_protocol")
 	if opts.Interactive && gitProtocol == "https" {
 		if err := credentialFlow.Prompt(hostname); err != nil {
