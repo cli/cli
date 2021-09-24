@@ -129,7 +129,9 @@ func refreshRun(opts *RefreshOptions) error {
 
 	var additionalScopes []string
 
-	credentialFlow := &shared.GitCredentialFlow{}
+	credentialFlow := &shared.GitCredentialFlow{
+		Executable: opts.MainExecutable,
+	}
 	gitProtocol, _ := cfg.Get(hostname, "git_protocol")
 	if opts.Interactive && gitProtocol == "https" {
 		if err := credentialFlow.Prompt(hostname); err != nil {
