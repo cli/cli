@@ -157,8 +157,8 @@ type FilterOptions struct {
 	Mention    string
 	Milestone  string
 	Search     string
-
-	Fields []string
+	Draft      string
+	Fields     []string
 }
 
 func (opts *FilterOptions) IsDefault() bool {
@@ -241,7 +241,9 @@ func SearchQueryBuild(options FilterOptions) string {
 	if options.Search != "" {
 		q.AddQuery(options.Search)
 	}
-
+	if options.Draft != "" {
+		q.SetDraft(options.Draft)
+	}
 	return q.String()
 }
 

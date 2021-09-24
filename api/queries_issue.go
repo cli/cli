@@ -16,8 +16,9 @@ type IssuesPayload struct {
 }
 
 type IssuesAndTotalCount struct {
-	Issues     []Issue
-	TotalCount int
+	Issues       []Issue
+	TotalCount   int
+	SearchCapped bool
 }
 
 type Issue struct {

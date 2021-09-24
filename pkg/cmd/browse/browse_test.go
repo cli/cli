@@ -213,7 +213,7 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:      ghrepo.New("ravocean", "angur"),
 			defaultBranch: "trunk",
-			expectedURL:   "https://github.com/ravocean/angur/tree/trunk/path/to/file.txt#L32",
+			expectedURL:   "https://github.com/ravocean/angur/blob/trunk/path/to/file.txt?plain=1#L32",
 		},
 		{
 			name: "file with line range",
@@ -222,12 +222,37 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:      ghrepo.New("ravocean", "angur"),
 			defaultBranch: "trunk",
-			expectedURL:   "https://github.com/ravocean/angur/tree/trunk/path/to/file.txt#L32-L40",
+			expectedURL:   "https://github.com/ravocean/angur/blob/trunk/path/to/file.txt?plain=1#L32-L40",
+		},
+		{
+			name: "invalid default branch",
+			opts: BrowseOptions{
+				SelectorArg: "chocolate-pecan-pie.txt",
+			},
+			baseRepo:      ghrepo.New("andrewhsu", "recipies"),
+			defaultBranch: "",
+			wantsErr:      true,
+		},
+		{
+			name: "file with invalid line number after colon",
+			opts: BrowseOptions{
+				SelectorArg: "laptime-notes.txt:w-9",
+			},
+			baseRepo: ghrepo.New("andrewhsu", "sonoma-raceway"),
+			wantsErr: true,
+		},
+		{
+			name: "file with invalid file format",
+			opts: BrowseOptions{
+				SelectorArg: "path/to/file.txt:32:32",
+			},
+			baseRepo: ghrepo.New("ttran112", "ttrain211"),
+			wantsErr: true,
 		},
 		{
 			name: "file with invalid line number",
 			opts: BrowseOptions{
-				SelectorArg: "path/to/file.txt:32:32",
+				SelectorArg: "path/to/file.txt:32a",
 			},
 			baseRepo: ghrepo.New("ttran112", "ttrain211"),
 			wantsErr: true,
@@ -258,7 +283,7 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("github", "ThankYouGitHub"),
 			wantsErr:    false,
-			expectedURL: "https://github.com/github/ThankYouGitHub/tree/first-browse-pull/browse.go#L32",
+			expectedURL: "https://github.com/github/ThankYouGitHub/blob/first-browse-pull/browse.go?plain=1#L32",
 		},
 		{
 			name: "no browser with branch file and line number",
@@ -269,7 +294,7 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("mislav", "will_paginate"),
 			wantsErr:    false,
-			expectedURL: "https://github.com/mislav/will_paginate/tree/3-0-stable/init.rb#L6",
+			expectedURL: "https://github.com/mislav/will_paginate/blob/3-0-stable/init.rb?plain=1#L6",
 		},
 	}
 
@@ -311,43 +336,5 @@ func Test_runBrowse(t *testing.T) {
 				browser.Verify(t, tt.expectedURL)
 			}
 		})
-	}
-}
-
-func Test_parseFileArg(t *testing.T) {
-	tests := []struct {
-		name            string
-		arg             string
-		errorExpected   bool
-		expectedFileArg string
-		stderrExpected  string
-	}{
-		{
-			name:            "non line number",
-			arg:             "main.go",
-			errorExpected:   false,
-			expectedFileArg: "main.go",
-		},
-		{
-			name:            "line number",
-			arg:             "main.go:32",
-			errorExpected:   false,
-			expectedFileArg: "main.go#L32",
-		},
-		{
-			name:           "non line number error",
-			arg:            "ma:in.go",
-			errorExpected:  true,
-			stderrExpected: "invalid line number after colon\nUse 'gh browse --help' for more information about browse\n",
-		},
-	}
-	for _, tt := range tests {
-		fileArg, err := parseFileArg(tt.arg)
-		if tt.errorExpected {
-			assert.Equal(t, err.Error(), tt.stderrExpected)
-		} else {
-			assert.Equal(t, err, nil)
-			assert.Equal(t, tt.expectedFileArg, fileArg)
-		}
 	}
 }

@@ -171,6 +171,9 @@ func listRun(opts *ListOptions) error {
 		tp.EndRow()
 	}
 
+	if listResult.FromSearch && opts.Limit > 1000 {
+		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
+	}
 	if opts.IO.IsStdoutTTY() {
 		hasFilters := filter.Visibility != "" || filter.Fork || filter.Source || filter.Language != "" || filter.Topic != ""
 		title := listHeader(listResult.Owner, len(listResult.Repositories), listResult.TotalCount, hasFilters)

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/context"
@@ -31,6 +32,7 @@ func New(appVersion string) *cmdutil.Factory {
 	f.Remotes = remotesFunc(f)                   // Depends on Config
 	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
 	f.Browser = browser(f)                       // Depends on Config, and IOStreams
+	f.ExtensionManager = extensionManager(f)     // Depends on Config, HttpClient, and IOStreams
 
 	return f
 }
@@ -185,6 +187,25 @@ func branchFunc() func() (string, error) {
 		}
 		return currentBranch, nil
 	}
+}
+
+func extensionManager(f *cmdutil.Factory) *extension.Manager {
+	em := extension.NewManager(f.IOStreams)
+
+	cfg, err := f.Config()
+	if err != nil {
+		return em
+	}
+	em.SetConfig(cfg)
+
+	client, err := f.HttpClient()
+	if err != nil {
+		return em
+	}
+
+	em.SetClient(api.NewCachedClient(client, time.Second*30))
+
+	return em
 }
 
 func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {

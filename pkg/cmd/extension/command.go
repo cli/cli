@@ -30,6 +30,8 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			will be forwarded to the %[1]sgh-<extname>%[1]s executable of the extension.
 
 			An extension cannot override any of the core gh commands.
+
+			See the list of available extensions at <https://github.com/topics/gh-extension>
 		`, "`"),
 		Aliases: []string{"extensions"},
 	}
@@ -67,9 +69,25 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			},
 		},
 		&cobra.Command{
-			Use:   "install <repo>",
+			Use:   "install <repository>",
 			Short: "Install a gh extension from a repository",
-			Args:  cmdutil.MinimumArgs(1, "must specify a repository to install from"),
+			Long: heredoc.Doc(`
+				Install a GitHub repository locally as a GitHub CLI extension.
+				
+				The repository argument can be specified in "owner/repo" format as well as a full URL.
+				The URL format is useful when the repository is not hosted on github.com.
+				
+				To install an extension in development from the current directory, use "." as the
+				value of the repository argument.
+
+				See the list of available extensions at <https://github.com/topics/gh-extension>
+			`),
+			Example: heredoc.Doc(`
+				$ gh extension install owner/gh-extension
+				$ gh extension install https://git.example.com/owner/gh-extension
+				$ gh extension install .
+			`),
+			Args: cmdutil.MinimumArgs(1, "must specify a repository to install from"),
 			RunE: func(cmd *cobra.Command, args []string) error {
 				if args[0] == "." {
 					wd, err := os.Getwd()
@@ -83,16 +101,12 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				if err != nil {
 					return err
 				}
+
 				if err := checkValidExtension(cmd.Root(), m, repo.RepoName()); err != nil {
 					return err
 				}
 
-				cfg, err := f.Config()
-				if err != nil {
-					return err
-				}
-				protocol, _ := cfg.Get(repo.RepoHost(), "git_protocol")
-				return m.Install(ghrepo.FormatRemoteURL(repo, protocol), io.Out, io.ErrOut)
+				return m.Install(repo)
 			},
 		},
 		func() *cobra.Command {
