@@ -18,6 +18,18 @@ import (
 )
 
 // TODO scope stats by repo
+// TODO generalize this
+// TODO scope stats by data type
+// TODO should work with:
+// - issues
+// - prs
+// - gists
+// - repos
+// - (?) releases
+// - (?) runs
+// - (?) workflows
+// - (?) ssh key
+// - (?) extensions
 
 type ByLastAccess []issueWithStats
 
