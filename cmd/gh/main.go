@@ -236,7 +236,7 @@ func mainRun() exitCode {
 
 	newRelease := <-updateMessageChan
 	if newRelease != nil {
-		isHomebrew := isUnderHomebrew(cmdFactory.Executable)
+		isHomebrew := isUnderHomebrew(cmdFactory.Executable())
 		if isHomebrew && isRecentRelease(newRelease.PublishedAt) {
 			// do not notify Homebrew users before the version bump had a chance to get merged into homebrew-core
 			return exitOK

@@ -88,7 +88,8 @@ func Test_NewCmdRefresh(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			io, _, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams:  io,
+				Executable: func() string { return "/path/to/gh" },
 			}
 			io.SetStdinTTY(tt.tty)
 			io.SetStdoutTTY(tt.tty)
