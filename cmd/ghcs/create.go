@@ -23,7 +23,7 @@ type createOptions struct {
 }
 
 func newCreateCmd(app *App) *cobra.Command {
-	opts := &createOptions{}
+	opts := createOptions{}
 
 	createCmd := &cobra.Command{
 		Use:   "create",
@@ -43,7 +43,7 @@ func newCreateCmd(app *App) *cobra.Command {
 }
 
 // Create creates a new Codespace
-func (a *App) Create(ctx context.Context, opts *createOptions) error {
+func (a *App) Create(ctx context.Context, opts createOptions) error {
 	locationCh := getLocation(ctx, a.apiClient)
 	userCh := getUser(ctx, a.apiClient)
 
