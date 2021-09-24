@@ -1,12 +1,15 @@
 package ghcs
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"testing"
 	"time"
 
+	"github.com/github/ghcs/cmd/ghcs/output"
 	"github.com/github/ghcs/internal/api"
 )
 
@@ -22,8 +25,11 @@ func TestDelete(t *testing.T) {
 		opts        deleteOptions
 		codespaces  []*api.Codespace
 		confirms    map[string]bool
+		deleteErr   error
 		wantErr     bool
 		wantDeleted []string
+		wantStdout  string
+		wantStderr  string
 	}{
 		{
 			name: "by name",
@@ -81,6 +87,24 @@ func TestDelete(t *testing.T) {
 			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-c4f3"},
 		},
 		{
+			name: "deletion failed",
+			opts: deleteOptions{
+				deleteAll: true,
+			},
+			codespaces: []*api.Codespace{
+				{
+					Name: "monalisa-spoonknife-123",
+				},
+				{
+					Name: "hubot-robawt-abc",
+				},
+			},
+			deleteErr:   errors.New("aborted by test"),
+			wantErr:     true,
+			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-123"},
+			wantStderr:  "error deleting codespace \"hubot-robawt-abc\": aborted by test\nerror deleting codespace \"monalisa-spoonknife-123\": aborted by test\n",
+		},
+		{
 			name: "with confirm",
 			opts: deleteOptions{
 				isInteractive: true,
@@ -131,6 +155,9 @@ func TestDelete(t *testing.T) {
 					if userLogin != user.Login {
 						return fmt.Errorf("unexpected user %q", userLogin)
 					}
+					if tt.deleteErr != nil {
+						return tt.deleteErr
+					}
 					return nil
 				},
 			}
@@ -171,7 +198,10 @@ func TestDelete(t *testing.T) {
 				},
 			}
 
-			err := delete(context.Background(), nil, opts)
+			stdout := &bytes.Buffer{}
+			stderr := &bytes.Buffer{}
+			log := output.NewLogger(stdout, stderr, false)
+			err := delete(context.Background(), log, opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("delete() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -185,6 +215,12 @@ func TestDelete(t *testing.T) {
 			sort.Strings(gotDeleted)
 			if !sliceEquals(gotDeleted, tt.wantDeleted) {
 				t.Errorf("deleted %q, want %q", gotDeleted, tt.wantDeleted)
+			}
+			if out := stdout.String(); out != tt.wantStdout {
+				t.Errorf("stdout = %q, want %q", out, tt.wantStdout)
+			}
+			if out := stderr.String(); out != tt.wantStderr {
+				t.Errorf("stderr = %q, want %q", out, tt.wantStderr)
 			}
 		})
 	}

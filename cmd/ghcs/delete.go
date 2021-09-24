@@ -151,7 +151,7 @@ func delete(ctx context.Context, log logger, opts deleteOptions) error {
 		codespaceName := c.Name
 		g.Go(func() error {
 			if err := opts.apiClient.DeleteCodespace(ctx, user.Login, codespaceName); err != nil {
-				_, _ = log.Errorf("error deleting codespace %q: %v", codespaceName, err)
+				_, _ = log.Errorf("error deleting codespace %q: %v\n", codespaceName, err)
 				return err
 			}
 			return nil
