@@ -4,29 +4,24 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
 
-	"github.com/github/ghcs/cmd/ghcs/output"
-	"github.com/github/ghcs/internal/api"
 	"github.com/github/ghcs/internal/codespaces"
 	"github.com/github/ghcs/internal/liveshare"
 	"github.com/spf13/cobra"
 )
 
-func newLogsCmd() *cobra.Command {
+func newLogsCmd(app *App) *cobra.Command {
 	var (
 		codespace string
 		follow    bool
 	)
-
-	log := output.NewLogger(os.Stdout, os.Stderr, false)
 
 	logsCmd := &cobra.Command{
 		Use:   "logs",
 		Short: "Access codespace logs",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return logs(context.Background(), log, codespace, follow)
+			return app.Logs(cmd.Context(), codespace, follow)
 		},
 	}
 
@@ -36,29 +31,27 @@ func newLogsCmd() *cobra.Command {
 	return logsCmd
 }
 
-func logs(ctx context.Context, log *output.Logger, codespaceName string, follow bool) (err error) {
+func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err error) {
 	// Ensure all child tasks (port forwarding, remote exec) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	apiClient := api.New(GithubToken)
-
-	user, err := apiClient.GetUser(ctx)
+	user, err := a.apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("getting user: %w", err)
 	}
 
 	authkeys := make(chan error, 1)
 	go func() {
-		authkeys <- checkAuthorizedKeys(ctx, apiClient, user.Login)
+		authkeys <- checkAuthorizedKeys(ctx, a.apiClient, user.Login)
 	}()
 
-	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
+	codespace, token, err := getOrChooseCodespace(ctx, a.apiClient, user, codespaceName)
 	if err != nil {
 		return fmt.Errorf("get or choose codespace: %w", err)
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, a.apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("connecting to Live Share: %w", err)
 	}
@@ -76,7 +69,7 @@ func logs(ctx context.Context, log *output.Logger, codespaceName string, follow 
 	defer listen.Close()
 	localPort := listen.Addr().(*net.TCPAddr).Port
 
-	log.Println("Fetching SSH Details...")
+	a.logger.Println("Fetching SSH Details...")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)

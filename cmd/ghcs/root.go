@@ -1,10 +1,8 @@
 package ghcs
 
 import (
-	"errors"
 	"fmt"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 
@@ -15,10 +13,7 @@ import (
 
 var version = "DEV" // Replaced in the release build process (by GoReleaser or Homebrew) by the git tag version number.
 
-// GithubToken is a temporary stopgap to make the token configurable by apps that import this package
-var GithubToken = os.Getenv("GITHUB_TOKEN")
-
-func NewRootCmd() *cobra.Command {
+func NewRootCmd(app *App) *cobra.Command {
 	var lightstep string
 
 	root := &cobra.Command{
@@ -32,27 +27,22 @@ token to access the GitHub API with.`,
 		Version: version,
 
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			if os.Getenv("GITHUB_TOKEN") == "" {
-				return ErrTokenMissing
-			}
 			return initLightstep(lightstep)
 		},
 	}
 
 	root.PersistentFlags().StringVar(&lightstep, "lightstep", "", "Lightstep tracing endpoint (service:token@host:port)")
 
-	root.AddCommand(newCodeCmd())
-	root.AddCommand(newCreateCmd())
-	root.AddCommand(newDeleteCmd())
-	root.AddCommand(newListCmd())
-	root.AddCommand(newLogsCmd())
-	root.AddCommand(newPortsCmd())
-	root.AddCommand(newSSHCmd())
+	root.AddCommand(newCodeCmd(app))
+	root.AddCommand(newCreateCmd(app))
+	root.AddCommand(newDeleteCmd(app))
+	root.AddCommand(newListCmd(app))
+	root.AddCommand(newLogsCmd(app))
+	root.AddCommand(newPortsCmd(app))
+	root.AddCommand(newSSHCmd(app))
 
 	return root
 }
-
-var ErrTokenMissing = errors.New("GITHUB_TOKEN is missing")
 
 // initLightstep parses the --lightstep=service:token@host:port flag and
 // enables tracing if non-empty.

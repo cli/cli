@@ -14,7 +14,7 @@ type listOptions struct {
 	asJSON bool
 }
 
-func newListCmd() *cobra.Command {
+func newListCmd(app *App) *cobra.Command {
 	opts := &listOptions{}
 
 	listCmd := &cobra.Command{
@@ -22,7 +22,7 @@ func newListCmd() *cobra.Command {
 		Short: "List your codespaces",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return list(opts)
+			return app.List(cmd.Context(), opts)
 		},
 	}
 
@@ -31,16 +31,13 @@ func newListCmd() *cobra.Command {
 	return listCmd
 }
 
-func list(opts *listOptions) error {
-	apiClient := api.New(GithubToken)
-	ctx := context.Background()
-
-	user, err := apiClient.GetUser(ctx)
+func (a *App) List(ctx context.Context, opts *listOptions) error {
+	user, err := a.apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting user: %w", err)
 	}
 
-	codespaces, err := apiClient.ListCodespaces(ctx, user.Login)
+	codespaces, err := a.apiClient.ListCodespaces(ctx, user.Login)
 	if err != nil {
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}

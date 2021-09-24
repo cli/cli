@@ -22,7 +22,7 @@ import (
 
 // newPortsCmd returns a Cobra "ports" command that displays a table of available ports,
 // according to the specified flags.
-func newPortsCmd() *cobra.Command {
+func newPortsCmd(app *App) *cobra.Command {
 	var (
 		codespace string
 		asJSON    bool
@@ -33,31 +33,28 @@ func newPortsCmd() *cobra.Command {
 		Short: "List ports in a codespace",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return ports(codespace, asJSON)
+			return app.ListPorts(cmd.Context(), codespace, asJSON)
 		},
 	}
 
 	portsCmd.PersistentFlags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
 	portsCmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 
-	portsCmd.AddCommand(newPortsPublicCmd())
-	portsCmd.AddCommand(newPortsPrivateCmd())
-	portsCmd.AddCommand(newPortsForwardCmd())
+	portsCmd.AddCommand(newPortsPublicCmd(app))
+	portsCmd.AddCommand(newPortsPrivateCmd(app))
+	portsCmd.AddCommand(newPortsForwardCmd(app))
 
 	return portsCmd
 }
 
-func ports(codespaceName string, asJSON bool) (err error) {
-	apiClient := api.New(os.Getenv("GITHUB_TOKEN"))
-	ctx := context.Background()
-	log := output.NewLogger(os.Stdout, os.Stderr, asJSON)
-
-	user, err := apiClient.GetUser(ctx)
+// ListPorts lists known ports in a codespace.
+func (a *App) ListPorts(ctx context.Context, codespaceName string, asJSON bool) (err error) {
+	user, err := a.apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting user: %w", err)
 	}
 
-	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
+	codespace, token, err := getOrChooseCodespace(ctx, a.apiClient, user, codespaceName)
 	if err != nil {
 		// TODO(josebalius): remove special handling of this error here and it other places
 		if err == errNoCodespaces {
@@ -66,15 +63,15 @@ func ports(codespaceName string, asJSON bool) (err error) {
 		return fmt.Errorf("error choosing codespace: %w", err)
 	}
 
-	devContainerCh := getDevContainer(ctx, apiClient, codespace)
+	devContainerCh := getDevContainer(ctx, a.apiClient, codespace)
 
-	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, a.apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
 	defer safeClose(session, &err)
 
-	log.Println("Loading ports...")
+	a.logger.Println("Loading ports...")
 	ports, err := session.GetSharedServers(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting ports of shared servers: %w", err)
@@ -83,7 +80,7 @@ func ports(codespaceName string, asJSON bool) (err error) {
 	devContainerResult := <-devContainerCh
 	if devContainerResult.err != nil {
 		// Warn about failure to read the devcontainer file. Not a ghcs command error.
-		_, _ = log.Errorf("Failed to get port names: %v\n", devContainerResult.err.Error())
+		_, _ = a.logger.Errorf("Failed to get port names: %v\n", devContainerResult.err.Error())
 	}
 
 	table := output.NewTable(os.Stdout, asJSON)
@@ -122,7 +119,7 @@ type portAttribute struct {
 	Label string `json:"label"`
 }
 
-func getDevContainer(ctx context.Context, apiClient *api.API, codespace *api.Codespace) <-chan devContainerResult {
+func getDevContainer(ctx context.Context, apiClient apiClient, codespace *api.Codespace) <-chan devContainerResult {
 	ch := make(chan devContainerResult, 1)
 	go func() {
 		contents, err := apiClient.GetCodespaceRepositoryContents(ctx, codespace, ".devcontainer/devcontainer.json")
@@ -154,7 +151,7 @@ func getDevContainer(ctx context.Context, apiClient *api.API, codespace *api.Cod
 }
 
 // newPortsPublicCmd returns a Cobra "ports public" subcommand, which makes a given port public.
-func newPortsPublicCmd() *cobra.Command {
+func newPortsPublicCmd(app *App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "public <port>",
 		Short: "Mark port as public",
@@ -168,14 +165,13 @@ func newPortsPublicCmd() *cobra.Command {
 				return fmt.Errorf("get codespace flag: %w", err)
 			}
 
-			log := output.NewLogger(os.Stdout, os.Stderr, false)
-			return updatePortVisibility(log, codespace, args[0], true)
+			return app.UpdatePortVisibility(cmd.Context(), codespace, args[0], true)
 		},
 	}
 }
 
 // newPortsPrivateCmd returns a Cobra "ports private" subcommand, which makes a given port private.
-func newPortsPrivateCmd() *cobra.Command {
+func newPortsPrivateCmd(app *App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "private <port>",
 		Short: "Mark port as private",
@@ -189,22 +185,18 @@ func newPortsPrivateCmd() *cobra.Command {
 				return fmt.Errorf("get codespace flag: %w", err)
 			}
 
-			log := output.NewLogger(os.Stdout, os.Stderr, false)
-			return updatePortVisibility(log, codespace, args[0], false)
+			return app.UpdatePortVisibility(cmd.Context(), codespace, args[0], false)
 		},
 	}
 }
 
-func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, public bool) (err error) {
-	ctx := context.Background()
-	apiClient := api.New(GithubToken)
-
-	user, err := apiClient.GetUser(ctx)
+func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName, sourcePort string, public bool) (err error) {
+	user, err := a.apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting user: %w", err)
 	}
 
-	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
+	codespace, token, err := getOrChooseCodespace(ctx, a.apiClient, user, codespaceName)
 	if err != nil {
 		if err == errNoCodespaces {
 			return err
@@ -212,7 +204,7 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 		return fmt.Errorf("error getting codespace: %w", err)
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, a.apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
@@ -231,14 +223,14 @@ func updatePortVisibility(log *output.Logger, codespaceName, sourcePort string, 
 	if !public {
 		state = "PRIVATE"
 	}
-	log.Printf("Port %s is now %s.\n", sourcePort, state)
+	a.logger.Printf("Port %s is now %s.\n", sourcePort, state)
 
 	return nil
 }
 
 // NewPortsForwardCmd returns a Cobra "ports forward" subcommand, which forwards a set of
 // port pairs from the codespace to localhost.
-func newPortsForwardCmd() *cobra.Command {
+func newPortsForwardCmd(app *App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "forward <remote-port>:<local-port>...",
 		Short: "Forward ports",
@@ -252,27 +244,23 @@ func newPortsForwardCmd() *cobra.Command {
 				return fmt.Errorf("get codespace flag: %w", err)
 			}
 
-			log := output.NewLogger(os.Stdout, os.Stderr, false)
-			return forwardPorts(log, codespace, args)
+			return app.ForwardPorts(cmd.Context(), codespace, args)
 		},
 	}
 }
 
-func forwardPorts(log *output.Logger, codespaceName string, ports []string) (err error) {
-	ctx := context.Background()
-	apiClient := api.New(GithubToken)
-
+func (a *App) ForwardPorts(ctx context.Context, codespaceName string, ports []string) (err error) {
 	portPairs, err := getPortPairs(ports)
 	if err != nil {
 		return fmt.Errorf("get port pairs: %w", err)
 	}
 
-	user, err := apiClient.GetUser(ctx)
+	user, err := a.apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting user: %w", err)
 	}
 
-	codespace, token, err := getOrChooseCodespace(ctx, apiClient, user, codespaceName)
+	codespace, token, err := getOrChooseCodespace(ctx, a.apiClient, user, codespaceName)
 	if err != nil {
 		if err == errNoCodespaces {
 			return err
@@ -280,7 +268,7 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) (err
 		return fmt.Errorf("error getting codespace: %w", err)
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, a.apiClient, user.Login, token, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
@@ -297,7 +285,7 @@ func forwardPorts(log *output.Logger, codespaceName string, ports []string) (err
 				return err
 			}
 			defer listen.Close()
-			log.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
+			a.logger.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
 			name := fmt.Sprintf("share-%d", pair.remote)
 			fwd := liveshare.NewPortForwarder(session, name, pair.remote)
 			return fwd.ForwardToListener(ctx, listen) // error always non-nil
