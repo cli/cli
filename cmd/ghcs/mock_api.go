@@ -19,7 +19,7 @@ import (
 // 			AuthorizedKeysFunc: func(ctx context.Context, user string) ([]byte, error) {
 // 				panic("mock out the AuthorizedKeys method")
 // 			},
-// 			CreateCodespaceFunc: func(ctx context.Context, logger api.Logger, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+// 			CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
 // 				panic("mock out the CreateCodespace method")
 // 			},
 // 			DeleteCodespaceFunc: func(ctx context.Context, user string, name string) error {
@@ -63,7 +63,7 @@ type apiClientMock struct {
 	AuthorizedKeysFunc func(ctx context.Context, user string) ([]byte, error)
 
 	// CreateCodespaceFunc mocks the CreateCodespace method.
-	CreateCodespaceFunc func(ctx context.Context, logger api.Logger, params *api.CreateCodespaceParams) (*api.Codespace, error)
+	CreateCodespaceFunc func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
 
 	// DeleteCodespaceFunc mocks the DeleteCodespace method.
 	DeleteCodespaceFunc func(ctx context.Context, user string, name string) error
@@ -108,8 +108,6 @@ type apiClientMock struct {
 		CreateCodespace []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// Logger is the logger argument value.
-			Logger api.Logger
 			// Params is the params argument value.
 			Params *api.CreateCodespaceParams
 		}
@@ -248,23 +246,21 @@ func (mock *apiClientMock) AuthorizedKeysCalls() []struct {
 }
 
 // CreateCodespace calls CreateCodespaceFunc.
-func (mock *apiClientMock) CreateCodespace(ctx context.Context, logger api.Logger, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+func (mock *apiClientMock) CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
 	if mock.CreateCodespaceFunc == nil {
 		panic("apiClientMock.CreateCodespaceFunc: method is nil but apiClient.CreateCodespace was just called")
 	}
 	callInfo := struct {
 		Ctx    context.Context
-		Logger api.Logger
 		Params *api.CreateCodespaceParams
 	}{
 		Ctx:    ctx,
-		Logger: logger,
 		Params: params,
 	}
 	mock.lockCreateCodespace.Lock()
 	mock.calls.CreateCodespace = append(mock.calls.CreateCodespace, callInfo)
 	mock.lockCreateCodespace.Unlock()
-	return mock.CreateCodespaceFunc(ctx, logger, params)
+	return mock.CreateCodespaceFunc(ctx, params)
 }
 
 // CreateCodespaceCalls gets all the calls that were made to CreateCodespace.
@@ -272,12 +268,10 @@ func (mock *apiClientMock) CreateCodespace(ctx context.Context, logger api.Logge
 //     len(mockedapiClient.CreateCodespaceCalls())
 func (mock *apiClientMock) CreateCodespaceCalls() []struct {
 	Ctx    context.Context
-	Logger api.Logger
 	Params *api.CreateCodespaceParams
 } {
 	var calls []struct {
 		Ctx    context.Context
-		Logger api.Logger
 		Params *api.CreateCodespaceParams
 	}
 	mock.lockCreateCodespace.RLock()

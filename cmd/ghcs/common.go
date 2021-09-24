@@ -38,7 +38,7 @@ type apiClient interface {
 	ListCodespaces(ctx context.Context, user string) ([]*api.Codespace, error)
 	DeleteCodespace(ctx context.Context, user, name string) error
 	StartCodespace(ctx context.Context, token string, codespace *api.Codespace) error
-	CreateCodespace(ctx context.Context, logger api.Logger, params *api.CreateCodespaceParams) (*api.Codespace, error)
+	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
 	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
 	AuthorizedKeys(ctx context.Context, user string) ([]byte, error)
 	GetCodespaceRegionLocation(ctx context.Context) (string, error)

@@ -423,14 +423,9 @@ type CreateCodespaceParams struct {
 	Branch, Machine, Location string
 }
 
-type Logger interface {
-	Print(v ...interface{}) (int, error)
-	Println(v ...interface{}) (int, error)
-}
-
 // CreateCodespace creates a codespace with the given parameters and returns a non-nil error if it
 // fails to create.
-func (a *API) CreateCodespace(ctx context.Context, log Logger, params *CreateCodespaceParams) (*Codespace, error) {
+func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams) (*Codespace, error) {
 	codespace, err := a.startCreate(
 		ctx, params.User, params.RepositoryID, params.Machine, params.Branch, params.Location,
 	)
@@ -452,7 +447,6 @@ func (a *API) CreateCodespace(ctx context.Context, log Logger, params *CreateCod
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case <-ticker.C:
-			log.Print(".")
 			token, err := a.GetCodespaceToken(ctx, params.User, codespace.Name)
 			if err != nil {
 				if err == ErrNotProvisioned {

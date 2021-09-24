@@ -80,7 +80,7 @@ func (a *App) Create(ctx context.Context, opts *createOptions) error {
 	}
 
 	a.logger.Print("Creating your codespace...")
-	codespace, err := a.apiClient.CreateCodespace(ctx, a.logger, &api.CreateCodespaceParams{
+	codespace, err := a.apiClient.CreateCodespace(ctx, &api.CreateCodespaceParams{
 		User:         userResult.User.Login,
 		RepositoryID: repository.ID,
 		Branch:       branch,
