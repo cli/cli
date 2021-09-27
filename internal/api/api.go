@@ -319,7 +319,10 @@ func (a *API) StartCodespace(ctx context.Context, token string, codespace *Codes
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		// Error response is typically a numeric code (not an error message, nor JSON).
+		// Error response may be a numeric code or a JSON {"message": "..."}.
+		if bytes.HasPrefix(b, []byte("{")) {
+			return jsonErrorResponse(b) // probably JSON
+		}
 		if len(b) > 100 {
 			b = append(b[:97], "..."...)
 		}
