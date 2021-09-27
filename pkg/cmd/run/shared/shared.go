@@ -304,13 +304,13 @@ func Symbol(cs *iostreams.ColorScheme, status Status, conclusion Conclusion) (st
 		case Success:
 			return cs.SuccessIconWithColor(noColor), cs.Green
 		case Skipped, Cancelled, Neutral:
-			return cs.SuccessIconWithColor(noColor), cs.Gray
+			return "-", cs.Gray
 		default:
 			return cs.FailureIconWithColor(noColor), cs.Red
 		}
 	}
 
-	return "-", cs.Yellow
+	return "*", cs.Yellow
 }
 
 func PullRequestForRun(client *api.Client, repo ghrepo.Interface, run Run) (int, error) {
