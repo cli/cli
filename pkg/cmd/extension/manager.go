@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -105,7 +106,6 @@ func (m *Manager) List(includeMetadata bool) []extensions.Extension {
 }
 
 func (m *Manager) list(includeMetadata bool) ([]extensions.Extension, error) {
-	// TODO need to fix this to work with binary extensions before upgrade will work
 	dir := m.installDir()
 	entries, err := ioutil.ReadDir(dir)
 	if err != nil {
@@ -117,34 +117,94 @@ func (m *Manager) list(includeMetadata bool) ([]extensions.Extension, error) {
 		if !strings.HasPrefix(f.Name(), "gh-") {
 			continue
 		}
-		var remoteUrl string
-		updateAvailable := false
-		isLocal := false
-		exePath := filepath.Join(dir, f.Name(), f.Name())
-		if f.IsDir() {
-			if includeMetadata {
-				remoteUrl = m.getRemoteUrl(f.Name())
-				updateAvailable = m.checkUpdateAvailable(f.Name())
-			}
-		} else {
-			isLocal = true
-			if !isSymlink(f.Mode()) {
-				// if this is a regular file, its contents is the local directory of the extension
-				p, err := readPathFromFile(filepath.Join(dir, f.Name()))
-				if err != nil {
-					return nil, err
-				}
-				exePath = filepath.Join(p, f.Name())
-			}
+		ext, err := m.parseExtensionDir(f, includeMetadata)
+		if err != nil {
+			return nil, err
 		}
-		results = append(results, &Extension{
-			path:            exePath,
-			url:             remoteUrl,
-			isLocal:         isLocal,
-			updateAvailable: updateAvailable,
-		})
+		results = append(results, ext)
 	}
+
 	return results, nil
+}
+
+func (m *Manager) parseExtensionDir(fi fs.FileInfo, includeMetadata bool) (*Extension, error) {
+	id := m.installDir()
+	if _, err := os.Stat(filepath.Join(id, fi.Name(), manifestName)); err == nil {
+		return m.parseBinaryExtension(fi, includeMetadata)
+	}
+
+	return m.parseGitExtension(fi, includeMetadata)
+}
+
+func (m *Manager) parseBinaryExtension(fi fs.FileInfo, includeMetadata bool) (*Extension, error) {
+	id := m.installDir()
+	exePath := filepath.Join(id, fi.Name(), fi.Name())
+	manifestPath := filepath.Join(id, fi.Name(), manifestName)
+	manifest, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return nil, fmt.Errorf("could not open %s for reading: %w", manifestPath, err)
+	}
+
+	var bm binManifest
+	err = yaml.Unmarshal(manifest, &bm)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse %s: %w", manifestPath, err)
+	}
+
+	repo := ghrepo.NewWithHost(bm.Owner, bm.Name, bm.Host)
+
+	var remoteURL string
+	var updateAvailable bool
+
+	if includeMetadata {
+		remoteURL = ghrepo.GenerateRepoURL(repo, "")
+		var r *release
+		r, err = fetchLatestRelease(m.client, repo)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get release info for %s: %w", ghrepo.FullName(repo), err)
+		}
+		if bm.Tag != r.Tag {
+			updateAvailable = true
+		}
+	}
+
+	return &Extension{
+		path:            exePath,
+		url:             remoteURL,
+		updateAvailable: updateAvailable,
+	}, nil
+}
+
+func (m *Manager) parseGitExtension(fi fs.FileInfo, includeMetadata bool) (*Extension, error) {
+	// TODO untangle local from this since local might be binary or git
+	id := m.installDir()
+	var remoteUrl string
+	updateAvailable := false
+	isLocal := false
+	exePath := filepath.Join(id, fi.Name(), fi.Name())
+	if fi.IsDir() {
+		if includeMetadata {
+			remoteUrl = m.getRemoteUrl(fi.Name())
+			updateAvailable = m.checkUpdateAvailable(fi.Name())
+		}
+	} else {
+		isLocal = true
+		if !isSymlink(fi.Mode()) {
+			// if this is a regular file, its contents is the local directory of the extension
+			p, err := readPathFromFile(filepath.Join(id, fi.Name()))
+			if err != nil {
+				return nil, err
+			}
+			exePath = filepath.Join(p, fi.Name())
+		}
+	}
+
+	return &Extension{
+		path:            exePath,
+		url:             remoteUrl,
+		isLocal:         isLocal,
+		updateAvailable: updateAvailable,
+	}, nil
 }
 
 func (m *Manager) getRemoteUrl(extension string) string {
@@ -335,9 +395,8 @@ func (m *Manager) Upgrade(name string, force bool) error {
 			continue
 		}
 
-		_, err := os.Stat(filepath.Join(f.Path(), manifestName))
-		if err == nil {
-			// TODO is there any need for a "forced" binary upgrade?
+		binManifestPath := filepath.Join(filepath.Dir(f.Path()), manifestName)
+		if _, e := os.Stat(binManifestPath); e == nil {
 			err = m.upgradeBin(f)
 			someUpgraded = true
 			continue
@@ -372,7 +431,7 @@ func (m *Manager) upgradeGit(ext extensions.Extension, exe string, force bool) e
 }
 
 func (m *Manager) upgradeBin(ext extensions.Extension) error {
-	manifestPath := filepath.Join(ext.Path(), manifestName)
+	manifestPath := filepath.Join(filepath.Dir(ext.Path()), manifestName)
 	manifest, err := os.ReadFile(manifestPath)
 	if err != nil {
 		return fmt.Errorf("could not open %s for reading: %w", manifestPath, err)
@@ -395,7 +454,6 @@ func (m *Manager) upgradeBin(ext extensions.Extension) error {
 		return nil
 	}
 
-	// TODO will this work?
 	return m.installBin(repo)
 }
 

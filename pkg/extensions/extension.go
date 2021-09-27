@@ -8,8 +8,8 @@ import (
 
 //go:generate moq -rm -out extension_mock.go . Extension
 type Extension interface {
-	Name() string
-	Path() string
+	Name() string // Extension Name without gh-
+	Path() string // Path to executable
 	URL() string
 	IsLocal() bool
 	UpdateAvailable() bool
