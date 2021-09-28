@@ -66,6 +66,10 @@ func TestManager_List(t *testing.T) {
 	assert.Equal(t, "two", exts[1].Name())
 }
 
+func TestManager_List_Binary(t *testing.T) {
+	// TODO
+}
+
 func TestManager_Dispatch(t *testing.T) {
 	tempDir := t.TempDir()
 	extPath := filepath.Join(tempDir, "extensions", "gh-hello", "gh-hello")
@@ -197,6 +201,10 @@ func TestManager_Upgrade_NoExtensions(t *testing.T) {
 	assert.EqualError(t, err, "no extensions installed")
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
+}
+
+func TestManager_Upgrade_BinaryExtension(t *testing.T) {
+	// TODO
 }
 
 func TestManager_Install_git(t *testing.T) {
