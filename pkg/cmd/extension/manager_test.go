@@ -204,7 +204,101 @@ func TestManager_Upgrade_NoExtensions(t *testing.T) {
 }
 
 func TestManager_Upgrade_BinaryExtension(t *testing.T) {
-	// TODO
+	tempDir := t.TempDir()
+
+	installReg := httpmock.Registry{}
+	defer installReg.Verify(t)
+	installClient := http.Client{Transport: &installReg}
+
+	io, _, _, _ := iostreams.Test()
+	m := newTestManager(tempDir, &installClient, io)
+	repo := ghrepo.NewWithHost("owner", "gh-bin-ext", "example.com")
+
+	installReg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-windows-amd64",
+						APIURL: "https://example.com/release/cool",
+					},
+				},
+			}))
+	installReg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Tag: "v1.0.1",
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-windows-amd64",
+						APIURL: "https://example.com/release/cool",
+					},
+				},
+			}))
+	installReg.Register(
+		httpmock.REST("GET", "release/cool"),
+		httpmock.StringResponse("FAKE BINARY"))
+
+	err := m.Install(repo)
+	assert.NoError(t, err)
+
+	upgradeReg := httpmock.Registry{}
+	defer upgradeReg.Verify(t)
+	upgradeClient := http.Client{Transport: &upgradeReg}
+
+	um := newTestManager(tempDir, &upgradeClient, io)
+	upgradeReg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Tag: "v1.0.2",
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-windows-amd64",
+						APIURL: "https://example.com/release/cool2",
+					},
+				},
+			}))
+	upgradeReg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Tag: "v1.0.2",
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-windows-amd64",
+						APIURL: "https://example.com/release/cool2",
+					},
+				},
+			}))
+	upgradeReg.Register(
+		httpmock.REST("GET", "release/cool2"),
+		httpmock.StringResponse("FAKE UPGRADED BINARY"))
+
+	err = um.Upgrade("bin-ext", false)
+	assert.NoError(t, err)
+
+	manifest, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext", manifestName))
+	assert.NoError(t, err)
+
+	var bm binManifest
+	err = yaml.Unmarshal(manifest, &bm)
+	assert.NoError(t, err)
+
+	assert.Equal(t, binManifest{
+		Name:  "gh-bin-ext",
+		Owner: "owner",
+		Host:  "example.com",
+		Tag:   "v1.0.2",
+		Path:  filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext"),
+	}, bm)
+
+	fakeBin, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext"))
+	assert.NoError(t, err)
+
+	assert.Equal(t, "FAKE UPGRADED BINARY", string(fakeBin))
 }
 
 func TestManager_Install_git(t *testing.T) {
