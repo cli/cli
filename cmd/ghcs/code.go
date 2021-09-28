@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/github/ghcs/internal/api"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/spf13/cobra"
 )
 
-func newCodeCmd() *cobra.Command {
+func newCodeCmd(app *App) *cobra.Command {
 	var (
 		codespace   string
 		useInsiders bool
@@ -21,7 +20,7 @@ func newCodeCmd() *cobra.Command {
 		Short: "Open a codespace in VS Code",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return code(codespace, useInsiders)
+			return app.VSCode(cmd.Context(), codespace, useInsiders)
 		},
 	}
 
@@ -31,17 +30,15 @@ func newCodeCmd() *cobra.Command {
 	return codeCmd
 }
 
-func code(codespaceName string, useInsiders bool) error {
-	apiClient := api.New(GithubToken)
-	ctx := context.Background()
-
-	user, err := apiClient.GetUser(ctx)
+// VSCode opens a codespace in the local VS VSCode application.
+func (a *App) VSCode(ctx context.Context, codespaceName string, useInsiders bool) error {
+	user, err := a.apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting user: %w", err)
 	}
 
 	if codespaceName == "" {
-		codespace, err := chooseCodespace(ctx, apiClient, user)
+		codespace, err := chooseCodespace(ctx, a.apiClient, user)
 		if err != nil {
 			if err == errNoCodespaces {
 				return err

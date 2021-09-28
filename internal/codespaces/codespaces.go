@@ -23,9 +23,15 @@ func connectionReady(codespace *api.Codespace) bool {
 		codespace.Environment.State == api.CodespaceEnvironmentStateAvailable
 }
 
+type apiClient interface {
+	GetCodespace(ctx context.Context, token, user, name string) (*api.Codespace, error)
+	GetCodespaceToken(ctx context.Context, user, codespace string) (string, error)
+	StartCodespace(ctx context.Context, token string, codespace *api.Codespace) error
+}
+
 // ConnectToLiveshare waits for a Codespace to become running,
 // and connects to it using a Live Share session.
-func ConnectToLiveshare(ctx context.Context, log logger, apiClient *api.API, userLogin, token string, codespace *api.Codespace) (*liveshare.Session, error) {
+func ConnectToLiveshare(ctx context.Context, log logger, apiClient apiClient, userLogin, token string, codespace *api.Codespace) (*liveshare.Session, error) {
 	var startedCodespace bool
 	if codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
 		startedCodespace = true

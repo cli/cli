@@ -22,15 +22,15 @@ type createOptions struct {
 	showStatus bool
 }
 
-func newCreateCmd() *cobra.Command {
-	opts := &createOptions{}
+func newCreateCmd(app *App) *cobra.Command {
+	opts := createOptions{}
 
 	createCmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a codespace",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return create(opts)
+			return app.Create(cmd.Context(), opts)
 		},
 	}
 
@@ -42,12 +42,10 @@ func newCreateCmd() *cobra.Command {
 	return createCmd
 }
 
-func create(opts *createOptions) error {
-	ctx := context.Background()
-	apiClient := api.New(GithubToken)
-	locationCh := getLocation(ctx, apiClient)
-	userCh := getUser(ctx, apiClient)
-	log := output.NewLogger(os.Stdout, os.Stderr, false)
+// Create creates a new Codespace
+func (a *App) Create(ctx context.Context, opts createOptions) error {
+	locationCh := getLocation(ctx, a.apiClient)
+	userCh := getUser(ctx, a.apiClient)
 
 	repo, err := getRepoName(opts.repo)
 	if err != nil {
@@ -58,7 +56,7 @@ func create(opts *createOptions) error {
 		return fmt.Errorf("error getting branch name: %w", err)
 	}
 
-	repository, err := apiClient.GetRepository(ctx, repo)
+	repository, err := a.apiClient.GetRepository(ctx, repo)
 	if err != nil {
 		return fmt.Errorf("error getting repository: %w", err)
 	}
@@ -73,7 +71,7 @@ func create(opts *createOptions) error {
 		return fmt.Errorf("error getting codespace user: %w", userResult.Err)
 	}
 
-	machine, err := getMachineName(ctx, opts.machine, userResult.User, repository, branch, locationResult.Location, apiClient)
+	machine, err := getMachineName(ctx, opts.machine, userResult.User, repository, branch, locationResult.Location, a.apiClient)
 	if err != nil {
 		return fmt.Errorf("error getting machine type: %w", err)
 	}
@@ -81,26 +79,26 @@ func create(opts *createOptions) error {
 		return errors.New("there are no available machine types for this repository")
 	}
 
-	log.Print("Creating your codespace...")
-	codespace, err := apiClient.CreateCodespace(ctx, log, &api.CreateCodespaceParams{
+	a.logger.Print("Creating your codespace...")
+	codespace, err := a.apiClient.CreateCodespace(ctx, &api.CreateCodespaceParams{
 		User:         userResult.User.Login,
 		RepositoryID: repository.ID,
 		Branch:       branch,
 		Machine:      machine,
 		Location:     locationResult.Location,
 	})
-	log.Print("\n")
+	a.logger.Print("\n")
 	if err != nil {
 		return fmt.Errorf("error creating codespace: %w", err)
 	}
 
 	if opts.showStatus {
-		if err := showStatus(ctx, log, apiClient, userResult.User, codespace); err != nil {
+		if err := showStatus(ctx, a.logger, a.apiClient, userResult.User, codespace); err != nil {
 			return fmt.Errorf("show status: %w", err)
 		}
 	}
 
-	log.Printf("Codespace created: ")
+	a.logger.Printf("Codespace created: ")
 
 	fmt.Fprintln(os.Stdout, codespace.Name)
 
@@ -110,7 +108,7 @@ func create(opts *createOptions) error {
 // showStatus polls the codespace for a list of post create states and their status. It will keep polling
 // until all states have finished. Once all states have finished, we poll once more to check if any new
 // states have been introduced and stop polling otherwise.
-func showStatus(ctx context.Context, log *output.Logger, apiClient *api.API, user *api.User, codespace *api.Codespace) error {
+func showStatus(ctx context.Context, log *output.Logger, apiClient apiClient, user *api.User, codespace *api.Codespace) error {
 	var lastState codespaces.PostCreateState
 	var breakNextState bool
 
@@ -177,7 +175,7 @@ type getUserResult struct {
 }
 
 // getUser fetches the user record associated with the GITHUB_TOKEN
-func getUser(ctx context.Context, apiClient *api.API) <-chan getUserResult {
+func getUser(ctx context.Context, apiClient apiClient) <-chan getUserResult {
 	ch := make(chan getUserResult, 1)
 	go func() {
 		user, err := apiClient.GetUser(ctx)
@@ -192,7 +190,7 @@ type locationResult struct {
 }
 
 // getLocation fetches the closest Codespace datacenter region/location to the user.
-func getLocation(ctx context.Context, apiClient *api.API) <-chan locationResult {
+func getLocation(ctx context.Context, apiClient apiClient) <-chan locationResult {
 	ch := make(chan locationResult, 1)
 	go func() {
 		location, err := apiClient.GetCodespaceRegionLocation(ctx)
@@ -236,7 +234,7 @@ func getBranchName(branch string) (string, error) {
 }
 
 // getMachineName prompts the user to select the machine type, or validates the machine if non-empty.
-func getMachineName(ctx context.Context, machine string, user *api.User, repo *api.Repository, branch, location string, apiClient *api.API) (string, error) {
+func getMachineName(ctx context.Context, machine string, user *api.User, repo *api.Repository, branch, location string, apiClient apiClient) (string, error) {
 	skus, err := apiClient.GetCodespacesSKUs(ctx, user, repo, branch, location)
 	if err != nil {
 		return "", fmt.Errorf("error requesting machine instance types: %w", err)

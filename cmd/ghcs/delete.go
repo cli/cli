@@ -4,12 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/github/ghcs/cmd/ghcs/output"
 	"github.com/github/ghcs/internal/api"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -24,7 +22,6 @@ type deleteOptions struct {
 
 	isInteractive bool
 	now           func() time.Time
-	apiClient     apiClient
 	prompter      prompter
 }
 
@@ -33,20 +30,10 @@ type prompter interface {
 	Confirm(message string) (bool, error)
 }
 
-//go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
-type apiClient interface {
-	GetUser(ctx context.Context) (*api.User, error)
-	GetCodespaceToken(ctx context.Context, user, name string) (string, error)
-	GetCodespace(ctx context.Context, token, user, name string) (*api.Codespace, error)
-	ListCodespaces(ctx context.Context, user string) ([]*api.Codespace, error)
-	DeleteCodespace(ctx context.Context, user, name string) error
-}
-
-func newDeleteCmd() *cobra.Command {
+func newDeleteCmd(app *App) *cobra.Command {
 	opts := deleteOptions{
 		isInteractive: hasTTY,
 		now:           time.Now,
-		apiClient:     api.New(os.Getenv("GITHUB_TOKEN")),
 		prompter:      &surveyPrompter{},
 	}
 
@@ -58,8 +45,7 @@ func newDeleteCmd() *cobra.Command {
 			if opts.deleteAll && opts.repoFilter != "" {
 				return errors.New("both --all and --repo is not supported")
 			}
-			log := output.NewLogger(cmd.OutOrStdout(), cmd.ErrOrStderr(), !opts.isInteractive)
-			return delete(context.Background(), log, opts)
+			return app.Delete(cmd.Context(), opts)
 		},
 	}
 
@@ -72,12 +58,8 @@ func newDeleteCmd() *cobra.Command {
 	return deleteCmd
 }
 
-type logger interface {
-	Errorf(format string, v ...interface{}) (int, error)
-}
-
-func delete(ctx context.Context, log logger, opts deleteOptions) error {
-	user, err := opts.apiClient.GetUser(ctx)
+func (a *App) Delete(ctx context.Context, opts deleteOptions) error {
+	user, err := a.apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting user: %w", err)
 	}
@@ -85,7 +67,7 @@ func delete(ctx context.Context, log logger, opts deleteOptions) error {
 	var codespaces []*api.Codespace
 	nameFilter := opts.codespaceName
 	if nameFilter == "" {
-		codespaces, err = opts.apiClient.ListCodespaces(ctx, user.Login)
+		codespaces, err = a.apiClient.ListCodespaces(ctx, user.Login)
 		if err != nil {
 			return fmt.Errorf("error getting codespaces: %w", err)
 		}
@@ -99,12 +81,12 @@ func delete(ctx context.Context, log logger, opts deleteOptions) error {
 		}
 	} else {
 		// TODO: this token is discarded and then re-requested later in DeleteCodespace
-		token, err := opts.apiClient.GetCodespaceToken(ctx, user.Login, nameFilter)
+		token, err := a.apiClient.GetCodespaceToken(ctx, user.Login, nameFilter)
 		if err != nil {
 			return fmt.Errorf("error getting codespace token: %w", err)
 		}
 
-		codespace, err := opts.apiClient.GetCodespace(ctx, token, user.Login, nameFilter)
+		codespace, err := a.apiClient.GetCodespace(ctx, token, user.Login, nameFilter)
 		if err != nil {
 			return fmt.Errorf("error fetching codespace information: %w", err)
 		}
@@ -150,8 +132,8 @@ func delete(ctx context.Context, log logger, opts deleteOptions) error {
 	for _, c := range codespacesToDelete {
 		codespaceName := c.Name
 		g.Go(func() error {
-			if err := opts.apiClient.DeleteCodespace(ctx, user.Login, codespaceName); err != nil {
-				_, _ = log.Errorf("error deleting codespace %q: %v\n", codespaceName, err)
+			if err := a.apiClient.DeleteCodespace(ctx, user.Login, codespaceName); err != nil {
+				_, _ = a.logger.Errorf("error deleting codespace %q: %v\n", codespaceName, err)
 				return err
 			}
 			return nil

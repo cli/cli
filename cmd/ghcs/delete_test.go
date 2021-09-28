@@ -186,7 +186,6 @@ func TestDelete(t *testing.T) {
 				}
 			}
 			opts := tt.opts
-			opts.apiClient = apiMock
 			opts.now = func() time.Time { return now }
 			opts.prompter = &prompterMock{
 				ConfirmFunc: func(msg string) (bool, error) {
@@ -200,8 +199,11 @@ func TestDelete(t *testing.T) {
 
 			stdout := &bytes.Buffer{}
 			stderr := &bytes.Buffer{}
-			log := output.NewLogger(stdout, stderr, false)
-			err := delete(context.Background(), log, opts)
+			app := &App{
+				apiClient: apiMock,
+				logger:    output.NewLogger(stdout, stderr, false),
+			}
+			err := app.Delete(context.Background(), opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("delete() error = %v, wantErr %v", err, tt.wantErr)
 			}

@@ -12,14 +12,43 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/github/ghcs/cmd/ghcs/output"
 	"github.com/github/ghcs/internal/api"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
 
+type App struct {
+	apiClient apiClient
+	logger    *output.Logger
+}
+
+func NewApp(logger *output.Logger, apiClient apiClient) *App {
+	return &App{
+		apiClient: apiClient,
+		logger:    logger,
+	}
+}
+
+//go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
+type apiClient interface {
+	GetUser(ctx context.Context) (*api.User, error)
+	GetCodespaceToken(ctx context.Context, user, name string) (string, error)
+	GetCodespace(ctx context.Context, token, user, name string) (*api.Codespace, error)
+	ListCodespaces(ctx context.Context, user string) ([]*api.Codespace, error)
+	DeleteCodespace(ctx context.Context, user, name string) error
+	StartCodespace(ctx context.Context, token string, codespace *api.Codespace) error
+	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
+	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
+	AuthorizedKeys(ctx context.Context, user string) ([]byte, error)
+	GetCodespaceRegionLocation(ctx context.Context) (string, error)
+	GetCodespacesSKUs(ctx context.Context, user *api.User, repository *api.Repository, branch, location string) ([]*api.SKU, error)
+	GetCodespaceRepositoryContents(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
+}
+
 var errNoCodespaces = errors.New("you have no codespaces")
 
-func chooseCodespace(ctx context.Context, apiClient *api.API, user *api.User) (*api.Codespace, error) {
+func chooseCodespace(ctx context.Context, apiClient apiClient, user *api.User) (*api.Codespace, error) {
 	codespaces, err := apiClient.ListCodespaces(ctx, user.Login)
 	if err != nil {
 		return nil, fmt.Errorf("error getting codespaces: %w", err)
@@ -68,7 +97,7 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 
 // getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
 // It then fetches the codespace token and the codespace record.
-func getOrChooseCodespace(ctx context.Context, apiClient *api.API, user *api.User, codespaceName string) (codespace *api.Codespace, token string, err error) {
+func getOrChooseCodespace(ctx context.Context, apiClient apiClient, user *api.User, codespaceName string) (codespace *api.Codespace, token string, err error) {
 	if codespaceName == "" {
 		codespace, err = chooseCodespace(ctx, apiClient, user)
 		if err != nil {
@@ -135,7 +164,7 @@ func ask(qs []*survey.Question, response interface{}) error {
 // checkAuthorizedKeys reports an error if the user has not registered any SSH keys;
 // see https://github.com/github/ghcs/issues/166#issuecomment-921769703.
 // The check is not required for security but it improves the error message.
-func checkAuthorizedKeys(ctx context.Context, client *api.API, user string) error {
+func checkAuthorizedKeys(ctx context.Context, client apiClient, user string) error {
 	keys, err := client.AuthorizedKeys(ctx, user)
 	if err != nil {
 		return fmt.Errorf("failed to read GitHub-authorized SSH keys for %s: %w", user, err)

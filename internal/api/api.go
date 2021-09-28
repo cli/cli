@@ -45,14 +45,18 @@ const githubAPI = "https://api.github.com"
 
 type API struct {
 	token     string
-	client    *http.Client
+	client    httpClient
 	githubAPI string
 }
 
-func New(token string) *API {
+type httpClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+func New(token string, httpClient httpClient) *API {
 	return &API{
 		token:     token,
-		client:    &http.Client{},
+		client:    httpClient,
 		githubAPI: githubAPI,
 	}
 }
@@ -272,6 +276,7 @@ func (a *API) GetCodespace(ctx context.Context, token, owner, codespace string) 
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
+	// TODO: use a.setHeaders()
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces/*")
 	if err != nil {
@@ -306,6 +311,7 @@ func (a *API) StartCodespace(ctx context.Context, token string, codespace *Codes
 		return fmt.Errorf("error creating request: %w", err)
 	}
 
+	// TODO: use a.setHeaders()
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := a.do(ctx, req, "/vscs_internal/proxy/environments/*/start")
 	if err != nil {
@@ -420,14 +426,9 @@ type CreateCodespaceParams struct {
 	Branch, Machine, Location string
 }
 
-type logger interface {
-	Print(v ...interface{}) (int, error)
-	Println(v ...interface{}) (int, error)
-}
-
 // CreateCodespace creates a codespace with the given parameters and returns a non-nil error if it
 // fails to create.
-func (a *API) CreateCodespace(ctx context.Context, log logger, params *CreateCodespaceParams) (*Codespace, error) {
+func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams) (*Codespace, error) {
 	codespace, err := a.startCreate(
 		ctx, params.User, params.RepositoryID, params.Machine, params.Branch, params.Location,
 	)
@@ -449,7 +450,6 @@ func (a *API) CreateCodespace(ctx context.Context, log logger, params *CreateCod
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case <-ticker.C:
-			log.Print(".")
 			token, err := a.GetCodespaceToken(ctx, params.User, codespace.Name)
 			if err != nil {
 				if err == ErrNotProvisioned {
@@ -532,6 +532,7 @@ func (a *API) DeleteCodespace(ctx context.Context, user string, codespaceName st
 		return fmt.Errorf("error creating request: %w", err)
 	}
 
+	// TODO: use a.setHeaders()
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces/*")
 	if err != nil {
@@ -631,6 +632,8 @@ func (a *API) do(ctx context.Context, req *http.Request, spanName string) (*http
 }
 
 func (a *API) setHeaders(req *http.Request) {
-	req.Header.Set("Authorization", "Bearer "+a.token)
+	if a.token != "" {
+		req.Header.Set("Authorization", "Bearer "+a.token)
+	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 }
