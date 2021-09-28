@@ -37,12 +37,13 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/objx v0.1.1 // indirect
 	github.com/stretchr/testify v1.7.0
-	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
+	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210601080250-7ecdf8ef093b
+	golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1
 	golang.org/x/term v0.0.0-20210503060354-a79de5458b56
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
 
 replace github.com/shurcooL/graphql => github.com/cli/shurcooL-graphql v0.0.0-20200707151639-0f7232a2bf7e
-replace golang.org/x/crypto => ./internal/crypto
+
+replace golang.org/x/crypto => github.com/cli/crypto v0.0.0-20210929142629-6be313f59b03
