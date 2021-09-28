@@ -8,10 +8,10 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/cli/cli/v2/cmd/ghcs/output"
+	"github.com/cli/cli/v2/internal/api"
+	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/fatih/camelcase"
-	"github.com/github/ghcs/cmd/ghcs/output"
-	"github.com/github/ghcs/internal/api"
-	"github.com/github/ghcs/internal/codespaces"
 	"github.com/spf13/cobra"
 )
 

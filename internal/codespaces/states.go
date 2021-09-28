@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/github/ghcs/internal/api"
-	"github.com/github/ghcs/internal/liveshare"
+	"github.com/cli/cli/v2/internal/api"
+	"github.com/cli/cli/v2/internal/liveshare"
 )
 
 // PostCreateStateStatus is a string value representing the different statuses a state can have.

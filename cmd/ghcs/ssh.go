@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/github/ghcs/internal/codespaces"
-	"github.com/github/ghcs/internal/liveshare"
+	"github.com/cli/cli/v2/internal/codespaces"
+	"github.com/cli/cli/v2/internal/liveshare"
 	"github.com/spf13/cobra"
 )
 

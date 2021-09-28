@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/github/ghcs/cmd/ghcs/output"
-	"github.com/github/ghcs/internal/api"
+	"github.com/cli/cli/v2/cmd/ghcs/output"
+	"github.com/cli/cli/v2/internal/api"
 	"github.com/spf13/cobra"
 )
 

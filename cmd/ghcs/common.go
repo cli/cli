@@ -12,8 +12,8 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
-	"github.com/github/ghcs/cmd/ghcs/output"
-	"github.com/github/ghcs/internal/api"
+	"github.com/cli/cli/v2/cmd/ghcs/output"
+	"github.com/cli/cli/v2/internal/api"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -162,7 +162,7 @@ func ask(qs []*survey.Question, response interface{}) error {
 }
 
 // checkAuthorizedKeys reports an error if the user has not registered any SSH keys;
-// see https://github.com/github/ghcs/issues/166#issuecomment-921769703.
+// see https://github.com/cli/cli/v2/issues/166#issuecomment-921769703.
 // The check is not required for security but it improves the error message.
 func checkAuthorizedKeys(ctx context.Context, client apiClient, user string) error {
 	keys, err := client.AuthorizedKeys(ctx, user)

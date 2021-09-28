@@ -12,9 +12,11 @@ require (
 	github.com/cli/safeexec v1.0.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.0
 	github.com/creack/pty v1.1.13
+	github.com/fatih/camelcase v1.0.0
 	github.com/gabriel-vasile/mimetype v1.1.2
 	github.com/google/go-cmp v0.5.5
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
+	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/go-version v1.2.1
 	github.com/henvic/httpretty v0.0.6
 	github.com/itchyny/gojq v0.12.4
@@ -24,8 +26,13 @@ require (
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/muesli/reflow v0.2.1-0.20210502190812-c80126ec2ad5
 	github.com/muesli/termenv v0.8.1
+	github.com/muhammadmuzzammil1998/jsonc v0.0.0-20201229145248-615b0916ca38
+	github.com/olekukonko/tablewriter v0.0.5
+	github.com/opentracing/opentracing-go v1.1.0
 	github.com/shurcooL/githubv4 v0.0.0-20200928013246-d292edc3691b
 	github.com/shurcooL/graphql v0.0.0-20181231061246-d48a9a75455f
+	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
+	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/objx v0.1.1 // indirect
