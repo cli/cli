@@ -70,12 +70,7 @@ func downloadAsset(httpClient *http.Client, asset releaseAsset, destPath string)
 		return api.HandleHTTPError(resp)
 	}
 
-	mode := os.O_WRONLY | os.O_CREATE | os.O_EXCL
-	if _, err := os.Stat(destPath); err == nil {
-		mode = os.O_WRONLY | os.O_EXCL
-	}
-
-	f, err := os.OpenFile(destPath, mode, 0755)
+	f, err := os.OpenFile(destPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
 		return err
 	}
