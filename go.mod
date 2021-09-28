@@ -45,3 +45,4 @@ require (
 )
 
 replace github.com/shurcooL/graphql => github.com/cli/shurcooL-graphql v0.0.0-20200707151639-0f7232a2bf7e
+replace golang.org/x/crypto => ./internal/crypto

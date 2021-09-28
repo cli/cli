@@ -2,8 +2,12 @@ package root
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/cmd/ghcs"
+	"github.com/cli/cli/v2/cmd/ghcs/output"
+	ghcsApi "github.com/cli/cli/v2/internal/api"
 	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
 	aliasCmd "github.com/cli/cli/v2/pkg/cmd/alias"
 	apiCmd "github.com/cli/cli/v2/pkg/cmd/api"
@@ -104,6 +108,15 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	referenceCmd := NewHelpTopic("reference")
 	referenceCmd.SetHelpFunc(referenceHelpFn(f.IOStreams))
 	cmd.AddCommand(referenceCmd)
+
+	ghcsApp := ghcs.NewApp(
+		output.NewLogger(f.IOStreams.Out, f.IOStreams.ErrOut, !f.IOStreams.IsStdoutTTY()),
+		ghcsApi.New(os.Getenv("GITHUB_TOKEN"), http.DefaultClient),
+	)
+	ghcsCmd := ghcs.NewRootCmd(ghcsApp)
+	ghcsCmd.Use = "codespace"
+	ghcsCmd.Aliases = []string{"cs"}
+	cmd.AddCommand(ghcsCmd)
 
 	cmdutil.DisableAuthCheck(cmd)
 
