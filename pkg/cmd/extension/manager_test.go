@@ -212,12 +212,13 @@ func TestManager_Upgrade_BinaryExtension(t *testing.T) {
 	reg := httpmock.Registry{}
 	defer reg.Verify(t)
 	client := http.Client{Transport: &reg}
-	stubBinaryExtension(filepath.Join(tempDir, "extensions", "gh-bin-ext"), binManifest{
+	err := stubBinaryExtension(filepath.Join(tempDir, "extensions", "gh-bin-ext"), binManifest{
 		Owner: "owner",
 		Name:  "gh-bin-ext",
 		Host:  "example.com",
 		Tag:   "v1.0.1",
 	})
+	assert.NoError(t, err)
 
 	m := newTestManager(tempDir, &client, io)
 	reg.Register(
@@ -248,7 +249,7 @@ func TestManager_Upgrade_BinaryExtension(t *testing.T) {
 		httpmock.REST("GET", "release/cool2"),
 		httpmock.StringResponse("FAKE UPGRADED BINARY"))
 
-	err := m.Upgrade("bin-ext", false)
+	err = m.Upgrade("bin-ext", false)
 	assert.NoError(t, err)
 
 	manifest, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext", manifestName))
@@ -472,9 +473,36 @@ func stubLocalExtension(tempDir, path string) error {
 	return f.Close()
 }
 
-func stubBinaryExtension(path string, bm binManifest) error {
-	// TODO make directory
-	// TODO write manifest file
-	// TODO write fake binary file
-	return nil
+// Given the path where an extension should be installed and a manifest struct, creates a fake binary extension on disk
+func stubBinaryExtension(installPath string, bm binManifest) error {
+	if err := os.MkdirAll(installPath, 0755); err != nil {
+		return err
+	}
+	fakeBinaryPath := filepath.Join(installPath, filepath.Base(installPath))
+	fb, err := os.OpenFile(fakeBinaryPath, os.O_CREATE, 0755)
+	if err != nil {
+		return err
+	}
+	err = fb.Close()
+	if err != nil {
+		return err
+	}
+
+	bs, err := yaml.Marshal(bm)
+	if err != nil {
+		return fmt.Errorf("failed to serialize manifest: %w", err)
+	}
+
+	manifestPath := filepath.Join(installPath, manifestName)
+
+	fm, err := os.OpenFile(manifestPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open manifest for writing: %w", err)
+	}
+	_, err = fm.Write(bs)
+	if err != nil {
+		return fmt.Errorf("failed write manifest file: %w", err)
+	}
+
+	return fm.Close()
 }
