@@ -184,13 +184,18 @@ func makeConnection(server *Server) http.HandlerFunc {
 	}
 }
 
+// sendError does a non-blocking send of the error to the err channel.
 func sendError(errc chan<- error, err error) {
 	select {
 	case errc <- err:
 	default:
+		// channel is blocked with a previous error, so we ignore
+		// this current error
 	}
 }
 
+// awaitError waits for the context to finish and returns its error (if any).
+// It also waits for an err to come through the err channel.
 func awaitError(ctx context.Context, errc <-chan error) error {
 	select {
 	case <-ctx.Done():
@@ -200,6 +205,9 @@ func awaitError(ctx context.Context, errc <-chan error) error {
 	}
 }
 
+// handleChannels services the sshChannels channel. For each SSH channel received
+// it creates a go routine to service the channel's requests. It returns on the first
+// error encountered.
 func handleChannels(ctx context.Context, server *Server, sshChannels <-chan ssh.NewChannel) error {
 	errc := make(chan error, 1)
 	go func() {
@@ -222,6 +230,10 @@ func handleChannels(ctx context.Context, server *Server, sshChannels <-chan ssh.
 	return awaitError(ctx, errc)
 }
 
+// handleRequests services the SSH channel requests channel. It replies to requests and
+// when stream transport requests are encountered, creates a go routine to create a
+// bi-directional data stream between the channel and server stream. It returns on the first error
+// encountered.
 func handleRequests(ctx context.Context, server *Server, channel ssh.Channel, reqs <-chan *ssh.Request) error {
 	errc := make(chan error, 1)
 	go func() {
@@ -246,6 +258,7 @@ func handleRequests(ctx context.Context, server *Server, channel ssh.Channel, re
 	return awaitError(ctx, errc)
 }
 
+// concurrentStream is a concurrency safe io.ReadWriter.
 type concurrentStream struct {
 	sync.RWMutex
 	stream io.ReadWriter
@@ -267,6 +280,8 @@ func (cs *concurrentStream) Write(b []byte) (int, error) {
 	return cs.stream.Write(b)
 }
 
+// forwardStream does a bi-directional copy of the stream <-> with the SSH channel. The io.Copy
+// runs until an error is encountered.
 func forwardStream(ctx context.Context, server *Server, streamName string, channel ssh.Channel) (err error) {
 	simpleStreamName := strings.TrimPrefix(streamName, "stream-transport-")
 	stream, found := server.streams[simpleStreamName]
@@ -308,6 +323,8 @@ func newRPCHandler(server *Server) *rpcHandler {
 	return &rpcHandler{server}
 }
 
+// Handle satisfies the jsonrpc2 pkg handler interface. It tries to find a mocked
+// RPC service method and if found, it invokes the handler and replies to the request.
 func (r *rpcHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
 	handler, found := r.server.services[req.Method]
 	if !found {
