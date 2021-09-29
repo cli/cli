@@ -59,17 +59,21 @@ func TestManager_List(t *testing.T) {
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-hello", "gh-hello")))
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-two", "gh-two")))
 
+	assert.NoError(t, stubBinaryExtension(
+		filepath.Join(tempDir, "extensions", "gh-bin-ext"),
+		binManifest{
+			Owner: "owner",
+			Name:  "gh-bin-ext",
+			Host:  "example.com",
+			Tag:   "v1.0.1",
+		}))
+
 	m := newTestManager(tempDir, nil, nil)
 	exts := m.List(false)
-	assert.Equal(t, 2, len(exts))
-	assert.Equal(t, "hello", exts[0].Name())
-	assert.Equal(t, "two", exts[1].Name())
-}
-
-func TestManager_List_Binary(t *testing.T) {
-	//tempDir := t.TempDir()
-	// TODO
-
+	assert.Equal(t, 3, len(exts))
+	assert.Equal(t, "bin-ext", exts[0].Name())
+	assert.Equal(t, "hello", exts[1].Name())
+	assert.Equal(t, "two", exts[2].Name())
 }
 
 func TestManager_Dispatch(t *testing.T) {
@@ -212,13 +216,15 @@ func TestManager_Upgrade_BinaryExtension(t *testing.T) {
 	reg := httpmock.Registry{}
 	defer reg.Verify(t)
 	client := http.Client{Transport: &reg}
-	err := stubBinaryExtension(filepath.Join(tempDir, "extensions", "gh-bin-ext"), binManifest{
-		Owner: "owner",
-		Name:  "gh-bin-ext",
-		Host:  "example.com",
-		Tag:   "v1.0.1",
-	})
-	assert.NoError(t, err)
+
+	assert.NoError(t, stubBinaryExtension(
+		filepath.Join(tempDir, "extensions", "gh-bin-ext"),
+		binManifest{
+			Owner: "owner",
+			Name:  "gh-bin-ext",
+			Host:  "example.com",
+			Tag:   "v1.0.1",
+		}))
 
 	m := newTestManager(tempDir, &client, io)
 	reg.Register(
@@ -249,7 +255,7 @@ func TestManager_Upgrade_BinaryExtension(t *testing.T) {
 		httpmock.REST("GET", "release/cool2"),
 		httpmock.StringResponse("FAKE UPGRADED BINARY"))
 
-	err = m.Upgrade("bin-ext", false)
+	err := m.Upgrade("bin-ext", false)
 	assert.NoError(t, err)
 
 	manifest, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext", manifestName))
