@@ -5,6 +5,8 @@ import (
 	"strings"
 )
 
+const manifestName = "manifest.yml"
+
 type Extension struct {
 	path            string
 	url             string

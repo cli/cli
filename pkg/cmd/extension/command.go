@@ -132,7 +132,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if len(args) > 0 {
 						name = normalizeExtensionSelector(args[0])
 					}
-					return m.Upgrade(name, flagForce, io.Out, io.ErrOut)
+					return m.Upgrade(name, flagForce)
 				},
 			}
 			cmd.Flags().BoolVar(&flagAll, "all", false, "Upgrade all extensions")

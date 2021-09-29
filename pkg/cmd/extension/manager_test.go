@@ -59,11 +59,59 @@ func TestManager_List(t *testing.T) {
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-hello", "gh-hello")))
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-two", "gh-two")))
 
+	assert.NoError(t, stubBinaryExtension(
+		filepath.Join(tempDir, "extensions", "gh-bin-ext"),
+		binManifest{
+			Owner: "owner",
+			Name:  "gh-bin-ext",
+			Host:  "example.com",
+			Tag:   "v1.0.1",
+		}))
+
 	m := newTestManager(tempDir, nil, nil)
 	exts := m.List(false)
-	assert.Equal(t, 2, len(exts))
-	assert.Equal(t, "hello", exts[0].Name())
-	assert.Equal(t, "two", exts[1].Name())
+	assert.Equal(t, 3, len(exts))
+	assert.Equal(t, "bin-ext", exts[0].Name())
+	assert.Equal(t, "hello", exts[1].Name())
+	assert.Equal(t, "two", exts[2].Name())
+}
+
+func TestManager_List_binary_update(t *testing.T) {
+	tempDir := t.TempDir()
+
+	assert.NoError(t, stubBinaryExtension(
+		filepath.Join(tempDir, "extensions", "gh-bin-ext"),
+		binManifest{
+			Owner: "owner",
+			Name:  "gh-bin-ext",
+			Host:  "example.com",
+			Tag:   "v1.0.1",
+		}))
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+	client := http.Client{Transport: &reg}
+
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Tag: "v1.0.2",
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-windows-amd64",
+						APIURL: "https://example.com/release/cool2",
+					},
+				},
+			}))
+
+	m := newTestManager(tempDir, &client, nil)
+
+	exts := m.List(true)
+	assert.Equal(t, 1, len(exts))
+	assert.Equal(t, "bin-ext", exts[0].Name())
+	assert.True(t, exts[0].UpdateAvailable())
+	assert.Equal(t, "https://example.com/owner/gh-bin-ext", exts[0].URL())
 }
 
 func TestManager_Dispatch(t *testing.T) {
@@ -108,11 +156,11 @@ func TestManager_Upgrade_AllExtensions(t *testing.T) {
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-two", "gh-two")))
 	assert.NoError(t, stubLocalExtension(tempDir, filepath.Join(tempDir, "extensions", "gh-local", "gh-local")))
 
-	m := newTestManager(tempDir, nil, nil)
+	io, _, stdout, stderr := iostreams.Test()
 
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	err := m.Upgrade("", false, stdout, stderr)
+	m := newTestManager(tempDir, nil, io)
+
+	err := m.Upgrade("", false)
 	assert.NoError(t, err)
 
 	assert.Equal(t, heredoc.Docf(
@@ -133,11 +181,11 @@ func TestManager_Upgrade_RemoteExtension(t *testing.T) {
 	tempDir := t.TempDir()
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-remote", "gh-remote")))
 
-	m := newTestManager(tempDir, nil, nil)
+	io, _, stdout, stderr := iostreams.Test()
 
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	err := m.Upgrade("remote", false, stdout, stderr)
+	m := newTestManager(tempDir, nil, io)
+
+	err := m.Upgrade("remote", false)
 	assert.NoError(t, err)
 	assert.Equal(t, heredoc.Docf(
 		`
@@ -153,11 +201,10 @@ func TestManager_Upgrade_LocalExtension(t *testing.T) {
 	tempDir := t.TempDir()
 	assert.NoError(t, stubLocalExtension(tempDir, filepath.Join(tempDir, "extensions", "gh-local", "gh-local")))
 
-	m := newTestManager(tempDir, nil, nil)
+	io, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, nil, io)
 
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	err := m.Upgrade("local", false, stdout, stderr)
+	err := m.Upgrade("local", false)
 	assert.EqualError(t, err, "local extensions can not be upgraded")
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
@@ -170,11 +217,10 @@ func TestManager_Upgrade_Force(t *testing.T) {
 
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-remote", "gh-remote")))
 
-	m := newTestManager(tempDir, nil, nil)
+	io, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, nil, io)
 
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	err := m.Upgrade("remote", true, stdout, stderr)
+	err := m.Upgrade("remote", true)
 	assert.NoError(t, err)
 	assert.Equal(t, heredoc.Docf(
 		`
@@ -192,14 +238,83 @@ func TestManager_Upgrade_Force(t *testing.T) {
 func TestManager_Upgrade_NoExtensions(t *testing.T) {
 	tempDir := t.TempDir()
 
-	m := newTestManager(tempDir, nil, nil)
+	io, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, nil, io)
 
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	err := m.Upgrade("", false, stdout, stderr)
+	err := m.Upgrade("", false)
 	assert.EqualError(t, err, "no extensions installed")
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
+}
+
+func TestManager_Upgrade_BinaryExtension(t *testing.T) {
+	tempDir := t.TempDir()
+
+	io, _, _, _ := iostreams.Test()
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+	client := http.Client{Transport: &reg}
+
+	assert.NoError(t, stubBinaryExtension(
+		filepath.Join(tempDir, "extensions", "gh-bin-ext"),
+		binManifest{
+			Owner: "owner",
+			Name:  "gh-bin-ext",
+			Host:  "example.com",
+			Tag:   "v1.0.1",
+		}))
+
+	m := newTestManager(tempDir, &client, io)
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Tag: "v1.0.2",
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-windows-amd64",
+						APIURL: "https://example.com/release/cool2",
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Tag: "v1.0.2",
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-windows-amd64",
+						APIURL: "https://example.com/release/cool2",
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "release/cool2"),
+		httpmock.StringResponse("FAKE UPGRADED BINARY"))
+
+	err := m.Upgrade("bin-ext", false)
+	assert.NoError(t, err)
+
+	manifest, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext", manifestName))
+	assert.NoError(t, err)
+
+	var bm binManifest
+	err = yaml.Unmarshal(manifest, &bm)
+	assert.NoError(t, err)
+
+	assert.Equal(t, binManifest{
+		Name:  "gh-bin-ext",
+		Owner: "owner",
+		Host:  "example.com",
+		Tag:   "v1.0.2",
+		Path:  filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext"),
+	}, bm)
+
+	fakeBin, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext"))
+	assert.NoError(t, err)
+
+	assert.Equal(t, "FAKE UPGRADED BINARY", string(fakeBin))
 }
 
 func TestManager_Install_git(t *testing.T) {
@@ -322,7 +437,7 @@ func TestManager_Install_binary(t *testing.T) {
 	err := m.Install(repo)
 	assert.NoError(t, err)
 
-	manifest, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/manifest.yml"))
+	manifest, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext", manifestName))
 	assert.NoError(t, err)
 
 	var bm binManifest
@@ -400,4 +515,38 @@ func stubLocalExtension(tempDir, path string) error {
 		return err
 	}
 	return f.Close()
+}
+
+// Given the path where an extension should be installed and a manifest struct, creates a fake binary extension on disk
+func stubBinaryExtension(installPath string, bm binManifest) error {
+	if err := os.MkdirAll(installPath, 0755); err != nil {
+		return err
+	}
+	fakeBinaryPath := filepath.Join(installPath, filepath.Base(installPath))
+	fb, err := os.OpenFile(fakeBinaryPath, os.O_CREATE, 0755)
+	if err != nil {
+		return err
+	}
+	err = fb.Close()
+	if err != nil {
+		return err
+	}
+
+	bs, err := yaml.Marshal(bm)
+	if err != nil {
+		return fmt.Errorf("failed to serialize manifest: %w", err)
+	}
+
+	manifestPath := filepath.Join(installPath, manifestName)
+
+	fm, err := os.OpenFile(manifestPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open manifest for writing: %w", err)
+	}
+	_, err = fm.Write(bs)
+	if err != nil {
+		return fmt.Errorf("failed write manifest file: %w", err)
+	}
+
+	return fm.Close()
 }

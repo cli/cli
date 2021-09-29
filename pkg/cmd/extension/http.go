@@ -70,7 +70,7 @@ func downloadAsset(httpClient *http.Client, asset releaseAsset, destPath string)
 		return api.HandleHTTPError(resp)
 	}
 
-	f, err := os.OpenFile(destPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0755)
+	f, err := os.OpenFile(destPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
 		return err
 	}
