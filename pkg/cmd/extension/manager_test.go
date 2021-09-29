@@ -76,6 +76,44 @@ func TestManager_List(t *testing.T) {
 	assert.Equal(t, "two", exts[2].Name())
 }
 
+func TestManager_List_binary_update(t *testing.T) {
+	tempDir := t.TempDir()
+
+	assert.NoError(t, stubBinaryExtension(
+		filepath.Join(tempDir, "extensions", "gh-bin-ext"),
+		binManifest{
+			Owner: "owner",
+			Name:  "gh-bin-ext",
+			Host:  "example.com",
+			Tag:   "v1.0.1",
+		}))
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+	client := http.Client{Transport: &reg}
+
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Tag: "v1.0.2",
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-windows-amd64",
+						APIURL: "https://example.com/release/cool2",
+					},
+				},
+			}))
+
+	m := newTestManager(tempDir, &client, nil)
+
+	exts := m.List(true)
+	assert.Equal(t, 1, len(exts))
+	assert.Equal(t, "bin-ext", exts[0].Name())
+	assert.True(t, exts[0].UpdateAvailable())
+	assert.Equal(t, "https://example.com/owner/gh-bin-ext", exts[0].URL())
+}
+
 func TestManager_Dispatch(t *testing.T) {
 	tempDir := t.TempDir()
 	extPath := filepath.Join(tempDir, "extensions", "gh-hello", "gh-hello")
