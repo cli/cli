@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/cmd/ghcs/output"
 	"github.com/cli/cli/v2/internal/api"
 )
@@ -102,7 +104,10 @@ func TestDelete(t *testing.T) {
 			deleteErr:   errors.New("aborted by test"),
 			wantErr:     true,
 			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-123"},
-			wantStderr:  "error deleting codespace \"hubot-robawt-abc\": aborted by test\nerror deleting codespace \"monalisa-spoonknife-123\": aborted by test\n",
+			wantStderr: heredoc.Doc(`
+				error deleting codespace "hubot-robawt-abc": aborted by test
+				error deleting codespace "monalisa-spoonknife-123": aborted by test
+			`),
 		},
 		{
 			name: "with confirm",
@@ -221,7 +226,7 @@ func TestDelete(t *testing.T) {
 			if out := stdout.String(); out != tt.wantStdout {
 				t.Errorf("stdout = %q, want %q", out, tt.wantStdout)
 			}
-			if out := stderr.String(); out != tt.wantStderr {
+			if out := sortLines(stderr.String()); out != tt.wantStderr {
 				t.Errorf("stderr = %q, want %q", out, tt.wantStderr)
 			}
 		})
@@ -238,4 +243,15 @@ func sliceEquals(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+func sortLines(s string) string {
+	trailing := ""
+	if strings.HasSuffix(s, "\n") {
+		s = strings.TrimSuffix(s, "\n")
+		trailing = "\n"
+	}
+	lines := strings.Split(s, "\n")
+	sort.Strings(lines)
+	return strings.Join(lines, "\n") + trailing
 }
