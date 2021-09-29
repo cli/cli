@@ -130,13 +130,13 @@ func (m *Manager) list(includeMetadata bool) ([]extensions.Extension, error) {
 func (m *Manager) parseExtensionDir(fi fs.FileInfo, includeMetadata bool) (*Extension, error) {
 	id := m.installDir()
 	if _, err := os.Stat(filepath.Join(id, fi.Name(), manifestName)); err == nil {
-		return m.parseBinaryExtension(fi, includeMetadata)
+		return m.parseBinaryExtensionDir(fi, includeMetadata)
 	}
 
-	return m.parseGitExtension(fi, includeMetadata)
+	return m.parseGitExtensionDir(fi, includeMetadata)
 }
 
-func (m *Manager) parseBinaryExtension(fi fs.FileInfo, includeMetadata bool) (*Extension, error) {
+func (m *Manager) parseBinaryExtensionDir(fi fs.FileInfo, includeMetadata bool) (*Extension, error) {
 	id := m.installDir()
 	exePath := filepath.Join(id, fi.Name(), fi.Name())
 	manifestPath := filepath.Join(id, fi.Name(), manifestName)
@@ -175,7 +175,7 @@ func (m *Manager) parseBinaryExtension(fi fs.FileInfo, includeMetadata bool) (*E
 	}, nil
 }
 
-func (m *Manager) parseGitExtension(fi fs.FileInfo, includeMetadata bool) (*Extension, error) {
+func (m *Manager) parseGitExtensionDir(fi fs.FileInfo, includeMetadata bool) (*Extension, error) {
 	// TODO untangle local from this since local might be binary or git
 	id := m.installDir()
 	var remoteUrl string
