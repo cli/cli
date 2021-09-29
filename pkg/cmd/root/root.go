@@ -2,6 +2,7 @@ package root
 
 import (
 	"net/http"
+	"sync"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/cmd/ghcs"
@@ -138,12 +139,21 @@ func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
 }
 
 type lazyLoadedHTTPClient struct {
-	factory    *cmdutil.Factory
-	httpClient *http.Client
+	factory *cmdutil.Factory
+
+	httpClientMu sync.RWMutex // guards httpClient
+	httpClient   *http.Client
 }
 
 func (l *lazyLoadedHTTPClient) Do(req *http.Request) (*http.Response, error) {
-	if l.httpClient == nil {
+	l.httpClientMu.RLock()
+	httpClient := l.httpClient
+	l.httpClientMu.RUnlock()
+
+	if httpClient == nil {
+		l.httpClientMu.Lock()
+		defer l.httpClientMu.Unlock()
+
 		var err error
 		l.httpClient, err = l.factory.HttpClient()
 		if err != nil {
