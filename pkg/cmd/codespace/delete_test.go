@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/cmd/ghcs/output"
 	"github.com/cli/cli/v2/internal/api"
+	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 )
 
 func TestDelete(t *testing.T) {
