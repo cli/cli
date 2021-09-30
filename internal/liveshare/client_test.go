@@ -15,9 +15,10 @@ import (
 
 func TestConnect(t *testing.T) {
 	opts := Options{
-		SessionID:    "session-id",
-		SessionToken: "session-token",
-		RelaySAS:     "relay-sas",
+		SessionID:      "session-id",
+		SessionToken:   "session-token",
+		RelaySAS:       "relay-sas",
+		HostPublicKeys: []string{livesharetest.SSHPublicKey},
 	}
 	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
 		var joinWorkspaceReq joinWorkspaceArgs
