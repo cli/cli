@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/MakeNowJust/heredoc"
-	ghcsApi "github.com/cli/cli/v2/internal/api"
+	codespacesAPI "github.com/cli/cli/v2/internal/codespaces/api"
 	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
 	aliasCmd "github.com/cli/cli/v2/pkg/cmd/alias"
 	apiCmd "github.com/cli/cli/v2/pkg/cmd/api"
@@ -130,7 +130,7 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := codespaceCmd.NewRootCmd(codespaceCmd.NewApp(
 		output.NewLogger(f.IOStreams.Out, f.IOStreams.ErrOut, !f.IOStreams.IsStdoutTTY()),
-		ghcsApi.New("", &lazyLoadedHTTPClient{factory: f}),
+		codespacesAPI.New("", &lazyLoadedHTTPClient{factory: f}),
 	))
 	cmd.Use = "codespace"
 	cmd.Aliases = []string{"cs"}

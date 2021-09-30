@@ -12,7 +12,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
-	"github.com/cli/cli/v2/internal/api"
+	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"

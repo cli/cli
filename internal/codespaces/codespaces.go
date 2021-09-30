@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cli/cli/v2/internal/api"
-	"github.com/cli/cli/v2/internal/liveshare"
+	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/pkg/liveshare"
 )
 
 type logger interface {

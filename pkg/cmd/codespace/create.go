@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/v2/internal/api"
 	"github.com/cli/cli/v2/internal/codespaces"
+	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	"github.com/fatih/camelcase"
 	"github.com/spf13/cobra"
