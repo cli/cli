@@ -2,8 +2,12 @@ package root
 
 import (
 	"net/http"
+	"sync"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/cmd/ghcs"
+	"github.com/cli/cli/v2/cmd/ghcs/output"
+	ghcsApi "github.com/cli/cli/v2/internal/api"
 	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
 	aliasCmd "github.com/cli/cli/v2/pkg/cmd/alias"
 	apiCmd "github.com/cli/cli/v2/pkg/cmd/api"
@@ -78,6 +82,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(extensionCmd.NewCmdExtension(f))
 	cmd.AddCommand(secretCmd.NewCmdSecret(f))
 	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
+	cmd.AddCommand(newCodespaceCmd(f))
 
 	// the `api` command should not inherit any extra HTTP headers
 	bareHTTPCmdFactory := *f
@@ -120,4 +125,40 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 		}
 		return factory.NewHTTPClient(f.IOStreams, cfg, version, false)
 	}
+}
+
+func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
+	cmd := ghcs.NewRootCmd(ghcs.NewApp(
+		output.NewLogger(f.IOStreams.Out, f.IOStreams.ErrOut, !f.IOStreams.IsStdoutTTY()),
+		ghcsApi.New("", &lazyLoadedHTTPClient{factory: f}),
+	))
+	cmd.Use = "codespace"
+	cmd.Aliases = []string{"cs"}
+	cmd.Hidden = true
+	return cmd
+}
+
+type lazyLoadedHTTPClient struct {
+	factory *cmdutil.Factory
+
+	httpClientMu sync.RWMutex // guards httpClient
+	httpClient   *http.Client
+}
+
+func (l *lazyLoadedHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	l.httpClientMu.RLock()
+	httpClient := l.httpClient
+	l.httpClientMu.RUnlock()
+
+	if httpClient == nil {
+		l.httpClientMu.Lock()
+		defer l.httpClientMu.Unlock()
+
+		var err error
+		l.httpClient, err = l.factory.HttpClient()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return l.httpClient.Do(req)
 }
