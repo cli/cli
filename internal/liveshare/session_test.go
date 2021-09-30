@@ -29,11 +29,12 @@ func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server,
 	}
 
 	session, err := Connect(context.Background(), Options{
-		SessionID:     "session-id",
-		SessionToken:  sessionToken,
-		RelayEndpoint: "sb" + strings.TrimPrefix(testServer.URL(), "https"),
-		RelaySAS:      "relay-sas",
-		TLSConfig:     &tls.Config{InsecureSkipVerify: true},
+		SessionID:      "session-id",
+		SessionToken:   sessionToken,
+		RelayEndpoint:  "sb" + strings.TrimPrefix(testServer.URL(), "https"),
+		RelaySAS:       "relay-sas",
+		HostPublicKeys: []string{livesharetest.SSHPublicKey},
+		TLSConfig:      &tls.Config{InsecureSkipVerify: true},
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("error connecting to Live Share: %w", err)
@@ -192,5 +193,31 @@ func TestServerUpdateSharedVisibility(t *testing.T) {
 		if err != nil {
 			t.Errorf("error from client: %w", err)
 		}
+	}
+}
+
+func TestInvalidHostKey(t *testing.T) {
+	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
+		return joinWorkspaceResult{1}, nil
+	}
+	const sessionToken = "session-token"
+	opts := []livesharetest.ServerOption{
+		livesharetest.WithPassword(sessionToken),
+		livesharetest.WithService("workspace.joinWorkspace", joinWorkspace),
+	}
+	testServer, err := livesharetest.NewServer(opts...)
+	if err != nil {
+		t.Errorf("error creating server: %w", err)
+	}
+	_, err = Connect(context.Background(), Options{
+		SessionID:      "session-id",
+		SessionToken:   sessionToken,
+		RelayEndpoint:  "sb" + strings.TrimPrefix(testServer.URL(), "https"),
+		RelaySAS:       "relay-sas",
+		HostPublicKeys: []string{},
+		TLSConfig:      &tls.Config{InsecureSkipVerify: true},
+	})
+	if err == nil {
+		t.Error("expected invalid host key error, got: nil")
 	}
 }
