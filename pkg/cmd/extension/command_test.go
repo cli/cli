@@ -214,8 +214,8 @@ func TestNewCmdExtension(t *testing.T) {
 			args: []string{"list"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
 				em.ListFunc = func(bool) []extensions.Extension {
-					ex1 := &Extension{path: "cli/gh-test", url: "https://github.com/cli/gh-test", updateAvailable: false}
-					ex2 := &Extension{path: "cli/gh-test2", url: "https://github.com/cli/gh-test2", updateAvailable: true}
+					ex1 := &Extension{path: "cli/gh-test", url: "https://github.com/cli/gh-test", currentVersion: "1", latestVersion: "1"}
+					ex2 := &Extension{path: "cli/gh-test2", url: "https://github.com/cli/gh-test2", currentVersion: "1", latestVersion: "2"}
 					return []extensions.Extension{ex1, ex2}
 				}
 				return func(t *testing.T) {

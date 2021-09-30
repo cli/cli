@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -103,111 +104,127 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 
 func (m *Manager) List(includeMetadata bool) []extensions.Extension {
 	exts, _ := m.list(includeMetadata)
-	return exts
+	r := make([]extensions.Extension, len(exts))
+	for i, v := range exts {
+		val := v
+		r[i] = &val
+	}
+	return r
 }
 
-func (m *Manager) list(includeMetadata bool) ([]extensions.Extension, error) {
+func (m *Manager) list(includeMetadata bool) ([]Extension, error) {
 	dir := m.installDir()
 	entries, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
 
-	var results []extensions.Extension
+	var results []Extension
 	for _, f := range entries {
 		if !strings.HasPrefix(f.Name(), "gh-") {
 			continue
 		}
-		ext, err := m.parseExtensionDir(f, includeMetadata)
-		if err != nil {
-			return nil, err
+		var ext Extension
+		var err error
+		if f.IsDir() {
+			ext, err = m.parseExtensionDir(f)
+			if err != nil {
+				return nil, err
+			}
+			results = append(results, ext)
+		} else {
+			ext, err = m.parseExtensionFile(f)
+			if err != nil {
+				return nil, err
+			}
+			results = append(results, ext)
 		}
-		results = append(results, ext)
+	}
+
+	if includeMetadata {
+		m.populateLatestVersions(results)
 	}
 
 	return results, nil
 }
 
-func (m *Manager) parseExtensionDir(fi fs.FileInfo, includeMetadata bool) (*Extension, error) {
-	id := m.installDir()
-	if _, err := os.Stat(filepath.Join(id, fi.Name(), manifestName)); err == nil {
-		return m.parseBinaryExtensionDir(fi, includeMetadata)
-	}
-
-	return m.parseGitExtensionDir(fi, includeMetadata)
-}
-
-func (m *Manager) parseBinaryExtensionDir(fi fs.FileInfo, includeMetadata bool) (*Extension, error) {
+func (m *Manager) parseExtensionFile(fi fs.FileInfo) (Extension, error) {
+	ext := Extension{isLocal: true}
 	id := m.installDir()
 	exePath := filepath.Join(id, fi.Name(), fi.Name())
+	if !isSymlink(fi.Mode()) {
+		// if this is a regular file, its contents is the local directory of the extension
+		p, err := readPathFromFile(filepath.Join(id, fi.Name()))
+		if err != nil {
+			return ext, err
+		}
+		exePath = filepath.Join(p, fi.Name())
+	}
+	ext.path = exePath
+	return ext, nil
+}
+
+func (m *Manager) parseExtensionDir(fi fs.FileInfo) (Extension, error) {
+	id := m.installDir()
+	if _, err := os.Stat(filepath.Join(id, fi.Name(), manifestName)); err == nil {
+		return m.parseBinaryExtensionDir(fi)
+	}
+
+	return m.parseGitExtensionDir(fi)
+}
+
+func (m *Manager) parseBinaryExtensionDir(fi fs.FileInfo) (Extension, error) {
+	id := m.installDir()
+	exePath := filepath.Join(id, fi.Name(), fi.Name())
+	ext := Extension{path: exePath, kind: BinaryKind}
 	manifestPath := filepath.Join(id, fi.Name(), manifestName)
 	manifest, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return nil, fmt.Errorf("could not open %s for reading: %w", manifestPath, err)
+		return ext, fmt.Errorf("could not open %s for reading: %w", manifestPath, err)
 	}
-
 	var bm binManifest
 	err = yaml.Unmarshal(manifest, &bm)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse %s: %w", manifestPath, err)
+		return ext, fmt.Errorf("could not parse %s: %w", manifestPath, err)
 	}
-
 	repo := ghrepo.NewWithHost(bm.Owner, bm.Name, bm.Host)
-
-	var remoteURL string
-	var updateAvailable bool
-
-	if includeMetadata {
-		remoteURL = ghrepo.GenerateRepoURL(repo, "")
-		var r *release
-		r, err = fetchLatestRelease(m.client, repo)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get release info for %s: %w", ghrepo.FullName(repo), err)
-		}
-		if bm.Tag != r.Tag {
-			updateAvailable = true
-		}
-	}
-
-	return &Extension{
-		path:            exePath,
-		url:             remoteURL,
-		updateAvailable: updateAvailable,
-	}, nil
+	remoteURL := ghrepo.GenerateRepoURL(repo, "")
+	ext.url = remoteURL
+	ext.currentVersion = bm.Tag
+	return ext, nil
 }
 
-func (m *Manager) parseGitExtensionDir(fi fs.FileInfo, includeMetadata bool) (*Extension, error) {
-	// TODO untangle local from this since local might be binary or git
+func (m *Manager) parseGitExtensionDir(fi fs.FileInfo) (Extension, error) {
 	id := m.installDir()
-	var remoteUrl string
-	updateAvailable := false
-	isLocal := false
 	exePath := filepath.Join(id, fi.Name(), fi.Name())
-	if fi.IsDir() {
-		if includeMetadata {
-			remoteUrl = m.getRemoteUrl(fi.Name())
-			updateAvailable = m.checkUpdateAvailable(fi.Name())
-		}
-	} else {
-		isLocal = true
-		if !isSymlink(fi.Mode()) {
-			// if this is a regular file, its contents is the local directory of the extension
-			p, err := readPathFromFile(filepath.Join(id, fi.Name()))
-			if err != nil {
-				return nil, err
-			}
-			exePath = filepath.Join(p, fi.Name())
-		}
-	}
-
-	return &Extension{
-		path:            exePath,
-		url:             remoteUrl,
-		isLocal:         isLocal,
-		updateAvailable: updateAvailable,
+	remoteUrl := m.getRemoteUrl(fi.Name())
+	currentVersion := m.getCurrentVersion(fi.Name())
+	return Extension{
+		path:           exePath,
+		url:            remoteUrl,
+		isLocal:        false,
+		currentVersion: currentVersion,
+		kind:           GitKind,
 	}, nil
 }
 
+// getCurrentVersion determines the current version for non-local git extensions.
+func (m *Manager) getCurrentVersion(extension string) string {
+	gitExe, err := m.lookPath("git")
+	if err != nil {
+		return ""
+	}
+	dir := m.installDir()
+	gitDir := "--git-dir=" + filepath.Join(dir, extension, ".git")
+	cmd := m.newCommand(gitExe, gitDir, "rev-parse", "HEAD")
+	localSha, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return string(bytes.TrimSpace(localSha))
+}
+
+// getRemoteUrl determines the remote URL for non-local git extensions.
 func (m *Manager) getRemoteUrl(extension string) string {
 	gitExe, err := m.lookPath("git")
 	if err != nil {
@@ -223,26 +240,59 @@ func (m *Manager) getRemoteUrl(extension string) string {
 	return strings.TrimSpace(string(url))
 }
 
-func (m *Manager) checkUpdateAvailable(extension string) bool {
-	gitExe, err := m.lookPath("git")
-	if err != nil {
-		return false
+func (m *Manager) populateLatestVersions(exts []Extension) {
+	size := len(exts)
+	type result struct {
+		index   int
+		version string
 	}
-	dir := m.installDir()
-	gitDir := "--git-dir=" + filepath.Join(dir, extension, ".git")
-	cmd := m.newCommand(gitExe, gitDir, "ls-remote", "origin", "HEAD")
-	lsRemote, err := cmd.Output()
-	if err != nil {
-		return false
+	ch := make(chan result, size)
+	var wg sync.WaitGroup
+	wg.Add(size)
+	for idx, ext := range exts {
+		go func(i int, e Extension) {
+			defer wg.Done()
+			version, _ := m.getLatestVersion(e)
+			ch <- result{index: i, version: version}
+		}(idx, ext)
 	}
-	remoteSha := bytes.SplitN(lsRemote, []byte("\t"), 2)[0]
-	cmd = m.newCommand(gitExe, gitDir, "rev-parse", "HEAD")
-	localSha, err := cmd.Output()
-	if err != nil {
-		return false
+	wg.Wait()
+	close(ch)
+	for r := range ch {
+		ext := &exts[r.index]
+		ext.latestVersion = r.version
 	}
-	localSha = bytes.TrimSpace(localSha)
-	return !bytes.Equal(remoteSha, localSha)
+}
+
+func (m *Manager) getLatestVersion(ext Extension) (string, error) {
+	if ext.isLocal {
+		return "", fmt.Errorf("unable to get latest version for local extensions")
+	}
+	if ext.kind == GitKind {
+		gitExe, err := m.lookPath("git")
+		if err != nil {
+			return "", err
+		}
+		extDir := filepath.Dir(ext.path)
+		gitDir := "--git-dir=" + filepath.Join(extDir, ".git")
+		cmd := m.newCommand(gitExe, gitDir, "ls-remote", "origin", "HEAD")
+		lsRemote, err := cmd.Output()
+		if err != nil {
+			return "", err
+		}
+		remoteSha := bytes.SplitN(lsRemote, []byte("\t"), 2)[0]
+		return string(remoteSha), nil
+	} else {
+		repo, err := ghrepo.FromFullName(ext.url)
+		if err != nil {
+			return "", err
+		}
+		r, err := fetchLatestRelease(m.client, repo)
+		if err != nil {
+			return "", err
+		}
+		return r.Tag, nil
+	}
 }
 
 func (m *Manager) InstallLocal(dir string) error {
