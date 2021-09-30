@@ -7,7 +7,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/cli/cli/v2/internal/api"
+	"github.com/cli/cli/v2/internal/codespaces/api"
 )
 
 // apiClientMock is a mock implementation of apiClient.
