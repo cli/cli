@@ -6,7 +6,7 @@ import (
 	"net"
 
 	"github.com/cli/cli/v2/internal/codespaces"
-	"github.com/cli/cli/v2/internal/liveshare"
+	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
 )
 
