@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	livesharetest "github.com/cli/cli/v2/internal/liveshare/test"
+	livesharetest "github.com/cli/cli/v2/pkg/liveshare/test"
 	"github.com/sourcegraph/jsonrpc2"
 )
 
