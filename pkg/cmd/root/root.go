@@ -5,14 +5,14 @@ import (
 	"sync"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/cmd/ghcs"
-	"github.com/cli/cli/v2/cmd/ghcs/output"
 	codespacesAPI "github.com/cli/cli/v2/internal/codespaces/api"
 	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
 	aliasCmd "github.com/cli/cli/v2/pkg/cmd/alias"
 	apiCmd "github.com/cli/cli/v2/pkg/cmd/api"
 	authCmd "github.com/cli/cli/v2/pkg/cmd/auth"
 	browseCmd "github.com/cli/cli/v2/pkg/cmd/browse"
+	codespaceCmd "github.com/cli/cli/v2/pkg/cmd/codespace"
+	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	completionCmd "github.com/cli/cli/v2/pkg/cmd/completion"
 	configCmd "github.com/cli/cli/v2/pkg/cmd/config"
 	extensionCmd "github.com/cli/cli/v2/pkg/cmd/extension"
@@ -128,7 +128,7 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 }
 
 func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
-	cmd := ghcs.NewRootCmd(ghcs.NewApp(
+	cmd := codespaceCmd.NewRootCmd(codespaceCmd.NewApp(
 		output.NewLogger(f.IOStreams.Out, f.IOStreams.ErrOut, !f.IOStreams.IsStdoutTTY()),
 		codespacesAPI.New("", &lazyLoadedHTTPClient{factory: f}),
 	))
