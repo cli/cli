@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/v2/internal/api"
+	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )

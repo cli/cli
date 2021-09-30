@@ -9,7 +9,7 @@ import (
 
 	"github.com/cli/cli/v2/cmd/ghcs"
 	"github.com/cli/cli/v2/cmd/ghcs/output"
-	"github.com/cli/cli/v2/internal/api"
+	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/spf13/cobra"
 )
 
