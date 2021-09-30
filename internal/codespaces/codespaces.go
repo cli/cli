@@ -68,9 +68,10 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient apiClient, us
 	log.Println("Connecting to your codespace...")
 
 	return liveshare.Connect(ctx, liveshare.Options{
-		SessionID:     codespace.Environment.Connection.SessionID,
-		SessionToken:  codespace.Environment.Connection.SessionToken,
-		RelaySAS:      codespace.Environment.Connection.RelaySAS,
-		RelayEndpoint: codespace.Environment.Connection.RelayEndpoint,
+		SessionID:      codespace.Environment.Connection.SessionID,
+		SessionToken:   codespace.Environment.Connection.SessionToken,
+		RelaySAS:       codespace.Environment.Connection.RelaySAS,
+		RelayEndpoint:  codespace.Environment.Connection.RelayEndpoint,
+		HostPublicKeys: codespace.Environment.Connection.HostPublicKeys,
 	})
 }

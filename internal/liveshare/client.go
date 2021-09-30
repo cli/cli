@@ -24,11 +24,12 @@ import (
 
 // An Options specifies Live Share connection parameters.
 type Options struct {
-	SessionID     string
-	SessionToken  string // token for SSH session
-	RelaySAS      string
-	RelayEndpoint string
-	TLSConfig     *tls.Config // (optional)
+	SessionID      string
+	SessionToken   string // token for SSH session
+	RelaySAS       string
+	RelayEndpoint  string
+	HostPublicKeys []string
+	TLSConfig      *tls.Config // (optional)
 }
 
 // uri returns a websocket URL for the specified options.
@@ -71,7 +72,7 @@ func Connect(ctx context.Context, opts Options) (*Session, error) {
 	if opts.SessionToken == "" {
 		return nil, errors.New("SessionToken is required")
 	}
-	ssh := newSSHSession(opts.SessionToken, sock)
+	ssh := newSSHSession(opts.SessionToken, opts.HostPublicKeys, sock)
 	if err := ssh.connect(ctx); err != nil {
 		return nil, fmt.Errorf("error connecting to ssh session: %w", err)
 	}

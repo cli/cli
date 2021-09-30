@@ -2,6 +2,8 @@ package liveshare
 
 import (
 	"context"
+	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -12,15 +14,16 @@ import (
 
 type sshSession struct {
 	*ssh.Session
-	token  string
-	socket net.Conn
-	conn   ssh.Conn
-	reader io.Reader
-	writer io.Writer
+	token          string
+	hostPublicKeys []string
+	socket         net.Conn
+	conn           ssh.Conn
+	reader         io.Reader
+	writer         io.Writer
 }
 
-func newSSHSession(token string, socket net.Conn) *sshSession {
-	return &sshSession{token: token, socket: socket}
+func newSSHSession(token string, hostPublicKeys []string, socket net.Conn) *sshSession {
+	return &sshSession{token: token, hostPublicKeys: hostPublicKeys, socket: socket}
 }
 
 func (s *sshSession) connect(ctx context.Context) error {
@@ -30,8 +33,16 @@ func (s *sshSession) connect(ctx context.Context) error {
 			ssh.Password(s.token),
 		},
 		HostKeyAlgorithms: []string{"rsa-sha2-512", "rsa-sha2-256"},
-		HostKeyCallback:   ssh.InsecureIgnoreHostKey(),
-		Timeout:           10 * time.Second,
+		HostKeyCallback: func(hostname string, addr net.Addr, key ssh.PublicKey) error {
+			encodedKey := base64.StdEncoding.EncodeToString(key.Marshal())
+			for _, hpk := range s.hostPublicKeys {
+				if encodedKey == hpk {
+					return nil // we found a match for expected public key, safely return
+				}
+			}
+			return errors.New("invalid host public key")
+		},
+		Timeout: 10 * time.Second,
 	}
 
 	sshClientConn, chans, reqs, err := ssh.NewClientConn(s.socket, "", &clientConfig)
