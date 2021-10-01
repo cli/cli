@@ -167,10 +167,7 @@ func TestDelete(t *testing.T) {
 				},
 			}
 			if tt.opts.codespaceName == "" {
-				apiMock.ListCodespacesFunc = func(_ context.Context, userLogin string) ([]*api.Codespace, error) {
-					if userLogin != user.Login {
-						return nil, fmt.Errorf("unexpected user %q", userLogin)
-					}
+				apiMock.ListCodespacesFunc = func(_ context.Context) ([]*api.Codespace, error) {
 					return tt.codespaces, nil
 				}
 			} else {

@@ -67,7 +67,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) error {
 	var codespaces []*api.Codespace
 	nameFilter := opts.codespaceName
 	if nameFilter == "" {
-		codespaces, err = a.apiClient.ListCodespaces(ctx, user.Login)
+		codespaces, err = a.apiClient.ListCodespaces(ctx)
 		if err != nil {
 			return fmt.Errorf("error getting codespaces: %w", err)
 		}

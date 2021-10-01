@@ -34,7 +34,7 @@ func TestListCodespaces(t *testing.T) {
 		token:     "faketoken",
 	}
 	ctx := context.TODO()
-	codespaces, err := api.ListCodespaces(ctx, "testuser")
+	codespaces, err := api.ListCodespaces(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -35,7 +35,7 @@ type apiClient interface {
 	GetUser(ctx context.Context) (*api.User, error)
 	GetCodespaceToken(ctx context.Context, user, name string) (string, error)
 	GetCodespace(ctx context.Context, token, user, name string) (*api.Codespace, error)
-	ListCodespaces(ctx context.Context, user string) ([]*api.Codespace, error)
+	ListCodespaces(ctx context.Context) ([]*api.Codespace, error)
 	DeleteCodespace(ctx context.Context, user, name string) error
 	StartCodespace(ctx context.Context, token string, codespace *api.Codespace) error
 	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
@@ -48,8 +48,8 @@ type apiClient interface {
 
 var errNoCodespaces = errors.New("you have no codespaces")
 
-func chooseCodespace(ctx context.Context, apiClient apiClient, user *api.User) (*api.Codespace, error) {
-	codespaces, err := apiClient.ListCodespaces(ctx, user.Login)
+func chooseCodespace(ctx context.Context, apiClient apiClient) (*api.Codespace, error) {
+	codespaces, err := apiClient.ListCodespaces(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting codespaces: %w", err)
 	}
@@ -99,7 +99,7 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 // It then fetches the codespace token and the codespace record.
 func getOrChooseCodespace(ctx context.Context, apiClient apiClient, user *api.User, codespaceName string) (codespace *api.Codespace, token string, err error) {
 	if codespaceName == "" {
-		codespace, err = chooseCodespace(ctx, apiClient, user)
+		codespace, err = chooseCodespace(ctx, apiClient)
 		if err != nil {
 			if err == errNoCodespaces {
 				return nil, "", err

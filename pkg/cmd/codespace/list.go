@@ -28,12 +28,7 @@ func newListCmd(app *App) *cobra.Command {
 }
 
 func (a *App) List(ctx context.Context, asJSON bool) error {
-	user, err := a.apiClient.GetUser(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting user: %w", err)
-	}
-
-	codespaces, err := a.apiClient.ListCodespaces(ctx, user.Login)
+	codespaces, err := a.apiClient.ListCodespaces(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}
