@@ -1,5 +1,7 @@
 package archive
 
+replace github.com/cli/cli/v2/pkg/cmd/repo/shared => /Users/meiji163/Documents/mlh/cli/pkg/cmd/repo
+
 import (
 	"fmt"
 	"net/http"
@@ -12,7 +14,10 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
+
+    // change to github import
+	"cli/pkg/cmd/repo/shared"
+
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -87,12 +92,14 @@ func archiveRun(opts *ArchiveOptions) error{
 
     fields := []string{ "name", "owner", "isArchived", "id" }
     repo, err := shared.FetchRepository(apiClient, toArchive, fields)
-
-    err = api.RepoArchive(apiClient,repo)
     if err != nil {
         return err
     }
 
+    err = api.RepoArchive(apiClient, repo)
+    if err != nil {
+        return err
+    }
 
     return nil
 }

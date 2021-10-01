@@ -486,6 +486,27 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, e
 	}, nil
 }
 
+func RepoArchive(client *Client, repo *Repository) error {
+    query := `
+    mutation ArchiveRepository($input: ArchiveRepositoryInput!) {
+        archiveRepository(input: $input) { 
+            isArchived
+        }
+    }`
+
+    params := map[string]interface{
+        "repositoryId": repo.ID,
+    }
+    variables := map[string]interface{}{
+        "input": params,
+    }
+
+    result := struct {
+        IsArchived bool
+    }
+    err := client.GraphQL(repo.RepoHost(), query, variables, &result)
+}
+
 // RepoFindForks finds forks of the repo that are affiliated with the viewer
 func RepoFindForks(client *Client, repo ghrepo.Interface, limit int) ([]*Repository, error) {
 	result := struct {
