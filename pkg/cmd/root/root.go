@@ -151,14 +151,14 @@ func (l *lazyLoadedHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	l.httpClientMu.RUnlock()
 
 	if httpClient == nil {
-		l.httpClientMu.Lock()
-		defer l.httpClientMu.Unlock()
-
 		var err error
+		l.httpClientMu.Lock()
 		l.httpClient, err = l.factory.HttpClient()
+		l.httpClientMu.Unlock()
 		if err != nil {
 			return nil, err
 		}
 	}
+
 	return l.httpClient.Do(req)
 }
