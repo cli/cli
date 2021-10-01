@@ -527,7 +527,7 @@ func (a *API) DeleteCodespace(ctx context.Context, codespaceName string) error {
 	}
 
 	a.setHeaders(req)
-	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces/*")
+	resp, err := a.do(ctx, req, "/user/codespaces/*")
 	if err != nil {
 		return fmt.Errorf("error making request: %w", err)
 	}
