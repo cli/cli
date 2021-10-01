@@ -430,9 +430,7 @@ type CreateCodespaceParams struct {
 // CreateCodespace creates a codespace with the given parameters and returns a non-nil error if it
 // fails to create.
 func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams) (*Codespace, error) {
-	codespace, err := a.startCreate(
-		ctx, params.User, params.RepositoryID, params.Machine, params.Branch, params.Location,
-	)
+	codespace, err := a.startCreate(ctx, params.RepositoryID, params.Machine, params.Branch, params.Location)
 	if err != errProvisioningInProgress {
 		return codespace, err
 	}
@@ -475,7 +473,7 @@ type startCreateRequest struct {
 	RepositoryID int    `json:"repository_id"`
 	Ref          string `json:"ref"`
 	Location     string `json:"location"`
-	SkuName      string `json:"sku_name"`
+	Machine      string `json:"machine"`
 }
 
 var errProvisioningInProgress = errors.New("provisioning in progress")
@@ -484,19 +482,19 @@ var errProvisioningInProgress = errors.New("provisioning in progress")
 // It may return success or an error, or errProvisioningInProgress indicating that the operation
 // did not complete before the GitHub API's time limit for RPCs (10s), in which case the caller
 // must poll the server to learn the outcome.
-func (a *API) startCreate(ctx context.Context, user string, repository int, sku, branch, location string) (*Codespace, error) {
-	requestBody, err := json.Marshal(startCreateRequest{repository, branch, location, sku})
+func (a *API) startCreate(ctx context.Context, repoID int, machine, branch, location string) (*Codespace, error) {
+	requestBody, err := json.Marshal(startCreateRequest{repoID, branch, location, machine})
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, a.githubAPI+"/vscs_internal/user/"+user+"/codespaces", bytes.NewBuffer(requestBody))
+	req, err := http.NewRequest(http.MethodPost, a.githubAPI+"/user/codespaces", bytes.NewBuffer(requestBody))
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
 	a.setHeaders(req)
-	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces")
+	resp, err := a.do(ctx, req, "/user/codespaces")
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
 	}
