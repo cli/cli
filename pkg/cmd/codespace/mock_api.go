@@ -22,7 +22,7 @@ import (
 // 			CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
 // 				panic("mock out the CreateCodespace method")
 // 			},
-// 			DeleteCodespaceFunc: func(ctx context.Context, user string, name string) error {
+// 			DeleteCodespaceFunc: func(ctx context.Context, name string) error {
 // 				panic("mock out the DeleteCodespace method")
 // 			},
 // 			GetCodespaceFunc: func(ctx context.Context, token string, user string, name string) (*api.Codespace, error) {
@@ -66,7 +66,7 @@ type apiClientMock struct {
 	CreateCodespaceFunc func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
 
 	// DeleteCodespaceFunc mocks the DeleteCodespace method.
-	DeleteCodespaceFunc func(ctx context.Context, user string, name string) error
+	DeleteCodespaceFunc func(ctx context.Context, name string) error
 
 	// GetCodespaceFunc mocks the GetCodespace method.
 	GetCodespaceFunc func(ctx context.Context, token string, user string, name string) (*api.Codespace, error)
@@ -115,8 +115,6 @@ type apiClientMock struct {
 		DeleteCodespace []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// User is the user argument value.
-			User string
 			// Name is the name argument value.
 			Name string
 		}
@@ -279,23 +277,21 @@ func (mock *apiClientMock) CreateCodespaceCalls() []struct {
 }
 
 // DeleteCodespace calls DeleteCodespaceFunc.
-func (mock *apiClientMock) DeleteCodespace(ctx context.Context, user string, name string) error {
+func (mock *apiClientMock) DeleteCodespace(ctx context.Context, name string) error {
 	if mock.DeleteCodespaceFunc == nil {
 		panic("apiClientMock.DeleteCodespaceFunc: method is nil but apiClient.DeleteCodespace was just called")
 	}
 	callInfo := struct {
 		Ctx  context.Context
-		User string
 		Name string
 	}{
 		Ctx:  ctx,
-		User: user,
 		Name: name,
 	}
 	mock.lockDeleteCodespace.Lock()
 	mock.calls.DeleteCodespace = append(mock.calls.DeleteCodespace, callInfo)
 	mock.lockDeleteCodespace.Unlock()
-	return mock.DeleteCodespaceFunc(ctx, user, name)
+	return mock.DeleteCodespaceFunc(ctx, name)
 }
 
 // DeleteCodespaceCalls gets all the calls that were made to DeleteCodespace.
@@ -303,12 +299,10 @@ func (mock *apiClientMock) DeleteCodespace(ctx context.Context, user string, nam
 //     len(mockedapiClient.DeleteCodespaceCalls())
 func (mock *apiClientMock) DeleteCodespaceCalls() []struct {
 	Ctx  context.Context
-	User string
 	Name string
 } {
 	var calls []struct {
 		Ctx  context.Context
-		User string
 		Name string
 	}
 	mock.lockDeleteCodespace.RLock()
