@@ -32,13 +32,8 @@ func newCodeCmd(app *App) *cobra.Command {
 
 // VSCode opens a codespace in the local VS VSCode application.
 func (a *App) VSCode(ctx context.Context, codespaceName string, useInsiders bool) error {
-	user, err := a.apiClient.GetUser(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting user: %w", err)
-	}
-
 	if codespaceName == "" {
-		codespace, err := chooseCodespace(ctx, a.apiClient, user)
+		codespace, err := chooseCodespace(ctx, a.apiClient)
 		if err != nil {
 			if err == errNoCodespaces {
 				return err

@@ -179,16 +179,16 @@ type CodespaceEnvironmentConnection struct {
 	HostPublicKeys []string `json:"hostPublicKeys"`
 }
 
-func (a *API) ListCodespaces(ctx context.Context, user string) ([]*Codespace, error) {
+func (a *API) ListCodespaces(ctx context.Context) ([]*Codespace, error) {
 	req, err := http.NewRequest(
-		http.MethodGet, a.githubAPI+"/vscs_internal/user/"+user+"/codespaces", nil,
+		http.MethodGet, a.githubAPI+"/user/codespaces", nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
 	a.setHeaders(req)
-	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces")
+	resp, err := a.do(ctx, req, "/user/codespaces")
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
 	}
