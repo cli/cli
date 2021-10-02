@@ -487,24 +487,22 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, e
 }
 
 func RepoArchive(client *Client, repo *Repository) error {
-	query := `
-    mutation ArchiveRepository($input: ArchiveRepositoryInput!) {
-        archiveRepository(input: $input) {
-            repository { isArchived }
-        }
-    }`
-
-	params := map[string]interface{}{
-		"repositoryId": repo.ID,
+	var mutation struct {
+		ArchiveRepository struct {
+			Repository struct {
+				ID string
+			}
+		} `graphql:"archiveRepository(input: $input)"`
 	}
+
 	variables := map[string]interface{}{
-		"input": params,
+		"input": githubv4.ArchiveRepositoryInput{
+			RepositoryID: repo.ID,
+		},
 	}
 
-	result := struct {
-		Repository string
-	}{}
-	err := client.GraphQL(repo.RepoHost(), query, variables, &result)
+	gql := graphQLClient(client.http, repo.RepoHost())
+	err := gql.MutateNamed(context.Background(), "ArchiveRepository", &mutation, variables)
 	return err
 }
 

@@ -7,6 +7,8 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
+// this is copied from repo/view/view.go
+
 func FetchRepository(apiClient *api.Client, repo ghrepo.Interface, fields []string) (*api.Repository, error) {
 	query := fmt.Sprintf(`query RepositoryInfo($owner: String!, $name: String!) {
 		repository(owner: $owner, name: $name) {%s}

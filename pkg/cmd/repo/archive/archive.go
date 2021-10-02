@@ -10,7 +10,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
-	// change to github import
+	// change to github import in go.mod
 	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -55,6 +55,7 @@ func NewCmdArchive(f *cmdutil.Factory, runF func(*ArchiveOptions) error) *cobra.
 }
 
 func archiveRun(opts *ArchiveOptions) error {
+	cs := opts.IO.ColorScheme()
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -84,15 +85,20 @@ func archiveRun(opts *ArchiveOptions) error {
 
 	fields := []string{"name", "owner", "isArchived", "id"}
 	repo, err := shared.FetchRepository(apiClient, toArchive, fields)
-
 	if err != nil {
 		return err
+	}
+
+	if repo.IsArchived {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Repository %s/%s is already archived\n", cs.WarningIcon(), repo.Owner.Login, repo.Name)
+		return nil
 	}
 
 	err = api.RepoArchive(apiClient, repo)
 	if err != nil {
-		return err
+		return fmt.Errorf("API called failed: %w", err)
 	}
+	fmt.Fprintf(opts.IO.ErrOut, "%s Archived repository %s/%s\n", cs.SuccessIconWithColor(cs.Red), repo.Owner.Login, repo.Name)
 
 	return nil
 }
