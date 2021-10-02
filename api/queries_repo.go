@@ -925,6 +925,7 @@ func RepoAndOrgProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, e
 type RepoAssignee struct {
 	ID    string
 	Login string
+	Name  string
 }
 
 // RepoAssignableUsers fetches all the assignable users for a repository

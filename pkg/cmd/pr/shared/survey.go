@@ -207,7 +207,8 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 
 	var users []string
 	for _, u := range metadataResult.AssignableUsers {
-		users = append(users, u.Login)
+		userDisplay := fmt.Sprintf("%s (%s)", u.Login, u.Name)
+		users = append(users, userDisplay)
 	}
 	var teams []string
 	for _, t := range metadataResult.Teams {
