@@ -928,6 +928,19 @@ type RepoAssignee struct {
 	Name  string
 }
 
+// DisplayName returns a formatted string that uses Login and Name to be displayed e.g. 'Login (Name)' or 'Login'
+func (ra RepoAssignee) DisplayName() string {
+	name := ra.Name
+
+	if ra.Name != "" {
+		name = fmt.Sprintf("(%s)", ra.Name)
+	}
+
+	displayName := fmt.Sprintf("%s %s", ra.Login, name)
+
+	return strings.TrimSpace(displayName)
+}
+
 // RepoAssignableUsers fetches all the assignable users for a repository
 func RepoAssignableUsers(client *Client, repo ghrepo.Interface) ([]RepoAssignee, error) {
 	type responseData struct {
