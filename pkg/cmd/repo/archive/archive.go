@@ -1,77 +1,69 @@
 package archive
 
-replace github.com/cli/cli/v2/pkg/cmd/repo/shared => /Users/meiji163/Documents/mlh/cli/pkg/cmd/repo
-
 import (
 	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
-    // change to github import
-	"cli/pkg/cmd/repo/shared"
+	// change to github import
+	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 type ArchiveOptions struct {
 	HttpClient func() (*http.Client, error)
-	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
-    BaseRepo   func() (ghrepo.Interface, error)
-    RepoArg    string
+	BaseRepo   func() (ghrepo.Interface, error)
+	RepoArg    string
 }
 
-func NewCmdArchive(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Command {
-	opts := &CloneOptions{
+func NewCmdArchive(f *cmdutil.Factory, runF func(*ArchiveOptions) error) *cobra.Command {
+	opts := &ArchiveOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		Config:     f.Config,
+		BaseRepo:   f.BaseRepo,
 	}
 
 	cmd := &cobra.Command{
 		Use:   "archive [<repository>]",
 		Short: "Archive a repository",
-        Long: `Archive a GitHub repository.
+		Long: `Archive a GitHub repository.
 
         With no argument, the repository for the current directory is archived.`,
 
-		Args:  cmdutil.MaximumNArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-            if len(args) > 0 {
-                opts.RepoArg = args[0]
-            }
+			if len(args) > 0 {
+				opts.RepoArg = args[0]
+			}
 
 			if runF != nil {
-				return runF(&opts)
+				return runF(opts)
 			}
-			return archiveRun(&opts)
+			return archiveRun(opts)
 		},
 	}
 
 	return cmd
 }
 
-func archiveRun(opts *ArchiveOptions) error{
-    httpClient, err := opts.HttpClient()
-    if err != nil {
-        return err
-    }
-    apiClient := api.NewClientFromHTTP(httpClient)
+func archiveRun(opts *ArchiveOptions) error {
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+	apiClient := api.NewClientFromHTTP(httpClient)
 
-    var toArchive ghrepo.Interface
-
+	var toArchive ghrepo.Interface
 	if opts.RepoArg == "" {
-        toArchive, err := opts.BaseRepo()
+		toArchive, err = opts.BaseRepo()
 		if err != nil {
 			return err
 		}
@@ -90,16 +82,17 @@ func archiveRun(opts *ArchiveOptions) error{
 		}
 	}
 
-    fields := []string{ "name", "owner", "isArchived", "id" }
-    repo, err := shared.FetchRepository(apiClient, toArchive, fields)
-    if err != nil {
-        return err
-    }
+	fields := []string{"name", "owner", "isArchived", "id"}
+	repo, err := shared.FetchRepository(apiClient, toArchive, fields)
 
-    err = api.RepoArchive(apiClient, repo)
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 
-    return nil
+	err = api.RepoArchive(apiClient, repo)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
