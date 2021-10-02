@@ -341,3 +341,21 @@ func Test_RepoMilestones(t *testing.T) {
 		}
 	}
 }
+
+func TestDisplayName(t *testing.T) {
+	tests := []struct {
+		repoAssignee RepoAssignee
+		want         string
+	}{
+		{RepoAssignee{"123", "octocat123", "Octavious Cath"}, "octocat123 (Octavious Cath)"},
+		{RepoAssignee{"123", "octocat123", ""}, "octocat123"},
+	}
+
+	for _, tt := range tests {
+		actual := tt.repoAssignee.DisplayName()
+
+		if actual != tt.want {
+			t.Errorf("actual %s want %s", actual, tt.want)
+		}
+	}
+}
