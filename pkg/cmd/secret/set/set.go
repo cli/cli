@@ -35,6 +35,7 @@ type SetOptions struct {
 	OrgName         string
 	EnvName         string
 	Body            string
+	ShouldNotStore  bool
 	Visibility      string
 	RepositoryNames []string
 }
@@ -59,6 +60,9 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 
 			Use file as secret value
 			$ gh secret set MYSECRET < file.json
+
+			Print encoded secret value
+			$ gh secret set MYSECRET --no-store
 
 			Set environment level secret
 			$ gh secret set MYSECRET -bval --env=anEnv
@@ -128,6 +132,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	cmd.Flags().StringVarP(&opts.Visibility, "visibility", "v", "private", "Set visibility for an organization secret: `all`, `private`, or `selected`")
 	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of repository names for `selected` visibility")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "A value for the secret. Reads from STDIN if not specified.")
+	cmd.Flags().BoolVarP(&opts.ShouldNotStore, "no-store", "n", false, "Determines if we should store the secret in github or just print it")
 
 	return cmd
 }
@@ -183,6 +188,11 @@ func setRun(opts *SetOptions) error {
 	}
 
 	encoded := base64.StdEncoding.EncodeToString(eBody)
+	if opts.ShouldNotStore {
+		encodedSecret := fmt.Sprintf("Your encoded secret is %s", encoded)
+		fmt.Fprintln(opts.IO.Out, encodedSecret)
+		return nil
+	}
 
 	if orgName != "" {
 		err = putOrgSecret(client, host, pk, *opts, encoded)

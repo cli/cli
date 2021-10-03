@@ -122,6 +122,15 @@ func TestNewCmdSet(t *testing.T) {
 			},
 		},
 		{
+			name: "no store",
+			cli:  `cool_secret --no-store`,
+			wants: SetOptions{
+				SecretName:     "cool_secret",
+				Visibility:     shared.Private,
+				ShouldNotStore: true,
+			},
+		},
+		{
 			name:     "bad name prefix",
 			cli:      `GITHUB_SECRET -b"cool"`,
 			wantsErr: true,
@@ -172,6 +181,7 @@ func TestNewCmdSet(t *testing.T) {
 			assert.Equal(t, tt.wants.Visibility, gotOpts.Visibility)
 			assert.Equal(t, tt.wants.OrgName, gotOpts.OrgName)
 			assert.Equal(t, tt.wants.EnvName, gotOpts.EnvName)
+			assert.Equal(t, tt.wants.ShouldNotStore, gotOpts.ShouldNotStore)
 			assert.ElementsMatch(t, tt.wants.RepositoryNames, gotOpts.RepositoryNames)
 		})
 	}
@@ -333,6 +343,37 @@ func Test_setRun_org(t *testing.T) {
 			assert.ElementsMatch(t, payload.Repositories, tt.wantRepositories)
 		})
 	}
+}
+
+func Test_setRun_shouldNotStore(t *testing.T) {
+	reg := &httpmock.Registry{}
+
+	reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/secrets/public-key"),
+		httpmock.JSONResponse(PubKey{ID: "123", Key: "CDjXqf7AJBXWhMczcy+Fs7JlACEptgceysutztHaFQI="}))
+
+	io, _, outStream, _ := iostreams.Test()
+
+	opts := &SetOptions{
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		Config: func() (config.Config, error) { return config.NewBlankConfig(), nil },
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.FromFullName("owner/repo")
+		},
+		IO:             io,
+		SecretName:     "cool_secret",
+		Body:           "a secret",
+		ShouldNotStore: true,
+		// Cribbed from https://github.com/golang/crypto/commit/becbf705a91575484002d598f87d74f0002801e7
+		RandomOverride: bytes.NewReader([]byte{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5}),
+	}
+
+	err := setRun(opts)
+	assert.NoError(t, err)
+
+	reg.Verify(t)
+	assert.Contains(t, outStream.String(), "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=")
 }
 
 func Test_getBody(t *testing.T) {
