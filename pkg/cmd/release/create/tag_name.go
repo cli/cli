@@ -1,6 +1,7 @@
 package create
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -14,28 +15,32 @@ var (
 	defaultVersionRegexp = regexp.MustCompile(`^(.*)(\d)+\.(\d)+\.(\d)+(.*)$`)
 )
 
-func getTagNames(httpClient *http.Client, baseRepo ghrepo.Interface) ([]string, error) {
+func getTagNameOptions(httpClient *http.Client, baseRepo ghrepo.Interface) (string, []string, error) {
 	release, err := shared.FetchLatestRelease(httpClient, baseRepo)
-	if err != nil {
-		return nil, err
+	if errors.Is(err, shared.ErrReleaseNotFound) {
+		return "", nil, nil
 	}
 
-	fmt.Println(release.TagName)
+	if err != nil {
+		return "", nil, err
+	}
 
 	submatches := defaultVersionRegexp.FindStringSubmatch(release.TagName)
 	if len(submatches) == 0 {
-		return nil, nil
+		return "", nil, nil
 	}
 
 	prefix := submatches[1]
 	majorVersion, minorVersion, patchVersion := getVersionsFromTagNameSubmatches(submatches)
 	suffix := submatches[5]
 
-	return []string{
-		fmt.Sprintf("Major version: %s%d.%d.%d%s", prefix, majorVersion+1, minorVersion, patchVersion, suffix),
-		fmt.Sprintf("Major version: %s%d.%d.%d%s", prefix, majorVersion, minorVersion+1, patchVersion, suffix),
-		fmt.Sprintf("Major version: %s%d.%d.%d%s", prefix, majorVersion, minorVersion, patchVersion+1, suffix),
-	}, nil
+	options := []string{
+		fmt.Sprintf("%s%d.%d.%d%s", prefix, majorVersion+1, minorVersion, patchVersion, suffix),
+		fmt.Sprintf("%s%d.%d.%d%s", prefix, majorVersion, minorVersion+1, patchVersion, suffix),
+		fmt.Sprintf("%s%d.%d.%d%s", prefix, majorVersion, minorVersion, patchVersion+1, suffix),
+	}
+
+	return release.TagName, options, nil
 }
 
 func getVersionsFromTagNameSubmatches(submatches []string) (int, int, int) {
