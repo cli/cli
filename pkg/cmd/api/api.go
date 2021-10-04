@@ -84,8 +84,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			Note that adding request parameters will automatically switch the request method to POST. 
 			To send the parameters as a GET query string instead, use %[1]s--method%[1]s GET.
 
-			The %[1]s--field%[1]s flag behaves like %[1]s--raw-field%[1]s with magic type conversion based
-			on the format of the value:
+			The %[1]s--field%[1]s flag has magic type conversion based on the format of the value:
 
 			- literal values "true", "false", "null", and integer numbers get converted to
 			  appropriate JSON types;
@@ -94,6 +93,8 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			- if the value starts with "@", the rest of the value is interpreted as a
 			  filename to read the value from. Pass "-" to read from standard input.
 
+			The %[1]s--raw-field%[1]s flag has no magic type conversion.
+			
 			For GraphQL requests, all fields other than "query" and "operationName" are
 			interpreted as GraphQL variables.
 
