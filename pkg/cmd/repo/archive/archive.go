@@ -6,11 +6,12 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/shurcooL/githubv4"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
-	// change to github import in go.mod
+	// change to local import in go.mod
 	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -101,4 +102,24 @@ func archiveRun(opts *ArchiveOptions) error {
 	fmt.Fprintf(opts.IO.ErrOut, "%s Archived repository %s/%s\n", cs.SuccessIconWithColor(cs.Red), repo.Owner.Login, repo.Name)
 
 	return nil
+}
+
+func RepoArchive(client *Client, repo *api.Repository) error {
+	var mutation struct {
+		ArchiveRepository struct {
+			api.Repository struct {
+				ID string
+			}
+		} `graphql:"archiveRepository(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": githubv4.ArchiveRepositoryInput{
+			RepositoryID: repo.ID,
+		},
+	}
+
+	gql := graphQLClient(client.http, repo.RepoHost())
+	err := gql.MutateNamed(context.Background(), "ArchiveRepository", &mutation, variables)
+	return err
 }
