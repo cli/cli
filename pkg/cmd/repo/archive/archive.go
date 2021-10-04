@@ -89,8 +89,9 @@ func archiveRun(opts *ArchiveOptions) error {
 		return err
 	}
 
+    fullName := ghrepo.FullName(toArchive)
 	if repo.IsArchived {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Repository %s/%s is already archived\n", cs.WarningIcon(), repo.Owner.Login, repo.Name)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Repository %s is already archived\n", cs.WarningIcon(),fullName)
 		return nil
 	}
 
@@ -98,7 +99,7 @@ func archiveRun(opts *ArchiveOptions) error {
 	if err != nil {
 		return fmt.Errorf("API called failed: %w", err)
 	}
-	fmt.Fprintf(opts.IO.ErrOut, "%s Archived repository %s/%s\n", cs.SuccessIconWithColor(cs.Red), repo.Owner.Login, repo.Name)
+	fmt.Fprintf(opts.IO.ErrOut, "%s Archived repository %s\n", cs.SuccessIconWithColor(cs.Red), fullName)
 
 	return nil
 }
