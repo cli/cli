@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/shurcooL/githubv4"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/shurcooL/githubv4"
 
 	// change to local import in go.mod
 	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
@@ -107,7 +107,7 @@ func archiveRun(opts *ArchiveOptions) error {
 func RepoArchive(client *Client, repo *api.Repository) error {
 	var mutation struct {
 		ArchiveRepository struct {
-			Repository struct {
+			api.Repository struct {
 				ID string
 			}
 		} `graphql:"archiveRepository(input: $input)"`
