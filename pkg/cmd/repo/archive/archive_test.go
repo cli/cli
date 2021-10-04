@@ -15,17 +15,26 @@ import (
 func TestNewCmdArchive(t *testing.T) {
 	tests := []struct {
 		name    string
-		cli     string
+		input   string
 		tty     bool
-		wants   ArchiveOptions
+		output  ArchiveOptions
 		wantErr bool
+		errMsg  string
 	}{
 		{
-			name: "repo",
-			cli:  "foo/bar",
+			name: "valid repo",
+			input:  "cli/cli",
+			tty:  true,  
+			output: ArchiveOptions{
+				RepoArg: "cli/cli",
+			},
+		},
+		{
+			name: "no argument",
+			input: "",
 			tty:  true,
-			wants: ArchiveOptions{
-				RepoArg: "foo/bar",
+			output: ArchiveOptions{
+				RepoArg: "",
 			},
 		},
 	}
@@ -37,7 +46,7 @@ func TestNewCmdArchive(t *testing.T) {
 			f := &cmdutil.Factory{
 				IOStreams: io,
 			}
-			argv, err := shlex.Split(tt.cli)
+			argv, err := shlex.Split(tt.input)
 			assert.NoError(t, err)
 			var gotOpts *ArchiveOptions
 			cmd := NewCmdArchive(f, func(opts *ArchiveOptions) error {
@@ -50,8 +59,13 @@ func TestNewCmdArchive(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
-
-			assert.Equal(t, tt.wants.RepoArg, gotOpts.RepoArg)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			
+			assert.NoError(t, err)
+			assert.Equal(t, tt.output.RepoArg, gotOpts.RepoArg)
 		})
 	}
 }
