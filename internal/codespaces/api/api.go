@@ -34,7 +34,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -392,14 +391,15 @@ func (a *API) GetCodespaceRegionLocation(ctx context.Context) (string, error) {
 	return response.Current, nil
 }
 
-type SKU struct {
+type Machine struct {
 	Name        string `json:"name"`
 	DisplayName string `json:"display_name"`
 }
 
-// GetCodespacesSKUs returns the available SKUs for the user for a given repo, branch and location.
-func (a *API) GetCodespacesSKUs(ctx context.Context, user *User, repository *Repository, branch, location string) ([]*SKU, error) {
-	req, err := http.NewRequest(http.MethodGet, a.githubAPI+"/vscs_internal/user/"+user.Login+"/skus", nil)
+// GetCodespacesMachines returns the codespaces machines for the given repo, branch and location.
+func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, location string) ([]*Machine, error) {
+	reqURL := fmt.Sprintf("%s/repositories/%d/codespaces/machines", a.githubAPI, repoID)
+	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -407,11 +407,10 @@ func (a *API) GetCodespacesSKUs(ctx context.Context, user *User, repository *Rep
 	q := req.URL.Query()
 	q.Add("location", location)
 	q.Add("ref", branch)
-	q.Add("repository_id", strconv.Itoa(repository.ID))
 	req.URL.RawQuery = q.Encode()
 
 	a.setHeaders(req)
-	resp, err := a.do(ctx, req, "/vscs_internal/user/*/skus")
+	resp, err := a.do(ctx, req, "/repositories/*/codespaces/machines")
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
 	}
@@ -427,13 +426,13 @@ func (a *API) GetCodespacesSKUs(ctx context.Context, user *User, repository *Rep
 	}
 
 	var response struct {
-		SKUs []*SKU `json:"skus"`
+		Machines []*Machine `json:"machines"`
 	}
 	if err := json.Unmarshal(b, &response); err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
 
-	return response.SKUs, nil
+	return response.Machines, nil
 }
 
 // CreateCodespaceParams are the required parameters for provisioning a Codespace.
