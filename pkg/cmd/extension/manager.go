@@ -46,6 +46,7 @@ func NewManager(io *iostreams.IOStreams) *Manager {
 		platform: func() string {
 			return fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH)
 		},
+		io: io,
 	}
 }
 
