@@ -187,55 +187,61 @@ type CodespaceEnvironmentConnection struct {
 	HostPublicKeys []string `json:"hostPublicKeys"`
 }
 
+// codespacesListResponse is the request body for the `/user/codespaces` endpoint
+type getCodespacesListResponse struct {
+	Codespaces []*Codespace `json:"codespaces"`
+	TotalCount int          `json:"total_count"`
+}
+
 // ListCodespaces returns a list of codespaces for the user.
-func (a *API) ListCodespaces(ctx context.Context) ([]*Codespace, error) {
-	page := 1
-	per_page := 50
-	codespaces := []*Codespace{}
-
-	for page := 1;; page++ {
-		req, err := http.NewRequest(
-			http.MethodGet, a.githubAPI+"/user/codespaces", nil,
-		)
+func (a *API) ListCodespaces(ctx context.Context) (codespaces []*Codespace, err error) {
+	for page := 1; ; page++ {
+		response, err := a.fetchCodespaces(ctx, page)
 		if err != nil {
-			return nil, fmt.Errorf("error creating request: %w", err)
+			return nil, fmt.Errorf("%w", err)
 		}
-		a.setHeaders(req)
-		q := req.URL.Query()
-		q.Add("page", strconv.Itoa(page))
-		q.Add("per_page", strconv.Itoa(per_page))
-
-		req.URL.RawQuery = q.Encode()
-		resp, err := a.do(ctx, req, "/user/codespaces")
-		if err != nil {
-			return nil, fmt.Errorf("error making request: %w", err)
+		if len(codespaces) >= response.TotalCount {
+			break
 		}
-		defer resp.Body.Close()
-
-		b, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return nil, fmt.Errorf("error reading response body: %w", err)
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			return nil, jsonErrorResponse(b)
-		}
-
-		var response struct {
-			Codespaces []*Codespace `json:"codespaces"`
-		}
-		if err := json.Unmarshal(b, &response); err != nil {
-			return nil, fmt.Errorf("error unmarshaling response: %w", err)
-		}
-
-		if len(response.Codespaces) == 0 {
-		        break
-		}
-	        
-	        codespaces = append(codespaces, response.Codespaces...)
+		codespaces = append(codespaces, response.Codespaces...)
 	}
 
 	return codespaces, nil
+}
+
+func (a *API) fetchCodespaces(ctx context.Context, page int) (response *getCodespacesListResponse, err error) {
+	per_page := 50
+	req, err := http.NewRequest(
+		http.MethodGet, a.githubAPI+"/user/codespaces", nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+	a.setHeaders(req)
+	q := req.URL.Query()
+	q.Add("page", strconv.Itoa(page))
+	q.Add("per_page", strconv.Itoa(per_page))
+
+	req.URL.RawQuery = q.Encode()
+	resp, err := a.do(ctx, req, "/user/codespaces")
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, jsonErrorResponse(b)
+	}
+
+	if err := json.Unmarshal(b, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %w", err)
+	}
+	return response, nil
 }
 
 // getCodespaceTokenRequest is the request body for the get codespace token endpoint.
