@@ -42,7 +42,7 @@ type apiClient interface {
 	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
 	AuthorizedKeys(ctx context.Context, user string) ([]byte, error)
 	GetCodespaceRegionLocation(ctx context.Context) (string, error)
-	GetCodespacesSKUs(ctx context.Context, user *api.User, repository *api.Repository, branch, location string) ([]*api.SKU, error)
+	GetCodespacesMachines(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error)
 	GetCodespaceRepositoryContents(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
 }
 
