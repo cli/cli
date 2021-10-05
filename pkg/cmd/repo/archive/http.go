@@ -1,14 +1,14 @@
 package archive
 
 import (
-    "fmt"
-    "context"
+	"context"
+	"fmt"
 
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/shurcooL/githubv4"
 	"github.com/shurcooL/graphql"
-    "github.com/cli/cli/v2/internal/ghrepo"
-    "github.com/cli/cli/v2/internal/ghinstance"
-    "github.com/shurcooL/githubv4"
-    "github.com/cli/cli/v2/api"
 )
 
 func repoArchive(client *api.Client, repo *api.Repository) error {
@@ -26,8 +26,8 @@ func repoArchive(client *api.Client, repo *api.Repository) error {
 		},
 	}
 
-    host := repo.RepoHost()
-    gql := graphql.NewClient(ghinstance.GraphQLEndpoint(host), client.HTTP())
+	host := repo.RepoHost()
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(host), client.HTTP())
 	err := gql.MutateNamed(context.Background(), "ArchiveRepository", &mutation, variables)
 	return err
 }
@@ -50,4 +50,3 @@ func fetchRepository(apiClient *api.Client, repo ghrepo.Interface, fields []stri
 	}
 	return api.InitRepoHostname(&result.Repository, repo.RepoHost()), nil
 }
-

@@ -4,10 +4,7 @@ import (
 	"bytes"
 	"net/http"
 	"testing"
-    "fmt"
 
-	//"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -15,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// redundant
+// probably redundant
 func TestNewCmdArchive(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -26,17 +23,18 @@ func TestNewCmdArchive(t *testing.T) {
 		errMsg  string
 	}{
 		{
-			name: "valid repo",
-			input:  "cli/cli",
-			tty:  true,
+			name:  "valid repo",
+			input: "cli/cli",
+			tty:   true,
 			output: ArchiveOptions{
 				RepoArg: "cli/cli",
 			},
 		},
 		{
-			name: "no argument",
-			input: "",
-			tty:  true,
+			name:    "no argument",
+			input:   "",
+			wantErr: true,
+			tty:     true,
 			output: ArchiveOptions{
 				RepoArg: "",
 			},
@@ -73,85 +71,94 @@ func TestNewCmdArchive(t *testing.T) {
 	}
 }
 
-func Test_ArchiveRun(t *testing.T)  {
+func Test_ArchiveRun(t *testing.T) {
 	tests := []struct {
-		name       string
-		opts       *ArchiveOptions
-		repoName   string
-		stdoutTTY  bool
-		wantOut    string
-		wantErr    bool
-        isArchived bool
+		name      string
+		opts      *ArchiveOptions
+		repoName  string
+		httpStubs func(*httpmock.Registry)
+		stdoutTTY bool
+		wantOut   string
+		wantErr   bool
+		errMsg    string
 	}{
-        {
-            name: "no argument",
-            wantOut:        "✓ Archived repository OWNER/REPO\n",
-            stdoutTTY:      true,
-        },
 		{
-			name: "unarchived repo",
-            repoName: "OWNER/REPO",
-            isArchived:     false,
-            wantOut: "✓ Archived repository OWNER/REPO\n",
-            stdoutTTY:     true,
+			name:      "unarchived repo tty",
+			repoName:  "OWNER/REPO",
+			wantOut:   "✓ Archived repository OWNER/REPO\n",
+			stdoutTTY: true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`{ "data": { "repository": {
+												"id": "THE-ID",
+												"isArchived": false} } }`))
+				reg.Register(
+					httpmock.GraphQL(`mutation ArchiveRepository\b`),
+					httpmock.StringResponse(`{}`))
+			},
 		},
-        {
-            name: "archived repo",
-            repoName:       "OWNER/REPO",
-            isArchived:     true,
-            wantOut: "! Repository OWNER/REPO is already archived\n",
-            stdoutTTY:     true,
-        },
+		{
+			name:      "unarchived repo notty",
+			repoName:  "OWNER/REPO",
+			stdoutTTY: false,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`{ "data": { "repository": {
+												"id": "THE-ID",
+												"isArchived": false} } }`))
+				reg.Register(
+					httpmock.GraphQL(`mutation ArchiveRepository\b`),
+					httpmock.StringResponse(`{}`))
+			},
+		},
+		{
+			name:      "archived repo tty",
+			repoName:  "OWNER/REPO",
+			wantErr:   true,
+			errMsg:    "! Repository OWNER/REPO is already archived",
+			stdoutTTY: true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`{ "data": { "repository": {
+												"id": "THE-ID",
+												"isArchived": true } } }`))
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		if tt.opts == nil {
-            tt.opts = &ArchiveOptions{}
+			tt.opts = &ArchiveOptions{}
 		}
 
-		if tt.repoName == "" {
-			tt.repoName = "OWNER/REPO"
-		}
-        tt.opts.RepoArg = tt.repoName
-
-		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
-			repo, _ := ghrepo.FromFullName(tt.repoName)
-			return repo, nil
-		}
+		tt.opts.RepoArg = tt.repoName
 
 		reg := &httpmock.Registry{}
-		reg.Register(
-			httpmock.GraphQL(`query RepositoryInfo\b`),
-			httpmock.StringResponse(
-                fmt.Sprintf(`
-                    { "data": {
-                        "repository": {
-                            "id": "THE-ID",
-                            "isArchived": %t
-                    } } }`, tt.isArchived)),
-            )
-
-        if !tt.isArchived {
-            reg.Register(
-                httpmock.GraphQL(`mutation ArchiveRepository\b`),
-                httpmock.StringResponse(`{}`))
-        }
-
+		if tt.httpStubs != nil {
+			tt.httpStubs(reg)
+		}
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
 
-		io, _, _, stderr := iostreams.Test()
+		io, _, stdout, _ := iostreams.Test()
 		tt.opts.IO = io
 
 		t.Run(tt.name, func(t *testing.T) {
+			defer reg.Verify(t)
 			io.SetStdoutTTY(tt.stdoutTTY)
 
-			if err := archiveRun(tt.opts); (err != nil) != tt.wantErr {
-				t.Errorf("archiveRun() error = %v, wantErr %v", err, tt.wantErr)
+			err := archiveRun(tt.opts)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Equal(t, tt.errMsg, err.Error())
+				return
 			}
-			assert.Equal(t, tt.wantOut, stderr.String())
-            reg.Verify(t)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantOut, stdout.String())
 		})
 	}
 }

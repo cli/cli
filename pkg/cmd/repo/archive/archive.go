@@ -29,10 +29,10 @@ func NewCmdArchive(f *cmdutil.Factory, runF func(*ArchiveOptions) error) *cobra.
 	cmd := &cobra.Command{
 		Use:   "archive <repository>",
 		Short: "Archive a repository",
-		Long: `Archive a GitHub repository.`,
-        Args: cmdutil.ExactArgs(1,"cannot archive: repository argument required"),
+		Long:  `Archive a GitHub repository.`,
+		Args:  cmdutil.ExactArgs(1, "cannot archive: repository argument required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-            opts.RepoArg = args[0]
+			opts.RepoArg = args[0]
 			if runF != nil {
 				return runF(opts)
 			}
@@ -53,18 +53,18 @@ func archiveRun(opts *ArchiveOptions) error {
 
 	var toArchive ghrepo.Interface
 
-    archiveURL := opts.RepoArg
-    if !strings.Contains(archiveURL, "/") {
-        currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
-        if err != nil {
-            return err
-        }
-        archiveURL = currentUser + "/" + archiveURL
-    }
-    toArchive, err = ghrepo.FromFullName(archiveURL)
-    if err != nil {
-        return fmt.Errorf("argument error: %w", err)
-    }
+	archiveURL := opts.RepoArg
+	if !strings.Contains(archiveURL, "/") {
+		currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+		if err != nil {
+			return err
+		}
+		archiveURL = currentUser + "/" + archiveURL
+	}
+	toArchive, err = ghrepo.FromFullName(archiveURL)
+	if err != nil {
+		return fmt.Errorf("argument error: %w", err)
+	}
 
 	fields := []string{"name", "owner", "isArchived", "id"}
 	repo, err := fetchRepository(apiClient, toArchive, fields)
@@ -72,9 +72,9 @@ func archiveRun(opts *ArchiveOptions) error {
 		return err
 	}
 
-    fullName := ghrepo.FullName(toArchive)
+	fullName := ghrepo.FullName(toArchive)
 	if repo.IsArchived {
-		return fmt.Errorf("%s Repository %s is already archived", cs.WarningIcon(),fullName)
+		return fmt.Errorf("%s Repository %s is already archived", cs.WarningIcon(), fullName)
 	}
 
 	err = repoArchive(apiClient, repo)
@@ -82,12 +82,12 @@ func archiveRun(opts *ArchiveOptions) error {
 		return fmt.Errorf("API called failed: %w", err)
 	}
 
-    if opts.IO.IsStdoutTTY() {
-        fmt.Fprintf(opts.IO.Out,
-            "%s Archived repository %s\n",
-            cs.SuccessIconWithColor(cs.Red),
-            fullName)
-    }
+	if opts.IO.IsStdoutTTY() {
+		fmt.Fprintf(opts.IO.Out,
+			"%s Archived repository %s\n",
+			cs.SuccessIcon(),
+			fullName)
+	}
 
 	return nil
 }
