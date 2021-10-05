@@ -28,13 +28,13 @@ func TestListCodespaces(t *testing.T) {
 		}
 
 		page := 1
-		if r.URL.Query().Has("page") {
-			page, _ = strconv.Atoi(r.URL.Query()["page"][0])
+		if r.URL.Query().Get("page") != "" {
+			page, _ = strconv.Atoi(r.URL.Query().Get("page"))
 		}
 
 		per_page := 0
-		if r.URL.Query().Has("per_page") {
-			per_page, _ = strconv.Atoi(r.URL.Query()["per_page"][0])
+		if r.URL.Query().Get("per_page") != "" {
+			per_page, _ = strconv.Atoi(r.URL.Query().Get("per_page"))
 		}
 
 		codespaces := []*Codespace{}
