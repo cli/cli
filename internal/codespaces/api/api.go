@@ -520,20 +520,14 @@ func (a *API) startCreate(ctx context.Context, repoID int, machine, branch, loca
 	return &response, nil
 }
 
-func (a *API) DeleteCodespace(ctx context.Context, user string, codespaceName string) error {
-	token, err := a.GetCodespaceToken(ctx, user, codespaceName)
-	if err != nil {
-		return fmt.Errorf("error getting codespace token: %w", err)
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, a.githubAPI+"/vscs_internal/user/"+user+"/codespaces/"+codespaceName, nil)
+func (a *API) DeleteCodespace(ctx context.Context, codespaceName string) error {
+	req, err := http.NewRequest(http.MethodDelete, a.githubAPI+"/user/codespaces/"+codespaceName, nil)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
 
-	// TODO: use a.setHeaders()
-	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces/*")
+	a.setHeaders(req)
+	resp, err := a.do(ctx, req, "/user/codespaces/*")
 	if err != nil {
 		return fmt.Errorf("error making request: %w", err)
 	}

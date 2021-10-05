@@ -80,7 +80,6 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) error {
 			nameFilter = c.Name
 		}
 	} else {
-		// TODO: this token is discarded and then re-requested later in DeleteCodespace
 		token, err := a.apiClient.GetCodespaceToken(ctx, user.Login, nameFilter)
 		if err != nil {
 			return fmt.Errorf("error getting codespace token: %w", err)
@@ -132,7 +131,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) error {
 	for _, c := range codespacesToDelete {
 		codespaceName := c.Name
 		g.Go(func() error {
-			if err := a.apiClient.DeleteCodespace(ctx, user.Login, codespaceName); err != nil {
+			if err := a.apiClient.DeleteCodespace(ctx, codespaceName); err != nil {
 				_, _ = a.logger.Errorf("error deleting codespace %q: %v\n", codespaceName, err)
 				return err
 			}
@@ -143,6 +142,13 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) error {
 	if err := g.Wait(); err != nil {
 		return errors.New("some codespaces failed to delete")
 	}
+
+	noun := "Codespace"
+	if len(codespacesToDelete) > 1 {
+		noun = noun + "s"
+	}
+	a.logger.Println(noun + " deleted.")
+
 	return nil
 }
 
