@@ -189,36 +189,54 @@ type CodespaceEnvironmentConnection struct {
 
 // ListCodespaces returns a list of codespaces for the user.
 func (a *API) ListCodespaces(ctx context.Context) ([]*Codespace, error) {
-	req, err := http.NewRequest(
-		http.MethodGet, a.githubAPI+"/user/codespaces", nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+	page := 1
+	per_page := 50
+	codespaces := []*Codespace{}
+
+	for {
+		req, err := http.NewRequest(
+			http.MethodGet, a.githubAPI+"/user/codespaces", nil,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("error creating request: %w", err)
+		}
+		a.setHeaders(req)
+		q := req.URL.Query()
+		q.Add("page", strconv.Itoa(page))
+		q.Add("per_page", strconv.Itoa(per_page))
+
+		req.URL.RawQuery = q.Encode()
+		resp, err := a.do(ctx, req, "/user/codespaces")
+		if err != nil {
+			return nil, fmt.Errorf("error making request: %w", err)
+		}
+		defer resp.Body.Close()
+
+		b, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("error reading response body: %w", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, jsonErrorResponse(b)
+		}
+
+		var response struct {
+			Codespaces []*Codespace `json:"codespaces"`
+		}
+		if err := json.Unmarshal(b, &response); err != nil {
+			return nil, fmt.Errorf("error unmarshaling response: %w", err)
+		}
+
+		if len(response.Codespaces) > 0 {
+			codespaces = append(codespaces, response.Codespaces...)
+			page++
+		} else {
+			break
+		}
 	}
 
-	a.setHeaders(req)
-	resp, err := a.do(ctx, req, "/user/codespaces")
-	if err != nil {
-		return nil, fmt.Errorf("error making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, jsonErrorResponse(b)
-	}
-
-	var response struct {
-		Codespaces []*Codespace `json:"codespaces"`
-	}
-	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %w", err)
-	}
-	return response.Codespaces, nil
+	return codespaces, nil
 }
 
 // getCodespaceTokenRequest is the request body for the get codespace token endpoint.
