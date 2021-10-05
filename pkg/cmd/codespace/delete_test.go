@@ -1,4 +1,4 @@
-package ghcs
+package codespace
 
 import (
 	"bytes"
@@ -157,10 +157,7 @@ func TestDelete(t *testing.T) {
 				GetUserFunc: func(_ context.Context) (*api.User, error) {
 					return user, nil
 				},
-				DeleteCodespaceFunc: func(_ context.Context, userLogin, name string) error {
-					if userLogin != user.Login {
-						return fmt.Errorf("unexpected user %q", userLogin)
-					}
+				DeleteCodespaceFunc: func(_ context.Context, name string) error {
 					if tt.deleteErr != nil {
 						return tt.deleteErr
 					}

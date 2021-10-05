@@ -1,6 +1,6 @@
-package ghcs
+package codespace
 
-// This file defines functions common to the entire ghcs command set.
+// This file defines functions common to the entire codespace command set.
 
 import (
 	"context"
@@ -38,13 +38,13 @@ type apiClient interface {
 	GetCodespaceToken(ctx context.Context, user, name string) (string, error)
 	GetCodespace(ctx context.Context, token, user, name string) (*codespace.Codespace, error)
 	ListCodespaces(ctx context.Context) ([]*codespace.Codespace, error)
-	DeleteCodespace(ctx context.Context, user, name string) error
-	StartCodespace(ctx context.Context, token string, codespace *codespace.Codespace) error
+	DeleteCodespace(ctx context.Context, name string) error
+	StartCodespace(ctx context.Context, name string) error
 	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*codespace.Codespace, error)
 	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
 	AuthorizedKeys(ctx context.Context, user string) ([]byte, error)
 	GetCodespaceRegionLocation(ctx context.Context) (string, error)
-	GetCodespacesSKUs(ctx context.Context, user *api.User, repository *api.Repository, branch, location string) ([]*api.SKU, error)
+	GetCodespacesMachines(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error)
 	GetCodespaceRepositoryContents(ctx context.Context, codespace *codespace.Codespace, path string) ([]byte, error)
 }
 

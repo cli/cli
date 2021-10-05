@@ -1,4 +1,4 @@
-package ghcs
+package codespace
 
 import (
 	"bytes"
@@ -79,7 +79,7 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, asJSON bool) 
 
 	devContainerResult := <-devContainerCh
 	if devContainerResult.err != nil {
-		// Warn about failure to read the devcontainer file. Not a ghcs command error.
+		// Warn about failure to read the devcontainer file. Not a codespace command error.
 		_, _ = a.logger.Errorf("Failed to get port names: %v\n", devContainerResult.err.Error())
 	}
 
