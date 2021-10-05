@@ -11,11 +11,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -155,10 +158,21 @@ func Test_NewCmdCreate(t *testing.T) {
 			},
 		},
 		{
-			name:    "no arguments",
-			args:    "",
-			isTTY:   true,
-			wantErr: "could not create: no tag name provided",
+			name:  "no arguments",
+			args:  "",
+			isTTY: true,
+			want: CreateOptions{
+				TagName:      "",
+				Target:       "",
+				Name:         "",
+				Body:         "",
+				BodyProvided: false,
+				Draft:        false,
+				Prerelease:   false,
+				RepoOverride: "",
+				Concurrency:  5,
+				Assets:       []*shared.AssetForUpload(nil),
+			},
 		},
 		{
 			name:  "discussion category",
@@ -182,7 +196,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			name:    "discussion category for draft release",
 			args:    "v1.2.3 -d --discussion-category 'General'",
 			isTTY:   true,
-			wantErr: "Discussions for draft releases not supported",
+			wantErr: "discussions for draft releases not supported",
 		},
 	}
 	for _, tt := range tests {
@@ -450,4 +464,192 @@ func Test_createRun(t *testing.T) {
 			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
+}
+
+func Test_createRun_withoutTagName(t *testing.T) {
+	defaultQuestions := [][]*prompt.QuestionStub{
+		{
+			{
+				Name:    "name",
+				Default: true,
+			},
+			{
+				Name:  "releaseNotesAction",
+				Value: "Leave blank",
+			},
+		},
+		{
+			{
+				Name:    "prerelease",
+				Default: true,
+			},
+		},
+		{
+			{
+				Name:  "submitAction",
+				Value: "Publish release",
+			},
+		},
+	}
+
+	tests := []struct {
+		name       string
+		isTTY      bool
+		tagName    string
+		questions  [][]*prompt.QuestionStub
+		wantParams interface{}
+		wantErr    string
+		wantStdout string
+		wantStderr string
+	}{
+		{
+			name:    "create a major release",
+			isTTY:   true,
+			tagName: "v2.0.0",
+			questions: append([][]*prompt.QuestionStub{
+				{
+					{
+						Name:  "tagName",
+						Value: "v2.0.0",
+					},
+				},
+			}, defaultQuestions...),
+			wantParams: map[string]interface{}{
+				"tag_name":   "v2.0.0",
+				"name":       "",
+				"body":       "",
+				"draft":      false,
+				"prerelease": false,
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v2.0.0\n",
+			wantStderr: ``,
+		},
+		{
+			name:    "create a minor release",
+			isTTY:   true,
+			tagName: "v1.1.0",
+			questions: append([][]*prompt.QuestionStub{
+				{
+					{
+						Name:  "tagName",
+						Value: "v1.1.0",
+					},
+				},
+			}, defaultQuestions...),
+			wantParams: map[string]interface{}{
+				"tag_name":   "v1.1.0",
+				"name":       "",
+				"body":       "",
+				"draft":      false,
+				"prerelease": false,
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.1.0\n",
+			wantStderr: ``,
+		},
+		{
+			name:    "create a patch release",
+			isTTY:   true,
+			tagName: "v1.0.1",
+			questions: append([][]*prompt.QuestionStub{
+				{
+					{
+						Name:  "tagName",
+						Value: "v1.0.1",
+					},
+				},
+			}, defaultQuestions...),
+			wantParams: map[string]interface{}{
+				"tag_name":   "v1.0.1",
+				"name":       "",
+				"body":       "",
+				"draft":      false,
+				"prerelease": false,
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.0.1\n",
+			wantStderr: ``,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			as, teardown := prompt.InitAskStubber()
+			defer teardown()
+
+			stubQuestions(as, tt.questions)
+
+			fakeHTTP := &httpmock.Registry{}
+			fakeHTTP.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/latest"), httpmock.StatusStringResponse(201, fmt.Sprintf(`{
+				"tag_name": "%s"
+			}`, tt.tagName)))
+			fakeHTTP.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, fmt.Sprintf(`{
+				"url": "https://api.github.com/releases/123",
+				"upload_url": "https://api.github.com/assets/upload",
+				"html_url": "https://github.com/OWNER/REPO/releases/tag/%s"
+			}`, tt.tagName)))
+			fakeHTTP.Register(httpmock.REST("POST", "assets/upload"), httpmock.StatusStringResponse(201, `{}`))
+			fakeHTTP.Register(httpmock.REST("PATCH", "releases/123"), httpmock.StatusStringResponse(201, fmt.Sprintf(`{
+				"html_url": "https://github.com/OWNER/REPO/releases/tag/%s-final"
+			}`, tt.tagName)))
+
+			out, err := runCommand(fakeHTTP, true, "")
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantStdout, out.OutBuf.String())
+
+			bb, err := ioutil.ReadAll(fakeHTTP.Requests[1].Body)
+			require.NoError(t, err)
+			var params interface{}
+			err = json.Unmarshal(bb, &params)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantParams, params)
+		})
+	}
+
+}
+
+func stubQuestions(as *prompt.AskStubber, questions [][]*prompt.QuestionStub) {
+	for _, question := range questions {
+		as.Stub(question)
+	}
+}
+
+func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
+	io, _, stdout, stderr := iostreams.Test()
+	io.SetStdoutTTY(isTTY)
+	io.SetStdinTTY(isTTY)
+	io.SetStderrTTY(isTTY)
+
+	browser := &cmdutil.TestBrowser{}
+	factory := &cmdutil.Factory{
+		IOStreams: io,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: rt}, nil
+		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.New("OWNER", "REPO"), nil
+		},
+		Browser: browser,
+	}
+
+	cmd := NewCmdCreate(factory, func(opts *CreateOptions) error {
+		return createRun(opts)
+	})
+
+	argv, err := shlex.Split(cli)
+	if err != nil {
+		return nil, err
+	}
+	cmd.SetArgs(argv)
+
+	cmd.SetIn(&bytes.Buffer{})
+	cmd.SetOut(ioutil.Discard)
+	cmd.SetErr(ioutil.Discard)
+
+	_, err = cmd.ExecuteC()
+	return &test.CmdOut{
+		OutBuf:     stdout,
+		ErrBuf:     stderr,
+		BrowsedURL: browser.BrowsedURL(),
+	}, err
 }

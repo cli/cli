@@ -86,6 +86,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		`, "`"),
 		Example: heredoc.Doc(`
 			Interactively create a release
+			$ gh release create
+
+			Interactively create a release with specific tag
 			$ gh release create v1.2.3
 
 			Non-interactively create a release
@@ -103,8 +106,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			Create a release and start a discussion
 			$ gh release create v1.2.3 --discussion-category "General"
 		`),
-		Args: cmdutil.NoArgsQuoteReminder,
+		Args: cmdutil.MinimumArgs(0, "something unexpected happened, pelase report this error"),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			fmt.Println("ARGS", args)
+
 			if cmd.Flags().Changed("discussion-category") && opts.Draft {
 				return errors.New("discussions for draft releases not supported")
 			}
@@ -332,7 +337,7 @@ func handleTagName(opts *CreateOptions, httpClient *http.Client, baseRepo ghrepo
 		{
 			Name: "tagName",
 			Prompt: &survey.Select{
-				Message: "Choose tag name:",
+				Message: "Choose tag name",
 				Options: options,
 			},
 		},
