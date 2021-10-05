@@ -1,4 +1,4 @@
-package ghcs
+package codespace
 
 import (
 	"context"

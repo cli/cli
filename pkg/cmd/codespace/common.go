@@ -1,6 +1,6 @@
-package ghcs
+package codespace
 
-// This file defines functions common to the entire ghcs command set.
+// This file defines functions common to the entire codespace command set.
 
 import (
 	"context"
