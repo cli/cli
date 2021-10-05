@@ -228,12 +228,11 @@ func (a *API) ListCodespaces(ctx context.Context) ([]*Codespace, error) {
 			return nil, fmt.Errorf("error unmarshaling response: %w", err)
 		}
 
-		if len(response.Codespaces) > 0 {
-			codespaces = append(codespaces, response.Codespaces...)
-			page++
-		} else {
-			break
+		if len(response.Codespaces) == 0 {
+		        break
 		}
+	        
+	        codespaces = append(codespaces, response.Codespaces...)
 	}
 
 	return codespaces, nil
