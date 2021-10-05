@@ -102,6 +102,23 @@ func TestNewCmdExtension(t *testing.T) {
 					assert.Equal(t, "hello", calls[0].Name)
 				}
 			},
+			isTTY:      true,
+			wantStdout: "✓ Successfully upgraded extension hello\n",
+		},
+		{
+			name: "upgrade an extension notty",
+			args: []string{"upgrade", "hello"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.UpgradeFunc = func(name string, force bool) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					calls := em.UpgradeCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "hello", calls[0].Name)
+				}
+			},
+			isTTY: false,
 		},
 		{
 			name: "upgrade an extension gh-prefix",
@@ -116,6 +133,8 @@ func TestNewCmdExtension(t *testing.T) {
 					assert.Equal(t, "hello", calls[0].Name)
 				}
 			},
+			isTTY:      true,
+			wantStdout: "✓ Successfully upgraded extension hello\n",
 		},
 		{
 			name: "upgrade an extension full name",
@@ -130,6 +149,8 @@ func TestNewCmdExtension(t *testing.T) {
 					assert.Equal(t, "hello", calls[0].Name)
 				}
 			},
+			isTTY:      true,
+			wantStdout: "✓ Successfully upgraded extension hello\n",
 		},
 		{
 			name: "upgrade all",
@@ -144,6 +165,23 @@ func TestNewCmdExtension(t *testing.T) {
 					assert.Equal(t, "", calls[0].Name)
 				}
 			},
+			isTTY:      true,
+			wantStdout: "✓ Successfully upgraded extensions\n",
+		},
+		{
+			name: "upgrade all notty",
+			args: []string{"upgrade", "--all"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.UpgradeFunc = func(name string, force bool) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					calls := em.UpgradeCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "", calls[0].Name)
+				}
+			},
+			isTTY: false,
 		},
 		{
 			name: "remove extension tty",
