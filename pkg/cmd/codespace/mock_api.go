@@ -49,7 +49,7 @@ import (
 // 			ListCodespacesFunc: func(ctx context.Context) ([]*api.Codespace, error) {
 // 				panic("mock out the ListCodespaces method")
 // 			},
-// 			StartCodespaceFunc: func(ctx context.Context, name string) error {
+// 			StartCodespaceFunc: func(ctx context.Context, token string, codespace *api.Codespace) error {
 // 				panic("mock out the StartCodespace method")
 // 			},
 // 		}
@@ -93,7 +93,7 @@ type apiClientMock struct {
 	ListCodespacesFunc func(ctx context.Context) ([]*api.Codespace, error)
 
 	// StartCodespaceFunc mocks the StartCodespace method.
-	StartCodespaceFunc func(ctx context.Context, name string) error
+	StartCodespaceFunc func(ctx context.Context, token string, codespace *api.Codespace) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -186,8 +186,10 @@ type apiClientMock struct {
 		StartCodespace []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// Name is the name argument value.
-			Name string
+			// Token is the token argument value.
+			Token string
+			// Codespace is the codespace argument value.
+			Codespace *api.Codespace
 		}
 	}
 	lockAuthorizedKeys                 sync.RWMutex
@@ -606,33 +608,37 @@ func (mock *apiClientMock) ListCodespacesCalls() []struct {
 }
 
 // StartCodespace calls StartCodespaceFunc.
-func (mock *apiClientMock) StartCodespace(ctx context.Context, name string) error {
+func (mock *apiClientMock) StartCodespace(ctx context.Context, token string, codespace *api.Codespace) error {
 	if mock.StartCodespaceFunc == nil {
 		panic("apiClientMock.StartCodespaceFunc: method is nil but apiClient.StartCodespace was just called")
 	}
 	callInfo := struct {
-		Ctx  context.Context
-		Name string
+		Ctx       context.Context
+		Token     string
+		Codespace *api.Codespace
 	}{
-		Ctx:  ctx,
-		Name: name,
+		Ctx:       ctx,
+		Token:     token,
+		Codespace: codespace,
 	}
 	mock.lockStartCodespace.Lock()
 	mock.calls.StartCodespace = append(mock.calls.StartCodespace, callInfo)
 	mock.lockStartCodespace.Unlock()
-	return mock.StartCodespaceFunc(ctx, name)
+	return mock.StartCodespaceFunc(ctx, token, codespace)
 }
 
 // StartCodespaceCalls gets all the calls that were made to StartCodespace.
 // Check the length with:
 //     len(mockedapiClient.StartCodespaceCalls())
 func (mock *apiClientMock) StartCodespaceCalls() []struct {
-	Ctx  context.Context
-	Name string
+	Ctx       context.Context
+	Token     string
+	Codespace *api.Codespace
 } {
 	var calls []struct {
-		Ctx  context.Context
-		Name string
+		Ctx       context.Context
+		Token     string
+		Codespace *api.Codespace
 	}
 	mock.lockStartCodespace.RLock()
 	calls = mock.calls.StartCodespace
