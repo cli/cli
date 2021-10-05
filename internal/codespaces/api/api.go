@@ -524,14 +524,14 @@ type getCodespaceRepositoryContentsResponse struct {
 	Content string `json:"content"`
 }
 
-func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *codespace.Codespace, path string) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodGet, a.githubAPI+"/repos/"+codespace.RepositoryNWO+"/contents/"+path, nil)
+func (a *API) GetCodespaceRepositoryContents(ctx context.Context, cs *codespace.Codespace, path string) ([]byte, error) {
+	req, err := http.NewRequest(http.MethodGet, a.githubAPI+"/repos/"+cs.RepositoryNWO+"/contents/"+path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
 	q := req.URL.Query()
-	q.Add("ref", codespace.Branch)
+	q.Add("ref", cs.Branch)
 	req.URL.RawQuery = q.Encode()
 
 	a.setHeaders(req)

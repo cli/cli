@@ -119,10 +119,10 @@ type portAttribute struct {
 	Label string `json:"label"`
 }
 
-func getDevContainer(ctx context.Context, apiClient apiClient, codespace *codespace.Codespace) <-chan devContainerResult {
+func getDevContainer(ctx context.Context, apiClient apiClient, cs *codespace.Codespace) <-chan devContainerResult {
 	ch := make(chan devContainerResult, 1)
 	go func() {
-		contents, err := apiClient.GetCodespaceRepositoryContents(ctx, codespace, ".devcontainer/devcontainer.json")
+		contents, err := apiClient.GetCodespaceRepositoryContents(ctx, cs, ".devcontainer/devcontainer.json")
 		if err != nil {
 			ch <- devContainerResult{nil, fmt.Errorf("error getting content: %w", err)}
 			return
