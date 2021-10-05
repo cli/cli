@@ -32,11 +32,14 @@ func (c *Codespace) DisplayName(includeName, includeGitStatus bool) string {
 	return c.RepositoryNWO + ": " + branch
 }
 
+// GitStatusDirty represents an unsaved changes status.
+const GitStatusDirty = "*"
+
 // BranchWithGitStatus returns the branch with a star
 // if the branch is currently being worked on.
 func (c *Codespace) BranchWithGitStatus() string {
 	if c.HasUnsavedChanges() {
-		return c.Branch + "*"
+		return c.Branch + GitStatusDirty
 	}
 
 	return c.Branch

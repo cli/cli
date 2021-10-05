@@ -74,22 +74,30 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*codespace.Codesp
 		idx int
 	}
 
+	namesWithConflict := make(map[string]bool)
 	codespacesByName := make(map[string]codespaceWithIndex)
 	codespacesNames := make([]string, 0, len(codespaces))
 	for _, cs := range codespaces {
 		csName := cs.DisplayName(false, false)
 		displayNameWithGitStatus := cs.DisplayName(false, true)
 
-		if seenCodespace, ok := codespacesByName[csName]; ok {
-			// there is an existing codespace on the repo and branch
-			// we need to disambiguate by adding the codespace name
-			// to the existing entry and the one we are adding now
-			fullDisplayName := seenCodespace.cs.DisplayName(true, false)
-			fullDisplayNameWithGitStatus := seenCodespace.cs.DisplayName(true, true)
+		_, hasExistingConflict := namesWithConflict[csName]
+		if seenCodespace, ok := codespacesByName[csName]; ok || hasExistingConflict {
+			// There is an existing codespace on the repo and branch.
+			// We need to disambiguate by adding the codespace name
+			// to the existing entry and the one we are processing now.
+			if !hasExistingConflict {
+				fullDisplayName := seenCodespace.cs.DisplayName(true, false)
+				fullDisplayNameWithGitStatus := seenCodespace.cs.DisplayName(true, true)
 
-			codespacesByName[fullDisplayName] = codespaceWithIndex{seenCodespace.cs, seenCodespace.idx}
-			codespacesNames[seenCodespace.idx] = fullDisplayNameWithGitStatus
-			delete(codespacesByName, csName) // delete the existing map entry with old name
+				codespacesByName[fullDisplayName] = codespaceWithIndex{seenCodespace.cs, seenCodespace.idx}
+				codespacesNames[seenCodespace.idx] = fullDisplayNameWithGitStatus
+				delete(codespacesByName, csName) // delete the existing map entry with old name
+
+				// All other codespaces with the same name should update
+				// to their specific name, this tracks conflicting names going forward
+				namesWithConflict[csName] = true
+			}
 
 			// update this codespace names to include the name to disambiguate
 			csName = cs.DisplayName(true, false)
@@ -119,7 +127,10 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*codespace.Codesp
 		return nil, fmt.Errorf("error getting answers: %w", err)
 	}
 
-	selectedCodespace := strings.Replace(answers.Codespace, "*", "", -1)
+	// Codespaces are indexed without the git status included as compared
+	// to how it is displayed in the prompt, so the git status symbol needs
+	// cleaning up in case it is included.
+	selectedCodespace := strings.Replace(answers.Codespace, codespace.GitStatusDirty, "", -1)
 	codespace := codespacesByName[selectedCodespace].cs
 	return codespace, nil
 }
