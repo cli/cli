@@ -127,6 +127,20 @@ func Test_ArchiveRun(t *testing.T) {
 												"isArchived": true } } }`))
 			},
 		},
+		{
+			name:      "archived repo notty",
+			repoName:  "OWNER/REPO",
+			wantErr:   true,
+			errMsg:    "! Repository OWNER/REPO is already archived",
+			stdoutTTY: false,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`{ "data": { "repository": {
+												"id": "THE-ID",
+												"isArchived": true } } }`))
+			},
+		},
 	}
 
 	for _, tt := range tests {
