@@ -20,9 +20,8 @@ func generateCodespaceList(start int, end int) []*Codespace {
 	return codespacesList
 }
 
-func TestListCodespaces(t *testing.T) {
-
-	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func createFakeListEndpointServer(t *testing.T, initalTotal int, finalTotal int) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/user/codespaces" {
 			t.Fatal("Incorrect path")
 		}
@@ -37,23 +36,29 @@ func TestListCodespaces(t *testing.T) {
 			per_page, _ = strconv.Atoi(r.URL.Query().Get("per_page"))
 		}
 
-		codespaces := []*Codespace{}
-		if page == 1 {
-			codespaces = generateCodespaceList(0, per_page)
-		} else if page == 2 {
-			codespaces = generateCodespaceList(per_page, per_page*2)
-		}
-
 		response := struct {
 			Codespaces []*Codespace `json:"codespaces"`
 			TotalCount int          `json:"total_count"`
 		}{
-			Codespaces: codespaces,
-			TotalCount: 100,
+			Codespaces: []*Codespace{},
+			TotalCount: finalTotal,
 		}
+
+		if page == 1 {
+			response.Codespaces = generateCodespaceList(0, per_page)
+			response.TotalCount = initalTotal
+		} else if page == 2 {
+			response.Codespaces = generateCodespaceList(per_page, per_page*2)
+			response.TotalCount = finalTotal
+		}
+
 		data, _ := json.Marshal(response)
 		fmt.Fprint(w, string(data))
 	}))
+}
+
+func TestListCodespaces(t *testing.T) {
+	svr := createFakeListEndpointServer(t, 100, 100)
 	defer svr.Close()
 
 	api := API{
@@ -77,5 +82,42 @@ func TestListCodespaces(t *testing.T) {
 	if codespaces[99].Name != "codespace-99" {
 		t.Fatalf("expected codespace-99, got %s", codespaces[0].Name)
 	}
+}
 
+func TestMidIterationDeletion(t *testing.T) {
+	svr := createFakeListEndpointServer(t, 100, 99)
+	defer svr.Close()
+
+	api := API{
+		githubAPI: svr.URL,
+		client:    &http.Client{},
+		token:     "faketoken",
+	}
+	ctx := context.TODO()
+	codespaces, err := api.ListCodespaces(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(codespaces) != 100 {
+		t.Fatalf("expected 100 codespace, got %d", len(codespaces))
+	}
+}
+
+func TestMidIterationAddition(t *testing.T) {
+	svr := createFakeListEndpointServer(t, 99, 100)
+	defer svr.Close()
+
+	api := API{
+		githubAPI: svr.URL,
+		client:    &http.Client{},
+		token:     "faketoken",
+	}
+	ctx := context.TODO()
+	codespaces, err := api.ListCodespaces(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(codespaces) != 100 {
+		t.Fatalf("expected 100 codespace, got %d", len(codespaces))
+	}
 }
