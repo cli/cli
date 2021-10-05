@@ -9,10 +9,12 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/codespace"
 	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -34,21 +36,21 @@ func NewApp(logger *output.Logger, apiClient apiClient) *App {
 type apiClient interface {
 	GetUser(ctx context.Context) (*api.User, error)
 	GetCodespaceToken(ctx context.Context, user, name string) (string, error)
-	GetCodespace(ctx context.Context, token, user, name string) (*api.Codespace, error)
-	ListCodespaces(ctx context.Context) ([]*api.Codespace, error)
+	GetCodespace(ctx context.Context, token, user, name string) (*codespace.Codespace, error)
+	ListCodespaces(ctx context.Context) ([]*codespace.Codespace, error)
 	DeleteCodespace(ctx context.Context, user, name string) error
-	StartCodespace(ctx context.Context, token string, codespace *api.Codespace) error
-	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
+	StartCodespace(ctx context.Context, token string, codespace *codespace.Codespace) error
+	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*codespace.Codespace, error)
 	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
 	AuthorizedKeys(ctx context.Context, user string) ([]byte, error)
 	GetCodespaceRegionLocation(ctx context.Context) (string, error)
 	GetCodespacesSKUs(ctx context.Context, user *api.User, repository *api.Repository, branch, location string) ([]*api.SKU, error)
-	GetCodespaceRepositoryContents(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
+	GetCodespaceRepositoryContents(ctx context.Context, codespace *codespace.Codespace, path string) ([]byte, error)
 }
 
 var errNoCodespaces = errors.New("you have no codespaces")
 
-func chooseCodespace(ctx context.Context, apiClient apiClient) (*api.Codespace, error) {
+func chooseCodespace(ctx context.Context, apiClient apiClient) (*codespace.Codespace, error) {
 	codespaces, err := apiClient.ListCodespaces(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting codespaces: %w", err)
@@ -56,7 +58,9 @@ func chooseCodespace(ctx context.Context, apiClient apiClient) (*api.Codespace, 
 	return chooseCodespaceFromList(ctx, codespaces)
 }
 
-func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (*api.Codespace, error) {
+// chooseCodespaceFromList returns the selected codespace from the list,
+// or an error if there are no codespaces.
+func chooseCodespaceFromList(ctx context.Context, codespaces []*codespace.Codespace) (*codespace.Codespace, error) {
 	if len(codespaces) == 0 {
 		return nil, errNoCodespaces
 	}
@@ -65,14 +69,38 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 		return codespaces[i].CreatedAt > codespaces[j].CreatedAt
 	})
 
-	codespacesByName := make(map[string]*api.Codespace)
-	codespacesNames := make([]string, 0, len(codespaces))
-	for _, codespace := range codespaces {
-		codespacesByName[codespace.Name] = codespace
-		codespacesNames = append(codespacesNames, codespace.Name)
+	type codespaceWithIndex struct {
+		cs  *codespace.Codespace
+		idx int
 	}
 
-	sshSurvey := []*survey.Question{
+	codespacesByName := make(map[string]codespaceWithIndex)
+	codespacesNames := make([]string, 0, len(codespaces))
+	for _, cs := range codespaces {
+		csName := cs.DisplayName(false, false)
+		displayNameWithGitStatus := cs.DisplayName(false, true)
+
+		if seenCodespace, ok := codespacesByName[csName]; ok {
+			// there is an existing codespace on the repo and branch
+			// we need to disambiguate by adding the codespace name
+			// to the existing entry and the one we are adding now
+			fullDisplayName := seenCodespace.cs.DisplayName(true, false)
+			fullDisplayNameWithGitStatus := seenCodespace.cs.DisplayName(true, true)
+
+			codespacesByName[fullDisplayName] = codespaceWithIndex{seenCodespace.cs, seenCodespace.idx}
+			codespacesNames[seenCodespace.idx] = fullDisplayNameWithGitStatus
+			delete(codespacesByName, csName) // delete the existing map entry with old name
+
+			// update this codespace names to include the name to disambiguate
+			csName = cs.DisplayName(true, false)
+			displayNameWithGitStatus = cs.DisplayName(true, true)
+		}
+
+		codespacesByName[csName] = codespaceWithIndex{cs, len(codespacesNames)}
+		codespacesNames = append(codespacesNames, displayNameWithGitStatus)
+	}
+
+	csSurvey := []*survey.Question{
 		{
 			Name: "codespace",
 			Prompt: &survey.Select{
@@ -87,17 +115,18 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 	var answers struct {
 		Codespace string
 	}
-	if err := ask(sshSurvey, &answers); err != nil {
+	if err := ask(csSurvey, &answers); err != nil {
 		return nil, fmt.Errorf("error getting answers: %w", err)
 	}
 
-	codespace := codespacesByName[answers.Codespace]
+	selectedCodespace := strings.Replace(answers.Codespace, "*", "", -1)
+	codespace := codespacesByName[selectedCodespace].cs
 	return codespace, nil
 }
 
 // getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
 // It then fetches the codespace token and the codespace record.
-func getOrChooseCodespace(ctx context.Context, apiClient apiClient, user *api.User, codespaceName string) (codespace *api.Codespace, token string, err error) {
+func getOrChooseCodespace(ctx context.Context, apiClient apiClient, user *api.User, codespaceName string) (codespace *codespace.Codespace, token string, err error) {
 	if codespaceName == "" {
 		codespace, err = chooseCodespace(ctx, apiClient)
 		if err != nil {

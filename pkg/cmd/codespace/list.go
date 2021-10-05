@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	"github.com/spf13/cobra"
 )
@@ -39,7 +38,7 @@ func (a *App) List(ctx context.Context, asJSON bool) error {
 		table.Append([]string{
 			codespace.Name,
 			codespace.RepositoryNWO,
-			codespace.Branch + dirtyStar(codespace.Environment.GitStatus),
+			codespace.BranchWithGitStatus(),
 			codespace.Environment.State,
 			codespace.CreatedAt,
 		})
@@ -47,12 +46,4 @@ func (a *App) List(ctx context.Context, asJSON bool) error {
 
 	table.Render()
 	return nil
-}
-
-func dirtyStar(status api.CodespaceEnvironmentGitStatus) string {
-	if status.HasUncommitedChanges || status.HasUnpushedChanges {
-		return "*"
-	}
-
-	return ""
 }

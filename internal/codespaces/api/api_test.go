@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/cli/cli/v2/internal/codespaces/codespace"
 )
 
 func TestListCodespaces(t *testing.T) {
-	codespaces := []*Codespace{
+	codespaces := []*codespace.Codespace{
 		{
 			Name:       "testcodespace",
 			CreatedAt:  "2021-08-09T10:10:24+02:00",
@@ -19,7 +21,7 @@ func TestListCodespaces(t *testing.T) {
 	}
 	svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		response := struct {
-			Codespaces []*Codespace `json:"codespaces"`
+			Codespaces []*codespace.Codespace `json:"codespaces"`
 		}{
 			Codespaces: codespaces,
 		}

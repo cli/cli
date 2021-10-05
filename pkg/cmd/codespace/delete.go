@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/codespace"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
@@ -64,7 +64,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) error {
 		return fmt.Errorf("error getting user: %w", err)
 	}
 
-	var codespaces []*api.Codespace
+	var codespaces []*codespace.Codespace
 	nameFilter := opts.codespaceName
 	if nameFilter == "" {
 		codespaces, err = a.apiClient.ListCodespaces(ctx)
@@ -86,15 +86,15 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) error {
 			return fmt.Errorf("error getting codespace token: %w", err)
 		}
 
-		codespace, err := a.apiClient.GetCodespace(ctx, token, user.Login, nameFilter)
+		cs, err := a.apiClient.GetCodespace(ctx, token, user.Login, nameFilter)
 		if err != nil {
 			return fmt.Errorf("error fetching codespace information: %w", err)
 		}
 
-		codespaces = []*api.Codespace{codespace}
+		codespaces = []*codespace.Codespace{cs}
 	}
 
-	codespacesToDelete := make([]*api.Codespace, 0, len(codespaces))
+	codespacesToDelete := make([]*codespace.Codespace, 0, len(codespaces))
 	lastUpdatedCutoffTime := opts.now().AddDate(0, 0, -int(opts.keepDays))
 	for _, c := range codespaces {
 		if nameFilter != "" && c.Name != nameFilter {
@@ -146,16 +146,14 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) error {
 	return nil
 }
 
-func confirmDeletion(p prompter, codespace *api.Codespace, isInteractive bool) (bool, error) {
-	gs := codespace.Environment.GitStatus
-	hasUnsavedChanges := gs.HasUncommitedChanges || gs.HasUnpushedChanges
-	if !hasUnsavedChanges {
+func confirmDeletion(p prompter, cs *codespace.Codespace, isInteractive bool) (bool, error) {
+	if !cs.HasUnsavedChanges() {
 		return true, nil
 	}
 	if !isInteractive {
-		return false, fmt.Errorf("codespace %s has unsaved changes (use --force to override)", codespace.Name)
+		return false, fmt.Errorf("codespace %s has unsaved changes (use --force to override)", cs.Name)
 	}
-	return p.Confirm(fmt.Sprintf("Codespace %s has unsaved changes. OK to delete?", codespace.Name))
+	return p.Confirm(fmt.Sprintf("Codespace %s has unsaved changes. OK to delete?", cs.Name))
 }
 
 type surveyPrompter struct{}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/codespace"
 	"github.com/cli/cli/v2/pkg/liveshare"
 )
 
@@ -36,13 +37,13 @@ type PostCreateState struct {
 // PollPostCreateStates watches for state changes in a codespace,
 // and calls the supplied poller for each batch of state changes.
 // It runs until it encounters an error, including cancellation of the context.
-func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, user *api.User, codespace *api.Codespace, poller func([]PostCreateState)) (err error) {
-	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespace.Name)
+func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, user *api.User, c *codespace.Codespace, poller func([]PostCreateState)) (err error) {
+	token, err := apiClient.GetCodespaceToken(ctx, user.Login, c.Name)
 	if err != nil {
 		return fmt.Errorf("getting codespace token: %w", err)
 	}
 
-	session, err := ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
+	session, err := ConnectToLiveshare(ctx, log, apiClient, user.Login, token, c)
 	if err != nil {
 		return fmt.Errorf("connect to Live Share: %w", err)
 	}
@@ -83,7 +84,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, 
 			return fmt.Errorf("connection failed: %w", err)
 
 		case <-t.C:
-			states, err := getPostCreateOutput(ctx, localPort, codespace, sshUser)
+			states, err := getPostCreateOutput(ctx, localPort, sshUser)
 			if err != nil {
 				return fmt.Errorf("get post create output: %w", err)
 			}
@@ -93,7 +94,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, 
 	}
 }
 
-func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Codespace, user string) ([]PostCreateState, error) {
+func getPostCreateOutput(ctx context.Context, tunnelPort int, user string) ([]PostCreateState, error) {
 	cmd, err := NewRemoteCommand(
 		ctx, tunnelPort, fmt.Sprintf("%s@localhost", user),
 		"cat /workspaces/.codespaces/shared/postCreateOutput.json",

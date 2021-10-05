@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/internal/codespaces"
-	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/codespace"
 	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/muhammadmuzzammil1998/jsonc"
@@ -119,7 +119,7 @@ type portAttribute struct {
 	Label string `json:"label"`
 }
 
-func getDevContainer(ctx context.Context, apiClient apiClient, codespace *api.Codespace) <-chan devContainerResult {
+func getDevContainer(ctx context.Context, apiClient apiClient, codespace *codespace.Codespace) <-chan devContainerResult {
 	ch := make(chan devContainerResult, 1)
 	go func() {
 		contents, err := apiClient.GetCodespaceRepositoryContents(ctx, codespace, ".devcontainer/devcontainer.json")
