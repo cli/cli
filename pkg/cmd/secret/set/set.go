@@ -189,8 +189,7 @@ func setRun(opts *SetOptions) error {
 
 	encoded := base64.StdEncoding.EncodeToString(eBody)
 	if opts.ShouldNotStore {
-		encodedSecret := fmt.Sprintf("Your encoded secret is %s", encoded)
-		fmt.Fprintln(opts.IO.Out, encodedSecret)
+		fmt.Fprintln(opts.IO.Out, encoded)
 		return nil
 	}
 
