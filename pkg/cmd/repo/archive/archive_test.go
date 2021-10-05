@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// redundant
 func TestNewCmdArchive(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -82,6 +83,11 @@ func Test_ArchiveRun(t *testing.T)  {
 		wantErr    bool
         isArchived bool
 	}{
+        {
+            name: "no argument",
+            wantOut:        "✓ Archived repository OWNER/REPO\n",
+            stdoutTTY:      true,
+        },
 		{
 			name: "unarchived repo",
             repoName: "OWNER/REPO",
@@ -106,7 +112,7 @@ func Test_ArchiveRun(t *testing.T)  {
 		if tt.repoName == "" {
 			tt.repoName = "OWNER/REPO"
 		}
-        tt.opts.RepoArg = "OWNER/REPO"
+        tt.opts.RepoArg = tt.repoName
 
 		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 			repo, _ := ghrepo.FromFullName(tt.repoName)
@@ -122,7 +128,8 @@ func Test_ArchiveRun(t *testing.T)  {
                         "repository": {
                             "id": "THE-ID",
                             "isArchived": %t
-                    } } }`, tt.isArchived)))
+                    } } }`, tt.isArchived)),
+            )
 
         if !tt.isArchived {
             reg.Register(

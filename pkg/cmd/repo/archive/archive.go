@@ -10,9 +10,6 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
-	// change to github import in go.mod
-	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
-
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
@@ -20,7 +17,6 @@ import (
 type ArchiveOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
 	RepoArg    string
 }
 
@@ -28,22 +24,15 @@ func NewCmdArchive(f *cmdutil.Factory, runF func(*ArchiveOptions) error) *cobra.
 	opts := &ArchiveOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		BaseRepo:   f.BaseRepo,
 	}
 
 	cmd := &cobra.Command{
-		Use:   "archive [<repository>]",
+		Use:   "archive <repository>",
 		Short: "Archive a repository",
-		Long: `Archive a GitHub repository.
-
-        With no argument, the repository for the current directory is archived.`,
-
-		Args: cobra.MaximumNArgs(1),
+		Long: `Archive a GitHub repository.`,
+        Args: cmdutil.ExactArgs(1,"cannot archive: repository argument required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) > 0 {
-				opts.RepoArg = args[0]
-			}
-
+            opts.RepoArg = args[0]
 			if runF != nil {
 				return runF(opts)
 			}
@@ -63,43 +52,42 @@ func archiveRun(opts *ArchiveOptions) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	var toArchive ghrepo.Interface
-	if opts.RepoArg == "" {
-		toArchive, err = opts.BaseRepo()
-		if err != nil {
-			return err
-		}
-	} else {
-		archiveURL := opts.RepoArg
-		if !strings.Contains(archiveURL, "/") {
-			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
-			if err != nil {
-				return err
-			}
-			archiveURL = currentUser + "/" + archiveURL
-		}
-		toArchive, err = ghrepo.FromFullName(archiveURL)
-		if err != nil {
-			return fmt.Errorf("argument error: %w", err)
-		}
-	}
+
+    archiveURL := opts.RepoArg
+    if !strings.Contains(archiveURL, "/") {
+        currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+        if err != nil {
+            return err
+        }
+        archiveURL = currentUser + "/" + archiveURL
+    }
+    toArchive, err = ghrepo.FromFullName(archiveURL)
+    if err != nil {
+        return fmt.Errorf("argument error: %w", err)
+    }
 
 	fields := []string{"name", "owner", "isArchived", "id"}
-	repo, err := shared.FetchRepository(apiClient, toArchive, fields)
+	repo, err := fetchRepository(apiClient, toArchive, fields)
 	if err != nil {
 		return err
 	}
 
     fullName := ghrepo.FullName(toArchive)
 	if repo.IsArchived {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Repository %s is already archived\n", cs.WarningIcon(),fullName)
-		return nil
+		return fmt.Errorf("%s Repository %s is already archived", cs.WarningIcon(),fullName)
 	}
 
-	err = api.RepoArchive(apiClient, repo)
+	err = repoArchive(apiClient, repo)
 	if err != nil {
 		return fmt.Errorf("API called failed: %w", err)
 	}
-	fmt.Fprintf(opts.IO.ErrOut, "%s Archived repository %s\n", cs.SuccessIconWithColor(cs.Red), fullName)
+
+    if opts.IO.IsStdoutTTY() {
+        fmt.Fprintf(opts.IO.Out,
+            "%s Archived repository %s\n",
+            cs.SuccessIconWithColor(cs.Red),
+            fullName)
+    }
 
 	return nil
 }
