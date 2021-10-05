@@ -200,7 +200,7 @@ func (a *API) ListCodespaces(ctx context.Context) (codespaces []*Codespace, err 
 		if err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
-		if len(codespaces) >= response.TotalCount {
+		if len(codespaces) >= response.TotalCount || len(response.Codespaces) == 0 {
 			break
 		}
 		codespaces = append(codespaces, response.Codespaces...)
