@@ -106,10 +106,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			Create a release and start a discussion
 			$ gh release create v1.2.3 --discussion-category "General"
 		`),
-		Args: cmdutil.MinimumArgs(0, "something unexpected happened, pelase report this error"),
+		Args: cmdutil.MinimumArgs(0, "something unexpected happened, please report this error"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println("ARGS", args)
-
 			if cmd.Flags().Changed("discussion-category") && opts.Draft {
 				return errors.New("discussions for draft releases not supported")
 			}
