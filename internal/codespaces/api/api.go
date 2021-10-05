@@ -193,7 +193,7 @@ func (a *API) ListCodespaces(ctx context.Context) ([]*Codespace, error) {
 	per_page := 50
 	codespaces := []*Codespace{}
 
-	for {
+	for page := 1;; page++ {
 		req, err := http.NewRequest(
 			http.MethodGet, a.githubAPI+"/user/codespaces", nil,
 		)
