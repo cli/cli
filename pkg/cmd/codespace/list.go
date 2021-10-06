@@ -11,6 +11,7 @@ import (
 
 func newListCmd(app *App) *cobra.Command {
 	var asJSON bool
+	var limit int16
 
 	listCmd := &cobra.Command{
 		Use:   "list",
@@ -22,6 +23,8 @@ func newListCmd(app *App) *cobra.Command {
 	}
 
 	listCmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
+	listCmd.Flags().Int16VarP(&limit, "limit", "L", 30, "Maximum number of codespaces to list")
+	// take a look at pkg/cmd/repo/list.go:103
 
 	return listCmd
 }
