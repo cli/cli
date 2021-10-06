@@ -187,7 +187,7 @@ type CodespaceEnvironmentConnection struct {
 	HostPublicKeys []string `json:"hostPublicKeys"`
 }
 
-// codespacesListResponse is the request body for the `/user/codespaces` endpoint
+// codespacesListResponse is the response body for the `/user/codespaces` endpoint
 type getCodespacesListResponse struct {
 	Codespaces []*Codespace `json:"codespaces"`
 	TotalCount int          `json:"total_count"`
