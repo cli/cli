@@ -147,6 +147,7 @@ func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error
 	return &response, nil
 }
 
+// Codespace represents a codespace.
 type Codespace struct {
 	Name           string               `json:"name"`
 	CreatedAt      string               `json:"created_at"`
@@ -177,6 +178,7 @@ type CodespaceEnvironmentGitStatus struct {
 }
 
 const (
+	// CodespaceEnvironmentStateAvailable is the state for a running codespace environment.
 	CodespaceEnvironmentStateAvailable = "Available"
 )
 
@@ -421,7 +423,7 @@ type CreateCodespaceParams struct {
 // CreateCodespace creates a codespace with the given parameters and returns a non-nil error if it
 // fails to create.
 func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams) (*Codespace, error) {
-	cs, err := a.startCreate(ctx, params.RepositoryID, params.Machine, params.Branch, params.Location)
+	codespace, err := a.startCreate(ctx, params.RepositoryID, params.Machine, params.Branch, params.Location)
 	if err != errProvisioningInProgress {
 		return nil, err
 	}
@@ -440,17 +442,17 @@ func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case <-ticker.C:
-			cs, err = a.GetCodespace(ctx, cs.Name, false)
+			codespace, err = a.GetCodespace(ctx, codespace.Name, false)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get codespace: %w", err)
 			}
 
 			// we continue to poll until the codespace shows as provisioned
-			if cs.State != CodespaceStateProvisioned {
+			if codespace.State != CodespaceStateProvisioned {
 				continue
 			}
 
-			return cs, nil
+			return codespace, nil
 		}
 	}
 }
@@ -535,14 +537,14 @@ type getCodespaceRepositoryContentsResponse struct {
 	Content string `json:"content"`
 }
 
-func (a *API) GetCodespaceRepositoryContents(ctx context.Context, cs *Codespace, path string) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodGet, a.githubAPI+"/repos/"+cs.RepositoryNWO+"/contents/"+path, nil)
+func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Codespace, path string) ([]byte, error) {
+	req, err := http.NewRequest(http.MethodGet, a.githubAPI+"/repos/"+codespace.RepositoryNWO+"/contents/"+path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
 	q := req.URL.Query()
-	q.Add("ref", cs.Branch)
+	q.Add("ref", codespace.Branch)
 	req.URL.RawQuery = q.Encode()
 
 	a.setHeaders(req)

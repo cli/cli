@@ -15,12 +15,12 @@ type logger interface {
 	Println(v ...interface{}) (int, error)
 }
 
-func connectionReady(cs *api.Codespace) bool {
-	return cs.Environment.Connection.SessionID != "" &&
-		cs.Environment.Connection.SessionToken != "" &&
-		cs.Environment.Connection.RelayEndpoint != "" &&
-		cs.Environment.Connection.RelaySAS != "" &&
-		cs.Environment.State == api.CodespaceEnvironmentStateAvailable
+func connectionReady(codespace *api.Codespace) bool {
+	return codespace.Environment.Connection.SessionID != "" &&
+		codespace.Environment.Connection.SessionToken != "" &&
+		codespace.Environment.Connection.RelayEndpoint != "" &&
+		codespace.Environment.Connection.RelaySAS != "" &&
+		codespace.Environment.State == api.CodespaceEnvironmentStateAvailable
 }
 
 type apiClient interface {
@@ -30,17 +30,17 @@ type apiClient interface {
 
 // ConnectToLiveshare waits for a Codespace to become running,
 // and connects to it using a Live Share session.
-func ConnectToLiveshare(ctx context.Context, log logger, apiClient apiClient, cs *api.Codespace) (*liveshare.Session, error) {
+func ConnectToLiveshare(ctx context.Context, log logger, apiClient apiClient, codespace *api.Codespace) (*liveshare.Session, error) {
 	var startedCodespace bool
-	if cs.Environment.State != api.CodespaceEnvironmentStateAvailable {
+	if codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
 		startedCodespace = true
 		log.Print("Starting your codespace...")
-		if err := apiClient.StartCodespace(ctx, cs.Name); err != nil {
+		if err := apiClient.StartCodespace(ctx, codespace.Name); err != nil {
 			return nil, fmt.Errorf("error starting codespace: %w", err)
 		}
 	}
 
-	for retries := 0; !connectionReady(cs); retries++ {
+	for retries := 0; !connectionReady(codespace); retries++ {
 		if retries > 1 {
 			if retries%2 == 0 {
 				log.Print(".")
@@ -54,7 +54,7 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient apiClient, cs
 		}
 
 		var err error
-		cs, err = apiClient.GetCodespace(ctx, cs.Name, true)
+		codespace, err = apiClient.GetCodespace(ctx, codespace.Name, true)
 		if err != nil {
 			return nil, fmt.Errorf("error getting codespace: %w", err)
 		}
@@ -67,10 +67,10 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient apiClient, cs
 	log.Println("Connecting to your codespace...")
 
 	return liveshare.Connect(ctx, liveshare.Options{
-		SessionID:      cs.Environment.Connection.SessionID,
-		SessionToken:   cs.Environment.Connection.SessionToken,
-		RelaySAS:       cs.Environment.Connection.RelaySAS,
-		RelayEndpoint:  cs.Environment.Connection.RelayEndpoint,
-		HostPublicKeys: cs.Environment.Connection.HostPublicKeys,
+		SessionID:      codespace.Environment.Connection.SessionID,
+		SessionToken:   codespace.Environment.Connection.SessionToken,
+		RelaySAS:       codespace.Environment.Connection.RelaySAS,
+		RelayEndpoint:  codespace.Environment.Connection.RelayEndpoint,
+		HostPublicKeys: codespace.Environment.Connection.HostPublicKeys,
 	})
 }

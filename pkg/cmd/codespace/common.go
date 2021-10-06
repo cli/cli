@@ -135,9 +135,9 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 
 // getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
 // It then fetches the codespace record with full connection details.
-func getOrChooseCodespace(ctx context.Context, apiClient apiClient, codespaceName string) (cs *api.Codespace, err error) {
+func getOrChooseCodespace(ctx context.Context, apiClient apiClient, codespaceName string) (codespace *api.Codespace, err error) {
 	if codespaceName == "" {
-		cs, err = chooseCodespace(ctx, apiClient)
+		codespace, err = chooseCodespace(ctx, apiClient)
 		if err != nil {
 			if err == errNoCodespaces {
 				return nil, err
@@ -145,13 +145,13 @@ func getOrChooseCodespace(ctx context.Context, apiClient apiClient, codespaceNam
 			return nil, fmt.Errorf("choosing codespace: %w", err)
 		}
 	} else {
-		cs, err = apiClient.GetCodespace(ctx, codespaceName, true)
+		codespace, err = apiClient.GetCodespace(ctx, codespaceName, true)
 		if err != nil {
 			return nil, fmt.Errorf("getting full codespace details: %w", err)
 		}
 	}
 
-	return cs, nil
+	return codespace, nil
 }
 
 func safeClose(closer io.Closer, err *error) {

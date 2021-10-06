@@ -75,12 +75,12 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 			nameFilter = c.Name
 		}
 	} else {
-		cs, err := a.apiClient.GetCodespace(ctx, nameFilter, false)
+		codespace, err := a.apiClient.GetCodespace(ctx, nameFilter, false)
 		if err != nil {
 			return fmt.Errorf("error fetching codespace information: %w", err)
 		}
 
-		codespaces = []*api.Codespace{cs}
+		codespaces = []*api.Codespace{codespace}
 	}
 
 	codespacesToDelete := make([]*api.Codespace, 0, len(codespaces))
