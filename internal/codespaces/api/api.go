@@ -151,12 +151,15 @@ type Codespace struct {
 	Name           string               `json:"name"`
 	CreatedAt      string               `json:"created_at"`
 	LastUsedAt     string               `json:"last_used_at"`
+	State          string               `json:"state"`
 	Branch         string               `json:"branch"`
 	RepositoryName string               `json:"repository_name"`
 	RepositoryNWO  string               `json:"repository_nwo"`
 	OwnerLogin     string               `json:"owner_login"`
 	Environment    CodespaceEnvironment `json:"environment"`
 }
+
+const CodespaceStateProvisioned = "provisioned"
 
 type CodespaceEnvironment struct {
 	State      string                         `json:"state"`
@@ -220,77 +223,28 @@ func (a *API) ListCodespaces(ctx context.Context) ([]*Codespace, error) {
 	return response.Codespaces, nil
 }
 
-// getCodespaceTokenRequest is the request body for the get codespace token endpoint.
-type getCodespaceTokenRequest struct {
-	MintRepositoryToken bool `json:"mint_repository_token"`
-}
-
-type getCodespaceTokenResponse struct {
-	RepositoryToken string `json:"repository_token"`
-}
-
-// ErrNotProvisioned is returned by GetCodespacesToken to indicate that the
-// creation of a codespace is not yet complete and that the caller should try again.
-var ErrNotProvisioned = errors.New("codespace not provisioned")
-
-// GetCodespaceToken returns a codespace token for the user.
-func (a *API) GetCodespaceToken(ctx context.Context, ownerLogin, codespaceName string) (string, error) {
-	reqBody, err := json.Marshal(getCodespaceTokenRequest{true})
-	if err != nil {
-		return "", fmt.Errorf("error preparing request body: %w", err)
-	}
-
-	req, err := http.NewRequest(
-		http.MethodPost,
-		a.githubAPI+"/vscs_internal/user/"+ownerLogin+"/codespaces/"+codespaceName+"/token",
-		bytes.NewBuffer(reqBody),
-	)
-	if err != nil {
-		return "", fmt.Errorf("error creating request: %w", err)
-	}
-
-	a.setHeaders(req)
-	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces/*/token")
-	if err != nil {
-		return "", fmt.Errorf("error making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("error reading response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusUnprocessableEntity {
-			return "", ErrNotProvisioned
-		}
-
-		return "", jsonErrorResponse(b)
-	}
-
-	var response getCodespaceTokenResponse
-	if err := json.Unmarshal(b, &response); err != nil {
-		return "", fmt.Errorf("error unmarshaling response: %w", err)
-	}
-
-	return response.RepositoryToken, nil
-}
-
-// GetCodespace returns a codespace for the user.
-func (a *API) GetCodespace(ctx context.Context, token, owner, codespace string) (*Codespace, error) {
+// GetCodespace returns the user codespace based on the provided name.
+// If the codespace is not found, an error is returned.
+// If includeConnection is true, it will return the connection information for the codespace.
+func (a *API) GetCodespace(ctx context.Context, codespaceName string, includeConnection bool) (*Codespace, error) {
 	req, err := http.NewRequest(
 		http.MethodGet,
-		a.githubAPI+"/vscs_internal/user/"+owner+"/codespaces/"+codespace,
+		a.githubAPI+"/user/codespaces/"+codespaceName,
 		nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	// TODO: use a.setHeaders()
-	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces/*")
+	if includeConnection {
+		q := req.URL.Query()
+		q.Add("internal", "true")
+		q.Add("refresh", "true")
+		req.URL.RawQuery = q.Encode()
+	}
+
+	a.setHeaders(req)
+	resp, err := a.do(ctx, req, "/user/codespaces/*")
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
 	}
@@ -437,7 +391,6 @@ func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, loc
 
 // CreateCodespaceParams are the required parameters for provisioning a Codespace.
 type CreateCodespaceParams struct {
-	User                      string
 	RepositoryID              int
 	Branch, Machine, Location string
 }
@@ -464,19 +417,14 @@ func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case <-ticker.C:
-			token, err := a.GetCodespaceToken(ctx, params.User, codespace.Name)
-			if err != nil {
-				if err == ErrNotProvisioned {
-					// Do nothing. We expect this to fail until the codespace is provisioned
-					continue
-				}
-
-				return nil, fmt.Errorf("failed to get codespace token: %w", err)
-			}
-
-			codespace, err = a.GetCodespace(ctx, token, params.User, codespace.Name)
+			codespace, err = a.GetCodespace(ctx, codespace.Name, false)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get codespace: %w", err)
+			}
+
+			// we continue to poll until the codespace shows as provisioned
+			if codespace.State != CodespaceStateProvisioned {
+				continue
 			}
 
 			return codespace, nil
