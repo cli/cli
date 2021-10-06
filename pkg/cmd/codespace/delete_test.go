@@ -12,7 +12,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/internal/codespaces/codespace"
 	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 )
 
@@ -26,7 +25,7 @@ func TestDelete(t *testing.T) {
 	tests := []struct {
 		name        string
 		opts        deleteOptions
-		codespaces  []*codespace.Codespace
+		codespaces  []*api.Codespace
 		confirms    map[string]bool
 		deleteErr   error
 		wantErr     bool
@@ -39,7 +38,7 @@ func TestDelete(t *testing.T) {
 			opts: deleteOptions{
 				codespaceName: "hubot-robawt-abc",
 			},
-			codespaces: []*codespace.Codespace{
+			codespaces: []*api.Codespace{
 				{
 					Name: "hubot-robawt-abc",
 				},
@@ -51,7 +50,7 @@ func TestDelete(t *testing.T) {
 			opts: deleteOptions{
 				repoFilter: "monalisa/spoon-knife",
 			},
-			codespaces: []*codespace.Codespace{
+			codespaces: []*api.Codespace{
 				{
 					Name:          "monalisa-spoonknife-123",
 					RepositoryNWO: "monalisa/Spoon-Knife",
@@ -73,7 +72,7 @@ func TestDelete(t *testing.T) {
 				deleteAll: true,
 				keepDays:  3,
 			},
-			codespaces: []*codespace.Codespace{
+			codespaces: []*api.Codespace{
 				{
 					Name:       "monalisa-spoonknife-123",
 					LastUsedAt: daysAgo(1),
@@ -94,7 +93,7 @@ func TestDelete(t *testing.T) {
 			opts: deleteOptions{
 				deleteAll: true,
 			},
-			codespaces: []*codespace.Codespace{
+			codespaces: []*api.Codespace{
 				{
 					Name: "monalisa-spoonknife-123",
 				},
@@ -117,27 +116,27 @@ func TestDelete(t *testing.T) {
 				deleteAll:     true,
 				skipConfirm:   false,
 			},
-			codespaces: []*codespace.Codespace{
+			codespaces: []*api.Codespace{
 				{
 					Name: "monalisa-spoonknife-123",
-					Environment: codespace.Environment{
-						GitStatus: codespace.EnvironmentGitStatus{
+					Environment: api.CodespaceEnvironment{
+						GitStatus: api.CodespaceEnvironmentGitStatus{
 							HasUnpushedChanges: true,
 						},
 					},
 				},
 				{
 					Name: "hubot-robawt-abc",
-					Environment: codespace.Environment{
-						GitStatus: codespace.EnvironmentGitStatus{
+					Environment: api.CodespaceEnvironment{
+						GitStatus: api.CodespaceEnvironmentGitStatus{
 							HasUncommitedChanges: true,
 						},
 					},
 				},
 				{
 					Name: "monalisa-spoonknife-c4f3",
-					Environment: codespace.Environment{
-						GitStatus: codespace.EnvironmentGitStatus{
+					Environment: api.CodespaceEnvironment{
+						GitStatus: api.CodespaceEnvironmentGitStatus{
 							HasUnpushedChanges:   false,
 							HasUncommitedChanges: false,
 						},
@@ -165,11 +164,11 @@ func TestDelete(t *testing.T) {
 				},
 			}
 			if tt.opts.codespaceName == "" {
-				apiMock.ListCodespacesFunc = func(_ context.Context) ([]*codespace.Codespace, error) {
+				apiMock.ListCodespacesFunc = func(_ context.Context) ([]*api.Codespace, error) {
 					return tt.codespaces, nil
 				}
 			} else {
-				apiMock.GetCodespaceFunc = func(_ context.Context, name string, includeConnection bool) (*codespace.Codespace, error) {
+				apiMock.GetCodespaceFunc = func(_ context.Context, name string, includeConnection bool) (*api.Codespace, error) {
 					return tt.codespaces[0], nil
 				}
 			}

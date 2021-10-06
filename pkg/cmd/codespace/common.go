@@ -14,7 +14,6 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/internal/codespaces/codespace"
 	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
@@ -35,21 +34,21 @@ func NewApp(logger *output.Logger, apiClient apiClient) *App {
 //go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
 type apiClient interface {
 	GetUser(ctx context.Context) (*api.User, error)
-	GetCodespace(ctx context.Context, name string, includeConnection bool) (*codespace.Codespace, error)
-	ListCodespaces(ctx context.Context) ([]*codespace.Codespace, error)
+	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
+	ListCodespaces(ctx context.Context) ([]*api.Codespace, error)
 	DeleteCodespace(ctx context.Context, name string) error
 	StartCodespace(ctx context.Context, name string) error
-	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*codespace.Codespace, error)
+	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
 	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
 	AuthorizedKeys(ctx context.Context, user string) ([]byte, error)
 	GetCodespaceRegionLocation(ctx context.Context) (string, error)
 	GetCodespacesMachines(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error)
-	GetCodespaceRepositoryContents(ctx context.Context, codespace *codespace.Codespace, path string) ([]byte, error)
+	GetCodespaceRepositoryContents(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
 }
 
 var errNoCodespaces = errors.New("you have no codespaces")
 
-func chooseCodespace(ctx context.Context, apiClient apiClient) (*codespace.Codespace, error) {
+func chooseCodespace(ctx context.Context, apiClient apiClient) (*api.Codespace, error) {
 	codespaces, err := apiClient.ListCodespaces(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error getting codespaces: %w", err)
@@ -59,7 +58,7 @@ func chooseCodespace(ctx context.Context, apiClient apiClient) (*codespace.Codes
 
 // chooseCodespaceFromList returns the selected codespace from the list,
 // or an error if there are no codespaces.
-func chooseCodespaceFromList(ctx context.Context, codespaces []*codespace.Codespace) (*codespace.Codespace, error) {
+func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (*api.Codespace, error) {
 	if len(codespaces) == 0 {
 		return nil, errNoCodespaces
 	}
@@ -69,16 +68,17 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*codespace.Codesp
 	})
 
 	type codespaceWithIndex struct {
-		cs  *codespace.Codespace
+		cs  codespace
 		idx int
 	}
 
 	namesWithConflict := make(map[string]bool)
 	codespacesByName := make(map[string]codespaceWithIndex)
 	codespacesNames := make([]string, 0, len(codespaces))
-	for _, cs := range codespaces {
-		csName := cs.DisplayName(false, false)
-		displayNameWithGitStatus := cs.DisplayName(false, true)
+	for _, apiCodespace := range codespaces {
+		cs := codespace{apiCodespace}
+		csName := cs.displayName(false, false)
+		displayNameWithGitStatus := cs.displayName(false, true)
 
 		_, hasExistingConflict := namesWithConflict[csName]
 		if seenCodespace, ok := codespacesByName[csName]; ok || hasExistingConflict {
@@ -86,8 +86,8 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*codespace.Codesp
 			// We need to disambiguate by adding the codespace name
 			// to the existing entry and the one we are processing now.
 			if !hasExistingConflict {
-				fullDisplayName := seenCodespace.cs.DisplayName(true, false)
-				fullDisplayNameWithGitStatus := seenCodespace.cs.DisplayName(true, true)
+				fullDisplayName := seenCodespace.cs.displayName(true, false)
+				fullDisplayNameWithGitStatus := seenCodespace.cs.displayName(true, true)
 
 				codespacesByName[fullDisplayName] = codespaceWithIndex{seenCodespace.cs, seenCodespace.idx}
 				codespacesNames[seenCodespace.idx] = fullDisplayNameWithGitStatus
@@ -99,8 +99,8 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*codespace.Codesp
 			}
 
 			// update this codespace names to include the name to disambiguate
-			csName = cs.DisplayName(true, false)
-			displayNameWithGitStatus = cs.DisplayName(true, true)
+			csName = cs.displayName(true, false)
+			displayNameWithGitStatus = cs.displayName(true, true)
 		}
 
 		codespacesByName[csName] = codespaceWithIndex{cs, len(codespacesNames)}
@@ -129,14 +129,13 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*codespace.Codesp
 	// Codespaces are indexed without the git status included as compared
 	// to how it is displayed in the prompt, so the git status symbol needs
 	// cleaning up in case it is included.
-	selectedCodespace := strings.Replace(answers.Codespace, codespace.GitStatusDirty, "", -1)
-	codespace := codespacesByName[selectedCodespace].cs
-	return codespace, nil
+	selectedCodespace := strings.Replace(answers.Codespace, gitStatusDirty, "", -1)
+	return codespacesByName[selectedCodespace].cs.Codespace, nil
 }
 
 // getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
 // It then fetches the codespace record with full connection details.
-func getOrChooseCodespace(ctx context.Context, apiClient apiClient, codespaceName string) (cs *codespace.Codespace, err error) {
+func getOrChooseCodespace(ctx context.Context, apiClient apiClient, codespaceName string) (cs *api.Codespace, err error) {
 	if codespaceName == "" {
 		cs, err = chooseCodespace(ctx, apiClient)
 		if err != nil {
@@ -210,4 +209,45 @@ func noArgsConstraint(cmd *cobra.Command, args []string) error {
 		return ErrTooManyArgs
 	}
 	return nil
+}
+
+type codespace struct {
+	*api.Codespace
+}
+
+// displayName returns the repository nwo and branch.
+// If includeName is true, the name of the codespace is included.
+// If includeGitStatus is true, the branch will include a star if
+// the codespace has unsaved changes.
+func (c codespace) displayName(includeName, includeGitStatus bool) string {
+	branch := c.Branch
+	if includeGitStatus {
+		branch = c.branchWithGitStatus()
+	}
+
+	if includeName {
+		return fmt.Sprintf(
+			"%s: %s [%s]", c.RepositoryNWO, branch, c.Name,
+		)
+	}
+	return c.RepositoryNWO + ": " + branch
+}
+
+// GitStatusDirty represents an unsaved changes status.
+const gitStatusDirty = "*"
+
+// BranchWithGitStatus returns the branch with a star
+// if the branch is currently being worked on.
+func (c codespace) branchWithGitStatus() string {
+	if c.hasUnsavedChanges() {
+		return c.Branch + gitStatusDirty
+	}
+
+	return c.Branch
+}
+
+// HasUnsavedChanges returns whether the environment has
+// unsaved changes.
+func (c codespace) hasUnsavedChanges() bool {
+	return c.Environment.GitStatus.HasUncommitedChanges || c.Environment.GitStatus.HasUnpushedChanges
 }

@@ -37,7 +37,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/v2/internal/codespaces/codespace"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -147,7 +146,49 @@ func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error
 	return &response, nil
 }
 
-func (a *API) ListCodespaces(ctx context.Context) ([]*codespace.Codespace, error) {
+type Codespace struct {
+	Name           string               `json:"name"`
+	CreatedAt      string               `json:"created_at"`
+	LastUsedAt     string               `json:"last_used_at"`
+	State          string               `json:"state"`
+	GUID           string               `json:"guid"`
+	Branch         string               `json:"branch"`
+	RepositoryName string               `json:"repository_name"`
+	RepositoryNWO  string               `json:"repository_nwo"`
+	OwnerLogin     string               `json:"owner_login"`
+	Environment    CodespaceEnvironment `json:"environment"`
+}
+
+const CodespaceStateProvisioned = "provisioned"
+
+type CodespaceEnvironment struct {
+	State      string                         `json:"state"`
+	Connection CodespaceEnvironmentConnection `json:"connection"`
+	GitStatus  CodespaceEnvironmentGitStatus  `json:"gitStatus"`
+}
+
+type CodespaceEnvironmentGitStatus struct {
+	Ahead                int    `json:"ahead"`
+	Behind               int    `json:"behind"`
+	Branch               string `json:"branch"`
+	Commit               string `json:"commit"`
+	HasUnpushedChanges   bool   `json:"hasUnpushedChanges"`
+	HasUncommitedChanges bool   `json:"hasUncommitedChanges"`
+}
+
+const (
+	CodespaceEnvironmentStateAvailable = "Available"
+)
+
+type CodespaceEnvironmentConnection struct {
+	SessionID      string   `json:"sessionId"`
+	SessionToken   string   `json:"sessionToken"`
+	RelayEndpoint  string   `json:"relayEndpoint"`
+	RelaySAS       string   `json:"relaySas"`
+	HostPublicKeys []string `json:"hostPublicKeys"`
+}
+
+func (a *API) ListCodespaces(ctx context.Context) ([]*Codespace, error) {
 	req, err := http.NewRequest(
 		http.MethodGet, a.githubAPI+"/user/codespaces", nil,
 	)
@@ -172,7 +213,7 @@ func (a *API) ListCodespaces(ctx context.Context) ([]*codespace.Codespace, error
 	}
 
 	var response struct {
-		Codespaces []*codespace.Codespace `json:"codespaces"`
+		Codespaces []*Codespace `json:"codespaces"`
 	}
 	if err := json.Unmarshal(b, &response); err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %w", err)
@@ -183,7 +224,7 @@ func (a *API) ListCodespaces(ctx context.Context) ([]*codespace.Codespace, error
 // GetCodespace returns the user codespace based on the provided name.
 // If the codespace is not found, an error is returned.
 // If includeConnection is true, it will return the connection information for the codespace.
-func (a *API) GetCodespace(ctx context.Context, codespaceName string, includeConnection bool) (*codespace.Codespace, error) {
+func (a *API) GetCodespace(ctx context.Context, codespaceName string, includeConnection bool) (*Codespace, error) {
 	req, err := http.NewRequest(
 		http.MethodGet,
 		a.githubAPI+"/user/codespaces/"+codespaceName,
@@ -216,7 +257,7 @@ func (a *API) GetCodespace(ctx context.Context, codespaceName string, includeCon
 		return nil, jsonErrorResponse(b)
 	}
 
-	var response codespace.Codespace
+	var response Codespace
 	if err := json.Unmarshal(b, &response); err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
@@ -354,7 +395,7 @@ type CreateCodespaceParams struct {
 
 // CreateCodespace creates a codespace with the given parameters and returns a non-nil error if it
 // fails to create.
-func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams) (*codespace.Codespace, error) {
+func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams) (*Codespace, error) {
 	cs, err := a.startCreate(ctx, params.RepositoryID, params.Machine, params.Branch, params.Location)
 	if err != errProvisioningInProgress {
 		return nil, err
@@ -380,7 +421,7 @@ func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams
 			}
 
 			// we continue to poll until the codespace shows as provisioned
-			if cs.State != codespace.StateProvisioned {
+			if cs.State != CodespaceStateProvisioned {
 				continue
 			}
 
@@ -402,7 +443,7 @@ var errProvisioningInProgress = errors.New("provisioning in progress")
 // It may return success or an error, or errProvisioningInProgress indicating that the operation
 // did not complete before the GitHub API's time limit for RPCs (10s), in which case the caller
 // must poll the server to learn the outcome.
-func (a *API) startCreate(ctx context.Context, repoID int, machine, branch, location string) (*codespace.Codespace, error) {
+func (a *API) startCreate(ctx context.Context, repoID int, machine, branch, location string) (*Codespace, error) {
 	requestBody, err := json.Marshal(startCreateRequest{repoID, branch, location, machine})
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
@@ -432,7 +473,7 @@ func (a *API) startCreate(ctx context.Context, repoID int, machine, branch, loca
 		return nil, errProvisioningInProgress // RPC finished before result of creation known
 	}
 
-	var response codespace.Codespace
+	var response Codespace
 	if err := json.Unmarshal(b, &response); err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
@@ -469,7 +510,7 @@ type getCodespaceRepositoryContentsResponse struct {
 	Content string `json:"content"`
 }
 
-func (a *API) GetCodespaceRepositoryContents(ctx context.Context, cs *codespace.Codespace, path string) ([]byte, error) {
+func (a *API) GetCodespaceRepositoryContents(ctx context.Context, cs *Codespace, path string) ([]byte, error) {
 	req, err := http.NewRequest(http.MethodGet, a.githubAPI+"/repos/"+cs.RepositoryNWO+"/contents/"+path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)

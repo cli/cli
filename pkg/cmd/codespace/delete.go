@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/v2/internal/codespaces/codespace"
+	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
@@ -59,7 +59,7 @@ func newDeleteCmd(app *App) *cobra.Command {
 }
 
 func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
-	var codespaces []*codespace.Codespace
+	var codespaces []*api.Codespace
 	nameFilter := opts.codespaceName
 	if nameFilter == "" {
 		codespaces, err = a.apiClient.ListCodespaces(ctx)
@@ -80,10 +80,10 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 			return fmt.Errorf("error fetching codespace information: %w", err)
 		}
 
-		codespaces = []*codespace.Codespace{cs}
+		codespaces = []*api.Codespace{cs}
 	}
 
-	codespacesToDelete := make([]*codespace.Codespace, 0, len(codespaces))
+	codespacesToDelete := make([]*api.Codespace, 0, len(codespaces))
 	lastUpdatedCutoffTime := opts.now().AddDate(0, 0, -int(opts.keepDays))
 	for _, c := range codespaces {
 		if nameFilter != "" && c.Name != nameFilter {
@@ -142,8 +142,9 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 	return nil
 }
 
-func confirmDeletion(p prompter, cs *codespace.Codespace, isInteractive bool) (bool, error) {
-	if !cs.HasUnsavedChanges() {
+func confirmDeletion(p prompter, apiCodespace *api.Codespace, isInteractive bool) (bool, error) {
+	cs := codespace{apiCodespace}
+	if !cs.hasUnsavedChanges() {
 		return true, nil
 	}
 	if !isInteractive {

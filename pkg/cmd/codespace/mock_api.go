@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/internal/codespaces/codespace"
 )
 
 // apiClientMock is a mock implementation of apiClient.
@@ -20,19 +19,19 @@ import (
 // 			AuthorizedKeysFunc: func(ctx context.Context, user string) ([]byte, error) {
 // 				panic("mock out the AuthorizedKeys method")
 // 			},
-// 			CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*codespace.Codespace, error) {
+// 			CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
 // 				panic("mock out the CreateCodespace method")
 // 			},
 // 			DeleteCodespaceFunc: func(ctx context.Context, name string) error {
 // 				panic("mock out the DeleteCodespace method")
 // 			},
-// 			GetCodespaceFunc: func(ctx context.Context, name string, includeConnection bool) (*codespace.Codespace, error) {
+// 			GetCodespaceFunc: func(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error) {
 // 				panic("mock out the GetCodespace method")
 // 			},
 // 			GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
 // 				panic("mock out the GetCodespaceRegionLocation method")
 // 			},
-// 			GetCodespaceRepositoryContentsFunc: func(ctx context.Context, codespaceMoqParam *codespace.Codespace, path string) ([]byte, error) {
+// 			GetCodespaceRepositoryContentsFunc: func(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error) {
 // 				panic("mock out the GetCodespaceRepositoryContents method")
 // 			},
 // 			GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch string, location string) ([]*api.Machine, error) {
@@ -44,7 +43,7 @@ import (
 // 			GetUserFunc: func(ctx context.Context) (*api.User, error) {
 // 				panic("mock out the GetUser method")
 // 			},
-// 			ListCodespacesFunc: func(ctx context.Context) ([]*codespace.Codespace, error) {
+// 			ListCodespacesFunc: func(ctx context.Context) ([]*api.Codespace, error) {
 // 				panic("mock out the ListCodespaces method")
 // 			},
 // 			StartCodespaceFunc: func(ctx context.Context, name string) error {
@@ -61,19 +60,19 @@ type apiClientMock struct {
 	AuthorizedKeysFunc func(ctx context.Context, user string) ([]byte, error)
 
 	// CreateCodespaceFunc mocks the CreateCodespace method.
-	CreateCodespaceFunc func(ctx context.Context, params *api.CreateCodespaceParams) (*codespace.Codespace, error)
+	CreateCodespaceFunc func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
 
 	// DeleteCodespaceFunc mocks the DeleteCodespace method.
 	DeleteCodespaceFunc func(ctx context.Context, name string) error
 
 	// GetCodespaceFunc mocks the GetCodespace method.
-	GetCodespaceFunc func(ctx context.Context, name string, includeConnection bool) (*codespace.Codespace, error)
+	GetCodespaceFunc func(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
 
 	// GetCodespaceRegionLocationFunc mocks the GetCodespaceRegionLocation method.
 	GetCodespaceRegionLocationFunc func(ctx context.Context) (string, error)
 
 	// GetCodespaceRepositoryContentsFunc mocks the GetCodespaceRepositoryContents method.
-	GetCodespaceRepositoryContentsFunc func(ctx context.Context, codespaceMoqParam *codespace.Codespace, path string) ([]byte, error)
+	GetCodespaceRepositoryContentsFunc func(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
 
 	// GetCodespacesMachinesFunc mocks the GetCodespacesMachines method.
 	GetCodespacesMachinesFunc func(ctx context.Context, repoID int, branch string, location string) ([]*api.Machine, error)
@@ -85,7 +84,7 @@ type apiClientMock struct {
 	GetUserFunc func(ctx context.Context) (*api.User, error)
 
 	// ListCodespacesFunc mocks the ListCodespaces method.
-	ListCodespacesFunc func(ctx context.Context) ([]*codespace.Codespace, error)
+	ListCodespacesFunc func(ctx context.Context) ([]*api.Codespace, error)
 
 	// StartCodespaceFunc mocks the StartCodespace method.
 	StartCodespaceFunc func(ctx context.Context, name string) error
@@ -131,8 +130,8 @@ type apiClientMock struct {
 		GetCodespaceRepositoryContents []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// CodespaceMoqParam is the codespaceMoqParam argument value.
-			CodespaceMoqParam *codespace.Codespace
+			// Codespace is the codespace argument value.
+			Codespace *api.Codespace
 			// Path is the path argument value.
 			Path string
 		}
@@ -221,7 +220,7 @@ func (mock *apiClientMock) AuthorizedKeysCalls() []struct {
 }
 
 // CreateCodespace calls CreateCodespaceFunc.
-func (mock *apiClientMock) CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*codespace.Codespace, error) {
+func (mock *apiClientMock) CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
 	if mock.CreateCodespaceFunc == nil {
 		panic("apiClientMock.CreateCodespaceFunc: method is nil but apiClient.CreateCodespace was just called")
 	}
@@ -291,7 +290,7 @@ func (mock *apiClientMock) DeleteCodespaceCalls() []struct {
 }
 
 // GetCodespace calls GetCodespaceFunc.
-func (mock *apiClientMock) GetCodespace(ctx context.Context, name string, includeConnection bool) (*codespace.Codespace, error) {
+func (mock *apiClientMock) GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error) {
 	if mock.GetCodespaceFunc == nil {
 		panic("apiClientMock.GetCodespaceFunc: method is nil but apiClient.GetCodespace was just called")
 	}
@@ -361,37 +360,37 @@ func (mock *apiClientMock) GetCodespaceRegionLocationCalls() []struct {
 }
 
 // GetCodespaceRepositoryContents calls GetCodespaceRepositoryContentsFunc.
-func (mock *apiClientMock) GetCodespaceRepositoryContents(ctx context.Context, codespaceMoqParam *codespace.Codespace, path string) ([]byte, error) {
+func (mock *apiClientMock) GetCodespaceRepositoryContents(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error) {
 	if mock.GetCodespaceRepositoryContentsFunc == nil {
 		panic("apiClientMock.GetCodespaceRepositoryContentsFunc: method is nil but apiClient.GetCodespaceRepositoryContents was just called")
 	}
 	callInfo := struct {
-		Ctx               context.Context
-		CodespaceMoqParam *codespace.Codespace
-		Path              string
+		Ctx       context.Context
+		Codespace *api.Codespace
+		Path      string
 	}{
-		Ctx:               ctx,
-		CodespaceMoqParam: codespaceMoqParam,
-		Path:              path,
+		Ctx:       ctx,
+		Codespace: codespace,
+		Path:      path,
 	}
 	mock.lockGetCodespaceRepositoryContents.Lock()
 	mock.calls.GetCodespaceRepositoryContents = append(mock.calls.GetCodespaceRepositoryContents, callInfo)
 	mock.lockGetCodespaceRepositoryContents.Unlock()
-	return mock.GetCodespaceRepositoryContentsFunc(ctx, codespaceMoqParam, path)
+	return mock.GetCodespaceRepositoryContentsFunc(ctx, codespace, path)
 }
 
 // GetCodespaceRepositoryContentsCalls gets all the calls that were made to GetCodespaceRepositoryContents.
 // Check the length with:
 //     len(mockedapiClient.GetCodespaceRepositoryContentsCalls())
 func (mock *apiClientMock) GetCodespaceRepositoryContentsCalls() []struct {
-	Ctx               context.Context
-	CodespaceMoqParam *codespace.Codespace
-	Path              string
+	Ctx       context.Context
+	Codespace *api.Codespace
+	Path      string
 } {
 	var calls []struct {
-		Ctx               context.Context
-		CodespaceMoqParam *codespace.Codespace
-		Path              string
+		Ctx       context.Context
+		Codespace *api.Codespace
+		Path      string
 	}
 	mock.lockGetCodespaceRepositoryContents.RLock()
 	calls = mock.calls.GetCodespaceRepositoryContents
@@ -509,7 +508,7 @@ func (mock *apiClientMock) GetUserCalls() []struct {
 }
 
 // ListCodespaces calls ListCodespacesFunc.
-func (mock *apiClientMock) ListCodespaces(ctx context.Context) ([]*codespace.Codespace, error) {
+func (mock *apiClientMock) ListCodespaces(ctx context.Context) ([]*api.Codespace, error) {
 	if mock.ListCodespacesFunc == nil {
 		panic("apiClientMock.ListCodespacesFunc: method is nil but apiClient.ListCodespaces was just called")
 	}

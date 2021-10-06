@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/v2/internal/codespaces/codespace"
+	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/liveshare"
 )
 
@@ -36,7 +36,7 @@ type PostCreateState struct {
 // PollPostCreateStates watches for state changes in a codespace,
 // and calls the supplied poller for each batch of state changes.
 // It runs until it encounters an error, including cancellation of the context.
-func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, cs *codespace.Codespace, poller func([]PostCreateState)) (err error) {
+func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, cs *api.Codespace, poller func([]PostCreateState)) (err error) {
 	session, err := ConnectToLiveshare(ctx, log, apiClient, cs)
 	if err != nil {
 		return fmt.Errorf("connect to Live Share: %w", err)

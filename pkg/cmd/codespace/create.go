@@ -10,7 +10,6 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/internal/codespaces/codespace"
 	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	"github.com/fatih/camelcase"
 	"github.com/spf13/cobra"
@@ -108,7 +107,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 // showStatus polls the codespace for a list of post create states and their status. It will keep polling
 // until all states have finished. Once all states have finished, we poll once more to check if any new
 // states have been introduced and stop polling otherwise.
-func showStatus(ctx context.Context, log *output.Logger, apiClient apiClient, user *api.User, cs *codespace.Codespace) error {
+func showStatus(ctx context.Context, log *output.Logger, apiClient apiClient, user *api.User, cs *api.Codespace) error {
 	var lastState codespaces.PostCreateState
 	var breakNextState bool
 

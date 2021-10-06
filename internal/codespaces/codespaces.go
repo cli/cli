@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cli/cli/v2/internal/codespaces/codespace"
+	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/liveshare"
 )
 
@@ -15,24 +15,24 @@ type logger interface {
 	Println(v ...interface{}) (int, error)
 }
 
-func connectionReady(cs *codespace.Codespace) bool {
+func connectionReady(cs *api.Codespace) bool {
 	return cs.Environment.Connection.SessionID != "" &&
 		cs.Environment.Connection.SessionToken != "" &&
 		cs.Environment.Connection.RelayEndpoint != "" &&
 		cs.Environment.Connection.RelaySAS != "" &&
-		cs.Environment.State == codespace.EnvironmentStateAvailable
+		cs.Environment.State == api.CodespaceEnvironmentStateAvailable
 }
 
 type apiClient interface {
-	GetCodespace(ctx context.Context, name string, includeConnection bool) (*codespace.Codespace, error)
+	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
 	StartCodespace(ctx context.Context, name string) error
 }
 
 // ConnectToLiveshare waits for a Codespace to become running,
 // and connects to it using a Live Share session.
-func ConnectToLiveshare(ctx context.Context, log logger, apiClient apiClient, cs *codespace.Codespace) (*liveshare.Session, error) {
+func ConnectToLiveshare(ctx context.Context, log logger, apiClient apiClient, cs *api.Codespace) (*liveshare.Session, error) {
 	var startedCodespace bool
-	if cs.Environment.State != codespace.EnvironmentStateAvailable {
+	if cs.Environment.State != api.CodespaceEnvironmentStateAvailable {
 		startedCodespace = true
 		log.Print("Starting your codespace...")
 		if err := apiClient.StartCodespace(ctx, cs.Name); err != nil {
