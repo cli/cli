@@ -74,8 +74,7 @@ func TestNewCmdArchive(t *testing.T) {
 func Test_ArchiveRun(t *testing.T) {
 	tests := []struct {
 		name      string
-		opts      *ArchiveOptions
-		repoName  string
+		opts      ArchiveOptions
 		httpStubs func(*httpmock.Registry)
 		stdoutTTY bool
 		wantOut   string
@@ -84,7 +83,7 @@ func Test_ArchiveRun(t *testing.T) {
 	}{
 		{
 			name:      "unarchived repo tty",
-			repoName:  "OWNER/REPO",
+			opts:      ArchiveOptions{RepoArg: "OWNER/REPO"},
 			wantOut:   "✓ Archived repository OWNER/REPO\n",
 			stdoutTTY: true,
 			httpStubs: func(reg *httpmock.Registry) {
@@ -100,7 +99,7 @@ func Test_ArchiveRun(t *testing.T) {
 		},
 		{
 			name:      "unarchived repo notty",
-			repoName:  "OWNER/REPO",
+			opts:      ArchiveOptions{RepoArg: "OWNER/REPO"},
 			stdoutTTY: false,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -115,9 +114,8 @@ func Test_ArchiveRun(t *testing.T) {
 		},
 		{
 			name:      "archived repo tty",
-			repoName:  "OWNER/REPO",
-			wantErr:   true,
-			errMsg:    "! Repository OWNER/REPO is already archived",
+			opts:      ArchiveOptions{RepoArg: "OWNER/REPO"},
+			wantOut:   "! Repository OWNER/REPO is already archived",
 			stdoutTTY: true,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -129,9 +127,8 @@ func Test_ArchiveRun(t *testing.T) {
 		},
 		{
 			name:      "archived repo notty",
-			repoName:  "OWNER/REPO",
-			wantErr:   true,
-			errMsg:    "! Repository OWNER/REPO is already archived",
+			opts:      ArchiveOptions{RepoArg: "OWNER/REPO"},
+			wantOut:   "! Repository OWNER/REPO is already archived",
 			stdoutTTY: false,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -144,12 +141,6 @@ func Test_ArchiveRun(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		if tt.opts == nil {
-			tt.opts = &ArchiveOptions{}
-		}
-
-		tt.opts.RepoArg = tt.repoName
-
 		reg := &httpmock.Registry{}
 		if tt.httpStubs != nil {
 			tt.httpStubs(reg)
@@ -165,7 +156,7 @@ func Test_ArchiveRun(t *testing.T) {
 			defer reg.Verify(t)
 			io.SetStdoutTTY(tt.stdoutTTY)
 
-			err := archiveRun(tt.opts)
+			err := archiveRun(&tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Equal(t, tt.errMsg, err.Error())

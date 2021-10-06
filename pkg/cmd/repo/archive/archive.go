@@ -67,17 +67,21 @@ func archiveRun(opts *ArchiveOptions) error {
 	}
 
 	fields := []string{"name", "owner", "isArchived", "id"}
-	repo, err := fetchRepository(apiClient, toArchive, fields)
+	repo, err := api.FetchRepository(apiClient, toArchive, fields)
 	if err != nil {
 		return err
 	}
 
 	fullName := ghrepo.FullName(toArchive)
 	if repo.IsArchived {
-		return fmt.Errorf("%s Repository %s is already archived", cs.WarningIcon(), fullName)
+		fmt.Fprintf(opts.IO.Out,
+			"%s Repository %s is already archived\n",
+			cs.WarningIcon(),
+			fullName)
+		return nil
 	}
 
-	err = repoArchive(apiClient, repo)
+	err = repoArchive(httpClient, repo)
 	if err != nil {
 		return fmt.Errorf("API called failed: %w", err)
 	}
