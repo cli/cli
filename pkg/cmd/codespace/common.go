@@ -35,8 +35,7 @@ func NewApp(logger *output.Logger, apiClient apiClient) *App {
 //go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
 type apiClient interface {
 	GetUser(ctx context.Context) (*api.User, error)
-	GetCodespaceToken(ctx context.Context, user, name string) (string, error)
-	GetCodespace(ctx context.Context, token, user, name string) (*codespace.Codespace, error)
+	GetCodespace(ctx context.Context, name string, includeConnection bool) (*codespace.Codespace, error)
 	ListCodespaces(ctx context.Context) ([]*codespace.Codespace, error)
 	DeleteCodespace(ctx context.Context, name string) error
 	StartCodespace(ctx context.Context, name string) error
@@ -136,35 +135,24 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*codespace.Codesp
 }
 
 // getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
-// It then fetches the codespace token and the codespace record.
-func getOrChooseCodespace(ctx context.Context, apiClient apiClient, user *api.User, codespaceName string) (codespace *codespace.Codespace, token string, err error) {
+// It then fetches the codespace record with full connection details.
+func getOrChooseCodespace(ctx context.Context, apiClient apiClient, codespaceName string) (cs *codespace.Codespace, err error) {
 	if codespaceName == "" {
-		codespace, err = chooseCodespace(ctx, apiClient)
+		cs, err = chooseCodespace(ctx, apiClient)
 		if err != nil {
 			if err == errNoCodespaces {
-				return nil, "", err
+				return nil, err
 			}
-			return nil, "", fmt.Errorf("choosing codespace: %w", err)
-		}
-		codespaceName = codespace.Name
-
-		token, err = apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
-		if err != nil {
-			return nil, "", fmt.Errorf("getting codespace token: %w", err)
+			return nil, fmt.Errorf("choosing codespace: %w", err)
 		}
 	} else {
-		token, err = apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
+		cs, err = apiClient.GetCodespace(ctx, codespaceName, true)
 		if err != nil {
-			return nil, "", fmt.Errorf("getting codespace token for given codespace: %w", err)
-		}
-
-		codespace, err = apiClient.GetCodespace(ctx, token, user.Login, codespaceName)
-		if err != nil {
-			return nil, "", fmt.Errorf("getting full codespace details: %w", err)
+			return nil, fmt.Errorf("getting full codespace details: %w", err)
 		}
 	}
 
-	return codespace, token, nil
+	return cs, nil
 }
 
 func safeClose(closer io.Closer, err *error) {

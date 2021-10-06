@@ -6,6 +6,7 @@ type Codespace struct {
 	Name           string      `json:"name"`
 	CreatedAt      string      `json:"created_at"`
 	LastUsedAt     string      `json:"last_used_at"`
+	State          string      `json:"state"`
 	GUID           string      `json:"guid"`
 	Branch         string      `json:"branch"`
 	RepositoryName string      `json:"repository_name"`
@@ -13,6 +14,8 @@ type Codespace struct {
 	OwnerLogin     string      `json:"owner_login"`
 	Environment    Environment `json:"environment"`
 }
+
+const StateProvisioned = "provisioned"
 
 // DisplayName returns the repository nwo and branch.
 // If includeName is true, the name of the codespace is included.

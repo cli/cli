@@ -49,12 +49,7 @@ func newPortsCmd(app *App) *cobra.Command {
 
 // ListPorts lists known ports in a codespace.
 func (a *App) ListPorts(ctx context.Context, codespaceName string, asJSON bool) (err error) {
-	user, err := a.apiClient.GetUser(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting user: %w", err)
-	}
-
-	codespace, token, err := getOrChooseCodespace(ctx, a.apiClient, user, codespaceName)
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
 		// TODO(josebalius): remove special handling of this error here and it other places
 		if err == errNoCodespaces {
@@ -65,7 +60,7 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, asJSON bool) 
 
 	devContainerCh := getDevContainer(ctx, a.apiClient, codespace)
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, a.apiClient, user.Login, token, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
@@ -191,12 +186,7 @@ func newPortsPrivateCmd(app *App) *cobra.Command {
 }
 
 func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName, sourcePort string, public bool) (err error) {
-	user, err := a.apiClient.GetUser(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting user: %w", err)
-	}
-
-	codespace, token, err := getOrChooseCodespace(ctx, a.apiClient, user, codespaceName)
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
 		if err == errNoCodespaces {
 			return err
@@ -204,7 +194,7 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName, sourcePor
 		return fmt.Errorf("error getting codespace: %w", err)
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, a.apiClient, user.Login, token, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
@@ -255,12 +245,7 @@ func (a *App) ForwardPorts(ctx context.Context, codespaceName string, ports []st
 		return fmt.Errorf("get port pairs: %w", err)
 	}
 
-	user, err := a.apiClient.GetUser(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting user: %w", err)
-	}
-
-	codespace, token, err := getOrChooseCodespace(ctx, a.apiClient, user, codespaceName)
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
 		if err == errNoCodespaces {
 			return err
@@ -268,7 +253,7 @@ func (a *App) ForwardPorts(ctx context.Context, codespaceName string, ports []st
 		return fmt.Errorf("error getting codespace: %w", err)
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, a.apiClient, user.Login, token, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
