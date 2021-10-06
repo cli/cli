@@ -78,8 +78,6 @@ func Test_ArchiveRun(t *testing.T) {
 		httpStubs func(*httpmock.Registry)
 		stdoutTTY bool
 		wantOut   string
-		wantErr   bool
-		errMsg    string
 	}{
 		{
 			name:      "unarchived repo tty",
@@ -128,7 +126,6 @@ func Test_ArchiveRun(t *testing.T) {
 		{
 			name:      "archived repo notty",
 			opts:      ArchiveOptions{RepoArg: "OWNER/REPO"},
-			wantOut:   "! Repository OWNER/REPO is already archived\n",
 			stdoutTTY: false,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -157,11 +154,6 @@ func Test_ArchiveRun(t *testing.T) {
 			io.SetStdoutTTY(tt.stdoutTTY)
 
 			err := archiveRun(&tt.opts)
-			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Equal(t, tt.errMsg, err.Error())
-				return
-			}
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantOut, stdout.String())
 		})

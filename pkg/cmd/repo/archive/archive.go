@@ -76,10 +76,12 @@ func archiveRun(opts *ArchiveOptions) error {
 
 	fullName := ghrepo.FullName(toArchive)
 	if repo.IsArchived {
-		fmt.Fprintf(opts.IO.Out,
-			"%s Repository %s is already archived\n",
-			cs.WarningIcon(),
-			fullName)
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprintf(opts.IO.Out,
+				"%s Repository %s is already archived\n",
+				cs.WarningIcon(),
+				fullName)
+		}
 		return nil
 	}
 
