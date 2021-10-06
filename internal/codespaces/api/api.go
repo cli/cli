@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -187,15 +188,43 @@ type CodespaceEnvironmentConnection struct {
 	HostPublicKeys []string `json:"hostPublicKeys"`
 }
 
-func (a *API) ListCodespaces(ctx context.Context) ([]*Codespace, error) {
+// codespacesListResponse is the response body for the `/user/codespaces` endpoint
+type getCodespacesListResponse struct {
+	Codespaces []*Codespace `json:"codespaces"`
+	TotalCount int          `json:"total_count"`
+}
+
+// ListCodespaces returns a list of codespaces for the user.
+// It consumes all pages returned by the API until all codespaces have been fetched.
+func (a *API) ListCodespaces(ctx context.Context) (codespaces []*Codespace, err error) {
+	per_page := 100
+	for page := 1; ; page++ {
+		response, err := a.fetchCodespaces(ctx, page, per_page)
+		if err != nil {
+			return nil, err
+		}
+		codespaces = append(codespaces, response.Codespaces...)
+		if page*per_page >= response.TotalCount {
+			break
+		}
+	}
+
+	return codespaces, nil
+}
+
+func (a *API) fetchCodespaces(ctx context.Context, page int, per_page int) (response *getCodespacesListResponse, err error) {
 	req, err := http.NewRequest(
 		http.MethodGet, a.githubAPI+"/user/codespaces", nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
-
 	a.setHeaders(req)
+	q := req.URL.Query()
+	q.Add("page", strconv.Itoa(page))
+	q.Add("per_page", strconv.Itoa(per_page))
+
+	req.URL.RawQuery = q.Encode()
 	resp, err := a.do(ctx, req, "/user/codespaces")
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
@@ -211,13 +240,10 @@ func (a *API) ListCodespaces(ctx context.Context) ([]*Codespace, error) {
 		return nil, jsonErrorResponse(b)
 	}
 
-	var response struct {
-		Codespaces []*Codespace `json:"codespaces"`
-	}
 	if err := json.Unmarshal(b, &response); err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
-	return response.Codespaces, nil
+	return response, nil
 }
 
 // GetCodespace returns the user codespace based on the provided name.
