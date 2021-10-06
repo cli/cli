@@ -27,6 +27,8 @@ func NewCmdArchive(f *cmdutil.Factory, runF func(*ArchiveOptions) error) *cobra.
 	}
 
 	cmd := &cobra.Command{
+		DisableFlagsInUseLine: true,
+
 		Use:   "archive <repository>",
 		Short: "Archive a repository",
 		Long:  `Archive a GitHub repository.`,
