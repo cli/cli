@@ -223,15 +223,6 @@ func (a *API) ListCodespaces(ctx context.Context) ([]*Codespace, error) {
 	return response.Codespaces, nil
 }
 
-// getCodespaceTokenRequest is the request body for the get codespace token endpoint.
-type getCodespaceTokenRequest struct {
-	MintRepositoryToken bool `json:"mint_repository_token"`
-}
-
-type getCodespaceTokenResponse struct {
-	RepositoryToken string `json:"repository_token"`
-}
-
 // GetCodespace returns the user codespace based on the provided name.
 // If the codespace is not found, an error is returned.
 // If includeConnection is true, it will return the connection information for the codespace.
