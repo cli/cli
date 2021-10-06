@@ -58,12 +58,7 @@ func newDeleteCmd(app *App) *cobra.Command {
 	return deleteCmd
 }
 
-func (a *App) Delete(ctx context.Context, opts deleteOptions) error {
-	user, err := a.apiClient.GetUser(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting user: %w", err)
-	}
-
+func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 	var codespaces []*api.Codespace
 	nameFilter := opts.codespaceName
 	if nameFilter == "" {
@@ -80,12 +75,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) error {
 			nameFilter = c.Name
 		}
 	} else {
-		token, err := a.apiClient.GetCodespaceToken(ctx, user.Login, nameFilter)
-		if err != nil {
-			return fmt.Errorf("error getting codespace token: %w", err)
-		}
-
-		codespace, err := a.apiClient.GetCodespace(ctx, token, user.Login, nameFilter)
+		codespace, err := a.apiClient.GetCodespace(ctx, nameFilter, false)
 		if err != nil {
 			return fmt.Errorf("error fetching codespace information: %w", err)
 		}

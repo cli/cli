@@ -81,7 +81,6 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 
 	a.logger.Print("Creating your codespace...")
 	codespace, err := a.apiClient.CreateCodespace(ctx, &api.CreateCodespaceParams{
-		User:         userResult.User.Login,
 		RepositoryID: repository.ID,
 		Branch:       branch,
 		Machine:      machine,
@@ -157,7 +156,7 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient apiClient, us
 		}
 	}
 
-	err := codespaces.PollPostCreateStates(ctx, log, apiClient, user, codespace, poller)
+	err := codespaces.PollPostCreateStates(ctx, log, apiClient, codespace, poller)
 	if err != nil {
 		if errors.Is(err, context.Canceled) && breakNextState {
 			return nil // we cancelled the context to stop polling, we can ignore the error

@@ -45,12 +45,12 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, sshProfile, codespaceNa
 		authkeys <- checkAuthorizedKeys(ctx, a.apiClient, user.Login)
 	}()
 
-	codespace, token, err := getOrChooseCodespace(ctx, a.apiClient, user, codespaceName)
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
 		return fmt.Errorf("get or choose codespace: %w", err)
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, a.apiClient, user.Login, token, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
