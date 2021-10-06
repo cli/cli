@@ -168,7 +168,7 @@ func TestDelete(t *testing.T) {
 					return tt.codespaces, nil
 				}
 			} else {
-				apiMock.GetCodespaceFunc = func(_ context.Context, name string) (*api.Codespace, error) {
+				apiMock.GetCodespaceFunc = func(_ context.Context, name string, includeConnection bool) (*api.Codespace, error) {
 					return tt.codespaces[0], nil
 				}
 			}
