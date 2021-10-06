@@ -60,7 +60,7 @@ func createFakeListEndpointServer(t *testing.T, initalTotal int, finalTotal int)
 }
 
 func TestListCodespaces(t *testing.T) {
-	svr := createFakeListEndpointServer(t, 100, 100)
+	svr := createFakeListEndpointServer(t, 200, 200)
 	defer svr.Close()
 
 	api := API{
@@ -73,7 +73,7 @@ func TestListCodespaces(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(codespaces) != 100 {
+	if len(codespaces) != 200 {
 		t.Fatalf("expected 100 codespace, got %d", len(codespaces))
 	}
 
@@ -81,13 +81,13 @@ func TestListCodespaces(t *testing.T) {
 		t.Fatalf("expected codespace-0, got %s", codespaces[0].Name)
 	}
 
-	if codespaces[99].Name != "codespace-99" {
-		t.Fatalf("expected codespace-99, got %s", codespaces[0].Name)
+	if codespaces[199].Name != "codespace-199" {
+		t.Fatalf("expected codespace-199, got %s", codespaces[0].Name)
 	}
 }
 
 func TestMidIterationDeletion(t *testing.T) {
-	svr := createFakeListEndpointServer(t, 100, 99)
+	svr := createFakeListEndpointServer(t, 200, 199)
 	defer svr.Close()
 
 	api := API{
@@ -100,13 +100,13 @@ func TestMidIterationDeletion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(codespaces) != 100 {
-		t.Fatalf("expected 100 codespace, got %d", len(codespaces))
+	if len(codespaces) != 200 {
+		t.Fatalf("expected 200 codespace, got %d", len(codespaces))
 	}
 }
 
 func TestMidIterationAddition(t *testing.T) {
-	svr := createFakeListEndpointServer(t, 99, 100)
+	svr := createFakeListEndpointServer(t, 199, 200)
 	defer svr.Close()
 
 	api := API{
@@ -119,7 +119,7 @@ func TestMidIterationAddition(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(codespaces) != 100 {
-		t.Fatalf("expected 100 codespace, got %d", len(codespaces))
+	if len(codespaces) != 200 {
+		t.Fatalf("expected 200 codespace, got %d", len(codespaces))
 	}
 }

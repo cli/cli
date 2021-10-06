@@ -196,11 +196,11 @@ type getCodespacesListResponse struct {
 // ListCodespaces returns a list of codespaces for the user.
 // It consumes all pages returned by the API until all codespaces have been fetched.
 func (a *API) ListCodespaces(ctx context.Context) (codespaces []*Codespace, err error) {
-	per_page := 50
+	per_page := 100
 	for page := 1; ; page++ {
-		response, err := a.fetchCodespaces(ctx, page)
+		response, err := a.fetchCodespaces(ctx, page, per_page)
 		if err != nil {
-			return nil, fmt.Errorf("%w", err)
+			return nil, err
 		}
 		codespaces = append(codespaces, response.Codespaces...)
 		if page*per_page >= response.TotalCount {
@@ -211,8 +211,7 @@ func (a *API) ListCodespaces(ctx context.Context) (codespaces []*Codespace, err 
 	return codespaces, nil
 }
 
-func (a *API) fetchCodespaces(ctx context.Context, page int) (response *getCodespacesListResponse, err error) {
-	per_page := 50
+func (a *API) fetchCodespaces(ctx context.Context, page int, per_page int) (response *getCodespacesListResponse, err error) {
 	req, err := http.NewRequest(
 		http.MethodGet, a.githubAPI+"/user/codespaces", nil,
 	)
