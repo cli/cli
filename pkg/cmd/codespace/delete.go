@@ -142,16 +142,15 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 	return nil
 }
 
-func confirmDeletion(p prompter, codespace *api.Codespace, isInteractive bool) (bool, error) {
-	gs := codespace.Environment.GitStatus
-	hasUnsavedChanges := gs.HasUncommitedChanges || gs.HasUnpushedChanges
-	if !hasUnsavedChanges {
+func confirmDeletion(p prompter, apiCodespace *api.Codespace, isInteractive bool) (bool, error) {
+	cs := codespace{apiCodespace}
+	if !cs.hasUnsavedChanges() {
 		return true, nil
 	}
 	if !isInteractive {
-		return false, fmt.Errorf("codespace %s has unsaved changes (use --force to override)", codespace.Name)
+		return false, fmt.Errorf("codespace %s has unsaved changes (use --force to override)", cs.Name)
 	}
-	return p.Confirm(fmt.Sprintf("Codespace %s has unsaved changes. OK to delete?", codespace.Name))
+	return p.Confirm(fmt.Sprintf("Codespace %s has unsaved changes. OK to delete?", cs.Name))
 }
 
 type surveyPrompter struct{}

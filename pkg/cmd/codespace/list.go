@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	"github.com/spf13/cobra"
 )
@@ -35,24 +34,17 @@ func (a *App) List(ctx context.Context, asJSON bool) error {
 
 	table := output.NewTable(os.Stdout, asJSON)
 	table.SetHeader([]string{"Name", "Repository", "Branch", "State", "Created At"})
-	for _, codespace := range codespaces {
+	for _, apiCodespace := range codespaces {
+		cs := codespace{apiCodespace}
 		table.Append([]string{
-			codespace.Name,
-			codespace.RepositoryNWO,
-			codespace.Branch + dirtyStar(codespace.Environment.GitStatus),
-			codespace.Environment.State,
-			codespace.CreatedAt,
+			cs.Name,
+			cs.RepositoryNWO,
+			cs.branchWithGitStatus(),
+			cs.Environment.State,
+			cs.CreatedAt,
 		})
 	}
 
 	table.Render()
 	return nil
-}
-
-func dirtyStar(status api.CodespaceEnvironmentGitStatus) string {
-	if status.HasUncommitedChanges || status.HasUnpushedChanges {
-		return "*"
-	}
-
-	return ""
 }

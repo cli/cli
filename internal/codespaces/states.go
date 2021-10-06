@@ -78,7 +78,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, 
 			return fmt.Errorf("connection failed: %w", err)
 
 		case <-t.C:
-			states, err := getPostCreateOutput(ctx, localPort, codespace, sshUser)
+			states, err := getPostCreateOutput(ctx, localPort, sshUser)
 			if err != nil {
 				return fmt.Errorf("get post create output: %w", err)
 			}
@@ -88,7 +88,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, 
 	}
 }
 
-func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Codespace, user string) ([]PostCreateState, error) {
+func getPostCreateOutput(ctx context.Context, tunnelPort int, user string) ([]PostCreateState, error) {
 	cmd, err := NewRemoteCommand(
 		ctx, tunnelPort, fmt.Sprintf("%s@localhost", user),
 		"cat /workspaces/.codespaces/shared/postCreateOutput.json",

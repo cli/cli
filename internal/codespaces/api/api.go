@@ -425,7 +425,7 @@ type CreateCodespaceParams struct {
 func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams) (*Codespace, error) {
 	codespace, err := a.startCreate(ctx, params.RepositoryID, params.Machine, params.Branch, params.Location)
 	if err != errProvisioningInProgress {
-		return codespace, err
+		return nil, err
 	}
 
 	// errProvisioningInProgress indicates that codespace creation did not complete
