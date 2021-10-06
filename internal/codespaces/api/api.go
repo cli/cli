@@ -151,7 +151,6 @@ type Codespace struct {
 	CreatedAt      string               `json:"created_at"`
 	LastUsedAt     string               `json:"last_used_at"`
 	State          string               `json:"state"`
-	GUID           string               `json:"guid"`
 	Branch         string               `json:"branch"`
 	RepositoryName string               `json:"repository_name"`
 	RepositoryNWO  string               `json:"repository_nwo"`
