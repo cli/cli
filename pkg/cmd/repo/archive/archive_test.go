@@ -115,7 +115,7 @@ func Test_ArchiveRun(t *testing.T) {
 		{
 			name:      "archived repo tty",
 			opts:      ArchiveOptions{RepoArg: "OWNER/REPO"},
-			wantOut:   "! Repository OWNER/REPO is already archived",
+			wantOut:   "! Repository OWNER/REPO is already archived\n",
 			stdoutTTY: true,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -128,7 +128,7 @@ func Test_ArchiveRun(t *testing.T) {
 		{
 			name:      "archived repo notty",
 			opts:      ArchiveOptions{RepoArg: "OWNER/REPO"},
-			wantOut:   "! Repository OWNER/REPO is already archived",
+			wantOut:   "! Repository OWNER/REPO is already archived\n",
 			stdoutTTY: false,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
