@@ -31,7 +31,7 @@ func NewCmdArchive(f *cmdutil.Factory, runF func(*ArchiveOptions) error) *cobra.
 
 		Use:   "archive <repository>",
 		Short: "Archive a repository",
-		Long:  `Archive a GitHub repository.`,
+		Long:  "Archive a GitHub repository.",
 		Args:  cmdutil.ExactArgs(1, "cannot archive: repository argument required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.RepoArg = args[0]
@@ -85,7 +85,7 @@ func archiveRun(opts *ArchiveOptions) error {
 		return nil
 	}
 
-	err = repoArchive(httpClient, repo)
+	err = archiveRepo(httpClient, repo)
 	if err != nil {
 		return fmt.Errorf("API called failed: %w", err)
 	}

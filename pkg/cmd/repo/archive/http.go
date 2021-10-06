@@ -10,7 +10,7 @@ import (
 	"github.com/shurcooL/graphql"
 )
 
-func repoArchive(client *http.Client, repo *api.Repository) error {
+func archiveRepo(client *http.Client, repo *api.Repository) error {
 	var mutation struct {
 		ArchiveRepository struct {
 			Repository struct {
