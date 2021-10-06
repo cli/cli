@@ -50,6 +50,8 @@ func createFakeListEndpointServer(t *testing.T, initalTotal int, finalTotal int)
 		} else if page == 2 {
 			response.Codespaces = generateCodespaceList(per_page, per_page*2)
 			response.TotalCount = finalTotal
+		} else {
+			t.Fatal("Should not check extra page")
 		}
 
 		data, _ := json.Marshal(response)

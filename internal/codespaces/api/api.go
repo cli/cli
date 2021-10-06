@@ -194,16 +194,18 @@ type getCodespacesListResponse struct {
 }
 
 // ListCodespaces returns a list of codespaces for the user.
+// It consumes all pages returned by the API until all codespaces have been fetched.
 func (a *API) ListCodespaces(ctx context.Context) (codespaces []*Codespace, err error) {
+	per_page := 50
 	for page := 1; ; page++ {
 		response, err := a.fetchCodespaces(ctx, page)
 		if err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
-		if len(codespaces) >= response.TotalCount || len(response.Codespaces) == 0 {
+		codespaces = append(codespaces, response.Codespaces...)
+		if page*per_page >= response.TotalCount {
 			break
 		}
-		codespaces = append(codespaces, response.Codespaces...)
 	}
 
 	return codespaces, nil
