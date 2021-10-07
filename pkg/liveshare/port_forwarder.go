@@ -163,7 +163,7 @@ func (fwd *PortForwarder) handleConnection(ctx context.Context, id channelID, co
 		connReader    io.Reader = conn
 	)
 
-	// If we the port forwader has been configured to keep the session alive
+	// If the forwader has been configured to keep the session alive
 	// it will monitor the I/O and notify the session of the traffic.
 	if fwd.keepAlive {
 		channelReader = newTrafficMonitor(channelReader, fwd.session, "output")

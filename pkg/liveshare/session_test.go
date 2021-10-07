@@ -230,16 +230,12 @@ func TestInvalidHostKey(t *testing.T) {
 
 func TestKeepAliveNonBlocking(t *testing.T) {
 	session := &Session{keepAliveReason: make(chan string, 1)}
-	var i int
-	for ; i < 2; i++ {
+	for i := 0; i < 2; i++ {
 		session.keepAlive("io")
 	}
 
 	// if keepAlive blocks, we'll never reach this and timeout the test
 	// timing out
-	if i != 2 {
-		t.Errorf("unexpected iteration account, expected: 2, got: %d", i)
-	}
 }
 
 func TestNotifyHostOfActivity(t *testing.T) {
