@@ -62,7 +62,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 
 	var debugLogger *fileLogger
 	if opts.debug {
-		debugLogger, err = newFileLogger()
+		debugLogger, err = newFileLogger("gh-cs-ssh")
 		if err != nil {
 			return fmt.Errorf("error creating debug logger: %w", err)
 		}
@@ -135,8 +135,11 @@ type fileLogger struct {
 	f *os.File
 }
 
-func newFileLogger() (*fileLogger, error) {
-	f, err := ioutil.TempFile("", "gh-cs-ssh")
+// newFileLogger creates a new fileLogger. It returns an error if the file
+// cannot be created. The file is created in the operating system tmp directory
+// under the name parameter.
+func newFileLogger(name string) (*fileLogger, error) {
+	f, err := ioutil.TempFile("", name)
 	if err != nil {
 		return nil, err
 	}
