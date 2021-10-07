@@ -47,3 +47,5 @@ require (
 replace github.com/shurcooL/graphql => github.com/cli/shurcooL-graphql v0.0.0-20200707151639-0f7232a2bf7e
 
 replace golang.org/x/crypto => github.com/cli/crypto v0.0.0-20210929142629-6be313f59b03
+
+replace github.com/cli/cli/v2/pkg/cmd/repo/rename => /cli/cli/v2/pkg/cmd/repo/rename
