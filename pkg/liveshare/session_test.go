@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -295,9 +296,14 @@ func TestNotifyHostOfActivity(t *testing.T) {
 }
 
 func TestSessionHeartbeat(t *testing.T) {
-	var requests int
+	var (
+		requestsMu sync.Mutex
+		requests   int
+	)
 	notifyHostOfActivity := func(rpcReq *jsonrpc2.Request) (interface{}, error) {
+		requestsMu.Lock()
 		requests++
+		requestsMu.Unlock()
 
 		var req []interface{}
 		if err := json.Unmarshal(*rpcReq.Params, &req); err != nil {
@@ -369,21 +375,28 @@ func TestSessionHeartbeat(t *testing.T) {
 }
 
 type mockLogger struct {
+	sync.Mutex
 	buf *bytes.Buffer
 }
 
 func newMockLogger() *mockLogger {
-	return &mockLogger{new(bytes.Buffer)}
+	return &mockLogger{buf: new(bytes.Buffer)}
 }
 
 func (m *mockLogger) Printf(format string, v ...interface{}) (int, error) {
+	m.Lock()
+	defer m.Unlock()
 	return m.buf.WriteString(fmt.Sprintf(format, v...))
 }
 
 func (m *mockLogger) Println(v ...interface{}) (int, error) {
+	m.Lock()
+	defer m.Unlock()
 	return m.buf.WriteString(fmt.Sprintln(v...))
 }
 
 func (m *mockLogger) String() string {
+	m.Lock()
+	defer m.Unlock()
 	return m.buf.String()
 }

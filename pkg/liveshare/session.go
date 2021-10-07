@@ -114,7 +114,7 @@ func (s *Session) heartbeat(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.logger.Println("Running session heartbeat")
+			s.logger.Println("Heartbeat tick")
 			reason := <-s.keepAliveReason
 			s.logger.Println("Keep alive reason: " + reason)
 			if err := s.notifyHostOfActivity(ctx, reason); err != nil {
@@ -122,7 +122,6 @@ func (s *Session) heartbeat(ctx context.Context, interval time.Duration) {
 			}
 		}
 	}
-	s.logger.Println("Ending session heartbeat")
 }
 
 // notifyHostOfActivity notifies the Live Share host of client activity.
