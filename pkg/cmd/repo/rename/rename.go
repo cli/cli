@@ -88,8 +88,10 @@ func renameRun(opts *RenameOptions) error {
 }
 
 func renameRepo(apiClient *api.Client, hostname string, repoDetails *api.Repository) error {
-	path := fmt.Sprintf("/repos/%s/%s", repoDetails.Owner.Login, repoDetails.Name)
-	fmt.Println(path);
-
+	path := fmt.Sprintf("repos/%s/%s", repoDetails.Owner.Login, repoDetails.Name)
+	err := apiClient.REST(hostname, "PATCH", path, nil, nil)
+	if err != nil {
+		return err
+	}
 	return nil
 }
