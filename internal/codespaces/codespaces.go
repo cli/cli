@@ -12,6 +12,7 @@ import (
 
 type logger interface {
 	Print(v ...interface{}) (int, error)
+	Printf(f string, v ...interface{}) (int, error)
 	Println(v ...interface{}) (int, error)
 }
 
@@ -30,7 +31,7 @@ type apiClient interface {
 
 // ConnectToLiveshare waits for a Codespace to become running,
 // and connects to it using a Live Share session.
-func ConnectToLiveshare(ctx context.Context, log logger, apiClient apiClient, codespace *api.Codespace) (*liveshare.Session, error) {
+func ConnectToLiveshare(ctx context.Context, log, sessionLogger logger, apiClient apiClient, codespace *api.Codespace) (*liveshare.Session, error) {
 	var startedCodespace bool
 	if codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
 		startedCodespace = true
@@ -67,10 +68,12 @@ func ConnectToLiveshare(ctx context.Context, log logger, apiClient apiClient, co
 	log.Println("Connecting to your codespace...")
 
 	return liveshare.Connect(ctx, liveshare.Options{
+		ClientName:     "gh",
 		SessionID:      codespace.Environment.Connection.SessionID,
 		SessionToken:   codespace.Environment.Connection.SessionToken,
 		RelaySAS:       codespace.Environment.Connection.RelaySAS,
 		RelayEndpoint:  codespace.Environment.Connection.RelayEndpoint,
 		HostPublicKeys: codespace.Environment.Connection.HostPublicKeys,
+		Logger:         sessionLogger,
 	})
 }

@@ -22,18 +22,38 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+type logger interface {
+	Println(v ...interface{}) (int, error)
+	Printf(f string, v ...interface{}) (int, error)
+}
+
+type noopLogger struct{}
+
+func (n noopLogger) Println(...interface{}) (int, error) {
+	return 0, nil
+}
+
+func (n noopLogger) Printf(string, ...interface{}) (int, error) {
+	return 0, nil
+}
+
 // An Options specifies Live Share connection parameters.
 type Options struct {
+	ClientName     string // ClientName is the name of the connecting client.
 	SessionID      string
 	SessionToken   string // token for SSH session
 	RelaySAS       string
 	RelayEndpoint  string
 	HostPublicKeys []string
 	TLSConfig      *tls.Config // (optional)
+	Logger         logger      // (optional)
 }
 
 // uri returns a websocket URL for the specified options.
 func (opts *Options) uri(action string) (string, error) {
+	if opts.ClientName == "" {
+		return "", errors.New("ClientName is required")
+	}
 	if opts.SessionID == "" {
 		return "", errors.New("SessionID is required")
 	}
@@ -59,6 +79,11 @@ func Connect(ctx context.Context, opts Options) (*Session, error) {
 	uri, err := opts.uri("connect")
 	if err != nil {
 		return nil, err
+	}
+
+	var sessionLogger logger = noopLogger{}
+	if opts.Logger != nil {
+		sessionLogger = opts.Logger
 	}
 
 	span, ctx := opentracing.StartSpanFromContext(ctx, "Connect")
@@ -93,7 +118,16 @@ func Connect(ctx context.Context, opts Options) (*Session, error) {
 		return nil, fmt.Errorf("error joining Live Share workspace: %w", err)
 	}
 
-	return &Session{ssh: ssh, rpc: rpc}, nil
+	s := &Session{
+		ssh:             ssh,
+		rpc:             rpc,
+		clientName:      opts.ClientName,
+		keepAliveReason: make(chan string, 1),
+		logger:          sessionLogger,
+	}
+	go s.heartbeat(ctx)
+
+	return s, nil
 }
 
 type clientCapabilities struct {

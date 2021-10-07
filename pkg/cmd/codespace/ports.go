@@ -60,7 +60,7 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, asJSON bool) 
 
 	devContainerCh := getDevContainer(ctx, a.apiClient, codespace)
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, a.apiClient, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, nil, a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
@@ -194,7 +194,7 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName, sourcePor
 		return fmt.Errorf("error getting codespace: %w", err)
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, a.apiClient, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, nil, a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
@@ -253,7 +253,7 @@ func (a *App) ForwardPorts(ctx context.Context, codespaceName string, ports []st
 		return fmt.Errorf("error getting codespace: %w", err)
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, a.apiClient, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, nil, a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
@@ -272,7 +272,7 @@ func (a *App) ForwardPorts(ctx context.Context, codespaceName string, ports []st
 			defer listen.Close()
 			a.logger.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
 			name := fmt.Sprintf("share-%d", pair.remote)
-			fwd := liveshare.NewPortForwarder(session, name, pair.remote)
+			fwd := liveshare.NewPortForwarder(session, name, pair.remote, false)
 			return fwd.ForwardToListener(ctx, listen) // error always non-nil
 		})
 	}

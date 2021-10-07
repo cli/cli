@@ -4,12 +4,17 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 )
 
 // A Session represents the session between a connected Live Share client and server.
 type Session struct {
 	ssh *sshSession
 	rpc *rpcClient
+
+	clientName      string
+	keepAliveReason chan string
+	logger          logger
 }
 
 // Close should be called by users to clean up RPC and SSH resources whenever the session
@@ -96,4 +101,44 @@ func (s *Session) StartSSHServer(ctx context.Context) (int, string, error) {
 	}
 
 	return port, response.User, nil
+}
+
+// heartbeat ticks every minute and sends a signal to the Live Share host to keep
+// the connection alive if there is a reason to do so.
+func (s *Session) heartbeat(ctx context.Context) {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.logger.Println("Running session heartbeat")
+			reason := <-s.keepAliveReason
+			s.logger.Println("Keep alive reason: " + reason)
+			if err := s.notifyHostOfActivity(ctx, reason); err != nil {
+				s.logger.Printf("Failed to notify host of activity: %s\n", err)
+			}
+		}
+	}
+	s.logger.Println("Ending session heartbeat")
+}
+
+// notifyHostOfActivity notifies the Live Share host of client activity.
+func (s *Session) notifyHostOfActivity(ctx context.Context, activity string) error {
+	activities := []string{activity}
+	params := []interface{}{s.clientName, activities}
+	return s.rpc.do(ctx, "ICodespaceHostService.notifyCodespaceOfClientActivity", params, nil)
+}
+
+// keepAlive accepts a reason that is retained if there is no active reason
+// to send to the server.
+func (s *Session) keepAlive(reason string) {
+	select {
+	case s.keepAliveReason <- reason:
+	default:
+		// there is already an active keep alive reason
+		// so we can ignore this one
+	}
 }

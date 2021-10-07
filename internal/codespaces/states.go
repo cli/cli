@@ -37,7 +37,7 @@ type PostCreateState struct {
 // and calls the supplied poller for each batch of state changes.
 // It runs until it encounters an error, including cancellation of the context.
 func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, codespace *api.Codespace, poller func([]PostCreateState)) (err error) {
-	session, err := ConnectToLiveshare(ctx, log, apiClient, codespace)
+	session, err := ConnectToLiveshare(ctx, log, nil, apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("connect to Live Share: %w", err)
 	}
@@ -62,7 +62,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, 
 
 	tunnelClosed := make(chan error, 1) // buffered to avoid sender stuckness
 	go func() {
-		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
+		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, false)
 		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // error is non-nil
 	}()
 
