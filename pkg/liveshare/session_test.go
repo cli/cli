@@ -349,7 +349,7 @@ func TestSessionHeartbeat(t *testing.T) {
 	go session.heartbeat(ctx, 50*time.Millisecond)
 	go func() {
 		session.keepAlive("input")
-		<-time.Tick(100 * time.Millisecond)
+		<-time.Tick(200 * time.Millisecond)
 		session.keepAlive("input")
 		<-time.Tick(100 * time.Millisecond)
 		done <- struct{}{}
