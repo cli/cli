@@ -267,7 +267,7 @@ func (pr *PullRequest) DisplayableReviews() PullRequestReviews {
 	return PullRequestReviews{Nodes: published, TotalCount: len(published)}
 }
 
-func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int) (io.ReadCloser, error) {
+func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int, patch bool) (io.ReadCloser, error) {
 	url := fmt.Sprintf("%srepos/%s/pulls/%d",
 		ghinstance.RESTPrefix(baseRepo.RepoHost()), ghrepo.FullName(baseRepo), prNumber)
 	req, err := http.NewRequest("GET", url, nil)
@@ -275,7 +275,11 @@ func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int) (io.Rea
 		return nil, err
 	}
 
-	req.Header.Set("Accept", "application/vnd.github.v3.diff; charset=utf-8")
+	if patch {
+		req.Header.Set("Accept", "application/vnd.github.v3.patch")
+	} else {
+		req.Header.Set("Accept", "application/vnd.github.v3.diff; charset=utf-8")
+	}
 
 	resp, err := c.http.Do(req)
 	if err != nil {

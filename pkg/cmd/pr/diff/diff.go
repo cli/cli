@@ -25,6 +25,7 @@ type DiffOptions struct {
 
 	SelectorArg string
 	UseColor    string
+	Patch       bool
 }
 
 func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Command {
@@ -70,6 +71,7 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().StringVar(&opts.UseColor, "color", "auto", "Use color in diff output: {always|never|auto}")
+	cmd.Flags().BoolVar(&opts.Patch, "patch", false, "Display diff in patch format")
 
 	return cmd
 }
@@ -90,7 +92,7 @@ func diffRun(opts *DiffOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	diff, err := apiClient.PullRequestDiff(baseRepo, pr.Number)
+	diff, err := apiClient.PullRequestDiff(baseRepo, pr.Number, opts.Patch)
 	if err != nil {
 		return fmt.Errorf("could not find pull request diff: %w", err)
 	}
