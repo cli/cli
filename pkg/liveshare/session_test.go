@@ -367,7 +367,11 @@ func TestSessionHeartbeat(t *testing.T) {
 		if activityCount != 2 {
 			t.Errorf("unexpected number of activities, expected: 2, got: %d", activityCount)
 		}
-		if requests != 2 {
+
+		requestsMu.Lock()
+		rc := requests
+		requestsMu.Unlock()
+		if rc != 2 {
 			t.Errorf("unexpected number of requests, expected: 2, got: %d", requests)
 		}
 		return
