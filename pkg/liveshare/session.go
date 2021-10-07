@@ -103,10 +103,10 @@ func (s *Session) StartSSHServer(ctx context.Context) (int, string, error) {
 	return port, response.User, nil
 }
 
-// heartbeat ticks every minute and sends a signal to the Live Share host to keep
+// heartbeat ticks every interval and sends a signal to the Live Share host to keep
 // the connection alive if there is a reason to do so.
-func (s *Session) heartbeat(ctx context.Context) {
-	ticker := time.NewTicker(1 * time.Minute)
+func (s *Session) heartbeat(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {

@@ -1,6 +1,7 @@
 package liveshare
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -8,10 +9,13 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	livesharetest "github.com/cli/cli/v2/pkg/liveshare/test"
 	"github.com/sourcegraph/jsonrpc2"
 )
+
+const mockClientName = "liveshare-client"
 
 func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server, *Session, error) {
 	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
@@ -29,6 +33,7 @@ func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server,
 	}
 
 	session, err := Connect(context.Background(), Options{
+		ClientName:     mockClientName,
 		SessionID:      "session-id",
 		SessionToken:   sessionToken,
 		RelayEndpoint:  "sb" + strings.TrimPrefix(testServer.URL(), "https"),
@@ -220,4 +225,165 @@ func TestInvalidHostKey(t *testing.T) {
 	if err == nil {
 		t.Error("expected invalid host key error, got: nil")
 	}
+}
+
+func TestKeepAliveNonBlocking(t *testing.T) {
+	session := &Session{keepAliveReason: make(chan string, 1)}
+	var i int
+	for ; i < 2; i++ {
+		session.keepAlive("io")
+	}
+
+	// if keepAlive blocks, we'll never reach this and timeout the test
+	// timing out
+	if i != 2 {
+		t.Errorf("unexpected iteration account, expected: 2, got: %d", i)
+	}
+}
+
+func TestNotifyHostOfActivity(t *testing.T) {
+	notifyHostOfActivity := func(rpcReq *jsonrpc2.Request) (interface{}, error) {
+		var req []interface{}
+		if err := json.Unmarshal(*rpcReq.Params, &req); err != nil {
+			return nil, fmt.Errorf("unmarshal req: %w", err)
+		}
+		if len(req) < 2 {
+			return nil, errors.New("request arguments is less than 2")
+		}
+
+		if clientName, ok := req[0].(string); ok {
+			if clientName != mockClientName {
+				return nil, fmt.Errorf(
+					"unexpected clientName param, expected: %q, got: %q", mockClientName, clientName,
+				)
+			}
+		} else {
+			return nil, errors.New("clientName param is not a string")
+		}
+
+		if acs, ok := req[1].([]interface{}); ok {
+			if fmt.Sprintf("%s", acs) != "[input]" {
+				return nil, fmt.Errorf("unexpected activities param, expected: [input], got: %s", acs)
+			}
+		} else {
+			return nil, errors.New("activities param is not a slice")
+		}
+
+		return nil, nil
+	}
+	svc := livesharetest.WithService(
+		"ICodespaceHostService.notifyCodespaceOfClientActivity", notifyHostOfActivity,
+	)
+	testServer, session, err := makeMockSession(svc)
+	if err != nil {
+		t.Errorf("creating mock session: %w", err)
+	}
+	defer testServer.Close()
+	ctx := context.Background()
+	done := make(chan error)
+	go func() {
+		done <- session.notifyHostOfActivity(ctx, "input")
+	}()
+	select {
+	case err := <-testServer.Err():
+		t.Errorf("error from server: %w", err)
+	case err := <-done:
+		if err != nil {
+			t.Errorf("error from client: %w", err)
+		}
+	}
+}
+
+func TestSessionHeartbeat(t *testing.T) {
+	var requests int
+	notifyHostOfActivity := func(rpcReq *jsonrpc2.Request) (interface{}, error) {
+		requests++
+
+		var req []interface{}
+		if err := json.Unmarshal(*rpcReq.Params, &req); err != nil {
+			return nil, fmt.Errorf("unmarshal req: %w", err)
+		}
+		if len(req) < 2 {
+			return nil, errors.New("request arguments is less than 2")
+		}
+
+		if clientName, ok := req[0].(string); ok {
+			if clientName != mockClientName {
+				return nil, fmt.Errorf(
+					"unexpected clientName param, expected: %q, got: %q", mockClientName, clientName,
+				)
+			}
+		} else {
+			return nil, errors.New("clientName param is not a string")
+		}
+
+		if acs, ok := req[1].([]interface{}); ok {
+			if fmt.Sprintf("%s", acs) != "[input]" {
+				return nil, fmt.Errorf("unexpected activities param, expected: [input], got: %s", acs)
+			}
+		} else {
+			return nil, errors.New("activities param is not a slice")
+		}
+
+		return nil, nil
+	}
+	svc := livesharetest.WithService(
+		"ICodespaceHostService.notifyCodespaceOfClientActivity", notifyHostOfActivity,
+	)
+	testServer, session, err := makeMockSession(svc)
+	if err != nil {
+		t.Errorf("creating mock session: %w", err)
+	}
+	defer testServer.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan struct{})
+
+	logger := newMockLogger()
+	session.logger = logger
+
+	go session.heartbeat(ctx, 50*time.Millisecond)
+	go func() {
+		session.keepAlive("input")
+		<-time.Tick(100 * time.Millisecond)
+		session.keepAlive("input")
+		<-time.Tick(100 * time.Millisecond)
+		done <- struct{}{}
+	}()
+
+	select {
+	case err := <-testServer.Err():
+		t.Errorf("error from server: %w", err)
+	case <-done:
+		activityCount := strings.Count(logger.String(), "input")
+		if activityCount != 2 {
+			t.Errorf("unexpected number of activities, expected: 2, got: %d", activityCount)
+		}
+		if requests != 2 {
+			t.Errorf("unexpected number of requests, expected: 2, got: %d", requests)
+		}
+		return
+	}
+}
+
+type mockLogger struct {
+	buf *bytes.Buffer
+}
+
+func newMockLogger() *mockLogger {
+	return &mockLogger{new(bytes.Buffer)}
+}
+
+func (m *mockLogger) Printf(format string, v ...interface{}) (int, error) {
+	return m.buf.WriteString(fmt.Sprintf(format, v...))
+}
+
+func (m *mockLogger) Println(v ...interface{}) (int, error) {
+	return m.buf.WriteString(fmt.Sprintln(v...))
+}
+
+func (m *mockLogger) String() string {
+	return m.buf.String()
 }

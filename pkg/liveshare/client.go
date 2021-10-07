@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/opentracing/opentracing-go"
 	"golang.org/x/crypto/ssh"
@@ -76,6 +77,9 @@ func (opts *Options) uri(action string) (string, error) {
 // options, and returns a session representing the connection.
 // The caller must call the session's Close method to end the session.
 func Connect(ctx context.Context, opts Options) (*Session, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "Connect")
+	defer span.Finish()
+
 	uri, err := opts.uri("connect")
 	if err != nil {
 		return nil, err
@@ -85,9 +89,6 @@ func Connect(ctx context.Context, opts Options) (*Session, error) {
 	if opts.Logger != nil {
 		sessionLogger = opts.Logger
 	}
-
-	span, ctx := opentracing.StartSpanFromContext(ctx, "Connect")
-	defer span.Finish()
 
 	sock := newSocket(uri, opts.TLSConfig)
 	if err := sock.connect(ctx); err != nil {
@@ -125,7 +126,7 @@ func Connect(ctx context.Context, opts Options) (*Session, error) {
 		keepAliveReason: make(chan string, 1),
 		logger:          sessionLogger,
 	}
-	go s.heartbeat(ctx)
+	go s.heartbeat(ctx, 1*time.Minute)
 
 	return s, nil
 }

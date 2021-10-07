@@ -15,6 +15,7 @@ import (
 
 func TestConnect(t *testing.T) {
 	opts := Options{
+		ClientName:     "liveshare-client",
 		SessionID:      "session-id",
 		SessionToken:   "session-token",
 		RelaySAS:       "relay-sas",
