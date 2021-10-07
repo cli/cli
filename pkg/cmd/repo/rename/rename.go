@@ -18,28 +18,28 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type RenameOptions struct{
+type RenameOptions struct {
 	HttpClient func() (*http.Client, error)
-	IO *iostreams.IOStreams
+	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
-	RepoName string
+	RepoName   []string
 }
 
 func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Command {
-	opts:= &RenameOptions {
-		IO: f.IOStreams,
+	opts := &RenameOptions{
+		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 	}
 
 	cmd := &cobra.Command{
 		DisableFlagsInUseLine: true,
-		
-		Use: "rename <user/repo_name>",
+
+		Use:   "rename <user/repo_name> <user/new_repo_name>",
 		Short: "Rename a repository",
-		Long: "Rename a GitHub repository",
-		Args: cmdutil.ExactArgs(1, "cannot rename: repository argument required"),
-		RunE: func (cmd *cobra.Command, args []string) error {
-			opts.RepoName = args[0]
+		Long:  "Rename a GitHub repository",
+		Args:  cmdutil.ExactArgs(2, "cannot rename: repository argument required"),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.RepoName = append(opts.RepoName, args[0], args[1])
 			if runf != nil {
 				return runf(opts)
 			}
@@ -49,34 +49,47 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 	return cmd
 }
 
-
 func renameRun(opts *RenameOptions) error {
+	oldRepoName := opts.RepoName[0]
+
 	// cs := opts.IO.ColorScheme()
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient);
+	apiClient := api.NewClientFromHTTP(httpClient)
 
 	username, err := api.CurrentLoginName(apiClient, ghinstance.Default())
 	if err != nil {
 		return err
 	}
 
-	toRename, err := ghrepo.FromFullName(opts.RepoName)
+	repo, err := ghrepo.FromFullName(oldRepoName)
 	if err != nil {
 		return fmt.Errorf("argument error: %w", err)
 	}
 
 	fields := []string{"name", "owner", "id"}
-	repo, err := api.FetchRepository(apiClient, toRename, fields)
+	repoDetails, err := api.FetchRepository(apiClient, repo, fields)
 	if err != nil {
 		return err
 	}
 
-	if username != repo.Owner.Login {
-		return fmt.Errorf("you do not own this repository");
+	if username != repoDetails.Owner.Login {
+		return fmt.Errorf("you do not own this repository")
 	}
+
+	err = renameRepo(apiClient, repo.RepoHost(), repoDetails)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func renameRepo(apiClient *api.Client, hostname string, repoDetails *api.Repository) error {
+	path := fmt.Sprintf("/repos/%s/%s", repoDetails.Owner.Login, repoDetails.Name)
+	fmt.Println(path);
 
 	return nil
 }
