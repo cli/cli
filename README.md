@@ -49,13 +49,13 @@ Additional Conda installation options available on the [gh-feedstock page](https
 
 ### Linux & BSD
 
-`gh` is available via [Homebrew][], [Conda][], [Spack][], and as downloadable binaries from the [releases page][].
+`gh` is available via [Homebrew](#homebrew), [Conda](#conda), [Spack](#spack), and as downloadable binaries from the [releases page][].
 
 For instructions on specific distributions and package managers, see [Linux & BSD installation](./docs/install_linux.md).
 
 ### Windows
 
-`gh` is available via [WinGet][], [scoop][], [Chocolatey][], [Conda][], and as downloadable MSI.
+`gh` is available via [WinGet][], [scoop][], [Chocolatey][], [Conda](#conda), and as downloadable MSI.
 
 #### WinGet
 
