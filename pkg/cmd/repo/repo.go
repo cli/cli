@@ -8,9 +8,9 @@ import (
 	repoForkCmd "github.com/cli/cli/v2/pkg/cmd/repo/fork"
 	gardenCmd "github.com/cli/cli/v2/pkg/cmd/repo/garden"
 	repoListCmd "github.com/cli/cli/v2/pkg/cmd/repo/list"
+	repoRenameCmd "github.com/cli/cli/v2/pkg/cmd/repo/rename"
 	repoSyncCmd "github.com/cli/cli/v2/pkg/cmd/repo/sync"
 	repoViewCmd "github.com/cli/cli/v2/pkg/cmd/repo/view"
-	repoRenameCmd "github.com/cli/cli/v2/pkg/cmd/repo/rename"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
