@@ -38,7 +38,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		DisableFlagsInUseLine: true,
 
-		Use:   "rename <old_repo_name> <new_repo_name>",
+		Use:   "rename <user/old_repo_name> <new_repo_name>",
 		Short: "Rename a repository",
 		Long:  "Rename a GitHub repository",
 		Args:  cmdutil.ExactArgs(2, "cannot rename: repository argument required"),
@@ -84,7 +84,7 @@ func renameRun(opts *RenameOptions) error {
 	}
 
 	if currentUser != repoDetails.Owner.Login {
-		return fmt.Errorf("you do not own this repository")
+		return fmt.Errorf("%s you do not own this repository", cs.FailureIcon())
 	}
 
 	input := renameRepo{
