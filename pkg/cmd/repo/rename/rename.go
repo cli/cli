@@ -23,10 +23,10 @@ type RenameOptions struct {
 	RepoName   []string
 }
 
-type renameRepo struct{
-	Owner               string
-	Repository          string
-	Name                string `json:"name,omitempty"`
+type renameRepo struct {
+	Owner      string
+	Repository string
+	Name       string `json:"name,omitempty"`
 }
 
 func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Command {
@@ -88,9 +88,9 @@ func renameRun(opts *RenameOptions) error {
 	}
 
 	input := renameRepo{
-		Owner:           repo.RepoOwner(),
-		Repository:      repo.RepoName(),
-		Name:            newRepoName,
+		Owner:      repo.RepoOwner(),
+		Repository: repo.RepoName(),
+		Name:       newRepoName,
 	}
 
 	err = runRename(apiClient, repo.RepoHost(), repoDetails, input)
@@ -99,7 +99,7 @@ func renameRun(opts *RenameOptions) error {
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.Out, "%s Renamed repository %s\n", cs.SuccessIcon(), currentUser + "/" + newRepoName)
+		fmt.Fprintf(opts.IO.Out, "%s Renamed repository %s\n", cs.SuccessIcon(), currentUser+"/"+newRepoName)
 	}
 
 	return nil
@@ -107,13 +107,13 @@ func renameRun(opts *RenameOptions) error {
 
 func runRename(apiClient *api.Client, hostname string, repoDetails *api.Repository, input renameRepo) error {
 	path := fmt.Sprintf("repos/%s/%s", repoDetails.Owner.Login, repoDetails.Name)
-	
+
 	body := &bytes.Buffer{}
 	enc := json.NewEncoder(body)
 	if err := enc.Encode(input); err != nil {
 		return err
 	}
-	
+
 	err := apiClient.REST(hostname, "PATCH", path, body, nil)
 	if err != nil {
 		return err
