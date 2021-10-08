@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
@@ -37,7 +38,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		DisableFlagsInUseLine: true,
 
-		Use:   "rename <user/repo_name> <user/new_repo_name>",
+		Use:   "rename <old_repo_name> <new_repo_name>",
 		Short: "Rename a repository",
 		Long:  "Rename a GitHub repository",
 		Args:  cmdutil.ExactArgs(2, "cannot rename: repository argument required"),
@@ -53,20 +54,23 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 }
 
 func renameRun(opts *RenameOptions) error {
-	oldRepoName := opts.RepoName[0]
-	newRepoName := opts.RepoName[1]
-
-	// cs := opts.IO.ColorScheme()
+	cs := opts.IO.ColorScheme()
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	username, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+	currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
 	if err != nil {
 		return err
 	}
+
+	oldRepoName := opts.RepoName[0]
+	if !strings.Contains(oldRepoName, "/") {
+		oldRepoName = currentUser + "/" + oldRepoName
+	}
+	newRepoName := opts.RepoName[1]
 
 	repo, err := ghrepo.FromFullName(oldRepoName)
 	if err != nil {
@@ -79,7 +83,7 @@ func renameRun(opts *RenameOptions) error {
 		return err
 	}
 
-	if username != repoDetails.Owner.Login {
+	if currentUser != repoDetails.Owner.Login {
 		return fmt.Errorf("you do not own this repository")
 	}
 
@@ -94,7 +98,9 @@ func renameRun(opts *RenameOptions) error {
 		return err
 	}
 
-	
+	if opts.IO.IsStdoutTTY() {
+		fmt.Fprintf(opts.IO.Out, "%s Renamed repository %s\n", cs.SuccessIcon(), currentUser + "/" + newRepoName)
+	}
 
 	return nil
 }
