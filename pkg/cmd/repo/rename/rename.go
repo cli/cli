@@ -113,7 +113,7 @@ func runRename(apiClient *api.Client, hostname string, repoDetails *api.Reposito
 	if err := enc.Encode(input); err != nil {
 		return err
 	}
-
+	
 	err := apiClient.REST(hostname, "PATCH", path, body, nil)
 	if err != nil {
 		return err
