@@ -1,17 +1,14 @@
 package rename
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
-
-	// "strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
-
-	// "github.com/cli/cli/v2/internal/ghinstance"
-
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -23,6 +20,12 @@ type RenameOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	RepoName   []string
+}
+
+type renameRepo struct{
+	Owner               string
+	Repository          string
+	Name                string `json:"name,omitempty"`
 }
 
 func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Command {
@@ -51,6 +54,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 
 func renameRun(opts *RenameOptions) error {
 	oldRepoName := opts.RepoName[0]
+	newRepoName := opts.RepoName[1]
 
 	// cs := opts.IO.ColorScheme()
 	httpClient, err := opts.HttpClient()
@@ -79,7 +83,13 @@ func renameRun(opts *RenameOptions) error {
 		return fmt.Errorf("you do not own this repository")
 	}
 
-	err = renameRepo(apiClient, repo.RepoHost(), repoDetails)
+	input := renameRepo{
+		Owner:           repo.RepoOwner(),
+		Repository:      repo.RepoName(),
+		Name:            newRepoName,
+	}
+
+	err = runRename(apiClient, repo.RepoHost(), repoDetails, input)
 	if err != nil {
 		return err
 	}
@@ -87,9 +97,14 @@ func renameRun(opts *RenameOptions) error {
 	return nil
 }
 
-func renameRepo(apiClient *api.Client, hostname string, repoDetails *api.Repository) error {
+func runRename(apiClient *api.Client, hostname string, repoDetails *api.Repository, input renameRepo) error {
+	body := &bytes.Buffer{}
+	enc := json.NewEncoder(body)
+	if err := enc.Encode(input); err != nil {
+		return err
+	}
 	path := fmt.Sprintf("repos/%s/%s", repoDetails.Owner.Login, repoDetails.Name)
-	err := apiClient.REST(hostname, "PATCH", path, nil, nil)
+	err := apiClient.REST(hostname, "PATCH", path, nil, body)
 	if err != nil {
 		return err
 	}
