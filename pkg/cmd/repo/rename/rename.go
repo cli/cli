@@ -94,17 +94,21 @@ func renameRun(opts *RenameOptions) error {
 		return err
 	}
 
+	
+
 	return nil
 }
 
 func runRename(apiClient *api.Client, hostname string, repoDetails *api.Repository, input renameRepo) error {
+	path := fmt.Sprintf("repos/%s/%s", repoDetails.Owner.Login, repoDetails.Name)
+	
 	body := &bytes.Buffer{}
 	enc := json.NewEncoder(body)
 	if err := enc.Encode(input); err != nil {
 		return err
 	}
-	path := fmt.Sprintf("repos/%s/%s", repoDetails.Owner.Login, repoDetails.Name)
-	err := apiClient.REST(hostname, "PATCH", path, nil, body)
+
+	err := apiClient.REST(hostname, "PATCH", path, body, nil)
 	if err != nil {
 		return err
 	}
