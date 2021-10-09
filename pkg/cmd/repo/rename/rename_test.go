@@ -69,13 +69,13 @@ func TestNewCmdRename(t *testing.T) {
 	}
 }
 
-func TestRenameRun(t *testing.T)  {
+func TestRenameRun(t *testing.T) {
 	testCases := []struct {
-		name string
-		opts RenameOptions
+		name      string
+		opts      RenameOptions
 		httpStubs func(*httpmock.Registry)
 		stdoutTTY bool
-		wantOut string
+		wantOut   string
 	}{
 		{
 			name: "owner repo change name tty",
@@ -138,7 +138,7 @@ func TestRenameRun(t *testing.T)  {
 		}
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
-		}	
+		}
 
 		io, _, stdout, _ := iostreams.Test()
 		tt.opts.IO = io
@@ -152,5 +152,4 @@ func TestRenameRun(t *testing.T)  {
 			assert.Equal(t, tt.wantOut, stdout.String())
 		})
 	}
-	
 }
