@@ -51,6 +51,8 @@ type CreateOptions struct {
 	Concurrency int
 
 	DiscussionCategory string
+
+	GenerateReleaseNotes bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -98,6 +100,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			Create a release and start a discussion
 			$ gh release create v1.2.3 --discussion-category "General"
+
+			Create a release with automatically generated release notes
+			$ gh release create v1.2.3 --generate-release-notes
 		`),
 		Args: cmdutil.MinimumArgs(1, "could not create: no tag name provided"),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -143,6 +148,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion of the specified category")
+	cmd.Flags().BoolVarP(&opts.GenerateReleaseNotes, "generate-release-notes", "", false, "Automatically generate the name and body for this release")
 
 	return cmd
 }
@@ -158,7 +164,7 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
-	if !opts.BodyProvided && opts.IO.CanPrompt() {
+	if (!opts.BodyProvided && !opts.GenerateReleaseNotes) && opts.IO.CanPrompt() {
 		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
 		if err != nil {
 			return err
@@ -184,7 +190,10 @@ func createRun(opts *CreateOptions) error {
 			}
 		}
 
-		editorOptions := []string{"Write my own"}
+		editorOptions := []string{
+			"Write my own",
+			"Automatically generate the release notes",
+		}
 		if generatedChangelog != "" {
 			editorOptions = append(editorOptions, "Write using commit log as template")
 		}
@@ -220,6 +229,9 @@ func createRun(opts *CreateOptions) error {
 		switch opts.ReleaseNotesAction {
 		case "Write my own":
 			openEditor = true
+		case "Automatically generate the release notes":
+			openEditor = false
+			opts.GenerateReleaseNotes = true
 		case "Write using commit log as template":
 			openEditor = true
 			editorContents = generatedChangelog
@@ -306,6 +318,9 @@ func createRun(opts *CreateOptions) error {
 	}
 	if opts.DiscussionCategory != "" {
 		params["discussion_category_name"] = opts.DiscussionCategory
+	}
+	if opts.GenerateReleaseNotes {
+		params["generate_release_notes"] = true
 	}
 
 	hasAssets := len(opts.Assets) > 0

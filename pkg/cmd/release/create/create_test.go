@@ -184,6 +184,24 @@ func Test_NewCmdCreate(t *testing.T) {
 			isTTY:   true,
 			wantErr: "Discussions for draft releases not supported",
 		},
+		{
+			name:  "generage release notes",
+			args:  "v1.2.3 --generate-release-notes",
+			isTTY: true,
+			want: CreateOptions{
+				TagName:              "v1.2.3",
+				Target:               "",
+				Name:                 "",
+				Body:                 "",
+				BodyProvided:         false,
+				Draft:                false,
+				Prerelease:           false,
+				RepoOverride:         "",
+				Concurrency:          5,
+				Assets:               []*shared.AssetForUpload(nil),
+				GenerateReleaseNotes: true,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
