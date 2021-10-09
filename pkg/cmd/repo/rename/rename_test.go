@@ -1,9 +1,11 @@
 package rename
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
@@ -65,4 +67,90 @@ func TestNewCmdRename(t *testing.T) {
 			assert.Equal(t, tt.wantOpts.newRepoName, opts.newRepoName)
 		})
 	}
+}
+
+func TestRenameRun(t *testing.T)  {
+	testCases := []struct {
+		name string
+		opts RenameOptions
+		httpStubs func(*httpmock.Registry)
+		stdoutTTY bool
+		wantOut string
+	}{
+		{
+			name: "owner repo change name tty",
+			opts: RenameOptions{
+				oldRepoName: "OWNER/REPO",
+				newRepoName: "NEW_REPO",
+			},
+			wantOut: "✓ Renamed repository pxrth9/team2-hack",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.StatusStringResponse(200, "{}"))
+			},
+			stdoutTTY: true,
+		},
+		{
+			name: "owner repo change name notty",
+			opts: RenameOptions{
+				oldRepoName: "OWNER/REPO",
+				newRepoName: "NEW_REPO",
+			},
+			wantOut: "✓ Renamed repository pxrth9/team2-hack",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.StatusStringResponse(200, "{}"))
+			},
+			stdoutTTY: false,
+		},
+		{
+			name: "nonowner repo change name tty",
+			opts: RenameOptions{
+				oldRepoName: "NON_OWNER/REPO",
+				newRepoName: "NEW_REPO",
+			},
+			wantOut: "X you do not own this repository",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("PATCH", "repos/NON_OWNER/REPO"),
+					httpmock.StatusStringResponse(200, "{}"))
+			},
+			stdoutTTY: true,
+		},
+		{
+			name: "non owner repo change name notty",
+			opts: RenameOptions{
+				oldRepoName: "NON_OWNER/REPO",
+				newRepoName: "NEW_REPO",
+			},
+			wantOut: "X you do not own this repository",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("PATCH", "repos/NON_OWNER/REPO"),
+					httpmock.StatusStringResponse(200, "{}"))
+			},
+			stdoutTTY: false,
+		},
+	}
+
+	for _, tt := range testCases {
+		reg := &httpmock.Registry{}
+		if tt.httpStubs != nil {
+			tt.httpStubs(reg)
+		}
+		tt.opts.HttpClient = func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		}	
+
+		io, _, stdout, _ := iostreams.Test()
+		tt.opts.IO = io
+
+		t.Run(tt.name, func(t *testing.T) {
+			defer reg.Verify(t)
+			io.SetStderrTTY(tt.stdoutTTY)
+
+			err := renameRun(&tt.opts)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantOut, stdout.String())
+		})
+	}
+	
 }
