@@ -17,10 +17,11 @@ import (
 )
 
 type RenameOptions struct {
-	HttpClient func() (*http.Client, error)
-	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
-	RepoName   []string
+	HttpClient  func() (*http.Client, error)
+	IO          *iostreams.IOStreams
+	Config      func() (config.Config, error)
+	oldRepoName string
+	newRepoName string
 }
 
 type renameRepo struct {
@@ -43,7 +44,8 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 		Long:  "Rename a GitHub repository",
 		Args:  cmdutil.ExactArgs(2, "cannot rename: repository argument required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.RepoName = append(opts.RepoName, args[0], args[1])
+			opts.oldRepoName = args[0]
+			opts.newRepoName = args[1]
 			if runf != nil {
 				return runf(opts)
 			}
@@ -66,11 +68,11 @@ func renameRun(opts *RenameOptions) error {
 		return err
 	}
 
-	oldRepoName := opts.RepoName[0]
+	oldRepoName := opts.oldRepoName
 	if !strings.Contains(oldRepoName, "/") {
 		oldRepoName = currentUser + "/" + oldRepoName
 	}
-	newRepoName := opts.RepoName[1]
+	newRepoName := opts.newRepoName
 
 	repo, err := ghrepo.FromFullName(oldRepoName)
 	if err != nil {
