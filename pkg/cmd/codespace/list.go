@@ -29,7 +29,7 @@ func newListCmd(app *App) *cobra.Command {
 }
 
 func (a *App) List(ctx context.Context, asJSON bool, limit int) error {
-	codespaces, err := a.apiClient.ListCodespaces(ctx)
+	codespaces, err := a.apiClient.ListCodespaces(ctx, limit)
 	if err != nil {
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}

@@ -69,12 +69,12 @@ func TestListCodespaces(t *testing.T) {
 		token:     "faketoken",
 	}
 	ctx := context.TODO()
-	codespaces, err := api.ListCodespaces(ctx)
+	codespaces, err := api.ListCodespaces(ctx, -1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(codespaces) != 200 {
-		t.Fatalf("expected 100 codespace, got %d", len(codespaces))
+		t.Fatalf("expected 200 codespace, got %d", len(codespaces))
 	}
 
 	if codespaces[0].Name != "codespace-0" {
@@ -96,7 +96,7 @@ func TestMidIterationDeletion(t *testing.T) {
 		token:     "faketoken",
 	}
 	ctx := context.TODO()
-	codespaces, err := api.ListCodespaces(ctx)
+	codespaces, err := api.ListCodespaces(ctx, -1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestMidIterationAddition(t *testing.T) {
 		token:     "faketoken",
 	}
 	ctx := context.TODO()
-	codespaces, err := api.ListCodespaces(ctx)
+	codespaces, err := api.ListCodespaces(ctx, -1)
 	if err != nil {
 		t.Fatal(err)
 	}
