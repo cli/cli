@@ -125,9 +125,10 @@ func Test_ArchiveRun(t *testing.T) {
 			},
 		},
 		{
-			name:  "archived repo notty",
-			opts:  ArchiveOptions{RepoArg: "OWNER/REPO"},
-			isTTY: false,
+			name:       "archived repo notty",
+			opts:       ArchiveOptions{RepoArg: "OWNER/REPO"},
+			isTTY:      false,
+			wantStderr: "! Repository OWNER/REPO is already archived\n",
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryInfo\b`),
