@@ -73,17 +73,18 @@ func TestNewCmdArchive(t *testing.T) {
 
 func Test_ArchiveRun(t *testing.T) {
 	tests := []struct {
-		name      string
-		opts      ArchiveOptions
-		httpStubs func(*httpmock.Registry)
-		stdoutTTY bool
-		wantOut   string
+		name       string
+		opts       ArchiveOptions
+		httpStubs  func(*httpmock.Registry)
+		isTTY      bool
+		wantStdout string
+		wantStderr string
 	}{
 		{
-			name:      "unarchived repo tty",
-			opts:      ArchiveOptions{RepoArg: "OWNER/REPO"},
-			wantOut:   "✓ Archived repository OWNER/REPO\n",
-			stdoutTTY: true,
+			name:       "unarchived repo tty",
+			opts:       ArchiveOptions{RepoArg: "OWNER/REPO"},
+			wantStdout: "✓ Archived repository OWNER/REPO\n",
+			isTTY:      true,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryInfo\b`),
@@ -96,9 +97,9 @@ func Test_ArchiveRun(t *testing.T) {
 			},
 		},
 		{
-			name:      "unarchived repo notty",
-			opts:      ArchiveOptions{RepoArg: "OWNER/REPO"},
-			stdoutTTY: false,
+			name:  "unarchived repo notty",
+			opts:  ArchiveOptions{RepoArg: "OWNER/REPO"},
+			isTTY: false,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryInfo\b`),
@@ -111,10 +112,10 @@ func Test_ArchiveRun(t *testing.T) {
 			},
 		},
 		{
-			name:      "archived repo tty",
-			opts:      ArchiveOptions{RepoArg: "OWNER/REPO"},
-			wantOut:   "! Repository OWNER/REPO is already archived\n",
-			stdoutTTY: true,
+			name:       "archived repo tty",
+			opts:       ArchiveOptions{RepoArg: "OWNER/REPO"},
+			wantStderr: "! Repository OWNER/REPO is already archived\n",
+			isTTY:      true,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryInfo\b`),
@@ -124,9 +125,9 @@ func Test_ArchiveRun(t *testing.T) {
 			},
 		},
 		{
-			name:      "archived repo notty",
-			opts:      ArchiveOptions{RepoArg: "OWNER/REPO"},
-			stdoutTTY: false,
+			name:  "archived repo notty",
+			opts:  ArchiveOptions{RepoArg: "OWNER/REPO"},
+			isTTY: false,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryInfo\b`),
@@ -146,16 +147,18 @@ func Test_ArchiveRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 
-		io, _, stdout, _ := iostreams.Test()
+		io, _, stdout, stderr := iostreams.Test()
 		tt.opts.IO = io
 
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)
-			io.SetStdoutTTY(tt.stdoutTTY)
+			io.SetStdoutTTY(tt.isTTY)
+			io.SetStderrTTY(tt.isTTY)
 
 			err := archiveRun(&tt.opts)
 			assert.NoError(t, err)
-			assert.Equal(t, tt.wantOut, stdout.String())
+			assert.Equal(t, tt.wantStdout, stdout.String())
+			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
 }

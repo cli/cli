@@ -76,8 +76,8 @@ func archiveRun(opts *ArchiveOptions) error {
 
 	fullName := ghrepo.FullName(toArchive)
 	if repo.IsArchived {
-		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out,
+		if opts.IO.IsStderrTTY() {
+			fmt.Fprintf(opts.IO.ErrOut,
 				"%s Repository %s is already archived\n",
 				cs.WarningIcon(),
 				fullName)
