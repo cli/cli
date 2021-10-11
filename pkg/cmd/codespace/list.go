@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
 
@@ -18,6 +19,10 @@ func newListCmd(app *App) *cobra.Command {
 		Short: "List your codespaces",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if limit < 1 {
+				return &cmdutil.FlagError{Err: fmt.Errorf("invalid limit: %v", limit)}
+			}
+
 			return app.List(cmd.Context(), asJSON, limit)
 		},
 	}
