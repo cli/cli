@@ -196,10 +196,24 @@ type getCodespacesListResponse struct {
 	TotalCount int          `json:"total_count"`
 }
 
+// Define custom type for list default value key name for contexts
+type ListDefaultLimitKey struct{}
+
 // ListCodespaces returns a list of codespaces for the user.
 // It consumes all pages returned by the API until all codespaces have been fetched.
 func (a *API) ListCodespaces(ctx context.Context) (codespaces []*Codespace, err error) {
-	per_page := 100
+	var per_page = 100
+
+	var optLimit int
+	limitValue := ctx.Value(&ListDefaultLimitKey{})
+
+	if limitValue != nil {
+		optLimit = limitValue.(int)
+		if per_page > optLimit {
+			per_page = optLimit
+		}
+	}
+
 	for page := 1; ; page++ {
 		response, err := a.fetchCodespaces(ctx, page, per_page)
 		if err != nil {
@@ -207,6 +221,10 @@ func (a *API) ListCodespaces(ctx context.Context) (codespaces []*Codespace, err 
 		}
 		codespaces = append(codespaces, response.Codespaces...)
 		if page*per_page >= response.TotalCount {
+			break
+		}
+
+		if optLimit > 0 && page*per_page >= optLimit {
 			break
 		}
 	}
