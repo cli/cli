@@ -10,9 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f
       - name: Set up Go 1.16
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@331ce1d993939866bb63c32c6cbbfd48fa76fc57
         with:
           go-version: 1.16
       - name: Generate changelog
@@ -21,14 +21,14 @@ jobs:
           git fetch --unshallow
           script/changelog | tee CHANGELOG.md
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
+        uses: goreleaser/goreleaser-action@5a54d7e660bda43b405e8463261b3d25631ffe86
         with:
           version: v0.174.1
           args: release --release-notes=CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Checkout documentation site
-        uses: actions/checkout@v2
+        uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f
         with:
           repository: github/cli.github.com
           path: site
@@ -113,7 +113,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f
       - name: Download gh.exe
         id: download_exe
         shell: bash
@@ -167,14 +167,14 @@ jobs:
           DISCUSSION_CATEGORY: General
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Bump homebrew-core formula
-        uses: mislav/bump-homebrew-formula-action@v1
+        uses: mislav/bump-homebrew-formula-action@c7b9693c4ff4ba1334c8c0bb8dc3ba869b205ba7
         if: "!contains(github.ref, '-')" # skip prereleases
         with:
           formula-name: gh
         env:
           COMMITTER_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
       - name: Checkout scoop bucket
-        uses: actions/checkout@v2
+        uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f
         with:
           repository: cli/scoop-gh
           path: scoop-gh

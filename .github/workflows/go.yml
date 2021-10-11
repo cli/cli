@@ -10,12 +10,12 @@ jobs:
 
     steps:
       - name: Set up Go 1.16
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@331ce1d993939866bb63c32c6cbbfd48fa76fc57
         with:
           go-version: 1.16
 
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@5a4ac9002d0be2fb38bd78e4b4dbde5606d7042f
 
       - name: Download dependencies
         run: go mod download
