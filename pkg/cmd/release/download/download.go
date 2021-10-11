@@ -2,7 +2,9 @@ package download
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -27,6 +29,8 @@ type DownloadOptions struct {
 
 	// maximum number of simultaneous downloads
 	Concurrency int
+
+	ArchiveType string
 }
 
 func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobra.Command {
@@ -47,12 +51,15 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 		Example: heredoc.Doc(`
 			# download all assets from a specific release
 			$ gh release download v1.2.3
-			
+
 			# download only Debian packages for the latest release
 			$ gh release download --pattern '*.deb'
-			
+
 			# specify multiple file patterns
 			$ gh release download -p '*.deb' -p '*.rpm'
+
+			# download the archive of the source code for a release
+			$ gh release download v1.2.3 --archive=zip
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -67,6 +74,11 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 				opts.TagName = args[0]
 			}
 
+			// check archive type option validity
+			if err := checkArchiveTypeOption(opts); err != nil {
+				return err
+			}
+
 			opts.Concurrency = 5
 
 			if runF != nil {
@@ -78,8 +90,28 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 
 	cmd.Flags().StringVarP(&opts.Destination, "dir", "D", ".", "The directory to download files into")
 	cmd.Flags().StringArrayVarP(&opts.FilePatterns, "pattern", "p", nil, "Download only assets that match a glob pattern")
+	cmd.Flags().StringVarP(&opts.ArchiveType, "archive", "A", "", "Download the source code archive in the specified `format` (zip or tar.gz)")
 
 	return cmd
+}
+
+func checkArchiveTypeOption(opts *DownloadOptions) error {
+	if len(opts.ArchiveType) == 0 {
+		return nil
+	}
+
+	if err := cmdutil.MutuallyExclusive(
+		"specify only one of '--pattern' or '--archive'",
+		true, // ArchiveType len > 0
+		len(opts.FilePatterns) > 0,
+	); err != nil {
+		return err
+	}
+
+	if opts.ArchiveType != "zip" && opts.ArchiveType != "tar.gz" {
+		return cmdutil.FlagErrorf("the value for `--archive` must be one of \"zip\" or \"tar.gz\"")
+	}
+	return nil
 }
 
 func downloadRun(opts *DownloadOptions) error {
@@ -93,8 +125,10 @@ func downloadRun(opts *DownloadOptions) error {
 		return err
 	}
 
-	var release *shared.Release
+	opts.IO.StartProgressIndicator()
+	defer opts.IO.StopProgressIndicator()
 
+	var release *shared.Release
 	if opts.TagName == "" {
 		release, err = shared.FetchLatestRelease(httpClient, baseRepo)
 		if err != nil {
@@ -108,11 +142,22 @@ func downloadRun(opts *DownloadOptions) error {
 	}
 
 	var toDownload []shared.ReleaseAsset
-	for _, a := range release.Assets {
-		if len(opts.FilePatterns) > 0 && !matchAny(opts.FilePatterns, a.Name) {
-			continue
+	isArchive := false
+	if opts.ArchiveType != "" {
+		var archiveURL = release.ZipballURL
+		if opts.ArchiveType == "tar.gz" {
+			archiveURL = release.TarballURL
 		}
-		toDownload = append(toDownload, a)
+		// create pseudo-Asset with no name and pointing to ZipBallURL or TarBallURL
+		toDownload = append(toDownload, shared.ReleaseAsset{APIURL: archiveURL})
+		isArchive = true
+	} else {
+		for _, a := range release.Assets {
+			if len(opts.FilePatterns) > 0 && !matchAny(opts.FilePatterns, a.Name) {
+				continue
+			}
+			toDownload = append(toDownload, a)
+		}
 	}
 
 	if len(toDownload) == 0 {
@@ -129,10 +174,7 @@ func downloadRun(opts *DownloadOptions) error {
 		}
 	}
 
-	opts.IO.StartProgressIndicator()
-	err = downloadAssets(httpClient, toDownload, opts.Destination, opts.Concurrency)
-	opts.IO.StopProgressIndicator()
-	return err
+	return downloadAssets(httpClient, toDownload, opts.Destination, opts.Concurrency, isArchive)
 }
 
 func matchAny(patterns []string, name string) bool {
@@ -144,7 +186,7 @@ func matchAny(patterns []string, name string) bool {
 	return false
 }
 
-func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, destDir string, numWorkers int) error {
+func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, destDir string, numWorkers int, isArchive bool) error {
 	if numWorkers == 0 {
 		return errors.New("the number of concurrent workers needs to be greater than 0")
 	}
@@ -159,7 +201,7 @@ func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, d
 	for w := 1; w <= numWorkers; w++ {
 		go func() {
 			for a := range jobs {
-				results <- downloadAsset(httpClient, a.APIURL, filepath.Join(destDir, a.Name))
+				results <- downloadAsset(httpClient, a.APIURL, destDir, a.Name, isArchive)
 			}
 		}()
 	}
@@ -179,13 +221,17 @@ func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, d
 	return downloadError
 }
 
-func downloadAsset(httpClient *http.Client, assetURL, destinationPath string) error {
+func downloadAsset(httpClient *http.Client, assetURL, destinationDir string, fileName string, isArchive bool) error {
 	req, err := http.NewRequest("GET", assetURL, nil)
 	if err != nil {
 		return err
 	}
 
 	req.Header.Set("Accept", "application/octet-stream")
+	// adding application/json to Accept header due to a bug in the zipball/tarball API endpoint that makes it mandatory
+	if isArchive {
+		req.Header.Set("Accept", "application/octet-stream, application/json")
+	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -195,6 +241,22 @@ func downloadAsset(httpClient *http.Client, assetURL, destinationPath string) er
 
 	if resp.StatusCode > 299 {
 		return api.HandleHTTPError(resp)
+	}
+
+	var destinationPath = filepath.Join(destinationDir, fileName)
+
+	if len(fileName) == 0 {
+		contentDisposition := resp.Header.Get("Content-Disposition")
+
+		_, params, err := mime.ParseMediaType(contentDisposition)
+		if err != nil {
+			return fmt.Errorf("unable to parse file name of archive: %w", err)
+		}
+		if serverFileName, ok := params["filename"]; ok {
+			destinationPath = filepath.Join(destinationDir, serverFileName)
+		} else {
+			return errors.New("unable to determine file name of archive")
+		}
 	}
 
 	f, err := os.OpenFile(destinationPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
