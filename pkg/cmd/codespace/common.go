@@ -35,7 +35,7 @@ func NewApp(logger *output.Logger, apiClient apiClient) *App {
 type apiClient interface {
 	GetUser(ctx context.Context) (*api.User, error)
 	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
-	ListCodespaces(ctx context.Context, num int) ([]*api.Codespace, error)
+	ListCodespaces(ctx context.Context, limit int) ([]*api.Codespace, error)
 	DeleteCodespace(ctx context.Context, name string) error
 	StartCodespace(ctx context.Context, name string) error
 	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
