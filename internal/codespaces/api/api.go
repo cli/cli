@@ -234,13 +234,15 @@ func (a *API) ListCodespaces(ctx context.Context, limit int) (codespaces []*Code
 			break
 		}
 
-		u, _ := url.Parse(nextURL)
 		if newPerPage := limit - len(codespaces); limit > 0 && newPerPage < 100 {
+			u, _ := url.Parse(nextURL)
 			q := u.Query()
 			q.Set("per_page", strconv.Itoa(newPerPage))
 			u.RawQuery = q.Encode()
+			listURL = u.String()
+		} else {
+			listURL = nextURL
 		}
-		listURL = u.String()
 	}
 
 	return codespaces, nil

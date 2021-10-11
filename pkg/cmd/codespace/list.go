@@ -41,10 +41,7 @@ func (a *App) List(ctx context.Context, asJSON bool, limit int) error {
 
 	table := output.NewTable(os.Stdout, asJSON)
 	table.SetHeader([]string{"Name", "Repository", "Branch", "State", "Created At"})
-	for i, apiCodespace := range codespaces {
-		if i == limit {
-			break
-		}
+	for _, apiCodespace := range codespaces {
 		cs := codespace{apiCodespace}
 		table.Append([]string{
 			cs.Name,
