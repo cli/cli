@@ -55,6 +55,23 @@ func Test_deleteRun(t *testing.T) {
 			wantErr: true,
 			errMsg:  "could not prompt: confirmation with prompt or --confirm flag required",
 		},
+		{
+			name:       "short repo name",
+			opts:       &DeleteOptions{RepoArg: "REPO"},
+			wantStdout: "✓ Deleted repository OWNER/REPO\n",
+			tty:        true,
+			askStubs: func(q *prompt.AskStubber) {
+				q.StubOne("OWNER/REPO")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"OWNER"}}}`))
+				reg.Register(
+					httpmock.REST("DELETE", "repos/OWNER/REPO"),
+					httpmock.StatusStringResponse(204, "{}"))
+			},
+		},
 	}
 	for _, tt := range tests {
 		q, teardown := prompt.InitAskStubber()
