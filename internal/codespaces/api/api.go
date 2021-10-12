@@ -34,10 +34,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -190,62 +193,70 @@ type CodespaceEnvironmentConnection struct {
 	HostPublicKeys []string `json:"hostPublicKeys"`
 }
 
-// codespacesListResponse is the response body for the `/user/codespaces` endpoint
-type getCodespacesListResponse struct {
-	Codespaces []*Codespace `json:"codespaces"`
-	TotalCount int          `json:"total_count"`
-}
+// ListCodespaces returns a list of codespaces for the user. Pass a negative limit to request all pages from
+// the API until all codespaces have been fetched.
+func (a *API) ListCodespaces(ctx context.Context, limit int) (codespaces []*Codespace, err error) {
+	perPage := 100
+	if limit > 0 && limit < 100 {
+		perPage = limit
+	}
 
-// ListCodespaces returns a list of codespaces for the user.
-// It consumes all pages returned by the API until all codespaces have been fetched.
-func (a *API) ListCodespaces(ctx context.Context) (codespaces []*Codespace, err error) {
-	per_page := 100
-	for page := 1; ; page++ {
-		response, err := a.fetchCodespaces(ctx, page, per_page)
+	listURL := fmt.Sprintf("%s/user/codespaces?per_page=%d", a.githubAPI, perPage)
+	for {
+		req, err := http.NewRequest(http.MethodGet, listURL, nil)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error creating request: %w", err)
 		}
+		a.setHeaders(req)
+
+		resp, err := a.do(ctx, req, "/user/codespaces")
+		if err != nil {
+			return nil, fmt.Errorf("error making request: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, api.HandleHTTPError(resp)
+		}
+
+		var response struct {
+			Codespaces []*Codespace `json:"codespaces"`
+		}
+		dec := json.NewDecoder(resp.Body)
+		if err := dec.Decode(&response); err != nil {
+			return nil, fmt.Errorf("error unmarshaling response: %w", err)
+		}
+
+		nextURL := findNextPage(resp.Header.Get("Link"))
 		codespaces = append(codespaces, response.Codespaces...)
-		if page*per_page >= response.TotalCount {
+
+		if nextURL == "" || (limit > 0 && len(codespaces) >= limit) {
 			break
+		}
+
+		if newPerPage := limit - len(codespaces); limit > 0 && newPerPage < 100 {
+			u, _ := url.Parse(nextURL)
+			q := u.Query()
+			q.Set("per_page", strconv.Itoa(newPerPage))
+			u.RawQuery = q.Encode()
+			listURL = u.String()
+		} else {
+			listURL = nextURL
 		}
 	}
 
 	return codespaces, nil
 }
 
-func (a *API) fetchCodespaces(ctx context.Context, page int, per_page int) (response *getCodespacesListResponse, err error) {
-	req, err := http.NewRequest(
-		http.MethodGet, a.githubAPI+"/user/codespaces", nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
-	}
-	a.setHeaders(req)
-	q := req.URL.Query()
-	q.Add("page", strconv.Itoa(page))
-	q.Add("per_page", strconv.Itoa(per_page))
+var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
 
-	req.URL.RawQuery = q.Encode()
-	resp, err := a.do(ctx, req, "/user/codespaces")
-	if err != nil {
-		return nil, fmt.Errorf("error making request: %w", err)
+func findNextPage(linkValue string) string {
+	for _, m := range linkRE.FindAllStringSubmatch(linkValue, -1) {
+		if len(m) > 2 && m[2] == "next" {
+			return m[1]
+		}
 	}
-	defer resp.Body.Close()
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, jsonErrorResponse(b)
-	}
-
-	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %w", err)
-	}
-	return response, nil
+	return ""
 }
 
 // GetCodespace returns the user codespace based on the provided name.
