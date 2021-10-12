@@ -2,7 +2,11 @@ name: Code Scanning
 
 on:
   push:
+    branches: [trunk]
   pull_request:
+    branches: [trunk]
+    paths-ignore:
+      - '**/*.md'
   schedule:
     - cron: "0 0 * * 0"
 

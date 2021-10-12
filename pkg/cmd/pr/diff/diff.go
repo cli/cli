@@ -11,6 +11,8 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -25,6 +27,7 @@ type DiffOptions struct {
 
 	SelectorArg string
 	UseColor    string
+	Patch       bool
 }
 
 func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Command {
@@ -70,6 +73,7 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().StringVar(&opts.UseColor, "color", "auto", "Use color in diff output: {always|never|auto}")
+	cmd.Flags().BoolVar(&opts.Patch, "patch", false, "Display diff in patch format")
 
 	return cmd
 }
@@ -88,9 +92,8 @@ func diffRun(opts *DiffOptions) error {
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
-	diff, err := apiClient.PullRequestDiff(baseRepo, pr.Number)
+	diff, err := fetchDiff(httpClient, baseRepo, pr.Number, opts.Patch)
 	if err != nil {
 		return fmt.Errorf("could not find pull request diff: %w", err)
 	}
@@ -130,6 +133,36 @@ func diffRun(opts *DiffOptions) error {
 	}
 
 	return nil
+}
+
+func fetchDiff(httpClient *http.Client, baseRepo ghrepo.Interface, prNumber int, asPatch bool) (io.ReadCloser, error) {
+	url := fmt.Sprintf(
+		"%srepos/%s/pulls/%d",
+		ghinstance.RESTPrefix(baseRepo.RepoHost()),
+		ghrepo.FullName(baseRepo),
+		prNumber,
+	)
+	acceptType := "application/vnd.github.v3.diff"
+	if asPatch {
+		acceptType = "application/vnd.github.v3.patch"
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Accept", acceptType)
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != 200 {
+		return nil, api.HandleHTTPError(resp)
+	}
+
+	return resp.Body, nil
 }
 
 var diffHeaderPrefixes = []string{"+++", "---", "diff", "index"}

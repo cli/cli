@@ -164,7 +164,7 @@ func TestDelete(t *testing.T) {
 				},
 			}
 			if tt.opts.codespaceName == "" {
-				apiMock.ListCodespacesFunc = func(_ context.Context) ([]*api.Codespace, error) {
+				apiMock.ListCodespacesFunc = func(_ context.Context, num int) ([]*api.Codespace, error) {
 					return tt.codespaces, nil
 				}
 			} else {

@@ -44,13 +44,19 @@ func createFakeListEndpointServer(t *testing.T, initalTotal int, finalTotal int)
 			TotalCount: finalTotal,
 		}
 
-		if page == 1 {
+		switch page {
+		case 1:
 			response.Codespaces = generateCodespaceList(0, per_page)
 			response.TotalCount = initalTotal
-		} else if page == 2 {
+			w.Header().Set("Link", fmt.Sprintf(`<http://%[1]s/user/codespaces?page=3&per_page=%[2]d>; rel="last", <http://%[1]s/user/codespaces?page=2&per_page=%[2]d>; rel="next"`, r.Host, per_page))
+		case 2:
 			response.Codespaces = generateCodespaceList(per_page, per_page*2)
 			response.TotalCount = finalTotal
-		} else {
+			w.Header().Set("Link", fmt.Sprintf(`<http://%s/user/codespaces?page=3&per_page=%d>; rel="next"`, r.Host, per_page))
+		case 3:
+			response.Codespaces = generateCodespaceList(per_page*2, per_page*3-per_page/2)
+			response.TotalCount = finalTotal
+		default:
 			t.Fatal("Should not check extra page")
 		}
 
@@ -59,7 +65,7 @@ func createFakeListEndpointServer(t *testing.T, initalTotal int, finalTotal int)
 	}))
 }
 
-func TestListCodespaces(t *testing.T) {
+func TestListCodespaces_limited(t *testing.T) {
 	svr := createFakeListEndpointServer(t, 200, 200)
 	defer svr.Close()
 
@@ -69,25 +75,24 @@ func TestListCodespaces(t *testing.T) {
 		token:     "faketoken",
 	}
 	ctx := context.TODO()
-	codespaces, err := api.ListCodespaces(ctx)
+	codespaces, err := api.ListCodespaces(ctx, 200)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(codespaces) != 200 {
-		t.Fatalf("expected 100 codespace, got %d", len(codespaces))
-	}
 
+	if len(codespaces) != 200 {
+		t.Fatalf("expected 200 codespace, got %d", len(codespaces))
+	}
 	if codespaces[0].Name != "codespace-0" {
 		t.Fatalf("expected codespace-0, got %s", codespaces[0].Name)
 	}
-
 	if codespaces[199].Name != "codespace-199" {
 		t.Fatalf("expected codespace-199, got %s", codespaces[0].Name)
 	}
 }
 
-func TestMidIterationDeletion(t *testing.T) {
-	svr := createFakeListEndpointServer(t, 200, 199)
+func TestListCodespaces_unlimited(t *testing.T) {
+	svr := createFakeListEndpointServer(t, 200, 200)
 	defer svr.Close()
 
 	api := API{
@@ -96,30 +101,18 @@ func TestMidIterationDeletion(t *testing.T) {
 		token:     "faketoken",
 	}
 	ctx := context.TODO()
-	codespaces, err := api.ListCodespaces(ctx)
+	codespaces, err := api.ListCodespaces(ctx, -1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(codespaces) != 200 {
-		t.Fatalf("expected 200 codespace, got %d", len(codespaces))
-	}
-}
 
-func TestMidIterationAddition(t *testing.T) {
-	svr := createFakeListEndpointServer(t, 199, 200)
-	defer svr.Close()
-
-	api := API{
-		githubAPI: svr.URL,
-		client:    &http.Client{},
-		token:     "faketoken",
+	if len(codespaces) != 250 {
+		t.Fatalf("expected 250 codespace, got %d", len(codespaces))
 	}
-	ctx := context.TODO()
-	codespaces, err := api.ListCodespaces(ctx)
-	if err != nil {
-		t.Fatal(err)
+	if codespaces[0].Name != "codespace-0" {
+		t.Fatalf("expected codespace-0, got %s", codespaces[0].Name)
 	}
-	if len(codespaces) != 200 {
-		t.Fatalf("expected 200 codespace, got %d", len(codespaces))
+	if codespaces[249].Name != "codespace-249" {
+		t.Fatalf("expected codespace-249, got %s", codespaces[0].Name)
 	}
 }

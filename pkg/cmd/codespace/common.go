@@ -35,7 +35,7 @@ func NewApp(logger *output.Logger, apiClient apiClient) *App {
 type apiClient interface {
 	GetUser(ctx context.Context) (*api.User, error)
 	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
-	ListCodespaces(ctx context.Context) ([]*api.Codespace, error)
+	ListCodespaces(ctx context.Context, limit int) ([]*api.Codespace, error)
 	DeleteCodespace(ctx context.Context, name string) error
 	StartCodespace(ctx context.Context, name string) error
 	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
@@ -49,7 +49,7 @@ type apiClient interface {
 var errNoCodespaces = errors.New("you have no codespaces")
 
 func chooseCodespace(ctx context.Context, apiClient apiClient) (*api.Codespace, error) {
-	codespaces, err := apiClient.ListCodespaces(ctx)
+	codespaces, err := apiClient.ListCodespaces(ctx, -1)
 	if err != nil {
 		return nil, fmt.Errorf("error getting codespaces: %w", err)
 	}
