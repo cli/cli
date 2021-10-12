@@ -34,15 +34,19 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/opentracing/opentracing-go"
 )
 
 const githubAPI = "https://api.github.com"
 
+// API is the interface to the codespace service.
 type API struct {
 	token     string
 	client    httpClient
@@ -53,6 +57,7 @@ type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+// New creates a new API client with the given token and HTTP client.
 func New(token string, httpClient httpClient) *API {
 	return &API{
 		token:     token,
@@ -61,10 +66,12 @@ func New(token string, httpClient httpClient) *API {
 	}
 }
 
+// User represents a GitHub user.
 type User struct {
 	Login string `json:"login"`
 }
 
+// GetUser returns the user associated with the given token.
 func (a *API) GetUser(ctx context.Context) (*User, error) {
 	req, err := http.NewRequest(http.MethodGet, a.githubAPI+"/user", nil)
 	if err != nil {
@@ -95,6 +102,7 @@ func (a *API) GetUser(ctx context.Context) (*User, error) {
 	return &response, nil
 }
 
+// jsonErrorResponse returns the error message from a JSON response.
 func jsonErrorResponse(b []byte) error {
 	var response struct {
 		Message string `json:"message"`
@@ -106,10 +114,12 @@ func jsonErrorResponse(b []byte) error {
 	return errors.New(response.Message)
 }
 
+// Repository represents a GitHub repository.
 type Repository struct {
 	ID int `json:"id"`
 }
 
+// GetRepository returns the repository associated with the given owner and name.
 func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error) {
 	req, err := http.NewRequest(http.MethodGet, a.githubAPI+"/repos/"+strings.ToLower(nwo), nil)
 	if err != nil {
@@ -140,17 +150,20 @@ func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error
 	return &response, nil
 }
 
+// Codespace represents a codespace.
 type Codespace struct {
 	Name           string               `json:"name"`
-	GUID           string               `json:"guid"`
 	CreatedAt      string               `json:"created_at"`
 	LastUsedAt     string               `json:"last_used_at"`
+	State          string               `json:"state"`
 	Branch         string               `json:"branch"`
 	RepositoryName string               `json:"repository_name"`
 	RepositoryNWO  string               `json:"repository_nwo"`
 	OwnerLogin     string               `json:"owner_login"`
 	Environment    CodespaceEnvironment `json:"environment"`
 }
+
+const CodespaceStateProvisioned = "provisioned"
 
 type CodespaceEnvironment struct {
 	State      string                         `json:"state"`
@@ -168,6 +181,7 @@ type CodespaceEnvironmentGitStatus struct {
 }
 
 const (
+	// CodespaceEnvironmentStateAvailable is the state for a running codespace environment.
 	CodespaceEnvironmentStateAvailable = "Available"
 )
 
@@ -179,107 +193,94 @@ type CodespaceEnvironmentConnection struct {
 	HostPublicKeys []string `json:"hostPublicKeys"`
 }
 
-func (a *API) ListCodespaces(ctx context.Context) ([]*Codespace, error) {
-	req, err := http.NewRequest(
-		http.MethodGet, a.githubAPI+"/user/codespaces", nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+// ListCodespaces returns a list of codespaces for the user. Pass a negative limit to request all pages from
+// the API until all codespaces have been fetched.
+func (a *API) ListCodespaces(ctx context.Context, limit int) (codespaces []*Codespace, err error) {
+	perPage := 100
+	if limit > 0 && limit < 100 {
+		perPage = limit
 	}
 
-	a.setHeaders(req)
-	resp, err := a.do(ctx, req, "/user/codespaces")
-	if err != nil {
-		return nil, fmt.Errorf("error making request: %w", err)
-	}
-	defer resp.Body.Close()
+	listURL := fmt.Sprintf("%s/user/codespaces?per_page=%d", a.githubAPI, perPage)
+	for {
+		req, err := http.NewRequest(http.MethodGet, listURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("error creating request: %w", err)
+		}
+		a.setHeaders(req)
 
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %w", err)
-	}
+		resp, err := a.do(ctx, req, "/user/codespaces")
+		if err != nil {
+			return nil, fmt.Errorf("error making request: %w", err)
+		}
+		defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, jsonErrorResponse(b)
-	}
-
-	var response struct {
-		Codespaces []*Codespace `json:"codespaces"`
-	}
-	if err := json.Unmarshal(b, &response); err != nil {
-		return nil, fmt.Errorf("error unmarshaling response: %w", err)
-	}
-	return response.Codespaces, nil
-}
-
-type getCodespaceTokenRequest struct {
-	MintRepositoryToken bool `json:"mint_repository_token"`
-}
-
-type getCodespaceTokenResponse struct {
-	RepositoryToken string `json:"repository_token"`
-}
-
-// ErrNotProvisioned is returned by GetCodespacesToken to indicate that the
-// creation of a codespace is not yet complete and that the caller should try again.
-var ErrNotProvisioned = errors.New("codespace not provisioned")
-
-func (a *API) GetCodespaceToken(ctx context.Context, ownerLogin, codespaceName string) (string, error) {
-	reqBody, err := json.Marshal(getCodespaceTokenRequest{true})
-	if err != nil {
-		return "", fmt.Errorf("error preparing request body: %w", err)
-	}
-
-	req, err := http.NewRequest(
-		http.MethodPost,
-		a.githubAPI+"/vscs_internal/user/"+ownerLogin+"/codespaces/"+codespaceName+"/token",
-		bytes.NewBuffer(reqBody),
-	)
-	if err != nil {
-		return "", fmt.Errorf("error creating request: %w", err)
-	}
-
-	a.setHeaders(req)
-	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces/*/token")
-	if err != nil {
-		return "", fmt.Errorf("error making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("error reading response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode == http.StatusUnprocessableEntity {
-			return "", ErrNotProvisioned
+		if resp.StatusCode != http.StatusOK {
+			return nil, api.HandleHTTPError(resp)
 		}
 
-		return "", jsonErrorResponse(b)
+		var response struct {
+			Codespaces []*Codespace `json:"codespaces"`
+		}
+		dec := json.NewDecoder(resp.Body)
+		if err := dec.Decode(&response); err != nil {
+			return nil, fmt.Errorf("error unmarshaling response: %w", err)
+		}
+
+		nextURL := findNextPage(resp.Header.Get("Link"))
+		codespaces = append(codespaces, response.Codespaces...)
+
+		if nextURL == "" || (limit > 0 && len(codespaces) >= limit) {
+			break
+		}
+
+		if newPerPage := limit - len(codespaces); limit > 0 && newPerPage < 100 {
+			u, _ := url.Parse(nextURL)
+			q := u.Query()
+			q.Set("per_page", strconv.Itoa(newPerPage))
+			u.RawQuery = q.Encode()
+			listURL = u.String()
+		} else {
+			listURL = nextURL
+		}
 	}
 
-	var response getCodespaceTokenResponse
-	if err := json.Unmarshal(b, &response); err != nil {
-		return "", fmt.Errorf("error unmarshaling response: %w", err)
-	}
-
-	return response.RepositoryToken, nil
+	return codespaces, nil
 }
 
-func (a *API) GetCodespace(ctx context.Context, token, owner, codespace string) (*Codespace, error) {
+var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
+
+func findNextPage(linkValue string) string {
+	for _, m := range linkRE.FindAllStringSubmatch(linkValue, -1) {
+		if len(m) > 2 && m[2] == "next" {
+			return m[1]
+		}
+	}
+	return ""
+}
+
+// GetCodespace returns the user codespace based on the provided name.
+// If the codespace is not found, an error is returned.
+// If includeConnection is true, it will return the connection information for the codespace.
+func (a *API) GetCodespace(ctx context.Context, codespaceName string, includeConnection bool) (*Codespace, error) {
 	req, err := http.NewRequest(
 		http.MethodGet,
-		a.githubAPI+"/vscs_internal/user/"+owner+"/codespaces/"+codespace,
+		a.githubAPI+"/user/codespaces/"+codespaceName,
 		nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	// TODO: use a.setHeaders()
-	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces/*")
+	if includeConnection {
+		q := req.URL.Query()
+		q.Add("internal", "true")
+		q.Add("refresh", "true")
+		req.URL.RawQuery = q.Encode()
+	}
+
+	a.setHeaders(req)
+	resp, err := a.do(ctx, req, "/user/codespaces/*")
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
 	}
@@ -302,19 +303,20 @@ func (a *API) GetCodespace(ctx context.Context, token, owner, codespace string) 
 	return &response, nil
 }
 
-func (a *API) StartCodespace(ctx context.Context, token string, codespace *Codespace) error {
+// StartCodespace starts a codespace for the user.
+// If the codespace is already running, the returned error from the API is ignored.
+func (a *API) StartCodespace(ctx context.Context, codespaceName string) error {
 	req, err := http.NewRequest(
 		http.MethodPost,
-		a.githubAPI+"/vscs_internal/proxy/environments/"+codespace.GUID+"/start",
+		a.githubAPI+"/user/codespaces/"+codespaceName+"/start",
 		nil,
 	)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
 
-	// TODO: use a.setHeaders()
-	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := a.do(ctx, req, "/vscs_internal/proxy/environments/*/start")
+	a.setHeaders(req)
+	resp, err := a.do(ctx, req, "/user/codespaces/*/start")
 	if err != nil {
 		return fmt.Errorf("error making request: %w", err)
 	}
@@ -326,19 +328,20 @@ func (a *API) StartCodespace(ctx context.Context, token string, codespace *Codes
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusConflict {
+			// 409 means the codespace is already running which we can safely ignore
+			return nil
+		}
+
 		// Error response may be a numeric code or a JSON {"message": "..."}.
 		if bytes.HasPrefix(b, []byte("{")) {
 			return jsonErrorResponse(b) // probably JSON
 		}
+
 		if len(b) > 100 {
 			b = append(b[:97], "..."...)
 		}
-		if strings.TrimSpace(string(b)) == "7" {
-			// Non-HTTP 200 with error code 7 (EnvironmentNotShutdown) is benign.
-			// Ignore it.
-		} else {
-			return fmt.Errorf("failed to start codespace: %s", b)
-		}
+		return fmt.Errorf("failed to start codespace: %s", b)
 	}
 
 	return nil
@@ -348,6 +351,7 @@ type getCodespaceRegionLocationResponse struct {
 	Current string `json:"current"`
 }
 
+// GetCodespaceRegionLocation returns the closest codespace location for the user.
 func (a *API) GetCodespaceRegionLocation(ctx context.Context) (string, error) {
 	req, err := http.NewRequest(http.MethodGet, "https://online.visualstudio.com/api/v1/locations", nil)
 	if err != nil {
@@ -377,13 +381,15 @@ func (a *API) GetCodespaceRegionLocation(ctx context.Context) (string, error) {
 	return response.Current, nil
 }
 
-type SKU struct {
+type Machine struct {
 	Name        string `json:"name"`
 	DisplayName string `json:"display_name"`
 }
 
-func (a *API) GetCodespacesSKUs(ctx context.Context, user *User, repository *Repository, branch, location string) ([]*SKU, error) {
-	req, err := http.NewRequest(http.MethodGet, a.githubAPI+"/vscs_internal/user/"+user.Login+"/skus", nil)
+// GetCodespacesMachines returns the codespaces machines for the given repo, branch and location.
+func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, location string) ([]*Machine, error) {
+	reqURL := fmt.Sprintf("%s/repositories/%d/codespaces/machines", a.githubAPI, repoID)
+	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -391,11 +397,10 @@ func (a *API) GetCodespacesSKUs(ctx context.Context, user *User, repository *Rep
 	q := req.URL.Query()
 	q.Add("location", location)
 	q.Add("ref", branch)
-	q.Add("repository_id", strconv.Itoa(repository.ID))
 	req.URL.RawQuery = q.Encode()
 
 	a.setHeaders(req)
-	resp, err := a.do(ctx, req, "/vscs_internal/user/*/skus")
+	resp, err := a.do(ctx, req, "/repositories/*/codespaces/machines")
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
 	}
@@ -411,18 +416,17 @@ func (a *API) GetCodespacesSKUs(ctx context.Context, user *User, repository *Rep
 	}
 
 	var response struct {
-		SKUs []*SKU `json:"skus"`
+		Machines []*Machine `json:"machines"`
 	}
 	if err := json.Unmarshal(b, &response); err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
 
-	return response.SKUs, nil
+	return response.Machines, nil
 }
 
 // CreateCodespaceParams are the required parameters for provisioning a Codespace.
 type CreateCodespaceParams struct {
-	User                      string
 	RepositoryID              int
 	Branch, Machine, Location string
 }
@@ -449,19 +453,14 @@ func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams
 		case <-ctx.Done():
 			return nil, ctx.Err()
 		case <-ticker.C:
-			token, err := a.GetCodespaceToken(ctx, params.User, codespace.Name)
-			if err != nil {
-				if err == ErrNotProvisioned {
-					// Do nothing. We expect this to fail until the codespace is provisioned
-					continue
-				}
-
-				return nil, fmt.Errorf("failed to get codespace token: %w", err)
-			}
-
-			codespace, err = a.GetCodespace(ctx, token, params.User, codespace.Name)
+			codespace, err = a.GetCodespace(ctx, codespace.Name, false)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get codespace: %w", err)
+			}
+
+			// we continue to poll until the codespace shows as provisioned
+			if codespace.State != CodespaceStateProvisioned {
+				continue
 			}
 
 			return codespace, nil
@@ -520,20 +519,15 @@ func (a *API) startCreate(ctx context.Context, repoID int, machine, branch, loca
 	return &response, nil
 }
 
-func (a *API) DeleteCodespace(ctx context.Context, user string, codespaceName string) error {
-	token, err := a.GetCodespaceToken(ctx, user, codespaceName)
-	if err != nil {
-		return fmt.Errorf("error getting codespace token: %w", err)
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, a.githubAPI+"/vscs_internal/user/"+user+"/codespaces/"+codespaceName, nil)
+// DeleteCodespace deletes the given codespace.
+func (a *API) DeleteCodespace(ctx context.Context, codespaceName string) error {
+	req, err := http.NewRequest(http.MethodDelete, a.githubAPI+"/user/codespaces/"+codespaceName, nil)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
 
-	// TODO: use a.setHeaders()
-	req.Header.Set("Authorization", "Bearer "+token)
-	resp, err := a.do(ctx, req, "/vscs_internal/user/*/codespaces/*")
+	a.setHeaders(req)
+	resp, err := a.do(ctx, req, "/user/codespaces/*")
 	if err != nil {
 		return fmt.Errorf("error making request: %w", err)
 	}
@@ -622,6 +616,8 @@ func (a *API) AuthorizedKeys(ctx context.Context, user string) ([]byte, error) {
 	return b, nil
 }
 
+// do executes the given request and returns the response. It creates an
+// opentracing span to track the length of the request.
 func (a *API) do(ctx context.Context, req *http.Request, spanName string) (*http.Response, error) {
 	// TODO(adonovan): use NewRequestWithContext(ctx) and drop ctx parameter.
 	span, ctx := opentracing.StartSpanFromContext(ctx, spanName)
@@ -630,6 +626,7 @@ func (a *API) do(ctx context.Context, req *http.Request, spanName string) (*http
 	return a.client.Do(req)
 }
 
+// setHeaders sets the required headers for the API.
 func (a *API) setHeaders(req *http.Request) {
 	if a.token != "" {
 		req.Header.Set("Authorization", "Bearer "+a.token)

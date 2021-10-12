@@ -1,4 +1,4 @@
-package ghcs
+package codespace
 
 import (
 	"context"
@@ -46,12 +46,12 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 		authkeys <- checkAuthorizedKeys(ctx, a.apiClient, user.Login)
 	}()
 
-	codespace, token, err := getOrChooseCodespace(ctx, a.apiClient, user, codespaceName)
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
 		return fmt.Errorf("get or choose codespace: %w", err)
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, a.apiClient, user.Login, token, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("connecting to Live Share: %w", err)
 	}

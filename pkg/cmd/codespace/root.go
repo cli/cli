@@ -1,4 +1,4 @@
-package ghcs
+package codespace
 
 import (
 	"github.com/spf13/cobra"
@@ -8,7 +8,7 @@ var version = "DEV" // Replaced in the release build process (by GoReleaser or H
 
 func NewRootCmd(app *App) *cobra.Command {
 	root := &cobra.Command{
-		Use:           "ghcs",
+		Use:           "codespace",
 		SilenceUsage:  true,  // don't print usage message after each error (see #80)
 		SilenceErrors: false, // print errors automatically so that main need not
 		Long: `Unofficial CLI tool to manage GitHub Codespaces.

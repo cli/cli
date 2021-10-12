@@ -19,7 +19,7 @@ If anything feels off, or if you feel that some functionality is missing, please
 
 ### macOS
 
-`gh` is available via [Homebrew][], [MacPorts][], [Conda][], and as a downloadable binary from the [releases page][].
+`gh` is available via [Homebrew][], [MacPorts][], [Conda][], [Spack][], and as a downloadable binary from the [releases page][].
 
 #### Homebrew
 
@@ -41,15 +41,21 @@ If anything feels off, or if you feel that some functionality is missing, please
 
 Additional Conda installation options available on the [gh-feedstock page](https://github.com/conda-forge/gh-feedstock#installing-gh).
 
+#### Spack
+
+| Install:           | Upgrade:                                 |
+| ------------------ | ---------------------------------------- |
+| `spack install gh` | `spack uninstall gh && spack install gh` |
+
 ### Linux & BSD
 
-`gh` is available via [Homebrew](#homebrew), [Conda](#Conda), and as downloadable binaries from the [releases page][].
+`gh` is available via [Homebrew](#homebrew), [Conda](#conda), [Spack](#spack), and as downloadable binaries from the [releases page][].
 
 For instructions on specific distributions and package managers, see [Linux & BSD installation](./docs/install_linux.md).
 
 ### Windows
 
-`gh` is available via [WinGet][], [scoop][], [Chocolatey][], [Conda](#Conda), and as downloadable MSI.
+`gh` is available via [WinGet][], [scoop][], [Chocolatey][], [Conda](#conda), and as downloadable MSI.
 
 #### WinGet
 
@@ -99,6 +105,7 @@ tool. Check out our [more detailed explanation][gh-vs-hub] to learn more.
 [scoop]: https://scoop.sh
 [Chocolatey]: https://chocolatey.org
 [Conda]: https://docs.conda.io/en/latest/
+[Spack]: https://spack.io
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
 [contributing]: ./.github/CONTRIBUTING.md
