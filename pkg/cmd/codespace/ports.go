@@ -42,6 +42,7 @@ func newPortsCmd(app *App) *cobra.Command {
 
 	portsCmd.AddCommand(newPortsPublicCmd(app))
 	portsCmd.AddCommand(newPortsPrivateCmd(app))
+	portsCmd.AddCommand(newPortsOrgCommand(app))
 	portsCmd.AddCommand(newPortsForwardCmd(app))
 
 	return portsCmd
@@ -79,7 +80,7 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, asJSON bool) 
 	}
 
 	table := output.NewTable(os.Stdout, asJSON)
-	table.SetHeader([]string{"Label", "Port", "Public", "Browse URL"})
+	table.SetHeader([]string{"Label", "Port", "Privacy", "Browse URL"})
 	for _, port := range ports {
 		sourcePort := strconv.Itoa(port.SourcePort)
 		var portName string
@@ -92,7 +93,7 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, asJSON bool) 
 		table.Append([]string{
 			portName,
 			sourcePort,
-			strings.ToUpper(strconv.FormatBool(port.IsPublic)),
+			port.Privacy,
 			fmt.Sprintf("https://%s-%s.githubpreview.dev/", codespace.Name, sourcePort),
 		})
 	}
@@ -160,7 +161,7 @@ func newPortsPublicCmd(app *App) *cobra.Command {
 				return fmt.Errorf("get codespace flag: %w", err)
 			}
 
-			return app.UpdatePortVisibility(cmd.Context(), codespace, args[0], true)
+			return app.UpdatePortVisibility(cmd.Context(), codespace, args[0], "public")
 		},
 	}
 }
@@ -180,12 +181,32 @@ func newPortsPrivateCmd(app *App) *cobra.Command {
 				return fmt.Errorf("get codespace flag: %w", err)
 			}
 
-			return app.UpdatePortVisibility(cmd.Context(), codespace, args[0], false)
+			return app.UpdatePortVisibility(cmd.Context(), codespace, args[0], "private")
 		},
 	}
 }
 
-func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName, sourcePort string, public bool) (err error) {
+// newPortsOrgCommand returns a Cobra "ports org" subcommand, which makes a given port org scoped.
+func newPortsOrgCommand(app *App) *cobra.Command {
+	return &cobra.Command{
+		Use:   "org <port>",
+		Short: "Mark port as org scoped",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			codespace, err := cmd.Flags().GetString("codespace")
+			if err != nil {
+				// should only happen if flag is not defined
+				// or if the flag is not of string type
+				// since it's a persistent flag that we control it should never happen
+				return fmt.Errorf("get codespace flag: %w", err)
+			}
+
+			return app.UpdatePortVisibility(cmd.Context(), codespace, args[0], "org")
+		},
+	}
+}
+
+func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName, sourcePort, visibility string) (err error) {
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
 		if err == errNoCodespaces {
@@ -205,15 +226,11 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName, sourcePor
 		return fmt.Errorf("error reading port number: %w", err)
 	}
 
-	if err := session.UpdateSharedVisibility(ctx, port, public); err != nil {
+	if err := session.UpdateSharedServerPrivacy(ctx, port, visibility); err != nil {
 		return fmt.Errorf("error update port to public: %w", err)
 	}
 
-	state := "PUBLIC"
-	if !public {
-		state = "PRIVATE"
-	}
-	a.logger.Printf("Port %s is now %s.\n", sourcePort, state)
+	a.logger.Printf("Port %s is now %s.\n", sourcePort, visibility)
 
 	return nil
 }
