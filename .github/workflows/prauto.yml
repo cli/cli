@@ -15,6 +15,7 @@ jobs:
           PRNUM: ${{ github.event.pull_request.number }}
           PRHEAD: ${{ github.event.pull_request.head.label }}
           PRAUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
         if: "!github.event.pull_request.draft"
         run: |
           commentPR () {
@@ -42,7 +43,7 @@ jobs:
             ' -f colID="$(colID "Needs review")" -f prID="$PRID"
           }
 
-          if gh api orgs/cli/public_members/$PRAUTHOR --silent 2>/dev/null
+          if [ "$PR_AUTHOR_TYPE" = "Bot" ] || gh api orgs/cli/public_members/$PRAUTHOR --silent 2>/dev/null
           then
             if ! errtext="$(addToBoard 2>&1)"
             then
