@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
 
 	"github.com/cli/cli/v2/internal/codespaces"
-	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
 )
@@ -18,6 +18,7 @@ type sshOptions struct {
 	profile    string
 	serverPort int
 	debug      bool
+	debugFile  string
 }
 
 func newSSHCmd(app *App) *cobra.Command {
@@ -35,6 +36,7 @@ func newSSHCmd(app *App) *cobra.Command {
 	sshCmd.Flags().IntVarP(&opts.serverPort, "server-port", "", 0, "SSH server port number (0 => pick unused)")
 	sshCmd.Flags().StringVarP(&opts.codespace, "codespace", "c", "", "Name of the codespace")
 	sshCmd.Flags().BoolVarP(&opts.debug, "debug", "d", false, "Log debug data to a file")
+	sshCmd.Flags().StringVarP(&opts.debugFile, "debug-file", "", "", "Path of the file log to")
 
 	return sshCmd
 }
@@ -62,7 +64,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 
 	var debugLogger *fileLogger
 	if opts.debug {
-		debugLogger, err = newFileLogger("gh-cs-ssh")
+		debugLogger, err = newFileLogger(opts.debugFile)
 		if err != nil {
 			return fmt.Errorf("error creating debug logger: %w", err)
 		}
@@ -125,26 +127,34 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 }
 
-// fileLogger is a wrapper around an output.Logger configured to write
+// fileLogger is a wrapper around an log.Logger configured to write
 // to a file. It exports two additional methods to get the log file name
 // and close the file handle when the operation is finished.
 type fileLogger struct {
-	// TODO(josebalius): should we use https://pkg.go.dev/log#New instead?
-	*output.Logger
+	*log.Logger
 
 	f *os.File
 }
 
 // newFileLogger creates a new fileLogger. It returns an error if the file
-// cannot be created. The file is created in the operating system tmp directory
-// under the name parameter.
-func newFileLogger(name string) (*fileLogger, error) {
-	f, err := ioutil.TempFile("", name)
-	if err != nil {
-		return nil, err
+// cannot be created. The file is created on the specified path, if the path
+// is empty it is created in the temporary directory.
+func newFileLogger(file string) (fl *fileLogger, err error) {
+	var f *os.File
+	if file == "" {
+		f, err = ioutil.TempFile("", "")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create tmp file: %w", err)
+		}
+	} else {
+		f, err = os.Create(file)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	return &fileLogger{
-		Logger: output.NewLogger(f, f, false),
+		Logger: log.New(f, "", log.LstdFlags),
 		f:      f,
 	}, nil
 }

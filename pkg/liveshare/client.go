@@ -24,18 +24,8 @@ import (
 )
 
 type logger interface {
-	Println(v ...interface{}) (int, error)
-	Printf(f string, v ...interface{}) (int, error)
-}
-
-type noopLogger struct{}
-
-func (n noopLogger) Println(...interface{}) (int, error) {
-	return 0, nil
-}
-
-func (n noopLogger) Printf(string, ...interface{}) (int, error) {
-	return 0, nil
+	Println(v ...interface{})
+	Printf(f string, v ...interface{})
 }
 
 // An Options specifies Live Share connection parameters.
@@ -46,8 +36,8 @@ type Options struct {
 	RelaySAS       string
 	RelayEndpoint  string
 	HostPublicKeys []string
+	Logger         logger      // required
 	TLSConfig      *tls.Config // (optional)
-	Logger         logger      // (optional)
 }
 
 // uri returns a websocket URL for the specified options.
@@ -85,9 +75,8 @@ func Connect(ctx context.Context, opts Options) (*Session, error) {
 		return nil, err
 	}
 
-	var sessionLogger logger = noopLogger{}
-	if opts.Logger != nil {
-		sessionLogger = opts.Logger
+	if opts.Logger == nil {
+		return nil, errors.New("Logger is required")
 	}
 
 	sock := newSocket(uri, opts.TLSConfig)
@@ -124,7 +113,7 @@ func Connect(ctx context.Context, opts Options) (*Session, error) {
 		rpc:             rpc,
 		clientName:      opts.ClientName,
 		keepAliveReason: make(chan string, 1),
-		logger:          sessionLogger,
+		logger:          opts.Logger,
 	}
 	go s.heartbeat(ctx, 1*time.Minute)
 

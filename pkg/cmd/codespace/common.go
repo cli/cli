@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
 	"os"
 	"sort"
 	"strings"
@@ -209,6 +211,10 @@ func noArgsConstraint(cmd *cobra.Command, args []string) error {
 		return ErrTooManyArgs
 	}
 	return nil
+}
+
+func noopLogger() *log.Logger {
+	return log.New(ioutil.Discard, "", 0)
 }
 
 type codespace struct {

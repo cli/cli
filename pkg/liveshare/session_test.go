@@ -41,6 +41,7 @@ func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server,
 		RelaySAS:       "relay-sas",
 		HostPublicKeys: []string{livesharetest.SSHPublicKey},
 		TLSConfig:      &tls.Config{InsecureSkipVerify: true},
+		Logger:         newMockLogger(),
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("error connecting to Live Share: %w", err)
@@ -383,16 +384,16 @@ func newMockLogger() *mockLogger {
 	return &mockLogger{buf: new(bytes.Buffer)}
 }
 
-func (m *mockLogger) Printf(format string, v ...interface{}) (int, error) {
+func (m *mockLogger) Printf(format string, v ...interface{}) {
 	m.Lock()
 	defer m.Unlock()
-	return m.buf.WriteString(fmt.Sprintf(format, v...))
+	m.buf.WriteString(fmt.Sprintf(format, v...))
 }
 
-func (m *mockLogger) Println(v ...interface{}) (int, error) {
+func (m *mockLogger) Println(v ...interface{}) {
 	m.Lock()
 	defer m.Unlock()
-	return m.buf.WriteString(fmt.Sprintln(v...))
+	m.buf.WriteString(fmt.Sprintln(v...))
 }
 
 func (m *mockLogger) String() string {

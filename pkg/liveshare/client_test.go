@@ -20,6 +20,7 @@ func TestConnect(t *testing.T) {
 		SessionToken:   "session-token",
 		RelaySAS:       "relay-sas",
 		HostPublicKeys: []string{livesharetest.SSHPublicKey},
+		Logger:         newMockLogger(),
 	}
 	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
 		var joinWorkspaceReq joinWorkspaceArgs
