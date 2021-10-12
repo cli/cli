@@ -77,12 +77,11 @@ func renameRun(opts *RenameOptions) error {
 	if err != nil {
 		return fmt.Errorf("argument error: %w", err)
 	}
-
-	fields := []string{"name", "owner", "id"}
-	repoDetails, err := api.FetchRepository(apiClient, repo, fields)
-	if err != nil {
-		return err
-	}
+	// fields := []string{"name", "owner", "id"}
+	// repoDetails, err := api.FetchRepository(apiClient, repo, fields)
+	// if err != nil {
+	// 	return err
+	// }
 
 	input := renameRepo{
 		Owner:      repo.RepoOwner(),
@@ -90,7 +89,7 @@ func renameRun(opts *RenameOptions) error {
 		Name:       newRepoName,
 	}
 
-	err = runRename(apiClient, repo.RepoHost(), repoDetails, input)
+	err = runRename(apiClient, repo.RepoHost(), input)
 	if err != nil {
 		return fmt.Errorf("API called failed: %s, please check your parameters", err.Error())
 	}
@@ -102,8 +101,8 @@ func renameRun(opts *RenameOptions) error {
 	return nil
 }
 
-func runRename(apiClient *api.Client, hostname string, repoDetails *api.Repository, input renameRepo) error {
-	path := fmt.Sprintf("repos/%s/%s", repoDetails.Owner.Login, repoDetails.Name)
+func runRename(apiClient *api.Client, hostname string, input renameRepo) error {
+	path := fmt.Sprintf("repos/%s/%s", input.Owner, input.Repository)
 
 	body := &bytes.Buffer{}
 	enc := json.NewEncoder(body)

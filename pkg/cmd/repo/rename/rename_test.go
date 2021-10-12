@@ -86,20 +86,6 @@ func TestRenameRun(t *testing.T) {
 			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n",
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryInfo\b`),
-					httpmock.StringResponse(`
-					{
-						"data": {
-						  "repository": {
-							"id": "THE-ID",
-							"name": "REPO",
-							"owner": {
-							  "login": "OWNER"
-							}
-						  }
-						}
-					}`))
-				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
 					httpmock.StatusStringResponse(204, "{}"))
 			},
@@ -108,26 +94,12 @@ func TestRenameRun(t *testing.T) {
 		{
 			name: "owner repo change name notty",
 			opts: RenameOptions{
-				oldRepoName: "OWNER/REPO",
+				oldRepoName: "NON_OWNER/REPO",
 				newRepoName: "NEW_REPO",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryInfo\b`),
-					httpmock.StringResponse(`
-					{
-						"data": {
-						  "repository": {
-							"id": "THE-ID",
-							"name": "REPO",
-							"owner": {
-							  "login": "OWNER"
-							}
-						  }
-						}
-					}`))
-				reg.Register(
-					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.REST("PATCH", "repos/NON_OWNER/REPO"),
 					httpmock.StatusStringResponse(200, "{}"))
 			},
 			stdoutTTY: false,
