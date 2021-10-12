@@ -64,9 +64,8 @@ func renameRun(opts *RenameOptions) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	oldRepoName := opts.oldRepoName
-	var currentUser string
 	if !strings.Contains(oldRepoName, "/") {
-		currentUser, err = api.CurrentLoginName(apiClient, ghinstance.Default())
+		currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
 		if err != nil {
 			return err
 		}
@@ -85,10 +84,6 @@ func renameRun(opts *RenameOptions) error {
 		return err
 	}
 
-	if currentUser != repoDetails.Owner.Login {
-		return fmt.Errorf("%s you do not own this repository", cs.FailureIcon())
-	}
-
 	input := renameRepo{
 		Owner:      repo.RepoOwner(),
 		Repository: repo.RepoName(),
@@ -97,11 +92,11 @@ func renameRun(opts *RenameOptions) error {
 
 	err = runRename(apiClient, repo.RepoHost(), repoDetails, input)
 	if err != nil {
-		return err
+		return fmt.Errorf("API called failed: %s, please check your parameters", err.Error())
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.Out, "%s Renamed repository %s\n", cs.SuccessIcon(), currentUser+"/"+newRepoName)
+		fmt.Fprintf(opts.IO.Out, "%s Renamed repository %s\n", cs.SuccessIcon(), repo.RepoOwner()+"/"+newRepoName)
 	}
 
 	return nil
