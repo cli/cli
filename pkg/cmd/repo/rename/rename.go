@@ -77,11 +77,6 @@ func renameRun(opts *RenameOptions) error {
 	if err != nil {
 		return fmt.Errorf("argument error: %w", err)
 	}
-	// fields := []string{"name", "owner", "id"}
-	// repoDetails, err := api.FetchRepository(apiClient, repo, fields)
-	// if err != nil {
-	// 	return err
-	// }
 
 	input := renameRepo{
 		Owner:      repo.RepoOwner(),
