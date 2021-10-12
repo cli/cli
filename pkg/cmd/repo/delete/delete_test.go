@@ -27,7 +27,9 @@ func Test_deleteRun(t *testing.T) {
 			opts:       &DeleteOptions{RepoArg: "OWNER/REPO"},
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
 			askStubs: func(q *prompt.AskStubber) {
-				q.StubOne("NOTOWNER/NOTREPO") // this always passes??
+				// TODO: survey stubber doesn't have WithValidation support
+				// so this always passes regardless of prompt input
+				q.StubOne("OWNER/REPO")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -51,7 +53,7 @@ func Test_deleteRun(t *testing.T) {
 			name:    "no confirmation no tty",
 			opts:    &DeleteOptions{RepoArg: "OWNER/REPO"},
 			wantErr: true,
-			errMsg:  "could not prompt: confirmation with prompt or --yes flag required",
+			errMsg:  "could not prompt: confirmation with prompt or --confirm flag required",
 		},
 	}
 	for _, tt := range tests {

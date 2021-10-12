@@ -15,7 +15,6 @@ func deleteRepo(client *http.Client, repo ghrepo.Interface) error {
 		ghrepo.FullName(repo))
 
 	request, err := http.NewRequest("DELETE", url, nil)
-	request.Header.Set("Accept", "application/vnd.github.v3+json")
 	if err != nil {
 		return err
 	}
@@ -26,13 +25,8 @@ func deleteRepo(client *http.Client, repo ghrepo.Interface) error {
 	}
 	defer resp.Body.Close()
 
-	err = api.HandleHTTPError(resp)
-	if resp.StatusCode == 403 {
-		return fmt.Errorf(`%w
-
-Deletion requires authorization with the "delete_repo" scope. To authorize, run "gh auth refresh -s delete_repo"`, err)
-	} else if resp.StatusCode > 204 {
-		return err
+	if resp.StatusCode > 299 {
+		return api.HandleHTTPError(resp)
 	}
 
 	return nil

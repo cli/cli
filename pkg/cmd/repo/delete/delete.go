@@ -36,7 +36,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		Long: `Delete a GitHub repository.
 
 Deletion requires authorization with the "delete_repo" scope. 
-To authorize, run "gh auth refresh -h github.com -s delete_repo"`,
+To authorize, run "gh auth refresh -s delete_repo"`,
 		Args: cmdutil.ExactArgs(1, "cannot delete: repository argument required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.RepoArg = args[0]
@@ -47,7 +47,7 @@ To authorize, run "gh auth refresh -h github.com -s delete_repo"`,
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.Confirmed, "yes", false, "confirm deletion without prompting")
+	cmd.Flags().BoolVarP(&opts.Confirmed, "confirm", "c", false, "confirm deletion without prompting")
 	return cmd
 }
 
@@ -77,7 +77,7 @@ func deleteRun(opts *DeleteOptions) error {
 
 	doPrompt := opts.IO.CanPrompt()
 	if !opts.Confirmed && !doPrompt {
-		return errors.New("could not prompt: confirmation with prompt or --yes flag required")
+		return errors.New("could not prompt: confirmation with prompt or --confirm flag required")
 	}
 
 	if !opts.Confirmed && doPrompt {
