@@ -148,7 +148,7 @@ func newPortsPrivacyCmd(app *App) *cobra.Command {
 	return &cobra.Command{
 		Use:     "privacy <port:public|private|org>...",
 		Short:   "Change the privacy of the forwarded port",
-		Example: "gh cs ports privacy 80:org 3000:private 8000:public",
+		Example: "gh codespace ports privacy 80:org 3000:private 8000:public",
 		Args:    cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
