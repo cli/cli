@@ -172,12 +172,12 @@ func TestServerUpdateSharedServerPrivacy(t *testing.T) {
 		} else {
 			return nil, errors.New("port param is not a float64")
 		}
-		if public, ok := req[1].(bool); ok {
-			if public != true {
-				return nil, errors.New("pulic param is not expected value")
+		if privacy, ok := req[1].(string); ok {
+			if privacy != "public" {
+				return nil, fmt.Errorf("expected privacy param to be public but got %q", privacy)
 			}
 		} else {
-			return nil, errors.New("public param is not a bool")
+			return nil, fmt.Errorf("expected privacy param to be a bool but go %T", req[1])
 		}
 		return nil, nil
 	}
