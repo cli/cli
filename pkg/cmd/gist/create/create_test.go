@@ -388,32 +388,3 @@ func Test_detectEmptyFiles(t *testing.T) {
 		assert.Equal(t, tt.isEmptyFile, isEmptyFile)
 	}
 }
-
-func Test_CreateRun_reauth(t *testing.T) {
-	reg := &httpmock.Registry{}
-	reg.Register(httpmock.REST("POST", "gists"), func(req *http.Request) (*http.Response, error) {
-		return &http.Response{
-			StatusCode: 404,
-			Request:    req,
-			Header: map[string][]string{
-				"X-Oauth-Scopes": {"repo, read:org"},
-			},
-			Body: ioutil.NopCloser(bytes.NewBufferString("oh no")),
-		}, nil
-	})
-
-	io, _, _, _ := iostreams.Test()
-
-	opts := &CreateOptions{
-		IO: io,
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		},
-		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
-		},
-	}
-
-	err := createRun(opts)
-	assert.EqualError(t, err, "This command requires the 'gist' OAuth scope.\nPlease re-authenticate with:  gh auth refresh -h github.com -s gist")
-}
