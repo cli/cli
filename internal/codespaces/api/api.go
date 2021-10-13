@@ -341,7 +341,7 @@ func (a *API) StartCodespace(ctx context.Context, codespaceName string) error {
 		if len(b) > 100 {
 			b = append(b[:97], "..."...)
 		}
-		return fmt.Errorf("failed to start codespace: %s", b)
+		return fmt.Errorf("failed to start codespace: %s (%s)", b, resp.Status)
 	}
 
 	return nil
