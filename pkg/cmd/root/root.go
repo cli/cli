@@ -128,10 +128,12 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 }
 
 func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
-	cmd := codespaceCmd.NewRootCmd(codespaceCmd.NewApp(
+	app := codespaceCmd.NewApp(
+		f.IOStreams,
 		output.NewLogger(f.IOStreams.Out, f.IOStreams.ErrOut, !f.IOStreams.IsStdoutTTY()),
 		codespacesAPI.New("", &lazyLoadedHTTPClient{factory: f}),
-	))
+	)
+	cmd := codespaceCmd.NewRootCmd(app)
 	cmd.Use = "codespace"
 	cmd.Aliases = []string{"cs"}
 	cmd.Hidden = true
