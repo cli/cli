@@ -62,17 +62,19 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		return fmt.Errorf("get or choose codespace: %w", err)
 	}
 
-	var debugLogger *fileLogger
+	liveshareLogger := noopLogger()
 	if opts.debug {
-		debugLogger, err = newFileLogger(opts.debugFile)
+		debugLogger, err := newFileLogger(opts.debugFile)
 		if err != nil {
 			return fmt.Errorf("error creating debug logger: %w", err)
 		}
 		defer safeClose(debugLogger, &err)
+
+		liveshareLogger = debugLogger.Logger
 		a.logger.Println("Debug file located at: " + debugLogger.Name())
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, debugLogger, a.apiClient, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, liveshareLogger, a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
