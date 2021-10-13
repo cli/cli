@@ -9,10 +9,14 @@ import (
 // NewLogger returns a Logger that will write to the given stdout/stderr writers.
 // Disable the Logger to prevent it from writing to stdout in a TTY environment.
 func NewLogger(stdout, stderr io.Writer, disabled bool) *Logger {
+	enabled := !disabled
+	if isTTY(stdout) && !enabled {
+		enabled = false
+	}
 	return &Logger{
 		out:     stdout,
 		errout:  stderr,
-		enabled: !disabled && isTTY(stdout),
+		enabled: enabled,
 	}
 }
 

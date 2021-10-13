@@ -17,23 +17,34 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/opentracing/opentracing-go"
 	"golang.org/x/crypto/ssh"
 )
 
+type logger interface {
+	Println(v ...interface{})
+	Printf(f string, v ...interface{})
+}
+
 // An Options specifies Live Share connection parameters.
 type Options struct {
+	ClientName     string // ClientName is the name of the connecting client.
 	SessionID      string
 	SessionToken   string // token for SSH session
 	RelaySAS       string
 	RelayEndpoint  string
 	HostPublicKeys []string
+	Logger         logger      // required
 	TLSConfig      *tls.Config // (optional)
 }
 
 // uri returns a websocket URL for the specified options.
 func (opts *Options) uri(action string) (string, error) {
+	if opts.ClientName == "" {
+		return "", errors.New("ClientName is required")
+	}
 	if opts.SessionID == "" {
 		return "", errors.New("SessionID is required")
 	}
@@ -56,13 +67,17 @@ func (opts *Options) uri(action string) (string, error) {
 // options, and returns a session representing the connection.
 // The caller must call the session's Close method to end the session.
 func Connect(ctx context.Context, opts Options) (*Session, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "Connect")
+	defer span.Finish()
+
 	uri, err := opts.uri("connect")
 	if err != nil {
 		return nil, err
 	}
 
-	span, ctx := opentracing.StartSpanFromContext(ctx, "Connect")
-	defer span.Finish()
+	if opts.Logger == nil {
+		return nil, errors.New("Logger is required")
+	}
 
 	sock := newSocket(uri, opts.TLSConfig)
 	if err := sock.connect(ctx); err != nil {
@@ -93,7 +108,16 @@ func Connect(ctx context.Context, opts Options) (*Session, error) {
 		return nil, fmt.Errorf("error joining Live Share workspace: %w", err)
 	}
 
-	return &Session{ssh: ssh, rpc: rpc}, nil
+	s := &Session{
+		ssh:             ssh,
+		rpc:             rpc,
+		clientName:      opts.ClientName,
+		keepAliveReason: make(chan string, 1),
+		logger:          opts.Logger,
+	}
+	go s.heartbeat(ctx, 1*time.Minute)
+
+	return s, nil
 }
 
 type clientCapabilities struct {
