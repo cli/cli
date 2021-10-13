@@ -161,14 +161,14 @@ type Codespace struct {
 	RepositoryNWO  string               `json:"repository_nwo"`
 	OwnerLogin     string               `json:"owner_login"`
 	Environment    CodespaceEnvironment `json:"environment"`
+	Connection     CodespaceConnection  `json:"connection"`
 }
 
 const CodespaceStateProvisioned = "provisioned"
 
 type CodespaceEnvironment struct {
-	State      string                         `json:"state"`
-	Connection CodespaceEnvironmentConnection `json:"connection"`
-	GitStatus  CodespaceEnvironmentGitStatus  `json:"gitStatus"`
+	State     string                        `json:"state"`
+	GitStatus CodespaceEnvironmentGitStatus `json:"gitStatus"`
 }
 
 type CodespaceEnvironmentGitStatus struct {
@@ -185,7 +185,7 @@ const (
 	CodespaceEnvironmentStateAvailable = "Available"
 )
 
-type CodespaceEnvironmentConnection struct {
+type CodespaceConnection struct {
 	SessionID      string   `json:"sessionId"`
 	SessionToken   string   `json:"sessionToken"`
 	RelayEndpoint  string   `json:"relayEndpoint"`
