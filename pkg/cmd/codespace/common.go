@@ -38,6 +38,7 @@ type apiClient interface {
 	ListCodespaces(ctx context.Context, limit int) ([]*api.Codespace, error)
 	DeleteCodespace(ctx context.Context, name string) error
 	StartCodespace(ctx context.Context, name string) error
+	StopCodespace(ctx context.Context, name string) error
 	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
 	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
 	AuthorizedKeys(ctx context.Context, user string) ([]byte, error)
@@ -250,4 +251,8 @@ func (c codespace) branchWithGitStatus() string {
 // unsaved changes.
 func (c codespace) hasUnsavedChanges() bool {
 	return c.Environment.GitStatus.HasUncommitedChanges || c.Environment.GitStatus.HasUnpushedChanges
+}
+
+func (c codespace) isRunning() bool {
+	return c.Environment.State == api.CodespaceEnvironmentStateAvailable
 }
