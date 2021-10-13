@@ -17,9 +17,9 @@ import (
 )
 
 type RenameOptions struct {
-	HttpClient  func() (*http.Client, error)
-	IO          *iostreams.IOStreams
-	Config      func() (config.Config, error)
+	HttpClient      func() (*http.Client, error)
+	IO              *iostreams.IOStreams
+	Config          func() (config.Config, error)
 	oldRepoSelector string
 	newRepoSelector string
 }
