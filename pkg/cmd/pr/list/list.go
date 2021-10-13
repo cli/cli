@@ -7,13 +7,13 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/text"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/text"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -37,6 +37,7 @@ type ListOptions struct {
 	Author     string
 	Assignee   string
 	Search     string
+	Draft      string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -46,15 +47,17 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Browser:    f.Browser,
 	}
 
+	var draft bool
+
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List and filter pull requests in this repository",
 		Example: heredoc.Doc(`
 			List PRs authored by you
-			$ gh pr list --author @me
+			$ gh pr list --author "@me"
 
 			List PRs assigned to you
-			$ gh pr list --assignee @me
+			$ gh pr list --assignee "@me"
 
 			List PRs by label, combining multiple labels with AND
 			$ gh pr list --label bug --label "priority 1"
@@ -74,6 +77,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return &cmdutil.FlagError{Err: fmt.Errorf("invalid value for --limit: %v", opts.LimitResults)}
 			}
 
+			if cmd.Flags().Changed("draft") {
+				opts.Draft = strconv.FormatBool(draft)
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -85,13 +92,15 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of items to fetch")
 	cmd.Flags().StringVarP(&opts.State, "state", "s", "open", "Filter by state: {open|closed|merged|all}")
 	_ = cmd.RegisterFlagCompletionFunc("state", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"open", "closed", "merged", "all"}, cobra.ShellCompDirectiveNoSpace
+		return []string{"open", "closed", "merged", "all"}, cobra.ShellCompDirectiveNoFileComp
 	})
 	cmd.Flags().StringVarP(&opts.BaseBranch, "base", "B", "", "Filter by base branch")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by labels")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
+	cmd.Flags().BoolVarP(&draft, "draft", "d", false, "Filter by draft state")
+
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
@@ -132,12 +141,12 @@ func listRun(opts *ListOptions) error {
 		Labels:     opts.Labels,
 		BaseBranch: opts.BaseBranch,
 		Search:     opts.Search,
+		Draft:      opts.Draft,
 		Fields:     defaultFields,
 	}
 	if opts.Exporter != nil {
 		filters.Fields = opts.Exporter.Fields()
 	}
-
 	if opts.WebMode {
 		prListURL := ghrepo.GenerateRepoURL(baseRepo, "pulls")
 		openURL, err := shared.ListURLWithQuery(prListURL, filters)
@@ -163,9 +172,12 @@ func listRun(opts *ListOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
-		return opts.Exporter.Write(opts.IO.Out, listResult.PullRequests, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO, listResult.PullRequests)
 	}
 
+	if listResult.SearchCapped {
+		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
+	}
 	if opts.IO.IsStdoutTTY() {
 		title := shared.ListHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, !filters.IsDefault())
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)

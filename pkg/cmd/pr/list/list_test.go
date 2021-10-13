@@ -8,12 +8,12 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/test"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -176,39 +176,89 @@ func TestPRList_filteringAssignee(t *testing.T) {
 	}
 }
 
-func TestPRList_filteringAssigneeLabels(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
+func TestPRList_filteringDraft(t *testing.T) {
+	tests := []struct {
+		name          string
+		cli           string
+		expectedQuery string
+	}{
+		{
+			name:          "draft",
+			cli:           "--draft",
+			expectedQuery: `repo:OWNER/REPO is:pr is:open draft:true`,
+		},
+		{
+			name:          "non-draft",
+			cli:           "--draft=false",
+			expectedQuery: `repo:OWNER/REPO is:pr is:open draft:false`,
+		},
+	}
 
-	_, err := runCommand(http, true, `-l one,two -a hubot`)
-	if err == nil && err.Error() != "multiple labels with --assignee are not supported" {
-		t.Fatal(err)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			http := initFakeHTTP()
+			defer http.Verify(t)
+
+			http.Register(
+				httpmock.GraphQL(`query PullRequestSearch\b`),
+				httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
+					assert.Equal(t, test.expectedQuery, params["q"].(string))
+				}))
+
+			_, err := runCommand(http, true, test.cli)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 
 func TestPRList_withInvalidLimitFlag(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
-
 	_, err := runCommand(http, true, `--limit=0`)
-	if err == nil && err.Error() != "invalid limit: 0" {
-		t.Errorf("error running command `issue list`: %v", err)
-	}
+	assert.EqualError(t, err, "invalid value for --limit: 0")
 }
 
 func TestPRList_web(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	_, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	output, err := runCommand(http, true, "--web -a peter -l bug -l docs -L 10 -s merged -B trunk")
-	if err != nil {
-		t.Errorf("error running command `pr list` with `--web` flag: %v", err)
+	tests := []struct {
+		name               string
+		cli                string
+		expectedBrowserURL string
+	}{
+		{
+			name:               "filters",
+			cli:                "-a peter -l bug -l docs -L 10 -s merged -B trunk",
+			expectedBrowserURL: "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk",
+		},
+		{
+			name:               "draft",
+			cli:                "--draft=true",
+			expectedBrowserURL: "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Aopen+draft%3Atrue",
+		},
+		{
+			name:               "non-draft",
+			cli:                "--draft=0",
+			expectedBrowserURL: "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Aopen+draft%3Afalse",
+		},
 	}
 
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/pulls in your browser.\n", output.Stderr())
-	assert.Equal(t, "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk", output.BrowsedURL)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			http := initFakeHTTP()
+			defer http.Verify(t)
+
+			_, cmdTeardown := run.Stub()
+			defer cmdTeardown(t)
+
+			output, err := runCommand(http, true, "--web "+test.cli)
+			if err != nil {
+				t.Errorf("error running command `pr list` with `--web` flag: %v", err)
+			}
+
+			assert.Equal(t, "", output.String())
+			assert.Equal(t, "Opening github.com/OWNER/REPO/pulls in your browser.\n", output.Stderr())
+			assert.Equal(t, test.expectedBrowserURL, output.BrowsedURL)
+		})
+	}
 }

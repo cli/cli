@@ -13,18 +13,18 @@ import (
 
 	surveyCore "github.com/AlecAivazis/survey/v2/core"
 	"github.com/AlecAivazis/survey/v2/terminal"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/build"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/internal/update"
-	"github.com/cli/cli/pkg/cmd/alias/expand"
-	"github.com/cli/cli/pkg/cmd/factory"
-	"github.com/cli/cli/pkg/cmd/root"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/build"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/internal/update"
+	"github.com/cli/cli/v2/pkg/cmd/alias/expand"
+	"github.com/cli/cli/v2/pkg/cmd/factory"
+	"github.com/cli/cli/v2/pkg/cmd/root"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/utils"
 	"github.com/cli/safeexec"
 	"github.com/mattn/go-colorable"
 	"github.com/mgutz/ansi"
@@ -61,6 +61,10 @@ func mainRun() exitCode {
 
 	cmdFactory := factory.New(buildVersion)
 	stderr := cmdFactory.IOStreams.ErrOut
+
+	if spec := os.Getenv("GH_FORCE_TTY"); spec != "" {
+		cmdFactory.IOStreams.ForceTerminal(spec)
+	}
 	if !cmdFactory.IOStreams.ColorEnabled() {
 		surveyCore.DisableColor = true
 	} else {
@@ -102,12 +106,17 @@ func mainRun() exitCode {
 		expandedArgs = os.Args[1:]
 	}
 
-	cmd, _, err := rootCmd.Traverse(expandedArgs)
-	if err != nil || cmd == rootCmd {
+	// translate `gh help <command>` to `gh <command> --help` for extensions
+	if len(expandedArgs) == 2 && expandedArgs[0] == "help" && !hasCommand(rootCmd, expandedArgs[1:]) {
+		expandedArgs = []string{expandedArgs[1], "--help"}
+	}
+
+	if !hasCommand(rootCmd, expandedArgs) {
 		originalArgs := expandedArgs
 		isShell := false
 
-		expandedArgs, isShell, err = expand.ExpandAlias(cfg, os.Args, nil)
+		argsForExpansion := append([]string{"gh"}, expandedArgs...)
+		expandedArgs, isShell, err = expand.ExpandAlias(cfg, argsForExpansion, nil)
 		if err != nil {
 			fmt.Fprintf(stderr, "failed to process aliases:  %s\n", err)
 			return exitError
@@ -141,7 +150,7 @@ func mainRun() exitCode {
 			}
 
 			return exitOK
-		} else if c, _, err := rootCmd.Traverse(expandedArgs); err == nil && c == rootCmd && len(expandedArgs) > 0 {
+		} else if len(expandedArgs) > 0 && !hasCommand(rootCmd, expandedArgs) {
 			extensionManager := cmdFactory.ExtensionManager
 			if found, err := extensionManager.Dispatch(expandedArgs, os.Stdin, os.Stdout, os.Stderr); err != nil {
 				var execError *exec.ExitError
@@ -166,7 +175,7 @@ func mainRun() exitCode {
 				}
 			}
 		}
-		for _, ext := range cmdFactory.ExtensionManager.List() {
+		for _, ext := range cmdFactory.ExtensionManager.List(false) {
 			if strings.HasPrefix(ext.Name(), toComplete) {
 				results = append(results, ext.Name())
 			}
@@ -208,13 +217,15 @@ func mainRun() exitCode {
 
 		if strings.Contains(err.Error(), "Incorrect function") {
 			fmt.Fprintln(stderr, "You appear to be running in MinTTY without pseudo terminal support.")
-			fmt.Fprintln(stderr, "To learn about workarounds for this error, run: gh help mintty")
+			fmt.Fprintln(stderr, "To learn about workarounds for this error, run:  gh help mintty")
 			return exitError
 		}
 
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 401 {
-			fmt.Fprintln(stderr, "hint: try authenticating with `gh auth login`")
+			fmt.Fprintln(stderr, "Try authenticating with:  gh auth login")
+		} else if strings.Contains(err.Error(), "Resource protected by organization SAML enforcement") {
+			fmt.Fprintln(stderr, "Try re-authenticating with:  gh auth refresh")
 		}
 
 		return exitError
@@ -225,7 +236,7 @@ func mainRun() exitCode {
 
 	newRelease := <-updateMessageChan
 	if newRelease != nil {
-		isHomebrew := isUnderHomebrew(cmdFactory.Executable)
+		isHomebrew := isUnderHomebrew(cmdFactory.Executable())
 		if isHomebrew && isRecentRelease(newRelease.PublishedAt) {
 			// do not notify Homebrew users before the version bump had a chance to get merged into homebrew-core
 			return exitOK
@@ -244,6 +255,12 @@ func mainRun() exitCode {
 	return exitOK
 }
 
+// hasCommand returns true if args resolve to a built-in command
+func hasCommand(rootCmd *cobra.Command, args []string) bool {
+	c, _, err := rootCmd.Traverse(args)
+	return err == nil && c != rootCmd
+}
+
 func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
 	var dnsError *net.DNSError
 	if errors.As(err, &dnsError) {
@@ -251,7 +268,7 @@ func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
 		if debug {
 			fmt.Fprintln(out, dnsError)
 		}
-		fmt.Fprintln(out, "check your internet connection or githubstatus.com")
+		fmt.Fprintln(out, "check your internet connection or https://githubstatus.com")
 		return
 	}
 

@@ -1,12 +1,12 @@
 package run
 
 import (
-	cmdDownload "github.com/cli/cli/pkg/cmd/run/download"
-	cmdList "github.com/cli/cli/pkg/cmd/run/list"
-	cmdRerun "github.com/cli/cli/pkg/cmd/run/rerun"
-	cmdView "github.com/cli/cli/pkg/cmd/run/view"
-	cmdWatch "github.com/cli/cli/pkg/cmd/run/watch"
-	"github.com/cli/cli/pkg/cmdutil"
+	cmdDownload "github.com/cli/cli/v2/pkg/cmd/run/download"
+	cmdList "github.com/cli/cli/v2/pkg/cmd/run/list"
+	cmdRerun "github.com/cli/cli/v2/pkg/cmd/run/rerun"
+	cmdView "github.com/cli/cli/v2/pkg/cmd/run/view"
+	cmdWatch "github.com/cli/cli/v2/pkg/cmd/run/watch"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
 

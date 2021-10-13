@@ -2,17 +2,16 @@ package factory
 
 import (
 	"errors"
+	"fmt"
 	"net/url"
 	"sort"
 
-	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/pkg/set"
+	"github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/pkg/set"
 )
-
-const GH_HOST = "GH_HOST"
 
 type remoteResolver struct {
 	readRemotes   func() (git.RemoteSet, error)
@@ -75,18 +74,19 @@ func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
 		// For enviornment default host (GH_HOST) do not fallback to cachedRemotes if none match
 		if src != "" {
 			filteredRemotes := cachedRemotes.FilterByHosts([]string{defaultHost})
-			if src == GH_HOST || len(filteredRemotes) > 0 {
+			if config.IsHostEnv(src) || len(filteredRemotes) > 0 {
 				cachedRemotes = filteredRemotes
 			}
 		}
 
 		if len(cachedRemotes) == 0 {
-			if src == GH_HOST {
-				remotesError = errors.New("none of the git remotes configured for this repository correspond to the GH_HOST environment variable. Try adding a matching remote or unsetting the variable.")
-			} else {
-				remotesError = errors.New("none of the git remotes configured for this repository point to a known GitHub host. To tell gh about a new GitHub host, please use `gh auth login`")
+			dummyHostname := "example.com" // any non-github.com hostname is fine here
+			if config.IsHostEnv(src) {
+				return nil, fmt.Errorf("none of the git remotes configured for this repository correspond to the %s environment variable. Try adding a matching remote or unsetting the variable.", src)
+			} else if v, src, _ := cfg.GetWithSource(dummyHostname, "oauth_token"); v != "" && config.IsEnterpriseEnv(src) {
+				return nil, errors.New("set the GH_HOST environment variable to specify which GitHub host to use")
 			}
-			return nil, remotesError
+			return nil, errors.New("none of the git remotes configured for this repository point to a known GitHub host. To tell gh about a new GitHub host, please use `gh auth login`")
 		}
 
 		return cachedRemotes, nil

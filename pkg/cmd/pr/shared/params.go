@@ -5,9 +5,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/githubsearch"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/githubsearch"
 	"github.com/google/shlex"
 )
 
@@ -157,8 +157,8 @@ type FilterOptions struct {
 	Mention    string
 	Milestone  string
 	Search     string
-
-	Fields []string
+	Draft      string
+	Fields     []string
 }
 
 func (opts *FilterOptions) IsDefault() bool {
@@ -241,7 +241,9 @@ func SearchQueryBuild(options FilterOptions) string {
 	if options.Search != "" {
 		q.AddQuery(options.Search)
 	}
-
+	if options.Draft != "" {
+		q.SetDraft(options.Draft)
+	}
 	return q.String()
 }
 

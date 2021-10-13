@@ -2,29 +2,33 @@ package root
 
 import (
 	"net/http"
+	"sync"
 
 	"github.com/MakeNowJust/heredoc"
-	actionsCmd "github.com/cli/cli/pkg/cmd/actions"
-	aliasCmd "github.com/cli/cli/pkg/cmd/alias"
-	apiCmd "github.com/cli/cli/pkg/cmd/api"
-	authCmd "github.com/cli/cli/pkg/cmd/auth"
-	browseCmd "github.com/cli/cli/pkg/cmd/browse"
-	completionCmd "github.com/cli/cli/pkg/cmd/completion"
-	configCmd "github.com/cli/cli/pkg/cmd/config"
-	extensionsCmd "github.com/cli/cli/pkg/cmd/extensions"
-	"github.com/cli/cli/pkg/cmd/factory"
-	gistCmd "github.com/cli/cli/pkg/cmd/gist"
-	issueCmd "github.com/cli/cli/pkg/cmd/issue"
-	prCmd "github.com/cli/cli/pkg/cmd/pr"
-	releaseCmd "github.com/cli/cli/pkg/cmd/release"
-	repoCmd "github.com/cli/cli/pkg/cmd/repo"
-	creditsCmd "github.com/cli/cli/pkg/cmd/repo/credits"
-	runCmd "github.com/cli/cli/pkg/cmd/run"
-	secretCmd "github.com/cli/cli/pkg/cmd/secret"
-	sshKeyCmd "github.com/cli/cli/pkg/cmd/ssh-key"
-	versionCmd "github.com/cli/cli/pkg/cmd/version"
-	workflowCmd "github.com/cli/cli/pkg/cmd/workflow"
-	"github.com/cli/cli/pkg/cmdutil"
+	codespacesAPI "github.com/cli/cli/v2/internal/codespaces/api"
+	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
+	aliasCmd "github.com/cli/cli/v2/pkg/cmd/alias"
+	apiCmd "github.com/cli/cli/v2/pkg/cmd/api"
+	authCmd "github.com/cli/cli/v2/pkg/cmd/auth"
+	browseCmd "github.com/cli/cli/v2/pkg/cmd/browse"
+	codespaceCmd "github.com/cli/cli/v2/pkg/cmd/codespace"
+	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
+	completionCmd "github.com/cli/cli/v2/pkg/cmd/completion"
+	configCmd "github.com/cli/cli/v2/pkg/cmd/config"
+	extensionCmd "github.com/cli/cli/v2/pkg/cmd/extension"
+	"github.com/cli/cli/v2/pkg/cmd/factory"
+	gistCmd "github.com/cli/cli/v2/pkg/cmd/gist"
+	issueCmd "github.com/cli/cli/v2/pkg/cmd/issue"
+	prCmd "github.com/cli/cli/v2/pkg/cmd/pr"
+	releaseCmd "github.com/cli/cli/v2/pkg/cmd/release"
+	repoCmd "github.com/cli/cli/v2/pkg/cmd/repo"
+	creditsCmd "github.com/cli/cli/v2/pkg/cmd/repo/credits"
+	runCmd "github.com/cli/cli/v2/pkg/cmd/run"
+	secretCmd "github.com/cli/cli/v2/pkg/cmd/secret"
+	sshKeyCmd "github.com/cli/cli/v2/pkg/cmd/ssh-key"
+	versionCmd "github.com/cli/cli/v2/pkg/cmd/version"
+	workflowCmd "github.com/cli/cli/v2/pkg/cmd/workflow"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
 
@@ -75,9 +79,10 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
 	cmd.AddCommand(completionCmd.NewCmdCompletion(f.IOStreams))
-	cmd.AddCommand(extensionsCmd.NewCmdExtensions(f))
+	cmd.AddCommand(extensionCmd.NewCmdExtension(f))
 	cmd.AddCommand(secretCmd.NewCmdSecret(f))
 	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
+	cmd.AddCommand(newCodespaceCmd(f))
 
 	// the `api` command should not inherit any extra HTTP headers
 	bareHTTPCmdFactory := *f
@@ -120,4 +125,40 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 		}
 		return factory.NewHTTPClient(f.IOStreams, cfg, version, false)
 	}
+}
+
+func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
+	cmd := codespaceCmd.NewRootCmd(codespaceCmd.NewApp(
+		output.NewLogger(f.IOStreams.Out, f.IOStreams.ErrOut, !f.IOStreams.IsStdoutTTY()),
+		codespacesAPI.New("", &lazyLoadedHTTPClient{factory: f}),
+	))
+	cmd.Use = "codespace"
+	cmd.Aliases = []string{"cs"}
+	cmd.Hidden = true
+	return cmd
+}
+
+type lazyLoadedHTTPClient struct {
+	factory *cmdutil.Factory
+
+	httpClientMu sync.RWMutex // guards httpClient
+	httpClient   *http.Client
+}
+
+func (l *lazyLoadedHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	l.httpClientMu.RLock()
+	httpClient := l.httpClient
+	l.httpClientMu.RUnlock()
+
+	if httpClient == nil {
+		var err error
+		l.httpClientMu.Lock()
+		l.httpClient, err = l.factory.HttpClient()
+		l.httpClientMu.Unlock()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return l.httpClient.Do(req)
 }

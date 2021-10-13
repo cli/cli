@@ -1,4 +1,4 @@
-# Installing gh on Linux and FreeBSD
+# Installing gh on Linux and BSD
 
 Packages downloaded from https://cli.github.com or from https://github.com/cli/cli/releases
 are considered official binaries. We focus on popular Linux distros and
@@ -7,15 +7,9 @@ the following CPU architectures: `i386`, `amd64`, `arm64`, `armhf`.
 Other sources for installation are community-maintained and thus might lag behind
 our release schedule.
 
-If none of our official binaries, packages, repositories, nor community sources work for you, we recommend using our `Makefile` to build `gh` from source. It's quick and easy.
-
 ## Official sources
 
-### Debian, Ubuntu Linux (apt)
-
-:warning: This will only work for the [architectures we officially support](/.goreleaser.yml#L27).
-
-The below should work for any debian-based distribution. You can change `stable` to a specific codename [we support](/.github/workflows/releases.yml#L83) if that is your preference.
+### Debian, Ubuntu Linux, Raspberry Pi OS (apt)
 
 Install:
 
@@ -26,7 +20,7 @@ sudo apt update
 sudo apt install gh
 ```
 
-**Note**: If you get _"gpg: failed to start the dirmngr '/usr/bin/dirmngr': No such file or directory"_ error, try installing the `dirmngr` package. Run `sudo apt-get install dirmngr` and repeat the steps above.  
+**Note**: If you get the error _"gpg: failed to start the dirmngr '/usr/bin/dirmngr': No such file or directory"_, try installing the `dirmngr` package: `sudo apt install dirmngr`.
 
 Upgrade:
 
@@ -72,16 +66,13 @@ sudo zypper update gh
 * [Download release binaries][releases page] that match your platform; or
 * [Build from source](./source.md).
 
-### openSUSE/SUSE Linux (zypper)
- 
-Install and upgrade:
+## Unofficial, community-supported methods
 
-1. Download the `.rpm` file from the [releases page][];
-2. Install the downloaded file: `sudo zypper in gh_*_linux_amd64.rpm`
+The GitHub CLI team does not maintain the following packages or repositories and thus we are unable to provide support for those installation methods.
 
-## Unofficial, Community-supported methods
+### Snap (do not use)
 
-The core GitHub CLI team does not maintain the following packages or repositories. They are unofficial and we are unable to provide support or guarantees for them. They are linked here as a convenience and their presence does not imply continued oversight from the CLI core team. Users who choose to use them do so at their own risk.
+There are [so many issues with Snap](https://github.com/casperdcl/cli/issues/7) as a runtime mechanism for apps like GitHub CLI that our team suggests _never installing gh as a snap_.
 
 ### Arch Linux
 
@@ -101,13 +92,6 @@ Android 7+ users can install via [Termux](https://wiki.termux.com/wiki/Main_Page
 pkg install gh
 ```
 
-### Homebrew (Linuxbrew)
-
-Linuxbrew users can install it as a [brew package](https://formulae.brew.sh/formula/gh#default):
-```bash
-brew install gh
-```
-
 ### FreeBSD
 
 FreeBSD users can install from the [ports collection](https://www.freshports.org/devel/gh/):
@@ -120,6 +104,14 @@ Or via [pkg(8)](https://www.freebsd.org/cgi/man.cgi?pkg(8)):
 
 ```bash
 pkg install gh
+```
+
+### OpenBSD
+
+In -current, or in releases starting from 7.0, OpenBSD users can install from packages:
+
+```
+pkg_add github-cli
 ```
 
 ### Funtoo
@@ -170,22 +162,10 @@ nix-env -iA nixos.gitAndTools.gh
 
 ### openSUSE Tumbleweed
 
-openSUSE Tumbleweed users can install from the [offical distribution repo](https://software.opensuse.org/package/gh):
+openSUSE Tumbleweed users can install from the [official distribution repo](https://software.opensuse.org/package/gh):
 ```bash
 sudo zypper in gh
 ```
-
-### Snaps
-
-Many Linux distro users can install using Snapd from the [Snap Store](https://snapcraft.io/gh) or the associated [repo](https://github.com/casperdcl/cli/tree/snap)
-
-```bash
-sudo snap install --edge gh && snap connect gh:ssh-keys
-```
-> Snaps are auto-updated every 6 hours. `Snapd` is required and is available on a wide range of Linux distros.
-> Find out which distros have Snapd pre-installed and how to install it in the [Snapcraft Installation Docs](https://snapcraft.io/docs/installing-snapd)
->
-> **Note:** `snap connect gh:ssh-keys` is needed for all authentication and SSH needs.
 
 [releases page]: https://github.com/cli/cli/releases/latest
 [arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli

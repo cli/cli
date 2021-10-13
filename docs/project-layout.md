@@ -24,7 +24,7 @@ commands is:
 pkg/cmd/<command>/<subcommand>/<subcommand>.go
 ```
 Following the above example, the main implementation for the `gh issue list` command, including its help
-text, is in [pkg/cmd/issue/view/view.go](../pkg/cmd/issue/view/view.go)
+text, is in [pkg/cmd/issue/list/list.go](../pkg/cmd/issue/list/list.go)
 
 Other help topics not specific to any command, for example `gh help environment`, are found in
 [pkg/cmd/root/help_topic.go](../pkg/cmd/root/help_topic.go).
@@ -37,7 +37,7 @@ manual pages and published under https://cli.github.com/manual/.
 To illustrate how GitHub CLI works in its typical mode of operation, let's build the project, run a command,
 and talk through which code gets run in order.
 
-1. `go run script/build.go` - Makes sure all external Go depedencies are fetched, then compiles the
+1. `go run script/build.go` - Makes sure all external Go dependencies are fetched, then compiles the
    `cmd/gh/main.go` file into a `bin/gh` binary.
 2. `bin/gh issue list --limit 5` - Runs the newly built `bin/gh` binary (note: on Windows you must use
    backslashes like `bin\gh`) and passes the following arguments to the process: `["issue", "list", "--limit", "5"]`.

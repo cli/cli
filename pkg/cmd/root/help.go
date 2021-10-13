@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/text"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/text"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -145,7 +145,7 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 	}
 
 	if isRootCmd(command) {
-		if exts := f.ExtensionManager.List(); len(exts) > 0 {
+		if exts := f.ExtensionManager.List(false); len(exts) > 0 {
 			var names []string
 			for _, ext := range exts {
 				names = append(names, ext.Name())

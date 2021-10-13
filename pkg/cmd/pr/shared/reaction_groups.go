@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cli/cli/api"
+	"github.com/cli/cli/v2/api"
 )
 
 func ReactionGroupList(rgs api.ReactionGroups) string {

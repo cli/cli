@@ -8,16 +8,15 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/issue/shared"
-	issueShared "github.com/cli/cli/pkg/cmd/issue/shared"
-	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/markdown"
-	"github.com/cli/cli/pkg/set"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
+	"github.com/cli/cli/v2/pkg/set"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -113,7 +112,7 @@ func viewRun(opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
-		return opts.Exporter.Write(opts.IO.Out, issue, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO, issue)
 	}
 
 	if opts.IO.IsStdoutTTY() {
@@ -125,7 +124,7 @@ func viewRun(opts *ViewOptions) error {
 		return nil
 	}
 
-	return printRawIssuePreview(opts.IO.Out, issue, opts.IO.ColorScheme())
+	return printRawIssuePreview(opts.IO.Out, issue)
 }
 
 func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, loadComments bool) (*api.Issue, error) {
@@ -141,9 +140,9 @@ func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error),
 	return issue, err
 }
 
-func printRawIssuePreview(out io.Writer, issue *api.Issue, cs *iostreams.ColorScheme) error {
+func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 	assignees := issueAssigneeList(*issue)
-	labels := shared.IssueLabelList(*issue, cs)
+	labels := issueLabelList(issue, nil)
 	projects := issueProjectList(*issue)
 
 	// Print empty strings for empty values so the number of metadata lines is consistent when
@@ -193,7 +192,7 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 		fmt.Fprint(out, cs.Bold("Assignees: "))
 		fmt.Fprintln(out, assignees)
 	}
-	if labels := shared.IssueLabelList(*issue, cs); labels != "" {
+	if labels := issueLabelList(issue, cs); labels != "" {
 		fmt.Fprint(out, cs.Bold("Labels: "))
 		fmt.Fprintln(out, labels)
 	}
@@ -277,4 +276,21 @@ func issueProjectList(issue api.Issue) string {
 		list += ", …"
 	}
 	return list
+}
+
+func issueLabelList(issue *api.Issue, cs *iostreams.ColorScheme) string {
+	if len(issue.Labels.Nodes) == 0 {
+		return ""
+	}
+
+	labelNames := make([]string, len(issue.Labels.Nodes))
+	for i, label := range issue.Labels.Nodes {
+		if cs == nil {
+			labelNames[i] = label.Name
+		} else {
+			labelNames[i] = cs.HexToRGB(label.Color, label.Name)
+		}
+	}
+
+	return strings.Join(labelNames, ", ")
 }

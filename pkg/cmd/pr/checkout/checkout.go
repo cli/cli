@@ -7,15 +7,15 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/safeexec"
 	"github.com/spf13/cobra"
 )
@@ -33,6 +33,7 @@ type CheckoutOptions struct {
 	RecurseSubmodules bool
 	Force             bool
 	Detach            bool
+	BranchName        string
 }
 
 func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobra.Command {
@@ -65,6 +66,7 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 	cmd.Flags().BoolVarP(&opts.RecurseSubmodules, "recurse-submodules", "", false, "Update all submodules after checkout")
 	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Reset the existing local branch to the latest state of the pull request")
 	cmd.Flags().BoolVarP(&opts.Detach, "detach", "", false, "Checkout PR with a detached HEAD")
+	cmd.Flags().StringVarP(&opts.BranchName, "branch", "b", "", "Local branch name to use (default: the name of the head branch)")
 
 	return cmd
 }
@@ -139,7 +141,6 @@ func checkoutRun(opts *CheckoutOptions) error {
 
 func cmdsForExistingRemote(remote *context.Remote, pr *api.PullRequest, opts *CheckoutOptions) [][]string {
 	var cmds [][]string
-
 	remoteBranch := fmt.Sprintf("%s/%s", remote.Name, pr.HeadRefName)
 
 	refSpec := fmt.Sprintf("+refs/heads/%s", pr.HeadRefName)
@@ -149,11 +150,16 @@ func cmdsForExistingRemote(remote *context.Remote, pr *api.PullRequest, opts *Ch
 
 	cmds = append(cmds, []string{"git", "fetch", remote.Name, refSpec})
 
+	localBranch := pr.HeadRefName
+	if opts.BranchName != "" {
+		localBranch = opts.BranchName
+	}
+
 	switch {
 	case opts.Detach:
 		cmds = append(cmds, []string{"git", "checkout", "--detach", "FETCH_HEAD"})
-	case localBranchExists(pr.HeadRefName):
-		cmds = append(cmds, []string{"git", "checkout", pr.HeadRefName})
+	case localBranchExists(localBranch):
+		cmds = append(cmds, []string{"git", "checkout", localBranch})
 		if opts.Force {
 			cmds = append(cmds, []string{"git", "reset", "--hard", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
 		} else {
@@ -161,9 +167,7 @@ func cmdsForExistingRemote(remote *context.Remote, pr *api.PullRequest, opts *Ch
 			cmds = append(cmds, []string{"git", "merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
 		}
 	default:
-		cmds = append(cmds, []string{"git", "checkout", "-b", pr.HeadRefName, "--no-track", remoteBranch})
-		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.remote", pr.HeadRefName), remote.Name})
-		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.merge", pr.HeadRefName), "refs/heads/" + pr.HeadRefName})
+		cmds = append(cmds, []string{"git", "checkout", "-b", localBranch, "--track", remoteBranch})
 	}
 
 	return cmds
@@ -171,13 +175,6 @@ func cmdsForExistingRemote(remote *context.Remote, pr *api.PullRequest, opts *Ch
 
 func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultBranch, protocol string, opts *CheckoutOptions) [][]string {
 	var cmds [][]string
-
-	newBranchName := pr.HeadRefName
-	// avoid naming the new branch the same as the default branch
-	if newBranchName == defaultBranch {
-		newBranchName = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, newBranchName)
-	}
-
 	ref := fmt.Sprintf("refs/pull/%d/head", pr.Number)
 
 	if opts.Detach {
@@ -186,8 +183,16 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 		return cmds
 	}
 
+	localBranch := pr.HeadRefName
+	if opts.BranchName != "" {
+		localBranch = opts.BranchName
+	} else if pr.HeadRefName == defaultBranch {
+		// avoid naming the new branch the same as the default branch
+		localBranch = fmt.Sprintf("%s/%s", pr.HeadRepositoryOwner.Login, localBranch)
+	}
+
 	currentBranch, _ := opts.Branch()
-	if newBranchName == currentBranch {
+	if localBranch == currentBranch {
 		// PR head matches currently checked out branch
 		cmds = append(cmds, []string{"git", "fetch", baseURLOrName, ref})
 		if opts.Force {
@@ -197,14 +202,14 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 			cmds = append(cmds, []string{"git", "merge", "--ff-only", "FETCH_HEAD"})
 		}
 	} else {
-		// create a new branch
 		if opts.Force {
-			cmds = append(cmds, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, newBranchName), "--force"})
+			cmds = append(cmds, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch), "--force"})
 		} else {
 			// TODO: check if non-fast-forward and suggest to use `--force`
-			cmds = append(cmds, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, newBranchName)})
+			cmds = append(cmds, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch)})
 		}
-		cmds = append(cmds, []string{"git", "checkout", newBranchName})
+
+		cmds = append(cmds, []string{"git", "checkout", localBranch})
 	}
 
 	remote := baseURLOrName
@@ -214,9 +219,13 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 		remote = ghrepo.FormatRemoteURL(headRepo, protocol)
 		mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
 	}
-	if missingMergeConfigForBranch(newBranchName) {
-		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.remote", newBranchName), remote})
-		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.merge", newBranchName), mergeRef})
+	if missingMergeConfigForBranch(localBranch) {
+		// .remote is needed for `git pull` to work
+		// .pushRemote is needed for `git push` to work, if user has set `remote.pushDefault`.
+		// see https://git-scm.com/docs/git-config#Documentation/git-config.txt-branchltnamegtremote
+		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.remote", localBranch), remote})
+		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.pushRemote", localBranch), remote})
+		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.merge", localBranch), mergeRef})
 	}
 
 	return cmds

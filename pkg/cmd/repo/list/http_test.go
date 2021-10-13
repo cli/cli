@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cli/cli/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

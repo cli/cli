@@ -7,11 +7,12 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -92,6 +93,13 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 				return err
 			}
 
+			if opts.CommitFlag {
+				commit, err := git.LastCommit()
+				if err != nil {
+					opts.Branch = commit.Sha
+				}
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -116,73 +124,101 @@ func runBrowse(opts *BrowseOptions) error {
 		return fmt.Errorf("unable to determine base repository: %w", err)
 	}
 
-	httpClient, err := opts.HttpClient()
+	section, err := parseSection(baseRepo, opts)
 	if err != nil {
-		return fmt.Errorf("unable to create an http client: %w", err)
+		return err
 	}
-	url := ghrepo.GenerateRepoURL(baseRepo, "")
-
-	if opts.SelectorArg == "" {
-		if opts.ProjectsFlag {
-			url += "/projects"
-		} else if opts.SettingsFlag {
-			url += "/settings"
-		} else if opts.WikiFlag {
-			url += "/wiki"
-		} else if opts.Branch != "" {
-			url += "/tree/" + opts.Branch + "/"
-		} else if opts.CommitFlag {
-			commit, _ := git.LastCommit()
-			url += "/tree/" + commit.Sha + "/"
-		}
-	} else {
-		if isNumber(opts.SelectorArg) {
-			url += "/issues/" + opts.SelectorArg
-		} else {
-			fileArg, err := parseFileArg(opts.SelectorArg)
-			if err != nil {
-				return err
-			}
-			if opts.CommitFlag {
-				commit, _ := git.LastCommit()
-				url += "/tree/" + commit.Sha + "/"
-			} else if opts.Branch != "" {
-				url += "/tree/" + opts.Branch + "/"
-			} else {
-				apiClient := api.NewClientFromHTTP(httpClient)
-				branchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
-				if err != nil {
-					return err
-				}
-				url += "/tree/" + branchName + "/"
-			}
-			url += fileArg
-		}
-	}
+	url := ghrepo.GenerateRepoURL(baseRepo, section)
 
 	if opts.NoBrowserFlag {
-		fmt.Fprintf(opts.IO.Out, "%s\n", url)
-		return nil
-	} else {
-		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "now opening %s in browser\n", url)
-		}
-		return opts.Browser.Browse(url)
+		_, err := fmt.Fprintln(opts.IO.Out, url)
+		return err
 	}
+
+	if opts.IO.IsStdoutTTY() {
+		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(url))
+	}
+	return opts.Browser.Browse(url)
 }
 
-func parseFileArg(fileArg string) (string, error) {
-	arr := strings.Split(fileArg, ":")
-	if len(arr) > 2 {
-		return "", fmt.Errorf("invalid use of colon\nUse 'gh browse --help' for more information about browse\n")
-	}
-	if len(arr) > 1 {
-		if !isNumber(arr[1]) {
-			return "", fmt.Errorf("invalid line number after colon\nUse 'gh browse --help' for more information about browse\n")
+func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error) {
+	if opts.SelectorArg == "" {
+		if opts.ProjectsFlag {
+			return "projects", nil
+		} else if opts.SettingsFlag {
+			return "settings", nil
+		} else if opts.WikiFlag {
+			return "wiki", nil
+		} else if opts.Branch == "" {
+			return "", nil
 		}
-		return arr[0] + "#L" + arr[1], nil
 	}
-	return arr[0], nil
+
+	if isNumber(opts.SelectorArg) {
+		return fmt.Sprintf("issues/%s", opts.SelectorArg), nil
+	}
+
+	filePath, rangeStart, rangeEnd, err := parseFile(opts.SelectorArg)
+	if err != nil {
+		return "", err
+	}
+
+	branchName := opts.Branch
+	if branchName == "" {
+		httpClient, err := opts.HttpClient()
+		if err != nil {
+			return "", err
+		}
+		apiClient := api.NewClientFromHTTP(httpClient)
+		branchName, err = api.RepoDefaultBranch(apiClient, baseRepo)
+		if err != nil {
+			return "", fmt.Errorf("error determining the default branch: %w", err)
+		}
+	}
+
+	if rangeStart > 0 {
+		var rangeFragment string
+		if rangeEnd > 0 && rangeStart != rangeEnd {
+			rangeFragment = fmt.Sprintf("L%d-L%d", rangeStart, rangeEnd)
+		} else {
+			rangeFragment = fmt.Sprintf("L%d", rangeStart)
+		}
+		return fmt.Sprintf("blob/%s/%s?plain=1#%s", branchName, filePath, rangeFragment), nil
+	}
+	return fmt.Sprintf("tree/%s/%s", branchName, filePath), nil
+}
+
+func parseFile(f string) (p string, start int, end int, err error) {
+	parts := strings.SplitN(f, ":", 3)
+	if len(parts) > 2 {
+		err = fmt.Errorf("invalid file argument: %q", f)
+		return
+	}
+
+	p = parts[0]
+	if len(parts) < 2 {
+		return
+	}
+
+	if idx := strings.IndexRune(parts[1], '-'); idx >= 0 {
+		start, err = strconv.Atoi(parts[1][:idx])
+		if err != nil {
+			err = fmt.Errorf("invalid file argument: %q", f)
+			return
+		}
+		end, err = strconv.Atoi(parts[1][idx+1:])
+		if err != nil {
+			err = fmt.Errorf("invalid file argument: %q", f)
+		}
+		return
+	}
+
+	start, err = strconv.Atoi(parts[1])
+	if err != nil {
+		err = fmt.Errorf("invalid file argument: %q", f)
+	}
+	end = start
+	return
 }
 
 func isNumber(arg string) bool {

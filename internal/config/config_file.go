@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"syscall"
 
-	"github.com/mitchellh/go-homedir"
 	"gopkg.in/yaml.v3"
 )
 
@@ -40,8 +39,9 @@ func ConfigDir() string {
 		path = filepath.Join(d, ".config", "gh")
 	}
 
-	// If the path does not exist try migrating config from default paths
-	if !dirExists(path) {
+	// If the path does not exist and the GH_CONFIG_DIR flag is not set try
+	// migrating config from default paths.
+	if !dirExists(path) && os.Getenv(GH_CONFIG_DIR) == "" {
 		_ = autoMigrateConfigDir(path)
 	}
 
@@ -92,16 +92,10 @@ func DataDir() string {
 var errSamePath = errors.New("same path")
 var errNotExist = errors.New("not exist")
 
-// Check default paths (os.UserHomeDir, and homedir.Dir) for existing configs
+// Check default path, os.UserHomeDir, for existing configs
 // If configs exist then move them to newPath
-// TODO: Remove support for homedir.Dir location in v2
 func autoMigrateConfigDir(newPath string) error {
 	path, err := os.UserHomeDir()
-	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
-		return migrateDir(oldPath, newPath)
-	}
-
-	path, err = homedir.Dir()
 	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
 		return migrateDir(oldPath, newPath)
 	}
@@ -109,16 +103,10 @@ func autoMigrateConfigDir(newPath string) error {
 	return errNotExist
 }
 
-// Check default paths (os.UserHomeDir, and homedir.Dir) for existing state file (state.yml)
+// Check default path, os.UserHomeDir, for existing state file (state.yml)
 // If state file exist then move it to newPath
-// TODO: Remove support for homedir.Dir location in v2
 func autoMigrateStateDir(newPath string) error {
 	path, err := os.UserHomeDir()
-	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
-		return migrateFile(oldPath, newPath, "state.yml")
-	}
-
-	path, err = homedir.Dir()
 	if oldPath := filepath.Join(path, ".config", "gh"); err == nil && dirExists(oldPath) {
 		return migrateFile(oldPath, newPath, "state.yml")
 	}
@@ -180,26 +168,10 @@ func ParseDefaultConfig() (Config, error) {
 func HomeDirPath(subdir string) (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		// TODO: remove go-homedir fallback in GitHub CLI v2
-		if legacyDir, err := homedir.Dir(); err == nil {
-			return filepath.Join(legacyDir, subdir), nil
-		}
 		return "", err
 	}
 
 	newPath := filepath.Join(homeDir, subdir)
-	if s, err := os.Stat(newPath); err == nil && s.IsDir() {
-		return newPath, nil
-	}
-
-	// TODO: remove go-homedir fallback in GitHub CLI v2
-	if legacyDir, err := homedir.Dir(); err == nil {
-		legacyPath := filepath.Join(legacyDir, subdir)
-		if s, err := os.Stat(legacyPath); err == nil && s.IsDir() {
-			return legacyPath, nil
-		}
-	}
-
 	return newPath, nil
 }
 

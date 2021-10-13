@@ -7,13 +7,13 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/internal/ghrepo"
-	runShared "github.com/cli/cli/pkg/cmd/run/shared"
-	"github.com/cli/cli/pkg/cmd/workflow/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	runShared "github.com/cli/cli/v2/pkg/cmd/run/shared"
+	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -177,9 +177,9 @@ func TestViewRun(t *testing.T) {
 		Total runs 10
 		Recent runs
 		X  cool commit  timed out    trunk  push  1
-		-  cool commit  in progress  trunk  push  2
+		*  cool commit  in progress  trunk  push  2
 		✓  cool commit  successful   trunk  push  3
-		✓  cool commit  cancelled    trunk  push  4
+		-  cool commit  cancelled    trunk  push  4
 
 		To see more runs for this workflow, try: gh run list --workflow flow.yml
 		To see the YAML for this workflow, try: gh workflow view flow.yml --yaml

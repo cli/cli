@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/secret/shared"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/secret/shared"
 )
 
 type SecretPayload struct {
@@ -130,17 +130,7 @@ func mapRepoNameToID(client *api.Client, host, orgName string, repositoryNames [
 		DatabaseID int `json:"databaseId"`
 	})
 
-	err := client.GraphQL(host, query, nil, &graphqlResult)
-
-	gqlErr, isGqlErr := err.(*api.GraphQLErrorResponse)
-	if isGqlErr {
-		for _, ge := range gqlErr.Errors {
-			if ge.Type == "NOT_FOUND" {
-				return nil, fmt.Errorf("could not find %s/%s", orgName, ge.Path[0])
-			}
-		}
-	}
-	if err != nil {
+	if err := client.GraphQL(host, query, nil, &graphqlResult); err != nil {
 		return nil, fmt.Errorf("failed to look up repositories: %w", err)
 	}
 

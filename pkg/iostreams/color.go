@@ -34,27 +34,33 @@ func EnvColorForced() bool {
 }
 
 func Is256ColorSupported() bool {
+	return IsTrueColorSupported() ||
+		strings.Contains(os.Getenv("TERM"), "256") ||
+		strings.Contains(os.Getenv("COLORTERM"), "256")
+}
+
+func IsTrueColorSupported() bool {
 	term := os.Getenv("TERM")
 	colorterm := os.Getenv("COLORTERM")
 
-	return strings.Contains(term, "256") ||
-		strings.Contains(term, "24bit") ||
+	return strings.Contains(term, "24bit") ||
 		strings.Contains(term, "truecolor") ||
-		strings.Contains(colorterm, "256") ||
 		strings.Contains(colorterm, "24bit") ||
 		strings.Contains(colorterm, "truecolor")
 }
 
-func NewColorScheme(enabled, is256enabled bool) *ColorScheme {
+func NewColorScheme(enabled, is256enabled bool, trueColor bool) *ColorScheme {
 	return &ColorScheme{
 		enabled:      enabled,
 		is256enabled: is256enabled,
+		hasTrueColor: trueColor,
 	}
 }
 
 type ColorScheme struct {
 	enabled      bool
 	is256enabled bool
+	hasTrueColor bool
 }
 
 func (c *ColorScheme) Bold(t string) string {
@@ -205,7 +211,7 @@ func (c *ColorScheme) ColorFromString(s string) func(string) string {
 }
 
 func (c *ColorScheme) HexToRGB(hex string, x string) string {
-	if !c.enabled || !c.is256enabled {
+	if !c.enabled || !c.hasTrueColor {
 		return x
 	}
 

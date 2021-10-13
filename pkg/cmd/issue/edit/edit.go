@@ -6,12 +6,12 @@ import (
 	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	shared "github.com/cli/cli/pkg/cmd/issue/shared"
-	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	shared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -50,7 +50,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		Example: heredoc.Doc(`
 			$ gh issue edit 23 --title "I found a bug" --body "Nothing works"
 			$ gh issue edit 23 --add-label "bug,help wanted" --remove-label "core"
-			$ gh issue edit 23 --add-assignee @me --remove-assignee monalisa,hubot
+			$ gh issue edit 23 --add-assignee "@me" --remove-assignee monalisa,hubot
 			$ gh issue edit 23 --add-project "Roadmap" --remove-project v1,v2
 			$ gh issue edit 23 --milestone "Version 1"
 			$ gh issue edit 23 --body-file body.txt
@@ -119,7 +119,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 	cmd.Flags().StringVarP(&opts.Editable.Title.Value, "title", "t", "", "Set the new title.")
 	cmd.Flags().StringVarP(&opts.Editable.Body.Value, "body", "b", "", "Set the new body.")
-	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
+	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().StringSliceVar(&opts.Editable.Assignees.Add, "add-assignee", nil, "Add assigned users by their `login`. Use \"@me\" to assign yourself.")
 	cmd.Flags().StringSliceVar(&opts.Editable.Assignees.Remove, "remove-assignee", nil, "Remove assigned users by their `login`. Use \"@me\" to unassign yourself.")
 	cmd.Flags().StringSliceVar(&opts.Editable.Labels.Add, "add-label", nil, "Add labels by `name`")
