@@ -29,7 +29,7 @@ func (a *App) StopCodespace(ctx context.Context, codespaceName string) error {
 	if codespaceName == "" {
 		codespaces, err := a.apiClient.ListCodespaces(ctx, -1)
 		if err != nil {
-			return fmt.Errorf("failed to list codespace: %w", err)
+			return fmt.Errorf("failed to list codespaces: %w", err)
 		}
 
 		var runningCodespaces []*api.Codespace
@@ -51,7 +51,7 @@ func (a *App) StopCodespace(ctx context.Context, codespaceName string) error {
 	} else {
 		c, err := a.apiClient.GetCodespace(ctx, codespaceName, false)
 		if err != nil {
-			return fmt.Errorf("failed to get codespace: %w", err)
+			return fmt.Errorf("failed to get codespace: %q: %w", codespaceName, err)
 		}
 		cs := codespace{c}
 		if !cs.running() {
