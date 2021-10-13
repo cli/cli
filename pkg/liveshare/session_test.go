@@ -82,7 +82,7 @@ func TestServerStartSharing(t *testing.T) {
 	defer testServer.Close() //nolint:staticcheck // httptest.Server does not return errors on Close()
 
 	if err != nil {
-		t.Errorf("error creating mock session: %w", err)
+		t.Errorf("error creating mock session: %v", err)
 	}
 	ctx := context.Background()
 
@@ -100,10 +100,10 @@ func TestServerStartSharing(t *testing.T) {
 
 	select {
 	case err := <-testServer.Err():
-		t.Errorf("error from server: %w", err)
+		t.Errorf("error from server: %v", err)
 	case err := <-done:
 		if err != nil {
-			t.Errorf("error from client: %w", err)
+			t.Errorf("error from client: %v", err)
 		}
 	}
 }
@@ -121,7 +121,7 @@ func TestServerGetSharedServers(t *testing.T) {
 		livesharetest.WithService("serverSharing.getSharedServers", getSharedServers),
 	)
 	if err != nil {
-		t.Errorf("error creating mock session: %w", err)
+		t.Errorf("error creating mock session: %v", err)
 	}
 	defer testServer.Close()
 	ctx := context.Background()
@@ -148,15 +148,15 @@ func TestServerGetSharedServers(t *testing.T) {
 
 	select {
 	case err := <-testServer.Err():
-		t.Errorf("error from server: %w", err)
+		t.Errorf("error from server: %v", err)
 	case err := <-done:
 		if err != nil {
-			t.Errorf("error from client: %w", err)
+			t.Errorf("error from client: %v", err)
 		}
 	}
 }
 
-func TestServerUpdateSharedVisibility(t *testing.T) {
+func TestServerUpdateSharedServerPrivacy(t *testing.T) {
 	updateSharedVisibility := func(rpcReq *jsonrpc2.Request) (interface{}, error) {
 		var req []interface{}
 		if err := json.Unmarshal(*rpcReq.Params, &req); err != nil {
@@ -172,33 +172,33 @@ func TestServerUpdateSharedVisibility(t *testing.T) {
 		} else {
 			return nil, errors.New("port param is not a float64")
 		}
-		if public, ok := req[1].(bool); ok {
-			if public != true {
-				return nil, errors.New("pulic param is not expected value")
+		if privacy, ok := req[1].(string); ok {
+			if privacy != "public" {
+				return nil, fmt.Errorf("expected privacy param to be public but got %q", privacy)
 			}
 		} else {
-			return nil, errors.New("public param is not a bool")
+			return nil, fmt.Errorf("expected privacy param to be a bool but go %T", req[1])
 		}
 		return nil, nil
 	}
 	testServer, session, err := makeMockSession(
-		livesharetest.WithService("serverSharing.updateSharedServerVisibility", updateSharedVisibility),
+		livesharetest.WithService("serverSharing.updateSharedServerPrivacy", updateSharedVisibility),
 	)
 	if err != nil {
-		t.Errorf("creating mock session: %w", err)
+		t.Errorf("creating mock session: %v", err)
 	}
 	defer testServer.Close()
 	ctx := context.Background()
 	done := make(chan error)
 	go func() {
-		done <- session.UpdateSharedVisibility(ctx, 80, true)
+		done <- session.UpdateSharedServerPrivacy(ctx, 80, "public")
 	}()
 	select {
 	case err := <-testServer.Err():
-		t.Errorf("error from server: %w", err)
+		t.Errorf("error from server: %v", err)
 	case err := <-done:
 		if err != nil {
-			t.Errorf("error from client: %w", err)
+			t.Errorf("error from client: %v", err)
 		}
 	}
 }
@@ -214,7 +214,7 @@ func TestInvalidHostKey(t *testing.T) {
 	}
 	testServer, err := livesharetest.NewServer(opts...)
 	if err != nil {
-		t.Errorf("error creating server: %w", err)
+		t.Errorf("error creating server: %v", err)
 	}
 	_, err = Connect(context.Background(), Options{
 		SessionID:      "session-id",

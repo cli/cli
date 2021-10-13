@@ -41,6 +41,7 @@ type Port struct {
 	IsPublic                         bool   `json:"isPublic"`
 	IsTCPServerConnectionEstablished bool   `json:"isTCPServerConnectionEstablished"`
 	HasTLSHandshakePassed            bool   `json:"hasTLSHandshakePassed"`
+	Privacy                          string `json:"privacy"`
 }
 
 // startSharing tells the Live Share host to start sharing the specified port from the container.
@@ -67,10 +68,10 @@ func (s *Session) GetSharedServers(ctx context.Context) ([]*Port, error) {
 	return response, nil
 }
 
-// UpdateSharedVisibility controls port permissions and whether it can be accessed publicly
-// via the Browse URL
-func (s *Session) UpdateSharedVisibility(ctx context.Context, port int, public bool) error {
-	if err := s.rpc.do(ctx, "serverSharing.updateSharedServerVisibility", []interface{}{port, public}, nil); err != nil {
+// UpdateSharedServerPrivacy controls port permissions and visibility scopes for who can access its URLs
+// in the browser.
+func (s *Session) UpdateSharedServerPrivacy(ctx context.Context, port int, visibility string) error {
+	if err := s.rpc.do(ctx, "serverSharing.updateSharedServerPrivacy", []interface{}{port, visibility}, nil); err != nil {
 		return err
 	}
 
