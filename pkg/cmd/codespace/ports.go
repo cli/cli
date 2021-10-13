@@ -146,7 +146,7 @@ func getDevContainer(ctx context.Context, apiClient apiClient, codespace *api.Co
 
 func newPortsVisibilityCmd(app *App) *cobra.Command {
 	return &cobra.Command{
-		Use:     "visibility <port:public|private|org>",
+		Use:     "visibility <port:public|private|org>...",
 		Short:   "Change the visibility of the forwarded port",
 		Example: "gh cs ports visibility 80:org 3000:private 8000:public",
 		Args:    cobra.ArbitraryArgs,
