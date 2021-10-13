@@ -227,7 +227,7 @@ func TestChecksRun_web(t *testing.T) {
 			_, teardown := run.Stub()
 			defer teardown(t)
 
-			err := checksRun(&ChecksOptions{
+			err := checksRunWebMode(&ChecksOptions{
 				IO:          io,
 				Browser:     browser,
 				WebMode:     true,

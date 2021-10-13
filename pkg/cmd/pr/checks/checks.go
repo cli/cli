@@ -60,6 +60,10 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 				return runF(opts)
 			}
 
+			if opts.WebMode {
+				return checksRunWebMode(opts)
+			}
+
 			return checksRun(opts)
 		},
 	}
@@ -69,13 +73,10 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 	return cmd
 }
 
-func checksRun(opts *ChecksOptions) error {
+func checksRunWebMode(opts *ChecksOptions) error {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
-		Fields:   []string{"number", "baseRefName", "statusCheckRollup"},
-	}
-	if opts.WebMode {
-		findOptions.Fields = []string{"number"}
+		Fields:   []string{"number"},
 	}
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
@@ -84,13 +85,24 @@ func checksRun(opts *ChecksOptions) error {
 
 	isTerminal := opts.IO.IsStdoutTTY()
 
-	if opts.WebMode {
-		openURL := ghrepo.GenerateRepoURL(baseRepo, "pull/%d/checks", pr.Number)
-		if isTerminal {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
-		}
-		return opts.Browser.Browse(openURL)
+	openURL := ghrepo.GenerateRepoURL(baseRepo, "pull/%d/checks", pr.Number)
+	if isTerminal {
+		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 	}
+	return opts.Browser.Browse(openURL)
+}
+
+func checksRun(opts *ChecksOptions) error {
+	findOptions := shared.FindOptions{
+		Selector: opts.SelectorArg,
+		Fields:   []string{"number", "baseRefName", "statusCheckRollup"},
+	}
+	pr, _, err := opts.Finder.Find(findOptions)
+	if err != nil {
+		return err
+	}
+
+	isTerminal := opts.IO.IsStdoutTTY()
 
 	if len(pr.StatusCheckRollup.Nodes) == 0 {
 		return fmt.Errorf("no commit found on the pull request")
