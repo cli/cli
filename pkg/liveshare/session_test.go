@@ -182,7 +182,7 @@ func TestServerUpdateSharedServerPrivacy(t *testing.T) {
 		return nil, nil
 	}
 	testServer, session, err := makeMockSession(
-		livesharetest.WithService("serverSharing.updateSharedServerVisibility", updateSharedVisibility),
+		livesharetest.WithService("serverSharing.updateSharedServerPrivacy", updateSharedVisibility),
 	)
 	if err != nil {
 		t.Errorf("creating mock session: %v", err)
