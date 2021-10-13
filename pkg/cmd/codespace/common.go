@@ -253,6 +253,7 @@ func (c codespace) hasUnsavedChanges() bool {
 	return c.Environment.GitStatus.HasUncommitedChanges || c.Environment.GitStatus.HasUnpushedChanges
 }
 
-func (c codespace) isRunning() bool {
+// running returns whether the codespace environment is running.
+func (c codespace) running() bool {
 	return c.Environment.State == api.CodespaceEnvironmentStateAvailable
 }

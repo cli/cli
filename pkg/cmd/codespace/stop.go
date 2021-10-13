@@ -35,7 +35,7 @@ func (a *App) StopCodespace(ctx context.Context, codespaceName string) error {
 		var runningCodespaces []*api.Codespace
 		for _, c := range codespaces {
 			cs := codespace{c}
-			if cs.isRunning() {
+			if cs.running() {
 				runningCodespaces = append(runningCodespaces, c)
 			}
 		}
@@ -54,7 +54,7 @@ func (a *App) StopCodespace(ctx context.Context, codespaceName string) error {
 			return fmt.Errorf("failed to get codespace: %w", err)
 		}
 		cs := codespace{c}
-		if !cs.isRunning() {
+		if !cs.running() {
 			return fmt.Errorf("codespace %q is not running", codespaceName)
 		}
 	}
