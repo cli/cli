@@ -1,6 +1,6 @@
 # Releasing
 
-Our build system automatically compiles and attaches cross-platform binaries to any git tag named `vX.Y.Z`. The automated changelog is generated from commit messages starting with “Merge pull request …” that landed between this tag and the previous one (as determined topologically by git).
+Our build system automatically compiles and attaches cross-platform binaries to any git tag named `vX.Y.Z`. The changelog is [generated from git commit log](https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes).
 
 Users who run official builds of `gh` on their machines will get notified about the new version within a 24 hour period.
 
