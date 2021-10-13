@@ -23,10 +23,10 @@ type liveshareLogger interface {
 }
 
 func connectionReady(codespace *api.Codespace) bool {
-	return codespace.Environment.Connection.SessionID != "" &&
-		codespace.Environment.Connection.SessionToken != "" &&
-		codespace.Environment.Connection.RelayEndpoint != "" &&
-		codespace.Environment.Connection.RelaySAS != "" &&
+	return codespace.Connection.SessionID != "" &&
+		codespace.Connection.SessionToken != "" &&
+		codespace.Connection.RelayEndpoint != "" &&
+		codespace.Connection.RelaySAS != "" &&
 		codespace.Environment.State == api.CodespaceEnvironmentStateAvailable
 }
 
@@ -75,11 +75,11 @@ func ConnectToLiveshare(ctx context.Context, log logger, sessionLogger liveshare
 
 	return liveshare.Connect(ctx, liveshare.Options{
 		ClientName:     "gh",
-		SessionID:      codespace.Environment.Connection.SessionID,
-		SessionToken:   codespace.Environment.Connection.SessionToken,
-		RelaySAS:       codespace.Environment.Connection.RelaySAS,
-		RelayEndpoint:  codespace.Environment.Connection.RelayEndpoint,
-		HostPublicKeys: codespace.Environment.Connection.HostPublicKeys,
+		SessionID:      codespace.Connection.SessionID,
+		SessionToken:   codespace.Connection.SessionToken,
+		RelaySAS:       codespace.Connection.RelaySAS,
+		RelayEndpoint:  codespace.Connection.RelayEndpoint,
+		HostPublicKeys: codespace.Connection.HostPublicKeys,
 		Logger:         sessionLogger,
 	})
 }

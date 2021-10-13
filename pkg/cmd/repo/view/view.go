@@ -111,7 +111,7 @@ func viewRun(opts *ViewOptions) error {
 		fields = opts.Exporter.Fields()
 	}
 
-	repo, err := fetchRepository(apiClient, toView, fields)
+	repo, err := api.FetchRepository(apiClient, toView, fields)
 	if err != nil {
 		return err
 	}

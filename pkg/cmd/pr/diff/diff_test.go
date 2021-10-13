@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
@@ -140,26 +141,67 @@ func runCommand(rt http.RoundTripper, remotes context.Remotes, isTTY bool, cli s
 	}, err
 }
 
-func TestPRDiff_notty(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
+func TestPRDiff_notty_diff(t *testing.T) {
+	httpReg := &httpmock.Registry{}
+	defer httpReg.Verify(t)
 
 	shared.RunCommandFinder("", &api.PullRequest{Number: 123}, ghrepo.New("OWNER", "REPO"))
 
-	http.Register(
+	var gotAccept string
+	httpReg.Register(
 		httpmock.REST("GET", "repos/OWNER/REPO/pulls/123"),
-		httpmock.StringResponse(testDiff))
+		func(req *http.Request) (*http.Response, error) {
+			gotAccept = req.Header.Get("Accept")
+			return &http.Response{
+				StatusCode: 200,
+				Request:    req,
+				Body:       ioutil.NopCloser(strings.NewReader(testDiff)),
+			}, nil
+		})
 
-	output, err := runCommand(http, nil, false, "")
+	output, err := runCommand(httpReg, nil, false, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
 	if diff := cmp.Diff(testDiff, output.String()); diff != "" {
 		t.Errorf("command output did not match:\n%s", diff)
 	}
+	if gotAccept != "application/vnd.github.v3.diff" {
+		t.Errorf("unexpected Accept header: %s", gotAccept)
+	}
 }
 
-func TestPRDiff_tty(t *testing.T) {
+func TestPRDiff_notty_patch(t *testing.T) {
+	httpReg := &httpmock.Registry{}
+	defer httpReg.Verify(t)
+
+	shared.RunCommandFinder("", &api.PullRequest{Number: 123}, ghrepo.New("OWNER", "REPO"))
+
+	var gotAccept string
+	httpReg.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO/pulls/123"),
+		func(req *http.Request) (*http.Response, error) {
+			gotAccept = req.Header.Get("Accept")
+			return &http.Response{
+				StatusCode: 200,
+				Request:    req,
+				Body:       ioutil.NopCloser(strings.NewReader(testDiff)),
+			}, nil
+		})
+
+	output, err := runCommand(httpReg, nil, false, "--patch")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+	if diff := cmp.Diff(testDiff, output.String()); diff != "" {
+		t.Errorf("command output did not match:\n%s", diff)
+	}
+	if gotAccept != "application/vnd.github.v3.patch" {
+		t.Errorf("unexpected Accept header: %s", gotAccept)
+	}
+}
+
+func TestPRDiff_tty_diff(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
 
