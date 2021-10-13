@@ -94,13 +94,13 @@ func TestRenameRun(t *testing.T) {
 		{
 			name: "owner repo change name notty",
 			opts: RenameOptions{
-				oldRepoName: "NON_OWNER/REPO",
+				oldRepoName: "OWNER/REPO",
 				newRepoName: "NEW_REPO",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("PATCH", "repos/NON_OWNER/REPO"),
-					httpmock.StatusStringResponse(200, "{}"))
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.StatusStringResponse(204, "{}"))
 			},
 			stdoutTTY: false,
 		},

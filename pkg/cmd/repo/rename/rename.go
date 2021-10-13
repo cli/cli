@@ -86,7 +86,7 @@ func renameRun(opts *RenameOptions) error {
 
 	err = runRename(apiClient, repo.RepoHost(), input)
 	if err != nil {
-		return fmt.Errorf("API called failed: %s, please check your parameters", err.Error())
+		return fmt.Errorf("API called failed: %s, please check your parameters", err)
 	}
 
 	if opts.IO.IsStdoutTTY() {
