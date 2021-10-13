@@ -28,8 +28,8 @@ func TestNewCmdRename(t *testing.T) {
 			name: "correct argument",
 			args: "OWNER/REPO REPOS",
 			wantOpts: RenameOptions{
-				oldRepoName: "OWNER/REPO",
-				newRepoName: "REPOS",
+				oldRepoSelector: "OWNER/REPO",
+				newRepoSelector: "REPOS",
 			},
 		},
 	}
@@ -63,8 +63,8 @@ func TestNewCmdRename(t *testing.T) {
 			assert.Equal(t, "", stdout.String())
 			assert.Equal(t, "", stderr.String())
 
-			assert.Equal(t, tt.wantOpts.oldRepoName, opts.oldRepoName)
-			assert.Equal(t, tt.wantOpts.newRepoName, opts.newRepoName)
+			assert.Equal(t, tt.wantOpts.oldRepoSelector, opts.oldRepoSelector)
+			assert.Equal(t, tt.wantOpts.newRepoSelector, opts.newRepoSelector)
 		})
 	}
 }
@@ -80,8 +80,8 @@ func TestRenameRun(t *testing.T) {
 		{
 			name: "owner repo change name tty",
 			opts: RenameOptions{
-				oldRepoName: "OWNER/REPO",
-				newRepoName: "NEW_REPO",
+				oldRepoSelector: "OWNER/REPO",
+				newRepoSelector: "NEW_REPO",
 			},
 			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n",
 			httpStubs: func(reg *httpmock.Registry) {
@@ -94,8 +94,8 @@ func TestRenameRun(t *testing.T) {
 		{
 			name: "owner repo change name notty",
 			opts: RenameOptions{
-				oldRepoName: "OWNER/REPO",
-				newRepoName: "NEW_REPO",
+				oldRepoSelector: "OWNER/REPO",
+				newRepoSelector: "NEW_REPO",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(

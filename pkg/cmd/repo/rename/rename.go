@@ -20,8 +20,8 @@ type RenameOptions struct {
 	HttpClient  func() (*http.Client, error)
 	IO          *iostreams.IOStreams
 	Config      func() (config.Config, error)
-	oldRepoName string
-	newRepoName string
+	oldRepoSelector string
+	newRepoSelector string
 }
 
 type renameRepo struct {
@@ -39,13 +39,13 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		DisableFlagsInUseLine: true,
 
-		Use:   "rename <user/old_repo_name> <new_repo_name>",
+		Use:   "rename <repository> <new-name>",
 		Short: "Rename a repository",
 		Long:  "Rename a GitHub repository",
 		Args:  cmdutil.ExactArgs(2, "cannot rename: repository argument required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.oldRepoName = args[0]
-			opts.newRepoName = args[1]
+			opts.oldRepoSelector = args[0]
+			opts.newRepoSelector = args[1]
 			if runf != nil {
 				return runf(opts)
 			}
@@ -63,17 +63,17 @@ func renameRun(opts *RenameOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	oldRepoName := opts.oldRepoName
-	if !strings.Contains(oldRepoName, "/") {
+	oldRepoURL := opts.oldRepoSelector
+	if !strings.Contains(oldRepoURL, "/") {
 		currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
 		if err != nil {
 			return err
 		}
-		oldRepoName = currentUser + "/" + oldRepoName
+		oldRepoURL = currentUser + "/" + oldRepoURL
 	}
-	newRepoName := opts.newRepoName
+	newRepoName := opts.newRepoSelector
 
-	repo, err := ghrepo.FromFullName(oldRepoName)
+	repo, err := ghrepo.FromFullName(oldRepoURL)
 	if err != nil {
 		return fmt.Errorf("argument error: %w", err)
 	}
@@ -105,9 +105,5 @@ func runRename(apiClient *api.Client, hostname string, input renameRepo) error {
 		return err
 	}
 
-	err := apiClient.REST(hostname, "PATCH", path, body, nil)
-	if err != nil {
-		return err
-	}
-	return nil
+	return apiClient.REST(hostname, "PATCH", path, body, nil)
 }
