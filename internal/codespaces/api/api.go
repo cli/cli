@@ -85,13 +85,13 @@ func (a *API) GetUser(ctx context.Context) (*User, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, api.HandleHTTPError(resp)
+	}
+
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, jsonErrorResponse(b)
 	}
 
 	var response User
@@ -100,18 +100,6 @@ func (a *API) GetUser(ctx context.Context) (*User, error) {
 	}
 
 	return &response, nil
-}
-
-// jsonErrorResponse returns the error message from a JSON response.
-func jsonErrorResponse(b []byte) error {
-	var response struct {
-		Message string `json:"message"`
-	}
-	if err := json.Unmarshal(b, &response); err != nil {
-		return fmt.Errorf("error unmarshaling error response: %w", err)
-	}
-
-	return errors.New(response.Message)
 }
 
 // Repository represents a GitHub repository.
@@ -133,13 +121,13 @@ func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, api.HandleHTTPError(resp)
+	}
+
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, jsonErrorResponse(b)
 	}
 
 	var response Repository
@@ -286,13 +274,13 @@ func (a *API) GetCodespace(ctx context.Context, codespaceName string, includeCon
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, api.HandleHTTPError(resp)
+	}
+
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, jsonErrorResponse(b)
 	}
 
 	var response Codespace
@@ -322,26 +310,12 @@ func (a *API) StartCodespace(ctx context.Context, codespaceName string) error {
 	}
 	defer resp.Body.Close()
 
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("error reading response body: %w", err)
-	}
-
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusConflict {
 			// 409 means the codespace is already running which we can safely ignore
 			return nil
 		}
-
-		// Error response may be a numeric code or a JSON {"message": "..."}.
-		if bytes.HasPrefix(b, []byte("{")) {
-			return jsonErrorResponse(b) // probably JSON
-		}
-
-		if len(b) > 100 {
-			b = append(b[:97], "..."...)
-		}
-		return fmt.Errorf("failed to start codespace: %s (%s)", b, resp.Status)
+		return api.HandleHTTPError(resp)
 	}
 
 	return nil
@@ -364,13 +338,13 @@ func (a *API) GetCodespaceRegionLocation(ctx context.Context) (string, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return "", api.HandleHTTPError(resp)
+	}
+
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("error reading response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return "", jsonErrorResponse(b)
 	}
 
 	var response getCodespaceRegionLocationResponse
@@ -406,13 +380,13 @@ func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, loc
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, api.HandleHTTPError(resp)
+	}
+
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, jsonErrorResponse(b)
 	}
 
 	var response struct {
@@ -499,16 +473,15 @@ func (a *API) startCreate(ctx context.Context, repoID int, machine, branch, loca
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusAccepted {
+		return nil, errProvisioningInProgress // RPC finished before result of creation known
+	} else if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return nil, api.HandleHTTPError(resp)
+	}
+
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
-	}
-
-	switch {
-	case resp.StatusCode > http.StatusAccepted:
-		return nil, jsonErrorResponse(b)
-	case resp.StatusCode == http.StatusAccepted:
-		return nil, errProvisioningInProgress // RPC finished before result of creation known
 	}
 
 	var response Codespace
@@ -533,12 +506,8 @@ func (a *API) DeleteCodespace(ctx context.Context, codespaceName string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode > http.StatusAccepted {
-		b, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return fmt.Errorf("error reading response body: %w", err)
-		}
-		return jsonErrorResponse(b)
+	if resp.StatusCode != http.StatusOK {
+		return api.HandleHTTPError(resp)
 	}
 
 	return nil
@@ -567,15 +536,13 @@ func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Cod
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, nil
+	} else if resp.StatusCode != http.StatusOK {
+		return nil, api.HandleHTTPError(resp)
 	}
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, jsonErrorResponse(b)
 	}
 
 	var response getCodespaceRepositoryContentsResponse
@@ -605,13 +572,13 @@ func (a *API) AuthorizedKeys(ctx context.Context, user string) ([]byte, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned %s", resp.Status)
+	}
+
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("server returned %s", resp.Status)
 	}
 	return b, nil
 }
