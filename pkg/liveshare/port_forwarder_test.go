@@ -46,7 +46,7 @@ func TestPortForwarderStart(t *testing.T) {
 	}
 	defer testServer.Close()
 
-	listen, err := net.Listen("tcp", ":8000")
+	listen, err := net.Listen("tcp", "127.0.0.1:8000")
 	if err != nil {
 		t.Fatal(err)
 	}
