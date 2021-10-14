@@ -40,7 +40,7 @@ func (a *App) List(ctx context.Context, asJSON bool, limit int) error {
 	}
 
 	if err := a.IO.StartPager(); err != nil {
-		return fmt.Errorf("error starting pager: %v", err)
+		return fmt.Errorf("error starting pager: %w", err)
 	}
 	defer a.IO.StopPager()
 
