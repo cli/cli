@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -23,10 +22,11 @@ type browser interface {
 }
 
 type BrowseOptions struct {
-	BaseRepo   func() (ghrepo.Interface, error)
-	Browser    browser
-	HttpClient func() (*http.Client, error)
-	IO         *iostreams.IOStreams
+	BaseRepo         func() (ghrepo.Interface, error)
+	Browser          browser
+	HttpClient       func() (*http.Client, error)
+	IO               *iostreams.IOStreams
+	PathFromRepoRoot func() string
 
 	SelectorArg string
 
@@ -40,9 +40,10 @@ type BrowseOptions struct {
 
 func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Command {
 	opts := &BrowseOptions{
-		Browser:    f.Browser,
-		HttpClient: f.HttpClient,
-		IO:         f.IOStreams,
+		Browser:          f.Browser,
+		HttpClient:       f.HttpClient,
+		IO:               f.IOStreams,
+		PathFromRepoRoot: git.PathFromRepoRoot,
 	}
 
 	cmd := &cobra.Command{
@@ -160,7 +161,7 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 		return fmt.Sprintf("issues/%s", opts.SelectorArg), nil
 	}
 
-	filePath, rangeStart, rangeEnd, err := parseFile(opts.SelectorArg)
+	filePath, rangeStart, rangeEnd, err := parseFile(*opts, opts.SelectorArg)
 	if err != nil {
 		return "", err
 	}
@@ -190,7 +191,7 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 	return fmt.Sprintf("tree/%s/%s", branchName, filePath), nil
 }
 
-func parseFile(f string) (p string, start int, end int, err error) {
+func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err error) {
 	parts := strings.SplitN(f, ":", 3)
 	if len(parts) > 2 {
 		err = fmt.Errorf("invalid file argument: %q", f)
@@ -198,6 +199,14 @@ func parseFile(f string) (p string, start int, end int, err error) {
 	}
 
 	p = parts[0]
+	if !filepath.IsAbs(p) {
+		p = filepath.Clean(filepath.Join(opts.PathFromRepoRoot(), p))
+		// Ensure that a path using \ can be used in a URL
+		p = strings.ReplaceAll(p, "\\", "/")
+		if p == "." || strings.HasPrefix(p, "..") {
+			p = ""
+		}
+	}
 	if len(parts) < 2 {
 		return
 	}
@@ -223,34 +232,7 @@ func parseFile(f string) (p string, start int, end int, err error) {
 	return
 }
 
-func parseFileArg(fileArg string) (string, error) {
-	arr := strings.Split(fileArg, ":")
-	if len(arr) > 2 {
-		return "", fmt.Errorf("invalid use of colon\nUse 'gh browse --help' for more information about browse\n")
-	}
-	if len(arr) > 1 {
-		if !isNumber(arr[1]) {
-			return "", fmt.Errorf("invalid line number after colon\nUse 'gh browse --help' for more information about browse\n")
-		}
-		return arr[0] + "#L" + arr[1], nil
-	}
-	return arr[0], nil
-}
-
 func isNumber(arg string) bool {
 	_, err := strconv.Atoi(arg)
 	return err == nil
-}
-
-func parsePathFromFileArg(fileArg string) string {
-	if filepath.IsAbs(fileArg) {
-		return fileArg
-	}
-	path := filepath.Clean(filepath.Join(git.PathFromRepoRoot(), fileArg))
-	path = strings.ReplaceAll(path, "\\", "/")
-	match, _ := regexp.Match("(^\\.$)|(^\\.\\./)", []byte(path))
-	if match {
-		return ""
-	}
-	return path
 }

@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -338,7 +340,10 @@ func Test_runBrowse(t *testing.T) {
 		{
 			name: "relative path from browse_test.go",
 			opts: BrowseOptions{
-				SelectorArg: "." + s + "browse_test.go",
+				SelectorArg: filepath.Join(".", "browse_test.go"),
+				PathFromRepoRoot: func() string {
+					return "pkg/cmd/browse/"
+				},
 			},
 			baseRepo:      ghrepo.New("bchadwic", "gh-graph"),
 			defaultBranch: "trunk",
@@ -349,6 +354,9 @@ func Test_runBrowse(t *testing.T) {
 			name: "relative path to file in parent folder from browse_test.go",
 			opts: BrowseOptions{
 				SelectorArg: ".." + s + "pr",
+				PathFromRepoRoot: func() string {
+					return "pkg/cmd/browse/"
+				},
 			},
 			baseRepo:      ghrepo.New("bchadwic", "gh-graph"),
 			defaultBranch: "trunk",
@@ -377,6 +385,9 @@ func Test_runBrowse(t *testing.T) {
 				return &http.Client{Transport: &reg}, nil
 			}
 			opts.Browser = &browser
+			if opts.PathFromRepoRoot == nil {
+				opts.PathFromRepoRoot = git.PathFromRepoRoot
+			}
 
 			err := runBrowse(&opts)
 			if tt.wantsErr {
@@ -395,44 +406,6 @@ func Test_runBrowse(t *testing.T) {
 				browser.Verify(t, tt.expectedURL)
 			}
 		})
-	}
-}
-
-func Test_parseFileArg(t *testing.T) {
-	tests := []struct {
-		name            string
-		arg             string
-		errorExpected   bool
-		expectedFileArg string
-		stderrExpected  string
-	}{
-		{
-			name:            "non line number",
-			arg:             "main.go",
-			errorExpected:   false,
-			expectedFileArg: "main.go",
-		},
-		{
-			name:            "line number",
-			arg:             "main.go:32",
-			errorExpected:   false,
-			expectedFileArg: "main.go#L32",
-		},
-		{
-			name:           "non line number error",
-			arg:            "ma:in.go",
-			errorExpected:  true,
-			stderrExpected: "invalid line number after colon\nUse 'gh browse --help' for more information about browse\n",
-		},
-	}
-	for _, tt := range tests {
-		fileArg, err := parseFileArg(tt.arg)
-		if tt.errorExpected {
-			assert.Equal(t, err.Error(), tt.stderrExpected)
-		} else {
-			assert.Equal(t, err, nil)
-			assert.Equal(t, tt.expectedFileArg, fileArg)
-		}
 	}
 }
 
@@ -461,51 +434,44 @@ func Test_parsePathFromFileArg(t *testing.T) {
 		{
 			name:         "file that starts with '.'",
 			fileArg:      ".gitignore",
-			expectedPath: ".gitignore",
+			expectedPath: "pkg/cmd/browse/.gitignore",
 		},
 		{
 			name:         "file in current folder",
-			fileArg:      "." + s + "browse.go",
+			fileArg:      filepath.Join(".", "browse.go"),
 			expectedPath: "pkg/cmd/browse/browse.go",
 		},
 		{
 			name:         "file within parent folder",
-			fileArg:      ".." + s + "browse.go",
+			fileArg:      filepath.Join("..", "browse.go"),
 			expectedPath: "pkg/cmd/browse.go",
 		},
 		{
 			name:         "file within parent folder uncleaned",
-			fileArg:      ".." + s + "." + s + s + s + "browse.go",
+			fileArg:      filepath.Join("..", ".") + s + s + s + "browse.go",
 			expectedPath: "pkg/cmd/browse.go",
 		},
 		{
 			name:         "different path from root directory",
-			fileArg:      ".." + s + ".." + s + ".." + s + "internal/build/build.go",
+			fileArg:      filepath.Join("..", "..", "..", "internal/build/build.go"),
 			expectedPath: "internal/build/build.go",
 		},
 		{
-			name:         "folder in root folder",
-			fileArg:      "pkg",
-			expectedPath: "pkg",
-		},
-		{
-			name:         "subfolder in root folder",
-			fileArg:      "pkg/cmd",
-			expectedPath: "pkg/cmd",
-		},
-		{
 			name:         "go out of repository",
-			fileArg:      ".." + s + ".." + s + ".." + s + ".." + s + ".." + s + ".." + s + "",
+			fileArg:      filepath.Join("..", "..", "..", "..", "..", "..") + s + "",
 			expectedPath: "",
 		},
 		{
 			name:         "go to root of repository",
-			fileArg:      ".." + s + ".." + s + ".." + s + "",
+			fileArg:      filepath.Join("..", "..", "..") + s + "",
 			expectedPath: "",
 		},
 	}
 	for _, tt := range tests {
-		path := parsePathFromFileArg(tt.fileArg)
-		assert.Equal(t, tt.expectedPath, path)
+		path, _, _, _ := parseFile(BrowseOptions{
+			PathFromRepoRoot: func() string {
+				return "pkg/cmd/browse/"
+			}}, tt.fileArg)
+		assert.Equal(t, tt.expectedPath, path, tt.name)
 	}
 }
