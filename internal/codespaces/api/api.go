@@ -347,6 +347,30 @@ func (a *API) StartCodespace(ctx context.Context, codespaceName string) error {
 	return nil
 }
 
+func (a *API) StopCodespace(ctx context.Context, codespaceName string) error {
+	req, err := http.NewRequest(
+		http.MethodPost,
+		a.githubAPI+"/user/codespaces/"+codespaceName+"/stop",
+		nil,
+	)
+	if err != nil {
+		return fmt.Errorf("error creating request: %w", err)
+	}
+
+	a.setHeaders(req)
+	resp, err := a.do(ctx, req, "/user/codespaces/*/stop")
+	if err != nil {
+		return fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return api.HandleHTTPError(resp)
+	}
+
+	return nil
+}
+
 type getCodespaceRegionLocationResponse struct {
 	Current string `json:"current"`
 }
