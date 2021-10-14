@@ -17,7 +17,7 @@ import (
 func TestNewPortForwarder(t *testing.T) {
 	testServer, session, err := makeMockSession()
 	if err != nil {
-		t.Errorf("create mock client: %w", err)
+		t.Errorf("create mock client: %v", err)
 	}
 	defer testServer.Close()
 	pf := NewPortForwarder(session, "ssh", 80, false)
@@ -42,11 +42,11 @@ func TestPortForwarderStart(t *testing.T) {
 		livesharetest.WithStream("stream-id", stream),
 	)
 	if err != nil {
-		t.Errorf("create mock session: %w", err)
+		t.Errorf("create mock session: %v", err)
 	}
 	defer testServer.Close()
 
-	listen, err := net.Listen("tcp", ":8000")
+	listen, err := net.Listen("tcp", "127.0.0.1:8000")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,10 +86,10 @@ func TestPortForwarderStart(t *testing.T) {
 
 	select {
 	case err := <-testServer.Err():
-		t.Errorf("error from server: %w", err)
+		t.Errorf("error from server: %v", err)
 	case err := <-done:
 		if err != nil {
-			t.Errorf("error from client: %w", err)
+			t.Errorf("error from client: %v", err)
 		}
 	}
 }

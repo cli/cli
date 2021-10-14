@@ -49,6 +49,9 @@ import (
 // 			StartCodespaceFunc: func(ctx context.Context, name string) error {
 // 				panic("mock out the StartCodespace method")
 // 			},
+// 			StopCodespaceFunc: func(ctx context.Context, name string) error {
+// 				panic("mock out the StopCodespace method")
+// 			},
 // 		}
 //
 // 		// use mockedapiClient in code that requires apiClient
@@ -88,6 +91,9 @@ type apiClientMock struct {
 
 	// StartCodespaceFunc mocks the StartCodespace method.
 	StartCodespaceFunc func(ctx context.Context, name string) error
+
+	// StopCodespaceFunc mocks the StopCodespace method.
+	StopCodespaceFunc func(ctx context.Context, name string) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -172,6 +178,13 @@ type apiClientMock struct {
 			// Name is the name argument value.
 			Name string
 		}
+		// StopCodespace holds details about calls to the StopCodespace method.
+		StopCodespace []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Name is the name argument value.
+			Name string
+		}
 	}
 	lockAuthorizedKeys                 sync.RWMutex
 	lockCreateCodespace                sync.RWMutex
@@ -184,6 +197,7 @@ type apiClientMock struct {
 	lockGetUser                        sync.RWMutex
 	lockListCodespaces                 sync.RWMutex
 	lockStartCodespace                 sync.RWMutex
+	lockStopCodespace                  sync.RWMutex
 }
 
 // AuthorizedKeys calls AuthorizedKeysFunc.
@@ -576,5 +590,40 @@ func (mock *apiClientMock) StartCodespaceCalls() []struct {
 	mock.lockStartCodespace.RLock()
 	calls = mock.calls.StartCodespace
 	mock.lockStartCodespace.RUnlock()
+	return calls
+}
+
+// StopCodespace calls StopCodespaceFunc.
+func (mock *apiClientMock) StopCodespace(ctx context.Context, name string) error {
+	if mock.StopCodespaceFunc == nil {
+		panic("apiClientMock.StopCodespaceFunc: method is nil but apiClient.StopCodespace was just called")
+	}
+	callInfo := struct {
+		Ctx  context.Context
+		Name string
+	}{
+		Ctx:  ctx,
+		Name: name,
+	}
+	mock.lockStopCodespace.Lock()
+	mock.calls.StopCodespace = append(mock.calls.StopCodespace, callInfo)
+	mock.lockStopCodespace.Unlock()
+	return mock.StopCodespaceFunc(ctx, name)
+}
+
+// StopCodespaceCalls gets all the calls that were made to StopCodespace.
+// Check the length with:
+//     len(mockedapiClient.StopCodespaceCalls())
+func (mock *apiClientMock) StopCodespaceCalls() []struct {
+	Ctx  context.Context
+	Name string
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Name string
+	}
+	mock.lockStopCodespace.RLock()
+	calls = mock.calls.StopCodespace
+	mock.lockStopCodespace.RUnlock()
 	return calls
 }

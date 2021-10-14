@@ -75,10 +75,6 @@ func Connect(ctx context.Context, opts Options) (*Session, error) {
 		return nil, err
 	}
 
-	if opts.Logger == nil {
-		return nil, errors.New("Logger is required")
-	}
-
 	sock := newSocket(uri, opts.TLSConfig)
 	if err := sock.connect(ctx); err != nil {
 		return nil, fmt.Errorf("error connecting websocket: %w", err)

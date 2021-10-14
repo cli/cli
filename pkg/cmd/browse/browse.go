@@ -8,6 +8,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -28,6 +29,7 @@ type BrowseOptions struct {
 	SelectorArg string
 
 	Branch        string
+	CommitFlag    bool
 	ProjectsFlag  bool
 	SettingsFlag  bool
 	WikiFlag      bool
@@ -81,8 +83,9 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			}
 
 			if err := cmdutil.MutuallyExclusive(
-				"specify only one of `--branch`, `--projects`, `--wiki`, or `--settings`",
+				"specify only one of `--branch`, `--commit`, `--projects`, `--wiki`, or `--settings`",
 				opts.Branch != "",
+				opts.CommitFlag,
 				opts.WikiFlag,
 				opts.SettingsFlag,
 				opts.ProjectsFlag,
@@ -102,6 +105,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Open repository wiki")
 	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Open repository settings")
 	cmd.Flags().BoolVarP(&opts.NoBrowserFlag, "no-browser", "n", false, "Print destination URL instead of opening the browser")
+	cmd.Flags().BoolVarP(&opts.CommitFlag, "commit", "c", false, "Open the last commit")
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Select another branch by passing in the branch name")
 
 	return cmd
@@ -111,6 +115,13 @@ func runBrowse(opts *BrowseOptions) error {
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return fmt.Errorf("unable to determine base repository: %w", err)
+	}
+
+	if opts.CommitFlag {
+		commit, err := git.LastCommit()
+		if err == nil {
+			opts.Branch = commit.Sha
+		}
 	}
 
 	section, err := parseSection(baseRepo, opts)

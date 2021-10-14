@@ -40,9 +40,8 @@ func newPortsCmd(app *App) *cobra.Command {
 	portsCmd.PersistentFlags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
 	portsCmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 
-	portsCmd.AddCommand(newPortsPublicCmd(app))
-	portsCmd.AddCommand(newPortsPrivateCmd(app))
 	portsCmd.AddCommand(newPortsForwardCmd(app))
+	portsCmd.AddCommand(newPortsPrivacyCmd(app))
 
 	return portsCmd
 }
@@ -79,7 +78,7 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, asJSON bool) 
 	}
 
 	table := output.NewTable(os.Stdout, asJSON)
-	table.SetHeader([]string{"Label", "Port", "Public", "Browse URL"})
+	table.SetHeader([]string{"Label", "Port", "Privacy", "Browse URL"})
 	for _, port := range ports {
 		sourcePort := strconv.Itoa(port.SourcePort)
 		var portName string
@@ -92,7 +91,7 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, asJSON bool) 
 		table.Append([]string{
 			portName,
 			sourcePort,
-			strings.ToUpper(strconv.FormatBool(port.IsPublic)),
+			port.Privacy,
 			fmt.Sprintf("https://%s-%s.githubpreview.dev/", codespace.Name, sourcePort),
 		})
 	}
@@ -145,13 +144,16 @@ func getDevContainer(ctx context.Context, apiClient apiClient, codespace *api.Co
 	return ch
 }
 
-// newPortsPublicCmd returns a Cobra "ports public" subcommand, which makes a given port public.
-func newPortsPublicCmd(app *App) *cobra.Command {
+func newPortsPrivacyCmd(app *App) *cobra.Command {
 	return &cobra.Command{
-		Use:   "public <port>",
-		Short: "Mark port as public",
-		Args:  cobra.ExactArgs(1),
+		Use:     "privacy <port:public|private|org>...",
+		Short:   "Change the privacy of the forwarded port",
+		Example: "gh codespace ports privacy 80:org 3000:private 8000:public",
+		Args:    cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return fmt.Errorf("at least one port privacy argument is required")
+			}
 			codespace, err := cmd.Flags().GetString("codespace")
 			if err != nil {
 				// should only happen if flag is not defined
@@ -159,33 +161,16 @@ func newPortsPublicCmd(app *App) *cobra.Command {
 				// since it's a persistent flag that we control it should never happen
 				return fmt.Errorf("get codespace flag: %w", err)
 			}
-
-			return app.UpdatePortVisibility(cmd.Context(), codespace, args[0], true)
+			return app.UpdatePortPrivacy(cmd.Context(), codespace, args)
 		},
 	}
 }
 
-// newPortsPrivateCmd returns a Cobra "ports private" subcommand, which makes a given port private.
-func newPortsPrivateCmd(app *App) *cobra.Command {
-	return &cobra.Command{
-		Use:   "private <port>",
-		Short: "Mark port as private",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			codespace, err := cmd.Flags().GetString("codespace")
-			if err != nil {
-				// should only happen if flag is not defined
-				// or if the flag is not of string type
-				// since it's a persistent flag that we control it should never happen
-				return fmt.Errorf("get codespace flag: %w", err)
-			}
-
-			return app.UpdatePortVisibility(cmd.Context(), codespace, args[0], false)
-		},
+func (a *App) UpdatePortPrivacy(ctx context.Context, codespaceName string, args []string) (err error) {
+	ports, err := a.parsePortPrivacies(args)
+	if err != nil {
+		return fmt.Errorf("error parsing port arguments: %w", err)
 	}
-}
-
-func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName, sourcePort string, public bool) (err error) {
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
 		if err == errNoCodespaces {
@@ -200,22 +185,37 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName, sourcePor
 	}
 	defer safeClose(session, &err)
 
-	port, err := strconv.Atoi(sourcePort)
-	if err != nil {
-		return fmt.Errorf("error reading port number: %w", err)
-	}
+	for _, port := range ports {
+		if err := session.UpdateSharedServerPrivacy(ctx, port.number, port.privacy); err != nil {
+			return fmt.Errorf("error update port to public: %w", err)
+		}
 
-	if err := session.UpdateSharedVisibility(ctx, port, public); err != nil {
-		return fmt.Errorf("error update port to public: %w", err)
+		a.logger.Printf("Port %d is now %s scoped.\n", port.number, port.privacy)
 	}
-
-	state := "PUBLIC"
-	if !public {
-		state = "PRIVATE"
-	}
-	a.logger.Printf("Port %s is now %s.\n", sourcePort, state)
 
 	return nil
+}
+
+type portPrivacy struct {
+	number  int
+	privacy string
+}
+
+func (a *App) parsePortPrivacies(args []string) ([]portPrivacy, error) {
+	ports := make([]portPrivacy, 0, len(args))
+	for _, a := range args {
+		fields := strings.Split(a, ":")
+		if len(fields) != 2 {
+			return nil, fmt.Errorf("invalid port privacy format for %q", a)
+		}
+		portStr, privacy := fields[0], fields[1]
+		portNumber, err := strconv.Atoi(portStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid port number: %w", err)
+		}
+		ports = append(ports, portPrivacy{portNumber, privacy})
+	}
+	return ports, nil
 }
 
 // NewPortsForwardCmd returns a Cobra "ports forward" subcommand, which forwards a set of

@@ -100,7 +100,7 @@ func Test_CurrentBranch(t *testing.T) {
 
 		result, err := CurrentBranch()
 		if err != nil {
-			t.Errorf("got unexpected error: %w", err)
+			t.Errorf("got unexpected error: %v", err)
 		}
 		if result != v.Expected {
 			t.Errorf("unexpected branch name: %s instead of %s", result, v.Expected)
