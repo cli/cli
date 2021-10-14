@@ -81,13 +81,13 @@ func Test_checksRun(t *testing.T) {
 			name:    "no commits",
 			prJSON:  `{ "number": 123 }`,
 			wantOut: "",
-			wantErr: "no commit found on the pull request",
+			wantErr: "cannot collect checks information: no commit found on the pull request",
 		},
 		{
 			name:    "no checks",
 			prJSON:  `{ "number": 123, "statusCheckRollup": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }`,
 			wantOut: "",
-			wantErr: "no checks reported on the 'master' branch",
+			wantErr: "cannot collect checks information: no checks reported on the 'master' branch",
 		},
 		{
 			name:    "some failing",
@@ -118,7 +118,7 @@ func Test_checksRun(t *testing.T) {
 			nontty:  true,
 			prJSON:  `{ "number": 123, "statusCheckRollup": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }`,
 			wantOut: "",
-			wantErr: "no checks reported on the 'master' branch",
+			wantErr: "cannot collect checks information: no checks reported on the 'master' branch",
 		},
 		{
 			name:    "some failing",
