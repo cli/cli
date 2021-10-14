@@ -3,6 +3,7 @@ package browse
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -102,6 +103,14 @@ func TestNewCmdBrowse(t *testing.T) {
 			cli:      "main.go main.go",
 			wantsErr: true,
 		},
+		{
+			name: "last commit flag",
+			cli:  "-c",
+			wants: BrowseOptions{
+				CommitFlag: true,
+			},
+			wantsErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -133,7 +142,17 @@ func TestNewCmdBrowse(t *testing.T) {
 	}
 }
 
+func setGitDir(t *testing.T, dir string) {
+	// taken from git_test.go
+	old_GIT_DIR := os.Getenv("GIT_DIR")
+	os.Setenv("GIT_DIR", dir)
+	t.Cleanup(func() {
+		os.Setenv("GIT_DIR", old_GIT_DIR)
+	})
+}
+
 func Test_runBrowse(t *testing.T) {
+	setGitDir(t, "../../../git/fixtures/simple.git")
 	tests := []struct {
 		name          string
 		opts          BrowseOptions
@@ -295,6 +314,25 @@ func Test_runBrowse(t *testing.T) {
 			baseRepo:    ghrepo.New("mislav", "will_paginate"),
 			wantsErr:    false,
 			expectedURL: "https://github.com/mislav/will_paginate/blob/3-0-stable/init.rb?plain=1#L6",
+		},
+		{
+			name: "open last commit",
+			opts: BrowseOptions{
+				CommitFlag: true,
+			},
+			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
+			wantsErr:    false,
+			expectedURL: "https://github.com/vilmibm/gh-user-status/tree/6f1a2405cace1633d89a79c74c65f22fe78f9659/",
+		},
+		{
+			name: "open last commit with a file",
+			opts: BrowseOptions{
+				CommitFlag:  true,
+				SelectorArg: "main.go",
+			},
+			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
+			wantsErr:    false,
+			expectedURL: "https://github.com/vilmibm/gh-user-status/tree/6f1a2405cace1633d89a79c74c65f22fe78f9659/main.go",
 		},
 	}
 
