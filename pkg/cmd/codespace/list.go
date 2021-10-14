@@ -7,7 +7,6 @@ import (
 
 	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +39,6 @@ func (a *App) List(ctx context.Context, asJSON bool, limit int) error {
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}
 
-	tp := utils.NewTablePrinter(a.io)
 	table := output.NewTable(os.Stdout, asJSON)
 	table.SetHeader([]string{"Name", "Repository", "Branch", "State", "Created At"})
 	for _, apiCodespace := range codespaces {
