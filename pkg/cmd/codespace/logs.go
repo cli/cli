@@ -62,7 +62,7 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 	}
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
-	listen, err := net.Listen("tcp", ":0") // arbitrary port
+	listen, err := net.Listen("tcp", "127.0.0.1:0") // arbitrary port
 	if err != nil {
 		return err
 	}

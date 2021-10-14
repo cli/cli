@@ -40,12 +40,14 @@ func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters pr
 			$limit: Int!,
 			$endCursor: String,
 			$baseBranch: String,
+			$headBranch: String,
 			$state: [PullRequestState!] = OPEN
 		) {
 			repository(owner: $owner, name: $repo) {
 				pullRequests(
 					states: $state,
 					baseRefName: $baseBranch,
+					headRefName: $headBranch,
 					first: $limit,
 					after: $endCursor,
 					orderBy: {field: CREATED_AT, direction: DESC}
@@ -83,6 +85,9 @@ func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters pr
 
 	if filters.BaseBranch != "" {
 		variables["baseBranch"] = filters.BaseBranch
+	}
+	if filters.HeadBranch != "" {
+		variables["headBranch"] = filters.HeadBranch
 	}
 
 	res := api.PullRequestAndTotalCount{}

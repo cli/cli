@@ -384,12 +384,14 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 		}
 	}
 
+	if serverError == "" && resp.StatusCode > 299 {
+		serverError = fmt.Sprintf("HTTP %d", resp.StatusCode)
+	}
 	if serverError != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
-		err = cmdutil.SilentError
-		return
-	} else if resp.StatusCode > 299 {
-		fmt.Fprintf(opts.IO.ErrOut, "gh: HTTP %d\n", resp.StatusCode)
+		if msg := api.ScopesSuggestion(resp); msg != "" {
+			fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", msg)
+		}
 		err = cmdutil.SilentError
 		return
 	}

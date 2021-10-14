@@ -94,7 +94,9 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	usingCustomPort := localSSHServerPort != 0 // suppress log of command line in Shell
 
 	// Ensure local port is listening before client (Shell) connects.
-	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", localSSHServerPort))
+	// Unless the user specifies a server port, localSSHServerPort is 0
+	// and thus the client will pick a random port.
+	listen, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", localSSHServerPort))
 	if err != nil {
 		return err
 	}

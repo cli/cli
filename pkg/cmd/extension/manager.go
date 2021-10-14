@@ -417,58 +417,81 @@ func (m *Manager) installGit(cloneURL string, stdout, stderr io.Writer) error {
 }
 
 var localExtensionUpgradeError = errors.New("local extensions can not be upgraded")
+var upToDateError = errors.New("already up to date")
+var noExtensionsInstalledError = errors.New("no extensions installed")
 
 func (m *Manager) Upgrade(name string, force bool) error {
+	// Fetch metadata during list only when upgrading all extensions.
+	// This is a performance improvement so that we don't make a
+	// bunch of unecessary network requests when trying to upgrade a single extension.
+	fetchMetadata := name == ""
+	exts, _ := m.list(fetchMetadata)
+	if len(exts) == 0 {
+		return noExtensionsInstalledError
+	}
+	if name == "" {
+		return m.upgradeExtensions(exts, force)
+	}
+	for _, f := range exts {
+		if f.Name() != name {
+			continue
+		}
+		var err error
+		// For single extensions manually retrieve latest version since we forgo
+		// doing it during list.
+		f.latestVersion, err = m.getLatestVersion(f)
+		if err != nil {
+			return err
+		}
+		return m.upgradeExtension(f, force)
+	}
+	return fmt.Errorf("no extension matched %q", name)
+}
+
+func (m *Manager) upgradeExtensions(exts []Extension, force bool) error {
+	var failed bool
+	for _, f := range exts {
+		fmt.Fprintf(m.io.Out, "[%s]: ", f.Name())
+		err := m.upgradeExtension(f, force)
+		if err != nil {
+			if !errors.Is(err, localExtensionUpgradeError) &&
+				!errors.Is(err, upToDateError) {
+				failed = true
+			}
+			fmt.Fprintf(m.io.Out, "%s\n", err)
+			continue
+		}
+		fmt.Fprintf(m.io.Out, "upgrade complete\n")
+	}
+	if failed {
+		return errors.New("some extensions failed to upgrade")
+	}
+	return nil
+}
+
+func (m *Manager) upgradeExtension(ext Extension, force bool) error {
+	if ext.isLocal {
+		return localExtensionUpgradeError
+	}
+	if !ext.UpdateAvailable() {
+		return upToDateError
+	}
+	var err error
+	if ext.kind == BinaryKind {
+		err = m.upgradeBinExtension(ext)
+	} else {
+		err = m.upgradeGitExtension(ext, force)
+	}
+	return err
+}
+
+func (m *Manager) upgradeGitExtension(ext Extension, force bool) error {
 	exe, err := m.lookPath("git")
 	if err != nil {
 		return err
 	}
-
-	exts := m.List(false)
-	if len(exts) == 0 {
-		return errors.New("no extensions installed")
-	}
-
-	someUpgraded := false
-	for _, f := range exts {
-		if name == "" {
-			fmt.Fprintf(m.io.Out, "[%s]: ", f.Name())
-		} else if f.Name() != name {
-			continue
-		}
-
-		if f.IsLocal() {
-			if name == "" {
-				fmt.Fprintf(m.io.Out, "%s\n", localExtensionUpgradeError)
-			} else {
-				err = localExtensionUpgradeError
-			}
-			continue
-		}
-
-		binManifestPath := filepath.Join(filepath.Dir(f.Path()), manifestName)
-		if _, e := os.Stat(binManifestPath); e == nil {
-			err = m.upgradeBin(f)
-			someUpgraded = true
-			continue
-		}
-
-		if e := m.upgradeGit(f, exe, force); e != nil {
-			err = e
-		}
-		someUpgraded = true
-	}
-
-	if err == nil && !someUpgraded {
-		err = fmt.Errorf("no extension matched %q", name)
-	}
-
-	return err
-}
-
-func (m *Manager) upgradeGit(ext extensions.Extension, exe string, force bool) error {
 	var cmds []*exec.Cmd
-	dir := filepath.Dir(ext.Path())
+	dir := filepath.Dir(ext.path)
 	if force {
 		fetchCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "fetch", "origin", "HEAD")
 		resetCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "reset", "--hard", "origin/HEAD")
@@ -477,34 +500,14 @@ func (m *Manager) upgradeGit(ext extensions.Extension, exe string, force bool) e
 		pullCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "pull", "--ff-only")
 		cmds = []*exec.Cmd{pullCmd}
 	}
-
-	return runCmds(cmds, m.io.Out, m.io.ErrOut)
+	return runCmds(cmds)
 }
 
-func (m *Manager) upgradeBin(ext extensions.Extension) error {
-	manifestPath := filepath.Join(filepath.Dir(ext.Path()), manifestName)
-	manifest, err := os.ReadFile(manifestPath)
+func (m *Manager) upgradeBinExtension(ext Extension) error {
+	repo, err := ghrepo.FromFullName(ext.url)
 	if err != nil {
-		return fmt.Errorf("could not open %s for reading: %w", manifestPath, err)
+		return fmt.Errorf("failed to parse URL %s: %w", ext.url, err)
 	}
-
-	var bm binManifest
-	err = yaml.Unmarshal(manifest, &bm)
-	if err != nil {
-		return fmt.Errorf("could not parse %s: %w", manifestPath, err)
-	}
-	repo := ghrepo.NewWithHost(bm.Owner, bm.Name, bm.Host)
-	var r *release
-
-	r, err = fetchLatestRelease(m.client, repo)
-	if err != nil {
-		return fmt.Errorf("failed to get release info for %s: %w", ghrepo.FullName(repo), err)
-	}
-
-	if bm.Tag == r.Tag {
-		return nil
-	}
-
 	return m.installBin(repo)
 }
 
@@ -590,10 +593,8 @@ func (m *Manager) Create(name string) error {
 	return err
 }
 
-func runCmds(cmds []*exec.Cmd, stdout, stderr io.Writer) error {
+func runCmds(cmds []*exec.Cmd) error {
 	for _, cmd := range cmds {
-		cmd.Stdout = stdout
-		cmd.Stderr = stderr
 		if err := cmd.Run(); err != nil {
 			return err
 		}

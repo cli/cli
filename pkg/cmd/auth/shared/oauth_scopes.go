@@ -32,19 +32,19 @@ type httpClient interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
-func HasMinimumScopes(httpClient httpClient, hostname, authToken string) error {
+func GetScopes(httpClient httpClient, hostname, authToken string) (string, error) {
 	apiEndpoint := ghinstance.RESTPrefix(hostname)
 
 	req, err := http.NewRequest("GET", apiEndpoint, nil)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	req.Header.Set("Authorization", "token "+authToken)
 
 	res, err := httpClient.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	defer func() {
@@ -55,10 +55,18 @@ func HasMinimumScopes(httpClient httpClient, hostname, authToken string) error {
 	}()
 
 	if res.StatusCode != 200 {
-		return api.HandleHTTPError(res)
+		return "", api.HandleHTTPError(res)
 	}
 
-	scopesHeader := res.Header.Get("X-Oauth-Scopes")
+	return res.Header.Get("X-Oauth-Scopes"), nil
+}
+
+func HasMinimumScopes(httpClient httpClient, hostname, authToken string) error {
+	scopesHeader, err := GetScopes(httpClient, hostname, authToken)
+	if err != nil {
+		return err
+	}
+
 	if scopesHeader == "" {
 		// if the token reports no scopes, assume that it's an integration token and give up on
 		// detecting its capabilities
