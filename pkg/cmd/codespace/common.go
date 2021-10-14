@@ -17,6 +17,7 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -24,12 +25,14 @@ import (
 type App struct {
 	apiClient apiClient
 	logger    *output.Logger
+	IO        *iostreams.IOStreams
 }
 
-func NewApp(logger *output.Logger, apiClient apiClient) *App {
+func NewApp(logger *output.Logger, apiClient apiClient, io *iostreams.IOStreams) *App {
 	return &App{
 		apiClient: apiClient,
 		logger:    logger,
+		IO:        io,
 	}
 }
 

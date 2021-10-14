@@ -3,10 +3,9 @@ package codespace
 import (
 	"context"
 	"fmt"
-	"os"
 
-	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -39,19 +38,50 @@ func (a *App) List(ctx context.Context, asJSON bool, limit int) error {
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}
 
-	table := output.NewTable(os.Stdout, asJSON)
-	table.SetHeader([]string{"Name", "Repository", "Branch", "State", "Created At"})
+	if err := a.IO.StartPager(); err != nil {
+		return fmt.Errorf("error starting pager: %v", err)
+	}
+	defer a.IO.StopPager()
+
+	cs := a.IO.ColorScheme()
+	tp := utils.NewTablePrinter(a.IO)
+
 	for _, apiCodespace := range codespaces {
-		cs := codespace{apiCodespace}
-		table.Append([]string{
-			cs.Name,
-			cs.RepositoryNWO,
-			cs.branchWithGitStatus(),
-			cs.Environment.State,
-			cs.CreatedAt,
-		})
+		c := codespace{apiCodespace}
+
+		tp.AddField(c.Name, nil, nil)
+		tp.AddField(c.RepositoryNWO, nil, cs.Bold)
+		tp.AddField(c.branchWithGitStatus(), nil, nil)
+
+		if c.Environment.State == "Shutdown" {
+			tp.AddField(c.Environment.State, nil, cs.Red)
+		} else if c.Environment.State == "Starting" {
+			tp.AddField(c.Environment.State, nil, cs.Yellow)
+		} else if c.Environment.State == "Available" {
+			tp.AddField(c.Environment.State, nil, cs.Green)
+		} else {
+			tp.AddField(c.Environment.State, nil, cs.Gray)
+		}
+
+		tp.AddField(c.CreatedAt, nil, cs.Gray)
+		tp.EndRow()
 	}
 
-	table.Render()
-	return nil
+	if a.IO.IsStdoutTTY() {
+		title := listHeader(len(codespaces))
+		fmt.Printf("\n%s\n\n", title)
+	}
+
+	return tp.Render()
+}
+
+func listHeader(count int) string {
+	s := ""
+	if count == 0 {
+		return "No results"
+	} else if count > 1 {
+		s = "s"
+	}
+
+	return fmt.Sprintf("Showing %d codespace%s", count, s)
 }

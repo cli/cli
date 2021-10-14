@@ -131,6 +131,7 @@ func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := codespaceCmd.NewRootCmd(codespaceCmd.NewApp(
 		output.NewLogger(f.IOStreams.Out, f.IOStreams.ErrOut, !f.IOStreams.IsStdoutTTY()),
 		codespacesAPI.New("", &lazyLoadedHTTPClient{factory: f}),
+		f.IOStreams,
 	))
 	cmd.Use = "codespace"
 	cmd.Aliases = []string{"cs"}
