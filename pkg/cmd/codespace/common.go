@@ -7,8 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
 	"os"
 	"sort"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
@@ -34,9 +37,10 @@ func NewApp(logger *output.Logger, apiClient apiClient) *App {
 type apiClient interface {
 	GetUser(ctx context.Context) (*api.User, error)
 	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
-	ListCodespaces(ctx context.Context) ([]*api.Codespace, error)
+	ListCodespaces(ctx context.Context, limit int) ([]*api.Codespace, error)
 	DeleteCodespace(ctx context.Context, name string) error
 	StartCodespace(ctx context.Context, name string) error
+	StopCodespace(ctx context.Context, name string) error
 	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
 	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
 	AuthorizedKeys(ctx context.Context, user string) ([]byte, error)
@@ -48,13 +52,15 @@ type apiClient interface {
 var errNoCodespaces = errors.New("you have no codespaces")
 
 func chooseCodespace(ctx context.Context, apiClient apiClient) (*api.Codespace, error) {
-	codespaces, err := apiClient.ListCodespaces(ctx)
+	codespaces, err := apiClient.ListCodespaces(ctx, -1)
 	if err != nil {
 		return nil, fmt.Errorf("error getting codespaces: %w", err)
 	}
 	return chooseCodespaceFromList(ctx, codespaces)
 }
 
+// chooseCodespaceFromList returns the selected codespace from the list,
+// or an error if there are no codespaces.
 func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (*api.Codespace, error) {
 	if len(codespaces) == 0 {
 		return nil, errNoCodespaces
@@ -64,14 +70,47 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 		return codespaces[i].CreatedAt > codespaces[j].CreatedAt
 	})
 
-	codespacesByName := make(map[string]*api.Codespace)
-	codespacesNames := make([]string, 0, len(codespaces))
-	for _, codespace := range codespaces {
-		codespacesByName[codespace.Name] = codespace
-		codespacesNames = append(codespacesNames, codespace.Name)
+	type codespaceWithIndex struct {
+		cs  codespace
+		idx int
 	}
 
-	sshSurvey := []*survey.Question{
+	namesWithConflict := make(map[string]bool)
+	codespacesByName := make(map[string]codespaceWithIndex)
+	codespacesNames := make([]string, 0, len(codespaces))
+	for _, apiCodespace := range codespaces {
+		cs := codespace{apiCodespace}
+		csName := cs.displayName(false, false)
+		displayNameWithGitStatus := cs.displayName(false, true)
+
+		_, hasExistingConflict := namesWithConflict[csName]
+		if seenCodespace, ok := codespacesByName[csName]; ok || hasExistingConflict {
+			// There is an existing codespace on the repo and branch.
+			// We need to disambiguate by adding the codespace name
+			// to the existing entry and the one we are processing now.
+			if !hasExistingConflict {
+				fullDisplayName := seenCodespace.cs.displayName(true, false)
+				fullDisplayNameWithGitStatus := seenCodespace.cs.displayName(true, true)
+
+				codespacesByName[fullDisplayName] = codespaceWithIndex{seenCodespace.cs, seenCodespace.idx}
+				codespacesNames[seenCodespace.idx] = fullDisplayNameWithGitStatus
+				delete(codespacesByName, csName) // delete the existing map entry with old name
+
+				// All other codespaces with the same name should update
+				// to their specific name, this tracks conflicting names going forward
+				namesWithConflict[csName] = true
+			}
+
+			// update this codespace names to include the name to disambiguate
+			csName = cs.displayName(true, false)
+			displayNameWithGitStatus = cs.displayName(true, true)
+		}
+
+		codespacesByName[csName] = codespaceWithIndex{cs, len(codespacesNames)}
+		codespacesNames = append(codespacesNames, displayNameWithGitStatus)
+	}
+
+	csSurvey := []*survey.Question{
 		{
 			Name: "codespace",
 			Prompt: &survey.Select{
@@ -86,12 +125,15 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 	var answers struct {
 		Codespace string
 	}
-	if err := ask(sshSurvey, &answers); err != nil {
+	if err := ask(csSurvey, &answers); err != nil {
 		return nil, fmt.Errorf("error getting answers: %w", err)
 	}
 
-	codespace := codespacesByName[answers.Codespace]
-	return codespace, nil
+	// Codespaces are indexed without the git status included as compared
+	// to how it is displayed in the prompt, so the git status symbol needs
+	// cleaning up in case it is included.
+	selectedCodespace := strings.Replace(answers.Codespace, gitStatusDirty, "", -1)
+	return codespacesByName[selectedCodespace].cs.Codespace, nil
 }
 
 // getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
@@ -170,4 +212,54 @@ func noArgsConstraint(cmd *cobra.Command, args []string) error {
 		return ErrTooManyArgs
 	}
 	return nil
+}
+
+func noopLogger() *log.Logger {
+	return log.New(ioutil.Discard, "", 0)
+}
+
+type codespace struct {
+	*api.Codespace
+}
+
+// displayName returns the repository nwo and branch.
+// If includeName is true, the name of the codespace is included.
+// If includeGitStatus is true, the branch will include a star if
+// the codespace has unsaved changes.
+func (c codespace) displayName(includeName, includeGitStatus bool) string {
+	branch := c.Branch
+	if includeGitStatus {
+		branch = c.branchWithGitStatus()
+	}
+
+	if includeName {
+		return fmt.Sprintf(
+			"%s: %s [%s]", c.RepositoryNWO, branch, c.Name,
+		)
+	}
+	return c.RepositoryNWO + ": " + branch
+}
+
+// gitStatusDirty represents an unsaved changes status.
+const gitStatusDirty = "*"
+
+// branchWithGitStatus returns the branch with a star
+// if the branch is currently being worked on.
+func (c codespace) branchWithGitStatus() string {
+	if c.hasUnsavedChanges() {
+		return c.Branch + gitStatusDirty
+	}
+
+	return c.Branch
+}
+
+// hasUnsavedChanges returns whether the environment has
+// unsaved changes.
+func (c codespace) hasUnsavedChanges() bool {
+	return c.Environment.GitStatus.HasUncommitedChanges || c.Environment.GitStatus.HasUnpushedChanges
+}
+
+// running returns whether the codespace environment is running.
+func (c codespace) running() bool {
+	return c.Environment.State == api.CodespaceEnvironmentStateAvailable
 }

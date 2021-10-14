@@ -7,11 +7,20 @@ import (
 
 const manifestName = "manifest.yml"
 
+type ExtensionKind int
+
+const (
+	GitKind ExtensionKind = iota
+	BinaryKind
+)
+
 type Extension struct {
-	path            string
-	url             string
-	isLocal         bool
-	updateAvailable bool
+	path           string
+	url            string
+	isLocal        bool
+	currentVersion string
+	latestVersion  string
+	kind           ExtensionKind
 }
 
 func (e *Extension) Name() string {
@@ -31,5 +40,11 @@ func (e *Extension) IsLocal() bool {
 }
 
 func (e *Extension) UpdateAvailable() bool {
-	return e.updateAvailable
+	if e.isLocal ||
+		e.currentVersion == "" ||
+		e.latestVersion == "" ||
+		e.currentVersion == e.latestVersion {
+		return false
+	}
+	return true
 }

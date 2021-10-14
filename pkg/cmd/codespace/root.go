@@ -25,6 +25,7 @@ token to access the GitHub API with.`,
 	root.AddCommand(newLogsCmd(app))
 	root.AddCommand(newPortsCmd(app))
 	root.AddCommand(newSSHCmd(app))
+	root.AddCommand(newStopCmd(app))
 
 	return root
 }

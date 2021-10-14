@@ -2,9 +2,7 @@ package api
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -265,30 +263,6 @@ func (pr *PullRequest) DisplayableReviews() PullRequestReviews {
 		}
 	}
 	return PullRequestReviews{Nodes: published, TotalCount: len(published)}
-}
-
-func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int) (io.ReadCloser, error) {
-	url := fmt.Sprintf("%srepos/%s/pulls/%d",
-		ghinstance.RESTPrefix(baseRepo.RepoHost()), ghrepo.FullName(baseRepo), prNumber)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Accept", "application/vnd.github.v3.diff; charset=utf-8")
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode == 404 {
-		return nil, errors.New("pull request not found")
-	} else if resp.StatusCode != 200 {
-		return nil, HandleHTTPError(resp)
-	}
-
-	return resp.Body, nil
 }
 
 type pullRequestFeature struct {

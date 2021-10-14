@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"net"
 	"strings"
 	"time"
@@ -36,8 +38,10 @@ type PostCreateState struct {
 // PollPostCreateStates watches for state changes in a codespace,
 // and calls the supplied poller for each batch of state changes.
 // It runs until it encounters an error, including cancellation of the context.
-func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, codespace *api.Codespace, poller func([]PostCreateState)) (err error) {
-	session, err := ConnectToLiveshare(ctx, log, apiClient, codespace)
+func PollPostCreateStates(ctx context.Context, logger logger, apiClient apiClient, codespace *api.Codespace, poller func([]PostCreateState)) (err error) {
+	noopLogger := log.New(ioutil.Discard, "", 0)
+
+	session, err := ConnectToLiveshare(ctx, logger, noopLogger, apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("connect to Live Share: %w", err)
 	}
@@ -54,7 +58,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, 
 	}
 	localPort := listen.Addr().(*net.TCPAddr).Port
 
-	log.Println("Fetching SSH Details...")
+	logger.Println("Fetching SSH Details...")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
@@ -62,7 +66,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, 
 
 	tunnelClosed := make(chan error, 1) // buffered to avoid sender stuckness
 	go func() {
-		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
+		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, false)
 		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // error is non-nil
 	}()
 
@@ -78,7 +82,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, 
 			return fmt.Errorf("connection failed: %w", err)
 
 		case <-t.C:
-			states, err := getPostCreateOutput(ctx, localPort, codespace, sshUser)
+			states, err := getPostCreateOutput(ctx, localPort, sshUser)
 			if err != nil {
 				return fmt.Errorf("get post create output: %w", err)
 			}
@@ -88,7 +92,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, 
 	}
 }
 
-func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Codespace, user string) ([]PostCreateState, error) {
+func getPostCreateOutput(ctx context.Context, tunnelPort int, user string) ([]PostCreateState, error) {
 	cmd, err := NewRemoteCommand(
 		ctx, tunnelPort, fmt.Sprintf("%s@localhost", user),
 		"cat /workspaces/.codespaces/shared/postCreateOutput.json",
