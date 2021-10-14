@@ -226,17 +226,17 @@ type codespace struct {
 // If includeGitStatus is true, the branch will include a star if
 // the codespace has unsaved changes.
 func (c codespace) displayName(includeName, includeGitStatus bool) string {
-	branch := c.Branch
+	branch := c.GitStatus.Ref
 	if includeGitStatus {
 		branch = c.branchWithGitStatus()
 	}
 
 	if includeName {
 		return fmt.Sprintf(
-			"%s: %s [%s]", c.RepositoryNWO, branch, c.Name,
+			"%s: %s [%s]", c.Repository.FullName, branch, c.Name,
 		)
 	}
-	return c.RepositoryNWO + ": " + branch
+	return c.Repository.FullName + ": " + branch
 }
 
 // gitStatusDirty represents an unsaved changes status.
@@ -246,14 +246,14 @@ const gitStatusDirty = "*"
 // if the branch is currently being worked on.
 func (c codespace) branchWithGitStatus() string {
 	if c.hasUnsavedChanges() {
-		return c.Branch + gitStatusDirty
+		return c.GitStatus.Ref + gitStatusDirty
 	}
 
-	return c.Branch
+	return c.GitStatus.Ref
 }
 
 // hasUnsavedChanges returns whether the environment has
 // unsaved changes.
 func (c codespace) hasUnsavedChanges() bool {
-	return c.Environment.GitStatus.HasUncommitedChanges || c.Environment.GitStatus.HasUnpushedChanges
+	return c.GitStatus.HasUncommitedChanges || c.GitStatus.HasUnpushedChanges
 }
