@@ -16,10 +16,15 @@ jobs:
         with:
           go-version: 1.16
       - name: Generate changelog
+        id: changelog
         run: |
-          echo "GORELEASER_CURRENT_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-          git fetch --unshallow
-          script/changelog | tee CHANGELOG.md
+          echo "::set-output name=tag-name::${GITHUB_REF#refs/tags/}"
+          gh api repos/$GITHUB_REPOSITORY/releases/generate-notes \
+            -f tag_name="${GITHUB_REF#refs/tags/}" \
+            -f target_commitish=trunk \
+            -q .body > CHANGELOG.md
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
         with:
@@ -27,6 +32,7 @@ jobs:
           args: release --release-notes=CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          GORELEASER_CURRENT_TAG: ${{steps.changelog.outputs.tag-name}}
       - name: Checkout documentation site
         uses: actions/checkout@v2
         with:
