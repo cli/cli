@@ -93,13 +93,6 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 				return err
 			}
 
-			if opts.CommitFlag {
-				commit, err := git.LastCommit()
-				if err != nil {
-					opts.Branch = commit.Sha
-				}
-			}
-
 			if runF != nil {
 				return runF(opts)
 			}
@@ -122,6 +115,13 @@ func runBrowse(opts *BrowseOptions) error {
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return fmt.Errorf("unable to determine base repository: %w", err)
+	}
+
+	if opts.CommitFlag {
+		commit, err := git.LastCommit()
+		if err == nil {
+			opts.Branch = commit.Sha
+		}
 	}
 
 	section, err := parseSection(baseRepo, opts)
