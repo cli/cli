@@ -1,4 +1,60 @@
-* @cli/code-reviewers
+* @cli/code-reviewersgo.mod
+# invoke the new command
+$ gh my-extension
+For more information, see gh help extension. To see currently published extensions, browse repositories with the gh-extension topic. Note that extensions may have runtime dependencies other than gh.
+
+Other additions
+Display label colors in issue list output #4106
+
+Add tablerow/tablerender template functions for rendering data as tables #3519
+
+Add GH_FORCE_TTY to enable terminal-style output even when redirected #4146
+
+Add repo sync command to sync a branch with its upstream state #3813
+
+Add pr checkout --branch flag to control the branch name #4005
+
+Add release create --discussion-category flag #4003
+
+Add config set browser option and GH_BROWSER environment variable #3992
+
+Add repo list --topic filter #4136
+
+Add PowerShell instructions to completion help #4114
+
+Fixes
+Improve accessibility of interactive select menus #4172
+
+Improve detection of truecolor terminal capabilities #4106
+
+Avoid wrapping issues in powershell.exe #4106
+
+Detect missing git and abort early during auth login flow #4109
+
+Fix HTTP 502 error printing from GraphQL responses #4154
+
+Removals
+Require Go 1.16+ #4175 - drops support for OS X El Capitan
+
+Remove backwards compatibility with homedir library for config files #4145
+
+Thanks
+As always, we couldn't have done this without our amazing contributors 🎉
+
+@despreston
+@lepasq
+@rneatherway
+@heaths
+@shaharyarahmed-bot
+@saintmalik
+@mahdyar$ gh extension install owner/gh-my-extension
+
+# invoke the new command
+$ gh my-extension
+--help   Show help for command  -h, --hostname string   The hostname of the GitHub instance to authenticate with
+  -s, --scopes strings    Additional authentication scopes for gh to have
+  -w, --web               Open a browser to authenticate
+      --with-token        Read token
 
 pkg/cmd/codespace/* @cli/codespaces
 pkg/liveshare/* @cli/codespaces
