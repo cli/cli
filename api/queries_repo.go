@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -228,6 +228,25 @@ func (r Repository) ViewerCanTriage() bool {
 	default:
 		return false
 	}
+}
+
+func FetchRepository(client *Client, repo ghrepo.Interface, fields []string) (*Repository, error) {
+	query := fmt.Sprintf(`query RepositoryInfo($owner: String!, $name: String!) {
+		repository(owner: $owner, name: $name) {%s}
+	}`, RepositoryGraphQL(fields))
+
+	variables := map[string]interface{}{
+		"owner": repo.RepoOwner(),
+		"name":  repo.RepoName(),
+	}
+
+	var result struct {
+		Repository Repository
+	}
+	if err := client.GraphQL(repo.RepoHost(), query, variables, &result); err != nil {
+		return nil, err
+	}
+	return InitRepoHostname(&result.Repository, repo.RepoHost()), nil
 }
 
 func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {

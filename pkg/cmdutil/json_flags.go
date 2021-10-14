@@ -10,9 +10,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cli/cli/pkg/export"
-	"github.com/cli/cli/pkg/jsoncolor"
-	"github.com/cli/cli/pkg/set"
+	"github.com/cli/cli/v2/pkg/export"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/jsoncolor"
+	"github.com/cli/cli/v2/pkg/set"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -29,13 +30,15 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 
 	_ = cmd.RegisterFlagCompletionFunc("json", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var results []string
-		if idx := strings.IndexRune(toComplete, ','); idx >= 0 {
+		var prefix string
+		if idx := strings.LastIndexByte(toComplete, ','); idx >= 0 {
+			prefix = toComplete[:idx+1]
 			toComplete = toComplete[idx+1:]
 		}
 		toComplete = strings.ToLower(toComplete)
 		for _, f := range fields {
 			if strings.HasPrefix(strings.ToLower(f), toComplete) {
-				results = append(results, f)
+				results = append(results, prefix+f)
 			}
 		}
 		sort.Strings(results)
@@ -105,7 +108,7 @@ func checkJSONFlags(cmd *cobra.Command) (*exportFormat, error) {
 
 type Exporter interface {
 	Fields() []string
-	Write(w io.Writer, data interface{}, colorEnabled bool) error
+	Write(io *iostreams.IOStreams, data interface{}) error
 }
 
 type exportFormat struct {
@@ -121,7 +124,7 @@ func (e *exportFormat) Fields() []string {
 // Write serializes data into JSON output written to w. If the object passed as data implements exportable,
 // or if data is a map or slice of exportable object, ExportData() will be called on each object to obtain
 // raw data for serialization.
-func (e *exportFormat) Write(w io.Writer, data interface{}, colorEnabled bool) error {
+func (e *exportFormat) Write(ios *iostreams.IOStreams, data interface{}) error {
 	buf := bytes.Buffer{}
 	encoder := json.NewEncoder(&buf)
 	encoder.SetEscapeHTML(false)
@@ -129,11 +132,12 @@ func (e *exportFormat) Write(w io.Writer, data interface{}, colorEnabled bool) e
 		return err
 	}
 
+	w := ios.Out
 	if e.filter != "" {
 		return export.FilterJSON(w, &buf, e.filter)
 	} else if e.template != "" {
-		return export.ExecuteTemplate(w, &buf, e.template, colorEnabled)
-	} else if colorEnabled {
+		return export.ExecuteTemplate(ios, &buf, e.template)
+	} else if ios.ColorEnabled() {
 		return jsoncolor.Write(w, &buf, "  ")
 	}
 

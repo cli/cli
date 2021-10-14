@@ -12,9 +12,13 @@ while [[ -z $previous_tag || ( $previous_tag == *-* && $current_tag != *-* ) ]];
   start_ref="$previous_tag"
 done
 
-git log "$previous_tag".. --reverse --merges --oneline --grep='Merge pull request #' | \
+git log "$previous_tag".. --reverse --first-parent --oneline | \
   while read -r sha title; do
-    pr_num="$(grep -o '#[[:digit:]]\+' <<<"$title")"
-    pr_desc="$(git show -s --format=%b "$sha" | sed -n '1,/^$/p' | tr $'\n' ' ')"
-    printf "* %s %s\n\n" "$pr_desc" "$pr_num"
+    if [[ $title == "Merge pull request #"* ]]; then
+      pr_num="$(grep -o '#[[:digit:]]\+' <<<"$title")"
+      pr_desc="$(git show -s --format=%b "$sha" | sed -n '1,/^$/p' | tr $'\n' ' ')"
+      printf "* %s %s\n\n" "$pr_desc" "$pr_num"
+    else
+      printf "* %s\n\n" "$title"
+    fi
   done

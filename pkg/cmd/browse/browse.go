@@ -3,18 +3,18 @@ package browse
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -31,6 +31,7 @@ type BrowseOptions struct {
 	SelectorArg string
 
 	Branch        string
+	CommitFlag    bool
 	ProjectsFlag  bool
 	SettingsFlag  bool
 	WikiFlag      bool
@@ -84,8 +85,9 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			}
 
 			if err := cmdutil.MutuallyExclusive(
-				"specify only one of `--branch`, `--projects`, `--wiki`, or `--settings`",
+				"specify only one of `--branch`, `--commit`, `--projects`, `--wiki`, or `--settings`",
 				opts.Branch != "",
+				opts.CommitFlag,
 				opts.WikiFlag,
 				opts.SettingsFlag,
 				opts.ProjectsFlag,
@@ -105,6 +107,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Open repository wiki")
 	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Open repository settings")
 	cmd.Flags().BoolVarP(&opts.NoBrowserFlag, "no-browser", "n", false, "Print destination URL instead of opening the browser")
+	cmd.Flags().BoolVarP(&opts.CommitFlag, "commit", "c", false, "Open the last commit")
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Select another branch by passing in the branch name")
 
 	return cmd
@@ -116,57 +119,108 @@ func runBrowse(opts *BrowseOptions) error {
 		return fmt.Errorf("unable to determine base repository: %w", err)
 	}
 
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return fmt.Errorf("unable to create an http client: %w", err)
+	if opts.CommitFlag {
+		commit, err := git.LastCommit()
+		if err == nil {
+			opts.Branch = commit.Sha
+		}
 	}
-	url := ghrepo.GenerateRepoURL(baseRepo, "")
 
-	if opts.SelectorArg == "" {
-		if opts.ProjectsFlag {
-			url += "/projects"
-		}
-		if opts.SettingsFlag {
-			url += "/settings"
-		}
-		if opts.WikiFlag {
-			url += "/wiki"
-		}
-		if opts.Branch != "" {
-			url += "/tree/" + opts.Branch + "/"
-		}
-	} else {
-		if isNumber(opts.SelectorArg) {
-			url += "/issues/" + opts.SelectorArg
-		} else {
-			if opts.Branch != "" {
-				url += "/tree/" + opts.Branch + "/"
-			} else {
-				apiClient := api.NewClientFromHTTP(httpClient)
-				branchName, err := api.RepoDefaultBranch(apiClient, baseRepo)
-				if err != nil {
-					return err
-				}
-				url += "/tree/" + branchName + "/"
-			}
-			fileArg, err := parseFileArg(opts.SelectorArg)
-			if err != nil {
-				return err
-			}
-			path := parsePathFromFileArg(fileArg)
-			url += path
-		}
+	section, err := parseSection(baseRepo, opts)
+	if err != nil {
+		return err
 	}
+	url := ghrepo.GenerateRepoURL(baseRepo, section)
 
 	if opts.NoBrowserFlag {
-		fmt.Fprintf(opts.IO.Out, "%s\n", url)
-		return nil
-	} else {
-		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "now opening %s in browser\n", url)
-		}
-		return opts.Browser.Browse(url)
+		_, err := fmt.Fprintln(opts.IO.Out, url)
+		return err
 	}
+
+	if opts.IO.IsStdoutTTY() {
+		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(url))
+	}
+	return opts.Browser.Browse(url)
+}
+
+func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error) {
+	if opts.SelectorArg == "" {
+		if opts.ProjectsFlag {
+			return "projects", nil
+		} else if opts.SettingsFlag {
+			return "settings", nil
+		} else if opts.WikiFlag {
+			return "wiki", nil
+		} else if opts.Branch == "" {
+			return "", nil
+		}
+	}
+
+	if isNumber(opts.SelectorArg) {
+		return fmt.Sprintf("issues/%s", opts.SelectorArg), nil
+	}
+
+	filePath, rangeStart, rangeEnd, err := parseFile(opts.SelectorArg)
+	if err != nil {
+		return "", err
+	}
+
+	branchName := opts.Branch
+	if branchName == "" {
+		httpClient, err := opts.HttpClient()
+		if err != nil {
+			return "", err
+		}
+		apiClient := api.NewClientFromHTTP(httpClient)
+		branchName, err = api.RepoDefaultBranch(apiClient, baseRepo)
+		if err != nil {
+			return "", fmt.Errorf("error determining the default branch: %w", err)
+		}
+	}
+
+	if rangeStart > 0 {
+		var rangeFragment string
+		if rangeEnd > 0 && rangeStart != rangeEnd {
+			rangeFragment = fmt.Sprintf("L%d-L%d", rangeStart, rangeEnd)
+		} else {
+			rangeFragment = fmt.Sprintf("L%d", rangeStart)
+		}
+		return fmt.Sprintf("blob/%s/%s?plain=1#%s", branchName, filePath, rangeFragment), nil
+	}
+	return fmt.Sprintf("tree/%s/%s", branchName, filePath), nil
+}
+
+func parseFile(f string) (p string, start int, end int, err error) {
+	parts := strings.SplitN(f, ":", 3)
+	if len(parts) > 2 {
+		err = fmt.Errorf("invalid file argument: %q", f)
+		return
+	}
+
+	p = parts[0]
+	if len(parts) < 2 {
+		return
+	}
+
+	if idx := strings.IndexRune(parts[1], '-'); idx >= 0 {
+		start, err = strconv.Atoi(parts[1][:idx])
+		if err != nil {
+			err = fmt.Errorf("invalid file argument: %q", f)
+			return
+		}
+		end, err = strconv.Atoi(parts[1][idx+1:])
+		if err != nil {
+			err = fmt.Errorf("invalid file argument: %q", f)
+		}
+		return
+	}
+
+	start, err = strconv.Atoi(parts[1])
+	if err != nil {
+		err = fmt.Errorf("invalid file argument: %q", f)
+	}
+	end = start
+	return
 }
 
 func parseFileArg(fileArg string) (string, error) {
@@ -189,7 +243,7 @@ func isNumber(arg string) bool {
 }
 
 func parsePathFromFileArg(fileArg string) string {
-	if !hasRelativePrefix(fileArg) {
+	if filepath.IsAbs(fileArg) {
 		return fileArg
 	}
 	path := filepath.Clean(filepath.Join(git.PathFromRepoRoot(), fileArg))
@@ -199,10 +253,4 @@ func parsePathFromFileArg(fileArg string) string {
 		return ""
 	}
 	return path
-}
-
-func hasRelativePrefix(fileArg string) bool {
-	return strings.HasPrefix(fileArg, ".."+string(os.PathSeparator)) ||
-		strings.HasPrefix(fileArg, "."+string(os.PathSeparator)) ||
-		fileArg == "."
 }

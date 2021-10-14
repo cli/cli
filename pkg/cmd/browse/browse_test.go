@@ -6,10 +6,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -103,6 +103,14 @@ func TestNewCmdBrowse(t *testing.T) {
 			cli:      "main.go main.go",
 			wantsErr: true,
 		},
+		{
+			name: "last commit flag",
+			cli:  "-c",
+			wants: BrowseOptions{
+				CommitFlag: true,
+			},
+			wantsErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -134,8 +142,18 @@ func TestNewCmdBrowse(t *testing.T) {
 	}
 }
 
+func setGitDir(t *testing.T, dir string) {
+	// taken from git_test.go
+	old_GIT_DIR := os.Getenv("GIT_DIR")
+	os.Setenv("GIT_DIR", dir)
+	t.Cleanup(func() {
+		os.Setenv("GIT_DIR", old_GIT_DIR)
+	})
+}
+
 func Test_runBrowse(t *testing.T) {
 	s := string(os.PathSeparator)
+	setGitDir(t, "../../../git/fixtures/simple.git")
 	tests := []struct {
 		name          string
 		opts          BrowseOptions
@@ -215,12 +233,54 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:      ghrepo.New("ravocean", "angur"),
 			defaultBranch: "trunk",
-			expectedURL:   "https://github.com/ravocean/angur/tree/trunk/path/to/file.txt#L32",
+			expectedURL:   "https://github.com/ravocean/angur/blob/trunk/path/to/file.txt?plain=1#L32",
+		},
+		{
+			name: "file with line range",
+			opts: BrowseOptions{
+				SelectorArg: "path/to/file.txt:32-40",
+			},
+			baseRepo:      ghrepo.New("ravocean", "angur"),
+			defaultBranch: "trunk",
+			expectedURL:   "https://github.com/ravocean/angur/blob/trunk/path/to/file.txt?plain=1#L32-L40",
+		},
+		{
+			name: "invalid default branch",
+			opts: BrowseOptions{
+				SelectorArg: "chocolate-pecan-pie.txt",
+			},
+			baseRepo:      ghrepo.New("andrewhsu", "recipies"),
+			defaultBranch: "",
+			wantsErr:      true,
+		},
+		{
+			name: "file with invalid line number after colon",
+			opts: BrowseOptions{
+				SelectorArg: "laptime-notes.txt:w-9",
+			},
+			baseRepo: ghrepo.New("andrewhsu", "sonoma-raceway"),
+			wantsErr: true,
+		},
+		{
+			name: "file with invalid file format",
+			opts: BrowseOptions{
+				SelectorArg: "path/to/file.txt:32:32",
+			},
+			baseRepo: ghrepo.New("ttran112", "ttrain211"),
+			wantsErr: true,
 		},
 		{
 			name: "file with invalid line number",
 			opts: BrowseOptions{
-				SelectorArg: "path/to/file.txt:32:32",
+				SelectorArg: "path/to/file.txt:32a",
+			},
+			baseRepo: ghrepo.New("ttran112", "ttrain211"),
+			wantsErr: true,
+		},
+		{
+			name: "file with invalid line range",
+			opts: BrowseOptions{
+				SelectorArg: "path/to/file.txt:32-abc",
 			},
 			baseRepo: ghrepo.New("ttran112", "ttrain211"),
 			wantsErr: true,
@@ -243,7 +303,7 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("github", "ThankYouGitHub"),
 			wantsErr:    false,
-			expectedURL: "https://github.com/github/ThankYouGitHub/tree/first-browse-pull/browse.go#L32",
+			expectedURL: "https://github.com/github/ThankYouGitHub/blob/first-browse-pull/browse.go?plain=1#L32",
 		},
 		{
 			name: "no browser with branch file and line number",
@@ -254,7 +314,26 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("mislav", "will_paginate"),
 			wantsErr:    false,
-			expectedURL: "https://github.com/mislav/will_paginate/tree/3-0-stable/init.rb#L6",
+			expectedURL: "https://github.com/mislav/will_paginate/blob/3-0-stable/init.rb?plain=1#L6",
+		},
+		{
+			name: "open last commit",
+			opts: BrowseOptions{
+				CommitFlag: true,
+			},
+			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
+			wantsErr:    false,
+			expectedURL: "https://github.com/vilmibm/gh-user-status/tree/6f1a2405cace1633d89a79c74c65f22fe78f9659/",
+		},
+		{
+			name: "open last commit with a file",
+			opts: BrowseOptions{
+				CommitFlag:  true,
+				SelectorArg: "main.go",
+			},
+			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
+			wantsErr:    false,
+			expectedURL: "https://github.com/vilmibm/gh-user-status/tree/6f1a2405cace1633d89a79c74c65f22fe78f9659/main.go",
 		},
 		{
 			name: "relative path from browse_test.go",
@@ -358,7 +437,6 @@ func Test_parseFileArg(t *testing.T) {
 }
 
 func Test_parsePathFromFileArg(t *testing.T) {
-
 	s := string(os.PathSeparator)
 	tests := []struct {
 		name         string

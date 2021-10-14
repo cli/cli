@@ -2,16 +2,14 @@ package api
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/set"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/set"
 	"github.com/shurcooL/githubv4"
 	"golang.org/x/sync/errgroup"
 )
@@ -26,6 +24,7 @@ type PullRequestsPayload struct {
 type PullRequestAndTotalCount struct {
 	TotalCount   int
 	PullRequests []PullRequest
+	SearchCapped bool
 }
 
 type PullRequest struct {
@@ -264,30 +263,6 @@ func (pr *PullRequest) DisplayableReviews() PullRequestReviews {
 		}
 	}
 	return PullRequestReviews{Nodes: published, TotalCount: len(published)}
-}
-
-func (c Client) PullRequestDiff(baseRepo ghrepo.Interface, prNumber int) (io.ReadCloser, error) {
-	url := fmt.Sprintf("%srepos/%s/pulls/%d",
-		ghinstance.RESTPrefix(baseRepo.RepoHost()), ghrepo.FullName(baseRepo), prNumber)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Accept", "application/vnd.github.v3.diff; charset=utf-8")
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode == 404 {
-		return nil, errors.New("pull request not found")
-	} else if resp.StatusCode != 200 {
-		return nil, HandleHTTPError(resp)
-	}
-
-	return resp.Body, nil
 }
 
 type pullRequestFeature struct {

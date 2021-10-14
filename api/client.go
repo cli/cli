@@ -11,7 +11,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/henvic/httpretty"
 	"github.com/shurcooL/graphql"
 )
@@ -123,8 +123,8 @@ type graphQLResponse struct {
 // GraphQLError is a single error returned in a GraphQL response
 type GraphQLError struct {
 	Type    string
-	Path    []string
 	Message string
+	// Path []interface // mixed strings and numbers
 }
 
 // GraphQLErrorResponse contains errors returned in a GraphQL response
@@ -285,7 +285,10 @@ func HandleHTTPError(resp *http.Response) error {
 		return httpError
 	}
 
-	messages := []string{parsedBody.Message}
+	var messages []string
+	if parsedBody.Message != "" {
+		messages = append(messages, parsedBody.Message)
+	}
 	for _, raw := range parsedBody.Errors {
 		switch raw[0] {
 		case '"':
@@ -297,7 +300,7 @@ func HandleHTTPError(resp *http.Response) error {
 			var errInfo HTTPErrorItem
 			_ = json.Unmarshal(raw, &errInfo)
 			msg := errInfo.Message
-			if errInfo.Code != "custom" {
+			if errInfo.Code != "" && errInfo.Code != "custom" {
 				msg = fmt.Sprintf("%s.%s %s", errInfo.Resource, errInfo.Field, errorCodeToMessage(errInfo.Code))
 			}
 			if msg != "" {

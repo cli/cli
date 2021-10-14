@@ -2,15 +2,16 @@ package shared
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 )
 
@@ -23,7 +24,8 @@ type GitCredentialFlow struct {
 }
 
 func (flow *GitCredentialFlow) Prompt(hostname string) error {
-	flow.helper, _ = gitCredentialHelper(hostname)
+	var gitErr error
+	flow.helper, gitErr = gitCredentialHelper(hostname)
 	if isOurCredentialHelper(flow.helper) {
 		flow.scopes = append(flow.scopes, "workflow")
 		return nil
@@ -37,6 +39,9 @@ func (flow *GitCredentialFlow) Prompt(hostname string) error {
 		return fmt.Errorf("could not prompt: %w", err)
 	}
 	if flow.shouldSetup {
+		if isGitMissing(gitErr) {
+			return gitErr
+		}
 		flow.scopes = append(flow.scopes, "workflow")
 	}
 
@@ -138,6 +143,14 @@ func isOurCredentialHelper(cmd string) bool {
 	}
 
 	return strings.TrimSuffix(filepath.Base(args[0]), ".exe") == "gh"
+}
+
+func isGitMissing(err error) bool {
+	if err == nil {
+		return false
+	}
+	var errNotInstalled *git.NotInstalled
+	return errors.As(err, &errNotInstalled)
 }
 
 func shellQuote(s string) string {

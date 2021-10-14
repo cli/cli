@@ -8,14 +8,14 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/internal/run"
-	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/test"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -100,9 +100,9 @@ func TestIssueList_tty(t *testing.T) {
 
 		Showing 3 of 3 open issues in OWNER/REPO
 
-		#1  number won   (label)  about X years ago
-		#2  number too   (label)  about X years ago
-		#4  number fore  (label)  about X years ago
+		#1  number won   label  about X years ago
+		#2  number too   label  about X years ago
+		#4  number fore  label  about X years ago
 	`), out)
 	assert.Equal(t, ``, output.Stderr())
 }
