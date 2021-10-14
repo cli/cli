@@ -8,6 +8,9 @@ import (
 
 const defaultHostname = "github.com"
 
+// localhost is the domain name of a local GitHub instance
+const localhost = "github.localhost"
+
 // Default returns the host name of the default GitHub instance
 func Default() string {
 	return defaultHostname
@@ -15,7 +18,8 @@ func Default() string {
 
 // IsEnterprise reports whether a non-normalized host name looks like a GHE instance
 func IsEnterprise(h string) bool {
-	return NormalizeHostname(h) != defaultHostname
+	normalizedHostName := NormalizeHostname(h)
+	return normalizedHostName != defaultHostname && normalizedHostName != localhost
 }
 
 // NormalizeHostname returns the canonical host name of a GitHub instance
@@ -24,6 +28,11 @@ func NormalizeHostname(h string) string {
 	if strings.HasSuffix(hostname, "."+defaultHostname) {
 		return defaultHostname
 	}
+
+	if strings.HasSuffix(hostname, "."+localhost) {
+		return localhost
+	}
+
 	return hostname
 }
 
@@ -46,14 +55,14 @@ func GraphQLEndpoint(hostname string) string {
 	if IsEnterprise(hostname) {
 		return fmt.Sprintf("https://%s/api/graphql", hostname)
 	}
-	return "https://api.github.com/graphql"
+	return fmt.Sprintf("https://api.%s/graphql", hostname)
 }
 
 func RESTPrefix(hostname string) string {
 	if IsEnterprise(hostname) {
 		return fmt.Sprintf("https://%s/api/v3/", hostname)
 	}
-	return "https://api.github.com/"
+	return fmt.Sprintf("https://api.%s/", hostname)
 }
 
 func GistPrefix(hostname string) string {
