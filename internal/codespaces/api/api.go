@@ -521,7 +521,7 @@ func (a *API) DeleteCodespace(ctx context.Context, codespaceName string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
 		return api.HandleHTTPError(resp)
 	}
 
