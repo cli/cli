@@ -261,5 +261,5 @@ func (c codespace) hasUnsavedChanges() bool {
 
 // running returns whether the codespace environment is running.
 func (c codespace) running() bool {
-	return c.Environment.State == api.CodespaceEnvironmentStateAvailable
+	return c.State == api.CodespaceStateAvailable
 }
