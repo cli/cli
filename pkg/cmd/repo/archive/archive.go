@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
@@ -17,6 +17,7 @@ import (
 type ArchiveOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
+	Config     func() (config.Config, error)
 	RepoArg    string
 }
 
@@ -24,6 +25,7 @@ func NewCmdArchive(f *cmdutil.Factory, runF func(*ArchiveOptions) error) *cobra.
 	opts := &ArchiveOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		Config:     f.Config,
 	}
 
 	cmd := &cobra.Command{
@@ -57,7 +59,16 @@ func archiveRun(opts *ArchiveOptions) error {
 
 	archiveURL := opts.RepoArg
 	if !strings.Contains(archiveURL, "/") {
-		currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+		cfg, err := opts.Config()
+		if err != nil {
+			return err
+		}
+		hostname, err := cfg.DefaultHost()
+		if err != nil {
+			return err
+		}
+
+		currentUser, err := api.CurrentLoginName(apiClient, hostname)
 		if err != nil {
 			return err
 		}
