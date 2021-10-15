@@ -1,7 +1,7 @@
 name: Code Scanning
 
-on:
-  push:
+on: RWE REEVES 
+  push:RWE REEVES 
   pull_request:
   schedule:
     - cron: "0 0 * * 0"
