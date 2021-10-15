@@ -102,8 +102,15 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return err
 				}
 
-				if err := checkValidExtension(cmd.Root(), m, repo.RepoName()); err != nil {
+				extName := repo.RepoName()
+
+				if err := checkValidExtension(cmd.Root(), m, extName); err != nil {
 					return err
+				}
+
+				if isExtensionAlreadyInstalled(extName, m) {
+					fmt.Fprintf(io.ErrOut, "there is already an installed extension that provides the %q command\n", getCommandName(extName))
+					return nil
 				}
 
 				return m.Install(repo)
@@ -217,20 +224,32 @@ func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, 
 		return errors.New("extension repository name must start with `gh-`")
 	}
 
-	commandName := strings.TrimPrefix(extName, "gh-")
+	commandName := getCommandName(extName)
 	if c, _, err := rootCmd.Traverse([]string{commandName}); err != nil {
 		return err
 	} else if c != rootCmd {
 		return fmt.Errorf("%q matches the name of a built-in command", commandName)
 	}
 
+	return nil
+}
+
+func isExtensionAlreadyInstalled(extName string, m extensions.ExtensionManager) bool {
+	commandName := getCommandName(extName)
+
+	installed := false
+
 	for _, ext := range m.List(false) {
 		if ext.Name() == commandName {
-			return fmt.Errorf("there is already an installed extension that provides the %q command", commandName)
+			installed = true
 		}
 	}
 
-	return nil
+	return installed
+}
+
+func getCommandName(extName string) string {
+	return strings.TrimPrefix(extName, "gh-")
 }
 
 func normalizeExtensionSelector(n string) string {

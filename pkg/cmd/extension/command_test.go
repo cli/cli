@@ -66,8 +66,7 @@ func TestNewCmdExtension(t *testing.T) {
 					assert.Equal(t, 1, len(calls))
 				}
 			},
-			wantErr: true,
-			errMsg:  "there is already an installed extension that provides the \"existing-ext\" command",
+			wantStderr: "there is already an installed extension that provides the \"existing-ext\" command\n",
 		},
 		{
 			name: "install local extension",
@@ -415,15 +414,6 @@ func Test_checkValidExtension(t *testing.T) {
 				extName: "gh-auth",
 			},
 			wantError: "\"auth\" matches the name of a built-in command",
-		},
-		{
-			name: "clashes with an installed extension",
-			args: args{
-				rootCmd: rootCmd,
-				manager: m,
-				extName: "gh-triage",
-			},
-			wantError: "there is already an installed extension that provides the \"triage\" command",
 		},
 	}
 	for _, tt := range tests {
