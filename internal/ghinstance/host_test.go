@@ -147,7 +147,7 @@ func TestGraphQLEndpoint(t *testing.T) {
 		},
 		{
 			host: "github.localhost",
-			want: "https://api.github.localhost/graphql",
+			want: "http://api.github.localhost/graphql",
 		},
 		{
 			host: "ghe.io",
@@ -174,7 +174,7 @@ func TestRESTPrefix(t *testing.T) {
 		},
 		{
 			host: "github.localhost",
-			want: "https://api.github.localhost/",
+			want: "http://api.github.localhost/",
 		},
 		{
 			host: "ghe.io",

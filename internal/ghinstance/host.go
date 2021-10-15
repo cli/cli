@@ -55,6 +55,9 @@ func GraphQLEndpoint(hostname string) string {
 	if IsEnterprise(hostname) {
 		return fmt.Sprintf("https://%s/api/graphql", hostname)
 	}
+	if strings.EqualFold(hostname, localhost) {
+		return fmt.Sprintf("http://api.%s/graphql", hostname)
+	}
 	return fmt.Sprintf("https://api.%s/graphql", hostname)
 }
 
@@ -62,12 +65,18 @@ func RESTPrefix(hostname string) string {
 	if IsEnterprise(hostname) {
 		return fmt.Sprintf("https://%s/api/v3/", hostname)
 	}
+	if strings.EqualFold(hostname, localhost) {
+		return fmt.Sprintf("http://api.%s/", hostname)
+	}
 	return fmt.Sprintf("https://api.%s/", hostname)
 }
 
 func GistPrefix(hostname string) string {
 	if IsEnterprise(hostname) {
 		return fmt.Sprintf("https://%s/gist/", hostname)
+	}
+	if strings.EqualFold(hostname, localhost) {
+		return fmt.Sprintf("http://%s/gist/", hostname)
 	}
 	return fmt.Sprintf("https://gist.%s/", hostname)
 }
