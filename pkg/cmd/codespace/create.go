@@ -266,7 +266,7 @@ func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machin
 	machineNames := make([]string, 0, len(machines))
 	machineByName := make(map[string]*api.Machine)
 	for _, m := range machines {
-		machineName: = m.DisplayName
+		machineName := m.DisplayName
 		machineNames = append(machineNames, machineName)
 		machineByName[machineName] = m
 	}
