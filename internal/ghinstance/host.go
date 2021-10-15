@@ -80,3 +80,10 @@ func GistPrefix(hostname string) string {
 	}
 	return fmt.Sprintf("https://gist.%s/", hostname)
 }
+
+func HostPrefix(hostname string) string {
+	if strings.EqualFold(hostname, localhost) {
+		return fmt.Sprintf("http://%s/", hostname)
+	}
+	return fmt.Sprintf("https://%s/", hostname)
+}

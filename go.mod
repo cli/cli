@@ -8,7 +8,7 @@ require (
 	github.com/briandowns/spinner v1.13.0
 	github.com/charmbracelet/glamour v0.3.0
 	github.com/cli/browser v1.1.0
-	github.com/cli/oauth v0.8.0
+	github.com/cli/oauth v0.9.0
 	github.com/cli/safeexec v1.0.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.1
 	github.com/creack/pty v1.1.16

@@ -10,6 +10,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
@@ -120,7 +121,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 }
 
 func gitCredentialHelperKey(hostname string) string {
-	return fmt.Sprintf("credential.https://%s.helper", hostname)
+	return fmt.Sprintf("credential.%s.helper", strings.TrimSuffix(ghinstance.HostPrefix(hostname), "/"))
 }
 
 func gitCredentialHelper(hostname string) (helper string, err error) {
