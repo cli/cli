@@ -115,7 +115,7 @@ func runCancel(opts *CancelOptions) error {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.Out, "%s Request to cancel workflow submitted.", cs.SuccessIcon())
+	fmt.Fprintf(opts.IO.Out, "%s Request to cancel workflow submitted.\n", cs.SuccessIcon())
 
 	return nil
 }
