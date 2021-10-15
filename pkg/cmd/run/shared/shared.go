@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 )
 
 const (
@@ -304,13 +304,13 @@ func Symbol(cs *iostreams.ColorScheme, status Status, conclusion Conclusion) (st
 		case Success:
 			return cs.SuccessIconWithColor(noColor), cs.Green
 		case Skipped, Cancelled, Neutral:
-			return cs.SuccessIconWithColor(noColor), cs.Gray
+			return "-", cs.Gray
 		default:
 			return cs.FailureIconWithColor(noColor), cs.Red
 		}
 	}
 
-	return "-", cs.Yellow
+	return "*", cs.Yellow
 }
 
 func PullRequestForRun(client *api.Client, repo ghrepo.Interface, run Run) (int, error) {

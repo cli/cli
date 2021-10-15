@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -189,6 +190,11 @@ type IssueLabel struct {
 	Color       string `json:"color"`
 }
 
+type License struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+}
+
 // RepoOwner is the login name of the owner
 func (r Repository) RepoOwner() string {
 	return r.Owner.Login
@@ -224,6 +230,36 @@ func (r Repository) ViewerCanTriage() bool {
 	}
 }
 
+func FetchRepository(client *Client, repo ghrepo.Interface, fields []string) (*Repository, error) {
+	query := fmt.Sprintf(`query RepositoryInfo($owner: String!, $name: String!) {
+		repository(owner: $owner, name: $name) {%s}
+	}`, RepositoryGraphQL(fields))
+
+	variables := map[string]interface{}{
+		"owner": repo.RepoOwner(),
+		"name":  repo.RepoName(),
+	}
+
+	var result struct {
+		Repository *Repository
+	}
+	if err := client.GraphQL(repo.RepoHost(), query, variables, &result); err != nil {
+		return nil, err
+	}
+	// The GraphQL API should have returned an error in case of a missing repository, but this isn't
+	// guaranteed to happen when an authentication token with insufficient permissions is being used.
+	if result.Repository == nil {
+		return nil, GraphQLErrorResponse{
+			Errors: []GraphQLError{{
+				Type:    "NOT_FOUND",
+				Message: fmt.Sprintf("Could not resolve to a Repository with the name '%s/%s'.", repo.RepoOwner(), repo.RepoName()),
+			}},
+		}
+	}
+
+	return InitRepoHostname(result.Repository, repo.RepoHost()), nil
+}
+
 func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
 	fragment repo on Repository {
@@ -255,16 +291,24 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 		"name":  repo.RepoName(),
 	}
 
-	result := struct {
-		Repository Repository
-	}{}
-	err := client.GraphQL(repo.RepoHost(), query, variables, &result)
-
-	if err != nil {
+	var result struct {
+		Repository *Repository
+	}
+	if err := client.GraphQL(repo.RepoHost(), query, variables, &result); err != nil {
 		return nil, err
 	}
+	// The GraphQL API should have returned an error in case of a missing repository, but this isn't
+	// guaranteed to happen when an authentication token with insufficient permissions is being used.
+	if result.Repository == nil {
+		return nil, GraphQLErrorResponse{
+			Errors: []GraphQLError{{
+				Type:    "NOT_FOUND",
+				Message: fmt.Sprintf("Could not resolve to a Repository with the name '%s/%s'.", repo.RepoOwner(), repo.RepoName()),
+			}},
+		}
+	}
 
-	return InitRepoHostname(&result.Repository, repo.RepoHost()), nil
+	return InitRepoHostname(result.Repository, repo.RepoHost()), nil
 }
 
 func RepoDefaultBranch(client *Client, repo ghrepo.Interface) (string, error) {
@@ -434,14 +478,17 @@ func InitRepoHostname(repo *Repository, hostname string) *Repository {
 	return repo
 }
 
-// repositoryV3 is the repository result from GitHub API v3
+// RepositoryV3 is the repository result from GitHub API v3
 type repositoryV3 struct {
-	NodeID    string
+	NodeID    string `json:"node_id"`
 	Name      string
 	CreatedAt time.Time `json:"created_at"`
 	Owner     struct {
 		Login string
 	}
+	Private bool
+	HTMLUrl string `json:"html_url"`
+	Parent  *repositoryV3
 }
 
 // ForkRepo forks the repository on GitHub and returns the new repository
@@ -1108,4 +1155,25 @@ func ProjectNamesToPaths(client *Client, repo ghrepo.Interface, projectNames []s
 		return paths, err
 	}
 	return ProjectsToPaths(projects, projectNames)
+}
+
+func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, path string, body io.Reader) (*Repository, error) {
+	var responsev3 repositoryV3
+	err := apiClient.REST(hostname, method, path, body, &responsev3)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &Repository{
+		Name:      responsev3.Name,
+		CreatedAt: responsev3.CreatedAt,
+		Owner: RepositoryOwner{
+			Login: responsev3.Owner.Login,
+		},
+		ID:        responsev3.NodeID,
+		hostname:  hostname,
+		URL:       responsev3.HTMLUrl,
+		IsPrivate: responsev3.Private,
+	}, nil
 }

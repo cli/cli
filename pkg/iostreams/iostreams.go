@@ -2,6 +2,7 @@ package iostreams
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -20,6 +21,8 @@ import (
 	"golang.org/x/term"
 )
 
+const DefaultWidth = 80
+
 type IOStreams struct {
 	In     io.ReadCloser
 	Out    io.Writer
@@ -29,6 +32,7 @@ type IOStreams struct {
 	originalOut   io.Writer
 	colorEnabled  bool
 	is256enabled  bool
+	hasTrueColor  bool
 	terminalTheme string
 
 	progressIndicatorEnabled bool
@@ -40,6 +44,8 @@ type IOStreams struct {
 	stdoutIsTTY       bool
 	stderrTTYOverride bool
 	stderrIsTTY       bool
+	termWidthOverride int
+	ttySize           func() (int, int, error)
 
 	pagerCommand string
 	pagerProcess *os.Process
@@ -55,6 +61,10 @@ func (s *IOStreams) ColorEnabled() bool {
 
 func (s *IOStreams) ColorSupport256() bool {
 	return s.is256enabled
+}
+
+func (s *IOStreams) HasTrueColor() bool {
+	return s.hasTrueColor
 }
 
 func (s *IOStreams) DetectTerminalTheme() string {
@@ -89,6 +99,10 @@ func (s *IOStreams) TerminalTheme() string {
 	}
 
 	return s.terminalTheme
+}
+
+func (s *IOStreams) SetColorEnabled(colorEnabled bool) {
+	s.colorEnabled = colorEnabled
 }
 
 func (s *IOStreams) SetStdinTTY(isTTY bool) {
@@ -138,6 +152,10 @@ func (s *IOStreams) IsStderrTTY() bool {
 
 func (s *IOStreams) SetPager(cmd string) {
 	s.pagerCommand = cmd
+}
+
+func (s *IOStreams) GetPager() string {
+	return s.pagerCommand
 }
 
 func (s *IOStreams) StartPager() error {
@@ -202,6 +220,10 @@ func (s *IOStreams) CanPrompt() bool {
 	return s.IsStdinTTY() && s.IsStdoutTTY()
 }
 
+func (s *IOStreams) GetNeverPrompt() bool {
+	return s.neverPrompt
+}
+
 func (s *IOStreams) SetNeverPrompt(v bool) {
 	s.neverPrompt = v
 }
@@ -223,8 +245,14 @@ func (s *IOStreams) StopProgressIndicator() {
 	s.progressIndicator = nil
 }
 
+// TerminalWidth returns the width of the terminal that stdout is attached to.
+// TODO: investigate whether ProcessTerminalWidth could replace all this.
 func (s *IOStreams) TerminalWidth() int {
-	defaultWidth := 80
+	if s.termWidthOverride > 0 {
+		return s.termWidthOverride
+	}
+
+	defaultWidth := DefaultWidth
 	out := s.Out
 	if s.originalOut != nil {
 		out = s.originalOut
@@ -251,8 +279,39 @@ func (s *IOStreams) TerminalWidth() int {
 	return defaultWidth
 }
 
+// ProcessTerminalWidth returns the width of the terminal that the process is attached to.
+func (s *IOStreams) ProcessTerminalWidth() int {
+	w, _, err := s.ttySize()
+	if err != nil {
+		return DefaultWidth
+	}
+	return w
+}
+
+func (s *IOStreams) ForceTerminal(spec string) {
+	s.colorEnabled = !EnvColorDisabled()
+	s.SetStdoutTTY(true)
+
+	if w, err := strconv.Atoi(spec); err == nil {
+		s.termWidthOverride = w
+		return
+	}
+
+	ttyWidth, _, err := s.ttySize()
+	if err != nil {
+		return
+	}
+	s.termWidthOverride = ttyWidth
+
+	if strings.HasSuffix(spec, "%") {
+		if p, err := strconv.Atoi(spec[:len(spec)-1]); err == nil {
+			s.termWidthOverride = int(float64(s.termWidthOverride) * (float64(p) / 100))
+		}
+	}
+}
+
 func (s *IOStreams) ColorScheme() *ColorScheme {
-	return NewColorScheme(s.ColorEnabled(), s.ColorSupport256())
+	return NewColorScheme(s.ColorEnabled(), s.ColorSupport256(), s.HasTrueColor())
 }
 
 func (s *IOStreams) ReadUserFile(fn string) ([]byte, error) {
@@ -281,11 +340,11 @@ func System() *IOStreams {
 	stdoutIsTTY := isTerminal(os.Stdout)
 	stderrIsTTY := isTerminal(os.Stderr)
 
-	var pagerCommand string
-	if ghPager, ghPagerExists := os.LookupEnv("GH_PAGER"); ghPagerExists {
-		pagerCommand = ghPager
-	} else {
-		pagerCommand = os.Getenv("PAGER")
+	assumeTrueColor := false
+	if stdoutIsTTY {
+		if err := enableVirtualTerminalProcessing(os.Stdout); err == nil {
+			assumeTrueColor = true
+		}
 	}
 
 	io := &IOStreams{
@@ -294,8 +353,10 @@ func System() *IOStreams {
 		Out:          colorable.NewColorable(os.Stdout),
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		colorEnabled: EnvColorForced() || (!EnvColorDisabled() && stdoutIsTTY),
-		is256enabled: Is256ColorSupported(),
-		pagerCommand: pagerCommand,
+		is256enabled: assumeTrueColor || Is256ColorSupported(),
+		hasTrueColor: assumeTrueColor || IsTrueColorSupported(),
+		pagerCommand: os.Getenv("PAGER"),
+		ttySize:      ttySize,
 	}
 
 	if stdoutIsTTY && stderrIsTTY {
@@ -316,6 +377,9 @@ func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 		In:     ioutil.NopCloser(in),
 		Out:    out,
 		ErrOut: errOut,
+		ttySize: func() (int, int, error) {
+			return -1, -1, errors.New("ttySize not implemented in tests")
+		},
 	}, in, out, errOut
 }
 
@@ -330,6 +394,7 @@ func isCygwinTerminal(w io.Writer) bool {
 	return false
 }
 
+// terminalSize measures the viewport of the terminal that the output stream is connected to
 func terminalSize(w io.Writer) (int, int, error) {
 	if f, isFile := w.(*os.File); isFile {
 		return term.GetSize(int(f.Fd()))

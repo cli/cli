@@ -14,12 +14,13 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/pkg/cmd/gist/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -58,7 +59,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			Gists can be created from one or multiple files. Alternatively, pass "-" as
 			file name to read from standard input.
 
-			By default, gists are private; use '--public' to make publicly listed ones.
+			By default, gists are secret; use '--public' to make publicly listed ones.
 		`),
 		Example: heredoc.Doc(`
 			# publish file 'hello.py' as a public gist
@@ -97,8 +98,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 	cmd.Flags().StringVarP(&opts.Description, "desc", "d", "", "A description for this gist")
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser with created gist")
-	cmd.Flags().BoolVarP(&opts.Public, "public", "p", false, "List the gist publicly (default: private)")
-	cmd.Flags().StringVarP(&opts.FilenameOverride, "filename", "f", "", "Provide a filename to be used when reading from STDIN")
+	cmd.Flags().BoolVarP(&opts.Public, "public", "p", false, "List the gist publicly (default: secret)")
+	cmd.Flags().StringVarP(&opts.FilenameOverride, "filename", "f", "", "Provide a filename to be used when reading from standard input")
 	return cmd
 }
 
@@ -150,9 +151,6 @@ func createRun(opts *CreateOptions) error {
 	if err != nil {
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) {
-			if httpError.OAuthScopes != "" && !strings.Contains(httpError.OAuthScopes, "gist") {
-				return fmt.Errorf("This command requires the 'gist' OAuth scope.\nPlease re-authenticate with:  gh auth refresh -h %s -s gist", host)
-			}
 			if httpError.StatusCode == http.StatusUnprocessableEntity {
 				if detectEmptyFiles(files) {
 					fmt.Fprintf(errOut, "%s Failed to create gist: %s\n", cs.FailureIcon(), "a gist file cannot be blank")
@@ -248,29 +246,42 @@ func guessGistName(files map[string]*shared.GistFile) string {
 }
 
 func createGist(client *http.Client, hostname, description string, public bool, files map[string]*shared.GistFile) (*shared.Gist, error) {
-	path := "gists"
-
 	body := &shared.Gist{
 		Description: description,
 		Public:      public,
 		Files:       files,
 	}
 
-	result := shared.Gist{}
-
-	requestByte, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	requestBody := bytes.NewReader(requestByte)
-
-	apiClient := api.NewClientFromHTTP(client)
-	err = apiClient.REST(hostname, "POST", path, requestBody, &result)
-	if err != nil {
+	requestBody := &bytes.Buffer{}
+	enc := json.NewEncoder(requestBody)
+	if err := enc.Encode(body); err != nil {
 		return nil, err
 	}
 
-	return &result, nil
+	u := ghinstance.RESTPrefix(hostname) + "gists"
+	req, err := http.NewRequest(http.MethodPost, u, requestBody)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode > 299 {
+		return nil, api.HandleHTTPError(api.EndpointNeedsScopes(resp, "gist"))
+	}
+
+	result := &shared.Gist{}
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 func detectEmptyFiles(files map[string]*shared.GistFile) bool {

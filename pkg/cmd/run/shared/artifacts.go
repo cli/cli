@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
 type Artifact struct {
 	Name        string `json:"name"`
-	Size        uint32 `json:"size_in_bytes"`
+	Size        uint64 `json:"size_in_bytes"`
 	DownloadURL string `json:"archive_download_url"`
 	Expired     bool   `json:"expired"`
 }

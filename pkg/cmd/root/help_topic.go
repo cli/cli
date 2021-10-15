@@ -33,23 +33,24 @@ var HelpTopics = map[string]map[string]string{
 			previously stored credentials.
 
 			GH_ENTERPRISE_TOKEN, GITHUB_ENTERPRISE_TOKEN (in order of precedence): an authentication
-			token for API requests to GitHub Enterprise.
+			token for API requests to GitHub Enterprise. When setting this, also set GH_HOST.
+
+			GH_HOST: specify the GitHub hostname for commands that would otherwise assume the
+			"github.com" host when not in a context of an existing repository.
 
 			GH_REPO: specify the GitHub repository in the "[HOST/]OWNER/REPO" format for commands
 			that otherwise operate on a local repository.
 
-			GH_HOST: specify the GitHub hostname for commands that would otherwise assume
-			the "github.com" host when not in a context of an existing repository.
-
 			GH_EDITOR, GIT_EDITOR, VISUAL, EDITOR (in order of precedence): the editor tool to use
 			for authoring text.
 
-			BROWSER: the web browser to use for opening links.
+			GH_BROWSER, BROWSER (in order of precedence): the web browser to use for opening links.
 
 			DEBUG: set to any value to enable verbose output to standard error. Include values "api"
 			or "oauth" to print detailed information about HTTP requests or authentication flow.
 
-			GH_PAGER, PAGER (in order of precedence): a terminal paging program to send standard output to, e.g. "less".
+			GH_PAGER, PAGER (in order of precedence): a terminal paging program to send standard output
+			to, e.g. "less".
 
 			GLAMOUR_STYLE: the style to use for rendering Markdown. See
 			https://github.com/charmbracelet/glamour#styles
@@ -61,15 +62,17 @@ var HelpTopics = map[string]map[string]string{
 			CLICOLOR_FORCE: set to a value other than "0" to keep ANSI colors in output
 			even when the output is piped.
 
+			GH_FORCE_TTY: set to any value to force terminal-style output even when the output is
+			redirected. When the value is a number, it is interpreted as the number of columns
+			available in the viewport. When the value is a percentage, it will be applied against
+			the number of columns available in the current viewport.
+
 			GH_NO_UPDATE_NOTIFIER: set to any value to disable update notifications. By default, gh
 			checks for new releases once every 24 hours and displays an upgrade notice on standard
 			error if a newer version was found.
 
-			GH_CONFIG_DIR, XDG_CONFIG_HOME (in order of precedence): the directory where gh will store configuration files.
-
-			XDG_STATE_HOME: the directory where gh will store state files.
-
-			XDG_DATA_HOME: the directory where gh will store data files.
+			GH_CONFIG_DIR: the directory where gh will store configuration files. Default:
+			"$XDG_CONFIG_HOME/gh" or "$HOME/.config/gh".
 		`),
 	},
 	"reference": {
@@ -92,12 +95,30 @@ var HelpTopics = map[string]map[string]string{
 			For the syntax of Go templates, see: https://golang.org/pkg/text/template/
 
 			The following functions are available in templates:
-			- %[1]scolor <style>, <input>%[1]s: colorize input using https://github.com/mgutz/ansi
 			- %[1]sautocolor%[1]s: like %[1]scolor%[1]s, but only emits color to terminals
-			- %[1]stimefmt <format> <time>%[1]s: formats a timestamp using Go's Time.Format function
-			- %[1]stimeago <time>%[1]s: renders a timestamp as relative to now
-			- %[1]spluck <field> <list>%[1]s: collects values of a field from all items in the input
+			- %[1]scolor <style> <input>%[1]s: colorize input using https://github.com/mgutz/ansi
 			- %[1]sjoin <sep> <list>%[1]s: joins values in the list using a separator
+			- %[1]spluck <field> <list>%[1]s: collects values of a field from all items in the input
+			- %[1]stablerow <fields>...%[1]s: aligns fields in output vertically as a table
+			- %[1]stablerender%[1]s: renders fields added by tablerow in place
+			- %[1]stimeago <time>%[1]s: renders a timestamp as relative to now
+			- %[1]stimefmt <format> <time>%[1]s: formats a timestamp using Go's Time.Format function
+			- %[1]struncate <length> <input>%[1]s: ensures input fits within length
+
+			EXAMPLES
+			  # format issues as table
+			  $ gh issue list --json number,title --template \
+			    '{{range .}}{{tablerow (printf "#%%v" .number | autocolor "green") .title}}{{end}}'
+			
+			  # format a pull request using multiple tables with headers
+			  $ gh pr view 3519 --json number,title,body,reviews,assignees --template \
+			    '{{printf "#%%v" .number}} {{.title}}
+
+			    {{.body}}
+
+			    {{tablerow "ASSIGNEE" "NAME"}}{{range .assignees}}{{tablerow .login .name}}{{end}}{{tablerender}}
+			    {{tablerow "REVIEWER" "STATE" "COMMENT"}}{{range .reviews}}{{tablerow .author.login .state .body}}{{end}}
+			    '
 		`, "`"),
 	},
 }

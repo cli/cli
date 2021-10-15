@@ -1,13 +1,13 @@
 package release
 
 import (
-	cmdCreate "github.com/cli/cli/pkg/cmd/release/create"
-	cmdDelete "github.com/cli/cli/pkg/cmd/release/delete"
-	cmdDownload "github.com/cli/cli/pkg/cmd/release/download"
-	cmdList "github.com/cli/cli/pkg/cmd/release/list"
-	cmdUpload "github.com/cli/cli/pkg/cmd/release/upload"
-	cmdView "github.com/cli/cli/pkg/cmd/release/view"
-	"github.com/cli/cli/pkg/cmdutil"
+	cmdCreate "github.com/cli/cli/v2/pkg/cmd/release/create"
+	cmdDelete "github.com/cli/cli/v2/pkg/cmd/release/delete"
+	cmdDownload "github.com/cli/cli/v2/pkg/cmd/release/download"
+	cmdList "github.com/cli/cli/v2/pkg/cmd/release/list"
+	cmdUpload "github.com/cli/cli/v2/pkg/cmd/release/upload"
+	cmdView "github.com/cli/cli/v2/pkg/cmd/release/view"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
 

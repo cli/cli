@@ -3,17 +3,16 @@ package view
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"net/http"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -669,9 +668,9 @@ func (e *testExporter) Fields() []string {
 	return e.fields
 }
 
-func (e *testExporter) Write(w io.Writer, data interface{}, colorize bool) error {
+func (e *testExporter) Write(io *iostreams.IOStreams, data interface{}) error {
 	r := data.(*api.Repository)
-	fmt.Fprintf(w, "name: %s\n", r.Name)
-	fmt.Fprintf(w, "defaultBranchRef: %s\n", r.DefaultBranchRef.Name)
+	fmt.Fprintf(io.Out, "name: %s\n", r.Name)
+	fmt.Fprintf(io.Out, "defaultBranchRef: %s\n", r.DefaultBranchRef.Name)
 	return nil
 }

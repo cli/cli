@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -39,7 +39,7 @@ func TestNewHTTPClient(t *testing.T) {
 			wantHeader: map[string]string{
 				"authorization": "token MYTOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
-				"accept":        "application/vnd.github.merge-info-preview+json",
+				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
 			},
 			wantStderr: "",
 		},
@@ -69,7 +69,7 @@ func TestNewHTTPClient(t *testing.T) {
 			wantHeader: map[string]string{
 				"authorization": "",
 				"user-agent":    "GitHub CLI v1.2.3",
-				"accept":        "application/vnd.github.merge-info-preview+json",
+				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
 			},
 			wantStderr: "",
 		},
@@ -85,14 +85,14 @@ func TestNewHTTPClient(t *testing.T) {
 			wantHeader: map[string]string{
 				"authorization": "token MYTOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
-				"accept":        "application/vnd.github.merge-info-preview+json",
+				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
 			},
 			wantStderr: heredoc.Doc(`
 				* Request at <time>
 				* Request to http://<host>:<port>
 				> GET / HTTP/1.1
 				> Host: github.com
-				> Accept: application/vnd.github.merge-info-preview+json
+				> Accept: application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview
 				> Authorization: token ████████████████████
 				> User-Agent: GitHub CLI v1.2.3
 				
@@ -113,7 +113,7 @@ func TestNewHTTPClient(t *testing.T) {
 			wantHeader: map[string]string{
 				"authorization": "token GHETOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
-				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.antiope-preview, application/vnd.github.shadow-cat-preview",
+				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview, application/vnd.github.antiope-preview, application/vnd.github.shadow-cat-preview",
 			},
 			wantStderr: "",
 		},
@@ -135,7 +135,8 @@ func TestNewHTTPClient(t *testing.T) {
 			})
 
 			io, _, _, stderr := iostreams.Test()
-			client := NewHTTPClient(io, tt.args.config, tt.args.appVersion, tt.args.setAccept)
+			client, err := NewHTTPClient(io, tt.args.config, tt.args.appVersion, tt.args.setAccept)
+			require.NoError(t, err)
 
 			req, err := http.NewRequest("GET", ts.URL, nil)
 			req.Host = tt.host

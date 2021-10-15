@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -103,6 +103,7 @@ func checksRun(opts *ChecksOptions) error {
 
 	passing := 0
 	failing := 0
+	skipping := 0
 	pending := 0
 
 	type output struct {
@@ -131,15 +132,20 @@ func checksRun(opts *ChecksOptions) error {
 			}
 		}
 		switch state {
-		case "SUCCESS", "NEUTRAL", "SKIPPED":
+		case "SUCCESS":
 			passing++
+		case "SKIPPED", "NEUTRAL":
+			mark = "-"
+			markColor = cs.Gray
+			skipping++
+			bucket = "skipping"
 		case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
 			mark = "X"
 			markColor = cs.Red
 			failing++
 			bucket = "fail"
 		default: // "EXPECTED", "REQUESTED", "WAITING", "QUEUED", "PENDING", "IN_PROGRESS", "STALE"
-			mark = "-"
+			mark = "*"
 			markColor = cs.Yellow
 			pending++
 			bucket = "pending"
@@ -209,7 +215,7 @@ func checksRun(opts *ChecksOptions) error {
 	}
 
 	summary := ""
-	if failing+passing+pending > 0 {
+	if failing+passing+skipping+pending > 0 {
 		if failing > 0 {
 			summary = "Some checks were not successful"
 		} else if pending > 0 {
@@ -218,9 +224,8 @@ func checksRun(opts *ChecksOptions) error {
 			summary = "All checks were successful"
 		}
 
-		tallies := fmt.Sprintf(
-			"%d failing, %d successful, and %d pending checks",
-			failing, passing, pending)
+		tallies := fmt.Sprintf("%d failing, %d successful, %d skipped, and %d pending checks",
+			failing, passing, skipping, pending)
 
 		summary = fmt.Sprintf("%s\n%s", cs.Bold(summary), tallies)
 	}
