@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -86,6 +87,7 @@ func TestRunCancel(t *testing.T) {
 	tests := []struct {
 		name      string
 		httpStubs func(*httpmock.Registry)
+		askStubs  func(*prompt.AskStubber)
 		opts      *CancelOptions
 		wantErr   bool
 		wantOut   string
@@ -103,8 +105,7 @@ func TestRunCancel(t *testing.T) {
 					httpmock.JSONResponse(inProgressRun))
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/1234/cancel"),
-					httpmock.StatusStringResponse(202, "{}"),
-				)
+					httpmock.StatusStringResponse(202, "{}"))
 			},
 			wantOut: "✓ Request to cancel workflow submitted.\n",
 		},
@@ -138,6 +139,45 @@ func TestRunCancel(t *testing.T) {
 				)
 			},
 		},
+		{
+			name: "prompt, no in progress runs",
+			opts: &CancelOptions{
+				Prompt: true,
+			},
+			wantErr: true,
+			errMsg:  "found no in progress runs to cancel",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: []shared.Run{
+							completedRun,
+						},
+					}))
+			},
+		},
+		{
+			name: "prompt, cancel",
+			opts: &CancelOptions{
+				Prompt: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
+					httpmock.JSONResponse(shared.RunsPayload{
+						WorkflowRuns: []shared.Run{
+							inProgressRun,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/1234/cancel"),
+					httpmock.StatusStringResponse(202, "{}"))
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne(0)
+			},
+			wantOut: "✓ Request to cancel workflow submitted.\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -153,6 +193,12 @@ func TestRunCancel(t *testing.T) {
 		tt.opts.IO = io
 		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("OWNER/REPO")
+		}
+
+		as, teardown := prompt.InitAskStubber()
+		defer teardown()
+		if tt.askStubs != nil {
+			tt.askStubs(as)
 		}
 
 		t.Run(tt.name, func(t *testing.T) {

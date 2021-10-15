@@ -81,7 +81,7 @@ func runCancel(opts *CancelOptions) error {
 			return fmt.Errorf("failed to get runs: %w", err)
 		}
 		if len(runs) == 0 {
-			return fmt.Errorf("found no in progress runs to watch")
+			return fmt.Errorf("found no in progress runs to cancel")
 		}
 		runID, err = shared.PromptForRun(cs, runs)
 		if err != nil {
