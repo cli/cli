@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/nacl/box"
 )
@@ -36,6 +37,7 @@ type SetOptions struct {
 	DoNotStore      bool
 	Visibility      string
 	RepositoryNames []string
+	EnvFile         string
 }
 
 func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command {
@@ -81,6 +83,9 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 
 			# Set user-level secret for Codespaces
 			$ gh secret set MYSECRET --user
+
+			# Set multiple secrets imported from the ".env" file
+			$ gh secret set -f .env
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -91,8 +96,12 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 				return err
 			}
 
+			if err := cmdutil.MutuallyExclusive("specify only one of `--body` or `--env-file`", opts.Body != "", opts.EnvFile != ""); err != nil {
+				return err
+			}
+
 			if len(args) == 0 {
-				if !opts.DoNotStore {
+				if !opts.DoNotStore && opts.EnvFile == "" {
 					return cmdutil.FlagErrorf("must pass name argument")
 				}
 			} else {
@@ -136,14 +145,15 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of `repositories` that can access an organization or user secret")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "The value for the secret (reads from standard input if not specified)")
 	cmd.Flags().BoolVar(&opts.DoNotStore, "no-store", false, "Print the encrypted, base64-encoded value instead of storing it on Github")
+	cmd.Flags().StringVarP(&opts.EnvFile, "env-file", "f", "", "Load secret names and values from a dotenv-formatted `file`")
 
 	return cmd
 }
 
 func setRun(opts *SetOptions) error {
-	body, err := getBody(opts)
+	secrets, err := getSecretsFromOptions(opts)
 	if err != nil {
-		return fmt.Errorf("did not understand secret body: %w", err)
+		return err
 	}
 
 	c, err := opts.HttpClient()
@@ -187,42 +197,77 @@ func setRun(opts *SetOptions) error {
 		return fmt.Errorf("failed to fetch public key: %w", err)
 	}
 
-	eBody, err := box.SealAnonymous(nil, body, &pk.Raw, opts.RandomOverride)
-	if err != nil {
-		return fmt.Errorf("failed to encrypt body: %w", err)
-	}
-
-	encoded := base64.StdEncoding.EncodeToString(eBody)
-	if opts.DoNotStore {
-		_, err := fmt.Fprintln(opts.IO.Out, encoded)
-		return err
-	}
-
-	if orgName != "" {
-		err = putOrgSecret(client, host, pk, *opts, encoded)
-	} else if envName != "" {
-		err = putEnvSecret(client, pk, baseRepo, envName, opts.SecretName, encoded)
-	} else if opts.UserSecrets {
-		err = putUserSecret(client, host, pk, *opts, encoded)
-	} else {
-		err = putRepoSecret(client, pk, baseRepo, opts.SecretName, encoded)
-	}
-	if err != nil {
-		return fmt.Errorf("failed to set secret: %w", err)
-	}
-
-	if opts.IO.IsStdoutTTY() {
-		target := orgName
-		if opts.UserSecrets {
-			target = "your user"
-		} else if orgName == "" {
-			target = ghrepo.FullName(baseRepo)
+	for secretKey, secret := range secrets {
+		// for env files the randomoverride used in tests needs to be reset on every iteration
+		if len(opts.EnvFile) > 0 {
+			if rd, ok := opts.RandomOverride.(io.Seeker); ok {
+				if _, err := rd.Seek(0, 0); err != nil {
+					return fmt.Errorf("internal error: %w", err)
+				}
+			}
 		}
-		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.Out, "%s Set secret %s for %s\n", cs.SuccessIconWithColor(cs.Green), opts.SecretName, target)
+		eBody, err := box.SealAnonymous(nil, secret[:], &pk.Raw, opts.RandomOverride)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt body: %w", err)
+		}
+
+		encoded := base64.StdEncoding.EncodeToString(eBody)
+		if opts.DoNotStore {
+			_, err := fmt.Fprintln(opts.IO.Out, encoded)
+			return err
+		}
+
+		if orgName != "" {
+			err = putOrgSecret(client, host, pk, *opts, secretKey, encoded)
+		} else if envName != "" {
+			err = putEnvSecret(client, pk, baseRepo, envName, secretKey, encoded)
+		} else if opts.UserSecrets {
+			err = putUserSecret(client, host, pk, *opts, encoded)
+		} else {
+			err = putRepoSecret(client, pk, baseRepo, secretKey, encoded)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to set secret: %w", err)
+		}
+
+		if opts.IO.IsStdoutTTY() {
+			target := orgName
+			if opts.UserSecrets {
+				target = "your user"
+			} else if orgName == "" {
+				target = ghrepo.FullName(baseRepo)
+			}
+			cs := opts.IO.ColorScheme()
+			fmt.Fprintf(opts.IO.Out, "%s Set secret %s for %s\n", cs.SuccessIconWithColor(cs.Green), secretKey, target)
+		}
+	}
+	return nil
+}
+
+func getSecretsFromOptions(opts *SetOptions) (map[string][]byte, error) {
+	secrets := make(map[string][]byte)
+
+	if len(opts.EnvFile) > 0 {
+		envs, err := godotenv.Read(opts.EnvFile)
+		if err != nil {
+			return nil, fmt.Errorf("could no open env file: %w", err)
+		}
+		for key, value := range envs {
+			secrets[key] = []byte(value)
+		}
+
+	} else {
+		body, err := getBody(opts)
+		if err != nil {
+			return nil, fmt.Errorf("did not understand secret body: %w", err)
+		}
+		secrets[opts.SecretName] = body
 	}
 
-	return nil
+	if len(secrets) == 0 {
+		return nil, fmt.Errorf("no secrets defined")
+	}
+	return secrets, nil
 }
 
 func getBody(opts *SetOptions) ([]byte, error) {

@@ -82,8 +82,7 @@ func putSecret(client *api.Client, host, path string, payload interface{}) error
 	return client.REST(host, "PUT", path, requestBody, nil)
 }
 
-func putOrgSecret(client *api.Client, host string, pk *PubKey, opts SetOptions, eValue string) error {
-	secretName := opts.SecretName
+func putOrgSecret(client *api.Client, host string, pk *PubKey, opts SetOptions, secretName string, eValue string) error {
 	orgName := opts.OrgName
 	visibility := opts.Visibility
 
