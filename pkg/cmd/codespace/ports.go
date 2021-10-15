@@ -146,14 +146,11 @@ func getDevContainer(ctx context.Context, apiClient apiClient, codespace *api.Co
 
 func newPortsVisibilityCmd(app *App) *cobra.Command {
 	return &cobra.Command{
-		Use:     "visibility <port:public|private|org>...",
+		Use:     "visibility <port>:{public|private|org}...",
 		Short:   "Change the visibility of the forwarded port",
 		Example: "gh codespace ports visibility 80:org 3000:private 8000:public",
-		Args:    cobra.ArbitraryArgs,
+		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return fmt.Errorf("at least one port visibility argument is required")
-			}
 			codespace, err := cmd.Flags().GetString("codespace")
 			if err != nil {
 				// should only happen if flag is not defined
