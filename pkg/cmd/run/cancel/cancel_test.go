@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -18,11 +19,19 @@ func TestNewCmdCancel(t *testing.T) {
 	tests := []struct {
 		name     string
 		cli      string
+		tty      bool
 		wants    CancelOptions
 		wantsErr bool
 	}{
 		{
-			name:     "blank",
+			name: "blank tty",
+			tty:  true,
+			wants: CancelOptions{
+				Prompt: true,
+			},
+		},
+		{
+			name:     "blank nontty",
 			wantsErr: true,
 		},
 		{
@@ -37,8 +46,8 @@ func TestNewCmdCancel(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			io, _, _, _ := iostreams.Test()
-			io.SetStdinTTY(true)
-			io.SetStdoutTTY(true)
+			io.SetStdinTTY(tt.tty)
+			io.SetStdoutTTY(tt.tty)
 
 			f := &cmdutil.Factory{
 				IOStreams: io,
@@ -72,6 +81,8 @@ func TestNewCmdCancel(t *testing.T) {
 }
 
 func TestRunCancel(t *testing.T) {
+	inProgressRun := shared.TestRun("more runs", 1234, shared.InProgress, "")
+	completedRun := shared.TestRun("more runs", 4567, shared.Completed, shared.Failure)
 	tests := []struct {
 		name      string
 		httpStubs func(*httpmock.Registry)
@@ -88,11 +99,14 @@ func TestRunCancel(t *testing.T) {
 			wantErr: false,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(inProgressRun))
+				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/1234/cancel"),
 					httpmock.StatusStringResponse(202, "{}"),
 				)
 			},
-			wantOut: "✓ You have successfully requested the workflow to be canceled.",
+			wantOut: "✓ Request to cancel workflow submitted.\n",
 		},
 		{
 			name: "not found",
@@ -103,21 +117,23 @@ func TestRunCancel(t *testing.T) {
 			errMsg:  "Could not find any workflow run with ID 1234",
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/1234/cancel"),
-					httpmock.StatusStringResponse(404, ""),
-				)
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.StatusStringResponse(404, ""))
 			},
 		},
 		{
 			name: "completed",
 			opts: &CancelOptions{
-				RunID: "1234",
+				RunID: "4567",
 			},
 			wantErr: true,
 			errMsg:  "Cannot cancel a workflow run that is completed",
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/1234/cancel"),
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/4567"),
+					httpmock.JSONResponse(completedRun))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/4567/cancel"),
 					httpmock.StatusStringResponse(409, ""),
 				)
 			},
@@ -133,6 +149,7 @@ func TestRunCancel(t *testing.T) {
 
 		io, _, stdout, _ := iostreams.Test()
 		io.SetStdoutTTY(true)
+		io.SetStdinTTY(true)
 		tt.opts.IO = io
 		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("OWNER/REPO")
@@ -145,6 +162,8 @@ func TestRunCancel(t *testing.T) {
 				if tt.errMsg != "" {
 					assert.Equal(t, tt.errMsg, err.Error())
 				}
+			} else {
+				assert.NoError(t, err)
 			}
 			assert.Equal(t, tt.wantOut, stdout.String())
 			reg.Verify(t)
