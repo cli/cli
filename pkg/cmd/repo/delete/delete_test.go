@@ -1,14 +1,77 @@
 package delete
 
 import (
+	"bytes"
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestNewCmdDelete(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		tty     bool
+		output  DeleteOptions
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:   "confirm flag",
+			input:  "OWNER/REPO --confirm",
+			output: DeleteOptions{RepoArg: "OWNER/REPO", Confirmed: true},
+		},
+		{
+			name:    "no confirmation no tty",
+			input:   "OWNER/REPO",
+			output:  DeleteOptions{RepoArg: "OWNER/REPO"},
+			wantErr: true,
+			errMsg:  "could not prompt: confirmation with prompt or --confirm flag required"},
+		{
+			name:    "no argument",
+			input:   "",
+			wantErr: true,
+			errMsg:  "cannot delete: repository argument required",
+			tty:     true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, _, _, _ := iostreams.Test()
+			io.SetStdinTTY(tt.tty)
+			io.SetStdoutTTY(tt.tty)
+			f := &cmdutil.Factory{
+				IOStreams: io,
+			}
+			argv, err := shlex.Split(tt.input)
+			assert.NoError(t, err)
+			var gotOpts *DeleteOptions
+			cmd := NewCmdDelete(f, func(opts *DeleteOptions) error {
+				gotOpts = opts
+				return nil
+			})
+			cmd.SetArgs(argv)
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+
+			_, err = cmd.ExecuteC()
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Equal(t, tt.errMsg, err.Error())
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.output.RepoArg, gotOpts.RepoArg)
+		})
+	}
+}
 
 func Test_deleteRun(t *testing.T) {
 	tests := []struct {
@@ -27,7 +90,7 @@ func Test_deleteRun(t *testing.T) {
 			opts:       &DeleteOptions{RepoArg: "OWNER/REPO"},
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
 			askStubs: func(q *prompt.AskStubber) {
-				// TODO: survey stubber doesn't have WithValidation support
+				// TODO: survey stubber doesn't have WithValidator support
 				// so this always passes regardless of prompt input
 				q.StubOne("OWNER/REPO")
 			},
@@ -48,12 +111,6 @@ func Test_deleteRun(t *testing.T) {
 					httpmock.REST("DELETE", "repos/OWNER/REPO"),
 					httpmock.StatusStringResponse(204, "{}"))
 			},
-		},
-		{
-			name:    "no confirmation no tty",
-			opts:    &DeleteOptions{RepoArg: "OWNER/REPO"},
-			wantErr: true,
-			errMsg:  "could not prompt: confirmation with prompt or --confirm flag required",
 		},
 		{
 			name:       "short repo name",

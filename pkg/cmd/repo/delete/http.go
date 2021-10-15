@@ -25,8 +25,13 @@ func deleteRepo(client *http.Client, repo ghrepo.Interface) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
+	err = api.HandleHTTPError(resp)
+
+	if resp.StatusCode == 403 {
+		return fmt.Errorf(`%w
+Try authorizing the "delete_repo" scope with "gh auth refresh -s delete_repo".`, err)
+	} else if resp.StatusCode > 299 {
+		return err
 	}
 
 	return nil

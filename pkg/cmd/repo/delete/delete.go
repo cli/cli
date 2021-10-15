@@ -40,6 +40,10 @@ To authorize, run "gh auth refresh -s delete_repo"`,
 		Args: cmdutil.ExactArgs(1, "cannot delete: repository argument required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.RepoArg = args[0]
+			if !opts.IO.CanPrompt() && !opts.Confirmed {
+				return &cmdutil.FlagError{
+					Err: errors.New("could not prompt: confirmation with prompt or --confirm flag required")}
+			}
 			if runF != nil {
 				return runF(opts)
 			}
@@ -47,7 +51,7 @@ To authorize, run "gh auth refresh -s delete_repo"`,
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Confirmed, "confirm", "c", false, "confirm deletion without prompting")
+	cmd.Flags().BoolVar(&opts.Confirmed, "confirm", false, "confirm deletion without prompting")
 	return cmd
 }
 
@@ -58,36 +62,31 @@ func deleteRun(opts *DeleteOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	deleteURL := opts.RepoArg
+	repoSelector := opts.RepoArg
 	var toDelete ghrepo.Interface
 
-	if !strings.Contains(deleteURL, "/") {
+	if !strings.Contains(repoSelector, "/") {
 		currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
 		if err != nil {
 			return err
 		}
-		deleteURL = currentUser + "/" + deleteURL
+		repoSelector = currentUser + "/" + repoSelector
 	}
-	toDelete, err = ghrepo.FromFullName(deleteURL)
+	toDelete, err = ghrepo.FromFullName(repoSelector)
 	if err != nil {
 		return fmt.Errorf("argument error: %w", err)
 	}
 
 	fullName := ghrepo.FullName(toDelete)
 
-	doPrompt := opts.IO.CanPrompt()
-	if !opts.Confirmed && !doPrompt {
-		return errors.New("could not prompt: confirmation with prompt or --confirm flag required")
-	}
-
-	if !opts.Confirmed && doPrompt {
+	if !opts.Confirmed {
 		var valid string
 		err := prompt.SurveyAskOne(
 			&survey.Input{Message: fmt.Sprintf("Type %s to confirm deletion:", fullName)},
 			&valid,
 			survey.WithValidator(
 				func(val interface{}) error {
-					if str := val.(string); str != fullName {
+					if str := val.(string); !strings.EqualFold(str, fullName) {
 						return fmt.Errorf("You entered %s", str)
 					}
 					return nil
@@ -99,7 +98,7 @@ func deleteRun(opts *DeleteOptions) error {
 
 	err = deleteRepo(httpClient, toDelete)
 	if err != nil {
-		return fmt.Errorf("API call failed: %w", err)
+		return err
 	}
 
 	if opts.IO.IsStdoutTTY() {
