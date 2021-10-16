@@ -1,6 +1,7 @@
 package root
 
 import (
+	"log"
 	"net/http"
 	"sync"
 
@@ -12,7 +13,6 @@ import (
 	authCmd "github.com/cli/cli/v2/pkg/cmd/auth"
 	browseCmd "github.com/cli/cli/v2/pkg/cmd/browse"
 	codespaceCmd "github.com/cli/cli/v2/pkg/cmd/codespace"
-	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	completionCmd "github.com/cli/cli/v2/pkg/cmd/completion"
 	configCmd "github.com/cli/cli/v2/pkg/cmd/config"
 	extensionCmd "github.com/cli/cli/v2/pkg/cmd/extension"
@@ -128,9 +128,12 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 }
 
 func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
+	logger := log.New(f.IOStreams.Out, "", 0)
+	errLogger := log.New(f.IOStreams.ErrOut, "", 0)
+
 	app := codespaceCmd.NewApp(
-		f.IOStreams,
-		output.NewLogger(f.IOStreams.Out, f.IOStreams.ErrOut, !f.IOStreams.IsStdoutTTY()),
+		logger,
+		errLogger,
 		codespacesAPI.New("", &lazyLoadedHTTPClient{factory: f}),
 	)
 	cmd := codespaceCmd.NewRootCmd(app)

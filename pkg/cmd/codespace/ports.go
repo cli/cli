@@ -74,7 +74,7 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, asJSON bool) 
 	devContainerResult := <-devContainerCh
 	if devContainerResult.err != nil {
 		// Warn about failure to read the devcontainer file. Not a codespace command error.
-		_, _ = a.logger.Errorf("Failed to get port names: %v\n", devContainerResult.err.Error())
+		a.errLogger.Printf("Failed to get port names: %v\n", devContainerResult.err.Error())
 	}
 
 	table := output.NewTable(os.Stdout, asJSON)

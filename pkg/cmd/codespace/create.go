@@ -10,7 +10,6 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	"github.com/fatih/camelcase"
 	"github.com/spf13/cobra"
 )
@@ -92,24 +91,25 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	}
 
 	if opts.showStatus {
-		if err := showStatus(ctx, a.logger, a.apiClient, userResult.User, codespace); err != nil {
+		if err := a.showCreateStatus(ctx, userResult.User, codespace); err != nil {
 			return fmt.Errorf("show status: %w", err)
 		}
 	}
 
 	a.logger.Printf("Codespace created: ")
-
 	fmt.Fprintln(os.Stdout, codespace.Name)
 
 	return nil
 }
 
-// showStatus polls the codespace for a list of post create states and their status. It will keep polling
-// until all states have finished. Once all states have finished, we poll once more to check if any new
-// states have been introduced and stop polling otherwise.
-func showStatus(ctx context.Context, log *output.Logger, apiClient apiClient, user *api.User, codespace *api.Codespace) error {
-	var lastState codespaces.PostCreateState
-	var breakNextState bool
+// showCreateStatus polls the codespace for a list of post create states and their status.
+// It will keep polling until all states have finished. Once all states have finished,
+// we poll once more to check if any new states have been introduced and stop polling otherwise.
+func (a *App) showCreateStatus(ctx context.Context, user *api.User, codespace *api.Codespace) error {
+	var (
+		lastState      codespaces.PostCreateState
+		breakNextState bool
+	)
 
 	finishedStates := make(map[string]bool)
 	ctx, stopPolling := context.WithCancel(ctx)
@@ -123,26 +123,26 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient apiClient, us
 			}
 
 			if state.Name != lastState.Name {
-				log.Print(state.Name)
+				a.logger.Print(state.Name)
 
 				if state.Status == codespaces.PostCreateStateRunning {
 					inProgress = true
 					lastState = state
-					log.Print("...")
+					a.logger.Print("...")
 					break
 				}
 
 				finishedStates[state.Name] = true
-				log.Println("..." + state.Status)
+				a.logger.Println("..." + state.Status)
 			} else {
 				if state.Status == codespaces.PostCreateStateRunning {
 					inProgress = true
-					log.Print(".")
+					a.logger.Print(".")
 					break
 				}
 
 				finishedStates[state.Name] = true
-				log.Println(state.Status)
+				a.logger.Println(state.Status)
 				lastState = codespaces.PostCreateState{} // reset the value
 			}
 		}
@@ -156,7 +156,7 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient apiClient, us
 		}
 	}
 
-	err := codespaces.PollPostCreateStates(ctx, log, apiClient, codespace, poller)
+	err := codespaces.PollPostCreateStates(ctx, a.logger, a.apiClient, codespace, poller)
 	if err != nil {
 		if errors.Is(err, context.Canceled) && breakNextState {
 			return nil // we cancelled the context to stop polling, we can ignore the error
