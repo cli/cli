@@ -31,9 +31,8 @@ type App struct {
 func NewApp(io *iostreams.IOStreams, apiClient apiClient) *App {
 	isInteractive := io.IsStdinTTY() && io.IsStdoutTTY()
 	logger := noopLogger()
-	// TODO(josebalius): pass this in
-	if os.Getenv("DEBUG") != "" {
-		logger = log.New(io.Out, "* ", 0)
+	if isInteractive {
+		logger = log.New(io.Out, "", 0)
 	}
 	errLogger := log.New(io.ErrOut, "", 0)
 
@@ -46,18 +45,15 @@ func NewApp(io *iostreams.IOStreams, apiClient apiClient) *App {
 	}
 }
 
-func (a *App) progress(msg string) {
+func (a *App) Print(v ...interface{}) {
 	if a.isInteractive {
-		a.io.StartProgressIndicatorWithMessage(msg)
-		return
+		fmt.Fprint(a.io.Out, v...)
 	}
-
-	a.logger.Println(msg)
 }
 
-func (a *App) progressStop() {
+func (a *App) Println(v ...interface{}) {
 	if a.isInteractive {
-		a.io.StopProgressIndicator()
+		fmt.Fprintln(a.io.Out, v...)
 	}
 }
 

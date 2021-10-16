@@ -55,9 +55,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return fmt.Errorf("error getting branch name: %w", err)
 	}
 
-	a.progress("Fetching repository")
 	repository, err := a.apiClient.GetRepository(ctx, repo)
-	a.progressStop()
 	if err != nil {
 		return fmt.Errorf("error getting repository: %w", err)
 	}
@@ -80,14 +78,13 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return errors.New("there are no available machine types for this repository")
 	}
 
-	a.progress("Creating your codespace...")
+	a.logger.Println("Creating your codespace...")
 	codespace, err := a.apiClient.CreateCodespace(ctx, &api.CreateCodespaceParams{
 		RepositoryID: repository.ID,
 		Branch:       branch,
 		Machine:      machine,
 		Location:     locationResult.Location,
 	})
-	a.progressStop()
 	if err != nil {
 		return fmt.Errorf("error creating codespace: %w", err)
 	}
@@ -98,7 +95,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		}
 	}
 
-	a.logger.Printf("Codespace created: ")
+	a.logger.Println("Codespace created: ")
 
 	fmt.Fprintln(os.Stdout, codespace.Name)
 
@@ -126,24 +123,26 @@ func (a *App) showStatus(ctx context.Context, user *api.User, codespace *api.Cod
 			}
 
 			if state.Name != lastState.Name {
-				a.progress(state.Name)
+				a.Print(state.Name)
 
 				if state.Status == codespaces.PostCreateStateRunning {
 					inProgress = true
 					lastState = state
+					a.Print("...")
 					break
 				}
 
 				finishedStates[state.Name] = true
-				a.progressStop()
+				a.Println("..." + state.Status)
 			} else {
 				if state.Status == codespaces.PostCreateStateRunning {
 					inProgress = true
+					a.Print(".")
 					break
 				}
 
 				finishedStates[state.Name] = true
-				a.progressStop()
+				a.Println(state.Status)
 				lastState = codespaces.PostCreateState{} // reset the value
 			}
 		}
@@ -157,7 +156,7 @@ func (a *App) showStatus(ctx context.Context, user *api.User, codespace *api.Cod
 		}
 	}
 
-	err := codespaces.PollPostCreateStates(ctx, a.logger, a.apiClient, codespace, poller)
+	err := codespaces.PollPostCreateStates(ctx, a, a.apiClient, codespace, poller)
 	if err != nil {
 		if errors.Is(err, context.Canceled) && breakNextState {
 			return nil // we cancelled the context to stop polling, we can ignore the error

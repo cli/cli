@@ -11,6 +11,11 @@ import (
 	"github.com/cli/cli/v2/pkg/liveshare"
 )
 
+type logger interface {
+	Print(v ...interface{})
+	Println(v ...interface{})
+}
+
 func connectionReady(codespace *api.Codespace) bool {
 	return codespace.Connection.SessionID != "" &&
 		codespace.Connection.SessionToken != "" &&
@@ -26,7 +31,7 @@ type apiClient interface {
 
 // ConnectToLiveshare waits for a Codespace to become running,
 // and connects to it using a Live Share session.
-func ConnectToLiveshare(ctx context.Context, logger, sessionLogger *log.Logger, apiClient apiClient, codespace *api.Codespace) (*liveshare.Session, error) {
+func ConnectToLiveshare(ctx context.Context, logger logger, sessionLogger *log.Logger, apiClient apiClient, codespace *api.Codespace) (*liveshare.Session, error) {
 	var startedCodespace bool
 	if codespace.State != api.CodespaceStateAvailable {
 		startedCodespace = true
