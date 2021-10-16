@@ -1,11 +1,11 @@
 package root
 
 import (
-	"log"
 	"net/http"
 	"sync"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/codespaces"
 	codespacesAPI "github.com/cli/cli/v2/internal/codespaces/api"
 	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
 	aliasCmd "github.com/cli/cli/v2/pkg/cmd/alias"
@@ -128,12 +128,9 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 }
 
 func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
-	logger := log.New(f.IOStreams.Out, "", 0)
-	errLogger := log.New(f.IOStreams.ErrOut, "", 0)
-
-	app := codespaceCmd.NewApp(
-		logger,
-		errLogger,
+	app := codespaces.NewApp(
+		f.IOStreams.IsStdinTTY() && f.IOStreams.IsStdoutTTY(),
+		f.IOStreams.Out, f.IOStreams.ErrOut,
 		codespacesAPI.New("", &lazyLoadedHTTPClient{factory: f}),
 	)
 	cmd := codespaceCmd.NewRootCmd(app)

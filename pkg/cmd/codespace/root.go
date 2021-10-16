@@ -2,10 +2,11 @@ package codespace
 
 import (
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/spf13/cobra"
 )
 
-func NewRootCmd(app *App) *cobra.Command {
+func NewRootCmd(app *codespaces.App) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "codespace",
 		SilenceUsage:  true,  // don't print usage message after each error (see #80)

@@ -15,33 +15,33 @@ import (
 	"github.com/cli/cli/v2/pkg/liveshare"
 )
 
-// PostCreateStateStatus is a string value representing the different statuses a state can have.
-type PostCreateStateStatus string
+// postCreateStateStatus is a string value representing the different statuses a state can have.
+type postCreateStateStatus string
 
-func (p PostCreateStateStatus) String() string {
+func (p postCreateStateStatus) String() string {
 	return strings.Title(string(p))
 }
 
 const (
-	PostCreateStateRunning PostCreateStateStatus = "running"
-	PostCreateStateSuccess PostCreateStateStatus = "succeeded"
-	PostCreateStateFailed  PostCreateStateStatus = "failed"
+	postCreateStateRunning postCreateStateStatus = "running"
+	postCreateStateSuccess postCreateStateStatus = "succeeded"
+	postCreateStateFailed  postCreateStateStatus = "failed"
 )
 
-// PostCreateState is a combination of a state and status value that is captured
+// postCreateState is a combination of a state and status value that is captured
 // during codespace creation.
-type PostCreateState struct {
+type postCreateState struct {
 	Name   string                `json:"name"`
-	Status PostCreateStateStatus `json:"status"`
+	Status postCreateStateStatus `json:"status"`
 }
 
-// PollPostCreateStates watches for state changes in a codespace,
+// pollPostCreateStates watches for state changes in a codespace,
 // and calls the supplied poller for each batch of state changes.
 // It runs until it encounters an error, including cancellation of the context.
-func PollPostCreateStates(ctx context.Context, logger *log.Logger, apiClient apiClient, codespace *api.Codespace, poller func([]PostCreateState)) (err error) {
+func (a *App) pollPostCreateStates(ctx context.Context, codespace *api.Codespace, poller func([]postCreateState)) (err error) {
 	noopLogger := log.New(ioutil.Discard, "", 0)
 
-	session, err := ConnectToLiveshare(ctx, logger, noopLogger, apiClient, codespace)
+	session, err := a.connectToLiveshare(ctx, noopLogger, codespace)
 	if err != nil {
 		return fmt.Errorf("connect to Live Share: %w", err)
 	}
@@ -58,7 +58,7 @@ func PollPostCreateStates(ctx context.Context, logger *log.Logger, apiClient api
 	}
 	localPort := listen.Addr().(*net.TCPAddr).Port
 
-	logger.Println("Fetching SSH Details...")
+	a.logger.Println("Fetching SSH Details...")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
@@ -92,7 +92,7 @@ func PollPostCreateStates(ctx context.Context, logger *log.Logger, apiClient api
 	}
 }
 
-func getPostCreateOutput(ctx context.Context, tunnelPort int, user string) ([]PostCreateState, error) {
+func getPostCreateOutput(ctx context.Context, tunnelPort int, user string) ([]postCreateState, error) {
 	cmd, err := NewRemoteCommand(
 		ctx, tunnelPort, fmt.Sprintf("%s@localhost", user),
 		"cat /workspaces/.codespaces/shared/postCreateOutput.json",
@@ -107,7 +107,7 @@ func getPostCreateOutput(ctx context.Context, tunnelPort int, user string) ([]Po
 		return nil, fmt.Errorf("run command: %w", err)
 	}
 	var output struct {
-		Steps []PostCreateState `json:"steps"`
+		Steps []postCreateState `json:"steps"`
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &output); err != nil {
 		return nil, fmt.Errorf("unmarshal output: %w", err)

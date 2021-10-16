@@ -1,4 +1,4 @@
-package codespace
+package codespaces
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"sort"
 	"strings"
 	"testing"
@@ -24,7 +25,7 @@ func TestDelete(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		opts        deleteOptions
+		opts        DeleteOptions
 		codespaces  []*api.Codespace
 		confirms    map[string]bool
 		deleteErr   error
@@ -35,8 +36,8 @@ func TestDelete(t *testing.T) {
 	}{
 		{
 			name: "by name",
-			opts: deleteOptions{
-				codespaceName: "hubot-robawt-abc",
+			opts: DeleteOptions{
+				CodespaceName: "hubot-robawt-abc",
 			},
 			codespaces: []*api.Codespace{
 				{
@@ -48,8 +49,8 @@ func TestDelete(t *testing.T) {
 		},
 		{
 			name: "by repo",
-			opts: deleteOptions{
-				repoFilter: "monalisa/spoon-knife",
+			opts: DeleteOptions{
+				RepoFilter: "monalisa/spoon-knife",
 			},
 			codespaces: []*api.Codespace{
 				{
@@ -76,9 +77,9 @@ func TestDelete(t *testing.T) {
 		},
 		{
 			name: "unused",
-			opts: deleteOptions{
-				deleteAll: true,
-				keepDays:  3,
+			opts: DeleteOptions{
+				DeleteAll: true,
+				KeepDays:  3,
 			},
 			codespaces: []*api.Codespace{
 				{
@@ -99,8 +100,8 @@ func TestDelete(t *testing.T) {
 		},
 		{
 			name: "deletion failed",
-			opts: deleteOptions{
-				deleteAll: true,
+			opts: DeleteOptions{
+				DeleteAll: true,
 			},
 			codespaces: []*api.Codespace{
 				{
@@ -120,10 +121,9 @@ func TestDelete(t *testing.T) {
 		},
 		{
 			name: "with confirm",
-			opts: deleteOptions{
-				isInteractive: true,
-				deleteAll:     true,
-				skipConfirm:   false,
+			opts: DeleteOptions{
+				DeleteAll:   true,
+				SkipConfirm: false,
 			},
 			codespaces: []*api.Codespace{
 				{
@@ -167,7 +167,7 @@ func TestDelete(t *testing.T) {
 					return nil
 				},
 			}
-			if tt.opts.codespaceName == "" {
+			if tt.opts.CodespaceName == "" {
 				apiMock.ListCodespacesFunc = func(_ context.Context, num int) ([]*api.Codespace, error) {
 					return tt.codespaces, nil
 				}
@@ -177,9 +177,9 @@ func TestDelete(t *testing.T) {
 				}
 			}
 			opts := tt.opts
-			opts.now = func() time.Time { return now }
-			opts.prompter = &prompterMock{
-				ConfirmFunc: func(msg string) (bool, error) {
+			opts.Now = func() time.Time { return now }
+			opts.Prompter = &prompterMock{
+				ConfirmFunc: func(a *App, msg string) (bool, error) {
 					res, found := tt.confirms[msg]
 					if !found {
 						return false, fmt.Errorf("unexpected prompt %q", msg)
@@ -191,9 +191,12 @@ func TestDelete(t *testing.T) {
 			stdout := &bytes.Buffer{}
 			stderr := &bytes.Buffer{}
 			app := &App{
-				apiClient: apiMock,
-				logger:    log.New(stdout, "", 0),
-				errLogger: log.New(stderr, "", 0),
+				apiClient:     apiMock,
+				isInteractive: true,
+				stdout:        os.Stdout,
+				stderr:        os.Stderr,
+				logger:        log.New(stdout, "", 0),
+				errLogger:     log.New(stderr, "", 0),
 			}
 			err := app.Delete(context.Background(), opts)
 			if (err != nil) != tt.wantErr {

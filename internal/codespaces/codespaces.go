@@ -11,35 +11,24 @@ import (
 	"github.com/cli/cli/v2/pkg/liveshare"
 )
 
-func connectionReady(codespace *api.Codespace) bool {
-	return codespace.Connection.SessionID != "" &&
-		codespace.Connection.SessionToken != "" &&
-		codespace.Connection.RelayEndpoint != "" &&
-		codespace.Connection.RelaySAS != "" &&
-		codespace.State == api.CodespaceStateAvailable
-}
-
-type apiClient interface {
-	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
-	StartCodespace(ctx context.Context, name string) error
-}
-
-// ConnectToLiveshare waits for a Codespace to become running,
+// connectToLiveshare waits for a Codespace to become running,
 // and connects to it using a Live Share session.
-func ConnectToLiveshare(ctx context.Context, logger, sessionLogger *log.Logger, apiClient apiClient, codespace *api.Codespace) (session *liveshare.Session, err error) {
+func (a *App) connectToLiveshare(ctx context.Context, sessionLogger *log.Logger, apiCodespace *api.Codespace) (session *liveshare.Session, err error) {
 	var startedCodespace bool
-	if codespace.State != api.CodespaceStateAvailable {
+	cs := codespace{apiCodespace}
+
+	if !cs.running() {
 		startedCodespace = true
-		logger.Print("Starting your codespace...")
-		if err := apiClient.StartCodespace(ctx, codespace.Name); err != nil {
+		a.Print("Starting your codespace...")
+		if err := a.apiClient.StartCodespace(ctx, cs.Name); err != nil {
 			return nil, fmt.Errorf("error starting codespace: %w", err)
 		}
 	}
 
-	for retries := 0; !connectionReady(codespace); retries++ {
+	for retries := 0; !cs.connectionReady(); retries++ {
 		if retries > 1 {
 			if retries%2 == 0 {
-				logger.Print(".")
+				a.Print(".")
 			}
 
 			time.Sleep(1 * time.Second)
@@ -49,25 +38,25 @@ func ConnectToLiveshare(ctx context.Context, logger, sessionLogger *log.Logger, 
 			return nil, errors.New("timed out while waiting for the codespace to start")
 		}
 
-		codespace, err = apiClient.GetCodespace(ctx, codespace.Name, true)
+		apiCodespace, err = a.apiClient.GetCodespace(ctx, cs.Name, true)
 		if err != nil {
 			return nil, fmt.Errorf("error getting codespace: %w", err)
 		}
+		cs = codespace{apiCodespace}
 	}
 
 	if startedCodespace {
-		logger.Print("\n")
+		a.Print("\n")
 	}
 
-	logger.Println("Connecting to your codespace...")
-
+	a.Println("Connecting to your codespace...")
 	return liveshare.Connect(ctx, liveshare.Options{
 		ClientName:     "gh",
-		SessionID:      codespace.Connection.SessionID,
-		SessionToken:   codespace.Connection.SessionToken,
-		RelaySAS:       codespace.Connection.RelaySAS,
-		RelayEndpoint:  codespace.Connection.RelayEndpoint,
-		HostPublicKeys: codespace.Connection.HostPublicKeys,
+		SessionID:      cs.Connection.SessionID,
+		SessionToken:   cs.Connection.SessionToken,
+		RelaySAS:       cs.Connection.RelaySAS,
+		RelayEndpoint:  cs.Connection.RelayEndpoint,
+		HostPublicKeys: cs.Connection.HostPublicKeys,
 		Logger:         sessionLogger,
 	})
 }
