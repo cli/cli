@@ -237,6 +237,16 @@ func (s *IOStreams) StartProgressIndicator() {
 	s.progressIndicator = sp
 }
 
+func (s *IOStreams) StartProgressIndicatorWithMessage(msg string) {
+	if !s.progressIndicatorEnabled {
+		return
+	}
+	sp := spinner.New(spinner.CharSets[11], 400*time.Millisecond, spinner.WithWriter(s.ErrOut), spinner.WithSuffix(" "+msg))
+	sp.Color("black")
+	sp.Start()
+	s.progressIndicator = sp
+}
+
 func (s *IOStreams) StopProgressIndicator() {
 	if s.progressIndicator == nil {
 		return

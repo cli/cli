@@ -16,20 +16,48 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
 
 type App struct {
-	apiClient apiClient
-	logger    *output.Logger
+	io                *iostreams.IOStreams
+	apiClient         apiClient
+	logger, errLogger *log.Logger
+	isInteractive     bool
 }
 
-func NewApp(logger *output.Logger, apiClient apiClient) *App {
+func NewApp(io *iostreams.IOStreams, apiClient apiClient) *App {
+	isInteractive := io.IsStdinTTY() && io.IsStdoutTTY()
+	logger := noopLogger()
+	// TODO(josebalius): pass this in
+	if os.Getenv("DEBUG") != "" {
+		logger = log.New(io.Out, "* ", 0)
+	}
+	errLogger := log.New(io.ErrOut, "", 0)
+
 	return &App{
-		apiClient: apiClient,
-		logger:    logger,
+		io:            io,
+		apiClient:     apiClient,
+		logger:        logger,
+		errLogger:     errLogger,
+		isInteractive: isInteractive,
+	}
+}
+
+func (a *App) progress(msg string) {
+	if a.isInteractive {
+		a.io.StartProgressIndicatorWithMessage(msg)
+		return
+	}
+
+	a.logger.Println(msg)
+}
+
+func (a *App) progressStop() {
+	if a.isInteractive {
+		a.io.StopProgressIndicator()
 	}
 }
 

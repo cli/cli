@@ -122,7 +122,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 		codespaceName := c.Name
 		g.Go(func() error {
 			if err := a.apiClient.DeleteCodespace(ctx, codespaceName); err != nil {
-				_, _ = a.logger.Errorf("error deleting codespace %q: %v\n", codespaceName, err)
+				a.errLogger.Printf("error deleting codespace %q: %v\n", codespaceName, err)
 				return err
 			}
 			return nil

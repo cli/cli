@@ -10,7 +10,6 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	"github.com/fatih/camelcase"
 	"github.com/spf13/cobra"
 )
@@ -56,7 +55,9 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return fmt.Errorf("error getting branch name: %w", err)
 	}
 
+	a.progress("Fetching repository")
 	repository, err := a.apiClient.GetRepository(ctx, repo)
+	a.progressStop()
 	if err != nil {
 		return fmt.Errorf("error getting repository: %w", err)
 	}
@@ -79,20 +80,20 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return errors.New("there are no available machine types for this repository")
 	}
 
-	a.logger.Print("Creating your codespace...")
+	a.progress("Creating your codespace...")
 	codespace, err := a.apiClient.CreateCodespace(ctx, &api.CreateCodespaceParams{
 		RepositoryID: repository.ID,
 		Branch:       branch,
 		Machine:      machine,
 		Location:     locationResult.Location,
 	})
-	a.logger.Print("\n")
+	a.progressStop()
 	if err != nil {
 		return fmt.Errorf("error creating codespace: %w", err)
 	}
 
 	if opts.showStatus {
-		if err := showStatus(ctx, a.logger, a.apiClient, userResult.User, codespace); err != nil {
+		if err := a.showStatus(ctx, userResult.User, codespace); err != nil {
 			return fmt.Errorf("show status: %w", err)
 		}
 	}
@@ -107,9 +108,11 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 // showStatus polls the codespace for a list of post create states and their status. It will keep polling
 // until all states have finished. Once all states have finished, we poll once more to check if any new
 // states have been introduced and stop polling otherwise.
-func showStatus(ctx context.Context, log *output.Logger, apiClient apiClient, user *api.User, codespace *api.Codespace) error {
-	var lastState codespaces.PostCreateState
-	var breakNextState bool
+func (a *App) showStatus(ctx context.Context, user *api.User, codespace *api.Codespace) error {
+	var (
+		lastState      codespaces.PostCreateState
+		breakNextState bool
+	)
 
 	finishedStates := make(map[string]bool)
 	ctx, stopPolling := context.WithCancel(ctx)
@@ -123,26 +126,24 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient apiClient, us
 			}
 
 			if state.Name != lastState.Name {
-				log.Print(state.Name)
+				a.progress(state.Name)
 
 				if state.Status == codespaces.PostCreateStateRunning {
 					inProgress = true
 					lastState = state
-					log.Print("...")
 					break
 				}
 
 				finishedStates[state.Name] = true
-				log.Println("..." + state.Status)
+				a.progressStop()
 			} else {
 				if state.Status == codespaces.PostCreateStateRunning {
 					inProgress = true
-					log.Print(".")
 					break
 				}
 
 				finishedStates[state.Name] = true
-				log.Println(state.Status)
+				a.progressStop()
 				lastState = codespaces.PostCreateState{} // reset the value
 			}
 		}
@@ -156,7 +157,7 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient apiClient, us
 		}
 	}
 
-	err := codespaces.PollPostCreateStates(ctx, log, apiClient, codespace, poller)
+	err := codespaces.PollPostCreateStates(ctx, a.logger, a.apiClient, codespace, poller)
 	if err != nil {
 		if errors.Is(err, context.Canceled) && breakNextState {
 			return nil // we cancelled the context to stop polling, we can ignore the error
