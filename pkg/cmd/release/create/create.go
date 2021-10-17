@@ -170,8 +170,22 @@ func createRun(opts *CreateOptions) error {
 			return err
 		}
 
+		var generatedNotes *ReleaseNotes
 		var tagDescription string
 		var generatedChangelog string
+		// TODO: use ghinstance.IsEnterprise(hostname)
+		if true {
+			params := map[string]interface{}{
+				"tag_name": opts.TagName,
+			}
+			if opts.Target != "" {
+				params["target_commitish"] = opts.Target
+			}
+			generatedNotes, err = generateReleaseNotes(httpClient, baseRepo, params)
+			if err != nil {
+				return err
+			}
+		}
 		if opts.RepoOverride == "" {
 			headRef := opts.TagName
 			tagDescription, _ = gitTagInfo(opts.TagName)
@@ -190,9 +204,9 @@ func createRun(opts *CreateOptions) error {
 			}
 		}
 
-		editorOptions := []string{
-			"Write my own",
-			"Automatically generate the release notes",
+		editorOptions := []string{"Write my own"}
+		if generatedNotes != nil {
+			editorOptions = append(editorOptions, "Write using generated notes as template")
 		}
 		if generatedChangelog != "" {
 			editorOptions = append(editorOptions, "Write using commit log as template")
@@ -202,12 +216,16 @@ func createRun(opts *CreateOptions) error {
 		}
 		editorOptions = append(editorOptions, "Leave blank")
 
+		defaultName := opts.Name
+		if defaultName == "" && generatedNotes != nil {
+			defaultName = generatedNotes.Name
+		}
 		qs := []*survey.Question{
 			{
 				Name: "name",
 				Prompt: &survey.Input{
 					Message: "Title (optional)",
-					Default: opts.Name,
+					Default: defaultName,
 				},
 			},
 			{
@@ -229,9 +247,9 @@ func createRun(opts *CreateOptions) error {
 		switch opts.ReleaseNotesAction {
 		case "Write my own":
 			openEditor = true
-		case "Automatically generate the release notes":
-			openEditor = false
-			opts.GenerateNotes = true
+		case "Write using generated notes as template":
+			openEditor = true
+			editorContents = generatedNotes.Body
 		case "Write using commit log as template":
 			openEditor = true
 			editorContents = generatedChangelog
