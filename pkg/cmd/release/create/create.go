@@ -332,8 +332,12 @@ func createRun(opts *CreateOptions) error {
 		"tag_name":   opts.TagName,
 		"draft":      opts.Draft,
 		"prerelease": opts.Prerelease,
-		"name":       opts.Name,
-		"body":       opts.Body,
+	}
+	if opts.Name != "" {
+		params["name"] = opts.Name
+	}
+	if opts.Body != "" {
+		params["body"] = opts.Body
 	}
 	if opts.Target != "" {
 		params["target_commitish"] = opts.Target
