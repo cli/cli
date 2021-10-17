@@ -36,6 +36,11 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
+	if err != nil {
+		return fmt.Errorf("get or choose codespace: %w", err)
+	}
+
 	user, err := a.apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("getting user: %w", err)
@@ -45,11 +50,6 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 	go func() {
 		authkeys <- checkAuthorizedKeys(ctx, a.apiClient, user.Login)
 	}()
-
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
-	if err != nil {
-		return fmt.Errorf("get or choose codespace: %w", err)
-	}
 
 	session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, codespace)
 	if err != nil {
@@ -69,8 +69,9 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 	defer listen.Close()
 	localPort := listen.Addr().(*net.TCPAddr).Port
 
-	a.logger.Println("Fetching SSH Details...")
+	a.StartProgressIndicatorWithSuffix("Fetching SSH Details")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
+	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}

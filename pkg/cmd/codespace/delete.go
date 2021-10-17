@@ -62,7 +62,9 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 	var codespaces []*api.Codespace
 	nameFilter := opts.codespaceName
 	if nameFilter == "" {
+		a.StartProgressIndicatorWithSuffix("Fetching codespaces")
 		codespaces, err = a.apiClient.ListCodespaces(ctx, -1)
+		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error getting codespaces: %w", err)
 		}
@@ -75,7 +77,9 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 			nameFilter = c.Name
 		}
 	} else {
+		a.StartProgressIndicatorWithSuffix("Fetching codespace")
 		codespace, err := a.apiClient.GetCodespace(ctx, nameFilter, false)
+		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error fetching codespace information: %w", err)
 		}
@@ -117,6 +121,12 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 		return errors.New("no codespaces to delete")
 	}
 
+	noun := "Codespace"
+	if len(codespacesToDelete) > 1 {
+		noun = noun + "s"
+	}
+
+	a.StartProgressIndicatorWithSuffix(fmt.Sprintf("Deleting %s", strings.ToLower(noun)))
 	g := errgroup.Group{}
 	for _, c := range codespacesToDelete {
 		codespaceName := c.Name
@@ -130,14 +140,12 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 	}
 
 	if err := g.Wait(); err != nil {
+		a.StopProgressIndicator()
 		return errors.New("some codespaces failed to delete")
 	}
+	a.StopProgressIndicator()
 
-	noun := "Codespace"
-	if len(codespacesToDelete) > 1 {
-		noun = noun + "s"
-	}
-	a.logger.Println(noun + " deleted.")
+	a.Println(noun + " deleted.")
 
 	return nil
 }

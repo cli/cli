@@ -47,6 +47,11 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
+	if err != nil {
+		return fmt.Errorf("get or choose codespace: %w", err)
+	}
+
 	user, err := a.apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting user: %w", err)
@@ -57,11 +62,6 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		authkeys <- checkAuthorizedKeys(ctx, a.apiClient, user.Login)
 	}()
 
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
-	if err != nil {
-		return fmt.Errorf("get or choose codespace: %w", err)
-	}
-
 	liveshareLogger := noopLogger()
 	if opts.debug {
 		debugLogger, err := newFileLogger(opts.debugFile)
@@ -71,7 +71,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		defer safeClose(debugLogger, &err)
 
 		liveshareLogger = debugLogger.Logger
-		a.logger.Println("Debug file located at: " + debugLogger.Name())
+		a.Println("Debug file located at: " + debugLogger.Name())
 	}
 
 	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
@@ -84,8 +84,9 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		return err
 	}
 
-	a.logger.Println("Fetching SSH Details...")
+	a.StartProgressIndicatorWithSuffix("Fetching SSH Details")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
+	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}

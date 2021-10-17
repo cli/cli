@@ -38,10 +38,10 @@ type PostCreateState struct {
 // PollPostCreateStates watches for state changes in a codespace,
 // and calls the supplied poller for each batch of state changes.
 // It runs until it encounters an error, including cancellation of the context.
-func PollPostCreateStates(ctx context.Context, logger logger, apiClient apiClient, codespace *api.Codespace, poller func([]PostCreateState)) (err error) {
+func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiClient apiClient, codespace *api.Codespace, poller func([]PostCreateState)) (err error) {
 	noopLogger := log.New(ioutil.Discard, "", 0)
 
-	session, err := ConnectToLiveshare(ctx, logger, noopLogger, apiClient, codespace)
+	session, err := ConnectToLiveshare(ctx, progress, noopLogger, apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("connect to Live Share: %w", err)
 	}
@@ -58,12 +58,14 @@ func PollPostCreateStates(ctx context.Context, logger logger, apiClient apiClien
 	}
 	localPort := listen.Addr().(*net.TCPAddr).Port
 
-	logger.Println("Fetching SSH Details...")
+	progress.StartProgressIndicatorWithSuffix("Fetching SSH Details")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
+	progress.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}
 
+	progress.StartProgressIndicatorWithSuffix("Fetching status")
 	tunnelClosed := make(chan error, 1) // buffered to avoid sender stuckness
 	go func() {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, false)
@@ -73,6 +75,7 @@ func PollPostCreateStates(ctx context.Context, logger logger, apiClient apiClien
 	t := time.NewTicker(1 * time.Second)
 	defer t.Stop()
 
+	var ticks int
 	for {
 		select {
 		case <-ctx.Done():
@@ -83,9 +86,13 @@ func PollPostCreateStates(ctx context.Context, logger logger, apiClient apiClien
 
 		case <-t.C:
 			states, err := getPostCreateOutput(ctx, localPort, sshUser)
+			if ticks == 0 {
+				progress.StopProgressIndicator()
+			}
 			if err != nil {
 				return fmt.Errorf("get post create output: %w", err)
 			}
+			ticks++
 
 			poller(states)
 		}

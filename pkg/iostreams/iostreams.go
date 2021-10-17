@@ -229,19 +229,21 @@ func (s *IOStreams) SetNeverPrompt(v bool) {
 }
 
 func (s *IOStreams) StartProgressIndicator() {
-	if !s.progressIndicatorEnabled {
-		return
-	}
-	sp := spinner.New(spinner.CharSets[11], 400*time.Millisecond, spinner.WithWriter(s.ErrOut))
-	sp.Start()
-	s.progressIndicator = sp
+	s.StartProgressIndicatorWithSuffix("")
 }
 
-func (s *IOStreams) StartProgressIndicatorWithMessage(msg string) {
+func (s *IOStreams) StartProgressIndicatorWithSuffix(suffix string) {
 	if !s.progressIndicatorEnabled {
 		return
 	}
-	sp := spinner.New(spinner.CharSets[11], 400*time.Millisecond, spinner.WithWriter(s.ErrOut), spinner.WithSuffix(" "+msg))
+
+	opts := []spinner.Option{
+		spinner.WithWriter(s.ErrOut),
+	}
+	if suffix != "" {
+		opts = append(opts, spinner.WithSuffix(" "+suffix))
+	}
+	sp := spinner.New(spinner.CharSets[11], 400*time.Millisecond, opts...)
 	sp.Color("black")
 	sp.Start()
 	s.progressIndicator = sp

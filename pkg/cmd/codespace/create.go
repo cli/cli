@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -55,7 +54,9 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return fmt.Errorf("error getting branch name: %w", err)
 	}
 
+	a.StartProgressIndicatorWithSuffix("Fetching repository")
 	repository, err := a.apiClient.GetRepository(ctx, repo)
+	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting repository: %w", err)
 	}
@@ -78,13 +79,14 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return errors.New("there are no available machine types for this repository")
 	}
 
-	a.logger.Println("Creating your codespace...")
+	a.StartProgressIndicatorWithSuffix("Creating codespace")
 	codespace, err := a.apiClient.CreateCodespace(ctx, &api.CreateCodespaceParams{
 		RepositoryID: repository.ID,
 		Branch:       branch,
 		Machine:      machine,
 		Location:     locationResult.Location,
 	})
+	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error creating codespace: %w", err)
 	}
@@ -95,9 +97,8 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		}
 	}
 
-	a.logger.Println("Codespace created: ")
-
-	fmt.Fprintln(os.Stdout, codespace.Name)
+	a.Println("Codespace created.")
+	fmt.Fprintln(a.io.Out, codespace.Name)
 
 	return nil
 }
@@ -123,26 +124,24 @@ func (a *App) showStatus(ctx context.Context, user *api.User, codespace *api.Cod
 			}
 
 			if state.Name != lastState.Name {
-				a.Print(state.Name)
+				a.StartProgressIndicatorWithSuffix(state.Name)
 
 				if state.Status == codespaces.PostCreateStateRunning {
 					inProgress = true
 					lastState = state
-					a.Print("...")
 					break
 				}
 
 				finishedStates[state.Name] = true
-				a.Println("..." + state.Status)
+				a.StopProgressIndicator()
 			} else {
 				if state.Status == codespaces.PostCreateStateRunning {
 					inProgress = true
-					a.Print(".")
 					break
 				}
 
 				finishedStates[state.Name] = true
-				a.Println(state.Status)
+				a.StopProgressIndicator()
 				lastState = codespaces.PostCreateState{} // reset the value
 			}
 		}
