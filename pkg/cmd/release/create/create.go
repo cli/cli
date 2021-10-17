@@ -52,7 +52,7 @@ type CreateOptions struct {
 
 	DiscussionCategory string
 
-	GenerateReleaseNotes bool
+	GenerateNotes bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -102,7 +102,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh release create v1.2.3 --discussion-category "General"
 
 			Create a release with automatically generated release notes
-			$ gh release create v1.2.3 --generate-release-notes
+			$ gh release create v1.2.3 --generate-notes
 		`),
 		Args: cmdutil.MinimumArgs(1, "could not create: no tag name provided"),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -148,7 +148,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion of the specified category")
-	cmd.Flags().BoolVarP(&opts.GenerateReleaseNotes, "generate-release-notes", "", false, "Automatically generate the name and body for this release")
+	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate the name and body for this release")
 
 	return cmd
 }
@@ -164,7 +164,7 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
-	if (!opts.BodyProvided && !opts.GenerateReleaseNotes) && opts.IO.CanPrompt() {
+	if (!opts.BodyProvided && !opts.GenerateNotes) && opts.IO.CanPrompt() {
 		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
 		if err != nil {
 			return err
@@ -231,7 +231,7 @@ func createRun(opts *CreateOptions) error {
 			openEditor = true
 		case "Automatically generate the release notes":
 			openEditor = false
-			opts.GenerateReleaseNotes = true
+			opts.GenerateNotes = true
 		case "Write using commit log as template":
 			openEditor = true
 			editorContents = generatedChangelog
@@ -319,7 +319,7 @@ func createRun(opts *CreateOptions) error {
 	if opts.DiscussionCategory != "" {
 		params["discussion_category_name"] = opts.DiscussionCategory
 	}
-	if opts.GenerateReleaseNotes {
+	if opts.GenerateNotes {
 		params["generate_release_notes"] = true
 	}
 
