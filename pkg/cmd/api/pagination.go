@@ -89,9 +89,14 @@ loop:
 	return ""
 }
 
-func addPerPage(p string, perPage int, params map[string]interface{}) string {
-	if _, hasPerPage := params["per_page"]; hasPerPage {
-		return p
+func addPerPage(p string, defaultPerPage int, params map[string]interface{}) string {
+	perPage := defaultPerPage
+	if value, hasPerPage := params["per_page"]; hasPerPage {
+		switch v := value.(type) {
+		case int:
+			perPage = v
+		}
+		delete(params, "per_page")
 	}
 
 	idx := strings.IndexRune(p, '?')
@@ -105,4 +110,27 @@ func addPerPage(p string, perPage int, params map[string]interface{}) string {
 	}
 
 	return fmt.Sprintf("%s%sper_page=%d", p, sep, perPage)
+}
+
+func addPage(p string, defaultPage int, params map[string]interface{}) string {
+	page := defaultPage
+	if value, hasPage := params["page"]; hasPage {
+		switch v := value.(type) {
+		case int:
+			page = v
+		}
+		delete(params, "page")
+	}
+
+	idx := strings.IndexRune(p, '?')
+	sep := "?"
+
+	if idx >= 0 {
+		if qp, err := url.ParseQuery(p[idx+1:]); err == nil && qp.Get("page") != "" {
+			return p
+		}
+		sep = "&"
+	}
+
+	return fmt.Sprintf("%s%spage=%d", p, sep, page)
 }

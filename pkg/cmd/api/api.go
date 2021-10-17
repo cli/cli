@@ -242,6 +242,7 @@ func apiRun(opts *ApiOptions) error {
 
 	if opts.Paginate && !isGraphQL {
 		requestPath = addPerPage(requestPath, 100, params)
+		requestPath = addPage(requestPath, 1, params)
 	}
 
 	if opts.RequestInputFile != "" {

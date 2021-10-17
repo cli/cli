@@ -138,7 +138,7 @@ func Test_addPerPage(t *testing.T) {
 			want: "items?per_page=13",
 		},
 		{
-			name: "avoids adding per_page if already in params",
+			name: "use params per_page if already in params",
 			args: args{
 				p:       "items",
 				perPage: 13,
@@ -147,7 +147,7 @@ func Test_addPerPage(t *testing.T) {
 					"per_page": 99,
 				},
 			},
-			want: "items",
+			want: "items?per_page=99",
 		},
 		{
 			name: "avoids adding per_page if already in query",
@@ -163,6 +163,56 @@ func Test_addPerPage(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := addPerPage(tt.args.p, tt.args.perPage, tt.args.params); got != tt.want {
 				t.Errorf("addPerPage() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+func Test_addPage(t *testing.T) {
+	type args struct {
+		p      string
+		page   int
+		params map[string]interface{}
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "adds page",
+			args: args{
+				p:      "items",
+				page:   3,
+				params: nil,
+			},
+			want: "items?page=3",
+		},
+		{
+			name: "use params page if already in params",
+			args: args{
+				p:    "items",
+				page: 3,
+				params: map[string]interface{}{
+					"state": "open",
+					"page":  4,
+				},
+			},
+			want: "items?page=4",
+		},
+		{
+			name: "avoids adding page if already in query",
+			args: args{
+				p:      "items?page=6&state=open",
+				page:   3,
+				params: nil,
+			},
+			want: "items?page=6&state=open",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := addPage(tt.args.p, tt.args.page, tt.args.params); got != tt.want {
+				t.Errorf("addPage() = %v, want %v", got, tt.want)
 			}
 		})
 	}
