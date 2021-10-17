@@ -12,6 +12,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
@@ -173,8 +174,10 @@ func createRun(opts *CreateOptions) error {
 		var generatedNotes *ReleaseNotes
 		var tagDescription string
 		var generatedChangelog string
-		// TODO: use ghinstance.IsEnterprise(hostname)
-		if true {
+
+		canGenerateNotes := !ghinstance.IsEnterprise(baseRepo.RepoHost())
+
+		if canGenerateNotes {
 			params := map[string]interface{}{
 				"tag_name": opts.TagName,
 			}
@@ -197,10 +200,11 @@ func createRun(opts *CreateOptions) error {
 					headRef = "HEAD"
 				}
 			}
-
-			if prevTag, err := detectPreviousTag(headRef); err == nil {
-				commits, _ := changelogForRange(fmt.Sprintf("%s..%s", prevTag, headRef))
-				generatedChangelog = generateChangelog(commits)
+			if !canGenerateNotes {
+				if prevTag, err := detectPreviousTag(headRef); err == nil {
+					commits, _ := changelogForRange(fmt.Sprintf("%s..%s", prevTag, headRef))
+					generatedChangelog = generateChangelog(commits)
+				}
 			}
 		}
 
