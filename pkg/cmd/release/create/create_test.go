@@ -326,8 +326,6 @@ func Test_createRun(t *testing.T) {
 			},
 			wantParams: map[string]interface{}{
 				"tag_name":         "v1.2.3",
-				"name":             "",
-				"body":             "",
 				"draft":            false,
 				"prerelease":       false,
 				"target_commitish": "main",
@@ -348,8 +346,6 @@ func Test_createRun(t *testing.T) {
 			},
 			wantParams: map[string]interface{}{
 				"tag_name":   "v1.2.3",
-				"name":       "",
-				"body":       "",
 				"draft":      true,
 				"prerelease": false,
 			},
@@ -370,14 +366,31 @@ func Test_createRun(t *testing.T) {
 			},
 			wantParams: map[string]interface{}{
 				"tag_name":                 "v1.2.3",
-				"name":                     "",
-				"body":                     "",
 				"draft":                    true,
 				"prerelease":               false,
 				"discussion_category_name": "general",
 			},
 			wantErr:    "X Discussions not supported with draft releases",
 			wantStdout: "",
+		},
+		{
+			name:  "with generate notes",
+			isTTY: true,
+			opts: CreateOptions{
+				TagName:       "v1.2.3",
+				Name:          "",
+				Body:          "",
+				Target:        "",
+				GenerateNotes: true,
+			},
+			wantParams: map[string]interface{}{
+				"tag_name":               "v1.2.3",
+				"draft":                  false,
+				"prerelease":             false,
+				"generate_release_notes": true,
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantErr:    "",
 		},
 		{
 			name:  "publish after uploading files",
@@ -401,8 +414,6 @@ func Test_createRun(t *testing.T) {
 			},
 			wantParams: map[string]interface{}{
 				"tag_name":   "v1.2.3",
-				"name":       "",
-				"body":       "",
 				"draft":      true,
 				"prerelease": false,
 			},
