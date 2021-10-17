@@ -59,7 +59,7 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, asJSON bool) 
 
 	devContainerCh := getDevContainer(ctx, a.apiClient, codespace)
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, noopLogger(), a.apiClient, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
@@ -176,7 +176,7 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 		return fmt.Errorf("error getting codespace: %w", err)
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, noopLogger(), a.apiClient, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
@@ -250,7 +250,7 @@ func (a *App) ForwardPorts(ctx context.Context, codespaceName string, ports []st
 		return fmt.Errorf("error getting codespace: %w", err)
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, noopLogger(), a.apiClient, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}

@@ -35,7 +35,7 @@ func ConnectToLiveshare(ctx context.Context, logger logger, sessionLogger *log.L
 	var startedCodespace bool
 	if codespace.State != api.CodespaceStateAvailable {
 		startedCodespace = true
-		log.Print("Starting your codespace...")
+		logger.Print("Starting your codespace...")
 		if err := apiClient.StartCodespace(ctx, codespace.Name); err != nil {
 			return nil, fmt.Errorf("error starting codespace: %w", err)
 		}
@@ -44,7 +44,7 @@ func ConnectToLiveshare(ctx context.Context, logger logger, sessionLogger *log.L
 	for retries := 0; !connectionReady(codespace); retries++ {
 		if retries > 1 {
 			if retries%2 == 0 {
-				log.Print(".")
+				logger.Print(".")
 			}
 
 			time.Sleep(1 * time.Second)
@@ -62,10 +62,10 @@ func ConnectToLiveshare(ctx context.Context, logger logger, sessionLogger *log.L
 	}
 
 	if startedCodespace {
-		fmt.Print("\n")
+		logger.Print("\n")
 	}
 
-	log.Println("Connecting to your codespace...")
+	logger.Println("Connecting to your codespace...")
 
 	return liveshare.Connect(ctx, liveshare.Options{
 		ClientName:     "gh",

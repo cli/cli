@@ -74,7 +74,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		a.logger.Println("Debug file located at: " + debugLogger.Name())
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, liveshareLogger, a.apiClient, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
