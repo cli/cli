@@ -173,6 +173,7 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 
 // getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
 // It then fetches the codespace record with full connection details.
+// TODO(josebalius): accept a progress indicator or *App and show progress when fetching.
 func getOrChooseCodespace(ctx context.Context, apiClient apiClient, codespaceName string) (codespace *api.Codespace, err error) {
 	if codespaceName == "" {
 		codespace, err = chooseCodespace(ctx, apiClient)
