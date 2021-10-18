@@ -27,6 +27,7 @@ func NewRootCmd(app *App) *cobra.Command {
 	root.AddCommand(newLogsCmd(app))
 	root.AddCommand(newPortsCmd(app))
 	root.AddCommand(newSSHCmd(app))
+	root.AddCommand(newCpCmd(app))
 	root.AddCommand(newStopCmd(app))
 
 	return root
