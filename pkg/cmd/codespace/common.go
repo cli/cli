@@ -47,13 +47,13 @@ func NewApp(io *iostreams.IOStreams, apiClient apiClient) *App {
 }
 
 func (a *App) StartProgressIndicatorWithSuffix(s string) {
-	if a.isInteractive {
-		a.io.StartProgressIndicatorWithSuffix(s)
+	if !a.isInteractive {
+		// if we are not interactive, log the progress states
+		a.logger.Println(s)
 		return
 	}
 
-	// if we are not interactive, log the progress states
-	a.logger.Println(s)
+	a.io.StartProgressIndicatorWithSuffix(s)
 }
 
 func (a *App) StopProgressIndicator() {
