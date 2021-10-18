@@ -58,8 +58,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 				} else if len(args) == 1 && !opts.flagRepo {
 					opts.newRepoSelector = args[0]
 				} else {
-					return &cmdutil.FlagError{
-						Err: errors.New("check your parameters")}
+					return fmt.Errorf("check your parameters")
 				}
 			} else {
 				if !opts.IO.CanPrompt() {
