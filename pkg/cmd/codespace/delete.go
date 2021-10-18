@@ -137,7 +137,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 	if len(codespacesToDelete) > 1 {
 		noun = noun + "s"
 	}
-	a.logger.Println(noun + " deleted.")
+	a.Println(noun + " deleted.")
 
 	return nil
 }

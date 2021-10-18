@@ -1,7 +1,6 @@
 package codespace
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -12,7 +11,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
+	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 func TestDelete(t *testing.T) {
@@ -188,12 +187,10 @@ func TestDelete(t *testing.T) {
 				},
 			}
 
-			stdout := &bytes.Buffer{}
-			stderr := &bytes.Buffer{}
-			app := &App{
-				apiClient: apiMock,
-				logger:    output.NewLogger(stdout, stderr, false),
-			}
+			io, _, stdout, stderr := iostreams.Test()
+			io.SetStdinTTY(true)
+			io.SetStdoutTTY(true)
+			app := NewApp(io, apiMock)
 			err := app.Delete(context.Background(), opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("delete() error = %v, wantErr %v", err, tt.wantErr)
