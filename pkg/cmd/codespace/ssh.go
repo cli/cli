@@ -1,5 +1,7 @@
 package codespace
 
+// This file defines the 'gh cs ssh' and 'gh cs cp' subcommands.
+
 import (
 	"context"
 	"fmt"
@@ -7,6 +9,8 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/pkg/liveshare"
@@ -19,6 +23,7 @@ type sshOptions struct {
 	serverPort int
 	debug      bool
 	debugFile  string
+	scpArgs    []string // scp arguments, for 'cs cp' (nil for 'cs ssh')
 }
 
 func newSSHCmd(app *App) *cobra.Command {
@@ -117,7 +122,13 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 
 	shellClosed := make(chan error, 1)
 	go func() {
-		shellClosed <- codespaces.Shell(ctx, a.logger, sshArgs, localSSHServerPort, connectDestination, usingCustomPort)
+		var err error
+		if opts.scpArgs != nil {
+			err = codespaces.Copy(ctx, opts.scpArgs, localSSHServerPort)
+		} else {
+			err = codespaces.Shell(ctx, a.logger, sshArgs, localSSHServerPort, connectDestination, usingCustomPort)
+		}
+		shellClosed <- err
 	}()
 
 	select {
@@ -129,6 +140,70 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		}
 		return nil // success
 	}
+}
+
+type cpOptions struct {
+	sshOptions
+	recursive bool // -r
+}
+
+func newCpCmd(app *App) *cobra.Command {
+	var opts cpOptions
+
+	cpCmd := &cobra.Command{
+		Use:   "cp [-r] srcs... dest",
+		Short: "Copy files between local and remote file systems",
+		Long: `
+The cp command copies files between the local and remote file systems.
+
+A 'remote:' prefix on any file name argument indicates that it refers to
+the file system of the remote (Codespace) machine.
+
+As with the UNIX cp command, the first argument specifies the source and the last
+specifies the destination; additional sources may be specified after the first,
+if the destination is a directory.
+
+The -r (recursive) flag is required if any source is a directory.
+`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return app.Copy(cmd.Context(), args, opts)
+		},
+	}
+
+	// We don't expose all sshOptions.
+	cpCmd.Flags().BoolVarP(&opts.recursive, "recursive", "r", false, "Recursively copy directories")
+	cpCmd.Flags().StringVarP(&opts.codespace, "codespace", "c", "", "Name of the codespace")
+	return cpCmd
+}
+
+// Copy copies files between the local and remote file systems.
+// The mechanics are similar to 'ssh' but using 'scp'.
+func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) (err error) {
+	if len(args) < 2 {
+		return fmt.Errorf("cp requires source and destination arguments")
+	}
+	if opts.recursive {
+		opts.scpArgs = append(opts.scpArgs, "-r")
+	}
+	opts.scpArgs = append(opts.scpArgs, "--")
+	for _, arg := range args {
+		if rest := strings.TrimPrefix(arg, "remote:"); rest != arg {
+			// TODO(adonovan): don't assume user=root:
+			// use value from session.StartSSHServer.
+			arg = "root@localhost:" + rest
+		} else if !filepath.IsAbs(arg) {
+			// scp treats a colon in the first path segment as a host identifier.
+			// Escape it by prepending "./".
+			// TODO(adonovan): test on Windows, including with a c:\\foo path.
+			const sep = string(os.PathSeparator)
+			first := strings.Split(filepath.ToSlash(arg), sep)[0]
+			if strings.Contains(first, ":") {
+				arg = "." + sep + arg
+			}
+		}
+		opts.scpArgs = append(opts.scpArgs, arg)
+	}
+	return a.SSH(ctx, nil, opts.sshOptions)
 }
 
 // fileLogger is a wrapper around an log.Logger configured to write

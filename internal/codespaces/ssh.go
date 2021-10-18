@@ -25,6 +25,24 @@ func Shell(ctx context.Context, log logger, sshArgs []string, port int, destinat
 	return cmd.Run()
 }
 
+// Copy runs an scp command over the specified port. The arguments may
+// include flags and non-flags, optionally separated by "--".
+// Remote files are indicated by a "user@host:" prefix.
+func Copy(ctx context.Context, scpArgs []string, port int) error {
+	// Beware: invalid syntax causes scp to exit 1 with
+	// no error message, so don't let that happen.
+	scpArgs = append([]string{
+		"-P", strconv.Itoa(port),
+		"-o", "NoHostAuthenticationForLocalhost=yes",
+		"-C", // compression
+	}, scpArgs...)
+	cmd := exec.CommandContext(ctx, "scp", scpArgs...)
+	cmd.Stdin = nil
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
 // NewRemoteCommand returns an exec.Cmd that will securely run a shell
 // command on the remote machine.
 func NewRemoteCommand(ctx context.Context, tunnelPort int, destination string, sshArgs ...string) (*exec.Cmd, error) {
