@@ -125,7 +125,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 	a.StartProgressIndicatorWithSuffix("Deleting codespace(s)")
 	var (
 		deletedCodespaces int
-		g                 = errgroup.Group{}
+		g                 errgroup.Group
 	)
 	for _, c := range codespacesToDelete {
 		codespaceName := c.Name
