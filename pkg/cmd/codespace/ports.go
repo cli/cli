@@ -191,7 +191,7 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 			return fmt.Errorf("error update port to public: %w", err)
 		}
 
-		a.Println(fmt.Sprintf("Port %d is now %s scoped.", port.number, port.visibility))
+		a.Printf("Port %d is now %s scoped.\n", port.number, port.visibility)
 	}
 
 	return nil
@@ -272,7 +272,7 @@ func (a *App) ForwardPorts(ctx context.Context, codespaceName string, ports []st
 			}
 			defer listen.Close()
 
-			a.Println(fmt.Sprintf("Forwarding ports: remote %d <=> local %d", pair.remote, pair.local))
+			a.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
 			name := fmt.Sprintf("share-%d", pair.remote)
 			fwd := liveshare.NewPortForwarder(session, name, pair.remote, false)
 			return fwd.ForwardToListener(ctx, listen) // error always non-nil

@@ -3,24 +3,27 @@ package codespaces
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 )
 
+type printer interface {
+	Println(v ...interface{})
+}
+
 // Shell runs an interactive secure shell over an existing
 // port-forwarding session. It runs until the shell is terminated
 // (including by cancellation of the context).
-func Shell(ctx context.Context, logger *log.Logger, sshArgs []string, port int, destination string, usingCustomPort bool) error {
+func Shell(ctx context.Context, p printer, sshArgs []string, port int, destination string, usingCustomPort bool) error {
 	cmd, connArgs, err := newSSHCommand(ctx, port, destination, sshArgs)
 	if err != nil {
 		return fmt.Errorf("failed to create ssh command: %w", err)
 	}
 
 	if usingCustomPort {
-		logger.Println("Connection Details: ssh " + destination + " " + strings.Join(connArgs, " "))
+		p.Println("Connection Details: ssh " + destination + " " + strings.Join(connArgs, " "))
 	}
 
 	return cmd.Run()

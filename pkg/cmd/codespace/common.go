@@ -68,6 +68,12 @@ func (a *App) Println(v ...interface{}) {
 	fmt.Fprintln(a.io.Out, v...)
 }
 
+func (a *App) Printf(f string, v ...interface{}) {
+	if a.isInteractive {
+		fmt.Fprintf(a.io.Out, f, v...)
+	}
+}
+
 //go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
 type apiClient interface {
 	GetUser(ctx context.Context) (*api.User, error)
