@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -124,8 +125,9 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 
 	a.StartProgressIndicatorWithSuffix("Deleting codespace(s)")
 	var (
-		deletedCodespaces int
-		g                 errgroup.Group
+		deletedCodespacesMu sync.Mutex // guards deletedCodespaces
+		deletedCodespaces   int
+		g                   errgroup.Group
 	)
 	for _, c := range codespacesToDelete {
 		codespaceName := c.Name
@@ -134,7 +136,9 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 				a.errLogger.Printf("error deleting codespace %q: %v\n", codespaceName, err)
 				return err
 			}
+			deletedCodespacesMu.Lock()
 			deletedCodespaces++
+			deletedCodespacesMu.Unlock()
 			return nil
 		})
 	}
