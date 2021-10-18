@@ -155,8 +155,8 @@ type CodespaceGitStatus struct {
 	Ahead                int    `json:"ahead"`
 	Behind               int    `json:"behind"`
 	Ref                  string `json:"ref"`
-	HasUnpushedChanges   bool   `json:"hasUnpushedChanges"`
-	HasUncommitedChanges bool   `json:"hasUncommitedChanges"`
+	HasUnpushedChanges   bool   `json:"has_unpushed_changes"`
+	HasUncommitedChanges bool   `json:"has_uncommited_changes"`
 }
 
 const (
