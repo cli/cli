@@ -22,24 +22,19 @@ import (
 )
 
 type App struct {
-	io                *iostreams.IOStreams
-	apiClient         apiClient
-	logger, errLogger *log.Logger
-	isInteractive     bool
+	io            *iostreams.IOStreams
+	apiClient     apiClient
+	errLogger     *log.Logger
+	isInteractive bool
 }
 
 func NewApp(io *iostreams.IOStreams, apiClient apiClient) *App {
 	isInteractive := io.IsStdinTTY() && io.IsStdoutTTY()
-	logger := noopLogger()
-	if isInteractive {
-		logger = log.New(io.Out, "", 0)
-	}
 	errLogger := log.New(io.ErrOut, "", 0)
 
 	return &App{
 		io:            io,
 		apiClient:     apiClient,
-		logger:        logger,
 		errLogger:     errLogger,
 		isInteractive: isInteractive,
 	}
@@ -54,6 +49,12 @@ func (a *App) Print(v ...interface{}) {
 func (a *App) Println(v ...interface{}) {
 	if a.isInteractive {
 		fmt.Fprintln(a.io.Out, v...)
+	}
+}
+
+func (a *App) Printf(f string, v ...interface{}) {
+	if a.isInteractive {
+		fmt.Fprintf(a.io.Out, f, v...)
 	}
 }
 

@@ -65,7 +65,7 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, asJSON bool) 
 	}
 	defer safeClose(session, &err)
 
-	a.logger.Println("Loading ports...")
+	a.Println("Loading ports...")
 	ports, err := session.GetSharedServers(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting ports of shared servers: %w", err)
@@ -187,7 +187,7 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 			return fmt.Errorf("error update port to public: %w", err)
 		}
 
-		a.logger.Printf("Port %d is now %s scoped.\n", port.number, port.visibility)
+		a.Printf("Port %d is now %s scoped.\n", port.number, port.visibility)
 	}
 
 	return nil
@@ -267,7 +267,7 @@ func (a *App) ForwardPorts(ctx context.Context, codespaceName string, ports []st
 				return err
 			}
 			defer listen.Close()
-			a.logger.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
+			a.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
 			name := fmt.Sprintf("share-%d", pair.remote)
 			fwd := liveshare.NewPortForwarder(session, name, pair.remote, false)
 			return fwd.ForwardToListener(ctx, listen) // error always non-nil

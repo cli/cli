@@ -62,7 +62,7 @@ func (a *App) StopCodespace(ctx context.Context, codespaceName string) error {
 	if err := a.apiClient.StopCodespace(ctx, codespaceName); err != nil {
 		return fmt.Errorf("failed to stop codespace: %w", err)
 	}
-	a.logger.Println("Codespace stopped")
+	a.Println("Codespace stopped")
 
 	return nil
 }
