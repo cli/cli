@@ -75,8 +75,7 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 	t := time.NewTicker(1 * time.Second)
 	defer t.Stop()
 
-	var ticks int
-	for {
+	for ticks := 0; ; ticks++ {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -86,13 +85,16 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 
 		case <-t.C:
 			states, err := getPostCreateOutput(ctx, localPort, sshUser)
+			// There is an active progress indicator before the first tick
+			// to show that we are fetching statuses.
+			// Once the first tick happens, we stop the indicator and let
+			// the subsequent post create states manage their own progress.
 			if ticks == 0 {
 				progress.StopProgressIndicator()
 			}
 			if err != nil {
 				return fmt.Errorf("get post create output: %w", err)
 			}
-			ticks++
 
 			poller(states)
 		}
