@@ -58,12 +58,13 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 				} else if len(args) == 1 && !opts.flagRepo {
 					opts.newRepoSelector = args[0]
 				} else {
-					return fmt.Errorf("check your parameters")
+					return &cmdutil.FlagError{
+						Err: errors.New("check your parameters")}
 				}
 			} else {
 				if !opts.IO.CanPrompt() {
 					return &cmdutil.FlagError{
-						Err: errors.New("could not prompt: proceed with prompt or argument(s) required")}
+						Err: errors.New("could not prompt: proceed with prompt")}
 				}
 			}
 			if runf != nil {
@@ -86,11 +87,17 @@ func renameRun(opts *RenameOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	var toRename ghrepo.Interface
-	oldRepoURL := ""
-	newRepoName := ""
+	var hostName string
+	var input renameRepo
+	var newRepoName string
 
 	if !opts.flagRepo {
+		currRepo, err := opts.BaseRepo()
+		if err != nil {
+			return err
+		}
+
+		hostName = currRepo.RepoHost()
 		if opts.newRepoSelector != "" && opts.oldRepoSelector == "" {
 			newRepoName = opts.newRepoSelector
 		} else {
@@ -103,51 +110,47 @@ func renameRun(opts *RenameOptions) error {
 			if err != nil {
 				return err
 			}
-
-			toRename, err = opts.BaseRepo()
-			if err != nil {
-				return err
-			}
 		}
+
+		input = renameRepo{
+			Owner:      currRepo.RepoOwner(),
+			Repository: currRepo.RepoName(),
+			Name:       newRepoName,
+		}
+
 	} else {
-		if opts.newRepoSelector != "" && opts.oldRepoSelector != "" {
-			oldRepoURL = opts.oldRepoSelector
-			newRepoName = opts.newRepoSelector
-			if !strings.Contains(oldRepoURL, "/") {
-				currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
-				if err != nil {
-					return err
-				}
-				oldRepoURL = currentUser + "/" + oldRepoURL
-			}
-		} else {
-			return fmt.Errorf("check your params")
+		oldRepoURL := opts.oldRepoSelector
+		newRepoName = opts.newRepoSelector
+
+		currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+		if err != nil {
+			return err
+		}
+
+		if !strings.Contains(oldRepoURL, "/") {
+			oldRepoURL = currentUser + "/" + oldRepoURL
+		}
+
+		currRepo, err := ghrepo.FromFullName(oldRepoURL)
+		if err != nil {
+			return fmt.Errorf("argument error: %w", err)
+		}
+		hostName = currRepo.RepoHost()
+
+		input = renameRepo{
+			Owner:      currRepo.RepoOwner(),
+			Repository: currRepo.RepoName(),
+			Name:       newRepoName,
 		}
 	}
 
-	fmt.Println(toRename)
-	fmt.Printf("Old: %s\n", oldRepoURL)
-	fmt.Printf("New: %s\n", newRepoName)
-	fmt.Println(opts.flagRepo)
-
-	repo, err := ghrepo.FromFullName(oldRepoURL)
-	if err != nil {
-		return fmt.Errorf("argument error: %w", err)
-	}
-
-	input := renameRepo{
-		Owner:      repo.RepoOwner(),
-		Repository: repo.RepoName(),
-		Name:       newRepoName,
-	}
-
-	err = runRename(apiClient, repo.RepoHost(), input)
+	err = runRename(apiClient, hostName, input)
 	if err != nil {
 		return fmt.Errorf("API called failed: %s, please check your parameters", err)
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.Out, "%s Renamed repository %s\n", cs.SuccessIcon(), repo.RepoOwner()+"/"+newRepoName)
+		fmt.Fprintf(opts.IO.Out, "%s Renamed repository %s\n", cs.SuccessIcon(), input.Owner+"/"+newRepoName)
 	}
 
 	return nil
