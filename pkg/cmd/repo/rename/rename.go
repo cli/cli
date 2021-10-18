@@ -88,9 +88,9 @@ func renameRun(opts *RenameOptions) error {
 
 	var hostName string
 	var input renameRepo
-	var newRepoName string
 
 	if !opts.flagRepo {
+		var newRepoName string
 		currRepo, err := opts.BaseRepo()
 		if err != nil {
 			return err
@@ -119,7 +119,7 @@ func renameRun(opts *RenameOptions) error {
 
 	} else {
 		oldRepoURL := opts.oldRepoSelector
-		newRepoName = opts.newRepoSelector
+		newRepoName := opts.newRepoSelector
 
 		currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
 		if err != nil {
@@ -134,6 +134,7 @@ func renameRun(opts *RenameOptions) error {
 		if err != nil {
 			return fmt.Errorf("argument error: %w", err)
 		}
+
 		hostName = currRepo.RepoHost()
 
 		input = renameRepo{
@@ -149,7 +150,7 @@ func renameRun(opts *RenameOptions) error {
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.Out, "%s Renamed repository %s\n", cs.SuccessIcon(), input.Owner+"/"+newRepoName)
+		fmt.Fprintf(opts.IO.Out, "%s Renamed repository %s\n", cs.SuccessIcon(), input.Owner+"/"+input.Name)
 	}
 
 	return nil
