@@ -22,14 +22,16 @@ import (
 )
 
 type App struct {
-	io                *iostreams.IOStreams
-	apiClient         apiClient
+	io        *iostreams.IOStreams
+	apiClient apiClient
+
 	logger, errLogger *log.Logger
 	isInteractive     bool
 }
 
 func NewApp(io *iostreams.IOStreams, apiClient apiClient) *App {
 	isInteractive := io.IsStdinTTY() && io.IsStdoutTTY()
+
 	logger := noopLogger()
 	// TODO(josebalius): Accept a debug parameter
 	if os.Getenv("DEBUG") != "" {
@@ -46,6 +48,8 @@ func NewApp(io *iostreams.IOStreams, apiClient apiClient) *App {
 	}
 }
 
+// StartProgressIndicatorWithSuffix starts a progress indicator with a message.
+// If the app is non-interactive the message is logged.
 func (a *App) StartProgressIndicatorWithSuffix(s string) {
 	if !a.isInteractive {
 		// if we are not interactive, log the progress states
@@ -56,6 +60,7 @@ func (a *App) StartProgressIndicatorWithSuffix(s string) {
 	a.io.StartProgressIndicatorWithSuffix(s)
 }
 
+// StopProgressIndicator stops the progress indicator.
 func (a *App) StopProgressIndicator() {
 	a.io.StopProgressIndicator()
 }
@@ -69,9 +74,7 @@ func (a *App) Println(v ...interface{}) {
 }
 
 func (a *App) Printf(f string, v ...interface{}) {
-	if a.isInteractive {
-		fmt.Fprintf(a.io.Out, f, v...)
-	}
+	fmt.Fprintf(a.io.Out, f, v...)
 }
 
 //go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
