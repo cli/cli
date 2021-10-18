@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
@@ -62,7 +64,9 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 	var codespaces []*api.Codespace
 	nameFilter := opts.codespaceName
 	if nameFilter == "" {
+		a.StartProgressIndicatorWithSuffix("Fetching codespaces")
 		codespaces, err = a.apiClient.ListCodespaces(ctx, -1)
+		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error getting codespaces: %w", err)
 		}
@@ -75,7 +79,9 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 			nameFilter = c.Name
 		}
 	} else {
+		a.StartProgressIndicatorWithSuffix("Fetching codespace")
 		codespace, err := a.apiClient.GetCodespace(ctx, nameFilter, false)
+		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error fetching codespace information: %w", err)
 		}
@@ -117,7 +123,12 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 		return errors.New("no codespaces to delete")
 	}
 
-	g := errgroup.Group{}
+	a.StartProgressIndicatorWithSuffix("Deleting codespace(s)")
+	var (
+		deletedCodespacesMu sync.Mutex // guards deletedCodespaces
+		deletedCodespaces   int
+		g                   errgroup.Group
+	)
 	for _, c := range codespacesToDelete {
 		codespaceName := c.Name
 		g.Go(func() error {
@@ -125,19 +136,20 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 				a.errLogger.Printf("error deleting codespace %q: %v\n", codespaceName, err)
 				return err
 			}
+			deletedCodespacesMu.Lock()
+			deletedCodespaces++
+			deletedCodespacesMu.Unlock()
 			return nil
 		})
 	}
 
 	if err := g.Wait(); err != nil {
+		a.StopProgressIndicator()
 		return errors.New("some codespaces failed to delete")
 	}
+	a.StopProgressIndicator()
 
-	noun := "Codespace"
-	if len(codespacesToDelete) > 1 {
-		noun = noun + "s"
-	}
-	a.Println(noun + " deleted.")
+	a.Printf("%s deleted.\n", utils.Pluralize(deletedCodespaces, "codespace"))
 
 	return nil
 }

@@ -22,34 +22,50 @@ import (
 )
 
 type App struct {
-	io            *iostreams.IOStreams
-	apiClient     apiClient
-	errLogger     *log.Logger
-	isInteractive bool
+	io                *iostreams.IOStreams
+	apiClient         apiClient
+	logger, errLogger *log.Logger
+	isInteractive     bool
 }
 
 func NewApp(io *iostreams.IOStreams, apiClient apiClient) *App {
 	isInteractive := io.IsStdinTTY() && io.IsStdoutTTY()
+	logger := noopLogger()
+	// TODO(josebalius): Accept a debug parameter
+	if os.Getenv("DEBUG") != "" {
+		logger = log.New(io.Out, "* ", 0)
+	}
 	errLogger := log.New(io.ErrOut, "", 0)
 
 	return &App{
 		io:            io,
 		apiClient:     apiClient,
+		logger:        logger,
 		errLogger:     errLogger,
 		isInteractive: isInteractive,
 	}
 }
 
-func (a *App) Print(v ...interface{}) {
-	if a.isInteractive {
-		fmt.Fprint(a.io.Out, v...)
+func (a *App) StartProgressIndicatorWithSuffix(s string) {
+	if !a.isInteractive {
+		// if we are not interactive, log the progress states
+		a.logger.Println(s)
+		return
 	}
+
+	a.io.StartProgressIndicatorWithSuffix(s)
+}
+
+func (a *App) StopProgressIndicator() {
+	a.io.StopProgressIndicator()
+}
+
+func (a *App) Print(v ...interface{}) {
+	fmt.Fprint(a.io.Out, v...)
 }
 
 func (a *App) Println(v ...interface{}) {
-	if a.isInteractive {
-		fmt.Fprintln(a.io.Out, v...)
-	}
+	fmt.Fprintln(a.io.Out, v...)
 }
 
 func (a *App) Printf(f string, v ...interface{}) {
@@ -163,6 +179,7 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 
 // getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
 // It then fetches the codespace record with full connection details.
+// TODO(josebalius): accept a progress indicator or *App and show progress when fetching.
 func getOrChooseCodespace(ctx context.Context, apiClient apiClient, codespaceName string) (codespace *api.Codespace, err error) {
 	if codespaceName == "" {
 		codespace, err = chooseCodespace(ctx, apiClient)

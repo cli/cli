@@ -11,11 +11,6 @@ import (
 	"github.com/cli/cli/v2/pkg/liveshare"
 )
 
-type logger interface {
-	Print(v ...interface{})
-	Println(v ...interface{})
-}
-
 func connectionReady(codespace *api.Codespace) bool {
 	return codespace.Connection.SessionID != "" &&
 		codespace.Connection.SessionToken != "" &&
@@ -29,13 +24,18 @@ type apiClient interface {
 	StartCodespace(ctx context.Context, name string) error
 }
 
+type progressIndicator interface {
+	StartProgressIndicatorWithSuffix(s string)
+	StopProgressIndicator()
+}
+
 // ConnectToLiveshare waits for a Codespace to become running,
 // and connects to it using a Live Share session.
-func ConnectToLiveshare(ctx context.Context, logger logger, sessionLogger *log.Logger, apiClient apiClient, codespace *api.Codespace) (*liveshare.Session, error) {
+func ConnectToLiveshare(ctx context.Context, progress progressIndicator, sessionLogger *log.Logger, apiClient apiClient, codespace *api.Codespace) (sess *liveshare.Session, err error) {
 	var startedCodespace bool
 	if codespace.State != api.CodespaceStateAvailable {
 		startedCodespace = true
-		logger.Print("Starting your codespace...")
+		progress.StartProgressIndicatorWithSuffix("Starting codespace")
 		if err := apiClient.StartCodespace(ctx, codespace.Name); err != nil {
 			return nil, fmt.Errorf("error starting codespace: %w", err)
 		}
@@ -43,10 +43,6 @@ func ConnectToLiveshare(ctx context.Context, logger logger, sessionLogger *log.L
 
 	for retries := 0; !connectionReady(codespace); retries++ {
 		if retries > 1 {
-			if retries%2 == 0 {
-				logger.Print(".")
-			}
-
 			time.Sleep(1 * time.Second)
 		}
 
@@ -54,7 +50,6 @@ func ConnectToLiveshare(ctx context.Context, logger logger, sessionLogger *log.L
 			return nil, errors.New("timed out while waiting for the codespace to start")
 		}
 
-		var err error
 		codespace, err = apiClient.GetCodespace(ctx, codespace.Name, true)
 		if err != nil {
 			return nil, fmt.Errorf("error getting codespace: %w", err)
@@ -62,10 +57,11 @@ func ConnectToLiveshare(ctx context.Context, logger logger, sessionLogger *log.L
 	}
 
 	if startedCodespace {
-		logger.Print("\n")
+		progress.StopProgressIndicator()
 	}
 
-	logger.Println("Connecting to your codespace...")
+	progress.StartProgressIndicatorWithSuffix("Connecting to codespace")
+	defer progress.StopProgressIndicator()
 
 	return liveshare.Connect(ctx, liveshare.Options{
 		ClientName:     "gh",

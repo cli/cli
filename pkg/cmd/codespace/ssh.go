@@ -47,6 +47,13 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
+	if err != nil {
+		return fmt.Errorf("get or choose codespace: %w", err)
+	}
+
+	// TODO(josebalius): We can fetch the user in parallel to everything else
+	// we should convert this call and others to happen async
 	user, err := a.apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting user: %w", err)
@@ -56,11 +63,6 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	go func() {
 		authkeys <- checkAuthorizedKeys(ctx, a.apiClient, user.Login)
 	}()
-
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
-	if err != nil {
-		return fmt.Errorf("get or choose codespace: %w", err)
-	}
 
 	liveshareLogger := noopLogger()
 	if opts.debug {
@@ -84,8 +86,9 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		return err
 	}
 
-	a.Println("Fetching SSH Details...")
+	a.StartProgressIndicatorWithSuffix("Fetching SSH Details")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
+	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}
@@ -108,7 +111,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		connectDestination = fmt.Sprintf("%s@localhost", sshUser)
 	}
 
-	a.Println("Ready...")
+	a.logger.Println("Ready")
 	tunnelClosed := make(chan error, 1)
 	go func() {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)

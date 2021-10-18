@@ -229,10 +229,24 @@ func (s *IOStreams) SetNeverPrompt(v bool) {
 }
 
 func (s *IOStreams) StartProgressIndicator() {
+	s.StartProgressIndicatorWithSuffix("")
+}
+
+func (s *IOStreams) StartProgressIndicatorWithSuffix(suffix string) {
 	if !s.progressIndicatorEnabled {
 		return
 	}
-	sp := spinner.New(spinner.CharSets[11], 400*time.Millisecond, spinner.WithWriter(s.ErrOut))
+
+	opts := []spinner.Option{
+		spinner.WithWriter(s.ErrOut),
+	}
+	if suffix != "" {
+		opts = append(opts, spinner.WithSuffix(" "+suffix))
+	}
+
+	// 11 means Braille. See https://github.com/briandowns/spinner#available-character-sets
+	sp := spinner.New(spinner.CharSets[11], 400*time.Millisecond, opts...)
+	_ = sp.Color("black") // TODO(josebalius): Find correct color depending on terminal bg
 	sp.Start()
 	s.progressIndicator = sp
 }
