@@ -124,7 +124,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	go func() {
 		var err error
 		if opts.scpArgs != nil {
-			err = codespaces.Copy(ctx, opts.scpArgs, localSSHServerPort)
+			err = codespaces.Copy(ctx, opts.scpArgs, localSSHServerPort, connectDestination)
 		} else {
 			err = codespaces.Shell(ctx, a.logger, sshArgs, localSSHServerPort, connectDestination, usingCustomPort)
 		}
@@ -157,7 +157,8 @@ func newCpCmd(app *App) *cobra.Command {
 The cp command copies files between the local and remote file systems.
 
 A 'remote:' prefix on any file name argument indicates that it refers to
-the file system of the remote (Codespace) machine.
+the file system of the remote (Codespace) machine. It is resolved relative
+to the home directory of the remote user.
 
 As with the UNIX cp command, the first argument specifies the source and the last
 specifies the destination; additional sources may be specified after the first,
@@ -187,11 +188,7 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) (err erro
 	}
 	opts.scpArgs = append(opts.scpArgs, "--")
 	for _, arg := range args {
-		if rest := strings.TrimPrefix(arg, "remote:"); rest != arg {
-			// TODO(adonovan): don't assume user=root:
-			// use value from session.StartSSHServer.
-			arg = "root@localhost:" + rest
-		} else if !filepath.IsAbs(arg) {
+		if !filepath.IsAbs(arg) && !strings.HasPrefix(arg, "remote:") {
 			// scp treats a colon in the first path segment as a host identifier.
 			// Escape it by prepending "./".
 			// TODO(adonovan): test on Windows, including with a c:\\foo path.
