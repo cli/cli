@@ -140,6 +140,14 @@ func AddRemote(name, u string) (*Remote, error) {
 	}, nil
 }
 
+func UpdateRemote(name, u string) error {
+	addCmd, err := GitCommand("remote", "set-url", name, u)
+	if err != nil {
+		return err
+	}
+	return run.PrepareCmd(addCmd).Run()
+}
+
 func SetRemoteResolution(name, resolution string) error {
 	addCmd, err := GitCommand("config", "--add", fmt.Sprintf("remote.%s.gh-resolved", name), resolution)
 	if err != nil {

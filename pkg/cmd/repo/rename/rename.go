@@ -10,6 +10,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -30,9 +31,10 @@ type RenameOptions struct {
 }
 
 type renameRepo struct {
-	Owner      string
-	Repository string
-	Name       string `json:"name,omitempty"`
+	RepoHost  string
+	RepoOwner string
+	RepoName  string
+	Name      string `json:"name,omitempty"`
 }
 
 func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Command {
@@ -40,6 +42,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		BaseRepo:   f.BaseRepo,
+		Config:     f.Config,
 	}
 
 	cmd := &cobra.Command{
@@ -86,7 +89,6 @@ func renameRun(opts *RenameOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	var hostName string
 	var input renameRepo
 
 	if !opts.flagRepo {
@@ -96,7 +98,6 @@ func renameRun(opts *RenameOptions) error {
 			return err
 		}
 
-		hostName = currRepo.RepoHost()
 		if opts.newRepoSelector != "" && opts.oldRepoSelector == "" {
 			newRepoName = opts.newRepoSelector
 		} else {
@@ -112,9 +113,10 @@ func renameRun(opts *RenameOptions) error {
 		}
 
 		input = renameRepo{
-			Owner:      currRepo.RepoOwner(),
-			Repository: currRepo.RepoName(),
-			Name:       newRepoName,
+			RepoHost:  currRepo.RepoHost(),
+			RepoOwner: currRepo.RepoOwner(),
+			RepoName:  currRepo.RepoName(),
+			Name:      newRepoName,
 		}
 
 	} else {
@@ -135,29 +137,58 @@ func renameRun(opts *RenameOptions) error {
 			return fmt.Errorf("argument error: %w", err)
 		}
 
-		hostName = currRepo.RepoHost()
-
 		input = renameRepo{
-			Owner:      currRepo.RepoOwner(),
-			Repository: currRepo.RepoName(),
-			Name:       newRepoName,
+			RepoHost:  currRepo.RepoHost(),
+			RepoOwner: currRepo.RepoOwner(),
+			RepoName:  currRepo.RepoName(),
+			Name:      newRepoName,
 		}
 	}
 
-	err = runRename(apiClient, hostName, input)
+	err = runRename(apiClient, input.RepoHost, input)
 	if err != nil {
 		return fmt.Errorf("API called failed: %s, please check your parameters", err)
 	}
 
+	if !opts.flagRepo {
+		cfg, err := opts.Config()
+		if err != nil {
+			return err
+		}
+
+		protocol, err := cfg.Get(input.RepoHost, "git_protocol")
+		if err != nil {
+			return err
+		}
+		remoteURL := formatRemoteURL(input, protocol)
+
+		err = git.UpdateRemote("origin", remoteURL)
+		if err != nil {
+			return err
+		}
+
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprintf(opts.IO.Out, "%s Added remote %s\n", cs.SuccessIcon(), remoteURL)
+		}
+	}
+
 	if opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.Out, "%s Renamed repository %s\n", cs.SuccessIcon(), input.Owner+"/"+input.Name)
+		fmt.Fprintf(opts.IO.Out, "%s Renamed repository %s\n", cs.SuccessIcon(), input.RepoOwner+"/"+input.Name)
 	}
 
 	return nil
 }
 
+func formatRemoteURL(repo renameRepo, protocol string) string {
+	if protocol == "ssh" {
+		return fmt.Sprintf("git@%s:%s/%s.git", repo.RepoHost, repo.RepoOwner, repo.Name)
+	}
+
+	return fmt.Sprintf("https://%s/%s/%s.git", repo.RepoHost, repo.RepoOwner, repo.Name)
+}
+
 func runRename(apiClient *api.Client, hostname string, input renameRepo) error {
-	path := fmt.Sprintf("repos/%s/%s", input.Owner, input.Repository)
+	path := fmt.Sprintf("repos/%s/%s", input.RepoOwner, input.RepoName)
 
 	body := &bytes.Buffer{}
 	enc := json.NewEncoder(body)
