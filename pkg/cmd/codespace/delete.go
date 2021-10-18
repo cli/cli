@@ -9,6 +9,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
@@ -121,13 +122,11 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 		return errors.New("no codespaces to delete")
 	}
 
-	noun := "Codespace"
-	if len(codespacesToDelete) > 1 {
-		noun = noun + "s"
-	}
-
-	a.StartProgressIndicatorWithSuffix(fmt.Sprintf("Deleting %s", strings.ToLower(noun)))
-	g := errgroup.Group{}
+	a.StartProgressIndicatorWithSuffix("Deleting codespace(s)")
+	var (
+		deletedCodespaces int
+		g                 = errgroup.Group{}
+	)
 	for _, c := range codespacesToDelete {
 		codespaceName := c.Name
 		g.Go(func() error {
@@ -135,6 +134,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 				a.errLogger.Printf("error deleting codespace %q: %v\n", codespaceName, err)
 				return err
 			}
+			deletedCodespaces++
 			return nil
 		})
 	}
@@ -145,7 +145,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 	}
 	a.StopProgressIndicator()
 
-	a.Println(noun + " deleted.")
+	a.Printf("%s deleted.\n", utils.Pluralize(deletedCodespaces, "codespace"))
 
 	return nil
 }

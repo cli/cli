@@ -52,6 +52,8 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		return fmt.Errorf("get or choose codespace: %w", err)
 	}
 
+	// TODO(josebalius): We can fetch the user in parallel to everything else
+	// we should convert this call and others to happen async
 	user, err := a.apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting user: %w", err)

@@ -43,7 +43,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			wantDeleted: []string{"hubot-robawt-abc"},
-			wantStdout:  "Codespace deleted.\n",
+			wantStdout:  "1 codespace deleted.\n",
 		},
 		{
 			name: "by repo",
@@ -71,7 +71,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			wantDeleted: []string{"monalisa-spoonknife-123", "monalisa-spoonknife-c4f3"},
-			wantStdout:  "Codespaces deleted.\n",
+			wantStdout:  "2 codespaces deleted.\n",
 		},
 		{
 			name: "unused",
@@ -94,7 +94,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-c4f3"},
-			wantStdout:  "Codespaces deleted.\n",
+			wantStdout:  "2 codespaces deleted.\n",
 		},
 		{
 			name: "deletion failed",
@@ -150,7 +150,7 @@ func TestDelete(t *testing.T) {
 				"Codespace hubot-robawt-abc has unsaved changes. OK to delete?":        true,
 			},
 			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-c4f3"},
-			wantStdout:  "Codespaces deleted.\n",
+			wantStdout:  "2 codespaces deleted.\n",
 		},
 	}
 	for _, tt := range tests {
@@ -188,6 +188,8 @@ func TestDelete(t *testing.T) {
 			}
 
 			io, _, stdout, stderr := iostreams.Test()
+			io.SetStdinTTY(true)
+			io.SetStdoutTTY(true)
 			app := NewApp(io, apiMock)
 			err := app.Delete(context.Background(), opts)
 			if (err != nil) != tt.wantErr {
