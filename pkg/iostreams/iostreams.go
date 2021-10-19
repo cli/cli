@@ -246,7 +246,11 @@ func (s *IOStreams) StartProgressIndicatorWithSuffix(suffix string) {
 
 	// 11 means Braille. See https://github.com/briandowns/spinner#available-character-sets
 	sp := spinner.New(spinner.CharSets[11], 400*time.Millisecond, opts...)
-	_ = sp.Color("black") // TODO(josebalius): Find correct color depending on terminal bg
+
+	if s.TerminalTheme() == "light" {
+		_ = sp.Color("fgBlack")
+	}
+
 	sp.Start()
 	s.progressIndicator = sp
 }
