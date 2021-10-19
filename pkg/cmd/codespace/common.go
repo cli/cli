@@ -25,14 +25,14 @@ import (
 type App struct {
 	apiClient apiClient
 	logger    *output.Logger
-	IO        *iostreams.IOStreams
+	io        *iostreams.IOStreams
 }
 
 func NewApp(logger *output.Logger, apiClient apiClient, io *iostreams.IOStreams) *App {
 	return &App{
 		apiClient: apiClient,
 		logger:    logger,
-		IO:        io,
+		io:        io,
 	}
 }
 

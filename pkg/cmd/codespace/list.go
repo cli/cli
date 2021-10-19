@@ -39,14 +39,20 @@ func (a *App) List(ctx context.Context, asJSON bool, limit int) error {
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}
 
-	if err := a.IO.StartPager(); err != nil {
+	if err := a.io.StartPager(); err != nil {
 		return fmt.Errorf("error starting pager: %w", err)
 	}
-	defer a.IO.StopPager()
+	defer a.io.StopPager()
 
-	cs := a.IO.ColorScheme()
-	tp := utils.NewTablePrinter(a.IO)
+	cs := a.io.ColorScheme()
+	tp := utils.NewTablePrinter(a.io)
+	// tp := utils.NewTablePrinterWithOptions(a.io, utils.TablePrinterOptions{
+	// 	IsTTY:      a.io.IsStdoutTTY(),
+	// 	IsJSON:     true,
+	// 	JSONPretty: true,
+	// })
 
+	tp.SetHeader([]string{"Name", "Repository NWO", "Branch with status", "State", "Created at"})
 	for _, apiCodespace := range codespaces {
 		c := codespace{apiCodespace}
 
@@ -68,7 +74,7 @@ func (a *App) List(ctx context.Context, asJSON bool, limit int) error {
 		tp.EndRow()
 	}
 
-	if a.IO.IsStdoutTTY() {
+	if a.io.IsStdoutTTY() {
 		title := listHeader(len(codespaces))
 		fmt.Printf("\n%s\n\n", title)
 	}
