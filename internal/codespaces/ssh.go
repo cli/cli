@@ -27,8 +27,10 @@ func Shell(ctx context.Context, log logger, sshArgs []string, port int, destinat
 
 // Copy runs an scp command over the specified port. The arguments may
 // include flags and non-flags, optionally separated by "--".
-// Remote files are indicated by a "remote:" prefix, and are resolved
-// relative to the remote user's home directory.
+//
+// Remote files indicated by a "remote:" prefix are resolved relative
+// to the remote user's home directory, and are subject to shell expansion
+// on the remote host; see https://lwn.net/Articles/835962/.
 func Copy(ctx context.Context, scpArgs []string, port int, destination string) error {
 	// Beware: invalid syntax causes scp to exit 1 with
 	// no error message, so don't let that happen.
