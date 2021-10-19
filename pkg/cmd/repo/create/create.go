@@ -308,7 +308,10 @@ func createRun(opts *CreateOptions) error {
 			Message: "Your new repository will be created as " + remoteRepoName + ". Continue?",
 			Default: false,
 		}
-		survey.AskOne(confirmDifferentName, &useDifferentName)
+		err := survey.AskOne(confirmDifferentName, &useDifferentName)
+		if err != nil {
+			return err
+		}
 		if !useDifferentName {
 			fmt.Fprintln(opts.IO.Out, "Discarding...")
 			return nil
@@ -695,10 +698,10 @@ func getVisibility() (string, error) {
 	return strings.ToUpper(answer.RepoVisibility), nil
 }
 
-func getModifiedRemoteName(name string) string {
+func getModifiedRemoteName(localName string) string {
 	var remoteName strings.Builder
 	alreadyDashed := false
-	for _, e := range name {
+	for _, e := range localName {
 		if ('A' <= e && e <= 'Z') ||
 			('a' <= e && e <= 'z') ||
 			('0' <= e && e <= '9') ||
