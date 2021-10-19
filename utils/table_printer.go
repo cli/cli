@@ -34,6 +34,7 @@ func NewTablePrinter(io *iostreams.IOStreams) TablePrinter {
 func NewTablePrinterWithOptions(io *iostreams.IOStreams, opts TablePrinterOptions) TablePrinter {
 	if opts.IsJSON {
 		return &jsonTablePrinter{
+			out:    io.Out,
 			pretty: opts.JSONPretty,
 		}
 	} else if opts.IsTTY {
@@ -264,7 +265,7 @@ func (t *tsvTablePrinter) Render() error {
 type jsonTablePrinter struct {
 	out        io.Writer
 	currentCol int
-	rows       []map[string]string
+	rows       []interface{}
 	row        map[string]string
 	header     []string
 	pretty     bool
@@ -304,8 +305,5 @@ func (j *jsonTablePrinter) Render() error {
 		enc.SetIndent("", "  ")
 	}
 
-	for i, r := range j.rows {
-		fmt.Printf("%d : %+v\n", i, r)
-	}
 	return enc.Encode(j.rows)
 }

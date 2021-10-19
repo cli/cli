@@ -46,11 +46,6 @@ func (a *App) List(ctx context.Context, asJSON bool, limit int) error {
 
 	cs := a.io.ColorScheme()
 	tp := utils.NewTablePrinter(a.io)
-	// tp := utils.NewTablePrinterWithOptions(a.io, utils.TablePrinterOptions{
-	// 	IsTTY:      a.io.IsStdoutTTY(),
-	// 	IsJSON:     true,
-	// 	JSONPretty: true,
-	// })
 
 	tp.SetHeader([]string{"Name", "Repository NWO", "Branch with status", "State", "Created at"})
 	for _, apiCodespace := range codespaces {
