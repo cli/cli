@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
@@ -53,11 +54,11 @@ func (a *App) List(ctx context.Context, asJSON bool, limit int) error {
 		tp.AddField(c.RepositoryNWO, nil, cs.Bold)
 		tp.AddField(c.branchWithGitStatus(), nil, nil)
 
-		if c.Environment.State == "Shutdown" {
-			tp.AddField(c.Environment.State, nil, cs.Red)
-		} else if c.Environment.State == "Starting" {
+		if c.Environment.State == api.CodespaceEnvironmentStateShutdown {
+			tp.AddField(c.Environment.State, nil, cs.Gray)
+		} else if c.Environment.State == api.CodespaceEnvironmentStateStarting {
 			tp.AddField(c.Environment.State, nil, cs.Yellow)
-		} else if c.Environment.State == "Available" {
+		} else if c.Environment.State == api.CodespaceEnvironmentStateAvailable {
 			tp.AddField(c.Environment.State, nil, cs.Green)
 		} else {
 			tp.AddField(c.Environment.State, nil, cs.Gray)

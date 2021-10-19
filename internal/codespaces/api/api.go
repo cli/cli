@@ -183,6 +183,10 @@ type CodespaceEnvironmentGitStatus struct {
 const (
 	// CodespaceEnvironmentStateAvailable is the state for a running codespace environment.
 	CodespaceEnvironmentStateAvailable = "Available"
+	// CodespaceEnvironmentStateShutdown is the state for a shutdown codespace environment.
+	CodespaceEnvironmentStateShutdown = "Shutdown"
+	// CodespaceEnvironmentStateStarting is the state for a starting codespace environment.
+	CodespaceEnvironmentStateStarting = "Starting"
 )
 
 type CodespaceConnection struct {
