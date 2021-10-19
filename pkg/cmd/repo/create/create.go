@@ -302,6 +302,19 @@ func createRun(opts *CreateOptions) error {
 		repoToCreate = ghrepo.NewWithHost("", opts.Name, host)
 	}
 
+	if remoteRepoName := getModifiedRemoteName(repoToCreate.RepoName()); repoToCreate.RepoName() != remoteRepoName {
+		var useDifferentName bool
+		confirmDifferentName := &survey.Confirm{
+			Message: "Your new repository will be created as " + remoteRepoName + ". Continue?",
+			Default: false,
+		}
+		survey.AskOne(confirmDifferentName, &useDifferentName)
+		if !useDifferentName {
+			fmt.Fprintln(opts.IO.Out, "Discarding...")
+			return nil
+		}
+	}
+
 	input := repoCreateInput{
 		Name:              repoToCreate.RepoName(),
 		Visibility:        visibility,
@@ -680,4 +693,24 @@ func getVisibility() (string, error) {
 	}
 
 	return strings.ToUpper(answer.RepoVisibility), nil
+}
+
+func getModifiedRemoteName(name string) string {
+	var remoteName strings.Builder
+	alreadyDashed := false
+	for _, e := range name {
+		if ('A' <= e && e <= 'Z') ||
+			('a' <= e && e <= 'z') ||
+			('0' <= e && e <= '9') ||
+			e == '.' || e == '_' || e == '-' {
+			remoteName.WriteRune(e)
+			alreadyDashed = false
+		} else {
+			if !alreadyDashed {
+				remoteName.WriteRune('-')
+			}
+			alreadyDashed = true
+		}
+	}
+	return remoteName.String()
 }
