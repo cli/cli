@@ -41,7 +41,7 @@ func newPortsCmd(app *App) *cobra.Command {
 	portsCmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 
 	portsCmd.AddCommand(newPortsForwardCmd(app))
-	portsCmd.AddCommand(newPortsPrivacyCmd(app))
+	portsCmd.AddCommand(newPortsVisibilityCmd(app))
 
 	return portsCmd
 }
@@ -78,7 +78,7 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, asJSON bool) 
 	}
 
 	table := output.NewTable(os.Stdout, asJSON)
-	table.SetHeader([]string{"Label", "Port", "Privacy", "Browse URL"})
+	table.SetHeader([]string{"Label", "Port", "Visibility", "Browse URL"})
 	for _, port := range ports {
 		sourcePort := strconv.Itoa(port.SourcePort)
 		var portName string
@@ -144,16 +144,13 @@ func getDevContainer(ctx context.Context, apiClient apiClient, codespace *api.Co
 	return ch
 }
 
-func newPortsPrivacyCmd(app *App) *cobra.Command {
+func newPortsVisibilityCmd(app *App) *cobra.Command {
 	return &cobra.Command{
-		Use:     "privacy <port:public|private|org>...",
-		Short:   "Change the privacy of the forwarded port",
-		Example: "gh codespace ports privacy 80:org 3000:private 8000:public",
-		Args:    cobra.ArbitraryArgs,
+		Use:     "visibility <port>:{public|private|org}...",
+		Short:   "Change the visibility of the forwarded port",
+		Example: "gh codespace ports visibility 80:org 3000:private 8000:public",
+		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return fmt.Errorf("at least one port privacy argument is required")
-			}
 			codespace, err := cmd.Flags().GetString("codespace")
 			if err != nil {
 				// should only happen if flag is not defined
@@ -161,13 +158,13 @@ func newPortsPrivacyCmd(app *App) *cobra.Command {
 				// since it's a persistent flag that we control it should never happen
 				return fmt.Errorf("get codespace flag: %w", err)
 			}
-			return app.UpdatePortPrivacy(cmd.Context(), codespace, args)
+			return app.UpdatePortVisibility(cmd.Context(), codespace, args)
 		},
 	}
 }
 
-func (a *App) UpdatePortPrivacy(ctx context.Context, codespaceName string, args []string) (err error) {
-	ports, err := a.parsePortPrivacies(args)
+func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, args []string) (err error) {
+	ports, err := a.parsePortVisibilities(args)
 	if err != nil {
 		return fmt.Errorf("error parsing port arguments: %w", err)
 	}
@@ -186,34 +183,34 @@ func (a *App) UpdatePortPrivacy(ctx context.Context, codespaceName string, args 
 	defer safeClose(session, &err)
 
 	for _, port := range ports {
-		if err := session.UpdateSharedServerPrivacy(ctx, port.number, port.privacy); err != nil {
+		if err := session.UpdateSharedServerPrivacy(ctx, port.number, port.visibility); err != nil {
 			return fmt.Errorf("error update port to public: %w", err)
 		}
 
-		a.logger.Printf("Port %d is now %s scoped.\n", port.number, port.privacy)
+		a.logger.Printf("Port %d is now %s scoped.\n", port.number, port.visibility)
 	}
 
 	return nil
 }
 
-type portPrivacy struct {
-	number  int
-	privacy string
+type portVisibility struct {
+	number     int
+	visibility string
 }
 
-func (a *App) parsePortPrivacies(args []string) ([]portPrivacy, error) {
-	ports := make([]portPrivacy, 0, len(args))
+func (a *App) parsePortVisibilities(args []string) ([]portVisibility, error) {
+	ports := make([]portVisibility, 0, len(args))
 	for _, a := range args {
 		fields := strings.Split(a, ":")
 		if len(fields) != 2 {
-			return nil, fmt.Errorf("invalid port privacy format for %q", a)
+			return nil, fmt.Errorf("invalid port visibility format for %q", a)
 		}
-		portStr, privacy := fields[0], fields[1]
+		portStr, visibility := fields[0], fields[1]
 		portNumber, err := strconv.Atoi(portStr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid port number: %w", err)
 		}
-		ports = append(ports, portPrivacy{portNumber, privacy})
+		ports = append(ports, portVisibility{portNumber, visibility})
 	}
 	return ports, nil
 }

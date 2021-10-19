@@ -27,7 +27,7 @@ func connectionReady(codespace *api.Codespace) bool {
 		codespace.Connection.SessionToken != "" &&
 		codespace.Connection.RelayEndpoint != "" &&
 		codespace.Connection.RelaySAS != "" &&
-		codespace.Environment.State == api.CodespaceEnvironmentStateAvailable
+		codespace.State == api.CodespaceStateAvailable
 }
 
 type apiClient interface {
@@ -39,7 +39,7 @@ type apiClient interface {
 // and connects to it using a Live Share session.
 func ConnectToLiveshare(ctx context.Context, log logger, sessionLogger liveshareLogger, apiClient apiClient, codespace *api.Codespace) (*liveshare.Session, error) {
 	var startedCodespace bool
-	if codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
+	if codespace.State != api.CodespaceStateAvailable {
 		startedCodespace = true
 		log.Print("Starting your codespace...")
 		if err := apiClient.StartCodespace(ctx, codespace.Name); err != nil {

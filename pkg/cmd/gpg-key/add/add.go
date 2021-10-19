@@ -19,7 +19,6 @@ type AddOptions struct {
 	HTTPClient func() (*http.Client, error)
 
 	KeyFile string
-	Title   string
 }
 
 func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command {
@@ -31,12 +30,12 @@ func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command 
 
 	cmd := &cobra.Command{
 		Use:   "add [<key-file>]",
-		Short: "Add an SSH key to your GitHub account",
+		Short: "Add a GPG key to your GitHub account",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				if opts.IO.IsStdoutTTY() && opts.IO.IsStdinTTY() {
-					return &cmdutil.FlagError{Err: errors.New("public key file missing")}
+					return &cmdutil.FlagError{Err: errors.New("GPG key file missing")}
 				}
 				opts.KeyFile = "-"
 			} else {
@@ -50,7 +49,6 @@ func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command 
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Title, "title", "t", "", "Title for the new key")
 	return cmd
 }
 
@@ -83,14 +81,20 @@ func runAdd(opts *AddOptions) error {
 		return err
 	}
 
-	err = SSHKeyUpload(httpClient, hostname, keyReader, opts.Title)
+	err = gpgKeyUpload(httpClient, hostname, keyReader)
 	if err != nil {
+		if errors.Is(err, scopesError) {
+			cs := opts.IO.ColorScheme()
+			fmt.Fprint(opts.IO.ErrOut, "Error: insufficient OAuth scopes to list GPG keys\n")
+			fmt.Fprintf(opts.IO.ErrOut, "Run the following to grant scopes: %s\n", cs.Bold("gh auth refresh -s write:gpg_key"))
+			return cmdutil.SilentError
+		}
 		return err
 	}
 
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.ErrOut, "%s Public key added to your account\n", cs.SuccessIcon())
+		fmt.Fprintf(opts.IO.ErrOut, "%s GPG key added to your account\n", cs.SuccessIcon())
 	}
 	return nil
 }

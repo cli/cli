@@ -12,8 +12,10 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 )
 
-func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, title string) error {
-	url := ghinstance.RESTPrefix(hostname) + "user/keys"
+var scopesError = errors.New("insufficient OAuth scopes")
+
+func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader) error {
+	url := ghinstance.RESTPrefix(hostname) + "user/gpg_keys"
 
 	keyBytes, err := ioutil.ReadAll(keyFile)
 	if err != nil {
@@ -21,8 +23,7 @@ func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 	}
 
 	payload := map[string]string{
-		"title": title,
-		"key":   string(keyBytes),
+		"armored_public_key": string(keyBytes),
 	}
 
 	payloadBytes, err := json.Marshal(payload)
@@ -41,7 +42,9 @@ func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode > 299 {
+	if resp.StatusCode == 404 {
+		return scopesError
+	} else if resp.StatusCode > 299 {
 		var httpError api.HTTPError
 		err := api.HandleHTTPError(resp)
 		if errors.As(err, &httpError) && isDuplicateError(&httpError) {

@@ -1,6 +1,7 @@
 package list
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -27,7 +28,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "Lists SSH keys in your GitHub account",
+		Short: "Lists GPG keys in your GitHub account",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runF != nil {
@@ -56,13 +57,19 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	sshKeys, err := userKeys(apiClient, host, "")
+	gpgKeys, err := userKeys(apiClient, host, "")
 	if err != nil {
+		if errors.Is(err, scopesError) {
+			cs := opts.IO.ColorScheme()
+			fmt.Fprint(opts.IO.ErrOut, "Error: insufficient OAuth scopes to list GPG keys\n")
+			fmt.Fprintf(opts.IO.ErrOut, "Run the following to grant scopes: %s\n", cs.Bold("gh auth refresh -s read:gpg_key"))
+			return cmdutil.SilentError
+		}
 		return err
 	}
 
-	if len(sshKeys) == 0 {
-		fmt.Fprintln(opts.IO.ErrOut, "No SSH keys present in GitHub account.")
+	if len(gpgKeys) == 0 {
+		fmt.Fprintln(opts.IO.ErrOut, "No GPG keys present in GitHub account.")
 		return cmdutil.SilentError
 	}
 
@@ -70,15 +77,27 @@ func listRun(opts *ListOptions) error {
 	cs := opts.IO.ColorScheme()
 	now := time.Now()
 
-	for _, sshKey := range sshKeys {
-		t.AddField(sshKey.Title, nil, nil)
-		t.AddField(sshKey.Key, truncateMiddle, nil)
+	for _, gpgKey := range gpgKeys {
+		t.AddField(gpgKey.Emails.String(), nil, nil)
+		t.AddField(gpgKey.KeyId, nil, nil)
+		t.AddField(gpgKey.PublicKey, truncateMiddle, nil)
 
-		createdAt := sshKey.CreatedAt.Format(time.RFC3339)
+		createdAt := gpgKey.CreatedAt.Format(time.RFC3339)
 		if t.IsTTY() {
-			createdAt = utils.FuzzyAgoAbbr(now, sshKey.CreatedAt)
+			createdAt = "Created " + utils.FuzzyAgoAbbr(now, gpgKey.CreatedAt)
 		}
 		t.AddField(createdAt, nil, cs.Gray)
+
+		expiresAt := gpgKey.ExpiresAt.Format(time.RFC3339)
+		if t.IsTTY() {
+			if gpgKey.ExpiresAt.IsZero() {
+				expiresAt = "Never expires"
+			} else {
+				expiresAt = "Expires " + gpgKey.ExpiresAt.Format("2006-01-02")
+			}
+		}
+		t.AddField(expiresAt, nil, cs.Gray)
+
 		t.EndRow()
 	}
 

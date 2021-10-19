@@ -33,6 +33,7 @@ type ListOptions struct {
 
 	State      string
 	BaseBranch string
+	HeadBranch string
 	Labels     []string
 	Author     string
 	Assignee   string
@@ -95,6 +96,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		return []string{"open", "closed", "merged", "all"}, cobra.ShellCompDirectiveNoFileComp
 	})
 	cmd.Flags().StringVarP(&opts.BaseBranch, "base", "B", "", "Filter by base branch")
+	cmd.Flags().StringVarP(&opts.HeadBranch, "head", "H", "", "Filter by head branch")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by labels")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
@@ -140,6 +142,7 @@ func listRun(opts *ListOptions) error {
 		Assignee:   opts.Assignee,
 		Labels:     opts.Labels,
 		BaseBranch: opts.BaseBranch,
+		HeadBranch: opts.HeadBranch,
 		Search:     opts.Search,
 		Draft:      opts.Draft,
 		Fields:     defaultFields,
