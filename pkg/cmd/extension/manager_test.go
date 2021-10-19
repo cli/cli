@@ -139,6 +139,30 @@ func TestManager_Dispatch(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 }
 
+func TestManager_Dispatch_binary(t *testing.T) {
+	tempDir := t.TempDir()
+	extPath := filepath.Join(tempDir, "extensions", "gh-hello")
+	exePath := filepath.Join(extPath, "gh-hello")
+	bm := binManifest{
+		Owner: "owner",
+		Name:  "gh-hello",
+		Host:  "github.com",
+		Tag:   "v1.0.0",
+	}
+	assert.NoError(t, stubBinaryExtension(extPath, bm))
+
+	m := newTestManager(tempDir, nil, nil)
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	found, err := m.Dispatch([]string{"hello", "one", "two"}, nil, stdout, stderr)
+	assert.NoError(t, err)
+	assert.True(t, found)
+
+	assert.Equal(t, fmt.Sprintf("[%s one two]\n", exePath), stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
 func TestManager_Remove(t *testing.T) {
 	tempDir := t.TempDir()
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-hello", "gh-hello")))
