@@ -69,9 +69,11 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 	forwardArgs := args[1:]
 
 	exts, _ := m.list(false)
+	var ext Extension
 	for _, e := range exts {
 		if e.Name() == extName {
-			exe = e.Path()
+			ext = e
+			exe = ext.Path()
 			break
 		}
 	}
@@ -81,7 +83,9 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 
 	var externalCmd *exec.Cmd
 
-	if runtime.GOOS == "windows" {
+	if ext.IsBinary() {
+		externalCmd = m.newCommand(exe, forwardArgs...)
+	} else if runtime.GOOS == "windows" {
 		// Dispatch all extension calls through the `sh` interpreter to support executable files with a
 		// shebang line on Windows.
 		shExe, err := m.findSh()

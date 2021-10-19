@@ -48,3 +48,7 @@ func (e *Extension) UpdateAvailable() bool {
 	}
 	return true
 }
+
+func (e *Extension) IsBinary() bool {
+	return e.kind == BinaryKind
+}
