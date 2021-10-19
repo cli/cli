@@ -123,12 +123,11 @@ func renameRun(opts *RenameOptions) error {
 		oldRepoURL := opts.oldRepoSelector
 		newRepoName := opts.newRepoSelector
 
-		currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
-		if err != nil {
-			return err
-		}
-
 		if !strings.Contains(oldRepoURL, "/") {
+			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+			if err != nil {
+				return err
+			}
 			oldRepoURL = currentUser + "/" + oldRepoURL
 		}
 
