@@ -103,7 +103,7 @@ func IsSame(a, b Interface) bool {
 }
 
 func GenerateRepoURL(repo Interface, p string, args ...interface{}) string {
-	baseURL := fmt.Sprintf("https://%s/%s/%s", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
+	baseURL := fmt.Sprintf("%s%s/%s", ghinstance.HostPrefix(repo.RepoHost()), repo.RepoOwner(), repo.RepoName())
 	if p != "" {
 		return baseURL + "/" + fmt.Sprintf(p, args...)
 	}
@@ -116,7 +116,7 @@ func FormatRemoteURL(repo Interface, protocol string) string {
 		return fmt.Sprintf("git@%s:%s/%s.git", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
 	}
 
-	return fmt.Sprintf("https://%s/%s/%s.git", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
+	return fmt.Sprintf("%s%s/%s.git", ghinstance.HostPrefix(repo.RepoHost()), repo.RepoOwner(), repo.RepoName())
 }
 
 type ghRepo struct {

@@ -12,7 +12,6 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -327,7 +326,11 @@ func createRun(opts *CreateOptions) error {
 
 		templateRepoName := opts.Template
 		if !strings.Contains(templateRepoName, "/") {
-			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+			host, err := cfg.DefaultHost()
+			if err != nil {
+				return err
+			}
+			currentUser, err := api.CurrentLoginName(apiClient, host)
 			if err != nil {
 				return err
 			}
