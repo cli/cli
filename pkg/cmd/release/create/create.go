@@ -241,9 +241,11 @@ func createRun(opts *CreateOptions) error {
 			opts.Body = text
 		}
 
-		var defaultSubmit string
+		saveAsDraft := "Save as draft"
+		publishRelease := "Publish release"
+		defaultSubmit := publishRelease
 		if opts.Draft {
-			defaultSubmit = "Save as draft"
+			defaultSubmit = saveAsDraft
 		}
 
 		qs = []*survey.Question{
@@ -259,8 +261,8 @@ func createRun(opts *CreateOptions) error {
 				Prompt: &survey.Select{
 					Message: "Submit?",
 					Options: []string{
-						"Publish release",
-						"Save as draft",
+						publishRelease,
+						saveAsDraft,
 						"Cancel",
 					},
 					Default: defaultSubmit,
