@@ -241,6 +241,11 @@ func createRun(opts *CreateOptions) error {
 			opts.Body = text
 		}
 
+		var defaultSubmit string
+		if opts.Draft {
+			defaultSubmit = "Save as draft"
+		}
+
 		qs = []*survey.Question{
 			{
 				Name: "prerelease",
@@ -258,6 +263,7 @@ func createRun(opts *CreateOptions) error {
 						"Save as draft",
 						"Cancel",
 					},
+					Default: defaultSubmit,
 				},
 			},
 		}
