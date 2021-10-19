@@ -773,3 +773,42 @@ func TestRepoCreate_WithConfirmFlag(t *testing.T) {
 		t.Errorf("expected %q, got %q", "PRIVATE", repoVisibility)
 	}
 }
+
+func Test_getModifiedRemoteName(t *testing.T) {
+	// confirmed using GitHub.com/new
+	tests := []struct {
+		Name       string
+		LocalName  string
+		RemoteName string
+	}{
+		{
+			Name:       "non-modified",
+			LocalName:  "cli",
+			RemoteName: "cli",
+		},
+		{
+			Name:       "complex",
+			LocalName:  "@-#$^",
+			RemoteName: "---",
+		},
+		{
+			Name:       "bookends",
+			LocalName:  "[cli]",
+			RemoteName: "-cli-",
+		},
+		{
+			Name:       "sentence",
+			LocalName:  "Hello World, I'm a new repo!",
+			RemoteName: "Hello-World-I-m-a-new-repo-",
+		},
+		{
+			Name:       "All the above",
+			LocalName:  " @E3H*(#$#_$-ZVp,n.7lGq*_eMa-(-zAZSJYg!",
+			RemoteName: "-E3H-_--ZVp-n.7lGq-_eMa---zAZSJYg-",
+		},
+	}
+	for _, tt := range tests {
+		output := getModifiedRemoteName(tt.LocalName)
+		assert.Equal(t, tt.RemoteName, output)
+	}
+}
