@@ -1,16 +1,20 @@
 package rename
 
-import (
-	"net/http"
-	"testing"
+// import (
+// 	"fmt"
+// 	"net/http"
+// 	"testing"
 
-	// "github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/httpmock"
-	"github.com/cli/cli/v2/pkg/iostreams"
-	// "github.com/google/shlex"
-	"github.com/stretchr/testify/assert"
-	// "github.com/stretchr/testify/require"
-)
+// 	"github.com/cli/cli/v2/pkg/cmdutil"
+// 	"github.com/cli/cli/v2/internal/ghrepo"
+// 	"github.com/cli/cli/v2/pkg/httpmock"
+// 	"github.com/cli/cli/v2/pkg/iostreams"
+// 	"github.com/cli/cli/v2/pkg/prompt"
+
+// 	"github.com/google/shlex"
+// 	"github.com/stretchr/testify/assert"
+// 	"github.com/stretchr/testify/require"
+// )
 
 // func TestNewCmdRename(t *testing.T) {
 // 	testCases := []struct {
@@ -69,71 +73,114 @@ import (
 // 	}
 // }
 
-func TestRenameRun(t *testing.T) {
-	testCases := []struct {
-		name      string
-		opts      RenameOptions
-		httpStubs func(*httpmock.Registry)
-		stdoutTTY bool
-		wantOut   string
-	}{
-		{
-			name: "owner repo change name tty",
-			opts: RenameOptions{
-				oldRepoSelector: "OWNER/REPO",
-				newRepoSelector: "NEW_REPO",
-				flagRepo:        true,
-			},
-			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n",
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StringResponse(`{"data":{"viewer":{"login":"OWNER"}}}`))
-				reg.Register(
-					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.StatusStringResponse(204, "{}"))
-			},
-			stdoutTTY: true,
-		},
-		{
-			name: "owner repo change name notty",
-			opts: RenameOptions{
-				oldRepoSelector: "OWNER/REPO",
-				newRepoSelector: "NEW_REPO",
-				flagRepo:        true,
-			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StringResponse(`{"data":{"viewer":{"login":"OWNER"}}}`))
-				reg.Register(
-					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.StatusStringResponse(204, "{}"))
-			},
-			stdoutTTY: false,
-		},
+// func TestRenameRun(t *testing.T) {
+// 	testCases := []struct {
+// 		name      string
+// 		opts      RenameOptions
+// 		httpStubs func(*httpmock.Registry)
+// 		askStubs  func(*prompt.AskStubber)
+// 		wantOut   string
+// 		tty       bool
+// 		prompt    bool
+// 	}{ 
+		// {
+		// 	name: "owner repo change name using flag",
+		// 	opts: RenameOptions{
+		// 		oldRepoSelector: "OWNER/REPO",
+		// 		newRepoSelector: "NEW_REPO",
+		// 		flagRepo:        true,
+		// 	},
+		// 	wantOut: "✓ Renamed repository OWNER/NEW_REPO\n",
+		// 	httpStubs: func(reg *httpmock.Registry) {
+		// 		reg.Register(
+		// 			httpmock.GraphQL(`query UserCurrent\b`),
+		// 			httpmock.StringResponse(`{"data":{"viewer":{"login":"OWNER"}}}`))
+		// 		reg.Register(
+		// 			httpmock.REST("PATCH", "repos/OWNER/REPO"),
+		// 			httpmock.StatusStringResponse(204, "{}"))
+		// 	},
+		// 	tty: true,
+		// },
+		// {
+		// 	name: "owner repo change name prompt",
+		// 	opts: RenameOptions{
+		// 		BaseRepo: func() (ghrepo.Interface, error) {
+		// 			return ghrepo.New("OWNER", "REPO"), nil
+		// 		},
+		// 		oldRepoSelector: "NEW_REPO",
+		// 	},
+		// 	wantOut: "✓ Renamed repository OWNER/NEW_REPO\n",
+		// 	askStubs: func(q *prompt.AskStubber) {
+		// 		q.StubOne("NEW_REPO")
+		// 	},
+		// 	httpStubs: func(reg *httpmock.Registry) {
+		// 		reg.Register(
+		// 			httpmock.REST("PATCH", "repos/OWNER/REPO"),
+		// 			httpmock.StatusStringResponse(204, "{}"))
+		// 	},
+		// 	prompt: true,
+		// },
+		// {
+		// 	name: "owner repo change name argument ",
+		// 	opts: RenameOptions{
+		// 		newRepoSelector: "REPO",
+		// 		flagRepo: false,
+		// 	},
+		// 	askStubs: func(q *prompt.AskStubber) {
+		// 		q.StubOne("OWNER/REPO")
+		// 	},
+		// 	httpStubs: func(reg *httpmock.Registry) {
+		// 		reg.Register(
+		// 			httpmock.GraphQL(`query RepositoryInfo\b`),
+		// 			httpmock.StringResponse(`
+		// 			{
+		// 				"data": {
+		// 				  "repository": {
+		// 					"id": "THE-ID",
+		// 					"name": "REPO",
+		// 					"owner": {
+		// 					  "login": "OWNER"
+		// 					}
+		// 				  }
+		// 				}
+		// 			}`))
+		// 		reg.Register(
+		// 			httpmock.REST("PATCH", "repos/OWNER/REPO"),
+		// 			httpmock.StatusStringResponse(204, "{}"))
+		// 	},
+		// },
 	}
 
-	for _, tt := range testCases {
-		reg := &httpmock.Registry{}
-		if tt.httpStubs != nil {
-			tt.httpStubs(reg)
-		}
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
+// 	for _, tt := range testCases {
+// 		q, teardown := prompt.InitAskStubber()
+// 		defer teardown()
+// 		if tt.askStubs != nil {
+// 			tt.askStubs(q)
+// 		}
 
-		io, _, stdout, _ := iostreams.Test()
-		tt.opts.IO = io
+// 		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+// 			repo, _ := ghrepo.FromFullName(tt.opts.oldRepoSelector)
+// 			return repo, nil
+// 		}
 
-		t.Run(tt.name, func(t *testing.T) {
-			defer reg.Verify(t)
-			io.SetStderrTTY(tt.stdoutTTY)
-			io.SetStdoutTTY(tt.stdoutTTY)
+// 		reg := &httpmock.Registry{}
+// 		if tt.httpStubs != nil {
+// 			tt.httpStubs(reg)
+// 		}
+// 		tt.opts.HttpClient = func() (*http.Client, error) {
+// 			return &http.Client{Transport: reg}, nil
+// 		}
 
-			err := renameRun(&tt.opts)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.wantOut, stdout.String())
-		})
-	}
-}
+// 		io, _, stdout, _ := iostreams.Test()
+// 		io.SetStdinTTY(tt.tty)
+// 		io.SetStdoutTTY(tt.tty)
+// 		tt.opts.IO = io
+
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			defer reg.Verify(t)
+// 			err := renameRun(&tt.opts)
+// 			assert.NoError(t, err)
+// 			assert.Equal(t, tt.wantOut, stdout.String())
+// 		})
+// 	}
+// }
