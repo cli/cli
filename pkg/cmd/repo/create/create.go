@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"regexp"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -300,19 +301,6 @@ func createRun(opts *CreateOptions) error {
 			return err
 		}
 		repoToCreate = ghrepo.NewWithHost("", opts.Name, host)
-	}
-
-	if remoteRepoName := getModifiedRemoteName(repoToCreate.RepoName()); repoToCreate.RepoName() != remoteRepoName {
-		var useDifferentName bool
-		confirmDifferentName := &survey.Confirm{
-			Message: "Your new repository will be created as " + remoteRepoName + ". Continue?",
-			Default: false,
-		}
-		survey.AskOne(confirmDifferentName, &useDifferentName)
-		if !useDifferentName {
-			fmt.Fprintln(opts.IO.Out, "Discarding...")
-			return nil
-		}
 	}
 
 	input := repoCreateInput{
@@ -638,16 +626,29 @@ func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName s
 
 func confirmSubmission(repoName string, repoOwner string, inLocalRepo bool) (bool, error) {
 	qs := []*survey.Question{}
-
-	promptString := ""
+	promptString := `This will create the "%s" repository on GitHub. Continue?`
+	normalizedRepoName := normalizeRepoName(repoName)
 	if inLocalRepo {
+		if normalizedRepoName != repoName {
+			var confirmNormalizedName bool
+			err := survey.AskOne(&survey.Confirm{
+				Message: fmt.Sprintf(promptString, normalizedRepoName),
+				Default: false,
+			}, &confirmNormalizedName)
+			if err != nil {
+				return false, err
+			}
+			if !confirmNormalizedName {
+				return confirmNormalizedName, nil
+			}
+		}
 		promptString = `This will add an "origin" git remote to your local repository. Continue?`
 	} else {
-		targetRepo := repoName
+		targetRepo := normalizedRepoName
 		if repoOwner != "" {
-			targetRepo = fmt.Sprintf("%s/%s", repoOwner, repoName)
+			targetRepo = fmt.Sprintf("%s/%s", repoOwner, normalizedRepoName)
 		}
-		promptString = fmt.Sprintf(`This will create the "%s" repository on GitHub. Continue?`, targetRepo)
+		promptString = fmt.Sprintf(promptString, targetRepo)
 	}
 
 	confirmSubmitQuestion := &survey.Question{
@@ -695,22 +696,10 @@ func getVisibility() (string, error) {
 	return strings.ToUpper(answer.RepoVisibility), nil
 }
 
-func getModifiedRemoteName(name string) string {
-	var remoteName strings.Builder
-	alreadyDashed := false
-	for _, e := range name {
-		if ('A' <= e && e <= 'Z') ||
-			('a' <= e && e <= 'z') ||
-			('0' <= e && e <= '9') ||
-			e == '.' || e == '_' || e == '-' {
-			remoteName.WriteRune(e)
-			alreadyDashed = false
-		} else {
-			if !alreadyDashed {
-				remoteName.WriteRune('-')
-			}
-			alreadyDashed = true
-		}
+func normalizeRepoName(name string) string {
+	re := regexp.MustCompile(`[^a-zA-Z0-9-._]+`)
+	if normalizedRepoName := strings.TrimSuffix(re.ReplaceAllString(name, "-"), ".git"); normalizedRepoName != "" {
+		return normalizedRepoName
 	}
-	return remoteName.String()
+	return "-"
 }

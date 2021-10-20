@@ -774,41 +774,56 @@ func TestRepoCreate_WithConfirmFlag(t *testing.T) {
 	}
 }
 
-func Test_getModifiedRemoteName(t *testing.T) {
+func Test_getModifiedNormalizedName(t *testing.T) {
 	// confirmed using GitHub.com/new
 	tests := []struct {
-		Name       string
-		LocalName  string
-		RemoteName string
+		Name           string
+		LocalName      string
+		NormalizedName string
 	}{
 		{
-			Name:       "non-modified",
-			LocalName:  "cli",
-			RemoteName: "cli",
+			Name:           "non-modified",
+			LocalName:      "cli",
+			NormalizedName: "cli",
 		},
 		{
-			Name:       "complex",
-			LocalName:  "@-#$^",
-			RemoteName: "---",
+			Name:           ".git modified",
+			LocalName:      "cli.git",
+			NormalizedName: "cli",
 		},
 		{
-			Name:       "bookends",
-			LocalName:  "[cli]",
-			RemoteName: "-cli-",
+			Name:           "complex",
+			LocalName:      "@-#$^",
+			NormalizedName: "---",
 		},
 		{
-			Name:       "sentence",
-			LocalName:  "Hello World, I'm a new repo!",
-			RemoteName: "Hello-World-I-m-a-new-repo-",
+			Name:           "bookends",
+			LocalName:      "[cli]",
+			NormalizedName: "-cli-",
 		},
 		{
-			Name:       "All the above",
-			LocalName:  " @E3H*(#$#_$-ZVp,n.7lGq*_eMa-(-zAZSJYg!",
-			RemoteName: "-E3H-_--ZVp-n.7lGq-_eMa---zAZSJYg-",
+			Name:           "sentence",
+			LocalName:      "Hello World, I'm a new repo!",
+			NormalizedName: "Hello-World-I-m-a-new-repo-",
+		},
+		{
+			Name:           "All the above",
+			LocalName:      " @E3H*(#$#_$-ZVp,n.7lGq*_eMa-(-zAZSJYg!",
+			NormalizedName: "-E3H-_--ZVp-n.7lGq-_eMa---zAZSJYg-",
+		},
+		{
+			Name:           ".git repository name",
+			LocalName:      "I'm a crazy .git repo name .git.git .git",
+			NormalizedName: "I-m-a-crazy-.git-repo-name-.git.git-",
+		},
+		{
+			Name:           ".git edge case",
+			LocalName:      ".git",
+			NormalizedName: "-",
 		},
 	}
 	for _, tt := range tests {
-		output := getModifiedRemoteName(tt.LocalName)
-		assert.Equal(t, tt.RemoteName, output)
+		output := normalizeRepoName(tt.LocalName)
+		assert.Equal(t, tt.NormalizedName, output)
 	}
 }
