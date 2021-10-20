@@ -44,6 +44,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			wantDeleted: []string{"hubot-robawt-abc"},
+			wantStdout:  "Codespace deleted.\n",
 		},
 		{
 			name: "by repo",
@@ -52,19 +53,26 @@ func TestDelete(t *testing.T) {
 			},
 			codespaces: []*api.Codespace{
 				{
-					Name:          "monalisa-spoonknife-123",
-					RepositoryNWO: "monalisa/Spoon-Knife",
+					Name: "monalisa-spoonknife-123",
+					Repository: api.Repository{
+						FullName: "monalisa/Spoon-Knife",
+					},
 				},
 				{
-					Name:          "hubot-robawt-abc",
-					RepositoryNWO: "hubot/ROBAWT",
+					Name: "hubot-robawt-abc",
+					Repository: api.Repository{
+						FullName: "hubot/ROBAWT",
+					},
 				},
 				{
-					Name:          "monalisa-spoonknife-c4f3",
-					RepositoryNWO: "monalisa/Spoon-Knife",
+					Name: "monalisa-spoonknife-c4f3",
+					Repository: api.Repository{
+						FullName: "monalisa/Spoon-Knife",
+					},
 				},
 			},
 			wantDeleted: []string{"monalisa-spoonknife-123", "monalisa-spoonknife-c4f3"},
+			wantStdout:  "Codespaces deleted.\n",
 		},
 		{
 			name: "unused",
@@ -87,6 +95,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-c4f3"},
+			wantStdout:  "Codespaces deleted.\n",
 		},
 		{
 			name: "deletion failed",
@@ -119,27 +128,21 @@ func TestDelete(t *testing.T) {
 			codespaces: []*api.Codespace{
 				{
 					Name: "monalisa-spoonknife-123",
-					Environment: api.CodespaceEnvironment{
-						GitStatus: api.CodespaceEnvironmentGitStatus{
-							HasUnpushedChanges: true,
-						},
+					GitStatus: api.CodespaceGitStatus{
+						HasUnpushedChanges: true,
 					},
 				},
 				{
 					Name: "hubot-robawt-abc",
-					Environment: api.CodespaceEnvironment{
-						GitStatus: api.CodespaceEnvironmentGitStatus{
-							HasUncommitedChanges: true,
-						},
+					GitStatus: api.CodespaceGitStatus{
+						HasUncommitedChanges: true,
 					},
 				},
 				{
 					Name: "monalisa-spoonknife-c4f3",
-					Environment: api.CodespaceEnvironment{
-						GitStatus: api.CodespaceEnvironmentGitStatus{
-							HasUnpushedChanges:   false,
-							HasUncommitedChanges: false,
-						},
+					GitStatus: api.CodespaceGitStatus{
+						HasUnpushedChanges:   false,
+						HasUncommitedChanges: false,
 					},
 				},
 			},
@@ -148,6 +151,7 @@ func TestDelete(t *testing.T) {
 				"Codespace hubot-robawt-abc has unsaved changes. OK to delete?":        true,
 			},
 			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-c4f3"},
+			wantStdout:  "Codespaces deleted.\n",
 		},
 	}
 	for _, tt := range tests {

@@ -102,6 +102,23 @@ func TestNewCmdExtension(t *testing.T) {
 					assert.Equal(t, "hello", calls[0].Name)
 				}
 			},
+			isTTY:      true,
+			wantStdout: "✓ Successfully upgraded extension hello\n",
+		},
+		{
+			name: "upgrade an extension notty",
+			args: []string{"upgrade", "hello"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.UpgradeFunc = func(name string, force bool) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					calls := em.UpgradeCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "hello", calls[0].Name)
+				}
+			},
+			isTTY: false,
 		},
 		{
 			name: "upgrade an extension gh-prefix",
@@ -116,6 +133,8 @@ func TestNewCmdExtension(t *testing.T) {
 					assert.Equal(t, "hello", calls[0].Name)
 				}
 			},
+			isTTY:      true,
+			wantStdout: "✓ Successfully upgraded extension hello\n",
 		},
 		{
 			name: "upgrade an extension full name",
@@ -130,6 +149,8 @@ func TestNewCmdExtension(t *testing.T) {
 					assert.Equal(t, "hello", calls[0].Name)
 				}
 			},
+			isTTY:      true,
+			wantStdout: "✓ Successfully upgraded extension hello\n",
 		},
 		{
 			name: "upgrade all",
@@ -144,6 +165,23 @@ func TestNewCmdExtension(t *testing.T) {
 					assert.Equal(t, "", calls[0].Name)
 				}
 			},
+			isTTY:      true,
+			wantStdout: "✓ Successfully upgraded extensions\n",
+		},
+		{
+			name: "upgrade all notty",
+			args: []string{"upgrade", "--all"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.UpgradeFunc = func(name string, force bool) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					calls := em.UpgradeCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "", calls[0].Name)
+				}
+			},
+			isTTY: false,
 		},
 		{
 			name: "remove extension tty",
@@ -214,8 +252,8 @@ func TestNewCmdExtension(t *testing.T) {
 			args: []string{"list"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
 				em.ListFunc = func(bool) []extensions.Extension {
-					ex1 := &Extension{path: "cli/gh-test", url: "https://github.com/cli/gh-test", updateAvailable: false}
-					ex2 := &Extension{path: "cli/gh-test2", url: "https://github.com/cli/gh-test2", updateAvailable: true}
+					ex1 := &Extension{path: "cli/gh-test", url: "https://github.com/cli/gh-test", currentVersion: "1", latestVersion: "1"}
+					ex2 := &Extension{path: "cli/gh-test2", url: "https://github.com/cli/gh-test2", currentVersion: "1", latestVersion: "2"}
 					return []extensions.Extension{ex1, ex2}
 				}
 				return func(t *testing.T) {

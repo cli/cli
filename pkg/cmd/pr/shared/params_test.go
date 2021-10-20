@@ -71,10 +71,11 @@ func Test_listURLWithQuery(t *testing.T) {
 					Assignee:   "bo",
 					Author:     "ka",
 					BaseBranch: "trunk",
+					HeadBranch: "bug-fix",
 					Mention:    "nu",
 				},
 			},
-			want:    "https://example.com/path?q=is%3Aissue+is%3Aopen+assignee%3Abo+author%3Aka+mentions%3Anu+base%3Atrunk",
+			want:    "https://example.com/path?q=is%3Aissue+is%3Aopen+assignee%3Abo+author%3Aka+mentions%3Anu+base%3Atrunk+head%3Abug-fix",
 			wantErr: false,
 		},
 		{

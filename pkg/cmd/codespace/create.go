@@ -5,13 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
-	"github.com/fatih/camelcase"
 	"github.com/spf13/cobra"
 )
 
@@ -266,9 +264,7 @@ func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machin
 	machineNames := make([]string, 0, len(machines))
 	machineByName := make(map[string]*api.Machine)
 	for _, m := range machines {
-		nameParts := camelcase.Split(m.Name)
-		machineName := strings.Title(strings.ToLower(nameParts[0]))
-		machineName = fmt.Sprintf("%s - %s", machineName, m.DisplayName)
+		machineName := m.DisplayName
 		machineNames = append(machineNames, machineName)
 		machineByName[machineName] = m
 	}

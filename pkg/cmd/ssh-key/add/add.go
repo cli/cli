@@ -85,12 +85,6 @@ func runAdd(opts *AddOptions) error {
 
 	err = SSHKeyUpload(httpClient, hostname, keyReader, opts.Title)
 	if err != nil {
-		if errors.Is(err, scopesError) {
-			cs := opts.IO.ColorScheme()
-			fmt.Fprint(opts.IO.ErrOut, "Error: insufficient OAuth scopes to list SSH keys\n")
-			fmt.Fprintf(opts.IO.ErrOut, "Run the following to grant scopes: %s\n", cs.Bold("gh auth refresh -s write:public_key"))
-			return cmdutil.SilentError
-		}
 		return err
 	}
 

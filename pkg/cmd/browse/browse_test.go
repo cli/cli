@@ -3,8 +3,11 @@ package browse
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -102,6 +105,14 @@ func TestNewCmdBrowse(t *testing.T) {
 			cli:      "main.go main.go",
 			wantsErr: true,
 		},
+		{
+			name: "last commit flag",
+			cli:  "-c",
+			wants: BrowseOptions{
+				CommitFlag: true,
+			},
+			wantsErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -133,7 +144,18 @@ func TestNewCmdBrowse(t *testing.T) {
 	}
 }
 
+func setGitDir(t *testing.T, dir string) {
+	// taken from git_test.go
+	old_GIT_DIR := os.Getenv("GIT_DIR")
+	os.Setenv("GIT_DIR", dir)
+	t.Cleanup(func() {
+		os.Setenv("GIT_DIR", old_GIT_DIR)
+	})
+}
+
 func Test_runBrowse(t *testing.T) {
+	s := string(os.PathSeparator)
+	setGitDir(t, "../../../git/fixtures/simple.git")
 	tests := []struct {
 		name          string
 		opts          BrowseOptions
@@ -296,6 +318,51 @@ func Test_runBrowse(t *testing.T) {
 			wantsErr:    false,
 			expectedURL: "https://github.com/mislav/will_paginate/blob/3-0-stable/init.rb?plain=1#L6",
 		},
+		{
+			name: "open last commit",
+			opts: BrowseOptions{
+				CommitFlag: true,
+			},
+			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
+			wantsErr:    false,
+			expectedURL: "https://github.com/vilmibm/gh-user-status/tree/6f1a2405cace1633d89a79c74c65f22fe78f9659/",
+		},
+		{
+			name: "open last commit with a file",
+			opts: BrowseOptions{
+				CommitFlag:  true,
+				SelectorArg: "main.go",
+			},
+			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
+			wantsErr:    false,
+			expectedURL: "https://github.com/vilmibm/gh-user-status/tree/6f1a2405cace1633d89a79c74c65f22fe78f9659/main.go",
+		},
+		{
+			name: "relative path from browse_test.go",
+			opts: BrowseOptions{
+				SelectorArg: filepath.Join(".", "browse_test.go"),
+				PathFromRepoRoot: func() string {
+					return "pkg/cmd/browse/"
+				},
+			},
+			baseRepo:      ghrepo.New("bchadwic", "gh-graph"),
+			defaultBranch: "trunk",
+			expectedURL:   "https://github.com/bchadwic/gh-graph/tree/trunk/pkg/cmd/browse/browse_test.go",
+			wantsErr:      false,
+		},
+		{
+			name: "relative path to file in parent folder from browse_test.go",
+			opts: BrowseOptions{
+				SelectorArg: ".." + s + "pr",
+				PathFromRepoRoot: func() string {
+					return "pkg/cmd/browse/"
+				},
+			},
+			baseRepo:      ghrepo.New("bchadwic", "gh-graph"),
+			defaultBranch: "trunk",
+			expectedURL:   "https://github.com/bchadwic/gh-graph/tree/trunk/pkg/cmd/pr",
+			wantsErr:      false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -318,6 +385,9 @@ func Test_runBrowse(t *testing.T) {
 				return &http.Client{Transport: &reg}, nil
 			}
 			opts.Browser = &browser
+			if opts.PathFromRepoRoot == nil {
+				opts.PathFromRepoRoot = git.PathFromRepoRoot
+			}
 
 			err := runBrowse(&opts)
 			if tt.wantsErr {
@@ -336,5 +406,72 @@ func Test_runBrowse(t *testing.T) {
 				browser.Verify(t, tt.expectedURL)
 			}
 		})
+	}
+}
+
+func Test_parsePathFromFileArg(t *testing.T) {
+	s := string(os.PathSeparator)
+	tests := []struct {
+		name         string
+		fileArg      string
+		expectedPath string
+	}{
+		{
+			name:         "go to parent folder",
+			fileArg:      ".." + s,
+			expectedPath: "pkg/cmd",
+		},
+		{
+			name:         "current folder",
+			fileArg:      ".",
+			expectedPath: "pkg/cmd/browse",
+		},
+		{
+			name:         "current folder (alternative)",
+			fileArg:      "." + s,
+			expectedPath: "pkg/cmd/browse",
+		},
+		{
+			name:         "file that starts with '.'",
+			fileArg:      ".gitignore",
+			expectedPath: "pkg/cmd/browse/.gitignore",
+		},
+		{
+			name:         "file in current folder",
+			fileArg:      filepath.Join(".", "browse.go"),
+			expectedPath: "pkg/cmd/browse/browse.go",
+		},
+		{
+			name:         "file within parent folder",
+			fileArg:      filepath.Join("..", "browse.go"),
+			expectedPath: "pkg/cmd/browse.go",
+		},
+		{
+			name:         "file within parent folder uncleaned",
+			fileArg:      filepath.Join("..", ".") + s + s + s + "browse.go",
+			expectedPath: "pkg/cmd/browse.go",
+		},
+		{
+			name:         "different path from root directory",
+			fileArg:      filepath.Join("..", "..", "..", "internal/build/build.go"),
+			expectedPath: "internal/build/build.go",
+		},
+		{
+			name:         "go out of repository",
+			fileArg:      filepath.Join("..", "..", "..", "..", "..", "..") + s + "",
+			expectedPath: "",
+		},
+		{
+			name:         "go to root of repository",
+			fileArg:      filepath.Join("..", "..", "..") + s + "",
+			expectedPath: "",
+		},
+	}
+	for _, tt := range tests {
+		path, _, _, _ := parseFile(BrowseOptions{
+			PathFromRepoRoot: func() string {
+				return "pkg/cmd/browse/"
+			}}, tt.fileArg)
+		assert.Equal(t, tt.expectedPath, path, tt.name)
 	}
 }

@@ -45,9 +45,9 @@ func (a *App) List(ctx context.Context, asJSON bool, limit int) error {
 		cs := codespace{apiCodespace}
 		table.Append([]string{
 			cs.Name,
-			cs.RepositoryNWO,
+			cs.Repository.FullName,
 			cs.branchWithGitStatus(),
-			cs.Environment.State,
+			cs.State,
 			cs.CreatedAt,
 		})
 	}

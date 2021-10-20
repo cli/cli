@@ -5,14 +5,13 @@ go 1.16
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.2
 	github.com/MakeNowJust/heredoc v1.0.0
-	github.com/briandowns/spinner v1.16.0
+	github.com/briandowns/spinner v1.13.0
 	github.com/charmbracelet/glamour v0.3.0
 	github.com/cli/browser v1.1.0
-	github.com/cli/oauth v0.8.0
+	github.com/cli/oauth v0.9.0
 	github.com/cli/safeexec v1.0.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.1
-	github.com/creack/pty v1.1.16
-	github.com/fatih/camelcase v1.0.0
+	github.com/creack/pty v1.1.17
 	github.com/gabriel-vasile/mimetype v1.4.0
 	github.com/google/go-cmp v0.5.6
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510

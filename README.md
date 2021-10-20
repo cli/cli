@@ -61,7 +61,7 @@ For instructions on specific distributions and package managers, see [Linux & BS
 
 | Install:            | Upgrade:            |
 | ------------------- | --------------------|
-| `winget install gh` | `winget upgrade gh` |
+| `winget install --id GitHub.cli` | `winget upgrade --id GitHub.cli` |
 
 #### scoop
 

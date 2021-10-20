@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"log"
 	"os"
 	"sort"
 	"strings"
@@ -38,6 +40,7 @@ type apiClient interface {
 	ListCodespaces(ctx context.Context, limit int) ([]*api.Codespace, error)
 	DeleteCodespace(ctx context.Context, name string) error
 	StartCodespace(ctx context.Context, name string) error
+	StopCodespace(ctx context.Context, name string) error
 	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
 	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
 	AuthorizedKeys(ctx context.Context, user string) ([]byte, error)
@@ -211,6 +214,10 @@ func noArgsConstraint(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func noopLogger() *log.Logger {
+	return log.New(ioutil.Discard, "", 0)
+}
+
 type codespace struct {
 	*api.Codespace
 }
@@ -220,17 +227,17 @@ type codespace struct {
 // If includeGitStatus is true, the branch will include a star if
 // the codespace has unsaved changes.
 func (c codespace) displayName(includeName, includeGitStatus bool) string {
-	branch := c.Branch
+	branch := c.GitStatus.Ref
 	if includeGitStatus {
 		branch = c.branchWithGitStatus()
 	}
 
 	if includeName {
 		return fmt.Sprintf(
-			"%s: %s [%s]", c.RepositoryNWO, branch, c.Name,
+			"%s: %s [%s]", c.Repository.FullName, branch, c.Name,
 		)
 	}
-	return c.RepositoryNWO + ": " + branch
+	return c.Repository.FullName + ": " + branch
 }
 
 // gitStatusDirty represents an unsaved changes status.
@@ -240,14 +247,19 @@ const gitStatusDirty = "*"
 // if the branch is currently being worked on.
 func (c codespace) branchWithGitStatus() string {
 	if c.hasUnsavedChanges() {
-		return c.Branch + gitStatusDirty
+		return c.GitStatus.Ref + gitStatusDirty
 	}
 
-	return c.Branch
+	return c.GitStatus.Ref
 }
 
 // hasUnsavedChanges returns whether the environment has
 // unsaved changes.
 func (c codespace) hasUnsavedChanges() bool {
-	return c.Environment.GitStatus.HasUncommitedChanges || c.Environment.GitStatus.HasUnpushedChanges
+	return c.GitStatus.HasUncommitedChanges || c.GitStatus.HasUnpushedChanges
+}
+
+// running returns whether the codespace environment is running.
+func (c codespace) running() bool {
+	return c.State == api.CodespaceStateAvailable
 }

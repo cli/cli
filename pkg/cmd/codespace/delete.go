@@ -89,7 +89,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 		if nameFilter != "" && c.Name != nameFilter {
 			continue
 		}
-		if opts.repoFilter != "" && !strings.EqualFold(c.RepositoryNWO, opts.repoFilter) {
+		if opts.repoFilter != "" && !strings.EqualFold(c.Repository.FullName, opts.repoFilter) {
 			continue
 		}
 		if opts.keepDays > 0 {
