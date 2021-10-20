@@ -193,7 +193,7 @@ users; see https://lwn.net/Articles/835962/ for discussion.
 
 // Copy copies files between the local and remote file systems.
 // The mechanics are similar to 'ssh' but using 'scp'.
-func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) (err error) {
+func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) error {
 	if len(args) < 2 {
 		return fmt.Errorf("cp requires source and destination arguments")
 	}
@@ -201,8 +201,10 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) (err erro
 		opts.scpArgs = append(opts.scpArgs, "-r")
 	}
 	opts.scpArgs = append(opts.scpArgs, "--")
+	hasRemote := false
 	for _, arg := range args {
 		if rest := strings.TrimPrefix(arg, "remote:"); rest != arg {
+			hasRemote = true
 			// scp treats each filename argument as a shell expression,
 			// subjecting it to expansion of environment variables, braces,
 			// tilde, backticks, globs and so on. Because these present a
@@ -224,6 +226,9 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) (err erro
 			}
 		}
 		opts.scpArgs = append(opts.scpArgs, arg)
+	}
+	if !hasRemote {
+		return fmt.Errorf("cp: no argument is a 'remote:' filename")
 	}
 	return a.SSH(ctx, nil, opts.sshOptions)
 }
