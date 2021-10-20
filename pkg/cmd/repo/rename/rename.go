@@ -54,7 +54,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 		With '-R', and two arguments the given repository is replaced with the new name `,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) > 0  {
+			if len(args) > 0 {
 				opts.newRepoSelector = args[0]
 			} else {
 				if !opts.IO.CanPrompt() {
