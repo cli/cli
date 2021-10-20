@@ -303,6 +303,25 @@ func createRun(opts *CreateOptions) error {
 		repoToCreate = ghrepo.NewWithHost("", opts.Name, host)
 	}
 
+<<<<<<< HEAD
+=======
+	if remoteRepoName := getModifiedRemoteName(repoToCreate.RepoName()); repoToCreate.RepoName() != remoteRepoName {
+		var useDifferentName bool
+		confirmDifferentName := &survey.Confirm{
+			Message: "Your new repository will be created as " + remoteRepoName + ". Continue?",
+			Default: false,
+		}
+		err := survey.AskOne(confirmDifferentName, &useDifferentName)
+		if err != nil {
+			return err
+		}
+		if !useDifferentName {
+			fmt.Fprintln(opts.IO.Out, "Discarding...")
+			return nil
+		}
+	}
+
+>>>>>>> 1c6e31db15cda38ca7f94dcc0d701a2bbe643d6c
 	input := repoCreateInput{
 		Name:              repoToCreate.RepoName(),
 		Visibility:        visibility,
