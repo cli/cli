@@ -83,73 +83,73 @@ package rename
 // 		tty       bool
 // 		prompt    bool
 // 	}{ 
-		// {
-		// 	name: "owner repo change name using flag",
-		// 	opts: RenameOptions{
-		// 		oldRepoSelector: "OWNER/REPO",
-		// 		newRepoSelector: "NEW_REPO",
-		// 		flagRepo:        true,
-		// 	},
-		// 	wantOut: "✓ Renamed repository OWNER/NEW_REPO\n",
-		// 	httpStubs: func(reg *httpmock.Registry) {
-		// 		reg.Register(
-		// 			httpmock.GraphQL(`query UserCurrent\b`),
-		// 			httpmock.StringResponse(`{"data":{"viewer":{"login":"OWNER"}}}`))
-		// 		reg.Register(
-		// 			httpmock.REST("PATCH", "repos/OWNER/REPO"),
-		// 			httpmock.StatusStringResponse(204, "{}"))
-		// 	},
-		// 	tty: true,
-		// },
-		// {
-		// 	name: "owner repo change name prompt",
-		// 	opts: RenameOptions{
-		// 		BaseRepo: func() (ghrepo.Interface, error) {
-		// 			return ghrepo.New("OWNER", "REPO"), nil
-		// 		},
-		// 		oldRepoSelector: "NEW_REPO",
-		// 	},
-		// 	wantOut: "✓ Renamed repository OWNER/NEW_REPO\n",
-		// 	askStubs: func(q *prompt.AskStubber) {
-		// 		q.StubOne("NEW_REPO")
-		// 	},
-		// 	httpStubs: func(reg *httpmock.Registry) {
-		// 		reg.Register(
-		// 			httpmock.REST("PATCH", "repos/OWNER/REPO"),
-		// 			httpmock.StatusStringResponse(204, "{}"))
-		// 	},
-		// 	prompt: true,
-		// },
-		// {
-		// 	name: "owner repo change name argument ",
-		// 	opts: RenameOptions{
-		// 		newRepoSelector: "REPO",
-		// 		flagRepo: false,
-		// 	},
-		// 	askStubs: func(q *prompt.AskStubber) {
-		// 		q.StubOne("OWNER/REPO")
-		// 	},
-		// 	httpStubs: func(reg *httpmock.Registry) {
-		// 		reg.Register(
-		// 			httpmock.GraphQL(`query RepositoryInfo\b`),
-		// 			httpmock.StringResponse(`
-		// 			{
-		// 				"data": {
-		// 				  "repository": {
-		// 					"id": "THE-ID",
-		// 					"name": "REPO",
-		// 					"owner": {
-		// 					  "login": "OWNER"
-		// 					}
-		// 				  }
-		// 				}
-		// 			}`))
-		// 		reg.Register(
-		// 			httpmock.REST("PATCH", "repos/OWNER/REPO"),
-		// 			httpmock.StatusStringResponse(204, "{}"))
-		// 	},
-		// },
-	}
+// 		{
+// 			name: "owner repo change name using flag",
+// 			opts: RenameOptions{
+// 				oldRepoSelector: "OWNER/REPO",
+// 				newRepoSelector: "NEW_REPO",
+// 				flagRepo:        true,
+// 			},
+// 			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n",
+// 			httpStubs: func(reg *httpmock.Registry) {
+// 				reg.Register(
+// 					httpmock.GraphQL(`query UserCurrent\b`),
+// 					httpmock.StringResponse(`{"data":{"viewer":{"login":"OWNER"}}}`))
+// 				reg.Register(
+// 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+// 					httpmock.StatusStringResponse(204, "{}"))
+// 			},
+// 			tty: true,
+// 		},
+// 		{
+// 			name: "owner repo change name prompt",
+// 			opts: RenameOptions{
+// 				BaseRepo: func() (ghrepo.Interface, error) {
+// 					return ghrepo.New("OWNER", "REPO"), nil
+// 				},
+// 				oldRepoSelector: "NEW_REPO",
+// 			},
+// 			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n",
+// 			askStubs: func(q *prompt.AskStubber) {
+// 				q.StubOne("NEW_REPO")
+// 			},
+// 			httpStubs: func(reg *httpmock.Registry) {
+// 				reg.Register(
+// 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+// 					httpmock.StatusStringResponse(204, "{}"))
+// 			},
+// 			prompt: true,
+// 		},
+// 		{
+// 			name: "owner repo change name argument ",
+// 			opts: RenameOptions{
+// 				newRepoSelector: "REPO",
+// 				flagRepo: false,
+// 			},
+// 			askStubs: func(q *prompt.AskStubber) {
+// 				q.StubOne("OWNER/REPO")
+// 			},
+// 			httpStubs: func(reg *httpmock.Registry) {
+// 				reg.Register(
+// 					httpmock.GraphQL(`query RepositoryInfo\b`),
+// 					httpmock.StringResponse(`
+// 					{
+// 						"data": {
+// 						  "repository": {
+// 							"id": "THE-ID",
+// 							"name": "REPO",
+// 							"owner": {
+// 							  "login": "OWNER"
+// 							}
+// 						  }
+// 						}
+// 					}`))
+// 				reg.Register(
+// 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+// 					httpmock.StatusStringResponse(204, "{}"))
+// 			},
+// 		},
+// 	}
 
 // 	for _, tt := range testCases {
 // 		q, teardown := prompt.InitAskStubber()
