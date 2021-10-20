@@ -82,7 +82,7 @@ package rename
 // 		wantOut   string
 // 		tty       bool
 // 		prompt    bool
-// 	}{ 
+// 	}{
 // 		{
 // 			name: "owner repo change name using flag",
 // 			opts: RenameOptions{
