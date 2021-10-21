@@ -229,7 +229,7 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) error {
 		opts.scpArgs = append(opts.scpArgs, arg)
 	}
 	if !hasRemote {
-		return &cmdutil.FlagError{Err: fmt.Errorf("at least one argument must have a 'remote:' prefix")}
+		return cmdutil.FlagErrorf("at least one argument must have a 'remote:' prefix")
 	}
 	return a.SSH(ctx, nil, opts.sshOptions)
 }

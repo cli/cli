@@ -20,7 +20,7 @@ func newListCmd(app *App) *cobra.Command {
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if limit < 1 {
-				return &cmdutil.FlagError{Err: fmt.Errorf("invalid limit: %v", limit)}
+				return cmdutil.FlagErrorf("invalid limit: %v", limit)
 			}
 
 			return app.List(cmd.Context(), asJSON, limit)

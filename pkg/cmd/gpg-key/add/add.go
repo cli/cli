@@ -35,7 +35,7 @@ func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				if opts.IO.IsStdoutTTY() && opts.IO.IsStdinTTY() {
-					return &cmdutil.FlagError{Err: errors.New("GPG key file missing")}
+					return cmdutil.FlagErrorf("GPG key file missing")
 				}
 				opts.KeyFile = "-"
 			} else {
