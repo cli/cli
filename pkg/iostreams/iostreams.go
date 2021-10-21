@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/briandowns/spinner"
@@ -37,6 +38,7 @@ type IOStreams struct {
 
 	progressIndicatorEnabled bool
 	progressIndicator        *spinner.Spinner
+	progressIndicatorMu      sync.Mutex
 
 	stdinTTYOverride  bool
 	stdinIsTTY        bool
@@ -229,26 +231,31 @@ func (s *IOStreams) SetNeverPrompt(v bool) {
 }
 
 func (s *IOStreams) StartProgressIndicator() {
-	s.StartProgressIndicatorWithSuffix("")
+	s.StartProgressIndicatorWithLabel("")
 }
 
-func (s *IOStreams) StartProgressIndicatorWithSuffix(suffix string) {
+func (s *IOStreams) StartProgressIndicatorWithLabel(label string) {
 	if !s.progressIndicatorEnabled {
 		return
 	}
 
-	opts := []spinner.Option{
-		spinner.WithWriter(s.ErrOut),
-	}
-	if suffix != "" {
-		opts = append(opts, spinner.WithSuffix(" "+suffix))
+	s.progressIndicatorMu.Lock()
+	defer s.progressIndicatorMu.Unlock()
+
+	if s.progressIndicator != nil {
+		if label == "" {
+			s.progressIndicator.Prefix = ""
+		} else {
+			s.progressIndicator.Prefix = label + " "
+		}
+		return
 	}
 
-	// 11 means Braille. See https://github.com/briandowns/spinner#available-character-sets
-	sp := spinner.New(spinner.CharSets[11], 400*time.Millisecond, opts...)
-
-	if s.TerminalTheme() == "light" {
-		_ = sp.Color("fgBlack")
+	// https://github.com/briandowns/spinner#available-character-sets
+	dotStyle := spinner.CharSets[11]
+	sp := spinner.New(dotStyle, 120*time.Millisecond, spinner.WithWriter(s.ErrOut), spinner.WithColor("fgCyan"))
+	if label != "" {
+		sp.Prefix = label + " "
 	}
 
 	sp.Start()
@@ -256,6 +263,8 @@ func (s *IOStreams) StartProgressIndicatorWithSuffix(suffix string) {
 }
 
 func (s *IOStreams) StopProgressIndicator() {
+	s.progressIndicatorMu.Lock()
+	defer s.progressIndicatorMu.Unlock()
 	if s.progressIndicator == nil {
 		return
 	}
