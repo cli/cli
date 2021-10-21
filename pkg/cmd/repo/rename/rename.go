@@ -78,8 +78,6 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 }
 
 func renameRun(opts *RenameOptions) error {
-
-	cs := opts.IO.ColorScheme()
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -151,6 +149,7 @@ func renameRun(opts *RenameOptions) error {
 	}
 
 	if opts.IO.IsStdoutTTY() {
+		cs := opts.IO.ColorScheme()
 		fmt.Fprintf(opts.IO.Out, "%s Renamed repository %s\n", cs.SuccessIcon(), input.RepoOwner+"/"+input.Name)
 		if opts.newRepoSelector == "" {
 			fmt.Fprintf(opts.IO.Out, "%s Updated the %q remote", cs.SuccessIcon(), baseRemote.Name)
