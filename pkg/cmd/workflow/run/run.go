@@ -78,7 +78,7 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 		`),
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(opts.MagicFields)+len(opts.RawFields) > 0 && len(args) == 0 {
-				return cmdutil.FlagError{Err: fmt.Errorf("workflow argument required when passing -f or -F")}
+				return &cmdutil.FlagError{Err: fmt.Errorf("workflow argument required when passing -f or -F")}
 			}
 			return nil
 		},
@@ -103,7 +103,7 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 				}
 				opts.JSONInput = string(jsonIn)
 			} else if opts.JSON {
-				return cmdutil.FlagError{Err: errors.New("--json specified but nothing on STDIN")}
+				return &cmdutil.FlagError{Err: errors.New("--json specified but nothing on STDIN")}
 			}
 
 			if opts.Selector == "" {

@@ -61,7 +61,7 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 		Use: "fork [<repository>] [-- <gitflags>...]",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if cmd.ArgsLenAtDash() == 0 && len(args[1:]) > 0 {
-				return cmdutil.FlagError{Err: fmt.Errorf("repository argument required when passing 'git clone' flags")}
+				return &cmdutil.FlagError{Err: fmt.Errorf("repository argument required when passing 'git clone' flags")}
 			}
 			return nil
 		},
