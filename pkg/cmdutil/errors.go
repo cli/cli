@@ -6,16 +6,17 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 )
 
-// FlagError is the kind of error raised in flag processing
+// A *FlagError indicates an error processing command-line flags or other arguments.
+// Such errors cause the application to display the usage message.
 type FlagError struct {
 	Err error
 }
 
-func (fe FlagError) Error() string {
+func (fe *FlagError) Error() string {
 	return fe.Err.Error()
 }
 
-func (fe FlagError) Unwrap() error {
+func (fe *FlagError) Unwrap() error {
 	return fe.Err
 }
 

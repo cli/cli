@@ -10,37 +10,33 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type ListOptions struct {
-	AsJSON bool
-	Pretty bool
-	Limit  int
-}
-
 func newListCmd(app *App) *cobra.Command {
-	opts := ListOptions{}
+	var asJSON bool
+	var limit int
 
 	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List your codespaces",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if opts.Limit < 1 {
-				return &cmdutil.FlagError{Err: fmt.Errorf("invalid limit: %v", opts.Limit)}
+			if limit < 1 {
+				return &cmdutil.FlagError{Err: fmt.Errorf("invalid limit: %v", limit)}
 			}
 
-			return app.List(cmd.Context(), &opts)
+			return app.List(cmd.Context(), asJSON, limit)
 		},
 	}
 
-	listCmd.Flags().BoolVar(&opts.AsJSON, "json", false, "Output as JSON")
-	listCmd.Flags().BoolVar(&opts.Pretty, "pretty", false, "Prettify JSON")
-	listCmd.Flags().IntVarP(&opts.Limit, "limit", "L", 30, "Maximum number of codespaces to list")
+	listCmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
+	listCmd.Flags().IntVarP(&limit, "limit", "L", 30, "Maximum number of codespaces to list")
 
 	return listCmd
 }
 
-func (a *App) List(ctx context.Context, opts *ListOptions) error {
-	codespaces, err := a.apiClient.ListCodespaces(ctx, opts.Limit)
+func (a *App) List(ctx context.Context, asJSON bool, limit int) error {
+	a.StartProgressIndicatorWithLabel("Fetching codespaces")
+	codespaces, err := a.apiClient.ListCodespaces(ctx, limit)
+	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}
@@ -52,9 +48,8 @@ func (a *App) List(ctx context.Context, opts *ListOptions) error {
 
 	cs := a.io.ColorScheme()
 	tp := utils.NewTablePrinterWithOptions(a.io, utils.TablePrinterOptions{
-		IsTTY:      a.io.IsStdoutTTY(),
-		IsJSON:     opts.AsJSON,
-		JSONPretty: opts.Pretty,
+		IsTTY:  a.io.IsStdoutTTY(),
+		IsJSON: asJSON,
 	})
 
 	tp.SetHeader([]string{"Name", "Repository", "Branch", "State", "Created at"})
@@ -79,7 +74,7 @@ func (a *App) List(ctx context.Context, opts *ListOptions) error {
 		tp.EndRow()
 	}
 
-	if a.io.IsStdoutTTY() && !opts.AsJSON {
+	if a.io.IsStdoutTTY() {
 		title := listHeader(len(codespaces))
 		fmt.Printf("\n%s\n\n", title)
 	}

@@ -9,17 +9,21 @@ import (
 	"strings"
 )
 
+type printer interface {
+	Printf(fmt string, v ...interface{})
+}
+
 // Shell runs an interactive secure shell over an existing
 // port-forwarding session. It runs until the shell is terminated
 // (including by cancellation of the context).
-func Shell(ctx context.Context, log logger, sshArgs []string, port int, destination string, usingCustomPort bool) error {
+func Shell(ctx context.Context, p printer, sshArgs []string, port int, destination string, usingCustomPort bool) error {
 	cmd, connArgs, err := newSSHCommand(ctx, port, destination, sshArgs)
 	if err != nil {
 		return fmt.Errorf("failed to create ssh command: %w", err)
 	}
 
 	if usingCustomPort {
-		log.Println("Connection Details: ssh " + destination + " " + strings.Join(connArgs, " "))
+		p.Printf("Connection Details: ssh %s %s", destination, connArgs)
 	}
 
 	return cmd.Run()
@@ -27,8 +31,10 @@ func Shell(ctx context.Context, log logger, sshArgs []string, port int, destinat
 
 // Copy runs an scp command over the specified port. The arguments may
 // include flags and non-flags, optionally separated by "--".
-// Remote files are indicated by a "remote:" prefix, and are resolved
-// relative to the remote user's home directory.
+//
+// Remote files indicated by a "remote:" prefix are resolved relative
+// to the remote user's home directory, and are subject to shell expansion
+// on the remote host; see https://lwn.net/Articles/835962/.
 func Copy(ctx context.Context, scpArgs []string, port int, destination string) error {
 	// Beware: invalid syntax causes scp to exit 1 with
 	// no error message, so don't let that happen.

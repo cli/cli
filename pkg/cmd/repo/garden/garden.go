@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -90,6 +90,7 @@ type GardenOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Config     func() (config.Config, error)
 
 	RepoArg string
 }
@@ -99,6 +100,7 @@ func NewCmdGarden(f *cmdutil.Factory, runF func(*GardenOptions) error) *cobra.Co
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		BaseRepo:   f.BaseRepo,
+		Config:     f.Config,
 	}
 
 	cmd := &cobra.Command{
@@ -149,7 +151,16 @@ func gardenRun(opts *GardenOptions) error {
 		var err error
 		viewURL := opts.RepoArg
 		if !strings.Contains(viewURL, "/") {
-			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+			cfg, err := opts.Config()
+			if err != nil {
+				return err
+			}
+			hostname, err := cfg.DefaultHost()
+			if err != nil {
+				return err
+			}
+
+			currentUser, err := api.CurrentLoginName(apiClient, hostname)
 			if err != nil {
 				return err
 			}

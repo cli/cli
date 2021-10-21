@@ -319,6 +319,7 @@ func apiRun(opts *ApiOptions) error {
 			}
 		} else {
 			requestPath, hasNextPage = findNextPage(resp)
+			requestBody = nil // prevent repeating GET parameters
 		}
 
 		if hasNextPage && opts.ShowResponseHeaders {

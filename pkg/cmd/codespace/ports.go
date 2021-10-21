@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 
@@ -59,14 +58,15 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, asJSON bool) 
 
 	devContainerCh := getDevContainer(ctx, a.apiClient, codespace)
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, noopLogger(), a.apiClient, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
 	defer safeClose(session, &err)
 
-	a.logger.Println("Loading ports...")
+	a.StartProgressIndicatorWithLabel("Fetching ports")
 	ports, err := session.GetSharedServers(ctx)
+	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ports of shared servers: %w", err)
 	}
@@ -74,10 +74,10 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, asJSON bool) 
 	devContainerResult := <-devContainerCh
 	if devContainerResult.err != nil {
 		// Warn about failure to read the devcontainer file. Not a codespace command error.
-		_, _ = a.logger.Errorf("Failed to get port names: %v\n", devContainerResult.err.Error())
+		a.errLogger.Printf("Failed to get port names: %v\n", devContainerResult.err.Error())
 	}
 
-	table := output.NewTable(os.Stdout, asJSON)
+	table := output.NewTable(a.io.Out, asJSON)
 	table.SetHeader([]string{"Label", "Port", "Visibility", "Browse URL"})
 	for _, port := range ports {
 		sourcePort := strconv.Itoa(port.SourcePort)
@@ -168,6 +168,7 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 	if err != nil {
 		return fmt.Errorf("error parsing port arguments: %w", err)
 	}
+
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
 		if err == errNoCodespaces {
@@ -176,18 +177,20 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 		return fmt.Errorf("error getting codespace: %w", err)
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, noopLogger(), a.apiClient, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
 	defer safeClose(session, &err)
 
+	// TODO: check if port visibility can be updated in parallel instead of sequentially
 	for _, port := range ports {
-		if err := session.UpdateSharedServerPrivacy(ctx, port.number, port.visibility); err != nil {
+		a.StartProgressIndicatorWithLabel(fmt.Sprintf("Updating port %d visibility to: %s", port.number, port.visibility))
+		err := session.UpdateSharedServerPrivacy(ctx, port.number, port.visibility)
+		a.StopProgressIndicator()
+		if err != nil {
 			return fmt.Errorf("error update port to public: %w", err)
 		}
-
-		a.logger.Printf("Port %d is now %s scoped.\n", port.number, port.visibility)
 	}
 
 	return nil
@@ -250,7 +253,7 @@ func (a *App) ForwardPorts(ctx context.Context, codespaceName string, ports []st
 		return fmt.Errorf("error getting codespace: %w", err)
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, noopLogger(), a.apiClient, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
@@ -267,7 +270,8 @@ func (a *App) ForwardPorts(ctx context.Context, codespaceName string, ports []st
 				return err
 			}
 			defer listen.Close()
-			a.logger.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
+
+			a.errLogger.Printf("Forwarding ports: remote %d <=> local %d", pair.remote, pair.local)
 			name := fmt.Sprintf("share-%d", pair.remote)
 			fwd := liveshare.NewPortForwarder(session, name, pair.remote, false)
 			return fwd.ForwardToListener(ctx, listen) // error always non-nil

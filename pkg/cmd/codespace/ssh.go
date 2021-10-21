@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/internal/codespaces"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
 )
@@ -52,6 +53,13 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
+	if err != nil {
+		return fmt.Errorf("get or choose codespace: %w", err)
+	}
+
+	// TODO(josebalius): We can fetch the user in parallel to everything else
+	// we should convert this call and others to happen async
 	user, err := a.apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting user: %w", err)
@@ -62,11 +70,6 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		authkeys <- checkAuthorizedKeys(ctx, a.apiClient, user.Login)
 	}()
 
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
-	if err != nil {
-		return fmt.Errorf("get or choose codespace: %w", err)
-	}
-
 	liveshareLogger := noopLogger()
 	if opts.debug {
 		debugLogger, err := newFileLogger(opts.debugFile)
@@ -76,10 +79,10 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		defer safeClose(debugLogger, &err)
 
 		liveshareLogger = debugLogger.Logger
-		a.logger.Println("Debug file located at: " + debugLogger.Name())
+		a.errLogger.Printf("Debug file located at: %s", debugLogger.Name())
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, liveshareLogger, a.apiClient, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
@@ -89,8 +92,9 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		return err
 	}
 
-	a.logger.Println("Fetching SSH Details...")
+	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
+	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}
@@ -113,7 +117,6 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		connectDestination = fmt.Sprintf("%s@localhost", sshUser)
 	}
 
-	a.logger.Println("Ready...")
 	tunnelClosed := make(chan error, 1)
 	go func() {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
@@ -126,7 +129,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		if opts.scpArgs != nil {
 			err = codespaces.Copy(ctx, opts.scpArgs, localSSHServerPort, connectDestination)
 		} else {
-			err = codespaces.Shell(ctx, a.logger, sshArgs, localSSHServerPort, connectDestination, usingCustomPort)
+			err = codespaces.Shell(ctx, a.errLogger, sshArgs, localSSHServerPort, connectDestination, usingCustomPort)
 		}
 		shellClosed <- err
 	}()
@@ -145,26 +148,39 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 type cpOptions struct {
 	sshOptions
 	recursive bool // -r
+	expand    bool // -e
 }
 
 func newCpCmd(app *App) *cobra.Command {
 	var opts cpOptions
 
 	cpCmd := &cobra.Command{
-		Use:   "cp [-r] srcs... dest",
+		Use:   "cp [-e] [-r] srcs... dest",
 		Short: "Copy files between local and remote file systems",
 		Long: `
 The cp command copies files between the local and remote file systems.
-
-A 'remote:' prefix on any file name argument indicates that it refers to
-the file system of the remote (Codespace) machine. It is resolved relative
-to the home directory of the remote user.
 
 As with the UNIX cp command, the first argument specifies the source and the last
 specifies the destination; additional sources may be specified after the first,
 if the destination is a directory.
 
 The -r (recursive) flag is required if any source is a directory.
+
+A 'remote:' prefix on any file name argument indicates that it refers to
+the file system of the remote (Codespace) machine. It is resolved relative
+to the home directory of the remote user.
+
+By default, remote file names are interpreted literally. With the -e flag,
+each such argument is treated in the manner of scp, as a Bash expression to
+be evaluated on the remote machine, subject to expansion of tildes, braces,
+globs, environment variables, and backticks, as in these examples:
+
+ $ gh codespace cp -e README.md 'remote:/workspace/$RepositoryName/'
+ $ gh codespace cp -e 'remote:~/*.go' ./gofiles/
+ $ gh codespace cp -e 'remote:/workspace/myproj/go.{mod,sum}' ./gofiles/
+
+For security, do not use the -e flag with arguments provided by untrusted
+users; see https://lwn.net/Articles/835962/ for discussion.
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.Copy(cmd.Context(), args, opts)
@@ -173,13 +189,14 @@ The -r (recursive) flag is required if any source is a directory.
 
 	// We don't expose all sshOptions.
 	cpCmd.Flags().BoolVarP(&opts.recursive, "recursive", "r", false, "Recursively copy directories")
+	cpCmd.Flags().BoolVarP(&opts.expand, "expand", "e", false, "Expand remote file names on remote shell")
 	cpCmd.Flags().StringVarP(&opts.codespace, "codespace", "c", "", "Name of the codespace")
 	return cpCmd
 }
 
 // Copy copies files between the local and remote file systems.
 // The mechanics are similar to 'ssh' but using 'scp'.
-func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) (err error) {
+func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) error {
 	if len(args) < 2 {
 		return fmt.Errorf("cp requires source and destination arguments")
 	}
@@ -187,8 +204,21 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) (err erro
 		opts.scpArgs = append(opts.scpArgs, "-r")
 	}
 	opts.scpArgs = append(opts.scpArgs, "--")
+	hasRemote := false
 	for _, arg := range args {
-		if !filepath.IsAbs(arg) && !strings.HasPrefix(arg, "remote:") {
+		if rest := strings.TrimPrefix(arg, "remote:"); rest != arg {
+			hasRemote = true
+			// scp treats each filename argument as a shell expression,
+			// subjecting it to expansion of environment variables, braces,
+			// tilde, backticks, globs and so on. Because these present a
+			// security risk (see https://lwn.net/Articles/835962/), we
+			// disable them by shell-escaping the argument unless the user
+			// provided the -e flag.
+			if !opts.expand {
+				arg = `remote:'` + strings.Replace(rest, `'`, `'\''`, -1) + `'`
+			}
+
+		} else if !filepath.IsAbs(arg) {
 			// scp treats a colon in the first path segment as a host identifier.
 			// Escape it by prepending "./".
 			// TODO(adonovan): test on Windows, including with a c:\\foo path.
@@ -199,6 +229,9 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) (err erro
 			}
 		}
 		opts.scpArgs = append(opts.scpArgs, arg)
+	}
+	if !hasRemote {
+		return &cmdutil.FlagError{Err: fmt.Errorf("at least one argument must have a 'remote:' prefix")}
 	}
 	return a.SSH(ctx, nil, opts.sshOptions)
 }
