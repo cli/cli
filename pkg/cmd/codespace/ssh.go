@@ -53,6 +53,13 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
+	if err != nil {
+		return fmt.Errorf("get or choose codespace: %w", err)
+	}
+
+	// TODO(josebalius): We can fetch the user in parallel to everything else
+	// we should convert this call and others to happen async
 	user, err := a.apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting user: %w", err)
@@ -63,11 +70,6 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		authkeys <- checkAuthorizedKeys(ctx, a.apiClient, user.Login)
 	}()
 
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
-	if err != nil {
-		return fmt.Errorf("get or choose codespace: %w", err)
-	}
-
 	liveshareLogger := noopLogger()
 	if opts.debug {
 		debugLogger, err := newFileLogger(opts.debugFile)
@@ -77,10 +79,10 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		defer safeClose(debugLogger, &err)
 
 		liveshareLogger = debugLogger.Logger
-		a.logger.Println("Debug file located at: " + debugLogger.Name())
+		a.errLogger.Printf("Debug file located at: %s", debugLogger.Name())
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, liveshareLogger, a.apiClient, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
@@ -90,8 +92,9 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		return err
 	}
 
-	a.logger.Println("Fetching SSH Details...")
+	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
+	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}
@@ -114,7 +117,6 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		connectDestination = fmt.Sprintf("%s@localhost", sshUser)
 	}
 
-	a.logger.Println("Ready...")
 	tunnelClosed := make(chan error, 1)
 	go func() {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
@@ -127,7 +129,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		if opts.scpArgs != nil {
 			err = codespaces.Copy(ctx, opts.scpArgs, localSSHServerPort, connectDestination)
 		} else {
-			err = codespaces.Shell(ctx, a.logger, sshArgs, localSSHServerPort, connectDestination, usingCustomPort)
+			err = codespaces.Shell(ctx, a.errLogger, sshArgs, localSSHServerPort, connectDestination, usingCustomPort)
 		}
 		shellClosed <- err
 	}()

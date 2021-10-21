@@ -3,7 +3,6 @@ package codespace
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -34,12 +33,14 @@ func newListCmd(app *App) *cobra.Command {
 }
 
 func (a *App) List(ctx context.Context, asJSON bool, limit int) error {
+	a.StartProgressIndicatorWithLabel("Fetching codespaces")
 	codespaces, err := a.apiClient.ListCodespaces(ctx, limit)
+	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}
 
-	table := output.NewTable(os.Stdout, asJSON)
+	table := output.NewTable(a.io.Out, asJSON)
 	table.SetHeader([]string{"Name", "Repository", "Branch", "State", "Created At"})
 	for _, apiCodespace := range codespaces {
 		cs := codespace{apiCodespace}
