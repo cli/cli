@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
@@ -13,16 +12,13 @@ import (
 
 type TablePrinter interface {
 	IsTTY() bool
-	SetHeader([]string)
 	AddField(string, func(int, string) string, func(string) string)
 	EndRow()
 	Render() error
 }
 
 type TablePrinterOptions struct {
-	IsTTY      bool
-	IsJSON     bool
-	JSONPretty bool
+	IsTTY bool
 }
 
 func NewTablePrinter(io *iostreams.IOStreams) TablePrinter {
@@ -32,12 +28,7 @@ func NewTablePrinter(io *iostreams.IOStreams) TablePrinter {
 }
 
 func NewTablePrinterWithOptions(io *iostreams.IOStreams, opts TablePrinterOptions) TablePrinter {
-	if opts.IsJSON {
-		return &jsonTablePrinter{
-			out:    io.Out,
-			pretty: opts.JSONPretty,
-		}
-	} else if opts.IsTTY {
+	if opts.IsTTY {
 		var maxWidth int
 		if io.IsStdoutTTY() {
 			maxWidth = io.TerminalWidth()
@@ -68,15 +59,10 @@ type ttyTablePrinter struct {
 	out      io.Writer
 	maxWidth int
 	rows     [][]tableField
-	header   []string
 }
 
 func (t ttyTablePrinter) IsTTY() bool {
 	return true
-}
-
-func (t *ttyTablePrinter) SetHeader(header []string) {
-	t.header = header
 }
 
 func (t *ttyTablePrinter) AddField(s string, truncateFunc func(int, string) string, colorFunc func(string) string) {
@@ -231,16 +217,6 @@ type tsvTablePrinter struct {
 	currentCol int
 }
 
-func (t *tsvTablePrinter) SetHeader(header []string) {
-	for _, h := range header {
-		if t.currentCol > 0 {
-			fmt.Fprint(t.out, "\t")
-		}
-		fmt.Fprint(t.out, h)
-		t.currentCol++
-	}
-}
-
 func (t tsvTablePrinter) IsTTY() bool {
 	return false
 }
@@ -260,50 +236,4 @@ func (t *tsvTablePrinter) EndRow() {
 
 func (t *tsvTablePrinter) Render() error {
 	return nil
-}
-
-type jsonTablePrinter struct {
-	out        io.Writer
-	currentCol int
-	rows       []interface{}
-	row        map[string]string
-	header     []string
-	pretty     bool
-}
-
-func (j *jsonTablePrinter) SetHeader(header []string) {
-	for _, h := range header {
-		j.header = append(j.header, Camelize(h))
-	}
-}
-
-func (j jsonTablePrinter) IsTTY() bool {
-	return false
-}
-
-func (j *jsonTablePrinter) AddField(text string, _ func(int, string) string, _ func(string) string) {
-	if len(j.header) <= j.currentCol {
-		j.header = append(j.header, fmt.Sprint(j.currentCol))
-	}
-
-	if j.currentCol == 0 {
-		j.row = make(map[string]string)
-	}
-
-	j.row[j.header[j.currentCol]] = text
-	j.currentCol++
-}
-
-func (j *jsonTablePrinter) EndRow() {
-	j.rows = append(j.rows, j.row)
-	j.currentCol = 0
-}
-
-func (j *jsonTablePrinter) Render() error {
-	enc := json.NewEncoder(j.out)
-	if j.pretty {
-		enc.SetIndent("", "  ")
-	}
-
-	return enc.Encode(j.rows)
 }

@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"strings"
 	"time"
-	"unicode"
 )
 
 func Pluralize(num int, thing string) string {
@@ -80,28 +79,7 @@ func DisplayURL(urlStr string) string {
 	return u.Hostname() + u.Path
 }
 
-// ValidURL ccecks if maximum length of a URL: 8192 bytes
+// Maximum length of a URL: 8192 bytes
 func ValidURL(urlStr string) bool {
 	return len(urlStr) < 8192
-}
-
-// Camelize transforms string to CamelCase
-func Camelize(s string) string {
-	var b strings.Builder
-	capitalizeNext := false
-	for i, r := range s {
-		if r == ' ' {
-			capitalizeNext = true
-			continue
-		}
-		if capitalizeNext {
-			b.WriteRune(unicode.ToUpper(r))
-			capitalizeNext = false
-		} else if i == 0 {
-			b.WriteRune(unicode.ToLower(r))
-		} else {
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
 }
