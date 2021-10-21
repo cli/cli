@@ -82,7 +82,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return nil
 			}
 			if opts.IO.IsStdinTTY() {
-				return &cmdutil.FlagError{Err: errors.New("no filenames passed and nothing on STDIN")}
+				return cmdutil.FlagErrorf("no filenames passed and nothing on STDIN")
 			}
 			return nil
 		},

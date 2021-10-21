@@ -69,11 +69,11 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !opts.IO.CanPrompt() && !(tokenStdin || opts.Web) {
-				return &cmdutil.FlagError{Err: errors.New("--web or --with-token required when not running interactively")}
+				return cmdutil.FlagErrorf("--web or --with-token required when not running interactively")
 			}
 
 			if tokenStdin && opts.Web {
-				return &cmdutil.FlagError{Err: errors.New("specify only one of --web or --with-token")}
+				return cmdutil.FlagErrorf("specify only one of --web or --with-token")
 			}
 
 			if tokenStdin {
@@ -91,7 +91,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 
 			if cmd.Flags().Changed("hostname") {
 				if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
-					return &cmdutil.FlagError{Err: fmt.Errorf("error parsing --hostname: %w", err)}
+					return cmdutil.FlagErrorf("error parsing --hostname: %w", err)
 				}
 			}
 

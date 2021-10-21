@@ -1,7 +1,6 @@
 package fork
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -61,7 +60,7 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 		Use: "fork [<repository>] [-- <gitflags>...]",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if cmd.ArgsLenAtDash() == 0 && len(args[1:]) > 0 {
-				return &cmdutil.FlagError{Err: fmt.Errorf("repository argument required when passing 'git clone' flags")}
+				return cmdutil.FlagErrorf("repository argument required when passing 'git clone' flags")
 			}
 			return nil
 		},
@@ -84,11 +83,11 @@ Additional 'git clone' flags can be passed in by listing them after '--'.`,
 			}
 
 			if cmd.Flags().Changed("org") && opts.Organization == "" {
-				return &cmdutil.FlagError{Err: errors.New("--org cannot be blank")}
+				return cmdutil.FlagErrorf("--org cannot be blank")
 			}
 
 			if opts.RemoteName == "" {
-				return &cmdutil.FlagError{Err: errors.New("--remote-name cannot be blank")}
+				return cmdutil.FlagErrorf("--remote-name cannot be blank")
 			} else if !cmd.Flags().Changed("remote-name") {
 				opts.Rename = true // Any existing 'origin' will be renamed to upstream
 			}
@@ -109,7 +108,7 @@ Additional 'git clone' flags can be passed in by listing them after '--'.`,
 		if err == pflag.ErrHelp {
 			return err
 		}
-		return &cmdutil.FlagError{Err: fmt.Errorf("%w\nSeparate git clone flags with '--'.", err)}
+		return cmdutil.FlagErrorf("%w\nSeparate git clone flags with '--'.", err)
 	})
 
 	cmd.Flags().BoolVar(&opts.Clone, "clone", false, "Clone the fork {true|false}")

@@ -1,7 +1,6 @@
 package create
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"path"
@@ -94,25 +93,25 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 
 			if len(args) == 0 && (opts.GitIgnoreTemplate != "" || opts.LicenseTemplate != "") {
-				return &cmdutil.FlagError{Err: errors.New(".gitignore and license templates are added only when a specific repository name is passed")}
+				return cmdutil.FlagErrorf(".gitignore and license templates are added only when a specific repository name is passed")
 			}
 
 			if opts.Template != "" && (opts.GitIgnoreTemplate != "" || opts.LicenseTemplate != "") {
-				return &cmdutil.FlagError{Err: errors.New(".gitignore and license templates are not added when template is provided")}
+				return cmdutil.FlagErrorf(".gitignore and license templates are not added when template is provided")
 			}
 
 			if !opts.IO.CanPrompt() {
 				if opts.Name == "" {
-					return &cmdutil.FlagError{Err: errors.New("name argument required when not running interactively")}
+					return cmdutil.FlagErrorf("name argument required when not running interactively")
 				}
 
 				if !opts.Internal && !opts.Private && !opts.Public {
-					return &cmdutil.FlagError{Err: errors.New("`--public`, `--private`, or `--internal` required when not running interactively")}
+					return cmdutil.FlagErrorf("`--public`, `--private`, or `--internal` required when not running interactively")
 				}
 			}
 
 			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "" || cmd.Flags().Changed("enable-issues") || cmd.Flags().Changed("enable-wiki")) {
-				return &cmdutil.FlagError{Err: errors.New("The `--template` option is not supported with `--homepage`, `--team`, `--enable-issues`, or `--enable-wiki`")}
+				return cmdutil.FlagErrorf("The `--template` option is not supported with `--homepage`, `--team`, `--enable-issues`, or `--enable-wiki`")
 			}
 
 			if runF != nil {

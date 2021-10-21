@@ -61,7 +61,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 
 			if len(args) == 0 {
 				if len(opts.FilePatterns) == 0 {
-					return &cmdutil.FlagError{Err: errors.New("the '--pattern' flag is required when downloading the latest release")}
+					return cmdutil.FlagErrorf("the '--pattern' flag is required when downloading the latest release")
 				}
 			} else {
 				opts.TagName = args[0]

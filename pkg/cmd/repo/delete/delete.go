@@ -1,7 +1,6 @@
 package delete
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -41,8 +40,7 @@ To authorize, run "gh auth refresh -s delete_repo"`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.RepoArg = args[0]
 			if !opts.IO.CanPrompt() && !opts.Confirmed {
-				return &cmdutil.FlagError{
-					Err: errors.New("could not prompt: confirmation with prompt or --confirm flag required")}
+				return cmdutil.FlagErrorf("could not prompt: confirmation with prompt or --confirm flag required")
 			}
 			if runF != nil {
 				return runF(opts)
