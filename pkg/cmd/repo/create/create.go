@@ -679,6 +679,7 @@ func getVisibility() (string, error) {
 	return strings.ToUpper(answer.RepoVisibility), nil
 }
 
-func normalizeRepoName(name string) string {
-	return strings.TrimSuffix(regexp.MustCompile(`[^\w.-]+`).ReplaceAllString(name, "-"), ".git")
+// normalizeRepoName takes in the repo name the user inputted and normalizes it using the same logic as GitHub (GitHub.com/new)
+func normalizeRepoName(repoName string) string {
+	return strings.TrimSuffix(regexp.MustCompile(`[^\w.-]+`).ReplaceAllString(repoName, "-"), ".git")
 }
