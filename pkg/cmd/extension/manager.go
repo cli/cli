@@ -18,6 +18,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/extensions"
@@ -333,7 +334,6 @@ func (m *Manager) Install(repo ghrepo.Interface) error {
 		return err
 	}
 	if !hs {
-		// TODO open an issue hint, here?
 		return errors.New("extension is uninstallable: missing executable")
 	}
 
@@ -487,6 +487,19 @@ func (m *Manager) upgradeExtension(ext Extension, force bool) error {
 	if ext.IsBinary() {
 		err = m.upgradeBinExtension(ext)
 	} else {
+		// Check if git extension has changed to a binary extension
+		var isBin bool
+		repo, repoErr := repoFromPath(filepath.Join(ext.Path(), ".."))
+		if repoErr == nil {
+			isBin, _ = isBinExtension(m.client, repo)
+		}
+		if isBin {
+			err = m.Remove(ext.Name())
+			if err != nil {
+				return fmt.Errorf("failed to migrate to new precompiled extension format: %w", err)
+			}
+			return m.installBin(repo)
+		}
 		err = m.upgradeGitExtension(ext, force)
 	}
 	return err
@@ -652,6 +665,32 @@ func isBinExtension(client *http.Client, repo ghrepo.Interface) (isBin bool, err
 	}
 
 	return
+}
+
+func repoFromPath(path string) (ghrepo.Interface, error) {
+	remotes, err := git.RemotesForPath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(remotes) == 0 {
+		return nil, fmt.Errorf("no remotes configured for %s", path)
+	}
+
+	var remote *git.Remote
+
+	for _, r := range remotes {
+		if r.Name == "origin" {
+			remote = r
+			break
+		}
+	}
+
+	if remote == nil {
+		remote = remotes[0]
+	}
+
+	return ghrepo.FromURL(remote.FetchURL)
 }
 
 func possibleDists() []string {
