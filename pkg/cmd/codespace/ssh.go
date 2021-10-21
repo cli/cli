@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/internal/codespaces"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
 )
@@ -228,7 +229,7 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) error {
 		opts.scpArgs = append(opts.scpArgs, arg)
 	}
 	if !hasRemote {
-		return fmt.Errorf("cp: no argument is a 'remote:' filename")
+		return &cmdutil.FlagError{Err: fmt.Errorf("at least one argument must have a 'remote:' prefix")}
 	}
 	return a.SSH(ctx, nil, opts.sshOptions)
 }
