@@ -69,9 +69,11 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 	forwardArgs := args[1:]
 
 	exts, _ := m.list(false)
+	var ext Extension
 	for _, e := range exts {
 		if e.Name() == extName {
-			exe = e.Path()
+			ext = e
+			exe = ext.Path()
 			break
 		}
 	}
@@ -81,7 +83,9 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 
 	var externalCmd *exec.Cmd
 
-	if runtime.GOOS == "windows" {
+	if ext.IsBinary() || runtime.GOOS != "windows" {
+		externalCmd = m.newCommand(exe, forwardArgs...)
+	} else if runtime.GOOS == "windows" {
 		// Dispatch all extension calls through the `sh` interpreter to support executable files with a
 		// shebang line on Windows.
 		shExe, err := m.findSh()
@@ -93,8 +97,6 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 		}
 		forwardArgs = append([]string{"-c", `command "$@"`, "--", exe}, forwardArgs...)
 		externalCmd = m.newCommand(shExe, forwardArgs...)
-	} else {
-		externalCmd = m.newCommand(exe, forwardArgs...)
 	}
 	externalCmd.Stdin = stdin
 	externalCmd.Stdout = stdout
@@ -268,7 +270,17 @@ func (m *Manager) getLatestVersion(ext Extension) (string, error) {
 	if ext.isLocal {
 		return "", fmt.Errorf("unable to get latest version for local extensions")
 	}
-	if ext.kind == GitKind {
+	if ext.IsBinary() {
+		repo, err := ghrepo.FromFullName(ext.url)
+		if err != nil {
+			return "", err
+		}
+		r, err := fetchLatestRelease(m.client, repo)
+		if err != nil {
+			return "", err
+		}
+		return r.Tag, nil
+	} else {
 		gitExe, err := m.lookPath("git")
 		if err != nil {
 			return "", err
@@ -282,16 +294,6 @@ func (m *Manager) getLatestVersion(ext Extension) (string, error) {
 		}
 		remoteSha := bytes.SplitN(lsRemote, []byte("\t"), 2)[0]
 		return string(remoteSha), nil
-	} else {
-		repo, err := ghrepo.FromFullName(ext.url)
-		if err != nil {
-			return "", err
-		}
-		r, err := fetchLatestRelease(m.client, repo)
-		if err != nil {
-			return "", err
-		}
-		return r.Tag, nil
 	}
 }
 
@@ -477,7 +479,7 @@ func (m *Manager) upgradeExtension(ext Extension, force bool) error {
 		return upToDateError
 	}
 	var err error
-	if ext.kind == BinaryKind {
+	if ext.IsBinary() {
 		err = m.upgradeBinExtension(ext)
 	} else {
 		err = m.upgradeGitExtension(ext, force)
