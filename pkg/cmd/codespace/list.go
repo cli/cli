@@ -3,6 +3,7 @@ package codespace
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -42,53 +43,48 @@ func (a *App) List(ctx context.Context, asJSON bool, limit int) error {
 	}
 
 	if err := a.io.StartPager(); err != nil {
-		return fmt.Errorf("error starting pager: %w", err)
+		a.errLogger.Printf("error starting pager: %v", err)
 	}
 	defer a.io.StopPager()
 
-	cs := a.io.ColorScheme()
-	tp := utils.NewTablePrinterWithOptions(a.io, utils.TablePrinterOptions{
-		IsTTY:  a.io.IsStdoutTTY(),
-		IsJSON: asJSON,
-	})
-
-	tp.SetHeader([]string{"Name", "Repository", "Branch", "State", "Created at"})
-	for _, apiCodespace := range codespaces {
-		c := codespace{apiCodespace}
-
-		tp.AddField(c.Name, nil, nil)
-		tp.AddField(c.Repository.FullName, nil, cs.Bold)
-		tp.AddField(c.branchWithGitStatus(), nil, nil)
-
-		if c.State == api.CodespaceStateShutdown {
-			tp.AddField(c.State, nil, cs.Gray)
-		} else if c.State == api.CodespaceStateStarting {
-			tp.AddField(c.State, nil, cs.Yellow)
-		} else if c.State == api.CodespaceStateAvailable {
-			tp.AddField(c.State, nil, cs.Green)
-		} else {
-			tp.AddField(c.State, nil, cs.Gray)
-		}
-
-		tp.AddField(c.CreatedAt, nil, cs.Gray)
+	tp := utils.NewTablePrinter(a.io)
+	if tp.IsTTY() {
+		tp.AddField("NAME", nil, nil)
+		tp.AddField("REPOSITORY", nil, nil)
+		tp.AddField("BRANCH", nil, nil)
+		tp.AddField("STATE", nil, nil)
+		tp.AddField("CREATED AT", nil, nil)
 		tp.EndRow()
 	}
 
-	if a.io.IsStdoutTTY() {
-		title := listHeader(len(codespaces))
-		fmt.Printf("\n%s\n\n", title)
+	cs := a.io.ColorScheme()
+	for _, apiCodespace := range codespaces {
+		c := codespace{apiCodespace}
+
+		var stateColor func(string) string
+		switch c.State {
+		case api.CodespaceStateStarting:
+			stateColor = cs.Yellow
+		case api.CodespaceStateAvailable:
+			stateColor = cs.Green
+		}
+
+		tp.AddField(c.Name, nil, cs.Yellow)
+		tp.AddField(c.Repository.FullName, nil, nil)
+		tp.AddField(c.branchWithGitStatus(), nil, cs.Cyan)
+		tp.AddField(c.State, nil, stateColor)
+
+		if tp.IsTTY() {
+			ct, err := time.Parse(time.RFC3339, c.CreatedAt)
+			if err != nil {
+				return fmt.Errorf("error parsing date %q: %w", c.CreatedAt, err)
+			}
+			tp.AddField(utils.FuzzyAgoAbbr(time.Now(), ct), nil, cs.Gray)
+		} else {
+			tp.AddField(c.CreatedAt, nil, nil)
+		}
+		tp.EndRow()
 	}
 
 	return tp.Render()
-}
-
-func listHeader(count int) string {
-	s := ""
-	if count == 0 {
-		return "No results"
-	} else if count > 1 {
-		s = "s"
-	}
-
-	return fmt.Sprintf("Showing %d codespace%s", count, s)
 }
