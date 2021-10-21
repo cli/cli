@@ -69,7 +69,7 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 	defer listen.Close()
 	localPort := listen.Addr().(*net.TCPAddr).Port
 
-	a.StartProgressIndicatorWithSuffix("Fetching SSH Details")
+	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
 	a.StopProgressIndicator()
 	if err != nil {

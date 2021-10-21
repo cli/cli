@@ -43,7 +43,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			wantDeleted: []string{"hubot-robawt-abc"},
-			wantStdout:  "1 codespace deleted.\n",
+			wantStdout:  "",
 		},
 		{
 			name: "by repo",
@@ -71,7 +71,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			wantDeleted: []string{"monalisa-spoonknife-123", "monalisa-spoonknife-c4f3"},
-			wantStdout:  "2 codespaces deleted.\n",
+			wantStdout:  "",
 		},
 		{
 			name: "unused",
@@ -94,7 +94,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-c4f3"},
-			wantStdout:  "2 codespaces deleted.\n",
+			wantStdout:  "",
 		},
 		{
 			name: "deletion failed",
@@ -150,7 +150,7 @@ func TestDelete(t *testing.T) {
 				"Codespace hubot-robawt-abc has unsaved changes. OK to delete?":        true,
 			},
 			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-c4f3"},
-			wantStdout:  "2 codespaces deleted.\n",
+			wantStdout:  "",
 		},
 	}
 	for _, tt := range tests {

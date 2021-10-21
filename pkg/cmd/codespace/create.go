@@ -52,7 +52,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return fmt.Errorf("error getting branch name: %w", err)
 	}
 
-	a.StartProgressIndicatorWithSuffix("Fetching repository")
+	a.StartProgressIndicatorWithLabel("Fetching repository")
 	repository, err := a.apiClient.GetRepository(ctx, repo)
 	a.StopProgressIndicator()
 	if err != nil {
@@ -77,7 +77,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return errors.New("there are no available machine types for this repository")
 	}
 
-	a.StartProgressIndicatorWithSuffix("Creating codespace")
+	a.StartProgressIndicatorWithLabel("Creating codespace")
 	codespace, err := a.apiClient.CreateCodespace(ctx, &api.CreateCodespaceParams{
 		RepositoryID: repository.ID,
 		Branch:       branch,
@@ -95,9 +95,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		}
 	}
 
-	a.Println("Codespace created.")
 	fmt.Fprintln(a.io.Out, codespace.Name)
-
 	return nil
 }
 
@@ -122,7 +120,7 @@ func (a *App) showStatus(ctx context.Context, user *api.User, codespace *api.Cod
 			}
 
 			if state.Name != lastState.Name {
-				a.StartProgressIndicatorWithSuffix(state.Name)
+				a.StartProgressIndicatorWithLabel(state.Name)
 
 				if state.Status == codespaces.PostCreateStateRunning {
 					inProgress = true

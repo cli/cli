@@ -58,14 +58,14 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 	}
 	localPort := listen.Addr().(*net.TCPAddr).Port
 
-	progress.StartProgressIndicatorWithSuffix("Fetching SSH Details")
+	progress.StartProgressIndicatorWithLabel("Fetching SSH Details")
+	defer progress.StopProgressIndicator()
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
-	progress.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}
 
-	progress.StartProgressIndicatorWithSuffix("Fetching status")
+	progress.StartProgressIndicatorWithLabel("Fetching status")
 	tunnelClosed := make(chan error, 1) // buffered to avoid sender stuckness
 	go func() {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, false)

@@ -64,7 +64,7 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, asJSON bool) 
 	}
 	defer safeClose(session, &err)
 
-	a.StartProgressIndicatorWithSuffix("Fetching ports")
+	a.StartProgressIndicatorWithLabel("Fetching ports")
 	ports, err := session.GetSharedServers(ctx)
 	a.StopProgressIndicator()
 	if err != nil {
@@ -183,15 +183,14 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 	}
 	defer safeClose(session, &err)
 
+	// TODO: check if port visibility can be updated in parallel instead of sequentially
 	for _, port := range ports {
-		a.StartProgressIndicatorWithSuffix(fmt.Sprintf("Updating port %d visibility to: %s", port.number, port.visibility))
+		a.StartProgressIndicatorWithLabel(fmt.Sprintf("Updating port %d visibility to: %s", port.number, port.visibility))
 		err := session.UpdateSharedServerPrivacy(ctx, port.number, port.visibility)
 		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error update port to public: %w", err)
 		}
-
-		a.Printf("Port %d is now %s scoped.\n", port.number, port.visibility)
 	}
 
 	return nil
@@ -272,7 +271,7 @@ func (a *App) ForwardPorts(ctx context.Context, codespaceName string, ports []st
 			}
 			defer listen.Close()
 
-			a.Printf("Forwarding ports: remote %d <=> local %d\n", pair.remote, pair.local)
+			a.errLogger.Printf("Forwarding ports: remote %d <=> local %d", pair.remote, pair.local)
 			name := fmt.Sprintf("share-%d", pair.remote)
 			fwd := liveshare.NewPortForwarder(session, name, pair.remote, false)
 			return fwd.ForwardToListener(ctx, listen) // error always non-nil

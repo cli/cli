@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
@@ -25,17 +24,20 @@ type apiClient interface {
 }
 
 type progressIndicator interface {
-	StartProgressIndicatorWithSuffix(s string)
+	StartProgressIndicatorWithLabel(s string)
 	StopProgressIndicator()
+}
+
+type logger interface {
+	Println(v ...interface{})
+	Printf(f string, v ...interface{})
 }
 
 // ConnectToLiveshare waits for a Codespace to become running,
 // and connects to it using a Live Share session.
-func ConnectToLiveshare(ctx context.Context, progress progressIndicator, sessionLogger *log.Logger, apiClient apiClient, codespace *api.Codespace) (sess *liveshare.Session, err error) {
-	var startedCodespace bool
+func ConnectToLiveshare(ctx context.Context, progress progressIndicator, sessionLogger logger, apiClient apiClient, codespace *api.Codespace) (sess *liveshare.Session, err error) {
 	if codespace.State != api.CodespaceStateAvailable {
-		startedCodespace = true
-		progress.StartProgressIndicatorWithSuffix("Starting codespace")
+		progress.StartProgressIndicatorWithLabel("Starting codespace")
 		if err := apiClient.StartCodespace(ctx, codespace.Name); err != nil {
 			return nil, fmt.Errorf("error starting codespace: %w", err)
 		}
@@ -56,11 +58,7 @@ func ConnectToLiveshare(ctx context.Context, progress progressIndicator, session
 		}
 	}
 
-	if startedCodespace {
-		progress.StopProgressIndicator()
-	}
-
-	progress.StartProgressIndicatorWithSuffix("Connecting to codespace")
+	progress.StartProgressIndicatorWithLabel("Connecting to codespace")
 	defer progress.StopProgressIndicator()
 
 	return liveshare.Connect(ctx, liveshare.Options{

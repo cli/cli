@@ -33,7 +33,7 @@ func newListCmd(app *App) *cobra.Command {
 }
 
 func (a *App) List(ctx context.Context, asJSON bool, limit int) error {
-	a.StartProgressIndicatorWithSuffix("Fetching codespaces")
+	a.StartProgressIndicatorWithLabel("Fetching codespaces")
 	codespaces, err := a.apiClient.ListCodespaces(ctx, limit)
 	a.StopProgressIndicator()
 	if err != nil {

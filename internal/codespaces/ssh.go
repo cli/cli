@@ -10,7 +10,7 @@ import (
 )
 
 type printer interface {
-	Println(v ...interface{})
+	Printf(fmt string, v ...interface{})
 }
 
 // Shell runs an interactive secure shell over an existing
@@ -23,7 +23,7 @@ func Shell(ctx context.Context, p printer, sshArgs []string, port int, destinati
 	}
 
 	if usingCustomPort {
-		p.Println("Connection Details: ssh " + destination + " " + strings.Join(connArgs, " "))
+		p.Printf("Connection Details: ssh %s %s", destination, connArgs)
 	}
 
 	return cmd.Run()

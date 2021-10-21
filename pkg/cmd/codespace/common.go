@@ -24,57 +24,27 @@ import (
 type App struct {
 	io        *iostreams.IOStreams
 	apiClient apiClient
-
-	logger, errLogger *log.Logger
-	isInteractive     bool
+	errLogger *log.Logger
 }
 
 func NewApp(io *iostreams.IOStreams, apiClient apiClient) *App {
-	isInteractive := io.IsStdinTTY() && io.IsStdoutTTY()
-
-	logger := noopLogger()
-	// TODO(josebalius): Accept a debug parameter
-	if os.Getenv("DEBUG") != "" {
-		logger = log.New(io.Out, "* ", 0)
-	}
 	errLogger := log.New(io.ErrOut, "", 0)
 
 	return &App{
-		io:            io,
-		apiClient:     apiClient,
-		logger:        logger,
-		errLogger:     errLogger,
-		isInteractive: isInteractive,
+		io:        io,
+		apiClient: apiClient,
+		errLogger: errLogger,
 	}
 }
 
-// StartProgressIndicatorWithSuffix starts a progress indicator with a message.
-// If the app is non-interactive the message is logged.
-func (a *App) StartProgressIndicatorWithSuffix(s string) {
-	if !a.isInteractive {
-		// if we are not interactive, log the progress states
-		a.logger.Println(s)
-		return
-	}
-
-	a.io.StartProgressIndicatorWithSuffix(s)
+// StartProgressIndicatorWithLabel starts a progress indicator with a message.
+func (a *App) StartProgressIndicatorWithLabel(s string) {
+	a.io.StartProgressIndicatorWithLabel(s)
 }
 
 // StopProgressIndicator stops the progress indicator.
 func (a *App) StopProgressIndicator() {
 	a.io.StopProgressIndicator()
-}
-
-func (a *App) Print(v ...interface{}) {
-	fmt.Fprint(a.io.Out, v...)
-}
-
-func (a *App) Println(v ...interface{}) {
-	fmt.Fprintln(a.io.Out, v...)
-}
-
-func (a *App) Printf(f string, v ...interface{}) {
-	fmt.Fprintf(a.io.Out, f, v...)
 }
 
 //go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
