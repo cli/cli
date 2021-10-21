@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
@@ -25,7 +26,6 @@ type RenameOptions struct {
 	Config          func() (config.Config, error)
 	BaseRepo        func() (ghrepo.Interface, error)
 	Remotes         func() (context.Remotes, error)
-	oldRepoSelector string
 	newRepoSelector string
 }
 
@@ -46,32 +46,39 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 	}
 
 	cmd := &cobra.Command{
-		Use:   "rename [-R] [<repository>] [<new-name>]",
+		Use:   "rename [<repository>] [<new-name>]",
 		Short: "Rename a repository",
-		Long: `Rename a GitHub repository
+		Long: heredoc.Doc(`Rename a GitHub repository
+		
 		With no argument, the repository for the current directory is renamed using a prompt
+		
 		With one argument, the repository of the current directory is renamed using the argument
-		With '-R', and two arguments the given repository is replaced with the new name `,
+		
+		With '-R', and two arguments the given repository is replaced with the new name`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
+				opts.BaseRepo = f.BaseRepo
 				opts.newRepoSelector = args[0]
-			} else {
-				if !opts.IO.CanPrompt() {
-					return &cmdutil.FlagError{
-						Err: errors.New("could not prompt: proceed with prompt")}
-				}
+			} else if !opts.IO.CanPrompt() {
+				return &cmdutil.FlagError{
+					Err: errors.New("could not prompt: proceed with a repo name")}
+			}
+
+			if runf != nil {
+				return runf(opts)
 			}
 			return renameRun(opts)
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.oldRepoSelector, "repo", "R", "", "pass in two arguments to rename a repository")
+	cmdutil.EnableRepoOverride(cmd, f)
 
 	return cmd
 }
 
 func renameRun(opts *RenameOptions) error {
+
 	cs := opts.IO.ColorScheme()
 	httpClient, err := opts.HttpClient()
 	if err != nil {
@@ -80,71 +87,48 @@ func renameRun(opts *RenameOptions) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	var input renameRepo
-	var oldRepo ghrepo.Interface
 	var newRepo ghrepo.Interface
+	var baseRemote *context.Remote
+	newRepoName := opts.newRepoSelector
 
-	if opts.oldRepoSelector == "" {
-		var newRepoName string
-		currRepo, err := opts.BaseRepo()
+	currRepo, err := opts.BaseRepo()
+	if err != nil {
+		return err
+	}
+
+	if opts.newRepoSelector == "" {
+		err = prompt.SurveyAskOne(
+			&survey.Input{
+				Message: "Rename current repo to: ",
+			},
+			&newRepoName,
+		)
 		if err != nil {
 			return err
 		}
-
-		if opts.newRepoSelector != "" && opts.oldRepoSelector == "" {
-			newRepoName = opts.newRepoSelector
-		} else {
-			err = prompt.SurveyAskOne(
-				&survey.Input{
-					Message: "Rename current repo to: ",
-				},
-				&newRepoName,
-			)
-			if err != nil {
-				return err
-			}
-		}
-
-		oldRepo = ghrepo.NewWithHost(currRepo.RepoOwner(), currRepo.RepoName(), currRepo.RepoHost())
-		newRepo = ghrepo.NewWithHost(currRepo.RepoOwner(), newRepoName, currRepo.RepoHost())
-
-		input = renameRepo{
-			RepoHost:  currRepo.RepoHost(),
-			RepoOwner: currRepo.RepoOwner(),
-			RepoName:  currRepo.RepoName(),
-			Name:      newRepoName,
-		}
-
-	} else {
-		oldRepoURL := opts.oldRepoSelector
-		newRepoName := opts.newRepoSelector
-
-		currRepo, err := ghrepo.FromFullName(oldRepoURL)
-		if err != nil {
-			return fmt.Errorf("argument error: %w", err)
-		}
-
-		oldRepo = ghrepo.NewWithHost(currRepo.RepoOwner(), currRepo.RepoName(), currRepo.RepoHost())
-
-		input = renameRepo{
-			RepoHost:  currRepo.RepoHost(),
-			RepoOwner: currRepo.RepoOwner(),
-			RepoName:  currRepo.RepoName(),
-			Name:      newRepoName,
-		}
 	}
 
-	err = runRename(apiClient, oldRepo.RepoHost(), input)
+	input = renameRepo{
+		RepoHost:  currRepo.RepoHost(),
+		RepoOwner: currRepo.RepoOwner(),
+		RepoName:  currRepo.RepoName(),
+		Name:      newRepoName,
+	}
+
+	newRepo = ghrepo.NewWithHost(currRepo.RepoOwner(), newRepoName, currRepo.RepoHost())
+
+	err = runRename(apiClient, currRepo.RepoHost(), input)
 	if err != nil {
 		return fmt.Errorf("API called failed: %s, please check your parameters", err)
 	}
 
-	if opts.oldRepoSelector == "" {
+	if opts.newRepoSelector == "" {
 		cfg, err := opts.Config()
 		if err != nil {
 			return err
 		}
 
-		protocol, err := cfg.Get(oldRepo.RepoHost(), "git_protocol")
+		protocol, err := cfg.Get(currRepo.RepoHost(), "git_protocol")
 		if err != nil {
 			return err
 		}
@@ -154,7 +138,7 @@ func renameRun(opts *RenameOptions) error {
 			return err
 		}
 
-		baseRemote, err := remotes.FindByRepo(oldRepo.RepoOwner(), oldRepo.RepoName())
+		baseRemote, err = remotes.FindByRepo(currRepo.RepoOwner(), currRepo.RepoName())
 		if err != nil {
 			return err
 		}
@@ -168,8 +152,8 @@ func renameRun(opts *RenameOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		fmt.Fprintf(opts.IO.Out, "%s Renamed repository %s\n", cs.SuccessIcon(), input.RepoOwner+"/"+input.Name)
-		if opts.oldRepoSelector == "" {
-			fmt.Fprintf(opts.IO.Out, `%s Updated the "origin" remote`, cs.SuccessIcon())
+		if opts.newRepoSelector == "" {
+			fmt.Fprintf(opts.IO.Out, "%s Updated the %q remote", cs.SuccessIcon(), baseRemote.Name)
 		}
 	}
 
