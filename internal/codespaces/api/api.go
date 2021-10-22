@@ -104,8 +104,9 @@ func (a *API) GetUser(ctx context.Context) (*User, error) {
 
 // Repository represents a GitHub repository.
 type Repository struct {
-	ID       int    `json:"id"`
-	FullName string `json:"full_name"`
+	ID            int    `json:"id"`
+	FullName      string `json:"full_name"`
+	DefaultBranch string `json:"default_branch"`
 }
 
 // GetRepository returns the repository associated with the given owner and name.

@@ -42,20 +42,48 @@ func newCreateCmd(app *App) *cobra.Command {
 func (a *App) Create(ctx context.Context, opts createOptions) error {
 	locationCh := getLocation(ctx, a.apiClient)
 
-	repo, err := getRepoName(opts.repo)
-	if err != nil {
-		return fmt.Errorf("error getting repository name: %w", err)
+	userInputs := struct {
+		Repository string
+		Branch     string
+	}{
+		Repository: opts.repo,
+		Branch:     opts.branch,
 	}
-	branch, err := getBranchName(opts.branch)
-	if err != nil {
-		return fmt.Errorf("error getting branch name: %w", err)
+
+	if userInputs.Repository == "" {
+		branchPrompt := "Branch (leave blank for default branch):"
+		if userInputs.Branch != "" {
+			branchPrompt = "Branch:"
+		}
+		questions := []*survey.Question{
+			{
+				Name:     "repository",
+				Prompt:   &survey.Input{Message: "Repository:"},
+				Validate: survey.Required,
+			},
+			{
+				Name: "branch",
+				Prompt: &survey.Input{
+					Message: branchPrompt,
+					Default: userInputs.Branch,
+				},
+			},
+		}
+		if err := ask(questions, &userInputs); err != nil {
+			return fmt.Errorf("failed to prompt: %w", err)
+		}
 	}
 
 	a.StartProgressIndicatorWithLabel("Fetching repository")
-	repository, err := a.apiClient.GetRepository(ctx, repo)
+	repository, err := a.apiClient.GetRepository(ctx, userInputs.Repository)
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting repository: %w", err)
+	}
+
+	branch := userInputs.Branch
+	if branch == "" {
+		branch = repository.DefaultBranch
 	}
 
 	locationResult := <-locationCh
@@ -170,40 +198,6 @@ func getLocation(ctx context.Context, apiClient apiClient) <-chan locationResult
 		ch <- locationResult{location, err}
 	}()
 	return ch
-}
-
-// getRepoName prompts the user for the name of the repository, or returns the repository if non-empty.
-func getRepoName(repo string) (string, error) {
-	if repo != "" {
-		return repo, nil
-	}
-
-	repoSurvey := []*survey.Question{
-		{
-			Name:     "repository",
-			Prompt:   &survey.Input{Message: "Repository:"},
-			Validate: survey.Required,
-		},
-	}
-	err := ask(repoSurvey, &repo)
-	return repo, err
-}
-
-// getBranchName prompts the user for the name of the branch, or returns the branch if non-empty.
-func getBranchName(branch string) (string, error) {
-	if branch != "" {
-		return branch, nil
-	}
-
-	branchSurvey := []*survey.Question{
-		{
-			Name:     "branch",
-			Prompt:   &survey.Input{Message: "Branch:"},
-			Validate: survey.Required,
-		},
-	}
-	err := ask(branchSurvey, &branch)
-	return branch, err
 }
 
 // getMachineName prompts the user to select the machine type, or validates the machine if non-empty.
