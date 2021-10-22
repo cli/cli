@@ -12,8 +12,8 @@ import (
 )
 
 func newListCmd(app *App) *cobra.Command {
-	var asJSON bool
 	var limit int
+	var exporter cmdutil.Exporter
 
 	listCmd := &cobra.Command{
 		Use:   "list",
@@ -24,17 +24,17 @@ func newListCmd(app *App) *cobra.Command {
 				return cmdutil.FlagErrorf("invalid limit: %v", limit)
 			}
 
-			return app.List(cmd.Context(), asJSON, limit)
+			return app.List(cmd.Context(), limit, exporter)
 		},
 	}
 
-	listCmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
 	listCmd.Flags().IntVarP(&limit, "limit", "L", 30, "Maximum number of codespaces to list")
+	cmdutil.AddJSONFlags(listCmd, &exporter, api.CodespaceFields)
 
 	return listCmd
 }
 
-func (a *App) List(ctx context.Context, asJSON bool, limit int) error {
+func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) error {
 	a.StartProgressIndicatorWithLabel("Fetching codespaces")
 	codespaces, err := a.apiClient.ListCodespaces(ctx, limit)
 	a.StopProgressIndicator()
@@ -46,6 +46,10 @@ func (a *App) List(ctx context.Context, asJSON bool, limit int) error {
 		a.errLogger.Printf("error starting pager: %v", err)
 	}
 	defer a.io.StopPager()
+
+	if exporter != nil {
+		return exporter.Write(a.io, codespaces)
+	}
 
 	tp := utils.NewTablePrinter(a.io)
 	if tp.IsTTY() {
