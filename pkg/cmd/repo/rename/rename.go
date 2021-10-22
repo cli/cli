@@ -63,8 +63,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 			if len(args) > 0 {
 				opts.newRepoSelector = args[0]
 			} else if !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{
-					Err: errors.New("could not prompt: proceed with a repo name")}
+				return &cmdutil.FlagError{Err: errors.New("could not prompt: proceed with a repo name")}
 			}
 
 			if runf != nil {
