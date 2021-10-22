@@ -41,7 +41,6 @@ func newCreateCmd(app *App) *cobra.Command {
 // Create creates a new Codespace
 func (a *App) Create(ctx context.Context, opts createOptions) error {
 	locationCh := getLocation(ctx, a.apiClient)
-	userCh := getUser(ctx, a.apiClient)
 
 	repo, err := getRepoName(opts.repo)
 	if err != nil {
@@ -62,11 +61,6 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	locationResult := <-locationCh
 	if locationResult.Err != nil {
 		return fmt.Errorf("error getting codespace region location: %w", locationResult.Err)
-	}
-
-	userResult := <-userCh
-	if userResult.Err != nil {
-		return fmt.Errorf("error getting codespace user: %w", userResult.Err)
 	}
 
 	machine, err := getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, locationResult.Location)
@@ -90,7 +84,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	}
 
 	if opts.showStatus {
-		if err := a.showStatus(ctx, userResult.User, codespace); err != nil {
+		if err := a.showStatus(ctx, codespace); err != nil {
 			return fmt.Errorf("show status: %w", err)
 		}
 	}
@@ -102,7 +96,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 // showStatus polls the codespace for a list of post create states and their status. It will keep polling
 // until all states have finished. Once all states have finished, we poll once more to check if any new
 // states have been introduced and stop polling otherwise.
-func (a *App) showStatus(ctx context.Context, user *api.User, codespace *api.Codespace) error {
+func (a *App) showStatus(ctx context.Context, codespace *api.Codespace) error {
 	var (
 		lastState      codespaces.PostCreateState
 		breakNextState bool
@@ -161,21 +155,6 @@ func (a *App) showStatus(ctx context.Context, user *api.User, codespace *api.Cod
 	}
 
 	return nil
-}
-
-type getUserResult struct {
-	User *api.User
-	Err  error
-}
-
-// getUser fetches the user record associated with the GITHUB_TOKEN
-func getUser(ctx context.Context, apiClient apiClient) <-chan getUserResult {
-	ch := make(chan getUserResult, 1)
-	go func() {
-		user, err := apiClient.GetUser(ctx)
-		ch <- getUserResult{user, err}
-	}()
-	return ch
 }
 
 type locationResult struct {
