@@ -72,7 +72,7 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 			opts.Finder = shared.NewFinder(f)
 
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
-				return &cmdutil.FlagError{Err: errors.New("argument required when using the --repo flag")}
+				return cmdutil.FlagErrorf("argument required when using the --repo flag")
 			}
 
 			if len(args) > 0 {
@@ -106,26 +106,26 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 				found++
 				opts.ReviewType = api.ReviewRequestChanges
 				if opts.Body == "" {
-					return &cmdutil.FlagError{Err: errors.New("body cannot be blank for request-changes review")}
+					return cmdutil.FlagErrorf("body cannot be blank for request-changes review")
 				}
 			}
 			if flagComment {
 				found++
 				opts.ReviewType = api.ReviewComment
 				if opts.Body == "" {
-					return &cmdutil.FlagError{Err: errors.New("body cannot be blank for comment review")}
+					return cmdutil.FlagErrorf("body cannot be blank for comment review")
 				}
 			}
 
 			if found == 0 && opts.Body == "" {
 				if !opts.IO.CanPrompt() {
-					return &cmdutil.FlagError{Err: errors.New("--approve, --request-changes, or --comment required when not running interactively")}
+					return cmdutil.FlagErrorf("--approve, --request-changes, or --comment required when not running interactively")
 				}
 				opts.InteractiveMode = true
 			} else if found == 0 && opts.Body != "" {
-				return &cmdutil.FlagError{Err: errors.New("--body unsupported without --approve, --request-changes, or --comment")}
+				return cmdutil.FlagErrorf("--body unsupported without --approve, --request-changes, or --comment")
 			} else if found > 1 {
-				return &cmdutil.FlagError{Err: errors.New("need exactly one of --approve, --request-changes, or --comment")}
+				return cmdutil.FlagErrorf("need exactly one of --approve, --request-changes, or --comment")
 			}
 
 			if runF != nil {

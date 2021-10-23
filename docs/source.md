@@ -1,6 +1,6 @@
 # Installation from source
 
-0. Verify that you have Go 1.16+ installed
+1. Verify that you have Go 1.16+ installed
 
    ```sh
    $ go version
@@ -8,14 +8,14 @@
 
    If `go` is not installed, follow instructions on [the Go website](https://golang.org/doc/install).
 
-1. Clone this repository
+2. Clone this repository
 
    ```sh
    $ git clone https://github.com/cli/cli.git gh-cli
    $ cd gh-cli
    ```
 
-2. Build and install
+3. Build and install
 
    #### Unix-like systems
    ```sh
@@ -33,7 +33,7 @@
    ```
    There is no install step available on Windows.
 
-3. Run `gh version` to check if it worked.
+4. Run `gh version` to check if it worked.
 
    #### Windows
    Run `bin\gh version` to check if it worked.

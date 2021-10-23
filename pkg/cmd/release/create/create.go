@@ -57,6 +57,8 @@ type CreateOptions struct {
 	DiscussionCategory string
 }
 
+const tagsLimit = 5
+
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
@@ -256,20 +258,26 @@ func createRun(opts *CreateOptions) error {
 			opts.Body = text
 		}
 
-		if !opts.Prerelease { // If prerelease hasn't been specified ask user
-			qs = []*survey.Question{
-				{
-					Name: "prerelease",
-					Prompt: &survey.Confirm{
-						Message: "Is this a prerelease?",
-						Default: opts.Prerelease,
-					},
+		saveAsDraft := "Save as draft"
+		publishRelease := "Publish release"
+		defaultSubmit := publishRelease
+		if opts.Draft {
+			defaultSubmit = saveAsDraft
+		}
+
+		qs = []*survey.Question{
+			{
+				Name: "prerelease",
+				Prompt: &survey.Confirm{
+					Message: "Is this a prerelease?",
+					Default: opts.Prerelease,
 				},
-			}
-			err = prompt.SurveyAsk(qs, opts)
-			if err != nil {
-				return fmt.Errorf("could not prompt: %w", err)
-			}
+			},
+		}
+
+		err = prompt.SurveyAsk(qs, opts)
+		if err != nil {
+			return fmt.Errorf("could not prompt: %w", err)
 		}
 
 		qs = []*survey.Question{
@@ -278,10 +286,11 @@ func createRun(opts *CreateOptions) error {
 				Prompt: &survey.Select{
 					Message: "Submit?",
 					Options: []string{
-						"Publish release",
-						"Save as draft",
+						publishRelease,
+						saveAsDraft,
 						"Cancel",
 					},
+					Default: defaultSubmit,
 				},
 			},
 		}
@@ -314,18 +323,16 @@ func createRun(opts *CreateOptions) error {
 }
 
 func handleTagName(opts *CreateOptions, httpClient *http.Client, baseRepo ghrepo.Interface) error {
-	currentTagName, options, err := getTagNameOptions(httpClient, baseRepo)
+	options, err := getTagNameOptions(httpClient, baseRepo)
 	if err != nil {
 		return err
 	}
 
-	if options == nil {
+	if len(options) == 0 {
 		return askTagName(opts)
 	}
 
-	currentTagNameMetadataOption := fmt.Sprintf("Use current version (%s)", currentTagName)
-	options = append(options, currentTagNameMetadataOption)
-	options = append(options, "None of the above")
+	options = append(options, "Create new tag")
 
 	qs := []*survey.Question{
 		{
@@ -342,16 +349,26 @@ func handleTagName(opts *CreateOptions, httpClient *http.Client, baseRepo ghrepo
 		return fmt.Errorf("could not prompt: %w", err)
 	}
 
-	if opts.TagName == currentTagNameMetadataOption {
-		opts.TagName = currentTagName
-		return askPreReleaseAndBuild(opts)
-	}
-
-	if opts.TagName == "None of the above" {
+	if opts.TagName == "Create new tag" {
 		return askTagName(opts)
 	}
 
 	return nil
+}
+
+func getTagNameOptions(httpClient *http.Client, baseRepo ghrepo.Interface) ([]string, error) {
+	tags, err := fetchTags(httpClient, baseRepo, tagsLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	options := make([]string, len(tags))
+
+	for i, tag := range tags {
+		options[i] = tag.Name
+	}
+
+	return options, nil
 }
 
 func askTagName(opts *CreateOptions) error {
@@ -367,39 +384,6 @@ func askTagName(opts *CreateOptions) error {
 	err := prompt.SurveyAsk(qs, opts)
 	if err != nil {
 		return fmt.Errorf("could not prompt: %w", err)
-	}
-
-	return nil
-}
-
-func askPreReleaseAndBuild(opts *CreateOptions) error {
-	qs := []*survey.Question{
-		{
-			Name: "prereleaseText",
-			Prompt: &survey.Input{
-				Message: "Pre release (optional)",
-			},
-		},
-		{
-			Name: "build",
-			Prompt: &survey.Input{
-				Message: "Build (optional)",
-			},
-		},
-	}
-
-	err := prompt.SurveyAsk(qs, opts)
-	if err != nil {
-		return fmt.Errorf("could not prompt: %w", err)
-	}
-
-	if opts.PrereleaseText != "" {
-		opts.Prerelease = true
-		opts.TagName += "-" + opts.PrereleaseText
-	}
-
-	if opts.Build != "" {
-		opts.TagName += "+" + opts.Build
 	}
 
 	return nil

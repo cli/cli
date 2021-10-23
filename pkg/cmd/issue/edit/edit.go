@@ -1,7 +1,6 @@
 package edit
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -106,7 +105,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			}
 
 			if opts.Interactive && !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("field to edit flag required when not running interactively")}
+				return cmdutil.FlagErrorf("field to edit flag required when not running interactively")
 			}
 
 			if runF != nil {

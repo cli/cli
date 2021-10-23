@@ -2,6 +2,7 @@ package create
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -11,7 +12,70 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
+	"github.com/shurcooL/githubv4"
+	"github.com/shurcooL/graphql"
 )
+
+type Ref struct {
+	Name   string `json:"name"`
+	Prefix string `json:"refPrefix"`
+}
+
+const maxItemsPerPage = 100
+
+func fetchTags(httpClient *http.Client, repo ghrepo.Interface, limit int) ([]Ref, error) {
+	type responseData struct {
+		Repository struct {
+			Refs struct {
+				Nodes    []Ref
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			} `graphql:"refs(first: $perPage, orderBy: {field: TAG_COMMIT_DATE, direction: DESC}, after: $endCursor, refPrefix: $prefix)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	perPage := limit
+	if limit > maxItemsPerPage {
+		perPage = maxItemsPerPage
+	}
+
+	variables := map[string]interface{}{
+		"owner":     githubv4.String(repo.RepoOwner()),
+		"name":      githubv4.String(repo.RepoName()),
+		"perPage":   githubv4.Int(perPage),
+		"endCursor": (*githubv4.String)(nil),
+		"prefix":    githubv4.String("refs/tags/"),
+	}
+
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
+
+	var tags []Ref
+loop:
+	for {
+		var query responseData
+		err := gql.QueryNamed(context.Background(), "RepositoryReleaseList", &query, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, tag := range query.Repository.Refs.Nodes {
+			tags = append(tags, tag)
+			if len(tags) == limit {
+				break loop
+			}
+		}
+
+		if !query.Repository.Refs.PageInfo.HasNextPage {
+			break
+		}
+
+		variables["endCursor"] = githubv4.String(query.Repository.Refs.PageInfo.EndCursor)
+	}
+
+	return tags, nil
+}
 
 func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[string]interface{}) (*shared.Release, error) {
 	bodyBytes, err := json.Marshal(params)

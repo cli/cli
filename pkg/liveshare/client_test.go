@@ -15,10 +15,12 @@ import (
 
 func TestConnect(t *testing.T) {
 	opts := Options{
+		ClientName:     "liveshare-client",
 		SessionID:      "session-id",
 		SessionToken:   "session-token",
 		RelaySAS:       "relay-sas",
 		HostPublicKeys: []string{livesharetest.SSHPublicKey},
+		Logger:         newMockLogger(),
 	}
 	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
 		var joinWorkspaceReq joinWorkspaceArgs
@@ -46,7 +48,7 @@ func TestConnect(t *testing.T) {
 		livesharetest.WithRelaySAS(opts.RelaySAS),
 	)
 	if err != nil {
-		t.Errorf("error creating Live Share server: %w", err)
+		t.Errorf("error creating Live Share server: %v", err)
 	}
 	defer server.Close()
 	opts.RelayEndpoint = "sb" + strings.TrimPrefix(server.URL(), "https")
@@ -63,10 +65,10 @@ func TestConnect(t *testing.T) {
 
 	select {
 	case err := <-server.Err():
-		t.Errorf("error from server: %w", err)
+		t.Errorf("error from server: %v", err)
 	case err := <-done:
 		if err != nil {
-			t.Errorf("error from client: %w", err)
+			t.Errorf("error from client: %v", err)
 		}
 	}
 }
