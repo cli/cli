@@ -16,9 +16,10 @@ import (
 
 func Test_NewCmdStatus(t *testing.T) {
 	tests := []struct {
-		name  string
-		cli   string
-		wants StatusOptions
+		name    string
+		cli     string
+		wants   StatusOptions
+		wantErr bool
 	}{
 		{
 			name:  "no arguments",
@@ -33,6 +34,19 @@ func Test_NewCmdStatus(t *testing.T) {
 			},
 		},
 		{
+			name: "hostname set",
+			cli:  "-H bella.ramsey",
+			wants: StatusOptions{
+				Hostname: "bella.ramsey",
+			},
+		},
+		{
+			name:    "hostname not found",
+			cli:     "-H joel.miller",
+			wantErr: true,
+		},
+
+		{
 			name: "show token",
 			cli:  "--show-token",
 			wants: StatusOptions{
@@ -46,6 +60,11 @@ func Test_NewCmdStatus(t *testing.T) {
 			f := &cmdutil.Factory{}
 
 			argv, err := shlex.Split(tt.cli)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
 			assert.NoError(t, err)
 
 			var gotOpts *StatusOptions
@@ -188,7 +207,8 @@ func Test_statusRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
 			},
 			wantErrOut: regexp.MustCompile(`(?s)Token: xyz456.*Token: abc123`),
-		}, {
+		},
+		{
 			name: "missing hostname",
 			opts: &StatusOptions{
 				Hostname: "github.example.com",
