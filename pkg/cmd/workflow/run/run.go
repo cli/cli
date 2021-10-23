@@ -78,7 +78,7 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 		`),
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(opts.MagicFields)+len(opts.RawFields) > 0 && len(args) == 0 {
-				return cmdutil.FlagError{Err: fmt.Errorf("workflow argument required when passing -f or -F")}
+				return cmdutil.FlagErrorf("workflow argument required when passing -f or -F")
 			}
 			return nil
 		},
@@ -91,7 +91,7 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 			if len(args) > 0 {
 				opts.Selector = args[0]
 			} else if !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("workflow ID, name, or filename required when not running interactively")}
+				return cmdutil.FlagErrorf("workflow ID, name, or filename required when not running interactively")
 			} else {
 				opts.Prompt = true
 			}
@@ -103,16 +103,16 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 				}
 				opts.JSONInput = string(jsonIn)
 			} else if opts.JSON {
-				return cmdutil.FlagError{Err: errors.New("--json specified but nothing on STDIN")}
+				return cmdutil.FlagErrorf("--json specified but nothing on STDIN")
 			}
 
 			if opts.Selector == "" {
 				if opts.JSONInput != "" {
-					return &cmdutil.FlagError{Err: errors.New("workflow argument required when passing JSON")}
+					return cmdutil.FlagErrorf("workflow argument required when passing JSON")
 				}
 			} else {
 				if opts.JSON && inputFieldsPassed {
-					return &cmdutil.FlagError{Err: errors.New("only one of STDIN or -f/-F can be passed")}
+					return cmdutil.FlagErrorf("only one of STDIN or -f/-F can be passed")
 				}
 			}
 

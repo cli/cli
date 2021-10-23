@@ -1,17 +1,13 @@
-package ghcs
+package codespace
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
-	"github.com/fatih/camelcase"
 	"github.com/spf13/cobra"
 )
 
@@ -56,7 +52,9 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return fmt.Errorf("error getting branch name: %w", err)
 	}
 
+	a.StartProgressIndicatorWithLabel("Fetching repository")
 	repository, err := a.apiClient.GetRepository(ctx, repo)
+	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting repository: %w", err)
 	}
@@ -71,7 +69,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return fmt.Errorf("error getting codespace user: %w", userResult.Err)
 	}
 
-	machine, err := getMachineName(ctx, opts.machine, userResult.User, repository, branch, locationResult.Location, a.apiClient)
+	machine, err := getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, locationResult.Location)
 	if err != nil {
 		return fmt.Errorf("error getting machine type: %w", err)
 	}
@@ -79,38 +77,36 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return errors.New("there are no available machine types for this repository")
 	}
 
-	a.logger.Print("Creating your codespace...")
+	a.StartProgressIndicatorWithLabel("Creating codespace")
 	codespace, err := a.apiClient.CreateCodespace(ctx, &api.CreateCodespaceParams{
-		User:         userResult.User.Login,
 		RepositoryID: repository.ID,
 		Branch:       branch,
 		Machine:      machine,
 		Location:     locationResult.Location,
 	})
-	a.logger.Print("\n")
+	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error creating codespace: %w", err)
 	}
 
 	if opts.showStatus {
-		if err := showStatus(ctx, a.logger, a.apiClient, userResult.User, codespace); err != nil {
+		if err := a.showStatus(ctx, userResult.User, codespace); err != nil {
 			return fmt.Errorf("show status: %w", err)
 		}
 	}
 
-	a.logger.Printf("Codespace created: ")
-
-	fmt.Fprintln(os.Stdout, codespace.Name)
-
+	fmt.Fprintln(a.io.Out, codespace.Name)
 	return nil
 }
 
 // showStatus polls the codespace for a list of post create states and their status. It will keep polling
 // until all states have finished. Once all states have finished, we poll once more to check if any new
 // states have been introduced and stop polling otherwise.
-func showStatus(ctx context.Context, log *output.Logger, apiClient apiClient, user *api.User, codespace *api.Codespace) error {
-	var lastState codespaces.PostCreateState
-	var breakNextState bool
+func (a *App) showStatus(ctx context.Context, user *api.User, codespace *api.Codespace) error {
+	var (
+		lastState      codespaces.PostCreateState
+		breakNextState bool
+	)
 
 	finishedStates := make(map[string]bool)
 	ctx, stopPolling := context.WithCancel(ctx)
@@ -124,26 +120,24 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient apiClient, us
 			}
 
 			if state.Name != lastState.Name {
-				log.Print(state.Name)
+				a.StartProgressIndicatorWithLabel(state.Name)
 
 				if state.Status == codespaces.PostCreateStateRunning {
 					inProgress = true
 					lastState = state
-					log.Print("...")
 					break
 				}
 
 				finishedStates[state.Name] = true
-				log.Println("..." + state.Status)
+				a.StopProgressIndicator()
 			} else {
 				if state.Status == codespaces.PostCreateStateRunning {
 					inProgress = true
-					log.Print(".")
 					break
 				}
 
 				finishedStates[state.Name] = true
-				log.Println(state.Status)
+				a.StopProgressIndicator()
 				lastState = codespaces.PostCreateState{} // reset the value
 			}
 		}
@@ -157,7 +151,7 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient apiClient, us
 		}
 	}
 
-	err := codespaces.PollPostCreateStates(ctx, log, apiClient, user, codespace, poller)
+	err := codespaces.PollPostCreateStates(ctx, a, a.apiClient, codespace, poller)
 	if err != nil {
 		if errors.Is(err, context.Canceled) && breakNextState {
 			return nil // we cancelled the context to stop polling, we can ignore the error
@@ -234,8 +228,8 @@ func getBranchName(branch string) (string, error) {
 }
 
 // getMachineName prompts the user to select the machine type, or validates the machine if non-empty.
-func getMachineName(ctx context.Context, machine string, user *api.User, repo *api.Repository, branch, location string, apiClient apiClient) (string, error) {
-	skus, err := apiClient.GetCodespacesSKUs(ctx, user, repo, branch, location)
+func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machine, branch, location string) (string, error) {
+	machines, err := apiClient.GetCodespacesMachines(ctx, repoID, branch, location)
 	if err != nil {
 		return "", fmt.Errorf("error requesting machine instance types: %w", err)
 	}
@@ -243,55 +237,53 @@ func getMachineName(ctx context.Context, machine string, user *api.User, repo *a
 	// if user supplied a machine type, it must be valid
 	// if no machine type was supplied, we don't error if there are no machine types for the current repo
 	if machine != "" {
-		for _, sku := range skus {
-			if machine == sku.Name {
+		for _, m := range machines {
+			if machine == m.Name {
 				return machine, nil
 			}
 		}
 
-		availableSKUs := make([]string, len(skus))
-		for i := 0; i < len(skus); i++ {
-			availableSKUs[i] = skus[i].Name
+		availableMachines := make([]string, len(machines))
+		for i := 0; i < len(machines); i++ {
+			availableMachines[i] = machines[i].Name
 		}
 
-		return "", fmt.Errorf("there is no such machine for the repository: %s\nAvailable machines: %v", machine, availableSKUs)
-	} else if len(skus) == 0 {
+		return "", fmt.Errorf("there is no such machine for the repository: %s\nAvailable machines: %v", machine, availableMachines)
+	} else if len(machines) == 0 {
 		return "", nil
 	}
 
-	if len(skus) == 1 {
-		return skus[0].Name, nil // VS Code does not prompt for SKU if there is only one, this makes us consistent with that behavior
+	if len(machines) == 1 {
+		// VS Code does not prompt for machine if there is only one, this makes us consistent with that behavior
+		return machines[0].Name, nil
 	}
 
-	skuNames := make([]string, 0, len(skus))
-	skuByName := make(map[string]*api.SKU)
-	for _, sku := range skus {
-		nameParts := camelcase.Split(sku.Name)
-		machineName := strings.Title(strings.ToLower(nameParts[0]))
-		skuName := fmt.Sprintf("%s - %s", machineName, sku.DisplayName)
-		skuNames = append(skuNames, skuName)
-		skuByName[skuName] = sku
+	machineNames := make([]string, 0, len(machines))
+	machineByName := make(map[string]*api.Machine)
+	for _, m := range machines {
+		machineName := m.DisplayName
+		machineNames = append(machineNames, machineName)
+		machineByName[machineName] = m
 	}
 
-	skuSurvey := []*survey.Question{
+	machineSurvey := []*survey.Question{
 		{
-			Name: "sku",
+			Name: "machine",
 			Prompt: &survey.Select{
 				Message: "Choose Machine Type:",
-				Options: skuNames,
-				Default: skuNames[0],
+				Options: machineNames,
+				Default: machineNames[0],
 			},
 			Validate: survey.Required,
 		},
 	}
 
-	var skuAnswers struct{ SKU string }
-	if err := ask(skuSurvey, &skuAnswers); err != nil {
-		return "", fmt.Errorf("error getting SKU: %w", err)
+	var machineAnswers struct{ Machine string }
+	if err := ask(machineSurvey, &machineAnswers); err != nil {
+		return "", fmt.Errorf("error getting machine: %w", err)
 	}
 
-	sku := skuByName[skuAnswers.SKU]
-	machine = sku.Name
+	selectedMachine := machineByName[machineAnswers.Machine]
 
-	return machine, nil
+	return selectedMachine.Name, nil
 }

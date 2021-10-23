@@ -628,6 +628,12 @@ func Test_createRun_withoutTagNameAndWithCurrentVersion(t *testing.T) {
 		},
 		{
 			{
+				Name:    "prerelease",
+				Default: true,
+			},
+		},
+		{
+			{
 				Name:  "submitAction",
 				Value: "Publish release",
 			},

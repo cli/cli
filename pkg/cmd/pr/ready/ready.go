@@ -1,7 +1,6 @@
 package ready
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -35,14 +34,14 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 			Mark a pull request as ready for review
 
 			Without an argument, the pull request that belongs to the current branch
-			is displayed.
+			is marked as ready.
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
 
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
-				return &cmdutil.FlagError{Err: errors.New("argument required when using the --repo flag")}
+				return cmdutil.FlagErrorf("argument required when using the --repo flag")
 			}
 
 			if len(args) > 0 {

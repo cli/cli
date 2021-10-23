@@ -256,20 +256,26 @@ func createRun(opts *CreateOptions) error {
 			opts.Body = text
 		}
 
-		if !opts.Prerelease { // If prerelease hasn't been specified ask user
-			qs = []*survey.Question{
-				{
-					Name: "prerelease",
-					Prompt: &survey.Confirm{
-						Message: "Is this a prerelease?",
-						Default: opts.Prerelease,
-					},
+		saveAsDraft := "Save as draft"
+		publishRelease := "Publish release"
+		defaultSubmit := publishRelease
+		if opts.Draft {
+			defaultSubmit = saveAsDraft
+		}
+
+		qs = []*survey.Question{
+			{
+				Name: "prerelease",
+				Prompt: &survey.Confirm{
+					Message: "Is this a prerelease?",
+					Default: opts.Prerelease,
 				},
-			}
-			err = prompt.SurveyAsk(qs, opts)
-			if err != nil {
-				return fmt.Errorf("could not prompt: %w", err)
-			}
+			},
+		}
+
+		err = prompt.SurveyAsk(qs, opts)
+		if err != nil {
+			return fmt.Errorf("could not prompt: %w", err)
 		}
 
 		qs = []*survey.Question{
@@ -278,10 +284,11 @@ func createRun(opts *CreateOptions) error {
 				Prompt: &survey.Select{
 					Message: "Submit?",
 					Options: []string{
-						"Publish release",
-						"Save as draft",
+						publishRelease,
+						saveAsDraft,
 						"Cancel",
 					},
+					Default: defaultSubmit,
 				},
 			},
 		}

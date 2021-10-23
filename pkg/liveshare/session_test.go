@@ -1,17 +1,22 @@
 package liveshare
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	livesharetest "github.com/cli/cli/v2/pkg/liveshare/test"
 	"github.com/sourcegraph/jsonrpc2"
 )
+
+const mockClientName = "liveshare-client"
 
 func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server, *Session, error) {
 	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
@@ -29,12 +34,14 @@ func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server,
 	}
 
 	session, err := Connect(context.Background(), Options{
+		ClientName:     mockClientName,
 		SessionID:      "session-id",
 		SessionToken:   sessionToken,
 		RelayEndpoint:  "sb" + strings.TrimPrefix(testServer.URL(), "https"),
 		RelaySAS:       "relay-sas",
 		HostPublicKeys: []string{livesharetest.SSHPublicKey},
 		TLSConfig:      &tls.Config{InsecureSkipVerify: true},
+		Logger:         newMockLogger(),
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("error connecting to Live Share: %w", err)
@@ -75,7 +82,7 @@ func TestServerStartSharing(t *testing.T) {
 	defer testServer.Close() //nolint:staticcheck // httptest.Server does not return errors on Close()
 
 	if err != nil {
-		t.Errorf("error creating mock session: %w", err)
+		t.Errorf("error creating mock session: %v", err)
 	}
 	ctx := context.Background()
 
@@ -93,10 +100,10 @@ func TestServerStartSharing(t *testing.T) {
 
 	select {
 	case err := <-testServer.Err():
-		t.Errorf("error from server: %w", err)
+		t.Errorf("error from server: %v", err)
 	case err := <-done:
 		if err != nil {
-			t.Errorf("error from client: %w", err)
+			t.Errorf("error from client: %v", err)
 		}
 	}
 }
@@ -114,7 +121,7 @@ func TestServerGetSharedServers(t *testing.T) {
 		livesharetest.WithService("serverSharing.getSharedServers", getSharedServers),
 	)
 	if err != nil {
-		t.Errorf("error creating mock session: %w", err)
+		t.Errorf("error creating mock session: %v", err)
 	}
 	defer testServer.Close()
 	ctx := context.Background()
@@ -141,15 +148,15 @@ func TestServerGetSharedServers(t *testing.T) {
 
 	select {
 	case err := <-testServer.Err():
-		t.Errorf("error from server: %w", err)
+		t.Errorf("error from server: %v", err)
 	case err := <-done:
 		if err != nil {
-			t.Errorf("error from client: %w", err)
+			t.Errorf("error from client: %v", err)
 		}
 	}
 }
 
-func TestServerUpdateSharedVisibility(t *testing.T) {
+func TestServerUpdateSharedServerPrivacy(t *testing.T) {
 	updateSharedVisibility := func(rpcReq *jsonrpc2.Request) (interface{}, error) {
 		var req []interface{}
 		if err := json.Unmarshal(*rpcReq.Params, &req); err != nil {
@@ -165,33 +172,33 @@ func TestServerUpdateSharedVisibility(t *testing.T) {
 		} else {
 			return nil, errors.New("port param is not a float64")
 		}
-		if public, ok := req[1].(bool); ok {
-			if public != true {
-				return nil, errors.New("pulic param is not expected value")
+		if privacy, ok := req[1].(string); ok {
+			if privacy != "public" {
+				return nil, fmt.Errorf("expected privacy param to be public but got %q", privacy)
 			}
 		} else {
-			return nil, errors.New("public param is not a bool")
+			return nil, fmt.Errorf("expected privacy param to be a bool but go %T", req[1])
 		}
 		return nil, nil
 	}
 	testServer, session, err := makeMockSession(
-		livesharetest.WithService("serverSharing.updateSharedServerVisibility", updateSharedVisibility),
+		livesharetest.WithService("serverSharing.updateSharedServerPrivacy", updateSharedVisibility),
 	)
 	if err != nil {
-		t.Errorf("creating mock session: %w", err)
+		t.Errorf("creating mock session: %v", err)
 	}
 	defer testServer.Close()
 	ctx := context.Background()
 	done := make(chan error)
 	go func() {
-		done <- session.UpdateSharedVisibility(ctx, 80, true)
+		done <- session.UpdateSharedServerPrivacy(ctx, 80, "public")
 	}()
 	select {
 	case err := <-testServer.Err():
-		t.Errorf("error from server: %w", err)
+		t.Errorf("error from server: %v", err)
 	case err := <-done:
 		if err != nil {
-			t.Errorf("error from client: %w", err)
+			t.Errorf("error from client: %v", err)
 		}
 	}
 }
@@ -207,7 +214,7 @@ func TestInvalidHostKey(t *testing.T) {
 	}
 	testServer, err := livesharetest.NewServer(opts...)
 	if err != nil {
-		t.Errorf("error creating server: %w", err)
+		t.Errorf("error creating server: %v", err)
 	}
 	_, err = Connect(context.Background(), Options{
 		SessionID:      "session-id",
@@ -220,4 +227,177 @@ func TestInvalidHostKey(t *testing.T) {
 	if err == nil {
 		t.Error("expected invalid host key error, got: nil")
 	}
+}
+
+func TestKeepAliveNonBlocking(t *testing.T) {
+	session := &Session{keepAliveReason: make(chan string, 1)}
+	for i := 0; i < 2; i++ {
+		session.keepAlive("io")
+	}
+
+	// if keepAlive blocks, we'll never reach this and timeout the test
+	// timing out
+}
+
+func TestNotifyHostOfActivity(t *testing.T) {
+	notifyHostOfActivity := func(rpcReq *jsonrpc2.Request) (interface{}, error) {
+		var req []interface{}
+		if err := json.Unmarshal(*rpcReq.Params, &req); err != nil {
+			return nil, fmt.Errorf("unmarshal req: %w", err)
+		}
+		if len(req) < 2 {
+			return nil, errors.New("request arguments is less than 2")
+		}
+
+		if clientName, ok := req[0].(string); ok {
+			if clientName != mockClientName {
+				return nil, fmt.Errorf(
+					"unexpected clientName param, expected: %q, got: %q", mockClientName, clientName,
+				)
+			}
+		} else {
+			return nil, errors.New("clientName param is not a string")
+		}
+
+		if acs, ok := req[1].([]interface{}); ok {
+			if fmt.Sprintf("%s", acs) != "[input]" {
+				return nil, fmt.Errorf("unexpected activities param, expected: [input], got: %s", acs)
+			}
+		} else {
+			return nil, errors.New("activities param is not a slice")
+		}
+
+		return nil, nil
+	}
+	svc := livesharetest.WithService(
+		"ICodespaceHostService.notifyCodespaceOfClientActivity", notifyHostOfActivity,
+	)
+	testServer, session, err := makeMockSession(svc)
+	if err != nil {
+		t.Errorf("creating mock session: %w", err)
+	}
+	defer testServer.Close()
+	ctx := context.Background()
+	done := make(chan error)
+	go func() {
+		done <- session.notifyHostOfActivity(ctx, "input")
+	}()
+	select {
+	case err := <-testServer.Err():
+		t.Errorf("error from server: %w", err)
+	case err := <-done:
+		if err != nil {
+			t.Errorf("error from client: %w", err)
+		}
+	}
+}
+
+func TestSessionHeartbeat(t *testing.T) {
+	var (
+		requestsMu sync.Mutex
+		requests   int
+	)
+	notifyHostOfActivity := func(rpcReq *jsonrpc2.Request) (interface{}, error) {
+		requestsMu.Lock()
+		requests++
+		requestsMu.Unlock()
+
+		var req []interface{}
+		if err := json.Unmarshal(*rpcReq.Params, &req); err != nil {
+			return nil, fmt.Errorf("unmarshal req: %w", err)
+		}
+		if len(req) < 2 {
+			return nil, errors.New("request arguments is less than 2")
+		}
+
+		if clientName, ok := req[0].(string); ok {
+			if clientName != mockClientName {
+				return nil, fmt.Errorf(
+					"unexpected clientName param, expected: %q, got: %q", mockClientName, clientName,
+				)
+			}
+		} else {
+			return nil, errors.New("clientName param is not a string")
+		}
+
+		if acs, ok := req[1].([]interface{}); ok {
+			if fmt.Sprintf("%s", acs) != "[input]" {
+				return nil, fmt.Errorf("unexpected activities param, expected: [input], got: %s", acs)
+			}
+		} else {
+			return nil, errors.New("activities param is not a slice")
+		}
+
+		return nil, nil
+	}
+	svc := livesharetest.WithService(
+		"ICodespaceHostService.notifyCodespaceOfClientActivity", notifyHostOfActivity,
+	)
+	testServer, session, err := makeMockSession(svc)
+	if err != nil {
+		t.Errorf("creating mock session: %w", err)
+	}
+	defer testServer.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	done := make(chan struct{})
+
+	logger := newMockLogger()
+	session.logger = logger
+
+	go session.heartbeat(ctx, 50*time.Millisecond)
+	go func() {
+		session.keepAlive("input")
+		<-time.Tick(200 * time.Millisecond)
+		session.keepAlive("input")
+		<-time.Tick(100 * time.Millisecond)
+		done <- struct{}{}
+	}()
+
+	select {
+	case err := <-testServer.Err():
+		t.Errorf("error from server: %w", err)
+	case <-done:
+		activityCount := strings.Count(logger.String(), "input")
+		if activityCount != 2 {
+			t.Errorf("unexpected number of activities, expected: 2, got: %d", activityCount)
+		}
+
+		requestsMu.Lock()
+		rc := requests
+		requestsMu.Unlock()
+		if rc != 2 {
+			t.Errorf("unexpected number of requests, expected: 2, got: %d", requests)
+		}
+		return
+	}
+}
+
+type mockLogger struct {
+	sync.Mutex
+	buf *bytes.Buffer
+}
+
+func newMockLogger() *mockLogger {
+	return &mockLogger{buf: new(bytes.Buffer)}
+}
+
+func (m *mockLogger) Printf(format string, v ...interface{}) {
+	m.Lock()
+	defer m.Unlock()
+	m.buf.WriteString(fmt.Sprintf(format, v...))
+}
+
+func (m *mockLogger) Println(v ...interface{}) {
+	m.Lock()
+	defer m.Unlock()
+	m.buf.WriteString(fmt.Sprintln(v...))
+}
+
+func (m *mockLogger) String() string {
+	m.Lock()
+	defer m.Unlock()
+	return m.buf.String()
 }
