@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func (issue *Issue) ExportData(fields []string) *map[string]interface{} {
+func (issue *Issue) ExportData(fields []string) map[string]interface{} {
 	v := reflect.ValueOf(issue).Elem()
 	data := map[string]interface{}{}
 
@@ -25,10 +25,10 @@ func (issue *Issue) ExportData(fields []string) *map[string]interface{} {
 		}
 	}
 
-	return &data
+	return data
 }
 
-func (pr *PullRequest) ExportData(fields []string) *map[string]interface{} {
+func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 	v := reflect.ValueOf(pr).Elem()
 	data := map[string]interface{}{}
 
@@ -102,7 +102,7 @@ func (pr *PullRequest) ExportData(fields []string) *map[string]interface{} {
 		}
 	}
 
-	return &data
+	return data
 }
 
 func fieldByName(v reflect.Value, field string) reflect.Value {

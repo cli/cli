@@ -198,10 +198,10 @@ type exportableItem struct {
 	Name string
 }
 
-func (e *exportableItem) ExportData(fields []string) *map[string]interface{} {
+func (e *exportableItem) ExportData(fields []string) map[string]interface{} {
 	m := map[string]interface{}{}
 	for _, f := range fields {
 		m[f] = fmt.Sprintf("%s:%s", e.Name, f)
 	}
-	return &m
+	return m
 }

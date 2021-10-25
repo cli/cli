@@ -143,7 +143,7 @@ var portFields = []string{
 	"browseUrl",
 }
 
-func (pi *portInfo) ExportData(fields []string) *map[string]interface{} {
+func (pi *portInfo) ExportData(fields []string) map[string]interface{} {
 	data := map[string]interface{}{}
 
 	for _, f := range fields {
@@ -163,7 +163,7 @@ func (pi *portInfo) ExportData(fields []string) *map[string]interface{} {
 		}
 	}
 
-	return &data
+	return data
 }
 
 type devContainerResult struct {

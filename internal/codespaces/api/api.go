@@ -189,7 +189,7 @@ var CodespaceFields = []string{
 	"lastUsedAt",
 }
 
-func (c *Codespace) ExportData(fields []string) *map[string]interface{} {
+func (c *Codespace) ExportData(fields []string) map[string]interface{} {
 	v := reflect.ValueOf(c).Elem()
 	data := map[string]interface{}{}
 
@@ -213,7 +213,7 @@ func (c *Codespace) ExportData(fields []string) *map[string]interface{} {
 		}
 	}
 
-	return &data
+	return data
 }
 
 // ListCodespaces returns a list of codespaces for the user. Pass a negative limit to request all pages from
