@@ -70,7 +70,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			if len(args) == 0 && cmd.Flags().NFlag() == 0 {
 				if !opts.IO.CanPrompt() {
-					return &cmdutil.FlagError{Err: errors.New("At least one argument required in non-interactive mode")}
+					return &cmdutil.FlagError{Err: errors.New("at least one argument required in non-interactive mode")}
 				}
 				opts.Interactive = true
 			} else if !opts.Internal && !opts.Private && !opts.Public {
@@ -81,12 +81,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			if opts.Source != "" && (opts.Clone || opts.GitIgnoreTemplate != "" || opts.LicenseTemplate != "") {
 				// which options allowed with --source?
-				return &cmdutil.FlagError{Err: errors.New("The `--scope` option is not supported with `--clone`, `--template`, or `--gitignore`")}
+				return &cmdutil.FlagError{Err: errors.New("the `--scope` option is not supported with `--clone`, `--template`, or `--gitignore`")}
 			}
 
 			if opts.Source == "" {
 				if opts.Remote != "" {
-					return &cmdutil.FlagError{Err: errors.New("The `--remote` option can only be used with `--scope`")}
+					return &cmdutil.FlagError{Err: errors.New("the `--remote` option can only be used with `--scope`")}
 				}
 				if opts.Name == "" && !opts.Interactive {
 					return &cmdutil.FlagError{Err: errors.New("name argument required to create new remote repository")}
@@ -101,7 +101,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			wikiDisabled := cmd.Flags().Changed("enable-wiki") || opts.DisableWiki
 			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "" || issuesDisabled || wikiDisabled) {
 				return &cmdutil.FlagError{
-					Err: errors.New("The `--template` option is not supported with `--homepage`, `--team`, `--enable-issues`, or `--enable-wiki`")}
+					Err: errors.New("the `--template` option is not supported with `--homepage`, `--team`, `--enable-issues`, or `--enable-wiki`")}
 			}
 
 			if runF != nil {
@@ -132,9 +132,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVar(&opts.EnableIssues, "enable-issues", true, "Enable issues in the new repository")
 	cmd.Flags().BoolVar(&opts.EnableWiki, "enable-wiki", true, "Enable wiki in the new repository")
 
-	cmd.Flags().MarkDeprecated("confirm", "`--confirm` is deprecated. Pass any argument to skip confirmation prompt")
-	cmd.Flags().MarkDeprecated("enable-issues", "`--enable-issues` is deprecated. Disable issues with `--disable-issues`")
-	cmd.Flags().MarkDeprecated("enable-wiki", "`--enable-wiki` is deprecated. Disable wiki with `--disable-wiki`")
+	cmd.Flags().MarkDeprecated("confirm", "Pass any argument to skip confirmation prompt")
+	cmd.Flags().MarkDeprecated("enable-issues", "Disable issues with `--disable-issues`")
+	cmd.Flags().MarkDeprecated("enable-wiki", "Disable wiki with `--disable-wiki`")
 
 	_ = cmd.RegisterFlagCompletionFunc("gitignore", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		httpClient, err := opts.HttpClient()
