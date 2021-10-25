@@ -17,7 +17,7 @@ func newCodeCmd(app *App) *cobra.Command {
 
 	codeCmd := &cobra.Command{
 		Use:   "code",
-		Short: "Open a codespace in VS Code",
+		Short: "Open a codespace in Visual Studio Code",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.VSCode(cmd.Context(), codespace, useInsiders)
@@ -25,7 +25,7 @@ func newCodeCmd(app *App) *cobra.Command {
 	}
 
 	codeCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
-	codeCmd.Flags().BoolVar(&useInsiders, "insiders", false, "Use the insiders version of VS Code")
+	codeCmd.Flags().BoolVar(&useInsiders, "insiders", false, "Use the insiders version of Visual Studio Code")
 
 	return codeCmd
 }
@@ -45,7 +45,7 @@ func (a *App) VSCode(ctx context.Context, codespaceName string, useInsiders bool
 
 	url := vscodeProtocolURL(codespaceName, useInsiders)
 	if err := open.Run(url); err != nil {
-		return fmt.Errorf("error opening vscode URL %s: %s. (Is VS Code installed?)", url, err)
+		return fmt.Errorf("error opening vscode URL %s: %s. (Is Visual Studio Code installed?)", url, err)
 	}
 
 	return nil

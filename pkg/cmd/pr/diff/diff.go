@@ -50,7 +50,7 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 			opts.Finder = shared.NewFinder(f)
 
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
-				return &cmdutil.FlagError{Err: errors.New("argument required when using the --repo flag")}
+				return cmdutil.FlagErrorf("argument required when using the --repo flag")
 			}
 
 			if len(args) > 0 {
@@ -58,7 +58,7 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 			}
 
 			if !validColorFlag(opts.UseColor) {
-				return &cmdutil.FlagError{Err: fmt.Errorf("did not understand color: %q. Expected one of always, never, or auto", opts.UseColor)}
+				return cmdutil.FlagErrorf("did not understand color: %q. Expected one of always, never, or auto", opts.UseColor)
 			}
 
 			if opts.UseColor == "auto" && !opts.IO.IsStdoutTTY() {

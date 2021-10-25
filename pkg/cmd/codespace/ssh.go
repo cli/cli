@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/internal/codespaces"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
 )
@@ -30,11 +31,12 @@ func newSSHCmd(app *App) *cobra.Command {
 	var opts sshOptions
 
 	sshCmd := &cobra.Command{
-		Use:   "ssh [flags] [--] [ssh-flags] [command]",
+		Use:   "ssh [<flags>...] [-- <ssh-flags>...] [<command>]",
 		Short: "SSH into a codespace",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.SSH(cmd.Context(), args, opts)
 		},
+		DisableFlagsInUseLine: true,
 	}
 
 	sshCmd.Flags().StringVarP(&opts.profile, "profile", "", "", "Name of the SSH profile to use")
@@ -52,6 +54,13 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
+	if err != nil {
+		return fmt.Errorf("get or choose codespace: %w", err)
+	}
+
+	// TODO(josebalius): We can fetch the user in parallel to everything else
+	// we should convert this call and others to happen async
 	user, err := a.apiClient.GetUser(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting user: %w", err)
@@ -62,11 +71,6 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		authkeys <- checkAuthorizedKeys(ctx, a.apiClient, user.Login)
 	}()
 
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
-	if err != nil {
-		return fmt.Errorf("get or choose codespace: %w", err)
-	}
-
 	liveshareLogger := noopLogger()
 	if opts.debug {
 		debugLogger, err := newFileLogger(opts.debugFile)
@@ -76,10 +80,10 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		defer safeClose(debugLogger, &err)
 
 		liveshareLogger = debugLogger.Logger
-		a.logger.Println("Debug file located at: " + debugLogger.Name())
+		a.errLogger.Printf("Debug file located at: %s", debugLogger.Name())
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a.logger, liveshareLogger, a.apiClient, codespace)
+	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("error connecting to Live Share: %w", err)
 	}
@@ -89,8 +93,9 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		return err
 	}
 
-	a.logger.Println("Fetching SSH Details...")
+	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
+	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}
@@ -113,7 +118,6 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		connectDestination = fmt.Sprintf("%s@localhost", sshUser)
 	}
 
-	a.logger.Println("Ready...")
 	tunnelClosed := make(chan error, 1)
 	go func() {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
@@ -126,7 +130,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		if opts.scpArgs != nil {
 			err = codespaces.Copy(ctx, opts.scpArgs, localSSHServerPort, connectDestination)
 		} else {
-			err = codespaces.Shell(ctx, a.logger, sshArgs, localSSHServerPort, connectDestination, usingCustomPort)
+			err = codespaces.Shell(ctx, a.errLogger, sshArgs, localSSHServerPort, connectDestination, usingCustomPort)
 		}
 		shellClosed <- err
 	}()
@@ -193,7 +197,7 @@ users; see https://lwn.net/Articles/835962/ for discussion.
 
 // Copy copies files between the local and remote file systems.
 // The mechanics are similar to 'ssh' but using 'scp'.
-func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) (err error) {
+func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) error {
 	if len(args) < 2 {
 		return fmt.Errorf("cp requires source and destination arguments")
 	}
@@ -201,8 +205,10 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) (err erro
 		opts.scpArgs = append(opts.scpArgs, "-r")
 	}
 	opts.scpArgs = append(opts.scpArgs, "--")
+	hasRemote := false
 	for _, arg := range args {
 		if rest := strings.TrimPrefix(arg, "remote:"); rest != arg {
+			hasRemote = true
 			// scp treats each filename argument as a shell expression,
 			// subjecting it to expansion of environment variables, braces,
 			// tilde, backticks, globs and so on. Because these present a
@@ -224,6 +230,9 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) (err erro
 			}
 		}
 		opts.scpArgs = append(opts.scpArgs, arg)
+	}
+	if !hasRemote {
+		return cmdutil.FlagErrorf("at least one argument must have a 'remote:' prefix")
 	}
 	return a.SSH(ctx, nil, opts.sshOptions)
 }

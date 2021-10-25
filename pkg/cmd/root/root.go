@@ -12,7 +12,6 @@ import (
 	authCmd "github.com/cli/cli/v2/pkg/cmd/auth"
 	browseCmd "github.com/cli/cli/v2/pkg/cmd/browse"
 	codespaceCmd "github.com/cli/cli/v2/pkg/cmd/codespace"
-	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	completionCmd "github.com/cli/cli/v2/pkg/cmd/completion"
 	configCmd "github.com/cli/cli/v2/pkg/cmd/config"
 	extensionCmd "github.com/cli/cli/v2/pkg/cmd/extension"
@@ -130,13 +129,14 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 }
 
 func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
-	cmd := codespaceCmd.NewRootCmd(codespaceCmd.NewApp(
-		output.NewLogger(f.IOStreams.Out, f.IOStreams.ErrOut, !f.IOStreams.IsStdoutTTY()),
+	app := codespaceCmd.NewApp(
+		f.IOStreams,
 		codespacesAPI.New("", &lazyLoadedHTTPClient{factory: f}),
-	))
+	)
+	cmd := codespaceCmd.NewRootCmd(app)
 	cmd.Use = "codespace"
 	cmd.Aliases = []string{"cs"}
-	cmd.Hidden = true
+	cmd.Annotations = map[string]string{"IsCore": "true"}
 	return cmd
 }
 

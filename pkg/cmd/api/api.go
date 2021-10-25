@@ -173,12 +173,12 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 
 			if c.Flags().Changed("hostname") {
 				if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
-					return &cmdutil.FlagError{Err: fmt.Errorf("error parsing `--hostname`: %w", err)}
+					return cmdutil.FlagErrorf("error parsing `--hostname`: %w", err)
 				}
 			}
 
 			if opts.Paginate && !strings.EqualFold(opts.RequestMethod, "GET") && opts.RequestPath != "graphql" {
-				return &cmdutil.FlagError{Err: errors.New("the `--paginate` option is not supported for non-GET requests")}
+				return cmdutil.FlagErrorf("the `--paginate` option is not supported for non-GET requests")
 			}
 
 			if err := cmdutil.MutuallyExclusive(

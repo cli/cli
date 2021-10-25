@@ -117,13 +117,13 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				Short: "Upgrade installed extensions",
 				Args: func(cmd *cobra.Command, args []string) error {
 					if len(args) == 0 && !flagAll {
-						return &cmdutil.FlagError{Err: errors.New("must specify an extension to upgrade")}
+						return cmdutil.FlagErrorf("must specify an extension to upgrade")
 					}
 					if len(args) > 0 && flagAll {
-						return &cmdutil.FlagError{Err: errors.New("cannot use `--all` with extension name")}
+						return cmdutil.FlagErrorf("cannot use `--all` with extension name")
 					}
 					if len(args) > 1 {
-						return &cmdutil.FlagError{Err: errors.New("too many arguments")}
+						return cmdutil.FlagErrorf("too many arguments")
 					}
 					return nil
 				},

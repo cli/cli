@@ -31,6 +31,6 @@ If the build fails, there is not a clean way to re-run it. The easiest way would
 
 A local release can be created for testing without creating anything official on the release page.
 
-0. Make sure GoReleaser is installed: `brew install goreleaser`
-1. `goreleaser --skip-validate --skip-publish --rm-dist`
-2. Find the built products under `dist/`.
+1. Make sure GoReleaser is installed: `brew install goreleaser`
+2. `goreleaser --skip-validate --skip-publish --rm-dist`
+3. Find the built products under `dist/`.

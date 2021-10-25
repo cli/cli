@@ -4,12 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	"github.com/spf13/cobra"
 )
 
@@ -43,30 +41,54 @@ func newCreateCmd(app *App) *cobra.Command {
 // Create creates a new Codespace
 func (a *App) Create(ctx context.Context, opts createOptions) error {
 	locationCh := getLocation(ctx, a.apiClient)
-	userCh := getUser(ctx, a.apiClient)
 
-	repo, err := getRepoName(opts.repo)
-	if err != nil {
-		return fmt.Errorf("error getting repository name: %w", err)
-	}
-	branch, err := getBranchName(opts.branch)
-	if err != nil {
-		return fmt.Errorf("error getting branch name: %w", err)
+	userInputs := struct {
+		Repository string
+		Branch     string
+	}{
+		Repository: opts.repo,
+		Branch:     opts.branch,
 	}
 
-	repository, err := a.apiClient.GetRepository(ctx, repo)
+	if userInputs.Repository == "" {
+		branchPrompt := "Branch (leave blank for default branch):"
+		if userInputs.Branch != "" {
+			branchPrompt = "Branch:"
+		}
+		questions := []*survey.Question{
+			{
+				Name:     "repository",
+				Prompt:   &survey.Input{Message: "Repository:"},
+				Validate: survey.Required,
+			},
+			{
+				Name: "branch",
+				Prompt: &survey.Input{
+					Message: branchPrompt,
+					Default: userInputs.Branch,
+				},
+			},
+		}
+		if err := ask(questions, &userInputs); err != nil {
+			return fmt.Errorf("failed to prompt: %w", err)
+		}
+	}
+
+	a.StartProgressIndicatorWithLabel("Fetching repository")
+	repository, err := a.apiClient.GetRepository(ctx, userInputs.Repository)
+	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting repository: %w", err)
+	}
+
+	branch := userInputs.Branch
+	if branch == "" {
+		branch = repository.DefaultBranch
 	}
 
 	locationResult := <-locationCh
 	if locationResult.Err != nil {
 		return fmt.Errorf("error getting codespace region location: %w", locationResult.Err)
-	}
-
-	userResult := <-userCh
-	if userResult.Err != nil {
-		return fmt.Errorf("error getting codespace user: %w", userResult.Err)
 	}
 
 	machine, err := getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, locationResult.Location)
@@ -77,37 +99,36 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return errors.New("there are no available machine types for this repository")
 	}
 
-	a.logger.Print("Creating your codespace...")
+	a.StartProgressIndicatorWithLabel("Creating codespace")
 	codespace, err := a.apiClient.CreateCodespace(ctx, &api.CreateCodespaceParams{
 		RepositoryID: repository.ID,
 		Branch:       branch,
 		Machine:      machine,
 		Location:     locationResult.Location,
 	})
-	a.logger.Print("\n")
+	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error creating codespace: %w", err)
 	}
 
 	if opts.showStatus {
-		if err := showStatus(ctx, a.logger, a.apiClient, userResult.User, codespace); err != nil {
+		if err := a.showStatus(ctx, codespace); err != nil {
 			return fmt.Errorf("show status: %w", err)
 		}
 	}
 
-	a.logger.Printf("Codespace created: ")
-
-	fmt.Fprintln(os.Stdout, codespace.Name)
-
+	fmt.Fprintln(a.io.Out, codespace.Name)
 	return nil
 }
 
 // showStatus polls the codespace for a list of post create states and their status. It will keep polling
 // until all states have finished. Once all states have finished, we poll once more to check if any new
 // states have been introduced and stop polling otherwise.
-func showStatus(ctx context.Context, log *output.Logger, apiClient apiClient, user *api.User, codespace *api.Codespace) error {
-	var lastState codespaces.PostCreateState
-	var breakNextState bool
+func (a *App) showStatus(ctx context.Context, codespace *api.Codespace) error {
+	var (
+		lastState      codespaces.PostCreateState
+		breakNextState bool
+	)
 
 	finishedStates := make(map[string]bool)
 	ctx, stopPolling := context.WithCancel(ctx)
@@ -121,26 +142,24 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient apiClient, us
 			}
 
 			if state.Name != lastState.Name {
-				log.Print(state.Name)
+				a.StartProgressIndicatorWithLabel(state.Name)
 
 				if state.Status == codespaces.PostCreateStateRunning {
 					inProgress = true
 					lastState = state
-					log.Print("...")
 					break
 				}
 
 				finishedStates[state.Name] = true
-				log.Println("..." + state.Status)
+				a.StopProgressIndicator()
 			} else {
 				if state.Status == codespaces.PostCreateStateRunning {
 					inProgress = true
-					log.Print(".")
 					break
 				}
 
 				finishedStates[state.Name] = true
-				log.Println(state.Status)
+				a.StopProgressIndicator()
 				lastState = codespaces.PostCreateState{} // reset the value
 			}
 		}
@@ -154,7 +173,7 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient apiClient, us
 		}
 	}
 
-	err := codespaces.PollPostCreateStates(ctx, log, apiClient, codespace, poller)
+	err := codespaces.PollPostCreateStates(ctx, a, a.apiClient, codespace, poller)
 	if err != nil {
 		if errors.Is(err, context.Canceled) && breakNextState {
 			return nil // we cancelled the context to stop polling, we can ignore the error
@@ -164,21 +183,6 @@ func showStatus(ctx context.Context, log *output.Logger, apiClient apiClient, us
 	}
 
 	return nil
-}
-
-type getUserResult struct {
-	User *api.User
-	Err  error
-}
-
-// getUser fetches the user record associated with the GITHUB_TOKEN
-func getUser(ctx context.Context, apiClient apiClient) <-chan getUserResult {
-	ch := make(chan getUserResult, 1)
-	go func() {
-		user, err := apiClient.GetUser(ctx)
-		ch <- getUserResult{user, err}
-	}()
-	return ch
 }
 
 type locationResult struct {
@@ -194,40 +198,6 @@ func getLocation(ctx context.Context, apiClient apiClient) <-chan locationResult
 		ch <- locationResult{location, err}
 	}()
 	return ch
-}
-
-// getRepoName prompts the user for the name of the repository, or returns the repository if non-empty.
-func getRepoName(repo string) (string, error) {
-	if repo != "" {
-		return repo, nil
-	}
-
-	repoSurvey := []*survey.Question{
-		{
-			Name:     "repository",
-			Prompt:   &survey.Input{Message: "Repository:"},
-			Validate: survey.Required,
-		},
-	}
-	err := ask(repoSurvey, &repo)
-	return repo, err
-}
-
-// getBranchName prompts the user for the name of the branch, or returns the branch if non-empty.
-func getBranchName(branch string) (string, error) {
-	if branch != "" {
-		return branch, nil
-	}
-
-	branchSurvey := []*survey.Question{
-		{
-			Name:     "branch",
-			Prompt:   &survey.Input{Message: "Branch:"},
-			Validate: survey.Required,
-		},
-	}
-	err := ask(branchSurvey, &branch)
-	return branch, err
 }
 
 // getMachineName prompts the user to select the machine type, or validates the machine if non-empty.

@@ -62,7 +62,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			opts.Interactive = opts.IO.CanPrompt()
 
 			if !opts.Interactive && opts.Hostname == "" {
-				return &cmdutil.FlagError{Err: errors.New("--hostname required when not running interactively")}
+				return cmdutil.FlagErrorf("--hostname required when not running interactively")
 			}
 
 			opts.MainExecutable = f.Executable()
