@@ -1,7 +1,6 @@
 package rename
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -49,7 +48,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 			if len(args) > 0 {
 				opts.newRepoSelector = args[0]
 			} else if !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("could not prompt: new name required when not running interactively")}
+				return cmdutil.FlagErrorf("could not prompt: new name required when not running interactively")
 			}
 
 			if runf != nil {
