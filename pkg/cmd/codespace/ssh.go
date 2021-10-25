@@ -31,7 +31,7 @@ func newSSHCmd(app *App) *cobra.Command {
 	var opts sshOptions
 
 	sshCmd := &cobra.Command{
-		Use:   "ssh [<flags>...] [<command>] [-- <ssh-flags>...]",
+		Use:   "ssh [<flags>...] [-- <ssh-flags>...] [<command>]",
 		Short: "SSH into a codespace",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.SSH(cmd.Context(), args, opts)
