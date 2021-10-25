@@ -158,6 +158,8 @@ func (pi *portInfo) ExportData(fields []string) *map[string]interface{} {
 			data[f] = pi.Label()
 		case "browseUrl":
 			data[f] = pi.BrowseURL()
+		default:
+			panic("unkown field: " + f)
 		}
 	}
 

@@ -177,6 +177,7 @@ type CodespaceConnection struct {
 	HostPublicKeys []string `json:"hostPublicKeys"`
 }
 
+// CodespaceFields is the list of exportable fields for a codespace.
 var CodespaceFields = []string{
 	"name",
 	"owner",
