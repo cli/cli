@@ -35,6 +35,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -175,6 +176,44 @@ type CodespaceConnection struct {
 	RelayEndpoint  string   `json:"relayEndpoint"`
 	RelaySAS       string   `json:"relaySas"`
 	HostPublicKeys []string `json:"hostPublicKeys"`
+}
+
+// CodespaceFields is the list of exportable fields for a codespace.
+var CodespaceFields = []string{
+	"name",
+	"owner",
+	"repository",
+	"state",
+	"gitStatus",
+	"createdAt",
+	"lastUsedAt",
+}
+
+func (c *Codespace) ExportData(fields []string) *map[string]interface{} {
+	v := reflect.ValueOf(c).Elem()
+	data := map[string]interface{}{}
+
+	for _, f := range fields {
+		switch f {
+		case "owner":
+			data[f] = c.Owner.Login
+		case "repository":
+			data[f] = c.Repository.FullName
+		case "gitStatus":
+			data[f] = map[string]interface{}{
+				"ref":                  c.GitStatus.Ref,
+				"hasUnpushedChanges":   c.GitStatus.HasUnpushedChanges,
+				"hasUncommitedChanges": c.GitStatus.HasUncommitedChanges,
+			}
+		default:
+			sf := v.FieldByNameFunc(func(s string) bool {
+				return strings.EqualFold(f, s)
+			})
+			data[f] = sf.Interface()
+		}
+	}
+
+	return &data
 }
 
 // ListCodespaces returns a list of codespaces for the user. Pass a negative limit to request all pages from

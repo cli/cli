@@ -12,8 +12,9 @@ import (
 
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/liveshare"
+	"github.com/cli/cli/v2/utils"
 	"github.com/muhammadmuzzammil1998/jsonc"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -22,22 +23,20 @@ import (
 // newPortsCmd returns a Cobra "ports" command that displays a table of available ports,
 // according to the specified flags.
 func newPortsCmd(app *App) *cobra.Command {
-	var (
-		codespace string
-		asJSON    bool
-	)
+	var codespace string
+	var exporter cmdutil.Exporter
 
 	portsCmd := &cobra.Command{
 		Use:   "ports",
 		Short: "List ports in a codespace",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.ListPorts(cmd.Context(), codespace, asJSON)
+			return app.ListPorts(cmd.Context(), codespace, exporter)
 		},
 	}
 
 	portsCmd.PersistentFlags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
-	portsCmd.Flags().BoolVar(&asJSON, "json", false, "Output as JSON")
+	cmdutil.AddJSONFlags(portsCmd, &exporter, portFields)
 
 	portsCmd.AddCommand(newPortsForwardCmd(app))
 	portsCmd.AddCommand(newPortsVisibilityCmd(app))
@@ -46,7 +45,7 @@ func newPortsCmd(app *App) *cobra.Command {
 }
 
 // ListPorts lists known ports in a codespace.
-func (a *App) ListPorts(ctx context.Context, codespaceName string, asJSON bool) (err error) {
+func (a *App) ListPorts(ctx context.Context, codespaceName string, exporter cmdutil.Exporter) (err error) {
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
 		// TODO(josebalius): remove special handling of this error here and it other places
@@ -74,30 +73,97 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, asJSON bool) 
 	devContainerResult := <-devContainerCh
 	if devContainerResult.err != nil {
 		// Warn about failure to read the devcontainer file. Not a codespace command error.
-		a.errLogger.Printf("Failed to get port names: %v\n", devContainerResult.err.Error())
+		a.errLogger.Printf("Failed to get port names: %v", devContainerResult.err.Error())
 	}
 
-	table := output.NewTable(a.io.Out, asJSON)
-	table.SetHeader([]string{"Label", "Port", "Visibility", "Browse URL"})
-	for _, port := range ports {
-		sourcePort := strconv.Itoa(port.SourcePort)
-		var portName string
-		if devContainerResult.devContainer != nil {
-			if attributes, ok := devContainerResult.devContainer.PortAttributes[sourcePort]; ok {
-				portName = attributes.Label
-			}
+	portInfos := make([]*portInfo, len(ports))
+	for i, p := range ports {
+		portInfos[i] = &portInfo{
+			Port:         p,
+			codespace:    codespace,
+			devContainer: devContainerResult.devContainer,
 		}
-
-		table.Append([]string{
-			portName,
-			sourcePort,
-			port.Privacy,
-			fmt.Sprintf("https://%s-%s.githubpreview.dev/", codespace.Name, sourcePort),
-		})
 	}
-	table.Render()
 
-	return nil
+	if err := a.io.StartPager(); err != nil {
+		a.errLogger.Printf("error starting pager: %v", err)
+	}
+	defer a.io.StopPager()
+
+	if exporter != nil {
+		return exporter.Write(a.io, portInfos)
+	}
+
+	cs := a.io.ColorScheme()
+	tp := utils.NewTablePrinter(a.io)
+
+	if tp.IsTTY() {
+		tp.AddField("LABEL", nil, nil)
+		tp.AddField("PORT", nil, nil)
+		tp.AddField("VISIBILITY", nil, nil)
+		tp.AddField("BROWSE URL", nil, nil)
+		tp.EndRow()
+	}
+
+	for _, port := range portInfos {
+		tp.AddField(port.Label(), nil, nil)
+		tp.AddField(strconv.Itoa(port.SourcePort), nil, cs.Yellow)
+		tp.AddField(port.Privacy, nil, nil)
+		tp.AddField(port.BrowseURL(), nil, nil)
+		tp.EndRow()
+	}
+	return tp.Render()
+}
+
+type portInfo struct {
+	*liveshare.Port
+	codespace    *api.Codespace
+	devContainer *devContainer
+}
+
+func (pi *portInfo) BrowseURL() string {
+	return fmt.Sprintf("https://%s-%d.githubpreview.dev", pi.codespace.Name, pi.Port.SourcePort)
+}
+
+func (pi *portInfo) Label() string {
+	if pi.devContainer != nil {
+		portStr := strconv.Itoa(pi.Port.SourcePort)
+		if attributes, ok := pi.devContainer.PortAttributes[portStr]; ok {
+			return attributes.Label
+		}
+	}
+	return ""
+}
+
+var portFields = []string{
+	"sourcePort",
+	// "destinationPort", // TODO(mislav): this appears to always be blank?
+	"visibility",
+	"label",
+	"browseUrl",
+}
+
+func (pi *portInfo) ExportData(fields []string) *map[string]interface{} {
+	data := map[string]interface{}{}
+
+	for _, f := range fields {
+		switch f {
+		case "sourcePort":
+			data[f] = pi.Port.SourcePort
+		case "destinationPort":
+			data[f] = pi.Port.DestinationPort
+		case "visibility":
+			data[f] = pi.Port.Privacy
+		case "label":
+			data[f] = pi.Label()
+		case "browseUrl":
+			data[f] = pi.BrowseURL()
+		default:
+			panic("unkown field: " + f)
+		}
+	}
+
+	return &data
 }
 
 type devContainerResult struct {

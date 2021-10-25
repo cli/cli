@@ -26,7 +26,6 @@ require (
 	github.com/muesli/reflow v0.2.1-0.20210502190812-c80126ec2ad5
 	github.com/muesli/termenv v0.9.0
 	github.com/muhammadmuzzammil1998/jsonc v0.0.0-20201229145248-615b0916ca38
-	github.com/olekukonko/tablewriter v0.0.5
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/shurcooL/githubv4 v0.0.0-20200928013246-d292edc3691b
 	github.com/shurcooL/graphql v0.0.0-20181231061246-d48a9a75455f
