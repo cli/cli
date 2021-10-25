@@ -31,11 +31,12 @@ func newSSHCmd(app *App) *cobra.Command {
 	var opts sshOptions
 
 	sshCmd := &cobra.Command{
-		Use:   "ssh [flags] [--] [ssh-flags] [command]",
+		Use:   "ssh [<flags>...] [-- <ssh-flags>...] [<command>]",
 		Short: "SSH into a codespace",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.SSH(cmd.Context(), args, opts)
 		},
+		DisableFlagsInUseLine: true,
 	}
 
 	sshCmd.Flags().StringVarP(&opts.profile, "profile", "", "", "Name of the SSH profile to use")

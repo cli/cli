@@ -136,7 +136,6 @@ func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := codespaceCmd.NewRootCmd(app)
 	cmd.Use = "codespace"
 	cmd.Aliases = []string{"cs"}
-	cmd.Hidden = true
 	return cmd
 }
 
