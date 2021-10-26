@@ -37,8 +37,6 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 		},
 	}
 
-	cmdutil.EnableRepoOverride(cmd, f)
-
 	cmd.AddCommand(repoViewCmd.NewCmdView(f, nil))
 	cmd.AddCommand(repoForkCmd.NewCmdFork(f, nil))
 	cmd.AddCommand(repoCloneCmd.NewCmdClone(f, nil))
