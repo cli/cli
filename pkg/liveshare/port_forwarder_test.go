@@ -17,10 +17,10 @@ import (
 func TestNewPortForwarder(t *testing.T) {
 	testServer, session, err := makeMockSession()
 	if err != nil {
-		t.Errorf("create mock client: %w", err)
+		t.Errorf("create mock client: %v", err)
 	}
 	defer testServer.Close()
-	pf := NewPortForwarder(session, "ssh", 80)
+	pf := NewPortForwarder(session, "ssh", 80, false)
 	if pf == nil {
 		t.Error("port forwarder is nil")
 	}
@@ -42,11 +42,11 @@ func TestPortForwarderStart(t *testing.T) {
 		livesharetest.WithStream("stream-id", stream),
 	)
 	if err != nil {
-		t.Errorf("create mock session: %w", err)
+		t.Errorf("create mock session: %v", err)
 	}
 	defer testServer.Close()
 
-	listen, err := net.Listen("tcp", ":8000")
+	listen, err := net.Listen("tcp", "127.0.0.1:8000")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func TestPortForwarderStart(t *testing.T) {
 	done := make(chan error)
 	go func() {
 		const name, remote = "ssh", 8000
-		done <- NewPortForwarder(session, name, remote).ForwardToListener(ctx, listen)
+		done <- NewPortForwarder(session, name, remote, false).ForwardToListener(ctx, listen)
 	}()
 
 	go func() {
@@ -86,10 +86,33 @@ func TestPortForwarderStart(t *testing.T) {
 
 	select {
 	case err := <-testServer.Err():
-		t.Errorf("error from server: %w", err)
+		t.Errorf("error from server: %v", err)
 	case err := <-done:
 		if err != nil {
-			t.Errorf("error from client: %w", err)
+			t.Errorf("error from client: %v", err)
 		}
+	}
+}
+
+func TestPortForwarderTrafficMonitor(t *testing.T) {
+	buf := bytes.NewBufferString("some-input")
+	session := &Session{keepAliveReason: make(chan string, 1)}
+	trafficType := "io"
+
+	tm := newTrafficMonitor(buf, session, trafficType)
+	l := len(buf.Bytes())
+
+	bb := make([]byte, l)
+	n, err := tm.Read(bb)
+	if err != nil {
+		t.Errorf("failed to read from traffic monitor: %w", err)
+	}
+	if n != l {
+		t.Errorf("expected to read %d bytes, got %d", l, n)
+	}
+
+	keepAliveReason := <-session.keepAliveReason
+	if keepAliveReason != trafficType {
+		t.Errorf("expected keep alive reason to be %s, got %s", trafficType, keepAliveReason)
 	}
 }

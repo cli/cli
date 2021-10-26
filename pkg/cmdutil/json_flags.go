@@ -179,7 +179,7 @@ func (e *exportFormat) exportData(v reflect.Value) interface{} {
 }
 
 type exportable interface {
-	ExportData([]string) *map[string]interface{}
+	ExportData([]string) map[string]interface{}
 }
 
 var exportableType = reflect.TypeOf((*exportable)(nil)).Elem()

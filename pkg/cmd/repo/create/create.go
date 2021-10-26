@@ -1,7 +1,6 @@
 package create
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 

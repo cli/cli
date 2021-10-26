@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"net"
 	"strings"
 	"time"
@@ -36,8 +38,10 @@ type PostCreateState struct {
 // PollPostCreateStates watches for state changes in a codespace,
 // and calls the supplied poller for each batch of state changes.
 // It runs until it encounters an error, including cancellation of the context.
-func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, codespace *api.Codespace, poller func([]PostCreateState)) (err error) {
-	session, err := ConnectToLiveshare(ctx, log, apiClient, codespace)
+func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiClient apiClient, codespace *api.Codespace, poller func([]PostCreateState)) (err error) {
+	noopLogger := log.New(ioutil.Discard, "", 0)
+
+	session, err := ConnectToLiveshare(ctx, progress, noopLogger, apiClient, codespace)
 	if err != nil {
 		return fmt.Errorf("connect to Live Share: %w", err)
 	}
@@ -48,28 +52,30 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, 
 	}()
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
-	listen, err := net.Listen("tcp", ":0") // arbitrary port
+	listen, err := net.Listen("tcp", "127.0.0.1:0") // arbitrary port
 	if err != nil {
 		return err
 	}
 	localPort := listen.Addr().(*net.TCPAddr).Port
 
-	log.Println("Fetching SSH Details...")
+	progress.StartProgressIndicatorWithLabel("Fetching SSH Details")
+	defer progress.StopProgressIndicator()
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}
 
+	progress.StartProgressIndicatorWithLabel("Fetching status")
 	tunnelClosed := make(chan error, 1) // buffered to avoid sender stuckness
 	go func() {
-		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
+		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, false)
 		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // error is non-nil
 	}()
 
 	t := time.NewTicker(1 * time.Second)
 	defer t.Stop()
 
-	for {
+	for ticks := 0; ; ticks++ {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -79,6 +85,13 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, 
 
 		case <-t.C:
 			states, err := getPostCreateOutput(ctx, localPort, sshUser)
+			// There is an active progress indicator before the first tick
+			// to show that we are fetching statuses.
+			// Once the first tick happens, we stop the indicator and let
+			// the subsequent post create states manage their own progress.
+			if ticks == 0 {
+				progress.StopProgressIndicator()
+			}
 			if err != nil {
 				return fmt.Errorf("get post create output: %w", err)
 			}

@@ -146,3 +146,67 @@ func TestHandleHTTPError_GraphQL502(t *testing.T) {
 		t.Errorf("got error: %v", err)
 	}
 }
+
+func TestHTTPError_ScopesSuggestion(t *testing.T) {
+	makeResponse := func(s int, u, haveScopes, needScopes string) *http.Response {
+		req, err := http.NewRequest("GET", u, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return &http.Response{
+			Request:    req,
+			StatusCode: s,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(`{}`)),
+			Header: map[string][]string{
+				"Content-Type":            {"application/json"},
+				"X-Oauth-Scopes":          {haveScopes},
+				"X-Accepted-Oauth-Scopes": {needScopes},
+			},
+		}
+	}
+
+	tests := []struct {
+		name string
+		resp *http.Response
+		want string
+	}{
+		{
+			name: "has necessary scopes",
+			resp: makeResponse(404, "https://api.github.com/gists", "repo, gist, read:org", "gist"),
+			want: ``,
+		},
+		{
+			name: "normalizes scopes",
+			resp: makeResponse(404, "https://api.github.com/orgs/ORG/discussions", "admin:org, write:discussion", "read:org, read:discussion"),
+			want: ``,
+		},
+		{
+			name: "no scopes on endpoint",
+			resp: makeResponse(404, "https://api.github.com/user", "repo", ""),
+			want: ``,
+		},
+		{
+			name: "missing a scope",
+			resp: makeResponse(404, "https://api.github.com/gists", "repo, read:org", "gist, delete_repo"),
+			want: `This API operation needs the "gist" scope. To request it, run:  gh auth refresh -h github.com -s gist`,
+		},
+		{
+			name: "server error",
+			resp: makeResponse(500, "https://api.github.com/gists", "repo", "gist"),
+			want: ``,
+		},
+		{
+			name: "no scopes on token",
+			resp: makeResponse(404, "https://api.github.com/gists", "", "gist, delete_repo"),
+			want: ``,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			httpError := HandleHTTPError(tt.resp)
+			if got := httpError.(HTTPError).ScopesSuggestion(); got != tt.want {
+				t.Errorf("HTTPError.ScopesSuggestion() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

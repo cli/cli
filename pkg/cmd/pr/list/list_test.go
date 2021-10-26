@@ -160,6 +160,22 @@ func TestPRList_filteringClosed(t *testing.T) {
 	}
 }
 
+func TestPRList_filteringHeadBranch(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query PullRequestList\b`),
+		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
+			assert.Equal(t, interface{}("bug-fix"), params["headBranch"])
+		}))
+
+	_, err := runCommand(http, true, `-H bug-fix`)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestPRList_filteringAssignee(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)

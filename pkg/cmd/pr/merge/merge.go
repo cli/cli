@@ -75,7 +75,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			opts.Finder = shared.NewFinder(f)
 
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
-				return &cmdutil.FlagError{Err: errors.New("argument required when using the --repo flag")}
+				return cmdutil.FlagErrorf("argument required when using the --repo flag")
 			}
 
 			if len(args) > 0 {
@@ -97,11 +97,11 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			}
 			if methodFlags == 0 {
 				if !opts.IO.CanPrompt() {
-					return &cmdutil.FlagError{Err: errors.New("--merge, --rebase, or --squash required when not running interactively")}
+					return cmdutil.FlagErrorf("--merge, --rebase, or --squash required when not running interactively")
 				}
 				opts.InteractiveMode = true
 			} else if methodFlags > 1 {
-				return &cmdutil.FlagError{Err: errors.New("only one of --merge, --rebase, or --squash can be enabled")}
+				return cmdutil.FlagErrorf("only one of --merge, --rebase, or --squash can be enabled")
 			}
 
 			opts.IsDeleteBranchIndicated = cmd.Flags().Changed("delete-branch")

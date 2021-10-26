@@ -80,7 +80,7 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 	}
 
 	flow := &oauth.Flow{
-		Hostname:     oauthHost,
+		Host:         oauth.GitHubHost(ghinstance.HostPrefix(oauthHost)),
 		ClientID:     oauthClientID,
 		ClientSecret: oauthClientSecret,
 		CallbackURI:  callbackURI,
