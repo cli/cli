@@ -38,7 +38,7 @@ func TestRenameRun(t *testing.T) {
 					httpmock.StatusStringResponse(204, "{}"))
 			},
 			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git remote set-url origin https://github.com/OWNER/REPO.git`, 0, "")
+				cs.Register(`git remote set-url origin https://github.com/OWNER/NEW_REPO.git`, 0, "")
 			},
 			tty: true,
 		},
@@ -59,7 +59,7 @@ func TestRenameRun(t *testing.T) {
 					httpmock.StatusStringResponse(204, "{}"))
 			},
 			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git remote set-url origin https://github.com/OWNER/REPO.git`, 0, "")
+				cs.Register(`git remote set-url origin https://github.com/OWNER/NEW_REPO.git`, 0, "")
 			},
 			tty: true,
 		},
@@ -79,7 +79,7 @@ func TestRenameRun(t *testing.T) {
 					httpmock.StatusStringResponse(204, "{}"))
 			},
 			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git remote set-url origin https://github.com/OWNER/REPO.git`, 0, "")
+				cs.Register(`git remote set-url origin https://github.com/OWNER/NEW_REPO.git`, 0, "")
 			},
 		},
 		{
@@ -97,7 +97,7 @@ func TestRenameRun(t *testing.T) {
 					httpmock.StatusStringResponse(204, "{}"))
 			},
 			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git remote set-url origin https://github.com/OWNER/REPO.git`, 0, "")
+				cs.Register(`git remote set-url origin https://github.com/OWNER/NEW_REPO.git`, 0, "")
 			},
 			tty: true,
 		},
@@ -107,7 +107,7 @@ func TestRenameRun(t *testing.T) {
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.New("OWNER", "REPO"), nil
 				},
-				newRepoSelector: "REPO",
+				newRepoSelector: "NEW_REPO",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -115,7 +115,7 @@ func TestRenameRun(t *testing.T) {
 					httpmock.StatusStringResponse(204, "{}"))
 			},
 			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git remote set-url origin https://github.com/OWNER/REPO.git`, 0, "")
+				cs.Register(`git remote set-url origin https://github.com/OWNER/NEW_REPO.git`, 0, "")
 			},
 		},
 	}
@@ -143,6 +143,12 @@ func TestRenameRun(t *testing.T) {
 					Repo:   repo,
 				},
 			}, nil
+		}
+
+		cs, restoreRun := run.Stub()
+		defer restoreRun(t)
+		if tt.execStubs != nil {
+			tt.execStubs(cs)
 		}
 
 		reg := &httpmock.Registry{}
