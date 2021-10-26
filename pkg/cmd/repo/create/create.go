@@ -70,38 +70,36 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			if len(args) == 0 && cmd.Flags().NFlag() == 0 {
 				if !opts.IO.CanPrompt() {
-					return &cmdutil.FlagError{Err: errors.New("at least one argument required in non-interactive mode")}
+					return cmdutil.FlagErrorf("at least one argument required in non-interactive mode")
 				}
 				opts.Interactive = true
 			} else if !opts.Internal && !opts.Private && !opts.Public {
 				// always require visibility
-				return &cmdutil.FlagError{
-					Err: errors.New("`--public`, `--private`, or `--internal` required when not running interactively")}
+				return cmdutil.FlagErrorf("`--public`, `--private`, or `--internal` required when not running interactively")
 			}
 
 			if opts.Source != "" && (opts.Clone || opts.GitIgnoreTemplate != "" || opts.LicenseTemplate != "") {
 				// which options allowed with --source?
-				return &cmdutil.FlagError{Err: errors.New("the `--scope` option is not supported with `--clone`, `--template`, or `--gitignore`")}
+				return cmdutil.FlagErrorf("the `--scope` option is not supported with `--clone`, `--template`, or `--gitignore`")
 			}
 
 			if opts.Source == "" {
 				if opts.Remote != "" {
-					return &cmdutil.FlagError{Err: errors.New("the `--remote` option can only be used with `--scope`")}
+					return cmdutil.FlagErrorf("the `--remote` option can only be used with `--scope`")
 				}
 				if opts.Name == "" && !opts.Interactive {
-					return &cmdutil.FlagError{Err: errors.New("name argument required to create new remote repository")}
+					return cmdutil.FlagErrorf("name argument required to create new remote repository")
 				}
 			}
 
 			if opts.Template != "" && (opts.GitIgnoreTemplate != "" || opts.LicenseTemplate != "") {
-				return &cmdutil.FlagError{Err: errors.New(".gitignore and license templates are not added when template is provided")}
+				return cmdutil.FlagErrorf(".gitignore and license templates are not added when template is provided")
 			}
 
 			issuesDisabled := cmd.Flags().Changed("enable-issues") || opts.DisableIssues
 			wikiDisabled := cmd.Flags().Changed("enable-wiki") || opts.DisableWiki
 			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "" || issuesDisabled || wikiDisabled) {
-				return &cmdutil.FlagError{
-					Err: errors.New("the `--template` option is not supported with `--homepage`, `--team`, `--enable-issues`, or `--enable-wiki`")}
+				return cmdutil.FlagErrorf("the `--template` option is not supported with `--homepage`, `--team`, `--enable-issues`, or `--enable-wiki`")
 			}
 
 			if runF != nil {
