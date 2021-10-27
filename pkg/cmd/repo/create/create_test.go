@@ -12,7 +12,6 @@ import (
 )
 
 func TestNewCmdCreate(t *testing.T) {
-
 	tests := []struct {
 		name      string
 		tty       bool
@@ -32,7 +31,7 @@ func TestNewCmdCreate(t *testing.T) {
 			tty:      false,
 			cli:      "",
 			wantsErr: true,
-			errMsg:   "At least one argument required in non-interactive mode",
+			errMsg:   "at least one argument required in non-interactive mode",
 		},
 		{
 			name: "new repo from remote",
@@ -41,6 +40,20 @@ func TestNewCmdCreate(t *testing.T) {
 				Name:   "NEWREPO",
 				Public: true,
 				Clone:  true},
+		},
+		{
+			name:     "no visibility",
+			tty:      true,
+			cli:      "NEWREPO",
+			wantsErr: true,
+			errMsg:   "`--public`, `--private`, or `--internal` required when not running interactively",
+		},
+		{
+			name:     "multiple visibility",
+			tty:      true,
+			cli:      "NEWREPO --public --private",
+			wantsErr: true,
+			errMsg:   "`--public`, `--private`, or `--internal` required when not running interactively",
 		},
 		{
 			name: "new remote from local",

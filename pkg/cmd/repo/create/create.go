@@ -72,9 +72,17 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 					return cmdutil.FlagErrorf("at least one argument required in non-interactive mode")
 				}
 				opts.Interactive = true
-			} else if !opts.Internal && !opts.Private && !opts.Public {
-				// always require visibility
-				return cmdutil.FlagErrorf("`--public`, `--private`, or `--internal` required when not running interactively")
+			} else {
+				// exactly one visibility flag required
+				if !opts.Public && !opts.Private && !opts.Internal {
+					return cmdutil.FlagErrorf("`--public`, `--private`, or `--internal` required when not running interactively")
+				}
+				err := cmdutil.MutuallyExclusive(
+					"`--public`, `--private`, or `--internal` required when not running interactively",
+					opts.Public, opts.Private, opts.Internal)
+				if err != nil {
+					return err
+				}
 			}
 
 			if opts.Source != "" && (opts.Clone || opts.GitIgnoreTemplate != "" || opts.LicenseTemplate != "") {
@@ -85,6 +93,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			if opts.Source == "" {
 				if opts.Remote != "" {
 					return cmdutil.FlagErrorf("the `--remote` option can only be used with `--scope`")
+				}
+				if opts.Push {
+					return cmdutil.FlagErrorf("the `--push` option can only be used with `--scope`")
 				}
 				if opts.Name == "" && !opts.Interactive {
 					return cmdutil.FlagErrorf("name argument required to create new remote repository")
@@ -181,5 +192,26 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 }
 
 func createRun(opts *CreateOptions) error {
+
+	if opts.Interactive {
+		//prompt for options here
+	}
+
+	if opts.Source != "" {
+		return createFromLocal(opts)
+	} else {
+		return createFromScratch(opts)
+	}
+
+	return nil
+}
+
+// create new epo on remote host
+func createFromScratch(opts *CreateOptions) error {
+
+}
+
+// create repo on remote host from local repo
+func createFromLocal(opts *CreateOptions) error {
 	return nil
 }
