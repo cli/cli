@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/opentracing/opentracing-go"
 	"github.com/sourcegraph/jsonrpc2"
@@ -32,7 +33,11 @@ func (r *rpcClient) do(ctx context.Context, method string, args, result interfac
 		return fmt.Errorf("error dispatching %q call: %w", method, err)
 	}
 
-	return waiter.Wait(ctx, result)
+	// timeout for waiter in case a connection cannot be made
+	waitCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	return waiter.Wait(waitCtx, result)
 }
 
 type nullHandler struct{}
