@@ -199,6 +199,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 func createRun(opts *CreateOptions) error {
 	if opts.Interactive {
 		//prompt for options here
+		fmt.Println("Interactive")
 	}
 
 	if opts.Source != "" {
@@ -206,8 +207,6 @@ func createRun(opts *CreateOptions) error {
 	} else {
 		return createFromScratch(opts)
 	}
-
-	return nil
 }
 
 // create new repo on remote host
@@ -217,6 +216,16 @@ func createFromScratch(opts *CreateOptions) error {
 
 // create repo on remote host from existing local repo
 func createFromLocal(opts *CreateOptions) error {
+	/*
+		default:
+			name: current local directory
+			remote: origin
+
+		if source path isn't a git repo, should error out
+		if push is given, run git push -u $remote $currentbranch
+
+		repoCreateInput struct and just call repo create
+	*/
 	return nil
 }
 
