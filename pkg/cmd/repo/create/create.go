@@ -350,7 +350,7 @@ func createRun(opts *CreateOptions) error {
 
 	createLocalDirectory := opts.ConfirmSubmit
 	if !opts.ConfirmSubmit {
-		opts.ConfirmSubmit, err = confirmSubmission(input.Name, input.OwnerLogin)
+		opts.ConfirmSubmit, err = confirmSubmission(input.Name, input.OwnerLogin, inLocalRepo)
 		if err != nil {
 			return err
 		}
@@ -624,15 +624,19 @@ func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName s
 	return answers.RepoName, answers.RepoDescription, strings.ToUpper(answers.RepoVisibility), nil
 }
 
-func confirmSubmission(repoName string, repoOwner string) (bool, error) {
+func confirmSubmission(repoName string, repoOwner string, inLocalRepo bool) (bool, error) {
 	qs := []*survey.Question{}
-	promptString := `This will create "%s" on GitHub and add it as the "origin" git remote. Continue?`
+	promptString := ""
 	normalizedRepoName := normalizeRepoName(repoName)
-	targetRepo := normalizedRepoName
-	if repoOwner != "" {
-		targetRepo = fmt.Sprintf("%s/%s", repoOwner, normalizedRepoName)
+	if inLocalRepo {
+		promptString = fmt.Sprintf(`This will create "%s" on GitHub and add it as the "origin" git remote. Continue?`, normalizedRepoName)
+	} else {
+		targetRepo := normalizedRepoName
+		if repoOwner != "" {
+			targetRepo = fmt.Sprintf("%s/%s", repoOwner, normalizedRepoName)
+		}
+		promptString = fmt.Sprintf(`This will create the "%s" repository on GitHub. Continue?`, targetRepo)
 	}
-	promptString = fmt.Sprintf(promptString, targetRepo)
 
 	confirmSubmitQuestion := &survey.Question{
 		Name: "confirmSubmit",
