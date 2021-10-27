@@ -47,7 +47,7 @@ Additional Conda installation options available on the [gh-feedstock page](https
 | ------------------ | ---------------------------------------- |
 | `spack install gh` | `spack uninstall gh && spack install gh` |
 
-### Linux & BSD
+### Linux, BSD & WSL2
 
 `gh` is available via [Homebrew](#homebrew), [Conda](#conda), [Spack](#spack), and as downloadable binaries from the [releases page][].
 
