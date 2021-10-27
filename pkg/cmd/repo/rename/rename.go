@@ -39,7 +39,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 		Short: "Rename a repository",
 		Long: heredoc.Doc(`Rename a GitHub repository
 
-		By default, renames the current repository otherwise rename the specified repository.`),
+		By default, renames the current repository otherwise renames the specified repository.`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo
@@ -48,7 +48,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 			if len(args) > 0 {
 				opts.newRepoSelector = args[0]
 			} else if !opts.IO.CanPrompt() {
-				return cmdutil.FlagErrorf("could not prompt: new name required when not running interactively\n")
+				return cmdutil.FlagErrorf("new name argument required when not running interactively\n")
 			}
 
 			if runf != nil {
@@ -69,8 +69,6 @@ func renameRun(opts *RenameOptions) error {
 		return err
 	}
 
-	var newRepo ghrepo.Interface
-	var baseRemote *context.Remote
 	newRepoName := opts.newRepoSelector
 
 	currRepo, err := opts.BaseRepo()
@@ -90,54 +88,52 @@ func renameRun(opts *RenameOptions) error {
 		}
 	}
 
-	newRepo = ghrepo.NewWithHost(currRepo.RepoOwner(), newRepoName, currRepo.RepoHost())
-
 	err = runRename(httpClient, currRepo, newRepoName)
 	if err != nil {
 		return fmt.Errorf("API called failed: %s", err)
 	}
 
+	cs := opts.IO.ColorScheme()
+	newRepo := ghrepo.NewWithHost(currRepo.RepoOwner(), newRepoName, currRepo.RepoHost())
+
 	if opts.IO.IsStdoutTTY() {
-		cs := opts.IO.ColorScheme()
 		fmt.Fprintf(opts.IO.Out, "%s Renamed repository %s\n", cs.SuccessIcon(), ghrepo.FullName(newRepo))
 	}
 
 	if !opts.HasRepoOverride {
-		cs := opts.IO.ColorScheme()
-		cfg, err := opts.Config()
+		remote, err := updateRemote(currRepo, newRepo, opts)
 		if err != nil {
-			fmt.Fprintf(opts.IO.ErrOut, "%s warning: unable to update remote '%s'\n", cs.WarningIcon(), baseRemote.Name)
-			return nil
-		}
-
-		protocol, err := cfg.Get(currRepo.RepoHost(), "git_protocol")
-		if err != nil {
-			fmt.Fprintf(opts.IO.ErrOut, "%s warning: unable to update remote '%s'\n", cs.WarningIcon(), baseRemote.Name)
-			return nil
-		}
-
-		remotes, err := opts.Remotes()
-		if err != nil {
-			fmt.Fprintf(opts.IO.ErrOut, "%s warning: unable to update remote '%s'\n", cs.WarningIcon(), baseRemote.Name)
-			return nil
-		}
-
-		baseRemote, err = remotes.FindByRepo(currRepo.RepoOwner(), currRepo.RepoName())
-		if err != nil {
-			fmt.Fprintf(opts.IO.ErrOut, "%s warning: unable to update remote '%s'\n", cs.WarningIcon(), baseRemote.Name)
-			return nil
-		}
-
-		remoteURL := ghrepo.FormatRemoteURL(newRepo, protocol)
-		err = git.UpdateRemoteURL(baseRemote.Name, remoteURL)
-		if err != nil {
-			fmt.Fprintf(opts.IO.ErrOut, "%s warning: unable to update remote '%s'\n", cs.WarningIcon(), baseRemote.Name)
-			return nil
-		}
-
-		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "%s Updated the %q remote\n", cs.SuccessIcon(), baseRemote.Name)
+			fmt.Fprintf(opts.IO.ErrOut, "%s Warning: unable to update remote %q\n", cs.WarningIcon(), remote.Name)
+		} else if opts.IO.IsStdoutTTY() {
+			fmt.Fprintf(opts.IO.Out, "%s Updated the %q remote\n", cs.SuccessIcon(), remote.Name)
 		}
 	}
+
 	return nil
+}
+
+func updateRemote(repo ghrepo.Interface, renamed ghrepo.Interface, opts *RenameOptions) (*context.Remote, error) {
+	cfg, err := opts.Config()
+	if err != nil {
+		return nil, err
+	}
+
+	protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
+	if err != nil {
+		return nil, err
+	}
+
+	remotes, err := opts.Remotes()
+	if err != nil {
+		return nil, err
+	}
+
+	remote, err := remotes.FindByRepo(repo.RepoOwner(), repo.RepoName())
+	if err != nil {
+		return nil, err
+	}
+
+	remoteURL := ghrepo.FormatRemoteURL(renamed, protocol)
+	err = git.UpdateRemoteURL(remote.Name, remoteURL)
+	return remote, err
 }

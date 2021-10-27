@@ -30,7 +30,7 @@ func TestNewCmdRename(t *testing.T) {
 		{
 			name:    "no arguments no tty",
 			input:   "",
-			errMsg:  "could not prompt: new name required when not running interactively\n",
+			errMsg:  "new name argument required when not running interactively\n",
 			wantErr: true,
 			tty:     false,
 		},
@@ -83,14 +83,13 @@ func TestNewCmdRename(t *testing.T) {
 
 func TestRenameRun(t *testing.T) {
 	testCases := []struct {
-		name            string
-		opts            RenameOptions
-		httpStubs       func(*httpmock.Registry)
-		execStubs       func(*run.CommandStubber)
-		askStubs        func(*prompt.AskStubber)
-		wantOut         string
-		tty             bool
-		HasRepoOverride bool
+		name      string
+		opts      RenameOptions
+		httpStubs func(*httpmock.Registry)
+		execStubs func(*run.CommandStubber)
+		askStubs  func(*prompt.AskStubber)
+		wantOut   string
+		tty       bool
 	}{
 		{
 			name:    "none argument",
@@ -109,8 +108,11 @@ func TestRenameRun(t *testing.T) {
 			tty: true,
 		},
 		{
-			name:    "owner repo change name prompt",
-			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n✓ Updated the \"origin\" remote\n",
+			name: "repo override",
+			opts: RenameOptions{
+				HasRepoOverride: true,
+			},
+			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n",
 			askStubs: func(q *prompt.AskStubber) {
 				q.StubOne("NEW_REPO")
 			},
@@ -119,11 +121,7 @@ func TestRenameRun(t *testing.T) {
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
 					httpmock.StatusStringResponse(204, "{}"))
 			},
-			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git remote set-url origin https://github.com/OWNER/NEW_REPO.git`, 0, "")
-			},
-			tty:             true,
-			HasRepoOverride: true,
+			tty: true,
 		},
 		{
 			name: "owner repo change name argument tty",
