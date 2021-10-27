@@ -48,7 +48,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 			if len(args) > 0 {
 				opts.newRepoSelector = args[0]
 			} else if !opts.IO.CanPrompt() {
-				return cmdutil.FlagErrorf("could not prompt: new name required when not running interactively")
+				return cmdutil.FlagErrorf("could not prompt: new name required when not running interactively\n")
 			}
 
 			if runf != nil {
@@ -106,19 +106,37 @@ func renameRun(opts *RenameOptions) error {
 		cs := opts.IO.ColorScheme()
 		cfg, err := opts.Config()
 		if err != nil {
-			return err
+			fmt.Fprintf(opts.IO.ErrOut, "%s warning: unable to update remote '%s'\n", cs.WarningIcon(), baseRemote.Name)
+			return nil
 		}
 
-		protocol, _ := cfg.Get(currRepo.RepoHost(), "git_protocol")
-		remotes, _ := opts.Remotes()
-		baseRemote, _ = remotes.FindByRepo(currRepo.RepoOwner(), currRepo.RepoName())
+		protocol, err := cfg.Get(currRepo.RepoHost(), "git_protocol")
+		if err != nil {
+			fmt.Fprintf(opts.IO.ErrOut, "%s warning: unable to update remote '%s'\n", cs.WarningIcon(), baseRemote.Name)
+			return nil
+		}
+
+		remotes, err := opts.Remotes()
+		if err != nil {
+			fmt.Fprintf(opts.IO.ErrOut, "%s warning: unable to update remote '%s'\n", cs.WarningIcon(), baseRemote.Name)
+			return nil
+		}
+
+		baseRemote, err = remotes.FindByRepo(currRepo.RepoOwner(), currRepo.RepoName())
+		if err != nil {
+			fmt.Fprintf(opts.IO.ErrOut, "%s warning: unable to update remote '%s'\n", cs.WarningIcon(), baseRemote.Name)
+			return nil
+		}
+
 		remoteURL := ghrepo.FormatRemoteURL(newRepo, protocol)
 		err = git.UpdateRemoteURL(baseRemote.Name, remoteURL)
 		if err != nil {
-			fmt.Fprintf(opts.IO.ErrOut, "%s warning: unable to update remote '%s' \n", cs.WarningIcon(), err)
+			fmt.Fprintf(opts.IO.ErrOut, "%s warning: unable to update remote '%s'\n", cs.WarningIcon(), baseRemote.Name)
+			return nil
 		}
+
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "%s Updated the %q remote \n", cs.SuccessIcon(), baseRemote.Name)
+			fmt.Fprintf(opts.IO.Out, "%s Updated the %q remote\n", cs.SuccessIcon(), baseRemote.Name)
 		}
 	}
 	return nil

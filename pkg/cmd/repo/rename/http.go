@@ -11,22 +11,8 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
-type renameRepo struct {
-	RepoHost  string
-	RepoOwner string
-	RepoName  string
-	Name      string `json:"name,omitempty"`
-}
-
 func runRename(client *http.Client, repo ghrepo.Interface, newRepoName string) error {
-
-	input := renameRepo{
-		RepoHost:  repo.RepoHost(),
-		RepoOwner: repo.RepoOwner(),
-		RepoName:  repo.RepoName(),
-		Name:      newRepoName,
-	}
-
+	input := map[string]string{"name": newRepoName}
 	body, err := json.Marshal(input)
 	if err != nil {
 		return err
