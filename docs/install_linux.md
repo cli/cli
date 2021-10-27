@@ -9,7 +9,7 @@ our release schedule.
 
 ## Official sources
 
-### Debian, Ubuntu Linux, Raspberry Pi OS (apt)
+### Debian, Ubuntu Linux (including wsl2), Raspberry Pi OS (apt)
 
 Install:
 
@@ -21,6 +21,8 @@ sudo apt install gh
 ```
 
 **Note**: If you get the error _"gpg: failed to start the dirmngr '/usr/bin/dirmngr': No such file or directory"_, try installing the `dirmngr` package: `sudo apt install dirmngr`.
+
+**On wsL2 systems**: `sudo apt-get install -y xdg-utils` is required to lauch codespaces in vscode | vscode-insiders
 
 Upgrade:
 
