@@ -3,11 +3,16 @@ package create
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/spf13/cobra"
 )
 
@@ -192,7 +197,6 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 }
 
 func createRun(opts *CreateOptions) error {
-
 	if opts.Interactive {
 		//prompt for options here
 	}
@@ -206,12 +210,265 @@ func createRun(opts *CreateOptions) error {
 	return nil
 }
 
-// create new epo on remote host
+// create new repo on remote host
 func createFromScratch(opts *CreateOptions) error {
-
+	return nil
 }
 
-// create repo on remote host from local repo
+// create repo on remote host from existing local repo
 func createFromLocal(opts *CreateOptions) error {
 	return nil
+}
+
+func interactiveGitIgnore(client *http.Client, hostname string) (string, error) {
+
+	var addGitIgnore bool
+	var addGitIgnoreSurvey []*survey.Question
+
+	addGitIgnoreQuestion := &survey.Question{
+		Name: "addGitIgnore",
+		Prompt: &survey.Confirm{
+			Message: "Would you like to add a .gitignore?",
+			Default: false,
+		},
+	}
+
+	addGitIgnoreSurvey = append(addGitIgnoreSurvey, addGitIgnoreQuestion)
+	err := prompt.SurveyAsk(addGitIgnoreSurvey, &addGitIgnore)
+	if err != nil {
+		return "", err
+	}
+
+	var wantedIgnoreTemplate string
+
+	if addGitIgnore {
+		var gitIg []*survey.Question
+
+		gitIgnoretemplates, err := listGitIgnoreTemplates(client, hostname)
+		if err != nil {
+			return "", err
+		}
+		gitIgnoreQuestion := &survey.Question{
+			Name: "chooseGitIgnore",
+			Prompt: &survey.Select{
+				Message: "Choose a .gitignore template",
+				Options: gitIgnoretemplates,
+			},
+		}
+		gitIg = append(gitIg, gitIgnoreQuestion)
+		err = prompt.SurveyAsk(gitIg, &wantedIgnoreTemplate)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return wantedIgnoreTemplate, nil
+}
+
+func interactiveLicense(client *http.Client, hostname string) (string, error) {
+	var addLicense bool
+	var addLicenseSurvey []*survey.Question
+	var wantedLicense string
+
+	addLicenseQuestion := &survey.Question{
+		Name: "addLicense",
+		Prompt: &survey.Confirm{
+			Message: "Would you like to add a license?",
+			Default: false,
+		},
+	}
+
+	addLicenseSurvey = append(addLicenseSurvey, addLicenseQuestion)
+	err := prompt.SurveyAsk(addLicenseSurvey, &addLicense)
+	if err != nil {
+		return "", err
+	}
+
+	licenseKey := map[string]string{}
+
+	if addLicense {
+		licenseTemplates, err := listLicenseTemplates(client, hostname)
+		if err != nil {
+			return "", err
+		}
+		var licenseNames []string
+		for _, l := range licenseTemplates {
+			licenseNames = append(licenseNames, l.Name)
+			licenseKey[l.Name] = l.Key
+		}
+		var licenseQs []*survey.Question
+
+		licenseQuestion := &survey.Question{
+			Name: "chooseLicense",
+			Prompt: &survey.Select{
+				Message: "Choose a license",
+				Options: licenseNames,
+			},
+		}
+		licenseQs = append(licenseQs, licenseQuestion)
+		err = prompt.SurveyAsk(licenseQs, &wantedLicense)
+		if err != nil {
+			return "", err
+		}
+		return licenseKey[wantedLicense], nil
+	}
+	return "", nil
+}
+
+func localInit(io *iostreams.IOStreams, remoteURL, path, checkoutBranch string) error {
+	gitInit, err := git.GitCommand("init", path)
+	if err != nil {
+		return err
+	}
+	isTTY := io.IsStdoutTTY()
+	if isTTY {
+		gitInit.Stdout = io.Out
+	}
+	gitInit.Stderr = io.ErrOut
+	err = run.PrepareCmd(gitInit).Run()
+	if err != nil {
+		return err
+	}
+
+	gitRemoteAdd, err := git.GitCommand("-C", path, "remote", "add", "origin", remoteURL)
+	if err != nil {
+		return err
+	}
+	gitRemoteAdd.Stdout = io.Out
+	gitRemoteAdd.Stderr = io.ErrOut
+	err = run.PrepareCmd(gitRemoteAdd).Run()
+	if err != nil {
+		return err
+	}
+
+	if checkoutBranch == "" {
+		return nil
+	}
+
+	gitFetch, err := git.GitCommand("-C", path, "fetch", "origin", fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/origin/%[1]s", checkoutBranch))
+	if err != nil {
+		return err
+	}
+	gitFetch.Stdout = io.Out
+	gitFetch.Stderr = io.ErrOut
+	err = run.PrepareCmd(gitFetch).Run()
+	if err != nil {
+		return err
+	}
+
+	gitCheckout, err := git.GitCommand("-C", path, "checkout", checkoutBranch)
+	if err != nil {
+		return err
+	}
+	gitCheckout.Stdout = io.Out
+	gitCheckout.Stderr = io.ErrOut
+	return run.PrepareCmd(gitCheckout).Run()
+}
+
+func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName string) (string, string, string, error) {
+	qs := []*survey.Question{}
+
+	repoNameQuestion := &survey.Question{
+		Name: "repoName",
+		Prompt: &survey.Input{
+			Message: "Repository name",
+			Default: repoName,
+		},
+	}
+	qs = append(qs, repoNameQuestion)
+
+	if isDescEmpty {
+		repoDescriptionQuestion := &survey.Question{
+			Name: "repoDescription",
+			Prompt: &survey.Input{
+				Message: "Repository description",
+			},
+		}
+
+		qs = append(qs, repoDescriptionQuestion)
+	}
+
+	if !isVisibilityPassed {
+		repoVisibilityQuestion := &survey.Question{
+			Name: "repoVisibility",
+			Prompt: &survey.Select{
+				Message: "Visibility",
+				Options: []string{"Public", "Private", "Internal"},
+			},
+		}
+		qs = append(qs, repoVisibilityQuestion)
+	}
+
+	answers := struct {
+		RepoName        string
+		RepoDescription string
+		RepoVisibility  string
+	}{}
+
+	err := prompt.SurveyAsk(qs, &answers)
+
+	if err != nil {
+		return "", "", "", err
+	}
+
+	return answers.RepoName, answers.RepoDescription, strings.ToUpper(answers.RepoVisibility), nil
+}
+
+func confirmSubmission(repoName string, repoOwner string, inLocalRepo bool) (bool, error) {
+	qs := []*survey.Question{}
+
+	promptString := ""
+	if inLocalRepo {
+		promptString = `This will add an "origin" git remote to your local repository. Continue?`
+	} else {
+		targetRepo := repoName
+		if repoOwner != "" {
+			targetRepo = fmt.Sprintf("%s/%s", repoOwner, repoName)
+		}
+		promptString = fmt.Sprintf(`This will create the "%s" repository on GitHub. Continue?`, targetRepo)
+	}
+
+	confirmSubmitQuestion := &survey.Question{
+		Name: "confirmSubmit",
+		Prompt: &survey.Confirm{
+			Message: promptString,
+			Default: true,
+		},
+	}
+	qs = append(qs, confirmSubmitQuestion)
+
+	answer := struct {
+		ConfirmSubmit bool
+	}{}
+
+	err := prompt.SurveyAsk(qs, &answer)
+	if err != nil {
+		return false, err
+	}
+
+	return answer.ConfirmSubmit, nil
+}
+
+func getVisibility() (string, error) {
+	qs := []*survey.Question{}
+
+	getVisibilityQuestion := &survey.Question{
+		Name: "repoVisibility",
+		Prompt: &survey.Select{
+			Message: "Visibility",
+			Options: []string{"Public", "Private", "Internal"},
+		},
+	}
+	qs = append(qs, getVisibilityQuestion)
+
+	answer := struct {
+		RepoVisibility string
+	}{}
+
+	err := prompt.SurveyAsk(qs, &answer)
+	if err != nil {
+		return "", err
+	}
+
+	return strings.ToUpper(answer.RepoVisibility), nil
 }
