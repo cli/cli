@@ -3,6 +3,7 @@ package create
 import (
 	"fmt"
 	"net/http"
+	"path"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -125,7 +126,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "Description of the repository")
-	cmd.Flags().StringVarP(&opts.Homepage, "homepage", "h", "", "Repository home page `URL`")
+	cmd.Flags().StringVarP(&opts.Homepage, "homepage", "o", "", "Repository home page `URL`")
 	cmd.Flags().StringVarP(&opts.Team, "team", "t", "", "The `name` of the organization team to be granted access")
 	cmd.Flags().StringVarP(&opts.Template, "template", "p", "", "Make the new repository based on a template `repository`")
 	cmd.Flags().BoolVar(&opts.Public, "public", false, "Make the new repository public")
@@ -216,6 +217,40 @@ func createFromScratch(opts *CreateOptions) error {
 
 // create repo on remote host from existing local repo
 func createFromLocal(opts *CreateOptions) error {
+	cs := opts.IO.ColorScheme()
+	projectDir, projectDirErr := git.ToplevelDirFromPath(opts.Source)
+	if projectDirErr != nil {
+		return projectDirErr
+	}
+
+	var repoName string
+	var headRemote string
+
+	// repo name will be currdir name or specified
+	if opts.Name == "" {
+		repoName = path.Base(projectDir)
+	}
+
+	//remote will be origin or specified
+	if opts.Remote != "" {
+		headRemote = opts.Remote
+	} else {
+		headRemote = "origin"
+	}
+
+	if opts.Push {
+		currentBranch, err := git.CurrentBranch()
+		if err != nil {
+			currentBranch = "HEAD"
+		}
+		err = git.Push(headRemote, currentBranch, nil, nil)
+		if err != nil {
+			fmt.Fprintf(opts.IO.ErrOut, "%s warning: unable to push %q\n", cs.WarningIcon(), currentBranch)
+		}
+	}
+
+	fmt.Println("Repo Name: ", repoName)
+	fmt.Println("Remote Name: ", headRemote)
 	/*
 		default:
 			name: current local directory
