@@ -34,7 +34,7 @@ func (r *rpcClient) do(ctx context.Context, method string, args, result interfac
 	}
 
 	// timeout for waiter in case a connection cannot be made
-	waitCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	waitCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 
 	return waiter.Wait(waitCtx, result)
