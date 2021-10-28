@@ -32,13 +32,35 @@ func TestNewCmdRename(t *testing.T) {
 			input:   "",
 			errMsg:  "new name argument required when not running interactively\n",
 			wantErr: true,
-			tty:     false,
 		},
 		{
-			name:  "one argument",
-			input: "REPO",
+			name:  "one argument no tty confirmed",
+			input: "REPO --confirm",
 			output: RenameOptions{
 				newRepoSelector: "REPO",
+			},
+		},
+		{
+			name:    "one argument no tty",
+			input:   "REPO",
+			errMsg:  "--confirm required when passing a single argument",
+			wantErr: true,
+		},
+		{
+			name:  "one argument tty confirmed",
+			input: "REPO --confirm",
+			tty:   true,
+			output: RenameOptions{
+				newRepoSelector: "REPO",
+			},
+		},
+		{
+			name:  "one argument tty",
+			input: "REPO",
+			tty:   true,
+			output: RenameOptions{
+				newRepoSelector: "REPO",
+				DoConfirm:       true,
 			},
 		},
 		{
@@ -152,6 +174,39 @@ func TestRenameRun(t *testing.T) {
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git remote set-url origin https://github.com/OWNER/NEW_REPO.git`, 0, "")
 			},
+		},
+		{
+			name: "confirmation with yes",
+			tty:  true,
+			opts: RenameOptions{
+				newRepoSelector: "NEW_REPO",
+				DoConfirm:       true,
+			},
+			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n✓ Updated the \"origin\" remote\n",
+			askStubs: func(q *prompt.AskStubber) {
+				q.StubOne(true)
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.StatusStringResponse(204, "{}"))
+			},
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git remote set-url origin https://github.com/OWNER/NEW_REPO.git`, 0, "")
+			},
+		},
+
+		{
+			name: "confirmation with no",
+			tty:  true,
+			opts: RenameOptions{
+				newRepoSelector: "NEW_REPO",
+				DoConfirm:       true,
+			},
+			askStubs: func(q *prompt.AskStubber) {
+				q.StubOne(false)
+			},
+			wantOut: "",
 		},
 	}
 

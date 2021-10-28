@@ -22,6 +22,7 @@ type RenameOptions struct {
 	Config          func() (config.Config, error)
 	BaseRepo        func() (ghrepo.Interface, error)
 	Remotes         func() (context.Remotes, error)
+	DoConfirm       bool
 	HasRepoOverride bool
 	newRepoSelector string
 }
@@ -33,6 +34,8 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 		Remotes:    f.Remotes,
 		Config:     f.Config,
 	}
+
+	var confirm bool
 
 	cmd := &cobra.Command{
 		Use:   "rename [<new-name>]",
@@ -51,6 +54,13 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("new name argument required when not running interactively\n")
 			}
 
+			if len(args) == 1 && !confirm && !opts.HasRepoOverride {
+				if !opts.IO.CanPrompt() {
+					return cmdutil.FlagErrorf("--confirm required when passing a single argument")
+				}
+				opts.DoConfirm = true
+			}
+
 			if runf != nil {
 				return runf(opts)
 			}
@@ -59,6 +69,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 	}
 
 	cmdutil.EnableRepoOverride(cmd, f)
+	cmd.Flags().BoolVarP(&confirm, "confirm", "y", false, "skip confirmation prompt")
 
 	return cmd
 }
@@ -85,6 +96,21 @@ func renameRun(opts *RenameOptions) error {
 		)
 		if err != nil {
 			return err
+		}
+	}
+
+	if opts.DoConfirm {
+		var confirmed bool
+		p := &survey.Confirm{
+			Message: fmt.Sprintf("Rename %s to %s?", ghrepo.FullName(currRepo), newRepoName),
+			Default: false,
+		}
+		err = prompt.SurveyAskOne(p, &confirmed)
+		if err != nil {
+			return fmt.Errorf("failed to prompt: %w", err)
+		}
+		if !confirmed {
+			return nil
 		}
 	}
 
