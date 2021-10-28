@@ -7,8 +7,11 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -29,6 +32,7 @@ type CreateOptions struct {
 	Public            bool
 	Private           bool
 	Internal          bool
+	Visibility        string
 	Push              bool
 	Clone             bool
 	Source            string
@@ -83,10 +87,18 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 					return cmdutil.FlagErrorf("`--public`, `--private`, or `--internal` required when not running interactively")
 				}
 				err := cmdutil.MutuallyExclusive(
-					"`--public`, `--private`, or `--internal` required when not running interactively",
+					"expected exactly one of `--public`, `--private`, or `--internal`",
 					opts.Public, opts.Private, opts.Internal)
 				if err != nil {
 					return err
+				}
+
+				if opts.Public {
+					opts.Visibility = "PUBLIC"
+				} else if opts.Private {
+					opts.Visibility = "PRIVATE"
+				} else {
+					opts.Visibility = "INTERNAL"
 				}
 			}
 
@@ -145,9 +157,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVar(&opts.EnableIssues, "enable-issues", true, "Enable issues in the new repository")
 	cmd.Flags().BoolVar(&opts.EnableWiki, "enable-wiki", true, "Enable wiki in the new repository")
 
-	cmd.Flags().MarkDeprecated("confirm", "Pass any argument to skip confirmation prompt")
-	cmd.Flags().MarkDeprecated("enable-issues", "Disable issues with `--disable-issues`")
-	cmd.Flags().MarkDeprecated("enable-wiki", "Disable wiki with `--disable-wiki`")
+	_ = cmd.Flags().MarkDeprecated("confirm", "Pass any argument to skip confirmation prompt")
+	_ = cmd.Flags().MarkDeprecated("enable-issues", "Disable issues with `--disable-issues`")
+	_ = cmd.Flags().MarkDeprecated("enable-wiki", "Disable wiki with `--disable-wiki`")
 
 	_ = cmd.RegisterFlagCompletionFunc("gitignore", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		httpClient, err := opts.HttpClient()
@@ -211,6 +223,105 @@ func createRun(opts *CreateOptions) error {
 
 // create new repo on remote host
 func createFromScratch(opts *CreateOptions) error {
+	var repoToCreate ghrepo.Interface
+
+	if strings.Contains(opts.Name, "/") {
+		var err error
+		repoToCreate, err = ghrepo.FromFullName(opts.Name)
+		if err != nil {
+			return fmt.Errorf("argument error: %w", err)
+		}
+	} else {
+		host, err := cfg.DefaultHost()
+		if err != nil {
+			return err
+		}
+		repoToCreate = ghrepo.NewWithHost("", opts.Name, host)
+	}
+
+	input := repoCreateInput{
+		Name:              repoToCreate.RepoName(),
+		Visibility:        opts.Visibility,
+		OwnerLogin:        repoToCreate.RepoOwner(),
+		TeamSlug:          opts.Team,
+		Description:       opts.Description,
+		HomepageURL:       opts.Homepage,
+		HasIssuesEnabled:  opts.EnableIssues,
+		HasWikiEnabled:    opts.EnableWiki,
+		GitIgnoreTemplate: opts.GitIgnoreTemplate,
+		LicenseTemplate:   opts.LicenseTemplate,
+	}
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+
+	var templateRepoMainBranch string
+	if opts.Template != "" {
+		var templateRepo ghrepo.Interface
+		apiClient := api.NewClientFromHTTP(httpClient)
+
+		templateRepoName := opts.Template
+		if !strings.Contains(templateRepoName, "/") {
+			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+			if err != nil {
+				return err
+			}
+			templateRepoName = currentUser + "/" + templateRepoName
+		}
+		templateRepo, err = ghrepo.FromFullName(templateRepoName)
+		if err != nil {
+			return fmt.Errorf("argument error: %w", err)
+		}
+
+		repo, err := api.GitHubRepo(apiClient, templateRepo)
+		if err != nil {
+			return err
+		}
+
+		input.TemplateRepositoryID = repo.ID
+		templateRepoMainBranch = repo.DefaultBranchRef.Name
+	}
+
+	repo, err = repoCreate(httpClient, repoToCreate.RepoHost(), input)
+	if err != nil {
+		return err
+	}
+	if isTTY {
+		fmt.Fprintf(opts.IO.Out,
+			"%s Created repository %s on GitHub\n",
+			cs.SuccessIconWithColor(cs.Green),
+			ghrepo.FullName(repo))
+	}
+
+	cs := opts.IO.ColorScheme()
+	isTTY := opts.IO.IsStdoutTTY()
+	protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
+	if err != nil {
+		return err
+	}
+
+	if opts.Clone {
+		if opts.GitIgnoreTemplate == "" && opts.LicenseTemplate == "" {
+			path := repo.RepoName()
+			var checkoutBranch string
+			if opts.Template != "" {
+				// use template's default branch
+				checkoutBranch = templateRepoMainBranch
+			}
+
+			if err := localInit(opts.IO, remoteURL, path, checkoutBranch); err != nil {
+				return err
+			}
+		} else {
+			_, err := git.RunClone(remoteURL, []string{})
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
