@@ -226,6 +226,9 @@ func createRun(opts *CreateOptions) error {
 func createFromScratch(opts *CreateOptions) error {
 	var repoToCreate ghrepo.Interface
 	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
 
 	if strings.Contains(opts.Name, "/") {
 		var err error
@@ -332,17 +335,40 @@ func createFromScratch(opts *CreateOptions) error {
 // create repo on remote host from existing local repo
 func createFromLocal(opts *CreateOptions) error {
 	cs := opts.IO.ColorScheme()
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
 	projectDir, projectDirErr := git.ToplevelDirFromPath(opts.Source)
 	if projectDirErr != nil {
 		return projectDirErr
 	}
 
-	var repoName string
+	var repoToCreate ghrepo.Interface
 	var headRemote string
 
 	// repo name will be currdir name or specified
 	if opts.Name == "" {
-		repoName = path.Base(projectDir)
+		host, err := cfg.DefaultHost()
+		if err != nil {
+			return err
+		}
+		repoToCreate = ghrepo.NewWithHost("", path.Base(projectDir), host)
+	} else {
+		if strings.Contains(opts.Name, "/") {
+			var err error
+			repoToCreate, err = ghrepo.FromFullName(opts.Name)
+			if err != nil {
+				return fmt.Errorf("argument error: %w", err)
+			}
+		} else {
+			host, err := cfg.DefaultHost()
+			if err != nil {
+				return err
+			}
+			repoToCreate = ghrepo.NewWithHost("", opts.Name, host)
+		}
 	}
 
 	//remote will be origin or specified
@@ -363,7 +389,7 @@ func createFromLocal(opts *CreateOptions) error {
 		}
 	}
 
-	fmt.Println("Repo Name: ", repoName)
+	fmt.Println("Repo Name: ", repoToCreate.RepoName())
 	fmt.Println("Remote Name: ", headRemote)
 	/*
 		default:
