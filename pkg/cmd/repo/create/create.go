@@ -355,20 +355,18 @@ func createFromLocal(opts *CreateOptions) error {
 			return err
 		}
 		repoToCreate = ghrepo.NewWithHost("", path.Base(projectDir), host)
-	} else {
-		if strings.Contains(opts.Name, "/") {
-			var err error
-			repoToCreate, err = ghrepo.FromFullName(opts.Name)
-			if err != nil {
-				return fmt.Errorf("argument error: %w", err)
-			}
-		} else {
-			host, err := cfg.DefaultHost()
-			if err != nil {
-				return err
-			}
-			repoToCreate = ghrepo.NewWithHost("", opts.Name, host)
+	} else if strings.Contains(opts.Name, "/") {
+		var err error
+		repoToCreate, err = ghrepo.FromFullName(opts.Name)
+		if err != nil {
+			return fmt.Errorf("argument error: %w", err)
 		}
+	} else {
+		host, err := cfg.DefaultHost()
+		if err != nil {
+			return err
+		}
+		repoToCreate = ghrepo.NewWithHost("", opts.Name, host)
 	}
 
 	//remote will be origin or specified
