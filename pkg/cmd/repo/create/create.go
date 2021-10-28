@@ -339,6 +339,10 @@ func createFromLocal(opts *CreateOptions) error {
 	if err != nil {
 		return err
 	}
+	host, err := cfg.DefaultHost()
+	if err != nil {
+		return err
+	}
 
 	projectDir, projectDirErr := git.ToplevelDirFromPath(opts.Source)
 	if projectDirErr != nil {
@@ -350,10 +354,6 @@ func createFromLocal(opts *CreateOptions) error {
 
 	// repo name will be currdir name or specified
 	if opts.Name == "" {
-		host, err := cfg.DefaultHost()
-		if err != nil {
-			return err
-		}
 		repoToCreate = ghrepo.NewWithHost("", path.Base(projectDir), host)
 	} else if strings.Contains(opts.Name, "/") {
 		var err error
@@ -362,10 +362,6 @@ func createFromLocal(opts *CreateOptions) error {
 			return fmt.Errorf("argument error: %w", err)
 		}
 	} else {
-		host, err := cfg.DefaultHost()
-		if err != nil {
-			return err
-		}
 		repoToCreate = ghrepo.NewWithHost("", opts.Name, host)
 	}
 
