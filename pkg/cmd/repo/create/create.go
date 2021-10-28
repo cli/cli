@@ -225,6 +225,7 @@ func createRun(opts *CreateOptions) error {
 // create new repo on remote host
 func createFromScratch(opts *CreateOptions) error {
 	var repoToCreate ghrepo.Interface
+	cfg, err := opts.Config()
 
 	if strings.Contains(opts.Name, "/") {
 		var err error
@@ -285,10 +286,13 @@ func createFromScratch(opts *CreateOptions) error {
 		templateRepoMainBranch = repo.DefaultBranchRef.Name
 	}
 
-	repo, err = repoCreate(httpClient, repoToCreate.RepoHost(), input)
+	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
 	if err != nil {
 		return err
 	}
+
+	cs := opts.IO.ColorScheme()
+	isTTY := opts.IO.IsStdoutTTY()
 	if isTTY {
 		fmt.Fprintf(opts.IO.Out,
 			"%s Created repository %s on GitHub\n",
@@ -296,12 +300,11 @@ func createFromScratch(opts *CreateOptions) error {
 			ghrepo.FullName(repo))
 	}
 
-	cs := opts.IO.ColorScheme()
-	isTTY := opts.IO.IsStdoutTTY()
 	protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
 	if err != nil {
 		return err
 	}
+	remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
 	if opts.Clone {
 		if opts.GitIgnoreTemplate == "" && opts.LicenseTemplate == "" {
