@@ -215,15 +215,20 @@ func createRun(opts *CreateOptions) error {
 		fmt.Println("Interactive")
 	}
 
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+
 	if opts.Source != "" {
-		return createFromLocal(opts)
+		return createFromLocal(opts, httpClient)
 	} else {
-		return createFromScratch(opts)
+		return createFromScratch(opts, httpClient)
 	}
 }
 
 // create new repo on remote host
-func createFromScratch(opts *CreateOptions) error {
+func createFromScratch(opts *CreateOptions, httpClient *http.Client) error {
 	var repoToCreate ghrepo.Interface
 	cfg, err := opts.Config()
 	if err != nil {
@@ -255,11 +260,6 @@ func createFromScratch(opts *CreateOptions) error {
 		HasWikiEnabled:    opts.EnableWiki,
 		GitIgnoreTemplate: opts.GitIgnoreTemplate,
 		LicenseTemplate:   opts.LicenseTemplate,
-	}
-
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
 	}
 
 	var templateRepoMainBranch string
@@ -333,8 +333,14 @@ func createFromScratch(opts *CreateOptions) error {
 }
 
 // create repo on remote host from existing local repo
-func createFromLocal(opts *CreateOptions) error {
+func createFromLocal(opts *CreateOptions, httpClient *http.Client) error {
 	cs := opts.IO.ColorScheme()
+	isTTY := opts.IO.IsStdoutTTY()
+	stdout := opts.IO.Out
+
+	repoPath := opts.Source
+	baseRemote := opts.Remote
+
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
@@ -344,17 +350,19 @@ func createFromLocal(opts *CreateOptions) error {
 		return err
 	}
 
-	projectDir, projectDirErr := git.ToplevelDirFromPath(opts.Source)
+	projectDir, projectDirErr := git.ToplevelDirFromPath(repoPath)
 	if projectDirErr != nil {
 		return projectDirErr
 	}
 
 	var repoToCreate ghrepo.Interface
-	var headRemote string
 
 	// repo name will be currdir name or specified
 	if opts.Name == "" {
-		repoToCreate = ghrepo.NewWithHost("", path.Base(projectDir), host)
+		if projectDir != ".git" {
+			return fmt.Errorf("path not a local repository")
+		}
+		repoToCreate = ghrepo.NewWithHost("", path.Base(repoPath), host)
 	} else if strings.Contains(opts.Name, "/") {
 		var err error
 		repoToCreate, err = ghrepo.FromFullName(opts.Name)
@@ -366,35 +374,99 @@ func createFromLocal(opts *CreateOptions) error {
 	}
 
 	//remote will be origin or specified
-	if opts.Remote != "" {
-		headRemote = opts.Remote
-	} else {
-		headRemote = "origin"
+	if baseRemote == "" {
+		baseRemote = "origin"
+	}
+
+	input := repoCreateInput{
+		Name:              repoToCreate.RepoName(),
+		Visibility:        opts.Visibility,
+		OwnerLogin:        repoToCreate.RepoOwner(),
+		TeamSlug:          opts.Team,
+		Description:       opts.Description,
+		HomepageURL:       opts.Homepage,
+		HasIssuesEnabled:  opts.EnableIssues,
+		HasWikiEnabled:    opts.EnableWiki,
+		GitIgnoreTemplate: opts.GitIgnoreTemplate,
+		LicenseTemplate:   opts.LicenseTemplate,
+	}
+
+	fmt.Println(input)
+
+	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
+	if err != nil {
+		return err
+	}
+
+	if isTTY {
+		fmt.Fprintf(stdout,
+			"%s Created repository %s on GitHub\n",
+			cs.SuccessIconWithColor(cs.Green),
+			ghrepo.FullName(repo))
+	}
+
+	protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
+	if err != nil {
+		return err
+	}
+
+	remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
+
+	//get the current branch
+	currentBranch, err := git.CurrentBranch()
+	if err != nil {
+		//warning: unable to find a curr repo or
+		// use main branch as default
+		currentBranch = "main"
+	}
+
+	if err := sourceInit(opts.IO, remoteURL, baseRemote, repoPath, currentBranch); err != nil {
+		return err
 	}
 
 	if opts.Push {
-		currentBranch, err := git.CurrentBranch()
+		repoPush, err := git.GitCommand("-C", repoPath, "push", "-u", "origin", currentBranch)
 		if err != nil {
-			currentBranch = "HEAD"
+			return err
 		}
-		err = git.Push(headRemote, currentBranch, nil, nil)
+		err = run.PrepareCmd(repoPush).Run()
 		if err != nil {
-			fmt.Fprintf(opts.IO.ErrOut, "%s warning: unable to push %q\n", cs.WarningIcon(), currentBranch)
+			return err
 		}
 	}
 
-	fmt.Println("Repo Name: ", repoToCreate.RepoName())
-	fmt.Println("Remote Name: ", headRemote)
-	/*
-		default:
-			name: current local directory
-			remote: origin
+	return nil
+}
 
-		if source path isn't a git repo, should error out
-		if push is given, run git push -u $remote $currentbranch
+func sourceInit(io *iostreams.IOStreams, remoteURL, baseRemote, repoPath, currentBranch string) error {
+	cs := io.ColorScheme()
+	isTTY := io.IsStdoutTTY()
+	stdout := io.Out
+	stderr := io.ErrOut
 
-		repoCreateInput struct and just call repo create
-	*/
+	repoAdd, err := git.GitCommand("-C", repoPath, "remote", "add", baseRemote, remoteURL)
+	if err != nil {
+		return err
+	}
+
+	err = run.PrepareCmd(repoAdd).Run()
+	if err != nil {
+		fmt.Fprintf(stderr, "%s warning: unable to add remote %q\n", cs.WarningIcon(), baseRemote)
+	}
+
+	if isTTY {
+		fmt.Fprintf(stdout, "%s Added remote %s\n", cs.SuccessIcon(), remoteURL)
+	}
+
+	gitBranch, err := git.GitCommand("-C", repoPath, "branch", "-M", "main")
+	if err != nil {
+		return err
+	}
+
+	err = run.PrepareCmd(gitBranch).Run()
+	if err != nil {
+		fmt.Fprintf(stderr, "%s warning: unable to add a branch %q\n", cs.WarningIcon(), baseRemote)
+	}
 	return nil
 }
 
