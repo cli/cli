@@ -376,7 +376,6 @@ func ToplevelDirFromPath(p string) (string, error) {
 	return firstLine(output), err
 }
 
-
 func ToplevelDirWithPath(p string) (string, error) {
 	showCmd, err := GitCommand("-C", p, "rev-parse", "--show-toplevel")
 	if err != nil {
