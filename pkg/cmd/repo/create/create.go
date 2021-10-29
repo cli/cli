@@ -208,16 +208,27 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 }
 
 func createRun(opts *CreateOptions) error {
+	fromScratch := true
 	if opts.Interactive {
-		if err := interactiveRepoCreate(opts); err != nil {
-			return err
+		var createMode string
+		createModePrompt := &survey.Select{
+			Message: "What would you like to do?",
+			Options: []string{
+				"Create a new repository on GitHub from scratch",
+				"Push an existing local repository to GitHub"},
 		}
+		prompt.SurveyAskOne(createModePrompt, &createMode)
+		if createMode != "Create a new repository on GitHub from scratch" {
+			fromScratch = false
+		}
+	} else {
+		fromScratch = opts.Source == ""
 	}
 
-	if opts.Source != "" {
-		return createFromLocal(opts)
-	} else {
+	if fromScratch {
 		return createFromScratch(opts)
+	} else {
+		return createFromLocal(opts)
 	}
 }
 
@@ -225,6 +236,11 @@ func createRun(opts *CreateOptions) error {
 func createFromScratch(opts *CreateOptions) error {
 	var repoToCreate ghrepo.Interface
 	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
 	}
@@ -254,11 +270,6 @@ func createFromScratch(opts *CreateOptions) error {
 		HasWikiEnabled:    opts.EnableWiki,
 		GitIgnoreTemplate: opts.GitIgnoreTemplate,
 		LicenseTemplate:   opts.LicenseTemplate,
-	}
-
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
 	}
 
 	var templateRepoMainBranch string
@@ -309,8 +320,8 @@ func createFromScratch(opts *CreateOptions) error {
 	remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
 	if opts.Clone {
+		path := repo.RepoName()
 		if opts.GitIgnoreTemplate == "" && opts.LicenseTemplate == "" {
-			path := repo.RepoName()
 			var checkoutBranch string
 			if opts.Template != "" {
 				// use template's default branch
@@ -403,7 +414,6 @@ func createFromLocal(opts *CreateOptions) error {
 }
 
 func interactiveGitIgnore(client *http.Client, hostname string) (string, error) {
-
 	var addGitIgnore bool
 	var addGitIgnoreSurvey []*survey.Question
 
@@ -442,6 +452,7 @@ func interactiveGitIgnore(client *http.Client, hostname string) (string, error) 
 		if err != nil {
 			return "", err
 		}
+
 	}
 
 	return wantedIgnoreTemplate, nil
@@ -547,62 +558,67 @@ func localInit(io *iostreams.IOStreams, remoteURL, path, checkoutBranch string) 
 	return run.PrepareCmd(gitCheckout).Run()
 }
 
-func interactiveRepoCreate(opts *CreateOptions) error {
-	createModeQuestion := &survey.Question{
-		Name: "createMode",
-		Prompt: &survey.Select{
-			Message: "What would you like to do?",
-			Options: []string{
-				"Create a new repository on GitHub from scratch",
-				"Push an existing local repository to GitHub"},
-		}}
-	var createMode string
-	survey.AskOne(createModeQuestion, &createMode)
-	fromScratch := createMode == "Create a new repository on GitHub from scratch"
-
+func interactiveVisibility() (string, error) {
 	qs := []*survey.Question{}
 
-	repoNameQuestion := &survey.Question{
-		Name: "repoName",
-		Prompt: &survey.Input{
-			Message: "Repository name",
-			Default: repoName,
-		},
-	}
-	qs = append(qs, repoNameQuestion)
-
-	repoDescriptionQuestion := &survey.Question{
-		Name: "repoDescription",
-		Prompt: &survey.Input{
-			Message: "Repository description",
-		},
-	}
-
-	qs = append(qs, repoDescriptionQuestion)
-
-	repoVisibilityQuestion := &survey.Question{
+	getVisibilityQuestion := &survey.Question{
 		Name: "repoVisibility",
 		Prompt: &survey.Select{
 			Message: "Visibility",
 			Options: []string{"Public", "Private", "Internal"},
 		},
 	}
+	qs = append(qs, getVisibilityQuestion)
 
-	qs = append(qs, repoVisibilityQuestion)
-
-	answers := struct {
-		RepoName        string
-		RepoDescription string
-		RepoVisibility  string
+	answer := struct {
+		RepoVisibility string
 	}{}
 
-	err := prompt.SurveyAsk(qs, &answers)
-
+	err := prompt.SurveyAsk(qs, &answer)
 	if err != nil {
-		return "", "", "", err
+		return "", err
 	}
 
-	return answers.RepoName, answers.RepoDescription, strings.ToUpper(answers.RepoVisibility), nil
+	return strings.ToUpper(answer.RepoVisibility), nil
+}
+
+func interactiveDescription() (string, error) {
+	var repoDescription string
+	repoDescriptionPrompt := &survey.Input{Message: "Repository description"}
+
+	err := prompt.SurveyAskOne(repoDescriptionPrompt, &repoDescription)
+	if err != nil {
+		return "", err
+	}
+
+	return repoDescription, nil
+}
+
+func interactiveRepoName(defaultName string) (string, error) {
+	repoNamePrompt := &survey.Input{
+		Message: "Repository name",
+		Default: defaultName}
+
+	var repoName string
+	err := prompt.SurveyAskOne(repoNamePrompt, &repoName)
+	if err != nil {
+		return "", err
+	}
+
+	return repoName, nil
+}
+
+func interactiveSource() (string, error) {
+	var sourcePath string
+	sourcePrompt := &survey.Input{
+		Message: "Path to local repository?",
+		Default: "."}
+
+	err := prompt.SurveyAskOne(sourcePrompt, &sourcePath)
+	if err != nil {
+		return "", err
+	}
+	return sourcePath, nil
 }
 
 func confirmSubmission(repoName string, repoOwner string, inLocalRepo bool) (bool, error) {
@@ -638,28 +654,4 @@ func confirmSubmission(repoName string, repoOwner string, inLocalRepo bool) (boo
 	}
 
 	return answer.ConfirmSubmit, nil
-}
-
-func getVisibility() (string, error) {
-	qs := []*survey.Question{}
-
-	getVisibilityQuestion := &survey.Question{
-		Name: "repoVisibility",
-		Prompt: &survey.Select{
-			Message: "Visibility",
-			Options: []string{"Public", "Private", "Internal"},
-		},
-	}
-	qs = append(qs, getVisibilityQuestion)
-
-	answer := struct {
-		RepoVisibility string
-	}{}
-
-	err := prompt.SurveyAsk(qs, &answer)
-	if err != nil {
-		return "", err
-	}
-
-	return strings.ToUpper(answer.RepoVisibility), nil
 }
