@@ -406,8 +406,6 @@ func createFromLocal(opts *CreateOptions, httpClient *http.Client) error {
 		LicenseTemplate:   opts.LicenseTemplate,
 	}
 
-	fmt.Println(input)
-
 	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
 	if err != nil {
 		return err
@@ -459,28 +457,28 @@ func sourceInit(io *iostreams.IOStreams, remoteURL, baseRemote, repoPath, curren
 	stdout := io.Out
 	stderr := io.ErrOut
 
-	repoAdd, err := git.GitCommand("-C", repoPath, "remote", "add", baseRemote, remoteURL)
+	remoteAdd, err := git.GitCommand("-C", repoPath, "remote", "add", baseRemote, remoteURL)
 	if err != nil {
 		return err
 	}
 
-	err = run.PrepareCmd(repoAdd).Run()
+	err = run.PrepareCmd(remoteAdd).Run()
 	if err != nil {
 		fmt.Fprintf(stderr, "%s warning: unable to add remote %q\n", cs.WarningIcon(), baseRemote)
-	}
-
-	if isTTY {
+	} else if isTTY {
 		fmt.Fprintf(stdout, "%s Added remote %s\n", cs.SuccessIcon(), remoteURL)
 	}
 
-	gitBranch, err := git.GitCommand("-C", repoPath, "branch", "-M", "main")
+	gitBranch, err := git.GitCommand("-C", repoPath, "branch", "-M", currentBranch)
 	if err != nil {
 		return err
 	}
 
 	err = run.PrepareCmd(gitBranch).Run()
 	if err != nil {
-		fmt.Fprintf(stderr, "%s warning: unable to add a branch %q\n", cs.WarningIcon(), baseRemote)
+		fmt.Fprintf(stderr, "%s warning: unable to add a branch\n", cs.WarningIcon())
+	} else if isTTY {
+		fmt.Fprintf(stdout, "%s Added branch to %s\n", cs.SuccessIcon(), remoteURL)
 	}
 	return nil
 }
