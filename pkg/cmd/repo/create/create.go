@@ -124,9 +124,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf(".gitignore and license templates are not added when template is provided")
 			}
 
-			issuesDisabled := cmd.Flags().Changed("enable-issues") || opts.DisableIssues
-			wikiDisabled := cmd.Flags().Changed("enable-wiki") || opts.DisableWiki
-			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "" || issuesDisabled || wikiDisabled) {
+			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "" || opts.DisableIssues || opts.DisableWiki) {
 				return cmdutil.FlagErrorf("the `--template` option is not supported with `--homepage`, `--team`, `--enable-issues`, or `--enable-wiki`")
 			}
 
@@ -138,7 +136,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "Description of the repository")
-	cmd.Flags().StringVarP(&opts.Homepage, "homepage", "o", "", "Repository home page `URL`")
+	cmd.Flags().StringVarP(&opts.Homepage, "homepage", "h", "", "Repository home page `URL`")
 	cmd.Flags().StringVarP(&opts.Team, "team", "t", "", "The `name` of the organization team to be granted access")
 	cmd.Flags().StringVarP(&opts.Template, "template", "p", "", "Make the new repository based on a template `repository`")
 	cmd.Flags().BoolVar(&opts.Public, "public", false, "Make the new repository public")
@@ -211,8 +209,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 func createRun(opts *CreateOptions) error {
 	if opts.Interactive {
-		//prompt for options here
-		fmt.Println("Interactive")
+		if err := interactiveRepoCreate(opts); err != nil {
+			return err
+		}
 	}
 
 	if opts.Source != "" {
@@ -314,7 +313,6 @@ func createFromScratch(opts *CreateOptions) error {
 				// use template's default branch
 				checkoutBranch = templateRepoMainBranch
 			}
-
 			if err := localInit(opts.IO, remoteURL, path, checkoutBranch); err != nil {
 				return err
 			}
@@ -323,6 +321,12 @@ func createFromScratch(opts *CreateOptions) error {
 			if err != nil {
 				return err
 			}
+		}
+
+		if isTTY {
+			fmt.Fprintf(opts.IO.Out,
+				"%s Initialized repository in \"%s\"\n",
+				cs.SuccessIcon(), path)
 		}
 	}
 
@@ -523,7 +527,19 @@ func localInit(io *iostreams.IOStreams, remoteURL, path, checkoutBranch string) 
 	return run.PrepareCmd(gitCheckout).Run()
 }
 
-func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName string) (string, string, string, error) {
+func interactiveRepoCreate(opts *CreateOptions) error {
+	createModeQuestion := &survey.Question{
+		Name: "createMode",
+		Prompt: &survey.Select{
+			Message: "What would you like to do?",
+			Options: []string{
+				"Create a new repository on GitHub from scratch",
+				"Push an existing local repository to GitHub"},
+		}}
+	var createMode string
+	survey.AskOne(createModeQuestion, &createMode)
+	fromScratch := createMode == "Create a new repository on GitHub from scratch"
+
 	qs := []*survey.Question{}
 
 	repoNameQuestion := &survey.Question{
@@ -535,27 +551,24 @@ func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName s
 	}
 	qs = append(qs, repoNameQuestion)
 
-	if isDescEmpty {
-		repoDescriptionQuestion := &survey.Question{
-			Name: "repoDescription",
-			Prompt: &survey.Input{
-				Message: "Repository description",
-			},
-		}
-
-		qs = append(qs, repoDescriptionQuestion)
+	repoDescriptionQuestion := &survey.Question{
+		Name: "repoDescription",
+		Prompt: &survey.Input{
+			Message: "Repository description",
+		},
 	}
 
-	if !isVisibilityPassed {
-		repoVisibilityQuestion := &survey.Question{
-			Name: "repoVisibility",
-			Prompt: &survey.Select{
-				Message: "Visibility",
-				Options: []string{"Public", "Private", "Internal"},
-			},
-		}
-		qs = append(qs, repoVisibilityQuestion)
+	qs = append(qs, repoDescriptionQuestion)
+
+	repoVisibilityQuestion := &survey.Question{
+		Name: "repoVisibility",
+		Prompt: &survey.Select{
+			Message: "Visibility",
+			Options: []string{"Public", "Private", "Internal"},
+		},
 	}
+
+	qs = append(qs, repoVisibilityQuestion)
 
 	answers := struct {
 		RepoName        string
