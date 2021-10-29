@@ -220,3 +220,10 @@ func (c *ColorScheme) HexToRGB(hex string, x string) string {
 	b, _ := strconv.ParseInt(hex[4:6], 16, 64)
 	return fmt.Sprintf("\033[38;2;%d;%d;%dm%s\033[0m", r, g, b, x)
 }
+
+func (c *ColorScheme) HyperLink(title, href string) string {
+	if !c.enabled {
+		return title
+	}
+	return fmt.Sprintf("\x1b]8;;%s\x1b\\%s\x1b]8;;\x1b\\", href, title)
+}

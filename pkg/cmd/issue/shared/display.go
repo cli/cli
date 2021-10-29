@@ -19,7 +19,7 @@ func PrintIssues(io *iostreams.IOStreams, prefix string, totalCount int, issues 
 	for _, issue := range issues {
 		issueNum := strconv.Itoa(issue.Number)
 		if table.IsTTY() {
-			issueNum = "#" + issueNum
+			issueNum = cs.HyperLink("#"+issueNum, issue.URL)
 		}
 		issueNum = prefix + issueNum
 		now := time.Now()
