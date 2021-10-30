@@ -751,7 +751,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse(shared.SuccessfulRun))
 			},
 			browsedURL: "https://github.com/runs/3",
-			wantOut:    "Opening github.com/runs/3 in your browser.\n",
+			wantOut:    "Opening https://github.com/runs/3 in your browser.\n",
 		},
 		{
 			name: "web job",
@@ -769,7 +769,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse(shared.SuccessfulRun))
 			},
 			browsedURL: "https://github.com/jobs/10?check_suite_focus=true",
-			wantOut:    "Opening github.com/jobs/10 in your browser.\n",
+			wantOut:    "Opening https://github.com/jobs/10 in your browser.\n",
 		},
 		{
 			name: "hide job header, failure",

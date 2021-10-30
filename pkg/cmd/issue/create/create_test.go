@@ -152,7 +152,7 @@ func Test_createRun(t *testing.T) {
 				WebMode: true,
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new",
-			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
+			wantsStderr: "Opening https://github.com/OWNER/REPO/issues/new in your browser.\n",
 		},
 		{
 			name: "title and body",
@@ -162,7 +162,7 @@ func Test_createRun(t *testing.T) {
 				Body:    "hello cli",
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?body=hello+cli&title=myissue",
-			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
+			wantsStderr: "Opening https://github.com/OWNER/REPO/issues/new in your browser.\n",
 		},
 		{
 			name: "assignee",
@@ -171,7 +171,7 @@ func Test_createRun(t *testing.T) {
 				Assignees: []string{"monalisa"},
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?assignees=monalisa&body=",
-			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
+			wantsStderr: "Opening https://github.com/OWNER/REPO/issues/new in your browser.\n",
 		},
 		{
 			name: "@me",
@@ -188,7 +188,7 @@ func Test_createRun(t *testing.T) {
 					} }`))
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?assignees=MonaLisa&body=",
-			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
+			wantsStderr: "Opening https://github.com/OWNER/REPO/issues/new in your browser.\n",
 		},
 		{
 			name: "project",
@@ -217,7 +217,7 @@ func Test_createRun(t *testing.T) {
 					} } } }`))
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?body=&projects=OWNER%2FREPO%2F1",
-			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
+			wantsStderr: "Opening https://github.com/OWNER/REPO/issues/new in your browser.\n",
 		},
 		{
 			name: "has templates",
@@ -237,7 +237,7 @@ func Test_createRun(t *testing.T) {
 				)
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new/choose",
-			wantsStderr: "Opening github.com/OWNER/REPO/issues/new/choose in your browser.\n",
+			wantsStderr: "Opening https://github.com/OWNER/REPO/issues/new/choose in your browser.\n",
 		},
 		{
 			name: "too long body",
@@ -557,7 +557,7 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 
 		Creating issue in OWNER/REPO
 
-		Opening github.com/OWNER/REPO/issues/new in your browser.
+		Opening https://github.com/OWNER/REPO/issues/new in your browser.
 	`), output.Stderr())
 	assert.Equal(t, "https://github.com/OWNER/REPO/issues/new?body=body&title=hello", output.BrowsedURL)
 }

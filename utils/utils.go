@@ -76,7 +76,7 @@ func DisplayURL(urlStr string) string {
 	if err != nil {
 		return urlStr
 	}
-	return u.Hostname() + u.Path
+	return fmt.Sprintf("%s://%s%s", u.Scheme, u.Hostname(), u.Path)
 }
 
 // Maximum length of a URL: 8192 bytes

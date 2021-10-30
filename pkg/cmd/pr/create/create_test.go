@@ -779,7 +779,7 @@ func TestPRCreate_web(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
+	assert.Equal(t, "Opening https://github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
 	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1", output.BrowsedURL)
 }
 
@@ -850,7 +850,7 @@ func TestPRCreate_webProject(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
+	assert.Equal(t, "Opening https://github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
 	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1&projects=ORG%2F1", output.BrowsedURL)
 }
 

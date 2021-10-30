@@ -220,7 +220,7 @@ func Test_commentRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockIssueFromNumber(t, reg)
 			},
-			stderr: "Opening github.com/OWNER/REPO/issues/123 in your browser.\n",
+			stderr: "Opening https://github.com/OWNER/REPO/issues/123 in your browser.\n",
 		},
 		{
 			name: "non-interactive editor",

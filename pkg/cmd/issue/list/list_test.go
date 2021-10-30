@@ -210,7 +210,7 @@ func TestIssueList_web(t *testing.T) {
 	}
 
 	assert.Equal(t, "", stdout.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/issues in your browser.\n", stderr.String())
+	assert.Equal(t, "Opening https://github.com/OWNER/REPO/issues in your browser.\n", stderr.String())
 	browser.Verify(t, "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+mentions%3Afrank+milestone%3Av1.1")
 }
 
