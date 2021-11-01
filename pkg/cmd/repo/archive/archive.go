@@ -3,7 +3,6 @@ package archive
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
@@ -22,7 +21,6 @@ type ArchiveOptions struct {
 	IO              *iostreams.IOStreams
 	Config          func() (config.Config, error)
 	BaseRepo        func() (ghrepo.Interface, error)
-	RepoArg         string
 	HasRepoOverride bool
 	Confirmed       bool
 }
@@ -69,50 +67,20 @@ func archiveRun(opts *ArchiveOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	var toArchive ghrepo.Interface
-
-	repoSelector := opts.RepoArg
-	if repoSelector == "" {
-		currRepo, err := opts.BaseRepo()
-		if err != nil {
-			return err
-		}
-		repoSelector = ghrepo.FullName(currRepo)
-	}
-
-	if !strings.Contains(repoSelector, "/") {
-		cfg, err := opts.Config()
-		if err != nil {
-			return err
-		}
-		hostname, err := cfg.DefaultHost()
-		if err != nil {
-			return err
-		}
-
-		currentUser, err := api.CurrentLoginName(apiClient, hostname)
-		if err != nil {
-			return err
-		}
-		repoSelector = currentUser + "/" + repoSelector
-	}
-	toArchive, err = ghrepo.FromFullName(repoSelector)
-	if err != nil {
-		return fmt.Errorf("argument error: %w", err)
-	}
-
-	fields := []string{"name", "owner", "isArchived", "id"}
-	repo, err := api.FetchRepository(apiClient, toArchive, fields)
+	currRepo, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
 
-	fullName := ghrepo.FullName(toArchive)
+	fields := []string{"name", "owner", "isArchived", "id"}
+	repo, err := api.FetchRepository(apiClient, currRepo, fields)
+	if err != nil {
+		return err
+	}
+
+	fullName := ghrepo.FullName(currRepo)
 	if repo.IsArchived {
-		fmt.Fprintf(opts.IO.ErrOut,
-			"%s Repository %s is already archived\n",
-			cs.WarningIcon(),
-			fullName)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Repository %s is already archived\n", cs.WarningIcon(), fullName)
 		return nil
 	}
 
@@ -124,9 +92,6 @@ func archiveRun(opts *ArchiveOptions) error {
 		err = prompt.SurveyAskOne(p, &opts.Confirmed)
 		if err != nil {
 			return fmt.Errorf("failed to prompt: %w", err)
-		}
-		if !opts.Confirmed {
-			return nil
 		}
 	}
 
