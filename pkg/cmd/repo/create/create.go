@@ -446,6 +446,11 @@ func createFromLocal(opts *CreateOptions, httpClient *http.Client) error {
 		if err != nil {
 			return err
 		}
+
+		if isTTY {
+			fmt.Fprintf(stdout, "%s Pushed Repo to %s\n", cs.SuccessIcon(), remoteURL)
+		}
+
 	}
 
 	return nil
