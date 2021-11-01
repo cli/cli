@@ -438,7 +438,7 @@ func createFromLocal(opts *CreateOptions, httpClient *http.Client) error {
 	}
 
 	if opts.Push {
-		repoPush, err := git.GitCommand("-C", repoPath, "push", "-u", "origin", currentBranch)
+		repoPush, err := git.GitCommand("-C", repoPath, "push", "-u", baseRemote, currentBranch)
 		if err != nil {
 			return err
 		}
