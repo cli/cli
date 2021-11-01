@@ -104,22 +104,23 @@ var HelpTopics = map[string]map[string]string{
 			- %[1]stimeago <time>%[1]s: renders a timestamp as relative to now
 			- %[1]stimefmt <format> <time>%[1]s: formats a timestamp using Go's Time.Format function
 			- %[1]struncate <length> <input>%[1]s: ensures input fits within length
-		`),
-		"example": heredoc.Doc(`
-			# format issues as table
-			$ gh issue list --json number,title --template \
-				'{{range .}}{{tablerow (printf "#%v" .number | autocolor "green") .title}}{{end}}'
+		`, "`"),
+		"example": `
+  # format issues as table
+  $ gh issue list --json number,title --template '
+  {{range .}}{{tablerow (printf "#%v" .number | autocolor "green") .title}}{{end}}
+  '
 
-			# format a pull request using multiple tables with headers
-			$ gh pr view 3519 --json number,title,body,reviews,assignees --template \
-				'{{printf "#%v" .number}} {{.title}}
+  # format a pull request using multiple tables with headers
+  $ gh pr view 3519 --json number,title,body,reviews,assignees --template '
+  {{printf "#%v" .number}} {{.title}}
 
-				{{.body}}
+  {{.body}}
 
-				{{tablerow "ASSIGNEE" "NAME"}}{{range .assignees}}{{tablerow .login .name}}{{end}}{{tablerender}}
-				{{tablerow "REVIEWER" "STATE" "COMMENT"}}{{range .reviews}}{{tablerow .author.login .state .body}}{{end}}
-				'
-		`),
+  {{tablerow "ASSIGNEE" "NAME"}}{{range .assignees}}{{tablerow .login .name}}{{end}}{{tablerender}}
+  {{tablerow "REVIEWER" "STATE" "COMMENT"}}{{range .reviews}}{{tablerow .author.login .state .body}}{{end}}
+  '
+`,
 	},
 }
 
@@ -144,6 +145,7 @@ func NewHelpTopic(topic string) *cobra.Command {
 
 func helpTopicHelpFunc(command *cobra.Command, args []string) {
 	command.Print(command.Long)
+	command.Printf("\n\nEXAMPLES\n%s", command.Example)
 }
 
 func helpTopicUsageFunc(command *cobra.Command) error {
