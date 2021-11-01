@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -32,6 +33,7 @@ type EditOptions struct {
 	Selector     string
 	EditFilename string
 	AddFilename  string
+	SourceFile   string
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
@@ -49,11 +51,22 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "edit {<id> | <url>}",
+		Use:   "edit {<id> | <url>} [<filename>]",
 		Short: "Edit one of your gists",
-		Args:  cmdutil.ExactArgs(1, "cannot edit: gist argument required"),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) < 1 {
+				return cmdutil.FlagErrorf("cannot edit: gist argument required")
+			}
+			if len(args) > 2 {
+				return cmdutil.FlagErrorf("too many arguments")
+			}
+			return nil
+		},
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.Selector = args[0]
+			if len(args) > 1 {
+				opts.SourceFile = args[1]
+			}
 
 			if runF != nil {
 				return runF(&opts)
@@ -115,7 +128,36 @@ func editRun(opts *EditOptions) error {
 	}
 
 	if opts.AddFilename != "" {
-		files, err := getFilesToAdd(opts.AddFilename)
+		var input io.Reader
+		switch src := opts.SourceFile; {
+		case src == "-":
+			input = opts.IO.In
+		case src != "":
+			f, err := os.Open(src)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				_ = f.Close()
+			}()
+			input = f
+		default:
+			f, err := os.Open(opts.AddFilename)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				_ = f.Close()
+			}()
+			input = f
+		}
+
+		content, err := io.ReadAll(input)
+		if err != nil {
+			return fmt.Errorf("read content: %w", err)
+		}
+
+		files, err := getFilesToAdd(opts.AddFilename, content)
 		if err != nil {
 			return err
 		}
@@ -161,14 +203,32 @@ func editRun(opts *EditOptions) error {
 			return fmt.Errorf("editing binary files not supported")
 		}
 
-		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
-		if err != nil {
-			return err
-		}
-		text, err := opts.Edit(editorCommand, filename, gistFile.Content, opts.IO)
+		var text string
+		if src := opts.SourceFile; src != "" {
+			if src == "-" {
+				data, err := io.ReadAll(opts.IO.In)
+				if err != nil {
+					return fmt.Errorf("read from stdin: %w", err)
+				}
+				text = string(data)
+			} else {
+				data, err := os.ReadFile(src)
+				if err != nil {
+					return fmt.Errorf("read %s: %w", src, err)
+				}
+				text = string(data)
+			}
+		} else {
+			editorCommand, err := cmdutil.DetermineEditor(opts.Config)
+			if err != nil {
+				return err
+			}
 
-		if err != nil {
-			return err
+			data, err := opts.Edit(editorCommand, filename, gistFile.Content, opts.IO)
+			if err != nil {
+				return err
+			}
+			text = data
 		}
 
 		if text != gistFile.Content {
@@ -253,18 +313,9 @@ func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error
 	return nil
 }
 
-func getFilesToAdd(file string) (map[string]*shared.GistFile, error) {
-	isBinary, err := shared.IsBinaryFile(file)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file %s: %w", file, err)
-	}
-	if isBinary {
+func getFilesToAdd(file string, content []byte) (map[string]*shared.GistFile, error) {
+	if shared.IsBinaryContents(content) {
 		return nil, fmt.Errorf("failed to upload %s: binary file not supported", file)
-	}
-
-	content, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file %s: %w", file, err)
 	}
 
 	if len(content) == 0 {
