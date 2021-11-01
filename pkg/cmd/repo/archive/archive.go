@@ -35,20 +35,17 @@ func NewCmdArchive(f *cmdutil.Factory, runF func(*ArchiveOptions) error) *cobra.
 	}
 
 	cmd := &cobra.Command{
-		Use:   "archive [<repository>]",
+		Use:   "archive",
 		Short: "Archive a repository",
 		Long: heredoc.Doc(`Archive a GitHub repository.
 
 With no argument, archives the current repository.`),
-		Args: cobra.MaximumNArgs(1),
+		Args: cobra.MaximumNArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) > 0 {
-				opts.RepoArg = args[0]
-			}
 			opts.BaseRepo = f.BaseRepo
 			opts.HasRepoOverride = cmd.Flags().Changed("repo")
 
-			if !opts.Confirmed && !opts.IO.CanPrompt() {
+			if !opts.Confirmed && !opts.IO.CanPrompt() && !opts.HasRepoOverride {
 				return cmdutil.FlagErrorf("could not prompt: confirmation with prompt or --confirm flag required")
 			}
 
