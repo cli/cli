@@ -93,6 +93,9 @@ func archiveRun(opts *ArchiveOptions) error {
 		if err != nil {
 			return fmt.Errorf("failed to prompt: %w", err)
 		}
+		if !opts.Confirmed {
+			return nil
+		}
 	}
 
 	err = archiveRepo(httpClient, repo)
