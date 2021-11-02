@@ -3,17 +3,19 @@ package browse
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -131,7 +133,11 @@ func runBrowse(opts *BrowseOptions) error {
 	if err != nil {
 		return err
 	}
-	url := ghrepo.GenerateRepoURL(baseRepo, section)
+	// taken from cli/internal/ghrepo/repo.go
+	url := fmt.Sprintf("%s%s/%s", ghinstance.HostPrefix(baseRepo.RepoHost()), baseRepo.RepoOwner(), baseRepo.RepoName())
+	if section != "" {
+		url = fmt.Sprintf("%s/%s", url, section)
+	}
 
 	if opts.NoBrowserFlag {
 		_, err := fmt.Fprintln(opts.IO.Out, url)
@@ -139,7 +145,7 @@ func runBrowse(opts *BrowseOptions) error {
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(url))
+		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", url)
 	}
 	return opts.Browser.Browse(url)
 }
@@ -201,8 +207,8 @@ func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err 
 	p = parts[0]
 	if !filepath.IsAbs(p) {
 		p = filepath.Clean(filepath.Join(opts.PathFromRepoRoot(), p))
-		// Ensure that a path using \ can be used in a URL
-		p = strings.ReplaceAll(p, "\\", "/")
+		// encode special characters and replace all encoded slashes with forward slashes
+		p = regexp.MustCompile(`%2F|%5C`).ReplaceAllString(url.PathEscape(p), "/")
 		if p == "." || strings.HasPrefix(p, "..") {
 			p = ""
 		}
