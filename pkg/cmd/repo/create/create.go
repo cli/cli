@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -217,7 +218,10 @@ func createRun(opts *CreateOptions) error {
 				"Create a new repository on GitHub from scratch",
 				"Push an existing local repository to GitHub"},
 		}
-		prompt.SurveyAskOne(createModePrompt, &createMode)
+		err := prompt.SurveyAskOne(createModePrompt, &createMode)
+		if err != nil {
+			return err
+		}
 		if createMode != "Create a new repository on GitHub from scratch" {
 			fromScratch = false
 		}
@@ -245,6 +249,26 @@ func createFromScratch(opts *CreateOptions, httpClient *http.Client) error {
 		return err
 	}
 
+	host, err := cfg.DefaultHost()
+	if err != nil {
+		return err
+	}
+
+	if opts.Interactive {
+		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo("")
+		if err != nil {
+			return err
+		}
+		opts.GitIgnoreTemplate, err = interactiveGitIgnore(httpClient, host)
+		if err != nil {
+			return err
+		}
+		opts.LicenseTemplate, err = interactiveLicense(httpClient, host)
+		if err != nil {
+			return err
+		}
+	}
+
 	if strings.Contains(opts.Name, "/") {
 		var err error
 		repoToCreate, err = ghrepo.FromFullName(opts.Name)
@@ -252,10 +276,6 @@ func createFromScratch(opts *CreateOptions, httpClient *http.Client) error {
 			return fmt.Errorf("argument error: %w", err)
 		}
 	} else {
-		host, err := cfg.DefaultHost()
-		if err != nil {
-			return err
-		}
 		repoToCreate = ghrepo.NewWithHost("", opts.Name, host)
 	}
 
@@ -272,7 +292,7 @@ func createFromScratch(opts *CreateOptions, httpClient *http.Client) error {
 		LicenseTemplate:   opts.LicenseTemplate,
 	}
 
-	var templateRepoMainBranch string
+	//var templateRepoMainBranch string
 	if opts.Template != "" {
 		var templateRepo ghrepo.Interface
 		apiClient := api.NewClientFromHTTP(httpClient)
@@ -296,7 +316,14 @@ func createFromScratch(opts *CreateOptions, httpClient *http.Client) error {
 		}
 
 		input.TemplateRepositoryID = repo.ID
-		templateRepoMainBranch = repo.DefaultBranchRef.Name
+		//templateRepoMainBranch = repo.DefaultBranchRef.Name
+	}
+
+	if opts.Interactive {
+		confirm, err := confirmSubmission(input.Name, input.OwnerLogin, input.Visibility, false)
+		if !confirm || err != nil {
+			return nil
+		}
 	}
 
 	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
@@ -319,28 +346,23 @@ func createFromScratch(opts *CreateOptions, httpClient *http.Client) error {
 	}
 	remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
-	if opts.Clone {
-		path := repo.RepoName()
-		if opts.GitIgnoreTemplate == "" && opts.LicenseTemplate == "" {
-			var checkoutBranch string
-			if opts.Template != "" {
-				// use template's default branch
-				checkoutBranch = templateRepoMainBranch
-			}
-			if err := localInit(opts.IO, remoteURL, path, checkoutBranch); err != nil {
-				return err
-			}
-		} else {
-			_, err := git.RunClone(remoteURL, []string{})
-			if err != nil {
-				return err
-			}
+	if opts.Interactive {
+		cloneQuestion := &survey.Confirm{
+			Message: "Clone the new repository locally?",
+			Default: true,
 		}
+		err = prompt.SurveyAskOne(cloneQuestion, &opts.Clone)
+	}
 
+	if opts.Clone {
+		_, err := git.RunClone(remoteURL, []string{})
+		if err != nil {
+			return err
+		}
 		if isTTY {
 			fmt.Fprintf(opts.IO.Out,
 				"%s Initialized repository in \"%s\"\n",
-				cs.SuccessIcon(), path)
+				cs.SuccessIcon(), repo.RepoName())
 		}
 	}
 
@@ -353,9 +375,6 @@ func createFromLocal(opts *CreateOptions, httpClient *http.Client) error {
 	isTTY := opts.IO.IsStdoutTTY()
 	stdout := opts.IO.Out
 
-	repoPath := opts.Source
-	baseRemote := opts.Remote
-
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
@@ -365,9 +384,32 @@ func createFromLocal(opts *CreateOptions, httpClient *http.Client) error {
 		return err
 	}
 
+	if opts.Interactive {
+		opts.Source, err = interactiveSource()
+		if err != nil {
+			return err
+		}
+	}
+
+	repoPath := opts.Source
+	baseRemote := opts.Remote
+
 	projectDir, projectDirErr := git.ToplevelDirFromPath(repoPath)
 	if projectDirErr != nil {
 		return projectDirErr
+	}
+
+	if opts.Interactive {
+		// possibly unneccessary:
+		// absolute path to get directory name for prompt default
+		abs, err := filepath.Abs(repoPath)
+		if err != nil {
+			return err
+		}
+		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(path.Base(abs))
+		if err != nil {
+			return err
+		}
 	}
 
 	var repoToCreate ghrepo.Interface
@@ -406,6 +448,12 @@ func createFromLocal(opts *CreateOptions, httpClient *http.Client) error {
 		LicenseTemplate:   opts.LicenseTemplate,
 	}
 
+	if opts.Interactive {
+		confirm, err := confirmSubmission(input.Name, input.OwnerLogin, input.Visibility, true)
+		if !confirm || err != nil {
+			return nil
+		}
+	}
 	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
 	if err != nil {
 		return err
@@ -433,8 +481,22 @@ func createFromLocal(opts *CreateOptions, httpClient *http.Client) error {
 		currentBranch = "main"
 	}
 
+	// add option to (not) add remote
+
+	// Add a remote? (Y/n) y
 	if err := sourceInit(opts.IO, remoteURL, baseRemote, repoPath, currentBranch); err != nil {
 		return err
+	}
+
+	if opts.Interactive {
+		pushQuestion := &survey.Confirm{
+			Message: fmt.Sprintf(`Would you like to push local commits on "%s" and track "%s"?`, currentBranch, baseRemote),
+			Default: true,
+		}
+		err = prompt.SurveyAskOne(pushQuestion, &opts.Push)
+		if err != nil {
+			return err
+		}
 	}
 
 	if opts.Push {
@@ -633,54 +695,40 @@ func localInit(io *iostreams.IOStreams, remoteURL, path, checkoutBranch string) 
 	return run.PrepareCmd(gitCheckout).Run()
 }
 
-func interactiveVisibility() (string, error) {
-	qs := []*survey.Question{}
-
-	getVisibilityQuestion := &survey.Question{
-		Name: "repoVisibility",
-		Prompt: &survey.Select{
-			Message: "Visibility",
-			Options: []string{"Public", "Private", "Internal"},
+// name, description, and visibility
+func interactiveRepoInfo(defaultName string) (string, string, string, error) {
+	qs := []*survey.Question{
+		&survey.Question{
+			Name: "repoName",
+			Prompt: &survey.Input{
+				Message: "Repository Name",
+				Default: defaultName,
+			},
 		},
-	}
-	qs = append(qs, getVisibilityQuestion)
+		&survey.Question{
+			Name:   "repoDescription",
+			Prompt: &survey.Input{Message: "Description"},
+		},
+		&survey.Question{
+			Name: "repoVisibility",
+			Prompt: &survey.Select{
+				Message: "Visibility",
+				Options: []string{"Public", "Private", "Internal"},
+			},
+		}}
 
 	answer := struct {
-		RepoVisibility string
+		RepoName        string
+		RepoDescription string
+		RepoVisibility  string
 	}{}
 
 	err := prompt.SurveyAsk(qs, &answer)
 	if err != nil {
-		return "", err
+		return "", "", "", err
 	}
 
-	return strings.ToUpper(answer.RepoVisibility), nil
-}
-
-func interactiveDescription() (string, error) {
-	var repoDescription string
-	repoDescriptionPrompt := &survey.Input{Message: "Repository description"}
-
-	err := prompt.SurveyAskOne(repoDescriptionPrompt, &repoDescription)
-	if err != nil {
-		return "", err
-	}
-
-	return repoDescription, nil
-}
-
-func interactiveRepoName(defaultName string) (string, error) {
-	repoNamePrompt := &survey.Input{
-		Message: "Repository name",
-		Default: defaultName}
-
-	var repoName string
-	err := prompt.SurveyAskOne(repoNamePrompt, &repoName)
-	if err != nil {
-		return "", err
-	}
-
-	return repoName, nil
+	return answer.RepoName, answer.RepoDescription, strings.ToUpper(answer.RepoVisibility), nil
 }
 
 func interactiveSource() (string, error) {
@@ -696,7 +744,7 @@ func interactiveSource() (string, error) {
 	return sourcePath, nil
 }
 
-func confirmSubmission(repoName string, repoOwner string, inLocalRepo bool) (bool, error) {
+func confirmSubmission(repoName string, repoOwner string, visibility string, inLocalRepo bool) (bool, error) {
 	qs := []*survey.Question{}
 
 	promptString := ""
@@ -707,7 +755,7 @@ func confirmSubmission(repoName string, repoOwner string, inLocalRepo bool) (boo
 		if repoOwner != "" {
 			targetRepo = fmt.Sprintf("%s/%s", repoOwner, repoName)
 		}
-		promptString = fmt.Sprintf(`This will create the "%s" repository on GitHub. Continue?`, targetRepo)
+		promptString = fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(visibility))
 	}
 
 	confirmSubmitQuestion := &survey.Question{
