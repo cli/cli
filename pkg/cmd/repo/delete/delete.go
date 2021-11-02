@@ -47,9 +47,6 @@ To authorize, run "gh auth refresh -s delete_repo"`,
 			if !opts.IO.CanPrompt() && !opts.Confirmed {
 				return cmdutil.FlagErrorf("could not prompt: confirmation with prompt or --confirm flag required")
 			}
-			if !opts.IO.CanPrompt() && opts.RepoArg == "" {
-				return cmdutil.FlagErrorf("confirmation prompt required with no arguments")
-			}
 
 			if runF != nil {
 				return runF(opts)
