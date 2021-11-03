@@ -400,13 +400,11 @@ func createFromLocal(opts *CreateOptions, httpClient *http.Client) error {
 	}
 
 	if opts.Interactive {
-		// possibly unneccessary:
-		// absolute path to get directory name for prompt default
 		abs, err := filepath.Abs(repoPath)
 		if err != nil {
 			return err
 		}
-		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(path.Base(abs))
+		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(filepath.Base(abs))
 		if err != nil {
 			return err
 		}
@@ -430,11 +428,6 @@ func createFromLocal(opts *CreateOptions, httpClient *http.Client) error {
 		repoToCreate = ghrepo.NewWithHost("", opts.Name, host)
 	}
 
-	//remote will be origin or specified
-	if baseRemote == "" {
-		baseRemote = "origin"
-	}
-
 	input := repoCreateInput{
 		Name:              repoToCreate.RepoName(),
 		Visibility:        opts.Visibility,
@@ -448,12 +441,6 @@ func createFromLocal(opts *CreateOptions, httpClient *http.Client) error {
 		LicenseTemplate:   opts.LicenseTemplate,
 	}
 
-	if opts.Interactive {
-		confirm, err := confirmSubmission(input.Name, input.OwnerLogin, input.Visibility, true)
-		if !confirm || err != nil {
-			return nil
-		}
-	}
 	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
 	if err != nil {
 		return err
@@ -473,17 +460,38 @@ func createFromLocal(opts *CreateOptions, httpClient *http.Client) error {
 
 	remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
+	if opts.Interactive {
+		var addRemote bool
+		remoteQuesiton := &survey.Confirm{
+			Message: `Add a remote?`,
+			Default: true,
+		}
+		err = prompt.SurveyAskOne(remoteQuesiton, &addRemote)
+		if err != nil {
+			return err
+		}
+
+		if !addRemote {
+			return nil
+		}
+
+		pushQuestion := &survey.Input{
+			Message: "What should the new remote be called?",
+			Default: "origin",
+		}
+		err = prompt.SurveyAskOne(pushQuestion, &baseRemote)
+		if err != nil {
+			return err
+		}
+	}
+
 	//get the current branch
 	currentBranch, err := git.CurrentBranch()
 	if err != nil {
-		//warning: unable to find a curr repo or
-		// use main branch as default
-		currentBranch = "main"
+		//How do we wanna handle if there is no current branch?
+		return err
 	}
 
-	// add option to (not) add remote
-
-	// Add a remote? (Y/n) y
 	if err := sourceInit(opts.IO, remoteURL, baseRemote, repoPath, currentBranch); err != nil {
 		return err
 	}
@@ -512,9 +520,7 @@ func createFromLocal(opts *CreateOptions, httpClient *http.Client) error {
 		if isTTY {
 			fmt.Fprintf(stdout, "%s Pushed Repo to %s\n", cs.SuccessIcon(), remoteURL)
 		}
-
 	}
-
 	return nil
 }
 
@@ -531,8 +537,9 @@ func sourceInit(io *iostreams.IOStreams, remoteURL, baseRemote, repoPath, curren
 
 	err = run.PrepareCmd(remoteAdd).Run()
 	if err != nil {
-		fmt.Fprintf(stderr, "%s warning: unable to add remote %q\n", cs.WarningIcon(), baseRemote)
-	} else if isTTY {
+		return fmt.Errorf("%s Unable to add remote %q", cs.FailureIcon(), baseRemote)
+	}
+	if isTTY {
 		fmt.Fprintf(stdout, "%s Added remote %s\n", cs.SuccessIcon(), remoteURL)
 	}
 
@@ -645,71 +652,21 @@ func interactiveLicense(client *http.Client, hostname string) (string, error) {
 	return "", nil
 }
 
-func localInit(io *iostreams.IOStreams, remoteURL, path, checkoutBranch string) error {
-	gitInit, err := git.GitCommand("init", path)
-	if err != nil {
-		return err
-	}
-	isTTY := io.IsStdoutTTY()
-	if isTTY {
-		gitInit.Stdout = io.Out
-	}
-	gitInit.Stderr = io.ErrOut
-	err = run.PrepareCmd(gitInit).Run()
-	if err != nil {
-		return err
-	}
-
-	gitRemoteAdd, err := git.GitCommand("-C", path, "remote", "add", "origin", remoteURL)
-	if err != nil {
-		return err
-	}
-	gitRemoteAdd.Stdout = io.Out
-	gitRemoteAdd.Stderr = io.ErrOut
-	err = run.PrepareCmd(gitRemoteAdd).Run()
-	if err != nil {
-		return err
-	}
-
-	if checkoutBranch == "" {
-		return nil
-	}
-
-	gitFetch, err := git.GitCommand("-C", path, "fetch", "origin", fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/origin/%[1]s", checkoutBranch))
-	if err != nil {
-		return err
-	}
-	gitFetch.Stdout = io.Out
-	gitFetch.Stderr = io.ErrOut
-	err = run.PrepareCmd(gitFetch).Run()
-	if err != nil {
-		return err
-	}
-
-	gitCheckout, err := git.GitCommand("-C", path, "checkout", checkoutBranch)
-	if err != nil {
-		return err
-	}
-	gitCheckout.Stdout = io.Out
-	gitCheckout.Stderr = io.ErrOut
-	return run.PrepareCmd(gitCheckout).Run()
-}
-
 // name, description, and visibility
 func interactiveRepoInfo(defaultName string) (string, string, string, error) {
 	qs := []*survey.Question{
-		&survey.Question{
+		{
 			Name: "repoName",
 			Prompt: &survey.Input{
 				Message: "Repository Name",
 				Default: defaultName,
 			},
 		},
-		&survey.Question{
+		{
 			Name:   "repoDescription",
 			Prompt: &survey.Input{Message: "Description"},
 		},
-		&survey.Question{
+		{
 			Name: "repoVisibility",
 			Prompt: &survey.Select{
 				Message: "Visibility",

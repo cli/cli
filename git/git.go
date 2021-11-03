@@ -376,15 +376,6 @@ func ToplevelDirFromPath(p string) (string, error) {
 	return firstLine(output), err
 }
 
-func ToplevelDirWithPath(p string) (string, error) {
-	showCmd, err := GitCommand("-C", p, "rev-parse", "--show-toplevel")
-	if err != nil {
-		return "", err
-	}
-	output, err := run.PrepareCmd(showCmd).Output()
-	return firstLine(output), err
-}
-
 func PathFromRepoRoot() string {
 	showCmd, err := GitCommand("rev-parse", "--show-prefix")
 	if err != nil {
