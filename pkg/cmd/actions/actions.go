@@ -1,8 +1,6 @@
 package actions
 
 import (
-	"fmt"
-
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -16,9 +14,6 @@ func NewCmdActions(f *cmdutil.Factory) *cobra.Command {
 		Use:   "actions",
 		Short: "Learn about working with GitHub Actions",
 		Long:  actionsExplainer(cs),
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Fprintln(f.IOStreams.Out, actionsExplainer(cs))
-		},
 		Annotations: map[string]string{
 			"IsActions": "true",
 		},
