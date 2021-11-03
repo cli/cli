@@ -229,20 +229,20 @@ func createRun(opts *CreateOptions) error {
 		fromScratch = opts.Source == ""
 	}
 
+	if fromScratch {
+		return createFromScratch(opts)
+	} else {
+		return createFromLocal(opts)
+	}
+}
+
+// create new repo on remote host
+func createFromScratch(opts *CreateOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
 	}
 
-	if fromScratch {
-		return createFromScratch(opts, httpClient)
-	} else {
-		return createFromLocal(opts, httpClient)
-	}
-}
-
-// create new repo on remote host
-func createFromScratch(opts *CreateOptions, httpClient *http.Client) error {
 	var repoToCreate ghrepo.Interface
 	cfg, err := opts.Config()
 	if err != nil {
@@ -366,7 +366,12 @@ func createFromScratch(opts *CreateOptions, httpClient *http.Client) error {
 }
 
 // create repo on remote host from existing local repo
-func createFromLocal(opts *CreateOptions, httpClient *http.Client) error {
+func createFromLocal(opts *CreateOptions) error {
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+
 	cs := opts.IO.ColorScheme()
 	isTTY := opts.IO.IsStdoutTTY()
 	stdout := opts.IO.Out
