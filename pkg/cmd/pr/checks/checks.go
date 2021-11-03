@@ -26,6 +26,7 @@ type ChecksOptions struct {
 
 	SelectorArg string
 	WebMode     bool
+	Exporter    cmdutil.Exporter
 }
 
 func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Command {
@@ -64,6 +65,7 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to show details about checks")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, []string{"bucket", "elapsed", "link", "mark", "markColor", "name"})
 
 	return cmd
 }
@@ -191,30 +193,51 @@ func checksRun(opts *ChecksOptions) error {
 		return (b0 == "fail") || (b0 == "pending" && b1 == "success")
 	})
 
-	tp := utils.NewTablePrinter(opts.IO)
+	var jsonData map[string]interface{}
+	var tp utils.TablePrinter
 
-	for _, o := range outputs {
-		if isTerminal {
-			tp.AddField(o.mark, nil, o.markColor)
-			tp.AddField(o.name, nil, nil)
-			tp.AddField(o.elapsed, nil, nil)
-			tp.AddField(o.link, nil, nil)
-		} else {
-			tp.AddField(o.name, nil, nil)
-			tp.AddField(o.bucket, nil, nil)
-			if o.elapsed == "" {
-				tp.AddField("0", nil, nil)
-			} else {
-				tp.AddField(o.elapsed, nil, nil)
+	if opts.Exporter != nil {
+		jsonData = map[string]interface{}{}
+
+		for _, o := range outputs {
+			jsonData[o.name] = map[string]interface{}{
+				"number":    pr.Number,
+				"mark":      o.mark,
+				"bucket":    o.bucket,
+				"name":      o.name,
+				"elapsed":   o.elapsed,
+				"link":      o.link,
+				"markColor": o.markColor(o.mark),
 			}
-			tp.AddField(o.link, nil, nil)
 		}
+	} else {
+		tp = utils.NewTablePrinter(opts.IO)
 
-		tp.EndRow()
+		for _, o := range outputs {
+			if isTerminal {
+				tp.AddField(o.mark, nil, o.markColor)
+				tp.AddField(o.name, nil, nil)
+				tp.AddField(o.elapsed, nil, nil)
+				tp.AddField(o.link, nil, nil)
+			} else {
+				tp.AddField(o.name, nil, nil)
+				tp.AddField(o.bucket, nil, nil)
+				if o.elapsed == "" {
+					tp.AddField("0", nil, nil)
+				} else {
+					tp.AddField(o.elapsed, nil, nil)
+				}
+				tp.AddField(o.link, nil, nil)
+			}
+
+			tp.EndRow()
+		}
 	}
 
-	summary := ""
+	finalSummary := ""
+	unescapedSummary := ""
 	if failing+passing+skipping+pending > 0 {
+		summary := ""
 		if failing > 0 {
 			summary = "Some checks were not successful"
 		} else if pending > 0 {
@@ -226,17 +249,26 @@ func checksRun(opts *ChecksOptions) error {
 		tallies := fmt.Sprintf("%d failing, %d successful, %d skipped, and %d pending checks",
 			failing, passing, skipping, pending)
 
-		summary = fmt.Sprintf("%s\n%s", cs.Bold(summary), tallies)
+		finalSummary = fmt.Sprintf("%s\n%s", cs.Bold(summary), tallies)
+		unescapedSummary = fmt.Sprintf("%s\n%s", summary, tallies)
 	}
 
-	if isTerminal {
-		fmt.Fprintln(opts.IO.Out, summary)
-		fmt.Fprintln(opts.IO.Out)
-	}
+	if opts.Exporter == nil {
+		if isTerminal {
+			fmt.Fprintln(opts.IO.Out, finalSummary)
+			fmt.Fprintln(opts.IO.Out)
+		}
 
-	err = tp.Render()
-	if err != nil {
-		return err
+		err = tp.Render()
+		if err != nil {
+			return err
+		}
+	} else {
+		jsonData["summary"] = unescapedSummary
+		err = opts.Exporter.Write(opts.IO, jsonData)
+		if err != nil {
+			return err
+		}
 	}
 
 	if failing+pending > 0 {

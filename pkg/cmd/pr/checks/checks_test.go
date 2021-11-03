@@ -18,6 +18,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type testExporter struct {
+	jsonResult string
+}
+
+func (t *testExporter) Fields() []string {
+	return []string{}
+}
+
+func (t *testExporter) Write(io *iostreams.IOStreams, data interface{}) error {
+	prettifiedOSJSON, _ := json.Marshal(data)
+
+	t.jsonResult = string(prettifiedOSJSON)
+
+	return nil
+}
+
 func TestNewCmdChecks(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -34,6 +50,14 @@ func TestNewCmdChecks(t *testing.T) {
 			cli:  "1234",
 			wants: ChecksOptions{
 				SelectorArg: "1234",
+			},
+		},
+		{
+			name: "pr argument --json",
+			cli:  "1234 --json '*'",
+			wants: ChecksOptions{
+				SelectorArg: "1234",
+				Exporter:    &testExporter{},
 			},
 		},
 	}
@@ -62,18 +86,25 @@ func TestNewCmdChecks(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.SelectorArg, gotOpts.SelectorArg)
+			if tt.wants.Exporter == nil {
+				assert.Nil(t, gotOpts.Exporter)
+			} else {
+				assert.Condition(t, func() bool { return gotOpts.Exporter != nil }, "If --json is set, Exporter should not be nil")
+			}
 		})
 	}
 }
 
 func Test_checksRun(t *testing.T) {
 	tests := []struct {
-		name    string
-		fixture string
-		prJSON  string
-		nontty  bool
-		wantOut string
-		wantErr string
+		name       string
+		fixture    string
+		prJSON     string
+		nontty     bool
+		wantOut    string
+		wantErr    string
+		wantJson   string
+		jsonOutput bool
 	}{
 		{
 			name:    "no commits",
@@ -147,10 +178,36 @@ func Test_checksRun(t *testing.T) {
 			wantErr: "SilentError",
 		},
 		{
-			name:    "some skipped",
-			fixture: "./fixtures/someSkipping.json",
-			wantOut: "All checks were successful\n0 failing, 1 successful, 2 skipped, and 0 pending checks\n\n✓  cool tests  1m26s  sweet link\n-  rad tests   1m26s  sweet link\n-  skip tests  1m26s  sweet link\n",
-			wantErr: "",
+			name:       "some skipped --json",
+			fixture:    "./fixtures/someSkipping.json",
+			wantOut:    "",
+			wantErr:    "",
+			jsonOutput: true,
+			wantJson:   "{\"cool tests\":{\"bucket\":\"pass\",\"elapsed\":\"1m26s\",\"link\":\"sweet link\",\"mark\":\"✓\",\"markColor\":\"✓\",\"name\":\"cool tests\",\"number\":123},\"rad tests\":{\"bucket\":\"skipping\",\"elapsed\":\"1m26s\",\"link\":\"sweet link\",\"mark\":\"-\",\"markColor\":\"-\",\"name\":\"rad tests\",\"number\":123},\"skip tests\":{\"bucket\":\"skipping\",\"elapsed\":\"1m26s\",\"link\":\"sweet link\",\"mark\":\"-\",\"markColor\":\"-\",\"name\":\"skip tests\",\"number\":123},\"summary\":\"All checks were successful\\n0 failing, 1 successful, 2 skipped, and 0 pending checks\"}",
+		},
+		{
+			name:       "no commits --json",
+			prJSON:     `{ "number": 123 }`,
+			wantOut:    "",
+			wantErr:    "no commit found on the pull request",
+			jsonOutput: true,
+			wantJson:   "",
+		},
+		{
+			name:       "no checks --json",
+			prJSON:     `{ "number": 123, "statusCheckRollup": { "nodes": [{"commit": {"oid": "abc"}}]}, "baseRefName": "master" }`,
+			wantOut:    "",
+			wantErr:    "no checks reported on the 'master' branch",
+			jsonOutput: true,
+			wantJson:   "",
+		},
+		{
+			name:       "some failing --json",
+			fixture:    "./fixtures/someFailing.json",
+			wantOut:    "",
+			wantErr:    "SilentError",
+			jsonOutput: true,
+			wantJson:   "{\"cool tests\":{\"bucket\":\"pass\",\"elapsed\":\"1m26s\",\"link\":\"sweet link\",\"mark\":\"✓\",\"markColor\":\"✓\",\"name\":\"cool tests\",\"number\":123},\"sad tests\":{\"bucket\":\"fail\",\"elapsed\":\"1m26s\",\"link\":\"sweet link\",\"mark\":\"X\",\"markColor\":\"X\",\"name\":\"sad tests\",\"number\":123},\"slow tests\":{\"bucket\":\"pending\",\"elapsed\":\"1m26s\",\"link\":\"sweet link\",\"mark\":\"*\",\"markColor\":\"*\",\"name\":\"slow tests\",\"number\":123},\"summary\":\"Some checks were not successful\\n1 failing, 1 successful, 0 skipped, and 1 pending checks\"}",
 		},
 	}
 
@@ -178,6 +235,12 @@ func Test_checksRun(t *testing.T) {
 				Finder:      shared.NewMockFinder("123", response, ghrepo.New("OWNER", "REPO")),
 			}
 
+			exporter := &testExporter{}
+			if tt.jsonOutput {
+				// areese -- FIXME: add validation of json output
+				opts.Exporter = exporter
+			}
+
 			err := checksRun(opts)
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)
@@ -186,6 +249,7 @@ func Test_checksRun(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.wantOut, stdout.String())
+			assert.Equal(t, tt.wantJson, exporter.jsonResult)
 		})
 	}
 }

@@ -59,6 +59,13 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 				allowedFields := set.NewStringSet()
 				allowedFields.AddValues(fields)
 				for _, f := range export.fields {
+					// allow * to mean all fields.
+					if f == "*" {
+						// allow all fields.
+						export.fields = fields
+						break
+					}
+
 					if !allowedFields.Contains(f) {
 						sort.Strings(fields)
 						return JSONFlagError{fmt.Errorf("Unknown JSON field: %q\nAvailable fields:\n  %s", f, strings.Join(fields, "\n  "))}
