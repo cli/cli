@@ -192,7 +192,7 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 }
 
 func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err error) {
-	if opts.SelectorArg == "" {
+	if f == "" {
 		return
 	}
 
