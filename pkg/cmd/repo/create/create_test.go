@@ -53,7 +53,7 @@ func TestNewCmdCreate(t *testing.T) {
 			tty:      true,
 			cli:      "NEWREPO --public --private",
 			wantsErr: true,
-			errMsg:   "`--public`, `--private`, or `--internal` required when not running interactively",
+			errMsg:   "expected exactly one of `--public`, `--private`, or `--internal`",
 		},
 		{
 			name: "new remote from local",
