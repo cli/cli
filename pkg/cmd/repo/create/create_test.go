@@ -80,6 +80,16 @@ func TestNewCmdCreate(t *testing.T) {
 				Push:   true,
 			},
 		},
+		{
+			name: "new remote from local without visibility",
+			cli:  "--source=/path/to/repo --push",
+			wantsOpts: CreateOptions{
+				Source: "/path/to/repo",
+				Push:   true,
+			},
+			wantsErr: true,
+			errMsg:   "`--public`, `--private`, or `--internal` required when not running interactively",
+		},
 	}
 
 	for _, tt := range tests {
