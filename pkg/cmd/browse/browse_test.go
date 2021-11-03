@@ -170,7 +170,7 @@ func Test_runBrowse(t *testing.T) {
 				SelectorArg: "",
 			},
 			baseRepo:    ghrepo.New("jlsestak", "cli"),
-			expectedURL: "https://github.com/jlsestak/cli",
+			expectedURL: "https://github.com/jlsestak/cli/",
 		},
 		{
 			name: "settings flag",
@@ -366,11 +366,11 @@ func Test_runBrowse(t *testing.T) {
 		{
 			name: "use special characters in selector arg",
 			opts: BrowseOptions{
-				SelectorArg: "?=hello world *:23-44",
+				SelectorArg: "?=hello world/ *:23-44",
 			},
 			baseRepo:      ghrepo.New("bchadwic", "test"),
 			defaultBranch: "trunk",
-			expectedURL:   "https://github.com/bchadwic/test/blob/trunk/%3F=hello%20world%20%2A?plain=1#L23-L44",
+			expectedURL:   "https://github.com/bchadwic/test/blob/trunk/%3F=hello%20world/%20%2A?plain=1#L23-L44",
 			wantsErr:      false,
 		},
 	}
@@ -475,11 +475,6 @@ func Test_parsePathFromFileArg(t *testing.T) {
 			name:         "go to root of repository",
 			fileArg:      filepath.Join("..", "..", "..") + s + "",
 			expectedPath: "",
-		},
-		{
-			name:         "special character path",
-			fileArg:      "*bad path name*",
-			expectedPath: "pkg/cmd/browse/%2Abad%20path%20name%2A",
 		},
 	}
 	for _, tt := range tests {
