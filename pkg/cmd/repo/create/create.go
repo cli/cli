@@ -626,15 +626,14 @@ func interactiveRepoCreate(isDescEmpty bool, isVisibilityPassed bool, repoName s
 
 func confirmSubmission(repoName string, repoOwner string, inLocalRepo bool) (bool, error) {
 	qs := []*survey.Question{}
-	promptString := ""
-	normalizedRepoName := normalizeRepoName(repoName)
+	var promptString string
+	targetRepo := normalizeRepoName(repoName)
+	if repoOwner != "" {
+		targetRepo = fmt.Sprintf("%s/%s", repoOwner, targetRepo)
+	}
 	if inLocalRepo {
-		promptString = fmt.Sprintf(`This will create "%s" on GitHub and add it as the "origin" git remote. Continue?`, normalizedRepoName)
+		promptString = fmt.Sprintf(`This will create "%s" on GitHub and add it as the "origin" git remote. Continue?`, targetRepo)
 	} else {
-		targetRepo := normalizedRepoName
-		if repoOwner != "" {
-			targetRepo = fmt.Sprintf("%s/%s", repoOwner, normalizedRepoName)
-		}
 		promptString = fmt.Sprintf(`This will create the "%s" repository on GitHub. Continue?`, targetRepo)
 	}
 
@@ -685,5 +684,5 @@ func getVisibility() (string, error) {
 
 // normalizeRepoName takes in the repo name the user inputted and normalizes it using the same logic as GitHub (GitHub.com/new)
 func normalizeRepoName(repoName string) string {
-	return strings.TrimSuffix(regexp.MustCompile(`[^\w.-]+`).ReplaceAllString(repoName, "-"), ".git")
+	return strings.TrimSuffix(regexp.MustCompile(`[^\w._-]+`).ReplaceAllString(repoName, "-"), ".git")
 }
