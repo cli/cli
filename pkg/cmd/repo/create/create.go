@@ -126,7 +126,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 
 			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "" || opts.DisableIssues || opts.DisableWiki) {
-				return cmdutil.FlagErrorf("the `--template` option is not supported with `--homepage`, `--team`, `--enable-issues`, or `--enable-wiki`")
+				return cmdutil.FlagErrorf("the `--template` option is not supported with `--homepage`, `--team`, `--disable-issues`, or `--disable-wiki`")
 			}
 
 			if runF != nil {
@@ -319,13 +319,6 @@ func createFromScratch(opts *CreateOptions, httpClient *http.Client) error {
 		//templateRepoMainBranch = repo.DefaultBranchRef.Name
 	}
 
-	if opts.Interactive {
-		confirm, err := confirmSubmission(input.Name, input.OwnerLogin, input.Visibility, false)
-		if !confirm || err != nil {
-			return nil
-		}
-	}
-
 	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
 	if err != nil {
 		return err
@@ -352,6 +345,9 @@ func createFromScratch(opts *CreateOptions, httpClient *http.Client) error {
 			Default: true,
 		}
 		err = prompt.SurveyAskOne(cloneQuestion, &opts.Clone)
+		if err != nil {
+			return err
+		}
 	}
 
 	if opts.Clone {
@@ -449,7 +445,7 @@ func createFromLocal(opts *CreateOptions, httpClient *http.Client) error {
 	}
 
 	if opts.Interactive {
-		confirm, err := confirmSubmission(input.Name, input.OwnerLogin, input.Visibility, true)
+		confirm, err := confirmSubmission(input.Name, input.OwnerLogin, input.Visibility)
 		if !confirm || err != nil {
 			return nil
 		}
@@ -744,19 +740,16 @@ func interactiveSource() (string, error) {
 	return sourcePath, nil
 }
 
-func confirmSubmission(repoName string, repoOwner string, visibility string, inLocalRepo bool) (bool, error) {
+func confirmSubmission(repoName string, repoOwner string, visibility string) (bool, error) {
 	qs := []*survey.Question{}
 
 	promptString := ""
-	if inLocalRepo {
-		promptString = `This will add an "origin" git remote to your local repository. Continue?`
-	} else {
-		targetRepo := repoName
-		if repoOwner != "" {
-			targetRepo = fmt.Sprintf("%s/%s", repoOwner, repoName)
-		}
-		promptString = fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(visibility))
+
+	targetRepo := repoName
+	if repoOwner != "" {
+		targetRepo = fmt.Sprintf("%s/%s", repoOwner, repoName)
 	}
+	promptString = fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(visibility))
 
 	confirmSubmitQuestion := &survey.Question{
 		Name: "confirmSubmit",
