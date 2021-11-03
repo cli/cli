@@ -179,10 +179,6 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 		}
 	}
 
-	if opts.SelectorArg == "" {
-		return fmt.Sprintf("tree/%s/", branchName), nil
-	}
-
 	if rangeStart > 0 {
 		var rangeFragment string
 		if rangeEnd > 0 && rangeStart != rangeEnd {
@@ -196,6 +192,10 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 }
 
 func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err error) {
+	if opts.SelectorArg == "" {
+		return
+	}
+
 	parts := strings.SplitN(f, ":", 3)
 	if len(parts) > 2 {
 		err = fmt.Errorf("invalid file argument: %q", f)
