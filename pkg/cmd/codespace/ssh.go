@@ -181,7 +181,7 @@ globs, environment variables, and backticks, as in these examples:
  $ gh codespace cp -e 'remote:/workspace/myproj/go.{mod,sum}' ./gofiles/
 
 For security, do not use the -e flag with arguments provided by untrusted
-users; see https://lwn.net/Articles/835962/ for discussion.
+users; see <https://lwn.net/Articles/835962/> for discussion.
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.Copy(cmd.Context(), args, opts)
