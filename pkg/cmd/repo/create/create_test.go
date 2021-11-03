@@ -62,6 +62,24 @@ func TestNewCmdCreate(t *testing.T) {
 				Private: true,
 				Source:  "/path/to/repo"},
 		},
+		{
+			name: "new remote from local with remote",
+			cli:  "--source=/path/to/repo --public --remote upstream",
+			wantsOpts: CreateOptions{
+				Public: true,
+				Source: "/path/to/repo",
+				Remote: "upstream",
+			},
+		},
+		{
+			name: "new remote from local with push",
+			cli:  "--source=/path/to/repo --push --public",
+			wantsOpts: CreateOptions{
+				Public: true,
+				Source: "/path/to/repo",
+				Push:   true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
