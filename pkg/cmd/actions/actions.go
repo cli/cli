@@ -14,7 +14,7 @@ func NewCmdActions(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "actions",
-		Short: "Learn about working with GitHub actions",
+		Short: "Learn about working with GitHub Actions",
 		Long:  actionsExplainer(cs),
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Fprintln(f.IOStreams.Out, actionsExplainer(cs))
