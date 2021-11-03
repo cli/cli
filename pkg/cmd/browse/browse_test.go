@@ -495,6 +495,11 @@ func Test_parsePathFromFileArg(t *testing.T) {
 			fileArg:      filepath.Join("..", "..", "..") + s + "",
 			expectedPath: "",
 		},
+		{
+			name:         "empty fileArg",
+			fileArg:      "",
+			expectedPath: "",
+		},
 	}
 	for _, tt := range tests {
 		path, _, _, _ := parseFile(BrowseOptions{
