@@ -42,7 +42,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 		Short: "Rename a repository",
 		Long: heredoc.Doc(`Rename a GitHub repository
 
-		By default, renames the current repository otherwise renames the specified repository.`),
+		By default, this renames the current repository; otherwise renames the specified repository.`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo
@@ -51,7 +51,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 			if len(args) > 0 {
 				opts.newRepoSelector = args[0]
 			} else if !opts.IO.CanPrompt() {
-				return cmdutil.FlagErrorf("new name argument required when not running interactively\n")
+				return cmdutil.FlagErrorf("new name argument required when not running interactively")
 			}
 
 			if len(args) == 1 && !confirm && !opts.HasRepoOverride {
@@ -114,25 +114,25 @@ func renameRun(opts *RenameOptions) error {
 		}
 	}
 
-	err = runRename(httpClient, currRepo, newRepoName)
+	newRepo, err := apiRename(httpClient, currRepo, newRepoName)
 	if err != nil {
-		return fmt.Errorf("API called failed: %s", err)
+		return err
 	}
 
 	cs := opts.IO.ColorScheme()
-	newRepo := ghrepo.NewWithHost(currRepo.RepoOwner(), newRepoName, currRepo.RepoHost())
-
 	if opts.IO.IsStdoutTTY() {
 		fmt.Fprintf(opts.IO.Out, "%s Renamed repository %s\n", cs.SuccessIcon(), ghrepo.FullName(newRepo))
 	}
 
-	if !opts.HasRepoOverride {
-		remote, err := updateRemote(currRepo, newRepo, opts)
-		if err != nil {
-			fmt.Fprintf(opts.IO.ErrOut, "%s Warning: unable to update remote %q\n", cs.WarningIcon(), remote.Name)
-		} else if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "%s Updated the %q remote\n", cs.SuccessIcon(), remote.Name)
-		}
+	if opts.HasRepoOverride {
+		return nil
+	}
+
+	remote, err := updateRemote(currRepo, newRepo, opts)
+	if err != nil {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Warning: unable to update remote %q: %v\n", cs.WarningIcon(), remote.Name, err)
+	} else if opts.IO.IsStdoutTTY() {
+		fmt.Fprintf(opts.IO.Out, "%s Updated the %q remote\n", cs.SuccessIcon(), remote.Name)
 	}
 
 	return nil
