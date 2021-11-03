@@ -73,11 +73,14 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 	}
 
 	cmd.SetFlagErrorFunc(func(c *cobra.Command, e error) error {
-		if e.Error() == "flag needs an argument: --json" {
+		if c == cmd && e.Error() == "flag needs an argument: --json" {
 			sort.Strings(fields)
 			return JSONFlagError{fmt.Errorf("Specify one or more comma-separated fields for `--json`:\n  %s", strings.Join(fields, "\n  "))}
 		}
-		return c.Parent().FlagErrorFunc()(c, e)
+		if cmd.HasParent() {
+			return cmd.Parent().FlagErrorFunc()(c, e)
+		}
+		return e
 	})
 }
 
