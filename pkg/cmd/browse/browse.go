@@ -179,6 +179,10 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 		}
 	}
 
+	if opts.SelectorArg == "" {
+		return fmt.Sprintf("tree/%s/", branchName), nil
+	}
+
 	if rangeStart > 0 {
 		var rangeFragment string
 		if rangeEnd > 0 && rangeStart != rangeEnd {
