@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/liveshare"
@@ -156,36 +157,36 @@ func newCpCmd(app *App) *cobra.Command {
 	var opts cpOptions
 
 	cpCmd := &cobra.Command{
-		Use:   "cp [-e] [-r] srcs... dest",
+		Use:   "cp [-e] [-r] <sources>... <dest>",
 		Short: "Copy files between local and remote file systems",
-		Long: `
-The cp command copies files between the local and remote file systems.
+		Long: heredoc.Docf(`
+			The cp command copies files between the local and remote file systems.
 
-As with the UNIX cp command, the first argument specifies the source and the last
-specifies the destination; additional sources may be specified after the first,
-if the destination is a directory.
+			As with the UNIX %[1]scp%[1]s command, the first argument specifies the source and the last
+			specifies the destination; additional sources may be specified after the first,
+			if the destination is a directory.
 
-The -r (recursive) flag is required if any source is a directory.
+			The %[1]s--recursive%[1]s flag is required if any source is a directory.
 
-A 'remote:' prefix on any file name argument indicates that it refers to
-the file system of the remote (Codespace) machine. It is resolved relative
-to the home directory of the remote user.
+			A "remote:" prefix on any file name argument indicates that it refers to
+			the file system of the remote (Codespace) machine. It is resolved relative
+			to the home directory of the remote user.
 
-By default, remote file names are interpreted literally. With the -e flag,
-each such argument is treated in the manner of scp, as a Bash expression to
-be evaluated on the remote machine, subject to expansion of tildes, braces,
-globs, environment variables, and backticks, as in these examples:
-
- $ gh codespace cp -e README.md 'remote:/workspace/$RepositoryName/'
- $ gh codespace cp -e 'remote:~/*.go' ./gofiles/
- $ gh codespace cp -e 'remote:/workspace/myproj/go.{mod,sum}' ./gofiles/
-
-For security, do not use the -e flag with arguments provided by untrusted
-users; see <https://lwn.net/Articles/835962/> for discussion.
-`,
+			By default, remote file names are interpreted literally. With the %[1]s--expand%[1]s flag,
+			each such argument is treated in the manner of %[1]sscp%[1]s, as a Bash expression to
+			be evaluated on the remote machine, subject to expansion of tildes, braces, globs,
+			environment variables, and backticks. For security, do not use this flag with arguments
+			provided by untrusted users; see <https://lwn.net/Articles/835962/> for discussion.
+		`, "`"),
+		Example: heredoc.Doc(`
+			$ gh codespace cp -e README.md 'remote:/workspace/$RepositoryName/'
+			$ gh codespace cp -e 'remote:~/*.go' ./gofiles/
+			$ gh codespace cp -e 'remote:/workspace/myproj/go.{mod,sum}' ./gofiles/
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.Copy(cmd.Context(), args, opts)
 		},
+		DisableFlagsInUseLine: true,
 	}
 
 	// We don't expose all sshOptions.
