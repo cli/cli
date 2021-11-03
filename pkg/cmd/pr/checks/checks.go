@@ -29,6 +29,51 @@ type ChecksOptions struct {
 	Exporter    cmdutil.Exporter
 }
 
+type output struct {
+	mark      string
+	bucket    string
+	name      string
+	elapsed   string
+	link      string
+	markColor func(string) string
+}
+
+type checksSummary struct {
+	Passing  int    `json:"passing"`
+	Failing  int    `json:"failing"`
+	Skipping int    `json:"skipping"`
+	Pending  int    `json:"pending"`
+	Summary  string `json:"summary"`
+	Tallies  string `json:"tallies"`
+}
+
+// generateSummary generates the summary and tallies strings for a pr check.
+// if cs is not nil, then a Bold style will be applied to the Summary.
+func (s *checksSummary) generateSummary(cs *iostreams.ColorScheme) string {
+	s.Summary = ""
+	if s.Failing+s.Passing+s.Skipping+s.Pending > 0 {
+
+		if s.Failing > 0 {
+			s.Summary = "Some checks were not successful"
+		} else if s.Pending > 0 {
+			s.Summary = "Some checks are still pending"
+		} else {
+			s.Summary = "All checks were successful"
+		}
+
+		s.Tallies = fmt.Sprintf("%d failing, %d successful, %d skipped, and %d pending checks",
+			s.Failing, s.Passing, s.Skipping, s.Pending)
+
+		if cs != nil {
+			s.Summary = fmt.Sprintf("%s\n%s", cs.Bold(s.Summary), s.Tallies)
+		} else {
+			s.Summary = fmt.Sprintf("%s\n%s", s.Summary, s.Tallies)
+		}
+	}
+
+	return s.Summary
+}
+
 func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Command {
 	opts := &ChecksOptions{
 		IO:      f.IOStreams,
@@ -42,7 +87,7 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 			Show CI status for a single pull request.
 
 			Without an argument, the pull request that belongs to the current branch
-			is selected.			
+			is selected.
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -102,19 +147,7 @@ func checksRun(opts *ChecksOptions) error {
 		return fmt.Errorf("no checks reported on the '%s' branch", pr.BaseRefName)
 	}
 
-	passing := 0
-	failing := 0
-	skipping := 0
-	pending := 0
-
-	type output struct {
-		mark      string
-		bucket    string
-		name      string
-		elapsed   string
-		link      string
-		markColor func(string) string
-	}
+	s := &checksSummary{}
 
 	cs := opts.IO.ColorScheme()
 
@@ -134,21 +167,21 @@ func checksRun(opts *ChecksOptions) error {
 		}
 		switch state {
 		case "SUCCESS":
-			passing++
+			s.Passing++
 		case "SKIPPED", "NEUTRAL":
 			mark = "-"
 			markColor = cs.Gray
-			skipping++
+			s.Skipping++
 			bucket = "skipping"
 		case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
 			mark = "X"
 			markColor = cs.Red
-			failing++
+			s.Failing++
 			bucket = "fail"
 		default: // "EXPECTED", "REQUESTED", "WAITING", "QUEUED", "PENDING", "IN_PROGRESS", "STALE"
 			mark = "*"
 			markColor = cs.Yellow
-			pending++
+			s.Pending++
 			bucket = "pending"
 		}
 
@@ -193,87 +226,77 @@ func checksRun(opts *ChecksOptions) error {
 		return (b0 == "fail") || (b0 == "pending" && b1 == "success")
 	})
 
-	var jsonData map[string]interface{}
-	var tp utils.TablePrinter
-
-	if opts.Exporter != nil {
-		jsonData = map[string]interface{}{}
-
-		for _, o := range outputs {
-			jsonData[o.name] = map[string]interface{}{
-				"number":    pr.Number,
-				"mark":      o.mark,
-				"bucket":    o.bucket,
-				"name":      o.name,
-				"elapsed":   o.elapsed,
-				"link":      o.link,
-				"markColor": o.markColor(o.mark),
-			}
-		}
-	} else {
-		tp = utils.NewTablePrinter(opts.IO)
-
-		for _, o := range outputs {
-			if isTerminal {
-				tp.AddField(o.mark, nil, o.markColor)
-				tp.AddField(o.name, nil, nil)
-				tp.AddField(o.elapsed, nil, nil)
-				tp.AddField(o.link, nil, nil)
-			} else {
-				tp.AddField(o.name, nil, nil)
-				tp.AddField(o.bucket, nil, nil)
-				if o.elapsed == "" {
-					tp.AddField("0", nil, nil)
-				} else {
-					tp.AddField(o.elapsed, nil, nil)
-				}
-				tp.AddField(o.link, nil, nil)
-			}
-
-			tp.EndRow()
-		}
-	}
-
-	finalSummary := ""
-	unescapedSummary := ""
-	if failing+passing+skipping+pending > 0 {
-		summary := ""
-		if failing > 0 {
-			summary = "Some checks were not successful"
-		} else if pending > 0 {
-			summary = "Some checks are still pending"
-		} else {
-			summary = "All checks were successful"
-		}
-
-		tallies := fmt.Sprintf("%d failing, %d successful, %d skipped, and %d pending checks",
-			failing, passing, skipping, pending)
-
-		finalSummary = fmt.Sprintf("%s\n%s", cs.Bold(summary), tallies)
-		unescapedSummary = fmt.Sprintf("%s\n%s", summary, tallies)
-	}
-
 	if opts.Exporter == nil {
-		if isTerminal {
-			fmt.Fprintln(opts.IO.Out, finalSummary)
-			fmt.Fprintln(opts.IO.Out)
-		}
-
-		err = tp.Render()
-		if err != nil {
+		s.generateSummary(cs)
+		if err = printTable(opts, outputs, pr.Number, s); err != nil {
 			return err
 		}
 	} else {
-		jsonData["summary"] = unescapedSummary
-		err = opts.Exporter.Write(opts.IO, jsonData)
-		if err != nil {
+		s.generateSummary(nil)
+		if err = printJSON(opts, outputs, pr.Number, s); err != nil {
 			return err
 		}
 	}
 
-	if failing+pending > 0 {
+	if s.Failing+s.Pending > 0 {
 		return cmdutil.SilentError
 	}
 
 	return nil
+}
+
+func printJSON(opts *ChecksOptions, outputs []output, prNumber int, s *checksSummary) error {
+	jsonData := map[string]interface{}{}
+
+	for _, o := range outputs {
+		jsonData[o.name] = map[string]interface{}{
+			"number":    prNumber,
+			"mark":      o.mark,
+			"bucket":    o.bucket,
+			"name":      o.name,
+			"elapsed":   o.elapsed,
+			"link":      o.link,
+			"markColor": o.markColor(o.mark),
+		}
+	}
+	jsonData["passing"] = s.Passing
+	jsonData["failing"] = s.Failing
+	jsonData["skipping"] = s.Skipping
+	jsonData["pending"] = s.Pending
+	jsonData["summary"] = s.Summary
+	jsonData["tallies"] = s.Tallies
+
+	return opts.Exporter.Write(opts.IO, jsonData)
+}
+
+func printTable(opts *ChecksOptions, outputs []output, prNumber int, s *checksSummary) error {
+	tp := utils.NewTablePrinter(opts.IO)
+	isTerminal := opts.IO.IsStdoutTTY()
+
+	for _, o := range outputs {
+		if isTerminal {
+			tp.AddField(o.mark, nil, o.markColor)
+			tp.AddField(o.name, nil, nil)
+			tp.AddField(o.elapsed, nil, nil)
+			tp.AddField(o.link, nil, nil)
+		} else {
+			tp.AddField(o.name, nil, nil)
+			tp.AddField(o.bucket, nil, nil)
+			if o.elapsed == "" {
+				tp.AddField("0", nil, nil)
+			} else {
+				tp.AddField(o.elapsed, nil, nil)
+			}
+			tp.AddField(o.link, nil, nil)
+		}
+
+		tp.EndRow()
+	}
+
+	if isTerminal {
+		fmt.Fprintln(opts.IO.Out, s.Summary)
+		fmt.Fprintln(opts.IO.Out)
+	}
+
+	return tp.Render()
 }

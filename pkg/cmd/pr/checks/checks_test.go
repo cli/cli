@@ -183,7 +183,7 @@ func Test_checksRun(t *testing.T) {
 			wantOut:    "",
 			wantErr:    "",
 			jsonOutput: true,
-			wantJson:   "{\"cool tests\":{\"bucket\":\"pass\",\"elapsed\":\"1m26s\",\"link\":\"sweet link\",\"mark\":\"✓\",\"markColor\":\"✓\",\"name\":\"cool tests\",\"number\":123},\"rad tests\":{\"bucket\":\"skipping\",\"elapsed\":\"1m26s\",\"link\":\"sweet link\",\"mark\":\"-\",\"markColor\":\"-\",\"name\":\"rad tests\",\"number\":123},\"skip tests\":{\"bucket\":\"skipping\",\"elapsed\":\"1m26s\",\"link\":\"sweet link\",\"mark\":\"-\",\"markColor\":\"-\",\"name\":\"skip tests\",\"number\":123},\"summary\":\"All checks were successful\\n0 failing, 1 successful, 2 skipped, and 0 pending checks\"}",
+			wantJson:   "{\"cool tests\":{\"bucket\":\"pass\",\"elapsed\":\"1m26s\",\"link\":\"sweet link\",\"mark\":\"✓\",\"markColor\":\"✓\",\"name\":\"cool tests\",\"number\":123},\"failing\":0,\"passing\":1,\"pending\":0,\"rad tests\":{\"bucket\":\"skipping\",\"elapsed\":\"1m26s\",\"link\":\"sweet link\",\"mark\":\"-\",\"markColor\":\"-\",\"name\":\"rad tests\",\"number\":123},\"skip tests\":{\"bucket\":\"skipping\",\"elapsed\":\"1m26s\",\"link\":\"sweet link\",\"mark\":\"-\",\"markColor\":\"-\",\"name\":\"skip tests\",\"number\":123},\"skipping\":2,\"summary\":\"All checks were successful\\n0 failing, 1 successful, 2 skipped, and 0 pending checks\",\"tallies\":\"0 failing, 1 successful, 2 skipped, and 0 pending checks\"}",
 		},
 		{
 			name:       "no commits --json",
@@ -207,7 +207,7 @@ func Test_checksRun(t *testing.T) {
 			wantOut:    "",
 			wantErr:    "SilentError",
 			jsonOutput: true,
-			wantJson:   "{\"cool tests\":{\"bucket\":\"pass\",\"elapsed\":\"1m26s\",\"link\":\"sweet link\",\"mark\":\"✓\",\"markColor\":\"✓\",\"name\":\"cool tests\",\"number\":123},\"sad tests\":{\"bucket\":\"fail\",\"elapsed\":\"1m26s\",\"link\":\"sweet link\",\"mark\":\"X\",\"markColor\":\"X\",\"name\":\"sad tests\",\"number\":123},\"slow tests\":{\"bucket\":\"pending\",\"elapsed\":\"1m26s\",\"link\":\"sweet link\",\"mark\":\"*\",\"markColor\":\"*\",\"name\":\"slow tests\",\"number\":123},\"summary\":\"Some checks were not successful\\n1 failing, 1 successful, 0 skipped, and 1 pending checks\"}",
+			wantJson:   "{\"cool tests\":{\"bucket\":\"pass\",\"elapsed\":\"1m26s\",\"link\":\"sweet link\",\"mark\":\"✓\",\"markColor\":\"✓\",\"name\":\"cool tests\",\"number\":123},\"failing\":1,\"passing\":1,\"pending\":1,\"sad tests\":{\"bucket\":\"fail\",\"elapsed\":\"1m26s\",\"link\":\"sweet link\",\"mark\":\"X\",\"markColor\":\"X\",\"name\":\"sad tests\",\"number\":123},\"skipping\":0,\"slow tests\":{\"bucket\":\"pending\",\"elapsed\":\"1m26s\",\"link\":\"sweet link\",\"mark\":\"*\",\"markColor\":\"*\",\"name\":\"slow tests\",\"number\":123},\"summary\":\"Some checks were not successful\\n1 failing, 1 successful, 0 skipped, and 1 pending checks\",\"tallies\":\"1 failing, 1 successful, 0 skipped, and 1 pending checks\"}",
 		},
 	}
 
