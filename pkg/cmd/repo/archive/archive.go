@@ -3,6 +3,7 @@ package archive
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
@@ -17,12 +18,12 @@ import (
 )
 
 type ArchiveOptions struct {
-	HttpClient      func() (*http.Client, error)
-	IO              *iostreams.IOStreams
-	Config          func() (config.Config, error)
-	BaseRepo        func() (ghrepo.Interface, error)
-	HasRepoOverride bool
-	Confirmed       bool
+	HttpClient func() (*http.Client, error)
+	Config     func() (config.Config, error)
+	BaseRepo   func() (ghrepo.Interface, error)
+	Confirmed  bool
+	IO         *iostreams.IOStreams
+	RepoArg    string
 }
 
 func NewCmdArchive(f *cmdutil.Factory, runF func(*ArchiveOptions) error) *cobra.Command {
@@ -33,20 +34,21 @@ func NewCmdArchive(f *cmdutil.Factory, runF func(*ArchiveOptions) error) *cobra.
 	}
 
 	cmd := &cobra.Command{
-		Use:   "archive",
+		Use:   "archive [<repository>]",
 		Short: "Archive a repository",
 		Long: heredoc.Doc(`Archive a GitHub repository.
 
 With no argument, archives the current repository.`),
-		Args: cobra.MaximumNArgs(0),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				opts.RepoArg = args[0]
+			}
 			opts.BaseRepo = f.BaseRepo
-			opts.HasRepoOverride = cmd.Flags().Changed("repo")
 
-			if !opts.Confirmed && !opts.IO.CanPrompt() && !opts.HasRepoOverride {
+			if !opts.Confirmed && !opts.IO.CanPrompt() {
 				return cmdutil.FlagErrorf("could not prompt: confirmation with prompt or --confirm flag required")
 			}
-
 			if runF != nil {
 				return runF(opts)
 			}
@@ -54,7 +56,6 @@ With no argument, archives the current repository.`),
 		},
 	}
 
-	cmdutil.EnableRepoOverride(cmd, f)
 	cmd.Flags().BoolVarP(&opts.Confirmed, "confirm", "y", false, "skip confirmation prompt")
 	return cmd
 }
@@ -67,18 +68,45 @@ func archiveRun(opts *ArchiveOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	currRepo, err := opts.BaseRepo()
+	repoSelector := opts.RepoArg
+	if repoSelector == "" {
+		currRepo, err := opts.BaseRepo()
+		if err != nil {
+			return err
+		}
+		repoSelector = ghrepo.FullName(currRepo)
+	}
+
+	if !strings.Contains(repoSelector, "/") {
+		cfg, err := opts.Config()
+		if err != nil {
+			return err
+		}
+
+		hostname, err := cfg.DefaultHost()
+		if err != nil {
+			return err
+		}
+
+		currentUser, err := api.CurrentLoginName(apiClient, hostname)
+		if err != nil {
+			return err
+		}
+		repoSelector = currentUser + "/" + repoSelector
+	}
+
+	toArchive, err := ghrepo.FromFullName(repoSelector)
 	if err != nil {
 		return err
 	}
 
 	fields := []string{"name", "owner", "isArchived", "id"}
-	repo, err := api.FetchRepository(apiClient, currRepo, fields)
+	repo, err := api.FetchRepository(apiClient, toArchive, fields)
 	if err != nil {
 		return err
 	}
 
-	fullName := ghrepo.FullName(currRepo)
+	fullName := ghrepo.FullName(toArchive)
 	if repo.IsArchived {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Repository %s is already archived\n", cs.WarningIcon(), fullName)
 		return nil
@@ -100,7 +128,7 @@ func archiveRun(opts *ArchiveOptions) error {
 
 	err = archiveRepo(httpClient, repo)
 	if err != nil {
-		return fmt.Errorf("API called failed: %w", err)
+		return err
 	}
 
 	if opts.IO.IsStdoutTTY() {

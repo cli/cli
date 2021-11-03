@@ -2,6 +2,7 @@ package archive
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -14,7 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// probably redundant
 func TestNewCmdArchive(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -56,6 +56,10 @@ func TestNewCmdArchive(t *testing.T) {
 }
 
 func Test_ArchiveRun(t *testing.T) {
+	queryResponse := `{ "data": { "repository": 
+							{ "id": "THE-ID",
+					   		"isArchived": %s} 
+						} }`
 	tests := []struct {
 		name       string
 		opts       ArchiveOptions
@@ -72,23 +76,20 @@ func Test_ArchiveRun(t *testing.T) {
 				q.StubOne(true)
 			},
 			isTTY: true,
+			opts:  ArchiveOptions{RepoArg: "OWNER/REPO"},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryInfo\b`),
-					httpmock.StringResponse(`{ "data": { "repository": {
-												"id": "THE-ID",
-												"isArchived": false} } }`))
+					httpmock.StringResponse(fmt.Sprintf(queryResponse, "false")))
 				reg.Register(
 					httpmock.GraphQL(`mutation ArchiveRepository\b`),
 					httpmock.StringResponse(`{}`))
 			},
 		},
 		{
-			name:       "unarchived override repo tty",
+			name:       "infer base repo",
 			wantStdout: "✓ Archived repository OWNER/REPO\n",
-			opts: ArchiveOptions{
-				HasRepoOverride: true,
-			},
+			opts:       ArchiveOptions{},
 			askStubs: func(q *prompt.AskStubber) {
 				q.StubOne(true)
 			},
@@ -96,9 +97,7 @@ func Test_ArchiveRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryInfo\b`),
-					httpmock.StringResponse(`{ "data": { "repository": {
-												"id": "THE-ID",
-												"isArchived": false} } }`))
+					httpmock.StringResponse(fmt.Sprintf(queryResponse, "false")))
 				reg.Register(
 					httpmock.GraphQL(`mutation ArchiveRepository\b`),
 					httpmock.StringResponse(`{}`))
@@ -107,37 +106,14 @@ func Test_ArchiveRun(t *testing.T) {
 		{
 			name:       "archived repo tty",
 			wantStderr: "! Repository OWNER/REPO is already archived\n",
-			opts: ArchiveOptions{
-				HasRepoOverride: true,
-			},
+			opts:       ArchiveOptions{RepoArg: "OWNER/REPO"},
 			askStubs: func(q *prompt.AskStubber) {
 				q.StubOne(true)
 			},
-			isTTY: true,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryInfo\b`),
-					httpmock.StringResponse(`{ "data": { "repository": {
-												"id": "THE-ID",
-												"isArchived": true} } }`))
-			},
-		},
-		{
-			name:       "archived override repo tty",
-			wantStderr: "! Repository OWNER/REPO is already archived\n",
-			opts: ArchiveOptions{
-				HasRepoOverride: true,
-			},
-			askStubs: func(q *prompt.AskStubber) {
-				q.StubOne(true)
-			},
-			isTTY: true,
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryInfo\b`),
-					httpmock.StringResponse(`{ "data": { "repository": {
-												"id": "THE-ID",
-												"isArchived": true} } }`))
+					httpmock.StringResponse(fmt.Sprintf(queryResponse, "true")))
 			},
 		},
 	}
