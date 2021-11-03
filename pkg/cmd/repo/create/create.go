@@ -399,7 +399,7 @@ func createFromLocal(opts *CreateOptions) error {
 	repoPath := opts.Source
 	baseRemote := opts.Remote
 
-	projectDir, projectDirErr := git.ToplevelDirFromPath(repoPath)
+	projectDir, projectDirErr := git.GitDirFromPath(repoPath)
 	if projectDirErr != nil {
 		return projectDirErr
 	}
