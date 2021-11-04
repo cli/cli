@@ -1,7 +1,6 @@
 package list
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -40,7 +39,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.Limit < 1 {
-				return &cmdutil.FlagError{Err: fmt.Errorf("invalid limit: %v", opts.Limit)}
+				return cmdutil.FlagErrorf("invalid limit: %v", opts.Limit)
 			}
 
 			opts.Visibility = "all"

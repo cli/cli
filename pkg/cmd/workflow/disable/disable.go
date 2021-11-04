@@ -40,7 +40,7 @@ func NewCmdDisable(f *cmdutil.Factory, runF func(*DisableOptions) error) *cobra.
 			if len(args) > 0 {
 				opts.Selector = args[0]
 			} else if !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("workflow ID or name required when not running interactively")}
+				return cmdutil.FlagErrorf("workflow ID or name required when not running interactively")
 			} else {
 				opts.Prompt = true
 			}

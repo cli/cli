@@ -1,7 +1,6 @@
 package view
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -59,13 +58,13 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			if len(args) > 0 {
 				opts.Selector = args[0]
 			} else if !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("workflow argument required when not running interactively")}
+				return cmdutil.FlagErrorf("workflow argument required when not running interactively")
 			} else {
 				opts.Prompt = true
 			}
 
 			if !opts.YAML && opts.Ref != "" {
-				return &cmdutil.FlagError{Err: errors.New("`--yaml` required when specifying `--ref`")}
+				return cmdutil.FlagErrorf("`--yaml` required when specifying `--ref`")
 			}
 
 			if runF != nil {

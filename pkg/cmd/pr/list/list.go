@@ -75,7 +75,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			opts.BaseRepo = f.BaseRepo
 
 			if opts.LimitResults < 1 {
-				return &cmdutil.FlagError{Err: fmt.Errorf("invalid value for --limit: %v", opts.LimitResults)}
+				return cmdutil.FlagErrorf("invalid value for --limit: %v", opts.LimitResults)
 			}
 
 			if cmd.Flags().Changed("draft") {

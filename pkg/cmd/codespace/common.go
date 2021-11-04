@@ -16,21 +16,35 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
 
 type App struct {
+	io        *iostreams.IOStreams
 	apiClient apiClient
-	logger    *output.Logger
+	errLogger *log.Logger
 }
 
-func NewApp(logger *output.Logger, apiClient apiClient) *App {
+func NewApp(io *iostreams.IOStreams, apiClient apiClient) *App {
+	errLogger := log.New(io.ErrOut, "", 0)
+
 	return &App{
+		io:        io,
 		apiClient: apiClient,
-		logger:    logger,
+		errLogger: errLogger,
 	}
+}
+
+// StartProgressIndicatorWithLabel starts a progress indicator with a message.
+func (a *App) StartProgressIndicatorWithLabel(s string) {
+	a.io.StartProgressIndicatorWithLabel(s)
+}
+
+// StopProgressIndicator stops the progress indicator.
+func (a *App) StopProgressIndicator() {
+	a.io.StopProgressIndicator()
 }
 
 //go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
@@ -138,6 +152,7 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 
 // getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
 // It then fetches the codespace record with full connection details.
+// TODO(josebalius): accept a progress indicator or *App and show progress when fetching.
 func getOrChooseCodespace(ctx context.Context, apiClient apiClient, codespaceName string) (codespace *api.Codespace, err error) {
 	if codespaceName == "" {
 		codespace, err = chooseCodespace(ctx, apiClient)
@@ -227,17 +242,17 @@ type codespace struct {
 // If includeGitStatus is true, the branch will include a star if
 // the codespace has unsaved changes.
 func (c codespace) displayName(includeName, includeGitStatus bool) string {
-	branch := c.Branch
+	branch := c.GitStatus.Ref
 	if includeGitStatus {
 		branch = c.branchWithGitStatus()
 	}
 
 	if includeName {
 		return fmt.Sprintf(
-			"%s: %s [%s]", c.RepositoryNWO, branch, c.Name,
+			"%s: %s [%s]", c.Repository.FullName, branch, c.Name,
 		)
 	}
-	return c.RepositoryNWO + ": " + branch
+	return c.Repository.FullName + ": " + branch
 }
 
 // gitStatusDirty represents an unsaved changes status.
@@ -247,19 +262,19 @@ const gitStatusDirty = "*"
 // if the branch is currently being worked on.
 func (c codespace) branchWithGitStatus() string {
 	if c.hasUnsavedChanges() {
-		return c.Branch + gitStatusDirty
+		return c.GitStatus.Ref + gitStatusDirty
 	}
 
-	return c.Branch
+	return c.GitStatus.Ref
 }
 
 // hasUnsavedChanges returns whether the environment has
 // unsaved changes.
 func (c codespace) hasUnsavedChanges() bool {
-	return c.Environment.GitStatus.HasUncommitedChanges || c.Environment.GitStatus.HasUnpushedChanges
+	return c.GitStatus.HasUncommitedChanges || c.GitStatus.HasUnpushedChanges
 }
 
 // running returns whether the codespace environment is running.
 func (c codespace) running() bool {
-	return c.Environment.State == api.CodespaceEnvironmentStateAvailable
+	return c.State == api.CodespaceStateAvailable
 }

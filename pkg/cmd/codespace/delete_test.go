@@ -1,7 +1,6 @@
 package codespace
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -12,7 +11,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
+	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 func TestDelete(t *testing.T) {
@@ -44,7 +43,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			wantDeleted: []string{"hubot-robawt-abc"},
-			wantStdout:  "Codespace deleted.\n",
+			wantStdout:  "",
 		},
 		{
 			name: "by repo",
@@ -53,20 +52,26 @@ func TestDelete(t *testing.T) {
 			},
 			codespaces: []*api.Codespace{
 				{
-					Name:          "monalisa-spoonknife-123",
-					RepositoryNWO: "monalisa/Spoon-Knife",
+					Name: "monalisa-spoonknife-123",
+					Repository: api.Repository{
+						FullName: "monalisa/Spoon-Knife",
+					},
 				},
 				{
-					Name:          "hubot-robawt-abc",
-					RepositoryNWO: "hubot/ROBAWT",
+					Name: "hubot-robawt-abc",
+					Repository: api.Repository{
+						FullName: "hubot/ROBAWT",
+					},
 				},
 				{
-					Name:          "monalisa-spoonknife-c4f3",
-					RepositoryNWO: "monalisa/Spoon-Knife",
+					Name: "monalisa-spoonknife-c4f3",
+					Repository: api.Repository{
+						FullName: "monalisa/Spoon-Knife",
+					},
 				},
 			},
 			wantDeleted: []string{"monalisa-spoonknife-123", "monalisa-spoonknife-c4f3"},
-			wantStdout:  "Codespaces deleted.\n",
+			wantStdout:  "",
 		},
 		{
 			name: "unused",
@@ -89,7 +94,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-c4f3"},
-			wantStdout:  "Codespaces deleted.\n",
+			wantStdout:  "",
 		},
 		{
 			name: "deletion failed",
@@ -122,27 +127,21 @@ func TestDelete(t *testing.T) {
 			codespaces: []*api.Codespace{
 				{
 					Name: "monalisa-spoonknife-123",
-					Environment: api.CodespaceEnvironment{
-						GitStatus: api.CodespaceEnvironmentGitStatus{
-							HasUnpushedChanges: true,
-						},
+					GitStatus: api.CodespaceGitStatus{
+						HasUnpushedChanges: true,
 					},
 				},
 				{
 					Name: "hubot-robawt-abc",
-					Environment: api.CodespaceEnvironment{
-						GitStatus: api.CodespaceEnvironmentGitStatus{
-							HasUncommitedChanges: true,
-						},
+					GitStatus: api.CodespaceGitStatus{
+						HasUncommitedChanges: true,
 					},
 				},
 				{
 					Name: "monalisa-spoonknife-c4f3",
-					Environment: api.CodespaceEnvironment{
-						GitStatus: api.CodespaceEnvironmentGitStatus{
-							HasUnpushedChanges:   false,
-							HasUncommitedChanges: false,
-						},
+					GitStatus: api.CodespaceGitStatus{
+						HasUnpushedChanges:   false,
+						HasUncommitedChanges: false,
 					},
 				},
 			},
@@ -151,7 +150,7 @@ func TestDelete(t *testing.T) {
 				"Codespace hubot-robawt-abc has unsaved changes. OK to delete?":        true,
 			},
 			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-c4f3"},
-			wantStdout:  "Codespaces deleted.\n",
+			wantStdout:  "",
 		},
 	}
 	for _, tt := range tests {
@@ -188,12 +187,10 @@ func TestDelete(t *testing.T) {
 				},
 			}
 
-			stdout := &bytes.Buffer{}
-			stderr := &bytes.Buffer{}
-			app := &App{
-				apiClient: apiMock,
-				logger:    output.NewLogger(stdout, stderr, false),
-			}
+			io, _, stdout, stderr := iostreams.Test()
+			io.SetStdinTTY(true)
+			io.SetStdoutTTY(true)
+			app := NewApp(io, apiMock)
 			err := app.Delete(context.Background(), opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("delete() error = %v, wantErr %v", err, tt.wantErr)
