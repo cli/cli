@@ -333,12 +333,6 @@ func createFromScratch(opts *CreateOptions) error {
 			ghrepo.FullName(repo))
 	}
 
-	protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
-	if err != nil {
-		return err
-	}
-	remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
-
 	if opts.Interactive {
 		cloneQuestion := &survey.Confirm{
 			Message: "Clone the new repository locally?",
@@ -351,7 +345,13 @@ func createFromScratch(opts *CreateOptions) error {
 	}
 
 	if opts.Clone {
-		_, err := git.RunClone(remoteURL, []string{})
+		protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
+		if err != nil {
+			return err
+		}
+		remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
+
+		_, err = git.RunClone(remoteURL, []string{})
 		if err != nil {
 			return err
 		}
@@ -709,7 +709,7 @@ func interactiveSource() (string, error) {
 	return sourcePath, nil
 }
 
-func confirmSubmission(repoName string, repoOwner string, visibility string) (bool, error) {
+func confirmSubmission(repoName, repoOwner, visibility string) (bool, error) {
 	qs := []*survey.Question{}
 
 	promptString := ""

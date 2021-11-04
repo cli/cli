@@ -2,10 +2,14 @@ package create
 
 import (
 	"bytes"
+	"net/http"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -138,6 +142,91 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.wantsOpts.Internal, opts.Internal)
 			assert.Equal(t, tt.wantsOpts.Private, opts.Private)
 			assert.Equal(t, tt.wantsOpts.Clone, opts.Clone)
+		})
+	}
+}
+
+func Test_createFromScratch(t *testing.T) {
+	tests := []struct {
+		name       string
+		tty        bool
+		opts       *CreateOptions
+		httpStubs  func(*httpmock.Registry)
+		askStubs   func(*prompt.AskStubber)
+		wantStdout string
+		wantErr    bool
+		errMsg     string
+	}{
+		{
+			name:       "interactive with gitignore and license",
+			opts:       &CreateOptions{Interactive: true},
+			tty:        true,
+			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n",
+			askStubs: func(as *prompt.AskStubber) {
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "repoName", Value: "REPO"},
+					{Name: "repoDescription", Value: "my new repo"},
+					{Name: "repoVisibility", Value: "PRIVATE"},
+				})
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "addGitIgnore", Value: true}})
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "chooseGitIgnore", Value: "Go"}})
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "addLicense", Value: true}})
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "chooseLicense", Value: "GNU Lesser General Public License v3.0"}})
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "confirmSubmit", Value: true}})
+				as.StubOne(false) //clone locally?
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "gitignore/templates"),
+					httpmock.StringResponse(`["Actionscript","Android","AppceleratorTitanium","Autotools","Bancha","C","C++","Go"]`))
+				reg.Register(
+					httpmock.REST("GET", "licenses"),
+					httpmock.StringResponse(`[{"key": "mit","name": "MIT License"},{"key": "lgpl-3.0","name": "GNU Lesser General Public License v3.0"}]`))
+				reg.Register(
+					httpmock.REST("POST", "user/repos"),
+					httpmock.StringResponse(`{"name":"REPO", "owner":{"login": "OWNER"}, "html_url":"https://github.com/OWNER/REPO"}`))
+
+			},
+		},
+	}
+	for _, tt := range tests {
+		q, teardown := prompt.InitAskStubber()
+		defer teardown()
+		if tt.askStubs != nil {
+			tt.askStubs(q)
+		}
+
+		reg := &httpmock.Registry{}
+		if tt.httpStubs != nil {
+			tt.httpStubs(reg)
+		}
+		tt.opts.HttpClient = func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		}
+		tt.opts.Config = func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		}
+
+		io, _, stdout, _ := iostreams.Test()
+		io.SetStdinTTY(tt.tty)
+		io.SetStdoutTTY(tt.tty)
+		tt.opts.IO = io
+
+		t.Run(tt.name, func(t *testing.T) {
+			defer reg.Verify(t)
+			err := createFromScratch(tt.opts)
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.Equal(t, tt.errMsg, err.Error())
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantStdout, stdout.String())
 		})
 	}
 }
