@@ -503,7 +503,6 @@ func Test_parsePathFromFileArg(t *testing.T) {
 	}
 	for _, tt := range tests {
 		path, _, _, _ := parseFile(BrowseOptions{
-			SelectorArg: tt.fileArg,
 			PathFromRepoRoot: func() string {
 				return "pkg/cmd/browse/"
 			}}, tt.fileArg)
