@@ -536,7 +536,6 @@ func sourceInit(io *iostreams.IOStreams, remoteURL, baseRemote, repoPath, curren
 	cs := io.ColorScheme()
 	isTTY := io.IsStdoutTTY()
 	stdout := io.Out
-	stderr := io.ErrOut
 
 	remoteAdd, err := git.GitCommand("-C", repoPath, "remote", "add", baseRemote, remoteURL)
 	if err != nil {
@@ -558,8 +557,9 @@ func sourceInit(io *iostreams.IOStreams, remoteURL, baseRemote, repoPath, curren
 
 	err = run.PrepareCmd(gitBranch).Run()
 	if err != nil {
-		fmt.Fprintf(stderr, "%s warning: unable to add a branch\n", cs.WarningIcon())
-	} else if isTTY {
+		return fmt.Errorf("%s Unable to add a branch %q\n", cs.WarningIcon(), currentBranch)
+	}
+	if isTTY {
 		fmt.Fprintf(stdout, "%s Added branch to %s\n", cs.SuccessIcon(), remoteURL)
 	}
 	return nil
