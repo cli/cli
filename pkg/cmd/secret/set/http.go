@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
@@ -14,16 +15,21 @@ import (
 )
 
 type SecretPayload struct {
-	EncryptedValue string `json:"encrypted_value"`
-	Visibility     string `json:"visibility,omitempty"`
-	Repositories   []int  `json:"selected_repository_ids,omitempty"`
-	KeyID          string `json:"key_id"`
+	EncryptedValue string   `json:"encrypted_value"`
+	Visibility     string   `json:"visibility,omitempty"`
+	Repositories   []string `json:"selected_repository_ids,omitempty"`
+	KeyID          string   `json:"key_id"`
 }
 
 type PubKey struct {
 	Raw [32]byte
 	ID  string `json:"key_id"`
 	Key string
+}
+
+type repositoryNWO struct {
+	owner string
+	name  string
 }
 
 func getPubKey(client *api.Client, host, path string) (*PubKey, error) {
@@ -48,6 +54,10 @@ func getPubKey(client *api.Client, host, path string) (*PubKey, error) {
 
 func getOrgPublicKey(client *api.Client, host, orgName string) (*PubKey, error) {
 	return getPubKey(client, host, fmt.Sprintf("orgs/%s/actions/secrets/public-key", orgName))
+}
+
+func getUserPublicKey(client *api.Client, host string) (*PubKey, error) {
+	return getPubKey(client, host, "user/codespaces/secrets/public-key")
 }
 
 func getRepoPubKey(client *api.Client, repo ghrepo.Interface) (*PubKey, error) {
@@ -75,10 +85,14 @@ func putOrgSecret(client *api.Client, host string, pk *PubKey, opts SetOptions, 
 	orgName := opts.OrgName
 	visibility := opts.Visibility
 
-	var repositoryIDs []int
+	var repositoryIDs []string
 	var err error
 	if orgName != "" && visibility == shared.Selected {
-		repositoryIDs, err = mapRepoNameToID(client, host, orgName, opts.RepositoryNames)
+		repos := make([]ghrepo.Interface, 0, len(opts.RepositoryNames))
+		for _, repo := range opts.RepositoryNames {
+			repos = append(repos, ghrepo.New(opts.OrgName, repo))
+		}
+		repositoryIDs, err = mapRepoToID(client, host, repos)
 		if err != nil {
 			return fmt.Errorf("failed to look up IDs for repositories %v: %w", opts.RepositoryNames, err)
 		}
@@ -92,6 +106,39 @@ func putOrgSecret(client *api.Client, host string, pk *PubKey, opts SetOptions, 
 	}
 	path := fmt.Sprintf("orgs/%s/actions/secrets/%s", orgName, secretName)
 
+	return putSecret(client, host, path, payload)
+}
+
+func putUserSecret(client *api.Client, host string, pk *PubKey, opts SetOptions, eValue string) error {
+	secretName := opts.SecretName
+	visibility := opts.Visibility
+
+	var repositoryIDs []string
+	var err error
+	if visibility == shared.Selected {
+		repos := make([]ghrepo.Interface, 0, len(opts.RepositoryNames))
+		for _, repo := range opts.RepositoryNames {
+			// For user secrets, repository names should be fully qualifed (e.g. "owner/repo")
+			repoNWO, err := ghrepo.FromFullName(repo)
+			if err != nil {
+				return err
+			}
+			repos = append(repos, repoNWO)
+		}
+
+		repositoryIDs, err = mapRepoToID(client, host, repos)
+		if err != nil {
+			return fmt.Errorf("failed to look up IDs for repositories %v: %w", opts.RepositoryNames, err)
+		}
+	}
+
+	payload := SecretPayload{
+		EncryptedValue: eValue,
+		KeyID:          pk.ID,
+		Repositories:   repositoryIDs,
+		Visibility:     visibility,
+	}
+	path := fmt.Sprintf("user/codespaces/secrets/%s", secretName)
 	return putSecret(client, host, path, payload)
 }
 
@@ -114,14 +161,14 @@ func putRepoSecret(client *api.Client, pk *PubKey, repo ghrepo.Interface, secret
 }
 
 // This does similar logic to `api.RepoNetwork`, but without the overfetching.
-func mapRepoNameToID(client *api.Client, host, orgName string, repositoryNames []string) ([]int, error) {
-	queries := make([]string, 0, len(repositoryNames))
-	for i, repoName := range repositoryNames {
+func mapRepoToID(client *api.Client, host string, repositories []ghrepo.Interface) ([]string, error) {
+	queries := make([]string, 0, len(repositories))
+	for i, repo := range repositories {
 		queries = append(queries, fmt.Sprintf(`
 			repo_%03d: repository(owner: %q, name: %q) {
 				databaseId
 			}
-		`, i, orgName, repoName))
+		`, i, repo.RepoOwner(), repo.RepoName()))
 	}
 
 	query := fmt.Sprintf(`query MapRepositoryNames { %s }`, strings.Join(queries, ""))
@@ -134,15 +181,15 @@ func mapRepoNameToID(client *api.Client, host, orgName string, repositoryNames [
 		return nil, fmt.Errorf("failed to look up repositories: %w", err)
 	}
 
-	repoKeys := make([]string, 0, len(repositoryNames))
+	repoKeys := make([]string, 0, len(repositories))
 	for k := range graphqlResult {
 		repoKeys = append(repoKeys, k)
 	}
 	sort.Strings(repoKeys)
 
-	result := make([]int, len(repositoryNames))
+	result := make([]string, len(repositories))
 	for i, k := range repoKeys {
-		result[i] = graphqlResult[k].DatabaseID
+		result[i] = strconv.Itoa(graphqlResult[k].DatabaseID)
 	}
 
 	return result, nil

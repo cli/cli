@@ -34,6 +34,7 @@ type SetOptions struct {
 	SecretName      string
 	OrgName         string
 	EnvName         string
+	UserSecrets     bool
 	Body            string
 	Visibility      string
 	RepositoryNames []string
@@ -91,7 +92,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			}
 
 			if cmd.Flags().Changed("visibility") {
-				if opts.OrgName == "" {
+				if opts.OrgName == "" && !opts.UserSecrets {
 					return cmdutil.FlagErrorf("--visibility not supported for repository secrets; did you mean to pass --org?")
 				}
 
@@ -121,6 +122,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	}
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Set a secret for an organization")
 	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Set a secret for an environment")
+	cmd.Flags().BoolVarP(&opts.UserSecrets, "user", "u", false, "Set a secret for the current user")
 	cmd.Flags().StringVarP(&opts.Visibility, "visibility", "v", "private", "Set visibility for an organization secret: `all`, `private`, or `selected`")
 	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of repository names for `selected` visibility")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "A value for the secret. Reads from STDIN if not specified.")
@@ -166,6 +168,8 @@ func setRun(opts *SetOptions) error {
 		pk, err = getOrgPublicKey(client, host, orgName)
 	} else if envName != "" {
 		pk, err = getEnvPubKey(client, baseRepo, envName)
+	} else if opts.UserSecrets {
+		pk, err = getUserPublicKey(client, host)
 	} else {
 		pk, err = getRepoPubKey(client, baseRepo)
 	}
@@ -184,6 +188,8 @@ func setRun(opts *SetOptions) error {
 		err = putOrgSecret(client, host, pk, *opts, encoded)
 	} else if envName != "" {
 		err = putEnvSecret(client, pk, baseRepo, envName, opts.SecretName, encoded)
+	} else if opts.UserSecrets {
+		err = putUserSecret(client, host, pk, *opts, encoded)
 	} else {
 		err = putRepoSecret(client, pk, baseRepo, opts.SecretName, encoded)
 	}
