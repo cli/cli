@@ -152,6 +152,15 @@ Kiss Linux users can install from the [community repos](https://github.com/kissl
 kiss b github-cli && kiss i github-cli
 ```
 
+### makedeb Package Repository
+makedeb users can install from the [MPR](https://mpr.hunterwittenborn.com/packages/github-cli-bin):
+
+```bash
+git clone 'https://mpr.hunterwittenborn.com/github-cli-bin.git'
+cd github-cli-bin/
+makedeb -si
+```
+
 ### Nix/NixOS
 
 Nix/NixOS users can install from [nixpkgs](https://search.nixos.org/packages?show=gitAndTools.gh&query=gh&from=0&size=30&sort=relevance&channel=20.03#disabled):
