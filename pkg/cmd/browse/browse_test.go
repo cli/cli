@@ -229,6 +229,35 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/bchadwic/LedZeppelinIV/tree/trunk/main.go",
 		},
 		{
+			name: "branch flag within dir",
+			opts: BrowseOptions{
+				Branch:           "feature-123",
+				PathFromRepoRoot: func() string { return "pkg/dir" },
+			},
+			baseRepo:    ghrepo.New("bstnc", "yeepers"),
+			expectedURL: "https://github.com/bstnc/yeepers/tree/feature-123/",
+		},
+		{
+			name: "branch flag within dir with .",
+			opts: BrowseOptions{
+				Branch:           "feature-123",
+				SelectorArg:      ".",
+				PathFromRepoRoot: func() string { return "pkg/dir" },
+			},
+			baseRepo:    ghrepo.New("bstnc", "yeepers"),
+			expectedURL: "https://github.com/bstnc/yeepers/tree/feature-123/pkg/dir",
+		},
+		{
+			name: "branch flag within dir with dir",
+			opts: BrowseOptions{
+				Branch:           "feature-123",
+				SelectorArg:      "inner/more",
+				PathFromRepoRoot: func() string { return "pkg/dir" },
+			},
+			baseRepo:    ghrepo.New("bstnc", "yeepers"),
+			expectedURL: "https://github.com/bstnc/yeepers/tree/feature-123/pkg/dir/inner/more",
+		},
+		{
 			name: "file with line number",
 			opts: BrowseOptions{
 				SelectorArg: "path/to/file.txt:32",
@@ -464,6 +493,11 @@ func Test_parsePathFromFileArg(t *testing.T) {
 		{
 			name:         "go to root of repository",
 			fileArg:      filepath.Join("..", "..", "..") + s + "",
+			expectedPath: "",
+		},
+		{
+			name:         "empty fileArg",
+			fileArg:      "",
 			expectedPath: "",
 		},
 	}
