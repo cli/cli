@@ -65,12 +65,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			To create a repository interactively, use %[1]sgh repo create%[1]s with no arguments.
 
-			To create a new remote repository, supply the repository name 
-			and one of %[1]s--public%[1]s, %[1]s--private%[1]s, or %[1]s--internal%[1]s.
+			Otherwise, supply the repository name and one of %[1]s--public%[1]s, %[1]s--private%[1]s, or %[1]s--internal%[1]s.
 			Toggle %[1]s--clone%[1]s to clone the new repository locally.
 
-			To create a remote repository from an existing local repository, 
-			specify the source directory with %[1]s--source%[1]s.
+			To create a remote repository from an existing local repository, specify the source directory with %[1]s--source%[1]s.
 		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -322,6 +320,16 @@ func createFromScratch(opts *CreateOptions) error {
 	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
 	if err != nil {
 		return err
+	}
+
+	if opts.Interactive {
+		doCreate, err := confirmSubmission(opts.Name, repoToCreate.RepoOwner(), opts.Visibility)
+		if err != nil {
+			return err
+		}
+		if !doCreate {
+			return nil
+		}
 	}
 
 	cs := opts.IO.ColorScheme()
