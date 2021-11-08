@@ -85,7 +85,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 
 	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
 	if err != nil {
-		return fmt.Errorf("error connecting to Live Share: %w", err)
+		return fmt.Errorf("error connecting to codespace: %w", err)
 	}
 	defer safeClose(session, &err)
 
