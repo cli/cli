@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -153,17 +154,20 @@ func Test_createRun(t *testing.T) {
 		opts       *CreateOptions
 		httpStubs  func(*httpmock.Registry)
 		askStubs   func(*prompt.AskStubber)
+		execStubs  func(*run.CommandStubber)
 		wantStdout string
 		wantErr    bool
 		errMsg     string
 	}{
 		{
-			name:       "interactive create from scratch with gitignore and license",
-			opts:       &CreateOptions{Interactive: true},
-			tty:        true,
-			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n",
+			name: "interactive create from scratch with gitignore and license",
+			opts: &CreateOptions{Interactive: true},
+			tty:  true,
+			wantStdout: `✓ Created repository OWNER/REPO on GitHub
+✓ Initialized repository in "REPO"
+`,
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne("Create a repository on GitHub from scratch")
+				as.StubOne("Create a new repository on GitHub from scratch")
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoName", Value: "REPO"},
 					{Name: "repoDescription", Value: "my new repo"},
@@ -179,7 +183,7 @@ func Test_createRun(t *testing.T) {
 					{Name: "chooseLicense", Value: "GNU Lesser General Public License v3.0"}})
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "confirmSubmit", Value: true}})
-				as.StubOne(false) //clone locally?
+				as.StubOne(true) //clone locally?
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -191,6 +195,10 @@ func Test_createRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("POST", "user/repos"),
 					httpmock.StringResponse(`{"name":"REPO", "owner":{"login": "OWNER"}, "html_url":"https://github.com/OWNER/REPO"}`))
+
+			},
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
 			},
 		},
 	}
@@ -212,6 +220,12 @@ func Test_createRun(t *testing.T) {
 			return config.NewBlankConfig(), nil
 		}
 
+		cs, restoreRun := run.Stub()
+		defer restoreRun(t)
+		if tt.execStubs != nil {
+			tt.execStubs(cs)
+		}
+
 		io, _, stdout, _ := iostreams.Test()
 		io.SetStdinTTY(tt.tty)
 		io.SetStdoutTTY(tt.tty)
@@ -219,7 +233,7 @@ func Test_createRun(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)
-			err := createFromScratch(tt.opts)
+			err := createRun(tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Equal(t, tt.errMsg, err.Error())
