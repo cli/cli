@@ -447,7 +447,6 @@ func createFromLocal(opts *CreateOptions) error {
 		return err
 	}
 
-	fmt.Println("hjere")
 	if isTTY {
 		fmt.Fprintf(stdout,
 			"%s Created repository %s on GitHub\n",

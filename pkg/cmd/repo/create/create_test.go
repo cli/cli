@@ -202,7 +202,7 @@ func Test_createRun(t *testing.T) {
 			},
 		},
 		{
-			name: "interactive with existing repository",
+			name: "interactive with existing repository public",
 			opts: &CreateOptions{Interactive: true},
 			tty:  true,
 			askStubs: func(as *prompt.AskStubber) {
@@ -236,6 +236,89 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git -C . rev-parse --git-dir`, 0, "")
 			},
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n",
+		},
+		{
+			name: "interactive with existing repository public add remote",
+			opts: &CreateOptions{Interactive: true},
+			tty:  true,
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne("Push an existing local repository to GitHub")
+				as.StubOne(".")
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "repoName", Value: "REPO"},
+					{Name: "repoDescription", Value: "my new repo"},
+					{Name: "repoVisibility", Value: "PRIVATE"},
+				})
+				as.StubOne(true)     //ask for adding a remote
+				as.StubOne("origin") //ask for remote name
+				as.StubOne(false)    //ask to push to remote
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation RepositoryCreate\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"createRepository": {
+								"repository": {
+									"id": "REPOID",
+									"name": "REPO",
+									"owner": {"login":"OWNER"},
+									"url": "https://github.com/OWNER/REPO"
+								}
+							}
+						}
+					}`))
+			},
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git -C . rev-parse --git-dir`, 0, "")
+				cs.Register(`git symbolic-ref --quiet HEAD`, 0, "HEAD")
+				cs.Register(`git -C . remote add origin https://github.com/OWNER/REPO`, 0, "")
+				cs.Register(`git -C . branch -M HEAD`, 0, "")
+			},
+			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n✓ Added branch to https://github.com/OWNER/REPO.git\n",
+		},
+		{
+			name: "interactive with existing repository public add remote",
+			opts: &CreateOptions{Interactive: true},
+			tty:  true,
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne("Push an existing local repository to GitHub")
+				as.StubOne(".")
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "repoName", Value: "REPO"},
+					{Name: "repoDescription", Value: "my new repo"},
+					{Name: "repoVisibility", Value: "PRIVATE"},
+				})
+				as.StubOne(true)     //ask for adding a remote
+				as.StubOne("origin") //ask for remote name
+				as.StubOne(true)     //ask to push to remote
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation RepositoryCreate\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"createRepository": {
+								"repository": {
+									"id": "REPOID",
+									"name": "REPO",
+									"owner": {"login":"OWNER"},
+									"url": "https://github.com/OWNER/REPO"
+								}
+							}
+						}
+					}`))
+			},
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git -C . rev-parse --git-dir`, 0, "")
+				cs.Register(`git symbolic-ref --quiet HEAD`, 0, "HEAD")
+				cs.Register(`git -C . remote add origin https://github.com/OWNER/REPO`, 0, "")
+				cs.Register(`git -C . branch -M HEAD`, 0, "")
+				cs.Register(`git -C . push -u origin HEAD`, 0, "")
+			},
+			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n✓ Added branch to https://github.com/OWNER/REPO.git\n✓ Pushed Repo to https://github.com/OWNER/REPO.git\n",
 		},
 	}
 	for _, tt := range tests {
