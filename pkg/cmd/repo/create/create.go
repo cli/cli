@@ -209,7 +209,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 }
 
 func createRun(opts *CreateOptions) error {
-	fromScratch := true
+	var fromScratch bool
 	if opts.Interactive {
 		var createMode string
 		createModePrompt := &survey.Select{
@@ -222,9 +222,7 @@ func createRun(opts *CreateOptions) error {
 		if err != nil {
 			return err
 		}
-		if createMode != "Create a new repository on GitHub from scratch" {
-			fromScratch = false
-		}
+		fromScratch = createMode != "Create a new repository on GitHub from scratch"
 	} else {
 		fromScratch = opts.Source == ""
 	}
