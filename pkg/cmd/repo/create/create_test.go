@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -237,11 +238,44 @@ func Test_createRun(t *testing.T) {
 		opts       *CreateOptions
 		httpStubs  func(*httpmock.Registry)
 		askStubs   func(*prompt.AskStubber)
+		execStubs  func(*run.CommandStubber)
 		wantStdout string
 		wantErr    bool
 		errMsg     string
 	}{
-		// TODO: Add test cases.
+		{
+			name: "interactive with existing repository",
+			opts: &CreateOptions{Interactive: true},
+			tty:  true,
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne("Push an existing local repository to GitHub")
+				as.StubOne(".")
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "repoName", Value: "REPO"},
+					{Name: "repoDescription", Value: "my new repo"},
+					{Name: "repoVisibility", Value: "PRIVATE"},
+				})
+				as.StubOne(false)
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation RepositoryCreate\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"createRepository": {
+								"repository": {
+									"id": "REPOID",
+									"name": "REPO",
+									"owner": {"login":"OWNER"},
+									"url": "https://github.com/OWNER/REPO"
+								}
+							}
+						}
+					}`))
+			},
+			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n",
+		},
 	}
 	for _, tt := range tests {
 		q, teardown := prompt.InitAskStubber()
@@ -249,6 +283,11 @@ func Test_createRun(t *testing.T) {
 		if tt.askStubs != nil {
 			tt.askStubs(q)
 		}
+
+		// repo, _ := ghrepo.FromFullName("OWNER/REPO")
+		// tt.opts.Config = func() (config.Config, error) {
+		// 	return config.NewBlankConfig(), nil
+		// }
 
 		reg := &httpmock.Registry{}
 		if tt.httpStubs != nil {
@@ -268,7 +307,7 @@ func Test_createRun(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)
-			err := createFromScratch(tt.opts)
+			err := createRun(tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Equal(t, tt.errMsg, err.Error())

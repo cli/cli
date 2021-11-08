@@ -440,18 +440,12 @@ func createFromLocal(opts *CreateOptions) error {
 		LicenseTemplate:   opts.LicenseTemplate,
 	}
 
-	if opts.Interactive {
-		confirm, err := confirmSubmission(input.Name, input.OwnerLogin, input.Visibility)
-		if !confirm || err != nil {
-			return nil
-		}
-	}
-
 	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
 	if err != nil {
 		return err
 	}
 
+	fmt.Println("hjere")
 	if isTTY {
 		fmt.Fprintf(stdout,
 			"%s Created repository %s on GitHub\n",
