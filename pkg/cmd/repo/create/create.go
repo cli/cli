@@ -222,7 +222,7 @@ func createRun(opts *CreateOptions) error {
 		if err != nil {
 			return err
 		}
-		fromScratch = createMode != "Create a new repository on GitHub from scratch"
+		fromScratch = createMode == "Create a new repository on GitHub from scratch"
 	} else {
 		fromScratch = opts.Source == ""
 	}
