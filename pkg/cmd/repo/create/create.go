@@ -284,8 +284,8 @@ func createFromScratch(opts *CreateOptions) error {
 		TeamSlug:          opts.Team,
 		Description:       opts.Description,
 		HomepageURL:       opts.Homepage,
-		HasIssuesEnabled:  opts.EnableIssues,
-		HasWikiEnabled:    opts.EnableWiki,
+		HasIssuesEnabled:  !opts.DisableIssues,
+		HasWikiEnabled:    !opts.DisableWiki,
 		GitIgnoreTemplate: opts.GitIgnoreTemplate,
 		LicenseTemplate:   opts.LicenseTemplate,
 	}
@@ -434,8 +434,8 @@ func createFromLocal(opts *CreateOptions) error {
 		TeamSlug:          opts.Team,
 		Description:       opts.Description,
 		HomepageURL:       opts.Homepage,
-		HasIssuesEnabled:  opts.EnableIssues,
-		HasWikiEnabled:    opts.EnableWiki,
+		HasIssuesEnabled:  !opts.DisableIssues,
+		HasWikiEnabled:    !opts.DisableWiki,
 		GitIgnoreTemplate: opts.GitIgnoreTemplate,
 		LicenseTemplate:   opts.LicenseTemplate,
 	}

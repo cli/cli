@@ -146,7 +146,7 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 }
 
-func Test_createFromScratch(t *testing.T) {
+func Test_createRun(t *testing.T) {
 	tests := []struct {
 		name       string
 		tty        bool
@@ -158,11 +158,12 @@ func Test_createFromScratch(t *testing.T) {
 		errMsg     string
 	}{
 		{
-			name:       "interactive with gitignore and license",
+			name:       "interactive create from scratch with gitignore and license",
 			opts:       &CreateOptions{Interactive: true},
 			tty:        true,
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n",
 			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne("Create a repository on GitHub from scratch")
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoName", Value: "REPO"},
 					{Name: "repoDescription", Value: "my new repo"},
@@ -190,58 +191,8 @@ func Test_createFromScratch(t *testing.T) {
 				reg.Register(
 					httpmock.REST("POST", "user/repos"),
 					httpmock.StringResponse(`{"name":"REPO", "owner":{"login": "OWNER"}, "html_url":"https://github.com/OWNER/REPO"}`))
-
 			},
 		},
-	}
-	for _, tt := range tests {
-		q, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(q)
-		}
-
-		reg := &httpmock.Registry{}
-		if tt.httpStubs != nil {
-			tt.httpStubs(reg)
-		}
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
-		tt.opts.Config = func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
-		}
-
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdinTTY(tt.tty)
-		io.SetStdoutTTY(tt.tty)
-		tt.opts.IO = io
-
-		t.Run(tt.name, func(t *testing.T) {
-			defer reg.Verify(t)
-			err := createFromScratch(tt.opts)
-			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Equal(t, tt.errMsg, err.Error())
-				return
-			}
-			assert.NoError(t, err)
-			assert.Equal(t, tt.wantStdout, stdout.String())
-		})
-	}
-}
-func Test_createRun(t *testing.T) {
-	tests := []struct {
-		name       string
-		tty        bool
-		opts       *CreateOptions
-		httpStubs  func(*httpmock.Registry)
-		askStubs   func(*prompt.AskStubber)
-		wantStdout string
-		wantErr    bool
-		errMsg     string
-	}{
-		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		q, teardown := prompt.InitAskStubber()
