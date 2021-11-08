@@ -147,23 +147,27 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 }
 
-func Test_createFromScratch(t *testing.T) {
+func Test_createRun(t *testing.T) {
 	tests := []struct {
 		name       string
 		tty        bool
 		opts       *CreateOptions
 		httpStubs  func(*httpmock.Registry)
 		askStubs   func(*prompt.AskStubber)
+		execStubs  func(*run.CommandStubber)
 		wantStdout string
 		wantErr    bool
 		errMsg     string
 	}{
 		{
-			name:       "interactive with gitignore and license",
-			opts:       &CreateOptions{Interactive: true},
-			tty:        true,
-			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n",
+			name: "interactive create from scratch with gitignore and license",
+			opts: &CreateOptions{Interactive: true},
+			tty:  true,
+			wantStdout: `✓ Created repository OWNER/REPO on GitHub
+✓ Initialized repository in "REPO"
+`,
 			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne("Create a new repository on GitHub from scratch")
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoName", Value: "REPO"},
 					{Name: "repoDescription", Value: "my new repo"},
@@ -179,7 +183,7 @@ func Test_createFromScratch(t *testing.T) {
 					{Name: "chooseLicense", Value: "GNU Lesser General Public License v3.0"}})
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "confirmSubmit", Value: true}})
-				as.StubOne(false) //clone locally?
+				as.StubOne(true) //clone locally?
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -193,56 +197,10 @@ func Test_createFromScratch(t *testing.T) {
 					httpmock.StringResponse(`{"name":"REPO", "owner":{"login": "OWNER"}, "html_url":"https://github.com/OWNER/REPO"}`))
 
 			},
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
+			},
 		},
-	}
-	for _, tt := range tests {
-		q, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(q)
-		}
-
-		reg := &httpmock.Registry{}
-		if tt.httpStubs != nil {
-			tt.httpStubs(reg)
-		}
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
-		tt.opts.Config = func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
-		}
-
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdinTTY(tt.tty)
-		io.SetStdoutTTY(tt.tty)
-		tt.opts.IO = io
-
-		t.Run(tt.name, func(t *testing.T) {
-			defer reg.Verify(t)
-			err := createFromScratch(tt.opts)
-			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Equal(t, tt.errMsg, err.Error())
-				return
-			}
-			assert.NoError(t, err)
-			assert.Equal(t, tt.wantStdout, stdout.String())
-		})
-	}
-}
-func Test_createRun(t *testing.T) {
-	tests := []struct {
-		name       string
-		tty        bool
-		opts       *CreateOptions
-		httpStubs  func(*httpmock.Registry)
-		askStubs   func(*prompt.AskStubber)
-		execStubs  func(*run.CommandStubber)
-		wantStdout string
-		wantErr    bool
-		errMsg     string
-	}{
 		{
 			name: "interactive with existing repository",
 			opts: &CreateOptions{Interactive: true},
@@ -274,6 +232,9 @@ func Test_createRun(t *testing.T) {
 						}
 					}`))
 			},
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git -C . rev-parse --git-dir`, 0, "")
+			},
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n",
 		},
 	}
@@ -284,11 +245,6 @@ func Test_createRun(t *testing.T) {
 			tt.askStubs(q)
 		}
 
-		// repo, _ := ghrepo.FromFullName("OWNER/REPO")
-		// tt.opts.Config = func() (config.Config, error) {
-		// 	return config.NewBlankConfig(), nil
-		// }
-
 		reg := &httpmock.Registry{}
 		if tt.httpStubs != nil {
 			tt.httpStubs(reg)
@@ -298,6 +254,12 @@ func Test_createRun(t *testing.T) {
 		}
 		tt.opts.Config = func() (config.Config, error) {
 			return config.NewBlankConfig(), nil
+		}
+
+		cs, restoreRun := run.Stub()
+		defer restoreRun(t)
+		if tt.execStubs != nil {
+			tt.execStubs(cs)
 		}
 
 		io, _, stdout, _ := iostreams.Test()
