@@ -6,11 +6,13 @@ import (
 	"os"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/extensions"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
@@ -180,41 +182,127 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				return nil
 			},
 		},
-		&cobra.Command{
-			Use:   "create <name>",
-			Short: "Create a new extension",
-			Args:  cmdutil.ExactArgs(1, "must specify a name for the extension"),
-			RunE: func(cmd *cobra.Command, args []string) error {
-				extName := args[0]
-				if !strings.HasPrefix(extName, "gh-") {
-					extName = "gh-" + extName
+		func() *cobra.Command {
+			promptCreate := func() (string, extensions.ExtTemplateType, error) {
+				var extName string
+				var extTmplType int
+				err := prompt.SurveyAskOne(&survey.Input{
+					Message: "Extension name:",
+				}, &extName)
+				if err != nil {
+					return extName, -1, err
 				}
-				if err := m.Create(extName); err != nil {
-					return err
-				}
-				if !io.IsStdoutTTY() {
-					return nil
-				}
-				link := "https://docs.github.com/github-cli/github-cli/creating-github-cli-extensions"
-				cs := io.ColorScheme()
-				out := heredoc.Docf(`
+				err = prompt.SurveyAskOne(&survey.Select{
+					Message: "What kind of extension?",
+					Options: []string{
+						"Script (Bash, Ruby, Python, etc)",
+						"Go",
+						"Other Precompiled (C++, Rust, etc)",
+					},
+				}, &extTmplType)
+				return extName, extensions.ExtTemplateType(extTmplType), err
+			}
+			var flagType string
+			cmd := &cobra.Command{
+				Use:   "create [<name>]",
+				Short: "Create a new extension",
+				Example: heredoc.Doc(`
+				# Use interactively
+				gh extension create
+
+				# Create a script-based extension
+				gh extension create foobar
+
+				# Create a Go extension
+				gh extension create --precompiled=go foobar
+
+				# Create a non-Go precompiled extension
+				gh extension create --precompiled=other foobar
+				`),
+				Args: cobra.MaximumNArgs(1),
+				RunE: func(cmd *cobra.Command, args []string) error {
+					if cmd.Flags().Changed("precompiled") {
+						if flagType != "go" && flagType != "other" {
+							return cmdutil.FlagErrorf("value for --precompiled must be 'go' or 'other'. Got '%s'", flagType)
+						}
+					}
+					var extName string
+					var err error
+					tmplType := extensions.GitTemplateType
+					if len(args) == 0 {
+						if io.IsStdoutTTY() {
+							extName, tmplType, err = promptCreate()
+							if err != nil {
+								return fmt.Errorf("could not prompt: %w", err)
+							}
+						}
+					} else {
+						extName = args[0]
+						if flagType == "go" {
+							tmplType = extensions.GoBinTemplateType
+						} else if flagType == "other" {
+							tmplType = extensions.OtherBinTemplateType
+						}
+					}
+
+					var fullName string
+
+					if strings.HasPrefix(extName, "gh-") {
+						fullName = extName
+						extName = extName[3:]
+					} else {
+						fullName = "gh-" + extName
+					}
+					if err := m.Create(fullName, tmplType); err != nil {
+						return err
+					}
+					if !io.IsStdoutTTY() {
+						return nil
+					}
+
+					var goBinChecks string
+
+					steps := fmt.Sprintf(
+						"- run 'cd %[1]s; gh extension install .; gh %[2]s' to see your new extension in action",
+						fullName, extName)
+
+					cs := io.ColorScheme()
+					if tmplType == extensions.GoBinTemplateType {
+						goBinChecks = heredoc.Docf(`
+						%[1]s Downloaded Go dependencies
+						%[1]s Built %[2]s binary
+						`, cs.SuccessIcon(), fullName)
+						steps = heredoc.Docf(`
+						- run 'cd %[1]s; gh extension install .; gh %[2]s' to see your new extension in action
+						- use 'go build && gh %[2]s' to see changes in your code as you develop`, fullName, extName)
+					} else if tmplType == extensions.OtherBinTemplateType {
+						steps = heredoc.Docf(`
+						- run 'cd %[1]s; gh extension install .' to install your extension locally
+						- fill in script/build.sh with your compilation script for automated builds
+						- compile a %[1]s binary locally and run 'gh %[2]s' to see changes`, fullName, extName)
+					}
+					link := "https://docs.github.com/github-cli/github-cli/creating-github-cli-extensions"
+					out := heredoc.Docf(`
 					%[1]s Created directory %[2]s
 					%[1]s Initialized git repository
 					%[1]s Set up extension scaffolding
+					%[6]s
+					%[2]s is ready for development!
 
-					%[2]s is ready for development
-
-					Install locally with: cd %[2]s && gh extension install .
-
-					Publish to GitHub with: gh repo create %[2]s
+					%[4]s
+					%[5]s
+					- commit and use 'gh repo create' to share your extension with others
 
 					For more information on writing extensions:
 					%[3]s
-				`, cs.SuccessIcon(), extName, link)
-				fmt.Fprint(io.Out, out)
-				return nil
-			},
-		},
+				`, cs.SuccessIcon(), fullName, link, cs.Bold("Next Steps"), steps, goBinChecks)
+					fmt.Fprint(io.Out, out)
+					return nil
+				},
+			}
+			cmd.Flags().StringVar(&flagType, "precompiled", "", "Create a precompiled extension. Possible values: go, other")
+			return cmd
+		}(),
 	)
 
 	return &extCmd
