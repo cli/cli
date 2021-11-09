@@ -3,7 +3,6 @@ package create
 import (
 	"fmt"
 	"net/http"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -401,18 +400,28 @@ func createFromLocal(opts *CreateOptions) error {
 	}
 
 	repoPath := opts.Source
-	baseRemote := opts.Remote
+
+	var baseRemote string
+	if opts.Remote == "" {
+		baseRemote = "origin"
+	} else {
+		baseRemote = opts.Remote
+	}
 
 	projectDir, projectDirErr := git.GetDirFromPath(repoPath)
 	if projectDirErr != nil {
 		return projectDirErr
 	}
+	if projectDir != ".git" {
+		return fmt.Errorf("path not a local repository")
+	}
+
+	abs, err := filepath.Abs(repoPath)
+	if err != nil {
+		return err
+	}
 
 	if opts.Interactive {
-		abs, err := filepath.Abs(repoPath)
-		if err != nil {
-			return err
-		}
 		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(filepath.Base(abs))
 		if err != nil {
 			return err
@@ -423,10 +432,7 @@ func createFromLocal(opts *CreateOptions) error {
 
 	// repo name will be currdir name or specified
 	if opts.Name == "" {
-		if projectDir != ".git" {
-			return fmt.Errorf("path not a local repository")
-		}
-		repoToCreate = ghrepo.NewWithHost("", path.Base(repoPath), host)
+		repoToCreate = ghrepo.NewWithHost("", filepath.Base(abs), host)
 	} else if strings.Contains(opts.Name, "/") {
 		var err error
 		repoToCreate, err = ghrepo.FromFullName(opts.Name)
