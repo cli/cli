@@ -59,7 +59,7 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, exporter cmdu
 
 	session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, codespace)
 	if err != nil {
-		return fmt.Errorf("error connecting to Live Share: %w", err)
+		return fmt.Errorf("error connecting to codespace: %w", err)
 	}
 	defer safeClose(session, &err)
 
@@ -245,7 +245,7 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 
 	session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, codespace)
 	if err != nil {
-		return fmt.Errorf("error connecting to Live Share: %w", err)
+		return fmt.Errorf("error connecting to codespace: %w", err)
 	}
 	defer safeClose(session, &err)
 
@@ -321,7 +321,7 @@ func (a *App) ForwardPorts(ctx context.Context, codespaceName string, ports []st
 
 	session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, codespace)
 	if err != nil {
-		return fmt.Errorf("error connecting to Live Share: %w", err)
+		return fmt.Errorf("error connecting to codespace: %w", err)
 	}
 	defer safeClose(session, &err)
 

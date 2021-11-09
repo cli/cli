@@ -53,7 +53,7 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 
 	session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, codespace)
 	if err != nil {
-		return fmt.Errorf("connecting to Live Share: %w", err)
+		return fmt.Errorf("connecting to codespace: %w", err)
 	}
 	defer safeClose(session, &err)
 
