@@ -306,7 +306,7 @@ func createFromScratch(opts *CreateOptions) error {
 		LicenseTemplate:   opts.LicenseTemplate,
 	}
 
-	//var templateRepoMainBranch string
+	var templateRepoMainBranch string
 	if opts.Template != "" {
 		var templateRepo ghrepo.Interface
 		apiClient := api.NewClientFromHTTP(httpClient)
@@ -330,7 +330,7 @@ func createFromScratch(opts *CreateOptions) error {
 		}
 
 		input.TemplateRepositoryID = repo.ID
-		//templateRepoMainBranch = repo.DefaultBranchRef.Name
+		templateRepoMainBranch = repo.DefaultBranchRef.Name
 	}
 
 	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
@@ -373,12 +373,22 @@ func createFromScratch(opts *CreateOptions) error {
 		if err != nil {
 			return err
 		}
+
 		remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
-		_, err = git.RunClone(remoteURL, []string{})
-		if err != nil {
+		if opts.LicenseTemplate == "" && opts.GitIgnoreTemplate == "" {
+			// cloning empty repository or template
+			checkoutBranch := ""
+			if opts.Template != "" {
+				checkoutBranch = templateRepoMainBranch
+			}
+			if err := localInit(opts.IO, remoteURL, repo.RepoName(), checkoutBranch); err != nil {
+				return err
+			}
+		} else if _, err := git.RunClone(remoteURL, []string{}); err != nil {
 			return err
 		}
+
 		if isTTY {
 			fmt.Fprintf(opts.IO.Out,
 				"%s Initialized repository in \"%s\"\n",
@@ -550,7 +560,7 @@ func createFromLocal(opts *CreateOptions) error {
 		}
 
 		if isTTY {
-			fmt.Fprintf(stdout, "%s Pushed Repo to %s\n", cs.SuccessIcon(), remoteURL)
+			fmt.Fprintf(stdout, "%s Pushed commits to %s\n", cs.SuccessIcon(), remoteURL)
 		}
 	}
 	return nil
@@ -574,19 +584,70 @@ func sourceInit(io *iostreams.IOStreams, remoteURL, baseRemote, repoPath, curren
 		fmt.Fprintf(stdout, "%s Added remote %s\n", cs.SuccessIcon(), remoteURL)
 	}
 
-	gitBranch, err := git.GitCommand("-C", repoPath, "branch", "-M", currentBranch)
-	if err != nil {
-		return err
-	}
+	//gitBranch, err := git.GitCommand("-C", repoPath, "branch", "-M", currentBranch)
+	//if err != nil {
+	//return err
+	//}
 
-	err = run.PrepareCmd(gitBranch).Run()
-	if err != nil {
-		return fmt.Errorf("%s Unable to add a branch %q", cs.WarningIcon(), currentBranch)
-	}
+	//err = run.PrepareCmd(gitBranch).Run()
+	//if err != nil {
+	//return fmt.Errorf("%s Unable to add a branch %q", cs.WarningIcon(), currentBranch)
+	//}
 	if isTTY {
 		fmt.Fprintf(stdout, "%s Added branch to %s\n", cs.SuccessIcon(), remoteURL)
 	}
 	return nil
+}
+
+// clone the checkout branch to specified path
+func localInit(io *iostreams.IOStreams, remoteURL, path, checkoutBranch string) error {
+	gitInit, err := git.GitCommand("init", path)
+	if err != nil {
+		return err
+	}
+	isTTY := io.IsStdoutTTY()
+	if isTTY {
+		gitInit.Stdout = io.Out
+	}
+	gitInit.Stderr = io.ErrOut
+	err = run.PrepareCmd(gitInit).Run()
+	if err != nil {
+		return err
+	}
+
+	gitRemoteAdd, err := git.GitCommand("-C", path, "remote", "add", "origin", remoteURL)
+	if err != nil {
+		return err
+	}
+	gitRemoteAdd.Stdout = io.Out
+	gitRemoteAdd.Stderr = io.ErrOut
+	err = run.PrepareCmd(gitRemoteAdd).Run()
+	if err != nil {
+		return err
+	}
+
+	if checkoutBranch == "" {
+		return nil
+	}
+
+	gitFetch, err := git.GitCommand("-C", path, "fetch", "origin", fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/origin/%[1]s", checkoutBranch))
+	if err != nil {
+		return err
+	}
+	gitFetch.Stdout = io.Out
+	gitFetch.Stderr = io.ErrOut
+	err = run.PrepareCmd(gitFetch).Run()
+	if err != nil {
+		return err
+	}
+
+	gitCheckout, err := git.GitCommand("-C", path, "checkout", checkoutBranch)
+	if err != nil {
+		return err
+	}
+	gitCheckout.Stdout = io.Out
+	gitCheckout.Stderr = io.ErrOut
+	return run.PrepareCmd(gitCheckout).Run()
 }
 
 func interactiveGitIgnore(client *http.Client, hostname string) (string, error) {
