@@ -65,11 +65,23 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			To create a repository interactively, use %[1]sgh repo create%[1]s with no arguments.
 
-			Otherwise, supply the repository name and one of %[1]s--public%[1]s, %[1]s--private%[1]s, or %[1]s--internal%[1]s.
-			Toggle %[1]s--clone%[1]s to clone the new repository locally.
+			To create a remote repository, supply the repository name and one of %[1]s--public%[1]s, %[1]s--private%[1]s, or %[1]s--internal%[1]s.
+			Pass %[1]s--clone%[1]s to clone the new repository locally.
 
-			To create a remote repository from an existing local repository, specify the source directory with %[1]s--source%[1]s.
+			To create a remote repository from an existing local repository, specify the source directory with %[1]s--source%[1]s. 
+			By default, the remote repository name will be the name of the source directory. 
+			Pass %[1]s--push%[1]s to push any local commits to the new repository.
 		`, "`"),
+		Example: heredoc.Doc(`
+			# create a repository interactively 
+			gh repo create
+
+			# create a new remote repository and clone it locally
+			gh repo create my-project --public --clone
+
+			# create a remote repository from the current directory
+			gh repo create my-project --private --source=. --remote=upstream
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
@@ -103,16 +115,15 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 
 			if opts.Source != "" && (opts.Clone || opts.GitIgnoreTemplate != "" || opts.LicenseTemplate != "") {
-				// which options allowed with --source?
-				return cmdutil.FlagErrorf("the `--scope` option is not supported with `--clone`, `--template`, or `--gitignore`")
+				return cmdutil.FlagErrorf("the `--source` option is not supported with `--clone`, `--template`, or `--gitignore`")
 			}
 
 			if opts.Source == "" {
 				if opts.Remote != "" {
-					return cmdutil.FlagErrorf("the `--remote` option can only be used with `--scope`")
+					return cmdutil.FlagErrorf("the `--remote` option can only be used with `--source`")
 				}
 				if opts.Push {
-					return cmdutil.FlagErrorf("the `--push` option can only be used with `--scope`")
+					return cmdutil.FlagErrorf("the `--push` option can only be used with `--source`")
 				}
 				if opts.Name == "" && !opts.Interactive {
 					return cmdutil.FlagErrorf("name argument required to create new remote repository")
@@ -123,6 +134,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf(".gitignore and license templates are not added when template is provided")
 			}
 
+			if cmd.Flags().Changed("enable-issues") {
+				opts.DisableIssues = true
+			}
+			if cmd.Flags().Changed("enable-wiki") {
+				opts.DisableWiki = true
+			}
 			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "" || opts.DisableIssues || opts.DisableWiki) {
 				return cmdutil.FlagErrorf("the `--template` option is not supported with `--homepage`, `--team`, `--disable-issues`, or `--disable-wiki`")
 			}
@@ -713,13 +730,11 @@ func interactiveSource() (string, error) {
 func confirmSubmission(repoName, repoOwner, visibility string) (bool, error) {
 	qs := []*survey.Question{}
 
-	promptString := ""
-
 	targetRepo := repoName
 	if repoOwner != "" {
 		targetRepo = fmt.Sprintf("%s/%s", repoOwner, repoName)
 	}
-	promptString = fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(visibility))
+	promptString := fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(visibility))
 
 	confirmSubmitQuestion := &survey.Question{
 		Name: "confirmSubmit",
