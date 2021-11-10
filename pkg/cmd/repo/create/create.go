@@ -64,7 +64,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			To create a repository interactively, use %[1]sgh repo create%[1]s with no arguments.
 
-			To create a remote repository, supply the repository name and one of %[1]s--public%[1]s, %[1]s--private%[1]s, or %[1]s--internal%[1]s.
+			To create a remote repository non-interactively, supply the repository name and one of %[1]s--public%[1]s, %[1]s--private%[1]s, or %[1]s--internal%[1]s.
 			Pass %[1]s--clone%[1]s to clone the new repository locally.
 
 			To create a remote repository from an existing local repository, specify the source directory with %[1]s--source%[1]s. 
@@ -527,20 +527,13 @@ func createFromLocal(opts *CreateOptions) error {
 		}
 	}
 
-	//get the current branch
-	currentBranch, err := git.CurrentBranch()
-	if err != nil {
-		//How do we wanna handle if there is no current branch?
-		return err
-	}
-
-	if err := sourceInit(opts.IO, remoteURL, baseRemote, repoPath, currentBranch); err != nil {
+	if err := sourceInit(opts.IO, remoteURL, baseRemote, repoPath); err != nil {
 		return err
 	}
 
 	if opts.Interactive {
 		pushQuestion := &survey.Confirm{
-			Message: fmt.Sprintf(`Would you like to push local commits on "%s" and track "%s"?`, currentBranch, baseRemote),
+			Message: fmt.Sprintf(`Would you like to push commits from the current branch to the %q?`, baseRemote),
 			Default: true,
 		}
 		err = prompt.SurveyAskOne(pushQuestion, &opts.Push)
@@ -550,7 +543,7 @@ func createFromLocal(opts *CreateOptions) error {
 	}
 
 	if opts.Push {
-		repoPush, err := git.GitCommand("-C", repoPath, "push", "-u", baseRemote, currentBranch)
+		repoPush, err := git.GitCommand("-C", repoPath, "push", "-u", baseRemote, "HEAD")
 		if err != nil {
 			return err
 		}
@@ -566,7 +559,7 @@ func createFromLocal(opts *CreateOptions) error {
 	return nil
 }
 
-func sourceInit(io *iostreams.IOStreams, remoteURL, baseRemote, repoPath, currentBranch string) error {
+func sourceInit(io *iostreams.IOStreams, remoteURL, baseRemote, repoPath string) error {
 	cs := io.ColorScheme()
 	isTTY := io.IsStdoutTTY()
 	stdout := io.Out
@@ -582,19 +575,6 @@ func sourceInit(io *iostreams.IOStreams, remoteURL, baseRemote, repoPath, curren
 	}
 	if isTTY {
 		fmt.Fprintf(stdout, "%s Added remote %s\n", cs.SuccessIcon(), remoteURL)
-	}
-
-	//gitBranch, err := git.GitCommand("-C", repoPath, "branch", "-M", currentBranch)
-	//if err != nil {
-	//return err
-	//}
-
-	//err = run.PrepareCmd(gitBranch).Run()
-	//if err != nil {
-	//return fmt.Errorf("%s Unable to add a branch %q", cs.WarningIcon(), currentBranch)
-	//}
-	if isTTY {
-		fmt.Fprintf(stdout, "%s Added branch to %s\n", cs.SuccessIcon(), remoteURL)
 	}
 	return nil
 }
@@ -751,13 +731,13 @@ func interactiveRepoInfo(defaultName string) (string, string, string, error) {
 		{
 			Name: "repoName",
 			Prompt: &survey.Input{
-				Message: "Repository Name",
+				Message: "Repository Name: ",
 				Default: defaultName,
 			},
 		},
 		{
 			Name:   "repoDescription",
-			Prompt: &survey.Input{Message: "Description"},
+			Prompt: &survey.Input{Message: "Description: "},
 		},
 		{
 			Name: "repoVisibility",
@@ -784,7 +764,7 @@ func interactiveRepoInfo(defaultName string) (string, string, string, error) {
 func interactiveSource() (string, error) {
 	var sourcePath string
 	sourcePrompt := &survey.Input{
-		Message: "Path to local repository?",
+		Message: "Path to local repository: ",
 		Default: "."}
 
 	err := prompt.SurveyAskOne(sourcePrompt, &sourcePath)
