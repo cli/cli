@@ -3,6 +3,7 @@ package create
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -134,10 +134,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 
 			if cmd.Flags().Changed("enable-issues") {
-				opts.DisableIssues = true
+				opts.DisableIssues = !opts.EnableIssues
 			}
 			if cmd.Flags().Changed("enable-wiki") {
-				opts.DisableWiki = true
+				opts.DisableWiki = !opts.EnableWiki
 			}
 			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "" || opts.DisableIssues || opts.DisableWiki) {
 				return cmdutil.FlagErrorf("the `--template` option is not supported with `--homepage`, `--team`, `--disable-issues`, or `--disable-wiki`")
@@ -313,7 +313,7 @@ func createFromScratch(opts *CreateOptions) error {
 
 		templateRepoName := opts.Template
 		if !strings.Contains(templateRepoName, "/") {
-			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+			currentUser, err := api.CurrentLoginName(apiClient, host)
 			if err != nil {
 				return err
 			}
@@ -344,7 +344,7 @@ func createFromScratch(opts *CreateOptions) error {
 			return err
 		}
 		if !doCreate {
-			return nil
+			os.Exit(1)
 		}
 	}
 
