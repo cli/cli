@@ -92,8 +92,17 @@ func putOrgSecret(client *api.Client, host string, pk *PubKey, opts SetOptions, 
 	var err error
 	if orgName != "" && visibility == shared.Selected {
 		repos := make([]ghrepo.Interface, 0, len(opts.RepositoryNames))
-		for _, repo := range opts.RepositoryNames {
-			repos = append(repos, ghrepo.New(opts.OrgName, repo))
+		for _, repositoryName := range opts.RepositoryNames {
+			var repo ghrepo.Interface
+			if strings.Contains(repositoryName, "/") {
+				repo, err = ghrepo.FromFullName(repositoryName)
+				if err != nil {
+					return fmt.Errorf("invalid repository name: %w", err)
+				}
+			} else {
+				repo = ghrepo.NewWithHost(opts.OrgName, repositoryName, host)
+			}
+			repos = append(repos, repo)
 		}
 		repositoryIDs, err = mapRepoToID(client, host, repos)
 		if err != nil {

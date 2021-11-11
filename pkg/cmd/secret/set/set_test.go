@@ -295,7 +295,7 @@ func Test_setRun_org(t *testing.T) {
 			opts: &SetOptions{
 				OrgName:         "UmbrellaCorporation",
 				Visibility:      shared.Selected,
-				RepositoryNames: []string{"birkin", "wesker"},
+				RepositoryNames: []string{"birkin", "UmbrellaCorporation/wesker"},
 			},
 			wantRepositories: []int{1, 2},
 		},
@@ -317,7 +317,7 @@ func Test_setRun_org(t *testing.T) {
 
 			if len(tt.opts.RepositoryNames) > 0 {
 				reg.Register(httpmock.GraphQL(`query MapRepositoryNames\b`),
-					httpmock.StringResponse(`{"data":{"birkin":{"databaseId":1},"wesker":{"databaseId":2}}}`))
+					httpmock.StringResponse(`{"data":{"repo_0001":{"databaseId":1},"repo_0002":{"databaseId":2}}}`))
 			}
 
 			io, _, _, _ := iostreams.Test()
