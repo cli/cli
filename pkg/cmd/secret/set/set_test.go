@@ -397,9 +397,6 @@ func Test_setRun_user(t *testing.T) {
 
 			io, _, _, _ := iostreams.Test()
 
-			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
-				return ghrepo.FromFullName("owner/repo")
-			}
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}

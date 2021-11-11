@@ -146,7 +146,7 @@ func setRun(opts *SetOptions) error {
 	envName := opts.EnvName
 
 	var baseRepo ghrepo.Interface
-	if orgName == "" {
+	if orgName == "" && !opts.UserSecrets {
 		baseRepo, err = opts.BaseRepo()
 		if err != nil {
 			return fmt.Errorf("could not determine base repo: %w", err)
@@ -199,7 +199,9 @@ func setRun(opts *SetOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		target := orgName
-		if orgName == "" {
+		if opts.UserSecrets {
+			target = "your user"
+		} else if orgName == "" {
 			target = ghrepo.FullName(baseRepo)
 		}
 		cs := opts.IO.ColorScheme()
