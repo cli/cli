@@ -91,7 +91,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			if err := cmdutil.MutuallyExclusive("specify only one of `--org` or `--env`", opts.OrgName != "", opts.EnvName != ""); err != nil {
+			if err := cmdutil.MutuallyExclusive("specify only one of `--org`, `--env`, or `--user`", opts.OrgName != "", opts.EnvName != "", opts.UserSecrets); err != nil {
 				return err
 			}
 
@@ -103,18 +103,18 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 				}
 
 				if opts.Visibility != shared.All && opts.Visibility != shared.Private && opts.Visibility != shared.Selected {
-					return cmdutil.FlagErrorf("--visibility must be one of `all`, `private`, or `selected`")
+					return cmdutil.FlagErrorf("`--visibility` must be one of \"all\", \"private\", or \"selected\"")
 				}
 
-				if opts.Visibility != shared.Selected && cmd.Flags().Changed("repos") {
-					return cmdutil.FlagErrorf("--repos only supported when --visibility='selected'")
+				if opts.Visibility != shared.Selected && len(opts.RepositoryNames) > 0 {
+					return cmdutil.FlagErrorf("`--repos` is only supported with `--visibility=selected`")
 				}
 
-				if opts.Visibility == shared.Selected && !cmd.Flags().Changed("repos") {
-					return cmdutil.FlagErrorf("--repos flag required when --visibility='selected'")
+				if opts.Visibility == shared.Selected && len(opts.RepositoryNames) == 0 {
+					return cmdutil.FlagErrorf("`--repos` list required with `--visibility=selected`")
 				}
 			} else {
-				if cmd.Flags().Changed("repos") {
+				if len(opts.RepositoryNames) > 0 {
 					opts.Visibility = shared.Selected
 				}
 			}
