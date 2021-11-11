@@ -94,7 +94,7 @@ func putOrgSecret(client *api.Client, host string, pk *PubKey, opts SetOptions, 
 		for _, repositoryName := range opts.RepositoryNames {
 			var repo ghrepo.Interface
 			if strings.Contains(repositoryName, "/") {
-				repo, err = ghrepo.FromFullName(repositoryName)
+				repo, err = ghrepo.FromFullNameWithHost(repositoryName, host)
 				if err != nil {
 					return fmt.Errorf("invalid repository name: %w", err)
 				}
@@ -130,7 +130,7 @@ func putUserSecret(client *api.Client, host string, pk *PubKey, opts SetOptions,
 		repos := make([]ghrepo.Interface, len(opts.RepositoryNames))
 		for i, repo := range opts.RepositoryNames {
 			// For user secrets, repository names should be fully qualifed (e.g. "owner/repo")
-			repoNWO, err := ghrepo.FromFullName(repo)
+			repoNWO, err := ghrepo.FromFullNameWithHost(repo, host)
 			if err != nil {
 				return err
 			}
