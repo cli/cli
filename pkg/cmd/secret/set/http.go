@@ -15,6 +15,14 @@ import (
 )
 
 type SecretPayload struct {
+	EncryptedValue string `json:"encrypted_value"`
+	Visibility     string `json:"visibility,omitempty"`
+	Repositories   []int  `json:"selected_repository_ids,omitempty"`
+	KeyID          string `json:"key_id"`
+}
+
+// The Codespaces Secret API currently expects repositories IDs as strings
+type CodespacesSecretPayload struct {
 	EncryptedValue string   `json:"encrypted_value"`
 	Visibility     string   `json:"visibility,omitempty"`
 	Repositories   []string `json:"selected_repository_ids,omitempty"`
@@ -70,7 +78,7 @@ func getEnvPubKey(client *api.Client, repo ghrepo.Interface, envName string) (*P
 		ghrepo.FullName(repo), envName))
 }
 
-func putSecret(client *api.Client, host, path string, payload SecretPayload) error {
+func putSecret(client *api.Client, host, path string, payload interface{}) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to serialize: %w", err)
@@ -85,7 +93,7 @@ func putOrgSecret(client *api.Client, host string, pk *PubKey, opts SetOptions, 
 	orgName := opts.OrgName
 	visibility := opts.Visibility
 
-	var repositoryIDs []string
+	var repositoryIDs []int
 	var err error
 	if orgName != "" && visibility == shared.Selected {
 		repos := make([]ghrepo.Interface, 0, len(opts.RepositoryNames))
@@ -113,8 +121,7 @@ func putUserSecret(client *api.Client, host string, pk *PubKey, opts SetOptions,
 	secretName := opts.SecretName
 	visibility := opts.Visibility
 
-	var repositoryIDs []string
-	var err error
+	var repositoryStringIDs []string
 	if visibility == shared.Selected {
 		repos := make([]ghrepo.Interface, 0, len(opts.RepositoryNames))
 		for _, repo := range opts.RepositoryNames {
@@ -126,16 +133,19 @@ func putUserSecret(client *api.Client, host string, pk *PubKey, opts SetOptions,
 			repos = append(repos, repoNWO)
 		}
 
-		repositoryIDs, err = mapRepoToID(client, host, repos)
+		repositoryIDs, err := mapRepoToID(client, host, repos)
 		if err != nil {
 			return fmt.Errorf("failed to look up IDs for repositories %v: %w", opts.RepositoryNames, err)
 		}
+		for _, id := range repositoryIDs {
+			repositoryStringIDs = append(repositoryStringIDs, strconv.Itoa(id))
+		}
 	}
 
-	payload := SecretPayload{
+	payload := CodespacesSecretPayload{
 		EncryptedValue: eValue,
 		KeyID:          pk.ID,
-		Repositories:   repositoryIDs,
+		Repositories:   repositoryStringIDs,
 		Visibility:     visibility,
 	}
 	path := fmt.Sprintf("user/codespaces/secrets/%s", secretName)
@@ -161,7 +171,7 @@ func putRepoSecret(client *api.Client, pk *PubKey, repo ghrepo.Interface, secret
 }
 
 // This does similar logic to `api.RepoNetwork`, but without the overfetching.
-func mapRepoToID(client *api.Client, host string, repositories []ghrepo.Interface) ([]string, error) {
+func mapRepoToID(client *api.Client, host string, repositories []ghrepo.Interface) ([]int, error) {
 	queries := make([]string, 0, len(repositories))
 	for i, repo := range repositories {
 		queries = append(queries, fmt.Sprintf(`
@@ -187,9 +197,9 @@ func mapRepoToID(client *api.Client, host string, repositories []ghrepo.Interfac
 	}
 	sort.Strings(repoKeys)
 
-	result := make([]string, len(repositories))
+	result := make([]int, len(repositories))
 	for i, k := range repoKeys {
-		result[i] = strconv.Itoa(graphqlResult[k].DatabaseID)
+		result[i] = graphqlResult[k].DatabaseID
 	}
 
 	return result, nil

@@ -281,7 +281,7 @@ func Test_setRun_org(t *testing.T) {
 		name             string
 		opts             *SetOptions
 		wantVisibility   shared.Visibility
-		wantRepositories []string
+		wantRepositories []int
 	}{
 		{
 			name: "all vis",
@@ -297,7 +297,7 @@ func Test_setRun_org(t *testing.T) {
 				Visibility:      shared.Selected,
 				RepositoryNames: []string{"birkin", "wesker"},
 			},
-			wantRepositories: []string{"1", "2"},
+			wantRepositories: []int{1, 2},
 		},
 	}
 
@@ -419,7 +419,7 @@ func Test_setRun_user(t *testing.T) {
 
 			data, err := ioutil.ReadAll(reg.Requests[len(reg.Requests)-1].Body)
 			assert.NoError(t, err)
-			var payload SecretPayload
+			var payload CodespacesSecretPayload
 			err = json.Unmarshal(data, &payload)
 			assert.NoError(t, err)
 			assert.Equal(t, payload.KeyID, "123")
