@@ -131,21 +131,6 @@ func TestNewCmdSet(t *testing.T) {
 				OrgName:    "coolOrg",
 			},
 		},
-		{
-			name:     "bad name prefix",
-			cli:      `GITHUB_SECRET -b"cool"`,
-			wantsErr: true,
-		},
-		{
-			name:     "leading numbers in name",
-			cli:      `123_SECRET -b"cool"`,
-			wantsErr: true,
-		},
-		{
-			name:     "invalid characters in name",
-			cli:      `BAD-SECRET -b"cool"`,
-			wantsErr: true,
-		},
 	}
 
 	for _, tt := range tests {
