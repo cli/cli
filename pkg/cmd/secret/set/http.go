@@ -35,11 +35,6 @@ type PubKey struct {
 	Key string
 }
 
-type repositoryNWO struct {
-	owner string
-	name  string
-}
-
 func getPubKey(client *api.Client, host, path string) (*PubKey, error) {
 	pk := PubKey{}
 	err := client.REST(host, "GET", path, nil, &pk)
