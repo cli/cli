@@ -90,6 +90,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	var secrets []*Secret
+	showSelectedRepoInfo := opts.IO.IsStdoutTTY()
 	if orgName == "" && !opts.UserSecrets {
 		if envName == "" {
 			secrets, err = getRepoSecrets(client, baseRepo)
@@ -111,9 +112,9 @@ func listRun(opts *ListOptions) error {
 		}
 
 		if opts.UserSecrets {
-			secrets, err = getUserSecrets(client, host)
+			secrets, err = getUserSecrets(client, host, showSelectedRepoInfo)
 		} else {
-			secrets, err = getOrgSecrets(client, host, orgName)
+			secrets, err = getOrgSecrets(client, host, orgName, showSelectedRepoInfo)
 		}
 	}
 
@@ -130,7 +131,7 @@ func listRun(opts *ListOptions) error {
 		}
 		tp.AddField(updatedAt, nil, nil)
 		if secret.Visibility != "" {
-			if opts.IO.IsStdoutTTY() {
+			if showSelectedRepoInfo {
 				tp.AddField(fmtVisibility(*secret), nil, nil)
 			} else {
 				tp.AddField(strings.ToUpper(string(secret.Visibility)), nil, nil)
@@ -171,29 +172,32 @@ func fmtVisibility(s Secret) string {
 	return ""
 }
 
-func getOrgSecrets(client httpClient, host, orgName string) ([]*Secret, error) {
+func getOrgSecrets(client httpClient, host, orgName string, showSelectedRepoInfo bool) ([]*Secret, error) {
 	secrets, err := getSecrets(client, host, fmt.Sprintf("orgs/%s/actions/secrets", orgName))
 	if err != nil {
 		return nil, err
 	}
 
-	err = getSelectedRepositoryInformation(client, secrets)
-	if err != nil {
-		return nil, err
+	if showSelectedRepoInfo {
+		err = getSelectedRepositoryInformation(client, secrets)
+		if err != nil {
+			return nil, err
+		}
 	}
-
 	return secrets, nil
 }
 
-func getUserSecrets(client httpClient, host string) ([]*Secret, error) {
+func getUserSecrets(client httpClient, host string, showSelectedRepoInfo bool) ([]*Secret, error) {
 	secrets, err := getSecrets(client, host, "user/codespaces/secrets")
 	if err != nil {
 		return nil, err
 	}
 
-	err = getSelectedRepositoryInformation(client, secrets)
-	if err != nil {
-		return nil, err
+	if showSelectedRepoInfo {
+		err = getSelectedRepositoryInformation(client, secrets)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return secrets, nil

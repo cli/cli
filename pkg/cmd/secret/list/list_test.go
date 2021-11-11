@@ -234,11 +234,13 @@ func Test_listRun(t *testing.T) {
 				}
 				path = fmt.Sprintf("orgs/%s/actions/secrets", tt.opts.OrgName)
 
-				reg.Register(
-					httpmock.REST("GET", fmt.Sprintf("orgs/%s/actions/secrets/SECRET_THREE/repositories", tt.opts.OrgName)),
-					httpmock.JSONResponse(struct {
-						TotalCount int `json:"total_count"`
-					}{2}))
+				if tt.tty {
+					reg.Register(
+						httpmock.REST("GET", fmt.Sprintf("orgs/%s/actions/secrets/SECRET_THREE/repositories", tt.opts.OrgName)),
+						httpmock.JSONResponse(struct {
+							TotalCount int `json:"total_count"`
+						}{2}))
+				}
 			}
 
 			if tt.opts.UserSecrets {
@@ -264,15 +266,17 @@ func Test_listRun(t *testing.T) {
 				}
 
 				path = "user/codespaces/secrets"
-				for i, secret := range payload.Secrets {
-					hostLen := len("https://api.github.com/")
-					path := secret.SelectedReposURL[hostLen:len(secret.SelectedReposURL)]
-					repositoryCount := i + 1
-					reg.Register(
-						httpmock.REST("GET", path),
-						httpmock.JSONResponse(struct {
-							TotalCount int `json:"total_count"`
-						}{repositoryCount}))
+				if tt.tty {
+					for i, secret := range payload.Secrets {
+						hostLen := len("https://api.github.com/")
+						path := secret.SelectedReposURL[hostLen:len(secret.SelectedReposURL)]
+						repositoryCount := i + 1
+						reg.Register(
+							httpmock.REST("GET", path),
+							httpmock.JSONResponse(struct {
+								TotalCount int `json:"total_count"`
+							}{repositoryCount}))
+					}
 				}
 			}
 
