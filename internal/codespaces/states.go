@@ -43,7 +43,7 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 
 	session, err := ConnectToLiveshare(ctx, progress, noopLogger, apiClient, codespace)
 	if err != nil {
-		return fmt.Errorf("connect to Live Share: %w", err)
+		return fmt.Errorf("connect to codespace: %w", err)
 	}
 	defer func() {
 		if closeErr := session.Close(); err == nil {
