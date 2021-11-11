@@ -31,6 +31,7 @@ func NewCmdArchive(f *cmdutil.Factory, runF func(*ArchiveOptions) error) *cobra.
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
+		BaseRepo:   f.BaseRepo,
 	}
 
 	cmd := &cobra.Command{
@@ -44,10 +45,9 @@ With no argument, archives the current repository.`),
 			if len(args) > 0 {
 				opts.RepoArg = args[0]
 			}
-			opts.BaseRepo = f.BaseRepo
 
 			if !opts.Confirmed && !opts.IO.CanPrompt() {
-				return cmdutil.FlagErrorf("could not prompt: confirmation with prompt or --confirm flag required")
+				return cmdutil.FlagErrorf("--confirm required when not running interactively")
 			}
 			if runF != nil {
 				return runF(opts)
@@ -56,7 +56,7 @@ With no argument, archives the current repository.`),
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Confirmed, "confirm", "y", false, "skip confirmation prompt")
+	cmd.Flags().BoolVarP(&opts.Confirmed, "confirm", "y", false, "Skip the confirmation prompt")
 	return cmd
 }
 
@@ -68,36 +68,37 @@ func archiveRun(opts *ArchiveOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	repoSelector := opts.RepoArg
-	if repoSelector == "" {
-		currRepo, err := opts.BaseRepo()
+	var toArchive ghrepo.Interface
+
+	if opts.RepoArg == "" {
+		toArchive, err = opts.BaseRepo()
 		if err != nil {
 			return err
 		}
-		repoSelector = ghrepo.FullName(currRepo)
-	}
+	} else {
+		repoSelector := opts.RepoArg
+		if !strings.Contains(repoSelector, "/") {
+			cfg, err := opts.Config()
+			if err != nil {
+				return err
+			}
 
-	if !strings.Contains(repoSelector, "/") {
-		cfg, err := opts.Config()
+			hostname, err := cfg.DefaultHost()
+			if err != nil {
+				return err
+			}
+
+			currentUser, err := api.CurrentLoginName(apiClient, hostname)
+			if err != nil {
+				return err
+			}
+			repoSelector = currentUser + "/" + repoSelector
+		}
+
+		toArchive, err = ghrepo.FromFullName(repoSelector)
 		if err != nil {
 			return err
 		}
-
-		hostname, err := cfg.DefaultHost()
-		if err != nil {
-			return err
-		}
-
-		currentUser, err := api.CurrentLoginName(apiClient, hostname)
-		if err != nil {
-			return err
-		}
-		repoSelector = currentUser + "/" + repoSelector
-	}
-
-	toArchive, err := ghrepo.FromFullName(repoSelector)
-	if err != nil {
-		return err
 	}
 
 	fields := []string{"name", "owner", "isArchived", "id"}
@@ -122,7 +123,7 @@ func archiveRun(opts *ArchiveOptions) error {
 			return fmt.Errorf("failed to prompt: %w", err)
 		}
 		if !opts.Confirmed {
-			return nil
+			return cmdutil.CancelError
 		}
 	}
 

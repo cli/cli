@@ -20,13 +20,19 @@ func TestNewCmdArchive(t *testing.T) {
 		name    string
 		input   string
 		wantErr bool
+		output  ArchiveOptions
 		errMsg  string
 	}{
 		{
-			name:    "no arguments tty",
+			name:    "no arguments no tty",
 			input:   "",
-			errMsg:  "could not prompt: confirmation with prompt or --confirm flag required",
+			errMsg:  "--confirm required when not running interactively",
 			wantErr: true,
+		},
+		{
+			name:   "repo argument tty",
+			input:  "OWNER/REPO --confirm",
+			output: ArchiveOptions{RepoArg: "OWNER/REPO", Confirmed: true},
 		},
 	}
 	for _, tt := range tests {
@@ -37,7 +43,9 @@ func TestNewCmdArchive(t *testing.T) {
 			}
 			argv, err := shlex.Split(tt.input)
 			assert.NoError(t, err)
+			var gotOpts *ArchiveOptions
 			cmd := NewCmdArchive(f, func(opts *ArchiveOptions) error {
+				gotOpts = opts
 				return nil
 			})
 			cmd.SetArgs(argv)
@@ -51,15 +59,14 @@ func TestNewCmdArchive(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
+			assert.Equal(t, tt.output.RepoArg, gotOpts.RepoArg)
+			assert.Equal(t, tt.output.Confirmed, gotOpts.Confirmed)
 		})
 	}
 }
 
 func Test_ArchiveRun(t *testing.T) {
-	queryResponse := `{ "data": { "repository": 
-							{ "id": "THE-ID",
-					   		"isArchived": %s} 
-						} }`
+	queryResponse := `{ "data": { "repository": { "id": "THE-ID","isArchived": %s} } }`
 	tests := []struct {
 		name       string
 		opts       ArchiveOptions
@@ -107,9 +114,6 @@ func Test_ArchiveRun(t *testing.T) {
 			name:       "archived repo tty",
 			wantStderr: "! Repository OWNER/REPO is already archived\n",
 			opts:       ArchiveOptions{RepoArg: "OWNER/REPO"},
-			askStubs: func(q *prompt.AskStubber) {
-				q.StubOne(true)
-			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryInfo\b`),
@@ -120,26 +124,25 @@ func Test_ArchiveRun(t *testing.T) {
 
 	for _, tt := range tests {
 		repo, _ := ghrepo.FromFullName("OWNER/REPO")
+		reg := &httpmock.Registry{}
+		if tt.httpStubs != nil {
+			tt.httpStubs(reg)
+		}
+
 		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 			return repo, nil
 		}
+		tt.opts.HttpClient = func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		}
+		io, _, stdout, stderr := iostreams.Test()
+		tt.opts.IO = io
 
 		q, teardown := prompt.InitAskStubber()
 		defer teardown()
 		if tt.askStubs != nil {
 			tt.askStubs(q)
 		}
-
-		reg := &httpmock.Registry{}
-		if tt.httpStubs != nil {
-			tt.httpStubs(reg)
-		}
-		tt.opts.HttpClient = func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		}
-
-		io, _, stdout, stderr := iostreams.Test()
-		tt.opts.IO = io
 
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)
