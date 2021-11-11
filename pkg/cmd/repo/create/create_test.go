@@ -275,7 +275,7 @@ func Test_createRun(t *testing.T) {
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n",
 		},
 		{
-			name: "interactive with existing repository public add remote",
+			name: "interactive with existing repository public, add remote, and push",
 			opts: &CreateOptions{Interactive: true},
 			tty:  true,
 			askStubs: func(as *prompt.AskStubber) {
