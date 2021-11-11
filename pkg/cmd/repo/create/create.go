@@ -3,7 +3,6 @@ package create
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -344,7 +343,7 @@ func createFromScratch(opts *CreateOptions) error {
 			return err
 		}
 		if !doCreate {
-			os.Exit(1)
+			return cmdutil.CancelError
 		}
 	}
 
@@ -387,12 +386,6 @@ func createFromScratch(opts *CreateOptions) error {
 			}
 		} else if _, err := git.RunClone(remoteURL, []string{}); err != nil {
 			return err
-		}
-
-		if isTTY {
-			fmt.Fprintf(opts.IO.Out,
-				"%s Initialized repository in \"%s\"\n",
-				cs.SuccessIcon(), repo.RepoName())
 		}
 	}
 

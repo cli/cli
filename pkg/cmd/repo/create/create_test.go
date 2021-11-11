@@ -160,12 +160,10 @@ func Test_createRun(t *testing.T) {
 		errMsg     string
 	}{
 		{
-			name: "interactive create from scratch with gitignore and license",
-			opts: &CreateOptions{Interactive: true},
-			tty:  true,
-			wantStdout: `✓ Created repository OWNER/REPO on GitHub
-✓ Initialized repository in "REPO"
-`,
+			name:       "interactive create from scratch with gitignore and license",
+			opts:       &CreateOptions{Interactive: true},
+			tty:        true,
+			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n",
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubOne("Create a new repository on GitHub from scratch")
 				as.Stub([]*prompt.QuestionStub{
