@@ -28,6 +28,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	opts := &DeleteOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		BaseRepo:   f.BaseRepo,
 	}
 
 	cmd := &cobra.Command{
@@ -45,7 +46,7 @@ To authorize, run "gh auth refresh -s delete_repo"`,
 				opts.RepoArg = args[0]
 			}
 			if !opts.IO.CanPrompt() && !opts.Confirmed {
-				return cmdutil.FlagErrorf("could not prompt: confirmation with prompt or --confirm flag required")
+				return cmdutil.FlagErrorf("--confirm required when not running interactively")
 			}
 
 			if runF != nil {
@@ -67,27 +68,26 @@ func deleteRun(opts *DeleteOptions) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	var toDelete ghrepo.Interface
-	repoSelector := opts.RepoArg
-	if repoSelector == "" {
-		currRepo, err := opts.BaseRepo()
+
+	if opts.RepoArg == "" {
+		toDelete, err = opts.BaseRepo()
 		if err != nil {
 			return err
 		}
-		repoSelector = ghrepo.FullName(currRepo)
-	}
-
-	if !strings.Contains(repoSelector, "/") {
-		currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
-		if err != nil {
-			return err
+	} else {
+		repoSelector := opts.RepoArg
+		if !strings.Contains(repoSelector, "/") {
+			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+			if err != nil {
+				return err
+			}
+			repoSelector = currentUser + "/" + repoSelector
 		}
-		repoSelector = currentUser + "/" + repoSelector
+		toDelete, err = ghrepo.FromFullName(repoSelector)
+		if err != nil {
+			return fmt.Errorf("argument error: %w", err)
+		}
 	}
-	toDelete, err = ghrepo.FromFullName(repoSelector)
-	if err != nil {
-		return fmt.Errorf("argument error: %w", err)
-	}
-
 	fullName := ghrepo.FullName(toDelete)
 
 	if !opts.Confirmed {

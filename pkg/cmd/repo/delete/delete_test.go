@@ -34,7 +34,13 @@ func TestNewCmdDelete(t *testing.T) {
 			input:   "OWNER/REPO",
 			output:  DeleteOptions{RepoArg: "OWNER/REPO"},
 			wantErr: true,
-			errMsg:  "could not prompt: confirmation with prompt or --confirm flag required",
+			errMsg:  "--confirm required when not running interactively",
+		},
+		{
+			name:   "base repo resolution",
+			input:  "",
+			tty:    true,
+			output: DeleteOptions{},
 		},
 	}
 	for _, tt := range tests {
