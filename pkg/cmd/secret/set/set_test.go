@@ -91,18 +91,8 @@ func TestNewCmdSet(t *testing.T) {
 			},
 		},
 		{
-			name: "user with selected repo",
-			cli:  "-u -bs -vselected -rmonalisa/coolRepo cool_secret",
-			wants: SetOptions{
-				SecretName:      "cool_secret",
-				Visibility:      shared.Selected,
-				RepositoryNames: []string{"monalisa/coolRepo"},
-				Body:            "s",
-			},
-		},
-		{
 			name: "user with selected repos",
-			cli:  `-u -bs -vselected -r"monalisa/coolRepo,cli/cli,github/hub" cool_secret`,
+			cli:  `-u -bs -r"monalisa/coolRepo,cli/cli,github/hub" cool_secret`,
 			wants: SetOptions{
 				SecretName:      "cool_secret",
 				Visibility:      shared.Selected,
@@ -421,7 +411,6 @@ func Test_setRun_user(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, payload.KeyID, "123")
 			assert.Equal(t, payload.EncryptedValue, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=")
-			assert.Equal(t, payload.Visibility, tt.opts.Visibility)
 			assert.ElementsMatch(t, payload.Repositories, tt.wantRepositories)
 		})
 	}

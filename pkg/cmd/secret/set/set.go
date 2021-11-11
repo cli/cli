@@ -92,8 +92,8 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			}
 
 			if cmd.Flags().Changed("visibility") {
-				if opts.OrgName == "" && !opts.UserSecrets {
-					return cmdutil.FlagErrorf("--visibility not supported for repository secrets; did you mean to pass --org?")
+				if opts.OrgName == "" {
+					return cmdutil.FlagErrorf("`--visibility` is only supported with `--org`")
 				}
 
 				if opts.Visibility != shared.All && opts.Visibility != shared.Private && opts.Visibility != shared.Selected {

@@ -24,7 +24,6 @@ type SecretPayload struct {
 // The Codespaces Secret API currently expects repositories IDs as strings
 type CodespacesSecretPayload struct {
 	EncryptedValue string   `json:"encrypted_value"`
-	Visibility     string   `json:"visibility,omitempty"`
 	Repositories   []string `json:"selected_repository_ids,omitempty"`
 	KeyID          string   `json:"key_id"`
 }
@@ -122,37 +121,34 @@ func putOrgSecret(client *api.Client, host string, pk *PubKey, opts SetOptions, 
 }
 
 func putUserSecret(client *api.Client, host string, pk *PubKey, opts SetOptions, eValue string) error {
-	secretName := opts.SecretName
-	visibility := opts.Visibility
+	payload := CodespacesSecretPayload{
+		EncryptedValue: eValue,
+		KeyID:          pk.ID,
+	}
 
-	var repositoryStringIDs []string
-	if visibility == shared.Selected {
-		repos := make([]ghrepo.Interface, 0, len(opts.RepositoryNames))
-		for _, repo := range opts.RepositoryNames {
+	if len(opts.RepositoryNames) > 0 {
+		repos := make([]ghrepo.Interface, len(opts.RepositoryNames))
+		for i, repo := range opts.RepositoryNames {
 			// For user secrets, repository names should be fully qualifed (e.g. "owner/repo")
 			repoNWO, err := ghrepo.FromFullName(repo)
 			if err != nil {
 				return err
 			}
-			repos = append(repos, repoNWO)
+			repos[i] = repoNWO
 		}
 
 		repositoryIDs, err := mapRepoToID(client, host, repos)
 		if err != nil {
-			return fmt.Errorf("failed to look up IDs for repositories %v: %w", opts.RepositoryNames, err)
+			return fmt.Errorf("failed to look up repository IDs: %w", err)
 		}
-		for _, id := range repositoryIDs {
-			repositoryStringIDs = append(repositoryStringIDs, strconv.Itoa(id))
+		repositoryStringIDs := make([]string, len(repositoryIDs))
+		for i, id := range repositoryIDs {
+			repositoryStringIDs[i] = strconv.Itoa(id)
 		}
+		payload.Repositories = repositoryStringIDs
 	}
 
-	payload := CodespacesSecretPayload{
-		EncryptedValue: eValue,
-		KeyID:          pk.ID,
-		Repositories:   repositoryStringIDs,
-		Visibility:     visibility,
-	}
-	path := fmt.Sprintf("user/codespaces/secrets/%s", secretName)
+	path := fmt.Sprintf("user/codespaces/secrets/%s", opts.SecretName)
 	return putSecret(client, host, path, payload)
 }
 
