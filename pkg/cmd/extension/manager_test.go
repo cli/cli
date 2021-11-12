@@ -52,8 +52,8 @@ func newTestManager(dir string, client *http.Client, io *iostreams.IOStreams) *M
 		config: config.NewBlankConfig(),
 		io:     io,
 		client: client,
-		platform: func() string {
-			return "windows-amd64"
+		platform: func() (string, string) {
+			return "windows-amd64", ".exe"
 		},
 	}
 }

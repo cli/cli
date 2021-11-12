@@ -32,7 +32,7 @@ type Manager struct {
 	lookPath   func(string) (string, error)
 	findSh     func() (string, error)
 	newCommand func(string, ...string) *exec.Cmd
-	platform   func() string
+	platform   func() (string, string)
 	client     *http.Client
 	config     config.Config
 	io         *iostreams.IOStreams
@@ -44,8 +44,12 @@ func NewManager(io *iostreams.IOStreams) *Manager {
 		lookPath:   safeexec.LookPath,
 		findSh:     findsh.Find,
 		newCommand: exec.Command,
-		platform: func() string {
-			return fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH)
+		platform: func() (string, string) {
+			ext := ""
+			if runtime.GOOS == "windows" {
+				ext = ".exe"
+			}
+			return fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH), ext
 		},
 		io: io,
 	}
@@ -344,13 +348,10 @@ func (m *Manager) installBin(repo ghrepo.Interface) error {
 		return err
 	}
 
-	suffix := m.platform()
-	if runtime.GOOS == "windows" {
-		suffix += ".exe"
-	}
+	platform, ext := m.platform()
 	var asset *releaseAsset
 	for _, a := range r.Assets {
-		if strings.HasSuffix(a.Name, suffix) {
+		if strings.HasSuffix(a.Name, platform+ext) {
 			asset = &a
 			break
 		}
@@ -359,7 +360,7 @@ func (m *Manager) installBin(repo ghrepo.Interface) error {
 	if asset == nil {
 		return fmt.Errorf(
 			"%[1]s unsupported for %[2]s. Open an issue: `gh issue create -R %[3]s/%[1]s -t'Support %[2]s'`",
-			repo.RepoName(), m.platform(), repo.RepoOwner())
+			repo.RepoName(), platform, repo.RepoOwner())
 	}
 
 	name := repo.RepoName()
