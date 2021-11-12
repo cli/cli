@@ -106,7 +106,15 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return err
 				}
 
-				return m.Install(repo)
+				if err := m.Install(repo); err != nil {
+					return err
+				}
+
+				if io.IsStdoutTTY() {
+					cs := io.ColorScheme()
+					fmt.Fprintf(io.Out, "%s Installed extension %s\n", cs.SuccessIcon(), args[0])
+				}
+				return nil
 			},
 		},
 		func() *cobra.Command {
