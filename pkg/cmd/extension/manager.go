@@ -372,10 +372,7 @@ func (m *Manager) installBin(repo ghrepo.Interface) error {
 	}
 
 	binPath := filepath.Join(targetDir, name)
-
-	if runtime.GOOS == "windows" {
-		binPath += ".exe"
-	}
+	binPath += ext
 
 	err = downloadAsset(m.client, *asset, binPath)
 	if err != nil {
