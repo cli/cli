@@ -319,7 +319,7 @@ func TestManager_UpgradeExtension_BinaryExtension(t *testing.T) {
 				Tag: "v1.0.2",
 				Assets: []releaseAsset{
 					{
-						Name:   "gh-bin-ext-windows-amd64",
+						Name:   "gh-bin-ext-windows-amd64.exe",
 						APIURL: "https://example.com/release/cool2",
 					},
 				},
@@ -348,10 +348,10 @@ func TestManager_UpgradeExtension_BinaryExtension(t *testing.T) {
 		Owner: "owner",
 		Host:  "example.com",
 		Tag:   "v1.0.2",
-		Path:  filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext"),
+		Path:  filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext.exe"),
 	}, bm)
 
-	fakeBin, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext"))
+	fakeBin, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext.exe"))
 	assert.NoError(t, err)
 
 	assert.Equal(t, "FAKE UPGRADED BINARY", string(fakeBin))
@@ -448,7 +448,7 @@ func TestManager_Install_binary(t *testing.T) {
 			release{
 				Assets: []releaseAsset{
 					{
-						Name:   "gh-bin-ext-windows-amd64",
+						Name:   "gh-bin-ext-windows-amd64.exe",
 						APIURL: "https://example.com/release/cool",
 					},
 				},
@@ -460,7 +460,7 @@ func TestManager_Install_binary(t *testing.T) {
 				Tag: "v1.0.1",
 				Assets: []releaseAsset{
 					{
-						Name:   "gh-bin-ext-windows-amd64",
+						Name:   "gh-bin-ext-windows-amd64.exe",
 						APIURL: "https://example.com/release/cool",
 					},
 				},
@@ -489,10 +489,10 @@ func TestManager_Install_binary(t *testing.T) {
 		Owner: "owner",
 		Host:  "example.com",
 		Tag:   "v1.0.1",
-		Path:  filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext"),
+		Path:  filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext.exe"),
 	}, bm)
 
-	fakeBin, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext"))
+	fakeBin, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext.exe"))
 	assert.NoError(t, err)
 
 	assert.Equal(t, "FAKE BINARY", string(fakeBin))

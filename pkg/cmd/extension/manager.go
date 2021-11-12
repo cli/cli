@@ -345,6 +345,9 @@ func (m *Manager) installBin(repo ghrepo.Interface) error {
 	}
 
 	suffix := m.platform()
+	if runtime.GOOS == "windows" {
+		suffix += ".exe"
+	}
 	var asset *releaseAsset
 	for _, a := range r.Assets {
 		if strings.HasSuffix(a.Name, suffix) {
@@ -354,9 +357,9 @@ func (m *Manager) installBin(repo ghrepo.Interface) error {
 	}
 
 	if asset == nil {
-		return fmt.Errorf("%s unsupported for %s. Open an issue: `gh issue create -R %s/%s -t'Support %s'`",
-			repo.RepoName(),
-			suffix, repo.RepoOwner(), repo.RepoName(), suffix)
+		return fmt.Errorf(
+			"%[1]s unsupported for %[2]s. Open an issue: `gh issue create -R %[3]s/%[1]s -t'Support %[2]s'`",
+			repo.RepoName(), m.platform(), repo.RepoOwner())
 	}
 
 	name := repo.RepoName()
@@ -368,6 +371,10 @@ func (m *Manager) installBin(repo ghrepo.Interface) error {
 	}
 
 	binPath := filepath.Join(targetDir, name)
+
+	if runtime.GOOS == "windows" {
+		binPath += ".exe"
+	}
 
 	err = downloadAsset(m.client, *asset, binPath)
 	if err != nil {
@@ -635,7 +642,11 @@ func isBinExtension(client *http.Client, repo ghrepo.Interface) (isBin bool, err
 	for _, a := range r.Assets {
 		dists := possibleDists()
 		for _, d := range dists {
-			if strings.HasSuffix(a.Name, d) {
+			suffix := d
+			if strings.HasPrefix(d, "windows") {
+				suffix += ".exe"
+			}
+			if strings.HasSuffix(a.Name, suffix) {
 				isBin = true
 				break
 			}
