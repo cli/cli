@@ -46,13 +46,17 @@ import (
 	"github.com/opentracing/opentracing-go"
 )
 
-const githubAPI = "https://api.github.com"
+const (
+	githubAPI    = "https://api.github.com"
+	locationsURL = "https://online.visualstudio.com/api/v1/locations"
+)
 
 // API is the interface to the codespace service.
 type API struct {
-	token     string
-	client    httpClient
-	githubAPI string
+	token        string
+	client       httpClient
+	githubAPI    string
+	locationsURL string
 }
 
 type httpClient interface {
@@ -65,10 +69,15 @@ func New(token string, httpClient httpClient) *API {
 	if apiURL == "" {
 		apiURL = githubAPI
 	}
+	locationsURLEnv := os.Getenv("VSCS_LOCATIONS_URL")
+	if locationsURLEnv == "" {
+		locationsURLEnv = locationsURL
+	}
 	return &API{
-		token:     token,
-		client:    httpClient,
-		githubAPI: githubAPI,
+		token:        token,
+		client:       httpClient,
+		githubAPI:    apiURL,
+		locationsURL: locationsURLEnv,
 	}
 }
 
@@ -391,7 +400,7 @@ type getCodespaceRegionLocationResponse struct {
 
 // GetCodespaceRegionLocation returns the closest codespace location for the user.
 func (a *API) GetCodespaceRegionLocation(ctx context.Context) (string, error) {
-	req, err := http.NewRequest(http.MethodGet, "https://online.visualstudio.com/api/v1/locations", nil)
+	req, err := http.NewRequest(http.MethodGet, a.locationsURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("error creating request: %w", err)
 	}
