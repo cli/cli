@@ -47,16 +47,16 @@ import (
 )
 
 const (
-	githubAPI    = "https://api.github.com"
-	locationsURL = "https://online.visualstudio.com/api/v1/locations"
+	githubAPI = "https://api.github.com"
+	vscsAPI   = "https://online.visualstudio.com"
 )
 
 // API is the interface to the codespace service.
 type API struct {
-	token        string
-	client       httpClient
-	githubAPI    string
-	locationsURL string
+	token     string
+	client    httpClient
+	githubAPI string
+	vscsAPI   string
 }
 
 type httpClient interface {
@@ -69,15 +69,15 @@ func New(token string, httpClient httpClient) *API {
 	if apiURL == "" {
 		apiURL = githubAPI
 	}
-	locationsURLEnv := os.Getenv("VSCS_LOCATIONS_URL")
-	if locationsURLEnv == "" {
-		locationsURLEnv = locationsURL
+	vscsURL := os.Getenv("VSCS_TARGET_URL")
+	if vscsURL == "" {
+		vscsURL = vscsAPI
 	}
 	return &API{
-		token:        token,
-		client:       httpClient,
-		githubAPI:    apiURL,
-		locationsURL: locationsURLEnv,
+		token:     token,
+		client:    httpClient,
+		githubAPI: strings.TrimSuffix(apiURL, "/"),
+		vscsAPI:   strings.TrimSuffix(vscsURL, "/"),
 	}
 }
 
@@ -400,7 +400,7 @@ type getCodespaceRegionLocationResponse struct {
 
 // GetCodespaceRegionLocation returns the closest codespace location for the user.
 func (a *API) GetCodespaceRegionLocation(ctx context.Context) (string, error) {
-	req, err := http.NewRequest(http.MethodGet, a.locationsURL, nil)
+	req, err := http.NewRequest(http.MethodGet, a.vscsAPI+"/api/v1/locations", nil)
 	if err != nil {
 		return "", fmt.Errorf("error creating request: %w", err)
 	}
