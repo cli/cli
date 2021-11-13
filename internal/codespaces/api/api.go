@@ -47,16 +47,18 @@ import (
 )
 
 const (
-	githubAPI = "https://api.github.com"
-	vscsAPI   = "https://online.visualstudio.com"
+	githubServer = "https://github.com"
+	githubAPI    = "https://api.github.com"
+	vscsAPI      = "https://online.visualstudio.com"
 )
 
 // API is the interface to the codespace service.
 type API struct {
-	token     string
-	client    httpClient
-	githubAPI string
-	vscsAPI   string
+	token        string
+	client       httpClient
+	vscsAPI      string
+	githubAPI    string
+	githubServer string
 }
 
 type httpClient interface {
@@ -65,6 +67,10 @@ type httpClient interface {
 
 // New creates a new API client with the given token and HTTP client.
 func New(token string, httpClient httpClient) *API {
+	serverURL := os.Getenv("GITHUB_SERVER_URL")
+	if serverURL == "" {
+		serverURL = githubServer
+	}
 	apiURL := os.Getenv("GITHUB_API_URL")
 	if apiURL == "" {
 		apiURL = githubAPI
@@ -74,10 +80,11 @@ func New(token string, httpClient httpClient) *API {
 		vscsURL = vscsAPI
 	}
 	return &API{
-		token:     token,
-		client:    httpClient,
-		githubAPI: strings.TrimSuffix(apiURL, "/"),
-		vscsAPI:   strings.TrimSuffix(vscsURL, "/"),
+		token:        token,
+		client:       httpClient,
+		vscsAPI:      strings.TrimSuffix(vscsURL, "/"),
+		githubAPI:    strings.TrimSuffix(apiURL, "/"),
+		githubServer: strings.TrimSuffix(serverURL, "/"),
 	}
 }
 
@@ -634,7 +641,7 @@ func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Cod
 // AuthorizedKeys returns the public keys (in ~/.ssh/authorized_keys
 // format) registered by the specified GitHub user.
 func (a *API) AuthorizedKeys(ctx context.Context, user string) ([]byte, error) {
-	url := fmt.Sprintf("https://github.com/%s.keys", user)
+	url := fmt.Sprintf("%s/%s.keys", a.githubServer, user)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
