@@ -35,6 +35,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -60,6 +61,10 @@ type httpClient interface {
 
 // New creates a new API client with the given token and HTTP client.
 func New(token string, httpClient httpClient) *API {
+	apiURL := os.Getenv("GITHUB_API_URL")
+	if apiURL == "" {
+		apiURL = githubAPI
+	}
 	return &API{
 		token:     token,
 		client:    httpClient,
