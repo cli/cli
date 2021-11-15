@@ -6,8 +6,8 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/samcoe/go-graphql-client"
 	"github.com/shurcooL/githubv4"
-	"github.com/shurcooL/graphql"
 )
 
 func archiveRepo(client *http.Client, repo *api.Repository) error {

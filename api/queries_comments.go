@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/samcoe/go-graphql-client"
 	"github.com/shurcooL/githubv4"
-	"github.com/shurcooL/graphql"
 )
 
 type Comments struct {

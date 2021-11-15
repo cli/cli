@@ -13,7 +13,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/henvic/httpretty"
-	"github.com/shurcooL/graphql"
+	"github.com/samcoe/go-graphql-client"
 )
 
 // ClientOption represents an argument to NewClient
