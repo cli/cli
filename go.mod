@@ -8,6 +8,7 @@ require (
 	github.com/briandowns/spinner v1.13.0
 	github.com/charmbracelet/glamour v0.3.0
 	github.com/cli/browser v1.1.0
+	github.com/cli/go-gh v0.0.0-00010101000000-000000000000
 	github.com/cli/oauth v0.9.0
 	github.com/cli/safeexec v1.0.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.1
@@ -43,5 +44,7 @@ require (
 	golang.org/x/term v0.0.0-20210503060354-a79de5458b56
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
+
+replace github.com/cli/go-gh => ../go-gh
 
 replace golang.org/x/crypto => github.com/cli/crypto v0.0.0-20210929142629-6be313f59b03

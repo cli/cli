@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/go-gh/pkg/api"
 )
 
 type Browser interface {
@@ -28,4 +29,8 @@ type Factory struct {
 
 	// Executable is the path to the currently invoked gh binary
 	Executable func() string
+
+	RESTClient        func(*api.ClientOptions) (api.RESTClient, error)
+	GQLClient         func(*api.ClientOptions) (api.GQLClient, error)
+	CurrentRepository func() (ghrepo.Interface, error)
 }

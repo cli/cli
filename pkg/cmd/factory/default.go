@@ -16,6 +16,8 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/go-gh"
+	ghAPI "github.com/cli/go-gh/pkg/api"
 )
 
 func New(appVersion string) *cmdutil.Factory {
@@ -38,6 +40,10 @@ func New(appVersion string) *cmdutil.Factory {
 	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
 	f.Browser = browser(f)                       // Depends on Config, and IOStreams
 	f.ExtensionManager = extensionManager(f)     // Depends on Config, HttpClient, and IOStreams
+
+	f.RESTClient = restClientFunc(f, appVersion)
+	f.GQLClient = gqlClientFunc(f, appVersion)
+	f.CurrentRepository = currentRepositoryFunc()
 
 	return f
 }
@@ -94,6 +100,68 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 			return nil, err
 		}
 		return NewHTTPClient(io, cfg, appVersion, true)
+	}
+}
+
+func restClientFunc(f *cmdutil.Factory, appVersion string) func(*ghAPI.ClientOptions) (ghAPI.RESTClient, error) {
+	// This is different than http client as you will want to specify hostname at initialization rather than request time.
+	// Doesnt support http_unix_socket option but could easily be added.
+	// If opts host or auth token is blank we will load up config again even if we already have it loaded,
+	// we could use config func here to stop that but seemed unnecessary
+	// Does not support scope suggestions on error
+	return func(opts *ghAPI.ClientOptions) (ghAPI.RESTClient, error) {
+		if opts == nil {
+			opts = &ghAPI.ClientOptions{}
+		}
+
+		if opts.Headers == nil {
+			opts.Headers = map[string]string{}
+		}
+		if opts.Headers["User-Agent"] == "" {
+			opts.Headers["User-Agent"] = fmt.Sprintf("GitHub CLI %s", appVersion)
+		}
+
+		if debug := os.Getenv("DEBUG"); opts.Log == nil && debug != "" {
+			opts.Log = f.IOStreams.ErrOut
+		}
+
+		return gh.RESTClient(opts)
+	}
+}
+
+func gqlClientFunc(f *cmdutil.Factory, appVersion string) func(*ghAPI.ClientOptions) (ghAPI.GQLClient, error) {
+	// This is different than http client as you will want to specify hostname at initialization rather than request time.
+	// Doesnt support http_unix_socket option but could easily be added.
+	// If opts host or auth token is blank we will load up config again even if we already have it loaded,
+	// we could use config func here to stop that but seemed unnecessary
+	// Does not support scope suggestions on error
+	return func(opts *ghAPI.ClientOptions) (ghAPI.GQLClient, error) {
+		if opts == nil {
+			opts = &ghAPI.ClientOptions{}
+		}
+
+		if opts.Headers == nil {
+			opts.Headers = map[string]string{}
+		}
+		if opts.Headers["User-Agent"] == "" {
+			opts.Headers["User-Agent"] = fmt.Sprintf("GitHub CLI %s", appVersion)
+		}
+
+		if debug := os.Getenv("DEBUG"); opts.Log == nil && debug != "" {
+			opts.Log = f.IOStreams.ErrOut
+		}
+
+		return gh.GQLClient(opts)
+	}
+}
+
+func currentRepositoryFunc() func() (ghrepo.Interface, error) {
+	return func() (ghrepo.Interface, error) {
+		repo, err := gh.CurrentRepository()
+		if err != nil {
+			return nil, err
+		}
+		return ghrepo.NewWithHost(repo.Owner(), repo.Name(), repo.Host()), nil
 	}
 }
 
