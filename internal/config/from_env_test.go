@@ -75,15 +75,15 @@ func TestInheritEnv(t *testing.T) {
 			},
 		},
 		{
-			name:         "GITHUB_TOKEN applicable to GHE",
+			name:         "GITHUB_TOKEN not applicable to GHE",
 			baseConfig:   ``,
 			GITHUB_TOKEN: "OTOKEN",
 			hostname:     "example.org",
 			wants: wants{
 				hosts:     []string{"github.com"},
-				token:     "OTOKEN",
-				source:    "GITHUB_TOKEN",
-				writeable: false,
+				token:     "",
+				source:    ".config.gh.config.yml",
+				writeable: true,
 			},
 		},
 		{

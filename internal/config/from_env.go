@@ -90,11 +90,7 @@ func AuthTokenFromEnv(hostname string) (string, string) {
 			return token, GH_ENTERPRISE_TOKEN
 		}
 
-		if token := os.Getenv(GITHUB_ENTERPRISE_TOKEN); token != "" {
-			return token, GITHUB_ENTERPRISE_TOKEN
-		}
-
-		return os.Getenv(GITHUB_TOKEN), GITHUB_TOKEN
+		return os.Getenv(GITHUB_ENTERPRISE_TOKEN), GITHUB_ENTERPRISE_TOKEN
 	}
 
 	if token := os.Getenv(GH_TOKEN); token != "" {
