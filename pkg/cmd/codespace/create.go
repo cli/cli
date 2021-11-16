@@ -8,7 +8,6 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
@@ -18,6 +17,8 @@ type createOptions struct {
 	machine    string
 	showStatus bool
 }
+
+type textColorChanger func(string) string
 
 func newCreateCmd(app *App) *cobra.Command {
 	opts := createOptions{}
@@ -92,7 +93,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return fmt.Errorf("error getting codespace region location: %w", locationResult.Err)
 	}
 
-	machine, err := getMachineName(ctx, a.io, a.apiClient, repository.ID, opts.machine, branch, locationResult.Location)
+	machine, err := getMachineName(ctx, a.io.ColorScheme().Gray, a.apiClient, repository.ID, opts.machine, branch, locationResult.Location)
 	if err != nil {
 		return fmt.Errorf("error getting machine type: %w", err)
 	}
@@ -202,7 +203,7 @@ func getLocation(ctx context.Context, apiClient apiClient) <-chan locationResult
 }
 
 // getMachineName prompts the user to select the machine type, or validates the machine if non-empty.
-func getMachineName(ctx context.Context, io *iostreams.IOStreams, apiClient apiClient, repoID int, machine, branch, location string) (string, error) {
+func getMachineName(ctx context.Context, makeGrayText textColorChanger, apiClient apiClient, repoID int, machine, branch, location string) (string, error) {
 	machines, err := apiClient.GetCodespacesMachines(ctx, repoID, branch, location)
 	if err != nil {
 		return "", fmt.Errorf("error requesting machine instance types: %w", err)
@@ -232,13 +233,10 @@ func getMachineName(ctx context.Context, io *iostreams.IOStreams, apiClient apiC
 		return machines[0].Name, nil
 	}
 
-	cs := io.ColorScheme()
-
 	machineNames := make([]string, 0, len(machines))
 	machineByName := make(map[string]*api.Machine)
 	for _, m := range machines {
-		prebuildText := getPrebuildDisplayText(m.PrebuildAvailability)
-		machineName := fmt.Sprintf("%s %s", m.DisplayName, cs.Gray(prebuildText))
+		machineName := buildDisplayName(m.DisplayName, m.PrebuildAvailability, makeGrayText)
 		machineNames = append(machineNames, machineName)
 		machineByName[machineName] = m
 	}
@@ -265,13 +263,13 @@ func getMachineName(ctx context.Context, io *iostreams.IOStreams, apiClient apiC
 	return selectedMachine.Name, nil
 }
 
-// getPrebuildDisplayText determines the prebuild text based on the prebuildAvailability returned in the API response.
-func getPrebuildDisplayText(prebuildAvailability string) string {
-	displayText := ""
+// buildDisplayName returns display name to be used in the machine survey prompt.
+func buildDisplayName(displayName string, prebuildAvailability string, makeGrayText textColorChanger) string {
+	prebuildText := ""
 
 	if prebuildAvailability == "blob" || prebuildAvailability == "pool" {
-		displayText = "(Prebuild ready)"
+		prebuildText = " (Prebuild ready)"
 	}
 
-	return displayText
+	return fmt.Sprintf("%s%s", displayName, makeGrayText(prebuildText))
 }
