@@ -36,6 +36,7 @@ func TestInheritEnv(t *testing.T) {
 		GITHUB_ENTERPRISE_TOKEN string
 		GH_TOKEN                string
 		GH_ENTERPRISE_TOKEN     string
+		CODESPACES              string
 		hostname                string
 		wants                   wants
 	}{
@@ -96,6 +97,19 @@ func TestInheritEnv(t *testing.T) {
 				token:     "",
 				source:    ".config.gh.config.yml",
 				writeable: true,
+			},
+		},
+		{
+			name:         "GITHUB_TOKEN allowed in Codespaces",
+			baseConfig:   ``,
+			GITHUB_TOKEN: "OTOKEN",
+			hostname:     "example.org",
+			CODESPACES:   "true",
+			wants: wants{
+				hosts:     []string{"github.com"},
+				token:     "OTOKEN",
+				source:    "GITHUB_TOKEN",
+				writeable: false,
 			},
 		},
 		{
@@ -262,11 +276,12 @@ func TestInheritEnv(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("GITHUB_TOKEN", tt.GITHUB_TOKEN)
-			os.Setenv("GITHUB_ENTERPRISE_TOKEN", tt.GITHUB_ENTERPRISE_TOKEN)
-			os.Setenv("GH_TOKEN", tt.GH_TOKEN)
-			os.Setenv("GH_ENTERPRISE_TOKEN", tt.GH_ENTERPRISE_TOKEN)
-			os.Setenv("AppData", "")
+			t.Setenv("GITHUB_TOKEN", tt.GITHUB_TOKEN)
+			t.Setenv("GITHUB_ENTERPRISE_TOKEN", tt.GITHUB_ENTERPRISE_TOKEN)
+			t.Setenv("GH_TOKEN", tt.GH_TOKEN)
+			t.Setenv("GH_ENTERPRISE_TOKEN", tt.GH_ENTERPRISE_TOKEN)
+			t.Setenv("AppData", "")
+			t.Setenv("CODESPACES", tt.CODESPACES)
 
 			baseCfg := NewFromString(tt.baseConfig)
 			cfg := InheritEnv(baseCfg)

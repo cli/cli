@@ -75,7 +75,7 @@ func New(token string, httpClient httpClient) *API {
 	if apiURL == "" {
 		apiURL = githubAPI
 	}
-	vscsURL := os.Getenv("VSCS_TARGET_URL")
+	vscsURL := os.Getenv("GITHUB_VSCS_TARGET_URL")
 	if vscsURL == "" {
 		vscsURL = vscsAPI
 	}
