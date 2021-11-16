@@ -18,7 +18,8 @@ type ListOptions struct {
 
 func NewCmdConfigList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
-		IO: f.IOStreams,
+		IO:     f.IOStreams,
+		Config: f.Config,
 	}
 
 	cmd := &cobra.Command{
@@ -26,8 +27,6 @@ func NewCmdConfigList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.
 		Short: "Print a list of configuration keys and values",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.Config = f.Config
-
 			if runF != nil {
 				return runF(opts)
 			}
@@ -36,7 +35,7 @@ func NewCmdConfigList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Hostname, "host", "h", "", "Get per-host setting")
+	cmd.Flags().StringVarP(&opts.Hostname, "host", "h", "", "Get per-host configuration")
 
 	return cmd
 }
@@ -47,16 +46,21 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	//cs := opts.IO.ColorScheme()
+	cs := opts.IO.ColorScheme()
 	isTTY := opts.IO.IsStdoutTTY()
 
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
+	var host string
+	if opts.Hostname != "" {
+		host = opts.Hostname
+	} else {
+		host, err = cfg.DefaultHost()
+		if err != nil {
+			return err
+		}
 	}
 
 	if isTTY {
-		fmt.Printf("Settings configured for %s\n\n", host)
+		fmt.Fprintf(opts.IO.Out, cs.Grayf("Settings configured for %s\n\n", host))
 	}
 
 	configOptions := config.ConfigOptions()
@@ -66,7 +70,12 @@ func listRun(opts *ListOptions) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%s: %s\n", key.Key, val)
+		configLine := fmt.Sprintf("%s: %s", key.Key, val)
+		if isTTY && key.DefaultValue != "" && val != key.DefaultValue {
+			configLine = cs.Bold(configLine)
+			configLine += fmt.Sprintf(" (default: %s)", key.DefaultValue)
+		}
+		fmt.Fprintln(opts.IO.Out, configLine)
 	}
 
 	return nil
