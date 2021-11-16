@@ -95,6 +95,12 @@ func TestNewCmdCreate(t *testing.T) {
 			wantsErr: true,
 			errMsg:   "`--public`, `--private`, or `--internal` required when not running interactively",
 		},
+		{
+			name:     "source with template",
+			cli:      "--source=/path/to/repo --private --template mytemplate",
+			wantsErr: true,
+			errMsg:   "the `--source` option is not supported with `--clone`, `--template`, `--license`, or `--gitignore`",
+		},
 	}
 
 	for _, tt := range tests {
@@ -232,6 +238,7 @@ func Test_createRun(t *testing.T) {
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git -C . rev-parse --git-dir`, 0, ".git")
+				cs.Register(`git -C . rev-parse HEAD`, 0, "commithash")
 			},
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n",
 		},
@@ -270,6 +277,7 @@ func Test_createRun(t *testing.T) {
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git -C . rev-parse --git-dir`, 0, ".git")
+				cs.Register(`git -C . rev-parse HEAD`, 0, "commithash")
 				cs.Register(`git -C . remote add origin https://github.com/OWNER/REPO`, 0, "")
 			},
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n",
@@ -309,6 +317,7 @@ func Test_createRun(t *testing.T) {
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git -C . rev-parse --git-dir`, 0, ".git")
+				cs.Register(`git -C . rev-parse HEAD`, 0, "commithash")
 				cs.Register(`git -C . remote add origin https://github.com/OWNER/REPO`, 0, "")
 				cs.Register(`git -C . push -u origin HEAD`, 0, "")
 			},

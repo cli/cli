@@ -1,8 +1,10 @@
 package create
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -112,10 +114,6 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				}
 			}
 
-			if opts.Source != "" && (opts.Clone || opts.GitIgnoreTemplate != "" || opts.LicenseTemplate != "") {
-				return cmdutil.FlagErrorf("the `--source` option is not supported with `--clone`, `--template`, or `--gitignore`")
-			}
-
 			if opts.Source == "" {
 				if opts.Remote != "" {
 					return cmdutil.FlagErrorf("the `--remote` option can only be used with `--source`")
@@ -126,6 +124,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				if opts.Name == "" && !opts.Interactive {
 					return cmdutil.FlagErrorf("name argument required to create new remote repository")
 				}
+
+			} else if opts.Clone || opts.GitIgnoreTemplate != "" || opts.LicenseTemplate != "" || opts.Template != "" {
+				return cmdutil.FlagErrorf("the `--source` option is not supported with `--clone`, `--template`, `--license`, or `--gitignore`")
 			}
 
 			if opts.Template != "" && (opts.GitIgnoreTemplate != "" || opts.LicenseTemplate != "") {
@@ -379,6 +380,7 @@ func createFromScratch(opts *CreateOptions) error {
 			// cloning empty repository or template
 			checkoutBranch := ""
 			if opts.Template != "" {
+				// use the template's default branch
 				checkoutBranch = templateRepoMainBranch
 			}
 			if err := localInit(opts.IO, remoteURL, repo.RepoName(), checkoutBranch); err != nil {
@@ -428,21 +430,35 @@ func createFromLocal(opts *CreateOptions) error {
 		baseRemote = opts.Remote
 	}
 
-	projectDir, projectDirErr := git.GetDirFromPath(repoPath)
-	if projectDirErr != nil {
-		return projectDirErr
-	}
-	if projectDir != ".git" {
-		return fmt.Errorf("path not a local repository")
-	}
-
-	abs, err := filepath.Abs(repoPath)
+	absPath, err := filepath.Abs(repoPath)
 	if err != nil {
 		return err
 	}
 
+	isRepo, err := isLocalRepo(repoPath)
+	if err != nil {
+		return err
+	}
+	if !isRepo {
+		if repoPath == "." {
+			return fmt.Errorf("current directory is not a git repository. Run `git init` to initalize it")
+		}
+		return fmt.Errorf("%s is not a git repository. Run `git -C %s init` to initialize it", absPath, repoPath)
+	}
+
+	committed, err := hasCommits(repoPath)
+	if err != nil {
+		return err
+	}
+	if opts.Push {
+		// fail immediately if trying to push with no commits
+		if !committed {
+			return fmt.Errorf("`--push` enabled but no commits found in %s", absPath)
+		}
+	}
+
 	if opts.Interactive {
-		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(filepath.Base(abs))
+		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(filepath.Base(absPath))
 		if err != nil {
 			return err
 		}
@@ -452,7 +468,7 @@ func createFromLocal(opts *CreateOptions) error {
 
 	// repo name will be currdir name or specified
 	if opts.Name == "" {
-		repoToCreate = ghrepo.NewWithHost("", filepath.Base(abs), host)
+		repoToCreate = ghrepo.NewWithHost("", filepath.Base(absPath), host)
 	} else if strings.Contains(opts.Name, "/") {
 		var err error
 		repoToCreate, err = ghrepo.FromFullName(opts.Name)
@@ -524,7 +540,8 @@ func createFromLocal(opts *CreateOptions) error {
 		return err
 	}
 
-	if opts.Interactive {
+	// don't prompt for push if there's no commits
+	if opts.Interactive && committed {
 		pushQuestion := &survey.Confirm{
 			Message: fmt.Sprintf(`Would you like to push commits from the current branch to the %q?`, baseRemote),
 			Default: true,
@@ -570,6 +587,47 @@ func sourceInit(io *iostreams.IOStreams, remoteURL, baseRemote, repoPath string)
 		fmt.Fprintf(stdout, "%s Added remote %s\n", cs.SuccessIcon(), remoteURL)
 	}
 	return nil
+}
+
+// check if local repository has commited changes
+func hasCommits(repoPath string) (bool, error) {
+	hasCommitsCmd, err := git.GitCommand("-C", repoPath, "rev-parse", "HEAD")
+	if err != nil {
+		return false, err
+	}
+	prepareCmd := run.PrepareCmd(hasCommitsCmd)
+	err = prepareCmd.Run()
+	if err == nil {
+		return true, nil
+	}
+
+	var execError *exec.ExitError
+	if errors.As(err, &execError) {
+		exitCode := int(execError.ExitCode())
+		if exitCode == 128 {
+			return false, nil
+		}
+		return false, err
+	}
+	return false, nil
+}
+
+// check if path is the top level directory of a git repo
+func isLocalRepo(repoPath string) (bool, error) {
+	projectDir, projectDirErr := git.GetDirFromPath(repoPath)
+	if projectDirErr != nil {
+		var execError *exec.ExitError
+		if errors.As(projectDirErr, &execError) {
+			if exitCode := int(execError.ExitCode()); exitCode == 128 {
+				return false, nil
+			}
+			return false, projectDirErr
+		}
+	}
+	if projectDir != ".git" {
+		return false, nil
+	}
+	return true, nil
 }
 
 // clone the checkout branch to specified path
