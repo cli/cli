@@ -2,7 +2,6 @@ package list
 
 import (
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -10,21 +9,23 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
+	"github.com/cli/go-gh/pkg/api"
 	"github.com/spf13/cobra"
 )
 
 type ListOptions struct {
-	HttpClient func() (*http.Client, error)
-	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
+	GQLClient func(*api.ClientOptions) (api.GQLClient, error)
+	IO        *iostreams.IOStreams
+	BaseRepo  func() (ghrepo.Interface, error)
 
 	LimitResults int
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		IO:        f.IOStreams,
+		GQLClient: f.GQLClient,
+		BaseRepo:  f.CurrentRepository, //This does not work with repo override
 	}
 
 	cmd := &cobra.Command{
@@ -32,9 +33,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Short: "List releases in a repository",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// support `-R, --repo` override
-			opts.BaseRepo = f.BaseRepo
-
 			if runF != nil {
 				return runF(opts)
 			}
@@ -48,17 +46,18 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 }
 
 func listRun(opts *ListOptions) error {
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
 
-	releases, err := fetchReleases(httpClient, baseRepo, opts.LimitResults)
+	clientOpts := api.ClientOptions{Host: baseRepo.RepoHost()}
+	gqlClient, err := opts.GQLClient(&clientOpts)
+	if err != nil {
+		return err
+	}
+
+	releases, err := fetchReleases(gqlClient, baseRepo, opts.LimitResults)
 	if err != nil {
 		return err
 	}
