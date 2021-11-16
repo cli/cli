@@ -63,7 +63,7 @@ func listRun(opts *ListOptions) error {
 		if err != nil {
 			return err
 		}
-		fmt.Fprint(opts.IO.Out, fmt.Sprintf("%s=%s\n", key.Key, val))
+		fmt.Fprintf(opts.IO.Out, "%s=%s\n", key.Key, val)
 	}
 
 	return nil
