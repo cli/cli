@@ -2,7 +2,6 @@ package rename
 
 import (
 	"fmt"
-	"net/http"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
@@ -13,11 +12,12 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/cli/go-gh/pkg/api"
 	"github.com/spf13/cobra"
 )
 
 type RenameOptions struct {
-	HttpClient      func() (*http.Client, error)
+	RESTClient      func(*api.ClientOptions) (api.RESTClient, error)
 	IO              *iostreams.IOStreams
 	Config          func() (config.Config, error)
 	BaseRepo        func() (ghrepo.Interface, error)
@@ -30,9 +30,10 @@ type RenameOptions struct {
 func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Command {
 	opts := &RenameOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		RESTClient: f.RESTClient,
 		Remotes:    f.Remotes,
 		Config:     f.Config,
+		BaseRepo:   f.CurrentRepository, //This does not work with repo override
 	}
 
 	var confirm bool
@@ -45,7 +46,6 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 		By default, this renames the current repository; otherwise renames the specified repository.`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.BaseRepo = f.BaseRepo
 			opts.HasRepoOverride = cmd.Flags().Changed("repo")
 
 			if len(args) > 0 {
@@ -75,11 +75,6 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 }
 
 func renameRun(opts *RenameOptions) error {
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-
 	newRepoName := opts.newRepoSelector
 
 	currRepo, err := opts.BaseRepo()
@@ -114,7 +109,13 @@ func renameRun(opts *RenameOptions) error {
 		}
 	}
 
-	newRepo, err := apiRename(httpClient, currRepo, newRepoName)
+	clientOpts := api.ClientOptions{Host: currRepo.RepoHost()}
+	client, err := opts.RESTClient(&clientOpts)
+	if err != nil {
+		return err
+	}
+
+	newRepo, err := apiRename(client, currRepo, newRepoName)
 	if err != nil {
 		return err
 	}
