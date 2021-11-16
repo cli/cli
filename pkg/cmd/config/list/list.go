@@ -60,7 +60,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if isTTY {
-		fmt.Fprintf(opts.IO.Out, cs.Grayf("Settings configured for %s\n\n", host))
+		fmt.Fprint(opts.IO.Out, cs.Grayf("Settings configured for %s\n\n", host))
 	}
 
 	configOptions := config.ConfigOptions()
@@ -75,7 +75,7 @@ func listRun(opts *ListOptions) error {
 			configLine = cs.Bold(configLine)
 			configLine += fmt.Sprintf(" (default: %s)", key.DefaultValue)
 		}
-		fmt.Fprintln(opts.IO.Out, configLine)
+		fmt.Fprint(opts.IO.Out, configLine, "\n")
 	}
 
 	return nil
