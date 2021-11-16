@@ -460,14 +460,14 @@ func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, loc
 
 // CreateCodespaceParams are the required parameters for provisioning a Codespace.
 type CreateCodespaceParams struct {
-	RepositoryID              int
-	Branch, Machine, Location string
+	RepositoryID, IdleTimeoutMinutes int
+	Branch, Machine, Location        string
 }
 
 // CreateCodespace creates a codespace with the given parameters and returns a non-nil error if it
 // fails to create.
 func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams) (*Codespace, error) {
-	codespace, err := a.startCreate(ctx, params.RepositoryID, params.Machine, params.Branch, params.Location)
+	codespace, err := a.startCreate(ctx, params.RepositoryID, params.IdleTimeoutMinutes, params.Machine, params.Branch, params.Location)
 	if err != errProvisioningInProgress {
 		return codespace, err
 	}
@@ -502,10 +502,11 @@ func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams
 }
 
 type startCreateRequest struct {
-	RepositoryID int    `json:"repository_id"`
-	Ref          string `json:"ref"`
-	Location     string `json:"location"`
-	Machine      string `json:"machine"`
+	RepositoryID       int    `json:"repository_id"`
+	IdleTimeoutMinutes int    `json:"idle_timeout_minutes"`
+	Ref                string `json:"ref"`
+	Location           string `json:"location"`
+	Machine            string `json:"machine"`
 }
 
 var errProvisioningInProgress = errors.New("provisioning in progress")
@@ -514,8 +515,8 @@ var errProvisioningInProgress = errors.New("provisioning in progress")
 // It may return success or an error, or errProvisioningInProgress indicating that the operation
 // did not complete before the GitHub API's time limit for RPCs (10s), in which case the caller
 // must poll the server to learn the outcome.
-func (a *API) startCreate(ctx context.Context, repoID int, machine, branch, location string) (*Codespace, error) {
-	requestBody, err := json.Marshal(startCreateRequest{repoID, branch, location, machine})
+func (a *API) startCreate(ctx context.Context, repoID, idleTimeoutMinutes int, machine, branch, location string) (*Codespace, error) {
+	requestBody, err := json.Marshal(startCreateRequest{repoID, idleTimeoutMinutes, branch, location, machine})
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}

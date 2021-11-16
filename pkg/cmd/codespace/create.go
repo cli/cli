@@ -12,10 +12,11 @@ import (
 )
 
 type createOptions struct {
-	repo       string
-	branch     string
-	machine    string
-	showStatus bool
+	repo               string
+	branch             string
+	machine            string
+	showStatus         bool
+	idleTimeoutMinutes int
 }
 
 func newCreateCmd(app *App) *cobra.Command {
@@ -34,6 +35,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().StringVarP(&opts.branch, "branch", "b", "", "repository branch")
 	createCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "hardware specifications for the VM")
 	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
+	createCmd.Flags().IntVarP(&opts.idleTimeoutMinutes, "idle-timeout-minutes", "i", 30, "idle timeout in minutes")
 
 	return createCmd
 }
@@ -43,11 +45,13 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	locationCh := getLocation(ctx, a.apiClient)
 
 	userInputs := struct {
-		Repository string
-		Branch     string
+		Repository         string
+		Branch             string
+		IdleTimeoutMinutes int
 	}{
-		Repository: opts.repo,
-		Branch:     opts.branch,
+		Repository:         opts.repo,
+		Branch:             opts.branch,
+		IdleTimeoutMinutes: opts.idleTimeoutMinutes,
 	}
 
 	if userInputs.Repository == "" {
@@ -101,10 +105,11 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 
 	a.StartProgressIndicatorWithLabel("Creating codespace")
 	codespace, err := a.apiClient.CreateCodespace(ctx, &api.CreateCodespaceParams{
-		RepositoryID: repository.ID,
-		Branch:       branch,
-		Machine:      machine,
-		Location:     locationResult.Location,
+		RepositoryID:       repository.ID,
+		Branch:             branch,
+		Machine:            machine,
+		Location:           locationResult.Location,
+		IdleTimeoutMinutes: userInputs.IdleTimeoutMinutes,
 	})
 	a.StopProgressIndicator()
 	if err != nil {
