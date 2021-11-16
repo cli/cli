@@ -72,13 +72,11 @@ func Test_listRun(t *testing.T) {
 		name    string
 		input   *ListOptions
 		config  config.ConfigStub
-		isTTY   bool
 		stdout  string
 		wantErr bool
 	}{
 		{
-			name:  "list",
-			isTTY: true,
+			name: "list",
 			config: config.ConfigStub{
 				"HOST:git_protocol":     "ssh",
 				"HOST:editor":           "/usr/bin/vim",
@@ -88,22 +86,18 @@ func Test_listRun(t *testing.T) {
 				"HOST:browser":          "brave",
 			},
 			input: &ListOptions{Hostname: "HOST"}, // ConfigStub gives empty DefaultHost
-			stdout: `Settings configured for HOST
-
-git_protocol: ssh (default: https)
-editor: /usr/bin/vim
-prompt: disabled (default: enabled)
-pager: less
-http_unix_socket: 
-browser: brave
+			stdout: `git_protocol=ssh
+editor=/usr/bin/vim
+prompt=disabled
+pager=less
+http_unix_socket=
+browser=brave
 `,
 		},
 	}
 
 	for _, tt := range tests {
 		io, _, stdout, _ := iostreams.Test()
-		io.SetStdoutTTY(tt.isTTY)
-		io.SetStdinTTY(tt.isTTY)
 		tt.input.IO = io
 		tt.input.Config = func() (config.Config, error) {
 			return tt.config, nil

@@ -46,9 +46,6 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	cs := opts.IO.ColorScheme()
-	isTTY := opts.IO.IsStdoutTTY()
-
 	var host string
 	if opts.Hostname != "" {
 		host = opts.Hostname
@@ -59,23 +56,14 @@ func listRun(opts *ListOptions) error {
 		}
 	}
 
-	if isTTY {
-		fmt.Fprint(opts.IO.Out, cs.Grayf("Settings configured for %s\n\n", host))
-	}
-
 	configOptions := config.ConfigOptions()
 
 	for _, key := range configOptions {
-		val, err := cfg.Get(opts.Hostname, key.Key)
+		val, err := cfg.Get(host, key.Key)
 		if err != nil {
 			return err
 		}
-		configLine := fmt.Sprintf("%s: %s", key.Key, val)
-		if isTTY && key.DefaultValue != "" && val != key.DefaultValue {
-			configLine = cs.Bold(configLine)
-			configLine += fmt.Sprintf(" (default: %s)", key.DefaultValue)
-		}
-		fmt.Fprint(opts.IO.Out, configLine, "\n")
+		fmt.Fprint(opts.IO.Out, fmt.Sprintf("%s=%s\n", key.Key, val))
 	}
 
 	return nil
