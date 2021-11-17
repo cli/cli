@@ -299,7 +299,7 @@ func CheckoutBranch(branch string) error {
 }
 
 //pull changes from remote branch without version history
-func PullLatestChanges(branch string) error {
+func PullLatestChanges() error {
 	pullCmd, err := GitCommand("pull", "--ff-only")
 	if err != nil {
 		return err

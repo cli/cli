@@ -334,7 +334,7 @@ func mergeRun(opts *MergeOptions) error {
 				return err
 			}
 
-			err = git.PullLatestChanges(branchToSwitchTo)
+			err = git.PullLatestChanges()
 			if err != nil {
 				return err
 			}
