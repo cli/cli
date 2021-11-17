@@ -32,7 +32,7 @@ type Manager struct {
 	lookPath   func(string) (string, error)
 	findSh     func() (string, error)
 	newCommand func(string, ...string) *exec.Cmd
-	platform   func() string
+	platform   func() (string, string)
 	client     *http.Client
 	config     config.Config
 	io         *iostreams.IOStreams
@@ -44,8 +44,12 @@ func NewManager(io *iostreams.IOStreams) *Manager {
 		lookPath:   safeexec.LookPath,
 		findSh:     findsh.Find,
 		newCommand: exec.Command,
-		platform: func() string {
-			return fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH)
+		platform: func() (string, string) {
+			ext := ""
+			if runtime.GOOS == "windows" {
+				ext = ".exe"
+			}
+			return fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH), ext
 		},
 		io: io,
 	}
@@ -344,19 +348,19 @@ func (m *Manager) installBin(repo ghrepo.Interface) error {
 		return err
 	}
 
-	suffix := m.platform()
+	platform, ext := m.platform()
 	var asset *releaseAsset
 	for _, a := range r.Assets {
-		if strings.HasSuffix(a.Name, suffix) {
+		if strings.HasSuffix(a.Name, platform+ext) {
 			asset = &a
 			break
 		}
 	}
 
 	if asset == nil {
-		return fmt.Errorf("%s unsupported for %s. Open an issue: `gh issue create -R %s/%s -t'Support %s'`",
-			repo.RepoName(),
-			suffix, repo.RepoOwner(), repo.RepoName(), suffix)
+		return fmt.Errorf(
+			"%[1]s unsupported for %[2]s. Open an issue: `gh issue create -R %[3]s/%[1]s -t'Support %[2]s'`",
+			repo.RepoName(), platform, repo.RepoOwner())
 	}
 
 	name := repo.RepoName()
@@ -368,6 +372,7 @@ func (m *Manager) installBin(repo ghrepo.Interface) error {
 	}
 
 	binPath := filepath.Join(targetDir, name)
+	binPath += ext
 
 	err = downloadAsset(m.client, *asset, binPath)
 	if err != nil {
@@ -635,7 +640,11 @@ func isBinExtension(client *http.Client, repo ghrepo.Interface) (isBin bool, err
 	for _, a := range r.Assets {
 		dists := possibleDists()
 		for _, d := range dists {
-			if strings.HasSuffix(a.Name, d) {
+			suffix := d
+			if strings.HasPrefix(d, "windows") {
+				suffix += ".exe"
+			}
+			if strings.HasSuffix(a.Name, suffix) {
 				isBin = true
 				break
 			}
