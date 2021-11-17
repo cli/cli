@@ -234,7 +234,7 @@ func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machin
 	machineNames := make([]string, 0, len(machines))
 	machineByName := make(map[string]*api.Machine)
 	for _, m := range machines {
-		machineName := m.DisplayName
+		machineName := buildDisplayName(m.DisplayName, m.PrebuildAvailability)
 		machineNames = append(machineNames, machineName)
 		machineByName[machineName] = m
 	}
@@ -259,4 +259,15 @@ func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machin
 	selectedMachine := machineByName[machineAnswers.Machine]
 
 	return selectedMachine.Name, nil
+}
+
+// buildDisplayName returns display name to be used in the machine survey prompt.
+func buildDisplayName(displayName string, prebuildAvailability string) string {
+	prebuildText := ""
+
+	if prebuildAvailability == "blob" || prebuildAvailability == "pool" {
+		prebuildText = " (Prebuild ready)"
+	}
+
+	return fmt.Sprintf("%s%s", displayName, prebuildText)
 }
