@@ -333,6 +333,11 @@ func mergeRun(opts *MergeOptions) error {
 			if err != nil {
 				return err
 			}
+
+			err = git.PullLatestChanges(branchToSwitchTo)
+			if err != nil {
+				return err
+			}
 		}
 
 		localBranchExists := git.HasLocalBranch(pr.HeadRefName)

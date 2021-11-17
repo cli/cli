@@ -298,6 +298,15 @@ func CheckoutBranch(branch string) error {
 	return run.PrepareCmd(configCmd).Run()
 }
 
+//pull changes from remote branch without version history
+func PullLatestChanges(branch string) error {
+	pullCmd, err := GitCommand("pull", "--ff-only")
+	if err != nil {
+		return err
+	}
+	return run.PrepareCmd(pullCmd).Run()
+}
+
 func parseCloneArgs(extraArgs []string) (args []string, target string) {
 	args = extraArgs
 

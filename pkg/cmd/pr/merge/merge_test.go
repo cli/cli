@@ -428,6 +428,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	cs.Register(`git checkout master`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, `pr merge --merge --delete-branch`)
 	if err != nil {
@@ -703,6 +704,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	cs.Register(`git checkout master`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
 
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
@@ -834,6 +836,7 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 	cs.Register(`git checkout master`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
 
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
