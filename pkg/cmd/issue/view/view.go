@@ -84,7 +84,7 @@ func viewRun(opts *ViewOptions) error {
 	}
 	if opts.IO.CanPrompt() && opts.SelectorArg == "" {
 		baseRepo, err := opts.BaseRepo()
-		issueNumber, err := shared.SelectFrecent(httpClient, baseRepo)
+		issueNumber, err := issueShared.SelectFrecent(httpClient, baseRepo)
 		if err != nil {
 			return err
 		}
@@ -105,7 +105,7 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	err = shared.UpdateFrecent(issue.Number)
+	err = issueShared.UpdateFrecent(issue.Number)
 	if err != nil {
 		// TODO just warn or ignore or whatever
 		return err
