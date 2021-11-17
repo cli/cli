@@ -2,8 +2,6 @@ package codespace
 
 import (
 	"testing"
-
-	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 func TestBuildDisplayName(t *testing.T) {
@@ -35,10 +33,7 @@ func TestBuildDisplayName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			makeGrayText := io.ColorScheme().Gray
-
-			displayName := buildDisplayName("4 cores, 8 GB RAM, 32 GB storage", tt.prebuildAvailability, makeGrayText)
+			displayName := buildDisplayName("4 cores, 8 GB RAM, 32 GB storage", tt.prebuildAvailability)
 
 			if displayName != tt.expectedDisplayName {
 				t.Errorf("displayName = %q, expectedDisplayName %q", displayName, tt.expectedDisplayName)

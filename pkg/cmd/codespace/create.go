@@ -18,8 +18,6 @@ type createOptions struct {
 	showStatus bool
 }
 
-type textColorChanger func(string) string
-
 func newCreateCmd(app *App) *cobra.Command {
 	opts := createOptions{}
 
@@ -93,7 +91,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return fmt.Errorf("error getting codespace region location: %w", locationResult.Err)
 	}
 
-	machine, err := getMachineName(ctx, a.io.ColorScheme().Gray, a.apiClient, repository.ID, opts.machine, branch, locationResult.Location)
+	machine, err := getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, locationResult.Location)
 	if err != nil {
 		return fmt.Errorf("error getting machine type: %w", err)
 	}
@@ -203,7 +201,7 @@ func getLocation(ctx context.Context, apiClient apiClient) <-chan locationResult
 }
 
 // getMachineName prompts the user to select the machine type, or validates the machine if non-empty.
-func getMachineName(ctx context.Context, makeGrayText textColorChanger, apiClient apiClient, repoID int, machine, branch, location string) (string, error) {
+func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machine, branch, location string) (string, error) {
 	machines, err := apiClient.GetCodespacesMachines(ctx, repoID, branch, location)
 	if err != nil {
 		return "", fmt.Errorf("error requesting machine instance types: %w", err)
@@ -236,7 +234,7 @@ func getMachineName(ctx context.Context, makeGrayText textColorChanger, apiClien
 	machineNames := make([]string, 0, len(machines))
 	machineByName := make(map[string]*api.Machine)
 	for _, m := range machines {
-		machineName := buildDisplayName(m.DisplayName, m.PrebuildAvailability, makeGrayText)
+		machineName := buildDisplayName(m.DisplayName, m.PrebuildAvailability)
 		machineNames = append(machineNames, machineName)
 		machineByName[machineName] = m
 	}
@@ -264,12 +262,12 @@ func getMachineName(ctx context.Context, makeGrayText textColorChanger, apiClien
 }
 
 // buildDisplayName returns display name to be used in the machine survey prompt.
-func buildDisplayName(displayName string, prebuildAvailability string, makeGrayText textColorChanger) string {
+func buildDisplayName(displayName string, prebuildAvailability string) string {
 	prebuildText := ""
 
 	if prebuildAvailability == "blob" || prebuildAvailability == "pool" {
 		prebuildText = " (Prebuild ready)"
 	}
 
-	return fmt.Sprintf("%s%s", displayName, makeGrayText(prebuildText))
+	return fmt.Sprintf("%s%s", displayName, prebuildText)
 }
