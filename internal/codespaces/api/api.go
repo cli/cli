@@ -35,7 +35,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -66,16 +65,13 @@ type httpClient interface {
 }
 
 // New creates a new API client with the given token and HTTP client.
-func New(token string, httpClient httpClient) *API {
-	serverURL := os.Getenv("GITHUB_SERVER_URL")
+func New(serverURL, apiURL, vscsURL, token string, httpClient httpClient) *API {
 	if serverURL == "" {
 		serverURL = githubServer
 	}
-	apiURL := os.Getenv("GITHUB_API_URL")
 	if apiURL == "" {
 		apiURL = githubAPI
 	}
-	vscsURL := os.Getenv("GITHUB_VSCS_TARGET_URL")
 	if vscsURL == "" {
 		vscsURL = vscsAPI
 	}
