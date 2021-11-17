@@ -96,6 +96,7 @@ func GenMan(cmd *cobra.Command, header *GenManHeader, w io.Writer) error {
 	}
 
 	b := genMan(cmd, header)
+
 	_, err := w.Write(md2man.Render(b))
 	return err
 }
@@ -133,7 +134,13 @@ func manPreamble(buf *bytes.Buffer, header *GenManHeader, cmd *cobra.Command, da
 `, header.Title, header.Section, header.date, header.Source, header.Manual))
 	buf.WriteString(fmt.Sprintf("%s \\- %s\n\n", dashedName, cmd.Short))
 	buf.WriteString("# SYNOPSIS\n")
-	buf.WriteString(fmt.Sprintf("**%s**\n\n", cmd.UseLine()))
+
+	// "<>" is rendered as HTML in md
+	synopsis := cmd.UseLine()
+	escAngle := strings.Replace(synopsis, "<", "\\<", -1)
+	escAngle = strings.Replace(escAngle, ">", "\\>", -1)
+	buf.WriteString(fmt.Sprintf("**%s**\n\n", escAngle))
+
 	buf.WriteString("# DESCRIPTION\n")
 	buf.WriteString(description + "\n\n")
 }
