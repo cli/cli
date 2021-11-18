@@ -36,7 +36,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().StringVarP(&opts.branch, "branch", "b", "", "repository branch")
 	createCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "hardware specifications for the VM")
 	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
-	createCmd.Flags().DurationVarP(&opts.idleTimeout, "idle-timeout", "i", 30*time.Minute, "duration of inactivity before codespace is shutdown/stopped e.g. \"3600s\", \"60m\", \"1h\"")
+	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 30*time.Minute, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
 
 	return createCmd
 }
@@ -46,13 +46,11 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	locationCh := getLocation(ctx, a.apiClient)
 
 	userInputs := struct {
-		Repository         string
-		Branch             string
-		IdleTimeoutMinutes int
+		Repository string
+		Branch     string
 	}{
-		Repository:         opts.repo,
-		Branch:             opts.branch,
-		IdleTimeoutMinutes: int(opts.idleTimeout.Minutes()), // necessary conversion for the API
+		Repository: opts.repo,
+		Branch:     opts.branch,
 	}
 
 	if userInputs.Repository == "" {
@@ -110,7 +108,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		Branch:             branch,
 		Machine:            machine,
 		Location:           locationResult.Location,
-		IdleTimeoutMinutes: userInputs.IdleTimeoutMinutes,
+		IdleTimeoutMinutes: int(opts.idleTimeout.Minutes()),
 	})
 	a.StopProgressIndicator()
 	if err != nil {
