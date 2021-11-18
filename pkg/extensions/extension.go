@@ -13,6 +13,7 @@ type Extension interface {
 	URL() string
 	IsLocal() bool
 	UpdateAvailable() bool
+	IsBinary() bool
 }
 
 //go:generate moq -rm -out manager_mock.go . ExtensionManager

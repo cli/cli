@@ -106,7 +106,15 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return err
 				}
 
-				return m.Install(repo)
+				if err := m.Install(repo); err != nil {
+					return err
+				}
+
+				if io.IsStdoutTTY() {
+					cs := io.ColorScheme()
+					fmt.Fprintf(io.Out, "%s Installed extension %s\n", cs.SuccessIcon(), args[0])
+				}
+				return nil
 			},
 		},
 		func() *cobra.Command {
@@ -117,13 +125,13 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				Short: "Upgrade installed extensions",
 				Args: func(cmd *cobra.Command, args []string) error {
 					if len(args) == 0 && !flagAll {
-						return &cmdutil.FlagError{Err: errors.New("must specify an extension to upgrade")}
+						return cmdutil.FlagErrorf("must specify an extension to upgrade")
 					}
 					if len(args) > 0 && flagAll {
-						return &cmdutil.FlagError{Err: errors.New("cannot use `--all` with extension name")}
+						return cmdutil.FlagErrorf("cannot use `--all` with extension name")
 					}
 					if len(args) > 1 {
-						return &cmdutil.FlagError{Err: errors.New("too many arguments")}
+						return cmdutil.FlagErrorf("too many arguments")
 					}
 					return nil
 				},
@@ -132,7 +140,24 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if len(args) > 0 {
 						name = normalizeExtensionSelector(args[0])
 					}
-					return m.Upgrade(name, flagForce)
+					cs := io.ColorScheme()
+					err := m.Upgrade(name, flagForce)
+					if err != nil {
+						if name != "" {
+							fmt.Fprintf(io.ErrOut, "%s Failed upgrading extension %s: %s", cs.FailureIcon(), name, err)
+						} else {
+							fmt.Fprintf(io.ErrOut, "%s Failed upgrading extensions", cs.FailureIcon())
+						}
+						return cmdutil.SilentError
+					}
+					if io.IsStdoutTTY() {
+						if name != "" {
+							fmt.Fprintf(io.Out, "%s Successfully upgraded extension %s\n", cs.SuccessIcon(), name)
+						} else {
+							fmt.Fprintf(io.Out, "%s Successfully upgraded extensions\n", cs.SuccessIcon())
+						}
+					}
+					return nil
 				},
 			}
 			cmd.Flags().BoolVar(&flagAll, "all", false, "Upgrade all extensions")

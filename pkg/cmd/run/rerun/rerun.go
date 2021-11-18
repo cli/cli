@@ -40,7 +40,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 			if len(args) > 0 {
 				opts.RunID = args[0]
 			} else if !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("run ID required when not running interactively")}
+				return cmdutil.FlagErrorf("run ID required when not running interactively")
 			} else {
 				opts.Prompt = true
 			}

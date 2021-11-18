@@ -10,6 +10,27 @@ import (
 	"github.com/cli/cli/v2/pkg/httpmock"
 )
 
+func TestGitHubRepo_notFound(t *testing.T) {
+	httpReg := &httpmock.Registry{}
+	defer httpReg.Verify(t)
+
+	httpReg.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`{ "data": { "repository": null } }`))
+
+	client := NewClient(ReplaceTripper(httpReg))
+	repo, err := GitHubRepo(client, ghrepo.New("OWNER", "REPO"))
+	if err == nil {
+		t.Fatal("GitHubRepo did not return an error")
+	}
+	if wants := "GraphQL error: Could not resolve to a Repository with the name 'OWNER/REPO'."; err.Error() != wants {
+		t.Errorf("GitHubRepo error: want %q, got %q", wants, err.Error())
+	}
+	if repo != nil {
+		t.Errorf("GitHubRepo: expected nil repo, got %v", repo)
+	}
+}
+
 func Test_RepoMetadata(t *testing.T) {
 	http := &httpmock.Registry{}
 	client := NewClient(ReplaceTripper(http))

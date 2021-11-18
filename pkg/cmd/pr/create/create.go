@@ -126,11 +126,11 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			opts.MaintainerCanModify = !noMaintainerEdit
 
 			if !opts.IO.CanPrompt() && opts.RecoverFile != "" {
-				return &cmdutil.FlagError{Err: errors.New("`--recover` only supported when running interactively")}
+				return cmdutil.FlagErrorf("`--recover` only supported when running interactively")
 			}
 
 			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.TitleProvided && !opts.Autofill {
-				return &cmdutil.FlagError{Err: errors.New("`--title` or `--fill` required when not running interactively")}
+				return cmdutil.FlagErrorf("`--title` or `--fill` required when not running interactively")
 			}
 
 			if opts.IsDraft && opts.WebMode {

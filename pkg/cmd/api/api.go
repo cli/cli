@@ -174,12 +174,12 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 
 			if c.Flags().Changed("hostname") {
 				if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
-					return &cmdutil.FlagError{Err: fmt.Errorf("error parsing `--hostname`: %w", err)}
+					return cmdutil.FlagErrorf("error parsing `--hostname`: %w", err)
 				}
 			}
 
 			if opts.Paginate && !strings.EqualFold(opts.RequestMethod, "GET") && opts.RequestPath != "graphql" {
-				return &cmdutil.FlagError{Err: errors.New("the `--paginate` option is not supported for non-GET requests")}
+				return cmdutil.FlagErrorf("the `--paginate` option is not supported for non-GET requests")
 			}
 
 			if err := cmdutil.MutuallyExclusive(
@@ -320,6 +320,7 @@ func apiRun(opts *ApiOptions) error {
 			}
 		} else {
 			requestPath, hasNextPage = findNextPage(resp)
+			requestBody = nil // prevent repeating GET parameters
 		}
 
 		if hasNextPage && opts.ShowResponseHeaders {
@@ -385,12 +386,14 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 		}
 	}
 
+	if serverError == "" && resp.StatusCode > 299 {
+		serverError = fmt.Sprintf("HTTP %d", resp.StatusCode)
+	}
 	if serverError != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
-		err = cmdutil.SilentError
-		return
-	} else if resp.StatusCode > 299 {
-		fmt.Fprintf(opts.IO.ErrOut, "gh: HTTP %d\n", resp.StatusCode)
+		if msg := api.ScopesSuggestion(resp); msg != "" {
+			fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", msg)
+		}
 		err = cmdutil.SilentError
 		return
 	}

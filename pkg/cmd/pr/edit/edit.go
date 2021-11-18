@@ -1,7 +1,6 @@
 package edit
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -120,7 +119,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			}
 
 			if opts.Interactive && !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("--tile, --body, --reviewer, --assignee, --label, --project, or --milestone required when not running interactively")}
+				return cmdutil.FlagErrorf("--tile, --body, --reviewer, --assignee, --label, --project, or --milestone required when not running interactively")
 			}
 
 			if runF != nil {
