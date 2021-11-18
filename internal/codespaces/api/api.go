@@ -507,7 +507,7 @@ func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams
 
 type startCreateRequest struct {
 	RepositoryID       int    `json:"repository_id"`
-	IdleTimeoutMinutes int    `json:"idle_timeout_minutes"`
+	IdleTimeoutMinutes int    `json:"idle_timeout_minutes,omitempty"`
 	Ref                string `json:"ref"`
 	Location           string `json:"location"`
 	Machine            string `json:"machine"`
