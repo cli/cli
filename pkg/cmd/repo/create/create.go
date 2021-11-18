@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -827,10 +828,9 @@ func interactiveSource() (string, error) {
 
 func confirmSubmission(repoName, repoOwner, visibility string) (bool, error) {
 	qs := []*survey.Question{}
-
-	targetRepo := repoName
+	targetRepo := normalizeRepoName(repoName)
 	if repoOwner != "" {
-		targetRepo = fmt.Sprintf("%s/%s", repoOwner, repoName)
+		targetRepo = fmt.Sprintf("%s/%s", repoOwner, targetRepo)
 	}
 	promptString := fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(visibility))
 
@@ -853,4 +853,9 @@ func confirmSubmission(repoName, repoOwner, visibility string) (bool, error) {
 	}
 
 	return answer.ConfirmSubmit, nil
+}
+
+// normalizeRepoName takes in the repo name the user inputted and normalizes it using the same logic as GitHub (GitHub.com/new)
+func normalizeRepoName(repoName string) string {
+	return strings.TrimSuffix(regexp.MustCompile(`[^\w._-]+`).ReplaceAllString(repoName, "-"), ".git")
 }
