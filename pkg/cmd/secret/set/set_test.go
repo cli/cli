@@ -91,6 +91,16 @@ func TestNewCmdSet(t *testing.T) {
 			},
 		},
 		{
+			name: "user with selected repos",
+			cli:  `-u -bs -r"monalisa/coolRepo,cli/cli,github/hub" cool_secret`,
+			wants: SetOptions{
+				SecretName:      "cool_secret",
+				Visibility:      shared.Selected,
+				RepositoryNames: []string{"monalisa/coolRepo", "cli/cli", "github/hub"},
+				Body:            "s",
+			},
+		},
+		{
 			name: "repo",
 			cli:  `cool_secret -b"a secret"`,
 			wants: SetOptions{
@@ -120,21 +130,6 @@ func TestNewCmdSet(t *testing.T) {
 				Body:       "cool",
 				OrgName:    "coolOrg",
 			},
-		},
-		{
-			name:     "bad name prefix",
-			cli:      `GITHUB_SECRET -b"cool"`,
-			wantsErr: true,
-		},
-		{
-			name:     "leading numbers in name",
-			cli:      `123_SECRET -b"cool"`,
-			wantsErr: true,
-		},
-		{
-			name:     "invalid characters in name",
-			cli:      `BAD-SECRET -b"cool"`,
-			wantsErr: true,
 		},
 	}
 
@@ -275,7 +270,7 @@ func Test_setRun_org(t *testing.T) {
 			opts: &SetOptions{
 				OrgName:         "UmbrellaCorporation",
 				Visibility:      shared.Selected,
-				RepositoryNames: []string{"birkin", "wesker"},
+				RepositoryNames: []string{"birkin", "UmbrellaCorporation/wesker"},
 			},
 			wantRepositories: []int{1, 2},
 		},
@@ -297,7 +292,7 @@ func Test_setRun_org(t *testing.T) {
 
 			if len(tt.opts.RepositoryNames) > 0 {
 				reg.Register(httpmock.GraphQL(`query MapRepositoryNames\b`),
-					httpmock.StringResponse(`{"data":{"birkin":{"databaseId":1},"wesker":{"databaseId":2}}}`))
+					httpmock.StringResponse(`{"data":{"repo_0001":{"databaseId":1},"repo_0002":{"databaseId":2}}}`))
 			}
 
 			io, _, _, _ := iostreams.Test()
@@ -330,6 +325,77 @@ func Test_setRun_org(t *testing.T) {
 			assert.Equal(t, payload.KeyID, "123")
 			assert.Equal(t, payload.EncryptedValue, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=")
 			assert.Equal(t, payload.Visibility, tt.opts.Visibility)
+			assert.ElementsMatch(t, payload.Repositories, tt.wantRepositories)
+		})
+	}
+}
+
+func Test_setRun_user(t *testing.T) {
+	tests := []struct {
+		name             string
+		opts             *SetOptions
+		wantVisibility   shared.Visibility
+		wantRepositories []string
+	}{
+		{
+			name: "all vis",
+			opts: &SetOptions{
+				UserSecrets: true,
+				Visibility:  shared.All,
+			},
+		},
+		{
+			name: "selected visibility",
+			opts: &SetOptions{
+				UserSecrets:     true,
+				Visibility:      shared.Selected,
+				RepositoryNames: []string{"cli/cli", "github/hub"},
+			},
+			wantRepositories: []string{"212613049", "401025"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+
+			reg.Register(httpmock.REST("GET", "user/codespaces/secrets/public-key"),
+				httpmock.JSONResponse(PubKey{ID: "123", Key: "CDjXqf7AJBXWhMczcy+Fs7JlACEptgceysutztHaFQI="}))
+
+			reg.Register(httpmock.REST("PUT", "user/codespaces/secrets/cool_secret"),
+				httpmock.StatusStringResponse(201, `{}`))
+
+			if len(tt.opts.RepositoryNames) > 0 {
+				reg.Register(httpmock.GraphQL(`query MapRepositoryNames\b`),
+					httpmock.StringResponse(`{"data":{"repo_0001":{"databaseId":212613049},"repo_0002":{"databaseId":401025}}}`))
+			}
+
+			io, _, _, _ := iostreams.Test()
+
+			tt.opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			}
+			tt.opts.Config = func() (config.Config, error) {
+				return config.NewBlankConfig(), nil
+			}
+			tt.opts.IO = io
+			tt.opts.SecretName = "cool_secret"
+			tt.opts.Body = "a secret"
+			// Cribbed from https://github.com/golang/crypto/commit/becbf705a91575484002d598f87d74f0002801e7
+			tt.opts.RandomOverride = bytes.NewReader([]byte{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5})
+
+			err := setRun(tt.opts)
+			assert.NoError(t, err)
+
+			reg.Verify(t)
+
+			data, err := ioutil.ReadAll(reg.Requests[len(reg.Requests)-1].Body)
+			assert.NoError(t, err)
+			var payload CodespacesSecretPayload
+			err = json.Unmarshal(data, &payload)
+			assert.NoError(t, err)
+			assert.Equal(t, payload.KeyID, "123")
+			assert.Equal(t, payload.EncryptedValue, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=")
 			assert.ElementsMatch(t, payload.Repositories, tt.wantRepositories)
 		})
 	}
