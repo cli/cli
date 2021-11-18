@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -166,8 +167,6 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 	if err != nil {
 		return "", err
 	}
-	// encode special characters and replace all encoded forward slashes back to normal forward slashes
-	filePath = strings.ReplaceAll(url.PathEscape(filePath), "%2F", "/")
 
 	branchName := opts.Branch
 	if branchName == "" {
@@ -189,9 +188,14 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 		} else {
 			rangeFragment = fmt.Sprintf("L%d", rangeStart)
 		}
-		return fmt.Sprintf("blob/%s/%s?plain=1#%s", branchName, filePath, rangeFragment), nil
+		return fmt.Sprintf("blob/%s/%s?plain=1#%s", escapePath(branchName), escapePath(filePath), rangeFragment), nil
 	}
-	return fmt.Sprintf("tree/%s/%s", branchName, filePath), nil
+	return strings.TrimSuffix(fmt.Sprintf("tree/%s/%s", escapePath(branchName), escapePath(filePath)), "/"), nil
+}
+
+// escapePath URL-encodes special characters but leaves slashes unchanged
+func escapePath(p string) string {
+	return strings.ReplaceAll(url.PathEscape(p), "%2F", "/")
 }
 
 func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err error) {
@@ -201,9 +205,9 @@ func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err 
 		return
 	}
 
-	p = parts[0]
-	if !filepath.IsAbs(p) {
-		p = filepath.Clean(filepath.Join(opts.PathFromRepoRoot(), p))
+	p = filepath.ToSlash(parts[0])
+	if !path.IsAbs(p) {
+		p = path.Join(opts.PathFromRepoRoot(), p)
 		if p == "." || strings.HasPrefix(p, "..") {
 			p = ""
 		}

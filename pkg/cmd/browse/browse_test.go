@@ -170,7 +170,7 @@ func Test_runBrowse(t *testing.T) {
 				SelectorArg: "",
 			},
 			baseRepo:    ghrepo.New("jlsestak", "cli"),
-			expectedURL: "https://github.com/jlsestak/cli/",
+			expectedURL: "https://github.com/jlsestak/cli",
 		},
 		{
 			name: "settings flag",
@@ -217,7 +217,7 @@ func Test_runBrowse(t *testing.T) {
 				Branch: "trunk",
 			},
 			baseRepo:    ghrepo.New("jlsestak", "CouldNotThinkOfARepoName"),
-			expectedURL: "https://github.com/jlsestak/CouldNotThinkOfARepoName/tree/trunk/",
+			expectedURL: "https://github.com/jlsestak/CouldNotThinkOfARepoName/tree/trunk",
 		},
 		{
 			name: "branch flag with file",
@@ -325,7 +325,7 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
 			wantsErr:    false,
-			expectedURL: "https://github.com/vilmibm/gh-user-status/tree/6f1a2405cace1633d89a79c74c65f22fe78f9659/",
+			expectedURL: "https://github.com/vilmibm/gh-user-status/tree/6f1a2405cace1633d89a79c74c65f22fe78f9659",
 		},
 		{
 			name: "open last commit with a file",
@@ -367,11 +367,11 @@ func Test_runBrowse(t *testing.T) {
 			name: "use special characters in selector arg",
 			opts: BrowseOptions{
 				SelectorArg: "?=hello world/ *:23-44",
+				Branch:      "branch/with spaces?",
 			},
-			baseRepo:      ghrepo.New("bchadwic", "test"),
-			defaultBranch: "trunk",
-			expectedURL:   "https://github.com/bchadwic/test/blob/trunk/%3F=hello%20world/%20%2A?plain=1#L23-L44",
-			wantsErr:      false,
+			baseRepo:    ghrepo.New("bchadwic", "test"),
+			expectedURL: "https://github.com/bchadwic/test/blob/branch/with%20spaces%3F/%3F=hello%20world/%20%2A?plain=1#L23-L44",
+			wantsErr:    false,
 		},
 	}
 
@@ -420,67 +420,95 @@ func Test_runBrowse(t *testing.T) {
 }
 
 func Test_parsePathFromFileArg(t *testing.T) {
-	s := string(os.PathSeparator)
 	tests := []struct {
 		name         string
+		currentDir   string
 		fileArg      string
 		expectedPath string
 	}{
 		{
+			name:         "empty paths",
+			currentDir:   "",
+			fileArg:      "",
+			expectedPath: "",
+		},
+		{
+			name:         "root directory",
+			currentDir:   "",
+			fileArg:      ".",
+			expectedPath: "",
+		},
+		{
+			name:         "relative path",
+			currentDir:   "",
+			fileArg:      filepath.FromSlash("foo/bar.py"),
+			expectedPath: "foo/bar.py",
+		},
+		{
 			name:         "go to parent folder",
-			fileArg:      ".." + s,
+			currentDir:   "pkg/cmd/browse/",
+			fileArg:      filepath.FromSlash("../"),
 			expectedPath: "pkg/cmd",
 		},
 		{
 			name:         "current folder",
+			currentDir:   "pkg/cmd/browse/",
 			fileArg:      ".",
 			expectedPath: "pkg/cmd/browse",
 		},
 		{
 			name:         "current folder (alternative)",
-			fileArg:      "." + s,
+			currentDir:   "pkg/cmd/browse/",
+			fileArg:      filepath.FromSlash("./"),
 			expectedPath: "pkg/cmd/browse",
 		},
 		{
 			name:         "file that starts with '.'",
+			currentDir:   "pkg/cmd/browse/",
 			fileArg:      ".gitignore",
 			expectedPath: "pkg/cmd/browse/.gitignore",
 		},
 		{
 			name:         "file in current folder",
+			currentDir:   "pkg/cmd/browse/",
 			fileArg:      filepath.Join(".", "browse.go"),
 			expectedPath: "pkg/cmd/browse/browse.go",
 		},
 		{
 			name:         "file within parent folder",
+			currentDir:   "pkg/cmd/browse/",
 			fileArg:      filepath.Join("..", "browse.go"),
 			expectedPath: "pkg/cmd/browse.go",
 		},
 		{
 			name:         "file within parent folder uncleaned",
-			fileArg:      filepath.Join("..", ".") + s + s + s + "browse.go",
+			currentDir:   "pkg/cmd/browse/",
+			fileArg:      filepath.FromSlash(".././//browse.go"),
 			expectedPath: "pkg/cmd/browse.go",
 		},
 		{
 			name:         "different path from root directory",
+			currentDir:   "pkg/cmd/browse/",
 			fileArg:      filepath.Join("..", "..", "..", "internal/build/build.go"),
 			expectedPath: "internal/build/build.go",
 		},
 		{
 			name:         "go out of repository",
-			fileArg:      filepath.Join("..", "..", "..", "..", "..", "..") + s + "",
+			currentDir:   "pkg/cmd/browse/",
+			fileArg:      filepath.FromSlash("../../../../../../"),
 			expectedPath: "",
 		},
 		{
 			name:         "go to root of repository",
-			fileArg:      filepath.Join("..", "..", "..") + s + "",
+			currentDir:   "pkg/cmd/browse/",
+			fileArg:      filepath.Join("../../../"),
 			expectedPath: "",
 		},
 	}
 	for _, tt := range tests {
 		path, _, _, _ := parseFile(BrowseOptions{
 			PathFromRepoRoot: func() string {
-				return "pkg/cmd/browse/"
+				return tt.currentDir
 			}}, tt.fileArg)
 		assert.Equal(t, tt.expectedPath, path, tt.name)
 	}
