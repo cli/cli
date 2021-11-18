@@ -2,6 +2,7 @@ package browse
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -125,6 +126,8 @@ func TestNewCmdBrowse(t *testing.T) {
 			argv, err := shlex.Split(tt.cli)
 			assert.NoError(t, err)
 			cmd.SetArgs(argv)
+			cmd.SetOut(ioutil.Discard)
+			cmd.SetErr(ioutil.Discard)
 			_, err = cmd.ExecuteC()
 
 			if tt.wantsErr {
@@ -235,7 +238,7 @@ func Test_runBrowse(t *testing.T) {
 				PathFromRepoRoot: func() string { return "pkg/dir" },
 			},
 			baseRepo:    ghrepo.New("bstnc", "yeepers"),
-			expectedURL: "https://github.com/bstnc/yeepers/tree/feature-123/",
+			expectedURL: "https://github.com/bstnc/yeepers/tree/feature-123",
 		},
 		{
 			name: "branch flag within dir with .",
