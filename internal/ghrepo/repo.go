@@ -53,6 +53,12 @@ func SetDefaultHost(host string) {
 // FromFullName extracts the GitHub repository information from the following
 // formats: "OWNER/REPO", "HOST/OWNER/REPO", and a full URL.
 func FromFullName(nwo string) (Interface, error) {
+	return FromFullNameWithHost(nwo, defaultHost())
+}
+
+// FromFullNameWithHost is like FromFullName that defaults to a specific host for values that don't
+// explicitly include a hostname.
+func FromFullNameWithHost(nwo, fallbackHost string) (Interface, error) {
 	if git.IsURL(nwo) {
 		u, err := git.ParseURL(nwo)
 		if err != nil {
@@ -71,7 +77,7 @@ func FromFullName(nwo string) (Interface, error) {
 	case 3:
 		return NewWithHost(parts[1], parts[2], parts[0]), nil
 	case 2:
-		return NewWithHost(parts[0], parts[1], defaultHost()), nil
+		return NewWithHost(parts[0], parts[1], fallbackHost), nil
 	default:
 		return nil, fmt.Errorf(`expected the "[HOST/]OWNER/REPO" format, got %q`, nwo)
 	}

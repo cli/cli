@@ -199,6 +199,10 @@ func escapePath(p string) string {
 }
 
 func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err error) {
+	if f == "" {
+		return
+	}
+
 	parts := strings.SplitN(f, ":", 3)
 	if len(parts) > 2 {
 		err = fmt.Errorf("invalid file argument: %q", f)

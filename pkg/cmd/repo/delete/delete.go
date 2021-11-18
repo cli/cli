@@ -18,6 +18,7 @@ import (
 
 type DeleteOptions struct {
 	HttpClient func() (*http.Client, error)
+	BaseRepo   func() (ghrepo.Interface, error)
 	IO         *iostreams.IOStreams
 	RepoArg    string
 	Confirmed  bool
@@ -27,21 +28,27 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	opts := &DeleteOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		BaseRepo:   f.BaseRepo,
 	}
 
 	cmd := &cobra.Command{
-		Use:   "delete <repository>",
+		Use:   "delete [<repository>]",
 		Short: "Delete a repository",
 		Long: `Delete a GitHub repository.
 
+With no argument, deletes the current repository. Otherwise, deletes the specified repository.
+
 Deletion requires authorization with the "delete_repo" scope. 
 To authorize, run "gh auth refresh -s delete_repo"`,
-		Args: cmdutil.ExactArgs(1, "cannot delete: repository argument required"),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.RepoArg = args[0]
-			if !opts.IO.CanPrompt() && !opts.Confirmed {
-				return cmdutil.FlagErrorf("could not prompt: confirmation with prompt or --confirm flag required")
+			if len(args) > 0 {
+				opts.RepoArg = args[0]
 			}
+			if !opts.IO.CanPrompt() && !opts.Confirmed {
+				return cmdutil.FlagErrorf("--confirm required when not running interactively")
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -60,21 +67,27 @@ func deleteRun(opts *DeleteOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	repoSelector := opts.RepoArg
 	var toDelete ghrepo.Interface
 
-	if !strings.Contains(repoSelector, "/") {
-		currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+	if opts.RepoArg == "" {
+		toDelete, err = opts.BaseRepo()
 		if err != nil {
 			return err
 		}
-		repoSelector = currentUser + "/" + repoSelector
+	} else {
+		repoSelector := opts.RepoArg
+		if !strings.Contains(repoSelector, "/") {
+			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+			if err != nil {
+				return err
+			}
+			repoSelector = currentUser + "/" + repoSelector
+		}
+		toDelete, err = ghrepo.FromFullName(repoSelector)
+		if err != nil {
+			return fmt.Errorf("argument error: %w", err)
+		}
 	}
-	toDelete, err = ghrepo.FromFullName(repoSelector)
-	if err != nil {
-		return fmt.Errorf("argument error: %w", err)
-	}
-
 	fullName := ghrepo.FullName(toDelete)
 
 	if !opts.Confirmed {
