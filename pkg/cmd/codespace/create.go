@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/codespaces"
@@ -12,10 +13,11 @@ import (
 )
 
 type createOptions struct {
-	repo       string
-	branch     string
-	machine    string
-	showStatus bool
+	repo        string
+	branch      string
+	machine     string
+	showStatus  bool
+	idleTimeout time.Duration
 }
 
 func newCreateCmd(app *App) *cobra.Command {
@@ -34,6 +36,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().StringVarP(&opts.branch, "branch", "b", "", "repository branch")
 	createCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "hardware specifications for the VM")
 	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
+	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 30*time.Minute, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
 
 	return createCmd
 }
@@ -101,10 +104,11 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 
 	a.StartProgressIndicatorWithLabel("Creating codespace")
 	codespace, err := a.apiClient.CreateCodespace(ctx, &api.CreateCodespaceParams{
-		RepositoryID: repository.ID,
-		Branch:       branch,
-		Machine:      machine,
-		Location:     locationResult.Location,
+		RepositoryID:       repository.ID,
+		Branch:             branch,
+		Machine:            machine,
+		Location:           locationResult.Location,
+		IdleTimeoutMinutes: int(opts.idleTimeout.Minutes()),
 	})
 	a.StopProgressIndicator()
 	if err != nil {
