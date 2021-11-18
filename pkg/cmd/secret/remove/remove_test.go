@@ -49,6 +49,14 @@ func TestNewCmdRemove(t *testing.T) {
 				EnvName:    "anEnv",
 			},
 		},
+		{
+			name: "user",
+			cli:  "cool -u",
+			wants: RemoveOptions{
+				SecretName:  "cool",
+				UserSecrets: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -200,4 +208,31 @@ func Test_removeRun_org(t *testing.T) {
 		})
 	}
 
+}
+
+func Test_removeRun_user(t *testing.T) {
+	reg := &httpmock.Registry{}
+
+	reg.Register(
+		httpmock.REST("DELETE", "user/codespaces/secrets/cool_secret"),
+		httpmock.StatusStringResponse(204, "No Content"))
+
+	io, _, _, _ := iostreams.Test()
+
+	opts := &RemoveOptions{
+		IO: io,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+		SecretName:  "cool_secret",
+		UserSecrets: true,
+	}
+
+	err := removeRun(opts)
+	assert.NoError(t, err)
+
+	reg.Verify(t)
 }
