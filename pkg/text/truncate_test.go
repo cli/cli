@@ -15,6 +15,22 @@ func TestTruncate(t *testing.T) {
 		want string
 	}{
 		{
+			name: "Short enough",
+			args: args{
+				max: 5,
+				s:   "short",
+			},
+			want: "short",
+		},
+		{
+			name: "Too short",
+			args: args{
+				max: 4,
+				s:   "short",
+			},
+			want: "shor",
+		},
+		{
 			name: "Japanese",
 			args: args{
 				max: 11,
@@ -78,11 +94,95 @@ func TestTruncate(t *testing.T) {
 			},
 			want: "é́́é́́é́́é́́é́́é́́é́́é́́...",
 		},
+		{
+			name: "Red accented characters",
+			args: args{
+				max: 11,
+				s:   "\x1b[0;31mé́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́é́́\x1b[0m",
+			},
+			want: "\x1b[0;31mé́́é́́é́́é́́é́́é́́é́́é́́...\x1b[0m",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := Truncate(tt.args.max, tt.args.s); got != tt.want {
 				t.Errorf("Truncate() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestTruncateColumn(t *testing.T) {
+	type args struct {
+		max int
+		s   string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "exactly minimum width",
+			args: args{
+				max: 5,
+				s:   "short",
+			},
+			want: "short",
+		},
+		{
+			name: "exactly minimum width with new line",
+			args: args{
+				max: 5,
+				s:   "short\n",
+			},
+			want: "sh...",
+		},
+		{
+			name: "less than minimum width",
+			args: args{
+				max: 4,
+				s:   "short",
+			},
+			want: "shor",
+		},
+		{
+			name: "less than minimum width with new line",
+			args: args{
+				max: 4,
+				s:   "short\n",
+			},
+			want: "shor",
+		},
+		{
+			name: "first line of multiple is short enough",
+			args: args{
+				max: 80,
+				s:   "short\n\nthis is a new line",
+			},
+			want: "short...",
+		},
+		{
+			name: "using Windows line endings",
+			args: args{
+				max: 80,
+				s:   "short\r\n\r\nthis is a new line",
+			},
+			want: "short...",
+		},
+		{
+			name: "using older MacOS line endings",
+			args: args{
+				max: 80,
+				s:   "short\r\rthis is a new line",
+			},
+			want: "short...",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := TruncateColumn(tt.args.max, tt.args.s); got != tt.want {
+				t.Errorf("TruncateColumn() = %q, want %q", got, tt.want)
 			}
 		})
 	}
@@ -148,6 +248,11 @@ func TestDisplayWidth(t *testing.T) {
 			name: "accent character",
 			text: `é́́`,
 			want: 1,
+		},
+		{
+			name: "color codes",
+			text: "\x1b[0;31mred\x1b[0m",
+			want: 3,
 		},
 	}
 	for _, tt := range tests {

@@ -5,9 +5,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/githubsearch"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/githubsearch"
 	"github.com/google/shlex"
 )
 
@@ -154,11 +154,12 @@ type FilterOptions struct {
 	Labels     []string
 	Author     string
 	BaseBranch string
+	HeadBranch string
 	Mention    string
 	Milestone  string
 	Search     string
-
-	Fields []string
+	Draft      string
+	Fields     []string
 }
 
 func (opts *FilterOptions) IsDefault() bool {
@@ -175,6 +176,9 @@ func (opts *FilterOptions) IsDefault() bool {
 		return false
 	}
 	if opts.BaseBranch != "" {
+		return false
+	}
+	if opts.HeadBranch != "" {
 		return false
 	}
 	if opts.Mention != "" {
@@ -232,6 +236,9 @@ func SearchQueryBuild(options FilterOptions) string {
 	if options.BaseBranch != "" {
 		q.SetBaseBranch(options.BaseBranch)
 	}
+	if options.HeadBranch != "" {
+		q.SetHeadBranch(options.HeadBranch)
+	}
 	if options.Mention != "" {
 		q.Mentions(options.Mention)
 	}
@@ -241,7 +248,9 @@ func SearchQueryBuild(options FilterOptions) string {
 	if options.Search != "" {
 		q.AddQuery(options.Search)
 	}
-
+	if options.Draft != "" {
+		q.SetDraft(options.Draft)
+	}
 	return q.String()
 }
 

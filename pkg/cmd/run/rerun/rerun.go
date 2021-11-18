@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/run/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/run/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +40,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 			if len(args) > 0 {
 				opts.RunID = args[0]
 			} else if !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("run ID required when not running interactively")}
+				return cmdutil.FlagErrorf("run ID required when not running interactively")
 			} else {
 				opts.Prompt = true
 			}

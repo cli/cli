@@ -7,15 +7,15 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	issueShared "github.com/cli/cli/pkg/cmd/issue/shared"
-	"github.com/cli/cli/pkg/cmd/pr/shared"
-	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
+	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -57,7 +57,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Example: heredoc.Doc(`
 			$ gh issue list -l "bug" -l "help wanted"
 			$ gh issue list -A monalisa
-			$ gh issue list -a @me
+			$ gh issue list -a "@me"
 			$ gh issue list --web
 			$ gh issue list --milestone "The big 1.0"
 			$ gh issue list --search "error no:assignee sort:created-asc"
@@ -68,7 +68,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			opts.BaseRepo = f.BaseRepo
 
 			if opts.LimitResults < 1 {
-				return &cmdutil.FlagError{Err: fmt.Errorf("invalid limit: %v", opts.LimitResults)}
+				return cmdutil.FlagErrorf("invalid limit: %v", opts.LimitResults)
 			}
 
 			if runF != nil {
@@ -163,9 +163,12 @@ func listRun(opts *ListOptions) error {
 	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
-		return opts.Exporter.Write(opts.IO.Out, listResult.Issues, opts.IO.ColorEnabled())
+		return opts.Exporter.Write(opts.IO, listResult.Issues)
 	}
 
+	if listResult.SearchCapped {
+		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
+	}
 	if isTerminal {
 		title := prShared.ListHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, !filterOptions.IsDefault())
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)

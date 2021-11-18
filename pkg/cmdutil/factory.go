@@ -3,11 +3,11 @@ package cmdutil
 import (
 	"net/http"
 
-	"github.com/cli/cli/context"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/extensions"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/extensions"
+	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 type Browser interface {
@@ -27,5 +27,5 @@ type Factory struct {
 	ExtensionManager extensions.ExtensionManager
 
 	// Executable is the path to the currently invoked gh binary
-	Executable string
+	Executable func() string
 }

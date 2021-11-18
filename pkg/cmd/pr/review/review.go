@@ -7,14 +7,14 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/markdown"
-	"github.com/cli/cli/pkg/prompt"
-	"github.com/cli/cli/pkg/surveyext"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
+	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/cli/cli/v2/pkg/surveyext"
 	"github.com/spf13/cobra"
 )
 
@@ -72,7 +72,7 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 			opts.Finder = shared.NewFinder(f)
 
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
-				return &cmdutil.FlagError{Err: errors.New("argument required when using the --repo flag")}
+				return cmdutil.FlagErrorf("argument required when using the --repo flag")
 			}
 
 			if len(args) > 0 {
@@ -106,26 +106,26 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 				found++
 				opts.ReviewType = api.ReviewRequestChanges
 				if opts.Body == "" {
-					return &cmdutil.FlagError{Err: errors.New("body cannot be blank for request-changes review")}
+					return cmdutil.FlagErrorf("body cannot be blank for request-changes review")
 				}
 			}
 			if flagComment {
 				found++
 				opts.ReviewType = api.ReviewComment
 				if opts.Body == "" {
-					return &cmdutil.FlagError{Err: errors.New("body cannot be blank for comment review")}
+					return cmdutil.FlagErrorf("body cannot be blank for comment review")
 				}
 			}
 
 			if found == 0 && opts.Body == "" {
 				if !opts.IO.CanPrompt() {
-					return &cmdutil.FlagError{Err: errors.New("--approve, --request-changes, or --comment required when not running interactively")}
+					return cmdutil.FlagErrorf("--approve, --request-changes, or --comment required when not running interactively")
 				}
 				opts.InteractiveMode = true
 			} else if found == 0 && opts.Body != "" {
-				return &cmdutil.FlagError{Err: errors.New("--body unsupported without --approve, --request-changes, or --comment")}
+				return cmdutil.FlagErrorf("--body unsupported without --approve, --request-changes, or --comment")
 			} else if found > 1 {
-				return &cmdutil.FlagError{Err: errors.New("need exactly one of --approve, --request-changes, or --comment")}
+				return cmdutil.FlagErrorf("need exactly one of --approve, --request-changes, or --comment")
 			}
 
 			if runF != nil {
@@ -139,7 +139,7 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&flagRequestChanges, "request-changes", "r", false, "Request changes on a pull request")
 	cmd.Flags().BoolVarP(&flagComment, "comment", "c", false, "Comment on a pull request")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Specify the body of a review")
-	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
+	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 
 	return cmd
 }

@@ -10,9 +10,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cli/cli/pkg/export"
-	"github.com/cli/cli/pkg/jsoncolor"
-	"github.com/cli/cli/pkg/set"
+	"github.com/cli/cli/v2/pkg/export"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/jsoncolor"
+	"github.com/cli/cli/v2/pkg/set"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -72,11 +73,14 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 	}
 
 	cmd.SetFlagErrorFunc(func(c *cobra.Command, e error) error {
-		if e.Error() == "flag needs an argument: --json" {
+		if c == cmd && e.Error() == "flag needs an argument: --json" {
 			sort.Strings(fields)
 			return JSONFlagError{fmt.Errorf("Specify one or more comma-separated fields for `--json`:\n  %s", strings.Join(fields, "\n  "))}
 		}
-		return c.Parent().FlagErrorFunc()(c, e)
+		if cmd.HasParent() {
+			return cmd.Parent().FlagErrorFunc()(c, e)
+		}
+		return e
 	})
 }
 
@@ -107,7 +111,7 @@ func checkJSONFlags(cmd *cobra.Command) (*exportFormat, error) {
 
 type Exporter interface {
 	Fields() []string
-	Write(w io.Writer, data interface{}, colorEnabled bool) error
+	Write(io *iostreams.IOStreams, data interface{}) error
 }
 
 type exportFormat struct {
@@ -123,7 +127,7 @@ func (e *exportFormat) Fields() []string {
 // Write serializes data into JSON output written to w. If the object passed as data implements exportable,
 // or if data is a map or slice of exportable object, ExportData() will be called on each object to obtain
 // raw data for serialization.
-func (e *exportFormat) Write(w io.Writer, data interface{}, colorEnabled bool) error {
+func (e *exportFormat) Write(ios *iostreams.IOStreams, data interface{}) error {
 	buf := bytes.Buffer{}
 	encoder := json.NewEncoder(&buf)
 	encoder.SetEscapeHTML(false)
@@ -131,11 +135,12 @@ func (e *exportFormat) Write(w io.Writer, data interface{}, colorEnabled bool) e
 		return err
 	}
 
+	w := ios.Out
 	if e.filter != "" {
 		return export.FilterJSON(w, &buf, e.filter)
 	} else if e.template != "" {
-		return export.ExecuteTemplate(w, &buf, e.template, colorEnabled)
-	} else if colorEnabled {
+		return export.ExecuteTemplate(ios, &buf, e.template)
+	} else if ios.ColorEnabled() {
 		return jsoncolor.Write(w, &buf, "  ")
 	}
 
@@ -177,7 +182,7 @@ func (e *exportFormat) exportData(v reflect.Value) interface{} {
 }
 
 type exportable interface {
-	ExportData([]string) *map[string]interface{}
+	ExportData([]string) map[string]interface{}
 }
 
 var exportableType = reflect.TypeOf((*exportable)(nil)).Elem()

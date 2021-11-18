@@ -7,14 +7,14 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
-	"github.com/cli/cli/pkg/surveyext"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/cli/cli/v2/pkg/surveyext"
 	"github.com/spf13/cobra"
 )
 
@@ -75,7 +75,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			opts.Finder = shared.NewFinder(f)
 
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
-				return &cmdutil.FlagError{Err: errors.New("argument required when using the --repo flag")}
+				return cmdutil.FlagErrorf("argument required when using the --repo flag")
 			}
 
 			if len(args) > 0 {
@@ -97,11 +97,11 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			}
 			if methodFlags == 0 {
 				if !opts.IO.CanPrompt() {
-					return &cmdutil.FlagError{Err: errors.New("--merge, --rebase, or --squash required when not running interactively")}
+					return cmdutil.FlagErrorf("--merge, --rebase, or --squash required when not running interactively")
 				}
 				opts.InteractiveMode = true
 			} else if methodFlags > 1 {
-				return &cmdutil.FlagError{Err: errors.New("only one of --merge, --rebase, or --squash can be enabled")}
+				return cmdutil.FlagErrorf("only one of --merge, --rebase, or --squash can be enabled")
 			}
 
 			opts.IsDeleteBranchIndicated = cmd.Flags().Changed("delete-branch")
@@ -153,7 +153,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	cmd.Flags().BoolVar(&opts.UseAdmin, "admin", false, "Use administrator privileges to merge a pull request that does not meet requirements")
 	cmd.Flags().BoolVarP(&opts.DeleteBranch, "delete-branch", "d", false, "Delete the local and remote branch after merge")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Body `text` for the merge commit")
-	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
+	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().BoolVarP(&flagMerge, "merge", "m", false, "Merge the commits with the base branch")
 	cmd.Flags().BoolVarP(&flagRebase, "rebase", "r", false, "Rebase the commits onto the base branch")
 	cmd.Flags().BoolVarP(&flagSquash, "squash", "s", false, "Squash the commits into one commit and merge it into the base branch")

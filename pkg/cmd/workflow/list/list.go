@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/workflow/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -45,7 +45,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			opts.PlainOutput = !terminal
 
 			if opts.Limit < 1 {
-				return &cmdutil.FlagError{Err: fmt.Errorf("invalid limit: %v", opts.Limit)}
+				return cmdutil.FlagErrorf("invalid limit: %v", opts.Limit)
 			}
 
 			if runF != nil {

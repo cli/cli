@@ -1,11 +1,9 @@
 package actions
 
 import (
-	"fmt"
-
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
@@ -14,11 +12,8 @@ func NewCmdActions(f *cmdutil.Factory) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "actions",
-		Short: "Learn about working with GitHub actions",
+		Short: "Learn about working with GitHub Actions",
 		Long:  actionsExplainer(cs),
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Fprintln(f.IOStreams.Out, actionsExplainer(cs))
-		},
 		Annotations: map[string]string{
 			"IsActions": "true",
 		},
@@ -56,8 +51,5 @@ func actionsExplainer(cs *iostreams.ColorScheme) string {
 			gh workflow run:      Trigger a workflow_dispatch run for a workflow file
 
 			To see more help, run 'gh help workflow <subcommand>'
-
-			For more in depth help including examples, see online documentation at:
-			<https://docs.github.com/en/actions/guides/managing-github-actions-with-github-cli>
 		`, header, runHeader, workflowHeader)
 }

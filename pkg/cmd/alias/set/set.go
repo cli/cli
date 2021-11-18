@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 )
@@ -82,7 +82,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 					return true
 				}
 
-				for _, ext := range f.ExtensionManager.List() {
+				for _, ext := range f.ExtensionManager.List(false) {
 					if ext.Name() == split[0] {
 						return true
 					}

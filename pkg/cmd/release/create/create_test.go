@@ -11,11 +11,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/release/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/release/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -160,6 +160,30 @@ func Test_NewCmdCreate(t *testing.T) {
 			isTTY:   true,
 			wantErr: "could not create: no tag name provided",
 		},
+		{
+			name:  "discussion category",
+			args:  "v1.2.3 --discussion-category 'General'",
+			isTTY: true,
+			want: CreateOptions{
+				TagName:            "v1.2.3",
+				Target:             "",
+				Name:               "",
+				Body:               "",
+				BodyProvided:       false,
+				Draft:              false,
+				Prerelease:         false,
+				RepoOverride:       "",
+				Concurrency:        5,
+				Assets:             []*shared.AssetForUpload(nil),
+				DiscussionCategory: "General",
+			},
+		},
+		{
+			name:    "discussion category for draft release",
+			args:    "v1.2.3 -d --discussion-category 'General'",
+			isTTY:   true,
+			wantErr: "Discussions for draft releases not supported",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -209,6 +233,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.want.Prerelease, opts.Prerelease)
 			assert.Equal(t, tt.want.Concurrency, opts.Concurrency)
 			assert.Equal(t, tt.want.RepoOverride, opts.RepoOverride)
+			assert.Equal(t, tt.want.DiscussionCategory, opts.DiscussionCategory)
 
 			require.Equal(t, len(tt.want.Assets), len(opts.Assets))
 			for i := range tt.want.Assets {
@@ -245,6 +270,28 @@ func Test_createRun(t *testing.T) {
 				"body":       "* Fixed bugs",
 				"draft":      false,
 				"prerelease": false,
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantStderr: ``,
+		},
+		{
+			name:  "with discussion category",
+			isTTY: true,
+			opts: CreateOptions{
+				TagName:            "v1.2.3",
+				Name:               "The Big 1.2",
+				Body:               "* Fixed bugs",
+				BodyProvided:       true,
+				Target:             "",
+				DiscussionCategory: "General",
+			},
+			wantParams: map[string]interface{}{
+				"tag_name":                 "v1.2.3",
+				"name":                     "The Big 1.2",
+				"body":                     "* Fixed bugs",
+				"draft":                    false,
+				"prerelease":               false,
+				"discussion_category_name": "General",
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: ``,
@@ -290,6 +337,29 @@ func Test_createRun(t *testing.T) {
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: ``,
+		},
+		{
+			name:  "discussion category for draft release",
+			isTTY: true,
+			opts: CreateOptions{
+				TagName:            "v1.2.3",
+				Name:               "",
+				Body:               "",
+				BodyProvided:       true,
+				Draft:              true,
+				Target:             "",
+				DiscussionCategory: "general",
+			},
+			wantParams: map[string]interface{}{
+				"tag_name":                 "v1.2.3",
+				"name":                     "",
+				"body":                     "",
+				"draft":                    true,
+				"prerelease":               false,
+				"discussion_category_name": "general",
+			},
+			wantErr:    "X Discussions not supported with draft releases",
+			wantStdout: "",
 		},
 		{
 			name:  "publish after uploading files",

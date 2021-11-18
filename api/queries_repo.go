@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -230,6 +230,36 @@ func (r Repository) ViewerCanTriage() bool {
 	}
 }
 
+func FetchRepository(client *Client, repo ghrepo.Interface, fields []string) (*Repository, error) {
+	query := fmt.Sprintf(`query RepositoryInfo($owner: String!, $name: String!) {
+		repository(owner: $owner, name: $name) {%s}
+	}`, RepositoryGraphQL(fields))
+
+	variables := map[string]interface{}{
+		"owner": repo.RepoOwner(),
+		"name":  repo.RepoName(),
+	}
+
+	var result struct {
+		Repository *Repository
+	}
+	if err := client.GraphQL(repo.RepoHost(), query, variables, &result); err != nil {
+		return nil, err
+	}
+	// The GraphQL API should have returned an error in case of a missing repository, but this isn't
+	// guaranteed to happen when an authentication token with insufficient permissions is being used.
+	if result.Repository == nil {
+		return nil, GraphQLErrorResponse{
+			Errors: []GraphQLError{{
+				Type:    "NOT_FOUND",
+				Message: fmt.Sprintf("Could not resolve to a Repository with the name '%s/%s'.", repo.RepoOwner(), repo.RepoName()),
+			}},
+		}
+	}
+
+	return InitRepoHostname(result.Repository, repo.RepoHost()), nil
+}
+
 func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
 	fragment repo on Repository {
@@ -261,16 +291,24 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 		"name":  repo.RepoName(),
 	}
 
-	result := struct {
-		Repository Repository
-	}{}
-	err := client.GraphQL(repo.RepoHost(), query, variables, &result)
-
-	if err != nil {
+	var result struct {
+		Repository *Repository
+	}
+	if err := client.GraphQL(repo.RepoHost(), query, variables, &result); err != nil {
 		return nil, err
 	}
+	// The GraphQL API should have returned an error in case of a missing repository, but this isn't
+	// guaranteed to happen when an authentication token with insufficient permissions is being used.
+	if result.Repository == nil {
+		return nil, GraphQLErrorResponse{
+			Errors: []GraphQLError{{
+				Type:    "NOT_FOUND",
+				Message: fmt.Sprintf("Could not resolve to a Repository with the name '%s/%s'.", repo.RepoOwner(), repo.RepoName()),
+			}},
+		}
+	}
 
-	return InitRepoHostname(&result.Repository, repo.RepoHost()), nil
+	return InitRepoHostname(result.Repository, repo.RepoHost()), nil
 }
 
 func RepoDefaultBranch(client *Client, repo ghrepo.Interface) (string, error) {

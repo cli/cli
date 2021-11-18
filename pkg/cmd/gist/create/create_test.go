@@ -10,12 +10,12 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/cmd/gist/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -387,33 +387,4 @@ func Test_detectEmptyFiles(t *testing.T) {
 		isEmptyFile := detectEmptyFiles(files)
 		assert.Equal(t, tt.isEmptyFile, isEmptyFile)
 	}
-}
-
-func Test_CreateRun_reauth(t *testing.T) {
-	reg := &httpmock.Registry{}
-	reg.Register(httpmock.REST("POST", "gists"), func(req *http.Request) (*http.Response, error) {
-		return &http.Response{
-			StatusCode: 404,
-			Request:    req,
-			Header: map[string][]string{
-				"X-Oauth-Scopes": {"repo, read:org"},
-			},
-			Body: ioutil.NopCloser(bytes.NewBufferString("oh no")),
-		}, nil
-	})
-
-	io, _, _, _ := iostreams.Test()
-
-	opts := &CreateOptions{
-		IO: io,
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		},
-		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
-		},
-	}
-
-	err := createRun(opts)
-	assert.EqualError(t, err, "This command requires the 'gist' OAuth scope.\nPlease re-authenticate with:  gh auth refresh -h github.com -s gist")
 }

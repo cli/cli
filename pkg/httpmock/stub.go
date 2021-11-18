@@ -162,5 +162,6 @@ func httpResponse(status int, req *http.Request, body io.Reader) *http.Response 
 		StatusCode: status,
 		Request:    req,
 		Body:       ioutil.NopCloser(body),
+		Header:     http.Header{},
 	}
 }

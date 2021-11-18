@@ -2,12 +2,11 @@ package secret
 
 import (
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/pkg/cmdutil"
+	cmdList "github.com/cli/cli/v2/pkg/cmd/secret/list"
+	cmdRemove "github.com/cli/cli/v2/pkg/cmd/secret/remove"
+	cmdSet "github.com/cli/cli/v2/pkg/cmd/secret/set"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
-
-	cmdList "github.com/cli/cli/pkg/cmd/secret/list"
-	cmdRemove "github.com/cli/cli/pkg/cmd/secret/remove"
-	cmdSet "github.com/cli/cli/pkg/cmd/secret/set"
 )
 
 func NewCmdSecret(f *cmdutil.Factory) *cobra.Command {
@@ -16,7 +15,8 @@ func NewCmdSecret(f *cmdutil.Factory) *cobra.Command {
 		Short: "Manage GitHub secrets",
 		Long: heredoc.Doc(`
 			Secrets can be set at the repository, environment, or organization level for use in
-			GitHub Actions. Run "gh help secret set" to learn how to get started.
+			GitHub Actions. User secrets can be set for use in GitHub Codespaces.
+			Run "gh help secret set" to learn how to get started.
 `),
 	}
 
