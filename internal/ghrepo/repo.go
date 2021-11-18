@@ -111,7 +111,9 @@ func IsSame(a, b Interface) bool {
 func GenerateRepoURL(repo Interface, p string, args ...interface{}) string {
 	baseURL := fmt.Sprintf("%s%s/%s", ghinstance.HostPrefix(repo.RepoHost()), repo.RepoOwner(), repo.RepoName())
 	if p != "" {
-		return baseURL + "/" + fmt.Sprintf(p, args...)
+		if path := fmt.Sprintf(p, args...); path != "" {
+			return baseURL + "/" + path
+		}
 	}
 	return baseURL
 }
