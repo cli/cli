@@ -12,8 +12,8 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/internal/ghinstance"
+	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/henvic/httpretty"
-	"github.com/shurcooL/graphql"
 )
 
 // ClientOption represents an argument to NewClient
