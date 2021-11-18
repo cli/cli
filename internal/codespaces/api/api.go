@@ -415,8 +415,9 @@ func (a *API) GetCodespaceRegionLocation(ctx context.Context) (string, error) {
 }
 
 type Machine struct {
-	Name        string `json:"name"`
-	DisplayName string `json:"display_name"`
+	Name                 string `json:"name"`
+	DisplayName          string `json:"display_name"`
+	PrebuildAvailability string `json:"prebuild_availability"`
 }
 
 // GetCodespacesMachines returns the codespaces machines for the given repo, branch and location.
