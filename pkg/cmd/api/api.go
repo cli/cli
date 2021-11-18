@@ -93,7 +93,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			  from the repository of the current directory;
 			- if the value starts with "@", the rest of the value is interpreted as a
 			  filename to read the value from. Pass "-" to read from standard input.
-			
+
 			For GraphQL requests, all fields other than "query" and "operationName" are
 			interpreted as GraphQL variables.
 
