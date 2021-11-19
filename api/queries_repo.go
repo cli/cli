@@ -741,7 +741,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 		go func() {
 			teams, err := OrganizationTeams(client, repo)
 			// TODO: better detection of non-org repos
-			if err != nil && !strings.HasPrefix(err.Error(), "Could not resolve to an Organization") {
+			if err != nil && !strings.Contains(err.Error(), "Could not resolve to an Organization") {
 				errc <- fmt.Errorf("error fetching organization teams: %w", err)
 				return
 			}
@@ -952,7 +952,7 @@ func RepoAndOrgProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, e
 
 	orgProjects, err := OrganizationProjects(client, repo)
 	// TODO: better detection of non-org repos
-	if err != nil && !strings.HasPrefix(err.Error(), "Could not resolve to an Organization") {
+	if err != nil && !strings.Contains(err.Error(), "Could not resolve to an Organization") {
 		return projects, fmt.Errorf("error fetching organization projects: %w", err)
 	}
 	projects = append(projects, orgProjects...)

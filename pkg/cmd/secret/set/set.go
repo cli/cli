@@ -2,13 +2,10 @@ package set
 
 import (
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"regexp"
-	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
@@ -34,6 +31,7 @@ type SetOptions struct {
 	SecretName      string
 	OrgName         string
 	EnvName         string
+	UserSecrets     bool
 	Body            string
 	Visibility      string
 	RepositoryNames []string
@@ -49,25 +47,39 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	cmd := &cobra.Command{
 		Use:   "set <secret-name>",
 		Short: "Create or update secrets",
-		Long:  "Locally encrypt a new or updated secret at either the repository, environment, or organization level and send it to GitHub for storage.",
+		Long: heredoc.Doc(`
+			Set a value for a secret on one of the following levels:
+			- repository (default): available to Actions runs in a repository
+			- environment: available to Actions runs for a deployment environment in a repository
+			- organization: available to Actions runs within an organization
+			- user: available to Codespaces for your user
+
+			Organization and user secrets can optionally be restricted to only be available to
+			specific repositories.
+
+			Secret values are locally encrypted before being sent to GitHub.
+		`),
 		Example: heredoc.Doc(`
-			Paste secret in prompt
+			# Paste secret value for the current repository in an interactive prompt
 			$ gh secret set MYSECRET
 
-			Use environment variable as secret value
-			$ gh secret set MYSECRET  -b"${ENV_VALUE}"
+			# Read secret value from an environment variable
+			$ gh secret set MYSECRET --body "$ENV_VALUE"
 
-			Use file as secret value
-			$ gh secret set MYSECRET < file.json
+			# Read secret value from a file
+			$ gh secret set MYSECRET < myfile.txt
 
-			Set environment level secret
-			$ gh secret set MYSECRET -bval --env=anEnv
+			# Set secret for a deployment environment in the current repository
+			$ gh secret set MYSECRET --env myenvironment
 
-			Set organization level secret visible to entire organization
-			$ gh secret set MYSECRET -bval --org=anOrg --visibility=all
+			# Set organization-level secret visible to both public and private repositories
+			$ gh secret set MYSECRET --org myOrg --visibility all
 
-			Set organization level secret visible only to certain repositories
-			$ gh secret set MYSECRET -bval --org=anOrg --repos="repo1,repo2,repo3"
+			# Set organization-level secret visible to specific repositories
+			$ gh secret set MYSECRET --org myOrg --repos repo1,repo2,repo3
+
+			# Set user-level secret for Codespaces
+			$ gh secret set MYSECRET --user
 `),
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
@@ -79,35 +91,30 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			if err := cmdutil.MutuallyExclusive("specify only one of `--org` or `--env`", opts.OrgName != "", opts.EnvName != ""); err != nil {
+			if err := cmdutil.MutuallyExclusive("specify only one of `--org`, `--env`, or `--user`", opts.OrgName != "", opts.EnvName != "", opts.UserSecrets); err != nil {
 				return err
 			}
 
 			opts.SecretName = args[0]
 
-			err := validSecretName(opts.SecretName)
-			if err != nil {
-				return err
-			}
-
 			if cmd.Flags().Changed("visibility") {
 				if opts.OrgName == "" {
-					return cmdutil.FlagErrorf("--visibility not supported for repository secrets; did you mean to pass --org?")
+					return cmdutil.FlagErrorf("`--visibility` is only supported with `--org`")
 				}
 
 				if opts.Visibility != shared.All && opts.Visibility != shared.Private && opts.Visibility != shared.Selected {
-					return cmdutil.FlagErrorf("--visibility must be one of `all`, `private`, or `selected`")
+					return cmdutil.FlagErrorf("`--visibility` must be one of \"all\", \"private\", or \"selected\"")
 				}
 
-				if opts.Visibility != shared.Selected && cmd.Flags().Changed("repos") {
-					return cmdutil.FlagErrorf("--repos only supported when --visibility='selected'")
+				if opts.Visibility != shared.Selected && len(opts.RepositoryNames) > 0 {
+					return cmdutil.FlagErrorf("`--repos` is only supported with `--visibility=selected`")
 				}
 
-				if opts.Visibility == shared.Selected && !cmd.Flags().Changed("repos") {
-					return cmdutil.FlagErrorf("--repos flag required when --visibility='selected'")
+				if opts.Visibility == shared.Selected && len(opts.RepositoryNames) == 0 {
+					return cmdutil.FlagErrorf("`--repos` list required with `--visibility=selected`")
 				}
 			} else {
-				if cmd.Flags().Changed("repos") {
+				if len(opts.RepositoryNames) > 0 {
 					opts.Visibility = shared.Selected
 				}
 			}
@@ -119,11 +126,13 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			return setRun(opts)
 		},
 	}
-	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Set a secret for an organization")
-	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Set a secret for an environment")
-	cmd.Flags().StringVarP(&opts.Visibility, "visibility", "v", "private", "Set visibility for an organization secret: `all`, `private`, or `selected`")
-	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of repository names for `selected` visibility")
-	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "A value for the secret. Reads from STDIN if not specified.")
+
+	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Set `organization` secret")
+	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Set deployment `environment` secret")
+	cmd.Flags().BoolVarP(&opts.UserSecrets, "user", "u", false, "Set a secret for your user")
+	cmd.Flags().StringVarP(&opts.Visibility, "visibility", "v", "private", "Set visibility for an organization secret: `{all|private|selected}`")
+	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of `repositories` that can access an organization or user secret")
+	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "The value for the secret (reads from standard input if not specified)")
 
 	return cmd
 }
@@ -144,7 +153,7 @@ func setRun(opts *SetOptions) error {
 	envName := opts.EnvName
 
 	var baseRepo ghrepo.Interface
-	if orgName == "" {
+	if orgName == "" && !opts.UserSecrets {
 		baseRepo, err = opts.BaseRepo()
 		if err != nil {
 			return fmt.Errorf("could not determine base repo: %w", err)
@@ -166,6 +175,8 @@ func setRun(opts *SetOptions) error {
 		pk, err = getOrgPublicKey(client, host, orgName)
 	} else if envName != "" {
 		pk, err = getEnvPubKey(client, baseRepo, envName)
+	} else if opts.UserSecrets {
+		pk, err = getUserPublicKey(client, host)
 	} else {
 		pk, err = getRepoPubKey(client, baseRepo)
 	}
@@ -184,6 +195,8 @@ func setRun(opts *SetOptions) error {
 		err = putOrgSecret(client, host, pk, *opts, encoded)
 	} else if envName != "" {
 		err = putEnvSecret(client, pk, baseRepo, envName, opts.SecretName, encoded)
+	} else if opts.UserSecrets {
+		err = putUserSecret(client, host, pk, *opts, encoded)
 	} else {
 		err = putRepoSecret(client, pk, baseRepo, opts.SecretName, encoded)
 	}
@@ -193,33 +206,13 @@ func setRun(opts *SetOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		target := orgName
-		if orgName == "" {
+		if opts.UserSecrets {
+			target = "your user"
+		} else if orgName == "" {
 			target = ghrepo.FullName(baseRepo)
 		}
 		cs := opts.IO.ColorScheme()
 		fmt.Fprintf(opts.IO.Out, "%s Set secret %s for %s\n", cs.SuccessIconWithColor(cs.Green), opts.SecretName, target)
-	}
-
-	return nil
-}
-
-func validSecretName(name string) error {
-	if name == "" {
-		return errors.New("secret name cannot be blank")
-	}
-
-	if strings.HasPrefix(name, "GITHUB_") {
-		return errors.New("secret name cannot begin with GITHUB_")
-	}
-
-	leadingNumber := regexp.MustCompile(`^[0-9]`)
-	if leadingNumber.MatchString(name) {
-		return errors.New("secret name cannot start with a number")
-	}
-
-	validChars := regexp.MustCompile(`^([0-9]|[a-z]|[A-Z]|_)+$`)
-	if !validChars.MatchString(name) {
-		return errors.New("secret name can only contain letters, numbers, and _")
 	}
 
 	return nil

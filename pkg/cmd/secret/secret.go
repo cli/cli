@@ -15,11 +15,9 @@ func NewCmdSecret(f *cmdutil.Factory) *cobra.Command {
 		Short: "Manage GitHub secrets",
 		Long: heredoc.Doc(`
 			Secrets can be set at the repository, environment, or organization level for use in
-			GitHub Actions. Run "gh help secret set" to learn how to get started.
-		`),
-		Annotations: map[string]string{
-			"IsActions": "true",
-		},
+			GitHub Actions. User secrets can be set for use in GitHub Codespaces.
+			Run "gh help secret set" to learn how to get started.
+`),
 	}
 
 	cmdutil.EnableRepoOverride(cmd, f)

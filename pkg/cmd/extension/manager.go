@@ -18,6 +18,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/extensions"
@@ -32,7 +33,7 @@ type Manager struct {
 	lookPath   func(string) (string, error)
 	findSh     func() (string, error)
 	newCommand func(string, ...string) *exec.Cmd
-	platform   func() string
+	platform   func() (string, string)
 	client     *http.Client
 	config     config.Config
 	io         *iostreams.IOStreams
@@ -44,8 +45,12 @@ func NewManager(io *iostreams.IOStreams) *Manager {
 		lookPath:   safeexec.LookPath,
 		findSh:     findsh.Find,
 		newCommand: exec.Command,
-		platform: func() string {
-			return fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH)
+		platform: func() (string, string) {
+			ext := ""
+			if runtime.GOOS == "windows" {
+				ext = ".exe"
+			}
+			return fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH), ext
 		},
 		io: io,
 	}
@@ -329,7 +334,6 @@ func (m *Manager) Install(repo ghrepo.Interface) error {
 		return err
 	}
 	if !hs {
-		// TODO open an issue hint, here?
 		return errors.New("extension is uninstallable: missing executable")
 	}
 
@@ -344,19 +348,19 @@ func (m *Manager) installBin(repo ghrepo.Interface) error {
 		return err
 	}
 
-	suffix := m.platform()
+	platform, ext := m.platform()
 	var asset *releaseAsset
 	for _, a := range r.Assets {
-		if strings.HasSuffix(a.Name, suffix) {
+		if strings.HasSuffix(a.Name, platform+ext) {
 			asset = &a
 			break
 		}
 	}
 
 	if asset == nil {
-		return fmt.Errorf("%s unsupported for %s. Open an issue: `gh issue create -R %s/%s -t'Support %s'`",
-			repo.RepoName(),
-			suffix, repo.RepoOwner(), repo.RepoName(), suffix)
+		return fmt.Errorf(
+			"%[1]s unsupported for %[2]s. Open an issue: `gh issue create -R %[3]s/%[1]s -t'Support %[2]s'`",
+			repo.RepoName(), platform, repo.RepoOwner())
 	}
 
 	name := repo.RepoName()
@@ -368,6 +372,7 @@ func (m *Manager) installBin(repo ghrepo.Interface) error {
 	}
 
 	binPath := filepath.Join(targetDir, name)
+	binPath += ext
 
 	err = downloadAsset(m.client, *asset, binPath)
 	if err != nil {
@@ -482,6 +487,19 @@ func (m *Manager) upgradeExtension(ext Extension, force bool) error {
 	if ext.IsBinary() {
 		err = m.upgradeBinExtension(ext)
 	} else {
+		// Check if git extension has changed to a binary extension
+		var isBin bool
+		repo, repoErr := repoFromPath(filepath.Join(ext.Path(), ".."))
+		if repoErr == nil {
+			isBin, _ = isBinExtension(m.client, repo)
+		}
+		if isBin {
+			err = m.Remove(ext.Name())
+			if err != nil {
+				return fmt.Errorf("failed to migrate to new precompiled extension format: %w", err)
+			}
+			return m.installBin(repo)
+		}
 		err = m.upgradeGitExtension(ext, force)
 	}
 	return err
@@ -635,7 +653,11 @@ func isBinExtension(client *http.Client, repo ghrepo.Interface) (isBin bool, err
 	for _, a := range r.Assets {
 		dists := possibleDists()
 		for _, d := range dists {
-			if strings.HasSuffix(a.Name, d) {
+			suffix := d
+			if strings.HasPrefix(d, "windows") {
+				suffix += ".exe"
+			}
+			if strings.HasSuffix(a.Name, suffix) {
 				isBin = true
 				break
 			}
@@ -643,6 +665,32 @@ func isBinExtension(client *http.Client, repo ghrepo.Interface) (isBin bool, err
 	}
 
 	return
+}
+
+func repoFromPath(path string) (ghrepo.Interface, error) {
+	remotes, err := git.RemotesForPath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(remotes) == 0 {
+		return nil, fmt.Errorf("no remotes configured for %s", path)
+	}
+
+	var remote *git.Remote
+
+	for _, r := range remotes {
+		if r.Name == "origin" {
+			remote = r
+			break
+		}
+	}
+
+	if remote == nil {
+		remote = remotes[0]
+	}
+
+	return ghrepo.FromURL(remote.FetchURL)
 }
 
 func possibleDists() []string {

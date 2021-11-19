@@ -415,8 +415,9 @@ func (a *API) GetCodespaceRegionLocation(ctx context.Context) (string, error) {
 }
 
 type Machine struct {
-	Name        string `json:"name"`
-	DisplayName string `json:"display_name"`
+	Name                 string `json:"name"`
+	DisplayName          string `json:"display_name"`
+	PrebuildAvailability string `json:"prebuild_availability"`
 }
 
 // GetCodespacesMachines returns the codespaces machines for the given repo, branch and location.
@@ -460,14 +461,17 @@ func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, loc
 
 // CreateCodespaceParams are the required parameters for provisioning a Codespace.
 type CreateCodespaceParams struct {
-	RepositoryID              int
-	Branch, Machine, Location string
+	RepositoryID       int
+	IdleTimeoutMinutes int
+	Branch             string
+	Machine            string
+	Location           string
 }
 
 // CreateCodespace creates a codespace with the given parameters and returns a non-nil error if it
 // fails to create.
 func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams) (*Codespace, error) {
-	codespace, err := a.startCreate(ctx, params.RepositoryID, params.Machine, params.Branch, params.Location)
+	codespace, err := a.startCreate(ctx, params)
 	if err != errProvisioningInProgress {
 		return codespace, err
 	}
@@ -502,10 +506,11 @@ func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams
 }
 
 type startCreateRequest struct {
-	RepositoryID int    `json:"repository_id"`
-	Ref          string `json:"ref"`
-	Location     string `json:"location"`
-	Machine      string `json:"machine"`
+	RepositoryID       int    `json:"repository_id"`
+	IdleTimeoutMinutes int    `json:"idle_timeout_minutes"`
+	Ref                string `json:"ref"`
+	Location           string `json:"location"`
+	Machine            string `json:"machine"`
 }
 
 var errProvisioningInProgress = errors.New("provisioning in progress")
@@ -514,8 +519,18 @@ var errProvisioningInProgress = errors.New("provisioning in progress")
 // It may return success or an error, or errProvisioningInProgress indicating that the operation
 // did not complete before the GitHub API's time limit for RPCs (10s), in which case the caller
 // must poll the server to learn the outcome.
-func (a *API) startCreate(ctx context.Context, repoID int, machine, branch, location string) (*Codespace, error) {
-	requestBody, err := json.Marshal(startCreateRequest{repoID, branch, location, machine})
+func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*Codespace, error) {
+	if params == nil {
+		return nil, errors.New("startCreate missing parameters")
+	}
+
+	requestBody, err := json.Marshal(startCreateRequest{
+		RepositoryID:       params.RepositoryID,
+		IdleTimeoutMinutes: params.IdleTimeoutMinutes,
+		Ref:                params.Branch,
+		Location:           params.Location,
+		Machine:            params.Machine,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}

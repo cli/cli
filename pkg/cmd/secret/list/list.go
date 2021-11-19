@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -25,8 +26,9 @@ type ListOptions struct {
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	OrgName string
-	EnvName string
+	OrgName     string
+	EnvName     string
+	UserSecrets bool
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -39,13 +41,19 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List secrets",
-		Long:  "List secrets for a repository, environment, or organization",
-		Args:  cobra.NoArgs,
+		Long: heredoc.Doc(`
+			List secrets on one of the following levels:
+			- repository (default): available to Actions runs in a repository
+			- environment: available to Actions runs for a deployment environment in a repository
+			- organization: available to Actions runs within an organization
+			- user: available to Codespaces for your user
+		`),
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			if err := cmdutil.MutuallyExclusive("specify only one of `--org` or `--env`", opts.OrgName != "", opts.EnvName != ""); err != nil {
+			if err := cmdutil.MutuallyExclusive("specify only one of `--org`, `--env`, or `--user`", opts.OrgName != "", opts.EnvName != "", opts.UserSecrets); err != nil {
 				return err
 			}
 
@@ -59,6 +67,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "List secrets for an organization")
 	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "List secrets for an environment")
+	cmd.Flags().BoolVarP(&opts.UserSecrets, "user", "u", false, "List a secret for your user")
 
 	return cmd
 }
@@ -73,7 +82,7 @@ func listRun(opts *ListOptions) error {
 	envName := opts.EnvName
 
 	var baseRepo ghrepo.Interface
-	if orgName == "" {
+	if orgName == "" && !opts.UserSecrets {
 		baseRepo, err = opts.BaseRepo()
 		if err != nil {
 			return fmt.Errorf("could not determine base repo: %w", err)
@@ -81,7 +90,8 @@ func listRun(opts *ListOptions) error {
 	}
 
 	var secrets []*Secret
-	if orgName == "" {
+	showSelectedRepoInfo := opts.IO.IsStdoutTTY()
+	if orgName == "" && !opts.UserSecrets {
 		if envName == "" {
 			secrets, err = getRepoSecrets(client, baseRepo)
 		} else {
@@ -101,7 +111,11 @@ func listRun(opts *ListOptions) error {
 			return err
 		}
 
-		secrets, err = getOrgSecrets(client, host, orgName)
+		if opts.UserSecrets {
+			secrets, err = getUserSecrets(client, host, showSelectedRepoInfo)
+		} else {
+			secrets, err = getOrgSecrets(client, host, orgName, showSelectedRepoInfo)
+		}
 	}
 
 	if err != nil {
@@ -117,7 +131,7 @@ func listRun(opts *ListOptions) error {
 		}
 		tp.AddField(updatedAt, nil, nil)
 		if secret.Visibility != "" {
-			if opts.IO.IsStdoutTTY() {
+			if showSelectedRepoInfo {
 				tp.AddField(fmtVisibility(*secret), nil, nil)
 			} else {
 				tp.AddField(strings.ToUpper(string(secret.Visibility)), nil, nil)
@@ -158,25 +172,32 @@ func fmtVisibility(s Secret) string {
 	return ""
 }
 
-func getOrgSecrets(client httpClient, host, orgName string) ([]*Secret, error) {
+func getOrgSecrets(client httpClient, host, orgName string, showSelectedRepoInfo bool) ([]*Secret, error) {
 	secrets, err := getSecrets(client, host, fmt.Sprintf("orgs/%s/actions/secrets", orgName))
 	if err != nil {
 		return nil, err
 	}
 
-	type responseData struct {
-		TotalCount int `json:"total_count"`
+	if showSelectedRepoInfo {
+		err = getSelectedRepositoryInformation(client, secrets)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return secrets, nil
+}
+
+func getUserSecrets(client httpClient, host string, showSelectedRepoInfo bool) ([]*Secret, error) {
+	secrets, err := getSecrets(client, host, "user/codespaces/secrets")
+	if err != nil {
+		return nil, err
 	}
 
-	for _, secret := range secrets {
-		if secret.SelectedReposURL == "" {
-			continue
+	if showSelectedRepoInfo {
+		err = getSelectedRepositoryInformation(client, secrets)
+		if err != nil {
+			return nil, err
 		}
-		var result responseData
-		if _, err := apiGet(client, secret.SelectedReposURL, &result); err != nil {
-			return nil, fmt.Errorf("failed determining selected repositories for %s: %w", secret.Name, err)
-		}
-		secret.NumSelectedRepos = result.TotalCount
 	}
 
 	return secrets, nil
@@ -255,4 +276,23 @@ func findNextPage(link string) string {
 		}
 	}
 	return ""
+}
+
+func getSelectedRepositoryInformation(client httpClient, secrets []*Secret) error {
+	type responseData struct {
+		TotalCount int `json:"total_count"`
+	}
+
+	for _, secret := range secrets {
+		if secret.SelectedReposURL == "" {
+			continue
+		}
+		var result responseData
+		if _, err := apiGet(client, secret.SelectedReposURL, &result); err != nil {
+			return fmt.Errorf("failed determining selected repositories for %s: %w", secret.Name, err)
+		}
+		secret.NumSelectedRepos = result.TotalCount
+	}
+
+	return nil
 }

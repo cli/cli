@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
+	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
-	"github.com/shurcooL/graphql"
 )
 
 type Comments struct {
