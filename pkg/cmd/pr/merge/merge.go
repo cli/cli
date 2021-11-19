@@ -317,7 +317,8 @@ func mergeRun(opts *MergeOptions) error {
 
 	branchSwitchString := ""
 
-	if opts.CanDeleteLocalBranch {
+	localBranchExists := git.HasLocalBranch(pr.HeadRefName)
+	if opts.CanDeleteLocalBranch && localBranchExists {
 		currentBranch, err := opts.Branch()
 		if err != nil {
 			return err
@@ -335,13 +336,10 @@ func mergeRun(opts *MergeOptions) error {
 			}
 		}
 
-		localBranchExists := git.HasLocalBranch(pr.HeadRefName)
-		if localBranchExists {
-			err = git.DeleteLocalBranch(pr.HeadRefName)
-			if err != nil {
-				err = fmt.Errorf("failed to delete local branch %s: %w", cs.Cyan(pr.HeadRefName), err)
-				return err
-			}
+		err = git.DeleteLocalBranch(pr.HeadRefName)
+		if err != nil {
+			err = fmt.Errorf("failed to delete local branch %s: %w", cs.Cyan(pr.HeadRefName), err)
+			return err
 		}
 
 		if branchToSwitchTo != "" {
