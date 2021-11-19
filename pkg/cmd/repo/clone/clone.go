@@ -156,7 +156,7 @@ func cloneRun(opts *CloneOptions) error {
 
 	// If the repo is a fork, add the parent as an upstream
 	if canonicalRepo.Parent != nil {
-		protocol, err := cfg.Get(canonicalRepo.Parent.RepoHost(), "git_protocol")
+		protocol, err := cfg.Get(canonicalRepo.Parent.RepoHost(), "https_protocol")
 		if err != nil {
 			return err
 		}
