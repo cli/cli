@@ -93,7 +93,7 @@ func GistRemote() (string, error) {
 			return r.PushURL.String(), nil
 		}
 	}
-	return "", nil
+	return "", fmt.Errorf("unable to determine remote repo or gist")
 }
 
 func parseRemotes(gitRemotes []string) (remotes RemoteSet) {

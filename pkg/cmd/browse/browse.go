@@ -126,12 +126,10 @@ func runBrowse(opts *BrowseOptions) error {
 
 func browseGist(opts *BrowseOptions) error {
 	url, err := git.GistRemote()
-	if url == "" {
-		return fmt.Errorf("unable to determine a remote github repo or gist")
-	}
 	if err != nil {
-		return fmt.Errorf("unable to determine base repository: %w", err)
+		return err
 	}
+	// TODO parse filename and line number
 	if opts.NoBrowserFlag {
 		_, err := fmt.Fprintln(opts.IO.Out, url)
 		return err
