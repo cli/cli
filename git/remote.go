@@ -82,6 +82,20 @@ func Remotes() (RemoteSet, error) {
 	return remotes(".", list)
 }
 
+func GistRemote() (string, error) {
+	list, err := listRemotes()
+	if err != nil {
+		return "", err
+	}
+	remotes := parseRemotes(list)
+	for _, r := range remotes {
+		if strings.Contains(r.PushURL.Host, "gist") {
+			return r.PushURL.String(), nil
+		}
+	}
+	return "", nil
+}
+
 func parseRemotes(gitRemotes []string) (remotes RemoteSet) {
 	for _, r := range gitRemotes {
 		match := remoteRE.FindStringSubmatch(r)

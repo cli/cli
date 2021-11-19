@@ -119,9 +119,31 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 func runBrowse(opts *BrowseOptions) error {
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
+		return browseGist(opts)
+	}
+	return browseRepo(opts, baseRepo)
+}
+
+func browseGist(opts *BrowseOptions) error {
+	url, err := git.GistRemote()
+	if url == "" {
+		return fmt.Errorf("unable to determine a remote github repo or gist")
+	}
+	if err != nil {
 		return fmt.Errorf("unable to determine base repository: %w", err)
 	}
+	if opts.NoBrowserFlag {
+		_, err := fmt.Fprintln(opts.IO.Out, url)
+		return err
+	}
 
+	if opts.IO.IsStdoutTTY() {
+		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(url))
+	}
+	return opts.Browser.Browse(url)
+}
+
+func browseRepo(opts *BrowseOptions, baseRepo ghrepo.Interface) error {
 	if opts.CommitFlag {
 		commit, err := git.LastCommit()
 		if err == nil {
