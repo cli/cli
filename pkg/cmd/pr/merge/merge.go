@@ -335,8 +335,9 @@ func mergeRun(opts *MergeOptions) error {
 			}
 
 			err = git.PullLatestChanges()
-			if err != nil {
-				return err
+			var httpErr api.HTTPError
+			if err != nil && (!errors.As(err, &httpErr) || httpErr.StatusCode == 128) {
+				fmt.Fprintf(opts.IO.ErrOut, "%s warning: not posible to fast-forward to: %q\n", cs.WarningIcon(), branchToSwitchTo)
 			}
 		}
 
