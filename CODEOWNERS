@@ -1,5 +1,0 @@
-* @cli/code-reviewers
-
-pkg/cmd/codespace/ @cli/codespaces
-pkg/liveshare/ @cli/codespaces
-internal/codespaces/ @cli/codespaces
