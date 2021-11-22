@@ -9,10 +9,10 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Set up Go 1.17
+      - name: Set up Go 1.16
         uses: actions/setup-go@v2
         with:
-          go-version: 1.17
+          go-version: 1.16
 
       - name: Check out code
         uses: actions/checkout@v2
