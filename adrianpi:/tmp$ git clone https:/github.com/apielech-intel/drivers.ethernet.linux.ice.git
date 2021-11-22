@@ -1,0 +1,16 @@
+#1 - Fork repo and download it
+adrianpi@adrianpi:~/CPK$ gh repo fork intel-sandbox/drivers.ethernet.linux.ice
+✓ Created fork apielech-intel/drivers.ethernet.linux.ice
+? Would you like to clone the fork? Yes
+Cloning into 'drivers.ethernet.linux.ice'...
+remote: Enumerating objects: 48580, done.
+remote: Counting objects: 100% (13570/13570), done.
+remote: Compressing objects: 100% (1566/1566), done.
+remote: Total 48580 (delta 12634), reused 12448 (delta 12002), pack-reused 35010
+Receiving objects: 100% (48580/48580), 16.70 MiB | 20.09 MiB/s, done.
+Resolving deltas: 100% (36036/36036), done.
+Updating upstream
+From https://github.com/intel-sandbox/drivers.ethernet.linux.ice
+[...]
+✓ Cloned fork
+adrianpi@adrianpi:~/CPK$
