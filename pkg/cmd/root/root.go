@@ -139,7 +139,6 @@ func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
 			serverURL,
 			apiURL,
 			vscsURL,
-			"",
 			&lazyLoadedHTTPClient{factory: f},
 		),
 	)

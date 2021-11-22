@@ -53,7 +53,6 @@ const (
 
 // API is the interface to the codespace service.
 type API struct {
-	token        string
 	client       httpClient
 	vscsAPI      string
 	githubAPI    string
@@ -64,8 +63,8 @@ type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// New creates a new API client with the given token and HTTP client.
-func New(serverURL, apiURL, vscsURL, token string, httpClient httpClient) *API {
+// New creates a new API client connecting to the configured endpoints with the HTTP client.
+func New(serverURL, apiURL, vscsURL string, httpClient httpClient) *API {
 	if serverURL == "" {
 		serverURL = githubServer
 	}
@@ -76,7 +75,6 @@ func New(serverURL, apiURL, vscsURL, token string, httpClient httpClient) *API {
 		vscsURL = vscsAPI
 	}
 	return &API{
-		token:        token,
 		client:       httpClient,
 		vscsAPI:      strings.TrimSuffix(vscsURL, "/"),
 		githubAPI:    strings.TrimSuffix(apiURL, "/"),
@@ -671,8 +669,5 @@ func (a *API) do(ctx context.Context, req *http.Request, spanName string) (*http
 
 // setHeaders sets the required headers for the API.
 func (a *API) setHeaders(req *http.Request) {
-	if a.token != "" {
-		req.Header.Set("Authorization", "Bearer "+a.token)
-	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 }
