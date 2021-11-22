@@ -8,6 +8,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func setenv(t *testing.T, key, newValue string) {
+	oldValue, hasValue := os.LookupEnv(key)
+	os.Setenv(key, newValue)
+	t.Cleanup(func() {
+		if hasValue {
+			os.Setenv(key, oldValue)
+		} else {
+			os.Unsetenv(key)
+		}
+	})
+}
+
 func TestInheritEnv(t *testing.T) {
 	orig_GITHUB_TOKEN := os.Getenv("GITHUB_TOKEN")
 	orig_GITHUB_ENTERPRISE_TOKEN := os.Getenv("GITHUB_ENTERPRISE_TOKEN")
@@ -276,12 +288,12 @@ func TestInheritEnv(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("GITHUB_TOKEN", tt.GITHUB_TOKEN)
-			t.Setenv("GITHUB_ENTERPRISE_TOKEN", tt.GITHUB_ENTERPRISE_TOKEN)
-			t.Setenv("GH_TOKEN", tt.GH_TOKEN)
-			t.Setenv("GH_ENTERPRISE_TOKEN", tt.GH_ENTERPRISE_TOKEN)
-			t.Setenv("AppData", "")
-			t.Setenv("CODESPACES", tt.CODESPACES)
+			setenv(t, "GITHUB_TOKEN", tt.GITHUB_TOKEN)
+			setenv(t, "GITHUB_ENTERPRISE_TOKEN", tt.GITHUB_ENTERPRISE_TOKEN)
+			setenv(t, "GH_TOKEN", tt.GH_TOKEN)
+			setenv(t, "GH_ENTERPRISE_TOKEN", tt.GH_ENTERPRISE_TOKEN)
+			setenv(t, "AppData", "")
+			setenv(t, "CODESPACES", tt.CODESPACES)
 
 			baseCfg := NewFromString(tt.baseConfig)
 			cfg := InheritEnv(baseCfg)
