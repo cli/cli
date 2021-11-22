@@ -45,25 +45,40 @@ import (
 	"github.com/opentracing/opentracing-go"
 )
 
-const githubAPI = "https://api.github.com"
+const (
+	githubServer = "https://github.com"
+	githubAPI    = "https://api.github.com"
+	vscsAPI      = "https://online.visualstudio.com"
+)
 
 // API is the interface to the codespace service.
 type API struct {
-	token     string
-	client    httpClient
-	githubAPI string
+	client       httpClient
+	vscsAPI      string
+	githubAPI    string
+	githubServer string
 }
 
 type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// New creates a new API client with the given token and HTTP client.
-func New(token string, httpClient httpClient) *API {
+// New creates a new API client connecting to the configured endpoints with the HTTP client.
+func New(serverURL, apiURL, vscsURL string, httpClient httpClient) *API {
+	if serverURL == "" {
+		serverURL = githubServer
+	}
+	if apiURL == "" {
+		apiURL = githubAPI
+	}
+	if vscsURL == "" {
+		vscsURL = vscsAPI
+	}
 	return &API{
-		token:     token,
-		client:    httpClient,
-		githubAPI: githubAPI,
+		client:       httpClient,
+		vscsAPI:      strings.TrimSuffix(vscsURL, "/"),
+		githubAPI:    strings.TrimSuffix(apiURL, "/"),
+		githubServer: strings.TrimSuffix(serverURL, "/"),
 	}
 }
 
@@ -386,7 +401,7 @@ type getCodespaceRegionLocationResponse struct {
 
 // GetCodespaceRegionLocation returns the closest codespace location for the user.
 func (a *API) GetCodespaceRegionLocation(ctx context.Context) (string, error) {
-	req, err := http.NewRequest(http.MethodGet, "https://online.visualstudio.com/api/v1/locations", nil)
+	req, err := http.NewRequest(http.MethodGet, a.vscsAPI+"/api/v1/locations", nil)
 	if err != nil {
 		return "", fmt.Errorf("error creating request: %w", err)
 	}
@@ -635,7 +650,7 @@ func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Cod
 // AuthorizedKeys returns the public keys (in ~/.ssh/authorized_keys
 // format) registered by the specified GitHub user.
 func (a *API) AuthorizedKeys(ctx context.Context, user string) ([]byte, error) {
-	url := fmt.Sprintf("https://github.com/%s.keys", user)
+	url := fmt.Sprintf("%s/%s.keys", a.githubServer, user)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -669,8 +684,5 @@ func (a *API) do(ctx context.Context, req *http.Request, spanName string) (*http
 
 // setHeaders sets the required headers for the API.
 func (a *API) setHeaders(req *http.Request) {
-	if a.token != "" {
-		req.Header.Set("Authorization", "Bearer "+a.token)
-	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 }
