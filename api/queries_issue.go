@@ -22,6 +22,7 @@ type IssuesAndTotalCount struct {
 }
 
 type Issue struct {
+	Typename       string `json:"__typename"`
 	ID             string
 	Number         int
 	Title          string
@@ -39,6 +40,10 @@ type Issue struct {
 	ProjectCards   ProjectCards
 	Milestone      *Milestone
 	ReactionGroups ReactionGroups
+}
+
+func (i Issue) IsPullRequest() bool {
+	return i.Typename == "PullRequest"
 }
 
 type Assignees struct {
@@ -335,31 +340,6 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 	}
 
 	return &resp.Repository.Issue, nil
-}
-
-func IssueClose(client *Client, repo ghrepo.Interface, issue Issue) error {
-	var mutation struct {
-		CloseIssue struct {
-			Issue struct {
-				ID githubv4.ID
-			}
-		} `graphql:"closeIssue(input: $input)"`
-	}
-
-	variables := map[string]interface{}{
-		"input": githubv4.CloseIssueInput{
-			IssueID: issue.ID,
-		},
-	}
-
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "IssueClose", &mutation, variables)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func IssueReopen(client *Client, repo ghrepo.Interface, issue Issue) error {

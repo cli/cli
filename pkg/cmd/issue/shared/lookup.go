@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -86,14 +87,17 @@ func issueMetadataFromURL(s string) (int, ghrepo.Interface) {
 func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, fields []string) (*api.Issue, error) {
 	type response struct {
 		Repository struct {
-			Issue *api.Issue
+			HasIssuesEnabled bool
+			Issue            *api.Issue
 		}
 	}
 
 	query := fmt.Sprintf(`
 	query IssueByNumber($owner: String!, $repo: String!, $number: Int!) {
 		repository(owner: $owner, name: $repo) {
+			hasIssuesEnabled
 			issue: issueOrPullRequest(number: $number) {
+				__typename
 				...on Issue{%[1]s}
 				...on PullRequest{%[1]s}
 			}
@@ -109,7 +113,15 @@ func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 	var resp response
 	client := api.NewClientFromHTTP(httpClient)
 	if err := client.GraphQL(repo.RepoHost(), query, variables, &resp); err != nil {
+		var gerr *api.GraphQLErrorResponse
+		if errors.As(err, &gerr) && gerr.Match("NOT_FOUND", "repository.issue") && !resp.Repository.HasIssuesEnabled {
+			return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))
+		}
 		return nil, err
+	}
+
+	if resp.Repository.Issue == nil {
+		return nil, errors.New("issue was not found but GraphQL reported no error")
 	}
 
 	return resp.Repository.Issue, nil

@@ -660,7 +660,7 @@ func isBlank(v interface{}) bool {
 	}
 }
 
-func PullRequestClose(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+func PullRequestClose(httpClient *http.Client, repo ghrepo.Interface, prID string) error {
 	var mutation struct {
 		ClosePullRequest struct {
 			PullRequest struct {
@@ -671,14 +671,12 @@ func PullRequestClose(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 
 	variables := map[string]interface{}{
 		"input": githubv4.ClosePullRequestInput{
-			PullRequestID: pr.ID,
+			PullRequestID: prID,
 		},
 	}
 
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "PullRequestClose", &mutation, variables)
-
-	return err
+	gql := graphQLClient(httpClient, repo.RepoHost())
+	return gql.MutateNamed(context.Background(), "PullRequestClose", &mutation, variables)
 }
 
 func PullRequestReopen(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
