@@ -216,7 +216,10 @@ func mergeRun(opts *MergeOptions) error {
 	deleteBranch := opts.DeleteBranch
 	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
 	autoMerge := opts.AutoMergeEnable && !isImmediatelyMergeable(pr.MergeStateStatus)
-	localBranchExists := git.HasLocalBranch(pr.HeadRefName)
+	localBranchExists := false
+	if opts.CanDeleteLocalBranch {
+		localBranchExists = git.HasLocalBranch(pr.HeadRefName)
+	}
 
 	if !isPRAlreadyMerged {
 		payload := mergePayload{
@@ -336,8 +339,7 @@ func mergeRun(opts *MergeOptions) error {
 			}
 		}
 
-		err = git.DeleteLocalBranch(pr.HeadRefName)
-		if err != nil {
+		if err := git.DeleteLocalBranch(pr.HeadRefName); err != nil {
 			err = fmt.Errorf("failed to delete local branch %s: %w", cs.Cyan(pr.HeadRefName), err)
 			return err
 		}
@@ -346,7 +348,7 @@ func mergeRun(opts *MergeOptions) error {
 			branchSwitchString = fmt.Sprintf(" and switched to branch %s", cs.Cyan(branchToSwitchTo))
 		}
 	}
-	if !isPRAlreadyMerged || !localBranchExists {
+	if !isPRAlreadyMerged {
 		err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
 		var httpErr api.HTTPError
 		// The ref might have already been deleted by GitHub
@@ -401,7 +403,6 @@ func mergeMethodSurvey(baseRepo *api.Repository) (PullRequestMergeMethod, error)
 func deleteBranchSurvey(opts *MergeOptions, crossRepoPR, localBranchExists bool) (bool, error) {
 	if !crossRepoPR && !opts.IsDeleteBranchIndicated {
 		var message string
-		fmt.Println(opts.CanDeleteLocalBranch, localBranchExists)
 		if opts.CanDeleteLocalBranch && localBranchExists {
 			message = "Delete the branch locally and on GitHub?"
 		} else {
