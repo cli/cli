@@ -54,17 +54,9 @@ Issues to consider:
 - renamed repo
 - updating yml risky, makes gh stateful
 
-gh issue view
-? Which issue?
-  1234 Add more flair
-> 1254 Reduce the foo
-  223  Port to plan9
-
-*/
-
 /*
 
--- make more agnostic to types
+-- make more agnostic to types, (more like plain key-value store ?)
 
 cli/cli:
 	last: 2021-11-17T16:26:48.6695015-06:00
@@ -90,7 +82,6 @@ cli/go-gh:
 type Manager struct {
 	config config.Config
 	io     *iostreams.IOStreams
-	//client *http.Client
 }
 
 func NewManager(io *iostreams.IOStreams) *Manager {
@@ -112,59 +103,72 @@ func (m *Manager) SetConfig(cfg config.Config) {
 	m.config = cfg
 }
 
-func (m *Manager) SetClient(client *http.Client) {
-	m.client = client
-}
-
 func (m *Manager) FrecentPath() string {
 	return filepath.Join(config.StateDir(), "frecent.yml")
 }
 
-// issue 1234 in cli/cli ->
-func (m *Manager) UpdateFrecent(dataType string, identifier interface{}) error {
-	frecent, err := m.getFrecentEntry(frecentPath, indentifier)
+type FrecentEntry map[string]*RepoEntry
+
+//TODO: repo is identified by full name
+// will get messed up if renamed
+type Identifier struct {
+	Repository string
+	Number     int
+}
+
+type RepoEntry struct {
+	Issues map[int]*CountEntry `yaml: "issues"`
+	PRs    map[int]*CountEntry `yaml: "prs"`
+}
+
+type CountEntry struct {
+	Last  time.Time
+	Count int
+}
+
+func (m *Manager) RecordAccess(dataType string, id Identifier) error {
+	frecentPath := m.FrecentPath()
+	frecent, err := m.getFrecentEntry(frecentPath)
 	if err != nil {
 		return err
 	}
-	count, ok := frecent.Issues[issueNumber]
+
+	var count *CountEntry
+	repoEntry, ok := (*frecent)[id.Repository]
 	if !ok {
-		count = &CountEntry{}
-		frecent.Issues[issueNumber] = count
+		(*frecent)[id.Repository] = &RepoEntry{}
+		repoEntry = (*frecent)[id.Repository]
 	}
+	if dataType == "issue" {
+		count, ok := repoEntry.Issues[id.Number]
+		if !ok {
+			count = &CountEntry{}
+			repoEntry.Issues[id.Number] = count
+		}
+	} else if dataType == "pr" {
+		count, ok := repoEntry.PRs[id.Number]
+		if !ok {
+			count = &CountEntry{}
+			repoEntry.PRs[id.Number] = count
+		}
+	} else {
+		return fmt.Errorf("Not implemented")
+	}
+
 	count.Count++
 	count.Last = time.Now()
 	content, err := yaml.Marshal(frecent)
 	if err != nil {
 		return err
 	}
-
-	frecentPath := m.FrecentPath()
 	err = os.MkdirAll(filepath.Dir(frecentPath), 0755)
 	if err != nil {
 		return err
 	}
-
 	return ioutil.WriteFile(frecentPath, content, 0600)
 }
 
-type FrecentEntry struct {
-	Issues map[int]*CountEntry
-}
-
-func (m *Manager) getFrecentEntry(dataType string, identifier interface{}) (*FrecentEntry, error) {
-
-	frecentPath := m.FrecentPath()
-	switch dataType {
-	case "issue":
-
-	case "pr":
-
-	case "repository":
-
-	default:
-		return nil, fmt.Errorf("Not implemented!!")
-	}
-
+func (m *Manager) getFrecentEntry(frecentPath string) (*FrecentEntry, error) {
 	content, err := ioutil.ReadFile(frecentPath)
 	if err != nil {
 		return nil, err
@@ -210,11 +214,6 @@ func SelectFrecent(c *http.Client, repo ghrepo.Interface) (string, error) {
 type issueWithStats struct {
 	api.Issue
 	CountEntry
-}
-
-type CountEntry struct {
-	Last  time.Time
-	Count int
 }
 
 type ByLastAccess []issueWithStats

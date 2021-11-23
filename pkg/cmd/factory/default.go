@@ -224,13 +224,6 @@ func frecencyManager(f *cmdutil.Factory) *frecency.Manager {
 	}
 	fm.SetConfig(cfg)
 
-	client, err := f.HttpClient()
-	if err != nil {
-		return fm
-	}
-
-	fm.SetClient(api.NewCachedClient(client, time.Second*30))
-
 	return fm
 }
 
