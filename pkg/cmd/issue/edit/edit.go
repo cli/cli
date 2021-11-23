@@ -129,12 +129,25 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	return cmd
 }
 
-var lookupFields = []string{"id", "number", "title", "body", "assignees", "labels", "projectCards", "milestone", "url"}
-
 func editRun(opts *EditOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
+	}
+
+	editable := opts.Editable
+	lookupFields := []string{"id", "number", "title", "body", "url"}
+	if opts.Interactive || editable.Assignees.Edited {
+		lookupFields = append(lookupFields, "assignees")
+	}
+	if opts.Interactive || editable.Labels.Edited {
+		lookupFields = append(lookupFields, "labels")
+	}
+	if opts.Interactive || editable.Projects.Edited {
+		lookupFields = append(lookupFields, "projectCards")
+	}
+	if opts.Interactive || editable.Milestone.Edited {
+		lookupFields = append(lookupFields, "milestone")
 	}
 
 	issue, repo, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, lookupFields)
@@ -142,7 +155,6 @@ func editRun(opts *EditOptions) error {
 		return err
 	}
 
-	editable := opts.Editable
 	editable.Title.Default = issue.Title
 	editable.Body.Default = issue.Body
 	editable.Assignees.Default = issue.Assignees.Logins()
