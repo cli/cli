@@ -23,7 +23,7 @@ func TestGitHubRepo_notFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("GitHubRepo did not return an error")
 	}
-	if wants := "GraphQL error: Could not resolve to a Repository with the name 'OWNER/REPO'."; err.Error() != wants {
+	if wants := "GraphQL: Could not resolve to a Repository with the name 'OWNER/REPO'."; err.Error() != wants {
 		t.Errorf("GitHubRepo error: want %q, got %q", wants, err.Error())
 	}
 	if repo != nil {
