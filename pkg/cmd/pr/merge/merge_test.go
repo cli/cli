@@ -383,10 +383,8 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	cs, cmdTeardown := run.Stub()
+	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
-
-	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "master", true, "pr merge 1 --merge -R OWNER/REPO")
 	if err != nil {
@@ -900,10 +898,8 @@ func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
 			assert.Equal(t, "DEFAULT BODY TEXT", input["commitBody"].(string))
 		}))
 
-	cs, cmdTeardown := run.Stub()
+	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
-
-	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
@@ -1000,10 +996,8 @@ func TestMergeRun_autoMerge(t *testing.T) {
 			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
 		}))
 
-	cs, cmdTeardown := run.Stub()
+	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
-
-	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	err := mergeRun(&MergeOptions{
 		IO: io,
@@ -1040,10 +1034,8 @@ func TestMergeRun_autoMerge_directMerge(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	cs, cmdTeardown := run.Stub()
+	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
-
-	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	err := mergeRun(&MergeOptions{
 		IO: io,
