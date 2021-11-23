@@ -342,27 +342,6 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 	return &resp.Repository.Issue, nil
 }
 
-func IssueReopen(client *Client, repo ghrepo.Interface, issue Issue) error {
-	var mutation struct {
-		ReopenIssue struct {
-			Issue struct {
-				ID githubv4.ID
-			}
-		} `graphql:"reopenIssue(input: $input)"`
-	}
-
-	variables := map[string]interface{}{
-		"input": githubv4.ReopenIssueInput{
-			IssueID: issue.ID,
-		},
-	}
-
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "IssueReopen", &mutation, variables)
-
-	return err
-}
-
 func IssueDelete(client *Client, repo ghrepo.Interface, issue Issue) error {
 	var mutation struct {
 		DeleteIssue struct {

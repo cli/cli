@@ -679,7 +679,7 @@ func PullRequestClose(httpClient *http.Client, repo ghrepo.Interface, prID strin
 	return gql.MutateNamed(context.Background(), "PullRequestClose", &mutation, variables)
 }
 
-func PullRequestReopen(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+func PullRequestReopen(httpClient *http.Client, repo ghrepo.Interface, prID string) error {
 	var mutation struct {
 		ReopenPullRequest struct {
 			PullRequest struct {
@@ -690,14 +690,12 @@ func PullRequestReopen(client *Client, repo ghrepo.Interface, pr *PullRequest) e
 
 	variables := map[string]interface{}{
 		"input": githubv4.ReopenPullRequestInput{
-			PullRequestID: pr.ID,
+			PullRequestID: prID,
 		},
 	}
 
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "PullRequestReopen", &mutation, variables)
-
-	return err
+	gql := graphQLClient(httpClient, repo.RepoHost())
+	return gql.MutateNamed(context.Background(), "PullRequestReopen", &mutation, variables)
 }
 
 func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
