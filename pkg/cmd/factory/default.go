@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/extension"
+	"github.com/cli/cli/v2/pkg/cmd/frecency"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
@@ -38,6 +39,7 @@ func New(appVersion string) *cmdutil.Factory {
 	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
 	f.Browser = browser(f)                       // Depends on Config, and IOStreams
 	f.ExtensionManager = extensionManager(f)     // Depends on Config, HttpClient, and IOStreams
+	f.FrecencyManager = frecencyManager(f)
 
 	return f
 }
@@ -211,6 +213,25 @@ func extensionManager(f *cmdutil.Factory) *extension.Manager {
 	em.SetClient(api.NewCachedClient(client, time.Second*30))
 
 	return em
+}
+
+func frecencyManager(f *cmdutil.Factory) *frecency.Manager {
+	fm := frecency.NewManager(f.IOStreams)
+
+	cfg, err := f.Config()
+	if err != nil {
+		return fm
+	}
+	fm.SetConfig(cfg)
+
+	client, err := f.HttpClient()
+	if err != nil {
+		return fm
+	}
+
+	fm.SetClient(api.NewCachedClient(client, time.Second*30))
+
+	return fm
 }
 
 func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
