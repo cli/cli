@@ -202,7 +202,7 @@ func editRun(opts *EditOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
-	err = updatePullRequest(apiClient, repo, pr.ID, editable)
+	err = updatePullRequest(httpClient, repo, pr.ID, editable)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -213,44 +213,14 @@ func editRun(opts *EditOptions) error {
 	return nil
 }
 
-func updatePullRequest(client *api.Client, repo ghrepo.Interface, id string, editable shared.Editable) error {
-	var err error
-	params := githubv4.UpdatePullRequestInput{
-		PullRequestID: id,
-		Title:         ghString(editable.TitleValue()),
-		Body:          ghString(editable.BodyValue()),
-	}
-	assigneeIds, err := editable.AssigneeIds(client, repo)
-	if err != nil {
+func updatePullRequest(httpClient *http.Client, repo ghrepo.Interface, id string, editable shared.Editable) error {
+	if err := shared.UpdateIssue(httpClient, repo, id, true, editable); err != nil {
 		return err
 	}
-	params.AssigneeIDs = ghIds(assigneeIds)
-	labelIds, err := editable.LabelIds()
-	if err != nil {
-		return err
-	}
-	params.LabelIDs = ghIds(labelIds)
-	projectIds, err := editable.ProjectIds()
-	if err != nil {
-		return err
-	}
-	params.ProjectIDs = ghIds(projectIds)
-	milestoneId, err := editable.MilestoneId()
-	if err != nil {
-		return err
-	}
-	params.MilestoneID = ghId(milestoneId)
-	if editable.Base.Edited {
-		params.BaseRefName = ghString(&editable.Base.Value)
-	}
-	err = api.UpdatePullRequest(client, repo, params)
-	if err != nil {
-		return err
-	}
-	return updatePullRequestReviews(client, repo, id, editable)
+	return updatePullRequestReviews(httpClient, repo, id, editable)
 }
 
-func updatePullRequestReviews(client *api.Client, repo ghrepo.Interface, id string, editable shared.Editable) error {
+func updatePullRequestReviews(httpClient *http.Client, repo ghrepo.Interface, id string, editable shared.Editable) error {
 	if !editable.Reviewers.Edited {
 		return nil
 	}
@@ -265,6 +235,7 @@ func updatePullRequestReviews(client *api.Client, repo ghrepo.Interface, id stri
 		UserIDs:       ghIds(userIds),
 		TeamIDs:       ghIds(teamIds),
 	}
+	client := api.NewClientFromHTTP(httpClient)
 	return api.UpdatePullRequestReviews(client, repo, reviewsRequestParams)
 }
 
@@ -314,24 +285,4 @@ func ghIds(s *[]string) *[]githubv4.ID {
 		ids[i] = v
 	}
 	return &ids
-}
-
-func ghId(s *string) *githubv4.ID {
-	if s == nil {
-		return nil
-	}
-	if *s == "" {
-		r := githubv4.ID(nil)
-		return &r
-	}
-	r := githubv4.ID(*s)
-	return &r
-}
-
-func ghString(s *string) *githubv4.String {
-	if s == nil {
-		return nil
-	}
-	r := githubv4.String(*s)
-	return &r
 }

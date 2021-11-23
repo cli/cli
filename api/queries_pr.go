@@ -621,20 +621,6 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 	return pr, nil
 }
 
-func UpdatePullRequest(client *Client, repo ghrepo.Interface, params githubv4.UpdatePullRequestInput) error {
-	var mutation struct {
-		UpdatePullRequest struct {
-			PullRequest struct {
-				ID string
-			}
-		} `graphql:"updatePullRequest(input: $input)"`
-	}
-	variables := map[string]interface{}{"input": params}
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "PullRequestUpdate", &mutation, variables)
-	return err
-}
-
 func UpdatePullRequestReviews(client *Client, repo ghrepo.Interface, params githubv4.RequestReviewsInput) error {
 	var mutation struct {
 		RequestReviews struct {

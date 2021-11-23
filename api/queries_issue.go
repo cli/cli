@@ -1,12 +1,10 @@
 package api
 
 import (
-	"context"
 	"fmt"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/shurcooL/githubv4"
 )
 
 type IssuesPayload struct {
@@ -340,20 +338,6 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 	}
 
 	return &resp.Repository.Issue, nil
-}
-
-func IssueUpdate(client *Client, repo ghrepo.Interface, params githubv4.UpdateIssueInput) error {
-	var mutation struct {
-		UpdateIssue struct {
-			Issue struct {
-				ID string
-			}
-		} `graphql:"updateIssue(input: $input)"`
-	}
-	variables := map[string]interface{}{"input": params}
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "IssueUpdate", &mutation, variables)
-	return err
 }
 
 func (i Issue) Link() string {
