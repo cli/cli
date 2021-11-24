@@ -56,6 +56,8 @@ jobs:
             exit 0
           fi
 
+          gh issue edit $ISSUENUM --add-label "external"
+
           if [ "$PRHEAD" = "cli:trunk" ]
           then
             closePR
