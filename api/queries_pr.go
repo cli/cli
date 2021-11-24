@@ -621,20 +621,6 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 	return pr, nil
 }
 
-func UpdatePullRequest(client *Client, repo ghrepo.Interface, params githubv4.UpdatePullRequestInput) error {
-	var mutation struct {
-		UpdatePullRequest struct {
-			PullRequest struct {
-				ID string
-			}
-		} `graphql:"updatePullRequest(input: $input)"`
-	}
-	variables := map[string]interface{}{"input": params}
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "PullRequestUpdate", &mutation, variables)
-	return err
-}
-
 func UpdatePullRequestReviews(client *Client, repo ghrepo.Interface, params githubv4.RequestReviewsInput) error {
 	var mutation struct {
 		RequestReviews struct {
@@ -660,7 +646,7 @@ func isBlank(v interface{}) bool {
 	}
 }
 
-func PullRequestClose(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+func PullRequestClose(httpClient *http.Client, repo ghrepo.Interface, prID string) error {
 	var mutation struct {
 		ClosePullRequest struct {
 			PullRequest struct {
@@ -671,17 +657,15 @@ func PullRequestClose(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 
 	variables := map[string]interface{}{
 		"input": githubv4.ClosePullRequestInput{
-			PullRequestID: pr.ID,
+			PullRequestID: prID,
 		},
 	}
 
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "PullRequestClose", &mutation, variables)
-
-	return err
+	gql := graphQLClient(httpClient, repo.RepoHost())
+	return gql.MutateNamed(context.Background(), "PullRequestClose", &mutation, variables)
 }
 
-func PullRequestReopen(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+func PullRequestReopen(httpClient *http.Client, repo ghrepo.Interface, prID string) error {
 	var mutation struct {
 		ReopenPullRequest struct {
 			PullRequest struct {
@@ -692,14 +676,12 @@ func PullRequestReopen(client *Client, repo ghrepo.Interface, pr *PullRequest) e
 
 	variables := map[string]interface{}{
 		"input": githubv4.ReopenPullRequestInput{
-			PullRequestID: pr.ID,
+			PullRequestID: prID,
 		},
 	}
 
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "PullRequestReopen", &mutation, variables)
-
-	return err
+	gql := graphQLClient(httpClient, repo.RepoHost())
+	return gql.MutateNamed(context.Background(), "PullRequestReopen", &mutation, variables)
 }
 
 func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) error {

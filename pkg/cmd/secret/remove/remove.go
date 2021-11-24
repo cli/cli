@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -18,9 +19,10 @@ type RemoveOptions struct {
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	SecretName string
-	OrgName    string
-	EnvName    string
+	SecretName  string
+	OrgName     string
+	EnvName     string
+	UserSecrets bool
 }
 
 func NewCmdRemove(f *cmdutil.Factory, runF func(*RemoveOptions) error) *cobra.Command {
@@ -33,13 +35,19 @@ func NewCmdRemove(f *cmdutil.Factory, runF func(*RemoveOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "remove <secret-name>",
 		Short: "Remove secrets",
-		Long:  "Remove a secret for a repository, environment, or organization",
-		Args:  cobra.ExactArgs(1),
+		Long: heredoc.Doc(`
+			Remove a secret on one of the following levels:
+			- repository (default): available to Actions runs in a repository
+			- environment: available to Actions runs for a deployment environment in a repository
+			- organization: available to Actions runs within an organization
+			- user: available to Codespaces for your user
+		`),
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			if err := cmdutil.MutuallyExclusive("specify only one of `--org` or `--env`", opts.OrgName != "", opts.EnvName != ""); err != nil {
+			if err := cmdutil.MutuallyExclusive("specify only one of `--org`, `--env`, or `--user`", opts.OrgName != "", opts.EnvName != "", opts.UserSecrets); err != nil {
 				return err
 			}
 
@@ -54,6 +62,7 @@ func NewCmdRemove(f *cmdutil.Factory, runF func(*RemoveOptions) error) *cobra.Co
 	}
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Remove a secret for an organization")
 	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Remove a secret for an environment")
+	cmd.Flags().BoolVarP(&opts.UserSecrets, "user", "u", false, "Remove a secret for your user")
 
 	return cmd
 }
@@ -69,7 +78,7 @@ func removeRun(opts *RemoveOptions) error {
 	envName := opts.EnvName
 
 	var baseRepo ghrepo.Interface
-	if orgName == "" {
+	if orgName == "" && !opts.UserSecrets {
 		baseRepo, err = opts.BaseRepo()
 		if err != nil {
 			return fmt.Errorf("could not determine base repo: %w", err)
@@ -81,6 +90,8 @@ func removeRun(opts *RemoveOptions) error {
 		path = fmt.Sprintf("orgs/%s/actions/secrets/%s", orgName, opts.SecretName)
 	} else if envName != "" {
 		path = fmt.Sprintf("repos/%s/environments/%s/secrets/%s", ghrepo.FullName(baseRepo), envName, opts.SecretName)
+	} else if opts.UserSecrets {
+		path = fmt.Sprintf("user/codespaces/secrets/%s", opts.SecretName)
 	} else {
 		path = fmt.Sprintf("repos/%s/actions/secrets/%s", ghrepo.FullName(baseRepo), opts.SecretName)
 	}
@@ -102,7 +113,9 @@ func removeRun(opts *RemoveOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		target := orgName
-		if orgName == "" {
+		if opts.UserSecrets {
+			target = "your user"
+		} else if orgName == "" {
 			target = ghrepo.FullName(baseRepo)
 		}
 		cs := opts.IO.ColorScheme()

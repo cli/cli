@@ -18,8 +18,8 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/set"
+	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
-	"github.com/shurcooL/graphql"
 	"golang.org/x/sync/errgroup"
 )
 
