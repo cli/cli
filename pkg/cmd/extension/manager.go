@@ -510,17 +510,14 @@ func (m *Manager) upgradeGitExtension(ext Extension, force bool) error {
 	if err != nil {
 		return err
 	}
-	var cmds []*exec.Cmd
 	dir := filepath.Dir(ext.path)
 	if force {
-		fetchCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "fetch", "origin", "HEAD")
-		resetCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "reset", "--hard", "origin/HEAD")
-		cmds = []*exec.Cmd{fetchCmd, resetCmd}
-	} else {
-		pullCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "pull", "--ff-only")
-		cmds = []*exec.Cmd{pullCmd}
+		if err := m.newCommand(exe, "-C", dir, "fetch", "origin", "HEAD").Run(); err != nil {
+			return err
+		}
+		return m.newCommand(exe, "-C", dir, "reset", "--hard", "origin/HEAD").Run()
 	}
-	return runCmds(cmds)
+	return m.newCommand(exe, "-C", dir, "pull", "--ff-only").Run()
 }
 
 func (m *Manager) upgradeBinExtension(ext Extension) error {
@@ -564,14 +561,7 @@ func (m *Manager) Create(name string, tmplType extensions.ExtTemplateType) error
 		return err
 	}
 
-	err = os.Mkdir(name, 0755)
-	if err != nil {
-		return err
-	}
-
-	initCmd := m.newCommand(exe, "init", "--quiet", name)
-	err = initCmd.Run()
-	if err != nil {
+	if err := m.newCommand(exe, "init", "--quiet", name).Run(); err != nil {
 		return err
 	}
 
@@ -581,55 +571,26 @@ func (m *Manager) Create(name string, tmplType extensions.ExtTemplateType) error
 		return m.otherBinScaffolding(exe, name)
 	}
 
-	script := fmt.Sprintf(scriptTmpl, name, "%s", "%v")
-	filePath := filepath.Join(name, name)
-	err = ioutil.WriteFile(filePath, []byte(script), 0755)
-	if err != nil {
+	script := fmt.Sprintf(scriptTmpl, name)
+	if err := writeFile(filepath.Join(name, name), []byte(script), 0755); err != nil {
 		return err
 	}
 
-	wd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	dir := filepath.Join(wd, name)
-	addCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "add", name, "--chmod=+x")
-	return addCmd.Run()
+	return m.newCommand(exe, "-C", name, "add", name, "--chmod=+x").Run()
 }
 
 func (m *Manager) otherBinScaffolding(gitExe, name string) error {
-	err := os.MkdirAll(filepath.Join(name, ".github", "workflows"), 0755)
-	if err != nil {
-		return err
-	}
-	workflowPath := filepath.Join(".github", "workflows", "release.yml")
-	err = ioutil.WriteFile(filepath.Join(name, workflowPath), otherBinWorkflow, 0644)
-	if err != nil {
-		return err
-	}
-	err = os.Mkdir(filepath.Join(name, "script"), 0755)
-	if err != nil {
+	if err := writeFile(filepath.Join(name, ".github", "workflows", "release.yml"), otherBinWorkflow, 0644); err != nil {
 		return err
 	}
 	buildScriptPath := filepath.Join("script", "build.sh")
-	err = ioutil.WriteFile(filepath.Join(name, buildScriptPath), buildScript, 0755)
-	if err != nil {
+	if err := writeFile(filepath.Join(name, buildScriptPath), buildScript, 0755); err != nil {
 		return err
 	}
-
-	wd, err := os.Getwd()
-	if err != nil {
+	if err := m.newCommand(gitExe, "-C", name, "add", buildScriptPath, "--chmod=+x").Run(); err != nil {
 		return err
 	}
-	dir := filepath.Join(wd, name)
-	addCmd := m.newCommand(gitExe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "add", buildScriptPath, "--chmod=+x")
-	err = addCmd.Run()
-	if err != nil {
-		return err
-	}
-
-	addCmd = m.newCommand(gitExe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "add", workflowPath)
-	return addCmd.Run()
+	return m.newCommand(gitExe, "-C", name, "add", ".").Run()
 }
 
 func (m *Manager) goBinScaffolding(gitExe, name string) error {
@@ -637,29 +598,15 @@ func (m *Manager) goBinScaffolding(gitExe, name string) error {
 	if err != nil {
 		return fmt.Errorf("go is required for creating Go extensions: %w", err)
 	}
-	err = os.MkdirAll(filepath.Join(name, ".github", "workflows"), 0755)
-	if err != nil {
-		return err
-	}
-	workflowPath := filepath.Join(".github", "workflows", "release.yml")
-	err = ioutil.WriteFile(filepath.Join(name, workflowPath), goBinWorkflow, 0644)
-	if err != nil {
+
+	if err := writeFile(filepath.Join(name, ".github", "workflows", "release.yml"), goBinWorkflow, 0644); err != nil {
 		return err
 	}
 
 	mainGo := fmt.Sprintf(mainGoTmpl, name)
-	mainPath := "main.go"
-
-	err = ioutil.WriteFile(filepath.Join(name, mainPath), []byte(mainGo), 0644)
-	if err != nil {
+	if err := writeFile(filepath.Join(name, "main.go"), []byte(mainGo), 0644); err != nil {
 		return err
 	}
-
-	wd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	dir := filepath.Join(wd, name)
 
 	host, err := m.config.DefaultHost()
 	if err != nil {
@@ -677,49 +624,33 @@ func (m *Manager) goBinScaffolding(gitExe, name string) error {
 		{"build"},
 	}
 
-	_, ext := m.platform()
-	ignore := name + ext
-
-	err = ioutil.WriteFile(filepath.Join(name, ".gitignore"), []byte(ignore), 0644)
-	if err != nil {
+	ignore := fmt.Sprintf("/%[1]s\n/%[1]s.exe\n", name)
+	if err := writeFile(filepath.Join(name, ".gitignore"), []byte(ignore), 0644); err != nil {
 		return err
 	}
 
 	for _, args := range goCmds {
 		goCmd := m.newCommand(goExe, args...)
-		goCmd.Dir = dir
-		err = goCmd.Run()
-		if err != nil {
+		goCmd.Dir = name
+		if err := goCmd.Run(); err != nil {
 			return fmt.Errorf("failed to set up go module: %w", err)
 		}
 	}
 
-	addArgs := []string{
-		"-C", dir,
-		"--git-dir=" + filepath.Join(dir, ".git"),
-		"add",
-		workflowPath,
-		mainPath,
-		".gitignore",
-		"go.mod",
-		"go.sum",
-	}
-
-	addCmd := m.newCommand(gitExe, addArgs...)
-	return addCmd.Run()
-}
-
-func runCmds(cmds []*exec.Cmd) error {
-	for _, cmd := range cmds {
-		if err := cmd.Run(); err != nil {
-			return err
-		}
-	}
-	return nil
+	return m.newCommand(gitExe, "-C", name, "add", ".").Run()
 }
 
 func isSymlink(m os.FileMode) bool {
 	return m&os.ModeSymlink != 0
+}
+
+func writeFile(p string, contents []byte, mode os.FileMode) error {
+	if dir := filepath.Dir(p); dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	}
+	return os.WriteFile(p, contents, mode)
 }
 
 // reads the product of makeSymlink on Windows
