@@ -47,7 +47,7 @@ jobs:
           then
             if [ "$PR_AUTHOR_TYPE" != "Bot" ]
             then
-              gh pr edit --add-assignee $PRAUTHOR
+              gh pr edit $PRNUM --add-assignee $PRAUTHOR
             fi
             if ! errtext="$(addToBoard 2>&1)"
             then
@@ -60,7 +60,7 @@ jobs:
             exit 0
           fi
 
-          gh issue edit $ISSUENUM --add-label "external"
+          gh pr edit $PRNUM --add-label "external"
 
           if [ "$PRHEAD" = "cli:trunk" ]
           then
