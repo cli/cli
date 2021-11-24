@@ -60,13 +60,15 @@ func transferRun(opts *TransferOptions) error {
 		return err
 	}
 
-	apiClient := api.NewClientFromHTTP(httpClient)
-	issue, _, err := shared.IssueFromArg(apiClient, opts.BaseRepo, opts.IssueSelector)
+	issue, baseRepo, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.IssueSelector, []string{"id", "number"})
 	if err != nil {
 		return err
 	}
+	if issue.IsPullRequest() {
+		return fmt.Errorf("issue #%d is a pull request and cannot be transferred", issue.Number)
+	}
 
-	destRepo, err := ghrepo.FromFullName(opts.DestRepoSelector)
+	destRepo, err := ghrepo.FromFullNameWithHost(opts.DestRepoSelector, baseRepo.RepoHost())
 	if err != nil {
 		return err
 	}

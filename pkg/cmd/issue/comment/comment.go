@@ -1,10 +1,7 @@
 package comment
 
 import (
-	"net/http"
-
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -32,7 +29,13 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 		`),
 		Args: cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			opts.RetrieveCommentable = retrieveIssue(f.HttpClient, f.BaseRepo, args[0])
+			opts.RetrieveCommentable = func() (prShared.Commentable, ghrepo.Interface, error) {
+				httpClient, err := f.HttpClient()
+				if err != nil {
+					return nil, nil, err
+				}
+				return issueShared.IssueFromArgWithFields(httpClient, f.BaseRepo, args[0], []string{"id", "url"})
+			}
 			return prShared.CommentablePreRun(cmd, opts)
 		},
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -57,23 +60,4 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 	cmd.Flags().BoolP("web", "w", false, "Add body in browser")
 
 	return cmd
-}
-
-func retrieveIssue(httpClient func() (*http.Client, error),
-	baseRepo func() (ghrepo.Interface, error),
-	selector string) func() (prShared.Commentable, ghrepo.Interface, error) {
-	return func() (prShared.Commentable, ghrepo.Interface, error) {
-		httpClient, err := httpClient()
-		if err != nil {
-			return nil, nil, err
-		}
-		apiClient := api.NewClientFromHTTP(httpClient)
-
-		issue, repo, err := issueShared.IssueFromArg(apiClient, baseRepo, selector)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		return issue, repo, nil
-	}
 }

@@ -36,7 +36,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().StringVarP(&opts.branch, "branch", "b", "", "repository branch")
 	createCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "hardware specifications for the VM")
 	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
-	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 30*time.Minute, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
+	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 0, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
 
 	return createCmd
 }

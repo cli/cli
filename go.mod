@@ -21,7 +21,7 @@ require (
 	github.com/henvic/httpretty v0.0.6
 	github.com/itchyny/gojq v0.12.5
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
-	github.com/mattn/go-colorable v0.1.11
+	github.com/mattn/go-colorable v0.1.12
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/microcosm-cc/bluemonday v1.0.16 // indirect
@@ -31,7 +31,6 @@ require (
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/shurcooL/githubv4 v0.0.0-20200928013246-d292edc3691b
 	github.com/shurcooL/graphql v0.0.0-20200928012149-18c5c3165e3a // indirect
-	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5

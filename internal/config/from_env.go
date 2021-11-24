@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/cli/cli/v2/internal/ghinstance"
 )
@@ -13,6 +14,7 @@ const (
 	GITHUB_TOKEN            = "GITHUB_TOKEN"
 	GH_ENTERPRISE_TOKEN     = "GH_ENTERPRISE_TOKEN"
 	GITHUB_ENTERPRISE_TOKEN = "GITHUB_ENTERPRISE_TOKEN"
+	CODESPACES              = "CODESPACES"
 )
 
 type ReadOnlyEnvError struct {
@@ -90,7 +92,15 @@ func AuthTokenFromEnv(hostname string) (string, string) {
 			return token, GH_ENTERPRISE_TOKEN
 		}
 
-		return os.Getenv(GITHUB_ENTERPRISE_TOKEN), GITHUB_ENTERPRISE_TOKEN
+		if token := os.Getenv(GITHUB_ENTERPRISE_TOKEN); token != "" {
+			return token, GITHUB_ENTERPRISE_TOKEN
+		}
+
+		if isCodespaces, _ := strconv.ParseBool(os.Getenv(CODESPACES)); isCodespaces {
+			return os.Getenv(GITHUB_TOKEN), GITHUB_TOKEN
+		}
+
+		return "", ""
 	}
 
 	if token := os.Getenv(GH_TOKEN); token != "" {

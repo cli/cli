@@ -1,12 +1,10 @@
 package api
 
 import (
-	"context"
 	"fmt"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/shurcooL/githubv4"
 )
 
 type IssuesPayload struct {
@@ -22,6 +20,7 @@ type IssuesAndTotalCount struct {
 }
 
 type Issue struct {
+	Typename       string `json:"__typename"`
 	ID             string
 	Number         int
 	Title          string
@@ -39,6 +38,10 @@ type Issue struct {
 	ProjectCards   ProjectCards
 	Milestone      *Milestone
 	ReactionGroups ReactionGroups
+}
+
+func (i Issue) IsPullRequest() bool {
+	return i.Typename == "PullRequest"
 }
 
 type Assignees struct {
@@ -335,87 +338,6 @@ func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, e
 	}
 
 	return &resp.Repository.Issue, nil
-}
-
-func IssueClose(client *Client, repo ghrepo.Interface, issue Issue) error {
-	var mutation struct {
-		CloseIssue struct {
-			Issue struct {
-				ID githubv4.ID
-			}
-		} `graphql:"closeIssue(input: $input)"`
-	}
-
-	variables := map[string]interface{}{
-		"input": githubv4.CloseIssueInput{
-			IssueID: issue.ID,
-		},
-	}
-
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "IssueClose", &mutation, variables)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func IssueReopen(client *Client, repo ghrepo.Interface, issue Issue) error {
-	var mutation struct {
-		ReopenIssue struct {
-			Issue struct {
-				ID githubv4.ID
-			}
-		} `graphql:"reopenIssue(input: $input)"`
-	}
-
-	variables := map[string]interface{}{
-		"input": githubv4.ReopenIssueInput{
-			IssueID: issue.ID,
-		},
-	}
-
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "IssueReopen", &mutation, variables)
-
-	return err
-}
-
-func IssueDelete(client *Client, repo ghrepo.Interface, issue Issue) error {
-	var mutation struct {
-		DeleteIssue struct {
-			Repository struct {
-				ID githubv4.ID
-			}
-		} `graphql:"deleteIssue(input: $input)"`
-	}
-
-	variables := map[string]interface{}{
-		"input": githubv4.DeleteIssueInput{
-			IssueID: issue.ID,
-		},
-	}
-
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "IssueDelete", &mutation, variables)
-
-	return err
-}
-
-func IssueUpdate(client *Client, repo ghrepo.Interface, params githubv4.UpdateIssueInput) error {
-	var mutation struct {
-		UpdateIssue struct {
-			Issue struct {
-				ID string
-			}
-		} `graphql:"updateIssue(input: $input)"`
-	}
-	variables := map[string]interface{}{"input": params}
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "IssueUpdate", &mutation, variables)
-	return err
 }
 
 func (i Issue) Link() string {

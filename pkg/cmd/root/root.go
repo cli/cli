@@ -2,6 +2,7 @@ package root
 
 import (
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/MakeNowJust/heredoc"
@@ -129,9 +130,17 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 }
 
 func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
+	serverURL := os.Getenv("GITHUB_SERVER_URL")
+	apiURL := os.Getenv("GITHUB_API_URL")
+	vscsURL := os.Getenv("INTERNAL_VSCS_TARGET_URL")
 	app := codespaceCmd.NewApp(
 		f.IOStreams,
-		codespacesAPI.New("", &lazyLoadedHTTPClient{factory: f}),
+		codespacesAPI.New(
+			serverURL,
+			apiURL,
+			vscsURL,
+			&lazyLoadedHTTPClient{factory: f},
+		),
 	)
 	cmd := codespaceCmd.NewRootCmd(app)
 	cmd.Use = "codespace"

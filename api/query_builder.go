@@ -176,6 +176,8 @@ var PullRequestFields = append(IssueFields,
 	"statusCheckRollup",
 )
 
+// PullRequestGraphQL constructs a GraphQL query fragment for a set of pull request fields. Since GitHub
+// pull requests are also technically issues, this function can be used to query issues as well.
 func PullRequestGraphQL(fields []string) string {
 	var q []string
 	for _, field := range fields {

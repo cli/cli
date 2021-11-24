@@ -72,7 +72,6 @@ func TestListCodespaces_limited(t *testing.T) {
 	api := API{
 		githubAPI: svr.URL,
 		client:    &http.Client{},
-		token:     "faketoken",
 	}
 	ctx := context.TODO()
 	codespaces, err := api.ListCodespaces(ctx, 200)
@@ -98,7 +97,6 @@ func TestListCodespaces_unlimited(t *testing.T) {
 	api := API{
 		githubAPI: svr.URL,
 		client:    &http.Client{},
-		token:     "faketoken",
 	}
 	ctx := context.TODO()
 	codespaces, err := api.ListCodespaces(ctx, -1)
