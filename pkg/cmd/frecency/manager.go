@@ -3,18 +3,14 @@ package frecency
 import (
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
+	"sync"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"gopkg.in/yaml.v3"
 )
 
@@ -80,22 +76,27 @@ cli/go-gh:
 
 // GetFrecent, RecordAccess
 type Manager struct {
-	config config.Config
-	io     *iostreams.IOStreams
+	config      config.Config
+	io          *iostreams.IOStreams
+	frecentFile fileStorage
 }
 
 func NewManager(io *iostreams.IOStreams) *Manager {
-	return &Manager{
-		io: io,
-	}
+	return &Manager{io: io}
 }
 
 // create the frecency.yml
-func (m *Manager) initFrecentFile() error {
-	_, err := os.Create("frecent.yml")
+func (m *Manager) initFrecentFile(dir string) error {
+	fs := fileStorage{
+		dir: filepath.Join(dir, "frecent.yml"),
+		mu:  &sync.RWMutex{},
+	}
+	m.frecentFile = fs
+	err := os.MkdirAll(filepath.Dir(fs.dir), 0755)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -103,8 +104,41 @@ func (m *Manager) SetConfig(cfg config.Config) {
 	m.config = cfg
 }
 
-func (m *Manager) FrecentPath() string {
+func defaultFrecentPath() string {
 	return filepath.Join(config.StateDir(), "frecent.yml")
+}
+
+type fileStorage struct {
+	dir string
+	mu  *sync.RWMutex
+}
+
+func (fs *fileStorage) read() (*FrecentEntry, error) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+	content, err := ioutil.ReadFile(fs.dir)
+	if err != nil {
+		return nil, err
+	}
+
+	var stateEntry FrecentEntry
+	err = yaml.Unmarshal(content, &stateEntry)
+	if err != nil {
+		return nil, err
+	}
+
+	return &stateEntry, nil
+}
+
+func (fs *fileStorage) write(content []byte) error {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+
+	err := os.MkdirAll(filepath.Dir(fs.dir), 0755)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(fs.dir, content, 0600)
 }
 
 type FrecentEntry map[string]*RepoEntry
@@ -127,8 +161,7 @@ type CountEntry struct {
 }
 
 func (m *Manager) RecordAccess(dataType string, id Identifier) error {
-	frecentPath := m.FrecentPath()
-	frecent, err := m.getFrecentEntry(frecentPath)
+	frecent, err := m.frecentFile.read()
 	if err != nil {
 		return err
 	}
@@ -161,62 +194,44 @@ func (m *Manager) RecordAccess(dataType string, id Identifier) error {
 	if err != nil {
 		return err
 	}
-	err = os.MkdirAll(filepath.Dir(frecentPath), 0755)
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(frecentPath, content, 0600)
+
+	return m.frecentFile.write(content)
 }
 
-func (m *Manager) getFrecentEntry(frecentPath string) (*FrecentEntry, error) {
-	content, err := ioutil.ReadFile(frecentPath)
-	if err != nil {
-		return nil, err
-	}
-
-	var stateEntry FrecentEntry
-	err = yaml.Unmarshal(content, &stateEntry)
-	if err != nil {
-		return nil, err
-	}
-
-	return &stateEntry, nil
-}
-
-func SelectFrecent(c *http.Client, repo ghrepo.Interface) (string, error) {
-	client := api.NewCachedClient(c, time.Hour*6)
-
-	issues, err := getIssues(client, repo)
-	if err != nil {
-		return "", err
-	}
-
-	frecent, err := getFrecentEntry(defaultFrecentPath())
-	if err != nil {
-		return "", err
-	}
-
-	choices := sortByFrecent(issues, frecent.Issues)
-
-	choice := ""
-	err = prompt.SurveyAskOne(&survey.Select{
-		Message: "Which issue?",
-		Options: choices,
-	}, &choice)
-	if err != nil {
-		return "", err
-	}
-
-	return choice, nil
-}
+//func SelectFrecent(c *http.Client, repo ghrepo.Interface) (string, error) {
+//	client := api.NewCachedClient(c, time.Hour*6)
+//
+//	issues, err := getIssues(client, repo)
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	frecent, err := getFrecentEntry(defaultFrecentPath())
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	choices := sortByFrecent(issues, frecent.Issues)
+//
+//	choice := ""
+//	err = prompt.SurveyAskOne(&survey.Select{
+//		Message: "Which issue?",
+//		Options: choices,
+//	}, &choice)
+//	if err != nil {
+//		return "", err
+//	}
+//
+//	return choice, nil
+//}
 
 // sorting
-type issueWithStats struct {
-	api.Issue
+type IDWithStats struct {
+	Identifier
 	CountEntry
 }
 
-type ByLastAccess []issueWithStats
+type ByLastAccess []IDWithStats
 
 func (l ByLastAccess) Len() int {
 	return len(l)
@@ -228,7 +243,7 @@ func (l ByLastAccess) Less(i, j int) bool {
 	return l[i].Last.After(l[j].Last)
 }
 
-type ByFrecency []issueWithStats
+type ByFrecency []IDWithStats
 
 func (f ByFrecency) Len() int {
 	return len(f)
@@ -245,23 +260,25 @@ func (f ByFrecency) Less(i, j int) bool {
 	return iScore > jScore
 }
 
-func sortByFrecent(issues []api.Issue, frecent map[int]*CountEntry) []string {
-	withStats := []issueWithStats{}
-	for _, i := range issues {
+func sortByFrecent(identifiers []Identifier, frecent map[int]*CountEntry) []string {
+	withStats := []IDWithStats{}
+	for _, i := range identifiers {
 		entry, ok := frecent[i.Number]
 		if !ok {
 			entry = &CountEntry{}
 		}
-		withStats = append(withStats, issueWithStats{
-			Issue:      i,
+		withStats = append(withStats, IDWithStats{
+			Identifier: i,
 			CountEntry: *entry,
 		})
 	}
 	sort.Sort(ByLastAccess(withStats))
-	previousIssue := withStats[0]
+
+	// why do this?
+	previousId := withStats[0]
 	withStats = withStats[1:]
 	sort.Stable(ByFrecency(withStats))
-	choices := []string{fmt.Sprintf("%d", previousIssue.Number)}
+	choices := []string{fmt.Sprintf("%d", previousId.Number)}
 	for _, ws := range withStats {
 		choices = append(choices, fmt.Sprintf("%d", ws.Number))
 	}
