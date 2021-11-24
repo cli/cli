@@ -13,6 +13,8 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -222,6 +224,16 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 		},
 		Branch: func() (string, error) {
 			return branch, nil
+		},
+		Remotes: func() (context.Remotes, error) {
+			return []*context.Remote{
+				{
+					Remote: &git.Remote{
+						Name: "origin",
+					},
+					Repo: ghrepo.New("OWNER", "REPO"),
+				},
+			}, nil
 		},
 	}
 

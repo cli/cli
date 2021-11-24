@@ -4,12 +4,15 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os/exec"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -26,6 +29,7 @@ type MergeOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	Branch     func() (string, error)
+	Remotes    func() (context.Remotes, error)
 
 	Finder shared.PRFinder
 
@@ -51,6 +55,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Branch:     f.Branch,
+		Remotes:    f.Remotes,
 	}
 
 	var (
@@ -329,14 +334,15 @@ func mergeRun(opts *MergeOptions) error {
 			if err != nil {
 				return err
 			}
+
 			err = git.CheckoutBranch(branchToSwitchTo)
 			if err != nil {
 				return err
 			}
 
-			err = git.PullLatestChanges()
-			var httpErr api.HTTPError
-			if err != nil && (!errors.As(err, &httpErr) || httpErr.StatusCode == 128) {
+			err := PullLatestChanges(opts, baseRepo, branchToSwitchTo)
+			var execError *exec.ExitError
+			if err != nil && (errors.As(err, &execError) || (int(execError.ExitCode()) == 128)) {
 				fmt.Fprintf(opts.IO.ErrOut, "%s warning: not posible to fast-forward to: %q\n", cs.WarningIcon(), branchToSwitchTo)
 			}
 		}
@@ -367,6 +373,25 @@ func mergeRun(opts *MergeOptions) error {
 
 	if isTerminal {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted branch %s%s\n", cs.SuccessIconWithColor(cs.Red), cs.Cyan(pr.HeadRefName), branchSwitchString)
+	}
+
+	return nil
+}
+
+func PullLatestChanges(opts *MergeOptions, repo ghrepo.Interface, branchToSwitchTo string) error {
+	remotes, err := opts.Remotes()
+	if err != nil {
+		return err
+	}
+
+	baseRemote, err := remotes.FindByRepo(repo.RepoOwner(), repo.RepoName())
+	if err != nil {
+		return err
+	}
+
+	err = git.RunPull(baseRemote.Name, branchToSwitchTo)
+	if err != nil {
+		return err
 	}
 
 	return nil

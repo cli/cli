@@ -307,12 +307,16 @@ func CheckoutBranch(branch string) error {
 	return run.PrepareCmd(configCmd).Run()
 }
 
-//pull changes from remote branch without version history
-func PullLatestChanges() error {
-	pullCmd, err := GitCommand("pull", "--ff-only")
+// pull changes from remote branch without version history
+func RunPull(baseRemote, baseBranch string) error {
+	pullCmd, err := GitCommand("pull", "--ff-only", baseRemote, baseBranch)
 	if err != nil {
 		return err
 	}
+
+	pullCmd.Stdout = os.Stdout
+	pullCmd.Stderr = os.Stderr
+	pullCmd.Stdin = os.Stdin
 	return run.PrepareCmd(pullCmd).Run()
 }
 
