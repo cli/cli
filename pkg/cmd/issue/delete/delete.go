@@ -1,18 +1,21 @@
 package delete
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
+	graphql "github.com/cli/shurcooL-graphql"
+	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
 
@@ -61,11 +64,13 @@ func deleteRun(opts *DeleteOptions) error {
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
-	issue, baseRepo, err := shared.IssueFromArg(apiClient, opts.BaseRepo, opts.SelectorArg)
+	issue, baseRepo, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, []string{"id", "number", "title"})
 	if err != nil {
 		return err
+	}
+	if issue.IsPullRequest() {
+		return fmt.Errorf("issue #%d is a pull request and cannot be deleted", issue.Number)
 	}
 
 	// When executed in an interactive shell, require confirmation. Otherwise skip confirmation.
@@ -87,12 +92,32 @@ func deleteRun(opts *DeleteOptions) error {
 		}
 	}
 
-	err = api.IssueDelete(apiClient, baseRepo, *issue)
-	if err != nil {
+	if err := apiDelete(httpClient, baseRepo, issue.ID); err != nil {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Deleted issue #%d (%s).\n", cs.Red("✔"), issue.Number, issue.Title)
+	if opts.IO.IsStdoutTTY() {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted issue #%d (%s).\n", cs.Red("✔"), issue.Number, issue.Title)
+	}
 
 	return nil
+}
+
+func apiDelete(httpClient *http.Client, repo ghrepo.Interface, issueID string) error {
+	var mutation struct {
+		DeleteIssue struct {
+			Repository struct {
+				ID githubv4.ID
+			}
+		} `graphql:"deleteIssue(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": githubv4.DeleteIssueInput{
+			IssueID: issueID,
+		},
+	}
+
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
+	return gql.MutateNamed(context.Background(), "IssueDelete", &mutation, variables)
 }

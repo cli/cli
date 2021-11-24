@@ -124,7 +124,18 @@ type graphQLResponse struct {
 type GraphQLError struct {
 	Type    string
 	Message string
-	// Path []interface // mixed strings and numbers
+	Path    []interface{} // mixed strings and numbers
+}
+
+func (ge GraphQLError) PathString() string {
+	var res strings.Builder
+	for i, v := range ge.Path {
+		if i > 0 {
+			res.WriteRune('.')
+		}
+		fmt.Fprintf(&res, "%v", v)
+	}
+	return res.String()
 }
 
 // GraphQLErrorResponse contains errors returned in a GraphQL response
@@ -138,6 +149,14 @@ func (gr GraphQLErrorResponse) Error() string {
 		errorMessages = append(errorMessages, e.Message)
 	}
 	return fmt.Sprintf("GraphQL error: %s", strings.Join(errorMessages, "\n"))
+}
+
+// Match checks if this error is only about a specific type on a specific path.
+func (gr GraphQLErrorResponse) Match(expectType, expectPath string) bool {
+	if len(gr.Errors) != 1 {
+		return false
+	}
+	return gr.Errors[0].Type == expectType && gr.Errors[0].PathString() == expectPath
 }
 
 // HTTPError is an error returned by a failed API call
@@ -221,7 +240,8 @@ func EndpointNeedsScopes(resp *http.Response, s string) *http.Response {
 	return resp
 }
 
-// GraphQL performs a GraphQL request and parses the response
+// GraphQL performs a GraphQL request and parses the response. If there are errors in the response,
+// *GraphQLErrorResponse will be returned, but the data will also be parsed into the receiver.
 func (c Client) GraphQL(hostname string, query string, variables map[string]interface{}, data interface{}) error {
 	reqBody, err := json.Marshal(map[string]interface{}{"query": query, "variables": variables})
 	if err != nil {

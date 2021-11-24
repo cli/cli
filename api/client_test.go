@@ -50,8 +50,16 @@ func TestGraphQLError(t *testing.T) {
 		httpmock.GraphQL(""),
 		httpmock.StringResponse(`
 			{ "errors": [
-				{"message":"OH NO"},
-				{"message":"this is fine"}
+				{
+					"type": "NOT_FOUND",
+					"message": "OH NO",
+					"path": ["repository", "issue"]
+				},
+				{
+					"type": "ACTUALLY_ITS_FINE",
+					"message": "this is fine",
+					"path": ["repository", "issues", 0, "comments"]
+				}
 			  ]
 			}
 		`),
