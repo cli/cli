@@ -51,8 +51,3 @@ func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 
 	return nil
 }
-
-func isDuplicateError(err *api.HTTPError) bool {
-	return err.StatusCode == 422 && len(err.Errors) == 1 &&
-		err.Errors[0].Field == "key" && err.Errors[0].Message == "key is already in use"
-}
