@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os/exec"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
@@ -344,9 +343,8 @@ func mergeRun(opts *MergeOptions) error {
 				return err
 			}
 
-			err := PullLatestChanges(opts, baseRepo, branchToSwitchTo)
-			var execError *exec.ExitError
-			if err != nil && (errors.As(err, &execError) || (int(execError.ExitCode()) == 128)) {
+			err := pullLatestChanges(opts, baseRepo, branchToSwitchTo)
+			if err != nil {
 				fmt.Fprintf(opts.IO.ErrOut, "%s warning: not posible to fast-forward to: %q\n", cs.WarningIcon(), branchToSwitchTo)
 			}
 		}
@@ -377,7 +375,7 @@ func mergeRun(opts *MergeOptions) error {
 	return nil
 }
 
-func PullLatestChanges(opts *MergeOptions, repo ghrepo.Interface, branchToSwitchTo string) error {
+func pullLatestChanges(opts *MergeOptions, repo ghrepo.Interface, branch string) error {
 	remotes, err := opts.Remotes()
 	if err != nil {
 		return err
@@ -388,7 +386,7 @@ func PullLatestChanges(opts *MergeOptions, repo ghrepo.Interface, branchToSwitch
 		return err
 	}
 
-	err = git.RunPull(baseRemote.Name, branchToSwitchTo)
+	err = git.Pull(baseRemote.Name, branch)
 	if err != nil {
 		return err
 	}

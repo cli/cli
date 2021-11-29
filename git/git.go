@@ -308,8 +308,8 @@ func CheckoutBranch(branch string) error {
 }
 
 // pull changes from remote branch without version history
-func RunPull(baseRemote, baseBranch string) error {
-	pullCmd, err := GitCommand("pull", "--ff-only", baseRemote, baseBranch)
+func Pull(remote, branch string) error {
+	pullCmd, err := GitCommand("pull", "--ff-only", remote, branch)
 	if err != nil {
 		return err
 	}
