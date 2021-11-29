@@ -146,17 +146,31 @@ type GraphQLErrorResponse struct {
 func (gr GraphQLErrorResponse) Error() string {
 	errorMessages := make([]string, 0, len(gr.Errors))
 	for _, e := range gr.Errors {
-		errorMessages = append(errorMessages, e.Message)
+		msg := e.Message
+		if p := e.PathString(); p != "" {
+			msg = fmt.Sprintf("%s (%s)", msg, p)
+		}
+		errorMessages = append(errorMessages, msg)
 	}
-	return fmt.Sprintf("GraphQL error: %s", strings.Join(errorMessages, "\n"))
+	return fmt.Sprintf("GraphQL: %s", strings.Join(errorMessages, ", "))
 }
 
-// Match checks if this error is only about a specific type on a specific path.
+// Match checks if this error is only about a specific type on a specific path. If the path argument ends
+// with a ".", it will match all its subpaths as well.
 func (gr GraphQLErrorResponse) Match(expectType, expectPath string) bool {
-	if len(gr.Errors) != 1 {
-		return false
+	for _, e := range gr.Errors {
+		if e.Type != expectType || !matchPath(e.PathString(), expectPath) {
+			return false
+		}
 	}
-	return gr.Errors[0].Type == expectType && gr.Errors[0].PathString() == expectPath
+	return true
+}
+
+func matchPath(p, expect string) bool {
+	if strings.HasSuffix(expect, ".") {
+		return strings.HasPrefix(p, expect) || p == strings.TrimSuffix(expect, ".")
+	}
+	return p == expect
 }
 
 // HTTPError is an error returned by a failed API call

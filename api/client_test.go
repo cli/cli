@@ -66,7 +66,7 @@ func TestGraphQLError(t *testing.T) {
 	)
 
 	err := client.GraphQL("github.com", "", nil, &response)
-	if err == nil || err.Error() != "GraphQL error: OH NO\nthis is fine" {
+	if err == nil || err.Error() != "GraphQL: OH NO (repository.issue), this is fine (repository.issues.0.comments)" {
 		t.Fatalf("got %q", err.Error())
 	}
 }

@@ -15,8 +15,11 @@ func preloadIssueComments(client *http.Client, repo ghrepo.Interface, issue *api
 	type response struct {
 		Node struct {
 			Issue struct {
-				Comments api.Comments `graphql:"comments(first: 100, after: $endCursor)"`
+				Comments *api.Comments `graphql:"comments(first: 100, after: $endCursor)"`
 			} `graphql:"...on Issue"`
+			PullRequest struct {
+				Comments *api.Comments `graphql:"comments(first: 100, after: $endCursor)"`
+			} `graphql:"...on PullRequest"`
 		} `graphql:"node(id: $id)"`
 	}
 
@@ -38,11 +41,16 @@ func preloadIssueComments(client *http.Client, repo ghrepo.Interface, issue *api
 			return err
 		}
 
-		issue.Comments.Nodes = append(issue.Comments.Nodes, query.Node.Issue.Comments.Nodes...)
-		if !query.Node.Issue.Comments.PageInfo.HasNextPage {
+		comments := query.Node.Issue.Comments
+		if comments == nil {
+			comments = query.Node.PullRequest.Comments
+		}
+
+		issue.Comments.Nodes = append(issue.Comments.Nodes, comments.Nodes...)
+		if !comments.PageInfo.HasNextPage {
 			break
 		}
-		variables["endCursor"] = githubv4.String(query.Node.Issue.Comments.PageInfo.EndCursor)
+		variables["endCursor"] = githubv4.String(comments.PageInfo.EndCursor)
 	}
 
 	issue.Comments.PageInfo.HasNextPage = false
