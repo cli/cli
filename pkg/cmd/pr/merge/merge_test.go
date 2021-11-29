@@ -13,6 +13,8 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -223,6 +225,16 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 		Branch: func() (string, error) {
 			return branch, nil
 		},
+		Remotes: func() (context.Remotes, error) {
+			return []*context.Remote{
+				{
+					Remote: &git.Remote{
+						Name: "origin",
+					},
+					Repo: ghrepo.New("OWNER", "REPO"),
+				},
+			}, nil
+		},
 	}
 
 	cmd := NewCmdMerge(factory, nil)
@@ -432,6 +444,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	cs.Register(`git checkout master`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, `pr merge --merge --delete-branch`)
 	if err != nil {
@@ -715,6 +728,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	cs.Register(`git checkout master`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
 
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
@@ -850,6 +864,7 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 	cs.Register(`git checkout master`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
 
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
