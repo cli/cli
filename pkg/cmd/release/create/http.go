@@ -17,8 +17,8 @@ import (
 )
 
 type Ref struct {
-	Name   string `graphql:"name"`
-	Prefix string `graphql:"refPrefix"`
+	Name   string `json:"name"`
+	Prefix string `json:"refPrefix"`
 }
 
 const maxItemsPerPage = 100

@@ -14,6 +14,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
@@ -52,8 +53,8 @@ func newTestManager(dir string, client *http.Client, io *iostreams.IOStreams) *M
 		config: config.NewBlankConfig(),
 		io:     io,
 		client: client,
-		platform: func() string {
-			return "windows-amd64"
+		platform: func() (string, string) {
+			return "windows-amd64", ".exe"
 		},
 	}
 }
@@ -297,6 +298,83 @@ func TestManager_UpgradeExtension_GitExtension_Force(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 }
 
+func TestManager_MigrateToBinaryExtension(t *testing.T) {
+	tempDir := t.TempDir()
+	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-remote", "gh-remote")))
+	io, _, stdout, stderr := iostreams.Test()
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+	client := http.Client{Transport: &reg}
+	m := newTestManager(tempDir, &client, io)
+	exts, err := m.list(false)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(exts))
+	ext := exts[0]
+	ext.currentVersion = "old version"
+	ext.latestVersion = "new version"
+
+	rs, restoreRun := run.Stub()
+	defer restoreRun(t)
+
+	rs.Register(`git -C.*?gh-remote remote -v`, 0, "origin  git@github.com:owner/gh-remote.git (fetch)\norigin  git@github.com:owner/gh-remote.git (push)")
+	rs.Register(`git -C.*?gh-remote config --get-regexp \^.*`, 0, "remote.origin.gh-resolve base")
+
+	reg.Register(
+		httpmock.REST("GET", "repos/owner/gh-remote/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Tag: "v1.0.2",
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-remote-windows-amd64.exe",
+						APIURL: "/release/cool",
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "repos/owner/gh-remote/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Tag: "v1.0.2",
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-remote-windows-amd64.exe",
+						APIURL: "/release/cool",
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "release/cool"),
+		httpmock.StringResponse("FAKE UPGRADED BINARY"))
+
+	err = m.upgradeExtension(ext, false)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "", stderr.String())
+
+	manifest, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-remote", manifestName))
+	assert.NoError(t, err)
+
+	var bm binManifest
+	err = yaml.Unmarshal(manifest, &bm)
+	assert.NoError(t, err)
+
+	assert.Equal(t, binManifest{
+		Name:  "gh-remote",
+		Owner: "owner",
+		Host:  "github.com",
+		Tag:   "v1.0.2",
+		Path:  filepath.Join(tempDir, "extensions/gh-remote/gh-remote.exe"),
+	}, bm)
+
+	fakeBin, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-remote/gh-remote.exe"))
+	assert.NoError(t, err)
+
+	assert.Equal(t, "FAKE UPGRADED BINARY", string(fakeBin))
+}
+
 func TestManager_UpgradeExtension_BinaryExtension(t *testing.T) {
 	tempDir := t.TempDir()
 	io, _, _, _ := iostreams.Test()
@@ -319,7 +397,7 @@ func TestManager_UpgradeExtension_BinaryExtension(t *testing.T) {
 				Tag: "v1.0.2",
 				Assets: []releaseAsset{
 					{
-						Name:   "gh-bin-ext-windows-amd64",
+						Name:   "gh-bin-ext-windows-amd64.exe",
 						APIURL: "https://example.com/release/cool2",
 					},
 				},
@@ -348,10 +426,10 @@ func TestManager_UpgradeExtension_BinaryExtension(t *testing.T) {
 		Owner: "owner",
 		Host:  "example.com",
 		Tag:   "v1.0.2",
-		Path:  filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext"),
+		Path:  filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext.exe"),
 	}, bm)
 
-	fakeBin, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext"))
+	fakeBin, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext.exe"))
 	assert.NoError(t, err)
 
 	assert.Equal(t, "FAKE UPGRADED BINARY", string(fakeBin))
@@ -448,7 +526,7 @@ func TestManager_Install_binary(t *testing.T) {
 			release{
 				Assets: []releaseAsset{
 					{
-						Name:   "gh-bin-ext-windows-amd64",
+						Name:   "gh-bin-ext-windows-amd64.exe",
 						APIURL: "https://example.com/release/cool",
 					},
 				},
@@ -460,7 +538,7 @@ func TestManager_Install_binary(t *testing.T) {
 				Tag: "v1.0.1",
 				Assets: []releaseAsset{
 					{
-						Name:   "gh-bin-ext-windows-amd64",
+						Name:   "gh-bin-ext-windows-amd64.exe",
 						APIURL: "https://example.com/release/cool",
 					},
 				},
@@ -489,10 +567,10 @@ func TestManager_Install_binary(t *testing.T) {
 		Owner: "owner",
 		Host:  "example.com",
 		Tag:   "v1.0.1",
-		Path:  filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext"),
+		Path:  filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext.exe"),
 	}, bm)
 
-	fakeBin, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext"))
+	fakeBin, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext.exe"))
 	assert.NoError(t, err)
 
 	assert.Equal(t, "FAKE BINARY", string(fakeBin))

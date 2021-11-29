@@ -10,6 +10,7 @@ require (
 	github.com/cli/browser v1.1.0
 	github.com/cli/oauth v0.9.0
 	github.com/cli/safeexec v1.0.0
+	github.com/cli/shurcooL-graphql v0.0.1
 	github.com/cpuguy83/go-md2man/v2 v2.0.1
 	github.com/creack/pty v1.1.17
 	github.com/gabriel-vasile/mimetype v1.4.0
@@ -20,17 +21,16 @@ require (
 	github.com/henvic/httpretty v0.0.6
 	github.com/itchyny/gojq v0.12.5
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
-	github.com/mattn/go-colorable v0.1.11
+	github.com/mattn/go-colorable v0.1.12
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
+	github.com/microcosm-cc/bluemonday v1.0.16 // indirect
 	github.com/muesli/reflow v0.2.1-0.20210502190812-c80126ec2ad5
 	github.com/muesli/termenv v0.9.0
 	github.com/muhammadmuzzammil1998/jsonc v0.0.0-20201229145248-615b0916ca38
-	github.com/olekukonko/tablewriter v0.0.5
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/shurcooL/githubv4 v0.0.0-20200928013246-d292edc3691b
-	github.com/shurcooL/graphql v0.0.0-20181231061246-d48a9a75455f
-	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
+	github.com/shurcooL/graphql v0.0.0-20200928012149-18c5c3165e3a // indirect
 	github.com/sourcegraph/jsonrpc2 v0.1.0
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
@@ -42,7 +42,5 @@ require (
 	golang.org/x/term v0.0.0-20210503060354-a79de5458b56
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
-
-replace github.com/shurcooL/graphql => github.com/cli/shurcooL-graphql v0.0.0-20200707151639-0f7232a2bf7e
 
 replace golang.org/x/crypto => github.com/cli/crypto v0.0.0-20210929142629-6be313f59b03

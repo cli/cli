@@ -274,8 +274,10 @@ func TestPrMerge(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "master", true, "pr merge 1 --merge")
 	if err != nil {
@@ -343,8 +345,10 @@ func TestPrMerge_nontty(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "master", false, "pr merge 1 --merge")
 	if err != nil {
@@ -515,6 +519,7 @@ func Test_nonDivergingPullRequest(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git .+ show .+ HEAD`, 0, "COMMITSHA1,title")
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, "pr merge --merge")
 	if err != nil {
@@ -554,6 +559,7 @@ func Test_divergingPullRequestWarning(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git .+ show .+ HEAD`, 0, "COMMITSHA2,title")
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, "pr merge --merge")
 	if err != nil {
@@ -590,8 +596,10 @@ func Test_pullRequestWithoutCommits(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, "pr merge --merge")
 	if err != nil {
@@ -627,8 +635,10 @@ func TestPrMerge_rebase(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "master", true, "pr merge 2 --rebase")
 	if err != nil {
@@ -666,8 +676,10 @@ func TestPrMerge_squash(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "master", true, "pr merge 3 --squash")
 	if err != nil {
@@ -730,8 +742,10 @@ func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
 		baseRepo("OWNER", "REPO", "master"),
 	)
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, "pr merge 4 --merge")
 	if err != nil {
@@ -774,8 +788,10 @@ func TestPRMerge_interactive(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
@@ -932,8 +948,10 @@ func TestPRMerge_interactiveCancelled(t *testing.T) {
 			"squashMergeAllowed": true
 		} } }`))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()

@@ -84,6 +84,15 @@ func CurrentBranch() (string, error) {
 	return "", fmt.Errorf("%sgit: %s", stderr.String(), err)
 }
 
+func listRemotesForPath(path string) ([]string, error) {
+	remoteCmd, err := GitCommand("-C", path, "remote", "-v")
+	if err != nil {
+		return nil, err
+	}
+	output, err := run.PrepareCmd(remoteCmd).Output()
+	return outputLines(output), err
+}
+
 func listRemotes() ([]string, error) {
 	remoteCmd, err := GitCommand("remote", "-v")
 	if err != nil {
@@ -364,6 +373,16 @@ func ToplevelDir() (string, error) {
 	output, err := run.PrepareCmd(showCmd).Output()
 	return firstLine(output), err
 
+}
+
+// ToplevelDirFromPath returns the top-level given path of the current repository
+func GetDirFromPath(p string) (string, error) {
+	showCmd, err := GitCommand("-C", p, "rev-parse", "--git-dir")
+	if err != nil {
+		return "", err
+	}
+	output, err := run.PrepareCmd(showCmd).Output()
+	return firstLine(output), err
 }
 
 func PathFromRepoRoot() string {

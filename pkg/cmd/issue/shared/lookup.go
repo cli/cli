@@ -1,7 +1,9 @@
 package shared
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -11,6 +13,8 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
+// IssueFromArg loads an issue with all its fields.
+// Deprecated: use IssueFromArgWithFields instead.
 func IssueFromArg(apiClient *api.Client, baseRepoFn func() (ghrepo.Interface, error), arg string) (*api.Issue, ghrepo.Interface, error) {
 	issueNumber, baseRepo := issueMetadataFromURL(arg)
 
@@ -30,7 +34,31 @@ func IssueFromArg(apiClient *api.Client, baseRepoFn func() (ghrepo.Interface, er
 		}
 	}
 
-	issue, err := issueFromNumber(apiClient, baseRepo, issueNumber)
+	issue, err := api.IssueByNumber(apiClient, baseRepo, issueNumber)
+	return issue, baseRepo, err
+}
+
+// IssueFromArgWithFields loads an issue or pull request with the specified fields.
+func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.Interface, error), arg string, fields []string) (*api.Issue, ghrepo.Interface, error) {
+	issueNumber, baseRepo := issueMetadataFromURL(arg)
+
+	if issueNumber == 0 {
+		var err error
+		issueNumber, err = strconv.Atoi(strings.TrimPrefix(arg, "#"))
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid issue format: %q", arg)
+		}
+	}
+
+	if baseRepo == nil {
+		var err error
+		baseRepo, err = baseRepoFn()
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not determine base repo: %w", err)
+		}
+	}
+
+	issue, err := findIssueOrPR(httpClient, baseRepo, issueNumber, fields)
 	return issue, baseRepo, err
 }
 
@@ -56,6 +84,45 @@ func issueMetadataFromURL(s string) (int, ghrepo.Interface) {
 	return issueNumber, repo
 }
 
-func issueFromNumber(apiClient *api.Client, repo ghrepo.Interface, issueNumber int) (*api.Issue, error) {
-	return api.IssueByNumber(apiClient, repo, issueNumber)
+func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, fields []string) (*api.Issue, error) {
+	type response struct {
+		Repository struct {
+			HasIssuesEnabled bool
+			Issue            *api.Issue
+		}
+	}
+
+	query := fmt.Sprintf(`
+	query IssueByNumber($owner: String!, $repo: String!, $number: Int!) {
+		repository(owner: $owner, name: $repo) {
+			hasIssuesEnabled
+			issue: issueOrPullRequest(number: $number) {
+				__typename
+				...on Issue{%[1]s}
+				...on PullRequest{%[1]s}
+			}
+		}
+	}`, api.PullRequestGraphQL(fields))
+
+	variables := map[string]interface{}{
+		"owner":  repo.RepoOwner(),
+		"repo":   repo.RepoName(),
+		"number": number,
+	}
+
+	var resp response
+	client := api.NewClientFromHTTP(httpClient)
+	if err := client.GraphQL(repo.RepoHost(), query, variables, &resp); err != nil {
+		var gerr *api.GraphQLErrorResponse
+		if errors.As(err, &gerr) && gerr.Match("NOT_FOUND", "repository.issue") && !resp.Repository.HasIssuesEnabled {
+			return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))
+		}
+		return nil, err
+	}
+
+	if resp.Repository.Issue == nil {
+		return nil, errors.New("issue was not found but GraphQL reported no error")
+	}
+
+	return resp.Repository.Issue, nil
 }

@@ -145,9 +145,24 @@ func TestIssueDelete_issuesDisabled(t *testing.T) {
 	httpRegistry.Register(
 		httpmock.GraphQL(`query IssueByNumber\b`),
 		httpmock.StringResponse(`
-			{ "data": { "repository": {
-				"hasIssuesEnabled": false
-			} } }`),
+		{
+			"data": {
+				"repository": {
+					"hasIssuesEnabled": false,
+					"issue": null
+				}
+			},
+			"errors": [
+				{
+					"type": "NOT_FOUND",
+					"path": [
+						"repository",
+						"issue"
+					],
+					"message": "Could not resolve to an issue or pull request with the number of 13."
+				}
+			]
+		}`),
 	)
 
 	_, err := runCommand(httpRegistry, true, "13")
