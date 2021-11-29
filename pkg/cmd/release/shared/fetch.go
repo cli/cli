@@ -15,28 +15,24 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
-var (
-	ReleaseFields = []string{
-		"url",
-		"apiUrl",
-		"uploadUrl",
-		"tarballUrl",
-		"zipballUrl",
-		"id",
-		"tagName",
-		"name",
-		"body",
-		"isDraft",
-		"isPrerelease",
-		"createdAt",
-		"publishedAt",
-		"targetCommitish",
-		"author",
-		"assets",
-	}
-
-	ErrReleaseNotFound = errors.New("release not found")
-)
+var ReleaseFields = []string{
+	"url",
+	"apiUrl",
+	"uploadUrl",
+	"tarballUrl",
+	"zipballUrl",
+	"id",
+	"tagName",
+	"name",
+	"body",
+	"isDraft",
+	"isPrerelease",
+	"createdAt",
+	"publishedAt",
+	"targetCommitish",
+	"author",
+	"assets",
+}
 
 type Release struct {
 	ID           string     `json:"node_id"`
@@ -173,10 +169,6 @@ func FetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*Re
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 404 {
-		return nil, ErrReleaseNotFound
-	}
-
 	if resp.StatusCode > 299 {
 		return nil, api.HandleHTTPError(resp)
 	}
@@ -238,5 +230,5 @@ func FindDraftRelease(httpClient *http.Client, baseRepo ghrepo.Interface, tagNam
 		break
 	}
 
-	return nil, ErrReleaseNotFound
+	return nil, errors.New("release not found")
 }

@@ -43,10 +43,6 @@ type CreateOptions struct {
 	SubmitAction string
 	// for interactive flow
 	ReleaseNotesAction string
-	// for interactive flow
-	PrereleaseText string
-	// for interactive flow
-	Build string
 
 	// the value from the --repo flag
 	RepoOverride string
