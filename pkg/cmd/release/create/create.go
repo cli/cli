@@ -57,7 +57,10 @@ type CreateOptions struct {
 	DiscussionCategory string
 }
 
-const tagsLimit = 5
+const (
+	tagsLimit          = 5
+	createNewTagOption = "Create new tag"
+)
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
@@ -332,7 +335,7 @@ func handleTagName(opts *CreateOptions, httpClient *http.Client, baseRepo ghrepo
 		return askTagName(opts)
 	}
 
-	options = append(options, "Create new tag")
+	options = append(options, createNewTagOption)
 
 	qs := []*survey.Question{
 		{
@@ -349,7 +352,7 @@ func handleTagName(opts *CreateOptions, httpClient *http.Client, baseRepo ghrepo
 		return fmt.Errorf("could not prompt: %w", err)
 	}
 
-	if opts.TagName == "Create new tag" {
+	if opts.TagName == createNewTagOption {
 		return askTagName(opts)
 	}
 
