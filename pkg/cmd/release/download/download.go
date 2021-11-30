@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -228,9 +229,19 @@ func downloadAsset(httpClient *http.Client, assetURL, destinationDir string, fil
 	}
 
 	req.Header.Set("Accept", "application/octet-stream")
-	// adding application/json to Accept header due to a bug in the zipball/tarball API endpoint that makes it mandatory
 	if isArchive {
+		// adding application/json to Accept header due to a bug in the zipball/tarball API endpoint that makes it mandatory
 		req.Header.Set("Accept", "application/octet-stream, application/json")
+
+		// override HTTP redirect logic to avoid "legacy" Codeload resources
+		oldClient := *httpClient
+		httpClient = &oldClient
+		httpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+			if len(via) == 1 {
+				req.URL.Path = removeLegacyFromCodeloadPath(req.URL.Path)
+			}
+			return nil
+		}
 	}
 
 	resp, err := httpClient.Do(req)
@@ -267,4 +278,17 @@ func downloadAsset(httpClient *http.Client, assetURL, destinationDir string, fil
 
 	_, err = io.Copy(f, resp.Body)
 	return err
+}
+
+var codeloadLegacyRE = regexp.MustCompile(`^(/[^/]+/[^/]+/)legacy\.`)
+
+// removeLegacyFromCodeloadPath converts URLs for "legacy" Codeload archives into ones that match the format
+// when you choose to download "Source code (zip/tar.gz)" from a tagged release on the web. The legacy URLs
+// look like this:
+//
+//   https://codeload.github.com/OWNER/REPO/legacy.zip/refs/tags/TAGNAME
+//
+// Removing the "legacy." part results in a valid Codeload URL for our desired archive format.
+func removeLegacyFromCodeloadPath(p string) string {
+	return codeloadLegacyRE.ReplaceAllString(p, "$1")
 }
