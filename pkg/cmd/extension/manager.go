@@ -2,6 +2,7 @@ package extension
 
 import (
 	"bytes"
+	_ "embed"
 	"errors"
 	"fmt"
 	"io"
@@ -16,7 +17,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
@@ -543,7 +543,22 @@ func (m *Manager) installDir() string {
 	return filepath.Join(m.dataDir(), "extensions")
 }
 
-func (m *Manager) Create(name string) error {
+//go:embed ext_tmpls/goBinMain.go.txt
+var mainGoTmpl string
+
+//go:embed ext_tmpls/goBinWorkflow.yml
+var goBinWorkflow []byte
+
+//go:embed ext_tmpls/otherBinWorkflow.yml
+var otherBinWorkflow []byte
+
+//go:embed ext_tmpls/script.sh
+var scriptTmpl string
+
+//go:embed ext_tmpls/buildScript.sh
+var buildScript []byte
+
+func (m *Manager) Create(name string, tmplType extensions.ExtTemplateType) error {
 	exe, err := m.lookPath("git")
 	if err != nil {
 		return err
@@ -560,45 +575,15 @@ func (m *Manager) Create(name string) error {
 		return err
 	}
 
-	fileTmpl := heredoc.Docf(`
-		#!/usr/bin/env bash
-		set -e
+	if tmplType == extensions.GoBinTemplateType {
+		return m.goBinScaffolding(exe, name)
+	} else if tmplType == extensions.OtherBinTemplateType {
+		return m.otherBinScaffolding(exe, name)
+	}
 
-		echo "Hello %[1]s!"
-
-		# Snippets to help get started:
-
-		# Determine if an executable is in the PATH
-		# if ! type -p ruby >/dev/null; then
-		#   echo "Ruby not found on the system" >&2
-		#   exit 1
-		# fi
-
-		# Pass arguments through to another command
-		# gh issue list "$@" -R cli/cli
-
-		# Using the gh api command to retrieve and format information
-		# QUERY='
-		#   query($endCursor: String) {
-		#     viewer {
-		#       repositories(first: 100, after: $endCursor) {
-		#         nodes {
-		#           nameWithOwner
-		#           stargazerCount
-		#         }
-		#       }
-		#     }
-		#   }
-		# '
-		# TEMPLATE='
-		#   {{- range $repo := .data.viewer.repositories.nodes -}}
-		#     {{- printf "name: %[2]s - stargazers: %[3]s\n" $repo.nameWithOwner $repo.stargazerCount -}}
-		#   {{- end -}}
-		# '
-		# exec gh api graphql -f query="${QUERY}" --paginate --template="${TEMPLATE}"
-	`, name, "%s", "%v")
+	script := fmt.Sprintf(scriptTmpl, name, "%s", "%v")
 	filePath := filepath.Join(name, name)
-	err = ioutil.WriteFile(filePath, []byte(fileTmpl), 0755)
+	err = ioutil.WriteFile(filePath, []byte(script), 0755)
 	if err != nil {
 		return err
 	}
@@ -609,8 +594,119 @@ func (m *Manager) Create(name string) error {
 	}
 	dir := filepath.Join(wd, name)
 	addCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "add", name, "--chmod=+x")
+	return addCmd.Run()
+}
+
+func (m *Manager) otherBinScaffolding(gitExe, name string) error {
+	err := os.MkdirAll(filepath.Join(name, ".github", "workflows"), 0755)
+	if err != nil {
+		return err
+	}
+	workflowPath := filepath.Join(".github", "workflows", "release.yml")
+	err = ioutil.WriteFile(filepath.Join(name, workflowPath), otherBinWorkflow, 0644)
+	if err != nil {
+		return err
+	}
+	err = os.Mkdir(filepath.Join(name, "script"), 0755)
+	if err != nil {
+		return err
+	}
+	buildScriptPath := filepath.Join("script", "build.sh")
+	err = ioutil.WriteFile(filepath.Join(name, buildScriptPath), buildScript, 0755)
+	if err != nil {
+		return err
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	dir := filepath.Join(wd, name)
+	addCmd := m.newCommand(gitExe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "add", buildScriptPath, "--chmod=+x")
 	err = addCmd.Run()
-	return err
+	if err != nil {
+		return err
+	}
+
+	addCmd = m.newCommand(gitExe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "add", workflowPath)
+	return addCmd.Run()
+}
+
+func (m *Manager) goBinScaffolding(gitExe, name string) error {
+	goExe, err := m.lookPath("go")
+	if err != nil {
+		return fmt.Errorf("go is required for creating Go extensions: %w", err)
+	}
+	err = os.MkdirAll(filepath.Join(name, ".github", "workflows"), 0755)
+	if err != nil {
+		return err
+	}
+	workflowPath := filepath.Join(".github", "workflows", "release.yml")
+	err = ioutil.WriteFile(filepath.Join(name, workflowPath), goBinWorkflow, 0644)
+	if err != nil {
+		return err
+	}
+
+	mainGo := fmt.Sprintf(mainGoTmpl, name)
+	mainPath := "main.go"
+
+	err = ioutil.WriteFile(filepath.Join(name, mainPath), []byte(mainGo), 0644)
+	if err != nil {
+		return err
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	dir := filepath.Join(wd, name)
+
+	host, err := m.config.DefaultHost()
+	if err != nil {
+		return err
+	}
+
+	currentUser, err := api.CurrentLoginName(api.NewClientFromHTTP(m.client), host)
+	if err != nil {
+		return err
+	}
+
+	goCmds := [][]string{
+		{"mod", "init", fmt.Sprintf("%s/%s/%s", host, currentUser, name)},
+		{"mod", "tidy"},
+		{"build"},
+	}
+
+	_, ext := m.platform()
+	ignore := name + ext
+
+	err = ioutil.WriteFile(filepath.Join(name, ".gitignore"), []byte(ignore), 0644)
+	if err != nil {
+		return err
+	}
+
+	for _, args := range goCmds {
+		goCmd := m.newCommand(goExe, args...)
+		goCmd.Dir = dir
+		err = goCmd.Run()
+		if err != nil {
+			return fmt.Errorf("failed to set up go module: %w", err)
+		}
+	}
+
+	addArgs := []string{
+		"-C", dir,
+		"--git-dir=" + filepath.Join(dir, ".git"),
+		"add",
+		workflowPath,
+		mainPath,
+		".gitignore",
+		"go.mod",
+		"go.sum",
+	}
+
+	addCmd := m.newCommand(gitExe, addArgs...)
+	return addCmd.Run()
 }
 
 func runCmds(cmds []*exec.Cmd) error {
