@@ -29,7 +29,7 @@ echo "Hello %[1]s!"
 # '
 # TEMPLATE='
 #   {{- range $repo := .data.viewer.repositories.nodes -}}
-#     {{- printf "name: %[2]s - stargazers: %[3]s\n" $repo.nameWithOwner $repo.stargazerCount -}}
+#     {{- printf "name: %%s - stargazers: %%v\n" $repo.nameWithOwner $repo.stargazerCount -}}
 #   {{- end -}}
 # '
 # exec gh api graphql -f query="${QUERY}" --paginate --template="${TEMPLATE}"
