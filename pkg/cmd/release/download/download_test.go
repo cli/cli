@@ -96,7 +96,7 @@ func Test_NewCmdDownload(t *testing.T) {
 			name:    "no arguments",
 			args:    "",
 			isTTY:   true,
-			wantErr: "the '--pattern' flag is required when downloading the latest release",
+			wantErr: "`--pattern` or `--archive` is required when downloading the latest release",
 		},
 		{
 			name:    "simultaneous pattern and archive arguments",
