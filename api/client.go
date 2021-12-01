@@ -186,6 +186,11 @@ func (err HTTPError) Error() string {
 }
 
 func (err HTTPError) ScopesSuggestion() string {
+	// Ignore 422 messages, which are typically reserved for validation errors, not permissions
+	// errors.
+	if err.StatusCode == 422 {
+		return ""
+	}
 	return err.scopesSuggestion
 }
 
