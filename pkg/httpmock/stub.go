@@ -24,6 +24,13 @@ func MatchAny(*http.Request) bool {
 	return true
 }
 
+func Git() Matcher {
+	re := regexp.MustCompile(`.*\.git\/.*`)
+	return func(req *http.Request) bool {
+		return re.MatchString(req.URL.Path)
+	}
+}
+
 func REST(method, p string) Matcher {
 	return func(req *http.Request) bool {
 		if !strings.EqualFold(req.Method, method) {
