@@ -208,6 +208,11 @@ func TestHTTPError_ScopesSuggestion(t *testing.T) {
 			resp: makeResponse(404, "https://api.github.com/gists", "", "gist, delete_repo"),
 			want: ``,
 		},
+		{
+			name: "http code is 422",
+			resp: makeResponse(422, "https://api.github.com/gists", "", "gist"),
+			want: "",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

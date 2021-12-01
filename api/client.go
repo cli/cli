@@ -206,7 +206,7 @@ func (err HTTPError) ScopesSuggestion() string {
 // ScopesSuggestion is an error messaging utility that prints the suggestion to request additional OAuth
 // scopes in case a server response indicates that there are missing scopes.
 func ScopesSuggestion(resp *http.Response) string {
-	if resp.StatusCode < 400 || resp.StatusCode > 499 {
+	if resp.StatusCode < 400 || resp.StatusCode > 499 || resp.StatusCode == 422 {
 		return ""
 	}
 
