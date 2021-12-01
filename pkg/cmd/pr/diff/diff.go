@@ -26,7 +26,7 @@ type DiffOptions struct {
 	Finder shared.PRFinder
 
 	SelectorArg string
-	UseColor    string
+	UseColor    bool
 	Patch       bool
 }
 
@@ -35,6 +35,8 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 	}
+
+	var colorFlag string
 
 	cmd := &cobra.Command{
 		Use:   "diff [<number> | <url> | <branch>]",
@@ -50,19 +52,22 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 			opts.Finder = shared.NewFinder(f)
 
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
-				return cmdutil.FlagErrorf("argument required when using the --repo flag")
+				return cmdutil.FlagErrorf("argument required when using the `--repo` flag")
 			}
 
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
 			}
 
-			if !validColorFlag(opts.UseColor) {
-				return cmdutil.FlagErrorf("did not understand color: %q. Expected one of always, never, or auto", opts.UseColor)
-			}
-
-			if opts.UseColor == "auto" && !opts.IO.IsStdoutTTY() {
-				opts.UseColor = "never"
+			switch colorFlag {
+			case "always":
+				opts.UseColor = true
+			case "auto":
+				opts.UseColor = opts.IO.ColorEnabled()
+			case "never":
+				opts.UseColor = false
+			default:
+				return cmdutil.FlagErrorf("the value for `--color` must be one of \"auto\", \"always\", or \"never\"")
 			}
 
 			if runF != nil {
@@ -72,7 +77,7 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.UseColor, "color", "auto", "Use color in diff output: {always|never|auto}")
+	cmd.Flags().StringVar(&colorFlag, "color", "auto", "Use color in diff output: {always|never|auto}")
 	cmd.Flags().BoolVar(&opts.Patch, "patch", false, "Display diff in patch format")
 
 	return cmd
@@ -105,7 +110,7 @@ func diffRun(opts *DiffOptions) error {
 	}
 	defer opts.IO.StopPager()
 
-	if opts.UseColor == "never" {
+	if !opts.UseColor {
 		_, err = io.Copy(opts.IO.Out, diff)
 		if errors.Is(err, syscall.EPIPE) {
 			return nil
@@ -182,8 +187,4 @@ func isAdditionLine(dl string) bool {
 
 func isRemovalLine(dl string) bool {
 	return strings.HasPrefix(dl, "-")
-}
-
-func validColorFlag(c string) bool {
-	return c == "auto" || c == "always" || c == "never"
 }
