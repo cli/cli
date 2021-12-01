@@ -390,7 +390,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 	}
 	if serverError != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
-		if msg := api.ScopesSuggestion(resp); msg != "" && resp.StatusCode != 422 {
+		if msg := api.ScopesSuggestion(resp); msg != "" {
 			fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", msg)
 		}
 		err = cmdutil.SilentError
