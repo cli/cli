@@ -118,26 +118,7 @@ func diffRun(opts *DiffOptions) error {
 		return err
 	}
 
-	diffLines := bufio.NewScanner(diff)
-	for diffLines.Scan() {
-		diffLine := diffLines.Text()
-		switch {
-		case isHeaderLine(diffLine):
-			fmt.Fprintf(opts.IO.Out, "\x1b[1;38m%s\x1b[m\n", diffLine)
-		case isAdditionLine(diffLine):
-			fmt.Fprintf(opts.IO.Out, "\x1b[32m%s\x1b[m\n", diffLine)
-		case isRemovalLine(diffLine):
-			fmt.Fprintf(opts.IO.Out, "\x1b[31m%s\x1b[m\n", diffLine)
-		default:
-			fmt.Fprintln(opts.IO.Out, diffLine)
-		}
-	}
-
-	if err := diffLines.Err(); err != nil {
-		return fmt.Errorf("error reading pull request diff: %w", err)
-	}
-
-	return nil
+	return colorDiffLines(opts.IO.Out, diff)
 }
 
 func fetchDiff(httpClient *http.Client, baseRepo ghrepo.Interface, prNumber int, asPatch bool) (io.ReadCloser, error) {
@@ -170,9 +151,71 @@ func fetchDiff(httpClient *http.Client, baseRepo ghrepo.Interface, prNumber int,
 	return resp.Body, nil
 }
 
+const lineBufferSize = 4096
+
+var (
+	colorHeader   = []byte("\x1b[1;38m")
+	colorAddition = []byte("\x1b[32m")
+	colorRemoval  = []byte("\x1b[31m")
+	colorReset    = []byte("\x1b[m")
+)
+
+func colorDiffLines(w io.Writer, r io.Reader) error {
+	diffLines := bufio.NewReaderSize(r, lineBufferSize)
+	wasPrefix := false
+	needsReset := false
+
+	for {
+		diffLine, isPrefix, err := diffLines.ReadLine()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return fmt.Errorf("error reading pull request diff: %w", err)
+		}
+
+		var color []byte
+		if !wasPrefix {
+			if isHeaderLine(diffLine) {
+				color = colorHeader
+			} else if isAdditionLine(diffLine) {
+				color = colorAddition
+			} else if isRemovalLine(diffLine) {
+				color = colorRemoval
+			}
+		}
+
+		if color != nil {
+			if _, err := w.Write(color); err != nil {
+				return err
+			}
+			needsReset = true
+		}
+
+		if _, err := w.Write(diffLine); err != nil {
+			return err
+		}
+
+		if !isPrefix {
+			if needsReset {
+				if _, err := w.Write(colorReset); err != nil {
+					return err
+				}
+				needsReset = false
+			}
+			if _, err := w.Write([]byte{'\n'}); err != nil {
+				return err
+			}
+		}
+		wasPrefix = isPrefix
+	}
+	return nil
+}
+
 var diffHeaderPrefixes = []string{"+++", "---", "diff", "index"}
 
-func isHeaderLine(dl string) bool {
+func isHeaderLine(l []byte) bool {
+	dl := string(l)
 	for _, p := range diffHeaderPrefixes {
 		if strings.HasPrefix(dl, p) {
 			return true
@@ -181,10 +224,10 @@ func isHeaderLine(dl string) bool {
 	return false
 }
 
-func isAdditionLine(dl string) bool {
-	return strings.HasPrefix(dl, "+")
+func isAdditionLine(l []byte) bool {
+	return len(l) > 0 && l[0] == '+'
 }
 
-func isRemovalLine(dl string) bool {
-	return strings.HasPrefix(dl, "-")
+func isRemovalLine(l []byte) bool {
+	return len(l) > 0 && l[0] == '-'
 }

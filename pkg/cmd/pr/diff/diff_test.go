@@ -248,3 +248,46 @@ const testDiff = `%[2]sdiff --git a/.github/workflows/releases.yml b/.github/wor
  site-docs: site
  	git -C site pull
 `
+
+func Test_colorDiffLines(t *testing.T) {
+	inputs := []struct {
+		input, output string
+	}{
+		{
+			input:  "",
+			output: "",
+		},
+		{
+			input:  "\n",
+			output: "\n",
+		},
+		{
+			input:  "foo\nbar\nbaz\n",
+			output: "foo\nbar\nbaz\n",
+		},
+		{
+			input:  "foo\nbar\nbaz",
+			output: "foo\nbar\nbaz\n",
+		},
+		{
+			input: fmt.Sprintf("+foo\n-b%sr\n+++ baz\n", strings.Repeat("a", 2*lineBufferSize)),
+			output: fmt.Sprintf(
+				"%[4]s+foo%[2]s\n%[5]s-b%[1]sr%[2]s\n%[3]s+++ baz%[2]s\n",
+				strings.Repeat("a", 2*lineBufferSize),
+				"\x1b[m",
+				"\x1b[1;38m",
+				"\x1b[32m",
+				"\x1b[31m",
+			),
+		},
+	}
+	for _, tt := range inputs {
+		buf := bytes.Buffer{}
+		if err := colorDiffLines(&buf, strings.NewReader(tt.input)); err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if got := buf.String(); got != tt.output {
+			t.Errorf("expected: %q, got: %q", tt.output, got)
+		}
+	}
+}
