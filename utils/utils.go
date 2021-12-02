@@ -83,13 +83,3 @@ func DisplayURL(urlStr string) string {
 func ValidURL(urlStr string) bool {
 	return len(urlStr) < 8192
 }
-
-// Has returns true if the given string is in the list.
-func Has(x string, list []string) bool {
-	for _, y := range list {
-		if x == y {
-			return true
-		}
-	}
-	return false
-}

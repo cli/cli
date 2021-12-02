@@ -3,12 +3,11 @@ package setupgit
 import (
 	"bytes"
 	"fmt"
-	"regexp"
 	"testing"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -75,7 +74,7 @@ func Test_setupGitRun(t *testing.T) {
 		name           string
 		opts           *SetupGitOptions
 		expectedErr    string
-		expectedErrOut *regexp.Regexp
+		expectedErrOut string
 	}{
 		{
 			name: "opts.Config returns an error",
@@ -90,7 +89,7 @@ func Test_setupGitRun(t *testing.T) {
 			name:           "no authenticated hostnames",
 			opts:           &SetupGitOptions{},
 			expectedErr:    "SilentError",
-			expectedErrOut: regexp.MustCompile("You are not logged into any GitHub hosts."),
+			expectedErrOut: "You are not logged into any GitHub hosts. Run gh auth login to authenticate.\n",
 		},
 		{
 			name: "not authenticated with the hostname given as flag",
@@ -102,8 +101,8 @@ func Test_setupGitRun(t *testing.T) {
 					return cfg, nil
 				},
 			},
-			expectedErr:    "SilentError",
-			expectedErrOut: regexp.MustCompile("You are not logged into any Github host with the hostname foo"),
+			expectedErr:    "You are not logged into the GitHub host \"foo\"\n",
+			expectedErrOut: "",
 		},
 		{
 			name: "error setting up git for hostname",
@@ -117,8 +116,8 @@ func Test_setupGitRun(t *testing.T) {
 					return cfg, nil
 				},
 			},
-			expectedErr:    "SilentError",
-			expectedErrOut: regexp.MustCompile("failed to setup git credential helper"),
+			expectedErr:    "failed to set up git credential helper: broken",
+			expectedErrOut: "",
 		},
 		{
 			name: "no hostname option given. Setup git for each hostname in config",
@@ -168,11 +167,7 @@ func Test_setupGitRun(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			if tt.expectedErrOut == nil {
-				assert.Equal(t, "", stderr.String())
-			} else {
-				assert.True(t, tt.expectedErrOut.MatchString(stderr.String()))
-			}
+			assert.Equal(t, tt.expectedErrOut, stderr.String())
 		})
 	}
 }

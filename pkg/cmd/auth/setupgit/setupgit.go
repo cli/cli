@@ -2,12 +2,12 @@ package setupgit
 
 import (
 	"fmt"
+	"strings"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/pkg/cmd/auth/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
@@ -16,25 +16,26 @@ type gitConfigurator interface {
 }
 
 type SetupGitOptions struct {
-	IO *iostreams.IOStreams
-	// Hostname is the host to setup as git credential helper for. This is set via command flag.
-	Hostname     string
+	IO           *iostreams.IOStreams
 	Config       func() (config.Config, error)
+	Hostname     string
 	gitConfigure gitConfigurator
 }
 
 func NewCmdSetupGit(f *cmdutil.Factory, runF func(*SetupGitOptions) error) *cobra.Command {
 	opts := &SetupGitOptions{
-		IO:           f.IOStreams,
-		Config:       f.Config,
-		gitConfigure: &shared.GitCredentialFlow{},
+		IO:     f.IOStreams,
+		Config: f.Config,
 	}
 
 	cmd := &cobra.Command{
-		Short: "Setup GH CLI as a git credential helper",
-		Long:  "Setup GH CLI as a git credential helper for all authenticated hostnames.",
-		Use:   "setup-git [<hostname>]",
+		Short: "Configure git to use GitHub CLI as a credential helper",
+		Use:   "setup-git",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.gitConfigure = &shared.GitCredentialFlow{
+				Executable: f.Executable(),
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -42,13 +43,7 @@ func NewCmdSetupGit(f *cmdutil.Factory, runF func(*SetupGitOptions) error) *cobr
 		},
 	}
 
-	cmd.Flags().StringVarP(
-		&opts.Hostname,
-		"hostname",
-		"h",
-		"",
-		"Setup git credential helper for a specific hostname",
-	)
+	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname to configure git for")
 
 	return cmd
 }
@@ -80,30 +75,26 @@ func setupGitRun(opts *SetupGitOptions) error {
 	hostnamesToSetup := hostnames
 
 	if opts.Hostname != "" {
-		if !utils.Has(opts.Hostname, hostnames) {
-			fmt.Fprintf(
-				stderr,
-				"You are not logged into any Github host with the hostname %s\n",
-				opts.Hostname,
-			)
-			return cmdutil.SilentError
+		if !has(opts.Hostname, hostnames) {
+			return fmt.Errorf("You are not logged into the GitHub host %q\n", opts.Hostname)
 		}
 		hostnamesToSetup = []string{opts.Hostname}
 	}
 
-	if err := setupGitForHostnames(hostnamesToSetup, opts.gitConfigure); err != nil {
-		fmt.Fprintln(stderr, err.Error())
-		return cmdutil.SilentError
+	for _, hostname := range hostnamesToSetup {
+		if err := opts.gitConfigure.Setup(hostname, "", ""); err != nil {
+			return fmt.Errorf("failed to set up git credential helper: %w", err)
+		}
 	}
 
 	return nil
 }
 
-func setupGitForHostnames(hostnames []string, gitCfg gitConfigurator) error {
-	for _, hostname := range hostnames {
-		if err := gitCfg.Setup(hostname, "", ""); err != nil {
-			return fmt.Errorf("failed to setup git credential helper: %w", err)
+func has(needle string, haystack []string) bool {
+	for _, s := range haystack {
+		if strings.EqualFold(s, needle) {
+			return true
 		}
 	}
-	return nil
+	return false
 }
