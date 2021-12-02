@@ -64,7 +64,7 @@ func (flow *GitCredentialFlow) Setup(hostname, username, authToken string) error
 func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password string) error {
 	if flow.helper == "" {
 		// first use a blank value to indicate to git we want to sever the chain of credential helpers
-		preConfigureCmd, err := git.GitCommand("config", "--global", gitCredentialHelperKey(hostname), "")
+		preConfigureCmd, err := git.GitCommand("config", "--global", "--replace-all", gitCredentialHelperKey(hostname), "")
 		if err != nil {
 			return err
 		}
