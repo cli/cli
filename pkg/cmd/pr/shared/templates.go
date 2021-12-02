@@ -13,12 +13,12 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/githubtemplate"
 	"github.com/cli/cli/v2/pkg/prompt"
+	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
-	"github.com/shurcooL/graphql"
 )
 
 type issueTemplate struct {
-	// I would have un-exported these fields, except `shurcool/graphql` then cannot unmarshal them :/
+	// I would have un-exported these fields, except `cli/shurcool-graphql` then cannot unmarshal them :/
 	Gname string `graphql:"name"`
 	Gbody string `graphql:"body"`
 }

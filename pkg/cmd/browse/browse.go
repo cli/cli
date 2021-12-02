@@ -3,11 +3,15 @@ package browse
 import (
 	"fmt"
 	"net/http"
+	"net/url"
+	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -20,14 +24,16 @@ type browser interface {
 }
 
 type BrowseOptions struct {
-	BaseRepo   func() (ghrepo.Interface, error)
-	Browser    browser
-	HttpClient func() (*http.Client, error)
-	IO         *iostreams.IOStreams
+	BaseRepo         func() (ghrepo.Interface, error)
+	Browser          browser
+	HttpClient       func() (*http.Client, error)
+	IO               *iostreams.IOStreams
+	PathFromRepoRoot func() string
 
 	SelectorArg string
 
 	Branch        string
+	CommitFlag    bool
 	ProjectsFlag  bool
 	SettingsFlag  bool
 	WikiFlag      bool
@@ -36,9 +42,10 @@ type BrowseOptions struct {
 
 func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Command {
 	opts := &BrowseOptions{
-		Browser:    f.Browser,
-		HttpClient: f.HttpClient,
-		IO:         f.IOStreams,
+		Browser:          f.Browser,
+		HttpClient:       f.HttpClient,
+		IO:               f.IOStreams,
+		PathFromRepoRoot: git.PathFromRepoRoot,
 	}
 
 	cmd := &cobra.Command{
@@ -81,8 +88,9 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			}
 
 			if err := cmdutil.MutuallyExclusive(
-				"specify only one of `--branch`, `--projects`, `--wiki`, or `--settings`",
+				"specify only one of `--branch`, `--commit`, `--projects`, `--wiki`, or `--settings`",
 				opts.Branch != "",
+				opts.CommitFlag,
 				opts.WikiFlag,
 				opts.SettingsFlag,
 				opts.ProjectsFlag,
@@ -102,6 +110,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Open repository wiki")
 	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Open repository settings")
 	cmd.Flags().BoolVarP(&opts.NoBrowserFlag, "no-browser", "n", false, "Print destination URL instead of opening the browser")
+	cmd.Flags().BoolVarP(&opts.CommitFlag, "commit", "c", false, "Open the last commit")
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Select another branch by passing in the branch name")
 
 	return cmd
@@ -113,11 +122,18 @@ func runBrowse(opts *BrowseOptions) error {
 		return fmt.Errorf("unable to determine base repository: %w", err)
 	}
 
+	if opts.CommitFlag {
+		commit, err := git.LastCommit()
+		if err == nil {
+			opts.Branch = commit.Sha
+		}
+	}
+
 	section, err := parseSection(baseRepo, opts)
 	if err != nil {
 		return err
 	}
-	url := ghrepo.GenerateRepoURL(baseRepo, section)
+	url := ghrepo.GenerateRepoURL(baseRepo, "%s", section)
 
 	if opts.NoBrowserFlag {
 		_, err := fmt.Fprintln(opts.IO.Out, url)
@@ -147,7 +163,7 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 		return fmt.Sprintf("issues/%s", opts.SelectorArg), nil
 	}
 
-	filePath, rangeStart, rangeEnd, err := parseFile(opts.SelectorArg)
+	filePath, rangeStart, rangeEnd, err := parseFile(*opts, opts.SelectorArg)
 	if err != nil {
 		return "", err
 	}
@@ -172,19 +188,34 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 		} else {
 			rangeFragment = fmt.Sprintf("L%d", rangeStart)
 		}
-		return fmt.Sprintf("blob/%s/%s?plain=1#%s", branchName, filePath, rangeFragment), nil
+		return fmt.Sprintf("blob/%s/%s?plain=1#%s", escapePath(branchName), escapePath(filePath), rangeFragment), nil
 	}
-	return fmt.Sprintf("tree/%s/%s", branchName, filePath), nil
+	return strings.TrimSuffix(fmt.Sprintf("tree/%s/%s", escapePath(branchName), escapePath(filePath)), "/"), nil
 }
 
-func parseFile(f string) (p string, start int, end int, err error) {
+// escapePath URL-encodes special characters but leaves slashes unchanged
+func escapePath(p string) string {
+	return strings.ReplaceAll(url.PathEscape(p), "%2F", "/")
+}
+
+func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err error) {
+	if f == "" {
+		return
+	}
+
 	parts := strings.SplitN(f, ":", 3)
 	if len(parts) > 2 {
 		err = fmt.Errorf("invalid file argument: %q", f)
 		return
 	}
 
-	p = parts[0]
+	p = filepath.ToSlash(parts[0])
+	if !path.IsAbs(p) {
+		p = path.Join(opts.PathFromRepoRoot(), p)
+		if p == "." || strings.HasPrefix(p, "..") {
+			p = ""
+		}
+	}
 	if len(parts) < 2 {
 		return
 	}

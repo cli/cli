@@ -15,16 +15,19 @@ type PortForwarder struct {
 	session    *Session
 	name       string
 	remotePort int
+	keepAlive  bool
 }
 
 // NewPortForwarder returns a new PortForwarder for the specified
 // remote port and Live Share session. The name describes the purpose
-// of the remote port or service.
-func NewPortForwarder(session *Session, name string, remotePort int) *PortForwarder {
+// of the remote port or service. The keepAlive flag indicates whether
+// the session should be kept alive with port forwarding traffic.
+func NewPortForwarder(session *Session, name string, remotePort int, keepAlive bool) *PortForwarder {
 	return &PortForwarder{
 		session:    session,
 		name:       name,
 		remotePort: remotePort,
+		keepAlive:  keepAlive,
 	}
 }
 
@@ -106,6 +109,27 @@ func awaitError(ctx context.Context, errc <-chan error) error {
 	}
 }
 
+// trafficMonitor implements io.Reader. It keeps the session alive by notifying
+// it of the traffic type during Read operations.
+type trafficMonitor struct {
+	reader io.Reader
+
+	session     *Session
+	trafficType string
+}
+
+// newTrafficMonitor returns a new trafficMonitor for the specified
+// session and traffic type. It wraps the provided io.Reader with its own
+// Read method.
+func newTrafficMonitor(reader io.Reader, session *Session, trafficType string) *trafficMonitor {
+	return &trafficMonitor{reader, session, trafficType}
+}
+
+func (t *trafficMonitor) Read(p []byte) (n int, err error) {
+	t.session.keepAlive(t.trafficType)
+	return t.reader.Read(p)
+}
+
 // handleConnection handles forwarding for a single accepted connection, then closes it.
 func (fwd *PortForwarder) handleConnection(ctx context.Context, id channelID, conn io.ReadWriteCloser) (err error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "PortForwarder.handleConnection")
@@ -133,8 +157,21 @@ func (fwd *PortForwarder) handleConnection(ctx context.Context, id channelID, co
 		_, err := io.Copy(w, r)
 		errs <- err
 	}
-	go copyConn(conn, channel)
-	go copyConn(channel, conn)
+
+	var (
+		channelReader io.Reader = channel
+		connReader    io.Reader = conn
+	)
+
+	// If the forwader has been configured to keep the session alive
+	// it will monitor the I/O and notify the session of the traffic.
+	if fwd.keepAlive {
+		channelReader = newTrafficMonitor(channelReader, fwd.session, "output")
+		connReader = newTrafficMonitor(connReader, fwd.session, "input")
+	}
+
+	go copyConn(conn, channelReader)
+	go copyConn(channel, connReader)
 
 	// Wait until context is cancelled or both copies are done.
 	// Discard errors from io.Copy; they should not cause (e.g.) ForwardToListener to fail.

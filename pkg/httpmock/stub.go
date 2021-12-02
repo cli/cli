@@ -77,6 +77,17 @@ func StringResponse(body string) Responder {
 	}
 }
 
+func WithHeader(responder Responder, header string, value string) Responder {
+	return func(req *http.Request) (*http.Response, error) {
+		resp, _ := responder(req)
+		if resp.Header == nil {
+			resp.Header = make(http.Header)
+		}
+		resp.Header.Set(header, value)
+		return resp, nil
+	}
+}
+
 func StatusStringResponse(status int, body string) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		return httpResponse(status, req, bytes.NewBufferString(body)), nil
@@ -162,5 +173,6 @@ func httpResponse(status int, req *http.Request, body io.Reader) *http.Response 
 		StatusCode: status,
 		Request:    req,
 		Body:       ioutil.NopCloser(body),
+		Header:     http.Header{},
 	}
 }

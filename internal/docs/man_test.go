@@ -101,7 +101,7 @@ func TestGenManSeeAlso(t *testing.T) {
 	if err := assertNextLineEquals(scanner, ".PP"); err != nil {
 		t.Fatalf("First line after SEE ALSO wasn't break-indent: %v", err)
 	}
-	if err := assertNextLineEquals(scanner, `\fBroot\-bbb(1)\fP, \fBroot\-ccc(1)\fP`); err != nil {
+	if err := assertNextLineEquals(scanner, `\fBroot-bbb(1)\fP, \fBroot-ccc(1)\fP`); err != nil {
 		t.Fatalf("Second line after SEE ALSO wasn't correct: %v", err)
 	}
 }
