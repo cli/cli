@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -471,7 +470,7 @@ func Test_promptGists(t *testing.T) {
 		as.StubOne(tt.gistIndex)
 
 		t.Run(tt.name, func(t *testing.T) {
-			gistID, err := promptGists(client, ghinstance.Default(), io.ColorScheme())
+			gistID, err := promptGists(client, "github.com", io.ColorScheme())
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantOut, gistID)
 			reg.Verify(t)

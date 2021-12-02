@@ -33,10 +33,12 @@ type ListOptions struct {
 
 	State      string
 	BaseBranch string
+	HeadBranch string
 	Labels     []string
 	Author     string
 	Assignee   string
 	Search     string
+	Draft      string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -45,6 +47,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
 	}
+
+	var draft bool
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -71,7 +75,11 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			opts.BaseRepo = f.BaseRepo
 
 			if opts.LimitResults < 1 {
-				return &cmdutil.FlagError{Err: fmt.Errorf("invalid value for --limit: %v", opts.LimitResults)}
+				return cmdutil.FlagErrorf("invalid value for --limit: %v", opts.LimitResults)
+			}
+
+			if cmd.Flags().Changed("draft") {
+				opts.Draft = strconv.FormatBool(draft)
 			}
 
 			if runF != nil {
@@ -88,10 +96,13 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		return []string{"open", "closed", "merged", "all"}, cobra.ShellCompDirectiveNoFileComp
 	})
 	cmd.Flags().StringVarP(&opts.BaseBranch, "base", "B", "", "Filter by base branch")
+	cmd.Flags().StringVarP(&opts.HeadBranch, "head", "H", "", "Filter by head branch")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by labels")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
+	cmd.Flags().BoolVarP(&draft, "draft", "d", false, "Filter by draft state")
+
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
@@ -131,13 +142,14 @@ func listRun(opts *ListOptions) error {
 		Assignee:   opts.Assignee,
 		Labels:     opts.Labels,
 		BaseBranch: opts.BaseBranch,
+		HeadBranch: opts.HeadBranch,
 		Search:     opts.Search,
+		Draft:      opts.Draft,
 		Fields:     defaultFields,
 	}
 	if opts.Exporter != nil {
 		filters.Fields = opts.Exporter.Fields()
 	}
-
 	if opts.WebMode {
 		prListURL := ghrepo.GenerateRepoURL(baseRepo, "pulls")
 		openURL, err := shared.ListURLWithQuery(prListURL, filters)
@@ -166,6 +178,9 @@ func listRun(opts *ListOptions) error {
 		return opts.Exporter.Write(opts.IO, listResult.PullRequests)
 	}
 
+	if listResult.SearchCapped {
+		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
+	}
 	if opts.IO.IsStdoutTTY() {
 		title := shared.ListHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, !filters.IsDefault())
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)

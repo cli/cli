@@ -118,7 +118,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 			if len(args) == 0 && opts.JobID == "" {
 				if !opts.IO.CanPrompt() {
-					return &cmdutil.FlagError{Err: errors.New("run or job ID required when not running interactively")}
+					return cmdutil.FlagErrorf("run or job ID required when not running interactively")
 				} else {
 					opts.Prompt = true
 				}
@@ -135,11 +135,11 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			}
 
 			if opts.Web && opts.Log {
-				return &cmdutil.FlagError{Err: errors.New("specify only one of --web or --log")}
+				return cmdutil.FlagErrorf("specify only one of --web or --log")
 			}
 
 			if opts.Log && opts.LogFailed {
-				return &cmdutil.FlagError{Err: errors.New("specify only one of --log or --log-failed")}
+				return cmdutil.FlagErrorf("specify only one of --log or --log-failed")
 			}
 
 			if runF != nil {

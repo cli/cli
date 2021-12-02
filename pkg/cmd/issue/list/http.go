@@ -171,7 +171,7 @@ func searchIssues(client *api.Client, repo ghrepo.Interface, filters prShared.Fi
 		"query": searchQuery,
 	}
 
-	ic := api.IssuesAndTotalCount{}
+	ic := api.IssuesAndTotalCount{SearchCapped: limit > 1000}
 
 loop:
 	for {

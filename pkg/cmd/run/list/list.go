@@ -48,7 +48,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			opts.PlainOutput = !terminal
 
 			if opts.Limit < 1 {
-				return &cmdutil.FlagError{Err: fmt.Errorf("invalid limit: %v", opts.Limit)}
+				return cmdutil.FlagErrorf("invalid limit: %v", opts.Limit)
 			}
 
 			if runF != nil {
