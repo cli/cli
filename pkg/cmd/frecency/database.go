@@ -5,49 +5,35 @@ import (
 	"errors"
 	"time"
 
+	"github.com/cli/cli/v2/api"
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// DBEntry is a frecency entry for a issue or PR
-// PRs are also issues, so we can store them in one table
-// IDs are the graphQL IDs
-type DBEntry struct {
-	Number int
-	Title  string
-	ID     string
-	Repo   Repository
-	Stats  CountEntry
-	IsPR   bool
+// stores issue/PR with frecency stats
+type entryWithStats struct {
+	Entry interface{}
+	Stats countEntry
 }
 
-type Repository struct {
-	OwnerID           string
-	OwnerName         string
-	ID                string
-	Name              string
-	IssuesLastQueried time.Time // the last time issues/PRs were fetched
-	PRsLastQueried    time.Time
+type countEntry struct {
+	LastAccess time.Time
+	Count      int
 }
 
-func UpdateEntry(db *sql.DB, updated *DBEntry) error {
+func updateEntry(db *sql.DB, updated *dbEntry) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
 	}
 
-	statement, err := tx.Prepare("UPDATE issues SET lastAccessed = ?, count = ? WHERE repoId = ? AND number = ?")
+	stmt, err := tx.Prepare("UPDATE issues SET lastAccess = ?, count = ? WHERE repo = ? AND number = ?")
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	defer statement.Close()
-
-	_, err = statement.Exec(
-		updated.Stats.LastAccessed.Unix(),
-		updated.Stats.Count,
-		updated.Repo.ID,
-		updated.Number)
+	defer stmt.Close()
+	_, err = stmt.Exec(updated.Stats.LastAccess.Unix(), updated.Stats.Count, updated.Repo, updated.Number)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -56,28 +42,14 @@ func UpdateEntry(db *sql.DB, updated *DBEntry) error {
 	return nil
 }
 
-// Create new Issue/PR entry in database
-func insertEntry(db *sql.DB, entry *DBEntry) error {
-
-	// insert the owner if it doesn't exist yet
-	ownerExists, err := OwnerExists(db, entry.Repo.OwnerID)
-	if err != nil {
-		return err
-	}
-	if !ownerExists {
-		if err := insertOwner(db, entry.Repo); err != nil {
-			return err
-		}
-	}
-
+func insertEntry(db *sql.DB, repoName string, entry *entryWithStats) error {
 	// insert the repo if it doesn't exist yet
-	repoExists, err := RepoExists(db, entry.Repo.ID)
+	repoExists, err := RepoExists(db, repoName)
 	if err != nil {
 		return err
 	}
 	if !repoExists {
-		err := insertRepo(db, &entry.Repo)
-		if err != nil {
+		if err := insertRepo(db, repoName); err != nil {
 			return err
 		}
 	}
@@ -87,7 +59,7 @@ func insertEntry(db *sql.DB, entry *DBEntry) error {
 		return err
 	}
 
-	stmt, err := tx.Prepare("INSERT INTO issues(gqlID,title,number,count,lastAccessed,repoID,isPR) values(?,?,?,?,?,?,?)")
+	stmt, err := tx.Prepare("INSERT INTO issues(title,number,count,lastAccess,repo,isPR) values(?,?,?,?,?,?,?)")
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -95,11 +67,10 @@ func insertEntry(db *sql.DB, entry *DBEntry) error {
 
 	defer stmt.Close()
 	_, err = stmt.Exec(
-		entry.ID,
 		entry.Title,
 		entry.Number,
 		entry.Stats.Count,
-		entry.Stats.LastAccessed.Unix(),
+		entry.Stats.LastAccess.Unix(),
 		entry.Repo.ID,
 		entry.IsPR)
 
@@ -111,21 +82,20 @@ func insertEntry(db *sql.DB, entry *DBEntry) error {
 	return nil
 }
 
-func insertOwner(db *sql.DB, repository Repository) error {
+func insertRepo(db *sql.DB, repoName string) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
 	}
 
-	statement, err := tx.Prepare("INSERT INTO owners(gqlID,name) values(?,?)")
+	stmt, err := tx.Prepare("INSERT INTO repos(name) values(?)")
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
 
-	defer statement.Close()
-	_, err = statement.Exec(repository.OwnerID, repository.OwnerName)
-
+	defer stmt.Close()
+	_, err = stmt.Exec(repo.Name)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -135,48 +105,10 @@ func insertOwner(db *sql.DB, repository Repository) error {
 	return nil
 }
 
-func insertRepo(db *sql.DB, repo *Repository) error {
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-
-	statement, err := tx.Prepare("INSERT INTO repos(gqlID,name,ownerID) values(?,?,?)")
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	defer statement.Close()
-
-	_, err = statement.Exec(repo.ID, repo.Name, repo.OwnerID)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	tx.Commit()
-	return nil
-}
-
-func OwnerExists(db *sql.DB, ownerID string) (bool, error) {
-	row := db.QueryRow("SELECT id FROM owners WHERE gqlID = ?", ownerID)
-	var id string
-	err := row.Scan(&id)
-	if err == nil {
-		return true, nil
-	}
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
-	return false, err
-}
-
-func RepoExists(db *sql.DB, repoID string) (bool, error) {
-	var id string
-	row := db.QueryRow("SELECT id FROM repos WHERE gqlID = ?", repoID)
-	err := row.Scan(&id)
+func repoExists(db *sql.DB, repoName string) (bool, error) {
+	var found int
+	row := db.QueryRow("SELECT 1 FROM repos WHERE name = ?", repoName)
+	err := row.Scan(&found)
 	if err == nil {
 		return true, nil
 	}
@@ -186,73 +118,62 @@ func RepoExists(db *sql.DB, repoID string) (bool, error) {
 	return false, err
 }
 
-// Retrieve all issues under the repo with given ID
-func GetIssues(db *sql.DB, repoID string) ([]*DBEntry, error) {
-	return getEntries(db, repoID, 0)
-}
-
-// Retrieve all PRs under the repo with given ID
-func GetPullRequests(db *sql.DB, repoID string) ([]*DBEntry, error) {
-	return getEntries(db, repoID, 1)
-}
-
-func getEntries(db *sql.DB, repoID string, isPR int) ([]*DBEntry, error) {
+// get issues or PRs
+func getEntries(db *sql.DB, repoName string, isPR bool) ([]entryWithStats, error) {
 	query := `
-	SELECT number,lastAccessed,count,isPR,title FROM issues 
-		WHERE repoID = ? 
+	SELECT number,lastAccess,count,title FROM issues 
+		WHERE repo = ? 
 		AND isPR = ?
-		ORDER BY lastAccessed DESC`
-	rows, err := db.Query(query, repoID, isPR)
+		ORDER BY lastAccess DESC`
+	rows, err := db.Query(query, repoName, isPR)
 	if err != nil {
 		return nil, err
 	}
 
-	var entries []*DBEntry
+	var entries []entryWithStats
 	for rows.Next() {
-		entry := DBEntry{}
+		var entry entryWithStats
+		if isPR {
+			entry.Entry = api.PullRequest{}
+		} else {
+			entry.Entry = api.Issue{}
+		}
 		var unixTime int64
-		if err := rows.Scan(&entry.Number, &unixTime, &entry.Stats.Count, &entry.IsPR, &entry.Title); err != nil {
+		if err := rows.Scan(&entry.Entry.Number, &unixTime, &entry.Stats.Count, &entry.Entry.Title); err != nil {
 			return nil, err
 		}
-		entry.Stats.LastAccessed = time.Unix(unixTime, 0)
-		entries = append(entries, &entry)
+		entry.Stats.LastAccess = time.Unix(unixTime, 0)
+		entries = append(entries, entry)
 	}
-
 	return entries, nil
 }
 
 func createTables(db *sql.DB) error {
+	// TODO: repo is identified by "owner/repo",
+	// so renaming and transfering ownership will invalidate the db
 	query := `
-	CREATE TABLE IF NOT EXISTS owners( 
-		id INTEGER PRIMARY KEY AUTOINCREMENT, 
-		gqlID TEXT NOT NULL UNIQUE,
-		name TEXT NOT NULL 
-	);
-
 	CREATE TABLE IF NOT EXISTS repos(
 		id INTEGER PRIMARY KEY AUTOINCREMENT, 
- 		gqlID TEXT NOT NULL UNIQUE,
- 		name TEXT NOT NULL,
-		ownerID TEXT NOT NULL, 
+ 		fullName TEXT NOT NULL UNIQUE,
 		issuesLastQueried INTEGER,
 		prsLastQueried INTEGER,
- 		FOREIGN KEY (ownerID) REFERENCES owners(gqlID)
 	);
 	
 	CREATE TABLE IF NOT EXISTS issues(
 		id INTEGER PRIMARY KEY AUTOINCREMENT, 
-		gqlID TEXT NOT NULL UNIQUE,
 		title TEXT NOT NULL,
 		number INTEGER NOT NULL,
 		count INTEGER NOT NULL,
-		lastAccessed INTEGER NOT NULL,
-		repoID TEXT NOT NULL,
-		isPR BOOLEAN NOT NULL DEFAULT 0,
-		FOREIGN KEY (repoID) REFERENCES repo(gqlID)
+		lastAccess INTEGER NOT NULL,
+		isPR BOOLEAN NOT NULL 
+			CHECK (isPR IN (0,1))
+			DEFAULT 0,
+		repo TEXT NOT NULL,
+		FOREIGN KEY (repo) REFERENCES repo(fullName)
 	);
 
 	CREATE INDEX IF NOT EXISTS 
-	frecent ON issues(lastAccessed, count);
+	frecent ON issues(lastAccess, count);
 	`
 	tx, err := db.Begin()
 	if err != nil {

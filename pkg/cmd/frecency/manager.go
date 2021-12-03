@@ -2,7 +2,7 @@ package frecency
 
 import (
 	"database/sql"
-	"log"
+	"errors"
 	"os"
 	"path/filepath"
 	"time"
@@ -10,20 +10,6 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
-
-// TODO scope stats by repo
-// TODO generalize this
-// TODO scope stats by data type
-// TODO should work with:
-// - issues
-// - prs
-// - gists
-// - repos
-// - (?) releases
-// - (?) runs
-// - (?) workflows
-// - (?) ssh key
-// - (?) extensions
 
 /** Manager:
 	- garbage collecting the frecency file
@@ -41,42 +27,59 @@ Issues to consider:
 
 // GetFrecent, RecordAccess
 type Manager struct {
-	config   config.Config
-	io       *iostreams.IOStreams
-	database *sql.DB
+	config config.Config
+	Client
+	io *iostreams.IOStreams
+	db *sql.DB
 }
 
-func NewManager(io *iostreams.IOStreams) *Manager {
-	return &Manager{io: io}
+func NewManager(io *iostreams.IOStreams, cfg config.Config) *Manager {
+	m := &Manager{io: io, config: cfg}
+	m.initDB(defaultDbPath())
+	return m
 }
 
-// create the frecency.yml
-func (m *Manager) initFile(dir string) error {
-	//if the file exists, return
-	if _, err := os.Stat(dir); err == nil {
-		return nil
-	}
-
+func (m *Manager) getDB() *sql.DB {
 	db, err := sql.Open("sqlite3", dir)
-	if err != nil {
-		log.Fatal(err)
+	return db
+}
+
+func (m *Manager) GetFrecentIssue() {
+
+}
+
+func (m *Manager) RecordAccess() {
+
+}
+
+// Initializes the sql database and opens a connection
+func (m *Manager) OpenDB() error {
+	dir := filepath.Join(config.StateDir(), "frecent.db")
+	fileExists := true
+	if _, err := os.Stat(dir); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			fileExists = false
+		} else {
+			return err
+		}
 	}
-	m.frecentFile = fs
-	err := os.MkdirAll(filepath.Dir(fs.dir), 0755)
-	if err != nil {
+
+	if !fileExists {
+		err := os.MkdirAll(filepath.Dir(dir), 0755)
+		if err != nil {
+			return err
+		}
+	}
+
+	m.db, err = sql.Open("sqlite3", dir)
+	if fileExists {
 		return err
 	}
-
-	return nil
+	return m.createTables()
 }
 
-func defaultFrecentPath() string {
-	return filepath.Join(config.StateDir(), "frecent.yml")
-}
-
-type CountEntry struct {
-	LastAccessed time.Time
-	Count        int
+func (m *Manager) CloseDB() error {
+	return m.db.Close()
 }
 
 //func SelectFrecent(c *http.Client, repo ghrepo.Interface) (string, error) {
@@ -112,77 +115,65 @@ type CountEntry struct {
 // 	CountEntry
 // }
 
-// type ByLastAccess []IDWithStats
+type ByFrecency []entryWithStats
 
-// func (l ByLastAccess) Len() int {
-// 	return len(l)
-// }
-// func (l ByLastAccess) Swap(i, j int) {
-// 	l[i], l[j] = l[j], l[i]
-// }
-// func (l ByLastAccess) Less(i, j int) bool {
-// 	return l[i].Last.After(l[j].Last)
-// }
+func (f ByFrecency) Len() int {
+	return len(f)
+}
+func (f ByFrecency) Swap(i, j int) {
+	f[i], f[j] = f[j], f[i]
+}
+func (f ByFrecency) Less(i, j int) bool {
+	iScore := f[i].countEntry.Score()
+	jScore := f[j].countEntry.Score()
+	if iScore == jScore {
+		return f[i].LastAccess.After(f[j].LastAccess)
+	}
+	return iScore > jScore
+}
 
-// type ByFrecency []IDWithStats
+func (c CountEntry) Score() int {
+	if c.Count == 0 {
+		return 0
+	}
+	duration := time.Since(c.Last)
+	recencyScore := 10
+	if duration < 1*time.Hour {
+		recencyScore = 100
+	} else if duration < 6*time.Hour {
+		recencyScore = 80
+	} else if duration < 24*time.Hour {
+		recencyScore = 60
+	} else if duration < 3*24*time.Hour {
+		recencyScore = 40
+	} else if duration < 7*24*time.Hour {
+		recencyScore = 20
+	}
 
-// func (f ByFrecency) Len() int {
-// 	return len(f)
-// }
-// func (f ByFrecency) Swap(i, j int) {
-// 	f[i], f[j] = f[j], f[i]
-// }
-// func (f ByFrecency) Less(i, j int) bool {
-// 	iScore := f[i].CountEntry.Score()
-// 	jScore := f[j].CountEntry.Score()
-// 	if iScore == jScore {
-// 		return f[i].LastAccess.After(f[j].LastAccess)
-// 	}
-// 	return iScore > jScore
-// }
+	return c.Count * recencyScore
+}
 
-// func sortByFrecent(identifiers []Identifier, frecent map[int]*CountEntry) []string {
-// 	withStats := []IDWithStats{}
-// 	for _, i := range identifiers {
-// 		entry, ok := frecent[i.Number]
-// 		if !ok {
-// 			entry = &CountEntry{}
-// 		}
-// 		withStats = append(withStats, IDWithStats{
-// 			Identifier: i,
-// 			CountEntry: *entry,
-// 		})
-// 	}
-// 	sort.Sort(ByLastAccess(withStats))
-
-// 	// why do this?
-// 	previousId := withStats[0]
-// 	withStats = withStats[1:]
-// 	sort.Stable(ByFrecency(withStats))
-// 	choices := []string{fmt.Sprintf("%d", previousId.Number)}
-// 	for _, ws := range withStats {
-// 		choices = append(choices, fmt.Sprintf("%d", ws.Number))
-// 	}
-// 	return choices
-// }
-
-// func (c CountEntry) Score() int {
-// 	if c.Count == 0 {
-// 		return 0
-// 	}
-// 	duration := time.Since(c.Last)
-// 	recencyScore := 10
-// 	if duration < 1*time.Hour {
-// 		recencyScore = 100
-// 	} else if duration < 6*time.Hour {
-// 		recencyScore = 80
-// 	} else if duration < 24*time.Hour {
-// 		recencyScore = 60
-// 	} else if duration < 3*24*time.Hour {
-// 		recencyScore = 40
-// 	} else if duration < 7*24*time.Hour {
-// 		recencyScore = 20
-// 	}
-
-// 	return c.Count * recencyScore
-// }
+//func sortByFrecent([]entryWithStats, frecent map[int]*CountEntry) []string {
+//	withStats := []entryWithStats{}
+//	for _, i := range identifiers {
+//		entry, ok := frecent[i.Number]
+//		if !ok {
+//			entry = &CountEntry{}
+//		}
+//		withStats = append(withStats, IDWithStats{
+//			Identifier: i,
+//			CountEntry: *entry,
+//		})
+//	}
+//	sort.Sort(ByLastAccess(withStats))
+//
+//	// why do this?
+//	previousId := withStats[0]
+//	withStats = withStats[1:]
+//	sort.Stable(ByFrecency(withStats))
+//	choices := []string{fmt.Sprintf("%d", previousId.Number)}
+//	for _, ws := range withStats {
+//		choices = append(choices, fmt.Sprintf("%d", ws.Number))
+//	}
+//	return choices
+//}
