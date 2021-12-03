@@ -29,6 +29,7 @@ type BrowseOptions struct {
 	HttpClient       func() (*http.Client, error)
 	IO               *iostreams.IOStreams
 	PathFromRepoRoot func() string
+	LastCommit       func() (*git.Commit, error)
 
 	SelectorArg string
 
@@ -46,6 +47,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 		HttpClient:       f.HttpClient,
 		IO:               f.IOStreams,
 		PathFromRepoRoot: git.PathFromRepoRoot,
+		LastCommit:       git.LastCommit,
 	}
 
 	cmd := &cobra.Command{
@@ -98,6 +100,10 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 				return err
 			}
 
+			if opts.CommitFlag && cmd.Flags().Changed("repo") {
+				panic(fmt.Errorf("woah"))
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -123,7 +129,7 @@ func runBrowse(opts *BrowseOptions) error {
 	}
 
 	if opts.CommitFlag {
-		commit, err := git.LastCommit()
+		commit, err := opts.LastCommit()
 		if err == nil {
 			opts.Branch = commit.Sha
 		}

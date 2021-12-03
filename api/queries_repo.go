@@ -896,6 +896,48 @@ func RepoResolveMetadataIDs(client *Client, repo ghrepo.Interface, input RepoRes
 	return result, nil
 }
 
+type Commit struct {
+}
+
+func LastCommit(client *Client, repo ghrepo.Interface) ([]RepoProject, error) {
+	type responseData struct {
+		Repository struct {
+			Projects struct {
+				Nodes    []RepoProject
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			} `graphql:"projects(states: [OPEN], first: 100, orderBy: {field: NAME, direction: ASC}, after: $endCursor)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":     githubv4.String(repo.RepoOwner()),
+		"name":      githubv4.String(repo.RepoName()),
+		"endCursor": (*githubv4.String)(nil),
+	}
+
+	gql := graphQLClient(client.http, repo.RepoHost())
+
+	var projects []RepoProject
+	for {
+		var query responseData
+		err := gql.QueryNamed(context.Background(), "RepositoryProjectList", &query, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		projects = append(projects, query.Repository.Projects.Nodes...)
+		if !query.Repository.Projects.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Repository.Projects.PageInfo.EndCursor)
+	}
+
+	return projects, nil
+}
+
 type RepoProject struct {
 	ID           string `json:"id"`
 	Name         string `json:"name"`
@@ -1177,3 +1219,23 @@ func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, 
 		IsPrivate: responsev3.Private,
 	}, nil
 }
+
+const commitQuery = `
+query {
+  repository(owner: "bchadwic", name: "cli") {
+    defaultBranchRef {
+      target {
+        ... on Commit {
+          history(first: 1) {
+            edges {
+              node {
+                oid
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+`
