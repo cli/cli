@@ -78,6 +78,7 @@ var prReviews = shortenQuery(`
 			reactionGroups{content,users{totalCount}}
 		}
 		pageInfo{hasNextPage,endCursor}
+		totalCount
 	}
 `)
 
