@@ -526,49 +526,32 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, e
 }
 
 func LastCommit(client *Client, repo ghrepo.Interface) (*git.Commit, error) {
-	type Edge struct {
-		Node struct {
-			Sha   string `json:"oid"`
-			Title string `json:"messageHeadline"`
-		}
-	}
 	var responseData struct {
 		Repository struct {
 			DefaultBranchRef struct {
 				Target struct {
-					History struct {
-						Edges []Edge
-					}
+					Commit struct {
+						History struct {
+							Edges []struct {
+								Node struct {
+									Sha   string `graphql:"oid"`
+									Title string `graphql:"messageHeadline"`
+								}
+							}
+						} `graphql:"history(first:1)"`
+					} `graphql:"... on Commit"`
 				}
 			}
-		}
+		} `graphql:"repository(owner: $owner, name: $repo)"`
 	}
 	variables := map[string]interface{}{
-		"owner": repo.RepoOwner(),
-		"repo":  repo.RepoName(),
+		"owner": githubv4.String(repo.RepoOwner()), "repo": githubv4.String(repo.RepoName()),
 	}
-	if err := client.GraphQL(repo.RepoHost(), `
-	query LastCommit($owner: String!, $repo: String!) {
-		repository(owner: $owner, name: $repo) {
-	    	defaultBranchRef {
-	        	target {
-					... on Commit {
-	            		history(first:1) {
-	              			edges {
-	                			node {
-									oid
-	                  				messageHeadline
-	                			}
-	              			}
-	            		}
-	          		}
-	        	}
-	      	}
-	    }
-	}`, variables, &responseData); err != nil {
+	gql := graphQLClient(client.http, repo.RepoHost())
+	if err := gql.QueryNamed(context.Background(), "LastCommit", &responseData, variables); err != nil {
 		return nil, err
 	}
-	return (*git.Commit)(&responseData.Repository.DefaultBranchRef.Target.History.Edges[0].Node), nil
+	return (*git.Commit)(&responseData.Repository.DefaultBranchRef.Target.Commit.History.Edges[0].Node), nil
 }
 
 // RepoFindForks finds forks of the repo that are affiliated with the viewer

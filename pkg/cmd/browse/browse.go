@@ -99,7 +99,6 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			); err != nil {
 				return err
 			}
-
 			if opts.CommitFlag && cmd.Flags().Changed("repo") {
 				opts.LastCommit = nil
 			}
@@ -134,9 +133,7 @@ func runBrowse(opts *BrowseOptions) error {
 			if err != nil {
 				return err
 			}
-			opts.LastCommit = func() (*git.Commit, error) {
-				return api.LastCommit(api.NewClientFromHTTP(httpClient), baseRepo)
-			}
+			opts.LastCommit = func() (*git.Commit, error) { return api.LastCommit(api.NewClientFromHTTP(httpClient), baseRepo) }
 		}
 		commit, err := opts.LastCommit()
 		if err == nil {

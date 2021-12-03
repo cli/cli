@@ -143,6 +143,7 @@ func TestNewCmdBrowse(t *testing.T) {
 			assert.Equal(t, tt.wants.WikiFlag, opts.WikiFlag)
 			assert.Equal(t, tt.wants.NoBrowserFlag, opts.NoBrowserFlag)
 			assert.Equal(t, tt.wants.SettingsFlag, opts.SettingsFlag)
+			assert.Equal(t, tt.wants.CommitFlag, opts.CommitFlag)
 		})
 	}
 }
@@ -354,6 +355,7 @@ func Test_runBrowse(t *testing.T) {
 			name: "open last commit",
 			opts: BrowseOptions{
 				CommitFlag: true,
+				LastCommit: git.LastCommit,
 			},
 			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
 			wantsErr:    false,
@@ -364,6 +366,7 @@ func Test_runBrowse(t *testing.T) {
 			opts: BrowseOptions{
 				CommitFlag:  true,
 				SelectorArg: "main.go",
+				LastCommit:  git.LastCommit,
 			},
 			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
 			wantsErr:    false,
