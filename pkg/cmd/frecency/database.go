@@ -11,7 +11,7 @@ import (
 
 // stores issue/PR with frecency stats
 type entryWithStats struct {
-	Entry interface{}
+	Entry api.Issue
 	Stats countEntry
 }
 
@@ -20,7 +20,7 @@ type countEntry struct {
 	Count      int
 }
 
-func updateEntry(db *sql.DB, updated *dbEntry) error {
+func updateEntry(db *sql.DB, updated *entryWithStats, repoName string) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -31,9 +31,8 @@ func updateEntry(db *sql.DB, updated *dbEntry) error {
 		tx.Rollback()
 		return err
 	}
-
 	defer stmt.Close()
-	_, err = stmt.Exec(updated.Stats.LastAccess.Unix(), updated.Stats.Count, updated.Repo, updated.Number)
+	_, err = stmt.Exec(updated.Stats.LastAccess.Unix(), updated.Stats.Count, repoName, updated.Entry.Number)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -42,9 +41,9 @@ func updateEntry(db *sql.DB, updated *dbEntry) error {
 	return nil
 }
 
-func insertEntry(db *sql.DB, repoName string, entry *entryWithStats) error {
+func insertEntry(db *sql.DB, repoName string, entry *entryWithStats, isPR bool) error {
 	// insert the repo if it doesn't exist yet
-	repoExists, err := RepoExists(db, repoName)
+	repoExists, err := repoExists(db, repoName)
 	if err != nil {
 		return err
 	}
@@ -58,22 +57,20 @@ func insertEntry(db *sql.DB, repoName string, entry *entryWithStats) error {
 	if err != nil {
 		return err
 	}
-
-	stmt, err := tx.Prepare("INSERT INTO issues(title,number,count,lastAccess,repo,isPR) values(?,?,?,?,?,?,?)")
+	stmt, err := tx.Prepare("INSERT INTO issues(title,number,count,lastAccess,repo,isPR) values(?,?,?,?,?,?)")
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
-
 	defer stmt.Close()
+
 	_, err = stmt.Exec(
-		entry.Title,
-		entry.Number,
+		entry.Entry.Title,
+		entry.Entry.Number,
 		entry.Stats.Count,
 		entry.Stats.LastAccess.Unix(),
-		entry.Repo.ID,
-		entry.IsPR)
-
+		repoName,
+		isPR)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -88,14 +85,14 @@ func insertRepo(db *sql.DB, repoName string) error {
 		return err
 	}
 
-	stmt, err := tx.Prepare("INSERT INTO repos(name) values(?)")
+	stmt, err := tx.Prepare("INSERT INTO repos(fullName) values(?)")
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
 
 	defer stmt.Close()
-	_, err = stmt.Exec(repo.Name)
+	_, err = stmt.Exec(repoName)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -107,7 +104,7 @@ func insertRepo(db *sql.DB, repoName string) error {
 
 func repoExists(db *sql.DB, repoName string) (bool, error) {
 	var found int
-	row := db.QueryRow("SELECT 1 FROM repos WHERE name = ?", repoName)
+	row := db.QueryRow("SELECT 1 FROM repos WHERE fullName = ?", repoName)
 	err := row.Scan(&found)
 	if err == nil {
 		return true, nil
@@ -121,28 +118,24 @@ func repoExists(db *sql.DB, repoName string) (bool, error) {
 // get issues or PRs
 func getEntries(db *sql.DB, repoName string, isPR bool) ([]entryWithStats, error) {
 	query := `
-	SELECT number,lastAccess,count,title FROM issues 
-		WHERE repo = ? 
+	SELECT number,lastAccess,count,title FROM issues
+		WHERE repo = ?
 		AND isPR = ?
 		ORDER BY lastAccess DESC`
 	rows, err := db.Query(query, repoName, isPR)
 	if err != nil {
 		return nil, err
 	}
-
-	var entries []entryWithStats
+	defer rows.Close()
+	entries := []entryWithStats{}
 	for rows.Next() {
 		var entry entryWithStats
-		if isPR {
-			entry.Entry = api.PullRequest{}
-		} else {
-			entry.Entry = api.Issue{}
-		}
-		var unixTime int64
-		if err := rows.Scan(&entry.Entry.Number, &unixTime, &entry.Stats.Count, &entry.Entry.Title); err != nil {
+		var lastAccess int64
+		err := rows.Scan(&entry.Entry.Number, &lastAccess, &entry.Stats.Count, &entry.Entry.Title)
+		if err != nil {
 			return nil, err
 		}
-		entry.Stats.LastAccess = time.Unix(unixTime, 0)
+		entry.Stats.LastAccess = time.Unix(lastAccess, 0)
 		entries = append(entries, entry)
 	}
 	return entries, nil
@@ -156,7 +149,7 @@ func createTables(db *sql.DB) error {
 		id INTEGER PRIMARY KEY AUTOINCREMENT, 
  		fullName TEXT NOT NULL UNIQUE,
 		issuesLastQueried INTEGER,
-		prsLastQueried INTEGER,
+		prsLastQueried INTEGER
 	);
 	
 	CREATE TABLE IF NOT EXISTS issues(
