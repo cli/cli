@@ -461,14 +461,14 @@ func (m *Manager) upgradeExtensions(exts []Extension, force bool) error {
 		fmt.Fprintf(m.io.Out, "[%s]: ", f.Name())
 		err := m.upgradeExtension(f, force)
 		if err != nil {
-			if !errors.Is(err, localExtensionUpgradeError) &&
-				!errors.Is(err, upToDateError) {
-				failed = true
-			}
+			failed = true
 			fmt.Fprintf(m.io.Out, "%s\n", err)
 			continue
 		}
-		fmt.Fprintf(m.io.Out, "upgrade complete\n")
+
+		if !f.isLocal && f.UpdateAvailable() {
+			fmt.Fprintf(m.io.Out, "upgrade complete\n")
+		}
 	}
 	if failed {
 		return errors.New("some extensions failed to upgrade")
@@ -478,10 +478,12 @@ func (m *Manager) upgradeExtensions(exts []Extension, force bool) error {
 
 func (m *Manager) upgradeExtension(ext Extension, force bool) error {
 	if ext.isLocal {
-		return localExtensionUpgradeError
+		fmt.Fprintf(m.io.Out, "%s\n", localExtensionUpgradeError)
+		return nil
 	}
 	if !ext.UpdateAvailable() {
-		return upToDateError
+		fmt.Fprintf(m.io.Out, "%s\n", upToDateError)
+		return nil
 	}
 	var err error
 	if ext.IsBinary() {

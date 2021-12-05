@@ -253,8 +253,8 @@ func TestManager_UpgradeExtension_LocalExtension(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(exts))
 	err = m.upgradeExtension(exts[0], false)
-	assert.EqualError(t, err, "local extensions can not be upgraded")
-	assert.Equal(t, "", stdout.String())
+	assert.NoError(t, err)
+	assert.Equal(t, "local extensions can not be upgraded\n", stdout.String())
 	assert.Equal(t, "", stderr.String())
 }
 
