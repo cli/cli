@@ -3,7 +3,6 @@ package frecency
 import (
 	"database/sql"
 	"errors"
-	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -122,7 +121,6 @@ func (m *Manager) initDB() error {
 	if err != nil {
 		return err
 	}
-	log.Print("DONE")
 
 	db, err := m.getDB()
 	if err != nil {
@@ -131,8 +129,8 @@ func (m *Manager) initDB() error {
 	return createTables(db)
 }
 
-func (m *Manager) CloseDB() error {
-	return m.db.Close()
+func (m *Manager) closeDB(db *sql.DB) error {
+	return db.Close()
 }
 
 type ByFrecency []entryWithStats
@@ -169,34 +167,8 @@ func (c countEntry) Score() int {
 	} else if duration < 7*24*time.Hour {
 		recencyScore = 20
 	}
-
-	return c.Count * recencyScore
+	return recencyScore * c.Count
 }
-
-//func sortByFrecent([]entryWithStats) []string {
-//  withStats := []entryWithStats{}
-//  for _, i := range identifiers {
-//		entry, ok := frecent[i.Number]
-//		if !ok {
-//			entry = &CountEntry{}
-//		}
-//		withStats = append(withStats, IDWithStats{
-//			Identifier: i,
-//			CountEntry: *entry,
-//		})
-//	}
-//	sort.Sort(ByLastAccess(withStats))
-//
-//	// why do this?
-//	previousId := withStats[0]
-//	withStats = withStats[1:]
-//	sort.Stable(ByFrecency(withStats))
-//	choices := []string{fmt.Sprintf("%d", previousId.Number)}
-//	for _, ws := range withStats {
-//		choices = append(choices, fmt.Sprintf("%d", ws.Number))
-//	}
-//	return choices
-//}
 
 //func SelectFrecent(c *http.Client, repo ghrepo.Interface) (string, error) {
 //	client := api.NewCachedClient(c, time.Hour*6)
@@ -224,9 +196,3 @@ func (c countEntry) Score() int {
 //
 //	return choice, nil
 //}
-
-// sorting
-// type IDWithStats struct {
-// 	Identifier
-// 	CountEntry
-// }

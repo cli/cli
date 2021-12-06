@@ -33,7 +33,6 @@ func updateEntry(db *sql.DB, repoName string, updated entryWithStats) error {
 		tx.Rollback()
 		return err
 	}
-
 	defer stmt.Close()
 	_, err = stmt.Exec(updated.Stats.LastAccess.Unix(), updated.Stats.Count, repoName, updated.Entry.Number)
 	if err != nil {
@@ -66,16 +65,15 @@ func insertEntry(db *sql.DB, repoName string, entry entryWithStats, isPR bool) e
 		tx.Rollback()
 		return err
 	}
-
 	defer stmt.Close()
+
 	_, err = stmt.Exec(
 		entry.Entry.Title,
 		entry.Entry.Number,
 		entry.Stats.Count,
 		entry.Stats.LastAccess.Unix(),
 		repoName,
-		isPR,
-	)
+		isPR)
 
 	if err != nil {
 		tx.Rollback()
@@ -124,16 +122,16 @@ func repoExists(db *sql.DB, repoName string) (bool, error) {
 // get all issues or PRs by repo
 func getEntries(db *sql.DB, repoName string, isPR bool) ([]entryWithStats, error) {
 	query := `
-	SELECT number,lastAccess,count,title FROM issues 
-		WHERE repo = ? 
+	SELECT number,lastAccess,count,title FROM issues
+		WHERE repo = ?
 		AND isPR = ?
 		ORDER BY lastAccess DESC`
 	rows, err := db.Query(query, repoName, isPR)
 	if err != nil {
 		return nil, err
 	}
-
-	var entries []entryWithStats
+	defer rows.Close()
+	entries := []entryWithStats{}
 	for rows.Next() {
 		entry := entryWithStats{IsPR: isPR, Stats: countEntry{}}
 		var unixTime int64
