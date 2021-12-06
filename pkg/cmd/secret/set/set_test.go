@@ -131,6 +131,15 @@ func TestNewCmdSet(t *testing.T) {
 				OrgName:    "coolOrg",
 			},
 		},
+		{
+			name: "no store",
+			cli:  `cool_secret --no-store`,
+			wants: SetOptions{
+				SecretName: "cool_secret",
+				Visibility: shared.Private,
+				DoNotStore: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -167,6 +176,7 @@ func TestNewCmdSet(t *testing.T) {
 			assert.Equal(t, tt.wants.Visibility, gotOpts.Visibility)
 			assert.Equal(t, tt.wants.OrgName, gotOpts.OrgName)
 			assert.Equal(t, tt.wants.EnvName, gotOpts.EnvName)
+			assert.Equal(t, tt.wants.DoNotStore, gotOpts.DoNotStore)
 			assert.ElementsMatch(t, tt.wants.RepositoryNames, gotOpts.RepositoryNames)
 		})
 	}
@@ -399,6 +409,39 @@ func Test_setRun_user(t *testing.T) {
 			assert.ElementsMatch(t, payload.Repositories, tt.wantRepositories)
 		})
 	}
+}
+
+func Test_setRun_shouldNotStore(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/secrets/public-key"),
+		httpmock.JSONResponse(PubKey{ID: "123", Key: "CDjXqf7AJBXWhMczcy+Fs7JlACEptgceysutztHaFQI="}))
+
+	io, _, stdout, stderr := iostreams.Test()
+
+	opts := &SetOptions{
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.FromFullName("owner/repo")
+		},
+		IO:         io,
+		Body:       "a secret",
+		DoNotStore: true,
+		// Cribbed from https://github.com/golang/crypto/commit/becbf705a91575484002d598f87d74f0002801e7
+		RandomOverride: bytes.NewReader([]byte{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5}),
+	}
+
+	err := setRun(opts)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=\n", stdout.String())
+	assert.Equal(t, "", stderr.String())
 }
 
 func Test_getBody(t *testing.T) {

@@ -71,15 +71,17 @@ func (l Labels) Names() []string {
 }
 
 type ProjectCards struct {
-	Nodes []struct {
-		Project struct {
-			Name string `json:"name"`
-		} `json:"project"`
-		Column struct {
-			Name string `json:"name"`
-		} `json:"column"`
-	}
+	Nodes      []*ProjectInfo
 	TotalCount int
+}
+
+type ProjectInfo struct {
+	Project struct {
+		Name string `json:"name"`
+	} `json:"project"`
+	Column struct {
+		Name string `json:"name"`
+	} `json:"column"`
 }
 
 func (p ProjectCards) ProjectNames() []string {
@@ -231,113 +233,6 @@ func IssueStatus(client *Client, repo ghrepo.Interface, options IssueStatusOptio
 	}
 
 	return &payload, nil
-}
-
-func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, error) {
-	type response struct {
-		Repository struct {
-			Issue            Issue
-			HasIssuesEnabled bool
-		}
-	}
-
-	query := `
-	query IssueByNumber($owner: String!, $repo: String!, $issue_number: Int!) {
-		repository(owner: $owner, name: $repo) {
-			hasIssuesEnabled
-			issue(number: $issue_number) {
-				id
-				title
-				state
-				body
-				author {
-					login
-				}
-				comments(last: 1) {
-					nodes {
-						author {
-							login
-						}
-						authorAssociation
-						body
-						createdAt
-						includesCreatedEdit
-						isMinimized
-						minimizedReason
-						reactionGroups {
-							content
-							users {
-								totalCount
-							}
-						}
-					}
-					totalCount
-				}
-				number
-				url
-				createdAt
-				assignees(first: 100) {
-					nodes {
-						id
-						name
-						login
-					}
-					totalCount
-				}
-				labels(first: 100) {
-					nodes {
-						id
-						name
-						description
-						color
-					}
-					totalCount
-				}
-				projectCards(first: 100) {
-					nodes {
-						project {
-							name
-						}
-						column {
-							name
-						}
-					}
-					totalCount
-				}
-				milestone {
-					number
-					title
-					description
-					dueOn
-				}
-				reactionGroups {
-					content
-					users {
-						totalCount
-					}
-				}
-			}
-		}
-	}`
-
-	variables := map[string]interface{}{
-		"owner":        repo.RepoOwner(),
-		"repo":         repo.RepoName(),
-		"issue_number": number,
-	}
-
-	var resp response
-	err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
-	if err != nil {
-		return nil, err
-	}
-
-	if !resp.Repository.HasIssuesEnabled {
-
-		return nil, &IssuesDisabledError{fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))}
-	}
-
-	return &resp.Repository.Issue, nil
 }
 
 func (i Issue) Link() string {

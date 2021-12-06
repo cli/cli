@@ -179,9 +179,9 @@ func newCpCmd(app *App) *cobra.Command {
 			provided by untrusted users; see <https://lwn.net/Articles/835962/> for discussion.
 		`, "`"),
 		Example: heredoc.Doc(`
-			$ gh codespace cp -e README.md 'remote:/workspace/$RepositoryName/'
+			$ gh codespace cp -e README.md 'remote:/workspaces/$RepositoryName/'
 			$ gh codespace cp -e 'remote:~/*.go' ./gofiles/
-			$ gh codespace cp -e 'remote:/workspace/myproj/go.{mod,sum}' ./gofiles/
+			$ gh codespace cp -e 'remote:/workspaces/myproj/go.{mod,sum}' ./gofiles/
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.Copy(cmd.Context(), args, opts)

@@ -66,7 +66,7 @@ func TestGraphQLError(t *testing.T) {
 	)
 
 	err := client.GraphQL("github.com", "", nil, &response)
-	if err == nil || err.Error() != "GraphQL error: OH NO\nthis is fine" {
+	if err == nil || err.Error() != "GraphQL: OH NO (repository.issue), this is fine (repository.issues.0.comments)" {
 		t.Fatalf("got %q", err.Error())
 	}
 }
@@ -207,6 +207,11 @@ func TestHTTPError_ScopesSuggestion(t *testing.T) {
 			name: "no scopes on token",
 			resp: makeResponse(404, "https://api.github.com/gists", "", "gist, delete_repo"),
 			want: ``,
+		},
+		{
+			name: "http code is 422",
+			resp: makeResponse(422, "https://api.github.com/gists", "", "gist"),
+			want: "",
 		},
 	}
 	for _, tt := range tests {

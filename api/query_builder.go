@@ -35,6 +35,22 @@ var issueComments = shortenQuery(`
 	}
 `)
 
+var issueCommentLast = shortenQuery(`
+	comments(last: 1) {
+		nodes {
+			author{login},
+			authorAssociation,
+			body,
+			createdAt,
+			includesCreatedEdit,
+			isMinimized,
+			minimizedReason,
+			reactionGroups{content,users{totalCount}}
+		},
+		totalCount
+	}
+`)
+
 var prReviewRequests = shortenQuery(`
 	reviewRequests(first: 100) {
 		nodes {
@@ -62,6 +78,7 @@ var prReviews = shortenQuery(`
 			reactionGroups{content,users{totalCount}}
 		}
 		pageInfo{hasNextPage,endCursor}
+		totalCount
 	}
 `)
 
@@ -206,6 +223,8 @@ func PullRequestGraphQL(fields []string) string {
 			q = append(q, `potentialMergeCommit{oid}`)
 		case "comments":
 			q = append(q, issueComments)
+		case "lastComment": // pseudo-field
+			q = append(q, issueCommentLast)
 		case "reviewRequests":
 			q = append(q, prReviewRequests)
 		case "reviews":

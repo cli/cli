@@ -1,0 +1,16 @@
+name: release
+on:
+  push:
+    tags:
+      - "v*"
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: cli/gh-extension-precompile@v1
+        with:
+          build_script_override: "script/build.sh"

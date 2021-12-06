@@ -33,6 +33,7 @@ type SetOptions struct {
 	EnvName         string
 	UserSecrets     bool
 	Body            string
+	DoNotStore      bool
 	Visibility      string
 	RepositoryNames []string
 }
@@ -80,13 +81,8 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 
 			# Set user-level secret for Codespaces
 			$ gh secret set MYSECRET --user
-`),
-		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) != 1 {
-				return cmdutil.FlagErrorf("must pass single secret name")
-			}
-			return nil
-		},
+		`),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
@@ -95,7 +91,13 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 				return err
 			}
 
-			opts.SecretName = args[0]
+			if len(args) == 0 {
+				if !opts.DoNotStore {
+					return cmdutil.FlagErrorf("must pass name argument")
+				}
+			} else {
+				opts.SecretName = args[0]
+			}
 
 			if cmd.Flags().Changed("visibility") {
 				if opts.OrgName == "" {
@@ -133,6 +135,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	cmd.Flags().StringVarP(&opts.Visibility, "visibility", "v", "private", "Set visibility for an organization secret: `{all|private|selected}`")
 	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of `repositories` that can access an organization or user secret")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "The value for the secret (reads from standard input if not specified)")
+	cmd.Flags().BoolVar(&opts.DoNotStore, "no-store", false, "Print the encrypted, base64-encoded value instead of storing it on Github")
 
 	return cmd
 }
@@ -190,6 +193,10 @@ func setRun(opts *SetOptions) error {
 	}
 
 	encoded := base64.StdEncoding.EncodeToString(eBody)
+	if opts.DoNotStore {
+		_, err := fmt.Fprintln(opts.IO.Out, encoded)
+		return err
+	}
 
 	if orgName != "" {
 		err = putOrgSecret(client, host, pk, *opts, encoded)
