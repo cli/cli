@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/internal/config"
+	cmdBase "github.com/cli/cli/v2/pkg/cmd/config/base"
 	cmdGet "github.com/cli/cli/v2/pkg/cmd/config/get"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/config/list"
 	cmdSet "github.com/cli/cli/v2/pkg/cmd/config/set"
@@ -32,6 +33,7 @@ func NewCmdConfig(f *cmdutil.Factory) *cobra.Command {
 
 	cmdutil.DisableAuthCheck(cmd)
 
+	cmd.AddCommand(cmdBase.NewCmdConfigBase(f, nil))
 	cmd.AddCommand(cmdGet.NewCmdConfigGet(f, nil))
 	cmd.AddCommand(cmdSet.NewCmdConfigSet(f, nil))
 	cmd.AddCommand(cmdList.NewCmdConfigList(f, nil))

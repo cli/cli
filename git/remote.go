@@ -167,3 +167,11 @@ func SetRemoteResolution(name, resolution string) error {
 	}
 	return run.PrepareCmd(addCmd).Run()
 }
+
+func RemoveRemoteResolution(name string) error {
+	addCmd, err := GitCommand("config", "--unset-all", fmt.Sprintf("remote.%s.gh-resolved", name))
+	if err != nil {
+		return err
+	}
+	return run.PrepareCmd(addCmd).Run()
+}
