@@ -53,11 +53,6 @@ type CreateOptions struct {
 	DiscussionCategory string
 }
 
-const (
-	tagsLimit          = 5
-	createNewTagOption = "Create new tag"
-)
-
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
@@ -70,7 +65,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		DisableFlagsInUseLine: true,
 
-		Use:   "create <tag> [<files>...]",
+		Use:   "create [<tag>] [<files>...]",
 		Short: "Create a new release",
 		Long: heredoc.Docf(`
 			Create a new GitHub Release for a repository.
@@ -89,7 +84,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			Interactively create a release
 			$ gh release create
 
-			Interactively create a release with specific tag
+			Interactively create a release from specific tag
 			$ gh release create v1.2.3
 
 			Non-interactively create a release
@@ -124,6 +119,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				if err != nil {
 					return err
 				}
+			}
+
+			if opts.TagName == "" && !opts.IO.CanPrompt() {
+				return cmdutil.FlagErrorf("tag required when not running interactively")
 			}
 
 			opts.Concurrency = 5
@@ -167,17 +166,49 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
-	if !opts.BodyProvided && opts.IO.CanPrompt() {
-		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
+	if opts.TagName == "" {
+		tags, err := getTags(httpClient, baseRepo, 5)
 		if err != nil {
 			return err
 		}
 
-		if opts.TagName == "" {
-			err = handleTagName(opts, httpClient, baseRepo)
-			if err != nil {
-				return err
+		if len(tags) != 0 {
+			options := make([]string, len(tags))
+			for i, tag := range tags {
+				options[i] = tag.Name
 			}
+			createNewTagOption := "Create a new tag"
+			options = append(options, createNewTagOption)
+			var tag string
+			q := &survey.Select{
+				Message: "Choose a tag",
+				Options: options,
+				Default: options[0],
+			}
+			err := prompt.SurveyAskOne(q, &tag)
+			if err != nil {
+				return fmt.Errorf("could not prompt: %w", err)
+			}
+			if tag != createNewTagOption {
+				opts.TagName = tag
+			}
+		}
+
+		if opts.TagName == "" {
+			q := &survey.Input{
+				Message: "Tag name",
+			}
+			err := prompt.SurveyAskOne(q, opts.TagName)
+			if err != nil {
+				return fmt.Errorf("could not prompt: %w", err)
+			}
+		}
+	}
+
+	if !opts.BodyProvided && opts.IO.CanPrompt() {
+		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
+		if err != nil {
+			return err
 		}
 
 		var tagDescription string
@@ -272,14 +303,6 @@ func createRun(opts *CreateOptions) error {
 					Default: opts.Prerelease,
 				},
 			},
-		}
-
-		err = prompt.SurveyAsk(qs, opts)
-		if err != nil {
-			return fmt.Errorf("could not prompt: %w", err)
-		}
-
-		qs = []*survey.Question{
 			{
 				Name: "submitAction",
 				Prompt: &survey.Select{
@@ -318,77 +341,6 @@ func createRun(opts *CreateOptions) error {
 		)
 	}
 
-	return executeRelease(opts, httpClient, baseRepo)
-}
-
-func handleTagName(opts *CreateOptions, httpClient *http.Client, baseRepo ghrepo.Interface) error {
-	options, err := getTagNameOptions(httpClient, baseRepo)
-	if err != nil {
-		return err
-	}
-
-	if len(options) == 0 {
-		return askTagName(opts)
-	}
-
-	options = append(options, createNewTagOption)
-
-	qs := []*survey.Question{
-		{
-			Name: "tagName",
-			Prompt: &survey.Select{
-				Message: "Choose tag name",
-				Options: options,
-			},
-		},
-	}
-
-	err = prompt.SurveyAsk(qs, opts)
-	if err != nil {
-		return fmt.Errorf("could not prompt: %w", err)
-	}
-
-	if opts.TagName == createNewTagOption {
-		return askTagName(opts)
-	}
-
-	return nil
-}
-
-func getTagNameOptions(httpClient *http.Client, baseRepo ghrepo.Interface) ([]string, error) {
-	tags, err := fetchTags(httpClient, baseRepo, tagsLimit)
-	if err != nil {
-		return nil, err
-	}
-
-	options := make([]string, len(tags))
-
-	for i, tag := range tags {
-		options[i] = tag.Name
-	}
-
-	return options, nil
-}
-
-func askTagName(opts *CreateOptions) error {
-	qs := []*survey.Question{
-		{
-			Name: "tagName",
-			Prompt: &survey.Input{
-				Message: "Tag name:",
-			},
-		},
-	}
-
-	err := prompt.SurveyAsk(qs, opts)
-	if err != nil {
-		return fmt.Errorf("could not prompt: %w", err)
-	}
-
-	return nil
-}
-
-func executeRelease(opts *CreateOptions, httpClient *http.Client, baseRepo ghrepo.Interface) error {
 	params := map[string]interface{}{
 		"tag_name":   opts.TagName,
 		"draft":      opts.Draft,
@@ -438,6 +390,7 @@ func executeRelease(opts *CreateOptions, httpClient *http.Client, baseRepo ghrep
 	}
 
 	fmt.Fprintf(opts.IO.Out, "%s\n", newRelease.URL)
+
 	return nil
 }
 

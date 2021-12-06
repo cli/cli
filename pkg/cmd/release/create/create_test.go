@@ -18,7 +18,6 @@ import (
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
-	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,6 +44,29 @@ func Test_NewCmdCreate(t *testing.T) {
 		want    CreateOptions
 		wantErr string
 	}{
+		{
+			name:  "no arguments tty",
+			args:  "",
+			isTTY: true,
+			want: CreateOptions{
+				TagName:      "",
+				Target:       "",
+				Name:         "",
+				Body:         "",
+				BodyProvided: false,
+				Draft:        false,
+				Prerelease:   false,
+				RepoOverride: "",
+				Concurrency:  5,
+				Assets:       []*shared.AssetForUpload(nil),
+			},
+		},
+		{
+			name:    "no arguments notty",
+			args:    "",
+			isTTY:   false,
+			wantErr: "tag required when not running interactively",
+		},
 		{
 			name:  "only tag name",
 			args:  "v1.2.3",
@@ -152,23 +174,6 @@ func Test_NewCmdCreate(t *testing.T) {
 				BodyProvided: false,
 				Draft:        true,
 				Prerelease:   true,
-				RepoOverride: "",
-				Concurrency:  5,
-				Assets:       []*shared.AssetForUpload(nil),
-			},
-		},
-		{
-			name:  "no arguments",
-			args:  "",
-			isTTY: true,
-			want: CreateOptions{
-				TagName:      "",
-				Target:       "",
-				Name:         "",
-				Body:         "",
-				BodyProvided: false,
-				Draft:        false,
-				Prerelease:   false,
 				RepoOverride: "",
 				Concurrency:  5,
 				Assets:       []*shared.AssetForUpload(nil),
@@ -466,278 +471,133 @@ func Test_createRun(t *testing.T) {
 	}
 }
 
-func Test_createRun_withoutTagName(t *testing.T) {
-	defaultQuestions := [][]*prompt.QuestionStub{
-		{
-			{
-				Name:    "name",
-				Default: true,
-			},
-			{
-				Name:  "releaseNotesAction",
-				Value: "Leave blank",
-			},
-		},
-		{
-			{
-				Name:    "prerelease",
-				Default: true,
-			},
-		},
-		{
-			{
-				Name:  "submitAction",
-				Value: "Publish release",
-			},
-		},
-	}
-
+func Test_createRun_interactive(t *testing.T) {
 	tests := []struct {
-		name       string
-		isTTY      bool
-		tagName    string
-		questions  [][]*prompt.QuestionStub
-		wantParams interface{}
-		wantErr    string
-		wantStdout string
-		wantStderr string
+		name      string
+		httpStubs func(*httpmock.Registry)
+		askStubs  func(*prompt.AskStubber)
+		opts      *CreateOptions
+		wantOut   string
+		wantErr   string
 	}{
 		{
-			name:    "create a major release",
-			isTTY:   true,
-			tagName: "v2.0.0",
-			questions: append([][]*prompt.QuestionStub{
-				{
+			name: "create a release from existing tag",
+			opts: &CreateOptions{},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne("v1.2.3") // Tag prompt
+				as.Stub([]*prompt.QuestionStub{
 					{
-						Name:  "tagName",
-						Value: "v2.0.0",
+						Name:  "name",
+						Value: "title",
 					},
-				},
-			}, defaultQuestions...),
-			wantParams: map[string]interface{}{
-				"tag_name":   "v2.0.0",
-				"name":       "",
-				"body":       "",
-				"draft":      false,
-				"prerelease": false,
+					{
+						Name:  "releaseNotesAction",
+						Value: "Leave blank",
+					},
+				})
+				as.Stub([]*prompt.QuestionStub{
+					{
+						Name:  "prerelease",
+						Value: false,
+					},
+					{
+						Name:  "submitAction",
+						Value: "Publish release",
+					},
+				})
 			},
-			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v2.0.0\n",
-			wantStderr: ``,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/tags"), httpmock.StatusStringResponse(200, `[
+           { "name": "v1.2.3" }, { "name": "v1.2.2" }, { "name": "v1.0.0" }, { "name": "v0.1.2" }
+        ]`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, `{
+          "url": "https://api.github.com/releases/123",
+          "upload_url": "https://api.github.com/assets/upload",
+          "html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+        }`))
+			},
+			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 		},
 		{
-			name:    "create a release with new tag",
-			isTTY:   true,
-			tagName: "v3.0.0",
-			questions: append([][]*prompt.QuestionStub{
-				{
+			name: "create a release from new tag",
+			opts: &CreateOptions{},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne("Create a new tag") // Tag prompt
+				as.StubOne("v1.2.3")           // New tag prompt
+				as.Stub([]*prompt.QuestionStub{
 					{
-						Name:  "tagName",
-						Value: createNewTagOption,
+						Name:  "name",
+						Value: "title",
 					},
-				},
-				{
 					{
-						Name:  "tagName",
-						Value: "v3.0.0",
+						Name:  "releaseNotesAction",
+						Value: "Leave blank",
 					},
-				},
-			}, defaultQuestions...),
-			wantParams: map[string]interface{}{
-				"tag_name":   "v3.0.0",
-				"name":       "",
-				"body":       "",
-				"draft":      false,
-				"prerelease": false,
+				})
+				as.Stub([]*prompt.QuestionStub{
+					{
+						Name:  "prerelease",
+						Value: false,
+					},
+					{
+						Name:  "submitAction",
+						Value: "Publish release",
+					},
+				})
 			},
-			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v3.0.0\n",
-			wantStderr: ``,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/tags"), httpmock.StatusStringResponse(200, `[
+           { "name": "v1.2.2" }, { "name": "v1.0.0" }, { "name": "v0.1.2" }
+        ]`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, `{
+          "url": "https://api.github.com/releases/123",
+          "upload_url": "https://api.github.com/assets/upload",
+          "html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+        }`))
+			},
+			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			as, teardown := prompt.InitAskStubber()
-			defer teardown()
+		io, _, stdout, stderr := iostreams.Test()
+		io.SetStdoutTTY(true)
+		io.SetStdinTTY(true)
+		io.SetStderrTTY(true)
+		tt.opts.IO = io
 
-			stubQuestions(as, tt.questions)
+		reg := &httpmock.Registry{}
+		defer reg.Verify(t)
+		tt.httpStubs(reg)
+		tt.opts.HttpClient = func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		}
 
-			fakeHTTP := &httpmock.Registry{}
-			fakeHTTP.Register(httpmock.GraphQL(`\bRepositoryReleaseList\(`), httpmock.StringResponse(`
-			{ "data": { "repository": { "refs": {
-				"nodes": [
-					{
-						"name": "v2.0.0",
-						"refPrefix": "refs/tags/"
-					},
-					{
-						"name": "v1.0.0",
-						"refPrefix": "refs/tags/"
-					}
-				]
-			} } } }`))
-			fakeHTTP.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, fmt.Sprintf(`{
-				"url": "https://api.github.com/releases/123",
-				"upload_url": "https://api.github.com/assets/upload",
-				"html_url": "https://github.com/OWNER/REPO/releases/tag/%s"
-			}`, tt.tagName)))
-			fakeHTTP.Register(httpmock.REST("POST", "assets/upload"), httpmock.StatusStringResponse(201, `{}`))
-			fakeHTTP.Register(httpmock.REST("PATCH", "releases/123"), httpmock.StatusStringResponse(201, fmt.Sprintf(`{
-				"html_url": "https://github.com/OWNER/REPO/releases/tag/%s-final"
-			}`, tt.tagName)))
+		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+			return ghrepo.FromFullName("OWNER/REPO")
+		}
 
-			out, err := runCommand(fakeHTTP, true, "")
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantStdout, out.OutBuf.String())
-
-			bb, err := ioutil.ReadAll(fakeHTTP.Requests[1].Body)
-			require.NoError(t, err)
-			var params interface{}
-			err = json.Unmarshal(bb, &params)
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantParams, params)
-		})
-	}
-}
-
-func Test_createRun_withoutTagNameAndOptions(t *testing.T) {
-	defaultQuestions := [][]*prompt.QuestionStub{
-		{
-			{
-				Name:    "name",
-				Default: true,
-			},
-			{
-				Name:  "releaseNotesAction",
-				Value: "Leave blank",
-			},
-		},
-		{
-			{
-				Name:    "prerelease",
-				Default: true,
-			},
-		},
-		{
-			{
-				Name:  "submitAction",
-				Value: "Publish release",
-			},
-		},
-	}
-
-	tests := []struct {
-		name       string
-		isTTY      bool
-		tagName    string
-		questions  [][]*prompt.QuestionStub
-		wantParams interface{}
-		wantErr    string
-		wantStdout string
-		wantStderr string
-	}{
-		{
-			name:    "create release without tag options",
-			isTTY:   true,
-			tagName: "v0.0.0",
-			questions: append([][]*prompt.QuestionStub{
-				{
-					{
-						Name:  "tagName",
-						Value: "v0.0.0",
-					},
-				},
-			}, defaultQuestions...),
-			wantParams: map[string]interface{}{
-				"tag_name":   "v0.0.0",
-				"name":       "",
-				"body":       "",
-				"draft":      false,
-				"prerelease": false,
-			},
-			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v0.0.0\n",
-			wantStderr: ``,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			as, teardown := prompt.InitAskStubber()
-			defer teardown()
-
-			stubQuestions(as, tt.questions)
-
-			fakeHTTP := &httpmock.Registry{}
-			fakeHTTP.Register(httpmock.GraphQL(`\bRepositoryReleaseList\(`), httpmock.StringResponse(`
-			{ "data": { "repository": { "refs": {
-				"nodes": []
-			} } } }`))
-			fakeHTTP.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, fmt.Sprintf(`{
-				"url": "https://api.github.com/releases/123",
-				"upload_url": "https://api.github.com/assets/upload",
-				"html_url": "https://github.com/OWNER/REPO/releases/tag/%s"
-			}`, tt.tagName)))
-			fakeHTTP.Register(httpmock.REST("POST", "assets/upload"), httpmock.StatusStringResponse(201, `{}`))
-			fakeHTTP.Register(httpmock.REST("PATCH", "releases/123"), httpmock.StatusStringResponse(201, fmt.Sprintf(`{
-				"html_url": "https://github.com/OWNER/REPO/releases/tag/%s-final"
-			}`, tt.tagName)))
-
-			out, err := runCommand(fakeHTTP, true, "")
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantStdout, out.OutBuf.String())
-
-			bb, err := ioutil.ReadAll(fakeHTTP.Requests[1].Body)
-			require.NoError(t, err)
-			var params interface{}
-			err = json.Unmarshal(bb, &params)
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantParams, params)
-		})
-	}
-}
-
-func stubQuestions(as *prompt.AskStubber, questions [][]*prompt.QuestionStub) {
-	for _, question := range questions {
-		as.Stub(question)
-	}
-}
-
-func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(isTTY)
-	io.SetStdinTTY(isTTY)
-	io.SetStderrTTY(isTTY)
-
-	browser := &cmdutil.TestBrowser{}
-	factory := &cmdutil.Factory{
-		IOStreams: io,
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: rt}, nil
-		},
-		Config: func() (config.Config, error) {
+		tt.opts.Config = func() (config.Config, error) {
 			return config.NewBlankConfig(), nil
-		},
-		BaseRepo: func() (ghrepo.Interface, error) {
-			return ghrepo.New("OWNER", "REPO"), nil
-		},
-		Browser: browser,
+		}
+
+		as, teardown := prompt.InitAskStubber()
+		defer teardown()
+		if tt.askStubs != nil {
+			tt.askStubs(as)
+		}
+
+		t.Run(tt.name, func(t *testing.T) {
+			err := createRun(tt.opts)
+
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.wantOut, stdout.String())
+			assert.Equal(t, "", stderr.String())
+		})
 	}
-
-	cmd := NewCmdCreate(factory, func(opts *CreateOptions) error {
-		return createRun(opts)
-	})
-
-	argv, err := shlex.Split(cli)
-	if err != nil {
-		return nil, err
-	}
-	cmd.SetArgs(argv)
-
-	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
-
-	_, err = cmd.ExecuteC()
-	return &test.CmdOut{
-		OutBuf:     stdout,
-		ErrBuf:     stderr,
-		BrowsedURL: browser.BrowsedURL(),
-	}, err
 }
