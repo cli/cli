@@ -13,7 +13,7 @@ import (
 // stores a issue/PR with frecency stats
 type entryWithStats struct {
 	IsPR     bool
-	RepoName string // OWNER/REPO
+	fullName string // OWNER/REPO
 	Entry    api.Issue
 	Stats    countEntry
 }
@@ -36,7 +36,7 @@ func updateEntry(db *sql.DB, updated entryWithStats) error {
 		return err
 	}
 	defer stmt.Close()
-	_, err = stmt.Exec(updated.Stats.LastAccess.Unix(), updated.Stats.Count, updated.RepoName, updated.Entry.Number)
+	_, err = stmt.Exec(updated.Stats.LastAccess.Unix(), updated.Stats.Count, updated.fullName, updated.Entry.Number)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -45,14 +45,14 @@ func updateEntry(db *sql.DB, updated entryWithStats) error {
 	return nil
 }
 
-func insertEntry(db *sql.DB, entry entryWithStats, isPR bool) error {
+func insertEntry(db *sql.DB, entry entryWithStats) error {
 	// insert the repo if it doesn't exist yet
-	exists, err := repoExists(db, entry.RepoName)
+	exists, err := repoExists(db, entry.fullName)
 	if err != nil {
 		return err
 	}
 	if !exists {
-		if err := insertRepo(db, entry.RepoName); err != nil {
+		if err := insertRepo(db, entry.fullName); err != nil {
 			return err
 		}
 	}
@@ -74,8 +74,8 @@ func insertEntry(db *sql.DB, entry entryWithStats, isPR bool) error {
 		entry.Entry.Number,
 		entry.Stats.Count,
 		entry.Stats.LastAccess.Unix(),
-		entry.RepoName,
-		isPR)
+		entry.fullName,
+		entry.IsPR)
 
 	if err != nil {
 		tx.Rollback()
@@ -122,37 +122,42 @@ func repoExists(db *sql.DB, repoName string) (bool, error) {
 }
 
 // get all issues or PRs by repo, sorted by most recent
-func getEntries(db *sql.DB, repoName string, isPR bool) ([]entryWithStats, error) {
+func getEntries(db *sql.DB, repoDetails entryWithStats) ([]entryWithStats, error) {
 	query := `
 	SELECT number,lastAccess,count,title FROM issues
 		WHERE repo = ?
 		AND isPR = ?
 		ORDER BY lastAccess DESC`
-	rows, err := db.Query(query, repoName, isPR)
+	rows, err := db.Query(query, repoDetails.fullName, repoDetails.IsPR)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	entries := []entryWithStats{}
 	for rows.Next() {
-		entry := entryWithStats{IsPR: isPR, Stats: countEntry{}}
+		entry := entryWithStats{IsPR: repoDetails.IsPR, Stats: countEntry{}}
 		var unixTime int64
 		if err := rows.Scan(&entry.Entry.Number, &unixTime, &entry.Stats.Count, &entry.Entry.Title); err != nil {
 			return nil, err
 		}
 		entry.Stats.LastAccess = time.Unix(unixTime, 0)
-		entry.RepoName = repoName
+		entry.fullName = repoDetails.fullName
 		entries = append(entries, entry)
 	}
 	return entries, nil
 }
 
 // lookup single issue or PR by number
-func getEntryByNumber(db *sql.DB, repoName string, number int) (entryWithStats, error) {
+func getEntryByNumber(db *sql.DB, repoDetails entryWithStats) (entryWithStats, error) {
 	query := `
 	SELECT number,title,lastAccess,count,isPR FROM issues
 		WHERE repo = ? AND number = ?`
-	rows, err := db.Query(query, repoName, number)
+	rows, err := db.Query(query, repoDetails.fullName, repoDetails.Entry.Number)
+	if err != nil {
+		return entryWithStats{}, err
+	}
+	defer rows.Close()
+
 	entry := entryWithStats{}
 
 	for rows.Next() {
@@ -162,20 +167,24 @@ func getEntryByNumber(db *sql.DB, repoName string, number int) (entryWithStats, 
 			return entry, err
 		}
 		entry.Stats.LastAccess = time.Unix(unixTime, 0)
-		entry.RepoName = repoName
+		entry.fullName = repoDetails.fullName
 	}
 	return entry, nil
 }
 
 // get last query time for a repo's Issues or PRs
-func getLastQueried(db *sql.DB, repoName string, isPR bool) (time.Time, error) {
+func getLastQueried(db *sql.DB, repoDetails entryWithStats) (time.Time, error) {
 	field := "issuesLastQueried"
-	if isPR {
+	if repoDetails.IsPR {
 		field = "prsLastQueried"
 	}
 	query := fmt.Sprintf("SELECT %s from repos where fullName = ?", field)
 
-	rows, err := db.Query(query, repoName)
+	rows, err := db.Query(query, repoDetails.fullName)
+	if err != nil {
+		return time.Time{}, err
+	}
+
 	var lastQueried time.Time
 	for rows.Next() {
 		var unixTime int64
@@ -188,9 +197,9 @@ func getLastQueried(db *sql.DB, repoName string, isPR bool) (time.Time, error) {
 	return lastQueried, nil
 }
 
-func updateLastQueried(db *sql.DB, updated time.Time, repoName string, isPR bool) error {
+func updateLastQueried(db *sql.DB, repoDetails entryWithStats) error {
 	field := "issuesLastQueried"
-	if isPR {
+	if repoDetails.IsPR {
 		field = "prsLastQueried"
 	}
 
@@ -206,7 +215,7 @@ func updateLastQueried(db *sql.DB, updated time.Time, repoName string, isPR bool
 		return err
 	}
 	defer stmt.Close()
-	_, err = stmt.Exec(updated.Unix(), repoName)
+	_, err = stmt.Exec(repoDetails.Stats.LastAccess.Unix(), repoDetails.fullName)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -215,7 +224,7 @@ func updateLastQueried(db *sql.DB, updated time.Time, repoName string, isPR bool
 	return nil
 }
 
-func deleteByNumber(db *sql.DB, repoName string, number int) error {
+func deleteByNumber(db *sql.DB, repoDetails entryWithStats) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -228,7 +237,7 @@ func deleteByNumber(db *sql.DB, repoName string, number int) error {
 	}
 
 	defer stmt.Close()
-	_, err = stmt.Exec(repoName, number)
+	_, err = stmt.Exec(repoDetails.fullName, repoDetails.Entry.Number)
 	if err != nil {
 		tx.Rollback()
 		return err

@@ -32,34 +32,34 @@ func testDataset() []entryWithStats {
 		{
 			Entry:    api.Issue{Number: 4827, Title: "Allow `auth status` to have reduced scope requirements"},
 			Stats:    countEntry{Count: 1, LastAccess: testTime},
-			RepoName: "cli/cli",
+			fullName: "cli/cli",
 		},
 		{
 			Entry:    api.Issue{Number: 4567, Title: "repo create rewrite"},
 			Stats:    countEntry{Count: 10, LastAccess: testTime.AddDate(0, 0, -3)},
-			RepoName: "cli/cli",
+			fullName: "cli/cli",
 		},
 		{
 			Entry:    api.Issue{Number: 4746, Title: "`gh browse` can't handle gist repos"},
 			Stats:    countEntry{Count: 1, LastAccess: testTime.AddDate(0, 0, -1)},
-			RepoName: "cli/cli",
+			fullName: "cli/cli",
 		},
 		{
 			IsPR:     true,
 			Entry:    api.Issue{Number: 4753, Title: "hack: frecency spike"},
 			Stats:    countEntry{Count: 2, LastAccess: testTime},
-			RepoName: "cli/cli",
+			fullName: "cli/cli",
 		},
 		{
 			IsPR:     true,
 			Entry:    api.Issue{Number: 4578, Title: "rewrite `gh repo create`"},
 			Stats:    countEntry{Count: 10, LastAccess: testTime.AddDate(0, 0, -4)},
-			RepoName: "cli/cli",
+			fullName: "cli/cli",
 		},
 		{
 			Entry:    api.Issue{Number: 5, Title: "[Discussion] Desired features"},
 			Stats:    countEntry{Count: 3, LastAccess: testTime},
-			RepoName: "cli/go-gh",
+			fullName: "cli/go-gh",
 		},
 	}
 }
@@ -77,11 +77,15 @@ func TestManager_insert_get(t *testing.T) {
 	testData := testDataset()
 	testTime := testData[0].Stats.LastAccess
 	for _, entry := range testData {
-		err := insertEntry(db, entry, entry.IsPR)
+		err := insertEntry(db, entry)
 		assert.NoError(t, err)
 	}
 
-	issues, err := getEntries(db, "cli/cli", false)
+	entry := entryWithStats{
+		fullName: "cli/cli",
+		IsPR:     false,
+	}
+	issues, err := getEntries(db, entry)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(issues))
 	latestIssue := issues[0]
@@ -91,7 +95,11 @@ func TestManager_insert_get(t *testing.T) {
 	assert.Equal(t, latestIssue.Stats.LastAccess.UTC(), testTime.UTC())
 	assert.False(t, latestIssue.IsPR)
 
-	prs, err := getEntries(db, "cli/cli", true)
+	entry = entryWithStats{
+		fullName: "cli/cli",
+		IsPR:     true,
+	}
+	prs, err := getEntries(db, entry)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(prs))
 	latestPR := prs[0]
@@ -116,19 +124,19 @@ func TestManager_update(t *testing.T) {
 	testData := testDataset()
 	testTime := testData[0].Stats.LastAccess
 	for _, entry := range testData {
-		err := insertEntry(db, entry, entry.IsPR)
+		err := insertEntry(db, entry)
 		assert.NoError(t, err)
 	}
 
 	updated := entryWithStats{
-		RepoName: "cli/cli",
+		fullName: "cli/cli",
 		Entry:    api.Issue{Number: 4827},
 		Stats:    countEntry{LastAccess: testTime.AddDate(0, 0, 2), Count: 4},
 	}
 	err = updateEntry(db, updated)
 	assert.NoError(t, err)
 
-	gotEntry, err := getEntryByNumber(db, updated.RepoName, updated.Entry.Number)
+	gotEntry, err := getEntryByNumber(db, updated)
 	assert.NoError(t, err)
 	assert.Equal(t, gotEntry.Stats.Count, updated.Stats.Count)
 	assert.Equal(t, gotEntry.Stats.LastAccess.UTC(), updated.Stats.LastAccess.UTC())

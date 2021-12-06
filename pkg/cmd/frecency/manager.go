@@ -33,8 +33,8 @@ func NewManager(io *iostreams.IOStreams, cfg config.Config) *Manager {
 
 func (m *Manager) getDB() (*sql.DB, error) {
 	if m.db == nil {
-		db, err := sql.Open("sqlite3", m.dataDir)
-		m.db = db
+		var err error
+		m.db, err = sql.Open("sqlite3", m.dataDir)
 		if err != nil {
 			return m.db, err
 		}
@@ -51,7 +51,11 @@ func (m *Manager) GetFrecentIssues(repoName string) ([]api.Issue, error) {
 	}
 
 	var issuesWithStats ByFrecency
-	issuesWithStats, err = getEntries(db, repoName, false)
+	repoDetails := entryWithStats{
+		fullName: repoName,
+		IsPR:     false,
+	}
+	issuesWithStats, err = getEntries(db, repoDetails)
 	if err != nil {
 		return frecentIssues, err
 	}
@@ -71,7 +75,11 @@ func (m *Manager) GetFrecentPullRequests(repoName string) ([]api.PullRequest, er
 	}
 
 	var prsWithStats ByFrecency
-	prsWithStats, err = getEntries(db, repoName, true)
+	repoDetails := entryWithStats{
+		fullName: repoName,
+		IsPR:     true,
+	}
+	prsWithStats, err = getEntries(db, repoDetails)
 	if err != nil {
 		return frecentPRs, err
 	}
@@ -90,9 +98,16 @@ func (m *Manager) RecordAccess(repoName string, number int, timestamp time.Time)
 	if err != nil {
 		return err
 	}
-	entry, err := getEntryByNumber(db, repoName, number)
+	repoDetails := entryWithStats{
+		fullName: repoName,
+		Entry: api.Issue{
+			Number: number,
+		},
+	}
+	entry, err := getEntryByNumber(db, repoDetails)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			// Create a new Entry?
 			// not in DB... what to do
 		}
 		return err
