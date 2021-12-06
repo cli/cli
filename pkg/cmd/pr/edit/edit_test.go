@@ -357,6 +357,7 @@ func Test_editRun(t *testing.T) {
 				mockRepoMetadata(t, reg, false)
 				mockPullRequestUpdate(t, reg)
 				mockPullRequestReviewersUpdate(t, reg)
+				mockPullRequestUpdateLabels(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -387,7 +388,7 @@ func Test_editRun(t *testing.T) {
 						Edited: true,
 					},
 					Labels: shared.EditableSlice{
-						Value:  []string{"feature", "TODO", "bug"},
+						Add:    []string{"feature", "TODO", "bug"},
 						Remove: []string{"docs"},
 						Edited: true,
 					},
@@ -406,6 +407,7 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockRepoMetadata(t, reg, true)
 				mockPullRequestUpdate(t, reg)
+				mockPullRequestUpdateLabels(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -490,7 +492,8 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry, skipReviewers bool) 
 			"nodes": [
 				{ "name": "feature", "id": "FEATUREID" },
 				{ "name": "TODO", "id": "TODOID" },
-				{ "name": "bug", "id": "BUGID" }
+				{ "name": "bug", "id": "BUGID" },
+				{ "name": "docs", "id": "DOCSID" }
 			],
 			"pageInfo": { "hasNextPage": false }
 		} } } }
@@ -552,6 +555,23 @@ func mockPullRequestReviewersUpdate(t *testing.T, reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation PullRequestUpdateRequestReviews\b`),
 		httpmock.StringResponse(`{}`))
+}
+
+func mockPullRequestUpdateLabels(t *testing.T, reg *httpmock.Registry) {
+	reg.Register(
+		httpmock.GraphQL(`mutation AddLabels\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "addLabelsToLabelable": { "labelable": {
+		} } } }`,
+			func(inputs map[string]interface{}) {}),
+	)
+	reg.Register(
+		httpmock.GraphQL(`mutation RemoveLabels\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "removeLabelsFromLabelable": { "labelable": {
+		} } } }`,
+			func(inputs map[string]interface{}) {}),
+	)
 }
 
 type testFetcher struct{}

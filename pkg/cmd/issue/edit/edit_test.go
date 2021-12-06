@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -286,6 +287,11 @@ func Test_editRun(t *testing.T) {
 						Value:  "GA",
 						Edited: true,
 					},
+					Metadata: api.RepoMetadataResult{
+						Labels: []api.RepoLabel{
+							{Name: "docs", ID: "DOCSID"},
+						},
+					},
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
@@ -293,6 +299,7 @@ func Test_editRun(t *testing.T) {
 				mockIssueGet(t, reg)
 				mockRepoMetadata(t, reg)
 				mockIssueUpdate(t, reg)
+				mockIssueUpdateLabels(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
 		},
@@ -386,7 +393,8 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
 			"nodes": [
 				{ "name": "feature", "id": "FEATUREID" },
 				{ "name": "TODO", "id": "TODOID" },
-				{ "name": "bug", "id": "BUGID" }
+				{ "name": "bug", "id": "BUGID" },
+				{ "name": "docs", "id": "DOCSID" }
 			],
 			"pageInfo": { "hasNextPage": false }
 		} } } }
@@ -432,6 +440,23 @@ func mockIssueUpdate(t *testing.T, reg *httpmock.Registry) {
 				{ "data": { "updateIssue": { "issue": {
 					"id": "123"
 				} } } }`,
+			func(inputs map[string]interface{}) {}),
+	)
+}
+
+func mockIssueUpdateLabels(t *testing.T, reg *httpmock.Registry) {
+	reg.Register(
+		httpmock.GraphQL(`mutation AddLabels\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "addLabelsToLabelable": { "labelable": {
+		} } } }`,
+			func(inputs map[string]interface{}) {}),
+	)
+	reg.Register(
+		httpmock.GraphQL(`mutation RemoveLabels\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "removeLabelsFromLabelable": { "labelable": {
+		} } } }`,
 			func(inputs map[string]interface{}) {}),
 	)
 }
