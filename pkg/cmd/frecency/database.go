@@ -9,9 +9,10 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// stores issue/PR with frecency stats
+// stores a issue/PR with frecency stats
 type entryWithStats struct {
-	Entry interface{}
+	Entry api.Issue
+	IsPR  bool
 	Stats countEntry
 }
 
@@ -20,7 +21,8 @@ type countEntry struct {
 	Count      int
 }
 
-func updateEntry(db *sql.DB, updated *dbEntry) error {
+// update the frecency stats of an entry
+func updateEntry(db *sql.DB, repoName string, updated entryWithStats) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -33,7 +35,7 @@ func updateEntry(db *sql.DB, updated *dbEntry) error {
 	}
 
 	defer stmt.Close()
-	_, err = stmt.Exec(updated.Stats.LastAccess.Unix(), updated.Stats.Count, updated.Repo, updated.Number)
+	_, err = stmt.Exec(updated.Stats.LastAccess.Unix(), updated.Stats.Count, repoName, updated.Entry.Number)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -42,13 +44,13 @@ func updateEntry(db *sql.DB, updated *dbEntry) error {
 	return nil
 }
 
-func insertEntry(db *sql.DB, repoName string, entry *entryWithStats) error {
+func insertEntry(db *sql.DB, repoName string, entry entryWithStats, isPR bool) error {
 	// insert the repo if it doesn't exist yet
-	repoExists, err := RepoExists(db, repoName)
+	exists, err := repoExists(db, repoName)
 	if err != nil {
 		return err
 	}
-	if !repoExists {
+	if !exists {
 		if err := insertRepo(db, repoName); err != nil {
 			return err
 		}
@@ -59,7 +61,7 @@ func insertEntry(db *sql.DB, repoName string, entry *entryWithStats) error {
 		return err
 	}
 
-	stmt, err := tx.Prepare("INSERT INTO issues(title,number,count,lastAccess,repo,isPR) values(?,?,?,?,?,?,?)")
+	stmt, err := tx.Prepare("INSERT INTO issues(title,number,count,lastAccess,repo,isPR) values(?,?,?,?,?,?)")
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -67,12 +69,13 @@ func insertEntry(db *sql.DB, repoName string, entry *entryWithStats) error {
 
 	defer stmt.Close()
 	_, err = stmt.Exec(
-		entry.Title,
-		entry.Number,
+		entry.Entry.Title,
+		entry.Entry.Number,
 		entry.Stats.Count,
 		entry.Stats.LastAccess.Unix(),
-		entry.Repo.ID,
-		entry.IsPR)
+		repoName,
+		isPR,
+	)
 
 	if err != nil {
 		tx.Rollback()
@@ -88,14 +91,14 @@ func insertRepo(db *sql.DB, repoName string) error {
 		return err
 	}
 
-	stmt, err := tx.Prepare("INSERT INTO repos(name) values(?)")
+	stmt, err := tx.Prepare("INSERT INTO repos(fullName) values(?)")
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
 
 	defer stmt.Close()
-	_, err = stmt.Exec(repo.Name)
+	_, err = stmt.Exec(repoName)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -107,7 +110,7 @@ func insertRepo(db *sql.DB, repoName string) error {
 
 func repoExists(db *sql.DB, repoName string) (bool, error) {
 	var found int
-	row := db.QueryRow("SELECT 1 FROM repos WHERE name = ?", repoName)
+	row := db.QueryRow("SELECT 1 FROM repos WHERE fullName = ?", repoName)
 	err := row.Scan(&found)
 	if err == nil {
 		return true, nil
@@ -118,7 +121,7 @@ func repoExists(db *sql.DB, repoName string) (bool, error) {
 	return false, err
 }
 
-// get issues or PRs
+// get all issues or PRs by repo
 func getEntries(db *sql.DB, repoName string, isPR bool) ([]entryWithStats, error) {
 	query := `
 	SELECT number,lastAccess,count,title FROM issues 
@@ -132,12 +135,7 @@ func getEntries(db *sql.DB, repoName string, isPR bool) ([]entryWithStats, error
 
 	var entries []entryWithStats
 	for rows.Next() {
-		var entry entryWithStats
-		if isPR {
-			entry.Entry = api.PullRequest{}
-		} else {
-			entry.Entry = api.Issue{}
-		}
+		entry := entryWithStats{IsPR: isPR, Stats: countEntry{}}
 		var unixTime int64
 		if err := rows.Scan(&entry.Entry.Number, &unixTime, &entry.Stats.Count, &entry.Entry.Title); err != nil {
 			return nil, err
@@ -148,6 +146,25 @@ func getEntries(db *sql.DB, repoName string, isPR bool) ([]entryWithStats, error
 	return entries, nil
 }
 
+// lookup single issue or PR by number
+func getEntryByNumber(db *sql.DB, repoName string, number int) (entryWithStats, error) {
+	query := `
+	SELECT number,title,lastAccess,count,isPR FROM issues
+		WHERE repo = ? AND number = ?`
+	rows, err := db.Query(query, repoName, number)
+	entry := entryWithStats{}
+
+	for rows.Next() {
+		var unixTime int64
+		err = rows.Scan(&entry.Entry.Number, &entry.Entry.Title, &unixTime, &entry.Stats.Count, &entry.IsPR)
+		if err != nil {
+			return entry, err
+		}
+		entry.Stats.LastAccess = time.Unix(unixTime, 0)
+	}
+	return entry, nil
+}
+
 func createTables(db *sql.DB) error {
 	// TODO: repo is identified by "owner/repo",
 	// so renaming and transfering ownership will invalidate the db
@@ -156,7 +173,7 @@ func createTables(db *sql.DB) error {
 		id INTEGER PRIMARY KEY AUTOINCREMENT, 
  		fullName TEXT NOT NULL UNIQUE,
 		issuesLastQueried INTEGER,
-		prsLastQueried INTEGER,
+		prsLastQueried INTEGER
 	);
 	
 	CREATE TABLE IF NOT EXISTS issues(
