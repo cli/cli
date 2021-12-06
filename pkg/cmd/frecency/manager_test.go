@@ -32,34 +32,34 @@ func testDataset() []entryWithStats {
 		{
 			Entry:    api.Issue{Number: 4827, Title: "Allow `auth status` to have reduced scope requirements"},
 			Stats:    countEntry{Count: 1, LastAccess: testTime},
-			fullName: "cli/cli",
+			RepoName: "cli/cli",
 		},
 		{
 			Entry:    api.Issue{Number: 4567, Title: "repo create rewrite"},
 			Stats:    countEntry{Count: 10, LastAccess: testTime.AddDate(0, 0, -3)},
-			fullName: "cli/cli",
+			RepoName: "cli/cli",
 		},
 		{
 			Entry:    api.Issue{Number: 4746, Title: "`gh browse` can't handle gist repos"},
 			Stats:    countEntry{Count: 1, LastAccess: testTime.AddDate(0, 0, -1)},
-			fullName: "cli/cli",
+			RepoName: "cli/cli",
 		},
 		{
 			IsPR:     true,
 			Entry:    api.Issue{Number: 4753, Title: "hack: frecency spike"},
 			Stats:    countEntry{Count: 2, LastAccess: testTime},
-			fullName: "cli/cli",
+			RepoName: "cli/cli",
 		},
 		{
 			IsPR:     true,
 			Entry:    api.Issue{Number: 4578, Title: "rewrite `gh repo create`"},
 			Stats:    countEntry{Count: 10, LastAccess: testTime.AddDate(0, 0, -4)},
-			fullName: "cli/cli",
+			RepoName: "cli/cli",
 		},
 		{
 			Entry:    api.Issue{Number: 5, Title: "[Discussion] Desired features"},
 			Stats:    countEntry{Count: 3, LastAccess: testTime},
-			fullName: "cli/go-gh",
+			RepoName: "cli/go-gh",
 		},
 	}
 }
@@ -68,7 +68,8 @@ func TestManager_insert_get(t *testing.T) {
 	tempDir := t.TempDir()
 	tempDB := filepath.Join(tempDir, "frecent.db")
 	m := newTestManager(tempDB, nil)
-	defer os.Remove(tempDB)
+	defer m.closeDB()
+	t.Cleanup(func() { os.Remove(tempDB) })
 
 	db, err := m.getDB()
 	if err != nil {
@@ -82,7 +83,7 @@ func TestManager_insert_get(t *testing.T) {
 	}
 
 	entry := entryWithStats{
-		fullName: "cli/cli",
+		RepoName: "cli/cli",
 		IsPR:     false,
 	}
 	issues, err := getEntries(db, entry)
@@ -96,7 +97,7 @@ func TestManager_insert_get(t *testing.T) {
 	assert.False(t, latestIssue.IsPR)
 
 	entry = entryWithStats{
-		fullName: "cli/cli",
+		RepoName: "cli/cli",
 		IsPR:     true,
 	}
 	prs, err := getEntries(db, entry)
@@ -115,7 +116,8 @@ func TestManager_update(t *testing.T) {
 	tempDir := t.TempDir()
 	tempDB := filepath.Join(tempDir, "frecent.db")
 	m := newTestManager(tempDB, nil)
-	defer os.Remove(tempDB)
+	defer m.closeDB()
+	t.Cleanup(func() { os.Remove(tempDB) })
 
 	db, err := m.getDB()
 	if err != nil {
@@ -129,7 +131,7 @@ func TestManager_update(t *testing.T) {
 	}
 
 	updated := entryWithStats{
-		fullName: "cli/cli",
+		RepoName: "cli/cli",
 		Entry:    api.Issue{Number: 4827},
 		Stats:    countEntry{LastAccess: testTime.AddDate(0, 0, 2), Count: 4},
 	}

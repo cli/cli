@@ -1,11 +1,14 @@
 package frecency
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
@@ -43,7 +46,59 @@ query GetIssues($owner: String!, $repo: String!, $since: DateTime!) {
 	return resp.Repository.Issues.Nodes, nil
 }
 
-func getPullRequests(c *http.Client, repo ghrepo.Interface, since time.Time) ([]api.Issue, error) {
+// get issues that were created after last query time (issuesLastQueried, prsLastQueried)
+func (m *Manager) getNewIssues(db *sql.DB, repoName string) ([]api.Issue, error) {
+	db, err := m.getDB()
+	if err != nil {
+		return nil, err
+	}
+
+	//before the forward slash is the owner and after is the repo name
+	repo := strings.Split(repoName, "/")
+	fullName := ghrepo.NewWithHost(ghinstance.Default(), repo[0], repo[1])
+
+	repoDetails := entryWithStats{RepoName: repoName}
+	lastQueried, err := getLastQueried(db, repoDetails)
+	newIssues, err := getIssues(m.client, fullName, lastQueried)
+	if err != nil {
+		return nil, err
+	}
+
+	repoDetails.Stats = countEntry{LastAccess: time.Now()}
+	err = updateLastQueried(db, repoDetails)
+	if err != nil {
+		return nil, err
+	}
+	return newIssues, nil
+}
+
+//get the latest issuesLastQueried
+func (m *Manager) getNewPullRequests(db *sql.DB, repoName string) ([]api.PullRequest, error) {
+	db, err := m.getDB()
+	if err != nil {
+		return nil, err
+	}
+
+	//before the forward slash is the owner and after is the repo name
+	repo := strings.Split(repoName, "/")
+	fullName := ghrepo.NewWithHost(ghinstance.Default(), repo[0], repo[1])
+
+	repoDetails := entryWithStats{RepoName: repoName, IsPR: true}
+	lastQueried, err := getLastQueried(db, repoDetails)
+	newPRs, err := getPullRequests(m.client, fullName, lastQueried)
+	if err != nil {
+		return nil, err
+	}
+
+	repoDetails.Stats = countEntry{LastAccess: time.Now()}
+	err = updateLastQueried(db, repoDetails)
+	if err != nil {
+		return nil, err
+	}
+	return newPRs, nil
+}
+
+func getPullRequests(c *http.Client, repo ghrepo.Interface, since time.Time) ([]api.PullRequest, error) {
 	apiClient := api.NewClientFromHTTP(c)
 	repoName := ghrepo.FullName(repo)
 
@@ -65,7 +120,11 @@ query getPRs($query: String!, $limit: Int!) {
 		"query": searchQuery,
 		"limit": 100,
 	}
-	type responseData struct{ Search struct{ Nodes []api.Issue } }
+	type responseData struct {
+		Search struct {
+			Nodes []api.PullRequest
+		}
+	}
 
 	var resp responseData
 	err := apiClient.GraphQL(repo.RepoHost(), query, variables, &resp)

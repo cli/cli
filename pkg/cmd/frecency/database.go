@@ -13,7 +13,7 @@ import (
 // stores a issue/PR with frecency stats
 type entryWithStats struct {
 	IsPR     bool
-	fullName string // OWNER/REPO
+	RepoName string // OWNER/REPO
 	Entry    api.Issue
 	Stats    countEntry
 }
@@ -32,13 +32,13 @@ func updateEntry(db *sql.DB, updated entryWithStats) error {
 
 	stmt, err := tx.Prepare("UPDATE issues SET lastAccess = ?, count = ? WHERE repo = ? AND number = ?")
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return err
 	}
 	defer stmt.Close()
-	_, err = stmt.Exec(updated.Stats.LastAccess.Unix(), updated.Stats.Count, updated.fullName, updated.Entry.Number)
+	_, err = stmt.Exec(updated.Stats.LastAccess.Unix(), updated.Stats.Count, updated.RepoName, updated.Entry.Number)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return err
 	}
 	tx.Commit()
@@ -47,12 +47,12 @@ func updateEntry(db *sql.DB, updated entryWithStats) error {
 
 func insertEntry(db *sql.DB, entry entryWithStats) error {
 	// insert the repo if it doesn't exist yet
-	exists, err := repoExists(db, entry.fullName)
+	exists, err := repoExists(db, entry.RepoName)
 	if err != nil {
 		return err
 	}
 	if !exists {
-		if err := insertRepo(db, entry.fullName); err != nil {
+		if err := insertRepo(db, entry.RepoName); err != nil {
 			return err
 		}
 	}
@@ -64,7 +64,7 @@ func insertEntry(db *sql.DB, entry entryWithStats) error {
 
 	stmt, err := tx.Prepare("INSERT INTO issues(title,number,count,lastAccess,repo,isPR) values(?,?,?,?,?,?)")
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return err
 	}
 	defer stmt.Close()
@@ -74,11 +74,11 @@ func insertEntry(db *sql.DB, entry entryWithStats) error {
 		entry.Entry.Number,
 		entry.Stats.Count,
 		entry.Stats.LastAccess.Unix(),
-		entry.fullName,
+		entry.RepoName,
 		entry.IsPR)
 
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return err
 	}
 	tx.Commit()
@@ -93,14 +93,14 @@ func insertRepo(db *sql.DB, repoName string) error {
 
 	stmt, err := tx.Prepare("INSERT INTO repos(fullName) values(?)")
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return err
 	}
 
 	defer stmt.Close()
 	_, err = stmt.Exec(repoName)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return err
 	}
 
@@ -128,7 +128,7 @@ func getEntries(db *sql.DB, repoDetails entryWithStats) ([]entryWithStats, error
 		WHERE repo = ?
 		AND isPR = ?
 		ORDER BY lastAccess DESC`
-	rows, err := db.Query(query, repoDetails.fullName, repoDetails.IsPR)
+	rows, err := db.Query(query, repoDetails.RepoName, repoDetails.IsPR)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +141,7 @@ func getEntries(db *sql.DB, repoDetails entryWithStats) ([]entryWithStats, error
 			return nil, err
 		}
 		entry.Stats.LastAccess = time.Unix(unixTime, 0)
-		entry.fullName = repoDetails.fullName
+		entry.RepoName = repoDetails.RepoName
 		entries = append(entries, entry)
 	}
 	return entries, nil
@@ -152,7 +152,7 @@ func getEntryByNumber(db *sql.DB, repoDetails entryWithStats) (entryWithStats, e
 	query := `
 	SELECT number,title,lastAccess,count,isPR FROM issues
 		WHERE repo = ? AND number = ?`
-	rows, err := db.Query(query, repoDetails.fullName, repoDetails.Entry.Number)
+	rows, err := db.Query(query, repoDetails.RepoName, repoDetails.Entry.Number)
 	if err != nil {
 		return entryWithStats{}, err
 	}
@@ -167,7 +167,7 @@ func getEntryByNumber(db *sql.DB, repoDetails entryWithStats) (entryWithStats, e
 			return entry, err
 		}
 		entry.Stats.LastAccess = time.Unix(unixTime, 0)
-		entry.fullName = repoDetails.fullName
+		entry.RepoName = repoDetails.RepoName
 	}
 	return entry, nil
 }
@@ -180,7 +180,7 @@ func getLastQueried(db *sql.DB, repoDetails entryWithStats) (time.Time, error) {
 	}
 	query := fmt.Sprintf("SELECT %s from repos where fullName = ?", field)
 
-	rows, err := db.Query(query, repoDetails.fullName)
+	rows, err := db.Query(query, repoDetails.RepoName)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -211,20 +211,20 @@ func updateLastQueried(db *sql.DB, repoDetails entryWithStats) error {
 	query := fmt.Sprintf("UPDATE repos SET %s = ? WHERE fullName = ?", field)
 	stmt, err := tx.Prepare(query)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return err
 	}
 	defer stmt.Close()
-	_, err = stmt.Exec(repoDetails.Stats.LastAccess.Unix(), repoDetails.fullName)
+	_, err = stmt.Exec(repoDetails.Stats.LastAccess.Unix(), repoDetails.RepoName)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return err
 	}
 	tx.Commit()
 	return nil
 }
 
-func deleteByNumber(db *sql.DB, repoDetails entryWithStats) error {
+func deleteByNumber(db *sql.DB, entry entryWithStats) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -232,14 +232,14 @@ func deleteByNumber(db *sql.DB, repoDetails entryWithStats) error {
 
 	stmt, err := tx.Prepare("DELETE FROM issues WHERE repo = ? AND number = ? ")
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return err
 	}
 
 	defer stmt.Close()
-	_, err = stmt.Exec(repoDetails.fullName, repoDetails.Entry.Number)
+	_, err = stmt.Exec(entry.RepoName, entry.Entry.Number)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return err
 	}
 	tx.Commit()

@@ -3,6 +3,7 @@ package frecency
 import (
 	"database/sql"
 	"errors"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -16,6 +17,7 @@ import (
 // GetFrecent, RecordAccess
 type Manager struct {
 	config  config.Config
+	client  *http.Client
 	io      *iostreams.IOStreams
 	db      *sql.DB
 	dataDir string
@@ -52,7 +54,7 @@ func (m *Manager) GetFrecentIssues(repoName string) ([]api.Issue, error) {
 
 	var issuesWithStats ByFrecency
 	repoDetails := entryWithStats{
-		fullName: repoName,
+		RepoName: repoName,
 		IsPR:     false,
 	}
 	issuesWithStats, err = getEntries(db, repoDetails)
@@ -76,7 +78,7 @@ func (m *Manager) GetFrecentPullRequests(repoName string) ([]api.PullRequest, er
 
 	var prsWithStats ByFrecency
 	repoDetails := entryWithStats{
-		fullName: repoName,
+		RepoName: repoName,
 		IsPR:     true,
 	}
 	prsWithStats, err = getEntries(db, repoDetails)
@@ -99,17 +101,16 @@ func (m *Manager) RecordAccess(repoName string, number int, timestamp time.Time)
 		return err
 	}
 	repoDetails := entryWithStats{
-		fullName: repoName,
+		RepoName: repoName,
 		Entry: api.Issue{
 			Number: number,
 		},
 	}
 	entry, err := getEntryByNumber(db, repoDetails)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			// Create a new Entry?
-			// not in DB... what to do
-		}
+		// if errors.Is(err, sql.ErrNoRows) {
+		// 	no entry in the DB.. create a new entry?
+		// }
 		return err
 	}
 
@@ -145,8 +146,8 @@ func (m *Manager) initDB() error {
 	return createTables(db)
 }
 
-func (m *Manager) closeDB(db *sql.DB) error {
-	return db.Close()
+func (m *Manager) closeDB() error {
+	return m.db.Close()
 }
 
 // Sorting
