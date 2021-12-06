@@ -39,6 +39,7 @@ func (m *Manager) getDB() (*sql.DB, error) {
 			return m.db, err
 		}
 	}
+	// should Ping here?
 	return m.db, nil
 }
 
@@ -133,6 +134,7 @@ func (m *Manager) closeDB(db *sql.DB) error {
 	return db.Close()
 }
 
+// Sorting
 type ByFrecency []entryWithStats
 
 func (f ByFrecency) Len() int {
