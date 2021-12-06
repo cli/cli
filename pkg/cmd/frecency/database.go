@@ -3,6 +3,7 @@ package frecency
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/cli/cli/v2/api"
@@ -11,9 +12,10 @@ import (
 
 // stores a issue/PR with frecency stats
 type entryWithStats struct {
-	Entry api.Issue
-	IsPR  bool
-	Stats countEntry
+	IsPR     bool
+	RepoName string // OWNER/REPO
+	Entry    api.Issue
+	Stats    countEntry
 }
 
 type countEntry struct {
@@ -22,7 +24,7 @@ type countEntry struct {
 }
 
 // update the frecency stats of an entry
-func updateEntry(db *sql.DB, repoName string, updated entryWithStats) error {
+func updateEntry(db *sql.DB, updated entryWithStats) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -34,7 +36,7 @@ func updateEntry(db *sql.DB, repoName string, updated entryWithStats) error {
 		return err
 	}
 	defer stmt.Close()
-	_, err = stmt.Exec(updated.Stats.LastAccess.Unix(), updated.Stats.Count, repoName, updated.Entry.Number)
+	_, err = stmt.Exec(updated.Stats.LastAccess.Unix(), updated.Stats.Count, updated.RepoName, updated.Entry.Number)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -43,14 +45,14 @@ func updateEntry(db *sql.DB, repoName string, updated entryWithStats) error {
 	return nil
 }
 
-func insertEntry(db *sql.DB, repoName string, entry entryWithStats, isPR bool) error {
+func insertEntry(db *sql.DB, entry entryWithStats, isPR bool) error {
 	// insert the repo if it doesn't exist yet
-	exists, err := repoExists(db, repoName)
+	exists, err := repoExists(db, entry.RepoName)
 	if err != nil {
 		return err
 	}
 	if !exists {
-		if err := insertRepo(db, repoName); err != nil {
+		if err := insertRepo(db, entry.RepoName); err != nil {
 			return err
 		}
 	}
@@ -72,7 +74,7 @@ func insertEntry(db *sql.DB, repoName string, entry entryWithStats, isPR bool) e
 		entry.Entry.Number,
 		entry.Stats.Count,
 		entry.Stats.LastAccess.Unix(),
-		repoName,
+		entry.RepoName,
 		isPR)
 
 	if err != nil {
@@ -119,7 +121,7 @@ func repoExists(db *sql.DB, repoName string) (bool, error) {
 	return false, err
 }
 
-// get all issues or PRs by repo
+// get all issues or PRs by repo, sorted by most recent
 func getEntries(db *sql.DB, repoName string, isPR bool) ([]entryWithStats, error) {
 	query := `
 	SELECT number,lastAccess,count,title FROM issues
@@ -139,6 +141,7 @@ func getEntries(db *sql.DB, repoName string, isPR bool) ([]entryWithStats, error
 			return nil, err
 		}
 		entry.Stats.LastAccess = time.Unix(unixTime, 0)
+		entry.RepoName = repoName
 		entries = append(entries, entry)
 	}
 	return entries, nil
@@ -159,8 +162,79 @@ func getEntryByNumber(db *sql.DB, repoName string, number int) (entryWithStats, 
 			return entry, err
 		}
 		entry.Stats.LastAccess = time.Unix(unixTime, 0)
+		entry.RepoName = repoName
 	}
 	return entry, nil
+}
+
+// get last query time for a repo's Issues or PRs
+func getLastQueried(db *sql.DB, repoName string, isPR bool) (time.Time, error) {
+	field := "issuesLastQueried"
+	if isPR {
+		field = "prsLastQueried"
+	}
+	query := fmt.Sprintf("SELECT %s from repos where fullName = ?", field)
+
+	rows, err := db.Query(query, repoName)
+	var lastQueried time.Time
+	for rows.Next() {
+		var unixTime int64
+		err = rows.Scan(&unixTime)
+		if err != nil {
+			return lastQueried, err
+		}
+		lastQueried = time.Unix(unixTime, 0)
+	}
+	return lastQueried, nil
+}
+
+func updateLastQueried(db *sql.DB, updated time.Time, repoName string, isPR bool) error {
+	field := "issuesLastQueried"
+	if isPR {
+		field = "prsLastQueried"
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+
+	query := fmt.Sprintf("UPDATE repos SET %s = ? WHERE fullName = ?", field)
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(updated.Unix(), repoName)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	tx.Commit()
+	return nil
+}
+
+func deleteByNumber(db *sql.DB, repoName string, number int) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare("DELETE FROM issues WHERE repo = ? AND number = ? ")
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	defer stmt.Close()
+	_, err = stmt.Exec(repoName, number)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	tx.Commit()
+	return nil
 }
 
 func createTables(db *sql.DB) error {
@@ -170,8 +244,8 @@ func createTables(db *sql.DB) error {
 	CREATE TABLE IF NOT EXISTS repos(
 		id INTEGER PRIMARY KEY AUTOINCREMENT, 
  		fullName TEXT NOT NULL UNIQUE,
-		issuesLastQueried INTEGER,
-		prsLastQueried INTEGER
+		issuesLastQueried INTEGER DEFAULT 0,
+		prsLastQueried INTEGER DEFAULT 0
 	);
 	
 	CREATE TABLE IF NOT EXISTS issues(

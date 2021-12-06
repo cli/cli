@@ -100,7 +100,7 @@ func (m *Manager) RecordAccess(repoName string, number int, timestamp time.Time)
 
 	entry.Stats.Count++
 	entry.Stats.LastAccess = timestamp
-	return updateEntry(db, repoName, entry)
+	return updateEntry(db, entry)
 }
 
 // Initializes the sql database
