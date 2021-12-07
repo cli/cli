@@ -44,7 +44,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				editorCmd,
 				"*."+filename,
 				defaultContent,
-				io.In, io.Out, io.ErrOut, nil)
+				io.In, io.Out, io.ErrOut)
 		},
 	}
 

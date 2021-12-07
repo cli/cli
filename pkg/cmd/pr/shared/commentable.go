@@ -151,7 +151,7 @@ func CommentableInteractiveEditSurvey(cf func() (config.Config, error), io *iost
 		cs := io.ColorScheme()
 		fmt.Fprintf(io.Out, "- %s to draft your comment in %s... ", cs.Bold("Press Enter"), cs.Bold(editorCommand))
 		_ = waitForEnter(io.In)
-		return surveyext.Edit(editorCommand, "*.md", "", io.In, io.Out, io.ErrOut, nil)
+		return surveyext.Edit(editorCommand, "*.md", "", io.In, io.Out, io.ErrOut)
 	}
 }
 
@@ -161,7 +161,7 @@ func CommentableEditSurvey(cf func() (config.Config, error), io *iostreams.IOStr
 		if err != nil {
 			return "", err
 		}
-		return surveyext.Edit(editorCommand, "*.md", "", io.In, io.Out, io.ErrOut, nil)
+		return surveyext.Edit(editorCommand, "*.md", "", io.In, io.Out, io.ErrOut)
 	}
 }
 

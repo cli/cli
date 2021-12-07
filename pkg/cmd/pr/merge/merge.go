@@ -494,7 +494,7 @@ func (e *userEditor) Edit(filename, startingText string) (string, error) {
 		return "", err
 	}
 
-	return surveyext.Edit(editorCommand, filename, startingText, e.io.In, e.io.Out, e.io.ErrOut, nil)
+	return surveyext.Edit(editorCommand, filename, startingText, e.io.In, e.io.Out, e.io.ErrOut)
 }
 
 // blockedReason translates various MergeStateStatus GraphQL values into human-readable reason
