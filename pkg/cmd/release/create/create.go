@@ -4,15 +4,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
@@ -29,6 +29,7 @@ type CreateOptions struct {
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
+	Edit       func(string, string, string, io.Reader, io.Writer, io.Writer) (string, error)
 
 	TagName      string
 	Target       string
@@ -44,16 +45,12 @@ type CreateOptions struct {
 	SubmitAction string
 	// for interactive flow
 	ReleaseNotesAction string
-
 	// the value from the --repo flag
 	RepoOverride string
-
 	// maximum number of simultaneous uploads
-	Concurrency int
-
+	Concurrency        int
 	DiscussionCategory string
-
-	GenerateNotes bool
+	GenerateNotes      bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -61,6 +58,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
+		Edit:       surveyext.Edit,
 	}
 
 	var notesFile string
@@ -82,6 +80,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			To create a release from an annotated git tag, first create one locally with
 			git, push the tag to GitHub, then run this command.
+
+      When using the automatically generated release notes flag if a release name is specified,
+      the specified name will be used; otherwise, a name will be automatically generated.
+      If notes are specified, the notes will be pre-pended to the automatically generated notes.
 		`, "`"),
 		Example: heredoc.Doc(`
 			Interactively create a release
@@ -89,6 +91,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			Non-interactively create a release
 			$ gh release create v1.2.3 --notes "bugfix release"
+
+			Use automatically generated release notes
+			$ gh release create v1.2.3 --generate-notes
 
 			Use release notes from a file
 			$ gh release create v1.2.3 -F changelog.md
@@ -101,9 +106,6 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			Create a release and start a discussion
 			$ gh release create v1.2.3 --discussion-category "General"
-
-			Create a release with automatically generated release notes
-			$ gh release create v1.2.3 --generate-notes
 		`),
 		Args: cmdutil.MinimumArgs(1, "could not create: no tag name provided"),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -125,7 +127,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			opts.Concurrency = 5
 
-			opts.BodyProvided = cmd.Flags().Changed("notes")
+			opts.BodyProvided = cmd.Flags().Changed("notes") || opts.GenerateNotes
 			if notesFile != "" {
 				b, err := cmdutil.ReadFile(notesFile, opts.IO.In)
 				if err != nil {
@@ -149,7 +151,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion of the specified category")
-	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate the name and body for this release")
+	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate name and notes for the release")
 
 	return cmd
 }
@@ -165,7 +167,7 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
-	if (!opts.BodyProvided && !opts.GenerateNotes) && opts.IO.CanPrompt() {
+	if !opts.BodyProvided && opts.IO.CanPrompt() {
 		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
 		if err != nil {
 			return err
@@ -175,20 +177,20 @@ func createRun(opts *CreateOptions) error {
 		var tagDescription string
 		var generatedChangelog string
 
-		canGenerateNotes := !ghinstance.IsEnterprise(baseRepo.RepoHost())
-
-		if canGenerateNotes {
-			params := map[string]interface{}{
-				"tag_name": opts.TagName,
-			}
-			if opts.Target != "" {
-				params["target_commitish"] = opts.Target
-			}
-			generatedNotes, err = generateReleaseNotes(httpClient, baseRepo, params)
-			if err != nil {
+		params := map[string]interface{}{
+			"tag_name": opts.TagName,
+		}
+		if opts.Target != "" {
+			params["target_commitish"] = opts.Target
+		}
+		generatedNotes, err = generateReleaseNotes(httpClient, baseRepo, params)
+		if err != nil {
+			var httpErr api.HTTPError
+			if !(errors.As(err, &httpErr) && httpErr.StatusCode == 404) {
 				return err
 			}
 		}
+
 		if opts.RepoOverride == "" {
 			headRef := opts.TagName
 			tagDescription, _ = gitTagInfo(opts.TagName)
@@ -200,7 +202,9 @@ func createRun(opts *CreateOptions) error {
 					headRef = "HEAD"
 				}
 			}
-			if !canGenerateNotes {
+			// If we were unable to retrieve generated notes from the API fallback to
+			// manually generated changelog using git commits.
+			if generatedNotes == nil {
 				if prevTag, err := detectPreviousTag(headRef); err == nil {
 					commits, _ := changelogForRange(fmt.Sprintf("%s..%s", prevTag, headRef))
 					generatedChangelog = generateChangelog(commits)
@@ -267,8 +271,8 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		if openEditor {
-			// TODO: consider using iostreams here
-			text, err := surveyext.Edit(editorCommand, "*.md", editorContents, os.Stdin, os.Stdout, os.Stderr, nil)
+			text, err := opts.Edit(editorCommand, "*.md", editorContents,
+				opts.IO.In, opts.IO.Out, opts.IO.ErrOut)
 			if err != nil {
 				return err
 			}
