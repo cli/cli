@@ -2,6 +2,7 @@ package edit
 
 import (
 	"bytes"
+	"context"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -111,6 +112,25 @@ func Test_editRun(t *testing.T) {
 					}))
 			},
 		},
+		{
+			name: "add and remove topics",
+			opts: EditOptions{
+				Repository:   ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				AddTopics:    []string{"topic1", "topic2"},
+				RemoveTopics: []string{"topic3"},
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/topics"),
+					httpmock.StringResponse(`{"names":["topic2", "topic3", "go"]}`))
+				r.Register(
+					httpmock.REST("PUT", "repos/OWNER/REPO/topics"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, 1, len(payload))
+						assert.Equal(t, []interface{}{"topic2", "go", "topic1"}, payload["names"])
+					}))
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -124,7 +144,7 @@ func Test_editRun(t *testing.T) {
 			opts := &tt.opts
 			opts.HTTPClient = &http.Client{Transport: httpReg}
 
-			err := editRun(opts)
+			err := editRun(context.Background(), opts)
 			if tt.wantsErr == "" {
 				require.NoError(t, err)
 			} else {

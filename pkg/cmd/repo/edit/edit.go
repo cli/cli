@@ -2,21 +2,29 @@ package edit
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/set"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 type EditOptions struct {
-	HTTPClient *http.Client
-	Repository ghrepo.Interface
-	Edits      EditRepositoryInput
+	HTTPClient   *http.Client
+	Repository   ghrepo.Interface
+	Edits        EditRepositoryInput
+	AddTopics    []string
+	RemoveTopics []string
 }
 
 type EditRepositoryInput struct {
@@ -78,7 +86,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 			if runF != nil {
 				return runF(opts)
 			}
-			return editRun(opts)
+			return editRun(cmd.Context(), opts)
 		},
 	}
 
@@ -96,23 +104,115 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableAutoMerge, "enable-auto-merge", "", "Enable auto-merge functionality")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.DeleteBranchOnMerge, "delete-branch-on-merge", "", "Delete head branch when pull requests are merged")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.AllowForking, "allow-forking", "", "Allow forking of an organization repository")
+	cmd.Flags().StringSliceVar(&opts.AddTopics, "add-topic", nil, "Add repository topic")
+	cmd.Flags().StringSliceVar(&opts.RemoveTopics, "remove-topic", nil, "Remove repository topic")
 
 	return cmd
 }
 
-func editRun(opts *EditOptions) error {
+func editRun(ctx context.Context, opts *EditOptions) error {
 	repo := opts.Repository
-	input := opts.Edits
-
 	apiPath := fmt.Sprintf("repos/%s/%s", repo.RepoOwner(), repo.RepoName())
 
 	body := &bytes.Buffer{}
 	enc := json.NewEncoder(body)
-	if err := enc.Encode(input); err != nil {
+	if err := enc.Encode(opts.Edits); err != nil {
 		return err
 	}
 
-	apiClient := api.NewClientFromHTTP(opts.HTTPClient)
-	_, err := api.CreateRepoTransformToV4(apiClient, repo.RepoHost(), "PATCH", apiPath, body)
-	return err
+	g := errgroup.Group{}
+
+	if body.Len() > 3 {
+		g.Go(func() error {
+			apiClient := api.NewClientFromHTTP(opts.HTTPClient)
+			_, err := api.CreateRepoTransformToV4(apiClient, repo.RepoHost(), "PATCH", apiPath, body)
+			return err
+		})
+	}
+
+	if len(opts.AddTopics) > 0 || len(opts.RemoveTopics) > 0 {
+		g.Go(func() error {
+			existingTopics, err := getTopics(ctx, opts.HTTPClient, repo)
+			if err != nil {
+				return err
+			}
+
+			oldTopics := set.NewStringSet()
+			oldTopics.AddValues(existingTopics)
+
+			newTopics := set.NewStringSet()
+			newTopics.AddValues(existingTopics)
+			newTopics.AddValues(opts.AddTopics)
+			newTopics.RemoveValues(opts.RemoveTopics)
+
+			if oldTopics.Equal(newTopics) {
+				return nil
+			}
+			return setTopics(ctx, opts.HTTPClient, repo, newTopics.ToSlice())
+		})
+	}
+
+	return g.Wait()
+}
+
+func getTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface) ([]string, error) {
+	apiPath := fmt.Sprintf("repos/%s/%s/topics", repo.RepoOwner(), repo.RepoName())
+	req, err := http.NewRequestWithContext(ctx, "GET", ghinstance.RESTPrefix(repo.RepoHost())+apiPath, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// "mercy-preview" is still needed for some GitHub Enterprise versions
+	req.Header.Set("Accept", "application/vnd.github.mercy-preview+json")
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, api.HandleHTTPError(res)
+	}
+
+	var responseData struct {
+		Names []string `json:"names"`
+	}
+	dec := json.NewDecoder(res.Body)
+	err = dec.Decode(&responseData)
+	return responseData.Names, err
+}
+
+func setTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface, topics []string) error {
+	payload := struct {
+		Names []string `json:"names"`
+	}{
+		Names: topics,
+	}
+	body := &bytes.Buffer{}
+	dec := json.NewEncoder(body)
+	if err := dec.Encode(&payload); err != nil {
+		return err
+	}
+
+	apiPath := fmt.Sprintf("repos/%s/%s/topics", repo.RepoOwner(), repo.RepoName())
+	req, err := http.NewRequestWithContext(ctx, "PUT", ghinstance.RESTPrefix(repo.RepoHost())+apiPath, body)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-type", "application/json")
+	// "mercy-preview" is still needed for some GitHub Enterprise versions
+	req.Header.Set("Accept", "application/vnd.github.mercy-preview+json")
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return api.HandleHTTPError(res)
+	}
+
+	if res.Body != nil {
+		_, _ = io.Copy(ioutil.Discard, res.Body)
+	}
+
+	return nil
 }
