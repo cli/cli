@@ -420,6 +420,7 @@ func Test_runBrowse(t *testing.T) {
 			if tt.defaultBranch != "" {
 				reg.StubRepoInfoResponse(tt.baseRepo.RepoOwner(), tt.baseRepo.RepoName(), tt.defaultBranch)
 			}
+
 			opts := tt.opts
 			opts.IO = io
 			opts.BaseRepo = func() (ghrepo.Interface, error) {
