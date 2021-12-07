@@ -29,7 +29,7 @@ type BrowseOptions struct {
 	HttpClient       func() (*http.Client, error)
 	IO               *iostreams.IOStreams
 	PathFromRepoRoot func() string
-	LastCommit       func() (*git.Commit, error)
+	GitClient        gitClient
 
 	SelectorArg string
 
@@ -47,7 +47,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 		HttpClient:       f.HttpClient,
 		IO:               f.IOStreams,
 		PathFromRepoRoot: git.PathFromRepoRoot,
-		LastCommit:       git.LastCommit,
+		GitClient:        &localGitClient{},
 	}
 
 	cmd := &cobra.Command{
@@ -99,8 +99,8 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			); err != nil {
 				return err
 			}
-			if opts.CommitFlag && cmd.Flags().Changed("repo") {
-				opts.LastCommit = nil
+			if cmd.Flags().Changed("repo") {
+				opts.GitClient = &remoteGitClient{opts.BaseRepo, opts.HttpClient}
 			}
 
 			if runF != nil {
@@ -128,15 +128,8 @@ func runBrowse(opts *BrowseOptions) error {
 	}
 
 	if opts.CommitFlag {
-		if opts.LastCommit == nil {
-			httpClient, err := opts.HttpClient()
-			if err != nil {
-				return err
-			}
-			opts.LastCommit = func() (*git.Commit, error) { return api.LastCommit(api.NewClientFromHTTP(httpClient), baseRepo) }
-		}
-		commit, err := opts.LastCommit()
-		if err == nil {
+		commit, err := opts.GitClient.LastCommit()
+		if err == nil && commit != nil {
 			opts.Branch = commit.Sha
 		}
 	}
@@ -256,4 +249,31 @@ func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err 
 func isNumber(arg string) bool {
 	_, err := strconv.Atoi(arg)
 	return err == nil
+}
+
+// gitClient is used to implement functions that can be performed on both local and remote git repositories
+type gitClient interface {
+	LastCommit() (*git.Commit, error)
+}
+
+type localGitClient struct{}
+
+type remoteGitClient struct {
+	repo       func() (ghrepo.Interface, error)
+	httpClient func() (*http.Client, error)
+}
+
+func (gc *localGitClient) LastCommit() (*git.Commit, error) { return git.LastCommit() }
+
+func (gc *remoteGitClient) LastCommit() (*git.Commit, error) {
+	httpClient, err := gc.httpClient()
+	if err != nil {
+		return nil, err
+	}
+	repo, err := gc.repo()
+	if err != nil {
+		return nil, err
+	}
+	commit, err := api.LastCommit(api.NewClientFromHTTP(httpClient), repo)
+	return &git.Commit{Sha: commit.OID}, err
 }

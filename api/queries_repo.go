@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
 )
@@ -525,21 +524,12 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, e
 	}, nil
 }
 
-func LastCommit(client *Client, repo ghrepo.Interface) (*git.Commit, error) {
+func LastCommit(client *Client, repo ghrepo.Interface) (*Commit, error) {
 	var responseData struct {
 		Repository struct {
 			DefaultBranchRef struct {
 				Target struct {
-					Commit struct {
-						History struct {
-							Edges []struct {
-								Node struct {
-									Sha   string `graphql:"oid"`
-									Title string `graphql:"messageHeadline"`
-								}
-							}
-						} `graphql:"history(first:1)"`
-					} `graphql:"... on Commit"`
+					Commit `graphql:"... on Commit"`
 				}
 			}
 		} `graphql:"repository(owner: $owner, name: $repo)"`
@@ -551,7 +541,7 @@ func LastCommit(client *Client, repo ghrepo.Interface) (*git.Commit, error) {
 	if err := gql.QueryNamed(context.Background(), "LastCommit", &responseData, variables); err != nil {
 		return nil, err
 	}
-	return (*git.Commit)(&responseData.Repository.DefaultBranchRef.Target.Commit.History.Edges[0].Node), nil
+	return &responseData.Repository.DefaultBranchRef.Target.Commit, nil
 }
 
 // RepoFindForks finds forks of the repo that are affiliated with the viewer

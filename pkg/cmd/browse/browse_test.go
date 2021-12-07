@@ -352,10 +352,10 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/mislav/will_paginate/blob/3-0-stable/init.rb?plain=1#L6",
 		},
 		{
-			name: "open last commit",
+			name: "open last commit (local git client)",
 			opts: BrowseOptions{
 				CommitFlag: true,
-				LastCommit: git.LastCommit,
+				GitClient:  &localGitClient{},
 			},
 			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
 			wantsErr:    false,
@@ -366,7 +366,7 @@ func Test_runBrowse(t *testing.T) {
 			opts: BrowseOptions{
 				CommitFlag:  true,
 				SelectorArg: "main.go",
-				LastCommit:  git.LastCommit,
+				GitClient:   &localGitClient{},
 			},
 			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
 			wantsErr:    false,
@@ -420,7 +420,6 @@ func Test_runBrowse(t *testing.T) {
 			if tt.defaultBranch != "" {
 				reg.StubRepoInfoResponse(tt.baseRepo.RepoOwner(), tt.baseRepo.RepoName(), tt.defaultBranch)
 			}
-
 			opts := tt.opts
 			opts.IO = io
 			opts.BaseRepo = func() (ghrepo.Interface, error) {
