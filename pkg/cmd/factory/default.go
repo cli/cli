@@ -216,17 +216,22 @@ func extensionManager(f *cmdutil.Factory) *extension.Manager {
 }
 
 func frecencyManager(f *cmdutil.Factory) *frecency.Manager {
+	fm := frecency.NewManager(f.IOStreams)
+
 	cfg, err := f.Config()
 	if err != nil {
-		return nil
+		return fm
 	}
+	fm.SetConfig(cfg)
 
 	client, err := f.HttpClient()
 	if err != nil {
-		return nil
+		return fm
 	}
 
-	return frecency.NewManager(f.IOStreams, cfg, client)
+	fm.SetClient(api.NewCachedClient(client, time.Second*30))
+
+	return fm
 }
 
 func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {

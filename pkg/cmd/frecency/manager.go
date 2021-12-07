@@ -28,15 +28,21 @@ type Manager struct {
 	dataDir func() string
 }
 
-func NewManager(io *iostreams.IOStreams, cfg config.Config, client *http.Client) *Manager {
+func NewManager(io *iostreams.IOStreams) *Manager {
 	m := &Manager{
 		io:      io,
-		config:  cfg,
 		dataDir: config.StateDir,
-		client:  client,
 	}
 	m.initDB()
 	return m
+}
+
+func (m *Manager) SetConfig(cfg config.Config) {
+	m.config = cfg
+}
+
+func (m *Manager) SetClient(client *http.Client) {
+	m.client = client
 }
 
 func (m *Manager) getDB() (*sql.DB, error) {
