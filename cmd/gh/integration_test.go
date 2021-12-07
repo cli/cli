@@ -23,6 +23,9 @@ import (
 )
 
 func TestRepoFork(t *testing.T) {
+	if os.Getenv("GOOS") == "windows" {
+		t.Skip("skipping test in windows")
+	}
 	setupEnvVars(t)
 	setupTempDir(t)
 	reg := httpmock.Registry{}
