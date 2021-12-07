@@ -7,12 +7,17 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
+
+//TODO: garbage collecting
 
 // GetFrecent, RecordAccess
 type Manager struct {
@@ -20,14 +25,15 @@ type Manager struct {
 	client  *http.Client
 	io      *iostreams.IOStreams
 	db      *sql.DB
-	dataDir string
+	dataDir func() string
 }
 
-func NewManager(io *iostreams.IOStreams, cfg config.Config) *Manager {
+func NewManager(io *iostreams.IOStreams, cfg config.Config, client *http.Client) *Manager {
 	m := &Manager{
 		io:      io,
 		config:  cfg,
-		dataDir: filepath.Join(config.StateDir(), "frecent.db"),
+		dataDir: config.StateDir,
+		client:  client,
 	}
 	m.initDB()
 	return m
@@ -36,7 +42,8 @@ func NewManager(io *iostreams.IOStreams, cfg config.Config) *Manager {
 func (m *Manager) getDB() (*sql.DB, error) {
 	if m.db == nil {
 		var err error
-		m.db, err = sql.Open("sqlite3", m.dataDir)
+		dir := filepath.Join(m.dataDir(), "frecent.db")
+		m.db, err = sql.Open("sqlite3", dir)
 		if err != nil {
 			return m.db, err
 		}
@@ -121,7 +128,7 @@ func (m *Manager) RecordAccess(repoName string, number int, timestamp time.Time)
 
 // Initializes the sql database
 func (m *Manager) initDB() error {
-	dir := m.dataDir
+	dir := filepath.Join(m.dataDir(), "frecent.db")
 	fileExists := true
 	if _, err := os.Stat(dir); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -150,67 +157,54 @@ func (m *Manager) closeDB() error {
 	return m.db.Close()
 }
 
-// Sorting
-type ByFrecency []entryWithStats
+// get issues that were created after last query time
+func (m *Manager) getNewIssues(db *sql.DB, repoName string) ([]api.Issue, error) {
+	db, err := m.getDB()
+	if err != nil {
+		return nil, err
+	}
 
-func (f ByFrecency) Len() int {
-	return len(f)
-}
-func (f ByFrecency) Swap(i, j int) {
-	f[i], f[j] = f[j], f[i]
-}
-func (f ByFrecency) Less(i, j int) bool {
-	iScore := f[i].Stats.Score()
-	jScore := f[j].Stats.Score()
-	if iScore == jScore {
-		return f[i].Stats.LastAccess.After(f[j].Stats.LastAccess)
-	}
-	return iScore > jScore
-}
+	//before the forward slash is the owner and after is the repo name
+	repo := strings.Split(repoName, "/")
+	fullName := ghrepo.NewWithHost(ghinstance.Default(), repo[0], repo[1])
 
-func (c countEntry) Score() int {
-	if c.Count == 0 {
-		return 0
+	repoDetails := entryWithStats{RepoName: repoName}
+	lastQueried, err := getLastQueried(db, repoDetails)
+	newIssues, err := getIssues(m.client, fullName, lastQueried)
+	if err != nil {
+		return nil, err
 	}
-	duration := time.Since(c.LastAccess)
-	recencyScore := 10
-	if duration < 1*time.Hour {
-		recencyScore = 100
-	} else if duration < 6*time.Hour {
-		recencyScore = 80
-	} else if duration < 24*time.Hour {
-		recencyScore = 60
-	} else if duration < 3*24*time.Hour {
-		recencyScore = 40
-	} else if duration < 7*24*time.Hour {
-		recencyScore = 20
+
+	repoDetails.Stats = countEntry{LastAccess: time.Now()}
+	err = updateLastQueried(db, repoDetails)
+	if err != nil {
+		return nil, err
 	}
-	return recencyScore * c.Count
+	return newIssues, nil
 }
 
-//func SelectFrecent(c *http.Client, repo ghrepo.Interface) (string, error) {
-//	client := api.NewCachedClient(c, time.Hour*6)
-//
-//	issues, err := getIssues(client, repo)
-//	if err != nil {
-//		return "", err
-//	}
-//
-//	frecent, err := getFrecentEntry(defaultFrecentPath())
-//	if err != nil {
-//		return "", err
-//	}
-//
-//	choices := sortByFrecent(issues, frecent.Issues)
-//
-//	choice := ""
-//	err = prompt.SurveyAskOne(&survey.Select{
-//		Message: "Which issue?",
-//		Options: choices,
-//	}, &choice)
-//	if err != nil {
-//		return "", err
-//	}
-//
-//	return choice, nil
-//}
+// get PRs that were created after last query time
+func (m *Manager) getNewPullRequests(db *sql.DB, repoName string) ([]api.PullRequest, error) {
+	db, err := m.getDB()
+	if err != nil {
+		return nil, err
+	}
+
+	//before the forward slash is the owner and after is the repo name
+	repo := strings.Split(repoName, "/")
+	fullName := ghrepo.NewWithHost(ghinstance.Default(), repo[0], repo[1])
+
+	repoDetails := entryWithStats{RepoName: repoName, IsPR: true}
+	lastQueried, err := getLastQueried(db, repoDetails)
+	newPRs, err := getPullRequests(m.client, fullName, lastQueried)
+	if err != nil {
+		return nil, err
+	}
+
+	repoDetails.Stats = countEntry{LastAccess: time.Now()}
+	err = updateLastQueried(db, repoDetails)
+	if err != nil {
+		return nil, err
+	}
+	return newPRs, nil
+}

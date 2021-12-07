@@ -41,7 +41,7 @@ func updateEntry(db *sql.DB, updated entryWithStats) error {
 		_ = tx.Rollback()
 		return err
 	}
-	tx.Commit()
+	_ = tx.Commit()
 	return nil
 }
 
@@ -81,7 +81,7 @@ func insertEntry(db *sql.DB, entry entryWithStats) error {
 		_ = tx.Rollback()
 		return err
 	}
-	tx.Commit()
+	_ = tx.Commit()
 	return nil
 }
 
@@ -104,7 +104,7 @@ func insertRepo(db *sql.DB, repoName string) error {
 		return err
 	}
 
-	tx.Commit()
+	_ = tx.Commit()
 	return nil
 }
 
@@ -220,7 +220,7 @@ func updateLastQueried(db *sql.DB, repoDetails entryWithStats) error {
 		_ = tx.Rollback()
 		return err
 	}
-	tx.Commit()
+	_ = tx.Commit()
 	return nil
 }
 
@@ -242,7 +242,7 @@ func deleteByNumber(db *sql.DB, entry entryWithStats) error {
 		_ = tx.Rollback()
 		return err
 	}
-	tx.Commit()
+	_ = tx.Commit()
 	return nil
 }
 

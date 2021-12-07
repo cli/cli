@@ -39,7 +39,7 @@ func New(appVersion string) *cmdutil.Factory {
 	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
 	f.Browser = browser(f)                       // Depends on Config, and IOStreams
 	f.ExtensionManager = extensionManager(f)     // Depends on Config, HttpClient, and IOStreams
-	f.FrecencyManager = frecencyManager(f)
+	f.FrecencyManager = frecencyManager(f)       // Depends on Config, HttpClient, and IOStreams
 
 	return f
 }
@@ -216,15 +216,17 @@ func extensionManager(f *cmdutil.Factory) *extension.Manager {
 }
 
 func frecencyManager(f *cmdutil.Factory) *frecency.Manager {
-	fm := frecency.NewManager(f.IOStreams)
-
 	cfg, err := f.Config()
 	if err != nil {
-		return fm
+		return nil
 	}
-	fm.SetConfig(cfg)
 
-	return fm
+	client, err := f.HttpClient()
+	if err != nil {
+		return nil
+	}
+
+	return frecency.NewManager(f.IOStreams, cfg, client)
 }
 
 func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {

@@ -17,7 +17,7 @@ func newTestManager(dir string, io *iostreams.IOStreams) *Manager {
 	m := &Manager{
 		config:  config.NewBlankConfig(),
 		io:      io,
-		dataDir: dir,
+		dataDir: func() string { return dir },
 	}
 	m.initDB()
 	return m
