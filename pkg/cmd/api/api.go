@@ -540,36 +540,58 @@ func parseErrorResponse(r io.Reader, statusCode int) (io.Reader, string, error) 
 
 	var parsedBody struct {
 		Message string
-		Errors  []json.RawMessage
+		Errors  json.RawMessage
 	}
 	err = json.Unmarshal(b, &parsedBody)
 	if err != nil {
-		return r, "", err
+		return bodyCopy, "", err
 	}
+
+	if len(parsedBody.Errors) > 0 && parsedBody.Errors[0] == '"' {
+		var stringError string
+		if err := json.Unmarshal(parsedBody.Errors, &stringError); err != nil {
+			return bodyCopy, "", err
+		}
+		if stringError != "" {
+			if parsedBody.Message != "" {
+				return bodyCopy, fmt.Sprintf("%s (%s)", stringError, parsedBody.Message), nil
+			}
+			return bodyCopy, stringError, nil
+		}
+	}
+
 	if parsedBody.Message != "" {
 		return bodyCopy, fmt.Sprintf("%s (HTTP %d)", parsedBody.Message, statusCode), nil
 	}
 
-	type errorMessage struct {
+	if len(parsedBody.Errors) == 0 || parsedBody.Errors[0] != '[' {
+		return bodyCopy, "", nil
+	}
+
+	var errorObjects []json.RawMessage
+	if err := json.Unmarshal(parsedBody.Errors, &errorObjects); err != nil {
+		return bodyCopy, "", err
+	}
+
+	var objectError struct {
 		Message string
 	}
 	var errors []string
-	for _, rawErr := range parsedBody.Errors {
+	for _, rawErr := range errorObjects {
 		if len(rawErr) == 0 {
 			continue
 		}
 		if rawErr[0] == '{' {
-			var objectError errorMessage
 			err := json.Unmarshal(rawErr, &objectError)
 			if err != nil {
-				return r, "", err
+				return bodyCopy, "", err
 			}
 			errors = append(errors, objectError.Message)
 		} else if rawErr[0] == '"' {
 			var stringError string
 			err := json.Unmarshal(rawErr, &stringError)
 			if err != nil {
-				return r, "", err
+				return bodyCopy, "", err
 			}
 			errors = append(errors, stringError)
 		}
