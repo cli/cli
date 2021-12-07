@@ -6,9 +6,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 )
@@ -59,4 +61,23 @@ func issueLabelList(issue *api.Issue, cs *iostreams.ColorScheme, colorize bool) 
 	}
 
 	return strings.Join(labelNames, ", ")
+}
+
+func SelectIssueNumber(issues []api.Issue) (string, error) {
+	choices := []string{}
+	for _, issue := range issues {
+		choices = append(choices, fmt.Sprintf("#%d %s", issue.Number, issue.Title))
+	}
+
+	var choice string
+	err := prompt.SurveyAskOne(&survey.Select{
+		Message: "Which issue?",
+		Options: choices,
+	}, &choice)
+	if err != nil {
+		return "", err
+	}
+
+	chosenNum := strings.Split(choice, " ")[0]
+	return chosenNum[1:], nil
 }

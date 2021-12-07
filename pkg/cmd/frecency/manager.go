@@ -7,19 +7,16 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
-//TODO: garbage collecting
+//TODO: pruning stale records
 
-// GetFrecent, RecordAccess
 type Manager struct {
 	config  config.Config
 	client  *http.Client
@@ -52,48 +49,100 @@ func (m *Manager) getDB() (*sql.DB, error) {
 	return m.db, nil
 }
 
-func (m *Manager) GetFrecentIssues(repoName string) ([]api.Issue, error) {
+// Suggests issues from frecency stats
+func (m *Manager) GetFrecentIssues(repo ghrepo.Interface) ([]api.Issue, error) {
 	var frecentIssues []api.Issue
 	db, err := m.getDB()
 	if err != nil {
 		return frecentIssues, err
 	}
 
-	var issuesWithStats ByFrecency
-	repoDetails := entryWithStats{
+	// first get issues created since last query, then sort frecent
+	repoName := ghrepo.FullName(repo)
+	args := entryWithStats{
 		RepoName: repoName,
-		IsPR:     false,
-	}
-	issuesWithStats, err = getEntries(db, repoDetails)
-	if err != nil {
-		return frecentIssues, err
+		Stats:    countEntry{LastAccess: time.Now()},
 	}
 
-	sort.Sort(issuesWithStats)
-	for _, entry := range issuesWithStats {
-		frecentIssues = append(frecentIssues, entry.Entry)
+	lastQueried, err := getLastQueried(db, args)
+	if err != nil {
+		return nil, err
+	}
+	newIssues, err := getIssuesSince(m.client, repo, lastQueried)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, newIssue := range newIssues {
+		entry := entryWithStats{
+			RepoName: repoName,
+			Entry:    newIssue,
+			Stats:    countEntry{LastAccess: time.Now()},
+		}
+
+		if err := insertEntry(db, entry); err != nil {
+			return nil, err
+		}
+	}
+
+	// update query timestamp
+	err = updateLastQueried(db, args)
+	if err != nil {
+		return nil, err
+	}
+
+	issuesWithStats, err := getEntries(db, args)
+	if err != nil {
+		return nil, err
+	}
+	sort.Sort(ByFrecency(issuesWithStats))
+	for _, issueWithStats := range issuesWithStats {
+		frecentIssues = append(frecentIssues, issueWithStats.Entry)
 	}
 	return frecentIssues, nil
 }
 
-func (m *Manager) GetFrecentPullRequests(repoName string) ([]api.PullRequest, error) {
+func (m *Manager) GetFrecentPullRequests(repo ghrepo.Interface) ([]api.PullRequest, error) {
 	var frecentPRs []api.PullRequest
 	db, err := m.getDB()
 	if err != nil {
-		return frecentPRs, err
+		return nil, err
 	}
 
-	var prsWithStats ByFrecency
-	repoDetails := entryWithStats{
+	repoName := ghrepo.FullName(repo)
+	args := entryWithStats{
 		RepoName: repoName,
 		IsPR:     true,
+		Stats:    countEntry{LastAccess: time.Now()},
 	}
-	prsWithStats, err = getEntries(db, repoDetails)
+	lastQueried, err := getLastQueried(db, args)
+	newPRs, err := getPullRequestsSince(m.client, repo, lastQueried)
 	if err != nil {
-		return frecentPRs, err
+		return nil, err
 	}
 
-	sort.Sort(prsWithStats)
+	for _, newPR := range newPRs {
+		entry := entryWithStats{
+			RepoName: repoName,
+			Entry:    newPR,
+			IsPR:     true,
+			Stats:    countEntry{LastAccess: time.Now()},
+		}
+		if err := insertEntry(db, entry); err != nil {
+			return nil, err
+		}
+	}
+	err = updateLastQueried(db, args)
+	if err != nil {
+		return nil, err
+	}
+
+	prsWithStats, err := getEntries(db, args)
+	if err != nil {
+		return nil, err
+	}
+	sort.Sort(ByFrecency(prsWithStats))
 	for _, entry := range prsWithStats {
 		pr := api.PullRequest{Number: entry.Entry.Number, Title: entry.Entry.Title}
 		frecentPRs = append(frecentPRs, pr)
@@ -102,28 +151,32 @@ func (m *Manager) GetFrecentPullRequests(repoName string) ([]api.PullRequest, er
 }
 
 // Records access to issue or PR at specified time
-func (m *Manager) RecordAccess(repoName string, number int, timestamp time.Time) error {
+func (m *Manager) UpdateIssue(repo ghrepo.Interface, issue *api.Issue, timestamp time.Time) error {
 	db, err := m.getDB()
 	if err != nil {
 		return err
 	}
-	repoDetails := entryWithStats{
-		RepoName: repoName,
-		Entry: api.Issue{
-			Number: number,
-		},
+
+	// search for issue by number, then update its stats
+	updated := entryWithStats{
+		RepoName: ghrepo.FullName(repo),
+		Entry:    api.Issue{Number: issue.Number, Title: issue.Title},
+		Stats:    countEntry{LastAccess: timestamp},
 	}
-	entry, err := getEntryByNumber(db, repoDetails)
+	gotIssue, err := getEntryByNumber(db, updated)
 	if err != nil {
-		// if errors.Is(err, sql.ErrNoRows) {
-		// 	no entry in the DB.. create a new entry?
-		// }
+		if errors.Is(err, sql.ErrNoRows) {
+			// no entry in the DB, insert it
+			updated.Stats.Count = 1
+			if insertErr := insertEntry(db, updated); err != nil {
+				return insertErr
+			}
+		}
 		return err
 	}
 
-	entry.Stats.Count++
-	entry.Stats.LastAccess = timestamp
-	return updateEntry(db, entry)
+	updated.Stats.Count = gotIssue.Stats.Count + 1
+	return updateEntry(db, updated)
 }
 
 // Initializes the sql database
@@ -157,54 +210,18 @@ func (m *Manager) closeDB() error {
 	return m.db.Close()
 }
 
-// get issues that were created after last query time
-func (m *Manager) getNewIssues(db *sql.DB, repoName string) ([]api.Issue, error) {
+// strategy: drop entries in the database with few visits,
+// then check if the remaining are still open
+func (m *Manager) pruneRecords(repo ghrepo.Interface, isPR bool, countThreshold int) error {
 	db, err := m.getDB()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	//before the forward slash is the owner and after is the repo name
-	repo := strings.Split(repoName, "/")
-	fullName := ghrepo.NewWithHost(ghinstance.Default(), repo[0], repo[1])
-
-	repoDetails := entryWithStats{RepoName: repoName}
-	lastQueried, err := getLastQueried(db, repoDetails)
-	newIssues, err := getIssues(m.client, fullName, lastQueried)
-	if err != nil {
-		return nil, err
+	args := entryWithStats{RepoName: ghrepo.FullName(repo), IsPR: isPR}
+	if err := deleteByCount(db, args); err != nil {
+		return err
 	}
-
-	repoDetails.Stats = countEntry{LastAccess: time.Now()}
-	err = updateLastQueried(db, repoDetails)
-	if err != nil {
-		return nil, err
-	}
-	return newIssues, nil
-}
-
-// get PRs that were created after last query time
-func (m *Manager) getNewPullRequests(db *sql.DB, repoName string) ([]api.PullRequest, error) {
-	db, err := m.getDB()
-	if err != nil {
-		return nil, err
-	}
-
-	//before the forward slash is the owner and after is the repo name
-	repo := strings.Split(repoName, "/")
-	fullName := ghrepo.NewWithHost(ghinstance.Default(), repo[0], repo[1])
-
-	repoDetails := entryWithStats{RepoName: repoName, IsPR: true}
-	lastQueried, err := getLastQueried(db, repoDetails)
-	newPRs, err := getPullRequests(m.client, fullName, lastQueried)
-	if err != nil {
-		return nil, err
-	}
-
-	repoDetails.Stats = countEntry{LastAccess: time.Now()}
-	err = updateLastQueried(db, repoDetails)
-	if err != nil {
-		return nil, err
-	}
-	return newPRs, nil
+	//TODO: check if still open
+	return nil
 }

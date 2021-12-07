@@ -2,7 +2,6 @@ package frecency
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"time"
 
@@ -46,15 +45,8 @@ func updateEntry(db *sql.DB, updated entryWithStats) error {
 }
 
 func insertEntry(db *sql.DB, entry entryWithStats) error {
-	// insert the repo if it doesn't exist yet
-	exists, err := repoExists(db, entry.RepoName)
-	if err != nil {
+	if err := insertRepo(db, entry.RepoName); err != nil {
 		return err
-	}
-	if !exists {
-		if err := insertRepo(db, entry.RepoName); err != nil {
-			return err
-		}
 	}
 
 	tx, err := db.Begin()
@@ -108,18 +100,18 @@ func insertRepo(db *sql.DB, repoName string) error {
 	return nil
 }
 
-func repoExists(db *sql.DB, repoName string) (bool, error) {
-	var found int
-	row := db.QueryRow("SELECT 1 FROM repos WHERE fullName = ?", repoName)
-	err := row.Scan(&found)
-	if err == nil {
-		return true, nil
-	}
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
-	}
-	return false, err
-}
+//func repoExists(db *sql.DB, repoName string) (bool, error) {
+//	var found int
+//	row := db.QueryRow("SELECT 1 FROM repos WHERE fullName = ?", repoName)
+//	err := row.Scan(&found)
+//	if err == nil {
+//		return true, nil
+//	}
+//	if errors.Is(err, sql.ErrNoRows) {
+//		return false, nil
+//	}
+//	return false, err
+//}
 
 // get all issues or PRs by repo, sorted by most recent
 func getEntries(db *sql.DB, repoDetails entryWithStats) ([]entryWithStats, error) {
@@ -230,14 +222,35 @@ func deleteByNumber(db *sql.DB, entry entryWithStats) error {
 		return err
 	}
 
-	stmt, err := tx.Prepare("DELETE FROM issues WHERE repo = ? AND number = ? ")
+	stmt, err := tx.Prepare("DELETE FROM issues WHERE repo = ? AND number = ?")
 	if err != nil {
 		_ = tx.Rollback()
 		return err
 	}
-
 	defer stmt.Close()
 	_, err = stmt.Exec(entry.RepoName, entry.Entry.Number)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	_ = tx.Commit()
+	return nil
+}
+
+// delete entries with count less than specified number
+func deleteByCount(db *sql.DB, entry entryWithStats) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare("DELETE FROM issues WHERE repo = ? AND count < ?")
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(entry.RepoName, entry.Stats.Count)
 	if err != nil {
 		_ = tx.Rollback()
 		return err
@@ -252,9 +265,10 @@ func createTables(db *sql.DB) error {
 	query := `
 	CREATE TABLE IF NOT EXISTS repos(
 		id INTEGER PRIMARY KEY AUTOINCREMENT, 
- 		fullName TEXT NOT NULL UNIQUE,
+ 		fullName TEXT NOT NULL, 
 		issuesLastQueried INTEGER DEFAULT 0,
-		prsLastQueried INTEGER DEFAULT 0
+		prsLastQueried INTEGER DEFAULT 0,
+		UNIQUE(fullName) ON CONFLICT IGNORE
 	);
 	
 	CREATE TABLE IF NOT EXISTS issues(
@@ -267,6 +281,7 @@ func createTables(db *sql.DB) error {
 			CHECK (isPR IN (0,1))
 			DEFAULT 0,
 		repo TEXT NOT NULL,
+		UNIQUE(repo,number) ON CONFLICT REPLACE,
 		FOREIGN KEY (repo) REFERENCES repo(fullName)
 	);
 

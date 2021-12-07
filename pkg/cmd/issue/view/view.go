@@ -10,6 +10,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/frecency"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -35,7 +36,9 @@ type ViewOptions struct {
 	Comments    bool
 	Exporter    cmdutil.Exporter
 
-	Now func() time.Time
+	Frecency    *frecency.Manager
+	UseFrecency bool
+	Now         func() time.Time
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -43,6 +46,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
+		Frecency:   f.FrecencyManager,
 		Now:        time.Now,
 	}
 
@@ -54,13 +58,17 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 			With '--web', open the issue in a web browser instead.
 		`),
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
+			} else if opts.IO.CanPrompt() {
+				opts.UseFrecency = true
+			} else {
+				return cmdutil.FlagErrorf("interactive mode required with no arguments")
 			}
 
 			if runF != nil {
@@ -83,6 +91,26 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
+	baseRepo, err := opts.BaseRepo()
+	if err != nil {
+		return err
+	}
+
+	if opts.UseFrecency {
+		opts.IO.StartProgressIndicator()
+		issues, err := opts.Frecency.GetFrecentIssues(baseRepo)
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
+
+		selected, err := issueShared.SelectIssueNumber(issues)
+		if err != nil {
+			return err
+		}
+		opts.SelectorArg = selected
+	}
+
 	loadComments := opts.Comments
 	if !loadComments && opts.Exporter != nil {
 		fields := set.NewStringSet()
@@ -94,6 +122,10 @@ func viewRun(opts *ViewOptions) error {
 	issue, err := findIssue(httpClient, opts.BaseRepo, opts.SelectorArg, loadComments)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
+		return err
+	}
+
+	if err = opts.Frecency.UpdateIssue(baseRepo, issue, opts.Now()); err != nil {
 		return err
 	}
 

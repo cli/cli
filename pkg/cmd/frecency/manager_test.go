@@ -81,6 +81,9 @@ func TestManager_insert_get(t *testing.T) {
 		err := insertEntry(db, entry)
 		assert.NoError(t, err)
 	}
+	// multiple insert should replace entry
+	err = insertEntry(db, testData[0])
+	assert.NoError(t, err)
 
 	entry := entryWithStats{
 		RepoName: "cli/cli",
