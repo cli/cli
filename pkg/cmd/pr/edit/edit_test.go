@@ -559,17 +559,15 @@ func mockPullRequestReviewersUpdate(t *testing.T, reg *httpmock.Registry) {
 
 func mockPullRequestUpdateLabels(t *testing.T, reg *httpmock.Registry) {
 	reg.Register(
-		httpmock.GraphQL(`mutation AddLabels\b`),
+		httpmock.GraphQL(`mutation LabelAdd\b`),
 		httpmock.GraphQLMutation(`
-		{ "data": { "addLabelsToLabelable": { "labelable": {
-		} } } }`,
+		{ "data": { "addLabelsToLabelable": { "__typename": "" } } }`,
 			func(inputs map[string]interface{}) {}),
 	)
 	reg.Register(
-		httpmock.GraphQL(`mutation RemoveLabels\b`),
+		httpmock.GraphQL(`mutation LabelRemove\b`),
 		httpmock.GraphQLMutation(`
-		{ "data": { "removeLabelsFromLabelable": { "labelable": {
-		} } } }`,
+		{ "data": { "removeLabelsFromLabelable": { "__typename": "" } } }`,
 			func(inputs map[string]interface{}) {}),
 	)
 }

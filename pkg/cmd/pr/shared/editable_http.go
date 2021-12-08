@@ -108,17 +108,13 @@ func addLabels(httpClient *http.Client, id string, repo ghrepo.Interface, labels
 
 	var mutation struct {
 		AddLabelsToLabelable struct {
-			Labelable struct {
-				Labels struct {
-					TotalCount int
-				}
-			}
+			Typename string `graphql:"__typename"`
 		} `graphql:"addLabelsToLabelable(input: $input)"`
 	}
 
 	variables := map[string]interface{}{"input": params}
 	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
-	return gql.MutateNamed(context.Background(), "AddLabels", &mutation, variables)
+	return gql.MutateNamed(context.Background(), "LabelAdd", &mutation, variables)
 }
 
 func removeLabels(httpClient *http.Client, id string, repo ghrepo.Interface, labels []string) error {
@@ -129,25 +125,19 @@ func removeLabels(httpClient *http.Client, id string, repo ghrepo.Interface, lab
 
 	var mutation struct {
 		RemoveLabelsFromLabelable struct {
-			Labelable struct {
-				Labels struct {
-					TotalCount int
-				}
-			}
+			Typename string `graphql:"__typename"`
 		} `graphql:"removeLabelsFromLabelable(input: $input)"`
 	}
 
 	variables := map[string]interface{}{"input": params}
 	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
-	return gql.MutateNamed(context.Background(), "RemoveLabels", &mutation, variables)
+	return gql.MutateNamed(context.Background(), "LabelRemove", &mutation, variables)
 }
 
 func updateIssue(httpClient *http.Client, repo ghrepo.Interface, params githubv4.UpdateIssueInput) error {
 	var mutation struct {
 		UpdateIssue struct {
-			Issue struct {
-				ID string
-			}
+			Typename string `graphql:"__typename"`
 		} `graphql:"updateIssue(input: $input)"`
 	}
 	variables := map[string]interface{}{"input": params}
@@ -158,9 +148,7 @@ func updateIssue(httpClient *http.Client, repo ghrepo.Interface, params githubv4
 func updatePullRequest(httpClient *http.Client, repo ghrepo.Interface, params githubv4.UpdatePullRequestInput) error {
 	var mutation struct {
 		UpdatePullRequest struct {
-			PullRequest struct {
-				ID string
-			}
+			Typename string `graphql:"__typename"`
 		} `graphql:"updatePullRequest(input: $input)"`
 	}
 	variables := map[string]interface{}{"input": params}
