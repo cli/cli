@@ -206,7 +206,7 @@ func createRun(opts *CreateOptions) error {
 			q := &survey.Input{
 				Message: "Tag name",
 			}
-			err := prompt.SurveyAskOne(q, opts.TagName)
+			err := prompt.SurveyAskOne(q, &opts.TagName)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
