@@ -30,7 +30,7 @@ func NewManager(io *iostreams.IOStreams) *Manager {
 		io:      io,
 		dataDir: config.StateDir,
 	}
-	m.initDB()
+	_ = m.initDB()
 	return m
 }
 
@@ -91,6 +91,9 @@ func (m *Manager) GetFrecent(repo ghrepo.Interface, isPR bool) ([]api.Issue, err
 		}
 		// get all new issues, since we deleted most of them
 		newIssues, err = getIssuesSince(m.client, repo, time.Unix(0, 0))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = updateLastQueried(db, args)
@@ -228,4 +231,17 @@ func (m *Manager) pruneRecords(repo ghrepo.Interface, isPR bool, countThreshold 
 		}
 	}
 	return nil
+}
+
+func (m *Manager) DeleteByNumber(repo ghrepo.Interface, isPR bool, number int) error {
+	db, err := m.getDB()
+	if err != nil {
+		return err
+	}
+	args := entryWithStats{
+		RepoName: ghrepo.FullName(repo),
+		IsPR:     isPR,
+		Entry:    api.Issue{Number: number},
+	}
+	return deleteByNumber(db, args)
 }

@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/frecency"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -23,6 +25,9 @@ type DeleteOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	SelectorArg string
+	Frecency    *frecency.Manager
+	UseFrecency bool
+	Now         func() time.Time
 }
 
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
@@ -30,18 +35,23 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
+		Frecency:   f.FrecencyManager,
 	}
 
 	cmd := &cobra.Command{
 		Use:   "delete {<number> | <url>}",
 		Short: "Delete issue",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
+			} else if opts.IO.CanPrompt() {
+				opts.UseFrecency = true
+			} else {
+				return cmdutil.FlagErrorf("interactive mode required with no arguments")
 			}
 
 			if runF != nil {
@@ -61,6 +71,27 @@ func deleteRun(opts *DeleteOptions) error {
 	if err != nil {
 		return err
 	}
+
+	baseRepo, err := opts.BaseRepo()
+	if err != nil {
+		return err
+	}
+
+	if opts.UseFrecency {
+		opts.IO.StartProgressIndicator()
+		issues, err := opts.Frecency.GetFrecent(baseRepo, false)
+		if err != nil {
+			return err
+		}
+		opts.IO.StopProgressIndicator()
+
+		selected, err := shared.SelectIssueNumber(issues)
+		if err != nil {
+			return err
+		}
+		opts.SelectorArg = selected
+	}
+
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	issue, baseRepo, err := shared.IssueFromArg(apiClient, opts.BaseRepo, opts.SelectorArg)
@@ -88,6 +119,11 @@ func deleteRun(opts *DeleteOptions) error {
 	}
 
 	err = api.IssueDelete(apiClient, baseRepo, *issue)
+	if err != nil {
+		return err
+	}
+
+	err = opts.Frecency.DeleteByNumber(baseRepo, false, issue.Number)
 	if err != nil {
 		return err
 	}
