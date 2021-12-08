@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -28,6 +28,7 @@ type CreateOptions struct {
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
+	Edit       func(string, string, string, io.Reader, io.Writer, io.Writer) (string, error)
 
 	TagName      string
 	Target       string
@@ -43,14 +44,12 @@ type CreateOptions struct {
 	SubmitAction string
 	// for interactive flow
 	ReleaseNotesAction string
-
 	// the value from the --repo flag
 	RepoOverride string
-
 	// maximum number of simultaneous uploads
-	Concurrency int
-
+	Concurrency        int
 	DiscussionCategory string
+	GenerateNotes      bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -58,6 +57,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
+		Edit:       surveyext.Edit,
 	}
 
 	var notesFile string
@@ -79,6 +79,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			To create a release from an annotated git tag, first create one locally with
 			git, push the tag to GitHub, then run this command.
+
+			When using automatically generated release notes, a release title will also be automatically
+			generated unless a title was explicitly passed. Additional release notes can be prepended to
+			automatically generated notes by using the notes parameter.
 		`, "`"),
 		Example: heredoc.Doc(`
 			Interactively create a release
@@ -86,6 +90,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			Non-interactively create a release
 			$ gh release create v1.2.3 --notes "bugfix release"
+
+			Use automatically generated release notes
+			$ gh release create v1.2.3 --generate-notes
 
 			Use release notes from a file
 			$ gh release create v1.2.3 -F changelog.md
@@ -119,7 +126,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			opts.Concurrency = 5
 
-			opts.BodyProvided = cmd.Flags().Changed("notes")
+			opts.BodyProvided = cmd.Flags().Changed("notes") || opts.GenerateNotes
 			if notesFile != "" {
 				b, err := cmdutil.ReadFile(notesFile, opts.IO.In)
 				if err != nil {
@@ -143,6 +150,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion of the specified category")
+	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate title and notes for the release")
 
 	return cmd
 }
@@ -164,9 +172,22 @@ func createRun(opts *CreateOptions) error {
 			return err
 		}
 
+		var generatedNotes *ReleaseNotes
 		var tagDescription string
 		var generatedChangelog string
-		if opts.RepoOverride == "" {
+
+		params := map[string]interface{}{
+			"tag_name": opts.TagName,
+		}
+		if opts.Target != "" {
+			params["target_commitish"] = opts.Target
+		}
+		generatedNotes, err = generateReleaseNotes(httpClient, baseRepo, params)
+		if err != nil && !errors.Is(err, notImplementedError) {
+			return err
+		}
+
+		if opts.RepoOverride == "" && generatedNotes == nil {
 			headRef := opts.TagName
 			tagDescription, _ = gitTagInfo(opts.TagName)
 			if tagDescription == "" {
@@ -177,7 +198,6 @@ func createRun(opts *CreateOptions) error {
 					headRef = "HEAD"
 				}
 			}
-
 			if prevTag, err := detectPreviousTag(headRef); err == nil {
 				commits, _ := changelogForRange(fmt.Sprintf("%s..%s", prevTag, headRef))
 				generatedChangelog = generateChangelog(commits)
@@ -185,6 +205,9 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		editorOptions := []string{"Write my own"}
+		if generatedNotes != nil {
+			editorOptions = append(editorOptions, "Write using generated notes as template")
+		}
 		if generatedChangelog != "" {
 			editorOptions = append(editorOptions, "Write using commit log as template")
 		}
@@ -193,12 +216,16 @@ func createRun(opts *CreateOptions) error {
 		}
 		editorOptions = append(editorOptions, "Leave blank")
 
+		defaultName := opts.Name
+		if defaultName == "" && generatedNotes != nil {
+			defaultName = generatedNotes.Name
+		}
 		qs := []*survey.Question{
 			{
 				Name: "name",
 				Prompt: &survey.Input{
 					Message: "Title (optional)",
-					Default: opts.Name,
+					Default: defaultName,
 				},
 			},
 			{
@@ -220,6 +247,9 @@ func createRun(opts *CreateOptions) error {
 		switch opts.ReleaseNotesAction {
 		case "Write my own":
 			openEditor = true
+		case "Write using generated notes as template":
+			openEditor = true
+			editorContents = generatedNotes.Body
 		case "Write using commit log as template":
 			openEditor = true
 			editorContents = generatedChangelog
@@ -233,8 +263,8 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		if openEditor {
-			// TODO: consider using iostreams here
-			text, err := surveyext.Edit(editorCommand, "*.md", editorContents, os.Stdin, os.Stdout, os.Stderr, nil)
+			text, err := opts.Edit(editorCommand, "*.md", editorContents,
+				opts.IO.In, opts.IO.Out, opts.IO.ErrOut)
 			if err != nil {
 				return err
 			}
@@ -298,14 +328,21 @@ func createRun(opts *CreateOptions) error {
 		"tag_name":   opts.TagName,
 		"draft":      opts.Draft,
 		"prerelease": opts.Prerelease,
-		"name":       opts.Name,
-		"body":       opts.Body,
+	}
+	if opts.Name != "" {
+		params["name"] = opts.Name
+	}
+	if opts.Body != "" {
+		params["body"] = opts.Body
 	}
 	if opts.Target != "" {
 		params["target_commitish"] = opts.Target
 	}
 	if opts.DiscussionCategory != "" {
 		params["discussion_category_name"] = opts.DiscussionCategory
+	}
+	if opts.GenerateNotes {
+		params["generate_release_notes"] = true
 	}
 
 	hasAssets := len(opts.Assets) > 0
