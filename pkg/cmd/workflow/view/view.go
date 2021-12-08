@@ -3,6 +3,7 @@ package view
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -101,7 +102,7 @@ func runView(opts *ViewOptions) error {
 	}
 
 	if opts.Web {
-		var url string
+		var address string
 		if opts.YAML {
 			ref := opts.Ref
 			if ref == "" {
@@ -112,14 +113,14 @@ func runView(opts *ViewOptions) error {
 					return err
 				}
 			}
-			url = ghrepo.GenerateRepoURL(repo, "blob/%s/%s", ref, workflow.Path)
+			address = ghrepo.GenerateRepoURL(repo, "blob/%s/%s", url.QueryEscape(ref), url.QueryEscape(workflow.Path))
 		} else {
-			url = ghrepo.GenerateRepoURL(repo, "actions/workflows/%s", workflow.Base())
+			address = ghrepo.GenerateRepoURL(repo, "actions/workflows/%s", url.QueryEscape(workflow.Base()))
 		}
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(url))
+			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(address))
 		}
-		return opts.Browser.Browse(url)
+		return opts.Browser.Browse(address)
 	}
 
 	if opts.YAML {

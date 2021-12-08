@@ -3,7 +3,6 @@ package add
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -42,12 +41,7 @@ func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 	defer resp.Body.Close()
 
 	if resp.StatusCode > 299 {
-		var httpError api.HTTPError
-		err := api.HandleHTTPError(resp)
-		if errors.As(err, &httpError) && isDuplicateError(&httpError) {
-			return nil
-		}
-		return err
+		return api.HandleHTTPError(resp)
 	}
 
 	_, err = io.Copy(ioutil.Discard, resp.Body)
@@ -56,9 +50,4 @@ func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 	}
 
 	return nil
-}
-
-func isDuplicateError(err *api.HTTPError) bool {
-	return err.StatusCode == 422 && len(err.Errors) == 1 &&
-		err.Errors[0].Field == "key" && err.Errors[0].Message == "key is already in use"
 }

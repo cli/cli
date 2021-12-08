@@ -79,9 +79,8 @@ func closeRun(opts *CloseOptions) error {
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
-	err = api.PullRequestClose(apiClient, baseRepo, pr)
+	err = api.PullRequestClose(httpClient, baseRepo, pr.ID)
 	if err != nil {
 		return fmt.Errorf("API call failed: %w", err)
 	}
@@ -90,6 +89,7 @@ func closeRun(opts *CloseOptions) error {
 
 	if opts.DeleteBranch {
 		branchSwitchString := ""
+		apiClient := api.NewClientFromHTTP(httpClient)
 
 		if opts.DeleteLocalBranch {
 			currentBranch, err := opts.Branch()

@@ -8,8 +8,10 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -26,6 +28,7 @@ type MergeOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	Branch     func() (string, error)
+	Remotes    func() (context.Remotes, error)
 
 	Finder shared.PRFinder
 
@@ -51,6 +54,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Branch:     f.Branch,
+		Remotes:    f.Remotes,
 	}
 
 	var (
@@ -216,6 +220,10 @@ func mergeRun(opts *MergeOptions) error {
 	deleteBranch := opts.DeleteBranch
 	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
 	autoMerge := opts.AutoMergeEnable && !isImmediatelyMergeable(pr.MergeStateStatus)
+	localBranchExists := false
+	if opts.CanDeleteLocalBranch {
+		localBranchExists = git.HasLocalBranch(pr.HeadRefName)
+	}
 
 	if !isPRAlreadyMerged {
 		payload := mergePayload{
@@ -236,7 +244,7 @@ func mergeRun(opts *MergeOptions) error {
 			if err != nil {
 				return err
 			}
-			deleteBranch, err = deleteBranchSurvey(opts, crossRepoPR)
+			deleteBranch, err = deleteBranchSurvey(opts, crossRepoPR, localBranchExists)
 			if err != nil {
 				return err
 			}
@@ -317,7 +325,7 @@ func mergeRun(opts *MergeOptions) error {
 
 	branchSwitchString := ""
 
-	if opts.CanDeleteLocalBranch {
+	if opts.CanDeleteLocalBranch && localBranchExists {
 		currentBranch, err := opts.Branch()
 		if err != nil {
 			return err
@@ -329,26 +337,27 @@ func mergeRun(opts *MergeOptions) error {
 			if err != nil {
 				return err
 			}
+
 			err = git.CheckoutBranch(branchToSwitchTo)
 			if err != nil {
 				return err
 			}
+
+			err := pullLatestChanges(opts, baseRepo, branchToSwitchTo)
+			if err != nil {
+				fmt.Fprintf(opts.IO.ErrOut, "%s warning: not posible to fast-forward to: %q\n", cs.WarningIcon(), branchToSwitchTo)
+			}
 		}
 
-		localBranchExists := git.HasLocalBranch(pr.HeadRefName)
-		if localBranchExists {
-			err = git.DeleteLocalBranch(pr.HeadRefName)
-			if err != nil {
-				err = fmt.Errorf("failed to delete local branch %s: %w", cs.Cyan(pr.HeadRefName), err)
-				return err
-			}
+		if err := git.DeleteLocalBranch(pr.HeadRefName); err != nil {
+			err = fmt.Errorf("failed to delete local branch %s: %w", cs.Cyan(pr.HeadRefName), err)
+			return err
 		}
 
 		if branchToSwitchTo != "" {
 			branchSwitchString = fmt.Sprintf(" and switched to branch %s", cs.Cyan(branchToSwitchTo))
 		}
 	}
-
 	if !isPRAlreadyMerged {
 		err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
 		var httpErr api.HTTPError
@@ -361,6 +370,25 @@ func mergeRun(opts *MergeOptions) error {
 
 	if isTerminal {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted branch %s%s\n", cs.SuccessIconWithColor(cs.Red), cs.Cyan(pr.HeadRefName), branchSwitchString)
+	}
+
+	return nil
+}
+
+func pullLatestChanges(opts *MergeOptions, repo ghrepo.Interface, branch string) error {
+	remotes, err := opts.Remotes()
+	if err != nil {
+		return err
+	}
+
+	baseRemote, err := remotes.FindByRepo(repo.RepoOwner(), repo.RepoName())
+	if err != nil {
+		return err
+	}
+
+	err = git.Pull(baseRemote.Name, branch)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -401,10 +429,10 @@ func mergeMethodSurvey(baseRepo *api.Repository) (PullRequestMergeMethod, error)
 	return mergeOpts[result].method, err
 }
 
-func deleteBranchSurvey(opts *MergeOptions, crossRepoPR bool) (bool, error) {
+func deleteBranchSurvey(opts *MergeOptions, crossRepoPR, localBranchExists bool) (bool, error) {
 	if !crossRepoPR && !opts.IsDeleteBranchIndicated {
 		var message string
-		if opts.CanDeleteLocalBranch {
+		if opts.CanDeleteLocalBranch && localBranchExists {
 			message = "Delete the branch locally and on GitHub?"
 		} else {
 			message = "Delete the branch on GitHub?"
@@ -466,7 +494,7 @@ func (e *userEditor) Edit(filename, startingText string) (string, error) {
 		return "", err
 	}
 
-	return surveyext.Edit(editorCommand, filename, startingText, e.io.In, e.io.Out, e.io.ErrOut, nil)
+	return surveyext.Edit(editorCommand, filename, startingText, e.io.In, e.io.Out, e.io.ErrOut)
 }
 
 // blockedReason translates various MergeStateStatus GraphQL values into human-readable reason
