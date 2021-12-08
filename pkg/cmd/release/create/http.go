@@ -3,6 +3,7 @@ package create
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -12,6 +13,8 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 )
+
+var notImplementedError = errors.New("not implemented")
 
 type ReleaseNotes struct {
 	Name string `json:"name"`
@@ -39,6 +42,10 @@ func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, params
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		return nil, notImplementedError
+	}
 
 	success := resp.StatusCode >= 200 && resp.StatusCode < 300
 	if !success {
