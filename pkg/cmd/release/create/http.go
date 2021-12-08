@@ -43,7 +43,7 @@ func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, params
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 401 {
+	if resp.StatusCode == 404 {
 		return nil, notImplementedError
 	}
 
