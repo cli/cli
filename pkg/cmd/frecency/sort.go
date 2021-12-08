@@ -38,30 +38,3 @@ func (c countEntry) Score() int {
 	}
 	return recencyScore * c.Count
 }
-
-//func SelectFrecent(c *http.Client, repo ghrepo.Interface) (string, error) {
-//	client := api.NewCachedClient(c, time.Hour*6)
-//
-//	issues, err := getIssues(client, repo)
-//	if err != nil {
-//		return "", err
-//	}
-//
-//	frecent, err := getFrecentEntry(defaultFrecentPath())
-//	if err != nil {
-//		return "", err
-//	}
-//
-//	choices := sortByFrecent(issues, frecent.Issues)
-//
-//	choice := ""
-//	err = prompt.SurveyAskOne(&survey.Select{
-//		Message: "Which issue?",
-//		Options: choices,
-//	}, &choice)
-//	if err != nil {
-//		return "", err
-//	}
-//
-//	return choice, nil
-//}
