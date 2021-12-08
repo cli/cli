@@ -7,16 +7,18 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/shurcooL/githubv4"
 )
 
 // get most recent PRs
-// returns api.Issue for easier DB insertion
+// returns api.Issue for easier database insertion
 func getPullRequests(c *http.Client, repo ghrepo.Interface) ([]api.Issue, error) {
 	apiClient := api.NewClientFromHTTP(c)
 	query := `query GetPRs($owner: String!, $repo: String!) {
   repository(owner: $owner, name: $repo) {
     pullRequests(first: 100, states: [OPEN], orderBy: {field: CREATED_AT, direction: DESC}) {
       nodes {
+	  	id
         number
         title
       }
@@ -55,6 +57,7 @@ func getPullRequestsSince(c *http.Client, repo ghrepo.Interface, since time.Time
   search(query: $query, type: ISSUE, first: 100) {
     nodes {
       ... on PullRequest {
+	  	id
         title
 		number
       }
@@ -84,6 +87,7 @@ func getIssuesSince(c *http.Client, repo ghrepo.Interface, since time.Time) ([]a
   repository(owner: $owner, name: $repo) {
     issues(first: $limit, orderBy: {field: CREATED_AT, direction: DESC}, filterBy: {since: $since, states: [OPEN]}) {
       nodes {
+	  	id
         number
         title
       }
@@ -112,34 +116,25 @@ func getIssuesSince(c *http.Client, repo ghrepo.Interface, since time.Time) ([]a
 	return resp.Repository.Issues.Nodes, nil
 }
 
-func getIssues(c *http.Client, repo ghrepo.Interface) ([]api.Issue, error) {
-	apiClient := api.NewClientFromHTTP(c)
-	query := `query GetIssues($owner: String!, $repo: String!){
-  repository(owner: $owner, name: $repo) {
-    issues(first: 100, orderBy: {field: CREATED_AT, direction: DESC}, filterBy: {states: [OPEN]}) {
-      nodes {
-        number
-        title
-      }
-    }
-  }
-}`
-	variables := map[string]interface{}{
-		"owner": repo.RepoOwner(),
-		"repo":  repo.RepoName(),
+// lookup issue or PR by graphQL ID to check if it is open
+func isOpen(c *http.Client, repo ghrepo.Interface, args entryWithStats) (bool, error) {
+	nodeType := "Issue"
+	if args.IsPR {
+		nodeType = "PullRequest"
 	}
+	query := fmt.Sprintf(
+		`query GetIssueByID($id: ID!) { node(id: $id) { ... on %s { state } } }`,
+		nodeType)
+
+	apiClient := api.NewClientFromHTTP(c)
+	variables := map[string]interface{}{"id": githubv4.ID(args.Entry.ID)}
 	type responseData struct {
-		Repository struct {
-			Issues struct {
-				Nodes []api.Issue
-			}
-		}
+		Node struct{ State string }
 	}
 	var resp responseData
 	err := apiClient.GraphQL(repo.RepoHost(), query, variables, &resp)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-
-	return resp.Repository.Issues.Nodes, nil
+	return resp.Node.State == "OPEN", nil
 }

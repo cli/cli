@@ -98,7 +98,7 @@ func viewRun(opts *ViewOptions) error {
 
 	if opts.UseFrecency {
 		opts.IO.StartProgressIndicator()
-		issues, err := opts.Frecency.GetFrecentIssues(baseRepo)
+		issues, err := opts.Frecency.GetFrecent(baseRepo, false)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
@@ -125,8 +125,10 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	if err = opts.Frecency.UpdateIssue(baseRepo, issue, opts.Now()); err != nil {
-		return err
+	if opts.UseFrecency {
+		if err = opts.Frecency.UpdateIssue(baseRepo, issue, opts.Now()); err != nil {
+			return err
+		}
 	}
 
 	if opts.WebMode {
