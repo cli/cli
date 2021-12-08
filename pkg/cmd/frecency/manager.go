@@ -241,7 +241,7 @@ func (m *Manager) pruneRecords(repo ghrepo.Interface, isPR bool, countThreshold 
 	return nil
 }
 
-// Deletes an issue or PR with specified number from the database
+// Deletes an issue/PR with specified number from the database
 func (m *Manager) DeleteByNumber(repo ghrepo.Interface, isPR bool, number int) error {
 	db, err := m.getDB()
 	if err != nil {

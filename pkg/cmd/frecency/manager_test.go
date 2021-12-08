@@ -19,7 +19,7 @@ func newTestManager(dir string, io *iostreams.IOStreams) *Manager {
 		io:      io,
 		dataDir: func() string { return dir },
 	}
-	m.initDB()
+	_ = m.initDB()
 	return m
 }
 
@@ -68,7 +68,6 @@ func TestManager_insert_get(t *testing.T) {
 	tempDir := t.TempDir()
 	tempDB := filepath.Join(tempDir, "frecent.db")
 	m := newTestManager(tempDB, nil)
-	defer m.closeDB()
 	t.Cleanup(func() { os.Remove(tempDB) })
 
 	db, err := m.getDB()
@@ -113,13 +112,13 @@ func TestManager_insert_get(t *testing.T) {
 	assert.Equal(t, latestPR.Stats.LastAccess.UTC(), testTime.UTC())
 	assert.True(t, latestPR.IsPR)
 
+	_ = m.closeDB()
 }
 
 func TestManager_update(t *testing.T) {
 	tempDir := t.TempDir()
 	tempDB := filepath.Join(tempDir, "frecent.db")
 	m := newTestManager(tempDB, nil)
-	defer m.closeDB()
 	t.Cleanup(func() { os.Remove(tempDB) })
 
 	db, err := m.getDB()
@@ -145,4 +144,6 @@ func TestManager_update(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, gotEntry.Stats.Count, updated.Stats.Count)
 	assert.Equal(t, gotEntry.Stats.LastAccess.UTC(), updated.Stats.LastAccess.UTC())
+
+	_ = m.closeDB()
 }
