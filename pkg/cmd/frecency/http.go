@@ -29,15 +29,14 @@ func getPullRequests(c *http.Client, repo ghrepo.Interface) ([]api.Issue, error)
 		"owner": repo.RepoOwner(),
 		"repo":  repo.RepoName(),
 	}
-	type responseData struct {
+	resp := struct {
 		Repository struct {
 			PullRequests struct {
 				Nodes []api.Issue
 			}
 		}
-	}
+	}{}
 
-	var resp responseData
 	err := apiClient.GraphQL(repo.RepoHost(), query, variables, &resp)
 	if err != nil {
 		return nil, err
@@ -65,13 +64,12 @@ func getPullRequestsSince(c *http.Client, repo ghrepo.Interface, since time.Time
   }
 }`
 	variables := map[string]interface{}{"query": searchQuery}
-	type responseData struct {
+	resp := struct {
 		Search struct {
 			Nodes []api.Issue
 		}
-	}
+	}{}
 
-	var resp responseData
 	err := apiClient.GraphQL(repo.RepoHost(), query, variables, &resp)
 	if err != nil {
 		return nil, err
@@ -100,14 +98,13 @@ func getIssuesSince(c *http.Client, repo ghrepo.Interface, since time.Time) ([]a
 		"since": since.UTC().Format("2006-01-02T15:04:05-0700"),
 		"limit": 100,
 	}
-	type responseData struct {
+	resp := struct {
 		Repository struct {
 			Issues struct {
 				Nodes []api.Issue
 			}
 		}
-	}
-	var resp responseData
+	}{}
 	err := apiClient.GraphQL(repo.RepoHost(), query, variables, &resp)
 	if err != nil {
 		return nil, err
@@ -128,10 +125,7 @@ func isOpen(c *http.Client, repo ghrepo.Interface, args entryWithStats) (bool, e
 
 	apiClient := api.NewClientFromHTTP(c)
 	variables := map[string]interface{}{"id": githubv4.ID(args.Entry.ID)}
-	type responseData struct {
-		Node struct{ State string }
-	}
-	var resp responseData
+	resp := struct{ Node struct{ State string } }{}
 	err := apiClient.GraphQL(repo.RepoHost(), query, variables, &resp)
 	if err != nil {
 		return false, err

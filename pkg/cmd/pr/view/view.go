@@ -2,12 +2,17 @@ package view
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/frecency"
+	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -24,18 +29,23 @@ type ViewOptions struct {
 	IO      *iostreams.IOStreams
 	Browser browser
 
+	BaseRepo func() (ghrepo.Interface, error)
 	Finder   shared.PRFinder
 	Exporter cmdutil.Exporter
 
 	SelectorArg string
 	BrowserMode bool
 	Comments    bool
+
+	Frecency    *frecency.Manager
+	UseFrecency bool
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
-		IO:      f.IOStreams,
-		Browser: f.Browser,
+		IO:       f.IOStreams,
+		Browser:  f.Browser,
+		Frecency: f.FrecencyManager,
 	}
 
 	cmd := &cobra.Command{
@@ -51,14 +61,21 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.BaseRepo = f.BaseRepo
 			opts.Finder = shared.NewFinder(f)
-
-			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
-				return cmdutil.FlagErrorf("argument required when using the --repo flag")
-			}
-
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
+			}
+
+			if opts.SelectorArg == "" {
+				// need to check repo override to determine whether to use frecency
+				baseRepo, err := opts.BaseRepo()
+				log.Printf("%+v", baseRepo)
+				if err == nil && opts.IO.CanPrompt() {
+					opts.UseFrecency = true
+				} else {
+					return cmdutil.FlagErrorf("could not resolve repository %s", ghrepo.FullName(baseRepo))
+				}
 			}
 
 			if runF != nil {
@@ -84,6 +101,23 @@ var defaultFields = []string{
 }
 
 func viewRun(opts *ViewOptions) error {
+	if opts.UseFrecency {
+		baseRepo, _ := opts.BaseRepo()
+
+		opts.IO.StartProgressIndicator()
+		prs, err := opts.Frecency.GetFrecent(baseRepo, true)
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
+
+		selected, err := issueShared.SelectIssueNumber(prs)
+		if err != nil {
+			return nil
+		}
+		opts.SelectorArg = selected
+	}
+
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
 		Fields:   defaultFields,
@@ -93,9 +127,15 @@ func viewRun(opts *ViewOptions) error {
 	} else if opts.Exporter != nil {
 		findOptions.Fields = opts.Exporter.Fields()
 	}
-	pr, _, err := opts.Finder.Find(findOptions)
+	pr, repo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
+	}
+
+	if opts.UseFrecency {
+		if err := opts.Frecency.UpdatePullRequest(repo, pr, time.Now()); err != nil {
+			return err
+		}
 	}
 
 	connectedToTerminal := opts.IO.IsStdoutTTY() && opts.IO.IsStderrTTY()

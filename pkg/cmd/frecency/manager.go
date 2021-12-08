@@ -67,6 +67,7 @@ func (m *Manager) GetFrecent(repo ghrepo.Interface, isPR bool) ([]api.Issue, err
 	now := time.Now()
 	repoName := ghrepo.FullName(repo)
 	args := entryWithStats{
+		IsPR:     isPR,
 		RepoName: repoName,
 		Stats:    countEntry{LastAccess: now},
 	}
@@ -76,22 +77,29 @@ func (m *Manager) GetFrecent(repo ghrepo.Interface, isPR bool) ([]api.Issue, err
 		return nil, err
 	}
 
-	var newIssues []api.Issue
+	var newEntries []api.Issue
 	pruneTime, _ := time.ParseDuration("60s") // tweak this
 	if time.Since(lastQueried) < pruneTime {
-		// get new issues created since last query
-		newIssues, err = getIssuesSince(m.client, repo, lastQueried)
-		if err != nil {
+		// no pruning; just get new issues/PRs created since last query
+		if isPR {
+			if newEntries, err = getPullRequestsSince(m.client, repo, lastQueried); err != nil {
+				return nil, err
+			}
+		} else if newEntries, err = getIssuesSince(m.client, repo, lastQueried); err != nil {
 			return nil, err
 		}
 	} else {
-		// prune stale records periodically
+		// prune stale records
 		if err := m.pruneRecords(repo, isPR, 1); err != nil {
 			return nil, err
 		}
-		// get all new issues, since we deleted most of them
-		newIssues, err = getIssuesSince(m.client, repo, time.Unix(0, 0))
-		if err != nil {
+
+		// find all new issues/PRs, since most of them were pruned
+		if isPR {
+			if newEntries, err = getPullRequests(m.client, repo); err != nil {
+				return nil, err
+			}
+		} else if newEntries, err = getIssuesSince(m.client, repo, time.Unix(0, 0)); err != nil {
 			return nil, err
 		}
 	}
@@ -101,11 +109,11 @@ func (m *Manager) GetFrecent(repo ghrepo.Interface, isPR bool) ([]api.Issue, err
 		return nil, err
 	}
 
-	for _, newIssue := range newIssues {
+	for _, newEntry := range newEntries {
 		entry := entryWithStats{
 			RepoName: repoName,
 			IsPR:     isPR,
-			Entry:    newIssue,
+			Entry:    newEntry,
 			Stats:    countEntry{LastAccess: now},
 		}
 		if err := insertEntry(db, entry); err != nil {
@@ -113,14 +121,14 @@ func (m *Manager) GetFrecent(repo ghrepo.Interface, isPR bool) ([]api.Issue, err
 		}
 	}
 
-	issuesWithStats, err := getEntries(db, args)
+	entriesWithStats, err := getEntries(db, args)
 	if err != nil {
 		return nil, err
 	}
-	sort.Sort(ByFrecency(issuesWithStats))
+	sort.Sort(ByFrecency(entriesWithStats))
 	var frecentIssues []api.Issue
-	for _, issueWithStats := range issuesWithStats {
-		frecentIssues = append(frecentIssues, issueWithStats.Entry)
+	for _, entry := range entriesWithStats {
+		frecentIssues = append(frecentIssues, entry.Entry)
 	}
 	return frecentIssues, nil
 }
@@ -233,6 +241,7 @@ func (m *Manager) pruneRecords(repo ghrepo.Interface, isPR bool, countThreshold 
 	return nil
 }
 
+// Deletes an issue or PR with specified number from the database
 func (m *Manager) DeleteByNumber(repo ghrepo.Interface, isPR bool, number int) error {
 	db, err := m.getDB()
 	if err != nil {
