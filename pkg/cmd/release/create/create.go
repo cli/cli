@@ -65,7 +65,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		DisableFlagsInUseLine: true,
 
-		Use:   "create <tag> [<files>...]",
+		Use:   "create [<tag>] [<files>...]",
 		Short: "Create a new release",
 		Long: heredoc.Docf(`
 			Create a new GitHub Release for a repository.
@@ -86,6 +86,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		`, "`"),
 		Example: heredoc.Doc(`
 			Interactively create a release
+			$ gh release create
+
+			Interactively create a release from specific tag
 			$ gh release create v1.2.3
 
 			Non-interactively create a release
@@ -106,22 +109,27 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			Create a release and start a discussion
 			$ gh release create v1.2.3 --discussion-category "General"
 		`),
-		Args: cmdutil.MinimumArgs(1, "could not create: no tag name provided"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cmd.Flags().Changed("discussion-category") && opts.Draft {
-				return errors.New("Discussions for draft releases not supported")
+				return errors.New("discussions for draft releases not supported")
 			}
 
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
 
-			opts.TagName = args[0]
-
 			var err error
-			opts.Assets, err = shared.AssetsFromArgs(args[1:])
-			if err != nil {
-				return err
+
+			if len(args) > 0 {
+				opts.TagName = args[0]
+				opts.Assets, err = shared.AssetsFromArgs(args[1:])
+				if err != nil {
+					return err
+				}
+			}
+
+			if opts.TagName == "" && !opts.IO.CanPrompt() {
+				return cmdutil.FlagErrorf("tag required when not running interactively")
 			}
 
 			opts.Concurrency = 5
@@ -166,13 +174,52 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
+	if opts.TagName == "" {
+		tags, err := getTags(httpClient, baseRepo, 5)
+		if err != nil {
+			return err
+		}
+
+		if len(tags) != 0 {
+			options := make([]string, len(tags))
+			for i, tag := range tags {
+				options[i] = tag.Name
+			}
+			createNewTagOption := "Create a new tag"
+			options = append(options, createNewTagOption)
+			var tag string
+			q := &survey.Select{
+				Message: "Choose a tag",
+				Options: options,
+				Default: options[0],
+			}
+			err := prompt.SurveyAskOne(q, &tag)
+			if err != nil {
+				return fmt.Errorf("could not prompt: %w", err)
+			}
+			if tag != createNewTagOption {
+				opts.TagName = tag
+			}
+		}
+
+		if opts.TagName == "" {
+			q := &survey.Input{
+				Message: "Tag name",
+			}
+			err := prompt.SurveyAskOne(q, &opts.TagName)
+			if err != nil {
+				return fmt.Errorf("could not prompt: %w", err)
+			}
+		}
+	}
+
 	if !opts.BodyProvided && opts.IO.CanPrompt() {
 		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
 		if err != nil {
 			return err
 		}
 
-		var generatedNotes *ReleaseNotes
+		var generatedNotes *releaseNotes
 		var tagDescription string
 		var generatedChangelog string
 

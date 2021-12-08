@@ -45,6 +45,29 @@ func Test_NewCmdCreate(t *testing.T) {
 		wantErr string
 	}{
 		{
+			name:  "no arguments tty",
+			args:  "",
+			isTTY: true,
+			want: CreateOptions{
+				TagName:      "",
+				Target:       "",
+				Name:         "",
+				Body:         "",
+				BodyProvided: false,
+				Draft:        false,
+				Prerelease:   false,
+				RepoOverride: "",
+				Concurrency:  5,
+				Assets:       []*shared.AssetForUpload(nil),
+			},
+		},
+		{
+			name:    "no arguments notty",
+			args:    "",
+			isTTY:   false,
+			wantErr: "tag required when not running interactively",
+		},
+		{
 			name:  "only tag name",
 			args:  "v1.2.3",
 			isTTY: true,
@@ -157,12 +180,6 @@ func Test_NewCmdCreate(t *testing.T) {
 			},
 		},
 		{
-			name:    "no arguments",
-			args:    "",
-			isTTY:   true,
-			wantErr: "could not create: no tag name provided",
-		},
-		{
 			name:  "discussion category",
 			args:  "v1.2.3 --discussion-category 'General'",
 			isTTY: true,
@@ -184,7 +201,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			name:    "discussion category for draft release",
 			args:    "v1.2.3 -d --discussion-category 'General'",
 			isTTY:   true,
-			wantErr: "Discussions for draft releases not supported",
+			wantErr: "discussions for draft releases not supported",
 		},
 		{
 			name:  "generate release notes",
@@ -495,8 +512,97 @@ func Test_createRun_interactive(t *testing.T) {
 		wantErr    string
 	}{
 		{
-			name: "create a release using generated notes",
+			name: "create a release from existing tag",
 			opts: &CreateOptions{},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne("v1.2.3") // Tag prompt
+				as.Stub([]*prompt.QuestionStub{
+					{
+						Name:  "name",
+						Value: "title",
+					},
+					{
+						Name:  "releaseNotesAction",
+						Value: "Leave blank",
+					},
+				})
+				as.Stub([]*prompt.QuestionStub{
+					{
+						Name:  "prerelease",
+						Value: false,
+					},
+					{
+						Name:  "submitAction",
+						Value: "Publish release",
+					},
+				})
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/tags"), httpmock.StatusStringResponse(200, `[
+            { "name": "v1.2.3" }, { "name": "v1.2.2" }, { "name": "v1.0.0" }, { "name": "v0.1.2" }
+         ]`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
+					httpmock.StatusStringResponse(200, `{
+            "name": "generated name",
+            "body": "generated body"
+         }`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, `{
+           "url": "https://api.github.com/releases/123",
+           "upload_url": "https://api.github.com/assets/upload",
+           "html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+         }`))
+			},
+			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+		},
+		{
+			name: "create a release from new tag",
+			opts: &CreateOptions{},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne("Create a new tag") // Tag prompt
+				as.StubOne("v1.2.3")           // New tag prompt
+				as.Stub([]*prompt.QuestionStub{
+					{
+						Name:  "name",
+						Value: "title",
+					},
+					{
+						Name:  "releaseNotesAction",
+						Value: "Leave blank",
+					},
+				})
+				as.Stub([]*prompt.QuestionStub{
+					{
+						Name:  "prerelease",
+						Value: false,
+					},
+					{
+						Name:  "submitAction",
+						Value: "Publish release",
+					},
+				})
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/tags"), httpmock.StatusStringResponse(200, `[
+            { "name": "v1.2.2" }, { "name": "v1.0.0" }, { "name": "v0.1.2" }
+         ]`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
+					httpmock.StatusStringResponse(200, `{
+            "name": "generated name",
+            "body": "generated body"
+         }`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, `{
+           "url": "https://api.github.com/releases/123",
+           "upload_url": "https://api.github.com/assets/upload",
+           "html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+         }`))
+			},
+			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+		},
+		{
+			name: "create a release using generated notes",
+			opts: &CreateOptions{
+				TagName: "v1.2.3",
+			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.Stub([]*prompt.QuestionStub{
 					{
@@ -537,7 +643,7 @@ func Test_createRun_interactive(t *testing.T) {
 				"draft":      false,
 				"name":       "title",
 				"prerelease": false,
-				"tag_name":   "",
+				"tag_name":   "v1.2.3",
 			},
 			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 		},
