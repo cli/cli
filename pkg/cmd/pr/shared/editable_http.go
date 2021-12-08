@@ -9,19 +9,47 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
+	"golang.org/x/sync/errgroup"
 )
 
 func UpdateIssue(httpClient *http.Client, repo ghrepo.Interface, id string, isPR bool, options Editable) error {
-	title := ghString(options.TitleValue())
-	body := ghString(options.BodyValue())
+	var wg errgroup.Group
 
-	apiClient := api.NewClientFromHTTP(httpClient)
-	assigneeIds, err := options.AssigneeIds(apiClient, repo)
-	if err != nil {
-		return err
+	// Labels are updated through discrete mutations to avoid having to replace the entire list of labels
+	// and risking race conditions.
+	if options.Labels.Edited {
+		if len(options.Labels.Add) > 0 {
+			wg.Go(func() error {
+				addedLabelIds, err := options.Metadata.LabelsToIDs(options.Labels.Add)
+				if err != nil {
+					return err
+				}
+				return addLabels(httpClient, id, repo, addedLabelIds)
+			})
+		}
+		if len(options.Labels.Remove) > 0 {
+			wg.Go(func() error {
+				removeLabelIds, err := options.Metadata.LabelsToIDs(options.Labels.Remove)
+				if err != nil {
+					return err
+				}
+				return removeLabels(httpClient, id, repo, removeLabelIds)
+			})
+		}
 	}
 
-	labelIds, err := options.LabelIds()
+	if dirtyExcludingLabels(options) {
+		wg.Go(func() error {
+			return replaceIssueFields(httpClient, repo, id, isPR, options)
+		})
+	}
+
+	return wg.Wait()
+}
+
+func replaceIssueFields(httpClient *http.Client, repo ghrepo.Interface, id string, isPR bool, options Editable) error {
+	apiClient := api.NewClientFromHTTP(httpClient)
+	assigneeIds, err := options.AssigneeIds(apiClient, repo)
 	if err != nil {
 		return err
 	}
@@ -39,10 +67,9 @@ func UpdateIssue(httpClient *http.Client, repo ghrepo.Interface, id string, isPR
 	if isPR {
 		params := githubv4.UpdatePullRequestInput{
 			PullRequestID: id,
-			Title:         title,
-			Body:          body,
+			Title:         ghString(options.TitleValue()),
+			Body:          ghString(options.BodyValue()),
 			AssigneeIDs:   ghIds(assigneeIds),
-			LabelIDs:      ghIds(labelIds),
 			ProjectIDs:    ghIds(projectIds),
 			MilestoneID:   ghId(milestoneId),
 		}
@@ -52,23 +79,65 @@ func UpdateIssue(httpClient *http.Client, repo ghrepo.Interface, id string, isPR
 		return updatePullRequest(httpClient, repo, params)
 	}
 
-	return updateIssue(httpClient, repo, githubv4.UpdateIssueInput{
+	params := githubv4.UpdateIssueInput{
 		ID:          id,
-		Title:       title,
-		Body:        body,
+		Title:       ghString(options.TitleValue()),
+		Body:        ghString(options.BodyValue()),
 		AssigneeIDs: ghIds(assigneeIds),
-		LabelIDs:    ghIds(labelIds),
 		ProjectIDs:  ghIds(projectIds),
 		MilestoneID: ghId(milestoneId),
-	})
+	}
+	return updateIssue(httpClient, repo, params)
+}
+
+func dirtyExcludingLabels(e Editable) bool {
+	return e.Title.Edited ||
+		e.Body.Edited ||
+		e.Base.Edited ||
+		e.Reviewers.Edited ||
+		e.Assignees.Edited ||
+		e.Projects.Edited ||
+		e.Milestone.Edited
+}
+
+func addLabels(httpClient *http.Client, id string, repo ghrepo.Interface, labels []string) error {
+	params := githubv4.AddLabelsToLabelableInput{
+		LabelableID: id,
+		LabelIDs:    *ghIds(&labels),
+	}
+
+	var mutation struct {
+		AddLabelsToLabelable struct {
+			Typename string `graphql:"__typename"`
+		} `graphql:"addLabelsToLabelable(input: $input)"`
+	}
+
+	variables := map[string]interface{}{"input": params}
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
+	return gql.MutateNamed(context.Background(), "LabelAdd", &mutation, variables)
+}
+
+func removeLabels(httpClient *http.Client, id string, repo ghrepo.Interface, labels []string) error {
+	params := githubv4.RemoveLabelsFromLabelableInput{
+		LabelableID: id,
+		LabelIDs:    *ghIds(&labels),
+	}
+
+	var mutation struct {
+		RemoveLabelsFromLabelable struct {
+			Typename string `graphql:"__typename"`
+		} `graphql:"removeLabelsFromLabelable(input: $input)"`
+	}
+
+	variables := map[string]interface{}{"input": params}
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
+	return gql.MutateNamed(context.Background(), "LabelRemove", &mutation, variables)
 }
 
 func updateIssue(httpClient *http.Client, repo ghrepo.Interface, params githubv4.UpdateIssueInput) error {
 	var mutation struct {
 		UpdateIssue struct {
-			Issue struct {
-				ID string
-			}
+			Typename string `graphql:"__typename"`
 		} `graphql:"updateIssue(input: $input)"`
 	}
 	variables := map[string]interface{}{"input": params}
@@ -79,9 +148,7 @@ func updateIssue(httpClient *http.Client, repo ghrepo.Interface, params githubv4
 func updatePullRequest(httpClient *http.Client, repo ghrepo.Interface, params githubv4.UpdatePullRequestInput) error {
 	var mutation struct {
 		UpdatePullRequest struct {
-			PullRequest struct {
-				ID string
-			}
+			Typename string `graphql:"__typename"`
 		} `graphql:"updatePullRequest(input: $input)"`
 	}
 	variables := map[string]interface{}{"input": params}
