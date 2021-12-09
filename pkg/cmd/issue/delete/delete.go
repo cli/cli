@@ -88,7 +88,7 @@ func deleteRun(opts *DeleteOptions) error {
 		}
 		opts.IO.StopProgressIndicator()
 
-		selected, err := shared.SelectIssueNumber(issues)
+		selected, err := shared.SelectIssueNumber(issues, "Which Issue?")
 		if err != nil {
 			return err
 		}

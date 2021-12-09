@@ -2,7 +2,6 @@ package view
 
 import (
 	"fmt"
-	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -70,7 +69,6 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			if opts.SelectorArg == "" {
 				// need to check repo override to determine whether to use frecency
 				baseRepo, err := opts.BaseRepo()
-				log.Printf("%+v", baseRepo)
 				if err == nil && opts.IO.CanPrompt() {
 					opts.UseFrecency = true
 				} else {
@@ -111,7 +109,7 @@ func viewRun(opts *ViewOptions) error {
 			return err
 		}
 
-		selected, err := issueShared.SelectIssueNumber(prs)
+		selected, err := issueShared.SelectIssueNumber(prs, "Which PR?")
 		if err != nil {
 			return nil
 		}

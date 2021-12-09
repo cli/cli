@@ -110,7 +110,7 @@ func viewRun(opts *ViewOptions) error {
 			return err
 		}
 
-		selected, err := issueShared.SelectIssueNumber(issues)
+		selected, err := issueShared.SelectIssueNumber(issues, "Which Issue?")
 		if err != nil {
 			return err
 		}

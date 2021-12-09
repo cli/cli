@@ -159,7 +159,7 @@ func editRun(opts *EditOptions) error {
 			return err
 		}
 
-		selected, err := shared.SelectIssueNumber(issues)
+		selected, err := shared.SelectIssueNumber(issues, "Which Issue?")
 		if err != nil {
 			return err
 		}

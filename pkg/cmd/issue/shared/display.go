@@ -63,7 +63,7 @@ func issueLabelList(issue *api.Issue, cs *iostreams.ColorScheme, colorize bool) 
 	return strings.Join(labelNames, ", ")
 }
 
-func SelectIssueNumber(issues []api.Issue) (string, error) {
+func SelectIssueNumber(issues []api.Issue, message string) (string, error) {
 	choices := []string{}
 	for _, issue := range issues {
 		choices = append(choices, fmt.Sprintf("#%d %s", issue.Number, issue.Title))
@@ -71,7 +71,7 @@ func SelectIssueNumber(issues []api.Issue) (string, error) {
 
 	var choice string
 	err := prompt.SurveyAskOne(&survey.Select{
-		Message: "Which issue?",
+		Message: message,
 		Options: choices,
 	}, &choice)
 	if err != nil {
