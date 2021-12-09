@@ -3,6 +3,7 @@ package httpmock
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 )
 
@@ -12,11 +13,13 @@ type Registry struct {
 	Requests []*http.Request
 }
 
-func (r *Registry) Register(m Matcher, resp Responder) {
-	r.stubs = append(r.stubs, &Stub{
+func (r *Registry) Register(m Matcher, resp Responder) *Stub {
+	stub := &Stub{
 		Matcher:   m,
 		Responder: resp,
-	})
+	}
+	r.stubs = append(r.stubs, stub)
+	return stub
 }
 
 type Testing interface {
@@ -25,17 +28,17 @@ type Testing interface {
 }
 
 func (r *Registry) Verify(t Testing) {
-	n := 0
+	var unmatched []string
 	for _, s := range r.stubs {
 		if !s.matched {
-			n++
+			unmatched = append(unmatched, s.Label())
 		}
 	}
-	if n > 0 {
+	if len(unmatched) > 0 {
 		t.Helper()
 		// NOTE: stubs offer no useful reflection, so we can't print details
 		// about dead stubs and what they were trying to match
-		t.Errorf("%d unmatched HTTP stubs", n)
+		t.Errorf("%d unmatched HTTP stubs: %s", len(unmatched), strings.Join(unmatched, "\n"))
 	}
 }
 

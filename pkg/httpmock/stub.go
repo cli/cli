@@ -18,6 +18,16 @@ type Stub struct {
 	matched   bool
 	Matcher   Matcher
 	Responder Responder
+	label     string
+}
+
+func (s *Stub) SetLabel(l string) *Stub {
+	s.label = l
+	return s
+}
+
+func (s *Stub) Label() string {
+	return s.label
 }
 
 func MatchAny(*http.Request) bool {
