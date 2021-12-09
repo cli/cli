@@ -157,6 +157,12 @@ func setGitDir(t *testing.T, dir string) {
 	})
 }
 
+type testGitClient struct{}
+
+func (gc *testGitClient) LastCommit() (*git.Commit, error) {
+	return &git.Commit{Sha: "6f1a2405cace1633d89a79c74c65f22fe78f9659"}, nil
+}
+
 func Test_runBrowse(t *testing.T) {
 	s := string(os.PathSeparator)
 	setGitDir(t, "../../../git/fixtures/simple.git")
@@ -352,10 +358,10 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/mislav/will_paginate/blob/3-0-stable/init.rb?plain=1#L6",
 		},
 		{
-			name: "open last commit (local git client)",
+			name: "open last commit",
 			opts: BrowseOptions{
 				CommitFlag: true,
-				GitClient:  &localGitClient{},
+				GitClient:  &testGitClient{},
 			},
 			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
 			wantsErr:    false,
@@ -366,7 +372,7 @@ func Test_runBrowse(t *testing.T) {
 			opts: BrowseOptions{
 				CommitFlag:  true,
 				SelectorArg: "main.go",
-				GitClient:   &localGitClient{},
+				GitClient:   &testGitClient{},
 			},
 			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
 			wantsErr:    false,

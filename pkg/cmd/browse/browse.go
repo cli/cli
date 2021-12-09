@@ -129,9 +129,10 @@ func runBrowse(opts *BrowseOptions) error {
 
 	if opts.CommitFlag {
 		commit, err := opts.GitClient.LastCommit()
-		if err == nil {
-			opts.Branch = commit.Sha
+		if err != nil {
+			return err
 		}
+		opts.Branch = commit.Sha
 	}
 
 	section, err := parseSection(baseRepo, opts)
@@ -278,5 +279,5 @@ func (gc *remoteGitClient) LastCommit() (*git.Commit, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &git.Commit{Sha: commit.OID}, err
+	return &git.Commit{Sha: commit.OID}, nil
 }
