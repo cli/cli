@@ -29,16 +29,23 @@ type Testing interface {
 
 func (r *Registry) Verify(t Testing) {
 	var unmatched []string
+	var n int
 	for _, s := range r.stubs {
 		if !s.matched {
-			unmatched = append(unmatched, s.Label())
+			n++
+			if label := s.Label(); label != "" {
+				unmatched = append(unmatched, s.Label())
+			}
 		}
 	}
-	if len(unmatched) > 0 {
+	if n > 0 {
 		t.Helper()
 		// NOTE: stubs offer no useful reflection, so we can't print details
 		// about dead stubs and what they were trying to match
-		t.Errorf("%d unmatched HTTP stubs: %s", len(unmatched), strings.Join(unmatched, "\n"))
+		t.Errorf("%d unmatched HTTP stubs", n)
+		if len(unmatched) > 0 {
+			t.Errorf("unmatched stubs with labels:\n%s", strings.Join(unmatched, "\n"))
+		}
 	}
 }
 
