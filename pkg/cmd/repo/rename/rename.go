@@ -2,6 +2,7 @@ package rename
 
 import (
 	"fmt"
+	"github.com/cli/cli/v2/api"
 	"net/http"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -114,7 +115,9 @@ func renameRun(opts *RenameOptions) error {
 		}
 	}
 
-	newRepo, err := apiRename(httpClient, currRepo, newRepoName)
+	apiClient := api.NewClientFromHTTP(httpClient)
+
+	newRepo, err := api.RenameRepo(apiClient, currRepo, newRepoName)
 	if err != nil {
 		return err
 	}
@@ -123,6 +126,8 @@ func renameRun(opts *RenameOptions) error {
 	if opts.IO.IsStdoutTTY() {
 		fmt.Fprintf(opts.IO.Out, "%s Renamed repository %s\n", cs.SuccessIcon(), ghrepo.FullName(newRepo))
 	}
+
+	fmt.Println(opts.HasRepoOverride, "=========erpo override=============")
 
 	if opts.HasRepoOverride {
 		return nil

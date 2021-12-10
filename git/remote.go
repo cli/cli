@@ -153,6 +153,7 @@ func AddRemote(name, u string) (*Remote, error) {
 }
 
 func UpdateRemoteURL(name, u string) error {
+	fmt.Println(name, u, "=====================name u==============")
 	addCmd, err := GitCommand("remote", "set-url", name, u)
 	if err != nil {
 		return err

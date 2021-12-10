@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"io"
 	"net/http"
 	"sort"
@@ -508,6 +509,37 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, e
 
 	result := repositoryV3{}
 	err := client.REST(repo.RepoHost(), "POST", path, body, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Repository{
+		ID:        result.NodeID,
+		Name:      result.Name,
+		CreatedAt: result.CreatedAt,
+		Owner: RepositoryOwner{
+			Login: result.Owner.Login,
+		},
+		ViewerPermission: "WRITE",
+		hostname:         repo.RepoHost(),
+	}, nil
+}
+
+// RenameRepo renames the repository on GitHub and returns the renamed repository
+func RenameRepo(client *Client, repo ghrepo.Interface, newRepoName string) (*Repository, error) {
+	input := map[string]string{"name": newRepoName}
+	body := &bytes.Buffer{}
+	enc := json.NewEncoder(body)
+	if err := enc.Encode(input); err != nil {
+		return nil, err
+	}
+
+	path := fmt.Sprintf("%srepos/%s",
+		ghinstance.RESTPrefix(repo.RepoHost()),
+		ghrepo.FullName(repo))
+
+	result := repositoryV3{}
+	err := client.REST(repo.RepoHost(), "PATCH", path, body, &result)
 	if err != nil {
 		return nil, err
 	}
