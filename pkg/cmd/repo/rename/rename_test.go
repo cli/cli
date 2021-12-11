@@ -122,7 +122,7 @@ func TestRenameRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.StatusStringResponse(204, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
+					httpmock.StatusStringResponse(200, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git remote set-url origin https://github.com/OWNER/NEW_REPO.git`, 0, "")
@@ -141,7 +141,7 @@ func TestRenameRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.StatusStringResponse(204, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
+					httpmock.StatusStringResponse(200, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
 			},
 			tty: true,
 		},
@@ -154,7 +154,7 @@ func TestRenameRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.StatusStringResponse(204, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
+					httpmock.StatusStringResponse(200, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git remote set-url origin https://github.com/OWNER/NEW_REPO.git`, 0, "")
@@ -169,7 +169,7 @@ func TestRenameRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.StatusStringResponse(204, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
+					httpmock.StatusStringResponse(200, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git remote set-url origin https://github.com/OWNER/NEW_REPO.git`, 0, "")
@@ -189,7 +189,7 @@ func TestRenameRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.StatusStringResponse(204, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
+					httpmock.StatusStringResponse(200, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git remote set-url origin https://github.com/OWNER/NEW_REPO.git`, 0, "")
