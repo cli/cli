@@ -64,6 +64,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 				- by URL, e.g. "https://github.com/OWNER/REPO"
 			`),
 		},
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cmd.Flags().NFlag() == 0 {
 				opts.InteractiveMode = true
