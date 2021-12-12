@@ -5,26 +5,31 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"net/http"
-
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/pkg/set"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"strconv"
 )
 
 type EditOptions struct {
-	HTTPClient   *http.Client
-	Repository   ghrepo.Interface
-	Edits        EditRepositoryInput
-	AddTopics    []string
-	RemoveTopics []string
+	HTTPClient      *http.Client
+	Repository      ghrepo.Interface
+	IO              *iostreams.IOStreams
+	Edits           EditRepositoryInput
+	AddTopics       []string
+	RemoveTopics    []string
+	InteractiveMode bool
 }
 
 type EditRepositoryInput struct {
@@ -45,7 +50,9 @@ type EditRepositoryInput struct {
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobra.Command {
-	opts := &EditOptions{}
+	opts := &EditOptions{
+		IO: f.IOStreams,
+	}
 
 	cmd := &cobra.Command{
 		Use:   "edit [<repository>]",
@@ -57,10 +64,9 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 				- by URL, e.g. "https://github.com/OWNER/REPO"
 			`),
 		},
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cmd.Flags().NFlag() == 0 {
-				return cmdutil.FlagErrorf("at least one flag is required")
+				opts.InteractiveMode = true
 			}
 
 			if len(args) > 0 {
@@ -111,6 +117,23 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 }
 
 func editRun(ctx context.Context, opts *EditOptions) error {
+	apiClient := api.NewClientFromHTTP(opts.HTTPClient)
+
+	opts.IO.StartProgressIndicator()
+	fetchedRepo, err := api.FetchRepository(apiClient, opts.Repository, []string{"description", "homepageUrl", "defaultBranchRef", "isInOrganization"})
+	if err != nil {
+		return err
+	}
+	opts.IO.StopProgressIndicator()
+
+	if opts.InteractiveMode {
+		editOpts, err := interactiveRepoEdit(fetchedRepo)
+		if err != nil {
+			return err
+		}
+		opts.Edits = *editOpts
+	}
+
 	repo := opts.Repository
 	apiPath := fmt.Sprintf("repos/%s/%s", repo.RepoOwner(), repo.RepoName())
 
@@ -153,6 +176,192 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 	}
 
 	return g.Wait()
+}
+
+func interactiveRepoEdit(r *api.Repository) (*EditRepositoryInput, error) {
+	var qs []*survey.Question
+
+	repoDescriptionQuestion := &survey.Question{
+		Name: "repoDescription",
+		Prompt: &survey.Input{
+			Message: "Description of the repository",
+			Default: r.Description,
+		},
+	}
+
+	qs = append(qs, repoDescriptionQuestion)
+
+	repoHomePageURLQuestion := &survey.Question{
+		Name: "repoURL",
+		Prompt: &survey.Input{
+			Message: "Repository home page URL",
+			Default: r.HomepageURL,
+		},
+	}
+
+	qs = append(qs, repoHomePageURLQuestion)
+
+	defaultBranchNameQuestion := &survey.Question{
+		Name: "defaultBranchName",
+		Prompt: &survey.Input{
+			Message: "Default branch name?",
+			Default: r.DefaultBranchRef.Name,
+		},
+	}
+
+	qs = append(qs, defaultBranchNameQuestion)
+
+	enableWikisQuestion := &survey.Question{
+		Name: "enableWikis",
+		Prompt: &survey.Confirm{
+			Message: "Enable Wikis?",
+			Default: true,
+		},
+	}
+
+	qs = append(qs, enableWikisQuestion)
+
+	enableIssuesQuestion := &survey.Question{
+		Name: "enableIssues",
+		Prompt: &survey.Confirm{
+			Message: "Enable Issues?",
+			Default: true,
+		},
+	}
+
+	qs = append(qs, enableIssuesQuestion)
+
+	enableProjectsQuestion := &survey.Question{
+		Name: "enableProjects",
+		Prompt: &survey.Confirm{
+			Message: "Enable Projects?",
+			Default: true,
+		},
+	}
+
+	qs = append(qs, enableProjectsQuestion)
+
+	repoVisibilityQuestion := &survey.Question{
+		Name: "repoVisibility",
+		Prompt: &survey.Select{
+			Message: "Visibility",
+			Options: []string{"Public", "Private", "Internal"},
+		},
+	}
+	qs = append(qs, repoVisibilityQuestion)
+
+	mergeOptionsQuestion := &survey.Question{
+		Name: "mergeOptions",
+		Prompt: &survey.MultiSelect{
+			Message: "Choose a merge option",
+			Default: []string{"Allow Merge Commits", "Allow Squash Merging", "Allow Rebase Merging"},
+			Options: []string{"Allow Merge Commits", "Allow Squash Merging", "Allow Rebase Merging"},
+		},
+	}
+	qs = append(qs, mergeOptionsQuestion)
+
+	enableAutoMergeQuestion := &survey.Question{
+		Name: "enableAutoMerge",
+		Prompt: &survey.Confirm{
+			Message: "Enable Auto Merge?",
+			Default: false,
+		},
+	}
+	qs = append(qs, enableAutoMergeQuestion)
+
+	templateRepoQuestion := &survey.Question{
+		Name: "isTemplateRepo",
+		Prompt: &survey.Confirm{
+			Message: "Convert into a template repository?",
+			Default: false,
+		},
+	}
+
+	qs = append(qs, templateRepoQuestion)
+
+	autoDeleteBranchQuestion := &survey.Question{
+		Name: "autoDeleteBranch",
+		Prompt: &survey.Confirm{
+			Message: "Automatically delete head branches after merging?",
+			Default: false,
+		},
+	}
+
+	qs = append(qs, autoDeleteBranchQuestion)
+
+	if r.IsInOrganization {
+		allowForkingQuestion := &survey.Question{
+			Name: "allowForking",
+			Prompt: &survey.Confirm{
+				Message: "Allow forking (of an organization repository)?",
+				Default: false,
+			},
+		}
+
+		qs = append(qs, allowForkingQuestion)
+	}
+
+	answers := struct {
+		RepoDescription   string
+		RepoURL           string
+		RepoVisibility    string
+		MergeOptions      []int
+		DefaultBranchName string
+		EnableWikis       bool
+		EnableIssues      bool
+		EnableProjects    bool
+		EnableAutoMerge   bool
+		IsTemplateRepo    bool
+		AutoDeleteBranch  bool
+		AllowForking      bool
+	}{}
+
+	err := prompt.SurveyAsk(qs, &answers)
+	if err != nil {
+		return nil, err
+	}
+
+	repoInput := &EditRepositoryInput{
+		Description:         &answers.RepoDescription,
+		Homepage:            &answers.RepoURL,
+		Visibility:          &answers.RepoVisibility,
+		EnableIssues:        &answers.EnableIssues,
+		EnableProjects:      &answers.EnableProjects,
+		EnableWiki:          &answers.EnableWikis,
+		IsTemplate:          &answers.IsTemplateRepo,
+		DefaultBranch:       &answers.DefaultBranchName,
+		EnableAutoMerge:     &answers.EnableAutoMerge,
+		DeleteBranchOnMerge: &answers.AutoDeleteBranch,
+	}
+
+	if r.IsInOrganization {
+		repoInput.AllowForking = &answers.AllowForking
+	}
+
+	mergeOptions := map[string]bool{
+		"0": false,
+		"1": false,
+		"2": false,
+	}
+
+	for _, v := range answers.MergeOptions {
+		index := strconv.Itoa(v)
+		mergeOptions[index] = true
+	}
+
+	if emc, ok := mergeOptions["0"]; ok {
+		repoInput.EnableMergeCommit = &emc
+	}
+
+	if esm, ok := mergeOptions["1"]; ok {
+		repoInput.EnableSquashMerge = &esm
+	}
+
+	if erm, ok := mergeOptions["2"]; ok {
+		repoInput.EnableRebaseMerge = &erm
+	}
+
+	return repoInput, nil
 }
 
 func getTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface) ([]string, error) {
