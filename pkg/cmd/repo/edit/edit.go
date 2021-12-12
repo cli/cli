@@ -118,16 +118,15 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 }
 
 func editRun(ctx context.Context, opts *EditOptions) error {
-	apiClient := api.NewClientFromHTTP(opts.HTTPClient)
-
-	opts.IO.StartProgressIndicator()
-	fetchedRepo, err := api.FetchRepository(apiClient, opts.Repository, []string{"description", "homepageUrl", "defaultBranchRef", "isInOrganization"})
-	if err != nil {
-		return err
-	}
-	opts.IO.StopProgressIndicator()
-
 	if opts.InteractiveMode {
+		apiClient := api.NewClientFromHTTP(opts.HTTPClient)
+
+		opts.IO.StartProgressIndicator()
+		fetchedRepo, err := api.FetchRepository(apiClient, opts.Repository, []string{"description", "homepageUrl", "defaultBranchRef", "isInOrganization"})
+		if err != nil {
+			return err
+		}
+		opts.IO.StopProgressIndicator()
 		editOpts, err := interactiveRepoEdit(fetchedRepo)
 		if err != nil {
 			return err

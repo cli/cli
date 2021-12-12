@@ -24,11 +24,6 @@ func TestNewCmdEdit(t *testing.T) {
 		wantErr  string
 	}{
 		{
-			name:    "no argument",
-			args:    "",
-			wantErr: "at least one flag is required",
-		},
-		{
 			name: "change repo description",
 			args: "--description hello",
 			wantOpts: EditOptions{
