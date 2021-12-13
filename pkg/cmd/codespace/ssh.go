@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/liveshare"
+	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 )
 
@@ -299,10 +300,12 @@ func (crwc *combinedReadWriteCloser) Write(p []byte) (n int, err error) {
 }
 
 func (crwc *combinedReadWriteCloser) Close() error {
-	werr := crwc.writer.Close()
-	rerr := crwc.reader.Close()
-	if werr != nil {
-		return werr
+	var errs error
+	if err := crwc.writer.Close(); err != nil {
+		errs = multierror.Append(errs, err)
 	}
-	return rerr
+	if err := crwc.reader.Close(); err != nil {
+		errs = multierror.Append(errs, err)
+	}
+	return errs
 }
