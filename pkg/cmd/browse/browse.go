@@ -1,6 +1,8 @@
 package browse
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -12,6 +14,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/git/remoterepo"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -23,13 +26,17 @@ type browser interface {
 	Browse(string) error
 }
 
+type gitClient interface {
+	LastCommit(context.Context) (*git.Commit, error)
+	PathPrefix(context.Context) (string, error)
+}
+
 type BrowseOptions struct {
-	BaseRepo         func() (ghrepo.Interface, error)
-	Browser          browser
-	HttpClient       func() (*http.Client, error)
-	IO               *iostreams.IOStreams
-	PathFromRepoRoot func() string
-	GitClient        gitClient
+	BaseRepo   func() (ghrepo.Interface, error)
+	Browser    browser
+	HttpClient func() (*http.Client, error)
+	IO         *iostreams.IOStreams
+	GitClient  gitClient
 
 	SelectorArg string
 
@@ -43,11 +50,10 @@ type BrowseOptions struct {
 
 func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Command {
 	opts := &BrowseOptions{
-		Browser:          f.Browser,
-		HttpClient:       f.HttpClient,
-		IO:               f.IOStreams,
-		PathFromRepoRoot: git.PathFromRepoRoot,
-		GitClient:        &localGitClient{},
+		Browser:    f.Browser,
+		HttpClient: f.HttpClient,
+		IO:         f.IOStreams,
+		GitClient:  &git.LocalRepo{},
 	}
 
 	cmd := &cobra.Command{
@@ -100,7 +106,10 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 				return err
 			}
 			if cmd.Flags().Changed("repo") {
-				opts.GitClient = &remoteGitClient{opts.BaseRepo, opts.HttpClient}
+				opts.GitClient = &remoterepo.Client{
+					Repo:       opts.BaseRepo,
+					HTTPClient: opts.HttpClient,
+				}
 			}
 
 			if runF != nil {
@@ -128,7 +137,7 @@ func runBrowse(opts *BrowseOptions) error {
 	}
 
 	if opts.CommitFlag {
-		commit, err := opts.GitClient.LastCommit()
+		commit, err := opts.GitClient.LastCommit(context.TODO())
 		if err != nil {
 			return err
 		}
@@ -217,7 +226,11 @@ func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err 
 
 	p = filepath.ToSlash(parts[0])
 	if !path.IsAbs(p) {
-		p = path.Join(opts.PathFromRepoRoot(), p)
+		prefix, err := opts.GitClient.PathPrefix(context.TODO())
+		if err != nil && !errors.Is(err, remoterepo.ErrNotImplemented) {
+			return "", 0, 0, err
+		}
+		p = path.Join(prefix, p)
 		if p == "." || strings.HasPrefix(p, "..") {
 			p = ""
 		}
@@ -250,34 +263,4 @@ func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err 
 func isNumber(arg string) bool {
 	_, err := strconv.Atoi(arg)
 	return err == nil
-}
-
-// gitClient is used to implement functions that can be performed on both local and remote git repositories
-type gitClient interface {
-	LastCommit() (*git.Commit, error)
-}
-
-type localGitClient struct{}
-
-type remoteGitClient struct {
-	repo       func() (ghrepo.Interface, error)
-	httpClient func() (*http.Client, error)
-}
-
-func (gc *localGitClient) LastCommit() (*git.Commit, error) { return git.LastCommit() }
-
-func (gc *remoteGitClient) LastCommit() (*git.Commit, error) {
-	httpClient, err := gc.httpClient()
-	if err != nil {
-		return nil, err
-	}
-	repo, err := gc.repo()
-	if err != nil {
-		return nil, err
-	}
-	commit, err := api.LastCommit(api.NewClientFromHTTP(httpClient), repo)
-	if err != nil {
-		return nil, err
-	}
-	return &git.Commit{Sha: commit.OID}, nil
 }

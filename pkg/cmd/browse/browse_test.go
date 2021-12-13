@@ -1,6 +1,7 @@
 package browse
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -148,24 +149,20 @@ func TestNewCmdBrowse(t *testing.T) {
 	}
 }
 
-func setGitDir(t *testing.T, dir string) {
-	// taken from git_test.go
-	old_GIT_DIR := os.Getenv("GIT_DIR")
-	os.Setenv("GIT_DIR", dir)
-	t.Cleanup(func() {
-		os.Setenv("GIT_DIR", old_GIT_DIR)
-	})
+type testGitClient struct {
+	pathPrefix string
 }
 
-type testGitClient struct{}
+func (gc *testGitClient) PathPrefix(_ context.Context) (string, error) {
+	return gc.pathPrefix, nil
+}
 
-func (gc *testGitClient) LastCommit() (*git.Commit, error) {
+func (gc *testGitClient) LastCommit(_ context.Context) (*git.Commit, error) {
 	return &git.Commit{Sha: "6f1a2405cace1633d89a79c74c65f22fe78f9659"}, nil
 }
 
 func Test_runBrowse(t *testing.T) {
 	s := string(os.PathSeparator)
-	setGitDir(t, "../../../git/fixtures/simple.git")
 	tests := []struct {
 		name          string
 		opts          BrowseOptions
@@ -207,8 +204,11 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/ravocean/ThreatLevelMidnight/wiki",
 		},
 		{
-			name:          "file argument",
-			opts:          BrowseOptions{SelectorArg: "path/to/file.txt"},
+			name: "file argument",
+			opts: BrowseOptions{
+				SelectorArg: "path/to/file.txt",
+				GitClient:   &testGitClient{},
+			},
 			baseRepo:      ghrepo.New("ken", "mrprofessor"),
 			defaultBranch: "main",
 			expectedURL:   "https://github.com/ken/mrprofessor/tree/main/path/to/file.txt",
@@ -234,6 +234,7 @@ func Test_runBrowse(t *testing.T) {
 			opts: BrowseOptions{
 				Branch:      "trunk",
 				SelectorArg: "main.go",
+				GitClient:   &testGitClient{},
 			},
 			baseRepo:    ghrepo.New("bchadwic", "LedZeppelinIV"),
 			expectedURL: "https://github.com/bchadwic/LedZeppelinIV/tree/trunk/main.go",
@@ -241,8 +242,8 @@ func Test_runBrowse(t *testing.T) {
 		{
 			name: "branch flag within dir",
 			opts: BrowseOptions{
-				Branch:           "feature-123",
-				PathFromRepoRoot: func() string { return "pkg/dir" },
+				Branch:    "feature-123",
+				GitClient: &testGitClient{pathPrefix: "pkg/dir"},
 			},
 			baseRepo:    ghrepo.New("bstnc", "yeepers"),
 			expectedURL: "https://github.com/bstnc/yeepers/tree/feature-123",
@@ -250,9 +251,9 @@ func Test_runBrowse(t *testing.T) {
 		{
 			name: "branch flag within dir with .",
 			opts: BrowseOptions{
-				Branch:           "feature-123",
-				SelectorArg:      ".",
-				PathFromRepoRoot: func() string { return "pkg/dir" },
+				Branch:      "feature-123",
+				SelectorArg: ".",
+				GitClient:   &testGitClient{pathPrefix: "pkg/dir"},
 			},
 			baseRepo:    ghrepo.New("bstnc", "yeepers"),
 			expectedURL: "https://github.com/bstnc/yeepers/tree/feature-123/pkg/dir",
@@ -260,9 +261,9 @@ func Test_runBrowse(t *testing.T) {
 		{
 			name: "branch flag within dir with dir",
 			opts: BrowseOptions{
-				Branch:           "feature-123",
-				SelectorArg:      "inner/more",
-				PathFromRepoRoot: func() string { return "pkg/dir" },
+				Branch:      "feature-123",
+				SelectorArg: "inner/more",
+				GitClient:   &testGitClient{pathPrefix: "pkg/dir"},
 			},
 			baseRepo:    ghrepo.New("bstnc", "yeepers"),
 			expectedURL: "https://github.com/bstnc/yeepers/tree/feature-123/pkg/dir/inner/more",
@@ -271,6 +272,7 @@ func Test_runBrowse(t *testing.T) {
 			name: "file with line number",
 			opts: BrowseOptions{
 				SelectorArg: "path/to/file.txt:32",
+				GitClient:   &testGitClient{},
 			},
 			baseRepo:      ghrepo.New("ravocean", "angur"),
 			defaultBranch: "trunk",
@@ -280,6 +282,7 @@ func Test_runBrowse(t *testing.T) {
 			name: "file with line range",
 			opts: BrowseOptions{
 				SelectorArg: "path/to/file.txt:32-40",
+				GitClient:   &testGitClient{},
 			},
 			baseRepo:      ghrepo.New("ravocean", "angur"),
 			defaultBranch: "trunk",
@@ -289,6 +292,7 @@ func Test_runBrowse(t *testing.T) {
 			name: "invalid default branch",
 			opts: BrowseOptions{
 				SelectorArg: "chocolate-pecan-pie.txt",
+				GitClient:   &testGitClient{},
 			},
 			baseRepo:      ghrepo.New("andrewhsu", "recipies"),
 			defaultBranch: "",
@@ -298,6 +302,7 @@ func Test_runBrowse(t *testing.T) {
 			name: "file with invalid line number after colon",
 			opts: BrowseOptions{
 				SelectorArg: "laptime-notes.txt:w-9",
+				GitClient:   &testGitClient{},
 			},
 			baseRepo: ghrepo.New("andrewhsu", "sonoma-raceway"),
 			wantsErr: true,
@@ -314,6 +319,7 @@ func Test_runBrowse(t *testing.T) {
 			name: "file with invalid line number",
 			opts: BrowseOptions{
 				SelectorArg: "path/to/file.txt:32a",
+				GitClient:   &testGitClient{},
 			},
 			baseRepo: ghrepo.New("ttran112", "ttrain211"),
 			wantsErr: true,
@@ -322,6 +328,7 @@ func Test_runBrowse(t *testing.T) {
 			name: "file with invalid line range",
 			opts: BrowseOptions{
 				SelectorArg: "path/to/file.txt:32-abc",
+				GitClient:   &testGitClient{},
 			},
 			baseRepo: ghrepo.New("ttran112", "ttrain211"),
 			wantsErr: true,
@@ -341,6 +348,7 @@ func Test_runBrowse(t *testing.T) {
 			opts: BrowseOptions{
 				Branch:      "first-browse-pull",
 				SelectorArg: "browse.go:32",
+				GitClient:   &testGitClient{},
 			},
 			baseRepo:    ghrepo.New("github", "ThankYouGitHub"),
 			wantsErr:    false,
@@ -351,6 +359,7 @@ func Test_runBrowse(t *testing.T) {
 			opts: BrowseOptions{
 				Branch:        "3-0-stable",
 				SelectorArg:   "init.rb:6",
+				GitClient:     &testGitClient{},
 				NoBrowserFlag: true,
 			},
 			baseRepo:    ghrepo.New("mislav", "will_paginate"),
@@ -382,9 +391,7 @@ func Test_runBrowse(t *testing.T) {
 			name: "relative path from browse_test.go",
 			opts: BrowseOptions{
 				SelectorArg: filepath.Join(".", "browse_test.go"),
-				PathFromRepoRoot: func() string {
-					return "pkg/cmd/browse/"
-				},
+				GitClient:   &testGitClient{pathPrefix: "pkg/cmd/browse/"},
 			},
 			baseRepo:      ghrepo.New("bchadwic", "gh-graph"),
 			defaultBranch: "trunk",
@@ -395,9 +402,7 @@ func Test_runBrowse(t *testing.T) {
 			name: "relative path to file in parent folder from browse_test.go",
 			opts: BrowseOptions{
 				SelectorArg: ".." + s + "pr",
-				PathFromRepoRoot: func() string {
-					return "pkg/cmd/browse/"
-				},
+				GitClient:   &testGitClient{pathPrefix: "pkg/cmd/browse/"},
 			},
 			baseRepo:      ghrepo.New("bchadwic", "gh-graph"),
 			defaultBranch: "trunk",
@@ -409,6 +414,7 @@ func Test_runBrowse(t *testing.T) {
 			opts: BrowseOptions{
 				SelectorArg: "?=hello world/ *:23-44",
 				Branch:      "branch/with spaces?",
+				GitClient:   &testGitClient{},
 			},
 			baseRepo:    ghrepo.New("bchadwic", "test"),
 			expectedURL: "https://github.com/bchadwic/test/blob/branch/with%20spaces%3F/%3F=hello%20world/%20%2A?plain=1#L23-L44",
@@ -436,9 +442,6 @@ func Test_runBrowse(t *testing.T) {
 				return &http.Client{Transport: &reg}, nil
 			}
 			opts.Browser = &browser
-			if opts.PathFromRepoRoot == nil {
-				opts.PathFromRepoRoot = git.PathFromRepoRoot
-			}
 
 			err := runBrowse(&opts)
 			if tt.wantsErr {
@@ -553,9 +556,8 @@ func Test_parsePathFromFileArg(t *testing.T) {
 	}
 	for _, tt := range tests {
 		path, _, _, _ := parseFile(BrowseOptions{
-			PathFromRepoRoot: func() string {
-				return tt.currentDir
-			}}, tt.fileArg)
+			GitClient: &testGitClient{pathPrefix: tt.currentDir},
+		}, tt.fileArg)
 		assert.Equal(t, tt.expectedPath, path, tt.name)
 	}
 }
