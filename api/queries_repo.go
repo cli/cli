@@ -524,6 +524,26 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, e
 	}, nil
 }
 
+func LastCommit(client *Client, repo ghrepo.Interface) (*Commit, error) {
+	var responseData struct {
+		Repository struct {
+			DefaultBranchRef struct {
+				Target struct {
+					Commit `graphql:"... on Commit"`
+				}
+			}
+		} `graphql:"repository(owner: $owner, name: $repo)"`
+	}
+	variables := map[string]interface{}{
+		"owner": githubv4.String(repo.RepoOwner()), "repo": githubv4.String(repo.RepoName()),
+	}
+	gql := graphQLClient(client.http, repo.RepoHost())
+	if err := gql.QueryNamed(context.Background(), "LastCommit", &responseData, variables); err != nil {
+		return nil, err
+	}
+	return &responseData.Repository.DefaultBranchRef.Target.Commit, nil
+}
+
 // RepoFindForks finds forks of the repo that are affiliated with the viewer
 func RepoFindForks(client *Client, repo ghrepo.Interface, limit int) ([]*Repository, error) {
 	result := struct {
