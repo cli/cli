@@ -26,6 +26,7 @@ type sshOptions struct {
 	serverPort int
 	debug      bool
 	debugFile  string
+	stdio      bool
 	scpArgs    []string // scp arguments, for 'cs cp' (nil for 'cs ssh')
 }
 
@@ -46,6 +47,11 @@ func newSSHCmd(app *App) *cobra.Command {
 	sshCmd.Flags().StringVarP(&opts.codespace, "codespace", "c", "", "Name of the codespace")
 	sshCmd.Flags().BoolVarP(&opts.debug, "debug", "d", false, "Log debug data to a file")
 	sshCmd.Flags().StringVarP(&opts.debugFile, "debug-file", "", "", "Path of the file log to")
+
+	// TODO: alternate name: "--proxy"? something else?
+	// also need to make this mutually exclusive with profile/server-port
+	// should probably require --codespace as well
+	sshCmd.Flags().BoolVarP(&opts.stdio, "stdio", "", false, "Proxy sshd connection to stdio")
 
 	return sshCmd
 }
@@ -102,49 +108,56 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}
 
-	localSSHServerPort := opts.serverPort
-	usingCustomPort := localSSHServerPort != 0 // suppress log of command line in Shell
-
-	// Ensure local port is listening before client (Shell) connects.
-	// Unless the user specifies a server port, localSSHServerPort is 0
-	// and thus the client will pick a random port.
-	listen, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", localSSHServerPort))
-	if err != nil {
-		return err
-	}
-	defer listen.Close()
-	localSSHServerPort = listen.Addr().(*net.TCPAddr).Port
-
-	connectDestination := opts.profile
-	if connectDestination == "" {
-		connectDestination = fmt.Sprintf("%s@localhost", sshUser)
-	}
-
-	tunnelClosed := make(chan error, 1)
-	go func() {
+	if opts.stdio {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
-		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // always non-nil
-	}()
-
-	shellClosed := make(chan error, 1)
-	go func() {
-		var err error
-		if opts.scpArgs != nil {
-			err = codespaces.Copy(ctx, opts.scpArgs, localSSHServerPort, connectDestination)
-		} else {
-			err = codespaces.Shell(ctx, a.errLogger, sshArgs, localSSHServerPort, connectDestination, usingCustomPort)
-		}
-		shellClosed <- err
-	}()
-
-	select {
-	case err := <-tunnelClosed:
+		stdio := newCombinedReadWriteCloser(os.Stdin, os.Stdout)
+		err := fwd.Forward(ctx, stdio) // always non-nil
 		return fmt.Errorf("tunnel closed: %w", err)
-	case err := <-shellClosed:
+	} else {
+		localSSHServerPort := opts.serverPort
+		usingCustomPort := localSSHServerPort != 0 // suppress log of command line in Shell
+
+		// Ensure local port is listening before client (Shell) connects.
+		// Unless the user specifies a server port, localSSHServerPort is 0
+		// and thus the client will pick a random port.
+		listen, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", localSSHServerPort))
 		if err != nil {
-			return fmt.Errorf("shell closed: %w", err)
+			return err
 		}
-		return nil // success
+		defer listen.Close()
+		localSSHServerPort = listen.Addr().(*net.TCPAddr).Port
+
+		connectDestination := opts.profile
+		if connectDestination == "" {
+			connectDestination = fmt.Sprintf("%s@localhost", sshUser)
+		}
+
+		tunnelClosed := make(chan error, 1)
+		go func() {
+			fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
+			tunnelClosed <- fwd.ForwardToListener(ctx, listen) // always non-nil
+		}()
+
+		shellClosed := make(chan error, 1)
+		go func() {
+			var err error
+			if opts.scpArgs != nil {
+				err = codespaces.Copy(ctx, opts.scpArgs, localSSHServerPort, connectDestination)
+			} else {
+				err = codespaces.Shell(ctx, a.errLogger, sshArgs, localSSHServerPort, connectDestination, usingCustomPort)
+			}
+			shellClosed <- err
+		}()
+
+		select {
+		case err := <-tunnelClosed:
+			return fmt.Errorf("tunnel closed: %w", err)
+		case err := <-shellClosed:
+			if err != nil {
+				return fmt.Errorf("shell closed: %w", err)
+			}
+			return nil // success
+		}
 	}
 }
 
