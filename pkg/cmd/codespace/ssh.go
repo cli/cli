@@ -277,3 +277,32 @@ func (fl *fileLogger) Name() string {
 func (fl *fileLogger) Close() error {
 	return fl.f.Close()
 }
+
+type combinedReadWriteCloser struct {
+	reader *os.File
+	writer *os.File
+}
+
+func newCombinedReadWriteCloser(reader *os.File, writer *os.File) (crwc *combinedReadWriteCloser) {
+	return &combinedReadWriteCloser{
+		reader: reader,
+		writer: writer,
+	}
+}
+
+func (crwc *combinedReadWriteCloser) Read(p []byte) (n int, err error) {
+	return crwc.reader.Read(p)
+}
+
+func (crwc *combinedReadWriteCloser) Write(p []byte) (n int, err error) {
+	return crwc.writer.Write(p)
+}
+
+func (crwc *combinedReadWriteCloser) Close() error {
+	werr := crwc.writer.Close()
+	rerr := crwc.reader.Close()
+	if werr != nil {
+		return werr
+	}
+	return rerr
+}
