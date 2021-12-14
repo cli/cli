@@ -323,6 +323,66 @@ func Test_createRun(t *testing.T) {
 			},
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n✓ Pushed commits to https://github.com/OWNER/REPO.git\n",
 		},
+		{
+			name: "noninteractive create from scratch",
+			opts: &CreateOptions{
+				Interactive: false,
+				Name:        "REPO",
+				Visibility:  "PRIVATE",
+			},
+			tty: false,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation RepositoryCreate\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"createRepository": {
+								"repository": {
+									"id": "REPOID",
+									"name": "REPO",
+									"owner": {"login":"OWNER"},
+									"url": "https://github.com/OWNER/REPO"
+								}
+							}
+						}
+					}`))
+			},
+			wantStdout: "https://github.com/OWNER/REPO\n",
+		},
+		{
+			name: "noninteractive create from source",
+			opts: &CreateOptions{
+				Interactive: false,
+				Source:      ".",
+				Name:        "REPO",
+				Visibility:  "PRIVATE",
+			},
+			tty: false,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation RepositoryCreate\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"createRepository": {
+								"repository": {
+									"id": "REPOID",
+									"name": "REPO",
+									"owner": {"login":"OWNER"},
+									"url": "https://github.com/OWNER/REPO"
+								}
+							}
+						}
+					}`))
+			},
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git -C . rev-parse --git-dir`, 0, ".git")
+				cs.Register(`git -C . rev-parse HEAD`, 0, "commithash")
+				cs.Register(`git -C . remote add origin https://github.com/OWNER/REPO`, 0, "")
+			},
+			wantStdout: "https://github.com/OWNER/REPO\n",
+		},
 	}
 	for _, tt := range tests {
 		q, teardown := prompt.InitAskStubber()
@@ -348,7 +408,7 @@ func Test_createRun(t *testing.T) {
 			tt.execStubs(cs)
 		}
 
-		io, _, stdout, _ := iostreams.Test()
+		io, _, stdout, stderr := iostreams.Test()
 		io.SetStdinTTY(tt.tty)
 		io.SetStdoutTTY(tt.tty)
 		tt.opts.IO = io
@@ -363,6 +423,7 @@ func Test_createRun(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantStdout, stdout.String())
+			assert.Equal(t, "", stderr.String())
 		})
 	}
 }

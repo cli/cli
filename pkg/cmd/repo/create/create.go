@@ -356,6 +356,8 @@ func createFromScratch(opts *CreateOptions) error {
 			"%s Created repository %s on GitHub\n",
 			cs.SuccessIconWithColor(cs.Green),
 			ghrepo.FullName(repo))
+	} else {
+		fmt.Fprintln(opts.IO.Out, repo.URL)
 	}
 
 	if opts.Interactive {
@@ -503,6 +505,8 @@ func createFromLocal(opts *CreateOptions) error {
 			"%s Created repository %s on GitHub\n",
 			cs.SuccessIconWithColor(cs.Green),
 			ghrepo.FullName(repo))
+	} else {
+		fmt.Fprintln(stdout, repo.URL)
 	}
 
 	protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
