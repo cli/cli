@@ -45,10 +45,6 @@ type CreateOptions struct {
 	DisableIssues     bool
 	DisableWiki       bool
 	Interactive       bool
-
-	ConfirmSubmit bool
-	EnableIssues  bool
-	EnableWiki    bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -57,6 +53,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
 	}
+
+	var enableIssues bool
+	var enableWiki bool
 
 	cmd := &cobra.Command{
 		Use:   "create [<name>]",
@@ -135,10 +134,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 
 			if cmd.Flags().Changed("enable-issues") {
-				opts.DisableIssues = !opts.EnableIssues
+				opts.DisableIssues = !enableIssues
 			}
 			if cmd.Flags().Changed("enable-wiki") {
-				opts.DisableWiki = !opts.EnableWiki
+				opts.DisableWiki = !enableWiki
 			}
 			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "" || opts.DisableIssues || opts.DisableWiki) {
 				return cmdutil.FlagErrorf("the `--template` option is not supported with `--homepage`, `--team`, `--disable-issues`, or `--disable-wiki`")
@@ -168,9 +167,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVar(&opts.DisableWiki, "disable-wiki", false, "Disable wiki in the new repository")
 
 	// deprecated flags
-	cmd.Flags().BoolVarP(&opts.ConfirmSubmit, "confirm", "y", false, "Skip the confirmation prompt")
-	cmd.Flags().BoolVar(&opts.EnableIssues, "enable-issues", true, "Enable issues in the new repository")
-	cmd.Flags().BoolVar(&opts.EnableWiki, "enable-wiki", true, "Enable wiki in the new repository")
+	cmd.Flags().BoolP("confirm", "y", false, "Skip the confirmation prompt")
+	cmd.Flags().BoolVar(&enableIssues, "enable-issues", true, "Enable issues in the new repository")
+	cmd.Flags().BoolVar(&enableWiki, "enable-wiki", true, "Enable wiki in the new repository")
 
 	_ = cmd.Flags().MarkDeprecated("confirm", "Pass any argument to skip confirmation prompt")
 	_ = cmd.Flags().MarkDeprecated("enable-issues", "Disable issues with `--disable-issues`")
@@ -224,31 +223,27 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 }
 
 func createRun(opts *CreateOptions) error {
-	var fromScratch bool
-	modeOptions := []string{
-		"Create a new repository on GitHub from scratch",
-		"Push an existing local repository to GitHub"}
+	fromScratch := opts.Source == ""
 
 	if opts.Interactive {
-		var createMode string
-		createModePrompt := &survey.Select{
+		var selectedMode string
+		modeOptions := []string{
+			"Create a new repository on GitHub from scratch",
+			"Push an existing local repository to GitHub",
+		}
+		if err := prompt.SurveyAskOne(&survey.Select{
 			Message: "What would you like to do?",
 			Options: modeOptions,
-		}
-		err := prompt.SurveyAskOne(createModePrompt, &createMode)
-		if err != nil {
+		}, &selectedMode); err != nil {
 			return err
 		}
-		fromScratch = createMode == modeOptions[0]
-	} else {
-		fromScratch = opts.Source == ""
+		fromScratch = selectedMode == modeOptions[0]
 	}
 
 	if fromScratch {
 		return createFromScratch(opts)
-	} else {
-		return createFromLocal(opts)
 	}
+	return createFromLocal(opts)
 }
 
 // create new repo on remote host
@@ -831,31 +826,23 @@ func interactiveSource() (string, error) {
 }
 
 func confirmSubmission(repoName, repoOwner, visibility string) (bool, error) {
-	qs := []*survey.Question{}
 	targetRepo := normalizeRepoName(repoName)
 	if repoOwner != "" {
 		targetRepo = fmt.Sprintf("%s/%s", repoOwner, targetRepo)
 	}
-	promptString := fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(visibility))
-
-	confirmSubmitQuestion := &survey.Question{
+	var answer struct {
+		ConfirmSubmit bool
+	}
+	err := prompt.SurveyAsk([]*survey.Question{{
 		Name: "confirmSubmit",
 		Prompt: &survey.Confirm{
-			Message: promptString,
+			Message: fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(visibility)),
 			Default: true,
 		},
-	}
-	qs = append(qs, confirmSubmitQuestion)
-
-	answer := struct {
-		ConfirmSubmit bool
-	}{}
-
-	err := prompt.SurveyAsk(qs, &answer)
+	}}, &answer)
 	if err != nil {
 		return false, err
 	}
-
 	return answer.ConfirmSubmit, nil
 }
 
