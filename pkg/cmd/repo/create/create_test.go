@@ -206,6 +206,28 @@ func Test_createRun(t *testing.T) {
 			},
 		},
 		{
+			name: "interactive create from scratch but cancel before submit",
+			opts: &CreateOptions{Interactive: true},
+			tty:  true,
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne("Create a new repository on GitHub from scratch")
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "repoName", Value: "REPO"},
+					{Name: "repoDescription", Value: "my new repo"},
+					{Name: "repoVisibility", Value: "PRIVATE"},
+				})
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "addGitIgnore", Value: false}})
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "addLicense", Value: false}})
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "confirmSubmit", Value: false}})
+			},
+			wantStdout: "",
+			wantErr:    true,
+			errMsg:     "CancelError",
+		},
+		{
 			name: "interactive with existing repository public",
 			opts: &CreateOptions{Interactive: true},
 			tty:  true,

@@ -329,11 +329,6 @@ func createFromScratch(opts *CreateOptions) error {
 		templateRepoMainBranch = repo.DefaultBranchRef.Name
 	}
 
-	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
-	if err != nil {
-		return err
-	}
-
 	if opts.Interactive {
 		doCreate, err := confirmSubmission(opts.Name, repoToCreate.RepoOwner(), opts.Visibility)
 		if err != nil {
@@ -342,6 +337,11 @@ func createFromScratch(opts *CreateOptions) error {
 		if !doCreate {
 			return cmdutil.CancelError
 		}
+	}
+
+	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
+	if err != nil {
+		return err
 	}
 
 	cs := opts.IO.ColorScheme()
