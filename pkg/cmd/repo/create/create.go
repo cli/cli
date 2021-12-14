@@ -277,6 +277,10 @@ func createFromScratch(opts *CreateOptions) error {
 		if err != nil {
 			return err
 		}
+
+		if err := confirmSubmission(opts.Name, opts.Visibility); err != nil {
+			return err
+		}
 	}
 
 	if strings.Contains(opts.Name, "/") {
@@ -327,16 +331,6 @@ func createFromScratch(opts *CreateOptions) error {
 
 		input.TemplateRepositoryID = repo.ID
 		templateRepoMainBranch = repo.DefaultBranchRef.Name
-	}
-
-	if opts.Interactive {
-		doCreate, err := confirmSubmission(opts.Name, repoToCreate.RepoOwner(), opts.Visibility)
-		if err != nil {
-			return err
-		}
-		if !doCreate {
-			return cmdutil.CancelError
-		}
 	}
 
 	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
@@ -782,13 +776,13 @@ func interactiveRepoInfo(defaultName string) (string, string, string, error) {
 		{
 			Name: "repoName",
 			Prompt: &survey.Input{
-				Message: "Repository Name: ",
+				Message: "Repository name",
 				Default: defaultName,
 			},
 		},
 		{
 			Name:   "repoDescription",
-			Prompt: &survey.Input{Message: "Description: "},
+			Prompt: &survey.Input{Message: "Description"},
 		},
 		{
 			Name: "repoVisibility",
@@ -815,7 +809,7 @@ func interactiveRepoInfo(defaultName string) (string, string, string, error) {
 func interactiveSource() (string, error) {
 	var sourcePath string
 	sourcePrompt := &survey.Input{
-		Message: "Path to local repository: ",
+		Message: "Path to local repository",
 		Default: "."}
 
 	err := prompt.SurveyAskOne(sourcePrompt, &sourcePath)
@@ -825,10 +819,10 @@ func interactiveSource() (string, error) {
 	return sourcePath, nil
 }
 
-func confirmSubmission(repoName, repoOwner, visibility string) (bool, error) {
-	targetRepo := normalizeRepoName(repoName)
-	if repoOwner != "" {
-		targetRepo = fmt.Sprintf("%s/%s", repoOwner, targetRepo)
+func confirmSubmission(repoWithOwner, visibility string) error {
+	targetRepo := normalizeRepoName(repoWithOwner)
+	if idx := strings.IndexRune(repoWithOwner, '/'); idx > 0 {
+		targetRepo = repoWithOwner[0:idx+1] + normalizeRepoName(repoWithOwner[idx+1:])
 	}
 	var answer struct {
 		ConfirmSubmit bool
@@ -841,9 +835,12 @@ func confirmSubmission(repoName, repoOwner, visibility string) (bool, error) {
 		},
 	}}, &answer)
 	if err != nil {
-		return false, err
+		return err
 	}
-	return answer.ConfirmSubmit, nil
+	if !answer.ConfirmSubmit {
+		return cmdutil.CancelError
+	}
+	return nil
 }
 
 // normalizeRepoName takes in the repo name the user inputted and normalizes it using the same logic as GitHub (GitHub.com/new)
