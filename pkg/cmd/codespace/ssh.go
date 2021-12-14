@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces"
@@ -27,6 +28,7 @@ type sshOptions struct {
 	debug      bool
 	debugFile  string
 	stdio      bool
+	config     bool
 	scpArgs    []string // scp arguments, for 'cs cp' (nil for 'cs ssh')
 }
 
@@ -52,6 +54,7 @@ func newSSHCmd(app *App) *cobra.Command {
 	// also need to make this mutually exclusive with profile/server-port
 	// should probably require --codespace as well
 	sshCmd.Flags().BoolVarP(&opts.stdio, "stdio", "", false, "Proxy sshd connection to stdio")
+	sshCmd.Flags().BoolVarP(&opts.config, "config", "", false, "Write OpenSSH configuration to stdout")
 
 	return sshCmd
 }
@@ -61,6 +64,10 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	if opts.config {
+		return a.ListOpensshConfig(ctx)
+	}
 
 	liveshareLogger := noopLogger()
 	if opts.debug {
@@ -92,52 +99,129 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		stdio := newCombinedReadWriteCloser(os.Stdin, os.Stdout)
 		err := fwd.Forward(ctx, stdio) // always non-nil
 		return fmt.Errorf("tunnel closed: %w", err)
-	} else {
-		localSSHServerPort := opts.serverPort
-		usingCustomPort := localSSHServerPort != 0 // suppress log of command line in Shell
+	}
 
-		// Ensure local port is listening before client (Shell) connects.
-		// Unless the user specifies a server port, localSSHServerPort is 0
-		// and thus the client will pick a random port.
-		listen, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", localSSHServerPort))
+	localSSHServerPort := opts.serverPort
+	usingCustomPort := localSSHServerPort != 0 // suppress log of command line in Shell
+
+	// Ensure local port is listening before client (Shell) connects.
+	// Unless the user specifies a server port, localSSHServerPort is 0
+	// and thus the client will pick a random port.
+	listen, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", localSSHServerPort))
+	if err != nil {
+		return err
+	}
+	defer listen.Close()
+	localSSHServerPort = listen.Addr().(*net.TCPAddr).Port
+
+	connectDestination := opts.profile
+	if connectDestination == "" {
+		connectDestination = fmt.Sprintf("%s@localhost", sshUser)
+	}
+
+	tunnelClosed := make(chan error, 1)
+	go func() {
+		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
+		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // always non-nil
+	}()
+
+	shellClosed := make(chan error, 1)
+	go func() {
+		var err error
+		if opts.scpArgs != nil {
+			err = codespaces.Copy(ctx, opts.scpArgs, localSSHServerPort, connectDestination)
+		} else {
+			err = codespaces.Shell(ctx, a.errLogger, sshArgs, localSSHServerPort, connectDestination, usingCustomPort)
+		}
+		shellClosed <- err
+	}()
+
+	select {
+	case err := <-tunnelClosed:
+		return fmt.Errorf("tunnel closed: %w", err)
+	case err := <-shellClosed:
 		if err != nil {
+			return fmt.Errorf("shell closed: %w", err)
+		}
+		return nil // success
+	}
+}
+
+func (a *App) ListOpensshConfig(ctx context.Context) error {
+	a.StartProgressIndicatorWithLabel("Fetching codespaces")
+	codespaces, err := a.apiClient.ListCodespaces(ctx, -1)
+	a.StopProgressIndicator()
+	if err != nil {
+		return fmt.Errorf("error getting codespaces: %w", err)
+	}
+
+	t, err := template.New("ssh_config").Parse(`Host cs.{{.Name}}.{{.EscapedRef}}
+	User {{.SshUser}}
+	ProxyCommand {{.GHExec}} cs ssh -c {{.Name}} --stdio
+	UserKnownHostsFile=/dev/null
+	StrictHostKeyChecking no
+	LogLevel quiet
+	ControlMaster auto
+
+`)
+	if err != nil {
+		return fmt.Errorf("error formatting template: %w", err)
+	}
+
+	ghexec, err := os.Executable()
+	if err != nil {
+		return err
+	}
+
+	sshUsers := map[string]string{}
+
+	for _, cs := range codespaces {
+
+		if cs.State != "Available" {
+			fmt.Fprintf(os.Stderr, "skipping unavailable codespace %s: %s\n", cs.Name, cs.State)
+			continue
+		}
+
+		var sshUser string
+		var ok bool
+
+		if sshUser, ok = sshUsers[cs.Repository.FullName]; !ok {
+			session, err := openSshSession(ctx, a, cs.Name, nil)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error connecting to codespace: %v\n", err)
+				continue
+			}
+			defer session.Close()
+
+			a.StartProgressIndicatorWithLabel(fmt.Sprintf("Fetching SSH Details for %s", cs.Name))
+			_, sshUser, err = session.StartSSHServer(ctx)
+			a.StopProgressIndicator()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error getting ssh server details: %v", err)
+				continue
+			}
+			sshUsers[cs.Repository.FullName] = sshUser
+		}
+
+		conf := codespaceSshConfig{
+			Name:       cs.Name,
+			EscapedRef: strings.ReplaceAll(cs.GitStatus.Ref, "/", "-"),
+			SshUser:    sshUser,
+			GHExec:     ghexec,
+		}
+		if err := t.Execute(a.io.Out, conf); err != nil {
 			return err
 		}
-		defer listen.Close()
-		localSSHServerPort = listen.Addr().(*net.TCPAddr).Port
-
-		connectDestination := opts.profile
-		if connectDestination == "" {
-			connectDestination = fmt.Sprintf("%s@localhost", sshUser)
-		}
-
-		tunnelClosed := make(chan error, 1)
-		go func() {
-			fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
-			tunnelClosed <- fwd.ForwardToListener(ctx, listen) // always non-nil
-		}()
-
-		shellClosed := make(chan error, 1)
-		go func() {
-			var err error
-			if opts.scpArgs != nil {
-				err = codespaces.Copy(ctx, opts.scpArgs, localSSHServerPort, connectDestination)
-			} else {
-				err = codespaces.Shell(ctx, a.errLogger, sshArgs, localSSHServerPort, connectDestination, usingCustomPort)
-			}
-			shellClosed <- err
-		}()
-
-		select {
-		case err := <-tunnelClosed:
-			return fmt.Errorf("tunnel closed: %w", err)
-		case err := <-shellClosed:
-			if err != nil {
-				return fmt.Errorf("shell closed: %w", err)
-			}
-			return nil // success
-		}
 	}
+
+	return nil
+}
+
+type codespaceSshConfig struct {
+	Name       string
+	EscapedRef string
+	SshUser    string
+	GHExec     string
 }
 
 func openSshSession(ctx context.Context, a *App, csName string, liveshareLogger *log.Logger) (*liveshare.Session, error) {
