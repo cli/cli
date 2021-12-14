@@ -62,23 +62,6 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
-	if err != nil {
-		return fmt.Errorf("get or choose codespace: %w", err)
-	}
-
-	// TODO(josebalius): We can fetch the user in parallel to everything else
-	// we should convert this call and others to happen async
-	user, err := a.apiClient.GetUser(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting user: %w", err)
-	}
-
-	authkeys := make(chan error, 1)
-	go func() {
-		authkeys <- checkAuthorizedKeys(ctx, a.apiClient, user.Login)
-	}()
-
 	liveshareLogger := noopLogger()
 	if opts.debug {
 		debugLogger, err := newFileLogger(opts.debugFile)
@@ -91,15 +74,11 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		a.errLogger.Printf("Debug file located at: %s", debugLogger.Name())
 	}
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
+	session, err := openSshSession(ctx, a, opts.codespace, liveshareLogger)
 	if err != nil {
 		return fmt.Errorf("error connecting to codespace: %w", err)
 	}
 	defer safeClose(session, &err)
-
-	if err := <-authkeys; err != nil {
-		return err
-	}
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
@@ -159,6 +138,40 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 			return nil // success
 		}
 	}
+}
+
+func openSshSession(ctx context.Context, a *App, csName string, liveshareLogger *log.Logger) (*liveshare.Session, error) {
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, csName)
+	if err != nil {
+		return nil, fmt.Errorf("get or choose codespace: %w", err)
+	}
+
+	// TODO(josebalius): We can fetch the user in parallel to everything else
+	// we should convert this call and others to happen async
+	user, err := a.apiClient.GetUser(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error getting user: %w", err)
+	}
+
+	authkeys := make(chan error, 1)
+	go func() {
+		authkeys <- checkAuthorizedKeys(ctx, a.apiClient, user.Login)
+	}()
+
+	if liveshareLogger == nil {
+		liveshareLogger = noopLogger()
+	}
+
+	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
+	if err != nil {
+		return nil, fmt.Errorf("error connecting to codespace: %w", err)
+	}
+
+	if err := <-authkeys; err != nil {
+		return nil, err
+	}
+
+	return session, nil
 }
 
 type cpOptions struct {
