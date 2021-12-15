@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 type EditOptions struct {
@@ -214,16 +215,19 @@ func editRun(opts *EditOptions) error {
 }
 
 func updatePullRequest(httpClient *http.Client, repo ghrepo.Interface, id string, editable shared.Editable) error {
-	if err := shared.UpdateIssue(httpClient, repo, id, true, editable); err != nil {
-		return err
+	var wg errgroup.Group
+	wg.Go(func() error {
+		return shared.UpdateIssue(httpClient, repo, id, true, editable)
+	})
+	if editable.Reviewers.Edited {
+		wg.Go(func() error {
+			return updatePullRequestReviews(httpClient, repo, id, editable)
+		})
 	}
-	return updatePullRequestReviews(httpClient, repo, id, editable)
+	return wg.Wait()
 }
 
 func updatePullRequestReviews(httpClient *http.Client, repo ghrepo.Interface, id string, editable shared.Editable) error {
-	if !editable.Reviewers.Edited {
-		return nil
-	}
 	userIds, teamIds, err := editable.ReviewerIds()
 	if err != nil {
 		return err
