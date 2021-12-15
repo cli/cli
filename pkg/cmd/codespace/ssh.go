@@ -16,6 +16,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces"
+	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/hashicorp/go-multierror"
@@ -72,7 +73,11 @@ func newSSHCmd(app *App) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.SSH(cmd.Context(), args, opts)
+			if opts.config {
+				return app.ListOpensshConfig(cmd.Context(), opts)
+			} else {
+				return app.SSH(cmd.Context(), args, opts)
+			}
 		},
 		DisableFlagsInUseLine: true,
 	}
@@ -93,10 +98,6 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-
-	if opts.config {
-		return a.ListOpensshConfig(ctx)
-	}
 
 	liveshareLogger := noopLogger()
 	if opts.debug {
@@ -176,12 +177,24 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 }
 
-func (a *App) ListOpensshConfig(ctx context.Context) error {
-	a.StartProgressIndicatorWithLabel("Fetching codespaces")
-	codespaces, err := a.apiClient.ListCodespaces(ctx, -1)
-	a.StopProgressIndicator()
+func (a *App) ListOpensshConfig(ctx context.Context, opts sshOptions) error {
+	// Ensure all child tasks (e.g. port forwarding) terminate before return.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var err error
+	var codespaces []*api.Codespace
+	if opts.codespace == "" {
+		a.StartProgressIndicatorWithLabel("Fetching codespaces")
+		codespaces, err = a.apiClient.ListCodespaces(ctx, -1)
+		a.StopProgressIndicator()
+	} else {
+		var codespace *api.Codespace
+		codespace, err = getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
+		codespaces = []*api.Codespace{codespace}
+	}
 	if err != nil {
-		return fmt.Errorf("error getting codespaces: %w", err)
+		return fmt.Errorf("error getting codespace info: %w", err)
 	}
 
 	t, err := template.New("ssh_config").Parse(`Host cs.{{.Name}}.{{.EscapedRef}}
