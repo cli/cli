@@ -179,7 +179,7 @@ func TestViewRun(t *testing.T) {
 		X  cool commit  timed out    trunk  push  1
 		*  cool commit  in progress  trunk  push  2
 		✓  cool commit  successful   trunk  push  3
-		-  cool commit  cancelled    trunk  push  4
+		X  cool commit  cancelled    trunk  push  4
 
 		To see more runs for this workflow, try: gh run list --workflow flow.yml
 		To see the YAML for this workflow, try: gh workflow view flow.yml --yaml

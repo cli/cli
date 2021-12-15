@@ -303,7 +303,7 @@ func Symbol(cs *iostreams.ColorScheme, status Status, conclusion Conclusion) (st
 		switch conclusion {
 		case Success:
 			return cs.SuccessIconWithColor(noColor), cs.Green
-		case Skipped, Cancelled, Neutral:
+		case Skipped, Neutral:
 			return "-", cs.Gray
 		default:
 			return cs.FailureIconWithColor(noColor), cs.Red

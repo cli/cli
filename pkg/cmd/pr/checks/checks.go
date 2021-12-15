@@ -133,12 +133,12 @@ func checksRun(opts *ChecksOptions) error {
 		switch state {
 		case "SUCCESS":
 			passing++
-		case "SKIPPED", "NEUTRAL", "CANCELLED":
+		case "SKIPPED", "NEUTRAL":
 			mark = "-"
 			markColor = cs.Gray
 			skipping++
 			bucket = "skipping"
-		case "ERROR", "FAILURE", "TIMED_OUT", "ACTION_REQUIRED":
+		case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
 			mark = "X"
 			markColor = cs.Red
 			failing++
