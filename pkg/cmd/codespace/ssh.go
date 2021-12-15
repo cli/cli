@@ -4,6 +4,7 @@ package codespace
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -38,6 +39,38 @@ func newSSHCmd(app *App) *cobra.Command {
 	sshCmd := &cobra.Command{
 		Use:   "ssh [<flags>...] [-- <ssh-flags>...] [<command>]",
 		Short: "SSH into a codespace",
+		PreRunE: func(c *cobra.Command, args []string) error {
+			f := c.Flags()
+			codespaceFlag := f.Lookup("codespace")
+			configFlag := f.Lookup("config")
+			portFlag := f.Lookup("server-port")
+			profileFlag := f.Lookup("profile")
+			stdioFlag := f.Lookup("stdio")
+
+			if stdioFlag.Changed {
+				if !codespaceFlag.Changed {
+					return errors.New("`--stdio` requires explicit `--codespace`")
+				}
+				if configFlag.Changed {
+					return errors.New("cannot use `--stdio` with `--config`")
+				}
+				if portFlag.Changed {
+					return errors.New("cannot use `--stdio` with `--server-port`")
+				}
+				if profileFlag.Changed {
+					return errors.New("cannot use `--stdio` with `--profile`")
+				}
+			}
+			if configFlag.Changed {
+				if profileFlag.Changed {
+					return errors.New("cannot use `--config` with `--profile`")
+				}
+				if portFlag.Changed {
+					return errors.New("cannot use `--config` with `--server-port`")
+				}
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.SSH(cmd.Context(), args, opts)
 		},
@@ -49,10 +82,6 @@ func newSSHCmd(app *App) *cobra.Command {
 	sshCmd.Flags().StringVarP(&opts.codespace, "codespace", "c", "", "Name of the codespace")
 	sshCmd.Flags().BoolVarP(&opts.debug, "debug", "d", false, "Log debug data to a file")
 	sshCmd.Flags().StringVarP(&opts.debugFile, "debug-file", "", "", "Path of the file log to")
-
-	// TODO: alternate name: "--proxy"? something else?
-	// also need to make this mutually exclusive with profile/server-port
-	// should probably require --codespace as well
 	sshCmd.Flags().BoolVarP(&opts.stdio, "stdio", "", false, "Proxy sshd connection to stdio")
 	sshCmd.Flags().BoolVarP(&opts.config, "config", "", false, "Write OpenSSH configuration to stdout")
 
