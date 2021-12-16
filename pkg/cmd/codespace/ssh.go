@@ -203,10 +203,8 @@ func (a *App) listOpensshConfig(ctx context.Context, opts configOptions) error {
 			continue
 		}
 
-		var sshUser string
-		var ok bool
-
-		if sshUser, ok = sshUsers[cs.Repository.FullName]; !ok {
+		sshUser, ok := sshUsers[cs.Repository.FullName]
+		if !ok {
 			session, err := openSSHSession(ctx, a, cs.Name, nil)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error connecting to codespace: %v\n", err)
