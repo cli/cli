@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -441,28 +442,17 @@ func (fl *fileLogger) Close() error {
 }
 
 type combinedReadWriteCloser struct {
-	reader *os.File
-	writer *os.File
+	io.ReadCloser
+	io.WriteCloser
 }
 
 func newCombinedReadWriteCloser(reader *os.File, writer *os.File) (crwc *combinedReadWriteCloser) {
-	return &combinedReadWriteCloser{
-		reader: reader,
-		writer: writer,
-	}
-}
-
-func (crwc *combinedReadWriteCloser) Read(p []byte) (n int, err error) {
-	return crwc.reader.Read(p)
-}
-
-func (crwc *combinedReadWriteCloser) Write(p []byte) (n int, err error) {
-	return crwc.writer.Write(p)
+	return &combinedReadWriteCloser{reader, writer}
 }
 
 func (crwc *combinedReadWriteCloser) Close() error {
-	werr := crwc.writer.Close()
-	rerr := crwc.reader.Close()
+	werr := crwc.WriteCloser.Close()
+	rerr := crwc.ReadCloser.Close()
 	if werr != nil {
 		return werr
 	}
