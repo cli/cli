@@ -15,6 +15,7 @@ type Release struct {
 	Name         string
 	TagName      string
 	IsDraft      bool
+	IsLatest     bool
 	IsPrerelease bool
 	CreatedAt    time.Time
 	PublishedAt  time.Time
