@@ -244,7 +244,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 	return nil
 }
 
-// codespaceSSHConfig contains values needed to write an openssh host
+// codespaceSSHConfig contains values needed to write an OpenSSH host
 // configuration for a single codespace. For example:
 //
 // Host {{Name}}.{{EscapedRef}
