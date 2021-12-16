@@ -40,20 +40,14 @@ func newSSHCmd(app *App) *cobra.Command {
 		Use:   "ssh [<flags>...] [-- <ssh-flags>...] [<command>]",
 		Short: "SSH into a codespace",
 		PreRunE: func(c *cobra.Command, args []string) error {
-			f := c.Flags()
-			codespaceFlag := f.Lookup("codespace")
-			portFlag := f.Lookup("server-port")
-			profileFlag := f.Lookup("profile")
-			stdioFlag := f.Lookup("stdio")
-
-			if stdioFlag.Changed {
-				if !codespaceFlag.Changed {
+			if opts.stdio {
+				if opts.codespace == "" {
 					return errors.New("`--stdio` requires explicit `--codespace`")
 				}
-				if portFlag.Changed {
+				if opts.serverPort != 0 {
 					return errors.New("cannot use `--stdio` with `--server-port`")
 				}
-				if profileFlag.Changed {
+				if opts.profile != "" {
 					return errors.New("cannot use `--stdio` with `--profile`")
 				}
 			}
