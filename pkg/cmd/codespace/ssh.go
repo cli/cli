@@ -238,11 +238,22 @@ func (a *App) ListOpensshConfig(ctx context.Context, opts configOptions) error {
 	return nil
 }
 
+// codespaceSSHConfig contains values needed to write an openssh host
+// configuration for a single codespace. For example:
+//
+// Host {{Name}}.{{EscapedRef}
+// User {{SSHUser}
+// ProxyCommand {{GHExec}} cs ssh -c {{Name}} --stdio
+//
+// EscapedRef is included in the name to help distinguish between codespaces
+// when tab-completing ssh hostnames. '/' characters in EscapedRef are
+// flattened to '-' to prevent problems with tab completion or when the
+// hostname appears in ControlMaster socket paths.
 type codespaceSSHConfig struct {
-	Name       string
-	EscapedRef string
-	SSHUser    string
-	GHExec     string
+	Name       string // the codespace name, passed to `ssh -c`
+	EscapedRef string // the currently checked-out branch
+	SSHUser    string // the remote ssh username
+	GHExec     string // path used for invoking the current `gh` binary
 }
 
 func openSSHSession(ctx context.Context, a *App, csName string, liveshareLogger *log.Logger) (*liveshare.Session, error) {
