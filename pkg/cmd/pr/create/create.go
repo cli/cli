@@ -1,9 +1,9 @@
 package create
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -12,7 +12,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/context"
+	remotesContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -28,9 +28,9 @@ type browser interface {
 	Browse(string) error
 }
 
-//go:generate mockery --name gitClient --structname GitClient
+//go:generate moq -fmt goimports -rm -skip-ensure -out git_client_mock.go . gitClient
 type gitClient interface {
-	Push(args []string, stdout io.Writer, stderr io.Writer) error
+	Push(ctx context.Context, opts git.PushOptions) error
 }
 
 type CreateOptions struct {
@@ -38,7 +38,7 @@ type CreateOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
-	Remotes    func() (context.Remotes, error)
+	Remotes    func() (remotesContext.Remotes, error)
 	Branch     func() (string, error)
 	Browser    browser
 	Git        gitClient
@@ -72,14 +72,14 @@ type CreateOptions struct {
 type CreateContext struct {
 	// This struct stores contextual data about the creation process and is for building up enough
 	// data to create a pull request
-	RepoContext        *context.ResolvedRemotes
+	RepoContext        *remotesContext.ResolvedRemotes
 	BaseRepo           *api.Repository
 	HeadRepo           ghrepo.Interface
 	BaseTrackingBranch string
 	BaseBranch         string
 	HeadBranch         string
 	HeadBranchLabel    string
-	HeadRemote         *context.Remote
+	HeadRemote         *remotesContext.Remote
 	IsPushEnabled      bool
 	Client             *api.Client
 }
@@ -92,7 +92,11 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
 		Browser:    f.Browser,
-		Git:        &gitClientExec{gitCommand: git.GitCommand},
+		Git: &git.LocalRepo{
+			Stdin:  f.IOStreams.In,
+			Stdout: f.IOStreams.Out,
+			Stderr: f.IOStreams.ErrOut,
+		},
 	}
 
 	var bodyFile string
@@ -393,7 +397,7 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState) e
 	return nil
 }
 
-func determineTrackingBranch(remotes context.Remotes, headBranch string) *git.TrackingRef {
+func determineTrackingBranch(remotes remotesContext.Remotes, headBranch string) *git.TrackingRef {
 	refsForLookup := []string{"HEAD"}
 	var trackingRefs []git.TrackingRef
 
@@ -478,7 +482,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		return nil, err
 	}
 
-	repoContext, err := context.ResolveRemotesToRepos(remotes, client, opts.RepoOverride)
+	repoContext, err := remotesContext.ResolveRemotesToRepos(remotes, client, opts.RepoOverride)
 	if err != nil {
 		return nil, err
 	}
@@ -518,7 +522,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	}
 
 	var headRepo ghrepo.Interface
-	var headRemote *context.Remote
+	var headRemote *remotesContext.Remote
 
 	if isPushEnabled {
 		// determine whether the head branch is already pushed to a remote
@@ -717,7 +721,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 		if err != nil {
 			return fmt.Errorf("error adding remote: %w", err)
 		}
-		headRemote = &context.Remote{
+		headRemote = &remotesContext.Remote{
 			Remote: gitRemote,
 			Repo:   headRepo,
 		}
@@ -727,14 +731,15 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	if ctx.IsPushEnabled {
 		pushTries := 0
 		maxPushTries := 3
+		ct := context.TODO()
 		for {
-			args := []string{"--set-upstream"}
-			if opts.IO.IsStderrTTY() {
-				args = append(args, "--progress")
-			}
-			args = append(args, headRemote.Name, fmt.Sprintf("HEAD:%s", ctx.HeadBranch))
-			if err := opts.Git.Push(args, opts.IO.Out, opts.IO.ErrOut); err != nil {
-				if didForkRepo && pushTries < maxPushTries {
+			if err := opts.Git.Push(ct, git.PushOptions{
+				RemoteName:   headRemote.Name,
+				TargetBranch: ctx.HeadBranch,
+				SetUpstream:  true,
+				ShowProgress: opts.IO.IsStderrTTY(),
+			}); err != nil {
+				if ct.Err() == nil && didForkRepo && pushTries < maxPushTries {
 					pushTries++
 					// first wait 2 seconds after forking, then 4s, then 6s
 					waitSeconds := 2 * pushTries

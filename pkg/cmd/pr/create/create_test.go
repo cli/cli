@@ -2,9 +2,9 @@ package create
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
@@ -12,12 +12,11 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/context"
+	remotesContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
-	"github.com/cli/cli/v2/pkg/cmd/pr/create/mocks"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -27,7 +26,6 @@ import (
 	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -162,29 +160,24 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 }
 
-var mockWriterArg = mock.MatchedBy(func(w io.Writer) bool { return true })
-
 /*** LEGACY TESTS ***/
 
-var mockGitClient *mocks.GitClient
+var mockGitClient *gitClientMock
 
 // This function exists to provide access to the `opts.Git` mock for `runCommand` tests. It should be
 // removed after tests are rewritten to exercise `createRun` or other methods directly.
-func runCommandMockGit(t *testing.T) *mocks.GitClient {
+func runCommandMockGit(_ *testing.T) *gitClientMock {
 	if mockGitClient == nil {
-		mockGitClient = &mocks.GitClient{}
-		if t != nil {
-			mockGitClient.Test(t)
-		}
+		mockGitClient = &gitClientMock{}
 	}
 	return mockGitClient
 }
 
-func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
+func runCommand(rt http.RoundTripper, remotes remotesContext.Remotes, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
 	return runCommandWithRootDirOverridden(rt, remotes, branch, isTTY, cli, "")
 }
 
-func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes context.Remotes, branch string, isTTY bool, cli string, rootDir string) (*test.CmdOut, error) {
+func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes remotesContext.Remotes, branch string, isTTY bool, cli string, rootDir string) (*test.CmdOut, error) {
 	io, _, stdout, stderr := iostreams.Test()
 	io.SetStdoutTTY(isTTY)
 	io.SetStdinTTY(isTTY)
@@ -200,11 +193,11 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes context.Remot
 		Config: func() (config.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
-		Remotes: func() (context.Remotes, error) {
+		Remotes: func() (remotesContext.Remotes, error) {
 			if remotes != nil {
 				return remotes, nil
 			}
-			return context.Remotes{
+			return remotesContext.Remotes{
 				{
 					Remote: &git.Remote{
 						Name:     "origin",
@@ -423,14 +416,23 @@ func TestPRCreate(t *testing.T) {
 	defer cleanupAsk()
 	ask.StubOne(0)
 
-	git := runCommandMockGit(t)
-	git.On("Push", []string{"--set-upstream", "--progress", "origin", "HEAD:feature"}, mockWriterArg, mockWriterArg).Return(nil)
+	gc := runCommandMockGit(t)
+	gc.PushFunc = func(ctx context.Context, opts git.PushOptions) error {
+		return nil
+	}
 
 	output, err := runCommand(http, nil, "feature", true, `-t "my title" -b "my body"`)
 	require.NoError(t, err)
 
 	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
 	assert.Equal(t, "\nCreating pull request for feature into master in OWNER/REPO\n\n", output.Stderr())
+	if assert.Len(t, gc.PushCalls(), 1) {
+		p := gc.PushCalls()[0]
+		assert.Equal(t, "origin", p.Opts.RemoteName)
+		assert.Equal(t, "feature", p.Opts.TargetBranch)
+		assert.True(t, p.Opts.SetUpstream)
+		assert.True(t, p.Opts.ShowProgress)
+	}
 }
 
 func TestPRCreate_NoMaintainerModify(t *testing.T) {
@@ -470,14 +472,17 @@ func TestPRCreate_NoMaintainerModify(t *testing.T) {
 	defer cleanupAsk()
 	ask.StubOne(0)
 
-	git := runCommandMockGit(t)
-	git.On("Push", []string{"--set-upstream", "--progress", "origin", "HEAD:feature"}, mockWriterArg, mockWriterArg).Return(nil)
+	gc := runCommandMockGit(t)
+	gc.PushFunc = func(ctx context.Context, opts git.PushOptions) error {
+		return nil
+	}
 
 	output, err := runCommand(http, nil, "feature", true, `-t "my title" -b "my body" --no-maintainer-edit`)
 	require.NoError(t, err)
 
 	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
 	assert.Equal(t, "\nCreating pull request for feature into master in OWNER/REPO\n\n", output.Stderr())
+	assert.Len(t, gc.PushCalls(), 1)
 }
 
 func TestPRCreate_createFork(t *testing.T) {
@@ -522,17 +527,20 @@ func TestPRCreate_createFork(t *testing.T) {
 	defer cleanupAsk()
 	ask.StubOne(1)
 
-	git := runCommandMockGit(t)
-	git.On("Push", []string{"--set-upstream", "--progress", "fork", "HEAD:feature"}, mockWriterArg, mockWriterArg).Return(nil)
+	gc := runCommandMockGit(t)
+	gc.PushFunc = func(ctx context.Context, opts git.PushOptions) error {
+		return nil
+	}
 
 	output, err := runCommand(http, nil, "feature", true, `-t title -b body`)
 	require.NoError(t, err)
 
 	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
+	assert.Len(t, gc.PushCalls(), 1)
 }
 
 func TestPRCreate_pushedToNonBaseRepo(t *testing.T) {
-	remotes := context.Remotes{
+	remotes := remotesContext.Remotes{
 		{
 			Remote: &git.Remote{
 				Name:     "upstream",
@@ -807,8 +815,10 @@ func TestPRCreate_web(t *testing.T) {
 	defer cleanupAsk()
 	ask.StubOne(0)
 
-	git := runCommandMockGit(t)
-	git.On("Push", []string{"--set-upstream", "--progress", "origin", "HEAD:feature"}, mockWriterArg, mockWriterArg).Return(nil)
+	gc := runCommandMockGit(t)
+	gc.PushFunc = func(ctx context.Context, opts git.PushOptions) error {
+		return nil
+	}
 
 	output, err := runCommand(http, nil, "feature", true, `--web`)
 	require.NoError(t, err)
@@ -816,6 +826,7 @@ func TestPRCreate_web(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
 	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1", output.BrowsedURL)
+	assert.Len(t, gc.PushCalls(), 1)
 }
 
 func TestPRCreate_webLongURL(t *testing.T) {
@@ -880,8 +891,10 @@ func TestPRCreate_webProject(t *testing.T) {
 	defer cleanupAsk()
 	ask.StubOne(0)
 
-	git := runCommandMockGit(t)
-	git.On("Push", []string{"--set-upstream", "--progress", "origin", "HEAD:feature"}, mockWriterArg, mockWriterArg).Return(nil)
+	gc := runCommandMockGit(t)
+	gc.PushFunc = func(ctx context.Context, opts git.PushOptions) error {
+		return nil
+	}
 
 	output, err := runCommand(http, nil, "feature", true, `--web -p Triage`)
 	require.NoError(t, err)
@@ -889,6 +902,7 @@ func TestPRCreate_webProject(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
 	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1&projects=ORG%2F1", output.BrowsedURL)
+	assert.Len(t, gc.PushCalls(), 1)
 }
 
 func Test_determineTrackingBranch_empty(t *testing.T) {
@@ -898,7 +912,7 @@ func Test_determineTrackingBranch_empty(t *testing.T) {
 	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
 	cs.Register(`git show-ref --verify -- HEAD`, 0, "abc HEAD")
 
-	remotes := context.Remotes{}
+	remotes := remotesContext.Remotes{}
 
 	ref := determineTrackingBranch(remotes, "feature")
 	if ref != nil {
@@ -913,12 +927,12 @@ func Test_determineTrackingBranch_noMatch(t *testing.T) {
 	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
 	cs.Register("git show-ref --verify -- HEAD refs/remotes/origin/feature refs/remotes/upstream/feature", 0, "abc HEAD\nbca refs/remotes/origin/feature")
 
-	remotes := context.Remotes{
-		&context.Remote{
+	remotes := remotesContext.Remotes{
+		&remotesContext.Remote{
 			Remote: &git.Remote{Name: "origin"},
 			Repo:   ghrepo.New("hubot", "Spoon-Knife"),
 		},
-		&context.Remote{
+		&remotesContext.Remote{
 			Remote: &git.Remote{Name: "upstream"},
 			Repo:   ghrepo.New("octocat", "Spoon-Knife"),
 		},
@@ -941,12 +955,12 @@ func Test_determineTrackingBranch_hasMatch(t *testing.T) {
 		deadbeef refs/remotes/upstream/feature
 	`))
 
-	remotes := context.Remotes{
-		&context.Remote{
+	remotes := remotesContext.Remotes{
+		&remotesContext.Remote{
 			Remote: &git.Remote{Name: "origin"},
 			Repo:   ghrepo.New("hubot", "Spoon-Knife"),
 		},
-		&context.Remote{
+		&remotesContext.Remote{
 			Remote: &git.Remote{Name: "upstream"},
 			Repo:   ghrepo.New("octocat", "Spoon-Knife"),
 		},
@@ -974,8 +988,8 @@ func Test_determineTrackingBranch_respectTrackingConfig(t *testing.T) {
 		deadb00f refs/remotes/origin/feature
 	`))
 
-	remotes := context.Remotes{
-		&context.Remote{
+	remotes := remotesContext.Remotes{
+		&remotesContext.Remote{
 			Remote: &git.Remote{Name: "origin"},
 			Repo:   ghrepo.New("hubot", "Spoon-Knife"),
 		},

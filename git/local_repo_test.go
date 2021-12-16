@@ -1,7 +1,8 @@
-package create
+package git
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -42,7 +43,7 @@ func TestHelperProcess(t *testing.T) {
 }
 
 func Test_gitClientExec_Push(t *testing.T) {
-	gitCommand := func(args ...string) (*exec.Cmd, error) {
+	gitCommand := func(ctx context.Context, args ...string) (*exec.Cmd, error) {
 		args = append([]string{"-test.run=TestHelperProcess", "--", "git"}, args...)
 		cmd := exec.Command(os.Args[0], args...)
 		cmd.Env = []string{"GH_WANT_HELPER_PROCESS=1"}
@@ -51,26 +52,26 @@ func Test_gitClientExec_Push(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		args       []string
+		args       PushOptions
 		wantStdout string
 		wantStderr *logWriter
 		wantErr    bool
 	}{
 		{
 			name:       "no output",
-			args:       []string{"origin", "HEAD:no-output"},
+			args:       PushOptions{RemoteName: "origin", TargetBranch: "no-output"},
 			wantStdout: "",
 			wantStderr: &logWriter{},
 		},
 		{
 			name:       "some output",
-			args:       []string{"origin", "HEAD:some-output"},
+			args:       PushOptions{RemoteName: "origin", TargetBranch: "some-output"},
 			wantStdout: "STDOUT\n",
 			wantStderr: &logWriter{"STDERR\n"},
 		},
 		{
 			name:       "progress output",
-			args:       []string{"--progress", "origin", "HEAD:feature"},
+			args:       PushOptions{RemoteName: "origin", TargetBranch: "feature", ShowProgress: true},
 			wantStdout: "",
 			wantStderr: &logWriter{
 				"progress: 0%\r",
@@ -85,23 +86,27 @@ func Test_gitClientExec_Push(t *testing.T) {
 		},
 		{
 			name:       "cr-lf",
-			args:       []string{"origin", "HEAD:crlf"},
+			args:       PushOptions{RemoteName: "origin", TargetBranch: "crlf"},
 			wantStdout: "",
 			wantStderr: &logWriter{"one\r\n", "two\r\n", "three\r", "four"},
 		},
 		{
 			name:       "failure",
-			args:       []string{"nonexist", "HEAD:feature"},
+			args:       PushOptions{RemoteName: "nonexist", TargetBranch: "feature"},
 			wantErr:    true,
 			wantStderr: &logWriter{"unrecognized arguments: []string{\"git\", \"push\", \"nonexist\", \"HEAD:feature\"}\n"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			g := &gitClientExec{gitCommand: gitCommand}
 			stdout := &bytes.Buffer{}
 			stderr := &logWriter{}
-			if err := g.Push(tt.args, stdout, stderr); (err != nil) != tt.wantErr {
+			g := &LocalRepo{
+				gitCommandInit: gitCommand,
+				Stdout:         stdout,
+				Stderr:         stderr,
+			}
+			if err := g.Push(context.Background(), tt.args); (err != nil) != tt.wantErr {
 				t.Errorf("gitClientExec.Push() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
