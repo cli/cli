@@ -194,6 +194,10 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 		return err
 	}
 
+	// store a mapping of repository -> remote ssh username. This is
+	// necessary because the username can vary between codespaces, but
+	// since fetching it is slow, we store it here so we at least only do
+	// it once per repository.
 	sshUsers := map[string]string{}
 
 	for _, cs := range codespaces {
