@@ -212,6 +212,10 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 			session, err := openSSHSession(ctx, a, cs.Name, nil)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error connecting to codespace: %v\n", err)
+
+				// Move on to the next codespace. We don't want to bail here - just because we're not
+				// able to set up connectivity to one doesn't mean we shouldn't make a best effort to
+				// generate configs for the rest of them.
 				continue
 			}
 			defer session.Close()
@@ -221,7 +225,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 			a.StopProgressIndicator()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error getting ssh server details: %v", err)
-				continue
+				continue // see above
 			}
 			sshUsers[cs.Repository.FullName] = sshUser
 		}
