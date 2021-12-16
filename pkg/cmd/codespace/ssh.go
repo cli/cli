@@ -156,7 +156,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 }
 
-func (a *App) ListOpensshConfig(ctx context.Context, opts configOptions) error {
+func (a *App) listOpensshConfig(ctx context.Context, opts configOptions) error {
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -402,7 +402,7 @@ func newConfigCmd(app *App) *cobra.Command {
 			$ echo 'include ~/.ssh/codespaces' >> ~/.ssh/config'
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.ListOpensshConfig(cmd.Context(), opts)
+			return app.listOpensshConfig(cmd.Context(), opts)
 		},
 		DisableFlagsInUseLine: true,
 	}
