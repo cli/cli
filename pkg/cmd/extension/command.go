@@ -127,7 +127,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				Short: "Upgrade installed extensions",
 				Args: func(cmd *cobra.Command, args []string) error {
 					if len(args) == 0 && !flagAll {
-						return cmdutil.FlagErrorf("must specify an extension to upgrade")
+						return cmdutil.FlagErrorf("specify an extension to upgrade or `--all`")
 					}
 					if len(args) > 0 && flagAll {
 						return cmdutil.FlagErrorf("cannot use `--all` with extension name")
@@ -144,16 +144,18 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					}
 					cs := io.ColorScheme()
 					err := m.Upgrade(name, flagForce)
-					if err != nil {
+					if err != nil && !errors.Is(err, upToDateError) {
 						if name != "" {
-							fmt.Fprintf(io.ErrOut, "%s Failed upgrading extension %s: %s", cs.FailureIcon(), name, err)
+							fmt.Fprintf(io.ErrOut, "%s Failed upgrading extension %s: %s\n", cs.FailureIcon(), name, err)
 						} else {
-							fmt.Fprintf(io.ErrOut, "%s Failed upgrading extensions", cs.FailureIcon())
+							fmt.Fprintf(io.ErrOut, "%s Failed upgrading extensions\n", cs.FailureIcon())
 						}
 						return cmdutil.SilentError
 					}
 					if io.IsStdoutTTY() {
-						if name != "" {
+						if errors.Is(err, upToDateError) {
+							fmt.Fprintf(io.Out, "%s Extension already up to date\n", cs.SuccessIcon())
+						} else if name != "" {
 							fmt.Fprintf(io.Out, "%s Successfully upgraded extension %s\n", cs.SuccessIcon(), name)
 						} else {
 							fmt.Fprintf(io.Out, "%s Successfully upgraded extensions\n", cs.SuccessIcon())

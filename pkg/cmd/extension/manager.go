@@ -273,7 +273,7 @@ func (m *Manager) populateLatestVersions(exts []Extension) {
 
 func (m *Manager) getLatestVersion(ext Extension) (string, error) {
 	if ext.isLocal {
-		return "", fmt.Errorf("unable to get latest version for local extensions")
+		return "", localExtensionUpgradeError
 	}
 	if ext.IsBinary() {
 		repo, err := ghrepo.FromFullName(ext.url)
