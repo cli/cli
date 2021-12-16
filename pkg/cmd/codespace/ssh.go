@@ -89,7 +89,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		a.errLogger.Printf("Debug file located at: %s", debugLogger.Name())
 	}
 
-	session, err := openSshSession(ctx, a, opts.codespace, liveshareLogger)
+	session, err := openSSHSession(ctx, a, opts.codespace, liveshareLogger)
 	if err != nil {
 		return fmt.Errorf("error connecting to codespace: %w", err)
 	}
@@ -176,7 +176,7 @@ func (a *App) ListOpensshConfig(ctx context.Context, opts configOptions) error {
 	}
 
 	t, err := template.New("ssh_config").Parse(`Host cs.{{.Name}}.{{.EscapedRef}}
-	User {{.SshUser}}
+	User {{.SSHUser}}
 	ProxyCommand {{.GHExec}} cs ssh -c {{.Name}} --stdio
 	UserKnownHostsFile=/dev/null
 	StrictHostKeyChecking no
@@ -206,7 +206,7 @@ func (a *App) ListOpensshConfig(ctx context.Context, opts configOptions) error {
 		var ok bool
 
 		if sshUser, ok = sshUsers[cs.Repository.FullName]; !ok {
-			session, err := openSshSession(ctx, a, cs.Name, nil)
+			session, err := openSSHSession(ctx, a, cs.Name, nil)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error connecting to codespace: %v\n", err)
 				continue
@@ -223,10 +223,10 @@ func (a *App) ListOpensshConfig(ctx context.Context, opts configOptions) error {
 			sshUsers[cs.Repository.FullName] = sshUser
 		}
 
-		conf := codespaceSshConfig{
+		conf := codespaceSSHConfig{
 			Name:       cs.Name,
 			EscapedRef: strings.ReplaceAll(cs.GitStatus.Ref, "/", "-"),
-			SshUser:    sshUser,
+			SSHUser:    sshUser,
 			GHExec:     ghexec,
 		}
 		if err := t.Execute(a.io.Out, conf); err != nil {
@@ -237,14 +237,14 @@ func (a *App) ListOpensshConfig(ctx context.Context, opts configOptions) error {
 	return nil
 }
 
-type codespaceSshConfig struct {
+type codespaceSSHConfig struct {
 	Name       string
 	EscapedRef string
-	SshUser    string
+	SSHUser    string
 	GHExec     string
 }
 
-func openSshSession(ctx context.Context, a *App, csName string, liveshareLogger *log.Logger) (*liveshare.Session, error) {
+func openSSHSession(ctx context.Context, a *App, csName string, liveshareLogger *log.Logger) (*liveshare.Session, error) {
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, csName)
 	if err != nil {
 		return nil, fmt.Errorf("get or choose codespace: %w", err)
