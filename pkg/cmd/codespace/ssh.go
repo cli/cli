@@ -30,7 +30,6 @@ type sshOptions struct {
 	debug      bool
 	debugFile  string
 	stdio      bool
-	config     bool
 	scpArgs    []string // scp arguments, for 'cs cp' (nil for 'cs ssh')
 }
 
@@ -43,7 +42,6 @@ func newSSHCmd(app *App) *cobra.Command {
 		PreRunE: func(c *cobra.Command, args []string) error {
 			f := c.Flags()
 			codespaceFlag := f.Lookup("codespace")
-			configFlag := f.Lookup("config")
 			portFlag := f.Lookup("server-port")
 			profileFlag := f.Lookup("profile")
 			stdioFlag := f.Lookup("stdio")
@@ -52,9 +50,6 @@ func newSSHCmd(app *App) *cobra.Command {
 				if !codespaceFlag.Changed {
 					return errors.New("`--stdio` requires explicit `--codespace`")
 				}
-				if configFlag.Changed {
-					return errors.New("cannot use `--stdio` with `--config`")
-				}
 				if portFlag.Changed {
 					return errors.New("cannot use `--stdio` with `--server-port`")
 				}
@@ -62,22 +57,10 @@ func newSSHCmd(app *App) *cobra.Command {
 					return errors.New("cannot use `--stdio` with `--profile`")
 				}
 			}
-			if configFlag.Changed {
-				if profileFlag.Changed {
-					return errors.New("cannot use `--config` with `--profile`")
-				}
-				if portFlag.Changed {
-					return errors.New("cannot use `--config` with `--server-port`")
-				}
-			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if opts.config {
-				return app.ListOpensshConfig(cmd.Context(), opts)
-			} else {
-				return app.SSH(cmd.Context(), args, opts)
-			}
+			return app.SSH(cmd.Context(), args, opts)
 		},
 		DisableFlagsInUseLine: true,
 	}
@@ -88,7 +71,8 @@ func newSSHCmd(app *App) *cobra.Command {
 	sshCmd.Flags().BoolVarP(&opts.debug, "debug", "d", false, "Log debug data to a file")
 	sshCmd.Flags().StringVarP(&opts.debugFile, "debug-file", "", "", "Path of the file log to")
 	sshCmd.Flags().BoolVarP(&opts.stdio, "stdio", "", false, "Proxy sshd connection to stdio")
-	sshCmd.Flags().BoolVarP(&opts.config, "config", "", false, "Write OpenSSH configuration to stdout")
+
+	sshCmd.AddCommand(newConfigCmd(app))
 
 	return sshCmd
 }
@@ -177,7 +161,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 }
 
-func (a *App) ListOpensshConfig(ctx context.Context, opts sshOptions) error {
+func (a *App) ListOpensshConfig(ctx context.Context, opts configOptions) error {
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -389,6 +373,37 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) error {
 		return cmdutil.FlagErrorf("at least one argument must have a 'remote:' prefix")
 	}
 	return a.SSH(ctx, nil, opts.sshOptions)
+}
+
+type configOptions struct {
+	codespace string
+}
+
+func newConfigCmd(app *App) *cobra.Command {
+	var opts configOptions
+
+	configCmd := &cobra.Command{
+		Use:   "config [-c codespace]",
+		Short: "Write OpenSSH configuration to stdout",
+		Long: heredoc.Docf(`
+			The config command generates ssh connection configuration in OpenSSH format.
+
+			If -c/--codespace is specified, configuration is generated for that codespace
+			only. Otherwise configuration is emitted for all available codespaces.
+		`, "`"),
+		Example: heredoc.Doc(`
+			$ gh codespace config > ~/.ssh/codespaces
+			$ echo 'include ~/.ssh/codespaces' >> ~/.ssh/config'
+		`),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return app.ListOpensshConfig(cmd.Context(), opts)
+		},
+		DisableFlagsInUseLine: true,
+	}
+
+	configCmd.Flags().StringVarP(&opts.codespace, "codespace", "c", "", "Name of the codespace")
+
+	return configCmd
 }
 
 // fileLogger is a wrapper around an log.Logger configured to write
