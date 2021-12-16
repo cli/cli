@@ -273,7 +273,7 @@ func (m *Manager) populateLatestVersions(exts []Extension) {
 
 func (m *Manager) getLatestVersion(ext Extension) (string, error) {
 	if ext.isLocal {
-		return "", fmt.Errorf("unable to get latest version for local extensions")
+		return "", localExtensionUpgradeError
 	}
 	if ext.IsBinary() {
 		repo, err := ghrepo.FromFullName(ext.url)
@@ -461,14 +461,14 @@ func (m *Manager) upgradeExtensions(exts []Extension, force bool) error {
 		fmt.Fprintf(m.io.Out, "[%s]: ", f.Name())
 		err := m.upgradeExtension(f, force)
 		if err != nil {
-			failed = true
+			if !errors.Is(err, localExtensionUpgradeError) &&
+				!errors.Is(err, upToDateError) {
+				failed = true
+			}
 			fmt.Fprintf(m.io.Out, "%s\n", err)
 			continue
 		}
-
-		if !f.isLocal && f.UpdateAvailable() {
-			fmt.Fprintf(m.io.Out, "upgrade complete\n")
-		}
+		fmt.Fprintf(m.io.Out, "upgrade complete\n")
 	}
 	if failed {
 		return errors.New("some extensions failed to upgrade")
@@ -478,12 +478,10 @@ func (m *Manager) upgradeExtensions(exts []Extension, force bool) error {
 
 func (m *Manager) upgradeExtension(ext Extension, force bool) error {
 	if ext.isLocal {
-		fmt.Fprintf(m.io.Out, "%s\n", localExtensionUpgradeError)
-		return nil
+		return localExtensionUpgradeError
 	}
 	if !ext.UpdateAvailable() {
-		fmt.Fprintf(m.io.Out, "%s\n", upToDateError)
-		return nil
+		return upToDateError
 	}
 	var err error
 	if ext.IsBinary() {
