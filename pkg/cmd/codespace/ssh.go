@@ -110,7 +110,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 
 	if opts.stdio {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
-		stdio := newCombinedReadWriteCloser(os.Stdin, os.Stdout)
+		stdio := newReadWriteCloser(os.Stdin, os.Stdout)
 		err := fwd.Forward(ctx, stdio) // always non-nil
 		return fmt.Errorf("tunnel closed: %w", err)
 	}
@@ -479,7 +479,7 @@ type combinedReadWriteCloser struct {
 	io.WriteCloser
 }
 
-func newCombinedReadWriteCloser(reader *os.File, writer *os.File) (crwc *combinedReadWriteCloser) {
+func newReadWriteCloser(reader io.ReadCloser, writer io.WriteCloser) io.ReadWriteCloser {
 	return &combinedReadWriteCloser{reader, writer}
 }
 
