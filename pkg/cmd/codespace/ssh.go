@@ -409,9 +409,9 @@ func newConfigCmd(app *App) *cobra.Command {
 		Long: heredoc.Docf(`
 			The config command generates per-codespace ssh configuration in OpenSSH format.
 
-			Including this configuration in ~/.ssh/config simplifies integration with other tools
-			that integrate with OpenSSH, such as bash/zsh ssh hostname completion, remote path
-			completion for scp/rsync/sshfs, git ssh remotes, and so on.
+			Including this configuration in ~/.ssh/config improves the user experience of other
+			tools that integrate with OpenSSH, such as bash/zsh completion of ssh hostnames,
+			remote path completion for scp/rsync/sshfs, git ssh remotes, and so on.
 
 			If -c/--codespace is specified, configuration is generated for that codespace
 			only. Otherwise configuration is emitted for all available codespaces.
@@ -429,7 +429,7 @@ func newConfigCmd(app *App) *cobra.Command {
 		DisableFlagsInUseLine: true,
 	}
 
-	configCmd.Flags().StringVarP(&opts.codespace, "codespace", "c", "", "Name of the codespace")
+	configCmd.Flags().StringVarP(&opts.codespace, "codespace", "c", "", "Name of a codespace")
 
 	return configCmd
 }
