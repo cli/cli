@@ -162,7 +162,6 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 }
 
 func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error {
-	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -181,6 +180,51 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 		return fmt.Errorf("error getting codespace info: %w", err)
 	}
 
+	sshUsers := make(chan sshResult)
+	fetches := 0
+	var status error
+	for _, cs := range codespaces {
+		if cs.State != "Available" {
+			fmt.Fprintf(os.Stderr, "skipping unavailable codespace %s: %s\n", cs.Name, cs.State)
+			status = cmdutil.SilentError
+			continue
+		}
+
+		cs := cs
+		fetches += 1
+		go func() {
+			result := sshResult{}
+			defer func() {
+				select {
+				case sshUsers <- result:
+				case <-ctx.Done():
+				}
+			}()
+
+			session, err := openSSHSession(ctx, a, cs, nil)
+			if err != nil {
+				result.err = fmt.Errorf("error connecting to codespace: %w", err)
+				return
+			}
+			defer session.Close()
+
+			//a.StartProgressIndicatorWithLabel(fmt.Sprintf("Fetching SSH Details for %s", cs.Name))
+			_, result.user, err = session.StartSSHServer(ctx)
+			//a.StopProgressIndicator()
+			if err != nil {
+				result.err = fmt.Errorf("error getting ssh server details: %w", err)
+				return
+			}
+
+			result.codespace = cs
+		}()
+	}
+
+	ghexec, err := os.Executable()
+	if err != nil {
+		return err
+	}
+
 	t, err := template.New("ssh_config").Parse(`Host cs.{{.Name}}.{{.EscapedRef}}
 	User {{.SSHUser}}
 	ProxyCommand {{.GHExec}} cs ssh -c {{.Name}} --stdio
@@ -194,55 +238,18 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 		return fmt.Errorf("error formatting template: %w", err)
 	}
 
-	ghexec, err := os.Executable()
-	if err != nil {
-		return err
-	}
-
-	// store a mapping of repository -> remote ssh username. This is
-	// necessary because the username can vary between codespaces, but
-	// since fetching it is slow, we store it here so we at least only do
-	// it once per repository.
-	sshUsers := map[string]string{}
-
-	var status error
-	for _, cs := range codespaces {
-
-		if cs.State != "Available" {
-			fmt.Fprintf(os.Stderr, "skipping unavailable codespace %s: %s\n", cs.Name, cs.State)
+	for i := 0; i < fetches; i++ {
+		result := <-sshUsers
+		if result.err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", result.err)
 			status = cmdutil.SilentError
 			continue
 		}
 
-		sshUser, ok := sshUsers[cs.Repository.FullName]
-		if !ok {
-			session, err := openSSHSession(ctx, a, cs, nil)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error connecting to codespace: %v\n", err)
-
-				// Move on to the next codespace. We don't want to bail here - just because we're not
-				// able to set up connectivity to one doesn't mean we shouldn't make a best effort to
-				// generate configs for the rest of them.
-				status = cmdutil.SilentError
-				continue
-			}
-			defer session.Close()
-
-			a.StartProgressIndicatorWithLabel(fmt.Sprintf("Fetching SSH Details for %s", cs.Name))
-			_, sshUser, err = session.StartSSHServer(ctx)
-			a.StopProgressIndicator()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error getting ssh server details: %v", err)
-				status = cmdutil.SilentError
-				continue // see above
-			}
-			sshUsers[cs.Repository.FullName] = sshUser
-		}
-
 		conf := codespaceSSHConfig{
-			Name:       cs.Name,
-			EscapedRef: strings.ReplaceAll(cs.GitStatus.Ref, "/", "-"),
-			SSHUser:    sshUser,
+			Name:       result.codespace.Name,
+			EscapedRef: strings.ReplaceAll(result.codespace.GitStatus.Ref, "/", "-"),
+			SSHUser:    result.user,
 			GHExec:     ghexec,
 		}
 		if err := t.Execute(a.io.Out, conf); err != nil {
@@ -251,6 +258,12 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 	}
 
 	return status
+}
+
+type sshResult struct {
+	codespace *api.Codespace
+	user      string // on success, the remote ssh username; else nil
+	err       error
 }
 
 // codespaceSSHConfig contains values needed to write an OpenSSH host
