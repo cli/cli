@@ -216,12 +216,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 
 		sshUser, ok := sshUsers[cs.Repository.FullName]
 		if !ok {
-			codespace, err := a.apiClient.GetCodespace(ctx, cs.Name, true)
-			if err != nil {
-				return fmt.Errorf("getting full codespace details: %w", err)
-			}
-
-			session, err := openSSHSession(ctx, a, codespace, nil)
+			session, err := openSSHSession(ctx, a, cs, nil)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error connecting to codespace: %v\n", err)
 
