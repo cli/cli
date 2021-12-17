@@ -270,8 +270,8 @@ type sshResult struct {
 // configuration for a single codespace. For example:
 //
 // Host {{Name}}.{{EscapedRef}
-// User {{SSHUser}
-// ProxyCommand {{GHExec}} cs ssh -c {{Name}} --stdio
+//   User {{SSHUser}
+//   ProxyCommand {{GHExec}} cs ssh -c {{Name}} --stdio
 //
 // EscapedRef is included in the name to help distinguish between codespaces
 // when tab-completing ssh hostnames. '/' characters in EscapedRef are
