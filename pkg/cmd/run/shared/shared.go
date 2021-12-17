@@ -94,7 +94,7 @@ func (r Run) CommitMsg() string {
 	}
 }
 
-func (r *Run) ExportData(fields []string) *map[string]interface{} {
+func (r *Run) ExportData(fields []string) map[string]interface{} {
 	v := reflect.ValueOf(r).Elem()
 	fieldByName := func(v reflect.Value, field string) reflect.Value {
 		return v.FieldByNameFunc(func(s string) bool {
@@ -115,7 +115,7 @@ func (r *Run) ExportData(fields []string) *map[string]interface{} {
 		}
 	}
 
-	return &data
+	return data
 }
 
 type Job struct {
