@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
 
@@ -42,6 +43,20 @@ type Status string
 type Conclusion string
 type Level string
 
+var RunFields = []string{
+	"name",
+	"headBranch",
+	"headSha",
+	"createdAt",
+	"updatedAt",
+	"status",
+	"conclusion",
+	"event",
+	"databaseId",
+	"workflowDatabaseId",
+	"url",
+}
+
 type Run struct {
 	Name           string
 	CreatedAt      time.Time `json:"created_at"`
@@ -50,6 +65,7 @@ type Run struct {
 	Conclusion     Conclusion
 	Event          string
 	ID             int64
+	WorkflowID     int64  `json:"workflow_id"`
 	HeadBranch     string `json:"head_branch"`
 	JobsURL        string `json:"jobs_url"`
 	HeadCommit     Commit `json:"head_commit"`
@@ -76,6 +92,30 @@ func (r Run) CommitMsg() string {
 	} else {
 		return r.HeadSha[0:8]
 	}
+}
+
+func (r *Run) ExportData(fields []string) map[string]interface{} {
+	v := reflect.ValueOf(r).Elem()
+	fieldByName := func(v reflect.Value, field string) reflect.Value {
+		return v.FieldByNameFunc(func(s string) bool {
+			return strings.EqualFold(field, s)
+		})
+	}
+	data := map[string]interface{}{}
+
+	for _, f := range fields {
+		switch f {
+		case "databaseId":
+			data[f] = r.ID
+		case "workflowDatabaseId":
+			data[f] = r.WorkflowID
+		default:
+			sf := fieldByName(v, f)
+			data[f] = sf.Interface()
+		}
+	}
+
+	return data
 }
 
 type Job struct {
