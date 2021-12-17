@@ -205,10 +205,12 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 	// it once per repository.
 	sshUsers := map[string]string{}
 
+	var status error
 	for _, cs := range codespaces {
 
 		if cs.State != "Available" {
 			fmt.Fprintf(os.Stderr, "skipping unavailable codespace %s: %s\n", cs.Name, cs.State)
+			status = cmdutil.SilentError
 			continue
 		}
 
@@ -226,6 +228,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 				// Move on to the next codespace. We don't want to bail here - just because we're not
 				// able to set up connectivity to one doesn't mean we shouldn't make a best effort to
 				// generate configs for the rest of them.
+				status = cmdutil.SilentError
 				continue
 			}
 			defer session.Close()
@@ -235,6 +238,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 			a.StopProgressIndicator()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error getting ssh server details: %v", err)
+				status = cmdutil.SilentError
 				continue // see above
 			}
 			sshUsers[cs.Repository.FullName] = sshUser
@@ -251,7 +255,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 		}
 	}
 
-	return nil
+	return status
 }
 
 // codespaceSSHConfig contains values needed to write an OpenSSH host
