@@ -1,12 +1,11 @@
 package completion
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
@@ -68,7 +67,7 @@ func NewCmdCompletion(io *iostreams.IOStreams) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if shellType == "" {
 				if io.IsStdoutTTY() {
-					return &cmdutil.FlagError{Err: errors.New("error: the value for `--shell` is required")}
+					return cmdutil.FlagErrorf("error: the value for `--shell` is required")
 				}
 				shellType = "bash"
 			}

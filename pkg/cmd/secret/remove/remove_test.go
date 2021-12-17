@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -47,6 +47,14 @@ func TestNewCmdRemove(t *testing.T) {
 			wants: RemoveOptions{
 				SecretName: "cool",
 				EnvName:    "anEnv",
+			},
+		},
+		{
+			name: "user",
+			cli:  "cool -u",
+			wants: RemoveOptions{
+				SecretName:  "cool",
+				UserSecrets: true,
 			},
 		},
 	}
@@ -200,4 +208,31 @@ func Test_removeRun_org(t *testing.T) {
 		})
 	}
 
+}
+
+func Test_removeRun_user(t *testing.T) {
+	reg := &httpmock.Registry{}
+
+	reg.Register(
+		httpmock.REST("DELETE", "user/codespaces/secrets/cool_secret"),
+		httpmock.StatusStringResponse(204, "No Content"))
+
+	io, _, _, _ := iostreams.Test()
+
+	opts := &RemoveOptions{
+		IO: io,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+		SecretName:  "cool_secret",
+		UserSecrets: true,
+	}
+
+	err := removeRun(opts)
+	assert.NoError(t, err)
+
+	reg.Verify(t)
 }

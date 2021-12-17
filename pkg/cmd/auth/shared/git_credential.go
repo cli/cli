@@ -9,9 +9,10 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 )
 
@@ -63,7 +64,7 @@ func (flow *GitCredentialFlow) Setup(hostname, username, authToken string) error
 func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password string) error {
 	if flow.helper == "" {
 		// first use a blank value to indicate to git we want to sever the chain of credential helpers
-		preConfigureCmd, err := git.GitCommand("config", "--global", gitCredentialHelperKey(hostname), "")
+		preConfigureCmd, err := git.GitCommand("config", "--global", "--replace-all", gitCredentialHelperKey(hostname), "")
 		if err != nil {
 			return err
 		}
@@ -120,7 +121,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 }
 
 func gitCredentialHelperKey(hostname string) string {
-	return fmt.Sprintf("credential.https://%s.helper", hostname)
+	return fmt.Sprintf("credential.%s.helper", strings.TrimSuffix(ghinstance.HostPrefix(hostname), "/"))
 }
 
 func gitCredentialHelper(hostname string) (helper string, err error) {

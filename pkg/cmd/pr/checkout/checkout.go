@@ -7,15 +7,15 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/safeexec"
 	"github.com/spf13/cobra"
 )
@@ -220,7 +220,11 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 		mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
 	}
 	if missingMergeConfigForBranch(localBranch) {
+		// .remote is needed for `git pull` to work
+		// .pushRemote is needed for `git push` to work, if user has set `remote.pushDefault`.
+		// see https://git-scm.com/docs/git-config#Documentation/git-config.txt-branchltnamegtremote
 		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.remote", localBranch), remote})
+		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.pushRemote", localBranch), remote})
 		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.merge", localBranch), mergeRef})
 	}
 

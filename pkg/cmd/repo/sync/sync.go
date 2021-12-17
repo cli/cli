@@ -7,12 +7,12 @@ import (
 	"regexp"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
-	gitpkg "github.com/cli/cli/git"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/context"
+	gitpkg "github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
@@ -34,7 +34,7 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		BaseRepo:   f.BaseRepo,
 		Remotes:    f.Remotes,
-		Git:        &gitExecuter{},
+		Git:        &gitExecuter{io: f.IOStreams},
 	}
 
 	cmd := &cobra.Command{
@@ -134,6 +134,11 @@ func syncLocalRepo(opts *SyncOptions) error {
 		}
 	}
 
+	// Git fetch might require input from user, so do it before starting progress indicator.
+	if err := opts.Git.Fetch(remote, fmt.Sprintf("refs/heads/%s", opts.Branch)); err != nil {
+		return err
+	}
+
 	opts.IO.StartProgressIndicator()
 	err = executeLocalRepoSync(srcRepo, remote, opts)
 	opts.IO.StopProgressIndicator()
@@ -231,10 +236,6 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 	git := opts.Git
 	branch := opts.Branch
 	useForce := opts.Force
-
-	if err := git.Fetch(remote, fmt.Sprintf("refs/heads/%s", branch)); err != nil {
-		return err
-	}
 
 	hasLocalBranch := git.HasLocalBranch(branch)
 	if hasLocalBranch {

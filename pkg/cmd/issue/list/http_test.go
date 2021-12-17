@@ -5,12 +5,11 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/httpmock"
 )
 
 func TestIssueList(t *testing.T) {

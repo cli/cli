@@ -2,13 +2,16 @@ package refresh
 
 import (
 	"bytes"
+	"io/ioutil"
+	"net/http"
+	"strings"
 	"testing"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -88,7 +91,8 @@ func Test_NewCmdRefresh(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			io, _, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams:  io,
+				Executable: func() string { return "/path/to/gh" },
 			}
 			io.SetStdinTTY(tt.tty)
 			io.SetStdoutTTY(tt.tty)
@@ -133,6 +137,7 @@ func Test_refreshRun(t *testing.T) {
 		opts         *RefreshOptions
 		askStubs     func(*prompt.AskStubber)
 		cfgHosts     []string
+		oldScopes    string
 		wantErr      string
 		nontty       bool
 		wantAuthArgs authArgs
@@ -210,6 +215,20 @@ func Test_refreshRun(t *testing.T) {
 				scopes:   []string{"repo:invite", "public_key:read"},
 			},
 		},
+		{
+			name: "scopes provided",
+			cfgHosts: []string{
+				"github.com",
+			},
+			oldScopes: "delete_repo, codespace",
+			opts: &RefreshOptions{
+				Scopes: []string{"repo:invite", "public_key:read"},
+			},
+			wantAuthArgs: authArgs{
+				hostname: "github.com",
+				scopes:   []string{"repo:invite", "public_key:read", "delete_repo", "codespace"},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -233,10 +252,26 @@ func Test_refreshRun(t *testing.T) {
 			for _, hostname := range tt.cfgHosts {
 				_ = cfg.Set(hostname, "oauth_token", "abc123")
 			}
-			reg := &httpmock.Registry{}
-			reg.Register(
-				httpmock.GraphQL(`query UserCurrent\b`),
-				httpmock.StringResponse(`{"data":{"viewer":{"login":"cybilb"}}}`))
+
+			httpReg := &httpmock.Registry{}
+			httpReg.Register(
+				httpmock.REST("GET", ""),
+				func(req *http.Request) (*http.Response, error) {
+					statusCode := 200
+					if req.Header.Get("Authorization") != "token abc123" {
+						statusCode = 400
+					}
+					return &http.Response{
+						Request:    req,
+						StatusCode: statusCode,
+						Body:       ioutil.NopCloser(strings.NewReader(``)),
+						Header: http.Header{
+							"X-Oauth-Scopes": {tt.oldScopes},
+						},
+					}, nil
+				},
+			)
+			tt.opts.httpClient = &http.Client{Transport: httpReg}
 
 			mainBuf := bytes.Buffer{}
 			hostsBuf := bytes.Buffer{}
@@ -257,8 +292,8 @@ func Test_refreshRun(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			assert.Equal(t, aa.hostname, tt.wantAuthArgs.hostname)
-			assert.Equal(t, aa.scopes, tt.wantAuthArgs.scopes)
+			assert.Equal(t, tt.wantAuthArgs.hostname, aa.hostname)
+			assert.Equal(t, tt.wantAuthArgs.scopes, aa.scopes)
 		})
 	}
 }

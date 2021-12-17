@@ -7,12 +7,12 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/test"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -119,9 +119,24 @@ func TestIssueClose_issuesDisabled(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`query IssueByNumber\b`),
 		httpmock.StringResponse(`
-			{ "data": { "repository": {
-				"hasIssuesEnabled": false
-			} } }`),
+			{
+				"data": {
+					"repository": {
+						"hasIssuesEnabled": false,
+						"issue": null
+					}
+				},
+				"errors": [
+					{
+						"type": "NOT_FOUND",
+						"path": [
+							"repository",
+							"issue"
+						],
+						"message": "Could not resolve to an issue or pull request with the number of 13."
+					}
+				]
+			}`),
 	)
 
 	_, err := runCommand(http, true, "13")

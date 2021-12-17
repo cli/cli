@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -50,15 +50,23 @@ func TestGraphQLError(t *testing.T) {
 		httpmock.GraphQL(""),
 		httpmock.StringResponse(`
 			{ "errors": [
-				{"message":"OH NO"},
-				{"message":"this is fine"}
+				{
+					"type": "NOT_FOUND",
+					"message": "OH NO",
+					"path": ["repository", "issue"]
+				},
+				{
+					"type": "ACTUALLY_ITS_FINE",
+					"message": "this is fine",
+					"path": ["repository", "issues", 0, "comments"]
+				}
 			  ]
 			}
 		`),
 	)
 
 	err := client.GraphQL("github.com", "", nil, &response)
-	if err == nil || err.Error() != "GraphQL error: OH NO\nthis is fine" {
+	if err == nil || err.Error() != "GraphQL: OH NO (repository.issue), this is fine (repository.issues.0.comments)" {
 		t.Fatalf("got %q", err.Error())
 	}
 }
@@ -144,5 +152,74 @@ func TestHandleHTTPError_GraphQL502(t *testing.T) {
 	err = HandleHTTPError(resp)
 	if err == nil || err.Error() != "HTTP 502: Something went wrong (https://api.github.com/user)" {
 		t.Errorf("got error: %v", err)
+	}
+}
+
+func TestHTTPError_ScopesSuggestion(t *testing.T) {
+	makeResponse := func(s int, u, haveScopes, needScopes string) *http.Response {
+		req, err := http.NewRequest("GET", u, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return &http.Response{
+			Request:    req,
+			StatusCode: s,
+			Body:       ioutil.NopCloser(bytes.NewBufferString(`{}`)),
+			Header: map[string][]string{
+				"Content-Type":            {"application/json"},
+				"X-Oauth-Scopes":          {haveScopes},
+				"X-Accepted-Oauth-Scopes": {needScopes},
+			},
+		}
+	}
+
+	tests := []struct {
+		name string
+		resp *http.Response
+		want string
+	}{
+		{
+			name: "has necessary scopes",
+			resp: makeResponse(404, "https://api.github.com/gists", "repo, gist, read:org", "gist"),
+			want: ``,
+		},
+		{
+			name: "normalizes scopes",
+			resp: makeResponse(404, "https://api.github.com/orgs/ORG/discussions", "admin:org, write:discussion", "read:org, read:discussion"),
+			want: ``,
+		},
+		{
+			name: "no scopes on endpoint",
+			resp: makeResponse(404, "https://api.github.com/user", "repo", ""),
+			want: ``,
+		},
+		{
+			name: "missing a scope",
+			resp: makeResponse(404, "https://api.github.com/gists", "repo, read:org", "gist, delete_repo"),
+			want: `This API operation needs the "gist" scope. To request it, run:  gh auth refresh -h github.com -s gist`,
+		},
+		{
+			name: "server error",
+			resp: makeResponse(500, "https://api.github.com/gists", "repo", "gist"),
+			want: ``,
+		},
+		{
+			name: "no scopes on token",
+			resp: makeResponse(404, "https://api.github.com/gists", "", "gist, delete_repo"),
+			want: ``,
+		},
+		{
+			name: "http code is 422",
+			resp: makeResponse(422, "https://api.github.com/gists", "", "gist"),
+			want: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			httpError := HandleHTTPError(tt.resp)
+			if got := httpError.(HTTPError).ScopesSuggestion(); got != tt.want {
+				t.Errorf("HTTPError.ScopesSuggestion() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

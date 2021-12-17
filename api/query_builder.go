@@ -35,6 +35,22 @@ var issueComments = shortenQuery(`
 	}
 `)
 
+var issueCommentLast = shortenQuery(`
+	comments(last: 1) {
+		nodes {
+			author{login},
+			authorAssociation,
+			body,
+			createdAt,
+			includesCreatedEdit,
+			isMinimized,
+			minimizedReason,
+			reactionGroups{content,users{totalCount}}
+		},
+		totalCount
+	}
+`)
+
 var prReviewRequests = shortenQuery(`
 	reviewRequests(first: 100) {
 		nodes {
@@ -62,6 +78,7 @@ var prReviews = shortenQuery(`
 			reactionGroups{content,users{totalCount}}
 		}
 		pageInfo{hasNextPage,endCursor}
+		totalCount
 	}
 `)
 
@@ -176,6 +193,8 @@ var PullRequestFields = append(IssueFields,
 	"statusCheckRollup",
 )
 
+// PullRequestGraphQL constructs a GraphQL query fragment for a set of pull request fields. Since GitHub
+// pull requests are also technically issues, this function can be used to query issues as well.
 func PullRequestGraphQL(fields []string) string {
 	var q []string
 	for _, field := range fields {
@@ -204,6 +223,8 @@ func PullRequestGraphQL(fields []string) string {
 			q = append(q, `potentialMergeCommit{oid}`)
 		case "comments":
 			q = append(q, issueComments)
+		case "lastComment": // pseudo-field
+			q = append(q, issueCommentLast)
 		case "reviewRequests":
 			q = append(q, prReviewRequests)
 		case "reviews":

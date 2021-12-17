@@ -2,18 +2,18 @@ package diff
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/test"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +34,7 @@ func Test_NewCmdDiff(t *testing.T) {
 			isTTY: true,
 			want: DiffOptions{
 				SelectorArg: "123",
-				UseColor:    "auto",
+				UseColor:    true,
 			},
 		},
 		{
@@ -43,7 +43,7 @@ func Test_NewCmdDiff(t *testing.T) {
 			isTTY: true,
 			want: DiffOptions{
 				SelectorArg: "",
-				UseColor:    "auto",
+				UseColor:    true,
 			},
 		},
 		{
@@ -52,20 +52,38 @@ func Test_NewCmdDiff(t *testing.T) {
 			isTTY: false,
 			want: DiffOptions{
 				SelectorArg: "",
-				UseColor:    "never",
+				UseColor:    false,
+			},
+		},
+		{
+			name:  "force color",
+			args:  "--color always",
+			isTTY: false,
+			want: DiffOptions{
+				SelectorArg: "",
+				UseColor:    true,
+			},
+		},
+		{
+			name:  "disable color",
+			args:  "--color never",
+			isTTY: true,
+			want: DiffOptions{
+				SelectorArg: "",
+				UseColor:    false,
 			},
 		},
 		{
 			name:    "no argument with --repo override",
 			args:    "-R owner/repo",
 			isTTY:   true,
-			wantErr: "argument required when using the --repo flag",
+			wantErr: "argument required when using the `--repo` flag",
 		},
 		{
 			name:    "invalid --color argument",
 			args:    "--color doublerainbow",
 			isTTY:   true,
-			wantErr: `did not understand color: "doublerainbow". Expected one of always, never, or auto`,
+			wantErr: "the value for `--color` must be one of \"auto\", \"always\", or \"never\"",
 		},
 	}
 	for _, tt := range tests {
@@ -74,6 +92,7 @@ func Test_NewCmdDiff(t *testing.T) {
 			io.SetStdoutTTY(tt.isTTY)
 			io.SetStdinTTY(tt.isTTY)
 			io.SetStderrTTY(tt.isTTY)
+			io.SetColorEnabled(tt.isTTY)
 
 			f := &cmdutil.Factory{
 				IOStreams: io,
@@ -108,104 +127,167 @@ func Test_NewCmdDiff(t *testing.T) {
 	}
 }
 
-func runCommand(rt http.RoundTripper, remotes context.Remotes, isTTY bool, cli string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(isTTY)
-	io.SetStdinTTY(isTTY)
-	io.SetStderrTTY(isTTY)
+func Test_diffRun(t *testing.T) {
+	pr := &api.PullRequest{Number: 123}
 
-	factory := &cmdutil.Factory{
-		IOStreams: io,
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: rt}, nil
+	tests := []struct {
+		name       string
+		opts       DiffOptions
+		rawDiff    string
+		wantAccept string
+		wantStdout string
+	}{
+		{
+			name: "no color",
+			opts: DiffOptions{
+				SelectorArg: "123",
+				UseColor:    false,
+				Patch:       false,
+			},
+			rawDiff:    fmt.Sprintf(testDiff, "", "", "", ""),
+			wantAccept: "application/vnd.github.v3.diff",
+			wantStdout: fmt.Sprintf(testDiff, "", "", "", ""),
+		},
+		{
+			name: "with color",
+			opts: DiffOptions{
+				SelectorArg: "123",
+				UseColor:    true,
+				Patch:       false,
+			},
+			rawDiff:    fmt.Sprintf(testDiff, "", "", "", ""),
+			wantAccept: "application/vnd.github.v3.diff",
+			wantStdout: fmt.Sprintf(testDiff, "\x1b[m", "\x1b[1;38m", "\x1b[32m", "\x1b[31m"),
+		},
+		{
+			name: "patch format",
+			opts: DiffOptions{
+				SelectorArg: "123",
+				UseColor:    false,
+				Patch:       true,
+			},
+			rawDiff:    fmt.Sprintf(testDiff, "", "", "", ""),
+			wantAccept: "application/vnd.github.v3.patch",
+			wantStdout: fmt.Sprintf(testDiff, "", "", "", ""),
 		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			httpReg := &httpmock.Registry{}
+			defer httpReg.Verify(t)
 
-	cmd := NewCmdDiff(factory, nil)
+			var gotAccept string
+			httpReg.Register(
+				httpmock.REST("GET", "repos/OWNER/REPO/pulls/123"),
+				func(req *http.Request) (*http.Response, error) {
+					gotAccept = req.Header.Get("Accept")
+					return &http.Response{
+						StatusCode: 200,
+						Request:    req,
+						Body:       ioutil.NopCloser(strings.NewReader(tt.rawDiff)),
+					}, nil
+				})
 
-	argv, err := shlex.Split(cli)
-	if err != nil {
-		return nil, err
+			opts := tt.opts
+			opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: httpReg}, nil
+			}
+
+			io, _, stdout, stderr := iostreams.Test()
+			opts.IO = io
+
+			finder := shared.NewMockFinder("123", pr, ghrepo.New("OWNER", "REPO"))
+			finder.ExpectFields([]string{"number"})
+			opts.Finder = finder
+
+			if err := diffRun(&opts); err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
+			if diff := cmp.Diff(tt.wantStdout, stdout.String()); diff != "" {
+				t.Errorf("command output did not match:\n%s", diff)
+			}
+			if stderr.String() != "" {
+				t.Errorf("unexpected stderr output: %s", stderr.String())
+			}
+			if gotAccept != tt.wantAccept {
+				t.Errorf("unexpected Accept header: %s", gotAccept)
+			}
+		})
 	}
-	cmd.SetArgs(argv)
-
-	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
-
-	_, err = cmd.ExecuteC()
-	return &test.CmdOut{
-		OutBuf: stdout,
-		ErrBuf: stderr,
-	}, err
 }
 
-func TestPRDiff_notty(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	shared.RunCommandFinder("", &api.PullRequest{Number: 123}, ghrepo.New("OWNER", "REPO"))
-
-	http.Register(
-		httpmock.REST("GET", "repos/OWNER/REPO/pulls/123"),
-		httpmock.StringResponse(testDiff))
-
-	output, err := runCommand(http, nil, false, "")
-	if err != nil {
-		t.Fatalf("unexpected error: %s", err)
-	}
-	if diff := cmp.Diff(testDiff, output.String()); diff != "" {
-		t.Errorf("command output did not match:\n%s", diff)
-	}
-}
-
-func TestPRDiff_tty(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	shared.RunCommandFinder("123", &api.PullRequest{Number: 123}, ghrepo.New("OWNER", "REPO"))
-
-	http.Register(
-		httpmock.REST("GET", "repos/OWNER/REPO/pulls/123"),
-		httpmock.StringResponse(testDiff),
-	)
-
-	output, err := runCommand(http, nil, true, "123")
-	if err != nil {
-		t.Fatalf("unexpected error: %s", err)
-	}
-	assert.Contains(t, output.String(), "\x1b[32m+site: bin/gh\x1b[m")
-}
-
-const testDiff = `diff --git a/.github/workflows/releases.yml b/.github/workflows/releases.yml
-index 73974448..b7fc0154 100644
---- a/.github/workflows/releases.yml
-+++ b/.github/workflows/releases.yml
+const testDiff = `%[2]sdiff --git a/.github/workflows/releases.yml b/.github/workflows/releases.yml%[1]s
+%[2]sindex 73974448..b7fc0154 100644%[1]s
+%[2]s--- a/.github/workflows/releases.yml%[1]s
+%[2]s+++ b/.github/workflows/releases.yml%[1]s
 @@ -44,6 +44,11 @@ jobs:
            token: ${{secrets.SITE_GITHUB_TOKEN}}
        - name: Publish documentation site
          if: "!contains(github.ref, '-')" # skip prereleases
-+        env:
-+          GIT_COMMITTER_NAME: cli automation
-+          GIT_AUTHOR_NAME: cli automation
-+          GIT_COMMITTER_EMAIL: noreply@github.com
-+          GIT_AUTHOR_EMAIL: noreply@github.com
+%[3]s+        env:%[1]s
+%[3]s+          GIT_COMMITTER_NAME: cli automation%[1]s
+%[3]s+          GIT_AUTHOR_NAME: cli automation%[1]s
+%[3]s+          GIT_COMMITTER_EMAIL: noreply@github.com%[1]s
+%[3]s+          GIT_AUTHOR_EMAIL: noreply@github.com%[1]s
          run: make site-publish
        - name: Move project cards
          if: "!contains(github.ref, '-')" # skip prereleases
-diff --git a/Makefile b/Makefile
-index f2b4805c..3d7bd0f9 100644
---- a/Makefile
-+++ b/Makefile
+%[2]sdiff --git a/Makefile b/Makefile%[1]s
+%[2]sindex f2b4805c..3d7bd0f9 100644%[1]s
+%[2]s--- a/Makefile%[1]s
+%[2]s+++ b/Makefile%[1]s
 @@ -22,8 +22,8 @@ test:
  	go test ./...
  .PHONY: test
  
--site:
--	git clone https://github.com/github/cli.github.com.git "$@"
-+site: bin/gh
-+	bin/gh repo clone github/cli.github.com "$@"
+%[4]s-site:%[1]s
+%[4]s-	git clone https://github.com/github/cli.github.com.git "$@"%[1]s
+%[3]s+site: bin/gh%[1]s
+%[3]s+	bin/gh repo clone github/cli.github.com "$@"%[1]s
  
  site-docs: site
  	git -C site pull
 `
+
+func Test_colorDiffLines(t *testing.T) {
+	inputs := []struct {
+		input, output string
+	}{
+		{
+			input:  "",
+			output: "",
+		},
+		{
+			input:  "\n",
+			output: "\n",
+		},
+		{
+			input:  "foo\nbar\nbaz\n",
+			output: "foo\nbar\nbaz\n",
+		},
+		{
+			input:  "foo\nbar\nbaz",
+			output: "foo\nbar\nbaz\n",
+		},
+		{
+			input: fmt.Sprintf("+foo\n-b%sr\n+++ baz\n", strings.Repeat("a", 2*lineBufferSize)),
+			output: fmt.Sprintf(
+				"%[4]s+foo%[2]s\n%[5]s-b%[1]sr%[2]s\n%[3]s+++ baz%[2]s\n",
+				strings.Repeat("a", 2*lineBufferSize),
+				"\x1b[m",
+				"\x1b[1;38m",
+				"\x1b[32m",
+				"\x1b[31m",
+			),
+		},
+	}
+	for _, tt := range inputs {
+		buf := bytes.Buffer{}
+		if err := colorDiffLines(&buf, strings.NewReader(tt.input)); err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if got := buf.String(); got != tt.output {
+			t.Errorf("expected: %q, got: %q", tt.output, got)
+		}
+	}
+}

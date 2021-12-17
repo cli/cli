@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -230,6 +230,36 @@ func (r Repository) ViewerCanTriage() bool {
 	}
 }
 
+func FetchRepository(client *Client, repo ghrepo.Interface, fields []string) (*Repository, error) {
+	query := fmt.Sprintf(`query RepositoryInfo($owner: String!, $name: String!) {
+		repository(owner: $owner, name: $name) {%s}
+	}`, RepositoryGraphQL(fields))
+
+	variables := map[string]interface{}{
+		"owner": repo.RepoOwner(),
+		"name":  repo.RepoName(),
+	}
+
+	var result struct {
+		Repository *Repository
+	}
+	if err := client.GraphQL(repo.RepoHost(), query, variables, &result); err != nil {
+		return nil, err
+	}
+	// The GraphQL API should have returned an error in case of a missing repository, but this isn't
+	// guaranteed to happen when an authentication token with insufficient permissions is being used.
+	if result.Repository == nil {
+		return nil, GraphQLErrorResponse{
+			Errors: []GraphQLError{{
+				Type:    "NOT_FOUND",
+				Message: fmt.Sprintf("Could not resolve to a Repository with the name '%s/%s'.", repo.RepoOwner(), repo.RepoName()),
+			}},
+		}
+	}
+
+	return InitRepoHostname(result.Repository, repo.RepoHost()), nil
+}
+
 func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	query := `
 	fragment repo on Repository {
@@ -261,16 +291,24 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 		"name":  repo.RepoName(),
 	}
 
-	result := struct {
-		Repository Repository
-	}{}
-	err := client.GraphQL(repo.RepoHost(), query, variables, &result)
-
-	if err != nil {
+	var result struct {
+		Repository *Repository
+	}
+	if err := client.GraphQL(repo.RepoHost(), query, variables, &result); err != nil {
 		return nil, err
 	}
+	// The GraphQL API should have returned an error in case of a missing repository, but this isn't
+	// guaranteed to happen when an authentication token with insufficient permissions is being used.
+	if result.Repository == nil {
+		return nil, GraphQLErrorResponse{
+			Errors: []GraphQLError{{
+				Type:    "NOT_FOUND",
+				Message: fmt.Sprintf("Could not resolve to a Repository with the name '%s/%s'.", repo.RepoOwner(), repo.RepoName()),
+			}},
+		}
+	}
 
-	return InitRepoHostname(&result.Repository, repo.RepoHost()), nil
+	return InitRepoHostname(result.Repository, repo.RepoHost()), nil
 }
 
 func RepoDefaultBranch(client *Client, repo ghrepo.Interface) (string, error) {
@@ -484,6 +522,26 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, e
 		ViewerPermission: "WRITE",
 		hostname:         repo.RepoHost(),
 	}, nil
+}
+
+func LastCommit(client *Client, repo ghrepo.Interface) (*Commit, error) {
+	var responseData struct {
+		Repository struct {
+			DefaultBranchRef struct {
+				Target struct {
+					Commit `graphql:"... on Commit"`
+				}
+			}
+		} `graphql:"repository(owner: $owner, name: $repo)"`
+	}
+	variables := map[string]interface{}{
+		"owner": githubv4.String(repo.RepoOwner()), "repo": githubv4.String(repo.RepoName()),
+	}
+	gql := graphQLClient(client.http, repo.RepoHost())
+	if err := gql.QueryNamed(context.Background(), "LastCommit", &responseData, variables); err != nil {
+		return nil, err
+	}
+	return &responseData.Repository.DefaultBranchRef.Target.Commit, nil
 }
 
 // RepoFindForks finds forks of the repo that are affiliated with the viewer
@@ -703,7 +761,7 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 		go func() {
 			teams, err := OrganizationTeams(client, repo)
 			// TODO: better detection of non-org repos
-			if err != nil && !strings.HasPrefix(err.Error(), "Could not resolve to an Organization") {
+			if err != nil && !strings.Contains(err.Error(), "Could not resolve to an Organization") {
 				errc <- fmt.Errorf("error fetching organization teams: %w", err)
 				return
 			}
@@ -914,7 +972,7 @@ func RepoAndOrgProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, e
 
 	orgProjects, err := OrganizationProjects(client, repo)
 	// TODO: better detection of non-org repos
-	if err != nil && !strings.HasPrefix(err.Error(), "Could not resolve to an Organization") {
+	if err != nil && !strings.Contains(err.Error(), "Could not resolve to an Organization") {
 		return projects, fmt.Errorf("error fetching organization projects: %w", err)
 	}
 	projects = append(projects, orgProjects...)

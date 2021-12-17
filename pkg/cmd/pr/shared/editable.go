@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/set"
-	"github.com/cli/cli/pkg/surveyext"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/set"
+	"github.com/cli/cli/v2/pkg/surveyext"
 )
 
 type Editable struct {
@@ -120,21 +120,6 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 	return &a, err
 }
 
-func (e Editable) LabelIds() (*[]string, error) {
-	if !e.Labels.Edited {
-		return nil, nil
-	}
-	if len(e.Labels.Add) != 0 || len(e.Labels.Remove) != 0 {
-		s := set.NewStringSet()
-		s.AddValues(e.Labels.Default)
-		s.AddValues(e.Labels.Add)
-		s.RemoveValues(e.Labels.Remove)
-		e.Labels.Value = s.ToSlice()
-	}
-	l, err := e.Metadata.LabelsToIDs(e.Labels.Value)
-	return &l, err
-}
-
 func (e Editable) ProjectIds() (*[]string, error) {
 	if !e.Projects.Edited {
 		return nil, nil
@@ -189,9 +174,21 @@ func EditFieldsSurvey(editable *Editable, editorCommand string) error {
 		}
 	}
 	if editable.Labels.Edited {
-		editable.Labels.Value, err = multiSelectSurvey("Labels", editable.Labels.Default, editable.Labels.Options)
+		editable.Labels.Add, err = multiSelectSurvey("Labels", editable.Labels.Default, editable.Labels.Options)
 		if err != nil {
 			return err
+		}
+		for _, prev := range editable.Labels.Default {
+			var found bool
+			for _, selected := range editable.Labels.Add {
+				if prev == selected {
+					found = true
+					break
+				}
+			}
+			if !found {
+				editable.Labels.Remove = append(editable.Labels.Remove, prev)
+			}
 		}
 	}
 	if editable.Projects.Edited {

@@ -2,18 +2,18 @@ package delete
 
 import (
 	"bytes"
-	"github.com/cli/cli/pkg/prompt"
 	"io/ioutil"
 	"net/http"
 	"regexp"
 	"testing"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/test"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -133,7 +133,7 @@ func TestIssueDelete_doesNotExist(t *testing.T) {
 	)
 
 	_, err := runCommand(httpRegistry, true, "13")
-	if err == nil || err.Error() != "GraphQL error: Could not resolve to an Issue with the number of 13." {
+	if err == nil || err.Error() != "GraphQL: Could not resolve to an Issue with the number of 13." {
 		t.Errorf("error running command `issue delete`: %v", err)
 	}
 }
@@ -145,9 +145,24 @@ func TestIssueDelete_issuesDisabled(t *testing.T) {
 	httpRegistry.Register(
 		httpmock.GraphQL(`query IssueByNumber\b`),
 		httpmock.StringResponse(`
-			{ "data": { "repository": {
-				"hasIssuesEnabled": false
-			} } }`),
+		{
+			"data": {
+				"repository": {
+					"hasIssuesEnabled": false,
+					"issue": null
+				}
+			},
+			"errors": [
+				{
+					"type": "NOT_FOUND",
+					"path": [
+						"repository",
+						"issue"
+					],
+					"message": "Could not resolve to an issue or pull request with the number of 13."
+				}
+			]
+		}`),
 	)
 
 	_, err := runCommand(httpRegistry, true, "13")

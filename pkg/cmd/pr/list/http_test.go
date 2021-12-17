@@ -5,9 +5,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/cli/cli/internal/ghrepo"
-	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/httpmock"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/httpmock"
 )
 
 func Test_listPullRequests(t *testing.T) {

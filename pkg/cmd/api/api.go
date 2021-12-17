@@ -17,14 +17,14 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/export"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/jsoncolor"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/export"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/jsoncolor"
 	"github.com/spf13/cobra"
 )
 
@@ -79,13 +79,13 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			The default HTTP request method is "GET" normally and "POST" if any parameters
 			were added. Override the method with %[1]s--method%[1]s.
 
-			Pass one or more %[1]s--raw-field%[1]s values in "key=value" format to add string 
-			parameters to the request payload. To add non-string parameters, see %[1]s--field%[1]s below. 
-			Note that adding request parameters will automatically switch the request method to POST. 
-			To send the parameters as a GET query string instead, use %[1]s--method%[1]s GET.
+			Pass one or more %[1]s-f/--raw-field%[1]s values in "key=value" format to add static string 
+			parameters to the request payload. To add non-string or otherwise dynamic values, see
+			%[1]s--field%[1]s below. Note that adding request parameters will automatically switch the
+			request method to POST. To send the parameters as a GET query string instead, use
+			%[1]s--method GET%[1]s.
 
-			The %[1]s--field%[1]s flag behaves like %[1]s--raw-field%[1]s with magic type conversion based
-			on the format of the value:
+			The %[1]s-F/--field%[1]s flag has magic type conversion based on the format of the value:
 
 			- literal values "true", "false", "null", and integer numbers get converted to
 			  appropriate JSON types;
@@ -173,12 +173,12 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 
 			if c.Flags().Changed("hostname") {
 				if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
-					return &cmdutil.FlagError{Err: fmt.Errorf("error parsing `--hostname`: %w", err)}
+					return cmdutil.FlagErrorf("error parsing `--hostname`: %w", err)
 				}
 			}
 
 			if opts.Paginate && !strings.EqualFold(opts.RequestMethod, "GET") && opts.RequestPath != "graphql" {
-				return &cmdutil.FlagError{Err: errors.New("the `--paginate` option is not supported for non-GET requests")}
+				return cmdutil.FlagErrorf("the `--paginate` option is not supported for non-GET requests")
 			}
 
 			if err := cmdutil.MutuallyExclusive(
@@ -213,7 +213,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringSliceVarP(&opts.Previews, "preview", "p", nil, "Opt into GitHub API previews")
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response headers in the output")
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
-	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request")
+	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request (use \"-\" to read from standard input)")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
 	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format the response using a Go template")
 	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
@@ -319,6 +319,7 @@ func apiRun(opts *ApiOptions) error {
 			}
 		} else {
 			requestPath, hasNextPage = findNextPage(resp)
+			requestBody = nil // prevent repeating GET parameters
 		}
 
 		if hasNextPage && opts.ShowResponseHeaders {
@@ -384,12 +385,14 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 		}
 	}
 
+	if serverError == "" && resp.StatusCode > 299 {
+		serverError = fmt.Sprintf("HTTP %d", resp.StatusCode)
+	}
 	if serverError != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
-		err = cmdutil.SilentError
-		return
-	} else if resp.StatusCode > 299 {
-		fmt.Fprintf(opts.IO.ErrOut, "gh: HTTP %d\n", resp.StatusCode)
+		if msg := api.ScopesSuggestion(resp); msg != "" {
+			fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", msg)
+		}
 		err = cmdutil.SilentError
 		return
 	}
@@ -537,36 +540,58 @@ func parseErrorResponse(r io.Reader, statusCode int) (io.Reader, string, error) 
 
 	var parsedBody struct {
 		Message string
-		Errors  []json.RawMessage
+		Errors  json.RawMessage
 	}
 	err = json.Unmarshal(b, &parsedBody)
 	if err != nil {
-		return r, "", err
+		return bodyCopy, "", err
 	}
+
+	if len(parsedBody.Errors) > 0 && parsedBody.Errors[0] == '"' {
+		var stringError string
+		if err := json.Unmarshal(parsedBody.Errors, &stringError); err != nil {
+			return bodyCopy, "", err
+		}
+		if stringError != "" {
+			if parsedBody.Message != "" {
+				return bodyCopy, fmt.Sprintf("%s (%s)", stringError, parsedBody.Message), nil
+			}
+			return bodyCopy, stringError, nil
+		}
+	}
+
 	if parsedBody.Message != "" {
 		return bodyCopy, fmt.Sprintf("%s (HTTP %d)", parsedBody.Message, statusCode), nil
 	}
 
-	type errorMessage struct {
+	if len(parsedBody.Errors) == 0 || parsedBody.Errors[0] != '[' {
+		return bodyCopy, "", nil
+	}
+
+	var errorObjects []json.RawMessage
+	if err := json.Unmarshal(parsedBody.Errors, &errorObjects); err != nil {
+		return bodyCopy, "", err
+	}
+
+	var objectError struct {
 		Message string
 	}
 	var errors []string
-	for _, rawErr := range parsedBody.Errors {
+	for _, rawErr := range errorObjects {
 		if len(rawErr) == 0 {
 			continue
 		}
 		if rawErr[0] == '{' {
-			var objectError errorMessage
 			err := json.Unmarshal(rawErr, &objectError)
 			if err != nil {
-				return r, "", err
+				return bodyCopy, "", err
 			}
 			errors = append(errors, objectError.Message)
 		} else if rawErr[0] == '"' {
 			var stringError string
 			err := json.Unmarshal(rawErr, &stringError)
 			if err != nil {
-				return r, "", err
+				return bodyCopy, "", err
 			}
 			errors = append(errors, stringError)
 		}
