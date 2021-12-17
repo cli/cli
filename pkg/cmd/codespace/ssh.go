@@ -194,7 +194,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 	fetches := 0
 	var status error
 	for _, cs := range codespaces {
-		if cs.State != "Available" {
+		if cs.State != "Available" && opts.codespace == "" {
 			fmt.Fprintf(os.Stderr, "skipping unavailable codespace %s: %s\n", cs.Name, cs.State)
 			status = cmdutil.SilentError
 			continue
@@ -423,7 +423,7 @@ func newConfigCmd(app *App) *cobra.Command {
 	configCmd := &cobra.Command{
 		Use:   "config [-c codespace]",
 		Short: "Write OpenSSH configuration to stdout",
-		Long: heredoc.Docf(`
+		Long: heredoc.Doc(`
 			The config command generates per-codespace ssh configuration in OpenSSH format.
 
 			Including this configuration in ~/.ssh/config improves the user experience of other
@@ -433,9 +433,10 @@ func newConfigCmd(app *App) *cobra.Command {
 			If -c/--codespace is specified, configuration is generated for that codespace
 			only. Otherwise configuration is emitted for all available codespaces.
 
-			Codespaces that aren't in "Available" state are skipped because it's necessary to
-			connect to the running codespace to determine the required remote ssh username.
-		`, "`"),
+			When generating configuration for all codespaces, ones that aren't in "Available"
+			state are skipped because it's necessary to start the codespace to determine its
+			remote ssh username. When generating configuration for a single codespace with '-c',
+		`),
 		Example: heredoc.Doc(`
 			$ gh codespace config > ~/.ssh/codespaces
 			$ echo 'include ~/.ssh/codespaces' >> ~/.ssh/config'
