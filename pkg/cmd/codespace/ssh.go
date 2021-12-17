@@ -95,8 +95,18 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		return fmt.Errorf("get or choose codespace: %w", err)
 	}
 
-	session, err := openSSHSession(ctx, a, codespace, liveshareLogger)
+	// While connecting, ensure in the background that the user has keys installed.
+	// That lets us report a more useful error message if they don't.
+	authkeys := make(chan error, 1)
+	go func() {
+		authkeys <- a.ensureAuthorizedKeys(ctx)
+	}()
+
+	session, err := a.openSSHSession(ctx, codespace, liveshareLogger)
 	if err != nil {
+		if authErr := <-authkeys; authErr != nil {
+			return authErr
+		}
 		return fmt.Errorf("error connecting to codespace: %w", err)
 	}
 	defer safeClose(session, &err)
@@ -201,7 +211,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 				}
 			}()
 
-			session, err := openSSHSession(ctx, a, cs, nil)
+			session, err := a.openSSHSession(ctx, cs, nil)
 			if err != nil {
 				result.err = fmt.Errorf("error connecting to codespace: %w", err)
 				return
@@ -218,6 +228,12 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 
 			result.codespace = cs
 		}()
+	}
+
+	// While the above fetches are running, ensure that the user has keys installed.
+	// That lets us report a more useful error message if they don't.
+	if err = a.ensureAuthorizedKeys(ctx); err != nil {
+		return err
 	}
 
 	ghexec, err := os.Executable()
@@ -284,19 +300,7 @@ type codespaceSSHConfig struct {
 	GHExec     string // path used for invoking the current `gh` binary
 }
 
-func openSSHSession(ctx context.Context, a *App, codespace *api.Codespace, liveshareLogger *log.Logger) (*liveshare.Session, error) {
-	// TODO(josebalius): We can fetch the user in parallel to everything else
-	// we should convert this call and others to happen async
-	user, err := a.apiClient.GetUser(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("error getting user: %w", err)
-	}
-
-	authkeys := make(chan error, 1)
-	go func() {
-		authkeys <- checkAuthorizedKeys(ctx, a.apiClient, user.Login)
-	}()
-
+func (a *App) openSSHSession(ctx context.Context, codespace *api.Codespace, liveshareLogger *log.Logger) (*liveshare.Session, error) {
 	if liveshareLogger == nil {
 		liveshareLogger = noopLogger()
 	}
@@ -306,12 +310,16 @@ func openSSHSession(ctx context.Context, a *App, codespace *api.Codespace, lives
 		return nil, fmt.Errorf("error connecting to codespace: %w", err)
 	}
 
-	if err := <-authkeys; err != nil {
-		session.Close()
-		return nil, err
+	return session, nil
+}
+
+func (a *App) ensureAuthorizedKeys(ctx context.Context) error {
+	user, err := a.apiClient.GetUser(ctx)
+	if err != nil {
+		return fmt.Errorf("error getting user: %w", err)
 	}
 
-	return session, nil
+	return checkAuthorizedKeys(ctx, a.apiClient, user.Login)
 }
 
 type cpOptions struct {
