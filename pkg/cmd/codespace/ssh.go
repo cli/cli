@@ -294,6 +294,7 @@ func openSSHSession(ctx context.Context, a *App, codespace *api.Codespace, lives
 	}
 
 	if err := <-authkeys; err != nil {
+		session.Close()
 		return nil, err
 	}
 
