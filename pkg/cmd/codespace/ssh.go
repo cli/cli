@@ -90,7 +90,12 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		a.errLogger.Printf("Debug file located at: %s", debugLogger.Name())
 	}
 
-	session, err := openSSHSession(ctx, a, opts.codespace, liveshareLogger)
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
+	if err != nil {
+		return fmt.Errorf("get or choose codespace: %w", err)
+	}
+
+	session, err := openSSHSession(ctx, a, codespace, liveshareLogger)
 	if err != nil {
 		return fmt.Errorf("error connecting to codespace: %w", err)
 	}
@@ -209,7 +214,12 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 
 		sshUser, ok := sshUsers[cs.Repository.FullName]
 		if !ok {
-			session, err := openSSHSession(ctx, a, cs.Name, nil)
+			codespace, err := a.apiClient.GetCodespace(ctx, cs.Name, true)
+			if err != nil {
+				return fmt.Errorf("getting full codespace details: %w", err)
+			}
+
+			session, err := openSSHSession(ctx, a, codespace, nil)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error connecting to codespace: %v\n", err)
 
@@ -262,12 +272,7 @@ type codespaceSSHConfig struct {
 	GHExec     string // path used for invoking the current `gh` binary
 }
 
-func openSSHSession(ctx context.Context, a *App, csName string, liveshareLogger *log.Logger) (*liveshare.Session, error) {
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, csName)
-	if err != nil {
-		return nil, fmt.Errorf("get or choose codespace: %w", err)
-	}
-
+func openSSHSession(ctx context.Context, a *App, codespace *api.Codespace, liveshareLogger *log.Logger) (*liveshare.Session, error) {
 	// TODO(josebalius): We can fetch the user in parallel to everything else
 	// we should convert this call and others to happen async
 	user, err := a.apiClient.GetUser(ctx)
