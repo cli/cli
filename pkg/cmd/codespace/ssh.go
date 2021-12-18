@@ -241,15 +241,16 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 		return err
 	}
 
-	t, err := template.New("ssh_config").Parse(`Host cs.{{.Name}}.{{.EscapedRef}}
-	User {{.SSHUser}}
-	ProxyCommand {{.GHExec}} cs ssh -c {{.Name}} --stdio
-	UserKnownHostsFile=/dev/null
-	StrictHostKeyChecking no
-	LogLevel quiet
-	ControlMaster auto
+	t, err := template.New("ssh_config").Parse(heredoc.Doc(`
+		Host cs.{{.Name}}.{{.EscapedRef}}
+			User {{.SSHUser}}
+			ProxyCommand {{.GHExec}} cs ssh -c {{.Name}} --stdio
+			UserKnownHostsFile=/dev/null
+			StrictHostKeyChecking no
+			LogLevel quiet
+			ControlMaster auto
 
-`)
+	`))
 	if err != nil {
 		return fmt.Errorf("error formatting template: %w", err)
 	}
