@@ -104,6 +104,20 @@ Or via [pkg(8)](https://www.freebsd.org/cgi/man.cgi?pkg(8)):
 pkg install gh
 ```
 
+### NetBSD and others via pkgsrc
+
+Users of NetBSD and other [supported platforms](https://pkgsrc.org/#index4h1) can install the [`gh`](https://pkgsrc.se/net/gh) package from pkgsrc. To install the binary package, run:
+
+```bash
+pkgin install gh
+```
+
+To install from source, run:
+
+```bash
+cd /usr/pkgsrc/net/gh && make package-install
+```
+
 ### OpenBSD
 
 In -current, or in releases starting from 7.0, OpenBSD users can install from packages:
