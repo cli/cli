@@ -65,7 +65,9 @@ func newSSHCmd(app *App, f *cmdutil.Factory) *cobra.Command {
 	sshCmd.Flags().BoolVarP(&opts.debug, "debug", "d", false, "Log debug data to a file")
 	sshCmd.Flags().StringVarP(&opts.debugFile, "debug-file", "", "", "Path of the file log to")
 	sshCmd.Flags().BoolVar(&opts.stdio, "stdio", false, "Proxy sshd connection to stdio")
-	sshCmd.Flags().MarkHidden("stdio")
+	if err := sshCmd.Flags().MarkHidden("stdio"); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+	}
 
 	sshCmd.AddCommand(newConfigCmd(app, f))
 
