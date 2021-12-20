@@ -101,7 +101,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	// That lets us report a more useful error message if they don't.
 	authkeys := make(chan error, 1)
 	go func() {
-		authkeys <- a.ensureAuthorizedKeys(ctx)
+		authkeys <- checkAuthorizedKeys(ctx, a.apiClient)
 	}()
 
 	session, err := a.openSSHSession(ctx, codespace, liveshareLogger)
@@ -240,7 +240,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions, execut
 
 	// While the above fetches are running, ensure that the user has keys installed.
 	// That lets us report a more useful error message if they don't.
-	if err = a.ensureAuthorizedKeys(ctx); err != nil {
+	if err = checkAuthorizedKeys(ctx, a.apiClient); err != nil {
 		return err
 	}
 
@@ -309,15 +309,6 @@ func (a *App) openSSHSession(ctx context.Context, codespace *api.Codespace, live
 	}
 
 	return session, nil
-}
-
-func (a *App) ensureAuthorizedKeys(ctx context.Context) error {
-	user, err := a.apiClient.GetUser(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting user: %w", err)
-	}
-
-	return checkAuthorizedKeys(ctx, a.apiClient, user.Login)
 }
 
 type cpOptions struct {
