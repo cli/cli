@@ -219,7 +219,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions, execut
 				}
 			}()
 
-			session, err := a.openSSHSession(ctx, cs, nil)
+			session, err := a.openSSHSession(ctx, cs, noopLogger())
 			if err != nil {
 				result.err = fmt.Errorf("error connecting to codespace: %w", err)
 				return
@@ -299,10 +299,6 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions, execut
 }
 
 func (a *App) openSSHSession(ctx context.Context, codespace *api.Codespace, liveshareLogger *log.Logger) (*liveshare.Session, error) {
-	if liveshareLogger == nil {
-		liveshareLogger = noopLogger()
-	}
-
 	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to codespace: %w", err)
