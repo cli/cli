@@ -371,6 +371,45 @@ func TestPrMerge_nontty(t *testing.T) {
 	assert.Equal(t, "", output.Stderr())
 }
 
+func TestPrMerge_editMessage_nontty(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.Equal(t, "mytitle", input["commitHeadline"].(string))
+			assert.Equal(t, "mybody", input["commitBody"].(string))
+		}))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+
+	output, err := runCommand(http, "master", false, "pr merge 1 --merge -t mytitle -b mybody")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
+}
+
 func TestPrMerge_withRepoFlag(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
@@ -884,7 +923,7 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 	`), output.Stderr())
 }
 
-func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
+func TestPRMerge_interactiveSquashEditCommitMsgAndSubject(t *testing.T) {
 	io, _, stdout, stderr := iostreams.Test()
 	io.SetStdoutTTY(true)
 	io.SetStderrTTY(true)
@@ -903,6 +942,14 @@ func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
 		httpmock.GraphQL(`query PullRequestMergeText\b`),
 		httpmock.StringResponse(`
 		{ "data": { "node": {
+			"viewerMergeHeadlineText": "default headline text",
+			"viewerMergeBodyText": "default body text"
+		} } }`))
+	tr.Register(
+		httpmock.GraphQL(`query PullRequestMergeText\b`),
+		httpmock.StringResponse(`
+		{ "data": { "node": {
+			"viewerMergeHeadlineText": "default headline text",
 			"viewerMergeBodyText": "default body text"
 		} } }`))
 	tr.Register(
@@ -910,6 +957,7 @@ func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
+			assert.Equal(t, "DEFAULT HEADLINE TEXT", input["commitHeadline"].(string))
 			assert.Equal(t, "DEFAULT BODY TEXT", input["commitBody"].(string))
 		}))
 
@@ -921,6 +969,7 @@ func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
 
 	as.StubOne(2)                     // Merge method survey
 	as.StubOne(false)                 // Delete branch survey
+	as.StubOne("Edit commit subject") // Confirm submit survey
 	as.StubOne("Edit commit message") // Confirm submit survey
 	as.StubOne("Submit")              // Confirm submit survey
 

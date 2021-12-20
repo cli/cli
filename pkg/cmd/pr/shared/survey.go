@@ -22,6 +22,7 @@ const (
 	CancelAction
 	MetadataAction
 	EditCommitMessageAction
+	EditCommitSubjectAction
 
 	noMilestone = "(none)"
 )
