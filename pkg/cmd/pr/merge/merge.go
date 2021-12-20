@@ -252,10 +252,10 @@ func mergeRun(opts *MergeOptions) error {
 				return err
 			}
 
-			allowEdit := payload.method != PullRequestMergeMethodRebase
+			allowEditMsg := payload.method != PullRequestMergeMethodRebase
 
 			for {
-				action, err := confirmSurvey(allowEdit)
+				action, err := confirmSurvey(allowEditMsg)
 				if err != nil {
 					return fmt.Errorf("unable to confirm: %w", err)
 				}
@@ -439,7 +439,7 @@ func deleteBranchSurvey(opts *MergeOptions, crossRepoPR, localBranchExists bool)
 	return opts.DeleteBranch, nil
 }
 
-func confirmSurvey(allowEdit bool) (shared.Action, error) {
+func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 	const (
 		submitLabel            = "Submit"
 		editCommitSubjectLabel = "Edit commit subject"
@@ -448,7 +448,7 @@ func confirmSurvey(allowEdit bool) (shared.Action, error) {
 	)
 
 	options := []string{submitLabel}
-	if allowEdit {
+	if allowEditMsg {
 		options = append(options, editCommitSubjectLabel, editCommitMsgLabel)
 	}
 	options = append(options, cancelLabel)
