@@ -1,7 +1,6 @@
 package edit
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 type EditOptions struct {
@@ -120,7 +120,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			}
 
 			if opts.Interactive && !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("--tile, --body, --reviewer, --assignee, --label, --project, or --milestone required when not running interactively")}
+				return cmdutil.FlagErrorf("--tile, --body, --reviewer, --assignee, --label, --project, or --milestone required when not running interactively")
 			}
 
 			if runF != nil {
@@ -133,7 +133,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 	cmd.Flags().StringVarP(&opts.Editable.Title.Value, "title", "t", "", "Set the new title.")
 	cmd.Flags().StringVarP(&opts.Editable.Body.Value, "body", "b", "", "Set the new body.")
-	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
+	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().StringVarP(&opts.Editable.Base.Value, "base", "B", "", "Change the base `branch` for this pull request")
 	cmd.Flags().StringSliceVar(&opts.Editable.Reviewers.Add, "add-reviewer", nil, "Add reviewers by their `login`.")
 	cmd.Flags().StringSliceVar(&opts.Editable.Reviewers.Remove, "remove-reviewer", nil, "Remove reviewers by their `login`.")
@@ -203,7 +203,7 @@ func editRun(opts *EditOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
-	err = updatePullRequest(apiClient, repo, pr.ID, editable)
+	err = updatePullRequest(httpClient, repo, pr.ID, editable)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -214,47 +214,20 @@ func editRun(opts *EditOptions) error {
 	return nil
 }
 
-func updatePullRequest(client *api.Client, repo ghrepo.Interface, id string, editable shared.Editable) error {
-	var err error
-	params := githubv4.UpdatePullRequestInput{
-		PullRequestID: id,
-		Title:         ghString(editable.TitleValue()),
-		Body:          ghString(editable.BodyValue()),
+func updatePullRequest(httpClient *http.Client, repo ghrepo.Interface, id string, editable shared.Editable) error {
+	var wg errgroup.Group
+	wg.Go(func() error {
+		return shared.UpdateIssue(httpClient, repo, id, true, editable)
+	})
+	if editable.Reviewers.Edited {
+		wg.Go(func() error {
+			return updatePullRequestReviews(httpClient, repo, id, editable)
+		})
 	}
-	assigneeIds, err := editable.AssigneeIds(client, repo)
-	if err != nil {
-		return err
-	}
-	params.AssigneeIDs = ghIds(assigneeIds)
-	labelIds, err := editable.LabelIds()
-	if err != nil {
-		return err
-	}
-	params.LabelIDs = ghIds(labelIds)
-	projectIds, err := editable.ProjectIds()
-	if err != nil {
-		return err
-	}
-	params.ProjectIDs = ghIds(projectIds)
-	milestoneId, err := editable.MilestoneId()
-	if err != nil {
-		return err
-	}
-	params.MilestoneID = ghId(milestoneId)
-	if editable.Base.Edited {
-		params.BaseRefName = ghString(&editable.Base.Value)
-	}
-	err = api.UpdatePullRequest(client, repo, params)
-	if err != nil {
-		return err
-	}
-	return updatePullRequestReviews(client, repo, id, editable)
+	return wg.Wait()
 }
 
-func updatePullRequestReviews(client *api.Client, repo ghrepo.Interface, id string, editable shared.Editable) error {
-	if !editable.Reviewers.Edited {
-		return nil
-	}
+func updatePullRequestReviews(httpClient *http.Client, repo ghrepo.Interface, id string, editable shared.Editable) error {
 	userIds, teamIds, err := editable.ReviewerIds()
 	if err != nil {
 		return err
@@ -266,6 +239,7 @@ func updatePullRequestReviews(client *api.Client, repo ghrepo.Interface, id stri
 		UserIDs:       ghIds(userIds),
 		TeamIDs:       ghIds(teamIds),
 	}
+	client := api.NewClientFromHTTP(httpClient)
 	return api.UpdatePullRequestReviews(client, repo, reviewsRequestParams)
 }
 
@@ -315,24 +289,4 @@ func ghIds(s *[]string) *[]githubv4.ID {
 		ids[i] = v
 	}
 	return &ids
-}
-
-func ghId(s *string) *githubv4.ID {
-	if s == nil {
-		return nil
-	}
-	if *s == "" {
-		r := githubv4.ID(nil)
-		return &r
-	}
-	r := githubv4.ID(*s)
-	return &r
-}
-
-func ghString(s *string) *githubv4.String {
-	if s == nil {
-		return nil
-	}
-	r := githubv4.String(*s)
-	return &r
 }

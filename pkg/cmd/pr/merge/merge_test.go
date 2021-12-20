@@ -13,6 +13,8 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -223,6 +225,16 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 		Branch: func() (string, error) {
 			return branch, nil
 		},
+		Remotes: func() (context.Remotes, error) {
+			return []*context.Remote{
+				{
+					Remote: &git.Remote{
+						Name: "origin",
+					},
+					Repo: ghrepo.New("OWNER", "REPO"),
+				},
+			}, nil
+		},
 	}
 
 	cmd := NewCmdMerge(factory, nil)
@@ -274,8 +286,10 @@ func TestPrMerge(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "master", true, "pr merge 1 --merge")
 	if err != nil {
@@ -343,10 +357,51 @@ func TestPrMerge_nontty(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+
 	output, err := runCommand(http, "master", false, "pr merge 1 --merge")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
+}
+
+func TestPrMerge_editMessage_nontty(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.Equal(t, "mytitle", input["commitHeadline"].(string))
+			assert.Equal(t, "mybody", input["commitBody"].(string))
+		}))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+
+	output, err := runCommand(http, "master", false, "pr merge 1 --merge -t mytitle -b mybody")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -428,6 +483,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	cs.Register(`git checkout master`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, `pr merge --merge --delete-branch`)
 	if err != nil {
@@ -515,6 +571,7 @@ func Test_nonDivergingPullRequest(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git .+ show .+ HEAD`, 0, "COMMITSHA1,title")
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, "pr merge --merge")
 	if err != nil {
@@ -554,6 +611,7 @@ func Test_divergingPullRequestWarning(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git .+ show .+ HEAD`, 0, "COMMITSHA2,title")
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, "pr merge --merge")
 	if err != nil {
@@ -590,8 +648,10 @@ func Test_pullRequestWithoutCommits(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, "pr merge --merge")
 	if err != nil {
@@ -627,8 +687,10 @@ func TestPrMerge_rebase(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "master", true, "pr merge 2 --rebase")
 	if err != nil {
@@ -666,8 +728,10 @@ func TestPrMerge_squash(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "master", true, "pr merge 3 --squash")
 	if err != nil {
@@ -703,6 +767,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	cs.Register(`git checkout master`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
 
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
@@ -730,8 +795,10 @@ func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
 		baseRepo("OWNER", "REPO", "master"),
 	)
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, "pr merge 4 --merge")
 	if err != nil {
@@ -774,8 +841,10 @@ func TestPRMerge_interactive(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
@@ -834,6 +903,7 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 	cs.Register(`git checkout master`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
 
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
@@ -853,7 +923,7 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 	`), output.Stderr())
 }
 
-func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
+func TestPRMerge_interactiveSquashEditCommitMsgAndSubject(t *testing.T) {
 	io, _, stdout, stderr := iostreams.Test()
 	io.SetStdoutTTY(true)
 	io.SetStderrTTY(true)
@@ -872,6 +942,14 @@ func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
 		httpmock.GraphQL(`query PullRequestMergeText\b`),
 		httpmock.StringResponse(`
 		{ "data": { "node": {
+			"viewerMergeHeadlineText": "default headline text",
+			"viewerMergeBodyText": "default body text"
+		} } }`))
+	tr.Register(
+		httpmock.GraphQL(`query PullRequestMergeText\b`),
+		httpmock.StringResponse(`
+		{ "data": { "node": {
+			"viewerMergeHeadlineText": "default headline text",
 			"viewerMergeBodyText": "default body text"
 		} } }`))
 	tr.Register(
@@ -879,6 +957,7 @@ func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
+			assert.Equal(t, "DEFAULT HEADLINE TEXT", input["commitHeadline"].(string))
 			assert.Equal(t, "DEFAULT BODY TEXT", input["commitBody"].(string))
 		}))
 
@@ -890,6 +969,7 @@ func TestPRMerge_interactiveSquashEditCommitMsg(t *testing.T) {
 
 	as.StubOne(2)                     // Merge method survey
 	as.StubOne(false)                 // Delete branch survey
+	as.StubOne("Edit commit subject") // Confirm submit survey
 	as.StubOne("Edit commit message") // Confirm submit survey
 	as.StubOne("Submit")              // Confirm submit survey
 
@@ -932,8 +1012,10 @@ func TestPRMerge_interactiveCancelled(t *testing.T) {
 			"squashMergeAllowed": true
 		} } }`))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()

@@ -226,6 +226,8 @@ func mainRun() exitCode {
 			fmt.Fprintln(stderr, "Try authenticating with:  gh auth login")
 		} else if strings.Contains(err.Error(), "Resource protected by organization SAML enforcement") {
 			fmt.Fprintln(stderr, "Try re-authenticating with:  gh auth refresh")
+		} else if msg := httpErr.ScopesSuggestion(); msg != "" {
+			fmt.Fprintln(stderr, msg)
 		}
 
 		return exitError
@@ -236,7 +238,7 @@ func mainRun() exitCode {
 
 	newRelease := <-updateMessageChan
 	if newRelease != nil {
-		isHomebrew := isUnderHomebrew(cmdFactory.Executable)
+		isHomebrew := isUnderHomebrew(cmdFactory.Executable())
 		if isHomebrew && isRecentRelease(newRelease.PublishedAt) {
 			// do not notify Homebrew users before the version bump had a chance to get merged into homebrew-core
 			return exitOK

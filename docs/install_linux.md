@@ -14,13 +14,11 @@ our release schedule.
 Install:
 
 ```bash
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo gpg --dearmor -o /usr/share/keyrings/githubcli-archive-keyring.gpg
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
 sudo apt update
 sudo apt install gh
 ```
-
-**Note**: If you get the error _"gpg: failed to start the dirmngr '/usr/bin/dirmngr': No such file or directory"_, try installing the `dirmngr` package: `sudo apt install dirmngr`.
 
 Upgrade:
 
@@ -104,6 +102,20 @@ Or via [pkg(8)](https://www.freebsd.org/cgi/man.cgi?pkg(8)):
 
 ```bash
 pkg install gh
+```
+
+### NetBSD/pkgsrc
+
+NetBSD users and those on [platforms supported by pkgsrc](https://pkgsrc.org/#index4h1) can install the [gh package](https://pkgsrc.se/net/gh):
+
+```bash
+pkgin install gh
+```
+
+To install from source:
+
+```bash
+cd /usr/pkgsrc/net/gh && make package-install
 ```
 
 ### OpenBSD

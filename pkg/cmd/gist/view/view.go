@@ -68,7 +68,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 	cmd.Flags().BoolVarP(&opts.Raw, "raw", "r", false, "Print raw instead of rendered gist contents")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open gist in the browser")
-	cmd.Flags().BoolVarP(&opts.ListFiles, "files", "", false, "List file names from the gist")
+	cmd.Flags().BoolVar(&opts.ListFiles, "files", false, "List file names from the gist")
 	cmd.Flags().StringVarP(&opts.Filename, "filename", "f", "", "Display a single file from the gist")
 
 	return cmd
