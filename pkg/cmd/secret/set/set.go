@@ -6,6 +6,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
@@ -16,6 +18,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/hashicorp/go-multierror"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/nacl/box"
@@ -27,7 +30,7 @@ type SetOptions struct {
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	RandomOverride io.Reader
+	RandomOverride func() io.Reader
 
 	SecretName      string
 	OrgName         string
@@ -100,6 +103,10 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 				return err
 			}
 
+			if err := cmdutil.MutuallyExclusive("specify only one of `--env-file` or `--no-store`", opts.EnvFile != "", opts.DoNotStore); err != nil {
+				return err
+			}
+
 			if len(args) == 0 {
 				if !opts.DoNotStore && opts.EnvFile == "" {
 					return cmdutil.FlagErrorf("must pass name argument")
@@ -165,23 +172,42 @@ func setRun(opts *SetOptions) error {
 	orgName := opts.OrgName
 	envName := opts.EnvName
 
+	var host string
 	var baseRepo ghrepo.Interface
 	if orgName == "" && !opts.UserSecrets {
 		baseRepo, err = opts.BaseRepo()
 		if err != nil {
 			return fmt.Errorf("could not determine base repo: %w", err)
 		}
+		host = baseRepo.RepoHost()
+	} else {
+		cfg, err := opts.Config()
+		if err != nil {
+			return err
+		}
+
+		host, err = cfg.DefaultHost()
+		if err != nil {
+			return err
+		}
 	}
 
-	cfg, err := opts.Config()
-	if err != nil {
-		return err
+	type repoNamesResult struct {
+		ids []int64
+		err error
 	}
-
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	repoNamesC := make(chan repoNamesResult, 1)
+	go func() {
+		if len(opts.RepositoryNames) == 0 {
+			repoNamesC <- repoNamesResult{}
+			return
+		}
+		repositoryIDs, err := mapRepoNamesToIDs(client, host, opts.OrgName, opts.RepositoryNames)
+		repoNamesC <- repoNamesResult{
+			ids: repositoryIDs,
+			err: err,
+		}
+	}()
 
 	var pk *PubKey
 	if orgName != "" {
@@ -197,98 +223,179 @@ func setRun(opts *SetOptions) error {
 		return fmt.Errorf("failed to fetch public key: %w", err)
 	}
 
-	for secretKey, secret := range secrets {
-		// for env files the randomoverride used in tests needs to be reset on every iteration
-		if len(opts.EnvFile) > 0 {
-			if rd, ok := opts.RandomOverride.(io.Seeker); ok {
-				if _, err := rd.Seek(0, 0); err != nil {
-					return fmt.Errorf("internal error: %w", err)
-				}
-			}
-		}
-		eBody, err := box.SealAnonymous(nil, secret[:], &pk.Raw, opts.RandomOverride)
-		if err != nil {
-			return fmt.Errorf("failed to encrypt body: %w", err)
-		}
-
-		encoded := base64.StdEncoding.EncodeToString(eBody)
-		if opts.DoNotStore {
-			_, err := fmt.Fprintln(opts.IO.Out, encoded)
-			return err
-		}
-
-		if orgName != "" {
-			err = putOrgSecret(client, host, pk, *opts, secretKey, encoded)
-		} else if envName != "" {
-			err = putEnvSecret(client, pk, baseRepo, envName, secretKey, encoded)
-		} else if opts.UserSecrets {
-			err = putUserSecret(client, host, pk, *opts, encoded)
-		} else {
-			err = putRepoSecret(client, pk, baseRepo, secretKey, encoded)
-		}
-		if err != nil {
-			return fmt.Errorf("failed to set secret: %w", err)
-		}
-
-		if opts.IO.IsStdoutTTY() {
-			target := orgName
-			if opts.UserSecrets {
-				target = "your user"
-			} else if orgName == "" {
-				target = ghrepo.FullName(baseRepo)
-			}
-			cs := opts.IO.ColorScheme()
-			fmt.Fprintf(opts.IO.Out, "%s Set secret %s for %s\n", cs.SuccessIconWithColor(cs.Green), secretKey, target)
-		}
+	var repositoryIDs []int64
+	if result := <-repoNamesC; result.err == nil {
+		repositoryIDs = result.ids
+	} else {
+		return result.err
 	}
-	return nil
+
+	setc := make(chan setResult)
+	for secretKey, secret := range secrets {
+		key := secretKey
+		value := secret
+		go func() {
+			setc <- setSecret(opts, pk, host, client, baseRepo, key, value, repositoryIDs)
+		}()
+	}
+
+	err = nil
+	cs := opts.IO.ColorScheme()
+	for i := 0; i < len(secrets); i++ {
+		result := <-setc
+		if result.err != nil {
+			err = multierror.Append(err, result.err)
+			continue
+		}
+		if result.encrypted != "" {
+			fmt.Fprintln(opts.IO.Out, result.encrypted)
+			continue
+		}
+		if !opts.IO.IsStdoutTTY() {
+			continue
+		}
+		target := orgName
+		if opts.UserSecrets {
+			target = "your user"
+		} else if orgName == "" {
+			target = ghrepo.FullName(baseRepo)
+		}
+		fmt.Fprintf(opts.IO.Out, "%s Set secret %s for %s\n", cs.SuccessIcon(), result.key, target)
+	}
+	return err
+}
+
+type setResult struct {
+	key       string
+	encrypted string
+	err       error
+}
+
+func setSecret(opts *SetOptions, pk *PubKey, host string, client *api.Client, baseRepo ghrepo.Interface, secretKey string, secret []byte, repositoryIDs []int64) (res setResult) {
+	orgName := opts.OrgName
+	envName := opts.EnvName
+	res.key = secretKey
+
+	decodedPubKey, err := base64.StdEncoding.DecodeString(pk.Key)
+	if err != nil {
+		res.err = fmt.Errorf("failed to decode public key: %w", err)
+		return
+	}
+	var peersPubKey [32]byte
+	copy(peersPubKey[:], decodedPubKey[0:32])
+
+	var rand io.Reader
+	if opts.RandomOverride != nil {
+		rand = opts.RandomOverride()
+	}
+	eBody, err := box.SealAnonymous(nil, secret[:], &peersPubKey, rand)
+	if err != nil {
+		res.err = fmt.Errorf("failed to encrypt body: %w", err)
+		return
+	}
+
+	encoded := base64.StdEncoding.EncodeToString(eBody)
+	if opts.DoNotStore {
+		res.encrypted = encoded
+		return
+	}
+
+	if orgName != "" {
+		err = putOrgSecret(client, host, pk, opts.OrgName, opts.Visibility, secretKey, encoded, repositoryIDs)
+	} else if envName != "" {
+		err = putEnvSecret(client, pk, baseRepo, envName, secretKey, encoded)
+	} else if opts.UserSecrets {
+		err = putUserSecret(client, host, pk, secretKey, encoded, repositoryIDs)
+	} else {
+		err = putRepoSecret(client, pk, baseRepo, secretKey, encoded)
+	}
+	if err != nil {
+		res.err = fmt.Errorf("failed to set secret %q: %w", secretKey, err)
+		return
+	}
+	return
 }
 
 func getSecretsFromOptions(opts *SetOptions) (map[string][]byte, error) {
 	secrets := make(map[string][]byte)
 
-	if len(opts.EnvFile) > 0 {
-		envs, err := godotenv.Read(opts.EnvFile)
+	if opts.EnvFile != "" {
+		var r io.Reader
+		if opts.EnvFile == "-" {
+			defer opts.IO.In.Close()
+			r = opts.IO.In
+		} else {
+			f, err := os.Open(opts.EnvFile)
+			if err != nil {
+				return nil, fmt.Errorf("failed to open env file: %w", err)
+			}
+			defer f.Close()
+			r = f
+		}
+		envs, err := godotenv.Parse(r)
 		if err != nil {
-			return nil, fmt.Errorf("could no open env file: %w", err)
+			return nil, fmt.Errorf("error parsing env file: %w", err)
+		}
+		if len(envs) == 0 {
+			return nil, fmt.Errorf("no secrets found in file")
 		}
 		for key, value := range envs {
 			secrets[key] = []byte(value)
 		}
-
-	} else {
-		body, err := getBody(opts)
-		if err != nil {
-			return nil, fmt.Errorf("did not understand secret body: %w", err)
-		}
-		secrets[opts.SecretName] = body
+		return secrets, nil
 	}
 
-	if len(secrets) == 0 {
-		return nil, fmt.Errorf("no secrets defined")
+	body, err := getBody(opts)
+	if err != nil {
+		return nil, fmt.Errorf("did not understand secret body: %w", err)
 	}
+	secrets[opts.SecretName] = body
 	return secrets, nil
 }
 
 func getBody(opts *SetOptions) ([]byte, error) {
-	if opts.Body == "" {
-		if opts.IO.CanPrompt() {
-			err := prompt.SurveyAskOne(&survey.Password{
-				Message: "Paste your secret",
-			}, &opts.Body)
-			if err != nil {
-				return nil, err
-			}
-			fmt.Fprintln(opts.IO.Out)
-		} else {
-			body, err := ioutil.ReadAll(opts.IO.In)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read from STDIN: %w", err)
-			}
-
-			return body, nil
-		}
+	if opts.Body != "" {
+		return []byte(opts.Body), nil
 	}
 
-	return []byte(opts.Body), nil
+	if opts.IO.CanPrompt() {
+		var bodyInput string
+		err := prompt.SurveyAskOne(&survey.Password{
+			Message: "Paste your secret",
+		}, &bodyInput)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Fprintln(opts.IO.Out)
+		return []byte(bodyInput), nil
+	}
+
+	body, err := ioutil.ReadAll(opts.IO.In)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read from standard input: %w", err)
+	}
+
+	return body, nil
+}
+
+func mapRepoNamesToIDs(client *api.Client, host, defaultOwner string, repositoryNames []string) ([]int64, error) {
+	repos := make([]ghrepo.Interface, 0, len(repositoryNames))
+	for _, repositoryName := range repositoryNames {
+		var repo ghrepo.Interface
+		if strings.Contains(repositoryName, "/") || defaultOwner == "" {
+			var err error
+			repo, err = ghrepo.FromFullNameWithHost(repositoryName, host)
+			if err != nil {
+				return nil, fmt.Errorf("invalid repository name: %w", err)
+			}
+		} else {
+			repo = ghrepo.NewWithHost(defaultOwner, repositoryName, host)
+		}
+		repos = append(repos, repo)
+	}
+	repositoryIDs, err := mapRepoToID(client, host, repos)
+	if err != nil {
+		return nil, fmt.Errorf("failed to look up IDs for repositories %v: %w", repositoryNames, err)
+	}
+	return repositoryIDs, nil
 }
