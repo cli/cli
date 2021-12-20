@@ -401,16 +401,17 @@ func newConfigCmd(app *App, f *cmdutil.Factory) *cobra.Command {
 		Long: heredoc.Doc(`
 			The config command generates per-codespace ssh configuration in OpenSSH format.
 
-			Including this configuration in ~/.ssh/config improves the user experience of other
+			Including this configuration in ~/.ssh/config improves the user experience of
 			tools that integrate with OpenSSH, such as bash/zsh completion of ssh hostnames,
 			remote path completion for scp/rsync/sshfs, git ssh remotes, and so on.
 
 			If -c/--codespace is specified, configuration is generated for that codespace
 			only. Otherwise configuration is emitted for all available codespaces.
 
-			When generating configuration for all codespaces, ones that aren't in "Available"
-			state are skipped because it's necessary to start the codespace to determine its
-			remote ssh username. When generating configuration for a single codespace with '-c',
+			When generating configuration for all codespaces, ones that aren't in
+			"Available" state are skipped because it's necessary to start the codespace to
+			determine its remote ssh username. However, when using '-c' to generate
+			configuration for a single codespace, it will be started if necessary.
 		`),
 		Example: heredoc.Doc(`
 			$ gh codespace config > ~/.ssh/codespaces
