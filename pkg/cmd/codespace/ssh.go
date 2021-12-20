@@ -190,6 +190,12 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions, execut
 		return fmt.Errorf("error getting codespace info: %w", err)
 	}
 
+	type sshResult struct {
+		codespace *api.Codespace
+		user      string // on success, the remote ssh username; else nil
+		err       error
+	}
+
 	sshUsers := make(chan sshResult)
 	fetches := 0
 	var status error
@@ -258,6 +264,24 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions, execut
 			continue
 		}
 
+		// codespaceSSHConfig contains values needed to write an OpenSSH host
+		// configuration for a single codespace. For example:
+		//
+		// Host {{Name}}.{{EscapedRef}
+		//   User {{SSHUser}
+		//   ProxyCommand {{GHExec}} cs ssh -c {{Name}} --stdio
+		//
+		// EscapedRef is included in the name to help distinguish between codespaces
+		// when tab-completing ssh hostnames. '/' characters in EscapedRef are
+		// flattened to '-' to prevent problems with tab completion or when the
+		// hostname appears in ControlMaster socket paths.
+		type codespaceSSHConfig struct {
+			Name       string // the codespace name, passed to `ssh -c`
+			EscapedRef string // the currently checked-out branch
+			SSHUser    string // the remote ssh username
+			GHExec     string // path used for invoking the current `gh` binary
+		}
+
 		conf := codespaceSSHConfig{
 			Name:       result.codespace.Name,
 			EscapedRef: strings.ReplaceAll(result.codespace.GitStatus.Ref, "/", "-"),
@@ -270,30 +294,6 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions, execut
 	}
 
 	return status
-}
-
-type sshResult struct {
-	codespace *api.Codespace
-	user      string // on success, the remote ssh username; else nil
-	err       error
-}
-
-// codespaceSSHConfig contains values needed to write an OpenSSH host
-// configuration for a single codespace. For example:
-//
-// Host {{Name}}.{{EscapedRef}
-//   User {{SSHUser}
-//   ProxyCommand {{GHExec}} cs ssh -c {{Name}} --stdio
-//
-// EscapedRef is included in the name to help distinguish between codespaces
-// when tab-completing ssh hostnames. '/' characters in EscapedRef are
-// flattened to '-' to prevent problems with tab completion or when the
-// hostname appears in ControlMaster socket paths.
-type codespaceSSHConfig struct {
-	Name       string // the codespace name, passed to `ssh -c`
-	EscapedRef string // the currently checked-out branch
-	SSHUser    string // the remote ssh username
-	GHExec     string // path used for invoking the current `gh` binary
 }
 
 func (a *App) openSSHSession(ctx context.Context, codespace *api.Codespace, liveshareLogger *log.Logger) (*liveshare.Session, error) {
