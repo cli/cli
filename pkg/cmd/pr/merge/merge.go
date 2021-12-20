@@ -39,11 +39,10 @@ type MergeOptions struct {
 	AutoMergeEnable  bool
 	AutoMergeDisable bool
 
-	Body       string
-	BodySet    bool
-	Subject    string
-	SubjectSet bool
-	Editor     editor
+	Body    string
+	BodySet bool
+	Subject string
+	Editor  editor
 
 	UseAdmin                bool
 	IsDeleteBranchIndicated bool
@@ -113,10 +112,6 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			opts.IsDeleteBranchIndicated = cmd.Flags().Changed("delete-branch")
 			opts.CanDeleteLocalBranch = !cmd.Flags().Changed("repo")
 
-			if opts.Subject != "" {
-				opts.SubjectSet = true
-			}
-
 			bodyProvided := cmd.Flags().Changed("body")
 			bodyFileProvided := bodyFile != ""
 
@@ -164,7 +159,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	cmd.Flags().BoolVarP(&opts.DeleteBranch, "delete-branch", "d", false, "Delete the local and remote branch after merge")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Body `text` for the merge commit")
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
-	cmd.Flags().StringVarP(&opts.Subject, "subject", "", "", "Subject `text` for the merge commit")
+	cmd.Flags().StringVarP(&opts.Subject, "subject", "t", "", "Subject `text` for the merge commit")
 	cmd.Flags().BoolVarP(&flagMerge, "merge", "m", false, "Merge the commits with the base branch")
 	cmd.Flags().BoolVarP(&flagRebase, "rebase", "r", false, "Rebase the commits onto the base branch")
 	cmd.Flags().BoolVarP(&flagSquash, "squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
@@ -234,13 +229,13 @@ func mergeRun(opts *MergeOptions) error {
 
 	if !isPRAlreadyMerged {
 		payload := mergePayload{
-			repo:             baseRepo,
-			pullRequestID:    pr.ID,
-			method:           opts.MergeMethod,
-			auto:             autoMerge,
-			commitBody:       opts.Body,
-			setCommitBody:    opts.BodySet,
-			setCommitSubject: opts.SubjectSet,
+			repo:          baseRepo,
+			pullRequestID: pr.ID,
+			method:        opts.MergeMethod,
+			auto:          autoMerge,
+			commitSubject: opts.Subject,
+			commitBody:    opts.Body,
+			setCommitBody: opts.BodySet,
 		}
 
 		if opts.InteractiveMode {
@@ -259,11 +254,8 @@ func mergeRun(opts *MergeOptions) error {
 
 			allowEdit := payload.method != PullRequestMergeMethodRebase
 
-			allowEditMsg := allowEdit && !payload.setCommitBody
-			allowEditSubject := allowEdit && !payload.setCommitSubject
-
 			for {
-				action, err := confirmSurvey(allowEditMsg, allowEditSubject)
+				action, err := confirmSurvey(allowEdit)
 				if err != nil {
 					return fmt.Errorf("unable to confirm: %w", err)
 				}
@@ -275,9 +267,6 @@ func mergeRun(opts *MergeOptions) error {
 				if submit {
 					break
 				}
-
-				allowEditMsg = !payload.setCommitBody
-				allowEditSubject = !payload.setCommitSubject
 			}
 		}
 
@@ -450,7 +439,7 @@ func deleteBranchSurvey(opts *MergeOptions, crossRepoPR, localBranchExists bool)
 	return opts.DeleteBranch, nil
 }
 
-func confirmSurvey(allowEditMsg, allowEditSubject bool) (shared.Action, error) {
+func confirmSurvey(allowEdit bool) (shared.Action, error) {
 	const (
 		submitLabel            = "Submit"
 		editCommitSubjectLabel = "Edit commit subject"
@@ -459,11 +448,8 @@ func confirmSurvey(allowEditMsg, allowEditSubject bool) (shared.Action, error) {
 	)
 
 	options := []string{submitLabel}
-	if allowEditSubject {
-		options = append(options, editCommitSubjectLabel)
-	}
-	if allowEditMsg {
-		options = append(options, editCommitMsgLabel)
+	if allowEdit {
+		options = append(options, editCommitSubjectLabel, editCommitMsgLabel)
 	}
 	options = append(options, cancelLabel)
 
@@ -495,7 +481,7 @@ func confirmSubmission(client *http.Client, opts *MergeOptions, action shared.Ac
 	switch action {
 	case shared.EditCommitMessageAction:
 		if !payload.setCommitBody {
-			payload.commitBody, err = getMergeText(client, payload.repo, payload.pullRequestID, payload.method)
+			_, payload.commitBody, err = getMergeText(client, payload.repo, payload.pullRequestID, payload.method)
 			if err != nil {
 				return false, err
 			}
@@ -510,8 +496,8 @@ func confirmSubmission(client *http.Client, opts *MergeOptions, action shared.Ac
 		return false, nil
 
 	case shared.EditCommitSubjectAction:
-		if !payload.setCommitSubject {
-			payload.commitSubject, err = getMergeHeadlineText(client, payload.repo, payload.pullRequestID, payload.method)
+		if payload.commitSubject == "" {
+			payload.commitSubject, _, err = getMergeText(client, payload.repo, payload.pullRequestID, payload.method)
 			if err != nil {
 				return false, err
 			}
@@ -521,7 +507,6 @@ func confirmSubmission(client *http.Client, opts *MergeOptions, action shared.Ac
 		if err != nil {
 			return false, err
 		}
-		payload.setCommitSubject = true
 
 		return false, nil
 

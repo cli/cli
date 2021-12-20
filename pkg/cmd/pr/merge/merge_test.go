@@ -903,13 +903,15 @@ func TestPRMerge_interactiveSquashEditCommitMsgAndSubject(t *testing.T) {
 		httpmock.GraphQL(`query PullRequestMergeText\b`),
 		httpmock.StringResponse(`
 		{ "data": { "node": {
+			"viewerMergeHeadlineText": "default headline text",
 			"viewerMergeBodyText": "default body text"
 		} } }`))
 	tr.Register(
-		httpmock.GraphQL(`query PullRequestMergeHeadlineText\b`),
+		httpmock.GraphQL(`query PullRequestMergeText\b`),
 		httpmock.StringResponse(`
 		{ "data": { "node": {
-			"viewerMergeHeadlineText": "default headline text"
+			"viewerMergeHeadlineText": "default headline text",
+			"viewerMergeBodyText": "default body text"
 		} } }`))
 	tr.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
