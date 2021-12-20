@@ -199,7 +199,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions, execut
 		err       error
 	}
 
-	sshUsers := make(chan sshResult)
+	sshUsers := make(chan sshResult, len(csList))
 	var wg sync.WaitGroup
 	var status error
 	for _, cs := range csList {
