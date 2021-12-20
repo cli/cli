@@ -4,10 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/secret/shared"
@@ -200,11 +203,10 @@ func Test_setRun_repo(t *testing.T) {
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("owner/repo")
 		},
-		IO:         io,
-		SecretName: "cool_secret",
-		Body:       "a secret",
-		// Cribbed from https://github.com/golang/crypto/commit/becbf705a91575484002d598f87d74f0002801e7
-		RandomOverride: bytes.NewReader([]byte{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5}),
+		IO:             io,
+		SecretName:     "cool_secret",
+		Body:           "a secret",
+		RandomOverride: fakeRandom,
 	}
 
 	err := setRun(opts)
@@ -239,12 +241,11 @@ func Test_setRun_env(t *testing.T) {
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("owner/repo")
 		},
-		EnvName:    "development",
-		IO:         io,
-		SecretName: "cool_secret",
-		Body:       "a secret",
-		// Cribbed from https://github.com/golang/crypto/commit/becbf705a91575484002d598f87d74f0002801e7
-		RandomOverride: bytes.NewReader([]byte{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5}),
+		EnvName:        "development",
+		IO:             io,
+		SecretName:     "cool_secret",
+		Body:           "a secret",
+		RandomOverride: fakeRandom,
 	}
 
 	err := setRun(opts)
@@ -266,7 +267,7 @@ func Test_setRun_org(t *testing.T) {
 		name             string
 		opts             *SetOptions
 		wantVisibility   shared.Visibility
-		wantRepositories []int
+		wantRepositories []int64
 	}{
 		{
 			name: "all vis",
@@ -282,7 +283,7 @@ func Test_setRun_org(t *testing.T) {
 				Visibility:      shared.Selected,
 				RepositoryNames: []string{"birkin", "UmbrellaCorporation/wesker"},
 			},
-			wantRepositories: []int{1, 2},
+			wantRepositories: []int64{1, 2},
 		},
 	}
 
@@ -319,8 +320,7 @@ func Test_setRun_org(t *testing.T) {
 			tt.opts.IO = io
 			tt.opts.SecretName = "cool_secret"
 			tt.opts.Body = "a secret"
-			// Cribbed from https://github.com/golang/crypto/commit/becbf705a91575484002d598f87d74f0002801e7
-			tt.opts.RandomOverride = bytes.NewReader([]byte{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5})
+			tt.opts.RandomOverride = fakeRandom
 
 			err := setRun(tt.opts)
 			assert.NoError(t, err)
@@ -391,8 +391,7 @@ func Test_setRun_user(t *testing.T) {
 			tt.opts.IO = io
 			tt.opts.SecretName = "cool_secret"
 			tt.opts.Body = "a secret"
-			// Cribbed from https://github.com/golang/crypto/commit/becbf705a91575484002d598f87d74f0002801e7
-			tt.opts.RandomOverride = bytes.NewReader([]byte{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5})
+			tt.opts.RandomOverride = fakeRandom
 
 			err := setRun(tt.opts)
 			assert.NoError(t, err)
@@ -430,11 +429,10 @@ func Test_setRun_shouldNotStore(t *testing.T) {
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("owner/repo")
 		},
-		IO:         io,
-		Body:       "a secret",
-		DoNotStore: true,
-		// Cribbed from https://github.com/golang/crypto/commit/becbf705a91575484002d598f87d74f0002801e7
-		RandomOverride: bytes.NewReader([]byte{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5}),
+		IO:             io,
+		Body:           "a secret",
+		DoNotStore:     true,
+		RandomOverride: fakeRandom,
 	}
 
 	err := setRun(opts)
@@ -499,4 +497,99 @@ func Test_getBodyPrompt(t *testing.T) {
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, string(body), "cool secret")
+}
+
+func Test_getSecretsFromOptions(t *testing.T) {
+	genFile := func(s string) string {
+		f, err := ioutil.TempFile("", "gh-env.*")
+		if err != nil {
+			t.Fatal(err)
+			return ""
+		}
+		defer f.Close()
+		t.Cleanup(func() {
+			_ = os.Remove(f.Name())
+		})
+		_, err = f.WriteString(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f.Name()
+	}
+
+	tests := []struct {
+		name    string
+		opts    SetOptions
+		isTTY   bool
+		stdin   string
+		want    map[string]string
+		wantErr bool
+	}{
+		{
+			name: "secret from arg",
+			opts: SetOptions{
+				SecretName: "FOO",
+				Body:       "bar",
+				EnvFile:    "",
+			},
+			want: map[string]string{"FOO": "bar"},
+		},
+		{
+			name: "secrets from stdin",
+			opts: SetOptions{
+				Body:    "",
+				EnvFile: "-",
+			},
+			stdin: `FOO=bar`,
+			want:  map[string]string{"FOO": "bar"},
+		},
+		{
+			name: "secrets from file",
+			opts: SetOptions{
+				Body: "",
+				EnvFile: genFile(heredoc.Doc(`
+					FOO=bar
+					QUOTED="my value"
+					#IGNORED=true
+					export SHELL=bash
+				`)),
+			},
+			stdin: `FOO=bar`,
+			want: map[string]string{
+				"FOO":    "bar",
+				"SHELL":  "bash",
+				"QUOTED": "my value",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, stdin, _, _ := iostreams.Test()
+			io.SetStdinTTY(tt.isTTY)
+			io.SetStdoutTTY(tt.isTTY)
+			stdin.WriteString(tt.stdin)
+			opts := tt.opts
+			opts.IO = io
+			gotSecrets, err := getSecretsFromOptions(&opts)
+			if err != nil {
+				if !tt.wantErr {
+					t.Fatalf("getSecretsFromOptions() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			} else if tt.wantErr {
+				t.Fatalf("getSecretsFromOptions() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if len(gotSecrets) != len(tt.want) {
+				t.Fatalf("getSecretsFromOptions() = got %d secrets, want %d", len(gotSecrets), len(tt.want))
+			}
+			for k, v := range gotSecrets {
+				if tt.want[k] != string(v) {
+					t.Errorf("getSecretsFromOptions() %s = got %q, want %q", k, string(v), tt.want[k])
+				}
+			}
+		})
+	}
+}
+
+func fakeRandom() io.Reader {
+	return bytes.NewReader(bytes.Repeat([]byte{5}, 32))
 }
