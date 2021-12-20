@@ -33,7 +33,7 @@ type sshOptions struct {
 	scpArgs    []string // scp arguments, for 'cs cp' (nil for 'cs ssh')
 }
 
-func newSSHCmd(app *App) *cobra.Command {
+func newSSHCmd(app *App, f *cmdutil.Factory) *cobra.Command {
 	var opts sshOptions
 
 	sshCmd := &cobra.Command{
@@ -67,7 +67,7 @@ func newSSHCmd(app *App) *cobra.Command {
 	sshCmd.Flags().BoolVar(&opts.stdio, "stdio", false, "Proxy sshd connection to stdio")
 	sshCmd.Flags().MarkHidden("stdio")
 
-	sshCmd.AddCommand(newConfigCmd(app))
+	sshCmd.AddCommand(newConfigCmd(app, f))
 
 	return sshCmd
 }
@@ -171,7 +171,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 }
 
-func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error {
+func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions, executable string) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -236,11 +236,6 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 		return err
 	}
 
-	ghexec, err := os.Executable()
-	if err != nil {
-		return err
-	}
-
 	t, err := template.New("ssh_config").Parse(heredoc.Doc(`
 		Host cs.{{.Name}}.{{.EscapedRef}}
 			User {{.SSHUser}}
@@ -267,7 +262,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error 
 			Name:       result.codespace.Name,
 			EscapedRef: strings.ReplaceAll(result.codespace.GitStatus.Ref, "/", "-"),
 			SSHUser:    result.user,
-			GHExec:     ghexec,
+			GHExec:     executable,
 		}
 		if err := t.Execute(a.io.Out, conf); err != nil {
 			return err
@@ -418,7 +413,7 @@ type configOptions struct {
 	codespace string
 }
 
-func newConfigCmd(app *App) *cobra.Command {
+func newConfigCmd(app *App, f *cmdutil.Factory) *cobra.Command {
 	var opts configOptions
 
 	configCmd := &cobra.Command{
@@ -443,7 +438,7 @@ func newConfigCmd(app *App) *cobra.Command {
 			$ echo 'include ~/.ssh/codespaces' >> ~/.ssh/config'
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.printOpenSSHConfig(cmd.Context(), opts)
+			return app.printOpenSSHConfig(cmd.Context(), opts, f.Executable())
 		},
 		DisableFlagsInUseLine: true,
 	}
