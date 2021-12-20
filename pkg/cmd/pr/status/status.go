@@ -8,15 +8,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/text"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/text"
 	"github.com/spf13/cobra"
 )
 
@@ -29,6 +29,7 @@ type StatusOptions struct {
 	Branch     func() (string, error)
 
 	HasRepoOverride bool
+	Exporter        cmdutil.Exporter
 }
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
@@ -55,6 +56,8 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 			return statusRun(opts)
 		},
 	}
+
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
 }
@@ -88,18 +91,36 @@ func statusRun(opts *StatusOptions) error {
 		}
 	}
 
-	// the `@me` macro is available because the API lookup is ElasticSearch-based
-	currentUser := "@me"
-	prPayload, err := api.PullRequests(apiClient, baseRepo, currentPRNumber, currentPRHeadRef, currentUser)
+	options := api.StatusOptions{
+		Username:  "@me",
+		CurrentPR: currentPRNumber,
+		HeadRef:   currentPRHeadRef,
+	}
+	if opts.Exporter != nil {
+		options.Fields = opts.Exporter.Fields()
+	}
+	prPayload, err := api.PullRequestStatus(apiClient, baseRepo, options)
 	if err != nil {
 		return err
 	}
 
 	err = opts.IO.StartPager()
 	if err != nil {
-		return err
+		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
 	defer opts.IO.StopPager()
+
+	if opts.Exporter != nil {
+		data := map[string]interface{}{
+			"currentBranch": nil,
+			"createdBy":     prPayload.ViewerCreated.PullRequests,
+			"needsReview":   prPayload.ReviewRequested.PullRequests,
+		}
+		if prPayload.CurrentPR != nil {
+			data["currentBranch"] = prPayload.CurrentPR
+		}
+		return opts.Exporter.Write(opts.IO, data)
+	}
 
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()

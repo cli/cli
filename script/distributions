@@ -32,6 +32,14 @@ SignWith: C99B11DEB97541F0
 
 Origin: gh
 Label: gh
+Codename: sid
+Architectures: i386 amd64 armhf arm64
+Components: main
+Description: The GitHub CLI - debian unstable repo
+SignWith: C99B11DEB97541F0
+
+Origin: gh
+Label: gh
 Codename: buster
 Architectures: i386 amd64 armhf arm64
 Components: main
@@ -140,5 +148,31 @@ Codename: cosmic
 Architectures: i386 amd64 armhf arm64
 Components: main
 Description: The GitHub CLI - ubuntu cosmic repo
+SignWith: C99B11DEB97541F0
+DebOverride: override.ubuntu
+
+Origin: gh
+Label: gh
+Codename: hirsute
+Architectures: i386 amd64 armhf arm64
+Components: main
+Description: The GitHub CLI - ubuntu hirsute repo
+SignWith: C99B11DEB97541F0
+DebOverride: override.ubuntu
+
+Origin: gh
+Label: gh
+Codename: kali-rolling
+Architectures: i386 amd64 armhf arm64
+Components: main
+Description: The GitHub CLI - kali repo
+SignWith: C99B11DEB97541F0
+
+Origin: gh
+Label: gh
+Codename: impish
+Architectures: i386 amd64 armhf arm64
+Components: main
+Description: The GitHub CLI - ubuntu impish repo
 SignWith: C99B11DEB97541F0
 DebOverride: override.ubuntu

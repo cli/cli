@@ -23,8 +23,7 @@ Please avoid:
 ## Building the project
 
 Prerequisites:
-- Go 1.13+ for building the binary
-- Go 1.15+ for running the test suite
+- Go 1.16+
 
 Build with:
 * Unix-like systems: `make`
@@ -35,6 +34,8 @@ Run the new binary as:
 * Windows: `bin\gh`
 
 Run tests with: `go test ./...`
+
+See [project layout documentation](../docs/project-layout.md) for information on where to find specific source files.
 
 ## Submitting a pull request
 

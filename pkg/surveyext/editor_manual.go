@@ -15,7 +15,19 @@ type showable interface {
 	Show()
 }
 
-func Edit(editorCommand, fn, initialValue string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cursor showable) (string, error) {
+func Edit(editorCommand, fn, initialValue string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (string, error) {
+	return edit(editorCommand, fn, initialValue, stdin, stdout, stderr, nil, defaultLookPath)
+}
+
+func defaultLookPath(name string) ([]string, []string, error) {
+	exe, err := safeexec.LookPath(name)
+	if err != nil {
+		return nil, nil, err
+	}
+	return []string{exe}, nil, nil
+}
+
+func edit(editorCommand, fn, initialValue string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cursor showable, lookPath func(string) ([]string, []string, error)) (string, error) {
 	// prepare the temp file
 	pattern := fn
 	if pattern == "" {
@@ -56,12 +68,14 @@ func Edit(editorCommand, fn, initialValue string, stdin io.Reader, stdout io.Wri
 	}
 	args = append(args, f.Name())
 
-	editorExe, err := safeexec.LookPath(args[0])
+	editorExe, env, err := lookPath(args[0])
 	if err != nil {
 		return "", err
 	}
+	args = append(editorExe, args[1:]...)
 
-	cmd := exec.Command(editorExe, args[1:]...)
+	cmd := exec.Command(args[0], args[1:]...)
+	cmd.Env = env
 	cmd.Stdin = stdin
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr

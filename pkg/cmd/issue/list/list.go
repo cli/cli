@@ -7,15 +7,15 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	issueShared "github.com/cli/cli/pkg/cmd/issue/shared"
-	"github.com/cli/cli/pkg/cmd/pr/shared"
-	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
+	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -30,7 +30,8 @@ type ListOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser
 
-	WebMode bool
+	WebMode  bool
+	Exporter cmdutil.Exporter
 
 	Assignee     string
 	Labels       []string
@@ -56,7 +57,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Example: heredoc.Doc(`
 			$ gh issue list -l "bug" -l "help wanted"
 			$ gh issue list -A monalisa
-			$ gh issue list -a @me
+			$ gh issue list -a "@me"
 			$ gh issue list --web
 			$ gh issue list --milestone "The big 1.0"
 			$ gh issue list --search "error no:assignee sort:created-asc"
@@ -67,7 +68,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			opts.BaseRepo = f.BaseRepo
 
 			if opts.LimitResults < 1 {
-				return &cmdutil.FlagError{Err: fmt.Errorf("invalid limit: %v", opts.LimitResults)}
+				return cmdutil.FlagErrorf("invalid limit: %v", opts.LimitResults)
 			}
 
 			if runF != nil {
@@ -81,13 +82,26 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by labels")
 	cmd.Flags().StringVarP(&opts.State, "state", "s", "open", "Filter by state: {open|closed|all}")
+	_ = cmd.RegisterFlagCompletionFunc("state", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"open", "closed", "all"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of issues to fetch")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVar(&opts.Mention, "mention", "", "Filter by mention")
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Filter by milestone `number` or `title`")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search issues with `query`")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.IssueFields)
 
 	return cmd
+}
+
+var defaultFields = []string{
+	"number",
+	"title",
+	"url",
+	"state",
+	"updatedAt",
+	"labels",
 }
 
 func listRun(opts *ListOptions) error {
@@ -101,15 +115,21 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
+	issueState := strings.ToLower(opts.State)
+	if issueState == "open" && shared.QueryHasStateClause(opts.Search) {
+		issueState = ""
+	}
+
 	filterOptions := prShared.FilterOptions{
 		Entity:    "issue",
-		State:     strings.ToLower(opts.State),
+		State:     issueState,
 		Assignee:  opts.Assignee,
 		Labels:    opts.Labels,
 		Author:    opts.Author,
 		Mention:   opts.Mention,
 		Milestone: opts.Milestone,
 		Search:    opts.Search,
+		Fields:    defaultFields,
 	}
 
 	isTerminal := opts.IO.IsStdoutTTY()
@@ -127,6 +147,10 @@ func listRun(opts *ListOptions) error {
 		return opts.Browser.Browse(openURL)
 	}
 
+	if opts.Exporter != nil {
+		filterOptions.Fields = opts.Exporter.Fields()
+	}
+
 	listResult, err := issueList(httpClient, baseRepo, filterOptions, opts.LimitResults)
 	if err != nil {
 		return err
@@ -138,6 +162,13 @@ func listRun(opts *ListOptions) error {
 	}
 	defer opts.IO.StopPager()
 
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, listResult.Issues)
+	}
+
+	if listResult.SearchCapped {
+		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
+	}
 	if isTerminal {
 		title := prShared.ListHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, !filterOptions.IsDefault())
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
@@ -160,32 +191,23 @@ func issueList(client *http.Client, repo ghrepo.Interface, filters prShared.Filt
 			filters.Milestone = milestone.Title
 		}
 
-		searchQuery := prShared.SearchQueryBuild(filters)
-		return api.IssueSearch(apiClient, repo, searchQuery, limit)
+		return searchIssues(apiClient, repo, filters, limit)
 	}
 
+	var err error
 	meReplacer := shared.NewMeReplacer(apiClient, repo.RepoHost())
-	filterAssignee, err := meReplacer.Replace(filters.Assignee)
+	filters.Assignee, err = meReplacer.Replace(filters.Assignee)
 	if err != nil {
 		return nil, err
 	}
-	filterAuthor, err := meReplacer.Replace(filters.Author)
+	filters.Author, err = meReplacer.Replace(filters.Author)
 	if err != nil {
 		return nil, err
 	}
-	filterMention, err := meReplacer.Replace(filters.Mention)
+	filters.Mention, err = meReplacer.Replace(filters.Mention)
 	if err != nil {
 		return nil, err
 	}
 
-	return api.IssueList(
-		apiClient,
-		repo,
-		filters.State,
-		filterAssignee,
-		limit,
-		filterAuthor,
-		filterMention,
-		filters.Milestone,
-	)
+	return listIssues(apiClient, repo, filters, limit)
 }

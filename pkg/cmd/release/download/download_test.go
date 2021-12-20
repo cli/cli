@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -81,10 +81,34 @@ func Test_NewCmdDownload(t *testing.T) {
 			},
 		},
 		{
+			name:  "download archive with valid option",
+			args:  "v1.2.3 -A zip",
+			isTTY: true,
+			want: DownloadOptions{
+				TagName:      "v1.2.3",
+				FilePatterns: []string(nil),
+				Destination:  ".",
+				ArchiveType:  "zip",
+				Concurrency:  5,
+			},
+		},
+		{
 			name:    "no arguments",
 			args:    "",
 			isTTY:   true,
-			wantErr: "the '--pattern' flag is required when downloading the latest release",
+			wantErr: "`--pattern` or `--archive` is required when downloading the latest release",
+		},
+		{
+			name:    "simultaneous pattern and archive arguments",
+			args:    "-p * -A zip",
+			isTTY:   true,
+			wantErr: "specify only one of '--pattern' or '--archive'",
+		},
+		{
+			name:    "invalid archive argument",
+			args:    "v1.2.3 -A abc",
+			isTTY:   true,
+			wantErr: "the value for `--archive` must be one of \"zip\" or \"tar.gz\"",
 		},
 	}
 	for _, tt := range tests {
@@ -184,6 +208,36 @@ func Test_downloadRun(t *testing.T) {
 			wantStderr: ``,
 			wantErr:    "no assets match the file pattern",
 		},
+		{
+			name:  "download archive in zip format into destination directory",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:     "v1.2.3",
+				ArchiveType: "zip",
+				Destination: "tmp/packages",
+				Concurrency: 2,
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+			wantFiles: []string{
+				"tmp/packages/zipball.zip",
+			},
+		},
+		{
+			name:  "download archive in `tar.gz` format into destination directory",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:     "v1.2.3",
+				ArchiveType: "tar.gz",
+				Destination: "tmp/packages",
+				Concurrency: 2,
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+			wantFiles: []string{
+				"tmp/packages/tarball.tgz",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -204,11 +258,33 @@ func Test_downloadRun(t *testing.T) {
 					  "url": "https://api.github.com/assets/3456" },
 					{ "name": "linux.tgz", "size": 56,
 					  "url": "https://api.github.com/assets/5678" }
-				]
+				],
+				"tarball_url": "https://api.github.com/repos/OWNER/REPO/tarball/v1.2.3",
+				"zipball_url": "https://api.github.com/repos/OWNER/REPO/zipball/v1.2.3"
 			}`))
 			fakeHTTP.Register(httpmock.REST("GET", "assets/1234"), httpmock.StringResponse(`1234`))
 			fakeHTTP.Register(httpmock.REST("GET", "assets/3456"), httpmock.StringResponse(`3456`))
 			fakeHTTP.Register(httpmock.REST("GET", "assets/5678"), httpmock.StringResponse(`5678`))
+
+			fakeHTTP.Register(
+				httpmock.REST(
+					"GET",
+					"repos/OWNER/REPO/tarball/v1.2.3",
+				),
+				httpmock.WithHeader(
+					httpmock.StringResponse("somedata"), "content-disposition", "attachment; filename=tarball.tgz",
+				),
+			)
+
+			fakeHTTP.Register(
+				httpmock.REST(
+					"GET",
+					"repos/OWNER/REPO/zipball/v1.2.3",
+				),
+				httpmock.WithHeader(
+					httpmock.StringResponse("somedata"), "content-disposition", "attachment; filename=zipball.zip",
+				),
+			)
 
 			tt.opts.IO = io
 			tt.opts.HttpClient = func() (*http.Client, error) {
@@ -226,7 +302,12 @@ func Test_downloadRun(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			assert.Equal(t, "application/octet-stream", fakeHTTP.Requests[1].Header.Get("Accept"))
+			var expectedAcceptHeader = "application/octet-stream"
+			if len(tt.opts.ArchiveType) > 0 {
+				expectedAcceptHeader = "application/octet-stream, application/json"
+			}
+
+			assert.Equal(t, expectedAcceptHeader, fakeHTTP.Requests[1].Header.Get("Accept"))
 
 			assert.Equal(t, tt.wantStdout, stdout.String())
 			assert.Equal(t, tt.wantStderr, stderr.String())

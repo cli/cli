@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/test"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -118,7 +118,7 @@ func Test_transferRunSuccessfulIssueTransfer(t *testing.T) {
 		httpmock.StringResponse(`
 			{ "data": { "repository": {
 				"hasIssuesEnabled": true,
-				"issue": { "id": "THE-ID", "number": 1234, "closed": true, "title": "The title of the issue"}
+				"issue": { "id": "THE-ID", "number": 1234, "title": "The title of the issue"}
 			} } }`))
 
 	http.Register(

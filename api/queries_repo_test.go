@@ -6,9 +6,30 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/httpmock"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/httpmock"
 )
+
+func TestGitHubRepo_notFound(t *testing.T) {
+	httpReg := &httpmock.Registry{}
+	defer httpReg.Verify(t)
+
+	httpReg.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`{ "data": { "repository": null } }`))
+
+	client := NewClient(ReplaceTripper(httpReg))
+	repo, err := GitHubRepo(client, ghrepo.New("OWNER", "REPO"))
+	if err == nil {
+		t.Fatal("GitHubRepo did not return an error")
+	}
+	if wants := "GraphQL: Could not resolve to a Repository with the name 'OWNER/REPO'."; err.Error() != wants {
+		t.Errorf("GitHubRepo error: want %q, got %q", wants, err.Error())
+	}
+	if repo != nil {
+		t.Errorf("GitHubRepo: expected nil repo, got %v", repo)
+	}
+}
 
 func Test_RepoMetadata(t *testing.T) {
 	http := &httpmock.Registry{}
@@ -144,9 +165,9 @@ func Test_RepoMetadata(t *testing.T) {
 func Test_ProjectsToPaths(t *testing.T) {
 	expectedProjectPaths := []string{"OWNER/REPO/PROJECT_NUMBER", "ORG/PROJECT_NUMBER"}
 	projects := []RepoProject{
-		{"id1", "My Project", "/OWNER/REPO/projects/PROJECT_NUMBER"},
-		{"id2", "Org Project", "/orgs/ORG/projects/PROJECT_NUMBER"},
-		{"id3", "Project", "/orgs/ORG/projects/PROJECT_NUMBER_2"},
+		{ID: "id1", Name: "My Project", ResourcePath: "/OWNER/REPO/projects/PROJECT_NUMBER"},
+		{ID: "id2", Name: "Org Project", ResourcePath: "/orgs/ORG/projects/PROJECT_NUMBER"},
+		{ID: "id3", Name: "Project", ResourcePath: "/orgs/ORG/projects/PROJECT_NUMBER_2"},
 	}
 	projectNames := []string{"My Project", "Org Project"}
 

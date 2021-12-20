@@ -1,19 +1,16 @@
 package checks
 
 import (
-	"errors"
 	"fmt"
-	"net/http"
 	"sort"
 	"time"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/utils"
+	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -22,38 +19,36 @@ type browser interface {
 }
 
 type ChecksOptions struct {
-	HttpClient func() (*http.Client, error)
-	IO         *iostreams.IOStreams
-	Browser    browser
-	BaseRepo   func() (ghrepo.Interface, error)
-	Branch     func() (string, error)
-	Remotes    func() (context.Remotes, error)
+	IO      *iostreams.IOStreams
+	Browser browser
 
-	WebMode bool
+	Finder shared.PRFinder
 
 	SelectorArg string
+	WebMode     bool
 }
 
 func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Command {
 	opts := &ChecksOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
-		Branch:     f.Branch,
-		Remotes:    f.Remotes,
-		BaseRepo:   f.BaseRepo,
-		Browser:    f.Browser,
+		IO:      f.IOStreams,
+		Browser: f.Browser,
 	}
 
 	cmd := &cobra.Command{
 		Use:   "checks [<number> | <url> | <branch>]",
 		Short: "Show CI status for a single pull request",
-		Args:  cobra.MaximumNArgs(1),
+		Long: heredoc.Doc(`
+			Show CI status for a single pull request.
+
+			Without an argument, the pull request that belongs to the current branch
+			is selected.			
+		`),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// support `-R, --repo` override
-			opts.BaseRepo = f.BaseRepo
+			opts.Finder = shared.NewFinder(f)
 
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
-				return &cmdutil.FlagError{Err: errors.New("argument required when using the --repo flag")}
+				return cmdutil.FlagErrorf("argument required when using the --repo flag")
 			}
 
 			if len(args) > 0 {
@@ -74,24 +69,16 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 }
 
 func checksRun(opts *ChecksOptions) error {
-	httpClient, err := opts.HttpClient()
+	findOptions := shared.FindOptions{
+		Selector: opts.SelectorArg,
+		Fields:   []string{"number", "baseRefName", "statusCheckRollup"},
+	}
+	if opts.WebMode {
+		findOptions.Fields = []string{"number"}
+	}
+	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
-	}
-	apiClient := api.NewClientFromHTTP(httpClient)
-
-	pr, baseRepo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
-	if err != nil {
-		return err
-	}
-
-	if len(pr.Commits.Nodes) == 0 {
-		return fmt.Errorf("no commit found on the pull request")
-	}
-
-	rollup := pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
-	if len(rollup) == 0 {
-		return fmt.Errorf("no checks reported on the '%s' branch", pr.BaseRefName)
 	}
 
 	isTerminal := opts.IO.IsStdoutTTY()
@@ -104,8 +91,18 @@ func checksRun(opts *ChecksOptions) error {
 		return opts.Browser.Browse(openURL)
 	}
 
+	if len(pr.StatusCheckRollup.Nodes) == 0 {
+		return fmt.Errorf("no commit found on the pull request")
+	}
+
+	rollup := pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
+	if len(rollup) == 0 {
+		return fmt.Errorf("no checks reported on the '%s' branch", pr.BaseRefName)
+	}
+
 	passing := 0
 	failing := 0
+	skipping := 0
 	pending := 0
 
 	type output struct {
@@ -121,7 +118,7 @@ func checksRun(opts *ChecksOptions) error {
 
 	outputs := []output{}
 
-	for _, c := range pr.Commits.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes {
+	for _, c := range pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes {
 		mark := "✓"
 		bucket := "pass"
 		state := c.State
@@ -134,20 +131,23 @@ func checksRun(opts *ChecksOptions) error {
 			}
 		}
 		switch state {
-		case "SUCCESS", "NEUTRAL", "SKIPPED":
+		case "SUCCESS":
 			passing++
+		case "SKIPPED", "NEUTRAL":
+			mark = "-"
+			markColor = cs.Gray
+			skipping++
+			bucket = "skipping"
 		case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
 			mark = "X"
 			markColor = cs.Red
 			failing++
 			bucket = "fail"
-		case "EXPECTED", "REQUESTED", "QUEUED", "PENDING", "IN_PROGRESS", "STALE":
-			mark = "-"
+		default: // "EXPECTED", "REQUESTED", "WAITING", "QUEUED", "PENDING", "IN_PROGRESS", "STALE"
+			mark = "*"
 			markColor = cs.Yellow
 			pending++
 			bucket = "pending"
-		default:
-			panic(fmt.Errorf("unsupported status: %q", state))
 		}
 
 		elapsed := ""
@@ -214,7 +214,7 @@ func checksRun(opts *ChecksOptions) error {
 	}
 
 	summary := ""
-	if failing+passing+pending > 0 {
+	if failing+passing+skipping+pending > 0 {
 		if failing > 0 {
 			summary = "Some checks were not successful"
 		} else if pending > 0 {
@@ -223,9 +223,8 @@ func checksRun(opts *ChecksOptions) error {
 			summary = "All checks were successful"
 		}
 
-		tallies := fmt.Sprintf(
-			"%d failing, %d successful, and %d pending checks",
-			failing, passing, pending)
+		tallies := fmt.Sprintf("%d failing, %d successful, %d skipped, and %d pending checks",
+			failing, passing, skipping, pending)
 
 		summary = fmt.Sprintf("%s\n%s", cs.Bold(summary), tallies)
 	}

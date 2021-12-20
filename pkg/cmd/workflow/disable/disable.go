@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/workflow/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
@@ -29,10 +29,10 @@ func NewCmdDisable(f *cmdutil.Factory, runF func(*DisableOptions) error) *cobra.
 	}
 
 	cmd := &cobra.Command{
-		Use:    "disable [<workflow ID> | <workflow name>]",
-		Short:  "Disable a workflow",
-		Args:   cobra.MaximumNArgs(1),
-		Hidden: true,
+		Use:   "disable [<workflow-id> | <workflow-name>]",
+		Short: "Disable a workflow",
+		Long:  "Disable a workflow, preventing it from running or showing up when listing workflows.",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
@@ -40,7 +40,7 @@ func NewCmdDisable(f *cmdutil.Factory, runF func(*DisableOptions) error) *cobra.
 			if len(args) > 0 {
 				opts.Selector = args[0]
 			} else if !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("workflow ID or name required when not running interactively")}
+				return cmdutil.FlagErrorf("workflow ID or name required when not running interactively")
 			} else {
 				opts.Prompt = true
 			}

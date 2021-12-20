@@ -10,7 +10,7 @@
               },
               "authorAssociation": "NONE",
               "body": "Review 1",
-              "createdAt": "2020-01-02T12:00:00Z",
+              "submittedAt": "2020-01-02T12:00:00Z",
               "includesCreatedEdit": false,
               "reactionGroups": [
                 {
@@ -71,7 +71,7 @@
               },
               "authorAssociation": "OWNER",
               "body": "Review 2",
-              "createdAt": "2020-01-04T12:00:00Z",
+              "submittedAt": "2020-01-04T12:00:00Z",
               "includesCreatedEdit": false,
               "reactionGroups": [
                 {
@@ -132,7 +132,7 @@
               },
               "authorAssociation": "MEMBER",
               "body": "Review 3",
-              "createdAt": "2020-01-06T12:00:00Z",
+              "submittedAt": "2020-01-06T12:00:00Z",
               "includesCreatedEdit": true,
               "reactionGroups": [
                 {
@@ -193,7 +193,7 @@
               },
               "authorAssociation": "NONE",
               "body": "Review 4",
-              "createdAt": "2020-01-08T12:00:00Z",
+              "submittedAt": "2020-01-08T12:00:00Z",
               "includesCreatedEdit": false,
               "reactionGroups": [
                 {
@@ -254,7 +254,7 @@
               },
               "authorAssociation": "NONE",
               "body": "Review 5",
-              "createdAt": "2020-01-10T12:00:00Z",
+              "submittedAt": "2020-01-10T12:00:00Z",
               "includesCreatedEdit": false,
               "reactionGroups": [
                 {

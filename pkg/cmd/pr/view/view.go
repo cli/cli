@@ -1,24 +1,18 @@
 package view
 
 import (
-	"errors"
 	"fmt"
-	"net/http"
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/markdown"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -27,13 +21,11 @@ type browser interface {
 }
 
 type ViewOptions struct {
-	HttpClient func() (*http.Client, error)
-	Config     func() (config.Config, error)
-	IO         *iostreams.IOStreams
-	Browser    browser
-	BaseRepo   func() (ghrepo.Interface, error)
-	Remotes    func() (context.Remotes, error)
-	Branch     func() (string, error)
+	IO      *iostreams.IOStreams
+	Browser browser
+
+	Finder   shared.PRFinder
+	Exporter cmdutil.Exporter
 
 	SelectorArg string
 	BrowserMode bool
@@ -42,12 +34,8 @@ type ViewOptions struct {
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
-		Config:     f.Config,
-		Remotes:    f.Remotes,
-		Branch:     f.Branch,
-		Browser:    f.Browser,
+		IO:      f.IOStreams,
+		Browser: f.Browser,
 	}
 
 	cmd := &cobra.Command{
@@ -60,14 +48,13 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			is displayed.
 
 			With '--web', open the pull request in a web browser instead.
-    	`),
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// support `-R, --repo` override
-			opts.BaseRepo = f.BaseRepo
+			opts.Finder = shared.NewFinder(f)
 
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
-				return &cmdutil.FlagError{Err: errors.New("argument required when using the --repo flag")}
+				return cmdutil.FlagErrorf("argument required when using the --repo flag")
 			}
 
 			if len(args) > 0 {
@@ -83,14 +70,30 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 	cmd.Flags().BoolVarP(&opts.BrowserMode, "web", "w", false, "Open a pull request in the browser")
 	cmd.Flags().BoolVarP(&opts.Comments, "comments", "c", false, "View pull request comments")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
 }
 
+var defaultFields = []string{
+	"url", "number", "title", "state", "body", "author",
+	"isDraft", "maintainerCanModify", "mergeable", "additions", "deletions", "commitsCount",
+	"baseRefName", "headRefName", "headRepositoryOwner", "headRepository", "isCrossRepository",
+	"reviewRequests", "reviews", "assignees", "labels", "projectCards", "milestone",
+	"comments", "reactionGroups",
+}
+
 func viewRun(opts *ViewOptions) error {
-	opts.IO.StartProgressIndicator()
-	pr, err := retrievePullRequest(opts)
-	opts.IO.StopProgressIndicator()
+	findOptions := shared.FindOptions{
+		Selector: opts.SelectorArg,
+		Fields:   defaultFields,
+	}
+	if opts.BrowserMode {
+		findOptions.Fields = []string{"url"}
+	} else if opts.Exporter != nil {
+		findOptions.Fields = opts.Exporter.Fields()
+	}
+	pr, _, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
 	}
@@ -113,6 +116,10 @@ func viewRun(opts *ViewOptions) error {
 	}
 	defer opts.IO.StopPager()
 
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, pr)
+	}
+
 	if connectedToTerminal {
 		return printHumanPrPreview(opts, pr)
 	}
@@ -131,7 +138,7 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 
 	reviewers := prReviewerList(*pr, cs)
 	assignees := prAssigneeList(*pr)
-	labels := prLabelList(*pr)
+	labels := prLabelList(*pr, cs)
 	projects := prProjectList(*pr)
 
 	fmt.Fprintf(out, "title:\t%s\n", pr.Title)
@@ -141,7 +148,11 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	fmt.Fprintf(out, "assignees:\t%s\n", assignees)
 	fmt.Fprintf(out, "reviewers:\t%s\n", reviewers)
 	fmt.Fprintf(out, "projects:\t%s\n", projects)
-	fmt.Fprintf(out, "milestone:\t%s\n", pr.Milestone.Title)
+	var milestoneTitle string
+	if pr.Milestone != nil {
+		milestoneTitle = pr.Milestone.Title
+	}
+	fmt.Fprintf(out, "milestone:\t%s\n", milestoneTitle)
 	fmt.Fprintf(out, "number:\t%d\n", pr.Number)
 	fmt.Fprintf(out, "url:\t%s\n", pr.URL)
 	fmt.Fprintf(out, "additions:\t%s\n", cs.Green(strconv.Itoa(pr.Additions)))
@@ -158,7 +169,7 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 	cs := opts.IO.ColorScheme()
 
 	// Header (Title and State)
-	fmt.Fprintln(out, cs.Bold(pr.Title))
+	fmt.Fprintf(out, "%s #%d\n", cs.Bold(pr.Title), pr.Number)
 	fmt.Fprintf(out,
 		"%s • %s wants to merge %s into %s from %s • %s %s \n",
 		shared.StateTitleWithColor(cs, *pr),
@@ -185,7 +196,7 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 		fmt.Fprint(out, cs.Bold("Assignees: "))
 		fmt.Fprintln(out, assignees)
 	}
-	if labels := prLabelList(*pr); labels != "" {
+	if labels := prLabelList(*pr, cs); labels != "" {
 		fmt.Fprint(out, cs.Bold("Labels: "))
 		fmt.Fprintln(out, labels)
 	}
@@ -193,7 +204,7 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 		fmt.Fprint(out, cs.Bold("Projects: "))
 		fmt.Fprintln(out, projects)
 	}
-	if pr.Milestone.Title != "" {
+	if pr.Milestone != nil {
 		fmt.Fprint(out, cs.Bold("Milestone: "))
 		fmt.Fprintln(out, pr.Milestone.Title)
 	}
@@ -282,8 +293,6 @@ func prReviewerList(pr api.PullRequest, cs *iostreams.ColorScheme) string {
 	return reviewerList
 }
 
-const teamTypeName = "Team"
-
 const ghostName = "ghost"
 
 // parseReviewers parses given Reviews and ReviewRequests
@@ -305,10 +314,7 @@ func parseReviewers(pr api.PullRequest) []*reviewerState {
 
 	// Overwrite reviewer's state if a review request for the same reviewer exists.
 	for _, reviewRequest := range pr.ReviewRequests.Nodes {
-		name := reviewRequest.RequestedReviewer.Login
-		if reviewRequest.RequestedReviewer.TypeName == teamTypeName {
-			name = reviewRequest.RequestedReviewer.Name
-		}
+		name := reviewRequest.RequestedReviewer.LoginOrSlug()
 		reviewerStates[name] = &reviewerState{
 			Name:  name,
 			State: requestedReviewState,
@@ -360,14 +366,14 @@ func prAssigneeList(pr api.PullRequest) string {
 	return list
 }
 
-func prLabelList(pr api.PullRequest) string {
+func prLabelList(pr api.PullRequest, cs *iostreams.ColorScheme) string {
 	if len(pr.Labels.Nodes) == 0 {
 		return ""
 	}
 
 	labelNames := make([]string, 0, len(pr.Labels.Nodes))
 	for _, label := range pr.Labels.Nodes {
-		labelNames = append(labelNames, label.Name)
+		labelNames = append(labelNames, cs.HexToRGB(label.Color, label.Name))
 	}
 
 	list := strings.Join(labelNames, ", ")
@@ -404,52 +410,4 @@ func prStateWithDraft(pr *api.PullRequest) string {
 	}
 
 	return pr.State
-}
-
-func retrievePullRequest(opts *ViewOptions) (*api.PullRequest, error) {
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return nil, err
-	}
-
-	apiClient := api.NewClientFromHTTP(httpClient)
-
-	pr, repo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
-	if err != nil {
-		return nil, err
-	}
-
-	if opts.BrowserMode {
-		return pr, nil
-	}
-
-	var errp, errc error
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		var reviews *api.PullRequestReviews
-		reviews, errp = api.ReviewsForPullRequest(apiClient, repo, pr)
-		pr.Reviews = *reviews
-	}()
-
-	if opts.Comments {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			var comments *api.Comments
-			comments, errc = api.CommentsForPullRequest(apiClient, repo, pr)
-			pr.Comments = *comments
-		}()
-	}
-
-	wg.Wait()
-
-	if errp != nil {
-		err = errp
-	}
-	if errc != nil {
-		err = errc
-	}
-	return pr, err
 }

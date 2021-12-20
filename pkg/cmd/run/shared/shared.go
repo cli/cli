@@ -1,16 +1,19 @@
 package shared
 
 import (
+	"archive/zip"
+	"errors"
 	"fmt"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 )
 
 const (
@@ -40,6 +43,20 @@ type Status string
 type Conclusion string
 type Level string
 
+var RunFields = []string{
+	"name",
+	"headBranch",
+	"headSha",
+	"createdAt",
+	"updatedAt",
+	"status",
+	"conclusion",
+	"event",
+	"databaseId",
+	"workflowDatabaseId",
+	"url",
+}
+
 type Run struct {
 	Name           string
 	CreatedAt      time.Time `json:"created_at"`
@@ -47,7 +64,8 @@ type Run struct {
 	Status         Status
 	Conclusion     Conclusion
 	Event          string
-	ID             int
+	ID             int64
+	WorkflowID     int64  `json:"workflow_id"`
 	HeadBranch     string `json:"head_branch"`
 	JobsURL        string `json:"jobs_url"`
 	HeadCommit     Commit `json:"head_commit"`
@@ -76,15 +94,40 @@ func (r Run) CommitMsg() string {
 	}
 }
 
+func (r *Run) ExportData(fields []string) map[string]interface{} {
+	v := reflect.ValueOf(r).Elem()
+	fieldByName := func(v reflect.Value, field string) reflect.Value {
+		return v.FieldByNameFunc(func(s string) bool {
+			return strings.EqualFold(field, s)
+		})
+	}
+	data := map[string]interface{}{}
+
+	for _, f := range fields {
+		switch f {
+		case "databaseId":
+			data[f] = r.ID
+		case "workflowDatabaseId":
+			data[f] = r.WorkflowID
+		default:
+			sf := fieldByName(v, f)
+			data[f] = sf.Interface()
+		}
+	}
+
+	return data
+}
+
 type Job struct {
-	ID          int
+	ID          int64
 	Status      Status
 	Conclusion  Conclusion
 	Name        string
-	Steps       []Step
+	Steps       Steps
 	StartedAt   time.Time `json:"started_at"`
 	CompletedAt time.Time `json:"completed_at"`
 	URL         string    `json:"html_url"`
+	RunID       int64     `json:"run_id"`
 }
 
 type Step struct {
@@ -92,7 +135,14 @@ type Step struct {
 	Status     Status
 	Conclusion Conclusion
 	Number     int
+	Log        *zip.File
 }
+
+type Steps []Step
+
+func (s Steps) Len() int           { return len(s) }
+func (s Steps) Less(i, j int) bool { return s[i].Number < s[j].Number }
+func (s Steps) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 type Annotation struct {
 	JobName   string
@@ -114,7 +164,7 @@ func AnnotationSymbol(cs *iostreams.ColorScheme, a Annotation) string {
 }
 
 type CheckRun struct {
-	ID int
+	ID int64
 }
 
 func GetAnnotations(client *api.Client, repo ghrepo.Interface, job Job) ([]Annotation, error) {
@@ -124,6 +174,10 @@ func GetAnnotations(client *api.Client, repo ghrepo.Interface, job Job) ([]Annot
 
 	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
 	if err != nil {
+		var httpError api.HTTPError
+		if errors.As(err, &httpError) && httpError.StatusCode == 404 {
+			return []Annotation{}, nil
+		}
 		return nil, err
 	}
 
@@ -147,10 +201,30 @@ func IsFailureState(c Conclusion) bool {
 }
 
 type RunsPayload struct {
+	TotalCount   int   `json:"total_count"`
 	WorkflowRuns []Run `json:"workflow_runs"`
 }
 
-func GetRunsByWorkflow(client *api.Client, repo ghrepo.Interface, limit, workflowID int) ([]Run, error) {
+func GetRunsWithFilter(client *api.Client, repo ghrepo.Interface, limit int, f func(Run) bool) ([]Run, error) {
+	path := fmt.Sprintf("repos/%s/actions/runs", ghrepo.FullName(repo))
+	runs, err := getRuns(client, repo, path, 50)
+	if err != nil {
+		return nil, err
+	}
+	filtered := []Run{}
+	for _, run := range runs {
+		if f(run) {
+			filtered = append(filtered, run)
+		}
+		if len(filtered) == limit {
+			break
+		}
+	}
+
+	return filtered, nil
+}
+
+func GetRunsByWorkflow(client *api.Client, repo ghrepo.Interface, limit int, workflowID int64) ([]Run, error) {
 	path := fmt.Sprintf("repos/%s/actions/workflows/%d/runs", ghrepo.FullName(repo), workflowID)
 	return getRuns(client, repo, path, limit)
 }
@@ -172,9 +246,17 @@ func getRuns(client *api.Client, repo ghrepo.Interface, path string, limit int) 
 	for len(runs) < limit {
 		var result RunsPayload
 
-		pagedPath := fmt.Sprintf("%s?per_page=%d&page=%d", path, perPage, page)
+		parsed, err := url.Parse(path)
+		if err != nil {
+			return nil, err
+		}
+		query := parsed.Query()
+		query.Set("per_page", fmt.Sprintf("%d", perPage))
+		query.Set("page", fmt.Sprintf("%d", page))
+		parsed.RawQuery = query.Encode()
+		pagedPath := parsed.String()
 
-		err := client.REST(repo.RepoHost(), "GET", pagedPath, nil, &result)
+		err = client.REST(repo.RepoHost(), "GET", pagedPath, nil, &result)
 		if err != nil {
 			return nil, err
 		}
@@ -206,38 +288,28 @@ type JobsPayload struct {
 
 func GetJobs(client *api.Client, repo ghrepo.Interface, run Run) ([]Job, error) {
 	var result JobsPayload
-	parsed, err := url.Parse(run.JobsURL)
-	if err != nil {
-		return nil, err
-	}
-
-	err = client.REST(repo.RepoHost(), "GET", parsed.Path[1:], nil, &result)
-	if err != nil {
+	if err := client.REST(repo.RepoHost(), "GET", run.JobsURL, nil, &result); err != nil {
 		return nil, err
 	}
 	return result.Jobs, nil
 }
 
-func PromptForRun(cs *iostreams.ColorScheme, client *api.Client, repo ghrepo.Interface) (string, error) {
-	// TODO arbitrary limit
-	runs, err := GetRuns(client, repo, 10)
-	if err != nil {
-		return "", err
-	}
-
+func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 	var selected int
+	now := time.Now()
 
 	candidates := []string{}
 
 	for _, run := range runs {
 		symbol, _ := Symbol(cs, run.Status, run.Conclusion)
 		candidates = append(candidates,
-			fmt.Sprintf("%s %s, %s (%s)", symbol, run.CommitMsg(), run.Name, run.HeadBranch))
+			// TODO truncate commit message, long ones look terrible
+			fmt.Sprintf("%s %s, %s (%s) %s", symbol, run.CommitMsg(), run.Name, run.HeadBranch, preciseAgo(now, run.CreatedAt)))
 	}
 
 	// TODO consider custom filter so it's fuzzier. right now matches start anywhere in string but
 	// become contiguous
-	err = prompt.SurveyAskOne(&survey.Select{
+	err := prompt.SurveyAskOne(&survey.Select{
 		Message:  "Select a workflow run",
 		Options:  candidates,
 		PageSize: 10,
@@ -271,14 +343,14 @@ func Symbol(cs *iostreams.ColorScheme, status Status, conclusion Conclusion) (st
 		switch conclusion {
 		case Success:
 			return cs.SuccessIconWithColor(noColor), cs.Green
-		case Skipped, Cancelled, Neutral:
-			return cs.SuccessIconWithColor(noColor), cs.Gray
+		case Skipped, Neutral:
+			return "-", cs.Gray
 		default:
 			return cs.FailureIconWithColor(noColor), cs.Red
 		}
 	}
 
-	return "-", cs.Yellow
+	return "*", cs.Yellow
 }
 
 func PullRequestForRun(client *api.Client, repo ghrepo.Interface, run Run) (int, error) {
@@ -347,4 +419,15 @@ func PullRequestForRun(client *api.Client, repo ghrepo.Interface, run Run) (int,
 	}
 
 	return number, nil
+}
+
+func preciseAgo(now time.Time, createdAt time.Time) string {
+	ago := now.Sub(createdAt)
+
+	if ago < 30*24*time.Hour {
+		s := ago.Truncate(time.Second).String()
+		return fmt.Sprintf("%s ago", s)
+	}
+
+	return createdAt.Format("Jan _2, 2006")
 }

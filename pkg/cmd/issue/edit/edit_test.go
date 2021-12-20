@@ -8,11 +8,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cli/cli/internal/ghrepo"
-	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -286,6 +287,11 @@ func Test_editRun(t *testing.T) {
 						Value:  "GA",
 						Edited: true,
 					},
+					Metadata: api.RepoMetadataResult{
+						Labels: []api.RepoLabel{
+							{Name: "docs", ID: "DOCSID"},
+						},
+					},
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
@@ -293,6 +299,7 @@ func Test_editRun(t *testing.T) {
 				mockIssueGet(t, reg)
 				mockRepoMetadata(t, reg)
 				mockIssueUpdate(t, reg)
+				mockIssueUpdateLabels(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
 		},
@@ -386,7 +393,8 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
 			"nodes": [
 				{ "name": "feature", "id": "FEATUREID" },
 				{ "name": "TODO", "id": "TODOID" },
-				{ "name": "bug", "id": "BUGID" }
+				{ "name": "bug", "id": "BUGID" },
+				{ "name": "docs", "id": "DOCSID" }
 			],
 			"pageInfo": { "hasNextPage": false }
 		} } } }
@@ -429,9 +437,22 @@ func mockIssueUpdate(t *testing.T, reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation IssueUpdate\b`),
 		httpmock.GraphQLMutation(`
-				{ "data": { "updateIssue": { "issue": {
-					"id": "123"
-				} } } }`,
+				{ "data": { "updateIssue": { "__typename": "" } } }`,
+			func(inputs map[string]interface{}) {}),
+	)
+}
+
+func mockIssueUpdateLabels(t *testing.T, reg *httpmock.Registry) {
+	reg.Register(
+		httpmock.GraphQL(`mutation LabelAdd\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "addLabelsToLabelable": { "__typename": "" } } }`,
+			func(inputs map[string]interface{}) {}),
+	)
+	reg.Register(
+		httpmock.GraphQL(`mutation LabelRemove\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "removeLabelsFromLabelable": { "__typename": "" } } }`,
 			func(inputs map[string]interface{}) {}),
 	)
 }

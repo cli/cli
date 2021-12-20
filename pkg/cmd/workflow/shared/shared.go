@@ -1,16 +1,18 @@
 package shared
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/url"
 	"path"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 )
 
 const (
@@ -22,7 +24,7 @@ type WorkflowState string
 
 type Workflow struct {
 	Name  string
-	ID    int
+	ID    int64
 	Path  string
 	State WorkflowState
 }
@@ -215,4 +217,29 @@ func ResolveWorkflow(io *iostreams.IOStreams, client *api.Client, repo ghrepo.In
 	}
 
 	return SelectWorkflow(workflows, "Which workflow do you mean?", states)
+}
+
+func GetWorkflowContent(client *api.Client, repo ghrepo.Interface, workflow Workflow, ref string) ([]byte, error) {
+	path := fmt.Sprintf("repos/%s/contents/%s", ghrepo.FullName(repo), workflow.Path)
+	if ref != "" {
+		q := fmt.Sprintf("?ref=%s", url.QueryEscape(ref))
+		path = path + q
+	}
+
+	type Result struct {
+		Content string
+	}
+
+	var result Result
+	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(result.Content)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode workflow file: %w", err)
+	}
+
+	return decoded, nil
 }

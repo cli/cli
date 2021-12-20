@@ -5,9 +5,10 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/githubsearch"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/githubsearch"
+	"github.com/google/shlex"
 )
 
 func WithPrAndIssueQueryParams(client *api.Client, baseRepo ghrepo.Interface, baseURL string, state IssueMetadataState) (string, error) {
@@ -19,9 +20,10 @@ func WithPrAndIssueQueryParams(client *api.Client, baseRepo ghrepo.Interface, ba
 	if state.Title != "" {
 		q.Set("title", state.Title)
 	}
-	if state.Body != "" {
-		q.Set("body", state.Body)
-	}
+	// We always want to send the body parameter, even if it's empty, to prevent the web interface from
+	// applying the default template. Since the user has the option to select a template in the terminal,
+	// assume that empty body here means that the user either skipped it or erased its contents.
+	q.Set("body", state.Body)
 	if len(state.Assignees) > 0 {
 		q.Set("assignees", strings.Join(state.Assignees, ","))
 	}
@@ -152,9 +154,12 @@ type FilterOptions struct {
 	Labels     []string
 	Author     string
 	BaseBranch string
+	HeadBranch string
 	Mention    string
 	Milestone  string
 	Search     string
+	Draft      string
+	Fields     []string
 }
 
 func (opts *FilterOptions) IsDefault() bool {
@@ -171,6 +176,9 @@ func (opts *FilterOptions) IsDefault() bool {
 		return false
 	}
 	if opts.BaseBranch != "" {
+		return false
+	}
+	if opts.HeadBranch != "" {
 		return false
 	}
 	if opts.Mention != "" {
@@ -228,6 +236,9 @@ func SearchQueryBuild(options FilterOptions) string {
 	if options.BaseBranch != "" {
 		q.SetBaseBranch(options.BaseBranch)
 	}
+	if options.HeadBranch != "" {
+		q.SetHeadBranch(options.HeadBranch)
+	}
 	if options.Mention != "" {
 		q.Mentions(options.Mention)
 	}
@@ -237,8 +248,25 @@ func SearchQueryBuild(options FilterOptions) string {
 	if options.Search != "" {
 		q.AddQuery(options.Search)
 	}
-
+	if options.Draft != "" {
+		q.SetDraft(options.Draft)
+	}
 	return q.String()
+}
+
+func QueryHasStateClause(searchQuery string) bool {
+	argv, err := shlex.Split(searchQuery)
+	if err != nil {
+		return false
+	}
+
+	for _, arg := range argv {
+		if arg == "is:closed" || arg == "is:merged" || arg == "state:closed" || arg == "state:merged" || strings.HasPrefix(arg, "merged:") || strings.HasPrefix(arg, "closed:") {
+			return true
+		}
+	}
+
+	return false
 }
 
 // MeReplacer resolves usages of `@me` to the handle of the currently logged in user.

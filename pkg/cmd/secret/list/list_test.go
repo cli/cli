@@ -3,17 +3,19 @@ package list
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/secret/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/test"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/secret/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -36,6 +38,20 @@ func Test_NewCmdList(t *testing.T) {
 			cli:  "-oUmbrellaCorporation",
 			wants: ListOptions{
 				OrgName: "UmbrellaCorporation",
+			},
+		},
+		{
+			name: "env",
+			cli:  "-eDevelopment",
+			wants: ListOptions{
+				EnvName: "Development",
+			},
+		},
+		{
+			name: "user",
+			cli:  "-u",
+			wants: ListOptions{
+				UserSecrets: true,
 			},
 		},
 	}
@@ -64,7 +80,7 @@ func Test_NewCmdList(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.OrgName, gotOpts.OrgName)
-
+			assert.Equal(t, tt.wants.EnvName, gotOpts.EnvName)
 		})
 	}
 }
@@ -120,16 +136,68 @@ func Test_listRun(t *testing.T) {
 				"SECRET_THREE\t1975-11-30\tSELECTED",
 			},
 		},
+		{
+			name: "env tty",
+			tty:  true,
+			opts: &ListOptions{
+				EnvName: "Development",
+			},
+			wantOut: []string{
+				"SECRET_ONE.*Updated 1988-10-11",
+				"SECRET_TWO.*Updated 2020-12-04",
+				"SECRET_THREE.*Updated 1975-11-30",
+			},
+		},
+		{
+			name: "env not tty",
+			tty:  false,
+			opts: &ListOptions{
+				EnvName: "Development",
+			},
+			wantOut: []string{
+				"SECRET_ONE\t1988-10-11",
+				"SECRET_TWO\t2020-12-04",
+				"SECRET_THREE\t1975-11-30",
+			},
+		},
+		{
+			name: "user tty",
+			tty:  true,
+			opts: &ListOptions{
+				UserSecrets: true,
+			},
+			wantOut: []string{
+				"SECRET_ONE.*Updated 1988-10-11.*Visible to 1 selected repository",
+				"SECRET_TWO.*Updated 2020-12-04.*Visible to 2 selected repositories",
+				"SECRET_THREE.*Updated 1975-11-30.*Visible to 3 selected repositories",
+			},
+		},
+		{
+			name: "user not tty",
+			tty:  false,
+			opts: &ListOptions{
+				UserSecrets: true,
+			},
+			wantOut: []string{
+				"SECRET_ONE\t1988-10-11\t",
+				"SECRET_TWO\t2020-12-04\t",
+				"SECRET_THREE\t1975-11-30\t",
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
 
+			path := "repos/owner/repo/actions/secrets"
+			if tt.opts.EnvName != "" {
+				path = fmt.Sprintf("repos/owner/repo/environments/%s/secrets", tt.opts.EnvName)
+			}
+
 			t0, _ := time.Parse("2006-01-02", "1988-10-11")
 			t1, _ := time.Parse("2006-01-02", "2020-12-04")
 			t2, _ := time.Parse("2006-01-02", "1975-11-30")
-			path := "repos/owner/repo/actions/secrets"
 			payload := secretsPayload{}
 			payload.Secrets = []*Secret{
 				{
@@ -166,11 +234,50 @@ func Test_listRun(t *testing.T) {
 				}
 				path = fmt.Sprintf("orgs/%s/actions/secrets", tt.opts.OrgName)
 
-				reg.Register(
-					httpmock.REST("GET", fmt.Sprintf("orgs/%s/actions/secrets/SECRET_THREE/repositories", tt.opts.OrgName)),
-					httpmock.JSONResponse(struct {
-						TotalCount int `json:"total_count"`
-					}{2}))
+				if tt.tty {
+					reg.Register(
+						httpmock.REST("GET", fmt.Sprintf("orgs/%s/actions/secrets/SECRET_THREE/repositories", tt.opts.OrgName)),
+						httpmock.JSONResponse(struct {
+							TotalCount int `json:"total_count"`
+						}{2}))
+				}
+			}
+
+			if tt.opts.UserSecrets {
+				payload.Secrets = []*Secret{
+					{
+						Name:             "SECRET_ONE",
+						UpdatedAt:        t0,
+						Visibility:       shared.Selected,
+						SelectedReposURL: "https://api.github.com/user/codespaces/secrets/SECRET_ONE/repositories",
+					},
+					{
+						Name:             "SECRET_TWO",
+						UpdatedAt:        t1,
+						Visibility:       shared.Selected,
+						SelectedReposURL: "https://api.github.com/user/codespaces/secrets/SECRET_TWO/repositories",
+					},
+					{
+						Name:             "SECRET_THREE",
+						UpdatedAt:        t2,
+						Visibility:       shared.Selected,
+						SelectedReposURL: "https://api.github.com/user/codespaces/secrets/SECRET_THREE/repositories",
+					},
+				}
+
+				path = "user/codespaces/secrets"
+				if tt.tty {
+					for i, secret := range payload.Secrets {
+						hostLen := len("https://api.github.com/")
+						path := secret.SelectedReposURL[hostLen:len(secret.SelectedReposURL)]
+						repositoryCount := i + 1
+						reg.Register(
+							httpmock.REST("GET", path),
+							httpmock.JSONResponse(struct {
+								TotalCount int `json:"total_count"`
+							}{repositoryCount}))
+					}
+				}
 			}
 
 			reg.Register(httpmock.REST("GET", path), httpmock.JSONResponse(payload))
@@ -199,4 +306,33 @@ func Test_listRun(t *testing.T) {
 			test.ExpectLines(t, stdout.String(), tt.wantOut...)
 		})
 	}
+}
+
+func Test_getSecrets_pagination(t *testing.T) {
+	var requests []*http.Request
+	var client testClient = func(req *http.Request) (*http.Response, error) {
+		header := make(map[string][]string)
+		if len(requests) == 0 {
+			header["Link"] = []string{`<http://example.com/page/0>; rel="previous", <http://example.com/page/2>; rel="next"`}
+		}
+		requests = append(requests, req)
+		return &http.Response{
+			Request: req,
+			Body:    ioutil.NopCloser(strings.NewReader(`{"secrets":[{},{}]}`)),
+			Header:  header,
+		}, nil
+	}
+
+	secrets, err := getSecrets(client, "github.com", "path/to")
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(requests))
+	assert.Equal(t, 4, len(secrets))
+	assert.Equal(t, "https://api.github.com/path/to?per_page=100", requests[0].URL.String())
+	assert.Equal(t, "http://example.com/page/2", requests[1].URL.String())
+}
+
+type testClient func(*http.Request) (*http.Response, error)
+
+func (c testClient) Do(req *http.Request) (*http.Response, error) {
+	return c(req)
 }

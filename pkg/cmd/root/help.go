@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/text"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/text"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -39,7 +38,7 @@ func rootFlagErrorFunc(cmd *cobra.Command, err error) error {
 	if err == pflag.ErrHelp {
 		return err
 	}
-	return &cmdutil.FlagError{Err: err}
+	return cmdutil.FlagErrorWrap(err)
 }
 
 var hasFailed bool
@@ -80,7 +79,9 @@ func isRootCmd(command *cobra.Command) bool {
 	return command != nil && !command.HasParent()
 }
 
-func rootHelpFunc(cs *iostreams.ColorScheme, command *cobra.Command, args []string) {
+func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
+	cs := f.IOStreams.ColorScheme()
+
 	if isRootCmd(command.Parent()) && len(args) >= 2 && args[1] != "--help" && args[1] != "-h" {
 		nestedSuggestFunc(command, args[1])
 		hasFailed = true
@@ -88,6 +89,7 @@ func rootHelpFunc(cs *iostreams.ColorScheme, command *cobra.Command, args []stri
 	}
 
 	coreCommands := []string{}
+	actionsCommands := []string{}
 	additionalCommands := []string{}
 	for _, c := range command.Commands() {
 		if c.Short == "" {
@@ -100,6 +102,8 @@ func rootHelpFunc(cs *iostreams.ColorScheme, command *cobra.Command, args []stri
 		s := rpad(c.Name()+":", c.NamePadding()) + c.Short
 		if _, ok := c.Annotations["IsCore"]; ok {
 			coreCommands = append(coreCommands, s)
+		} else if _, ok := c.Annotations["IsActions"]; ok {
+			actionsCommands = append(actionsCommands, s)
 		} else {
 			additionalCommands = append(additionalCommands, s)
 		}
@@ -116,18 +120,38 @@ func rootHelpFunc(cs *iostreams.ColorScheme, command *cobra.Command, args []stri
 		Body  string
 	}
 
+	longText := command.Long
+	if longText == "" {
+		longText = command.Short
+	}
+	if longText != "" && command.LocalFlags().Lookup("jq") != nil {
+		longText = strings.TrimRight(longText, "\n") +
+			"\n\nFor more information about output formatting flags, see `gh help formatting`."
+	}
+
 	helpEntries := []helpEntry{}
-	if command.Long != "" {
-		helpEntries = append(helpEntries, helpEntry{"", command.Long})
-	} else if command.Short != "" {
-		helpEntries = append(helpEntries, helpEntry{"", command.Short})
+	if longText != "" {
+		helpEntries = append(helpEntries, helpEntry{"", longText})
 	}
 	helpEntries = append(helpEntries, helpEntry{"USAGE", command.UseLine()})
 	if len(coreCommands) > 0 {
 		helpEntries = append(helpEntries, helpEntry{"CORE COMMANDS", strings.Join(coreCommands, "\n")})
 	}
+	if len(actionsCommands) > 0 {
+		helpEntries = append(helpEntries, helpEntry{"ACTIONS COMMANDS", strings.Join(actionsCommands, "\n")})
+	}
 	if len(additionalCommands) > 0 {
 		helpEntries = append(helpEntries, helpEntry{"ADDITIONAL COMMANDS", strings.Join(additionalCommands, "\n")})
+	}
+
+	if isRootCmd(command) {
+		if exts := f.ExtensionManager.List(false); len(exts) > 0 {
+			var names []string
+			for _, ext := range exts {
+				names = append(names, ext.Name())
+			}
+			helpEntries = append(helpEntries, helpEntry{"EXTENSION COMMANDS", strings.Join(names, "\n")})
+		}
 	}
 
 	flagUsages := command.LocalFlags().FlagUsages()

@@ -77,6 +77,17 @@ func StringResponse(body string) Responder {
 	}
 }
 
+func WithHeader(responder Responder, header string, value string) Responder {
+	return func(req *http.Request) (*http.Response, error) {
+		resp, _ := responder(req)
+		if resp.Header == nil {
+			resp.Header = make(http.Header)
+		}
+		resp.Header.Set(header, value)
+		return resp, nil
+	}
+}
+
 func StatusStringResponse(status int, body string) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		return httpResponse(status, req, bytes.NewBufferString(body)), nil
@@ -100,6 +111,17 @@ func FileResponse(filename string) Responder {
 	}
 }
 
+func RESTPayload(responseStatus int, responseBody string, cb func(payload map[string]interface{})) Responder {
+	return func(req *http.Request) (*http.Response, error) {
+		bodyData := make(map[string]interface{})
+		err := decodeJSONBody(req, &bodyData)
+		if err != nil {
+			return nil, err
+		}
+		cb(bodyData)
+		return httpResponse(responseStatus, req, bytes.NewBufferString(responseBody)), nil
+	}
+}
 func GraphQLMutation(body string, cb func(map[string]interface{})) Responder {
 	return func(req *http.Request) (*http.Response, error) {
 		var bodyData struct {
@@ -151,5 +173,6 @@ func httpResponse(status int, req *http.Request, body io.Reader) *http.Response 
 		StatusCode: status,
 		Request:    req,
 		Body:       ioutil.NopCloser(body),
+		Header:     http.Header{},
 	}
 }

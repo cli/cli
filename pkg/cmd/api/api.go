@@ -17,13 +17,14 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/jsoncolor"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/export"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/jsoncolor"
 	"github.com/spf13/cobra"
 )
 
@@ -70,21 +71,25 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			The endpoint argument should either be a path of a GitHub API v3 endpoint, or
 			"graphql" to access the GitHub API v4.
 
-			Placeholder values ":owner", ":repo", and ":branch" in the endpoint argument will
-			get replaced with values from the repository of the current directory.
+			Placeholder values "{owner}", "{repo}", and "{branch}" in the endpoint argument will
+			get replaced with values from the repository of the current directory. Note that in
+			some shells, for example PowerShell, you may need to enclose any value that contains
+			"{...}" in quotes to prevent the shell from applying special meaning to curly braces.
 
 			The default HTTP request method is "GET" normally and "POST" if any parameters
 			were added. Override the method with %[1]s--method%[1]s.
 
-			Pass one or more %[1]s--raw-field%[1]s values in "key=value" format to add
-			JSON-encoded string parameters to the POST body.
+			Pass one or more %[1]s-f/--raw-field%[1]s values in "key=value" format to add static string 
+			parameters to the request payload. To add non-string or otherwise dynamic values, see
+			%[1]s--field%[1]s below. Note that adding request parameters will automatically switch the
+			request method to POST. To send the parameters as a GET query string instead, use
+			%[1]s--method GET%[1]s.
 
-			The %[1]s--field%[1]s flag behaves like %[1]s--raw-field%[1]s with magic type conversion based
-			on the format of the value:
+			The %[1]s-F/--field%[1]s flag has magic type conversion based on the format of the value:
 
 			- literal values "true", "false", "null", and integer numbers get converted to
 			  appropriate JSON types;
-			- placeholder values ":owner", ":repo", and ":branch" get populated with values
+			- placeholder values "{owner}", "{repo}", and "{branch}" get populated with values
 			  from the repository of the current directory;
 			- if the value starts with "@", the rest of the value is interpreted as a
 			  filename to read the value from. Pass "-" to read from standard input.
@@ -100,29 +105,13 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			there are no more pages of results. For GraphQL requests, this requires that the
 			original query accepts an %[1]s$endCursor: String%[1]s variable and that it fetches the
 			%[1]spageInfo{ hasNextPage, endCursor }%[1]s set of fields from a collection.
-
-			The %[1]s--jq%[1]s option accepts a query in jq syntax and will print only the resulting
-			values that match the query. This is equivalent to piping the output to %[1]sjq -r%[1]s,
-			but does not require the jq utility to be installed on the system. To learn more
-			about the query syntax, see: https://stedolan.github.io/jq/manual/v1.6/
-
-			With %[1]s--template%[1]s, the provided Go template is rendered using the JSON data as input.
-			For the syntax of Go templates, see: https://golang.org/pkg/text/template/
-
-			The following functions are available in templates:
-			- %[1]scolor <style>, <input>%[1]s: colorize input using https://github.com/mgutz/ansi
-			- %[1]sautocolor%[1]s: like %[1]scolor%[1]s, but only emits color to terminals
-			- %[1]stimefmt <format> <time>%[1]s: formats a timestamp using Go's Time.Format function
-			- %[1]stimeago <time>%[1]s: renders a timestamp as relative to now
-			- %[1]spluck <field> <list>%[1]s: collects values of a field from all items in the input
-			- %[1]sjoin <sep> <list>%[1]s: joins values in the list using a separator
 		`, "`"),
 		Example: heredoc.Doc(`
 			# list releases in the current repository
-			$ gh api repos/:owner/:repo/releases
+			$ gh api repos/{owner}/{repo}/releases
 
 			# post an issue comment
-			$ gh api repos/:owner/:repo/issues/123/comments -f body='Hi from CLI'
+			$ gh api repos/{owner}/{repo}/issues/123/comments -f body='Hi from CLI'
 
 			# add parameters to a GET request
 			$ gh api -X GET search/issues -f q='repo:cli/cli is:open remote'
@@ -134,14 +123,14 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			$ gh api --preview baptiste,nebula ...
 
 			# print only specific fields from the response
-			$ gh api repos/:owner/:repo/issues --jq '.[].title'
+			$ gh api repos/{owner}/{repo}/issues --jq '.[].title'
 
 			# use a template for the output
-			$ gh api repos/:owner/:repo/issues --template \
+			$ gh api repos/{owner}/{repo}/issues --template \
 			  '{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " | color "yellow"}}){{"\n"}}{{end}}'
 
 			# list releases with GraphQL
-			$ gh api graphql -F owner=':owner' -F name=':repo' -f query='
+			$ gh api graphql -F owner='{owner}' -F name='{repo}' -f query='
 			  query($name: String!, $owner: String!) {
 			    repository(owner: $owner, name: $name) {
 			      releases(last: 3) {
@@ -184,12 +173,12 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 
 			if c.Flags().Changed("hostname") {
 				if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
-					return &cmdutil.FlagError{Err: fmt.Errorf("error parsing `--hostname`: %w", err)}
+					return cmdutil.FlagErrorf("error parsing `--hostname`: %w", err)
 				}
 			}
 
 			if opts.Paginate && !strings.EqualFold(opts.RequestMethod, "GET") && opts.RequestPath != "graphql" {
-				return &cmdutil.FlagError{Err: errors.New("the `--paginate` option is not supported for non-GET requests")}
+				return cmdutil.FlagErrorf("the `--paginate` option is not supported for non-GET requests")
 			}
 
 			if err := cmdutil.MutuallyExclusive(
@@ -224,7 +213,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringSliceVarP(&opts.Previews, "preview", "p", nil, "Opt into GitHub API previews")
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response headers in the output")
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
-	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request")
+	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request (use \"-\" to read from standard input)")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
 	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format the response using a Go template")
 	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
@@ -305,6 +294,8 @@ func apiRun(opts *ApiOptions) error {
 		host = opts.Hostname
 	}
 
+	template := export.NewTemplate(opts.IO, opts.Template)
+
 	hasNextPage := true
 	for hasNextPage {
 		resp, err := httpRequest(httpClient, host, method, requestPath, requestBody, requestHeaders)
@@ -312,7 +303,7 @@ func apiRun(opts *ApiOptions) error {
 			return err
 		}
 
-		endCursor, err := processResponse(resp, opts, headersOutputStream)
+		endCursor, err := processResponse(resp, opts, headersOutputStream, &template)
 		if err != nil {
 			return err
 		}
@@ -328,6 +319,7 @@ func apiRun(opts *ApiOptions) error {
 			}
 		} else {
 			requestPath, hasNextPage = findNextPage(resp)
+			requestBody = nil // prevent repeating GET parameters
 		}
 
 		if hasNextPage && opts.ShowResponseHeaders {
@@ -335,10 +327,10 @@ func apiRun(opts *ApiOptions) error {
 		}
 	}
 
-	return nil
+	return template.End()
 }
 
-func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream io.Writer) (endCursor string, err error) {
+func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream io.Writer, template *export.Template) (endCursor string, err error) {
 	if opts.ShowResponseHeaders {
 		fmt.Fprintln(headersOutputStream, resp.Proto, resp.Status)
 		printHeaders(headersOutputStream, resp.Header, opts.IO.ColorEnabled())
@@ -370,13 +362,13 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 
 	if opts.FilterOutput != "" {
 		// TODO: reuse parsed query across pagination invocations
-		err = filterJSON(opts.IO.Out, responseBody, opts.FilterOutput)
+		err = export.FilterJSON(opts.IO.Out, responseBody, opts.FilterOutput)
 		if err != nil {
 			return
 		}
 	} else if opts.Template != "" {
 		// TODO: reuse parsed template across pagination invocations
-		err = executeTemplate(opts.IO.Out, responseBody, opts.Template, opts.IO.ColorEnabled())
+		err = template.Execute(responseBody)
 		if err != nil {
 			return
 		}
@@ -393,12 +385,14 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 		}
 	}
 
+	if serverError == "" && resp.StatusCode > 299 {
+		serverError = fmt.Sprintf("HTTP %d", resp.StatusCode)
+	}
 	if serverError != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
-		err = cmdutil.SilentError
-		return
-	} else if resp.StatusCode > 299 {
-		fmt.Fprintf(opts.IO.ErrOut, "gh: HTTP %d\n", resp.StatusCode)
+		if msg := api.ScopesSuggestion(resp); msg != "" {
+			fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", msg)
+		}
 		err = cmdutil.SilentError
 		return
 	}
@@ -410,41 +404,41 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 	return
 }
 
-var placeholderRE = regexp.MustCompile(`\:(owner|repo|branch)\b`)
+var placeholderRE = regexp.MustCompile(`(\:(owner|repo|branch)\b|\{[a-z]+\})`)
 
-// fillPlaceholders populates `:owner` and `:repo` placeholders with values from the current repository
+// fillPlaceholders replaces placeholders with values from the current repository
 func fillPlaceholders(value string, opts *ApiOptions) (string, error) {
-	if !placeholderRE.MatchString(value) {
-		return value, nil
-	}
+	var err error
+	return placeholderRE.ReplaceAllStringFunc(value, func(m string) string {
+		var name string
+		if m[0] == ':' {
+			name = m[1:]
+		} else {
+			name = m[1 : len(m)-1]
+		}
 
-	baseRepo, err := opts.BaseRepo()
-	if err != nil {
-		return value, err
-	}
-
-	filled := placeholderRE.ReplaceAllStringFunc(value, func(m string) string {
-		switch m {
-		case ":owner":
-			return baseRepo.RepoOwner()
-		case ":repo":
-			return baseRepo.RepoName()
-		case ":branch":
-			branch, e := opts.Branch()
-			if e != nil {
+		switch name {
+		case "owner":
+			if baseRepo, e := opts.BaseRepo(); e == nil {
+				return baseRepo.RepoOwner()
+			} else {
 				err = e
 			}
-			return branch
-		default:
-			panic(fmt.Sprintf("invalid placeholder: %q", m))
+		case "repo":
+			if baseRepo, e := opts.BaseRepo(); e == nil {
+				return baseRepo.RepoName()
+			} else {
+				err = e
+			}
+		case "branch":
+			if branch, e := opts.Branch(); e == nil {
+				return branch
+			} else {
+				err = e
+			}
 		}
-	})
-
-	if err != nil {
-		return value, err
-	}
-
-	return filled, nil
+		return m
+	}), err
 }
 
 func printHeaders(w io.Writer, headers http.Header, colorize bool) {
@@ -546,36 +540,58 @@ func parseErrorResponse(r io.Reader, statusCode int) (io.Reader, string, error) 
 
 	var parsedBody struct {
 		Message string
-		Errors  []json.RawMessage
+		Errors  json.RawMessage
 	}
 	err = json.Unmarshal(b, &parsedBody)
 	if err != nil {
-		return r, "", err
+		return bodyCopy, "", err
 	}
+
+	if len(parsedBody.Errors) > 0 && parsedBody.Errors[0] == '"' {
+		var stringError string
+		if err := json.Unmarshal(parsedBody.Errors, &stringError); err != nil {
+			return bodyCopy, "", err
+		}
+		if stringError != "" {
+			if parsedBody.Message != "" {
+				return bodyCopy, fmt.Sprintf("%s (%s)", stringError, parsedBody.Message), nil
+			}
+			return bodyCopy, stringError, nil
+		}
+	}
+
 	if parsedBody.Message != "" {
 		return bodyCopy, fmt.Sprintf("%s (HTTP %d)", parsedBody.Message, statusCode), nil
 	}
 
-	type errorMessage struct {
+	if len(parsedBody.Errors) == 0 || parsedBody.Errors[0] != '[' {
+		return bodyCopy, "", nil
+	}
+
+	var errorObjects []json.RawMessage
+	if err := json.Unmarshal(parsedBody.Errors, &errorObjects); err != nil {
+		return bodyCopy, "", err
+	}
+
+	var objectError struct {
 		Message string
 	}
 	var errors []string
-	for _, rawErr := range parsedBody.Errors {
+	for _, rawErr := range errorObjects {
 		if len(rawErr) == 0 {
 			continue
 		}
 		if rawErr[0] == '{' {
-			var objectError errorMessage
 			err := json.Unmarshal(rawErr, &objectError)
 			if err != nil {
-				return r, "", err
+				return bodyCopy, "", err
 			}
 			errors = append(errors, objectError.Message)
 		} else if rawErr[0] == '"' {
 			var stringError string
 			err := json.Unmarshal(rawErr, &stringError)
 			if err != nil {
-				return r, "", err
+				return bodyCopy, "", err
 			}
 			errors = append(errors, stringError)
 		}

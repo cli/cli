@@ -7,13 +7,13 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/text"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/text"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -29,12 +29,16 @@ type ListOptions struct {
 
 	WebMode      bool
 	LimitResults int
-	State        string
-	BaseBranch   string
-	Labels       []string
-	Author       string
-	Assignee     string
-	Search       string
+	Exporter     cmdutil.Exporter
+
+	State      string
+	BaseBranch string
+	HeadBranch string
+	Labels     []string
+	Author     string
+	Assignee   string
+	Search     string
+	Draft      string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -44,12 +48,25 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Browser:    f.Browser,
 	}
 
+	var draft bool
+
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List and filter pull requests in this repository",
 		Example: heredoc.Doc(`
+			List PRs authored by you
+			$ gh pr list --author "@me"
+
+			List PRs assigned to you
+			$ gh pr list --assignee "@me"
+
+			List PRs by label, combining multiple labels with AND
 			$ gh pr list --label bug --label "priority 1"
+
+			List PRs using search syntax
 			$ gh pr list --search "status:success review:required"
+
+			Open the list of PRs in a web browser
 			$ gh pr list --web
     	`),
 		Args: cmdutil.NoArgsQuoteReminder,
@@ -58,7 +75,11 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			opts.BaseRepo = f.BaseRepo
 
 			if opts.LimitResults < 1 {
-				return &cmdutil.FlagError{Err: fmt.Errorf("invalid value for --limit: %v", opts.LimitResults)}
+				return cmdutil.FlagErrorf("invalid value for --limit: %v", opts.LimitResults)
+			}
+
+			if cmd.Flags().Changed("draft") {
+				opts.Draft = strconv.FormatBool(draft)
 			}
 
 			if runF != nil {
@@ -71,13 +92,31 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the browser to list the pull requests")
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of items to fetch")
 	cmd.Flags().StringVarP(&opts.State, "state", "s", "open", "Filter by state: {open|closed|merged|all}")
+	_ = cmd.RegisterFlagCompletionFunc("state", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"open", "closed", "merged", "all"}, cobra.ShellCompDirectiveNoFileComp
+	})
 	cmd.Flags().StringVarP(&opts.BaseBranch, "base", "B", "", "Filter by base branch")
+	cmd.Flags().StringVarP(&opts.HeadBranch, "head", "H", "", "Filter by head branch")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by labels")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
+	cmd.Flags().BoolVarP(&draft, "draft", "d", false, "Filter by draft state")
+
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
+}
+
+var defaultFields = []string{
+	"number",
+	"title",
+	"state",
+	"url",
+	"headRefName",
+	"headRepositoryOwner",
+	"isCrossRepository",
+	"isDraft",
 }
 
 func listRun(opts *ListOptions) error {
@@ -91,16 +130,26 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
+	prState := strings.ToLower(opts.State)
+	if prState == "open" && shared.QueryHasStateClause(opts.Search) {
+		prState = ""
+	}
+
 	filters := shared.FilterOptions{
 		Entity:     "pr",
-		State:      strings.ToLower(opts.State),
+		State:      prState,
 		Author:     opts.Author,
 		Assignee:   opts.Assignee,
 		Labels:     opts.Labels,
 		BaseBranch: opts.BaseBranch,
+		HeadBranch: opts.HeadBranch,
 		Search:     opts.Search,
+		Draft:      opts.Draft,
+		Fields:     defaultFields,
 	}
-
+	if opts.Exporter != nil {
+		filters.Fields = opts.Exporter.Fields()
+	}
 	if opts.WebMode {
 		prListURL := ghrepo.GenerateRepoURL(baseRepo, "pulls")
 		openURL, err := shared.ListURLWithQuery(prListURL, filters)
@@ -121,10 +170,17 @@ func listRun(opts *ListOptions) error {
 
 	err = opts.IO.StartPager()
 	if err != nil {
-		return err
+		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
 	defer opts.IO.StopPager()
 
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, listResult.PullRequests)
+	}
+
+	if listResult.SearchCapped {
+		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
+	}
 	if opts.IO.IsStdoutTTY() {
 		title := shared.ListHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, !filters.IsDefault())
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)

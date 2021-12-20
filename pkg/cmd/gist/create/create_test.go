@@ -5,21 +5,19 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"path"
 	"strings"
 	"testing"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/cmd/gist/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
-)
-
-const (
-	fixtureFile = "../fixture.txt"
 )
 
 func Test_processFiles(t *testing.T) {
@@ -164,15 +162,22 @@ func TestNewCmdCreate(t *testing.T) {
 }
 
 func Test_createRun(t *testing.T) {
+	tempDir := t.TempDir()
+	fixtureFile := path.Join(tempDir, "fixture.txt")
+	assert.NoError(t, ioutil.WriteFile(fixtureFile, []byte("{}"), 0644))
+	emptyFile := path.Join(tempDir, "empty.txt")
+	assert.NoError(t, ioutil.WriteFile(emptyFile, []byte(" \t\n"), 0644))
+
 	tests := []struct {
-		name       string
-		opts       *CreateOptions
-		stdin      string
-		wantOut    string
-		wantStderr string
-		wantParams map[string]interface{}
-		wantErr    bool
-		wantBrowse string
+		name           string
+		opts           *CreateOptions
+		stdin          string
+		wantOut        string
+		wantStderr     string
+		wantParams     map[string]interface{}
+		wantErr        bool
+		wantBrowse     string
+		responseStatus int
 	}{
 		{
 			name: "public",
@@ -193,6 +198,7 @@ func Test_createRun(t *testing.T) {
 					},
 				},
 			},
+			responseStatus: http.StatusOK,
 		},
 		{
 			name: "with description",
@@ -213,6 +219,7 @@ func Test_createRun(t *testing.T) {
 					},
 				},
 			},
+			responseStatus: http.StatusOK,
 		},
 		{
 			name: "multiple files",
@@ -236,6 +243,28 @@ func Test_createRun(t *testing.T) {
 					},
 				},
 			},
+			responseStatus: http.StatusOK,
+		},
+		{
+			name: "file with empty content",
+			opts: &CreateOptions{
+				Filenames: []string{emptyFile},
+			},
+			wantOut: "",
+			wantStderr: heredoc.Doc(`
+				- Creating gist empty.txt
+				X Failed to create gist: a gist file cannot be blank
+			`),
+			wantErr: true,
+			wantParams: map[string]interface{}{
+				"description": "",
+				"updated_at":  "0001-01-01T00:00:00Z",
+				"public":      false,
+				"files": map[string]interface{}{
+					"empty.txt": map[string]interface{}{"content": " \t\n"},
+				},
+			},
+			responseStatus: http.StatusUnprocessableEntity,
 		},
 		{
 			name: "stdin arg",
@@ -256,6 +285,7 @@ func Test_createRun(t *testing.T) {
 					},
 				},
 			},
+			responseStatus: http.StatusOK,
 		},
 		{
 			name: "web arg",
@@ -277,14 +307,22 @@ func Test_createRun(t *testing.T) {
 					},
 				},
 			},
+			responseStatus: http.StatusOK,
 		},
 	}
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}
-		reg.Register(httpmock.REST("POST", "gists"),
-			httpmock.JSONResponse(struct {
-				Html_url string
-			}{"https://gist.github.com/aa5a315d61ae9438b18d"}))
+		if tt.responseStatus == http.StatusOK {
+			reg.Register(
+				httpmock.REST("POST", "gists"),
+				httpmock.StringResponse(`{
+					"html_url": "https://gist.github.com/aa5a315d61ae9438b18d"
+				}`))
+		} else {
+			reg.Register(
+				httpmock.REST("POST", "gists"),
+				httpmock.StatusStringResponse(tt.responseStatus, "{}"))
+		}
 
 		mockClient := func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
@@ -325,40 +363,28 @@ func Test_createRun(t *testing.T) {
 	}
 }
 
-func Test_CreateRun_reauth(t *testing.T) {
-	reg := &httpmock.Registry{}
-	reg.Register(httpmock.REST("POST", "gists"), func(req *http.Request) (*http.Response, error) {
-		return &http.Response{
-			StatusCode: 404,
-			Request:    req,
-			Header: map[string][]string{
-				"X-Oauth-Scopes": {"coolScope"},
-			},
-			Body: ioutil.NopCloser(bytes.NewBufferString("oh no")),
-		}, nil
-	})
-
-	mockClient := func() (*http.Client, error) {
-		return &http.Client{Transport: reg}, nil
-	}
-
-	io, _, _, _ := iostreams.Test()
-
-	opts := &CreateOptions{
-		IO:         io,
-		HttpClient: mockClient,
-		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
+func Test_detectEmptyFiles(t *testing.T) {
+	tests := []struct {
+		content     string
+		isEmptyFile bool
+	}{
+		{
+			content:     "{}",
+			isEmptyFile: false,
 		},
-		Filenames: []string{fixtureFile},
+		{
+			content:     "\n\t",
+			isEmptyFile: true,
+		},
 	}
 
-	err := createRun(opts)
-	if err == nil {
-		t.Fatalf("expected oauth error")
-	}
+	for _, tt := range tests {
+		files := map[string]*shared.GistFile{}
+		files["file"] = &shared.GistFile{
+			Content: tt.content,
+		}
 
-	if !strings.Contains(err.Error(), "Please re-authenticate") {
-		t.Errorf("got unexpected error: %s", err)
+		isEmptyFile := detectEmptyFiles(files)
+		assert.Equal(t, tt.isEmptyFile, isEmptyFile)
 	}
 }

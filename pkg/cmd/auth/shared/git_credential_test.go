@@ -3,7 +3,7 @@ package shared
 import (
 	"testing"
 
-	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/v2/internal/run"
 )
 
 func TestGitCredentialSetup_configureExisting(t *testing.T) {
@@ -25,7 +25,7 @@ func TestGitCredentialSetup_configureExisting(t *testing.T) {
 func TestGitCredentialSetup_setOurs(t *testing.T) {
 	cs, restoreRun := run.Stub()
 	defer restoreRun(t)
-	cs.Register(`git config --global credential\.`, 0, "", func(args []string) {
+	cs.Register(`git config --global --replace-all credential\.`, 0, "", func(args []string) {
 		if key := args[len(args)-2]; key != "credential.https://example.com.helper" {
 			t.Errorf("git config key was %q", key)
 		}

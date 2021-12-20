@@ -1,12 +1,9 @@
 package cmdutil
 
 import (
-	"github.com/cli/cli/internal/config"
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/spf13/cobra"
 )
-
-// TODO can have this set a PersistentPreRun so we don't have to set for all child commands of auth,
-// config
 
 func DisableAuthCheck(cmd *cobra.Command) {
 	if cmd.Annotations == nil {
@@ -37,9 +34,11 @@ func CheckAuth(cfg config.Config) bool {
 }
 
 func IsAuthCheckEnabled(cmd *cobra.Command) bool {
-	if !cmd.Runnable() {
+	switch cmd.Name() {
+	case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd:
 		return false
 	}
+
 	for c := cmd; c.Parent() != nil; c = c.Parent() {
 		if c.Annotations != nil && c.Annotations["skipAuthCheck"] == "true" {
 			return false

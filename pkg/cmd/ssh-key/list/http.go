@@ -2,17 +2,14 @@ package list
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghinstance"
 )
-
-var scopesError = errors.New("insufficient OAuth scopes")
 
 type sshKey struct {
 	Key       string
@@ -37,9 +34,7 @@ func userKeys(httpClient *http.Client, host, userHandle string) ([]sshKey, error
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 404 {
-		return nil, scopesError
-	} else if resp.StatusCode > 299 {
+	if resp.StatusCode > 299 {
 		return nil, api.HandleHTTPError(resp)
 	}
 

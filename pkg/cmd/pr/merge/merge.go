@@ -7,16 +7,16 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
-	"github.com/cli/cli/pkg/surveyext"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/cli/cli/v2/pkg/surveyext"
 	"github.com/spf13/cobra"
 )
 
@@ -26,11 +26,11 @@ type editor interface {
 
 type MergeOptions struct {
 	HttpClient func() (*http.Client, error)
-	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
-	Remotes    func() (context.Remotes, error)
 	Branch     func() (string, error)
+	Remotes    func() (context.Remotes, error)
+
+	Finder shared.PRFinder
 
 	SelectorArg  string
 	DeleteBranch bool
@@ -45,6 +45,7 @@ type MergeOptions struct {
 	SubjectSet bool
 	Editor     editor
 
+	UseAdmin                bool
 	IsDeleteBranchIndicated bool
 	CanDeleteLocalBranch    bool
 	InteractiveMode         bool
@@ -54,9 +55,8 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	opts := &MergeOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		Config:     f.Config,
-		Remotes:    f.Remotes,
 		Branch:     f.Branch,
+		Remotes:    f.Remotes,
 	}
 
 	var (
@@ -72,14 +72,16 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 		Short: "Merge a pull request",
 		Long: heredoc.Doc(`
 			Merge a pull request on GitHub.
+
+			Without an argument, the pull request that belongs to the current branch
+			is selected.			
     	`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// support `-R, --repo` override
-			opts.BaseRepo = f.BaseRepo
+			opts.Finder = shared.NewFinder(f)
 
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
-				return &cmdutil.FlagError{Err: errors.New("argument required when using the --repo flag")}
+				return cmdutil.FlagErrorf("argument required when using the --repo flag")
 			}
 
 			if len(args) > 0 {
@@ -101,11 +103,11 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			}
 			if methodFlags == 0 {
 				if !opts.IO.CanPrompt() {
-					return &cmdutil.FlagError{Err: errors.New("--merge, --rebase, or --squash required when not running interactively")}
+					return cmdutil.FlagErrorf("--merge, --rebase, or --squash required when not running interactively")
 				}
 				opts.InteractiveMode = true
 			} else if methodFlags > 1 {
-				return &cmdutil.FlagError{Err: errors.New("only one of --merge, --rebase, or --squash can be enabled")}
+				return cmdutil.FlagErrorf("only one of --merge, --rebase, or --squash can be enabled")
 			}
 
 			opts.IsDeleteBranchIndicated = cmd.Flags().Changed("delete-branch")
@@ -117,6 +119,15 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 
 			bodyProvided := cmd.Flags().Changed("body")
 			bodyFileProvided := bodyFile != ""
+
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of `--auto`, `--disable-auto`, or `--admin`",
+				opts.AutoMergeEnable,
+				opts.AutoMergeDisable,
+				opts.UseAdmin,
+			); err != nil {
+				return err
+			}
 
 			if err := cmdutil.MutuallyExclusive(
 				"specify only one of `--body` or `--body-file`",
@@ -139,7 +150,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 
 			opts.Editor = &userEditor{
 				io:     opts.IO,
-				config: opts.Config,
+				config: f.Config,
 			}
 
 			if runF != nil {
@@ -149,9 +160,10 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 		},
 	}
 
+	cmd.Flags().BoolVar(&opts.UseAdmin, "admin", false, "Use administrator privileges to merge a pull request that does not meet requirements")
 	cmd.Flags().BoolVarP(&opts.DeleteBranch, "delete-branch", "d", false, "Delete the local and remote branch after merge")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Body `text` for the merge commit")
-	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
+	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().StringVarP(&opts.Subject, "subject", "", "", "Subject `text` for the merge commit")
 	cmd.Flags().BoolVarP(&flagMerge, "merge", "m", false, "Merge the commits with the base branch")
 	cmd.Flags().BoolVarP(&flagRebase, "rebase", "r", false, "Rebase the commits onto the base branch")
@@ -164,18 +176,22 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 func mergeRun(opts *MergeOptions) error {
 	cs := opts.IO.ColorScheme()
 
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
+	findOptions := shared.FindOptions{
+		Selector: opts.SelectorArg,
+		Fields:   []string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName"},
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
-
-	pr, baseRepo, err := shared.PRFromArgs(apiClient, opts.BaseRepo, opts.Branch, opts.Remotes, opts.SelectorArg)
+	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
 	}
 
 	isTerminal := opts.IO.IsStdoutTTY()
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+	apiClient := api.NewClientFromHTTP(httpClient)
 
 	if opts.AutoMergeDisable {
 		err := disableAutoMerge(httpClient, baseRepo, pr.ID)
@@ -190,28 +206,38 @@ func mergeRun(opts *MergeOptions) error {
 
 	if opts.SelectorArg == "" && len(pr.Commits.Nodes) > 0 {
 		if localBranchLastCommit, err := git.LastCommit(); err == nil {
-			if localBranchLastCommit.Sha != pr.Commits.Nodes[0].Commit.Oid {
+			if localBranchLastCommit.Sha != pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.OID {
 				fmt.Fprintf(opts.IO.ErrOut,
 					"%s Pull request #%d (%s) has diverged from local branch\n", cs.Yellow("!"), pr.Number, pr.Title)
 			}
 		}
 	}
 
-	if pr.Mergeable == "CONFLICTING" {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d (%s) has conflicts and isn't mergeable\n", cs.Red("!"), pr.Number, pr.Title)
+	isPRAlreadyMerged := pr.State == "MERGED"
+	if reason := blockedReason(pr.MergeStateStatus, opts.UseAdmin); !opts.AutoMergeEnable && !isPRAlreadyMerged && reason != "" {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is not mergeable: %s.\n", cs.FailureIcon(), pr.Number, reason)
+		fmt.Fprintf(opts.IO.ErrOut, "To have the pull request merged after all the requirements have been met, add the `--auto` flag.\n")
+		if !opts.UseAdmin && allowsAdminOverride(pr.MergeStateStatus) {
+			// TODO: show this flag only to repo admins
+			fmt.Fprintf(opts.IO.ErrOut, "To use administrator privileges to immediately merge the pull request, add the `--admin` flag.\n")
+		}
 		return cmdutil.SilentError
 	}
 
 	deleteBranch := opts.DeleteBranch
 	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
+	autoMerge := opts.AutoMergeEnable && !isImmediatelyMergeable(pr.MergeStateStatus)
+	localBranchExists := false
+	if opts.CanDeleteLocalBranch {
+		localBranchExists = git.HasLocalBranch(pr.HeadRefName)
+	}
 
-	isPRAlreadyMerged := pr.State == "MERGED"
 	if !isPRAlreadyMerged {
 		payload := mergePayload{
 			repo:             baseRepo,
 			pullRequestID:    pr.ID,
 			method:           opts.MergeMethod,
-			auto:             opts.AutoMergeEnable,
+			auto:             autoMerge,
 			commitBody:       opts.Body,
 			setCommitBody:    opts.BodySet,
 			setCommitSubject: opts.SubjectSet,
@@ -226,7 +252,7 @@ func mergeRun(opts *MergeOptions) error {
 			if err != nil {
 				return err
 			}
-			deleteBranch, err = deleteBranchSurvey(opts, crossRepoPR)
+			deleteBranch, err = deleteBranchSurvey(opts, crossRepoPR, localBranchExists)
 			if err != nil {
 				return err
 			}
@@ -293,13 +319,13 @@ func mergeRun(opts *MergeOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d was already merged\n", cs.WarningIcon(), pr.Number)
 	}
 
-	if !deleteBranch || crossRepoPR || opts.AutoMergeEnable {
+	if !deleteBranch || crossRepoPR || autoMerge {
 		return nil
 	}
 
 	branchSwitchString := ""
 
-	if opts.CanDeleteLocalBranch {
+	if opts.CanDeleteLocalBranch && localBranchExists {
 		currentBranch, err := opts.Branch()
 		if err != nil {
 			return err
@@ -311,26 +337,27 @@ func mergeRun(opts *MergeOptions) error {
 			if err != nil {
 				return err
 			}
+
 			err = git.CheckoutBranch(branchToSwitchTo)
 			if err != nil {
 				return err
 			}
+
+			err := pullLatestChanges(opts, baseRepo, branchToSwitchTo)
+			if err != nil {
+				fmt.Fprintf(opts.IO.ErrOut, "%s warning: not posible to fast-forward to: %q\n", cs.WarningIcon(), branchToSwitchTo)
+			}
 		}
 
-		localBranchExists := git.HasLocalBranch(pr.HeadRefName)
-		if localBranchExists {
-			err = git.DeleteLocalBranch(pr.HeadRefName)
-			if err != nil {
-				err = fmt.Errorf("failed to delete local branch %s: %w", cs.Cyan(pr.HeadRefName), err)
-				return err
-			}
+		if err := git.DeleteLocalBranch(pr.HeadRefName); err != nil {
+			err = fmt.Errorf("failed to delete local branch %s: %w", cs.Cyan(pr.HeadRefName), err)
+			return err
 		}
 
 		if branchToSwitchTo != "" {
 			branchSwitchString = fmt.Sprintf(" and switched to branch %s", cs.Cyan(branchToSwitchTo))
 		}
 	}
-
 	if !isPRAlreadyMerged {
 		err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
 		var httpErr api.HTTPError
@@ -343,6 +370,25 @@ func mergeRun(opts *MergeOptions) error {
 
 	if isTerminal {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted branch %s%s\n", cs.SuccessIconWithColor(cs.Red), cs.Cyan(pr.HeadRefName), branchSwitchString)
+	}
+
+	return nil
+}
+
+func pullLatestChanges(opts *MergeOptions, repo ghrepo.Interface, branch string) error {
+	remotes, err := opts.Remotes()
+	if err != nil {
+		return err
+	}
+
+	baseRemote, err := remotes.FindByRepo(repo.RepoOwner(), repo.RepoName())
+	if err != nil {
+		return err
+	}
+
+	err = git.Pull(baseRemote.Name, branch)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -383,10 +429,10 @@ func mergeMethodSurvey(baseRepo *api.Repository) (PullRequestMergeMethod, error)
 	return mergeOpts[result].method, err
 }
 
-func deleteBranchSurvey(opts *MergeOptions, crossRepoPR bool) (bool, error) {
+func deleteBranchSurvey(opts *MergeOptions, crossRepoPR, localBranchExists bool) (bool, error) {
 	if !crossRepoPR && !opts.IsDeleteBranchIndicated {
 		var message string
-		if opts.CanDeleteLocalBranch {
+		if opts.CanDeleteLocalBranch && localBranchExists {
 			message = "Delete the branch locally and on GitHub?"
 		} else {
 			message = "Delete the branch on GitHub?"
@@ -502,5 +548,43 @@ func (e *userEditor) Edit(filename, startingText string) (string, error) {
 		return "", err
 	}
 
-	return surveyext.Edit(editorCommand, filename, startingText, e.io.In, e.io.Out, e.io.ErrOut, nil)
+	return surveyext.Edit(editorCommand, filename, startingText, e.io.In, e.io.Out, e.io.ErrOut)
+}
+
+// blockedReason translates various MergeStateStatus GraphQL values into human-readable reason
+func blockedReason(status string, useAdmin bool) string {
+	switch status {
+	case "BLOCKED":
+		if useAdmin {
+			return ""
+		}
+		return "the base branch policy prohibits the merge"
+	case "BEHIND":
+		if useAdmin {
+			return ""
+		}
+		return "the head branch is not up to date with the base branch"
+	case "DIRTY":
+		return "the merge commit cannot be cleanly created"
+	default:
+		return ""
+	}
+}
+
+func allowsAdminOverride(status string) bool {
+	switch status {
+	case "BLOCKED", "BEHIND":
+		return true
+	default:
+		return false
+	}
+}
+
+func isImmediatelyMergeable(status string) bool {
+	switch status {
+	case "CLEAN", "HAS_HOOKS", "UNSTABLE":
+		return true
+	default:
+		return false
+	}
 }

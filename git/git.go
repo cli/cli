@@ -13,7 +13,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/safeexec"
 )
 
@@ -84,6 +84,15 @@ func CurrentBranch() (string, error) {
 	return "", fmt.Errorf("%sgit: %s", stderr.String(), err)
 }
 
+func listRemotesForPath(path string) ([]string, error) {
+	remoteCmd, err := GitCommand("-C", path, "remote", "-v")
+	if err != nil {
+		return nil, err
+	}
+	output, err := run.PrepareCmd(remoteCmd).Output()
+	return outputLines(output), err
+}
+
 func listRemotes() ([]string, error) {
 	remoteCmd, err := GitCommand("remote", "-v")
 	if err != nil {
@@ -107,14 +116,29 @@ func Config(name string) (string, error) {
 
 }
 
-var GitCommand = func(args ...string) (*exec.Cmd, error) {
+type NotInstalled struct {
+	message string
+	error
+}
+
+func (e *NotInstalled) Error() string {
+	return e.message
+}
+
+func GitCommand(args ...string) (*exec.Cmd, error) {
 	gitExe, err := safeexec.LookPath("git")
 	if err != nil {
-		programName := "git"
-		if runtime.GOOS == "windows" {
-			programName = "Git for Windows"
+		if errors.Is(err, exec.ErrNotFound) {
+			programName := "git"
+			if runtime.GOOS == "windows" {
+				programName = "Git for Windows"
+			}
+			return nil, &NotInstalled{
+				message: fmt.Sprintf("unable to find git executable in PATH; please install %s before retrying", programName),
+				error:   err,
+			}
 		}
-		return nil, fmt.Errorf("unable to find git executable in PATH; please install %s before retrying", programName)
+		return nil, err
 	}
 	return exec.Command(gitExe, args...), nil
 }
@@ -283,6 +307,19 @@ func CheckoutBranch(branch string) error {
 	return run.PrepareCmd(configCmd).Run()
 }
 
+// pull changes from remote branch without version history
+func Pull(remote, branch string) error {
+	pullCmd, err := GitCommand("pull", "--ff-only", remote, branch)
+	if err != nil {
+		return err
+	}
+
+	pullCmd.Stdout = os.Stdout
+	pullCmd.Stderr = os.Stderr
+	pullCmd.Stdin = os.Stdin
+	return run.PrepareCmd(pullCmd).Run()
+}
+
 func parseCloneArgs(extraArgs []string) (args []string, target string) {
 	args = extraArgs
 
@@ -349,6 +386,31 @@ func ToplevelDir() (string, error) {
 	output, err := run.PrepareCmd(showCmd).Output()
 	return firstLine(output), err
 
+}
+
+// ToplevelDirFromPath returns the top-level given path of the current repository
+func GetDirFromPath(p string) (string, error) {
+	showCmd, err := GitCommand("-C", p, "rev-parse", "--git-dir")
+	if err != nil {
+		return "", err
+	}
+	output, err := run.PrepareCmd(showCmd).Output()
+	return firstLine(output), err
+}
+
+func PathFromRepoRoot() string {
+	showCmd, err := GitCommand("rev-parse", "--show-prefix")
+	if err != nil {
+		return ""
+	}
+	output, err := run.PrepareCmd(showCmd).Output()
+	if err != nil {
+		return ""
+	}
+	if path := firstLine(output); path != "" {
+		return path[:len(path)-1]
+	}
+	return ""
 }
 
 func outputLines(output []byte) []string {

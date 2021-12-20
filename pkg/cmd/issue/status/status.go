@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	issueShared "github.com/cli/cli/pkg/cmd/issue/shared"
-	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
@@ -19,6 +19,8 @@ type StatusOptions struct {
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+
+	Exporter cmdutil.Exporter
 }
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
@@ -43,7 +45,18 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		},
 	}
 
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.IssueFields)
+
 	return cmd
+}
+
+var defaultFields = []string{
+	"number",
+	"title",
+	"url",
+	"state",
+	"updatedAt",
+	"labels",
 }
 
 func statusRun(opts *StatusOptions) error {
@@ -63,16 +76,32 @@ func statusRun(opts *StatusOptions) error {
 		return err
 	}
 
-	issuePayload, err := api.IssueStatus(apiClient, baseRepo, currentUser)
+	options := api.IssueStatusOptions{
+		Username: currentUser,
+		Fields:   defaultFields,
+	}
+	if opts.Exporter != nil {
+		options.Fields = opts.Exporter.Fields()
+	}
+	issuePayload, err := api.IssueStatus(apiClient, baseRepo, options)
 	if err != nil {
 		return err
 	}
 
 	err = opts.IO.StartPager()
 	if err != nil {
-		return err
+		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
 	defer opts.IO.StopPager()
+
+	if opts.Exporter != nil {
+		data := map[string]interface{}{
+			"createdBy": issuePayload.Authored.Issues,
+			"assigned":  issuePayload.Assigned.Issues,
+			"mentioned": issuePayload.Mentioned.Issues,
+		}
+		return opts.Exporter.Write(opts.IO, data)
+	}
 
 	out := opts.IO.Out
 

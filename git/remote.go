@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cli/cli/internal/run"
+	"github.com/cli/cli/v2/internal/run"
 )
 
 var remoteRE = regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
@@ -35,16 +35,11 @@ func (r *Remote) String() string {
 	return r.Name
 }
 
-// Remotes gets the git remotes set for the current repo
-func Remotes() (RemoteSet, error) {
-	list, err := listRemotes()
-	if err != nil {
-		return nil, err
-	}
-	remotes := parseRemotes(list)
+func remotes(path string, remoteList []string) (RemoteSet, error) {
+	remotes := parseRemotes(remoteList)
 
 	// this is affected by SetRemoteResolution
-	remoteCmd, err := GitCommand("config", "--get-regexp", `^remote\..*\.gh-resolved$`)
+	remoteCmd, err := GitCommand("-C", path, "config", "--get-regexp", `^remote\..*\.gh-resolved$`)
 	if err != nil {
 		return nil, err
 	}
@@ -68,6 +63,23 @@ func Remotes() (RemoteSet, error) {
 	}
 
 	return remotes, nil
+}
+
+func RemotesForPath(path string) (RemoteSet, error) {
+	list, err := listRemotesForPath(path)
+	if err != nil {
+		return nil, err
+	}
+	return remotes(path, list)
+}
+
+// Remotes gets the git remotes set for the current repo
+func Remotes() (RemoteSet, error) {
+	list, err := listRemotes()
+	if err != nil {
+		return nil, err
+	}
+	return remotes(".", list)
 }
 
 func parseRemotes(gitRemotes []string) (remotes RemoteSet) {
@@ -138,6 +150,14 @@ func AddRemote(name, u string) (*Remote, error) {
 		FetchURL: urlParsed,
 		PushURL:  urlParsed,
 	}, nil
+}
+
+func UpdateRemoteURL(name, u string) error {
+	addCmd, err := GitCommand("remote", "set-url", name, u)
+	if err != nil {
+		return err
+	}
+	return run.PrepareCmd(addCmd).Run()
 }
 
 func SetRemoteResolution(name, resolution string) error {

@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/test"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -112,6 +112,7 @@ func TestIssueView_nontty_Preview(t *testing.T) {
 				`comments:\t9`,
 				`author:\tmarseilles`,
 				`assignees:`,
+				`number:\t123\n`,
 				`\*\*bold story\*\*`,
 			},
 		},
@@ -126,6 +127,7 @@ func TestIssueView_nontty_Preview(t *testing.T) {
 				`labels:\tone, two, three, four, five`,
 				`projects:\tProject 1 \(column A\), Project 2 \(column B\), Project 3 \(column C\), Project 4 \(Awaiting triage\)\n`,
 				`milestone:\tuluru\n`,
+				`number:\t123\n`,
 				`\*\*bold story\*\*`,
 			},
 		},
@@ -136,6 +138,7 @@ func TestIssueView_nontty_Preview(t *testing.T) {
 				`state:\tOPEN`,
 				`author:\tmarseilles`,
 				`labels:\ttarot`,
+				`number:\t123\n`,
 			},
 		},
 		"Closed issue": {
@@ -146,6 +149,7 @@ func TestIssueView_nontty_Preview(t *testing.T) {
 				`\*\*bold story\*\*`,
 				`author:\tmarseilles`,
 				`labels:\ttarot`,
+				`number:\t123\n`,
 				`\*\*bold story\*\*`,
 			},
 		},
@@ -178,7 +182,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 		"Open issue without metadata": {
 			fixture: "./fixtures/issueView_preview.json",
 			expectedOutputs: []string{
-				`ix of coins`,
+				`ix of coins #123`,
 				`Open.*marseilles opened about 9 years ago.*9 comments`,
 				`bold story`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
@@ -187,7 +191,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 		"Open issue with metadata": {
 			fixture: "./fixtures/issueView_previewWithMetadata.json",
 			expectedOutputs: []string{
-				`ix of coins`,
+				`ix of coins #123`,
 				`Open.*marseilles opened about 9 years ago.*9 comments`,
 				`8 \x{1f615} • 7 \x{1f440} • 6 \x{2764}\x{fe0f} • 5 \x{1f389} • 4 \x{1f604} • 3 \x{1f680} • 2 \x{1f44e} • 1 \x{1f44d}`,
 				`Assignees:.*marseilles, monaco\n`,
@@ -201,7 +205,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 		"Open issue with empty body": {
 			fixture: "./fixtures/issueView_previewWithEmptyBody.json",
 			expectedOutputs: []string{
-				`ix of coins`,
+				`ix of coins #123`,
 				`Open.*marseilles opened about 9 years ago.*9 comments`,
 				`No description provided`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
@@ -210,7 +214,7 @@ func TestIssueView_tty_Preview(t *testing.T) {
 		"Closed issue": {
 			fixture: "./fixtures/issueView_previewClosedState.json",
 			expectedOutputs: []string{
-				`ix of coins`,
+				`ix of coins #123`,
 				`Closed.*marseilles opened about 9 years ago.*9 comments`,
 				`bold story`,
 				`View this issue on GitHub: https://github.com/OWNER/REPO/issues/123`,
@@ -272,7 +276,7 @@ func TestIssueView_web_notFound(t *testing.T) {
 	defer cmdTeardown(t)
 
 	_, err := runCommand(http, true, "-w 9999")
-	if err == nil || err.Error() != "GraphQL error: Could not resolve to an Issue with the number of 9999." {
+	if err == nil || err.Error() != "GraphQL: Could not resolve to an Issue with the number of 9999." {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
 }
@@ -284,10 +288,24 @@ func TestIssueView_disabledIssues(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`query IssueByNumber\b`),
 		httpmock.StringResponse(`
-			{ "data": { "repository": {
-				"id": "REPOID",
-				"hasIssuesEnabled": false
-			} } }
+			{
+				"data":
+					{ "repository": {
+						"id": "REPOID",
+						"hasIssuesEnabled": false
+					}
+				},
+				"errors": [
+					{
+						"type": "NOT_FOUND",
+						"path": [
+							"repository",
+							"issue"
+						],
+						"message": "Could not resolve to an issue or pull request with the number of 6666."
+					}
+				]
+			}
 		`),
 	)
 
@@ -310,7 +328,7 @@ func TestIssueView_tty_Comments(t *testing.T) {
 				"IssueByNumber": "./fixtures/issueView_previewSingleComment.json",
 			},
 			expectedOutputs: []string{
-				`some title`,
+				`some title #123`,
 				`some body`,
 				`———————— Not showing 5 comments ————————`,
 				`marseilles \(Collaborator\) • Jan  1, 2020 • Newest comment`,
@@ -326,7 +344,7 @@ func TestIssueView_tty_Comments(t *testing.T) {
 				"CommentsForIssue": "./fixtures/issueView_previewFullComments.json",
 			},
 			expectedOutputs: []string{
-				`some title`,
+				`some title #123`,
 				`some body`,
 				`monalisa • Jan  1, 2020 • Edited`,
 				`1 \x{1f615} • 2 \x{1f440} • 3 \x{2764}\x{fe0f} • 4 \x{1f389} • 5 \x{1f604} • 6 \x{1f680} • 7 \x{1f44e} • 8 \x{1f44d}`,
@@ -386,6 +404,7 @@ func TestIssueView_nontty_Comments(t *testing.T) {
 				`state:\tOPEN`,
 				`author:\tmarseilles`,
 				`comments:\t6`,
+				`number:\t123`,
 				`some body`,
 			},
 		},

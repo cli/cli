@@ -9,18 +9,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/shurcooL/githubv4"
-	"github.com/shurcooL/graphql"
 )
 
 type GistFile struct {
 	Filename string `json:"filename,omitempty"`
 	Type     string `json:"type,omitempty"`
 	Language string `json:"language,omitempty"`
-	Content  string `json:"content,omitempty"`
+	Content  string `json:"content"`
 }
 
 type GistOwner struct {
