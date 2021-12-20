@@ -104,7 +104,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		authkeys <- checkAuthorizedKeys(ctx, a.apiClient)
 	}()
 
-	session, err := a.openSSHSession(ctx, codespace, liveshareLogger)
+	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
 	if err != nil {
 		if authErr := <-authkeys; authErr != nil {
 			return authErr
@@ -178,15 +178,15 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions, execut
 	defer cancel()
 
 	var err error
-	var codespaces []*api.Codespace
+	var csList []*api.Codespace
 	if opts.codespace == "" {
 		a.StartProgressIndicatorWithLabel("Fetching codespaces")
-		codespaces, err = a.apiClient.ListCodespaces(ctx, -1)
+		csList, err = a.apiClient.ListCodespaces(ctx, -1)
 		a.StopProgressIndicator()
 	} else {
 		var codespace *api.Codespace
 		codespace, err = getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
-		codespaces = []*api.Codespace{codespace}
+		csList = []*api.Codespace{codespace}
 	}
 	if err != nil {
 		return fmt.Errorf("error getting codespace info: %w", err)
@@ -201,7 +201,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions, execut
 	sshUsers := make(chan sshResult)
 	fetches := 0
 	var status error
-	for _, cs := range codespaces {
+	for _, cs := range csList {
 		if cs.State != "Available" && opts.codespace == "" {
 			fmt.Fprintf(os.Stderr, "skipping unavailable codespace %s: %s\n", cs.Name, cs.State)
 			status = cmdutil.SilentError
@@ -219,7 +219,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions, execut
 				}
 			}()
 
-			session, err := a.openSSHSession(ctx, cs, noopLogger())
+			session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, cs)
 			if err != nil {
 				result.err = fmt.Errorf("error connecting to codespace: %w", err)
 				return
@@ -296,15 +296,6 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions, execut
 	}
 
 	return status
-}
-
-func (a *App) openSSHSession(ctx context.Context, codespace *api.Codespace, liveshareLogger *log.Logger) (*liveshare.Session, error) {
-	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
-	if err != nil {
-		return nil, fmt.Errorf("error connecting to codespace: %w", err)
-	}
-
-	return session, nil
 }
 
 type cpOptions struct {
