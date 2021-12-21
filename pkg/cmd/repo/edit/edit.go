@@ -119,7 +119,9 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 }
 
 func editRun(ctx context.Context, opts *EditOptions) error {
-	var existingTopics []string
+	var repoTopics []string
+
+	repo := opts.Repository
 
 	if opts.InteractiveMode {
 		apiClient := api.NewClientFromHTTP(opts.HTTPClient)
@@ -131,9 +133,9 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 		}
 		opts.IO.StopProgressIndicator()
 		for _, v := range fetchedRepo.RepositoryTopics.Nodes {
-			existingTopics = append(existingTopics, v.Topic.Name)
+			repoTopics = append(repoTopics, v.Topic.Name)
 		}
-		editOpts, addTopics, removeTopics, err := interactiveRepoEdit(fetchedRepo, existingTopics)
+		editOpts, addTopics, removeTopics, err := interactiveRepoEdit(fetchedRepo, repoTopics)
 		if err != nil {
 			return err
 		}
@@ -142,7 +144,6 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 		opts.RemoveTopics = removeTopics
 	}
 
-	repo := opts.Repository
 	apiPath := fmt.Sprintf("repos/%s/%s", repo.RepoOwner(), repo.RepoName())
 
 	body := &bytes.Buffer{}
@@ -163,6 +164,15 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 
 	if len(opts.AddTopics) > 0 || len(opts.RemoveTopics) > 0 {
 		g.Go(func() error {
+			var existingTopics []string
+			existingTopics = repoTopics
+			if !opts.InteractiveMode {
+				var err error
+				existingTopics, err = getTopics(ctx, opts.HTTPClient, repo)
+				if err != nil {
+					return err
+				}
+			}
 			oldTopics := set.NewStringSet()
 			oldTopics.AddValues(existingTopics)
 
