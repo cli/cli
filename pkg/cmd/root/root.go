@@ -135,6 +135,7 @@ func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
 	vscsURL := os.Getenv("INTERNAL_VSCS_TARGET_URL")
 	app := codespaceCmd.NewApp(
 		f.IOStreams,
+		f,
 		codespacesAPI.New(
 			serverURL,
 			apiURL,
@@ -142,7 +143,7 @@ func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
 			&lazyLoadedHTTPClient{factory: f},
 		),
 	)
-	cmd := codespaceCmd.NewRootCmd(app, f)
+	cmd := codespaceCmd.NewRootCmd(app)
 	cmd.Use = "codespace"
 	cmd.Aliases = []string{"cs"}
 	cmd.Annotations = map[string]string{"IsCore": "true"}

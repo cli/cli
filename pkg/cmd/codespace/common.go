@@ -21,19 +21,25 @@ import (
 	"golang.org/x/term"
 )
 
-type App struct {
-	io        *iostreams.IOStreams
-	apiClient apiClient
-	errLogger *log.Logger
+type executable interface {
+	Executable() string
 }
 
-func NewApp(io *iostreams.IOStreams, apiClient apiClient) *App {
+type App struct {
+	io         *iostreams.IOStreams
+	apiClient  apiClient
+	errLogger  *log.Logger
+	executable executable
+}
+
+func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient) *App {
 	errLogger := log.New(io.ErrOut, "", 0)
 
 	return &App{
-		io:        io,
-		apiClient: apiClient,
-		errLogger: errLogger,
+		io:         io,
+		apiClient:  apiClient,
+		errLogger:  errLogger,
+		executable: exe,
 	}
 }
 
