@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 type EditOptions struct {
@@ -118,20 +119,27 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 }
 
 func editRun(ctx context.Context, opts *EditOptions) error {
+	var existingTopics []string
+
 	if opts.InteractiveMode {
 		apiClient := api.NewClientFromHTTP(opts.HTTPClient)
 
 		opts.IO.StartProgressIndicator()
-		fetchedRepo, err := api.FetchRepository(apiClient, opts.Repository, []string{"description", "homepageUrl", "defaultBranchRef", "isInOrganization"})
+		fetchedRepo, err := api.FetchRepository(apiClient, opts.Repository, []string{"description", "homepageUrl", "defaultBranchRef", "isInOrganization", "repositoryTopics"})
 		if err != nil {
 			return err
 		}
 		opts.IO.StopProgressIndicator()
-		editOpts, err := interactiveRepoEdit(fetchedRepo)
+		for _, v := range fetchedRepo.RepositoryTopics.Nodes {
+			existingTopics = append(existingTopics, v.Topic.Name)
+		}
+		editOpts, addTopics, removeTopics, err := interactiveRepoEdit(fetchedRepo, existingTopics)
 		if err != nil {
 			return err
 		}
 		opts.Edits = *editOpts
+		opts.AddTopics = addTopics
+		opts.RemoveTopics = removeTopics
 	}
 
 	repo := opts.Repository
@@ -155,11 +163,6 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 
 	if len(opts.AddTopics) > 0 || len(opts.RemoveTopics) > 0 {
 		g.Go(func() error {
-			existingTopics, err := getTopics(ctx, opts.HTTPClient, repo)
-			if err != nil {
-				return err
-			}
-
 			oldTopics := set.NewStringSet()
 			oldTopics.AddValues(existingTopics)
 
@@ -178,7 +181,7 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 	return g.Wait()
 }
 
-func interactiveRepoEdit(r *api.Repository) (*EditRepositoryInput, error) {
+func interactiveRepoEdit(r *api.Repository, topics []string) (repoInput *EditRepositoryInput, addTopics, removeTopics []string, err error) {
 	var qs []*survey.Question
 
 	repoDescriptionQuestion := &survey.Question{
@@ -194,12 +197,41 @@ func interactiveRepoEdit(r *api.Repository) (*EditRepositoryInput, error) {
 	repoHomePageURLQuestion := &survey.Question{
 		Name: "repoURL",
 		Prompt: &survey.Input{
-			Message: "Repository home page URL",
+			Message: "Repository home page URL?",
 			Default: r.HomepageURL,
 		},
 	}
 
 	qs = append(qs, repoHomePageURLQuestion)
+
+	var defaultTopics string
+	for k, v := range topics {
+		if k == len(topics)-1 {
+			defaultTopics += fmt.Sprintf("%s", v)
+		} else {
+			defaultTopics += fmt.Sprintf("%s,", v)
+		}
+	}
+
+	addTopicsQuestion := &survey.Question{
+		Name: "addTopics",
+		Prompt: &survey.Input{
+			Message: "Add topics?(csv format)",
+			Default: defaultTopics,
+		},
+	}
+
+	qs = append(qs, addTopicsQuestion)
+
+	removeTopicsQuestion := &survey.Question{
+		Name: "removeTopics",
+		Prompt: &survey.Input{
+			Message: "Remove topics?(csv format)",
+			Default: "",
+		},
+	}
+
+	qs = append(qs, removeTopicsQuestion)
 
 	defaultBranchNameQuestion := &survey.Question{
 		Name: "defaultBranchName",
@@ -304,6 +336,8 @@ func interactiveRepoEdit(r *api.Repository) (*EditRepositoryInput, error) {
 	answers := struct {
 		RepoDescription   string
 		RepoURL           string
+		AddTopics         string
+		RemoveTopics      string
 		RepoVisibility    string
 		MergeOptions      []int
 		DefaultBranchName string
@@ -316,12 +350,22 @@ func interactiveRepoEdit(r *api.Repository) (*EditRepositoryInput, error) {
 		AllowForking      bool
 	}{}
 
-	err := prompt.SurveyAsk(qs, &answers)
+	err = prompt.SurveyAsk(qs, &answers)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
-	repoInput := &EditRepositoryInput{
+	addTopics = strings.Split(answers.AddTopics, ",")
+	for k, v := range addTopics {
+		addTopics[k] = strings.TrimSpace(v)
+	}
+
+	removeTopics = strings.Split(answers.RemoveTopics, ",")
+	for k, v := range removeTopics {
+		removeTopics[k] = strings.TrimSpace(v)
+	}
+
+	repoInput = &EditRepositoryInput{
 		Description:         &answers.RepoDescription,
 		Homepage:            &answers.RepoURL,
 		Visibility:          &answers.RepoVisibility,
@@ -361,7 +405,7 @@ func interactiveRepoEdit(r *api.Repository) (*EditRepositoryInput, error) {
 		repoInput.EnableRebaseMerge = &erm
 	}
 
-	return repoInput, nil
+	return
 }
 
 func getTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface) ([]string, error) {
