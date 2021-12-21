@@ -217,9 +217,9 @@ func interactiveRepoEdit(r *api.Repository, topics []string) (repoInput *EditRep
 	var defaultTopics string
 	for k, v := range topics {
 		if k == len(topics)-1 {
-			defaultTopics += fmt.Sprintf("%s", v)
+			defaultTopics += v
 		} else {
-			defaultTopics += fmt.Sprintf("%s,", v)
+			defaultTopics += v + ","
 		}
 	}
 
