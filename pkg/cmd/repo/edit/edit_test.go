@@ -3,6 +3,7 @@ package edit
 import (
 	"bytes"
 	"context"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -129,6 +130,115 @@ func Test_editRun(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			httpReg := &httpmock.Registry{}
+			defer httpReg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(t, httpReg)
+			}
+
+			opts := &tt.opts
+			opts.HTTPClient = &http.Client{Transport: httpReg}
+
+			err := editRun(context.Background(), opts)
+			if tt.wantsErr == "" {
+				require.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantsErr)
+				return
+			}
+		})
+	}
+}
+
+func Test_editRunInteractive(t *testing.T) {
+	tests := []struct {
+		name        string
+		opts        EditOptions
+		askStubs    func(*prompt.AskStubber)
+		httpStubs   func(*testing.T, *httpmock.Registry)
+		wantsStderr string
+		wantsErr    string
+	}{
+		{
+			name: "Interactive repo edit",
+			opts: EditOptions{
+				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				InteractiveMode: true,
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "repoDescription", Value: "awesome repo description"},
+					{Name: "repoURL", Value: "URL.com"},
+					{Name: "addTopics", Value: "a,b,c,d"},
+					{Name: "removeTopics", Value: "b,c"},
+					{Name: "defaultBranchName", Value: "master"},
+					{Name: "enableWikis", Value: true},
+					{Name: "enableIssues", Value: false},
+					{Name: "enableProjects", Value: true},
+					{Name: "repoVisibility", Value: "public"},
+					{Name: "mergeOptions", Value: []int{0, 1}},
+					{Name: "enableAutoMerge", Value: false},
+					{Name: "isTemplateRepo", Value: false},
+					{Name: "autoDeleteBranch", Value: false},
+				})
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"repository": {
+								"description": "old description",
+								"homePageUrl": "https://url.com",
+								"defaultBranchRef": {
+									"name": "main"
+								},
+								"isInOrganization": false,
+								"repositoryTopics": {
+									"nodes": [{
+										"topic": {
+											"name": "x"
+										}
+									}]
+								}
+							}
+						}
+					}`))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, "URL.com", payload["homepage"])
+						assert.Equal(t, "awesome repo description", payload["description"])
+						assert.Equal(t, true, payload["allow_merge_commit"])
+						assert.Equal(t, true, payload["allow_squash_merge"])
+						assert.Equal(t, false, payload["allow_rebase_merge"])
+					}))
+				reg.Register(
+					httpmock.REST("PUT", "repos/OWNER/REPO/topics"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, []interface{}{"x", "a", "d"}, payload["names"])
+					}))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		q, teardown := prompt.InitAskStubber()
+		defer teardown()
+		if tt.askStubs != nil {
+			tt.askStubs(q)
+		}
+
+		io, _, _, _ := iostreams.Test()
+		tt.opts.IO = io
+
+		reg := &httpmock.Registry{}
+		if tt.httpStubs != nil {
+			tt.httpStubs(t, reg)
+		}
+
 		t.Run(tt.name, func(t *testing.T) {
 			httpReg := &httpmock.Registry{}
 			defer httpReg.Verify(t)
