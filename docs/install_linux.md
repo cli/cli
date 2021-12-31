@@ -90,6 +90,14 @@ Android 7+ users can install via [Termux](https://wiki.termux.com/wiki/Main_Page
 pkg install gh
 ```
 
+### HomeBrew
+
+Linux/MacOSX/WSL users can install with homebrew.
+
+```
+brew install gh
+```
+
 ### FreeBSD
 
 FreeBSD users can install from the [ports collection](https://www.freshports.org/devel/gh/):
