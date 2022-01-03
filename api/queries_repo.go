@@ -44,6 +44,7 @@ type Repository struct {
 	MergeCommitAllowed      bool
 	SquashMergeAllowed      bool
 	RebaseMergeAllowed      bool
+	AutoMergeAllowed        bool
 
 	ForkCount      int
 	StargazerCount int
@@ -66,6 +67,7 @@ type Repository struct {
 	IsArchived                    bool
 	IsEmpty                       bool
 	IsFork                        bool
+	ForkingAllowed                bool
 	IsInOrganization              bool
 	IsMirror                      bool
 	IsPrivate                     bool

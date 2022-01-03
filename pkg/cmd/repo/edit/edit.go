@@ -127,7 +127,22 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 		apiClient := api.NewClientFromHTTP(opts.HTTPClient)
 
 		opts.IO.StartProgressIndicator()
-		fetchedRepo, err := api.FetchRepository(apiClient, opts.Repository, []string{"description", "homepageUrl", "defaultBranchRef", "isInOrganization", "repositoryTopics"})
+		fetchedRepo, err := api.FetchRepository(apiClient, opts.Repository, []string{"" +
+			"description",
+			"homepageUrl",
+			"defaultBranchRef",
+			"isInOrganization",
+			"repositoryTopics",
+			"hasWikiEnabled",
+			"hasIssuesEnabled",
+			"hasProjectsEnabled",
+			"autoMergeAllowed",
+			"mergeCommitAllowed",
+			"squashMergeAllowed",
+			"rebaseMergeAllowed",
+			"deleteBranchOnMerge",
+			"isTemplate",
+		})
 		if err != nil {
 			return err
 		}
@@ -191,6 +206,33 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 	return g.Wait()
 }
 
+func interactiveChoice(r *api.Repository) ([]string, error) {
+	options := []string{"Description", "Home Page URL", "Topics", "Default Branch Name", "Wikis", "Issues", "Projects", "Visibility", "Merge Options", "Template Repository"}
+
+	if r.IsInOrganization {
+		options = append(options, "Allow Forking")
+	}
+
+	qs := []*survey.Question{
+		{
+			Name: "Choice",
+			Prompt: &survey.MultiSelect{
+				Message: "What do you want to edit?",
+				Options: options,
+			},
+		},
+	}
+
+	var answers []string
+
+	err := prompt.SurveyAsk(qs, &answers, survey.WithPageSize(11))
+	if err != nil {
+		return []string{}, err
+	}
+
+	return answers, nil
+}
+
 func interactiveRepoEdit(r *api.Repository, topics []string) (repoInput *EditRepositoryInput, addTopics, removeTopics []string, err error) {
 	var defaultTopics string
 	for k, v := range topics {
@@ -201,111 +243,142 @@ func interactiveRepoEdit(r *api.Repository, topics []string) (repoInput *EditRep
 		}
 	}
 
-	qs := []*survey.Question{
-		{
-			Name: "repoDescription",
-			Prompt: &survey.Input{
-				Message: "Description of the repository",
-				Default: r.Description,
-			},
-		},
-		{
-			Name: "repoURL",
-			Prompt: &survey.Input{
-				Message: "Repository home page URL?",
-				Default: r.HomepageURL,
-			},
-		},
-		{
-			Name: "addTopics",
-			Prompt: &survey.Input{
-				Message: "Add topics?(csv format)",
-				Default: defaultTopics,
-			},
-		},
-		{
-			Name: "removeTopics",
-			Prompt: &survey.Input{
-				Message: "Remove topics?(csv format)",
-				Default: "",
-			},
-		},
-		{
-			Name: "defaultBranchName",
-			Prompt: &survey.Input{
-				Message: "Default branch name?",
-				Default: r.DefaultBranchRef.Name,
-			},
-		},
-		{
-			Name: "enableWikis",
-			Prompt: &survey.Confirm{
-				Message: "Enable Wikis?",
-				Default: true,
-			},
-		},
-		{
-			Name: "enableIssues",
-			Prompt: &survey.Confirm{
-				Message: "Enable Issues?",
-				Default: true,
-			},
-		},
-		{
-			Name: "enableProjects",
-			Prompt: &survey.Confirm{
-				Message: "Enable Projects?",
-				Default: true,
-			},
-		},
-		{
-			Name: "repoVisibility",
-			Prompt: &survey.Select{
-				Message: "Visibility",
-				Options: []string{"Public", "Private", "Internal"},
-			},
-		},
-		{
-			Name: "mergeOptions",
-			Prompt: &survey.MultiSelect{
-				Message: "Choose a merge option",
-				Default: []string{"Allow Merge Commits", "Allow Squash Merging", "Allow Rebase Merging"},
-				Options: []string{"Allow Merge Commits", "Allow Squash Merging", "Allow Rebase Merging"},
-			},
-		},
-		{
-			Name: "enableAutoMerge",
-			Prompt: &survey.Confirm{
-				Message: "Enable Auto Merge?",
-				Default: false,
-			},
-		},
-		{
-			Name: "isTemplateRepo",
-			Prompt: &survey.Confirm{
-				Message: "Convert into a template repository?",
-				Default: false,
-			},
-		},
-		{
-			Name: "autoDeleteBranch",
-			Prompt: &survey.Confirm{
-				Message: "Automatically delete head branches after merging?",
-				Default: false,
-			},
-		},
+	choices, err := interactiveChoice(r)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
-	if r.IsInOrganization {
-		allowForkingQuestion := &survey.Question{
-			Name: "allowForking",
-			Prompt: &survey.Confirm{
-				Message: "Allow forking (of an organization repository)?",
-				Default: false,
-			},
-		}
+	var qs []*survey.Question
+	var defaultMergeOptions []int
+	var defaultMergeSurvey []string
 
-		qs = append(qs, allowForkingQuestion)
+	if r.MergeCommitAllowed {
+		defaultMergeOptions = append(defaultMergeOptions, 0)
+		defaultMergeSurvey = append(defaultMergeSurvey, "Allow Merge Commits")
+	}
+
+	if r.SquashMergeAllowed {
+		defaultMergeOptions = append(defaultMergeOptions, 1)
+		defaultMergeSurvey = append(defaultMergeSurvey, "Allow Squash Merging")
+	}
+
+	if r.RebaseMergeAllowed {
+		defaultMergeOptions = append(defaultMergeOptions, 2)
+		defaultMergeSurvey = append(defaultMergeSurvey, "Allow Rebase Merging")
+	}
+
+	if len(choices) > 0 {
+		for _, c := range choices {
+			switch c {
+			case "Description":
+				qs = append(qs, &survey.Question{
+					Name: "repoDescription",
+					Prompt: &survey.Input{
+						Message: "Description of the repository",
+						Default: r.Description,
+					},
+				})
+			case "Home Page URL":
+				qs = append(qs, &survey.Question{
+					Name: "repoURL",
+					Prompt: &survey.Input{
+						Message: "Repository home page URL?",
+						Default: r.HomepageURL,
+					},
+				})
+			case "Topics":
+				qs = append(qs, &survey.Question{
+					Name: "addTopics",
+					Prompt: &survey.Input{
+						Message: "Add topics?(csv format)",
+						Default: defaultTopics,
+					},
+				}, &survey.Question{
+					Name: "removeTopics",
+					Prompt: &survey.Input{
+						Message: "Remove topics?(csv format)",
+						Default: "",
+					},
+				})
+			case "Default Branch Name":
+				qs = append(qs, &survey.Question{
+					Name: "defaultBranchName",
+					Prompt: &survey.Input{
+						Message: "Default branch name?",
+						Default: r.DefaultBranchRef.Name,
+					},
+				})
+			case "Wikis":
+				qs = append(qs, &survey.Question{
+					Name: "enableWikis",
+					Prompt: &survey.Confirm{
+						Message: "Enable Wikis?",
+						Default: r.HasWikiEnabled,
+					},
+				})
+			case "Issues":
+				qs = append(qs, &survey.Question{
+					Name: "enableIssues",
+					Prompt: &survey.Confirm{
+						Message: "Enable Issues?",
+						Default: r.HasIssuesEnabled,
+					},
+				})
+			case "Projects":
+				qs = append(qs, &survey.Question{
+					Name: "enableProjects",
+					Prompt: &survey.Confirm{
+						Message: "Enable Projects?",
+						Default: r.HasProjectsEnabled,
+					},
+				})
+			case "Visibility":
+				qs = append(qs, &survey.Question{
+					Name: "repoVisibility",
+					Prompt: &survey.Select{
+						Message: "Visibility",
+						Options: []string{"public", "private", "internal"},
+					},
+				})
+			case "Merge Options":
+				qs = append(qs, &survey.Question{
+					Name: "mergeOptions",
+					Prompt: &survey.MultiSelect{
+						Message: "Choose a merge option",
+						Default: defaultMergeSurvey,
+						Options: []string{"Allow Merge Commits", "Allow Squash Merging", "Allow Rebase Merging"},
+					},
+				}, &survey.Question{
+					Name: "enableAutoMerge",
+					Prompt: &survey.Confirm{
+						Message: "Enable Auto Merge?",
+						Default: r.AutoMergeAllowed,
+					},
+				}, &survey.Question{
+					Name: "autoDeleteBranch",
+					Prompt: &survey.Confirm{
+						Message: "Automatically delete head branches after merging?",
+						Default: r.DeleteBranchOnMerge,
+					},
+				})
+			case "Template Repository":
+				qs = append(qs, &survey.Question{
+					Name: "isTemplateRepo",
+					Prompt: &survey.Confirm{
+						Message: "Convert into a template repository?",
+						Default: r.IsTemplate,
+					},
+				})
+			case "Allow Forking":
+				qs = append(qs, &survey.Question{
+					Name: "allowForking",
+					Prompt: &survey.Confirm{
+						Message: "Allow forking (of an organization repository)?",
+						Default: r.ForkingAllowed,
+					},
+				})
+			}
+		}
 	}
 
 	answers := struct {
@@ -323,7 +396,20 @@ func interactiveRepoEdit(r *api.Repository, topics []string) (repoInput *EditRep
 		IsTemplateRepo    bool
 		AutoDeleteBranch  bool
 		AllowForking      bool
-	}{}
+	}{
+		RepoDescription:   r.Description,
+		RepoURL:           r.HomepageURL,
+		AddTopics:         defaultTopics,
+		MergeOptions:      defaultMergeOptions,
+		DefaultBranchName: r.DefaultBranchRef.Name,
+		EnableWikis:       r.HasWikiEnabled,
+		EnableIssues:      r.HasIssuesEnabled,
+		EnableProjects:    r.HasProjectsEnabled,
+		EnableAutoMerge:   r.AutoMergeAllowed,
+		IsTemplateRepo:    r.IsTemplate,
+		AutoDeleteBranch:  r.DeleteBranchOnMerge,
+		AllowForking:      r.ForkingAllowed,
+	}
 
 	err = prompt.SurveyAsk(qs, &answers)
 	if err != nil {
@@ -340,12 +426,10 @@ func interactiveRepoEdit(r *api.Repository, topics []string) (repoInput *EditRep
 		removeTopics[k] = strings.TrimSpace(v)
 	}
 
-	visibility := strings.ToLower(answers.RepoVisibility)
-
 	repoInput = &EditRepositoryInput{
 		Description:         &answers.RepoDescription,
 		Homepage:            &answers.RepoURL,
-		Visibility:          &visibility,
+		Visibility:          &answers.RepoVisibility,
 		EnableIssues:        &answers.EnableIssues,
 		EnableProjects:      &answers.EnableProjects,
 		EnableWiki:          &answers.EnableWikis,

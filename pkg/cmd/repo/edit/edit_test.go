@@ -168,19 +168,10 @@ func Test_editRunInteractive(t *testing.T) {
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.Stub([]*prompt.QuestionStub{
+					{Name: "Choice", Value: []string{"Description"}},
+				})
+				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoDescription", Value: "awesome repo description"},
-					{Name: "repoURL", Value: "URL.com"},
-					{Name: "addTopics", Value: "a,b,c,d"},
-					{Name: "removeTopics", Value: "b,c"},
-					{Name: "defaultBranchName", Value: "master"},
-					{Name: "enableWikis", Value: true},
-					{Name: "enableIssues", Value: false},
-					{Name: "enableProjects", Value: true},
-					{Name: "repoVisibility", Value: "public"},
-					{Name: "mergeOptions", Value: []int{0, 1}},
-					{Name: "enableAutoMerge", Value: false},
-					{Name: "isTemplateRepo", Value: false},
-					{Name: "autoDeleteBranch", Value: false},
 				})
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -209,16 +200,110 @@ func Test_editRunInteractive(t *testing.T) {
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
 					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
-						assert.Equal(t, "URL.com", payload["homepage"])
 						assert.Equal(t, "awesome repo description", payload["description"])
-						assert.Equal(t, true, payload["allow_merge_commit"])
-						assert.Equal(t, true, payload["allow_squash_merge"])
-						assert.Equal(t, false, payload["allow_rebase_merge"])
+					}))
+			},
+		},
+		{
+			name: "Interactive repo edit with topics",
+			opts: EditOptions{
+				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				InteractiveMode: true,
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "Choice", Value: []string{"Description", "Topics"}},
+				})
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "repoDescription", Value: "awesome repo description"},
+					{Name: "addTopics", Value: "a,b,c,d"},
+					{Name: "removeTopics", Value: "b,c"},
+				})
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"repository": {
+								"description": "old description",
+								"homePageUrl": "https://url.com",
+								"defaultBranchRef": {
+									"name": "main"
+								},
+								"isInOrganization": false,
+								"repositoryTopics": {
+									"nodes": [{
+										"topic": {
+											"name": "x"
+										}
+									}]
+								}
+							}
+						}
+					}`))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, "awesome repo description", payload["description"])
 					}))
 				reg.Register(
 					httpmock.REST("PUT", "repos/OWNER/REPO/topics"),
 					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
 						assert.Equal(t, []interface{}{"x", "a", "d"}, payload["names"])
+					}))
+			},
+		},
+		{
+			name: "Interactive repo edit with merge options",
+			opts: EditOptions{
+				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				InteractiveMode: true,
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "Choice", Value: []string{"Merge Options"}},
+				})
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "mergeOptions", Value: []int{0, 1}},
+					{Name: "enableAutoMerge", Value: false},
+					{Name: "autoDeleteBranch", Value: false},
+				})
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"repository": {
+								"description": "old description",
+								"homePageUrl": "https://url.com",
+								"defaultBranchRef": {
+									"name": "main"
+								},
+								"isInOrganization": false,
+								"squashMergeAllowed": false,
+								"rebaseMergeAllowed": true,
+								"mergeCommitAllowed": true,
+								"deleteBranchOnMerge": false,
+								"repositoryTopics": {
+									"nodes": [{
+										"topic": {
+											"name": "x"
+										}
+									}]
+								}
+							}
+						}
+					}`))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, true, payload["allow_merge_commit"])
+						assert.Equal(t, true, payload["allow_squash_merge"])
+						assert.Equal(t, true, payload["allow_rebase_merge"])
 					}))
 			},
 		},
