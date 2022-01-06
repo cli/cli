@@ -31,6 +31,7 @@ type sshOptions struct {
 	debug      bool
 	debugFile  string
 	stdio      bool
+	config     bool
 	scpArgs    []string // scp arguments, for 'cs cp' (nil for 'cs ssh')
 }
 
@@ -40,10 +41,33 @@ func newSSHCmd(app *App) *cobra.Command {
 	sshCmd := &cobra.Command{
 		Use:   "ssh [<flags>...] [-- <ssh-flags>...] [<command>]",
 		Short: "SSH into a codespace",
+		Long: heredoc.Doc(`
+			The 'ssh' command is used to SSH into a codespace. In its simplest form, you can
+			run 'gh cs ssh', select a codespace interactively, and connect.
+
+			The 'ssh' command also supports deeper integration with OpenSSH using a
+			'--config' option that generates per-codespace ssh configuration in OpenSSH
+			format. Including this configuration in your ~/.ssh/config improves the user
+			experience of tools that integrate with OpenSSH, such as bash/zsh completion of
+			ssh hostnames, remote path completion for scp/rsync/sshfs, git ssh remotes, and
+			so on.
+
+			Once that is set up (see the second example below), you can ssh to codespaces as
+			if they were ordinary remote hosts (using 'ssh', not 'gh cs ssh').
+		`),
+		Example: heredoc.Doc(`
+			$ gh codespace ssh
+
+			$ gh codespace ssh --config > ~/.ssh/codespaces
+			$ echo 'include ~/.ssh/codespaces' >> ~/.ssh/config'
+		`),
 		PreRunE: func(c *cobra.Command, args []string) error {
 			if opts.stdio {
 				if opts.codespace == "" {
 					return errors.New("`--stdio` requires explicit `--codespace`")
+				}
+				if opts.config {
+					return errors.New("cannot use `--stdio` with `--config`")
 				}
 				if opts.serverPort != 0 {
 					return errors.New("cannot use `--stdio` with `--server-port`")
@@ -52,10 +76,22 @@ func newSSHCmd(app *App) *cobra.Command {
 					return errors.New("cannot use `--stdio` with `--profile`")
 				}
 			}
+			if opts.config {
+				if opts.profile != "" {
+					return errors.New("cannot use `--config` with `--profile`")
+				}
+				if opts.serverPort != 0 {
+					return errors.New("cannot use `--config` with `--server-port`")
+				}
+			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.SSH(cmd.Context(), args, opts)
+			if opts.config {
+				return app.printOpenSSHConfig(cmd.Context(), opts)
+			} else {
+				return app.SSH(cmd.Context(), args, opts)
+			}
 		},
 		DisableFlagsInUseLine: true,
 	}
@@ -65,12 +101,11 @@ func newSSHCmd(app *App) *cobra.Command {
 	sshCmd.Flags().StringVarP(&opts.codespace, "codespace", "c", "", "Name of the codespace")
 	sshCmd.Flags().BoolVarP(&opts.debug, "debug", "d", false, "Log debug data to a file")
 	sshCmd.Flags().StringVarP(&opts.debugFile, "debug-file", "", "", "Path of the file log to")
+	sshCmd.Flags().BoolVarP(&opts.config, "config", "", false, "Write OpenSSH configuration to stdout")
 	sshCmd.Flags().BoolVar(&opts.stdio, "stdio", false, "Proxy sshd connection to stdio")
 	if err := sshCmd.Flags().MarkHidden("stdio"); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 	}
-
-	sshCmd.AddCommand(newConfigCmd(app))
 
 	return sshCmd
 }
@@ -174,7 +209,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 }
 
-func (a *App) printOpenSSHConfig(ctx context.Context, opts configOptions) error {
+func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -387,46 +422,6 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) error {
 		return cmdutil.FlagErrorf("at least one argument must have a 'remote:' prefix")
 	}
 	return a.SSH(ctx, nil, opts.sshOptions)
-}
-
-type configOptions struct {
-	codespace string
-}
-
-func newConfigCmd(app *App) *cobra.Command {
-	var opts configOptions
-
-	configCmd := &cobra.Command{
-		Use:   "config [-c codespace]",
-		Short: "Write OpenSSH configuration to stdout",
-		Long: heredoc.Doc(`
-			The config command generates per-codespace ssh configuration in OpenSSH format.
-
-			Including this configuration in ~/.ssh/config improves the user experience of
-			tools that integrate with OpenSSH, such as bash/zsh completion of ssh hostnames,
-			remote path completion for scp/rsync/sshfs, git ssh remotes, and so on.
-
-			If -c/--codespace is specified, configuration is generated for that codespace
-			only. Otherwise configuration is emitted for all available codespaces.
-
-			When generating configuration for all codespaces, ones that aren't in
-			"Available" state are skipped because it's necessary to start the codespace to
-			determine its remote ssh username. However, when using '-c' to generate
-			configuration for a single codespace, it will be started if necessary.
-		`),
-		Example: heredoc.Doc(`
-			$ gh codespace config > ~/.ssh/codespaces
-			$ echo 'include ~/.ssh/codespaces' >> ~/.ssh/config'
-		`),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.printOpenSSHConfig(cmd.Context(), opts)
-		},
-		DisableFlagsInUseLine: true,
-	}
-
-	configCmd.Flags().StringVarP(&opts.codespace, "codespace", "c", "", "Name of a codespace")
-
-	return configCmd
 }
 
 // fileLogger is a wrapper around an log.Logger configured to write
