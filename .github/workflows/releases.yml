@@ -7,7 +7,7 @@ on:
 
 jobs:
   goreleaser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -33,6 +33,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
           GORELEASER_CURRENT_TAG: ${{steps.changelog.outputs.tag-name}}
+          GITHUB_CERT_PASSWORD: ${{secrets.GITHUB_CERT_PASSWORD}}
+          DESKTOP_CERT_TOKEN: ${{secrets.DESKTOP_CERT_TOKEN}}
       - name: Checkout documentation site
         uses: actions/checkout@v2
         with:
@@ -61,7 +63,6 @@ jobs:
             api-write --silent projects/columns/cards/$card/moves -f position=top -F column_id=$DONE_COLUMN
           done
           echo "moved ${#cards[@]} cards to the Done column"
-      
       - name: Install packaging dependencies
         run: sudo apt-get install -y rpm reprepro
       - name: Set up GPG
