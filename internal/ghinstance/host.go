@@ -87,3 +87,10 @@ func HostPrefix(hostname string) string {
 	}
 	return fmt.Sprintf("https://%s/", hostname)
 }
+
+func HostSubdomainWildcard(hostname string) string {
+	if strings.EqualFold(hostname, localhost) {
+		return hostname
+	}
+	return fmt.Sprintf("*.%s", hostname)
+}

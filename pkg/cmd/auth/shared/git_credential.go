@@ -121,7 +121,10 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 }
 
 func gitCredentialHelperKey(hostname string) string {
-	return fmt.Sprintf("credential.%s.helper", strings.TrimSuffix(ghinstance.HostPrefix(hostname), "/"))
+	host := strings.TrimSuffix(
+		ghinstance.HostPrefix(
+			ghinstance.HostSubdomainWildcard(hostname)), "/")
+	return fmt.Sprintf("credential.%s.helper", host)
 }
 
 func gitCredentialHelper(hostname string) (helper string, err error) {
