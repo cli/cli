@@ -9,20 +9,18 @@ curl \
   --output windows-certificate.pfx \
   https://api.github.com/repos/desktop/desktop-secrets/contents/windows-certificate.pfx
 
-PROGRAM_NAME="GitHub CLI"
-
-# Convert private key to the expected format
 openssl pkcs12 -in windows-certificate.pfx -nocerts -nodes -out private-key.pem  -passin pass:${GITHUB_CERT_PASSWORD}
-openssl rsa -in private-key.pem -outform PVK -pvk-none -out private-key.pvk
-
-# Convert certificate chain into the expected format
 openssl pkcs12 -in windows-certificate.pfx -nokeys -nodes -out certificate.pem -passin pass:${GITHUB_CERT_PASSWORD}
-openssl crl2pkcs7 -nocrl -certfile certificate.pem -outform DER -out certificate.spc
 
-signcode \
-  -spc certificate.spc \
-  -v private-key.pvk \
-  -n $PROGRAM_NAME \
+osslsigncode sign \
+  -certs certificate.pem \
+  -key private-key.pem \
+  -n "GitHub CLI" \
   -t http://timestamp.digicert.com \
-  -a sha256 \
-$EXECUTABLE_PATH
+  -in $EXECUTABLE_PATH \
+  -out gh_signed.exe
+
+# Oddly, there can be a delay before the file is *actually* available - wait for it
+while [ ! -f gh_signed.exe ]; do sleep 1; done;
+
+mv gh_signed.exe $EXECUTABLE_PATH
