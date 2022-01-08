@@ -25,6 +25,8 @@ jobs:
             -q .body > CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Install osslsigncode
+        run: sudo apt-get install -y osslsigncode
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
         with:
