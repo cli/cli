@@ -134,8 +134,9 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 	return &newRelease, err
 }
 
-func publishRelease(httpClient *http.Client, releaseURL string) (*shared.Release, error) {
-	req, err := http.NewRequest("PATCH", releaseURL, bytes.NewBufferString(`{"draft":false}`))
+func publishRelease(httpClient *http.Client, releaseURL string, params map[string]interface{}) (*shared.Release, error) {
+	bodyBytes, err := json.Marshal(params)
+	req, err := http.NewRequest("PATCH", releaseURL, bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		return nil, err
 	}

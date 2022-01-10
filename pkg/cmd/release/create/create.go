@@ -418,7 +418,12 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		if !opts.Draft {
-			rel, err := publishRelease(httpClient, newRelease.APIURL)
+			params := map[string]interface{}{}
+			params["draft"] = false
+			if opts.DiscussionCategory != "" {
+				params["discussion_category_name"] = opts.DiscussionCategory
+			}
+			rel, err := publishRelease(httpClient, newRelease.APIURL, params)
 			if err != nil {
 				return err
 			}
