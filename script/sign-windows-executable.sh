@@ -35,4 +35,4 @@ sleep 10
 # seconds isn't ideal but it's better than 3 minutes.
 #while [ ! -f gh_signed.exe ]; do sleep 1; done;
 
-mv gh_signed-{foo}.exe $EXECUTABLE_PATH
+mv gh_signed-${foo}.exe $EXECUTABLE_PATH
