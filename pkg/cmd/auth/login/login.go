@@ -165,7 +165,7 @@ func loginRun(opts *LoginOptions) error {
 		return cfg.Write()
 	}
 
-	existingToken, _ := cfg.Get(hostname, "oauth_token")
+	existingToken, _ := cfg.GetOrDefault(hostname, "oauth_token")
 	if existingToken != "" && opts.Interactive {
 		if err := shared.HasMinimumScopes(httpClient, hostname, existingToken); err == nil {
 			var keepGoing bool

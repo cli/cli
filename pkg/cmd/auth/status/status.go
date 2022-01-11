@@ -92,7 +92,7 @@ func statusRun(opts *StatusOptions) error {
 		}
 		isHostnameFound = true
 
-		token, tokenSource, _ := cfg.GetWithSource(hostname, "oauth_token")
+		token, tokenSource, _ := cfg.GetOrDefaultWithSource(hostname, "oauth_token")
 		tokenIsWriteable := cfg.CheckWriteable(hostname, "oauth_token") == nil
 
 		statusInfo[hostname] = []string{}
@@ -127,7 +127,7 @@ func statusRun(opts *StatusOptions) error {
 				addMsg("%s %s: api call failed: %s", cs.Red("X"), hostname, err)
 			}
 			addMsg("%s Logged in to %s as %s (%s)", cs.SuccessIcon(), hostname, cs.Bold(username), tokenSource)
-			proto, _ := cfg.Get(hostname, "git_protocol")
+			proto, _ := cfg.GetOrDefault(hostname, "git_protocol")
 			if proto != "" {
 				addMsg("%s Git operations for %s configured to use %s protocol.",
 					cs.SuccessIcon(), hostname, cs.Bold(proto))

@@ -76,6 +76,24 @@ func (c *envConfig) GetWithSource(hostname, key string) (string, string, error) 
 	return c.Config.GetWithSource(hostname, key)
 }
 
+func (c *envConfig) GetOrDefault(hostname, key string) (val string, err error) {
+	val, _, err = c.GetOrDefaultWithSource(hostname, key)
+	return
+}
+
+func (c *envConfig) GetOrDefaultWithSource(hostname, key string) (val string, src string, err error) {
+	val, src, err = c.GetWithSource(hostname, key)
+	if err == nil && val == "" {
+		val = c.Default(key)
+	}
+
+	return
+}
+
+func (c *envConfig) Default(key string) string {
+	return c.Config.Default(key)
+}
+
 func (c *envConfig) CheckWriteable(hostname, key string) error {
 	if hostname != "" && key == "oauth_token" {
 		if token, env := AuthTokenFromEnv(hostname); token != "" {

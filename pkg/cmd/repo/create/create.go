@@ -361,7 +361,7 @@ func createFromScratch(opts *CreateOptions) error {
 	}
 
 	if opts.Clone {
-		protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
+		protocol, err := cfg.GetOrDefault(repo.RepoHost(), "git_protocol")
 		if err != nil {
 			return err
 		}
@@ -498,7 +498,7 @@ func createFromLocal(opts *CreateOptions) error {
 		fmt.Fprintln(stdout, repo.URL)
 	}
 
-	protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
+	protocol, err := cfg.GetOrDefault(repo.RepoHost(), "git_protocol")
 	if err != nil {
 		return err
 	}

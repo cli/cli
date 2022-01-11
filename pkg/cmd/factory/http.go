@@ -54,7 +54,7 @@ var timezoneNames = map[int]string{
 }
 
 type configGetter interface {
-	Get(string, string) (string, error)
+	GetOrDefault(string, string) (string, error)
 }
 
 // generic authenticated HTTP client for commands
@@ -73,7 +73,7 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg configGetter, appVersion string,
 	// which would use that non-default behavior is right here, and it doesn't
 	// seem worth the cognitive overhead everywhere else just to serve this one
 	// use case.
-	unixSocket, err := cfg.Get("", "http_unix_socket")
+	unixSocket, err := cfg.GetOrDefault("", "http_unix_socket")
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg configGetter, appVersion string,
 		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", appVersion)),
 		api.AddHeaderFunc("Authorization", func(req *http.Request) (string, error) {
 			hostname := ghinstance.NormalizeHostname(getHost(req))
-			if token, err := cfg.Get(hostname, "oauth_token"); err == nil && token != "" {
+			if token, err := cfg.GetOrDefault(hostname, "oauth_token"); err == nil && token != "" {
 				return fmt.Sprintf("token %s", token), nil
 			}
 			return "", nil

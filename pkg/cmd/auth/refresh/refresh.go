@@ -132,7 +132,7 @@ func refreshRun(opts *RefreshOptions) error {
 	}
 
 	var additionalScopes []string
-	if oldToken, _ := cfg.Get(hostname, "oauth_token"); oldToken != "" {
+	if oldToken, _ := cfg.GetOrDefault(hostname, "oauth_token"); oldToken != "" {
 		if oldScopes, err := shared.GetScopes(opts.httpClient, hostname, oldToken); err == nil {
 			for _, s := range strings.Split(oldScopes, ",") {
 				s = strings.TrimSpace(s)
@@ -146,7 +146,7 @@ func refreshRun(opts *RefreshOptions) error {
 	credentialFlow := &shared.GitCredentialFlow{
 		Executable: opts.MainExecutable,
 	}
-	gitProtocol, _ := cfg.Get(hostname, "git_protocol")
+	gitProtocol, _ := cfg.GetOrDefault(hostname, "git_protocol")
 	if opts.Interactive && gitProtocol == "https" {
 		if err := credentialFlow.Prompt(hostname); err != nil {
 			return err
@@ -159,8 +159,8 @@ func refreshRun(opts *RefreshOptions) error {
 	}
 
 	if credentialFlow.ShouldSetup() {
-		username, _ := cfg.Get(hostname, "user")
-		password, _ := cfg.Get(hostname, "oauth_token")
+		username, _ := cfg.GetOrDefault(hostname, "user")
+		password, _ := cfg.GetOrDefault(hostname, "oauth_token")
 		if err := credentialFlow.Setup(hostname, username, password); err != nil {
 			return err
 		}

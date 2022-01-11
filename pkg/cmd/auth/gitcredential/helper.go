@@ -14,7 +14,7 @@ import (
 const tokenUser = "x-access-token"
 
 type config interface {
-	GetWithSource(string, string) (string, string, error)
+	GetOrDefaultWithSource(string, string) (string, string, error)
 }
 
 type CredentialOptions struct {
@@ -101,11 +101,11 @@ func helperRun(opts *CredentialOptions) error {
 	}
 
 	var gotUser string
-	gotToken, source, _ := cfg.GetWithSource(wants["host"], "oauth_token")
+	gotToken, source, _ := cfg.GetOrDefaultWithSource(wants["host"], "oauth_token")
 	if strings.HasSuffix(source, "_TOKEN") {
 		gotUser = tokenUser
 	} else {
-		gotUser, _, _ = cfg.GetWithSource(wants["host"], "user")
+		gotUser, _, _ = cfg.GetOrDefaultWithSource(wants["host"], "user")
 	}
 
 	if gotUser == "" || gotToken == "" {

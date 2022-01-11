@@ -17,7 +17,7 @@ import (
 
 type tinyConfig map[string]string
 
-func (c tinyConfig) Get(host, key string) (string, error) {
+func (c tinyConfig) GetOrDefault(host, key string) (string, error) {
 	return c[fmt.Sprintf("%s:%s", host, key)], nil
 }
 
