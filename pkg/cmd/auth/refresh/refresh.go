@@ -158,6 +158,9 @@ func refreshRun(opts *RefreshOptions) error {
 		return err
 	}
 
+	cs := opts.IO.ColorScheme()
+	fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
+
 	if credentialFlow.ShouldSetup() {
 		username, _ := cfg.Get(hostname, "user")
 		password, _ := cfg.Get(hostname, "oauth_token")

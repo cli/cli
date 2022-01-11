@@ -50,13 +50,19 @@ func Test_NewCmdLogin(t *testing.T) {
 			name:     "nontty, hostname",
 			stdinTTY: false,
 			cli:      "--hostname claire.redfield",
-			wantsErr: true,
+			wants: LoginOptions{
+				Hostname: "claire.redfield",
+				Token:    "",
+			},
 		},
 		{
 			name:     "nontty",
 			stdinTTY: false,
 			cli:      "",
-			wantsErr: true,
+			wants: LoginOptions{
+				Hostname: "github.com",
+				Token:    "",
+			},
 		},
 		{
 			name:  "nontty, with-token, hostname",
@@ -102,8 +108,9 @@ func Test_NewCmdLogin(t *testing.T) {
 			stdinTTY: true,
 			cli:      "--web",
 			wants: LoginOptions{
-				Hostname: "github.com",
-				Web:      true,
+				Hostname:    "github.com",
+				Web:         true,
+				Interactive: true,
 			},
 		},
 		{

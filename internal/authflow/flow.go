@@ -27,13 +27,11 @@ type iconfig interface {
 	Write() error
 }
 
-func AuthFlowWithConfig(cfg iconfig, IO *iostreams.IOStreams, hostname, notice string, additionalScopes []string, interactive bool) (string, error) {
+func AuthFlowWithConfig(cfg iconfig, IO *iostreams.IOStreams, hostname, notice string, additionalScopes []string, isInteractive bool) (string, error) {
 	// TODO this probably shouldn't live in this package. It should probably be in a new package that
 	// depends on both iostreams and config.
-	stderr := IO.ErrOut
-	cs := IO.ColorScheme()
 
-	token, userLogin, err := authFlow(hostname, IO, notice, additionalScopes, interactive)
+	token, userLogin, err := authFlow(hostname, IO, notice, additionalScopes, isInteractive)
 	if err != nil {
 		return "", err
 	}
@@ -47,22 +45,10 @@ func AuthFlowWithConfig(cfg iconfig, IO *iostreams.IOStreams, hostname, notice s
 		return "", err
 	}
 
-	err = cfg.Write()
-	if err != nil {
-		return "", err
-	}
-
-	if interactive {
-		fmt.Fprintf(stderr, "%s Authentication complete. %s to continue...\n",
-			cs.SuccessIcon(), cs.Bold("Press Enter"))
-		_ = waitForEnter(IO.In)
-	} else {
-		fmt.Fprintf(stderr, "%s Authentication complete.\n", cs.SuccessIcon())
-	}
-	return token, nil
+	return token, cfg.Write()
 }
 
-func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string, interactive bool) (string, string, error) {
+func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string, isInteractive bool) (string, string, error) {
 	w := IO.ErrOut
 	cs := IO.ColorScheme()
 
@@ -93,24 +79,25 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 			return nil
 		},
 		BrowseURL: func(url string) error {
-			if interactive {
-				fmt.Fprintf(w, "- %s to open %s in your browser... ", cs.Bold("Press Enter"), oauthHost)
-				_ = waitForEnter(IO.In)
+			if !isInteractive {
+				fmt.Fprintf(w, "%s to continue in your web browser: %s\n", cs.Bold("Open this URL"), url)
+				return nil
+			}
 
-				// FIXME: read the browser from cmd Factory rather than recreating it
-				browser := cmdutil.NewBrowser(os.Getenv("BROWSER"), IO.Out, IO.ErrOut)
-				if err := browser.Browse(url); err != nil {
-					fmt.Fprintf(w, "%s Failed opening a web browser at %s\n", cs.Red("!"), url)
-					fmt.Fprintf(w, "  %s\n", err)
-					fmt.Fprint(w, "  Please try entering the URL in your browser manually\n")
-				}
-			} else {
-				fmt.Fprintf(w, "- Open this URL in your browser: %s", cs.Bold(url))
+			fmt.Fprintf(w, "%s to open %s in your browser... ", cs.Bold("Press Enter"), oauthHost)
+			_ = waitForEnter(IO.In)
+
+			// FIXME: read the browser from cmd Factory rather than recreating it
+			browser := cmdutil.NewBrowser(os.Getenv("BROWSER"), IO.Out, IO.ErrOut)
+			if err := browser.Browse(url); err != nil {
+				fmt.Fprintf(w, "%s Failed opening a web browser at %s\n", cs.Red("!"), url)
+				fmt.Fprintf(w, "  %s\n", err)
+				fmt.Fprint(w, "  Please try entering the URL in your browser manually\n")
 			}
 			return nil
 		},
 		WriteSuccessHTML: func(w io.Writer) {
-			fmt.Fprintln(w, oauthSuccessPage)
+			fmt.Fprint(w, oauthSuccessPage)
 		},
 		HTTPClient: httpClient,
 		Stdin:      IO.In,

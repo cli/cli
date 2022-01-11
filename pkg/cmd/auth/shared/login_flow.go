@@ -99,7 +99,7 @@ func Login(opts *LoginOptions) error {
 	var authMode int
 	if opts.Web {
 		authMode = 0
-	} else {
+	} else if opts.Interactive {
 		err := prompt.SurveyAskOne(&survey.Select{
 			Message: "How would you like to authenticate GitHub CLI?",
 			Options: []string{
@@ -121,6 +121,7 @@ func Login(opts *LoginOptions) error {
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
+		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
 		userValidated = true
 	} else {
 		minimumScopes := append([]string{"repo", "read:org"}, additionalScopes...)
