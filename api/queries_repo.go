@@ -983,6 +983,15 @@ func RepoAndOrgProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, e
 type RepoAssignee struct {
 	ID    string
 	Login string
+	Name  string
+}
+
+// DisplayName returns a formatted string that uses Login and Name to be displayed e.g. 'Login (Name)' or 'Login'
+func (ra RepoAssignee) DisplayName() string {
+	if ra.Name != "" {
+		return fmt.Sprintf("%s (%s)", ra.Login, ra.Name)
+	}
+	return ra.Login
 }
 
 // RepoAssignableUsers fetches all the assignable users for a repository
