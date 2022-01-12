@@ -71,7 +71,7 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 		},
 		{
 			Name:  "milestone",
-			Value: []string{"(none)"},
+			Value: "(none)",
 		},
 	})
 
