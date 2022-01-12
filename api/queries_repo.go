@@ -930,15 +930,10 @@ type RepoAssignee struct {
 
 // DisplayName returns a formatted string that uses Login and Name to be displayed e.g. 'Login (Name)' or 'Login'
 func (ra RepoAssignee) DisplayName() string {
-	name := ra.Name
-
 	if ra.Name != "" {
-		name = fmt.Sprintf("(%s)", ra.Name)
+		return fmt.Sprintf("%s (%s)", ra.Login, ra.Name)
 	}
-
-	displayName := fmt.Sprintf("%s %s", ra.Login, name)
-
-	return strings.TrimSpace(displayName)
+	return ra.Login
 }
 
 // RepoAssignableUsers fetches all the assignable users for a repository

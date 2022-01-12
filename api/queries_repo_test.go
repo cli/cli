@@ -344,18 +344,25 @@ func Test_RepoMilestones(t *testing.T) {
 
 func TestDisplayName(t *testing.T) {
 	tests := []struct {
-		repoAssignee RepoAssignee
-		want         string
+		name     string
+		assignee RepoAssignee
+		want     string
 	}{
-		{RepoAssignee{"123", "octocat123", "Octavious Cath"}, "octocat123 (Octavious Cath)"},
-		{RepoAssignee{"123", "octocat123", ""}, "octocat123"},
+		{
+			name:     "assignee with name",
+			assignee: RepoAssignee{"123", "octocat123", "Octavious Cath"},
+			want:     "octocat123 (Octavious Cath)",
+		},
+		{
+			name:     "assignee without name",
+			assignee: RepoAssignee{"123", "octocat123", ""},
+			want:     "octocat123",
+		},
 	}
-
 	for _, tt := range tests {
-		actual := tt.repoAssignee.DisplayName()
-
+		actual := tt.assignee.DisplayName()
 		if actual != tt.want {
-			t.Errorf("actual %s want %s", actual, tt.want)
+			t.Errorf("display name was %s wanted %s", actual, tt.want)
 		}
 	}
 }

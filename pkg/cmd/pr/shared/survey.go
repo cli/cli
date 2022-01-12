@@ -316,10 +316,20 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 	}
 
 	if isChosen("Reviewers") {
-		state.Reviewers = values.Reviewers
+		var usernames []string
+		for _, r := range values.Reviewers {
+			// Extract username from display name
+			usernames = append(usernames, (strings.Split(r, " "))[0])
+		}
+		state.Reviewers = usernames
 	}
 	if isChosen("Assignees") {
-		state.Assignees = values.Assignees
+		var usernames []string
+		for _, a := range values.Assignees {
+			// Extract username from display name
+			usernames = append(usernames, (strings.Split(a, " "))[0])
+		}
+		state.Assignees = usernames
 	}
 	if isChosen("Labels") {
 		state.Labels = values.Labels
