@@ -41,7 +41,7 @@ func InitAskStubber() (*AskStubber, func()) {
 			message = pt.Message
 			defaultValue = pt.Default
 		default:
-			panic(fmt.Sprintf("prompt type %T is not supported by the stubber", pt))
+			return fmt.Errorf("prompt type %T is not supported by the stubber", pt)
 		}
 
 		var stub *QuestionStub
@@ -53,12 +53,12 @@ func InitAskStubber() (*AskStubber, func()) {
 			}
 		}
 		if stub == nil {
-			panic(fmt.Sprintf("no prompt stub for %q", message))
+			return fmt.Errorf("no prompt stub for %q", message)
 		}
 
 		if len(stub.options) > 0 {
 			if err := compareOptions(stub.options, options); err != nil {
-				panic(fmt.Sprintf("options mismatch for %q: %v", message, err))
+				return fmt.Errorf("stubbed options mismatch for %q: %v", message, err)
 			}
 		}
 
@@ -73,7 +73,7 @@ func InitAskStubber() (*AskStubber, func()) {
 				}
 			}
 			if foundIndex < 0 {
-				panic(fmt.Sprintf("answer %q not found in options for %q: %v", stringValue, message, options))
+				return fmt.Errorf("answer %q not found in options for %q: %v", stringValue, message, options)
 			}
 			userValue = core.OptionAnswer{
 				Value: stringValue,
