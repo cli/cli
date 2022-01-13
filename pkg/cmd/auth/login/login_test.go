@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"runtime"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -17,6 +18,21 @@ import (
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
+
+func stubHomeDir(t *testing.T, dir string) {
+	homeEnv := "HOME"
+	switch runtime.GOOS {
+	case "windows":
+		homeEnv = "USERPROFILE"
+	case "plan9":
+		homeEnv = "home"
+	}
+	oldHomeDir := os.Getenv(homeEnv)
+	os.Setenv(homeEnv, dir)
+	t.Cleanup(func() {
+		os.Setenv(homeEnv, oldHomeDir)
+	})
+}
 
 func Test_NewCmdLogin(t *testing.T) {
 	tests := []struct {
@@ -352,6 +368,8 @@ func Test_loginRun_nontty(t *testing.T) {
 }
 
 func Test_loginRun_Survey(t *testing.T) {
+	stubHomeDir(t, t.TempDir())
+
 	tests := []struct {
 		name       string
 		opts       *LoginOptions
@@ -377,8 +395,8 @@ func Test_loginRun_Survey(t *testing.T) {
 				// 	httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(0)     // host type github.com
-				as.StubOne(false) // do not continue
+				as.StubPrompt("What account do you want to log into?").AnswerWith("GitHub.com")
+				as.StubPrompt("You're already logged into github.com. Do you want to re-authenticate?").AnswerWith(false)
 			},
 			wantHosts:  "", // nothing should have been written to hosts
 			wantErrOut: nil,
@@ -396,10 +414,10 @@ func Test_loginRun_Survey(t *testing.T) {
 				    git_protocol: https
 			`),
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne("HTTPS")  // git_protocol
-				as.StubOne(false)    // cache credentials
-				as.StubOne(1)        // auth mode: token
-				as.StubOne("def456") // auth token
+				as.StubPrompt("What is your preferred protocol for Git operations?").AnswerWith("HTTPS")
+				as.StubPrompt("Authenticate Git with your GitHub credentials?").AnswerWith(false)
+				as.StubPrompt("How would you like to authenticate GitHub CLI?").AnswerWith("Paste an authentication token")
+				as.StubPrompt("Paste your authentication token:").AnswerWith("def456")
 			},
 			runStubs: func(rs *run.CommandStubber) {
 				rs.Register(`git config credential\.https:/`, 1, "")
@@ -425,12 +443,12 @@ func Test_loginRun_Survey(t *testing.T) {
 				Interactive: true,
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(1)              // host type enterprise
-				as.StubOne("brad.vickers") // hostname
-				as.StubOne("HTTPS")        // git_protocol
-				as.StubOne(false)          // cache credentials
-				as.StubOne(1)              // auth mode: token
-				as.StubOne("def456")       // auth token
+				as.StubPrompt("What account do you want to log into?").AnswerWith("GitHub Enterprise Server")
+				as.StubPrompt("GHE hostname:").AnswerWith("brad.vickers")
+				as.StubPrompt("What is your preferred protocol for Git operations?").AnswerWith("HTTPS")
+				as.StubPrompt("Authenticate Git with your GitHub credentials?").AnswerWith(false)
+				as.StubPrompt("How would you like to authenticate GitHub CLI?").AnswerWith("Paste an authentication token")
+				as.StubPrompt("Paste your authentication token:").AnswerWith("def456")
 			},
 			runStubs: func(rs *run.CommandStubber) {
 				rs.Register(`git config credential\.https:/`, 1, "")
@@ -456,11 +474,11 @@ func Test_loginRun_Survey(t *testing.T) {
 				Interactive: true,
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(0)        // host type github.com
-				as.StubOne("HTTPS")  // git_protocol
-				as.StubOne(false)    // cache credentials
-				as.StubOne(1)        // auth mode: token
-				as.StubOne("def456") // auth token
+				as.StubPrompt("What account do you want to log into?").AnswerWith("GitHub.com")
+				as.StubPrompt("What is your preferred protocol for Git operations?").AnswerWith("HTTPS")
+				as.StubPrompt("Authenticate Git with your GitHub credentials?").AnswerWith(false)
+				as.StubPrompt("How would you like to authenticate GitHub CLI?").AnswerWith("Paste an authentication token")
+				as.StubPrompt("Paste your authentication token:").AnswerWith("def456")
 			},
 			runStubs: func(rs *run.CommandStubber) {
 				rs.Register(`git config credential\.https:/`, 1, "")
@@ -480,11 +498,11 @@ func Test_loginRun_Survey(t *testing.T) {
 				Interactive: true,
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(0)        // host type github.com
-				as.StubOne("SSH")    // git_protocol
-				as.StubOne(10)       // TODO: SSH key selection
-				as.StubOne(1)        // auth mode: token
-				as.StubOne("def456") // auth token
+				as.StubPrompt("What account do you want to log into?").AnswerWith("GitHub.com")
+				as.StubPrompt("What is your preferred protocol for Git operations?").AnswerWith("SSH")
+				as.StubPrompt("Generate a new SSH key to add to your GitHub account?").AnswerWith(false)
+				as.StubPrompt("How would you like to authenticate GitHub CLI?").AnswerWith("Paste an authentication token")
+				as.StubPrompt("Paste your authentication token:").AnswerWith("def456")
 			},
 			wantErrOut: regexp.MustCompile("Tip: you can generate a Personal Access Token here https://github.com/settings/tokens"),
 		},
