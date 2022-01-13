@@ -52,7 +52,7 @@ func Render(text string, opts ...glamour.TermRendererOption) (string, error) {
 	// we need to ensure that no such characters are present in the output.
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 
-	opts = append(opts, glamour.WithEmoji())
+	opts = append(opts, glamour.WithEmoji(), glamour.WithPreservedNewLines())
 	tr, err := glamour.NewTermRenderer(opts...)
 	if err != nil {
 		return "", err
