@@ -13,7 +13,11 @@ type AskStubber struct {
 	stubs []*QuestionStub
 }
 
-func InitAskStubber() (*AskStubber, func()) {
+type testing interface {
+	Errorf(format string, args ...interface{})
+}
+
+func NewAskStubber() (*AskStubber, func(t testing)) {
 	origSurveyAsk := SurveyAsk
 	origSurveyAskOne := SurveyAskOne
 	as := AskStubber{}
@@ -120,11 +124,27 @@ func InitAskStubber() (*AskStubber, func()) {
 		return nil
 	}
 
-	teardown := func() {
+	teardown := func(t testing) {
 		SurveyAsk = origSurveyAsk
 		SurveyAskOne = origSurveyAskOne
+		for _, s := range as.stubs {
+			if !s.matched {
+				if t == nil {
+					panic(fmt.Sprintf("unmatched prompt stub: %+v", s))
+				} else {
+					t.Errorf("unmatched prompt stub: %+v", s)
+				}
+			}
+		}
 	}
 	return &as, teardown
+}
+
+func InitAskStubber() (*AskStubber, func()) {
+	as, teardown := NewAskStubber()
+	return as, func() {
+		teardown(nil)
+	}
 }
 
 type QuestionStub struct {

@@ -309,27 +309,11 @@ func TestPRReview_interactive_no_body(t *testing.T) {
 
 	shared.RunCommandFinder("", &api.PullRequest{ID: "THE-ID", Number: 123}, ghrepo.New("OWNER", "REPO"))
 
-	as, teardown := prompt.InitAskStubber()
-	defer teardown()
+	as, teardown := prompt.NewAskStubber()
+	defer teardown(t)
 
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "reviewType",
-			Value: "Request changes",
-		},
-	})
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:    "body",
-			Default: true,
-		},
-	})
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "confirm",
-			Value: true,
-		},
-	})
+	as.StubPrompt("What kind of review do you want to give?").AnswerWith("Request changes")
+	as.StubPrompt("Review body").AnswerWith("")
 
 	_, err := runCommand(http, nil, true, "")
 	assert.EqualError(t, err, "this type of review cannot be blank")
