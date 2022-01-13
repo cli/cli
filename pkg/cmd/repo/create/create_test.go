@@ -175,7 +175,7 @@ func Test_createRun(t *testing.T) {
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoName", Value: "REPO"},
 					{Name: "repoDescription", Value: "my new repo"},
-					{Name: "repoVisibility", Value: "PRIVATE"},
+					{Name: "repoVisibility", Value: "Private"},
 				})
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "addGitIgnore", Value: true}})
@@ -214,7 +214,7 @@ func Test_createRun(t *testing.T) {
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoName", Value: "REPO"},
 					{Name: "repoDescription", Value: "my new repo"},
-					{Name: "repoVisibility", Value: "PRIVATE"},
+					{Name: "repoVisibility", Value: "Private"},
 				})
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "addGitIgnore", Value: false}})
@@ -237,7 +237,7 @@ func Test_createRun(t *testing.T) {
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoName", Value: "REPO"},
 					{Name: "repoDescription", Value: "my new repo"},
-					{Name: "repoVisibility", Value: "PRIVATE"},
+					{Name: "repoVisibility", Value: "Private"},
 				})
 				as.StubOne(false)
 			},
@@ -274,7 +274,7 @@ func Test_createRun(t *testing.T) {
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoName", Value: "REPO"},
 					{Name: "repoDescription", Value: "my new repo"},
-					{Name: "repoVisibility", Value: "PRIVATE"},
+					{Name: "repoVisibility", Value: "Private"},
 				})
 				as.StubOne(true)     //ask for adding a remote
 				as.StubOne("origin") //ask for remote name
@@ -314,7 +314,7 @@ func Test_createRun(t *testing.T) {
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoName", Value: "REPO"},
 					{Name: "repoDescription", Value: "my new repo"},
-					{Name: "repoVisibility", Value: "PRIVATE"},
+					{Name: "repoVisibility", Value: "Private"},
 				})
 				as.StubOne(true)     //ask for adding a remote
 				as.StubOne("origin") //ask for remote name
