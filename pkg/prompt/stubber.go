@@ -98,7 +98,11 @@ func InitAskStubber() (*AskStubber, func()) {
 		}
 
 		if err := core.WriteAnswer(response, fieldName, userValue); err != nil {
-			return fmt.Errorf("AskStubber failed writing the answer for field %q: %w", fieldName, err)
+			topic := fmt.Sprintf("field %q", fieldName)
+			if fieldName == "" {
+				topic = fmt.Sprintf("%q", message)
+			}
+			return fmt.Errorf("AskStubber failed writing the answer for %s: %w", topic, err)
 		}
 		return nil
 	}
