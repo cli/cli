@@ -4,6 +4,11 @@ set -e
 GITHUB_CERT_PASSWORD=$1
 DESKTOP_CERT_TOKEN=$2
 
+if [[ -z "$GITHUB_CERT_PASSWORD" || -z "$DESKTOP_CERT_TOKEN" ]]; then
+  echo "skipping windows signing prep; cert password or token not found"
+  exit 0
+fi
+
 curl \
   -H "Authorization: token $DESKTOP_CERT_TOKEN" \
   -H "Accept: application/vnd.github.v3.raw" \

@@ -1,8 +1,12 @@
 #!/bin/bash
 set -e
 
-EXECUTABLE_PATH=$1
+if [[ ! -e certificate.pem || ! -e private-key.pem ]]; then
+  echo "skipping windows signing; cert or key not found"
+  exit 0
+fi
 
+EXECUTABLE_PATH=$1
 ARCH="386"
 
 if [[ $EXECUTABLE_PATH =~ "amd64" ]]; then
