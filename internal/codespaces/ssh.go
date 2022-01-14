@@ -88,6 +88,7 @@ func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 	}
 
 	cmd := exec.CommandContext(ctx, "ssh", cmdArgs...)
+	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
