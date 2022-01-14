@@ -146,11 +146,6 @@ func gitCredentialHelperKey(hostname string) string {
 	return fmt.Sprintf("credential.%s.helper", host)
 }
 
-func gistGitCredentialHelperKey(hostname string) string {
-	host := strings.TrimSuffix(ghinstance.GistPrefix(hostname), "/")
-	return fmt.Sprintf("credential.%s.helper", host)
-}
-
 func gitCredentialHelper(hostname string) (helper string, err error) {
 	helper, err = git.Config(gitCredentialHelperKey(hostname))
 	if helper != "" {
