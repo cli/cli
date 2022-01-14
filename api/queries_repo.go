@@ -1137,46 +1137,6 @@ func RepoMilestones(client *Client, repo ghrepo.Interface, state string) ([]Repo
 	return milestones, nil
 }
 
-func MilestoneByTitle(client *Client, repo ghrepo.Interface, state, title string) (*RepoMilestone, error) {
-	milestones, err := RepoMilestones(client, repo, state)
-	if err != nil {
-		return nil, err
-	}
-
-	for i := range milestones {
-		if strings.EqualFold(milestones[i].Title, title) {
-			return &milestones[i], nil
-		}
-	}
-	return nil, fmt.Errorf("no milestone found with title %q", title)
-}
-
-func MilestoneByNumber(client *Client, repo ghrepo.Interface, number int32) (*RepoMilestone, error) {
-	var query struct {
-		Repository struct {
-			Milestone *RepoMilestone `graphql:"milestone(number: $number)"`
-		} `graphql:"repository(owner: $owner, name: $name)"`
-	}
-
-	variables := map[string]interface{}{
-		"owner":  githubv4.String(repo.RepoOwner()),
-		"name":   githubv4.String(repo.RepoName()),
-		"number": githubv4.Int(number),
-	}
-
-	gql := graphQLClient(client.http, repo.RepoHost())
-
-	err := gql.QueryNamed(context.Background(), "RepositoryMilestoneByNumber", &query, variables)
-	if err != nil {
-		return nil, err
-	}
-	if query.Repository.Milestone == nil {
-		return nil, fmt.Errorf("no milestone found with number '%d'", number)
-	}
-
-	return query.Repository.Milestone, nil
-}
-
 func ProjectNamesToPaths(client *Client, repo ghrepo.Interface, projectNames []string) ([]string, error) {
 	var paths []string
 	projects, err := RepoAndOrgProjects(client, repo)
