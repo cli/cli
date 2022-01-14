@@ -67,9 +67,9 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 			gitCredentialHelperKey(hostname),
 		}
 
-		gistHost := ghinstance.GistHost(hostname)
+		gistHost := strings.TrimSuffix(ghinstance.GistHost(hostname), "/")
 		if strings.HasPrefix(gistHost, "gist.") {
-			credHelperKeys = append(credHelperKeys, gistGitCredentialHelperKey(hostname))
+			credHelperKeys = append(credHelperKeys, gitCredentialHelperKey(gistHost))
 		}
 
 		var configErr error
