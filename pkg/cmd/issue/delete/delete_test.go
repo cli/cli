@@ -75,9 +75,9 @@ func TestIssueDelete(t *testing.T) {
 				assert.Equal(t, inputs["issueId"], "THE-ID")
 			}),
 	)
-	as, teardown := prompt.InitAskStubber()
-	defer teardown()
-	as.StubOne("13")
+
+	as := prompt.NewAskStubber(t)
+	as.StubPrompt("You're going to delete issue #13. This action cannot be reversed. To confirm, type the issue number:").AnswerWith("13")
 
 	output, err := runCommand(httpRegistry, true, "13")
 	if err != nil {
@@ -103,9 +103,9 @@ func TestIssueDelete_cancel(t *testing.T) {
 				"issue": { "id": "THE-ID", "number": 13, "title": "The title of the issue"}
 			} } }`),
 	)
-	as, teardown := prompt.InitAskStubber()
-	defer teardown()
-	as.StubOne("14")
+
+	as := prompt.NewAskStubber(t)
+	as.StubPrompt("You're going to delete issue #13. This action cannot be reversed. To confirm, type the issue number:").AnswerWith("14")
 
 	output, err := runCommand(httpRegistry, true, "13")
 	if err != nil {

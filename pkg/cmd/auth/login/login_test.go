@@ -548,8 +548,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			hostsBuf := bytes.Buffer{}
 			defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
-			as, teardown := prompt.InitAskStubber()
-			defer teardown()
+			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
 				tt.askStubs(as)
 			}
