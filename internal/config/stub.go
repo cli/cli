@@ -39,7 +39,6 @@ func (c ConfigStub) GetOrDefaultWithSource(hostname, key string) (val string, sr
 }
 
 func (c ConfigStub) Default(key string) string {
-	// TODO may regret this
 	return defaultFor(key)
 }
 
