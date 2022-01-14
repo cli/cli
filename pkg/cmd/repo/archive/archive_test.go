@@ -80,6 +80,7 @@ func Test_ArchiveRun(t *testing.T) {
 			name:       "unarchived repo tty",
 			wantStdout: "✓ Archived repository OWNER/REPO\n",
 			askStubs: func(q *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
 				q.StubOne(true)
 			},
 			isTTY: true,
@@ -98,6 +99,7 @@ func Test_ArchiveRun(t *testing.T) {
 			wantStdout: "✓ Archived repository OWNER/REPO\n",
 			opts:       ArchiveOptions{},
 			askStubs: func(q *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
 				q.StubOne(true)
 			},
 			isTTY: true,
@@ -138,6 +140,7 @@ func Test_ArchiveRun(t *testing.T) {
 		io, _, stdout, stderr := iostreams.Test()
 		tt.opts.IO = io
 
+		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 		q, teardown := prompt.InitAskStubber()
 		defer teardown()
 		if tt.askStubs != nil {

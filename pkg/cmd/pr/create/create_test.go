@@ -283,6 +283,7 @@ func TestPRCreate_recover(t *testing.T) {
 	cs.Register(`git status --porcelain`, 0, "")
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, teardown := prompt.InitAskStubber()
 	defer teardown()
 
@@ -379,6 +380,7 @@ func TestPRCreate(t *testing.T) {
 	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
 
@@ -425,6 +427,7 @@ func TestPRCreate_NoMaintainerModify(t *testing.T) {
 	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
 
@@ -476,6 +479,7 @@ func TestPRCreate_createFork(t *testing.T) {
 	cs.Register(`git remote add -f fork https://github.com/monalisa/REPO.git`, 0, "")
 	cs.Register(`git push --set-upstream fork HEAD:feature`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
 
@@ -535,6 +539,7 @@ func TestPRCreate_pushedToNonBaseRepo(t *testing.T) {
 		deadbeef refs/remotes/origin/feature
 	`)) // determineTrackingBranch
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	_, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
 
@@ -576,6 +581,7 @@ func TestPRCreate_pushedToDifferentBranchName(t *testing.T) {
 		deadbeef refs/remotes/origin/my-feat2
 	`)) // determineTrackingBranch
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	_, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
 
@@ -609,6 +615,7 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "1234567890,commit 0\n2345678901,commit 1")
 	cs.Register(`git status --porcelain`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, teardown := prompt.InitAskStubber()
 	defer teardown()
 
@@ -757,6 +764,7 @@ func TestPRCreate_web(t *testing.T) {
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
 
@@ -831,6 +839,7 @@ func TestPRCreate_webProject(t *testing.T) {
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
 

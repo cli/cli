@@ -631,6 +631,7 @@ func Test_createRun_interactive(t *testing.T) {
 			return val, nil
 		}
 
+		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 		as, teardown := prompt.InitAskStubber()
 		defer teardown()
 		if tt.askStubs != nil {

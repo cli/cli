@@ -270,21 +270,25 @@ func TestPRReview_interactive(t *testing.T) {
 			}),
 	)
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, teardown := prompt.InitAskStubber()
 	defer teardown()
 
+	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "reviewType",
 			Value: "Approve",
 		},
 	})
+	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "body",
 			Value: "cool story",
 		},
 	})
+	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "confirm",
@@ -333,21 +337,25 @@ func TestPRReview_interactive_blank_approve(t *testing.T) {
 			}),
 	)
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, teardown := prompt.InitAskStubber()
 	defer teardown()
 
+	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "reviewType",
 			Value: "Approve",
 		},
 	})
+	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:    "body",
 			Default: true,
 		},
 	})
+	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "confirm",
