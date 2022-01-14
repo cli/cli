@@ -277,8 +277,7 @@ func TestEnableRun(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
-			as, teardown := prompt.NewAskStubber()
-			defer teardown(t)
+			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
 				tt.askStubs(as)
 			}

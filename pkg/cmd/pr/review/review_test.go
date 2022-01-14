@@ -309,8 +309,7 @@ func TestPRReview_interactive_no_body(t *testing.T) {
 
 	shared.RunCommandFinder("", &api.PullRequest{ID: "THE-ID", Number: 123}, ghrepo.New("OWNER", "REPO"))
 
-	as, teardown := prompt.NewAskStubber()
-	defer teardown(t)
+	as := prompt.NewAskStubber(t)
 
 	as.StubPrompt("What kind of review do you want to give?").AnswerWith("Request changes")
 	as.StubPrompt("Review body").AnswerWith("")

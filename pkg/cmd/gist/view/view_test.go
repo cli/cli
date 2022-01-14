@@ -355,8 +355,7 @@ func Test_viewRun(t *testing.T) {
 				)),
 			)
 
-			as, surveyteardown := prompt.NewAskStubber()
-			defer surveyteardown(t)
+			as := prompt.NewAskStubber(t)
 			as.StubPrompt("Select a gist").AnswerDefault()
 		}
 
@@ -470,8 +469,7 @@ func Test_promptGists(t *testing.T) {
 		client := &http.Client{Transport: reg}
 
 		t.Run(tt.name, func(t *testing.T) {
-			as, surveyteardown := prompt.NewAskStubber()
-			defer surveyteardown(t)
+			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
 				tt.askStubs(as)
 			}
