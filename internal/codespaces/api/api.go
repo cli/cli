@@ -158,14 +158,15 @@ func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error
 
 // Codespace represents a codespace.
 type Codespace struct {
-	Name       string              `json:"name"`
-	CreatedAt  string              `json:"created_at"`
-	LastUsedAt string              `json:"last_used_at"`
-	Owner      User                `json:"owner"`
-	Repository Repository          `json:"repository"`
-	State      string              `json:"state"`
-	GitStatus  CodespaceGitStatus  `json:"git_status"`
-	Connection CodespaceConnection `json:"connection"`
+	Name        string              `json:"name"`
+	CreatedAt   string              `json:"created_at"`
+	DisplayName string              `json:"display_name"`
+	LastUsedAt  string              `json:"last_used_at"`
+	Owner       User                `json:"owner"`
+	Repository  Repository          `json:"repository"`
+	State       string              `json:"state"`
+	GitStatus   CodespaceGitStatus  `json:"git_status"`
+	Connection  CodespaceConnection `json:"connection"`
 }
 
 type CodespaceGitStatus struct {
@@ -195,6 +196,7 @@ type CodespaceConnection struct {
 
 // CodespaceFields is the list of exportable fields for a codespace.
 var CodespaceFields = []string{
+	"displayName",
 	"name",
 	"owner",
 	"repository",
