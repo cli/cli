@@ -62,7 +62,7 @@ func Test_defaultConfig(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "https", proto)
 
-	editor, err := cfg.GetOrDefault("", "editor")
+	editor, err := cfg.Get("", "editor")
 	assert.NoError(t, err)
 	assert.Equal(t, "", editor)
 
@@ -72,7 +72,7 @@ func Test_defaultConfig(t *testing.T) {
 	expansion, _ := aliases.Get("co")
 	assert.Equal(t, expansion, "pr checkout")
 
-	browser, err := cfg.GetOrDefault("", "browser")
+	browser, err := cfg.Get("", "browser")
 	assert.NoError(t, err)
 	assert.Equal(t, "", browser)
 }

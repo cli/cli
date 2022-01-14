@@ -113,7 +113,7 @@ func browserLauncher(f *cmdutil.Factory) string {
 
 	cfg, err := f.Config()
 	if err == nil {
-		if cfgBrowser, _ := cfg.GetOrDefault("", "browser"); cfgBrowser != "" {
+		if cfgBrowser, _ := cfg.Get("", "browser"); cfgBrowser != "" {
 			return cfgBrowser
 		}
 	}
@@ -230,7 +230,7 @@ func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 	// 3. PAGER
 	if ghPager, ghPagerExists := os.LookupEnv("GH_PAGER"); ghPagerExists {
 		io.SetPager(ghPager)
-	} else if pager, _ := cfg.GetOrDefault("", "pager"); pager != "" {
+	} else if pager, _ := cfg.Get("", "pager"); pager != "" {
 		io.SetPager(pager)
 	}
 

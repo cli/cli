@@ -92,7 +92,7 @@ func statusRun(opts *StatusOptions) error {
 		}
 		isHostnameFound = true
 
-		token, tokenSource, _ := cfg.GetOrDefaultWithSource(hostname, "oauth_token")
+		token, tokenSource, _ := cfg.GetWithSource(hostname, "oauth_token")
 		tokenIsWriteable := cfg.CheckWriteable(hostname, "oauth_token") == nil
 
 		statusInfo[hostname] = []string{}

@@ -24,7 +24,7 @@ func CheckAuth(cfg config.Config) bool {
 	}
 
 	for _, hostname := range hosts {
-		token, _ := cfg.GetOrDefault(hostname, "oauth_token")
+		token, _ := cfg.Get(hostname, "oauth_token")
 		if token != "" {
 			return true
 		}

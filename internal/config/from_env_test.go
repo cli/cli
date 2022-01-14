@@ -301,11 +301,11 @@ func TestInheritEnv(t *testing.T) {
 			hosts, _ := cfg.Hosts()
 			assert.Equal(t, tt.wants.hosts, hosts)
 
-			val, source, _ := cfg.GetOrDefaultWithSource(tt.hostname, "oauth_token")
+			val, source, _ := cfg.GetWithSource(tt.hostname, "oauth_token")
 			assert.Equal(t, tt.wants.token, val)
 			assert.Regexp(t, tt.wants.source, source)
 
-			val, _ = cfg.GetOrDefault(tt.hostname, "oauth_token")
+			val, _ = cfg.Get(tt.hostname, "oauth_token")
 			assert.Equal(t, tt.wants.token, val)
 
 			err := cfg.CheckWriteable(tt.hostname, "oauth_token")

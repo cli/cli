@@ -16,7 +16,7 @@ func DetermineEditor(cf func() (config.Config, error)) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("could not read config: %w", err)
 		}
-		editorCommand, _ = cfg.GetOrDefault("", "editor")
+		editorCommand, _ = cfg.Get("", "editor")
 	}
 
 	return editorCommand, nil

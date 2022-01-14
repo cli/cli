@@ -127,7 +127,7 @@ func logoutRun(opts *LogoutOptions) error {
 	if err != nil {
 		// suppressing; the user is trying to delete this token and it might be bad.
 		// we'll see if the username is in the config and fall back to that.
-		username, _ = cfg.GetOrDefault(hostname, "user")
+		username, _ = cfg.Get(hostname, "user")
 	}
 
 	usernameStr := ""

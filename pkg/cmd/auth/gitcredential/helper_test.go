@@ -11,12 +11,12 @@ import (
 // why not just use the config stub argh
 type tinyConfig map[string]string
 
-func (c tinyConfig) GetOrDefaultWithSource(host, key string) (string, string, error) {
+func (c tinyConfig) GetWithSource(host, key string) (string, string, error) {
 	return c[fmt.Sprintf("%s:%s", host, key)], c["_source"], nil
 }
 
-func (c tinyConfig) GetOrDefault(host, key string) (val string, err error) {
-	val, _, err = c.GetOrDefaultWithSource(host, key)
+func (c tinyConfig) Get(host, key string) (val string, err error) {
+	val, _, err = c.GetWithSource(host, key)
 	return
 }
 

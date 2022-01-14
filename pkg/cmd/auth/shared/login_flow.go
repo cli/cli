@@ -15,7 +15,7 @@ import (
 )
 
 type iconfig interface {
-	GetOrDefault(string, string) (string, error)
+	Get(string, string) (string, error)
 	Set(string, string, string) error
 	Write() error
 }
@@ -147,7 +147,7 @@ func Login(opts *LoginOptions) error {
 
 	var username string
 	if userValidated {
-		username, _ = cfg.GetOrDefault(hostname, "user")
+		username, _ = cfg.Get(hostname, "user")
 	} else {
 		apiClient := api.NewClientFromHTTP(httpClient)
 		var err error
