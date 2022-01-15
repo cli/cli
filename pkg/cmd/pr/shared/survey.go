@@ -24,7 +24,8 @@ const (
 	EditCommitMessageAction
 	EditCommitSubjectAction
 
-	noMilestone = "(none)"
+	noMilestone     = "(none)"
+	bodyPlaceHolder = "<!--TemplateBody-->"
 )
 
 func ConfirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
@@ -77,15 +78,24 @@ func ConfirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
 }
 
 func BodySurvey(state *IssueMetadataState, templateContent, editorCommand string) error {
-	if templateContent != "" {
-		if state.Body != "" {
-			// prevent excessive newlines between default body and template
-			state.Body = strings.TrimRight(state.Body, "\n")
-			state.Body += "\n\n"
+	resolveBody := func() string {
+		if templateContent == "" {
+			return state.Body
 		}
-		state.Body += templateContent
+		if state.Body == "" {
+			return templateContent
+		}
+		if strings.Contains(templateContent, bodyPlaceHolder) {
+			return strings.Replace(templateContent, bodyPlaceHolder, state.Body, 1)
+		}
+		// prevent excessive newlines between default body and template
+		body := strings.TrimRight(state.Body, "\n")
+		body += "\n\n"
+		body += templateContent
+		return body
 	}
 
+	state.Body = resolveBody()
 	preBody := state.Body
 
 	// TODO should just be an AskOne but ran into problems with the stubber
