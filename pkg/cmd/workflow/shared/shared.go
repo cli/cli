@@ -9,15 +9,16 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 )
 
 const (
-	Active           WorkflowState = "active"
-	DisabledManually WorkflowState = "disabled_manually"
+	Active             WorkflowState = "active"
+	DisabledManually   WorkflowState = "disabled_manually"
+	DisabledInactivity WorkflowState = "disabled_inactivity"
 )
 
 type WorkflowState string

@@ -6,11 +6,11 @@ import (
 	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/pkg/cmd/auth/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +35,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		Args:  cobra.ExactArgs(0),
 		Short: "View authentication status",
 		Long: heredoc.Doc(`Verifies and displays information about your authentication state.
-			
+
 			This command will test your authentication state for each GitHub host that gh knows about and
 			report on any issues.
 		`),
@@ -127,7 +127,7 @@ func statusRun(opts *StatusOptions) error {
 				addMsg("%s %s: api call failed: %s", cs.Red("X"), hostname, err)
 			}
 			addMsg("%s Logged in to %s as %s (%s)", cs.SuccessIcon(), hostname, cs.Bold(username), tokenSource)
-			proto, _ := cfg.Get(hostname, "git_protocol")
+			proto, _ := cfg.GetOrDefault(hostname, "git_protocol")
 			if proto != "" {
 				addMsg("%s Git operations for %s configured to use %s protocol.",
 					cs.SuccessIcon(), hostname, cs.Bold(proto))

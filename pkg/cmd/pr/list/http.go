@@ -4,14 +4,18 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/githubsearch"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/githubsearch"
 )
 
+func shouldUseSearch(filters prShared.FilterOptions) bool {
+	return filters.Draft != "" || filters.Author != "" || filters.Assignee != "" || filters.Search != "" || len(filters.Labels) > 0
+}
+
 func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.PullRequestAndTotalCount, error) {
-	if filters.Author != "" || filters.Assignee != "" || filters.Search != "" || len(filters.Labels) > 0 {
+	if shouldUseSearch(filters) {
 		return searchPullRequests(httpClient, repo, filters, limit)
 	}
 
@@ -36,12 +40,14 @@ func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters pr
 			$limit: Int!,
 			$endCursor: String,
 			$baseBranch: String,
+			$headBranch: String,
 			$state: [PullRequestState!] = OPEN
 		) {
 			repository(owner: $owner, name: $repo) {
 				pullRequests(
 					states: $state,
 					baseRefName: $baseBranch,
+					headRefName: $headBranch,
 					first: $limit,
 					after: $endCursor,
 					orderBy: {field: CREATED_AT, direction: DESC}
@@ -79,6 +85,9 @@ func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters pr
 
 	if filters.BaseBranch != "" {
 		variables["baseBranch"] = filters.BaseBranch
+	}
+	if filters.HeadBranch != "" {
+		variables["headBranch"] = filters.HeadBranch
 	}
 
 	res := api.PullRequestAndTotalCount{}
@@ -177,12 +186,16 @@ func searchPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters 
 		q.SetBaseBranch(filters.BaseBranch)
 	}
 
+	if filters.Draft != "" {
+		q.SetDraft(filters.Draft)
+	}
+
 	pageLimit := min(limit, 100)
 	variables := map[string]interface{}{
 		"q": q.String(),
 	}
 
-	res := api.PullRequestAndTotalCount{}
+	res := api.PullRequestAndTotalCount{SearchCapped: limit > 1000}
 	var check = make(map[int]struct{})
 	client := api.NewClientFromHTTP(httpClient)
 

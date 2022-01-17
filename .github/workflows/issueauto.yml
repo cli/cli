@@ -1,0 +1,19 @@
+name: Issue Automation
+on:
+  issues:
+    types: [opened]
+jobs:
+  issue-auto:
+    runs-on: ubuntu-latest
+    steps:
+      - name: label incoming issue
+        env:
+         GH_REPO: ${{ github.repository }}
+         GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
+         ISSUENUM: ${{ github.event.issue.number }}
+         ISSUEAUTHOR: ${{ github.event.issue.user.login }}
+        run: |
+          if ! gh api orgs/cli/public_members/$ISSUEAUTHOR --silent 2>/dev/null
+          then
+            gh issue edit $ISSUENUM --add-label "needs-triage"
+          fi

@@ -6,11 +6,11 @@ import (
 	"net/url"
 	"sort"
 
-	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/pkg/set"
+	"github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/pkg/set"
 )
 
 type remoteResolver struct {

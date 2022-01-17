@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 func Test_jsonScalarToString(t *testing.T) {

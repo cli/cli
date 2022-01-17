@@ -5,12 +5,11 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/pkg/cmd/gist/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -61,7 +60,6 @@ func Test_deleteRun(t *testing.T) {
 		opts       *DeleteOptions
 		gist       *shared.Gist
 		httpStubs  func(*httpmock.Registry)
-		askStubs   func(*prompt.AskStubber)
 		nontty     bool
 		wantErr    bool
 		wantStderr string
@@ -120,12 +118,6 @@ func Test_deleteRun(t *testing.T) {
 
 		if tt.httpStubs != nil {
 			tt.httpStubs(reg)
-		}
-
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
 		}
 
 		if tt.opts == nil {

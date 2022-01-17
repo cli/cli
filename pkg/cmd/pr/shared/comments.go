@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/markdown"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
+	"github.com/cli/cli/v2/utils"
 )
 
 type Comment interface {
@@ -123,8 +123,7 @@ func formatComment(io *iostreams.IOStreams, comment Comment, newest bool) (strin
 	if comment.Content() == "" {
 		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No body provided"))
 	} else {
-		style := markdown.GetStyle(io.TerminalTheme())
-		md, err = markdown.Render(comment.Content(), style)
+		md, err = markdown.Render(comment.Content(), markdown.WithIO(io))
 		if err != nil {
 			return "", err
 		}

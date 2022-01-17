@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/secret/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/test"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/secret/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -45,6 +45,13 @@ func Test_NewCmdList(t *testing.T) {
 			cli:  "-eDevelopment",
 			wants: ListOptions{
 				EnvName: "Development",
+			},
+		},
+		{
+			name: "user",
+			cli:  "-u",
+			wants: ListOptions{
+				UserSecrets: true,
 			},
 		},
 	}
@@ -153,6 +160,30 @@ func Test_listRun(t *testing.T) {
 				"SECRET_THREE\t1975-11-30",
 			},
 		},
+		{
+			name: "user tty",
+			tty:  true,
+			opts: &ListOptions{
+				UserSecrets: true,
+			},
+			wantOut: []string{
+				"SECRET_ONE.*Updated 1988-10-11.*Visible to 1 selected repository",
+				"SECRET_TWO.*Updated 2020-12-04.*Visible to 2 selected repositories",
+				"SECRET_THREE.*Updated 1975-11-30.*Visible to 3 selected repositories",
+			},
+		},
+		{
+			name: "user not tty",
+			tty:  false,
+			opts: &ListOptions{
+				UserSecrets: true,
+			},
+			wantOut: []string{
+				"SECRET_ONE\t1988-10-11\t",
+				"SECRET_TWO\t2020-12-04\t",
+				"SECRET_THREE\t1975-11-30\t",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -203,11 +234,50 @@ func Test_listRun(t *testing.T) {
 				}
 				path = fmt.Sprintf("orgs/%s/actions/secrets", tt.opts.OrgName)
 
-				reg.Register(
-					httpmock.REST("GET", fmt.Sprintf("orgs/%s/actions/secrets/SECRET_THREE/repositories", tt.opts.OrgName)),
-					httpmock.JSONResponse(struct {
-						TotalCount int `json:"total_count"`
-					}{2}))
+				if tt.tty {
+					reg.Register(
+						httpmock.REST("GET", fmt.Sprintf("orgs/%s/actions/secrets/SECRET_THREE/repositories", tt.opts.OrgName)),
+						httpmock.JSONResponse(struct {
+							TotalCount int `json:"total_count"`
+						}{2}))
+				}
+			}
+
+			if tt.opts.UserSecrets {
+				payload.Secrets = []*Secret{
+					{
+						Name:             "SECRET_ONE",
+						UpdatedAt:        t0,
+						Visibility:       shared.Selected,
+						SelectedReposURL: "https://api.github.com/user/codespaces/secrets/SECRET_ONE/repositories",
+					},
+					{
+						Name:             "SECRET_TWO",
+						UpdatedAt:        t1,
+						Visibility:       shared.Selected,
+						SelectedReposURL: "https://api.github.com/user/codespaces/secrets/SECRET_TWO/repositories",
+					},
+					{
+						Name:             "SECRET_THREE",
+						UpdatedAt:        t2,
+						Visibility:       shared.Selected,
+						SelectedReposURL: "https://api.github.com/user/codespaces/secrets/SECRET_THREE/repositories",
+					},
+				}
+
+				path = "user/codespaces/secrets"
+				if tt.tty {
+					for i, secret := range payload.Secrets {
+						hostLen := len("https://api.github.com/")
+						path := secret.SelectedReposURL[hostLen:len(secret.SelectedReposURL)]
+						repositoryCount := i + 1
+						reg.Register(
+							httpmock.REST("GET", path),
+							httpmock.JSONResponse(struct {
+								TotalCount int `json:"total_count"`
+							}{repositoryCount}))
+					}
+				}
 			}
 
 			reg.Register(httpmock.REST("GET", path), httpmock.JSONResponse(payload))

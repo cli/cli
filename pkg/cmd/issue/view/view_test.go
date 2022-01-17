@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/test"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -276,7 +276,7 @@ func TestIssueView_web_notFound(t *testing.T) {
 	defer cmdTeardown(t)
 
 	_, err := runCommand(http, true, "-w 9999")
-	if err == nil || err.Error() != "GraphQL error: Could not resolve to an Issue with the number of 9999." {
+	if err == nil || err.Error() != "GraphQL: Could not resolve to an Issue with the number of 9999." {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
 }
@@ -288,10 +288,24 @@ func TestIssueView_disabledIssues(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`query IssueByNumber\b`),
 		httpmock.StringResponse(`
-			{ "data": { "repository": {
-				"id": "REPOID",
-				"hasIssuesEnabled": false
-			} } }
+			{
+				"data":
+					{ "repository": {
+						"id": "REPOID",
+						"hasIssuesEnabled": false
+					}
+				},
+				"errors": [
+					{
+						"type": "NOT_FOUND",
+						"path": [
+							"repository",
+							"issue"
+						],
+						"message": "Could not resolve to an issue or pull request with the number of 6666."
+					}
+				]
+			}
 		`),
 	)
 

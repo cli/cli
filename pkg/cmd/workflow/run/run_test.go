@@ -9,13 +9,13 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/workflow/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -557,7 +557,7 @@ jobs:
 					httpmock.StatusStringResponse(204, "cool"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(0)
+				as.StubPrompt("Select a workflow").AnswerDefault()
 			},
 			wantBody: map[string]interface{}{
 				"inputs": map[string]interface{}{},
@@ -594,17 +594,9 @@ jobs:
 					httpmock.StatusStringResponse(204, "cool"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(0)
-				as.Stub([]*prompt.QuestionStub{
-					{
-						Name:    "greeting",
-						Default: true,
-					},
-					{
-						Name:  "name",
-						Value: "scully",
-					},
-				})
+				as.StubPrompt("Select a workflow").AnswerDefault()
+				as.StubPrompt("greeting").AnswerWith("hi")
+				as.StubPrompt("name").AnswerWith("scully")
 			},
 			wantBody: map[string]interface{}{
 				"inputs": map[string]interface{}{
@@ -638,12 +630,12 @@ jobs:
 			}, "github.com"), nil
 		}
 
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
-		}
 		t.Run(tt.name, func(t *testing.T) {
+			as := prompt.NewAskStubber(t)
+			if tt.askStubs != nil {
+				tt.askStubs(as)
+			}
+
 			err := runRun(tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)

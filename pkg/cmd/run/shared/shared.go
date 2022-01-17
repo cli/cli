@@ -5,14 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 )
 
 const (
@@ -42,6 +43,20 @@ type Status string
 type Conclusion string
 type Level string
 
+var RunFields = []string{
+	"name",
+	"headBranch",
+	"headSha",
+	"createdAt",
+	"updatedAt",
+	"status",
+	"conclusion",
+	"event",
+	"databaseId",
+	"workflowDatabaseId",
+	"url",
+}
+
 type Run struct {
 	Name           string
 	CreatedAt      time.Time `json:"created_at"`
@@ -50,6 +65,7 @@ type Run struct {
 	Conclusion     Conclusion
 	Event          string
 	ID             int64
+	WorkflowID     int64  `json:"workflow_id"`
 	HeadBranch     string `json:"head_branch"`
 	JobsURL        string `json:"jobs_url"`
 	HeadCommit     Commit `json:"head_commit"`
@@ -76,6 +92,30 @@ func (r Run) CommitMsg() string {
 	} else {
 		return r.HeadSha[0:8]
 	}
+}
+
+func (r *Run) ExportData(fields []string) map[string]interface{} {
+	v := reflect.ValueOf(r).Elem()
+	fieldByName := func(v reflect.Value, field string) reflect.Value {
+		return v.FieldByNameFunc(func(s string) bool {
+			return strings.EqualFold(field, s)
+		})
+	}
+	data := map[string]interface{}{}
+
+	for _, f := range fields {
+		switch f {
+		case "databaseId":
+			data[f] = r.ID
+		case "workflowDatabaseId":
+			data[f] = r.WorkflowID
+		default:
+			sf := fieldByName(v, f)
+			data[f] = sf.Interface()
+		}
+	}
+
+	return data
 }
 
 type Job struct {
@@ -303,14 +343,14 @@ func Symbol(cs *iostreams.ColorScheme, status Status, conclusion Conclusion) (st
 		switch conclusion {
 		case Success:
 			return cs.SuccessIconWithColor(noColor), cs.Green
-		case Skipped, Cancelled, Neutral:
-			return cs.SuccessIconWithColor(noColor), cs.Gray
+		case Skipped, Neutral:
+			return "-", cs.Gray
 		default:
 			return cs.FailureIconWithColor(noColor), cs.Red
 		}
 	}
 
-	return "-", cs.Yellow
+	return "*", cs.Yellow
 }
 
 func PullRequestForRun(client *api.Client, repo ghrepo.Interface, run Run) (int, error) {

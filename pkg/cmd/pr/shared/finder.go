@@ -11,15 +11,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cli/cli/api"
-	remotes "github.com/cli/cli/context"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/set"
+	"github.com/cli/cli/v2/api"
+	remotes "github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/set"
+	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
-	"github.com/shurcooL/graphql"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -122,6 +122,7 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 		return nil, nil, err
 	}
 
+	// TODO(josebalius): Should we be guarding here?
 	if f.progress != nil {
 		f.progress.StartProgressIndicator()
 		defer f.progress.StopProgressIndicator()
@@ -271,6 +272,9 @@ func findForBranch(httpClient *http.Client, repo ghrepo.Interface, baseBranch, h
 			PullRequests struct {
 				Nodes []api.PullRequest
 			}
+			DefaultBranchRef struct {
+				Name string
+			}
 		}
 	}
 
@@ -285,6 +289,7 @@ func findForBranch(httpClient *http.Client, repo ghrepo.Interface, baseBranch, h
 			pullRequests(headRefName: $headRefName, states: $states, first: 30, orderBy: { field: CREATED_AT, direction: DESC }) {
 				nodes {%s}
 			}
+			defaultBranchRef { name }
 		}
 	}`, api.PullRequestGraphQL(fieldSet.ToSlice()))
 
@@ -313,7 +318,7 @@ func findForBranch(httpClient *http.Client, repo ghrepo.Interface, baseBranch, h
 	})
 
 	for _, pr := range prs {
-		if pr.HeadLabel() == headBranch && (baseBranch == "" || pr.BaseRefName == baseBranch) {
+		if pr.HeadLabel() == headBranch && (baseBranch == "" || pr.BaseRefName == baseBranch) && (pr.State == "OPEN" || resp.Repository.DefaultBranchRef.Name != headBranch) {
 			return &pr, nil
 		}
 	}

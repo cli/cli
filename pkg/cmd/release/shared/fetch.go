@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
 var ReleaseFields = []string{
@@ -74,7 +74,7 @@ type ReleaseAsset struct {
 	BrowserDownloadURL string    `json:"browser_download_url"`
 }
 
-func (rel *Release) ExportData(fields []string) *map[string]interface{} {
+func (rel *Release) ExportData(fields []string) map[string]interface{} {
 	v := reflect.ValueOf(rel).Elem()
 	fieldByName := func(v reflect.Value, field string) reflect.Value {
 		return v.FieldByNameFunc(func(s string) bool {
@@ -114,7 +114,7 @@ func (rel *Release) ExportData(fields []string) *map[string]interface{} {
 		}
 	}
 
-	return &data
+	return data
 }
 
 // FetchRelease finds a repository release by its tagName.

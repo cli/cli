@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -63,9 +63,11 @@ func TestTemplateManager_hasAPI(t *testing.T) {
 
 	assert.Equal(t, "LEGACY", string(m.LegacyBody()))
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, askRestore := prompt.InitAskStubber()
 	defer askRestore()
 
+	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 	as.StubOne(1) // choose "Feature Request"
 	tpl, err := m.Choose()
 	assert.NoError(t, err)

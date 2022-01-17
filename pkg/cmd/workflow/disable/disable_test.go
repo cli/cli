@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/workflow/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -121,7 +121,7 @@ func TestDisableRun(t *testing.T) {
 					httpmock.StatusStringResponse(204, "{}"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(1)
+				as.StubPrompt("Select a workflow").AnswerWith("another workflow (another.yml)")
 			},
 			wantOut: "✓ Disabled another workflow\n",
 		},
@@ -176,7 +176,7 @@ func TestDisableRun(t *testing.T) {
 					httpmock.StatusStringResponse(204, "{}"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(1)
+				as.StubPrompt("Which workflow do you mean?").AnswerWith("another workflow (yetanother.yml)")
 			},
 			wantOut: "✓ Disabled another workflow\n",
 		},
@@ -277,13 +277,12 @@ func TestDisableRun(t *testing.T) {
 			return ghrepo.FromFullName("OWNER/REPO")
 		}
 
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
-		}
-
 		t.Run(tt.name, func(t *testing.T) {
+			as := prompt.NewAskStubber(t)
+			if tt.askStubs != nil {
+				tt.askStubs(as)
+			}
+
 			err := runDisable(tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)

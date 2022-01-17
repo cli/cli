@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/api"
+	"github.com/cli/cli/v2/api"
 )
 
 type AssetForUpload struct {

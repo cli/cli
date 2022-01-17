@@ -3,8 +3,9 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 
-	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghinstance"
 )
 
 const (
@@ -13,6 +14,7 @@ const (
 	GITHUB_TOKEN            = "GITHUB_TOKEN"
 	GH_ENTERPRISE_TOKEN     = "GH_ENTERPRISE_TOKEN"
 	GITHUB_ENTERPRISE_TOKEN = "GITHUB_ENTERPRISE_TOKEN"
+	CODESPACES              = "CODESPACES"
 )
 
 type ReadOnlyEnvError struct {
@@ -74,6 +76,24 @@ func (c *envConfig) GetWithSource(hostname, key string) (string, string, error) 
 	return c.Config.GetWithSource(hostname, key)
 }
 
+func (c *envConfig) GetOrDefault(hostname, key string) (val string, err error) {
+	val, _, err = c.GetOrDefaultWithSource(hostname, key)
+	return
+}
+
+func (c *envConfig) GetOrDefaultWithSource(hostname, key string) (val string, src string, err error) {
+	val, src, err = c.GetWithSource(hostname, key)
+	if err == nil && val == "" {
+		val = c.Default(key)
+	}
+
+	return
+}
+
+func (c *envConfig) Default(key string) string {
+	return c.Config.Default(key)
+}
+
 func (c *envConfig) CheckWriteable(hostname, key string) error {
 	if hostname != "" && key == "oauth_token" {
 		if token, env := AuthTokenFromEnv(hostname); token != "" {
@@ -90,7 +110,15 @@ func AuthTokenFromEnv(hostname string) (string, string) {
 			return token, GH_ENTERPRISE_TOKEN
 		}
 
-		return os.Getenv(GITHUB_ENTERPRISE_TOKEN), GITHUB_ENTERPRISE_TOKEN
+		if token := os.Getenv(GITHUB_ENTERPRISE_TOKEN); token != "" {
+			return token, GITHUB_ENTERPRISE_TOKEN
+		}
+
+		if isCodespaces, _ := strconv.ParseBool(os.Getenv(CODESPACES)); isCodespaces {
+			return os.Getenv(GITHUB_TOKEN), GITHUB_TOKEN
+		}
+
+		return "", ""
 	}
 
 	if token := os.Getenv(GH_TOKEN); token != "" {

@@ -1,6 +1,7 @@
 package view
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -8,15 +9,15 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghrepo"
-	issueShared "github.com/cli/cli/pkg/cmd/issue/shared"
-	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/markdown"
-	"github.com/cli/cli/pkg/set"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/markdown"
+	"github.com/cli/cli/v2/pkg/set"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -77,24 +78,40 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	return cmd
 }
 
+var defaultFields = []string{
+	"number", "url", "state", "createdAt", "title", "body", "author", "milestone",
+	"assignees", "labels", "projectCards", "reactionGroups", "lastComment",
+}
+
 func viewRun(opts *ViewOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
 	}
 
-	loadComments := opts.Comments
-	if !loadComments && opts.Exporter != nil {
-		fields := set.NewStringSet()
-		fields.AddValues(opts.Exporter.Fields())
-		loadComments = fields.Contains("comments")
+	lookupFields := set.NewStringSet()
+	if opts.Exporter != nil {
+		lookupFields.AddValues(opts.Exporter.Fields())
+	} else if opts.WebMode {
+		lookupFields.Add("url")
+	} else {
+		lookupFields.AddValues(defaultFields)
+	}
+	if opts.Comments {
+		lookupFields.Add("comments")
+		lookupFields.Remove("lastComment")
 	}
 
 	opts.IO.StartProgressIndicator()
-	issue, err := findIssue(httpClient, opts.BaseRepo, opts.SelectorArg, loadComments)
+	issue, err := findIssue(httpClient, opts.BaseRepo, opts.SelectorArg, lookupFields.ToSlice())
 	opts.IO.StopProgressIndicator()
 	if err != nil {
-		return err
+		var loadErr *issueShared.PartialLoadError
+		if opts.Exporter == nil && errors.As(err, &loadErr) {
+			fmt.Fprintf(opts.IO.ErrOut, "warning: %s\n", loadErr.Error())
+		} else {
+			return err
+		}
 	}
 
 	if opts.WebMode {
@@ -127,14 +144,17 @@ func viewRun(opts *ViewOptions) error {
 	return printRawIssuePreview(opts.IO.Out, issue)
 }
 
-func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, loadComments bool) (*api.Issue, error) {
-	apiClient := api.NewClientFromHTTP(client)
-	issue, repo, err := issueShared.IssueFromArg(apiClient, baseRepoFn, selector)
+func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, fields []string) (*api.Issue, error) {
+	fieldSet := set.NewStringSet()
+	fieldSet.AddValues(fields)
+	fieldSet.Add("id")
+
+	issue, repo, err := issueShared.IssueFromArgWithFields(client, baseRepoFn, selector, fieldSet.ToSlice())
 	if err != nil {
 		return issue, err
 	}
 
-	if loadComments {
+	if fieldSet.Contains("comments") {
 		err = preloadIssueComments(client, repo, issue)
 	}
 	return issue, err
@@ -211,8 +231,7 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 	if issue.Body == "" {
 		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
 	} else {
-		style := markdown.GetStyle(opts.IO.TerminalTheme())
-		md, err = markdown.Render(issue.Body, style)
+		md, err = markdown.Render(issue.Body, markdown.WithIO(opts.IO))
 		if err != nil {
 			return err
 		}

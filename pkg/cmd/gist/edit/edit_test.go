@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/pkg/cmd/gist/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -146,8 +146,8 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "multiple files, submit",
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne("unix.md")
-				as.StubOne("Submit")
+				as.StubPrompt("Edit which file?").AnswerWith("unix.md")
+				as.StubPrompt("What next?").AnswerWith("Submit")
 			},
 			gist: &shared.Gist{
 				ID:          "1234",
@@ -191,8 +191,8 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "multiple files, cancel",
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne("unix.md")
-				as.StubOne("Cancel")
+				as.StubPrompt("Edit which file?").AnswerWith("unix.md")
+				as.StubPrompt("What next?").AnswerWith("Cancel")
 			},
 			wantErr: "CancelError",
 			gist: &shared.Gist{
@@ -280,12 +280,6 @@ func Test_editRun(t *testing.T) {
 			tt.httpStubs(reg)
 		}
 
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
-		}
-
 		if tt.opts == nil {
 			tt.opts = &EditOptions{}
 		}
@@ -308,6 +302,11 @@ func Test_editRun(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
+			as := prompt.NewAskStubber(t)
+			if tt.askStubs != nil {
+				tt.askStubs(as)
+			}
+
 			err := editRun(tt.opts)
 			reg.Verify(t)
 			if tt.wantErr != "" {

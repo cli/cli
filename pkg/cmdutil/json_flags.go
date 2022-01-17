@@ -10,10 +10,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cli/cli/pkg/export"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/jsoncolor"
-	"github.com/cli/cli/pkg/set"
+	"github.com/cli/cli/v2/pkg/export"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/jsoncolor"
+	"github.com/cli/cli/v2/pkg/set"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -73,11 +73,14 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 	}
 
 	cmd.SetFlagErrorFunc(func(c *cobra.Command, e error) error {
-		if e.Error() == "flag needs an argument: --json" {
+		if c == cmd && e.Error() == "flag needs an argument: --json" {
 			sort.Strings(fields)
 			return JSONFlagError{fmt.Errorf("Specify one or more comma-separated fields for `--json`:\n  %s", strings.Join(fields, "\n  "))}
 		}
-		return c.Parent().FlagErrorFunc()(c, e)
+		if cmd.HasParent() {
+			return cmd.Parent().FlagErrorFunc()(c, e)
+		}
+		return e
 	})
 }
 
@@ -179,7 +182,7 @@ func (e *exportFormat) exportData(v reflect.Value) interface{} {
 }
 
 type exportable interface {
-	ExportData([]string) *map[string]interface{}
+	ExportData([]string) map[string]interface{}
 }
 
 var exportableType = reflect.TypeOf((*exportable)(nil)).Elem()

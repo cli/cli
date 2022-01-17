@@ -7,18 +7,18 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/githubtemplate"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/githubtemplate"
+	"github.com/cli/cli/v2/pkg/prompt"
+	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
-	"github.com/shurcooL/graphql"
 )
 
 type issueTemplate struct {
-	// I would have un-exported these fields, except `shurcool/graphql` then cannot unmarshal them :/
+	// I would have un-exported these fields, except `cli/shurcool-graphql` then cannot unmarshal them :/
 	Gname string `graphql:"name"`
 	Gbody string `graphql:"body"`
 }

@@ -7,13 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/pkg/cmd/gist/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -356,9 +355,8 @@ func Test_viewRun(t *testing.T) {
 				)),
 			)
 
-			as, surveyteardown := prompt.InitAskStubber()
-			defer surveyteardown()
-			as.StubOne(0)
+			as := prompt.NewAskStubber(t)
+			as.StubPrompt("Select a gist").AnswerDefault()
 		}
 
 		if tt.opts == nil {
@@ -393,16 +391,18 @@ func Test_viewRun(t *testing.T) {
 
 func Test_promptGists(t *testing.T) {
 	tests := []struct {
-		name      string
-		gistIndex int
-		response  string
-		wantOut   string
-		gist      *shared.Gist
-		wantErr   bool
+		name     string
+		askStubs func(as *prompt.AskStubber)
+		response string
+		wantOut  string
+		gist     *shared.Gist
+		wantErr  bool
 	}{
 		{
-			name:      "multiple files, select first gist",
-			gistIndex: 0,
+			name: "multiple files, select first gist",
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Select a gist").AnswerWith("cool.txt  about 6 hours ago")
+			},
 			response: `{ "data": { "viewer": { "gists": { "nodes": [
 							{
 								"name": "gistid1",
@@ -422,8 +422,10 @@ func Test_promptGists(t *testing.T) {
 			wantOut: "gistid1",
 		},
 		{
-			name:      "multiple files, select second gist",
-			gistIndex: 1,
+			name: "multiple files, select second gist",
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Select a gist").AnswerWith("gistfile0.txt  about 6 hours ago")
+			},
 			response: `{ "data": { "viewer": { "gists": { "nodes": [
 							{
 								"name": "gistid1",
@@ -466,12 +468,13 @@ func Test_promptGists(t *testing.T) {
 		)
 		client := &http.Client{Transport: reg}
 
-		as, surveyteardown := prompt.InitAskStubber()
-		defer surveyteardown()
-		as.StubOne(tt.gistIndex)
-
 		t.Run(tt.name, func(t *testing.T) {
-			gistID, err := promptGists(client, ghinstance.Default(), io.ColorScheme())
+			as := prompt.NewAskStubber(t)
+			if tt.askStubs != nil {
+				tt.askStubs(as)
+			}
+
+			gistID, err := promptGists(client, "github.com", io.ColorScheme())
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantOut, gistID)
 			reg.Verify(t)

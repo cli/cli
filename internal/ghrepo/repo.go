@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/ghinstance"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/ghinstance"
 )
 
 // Interface describes an object that represents a GitHub repository
@@ -53,6 +53,12 @@ func SetDefaultHost(host string) {
 // FromFullName extracts the GitHub repository information from the following
 // formats: "OWNER/REPO", "HOST/OWNER/REPO", and a full URL.
 func FromFullName(nwo string) (Interface, error) {
+	return FromFullNameWithHost(nwo, defaultHost())
+}
+
+// FromFullNameWithHost is like FromFullName that defaults to a specific host for values that don't
+// explicitly include a hostname.
+func FromFullNameWithHost(nwo, fallbackHost string) (Interface, error) {
 	if git.IsURL(nwo) {
 		u, err := git.ParseURL(nwo)
 		if err != nil {
@@ -71,7 +77,7 @@ func FromFullName(nwo string) (Interface, error) {
 	case 3:
 		return NewWithHost(parts[1], parts[2], parts[0]), nil
 	case 2:
-		return NewWithHost(parts[0], parts[1], defaultHost()), nil
+		return NewWithHost(parts[0], parts[1], fallbackHost), nil
 	default:
 		return nil, fmt.Errorf(`expected the "[HOST/]OWNER/REPO" format, got %q`, nwo)
 	}
@@ -103,9 +109,11 @@ func IsSame(a, b Interface) bool {
 }
 
 func GenerateRepoURL(repo Interface, p string, args ...interface{}) string {
-	baseURL := fmt.Sprintf("https://%s/%s/%s", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
+	baseURL := fmt.Sprintf("%s%s/%s", ghinstance.HostPrefix(repo.RepoHost()), repo.RepoOwner(), repo.RepoName())
 	if p != "" {
-		return baseURL + "/" + fmt.Sprintf(p, args...)
+		if path := fmt.Sprintf(p, args...); path != "" {
+			return baseURL + "/" + path
+		}
 	}
 	return baseURL
 }
@@ -116,7 +124,7 @@ func FormatRemoteURL(repo Interface, protocol string) string {
 		return fmt.Sprintf("git@%s:%s/%s.git", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
 	}
 
-	return fmt.Sprintf("https://%s/%s/%s.git", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
+	return fmt.Sprintf("%s%s/%s.git", ghinstance.HostPrefix(repo.RepoHost()), repo.RepoOwner(), repo.RepoName())
 }
 
 type ghRepo struct {

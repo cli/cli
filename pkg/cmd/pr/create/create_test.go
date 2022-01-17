@@ -10,19 +10,19 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/cmd/pr/shared"
-	prShared "github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
-	"github.com/cli/cli/test"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -283,26 +283,13 @@ func TestPRCreate_recover(t *testing.T) {
 	cs.Register(`git status --porcelain`, 0, "")
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, teardown := prompt.InitAskStubber()
 	defer teardown()
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:    "Title",
-			Default: true,
-		},
-	})
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:    "Body",
-			Default: true,
-		},
-	})
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "confirmation",
-			Value: 0,
-		},
-	})
+
+	as.StubPrompt("Title").AnswerDefault()
+	as.StubPrompt("Body").AnswerDefault()
+	as.StubPrompt("What's next?").AnswerDefault()
 
 	tmpfile, err := ioutil.TempFile(t.TempDir(), "testrecover*")
 	assert.NoError(t, err)
@@ -393,9 +380,11 @@ func TestPRCreate(t *testing.T) {
 	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
-	ask.StubOne(0)
+
+	ask.StubPrompt("Where should we push the 'feature' branch?").AnswerDefault()
 
 	output, err := runCommand(http, nil, "feature", true, `-t "my title" -b "my body"`)
 	require.NoError(t, err)
@@ -438,9 +427,11 @@ func TestPRCreate_NoMaintainerModify(t *testing.T) {
 	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
-	ask.StubOne(0)
+
+	ask.StubPrompt("Where should we push the 'feature' branch?").AnswerDefault()
 
 	output, err := runCommand(http, nil, "feature", true, `-t "my title" -b "my body" --no-maintainer-edit`)
 	require.NoError(t, err)
@@ -488,9 +479,13 @@ func TestPRCreate_createFork(t *testing.T) {
 	cs.Register(`git remote add -f fork https://github.com/monalisa/REPO.git`, 0, "")
 	cs.Register(`git push --set-upstream fork HEAD:feature`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
-	ask.StubOne(1)
+
+	ask.StubPrompt("Where should we push the 'feature' branch?").
+		AssertOptions([]string{"OWNER/REPO", "Create a fork of OWNER/REPO", "Skip pushing the branch", "Cancel"}).
+		AnswerWith("Create a fork of OWNER/REPO")
 
 	output, err := runCommand(http, nil, "feature", true, `-t title -b body`)
 	require.NoError(t, err)
@@ -544,6 +539,7 @@ func TestPRCreate_pushedToNonBaseRepo(t *testing.T) {
 		deadbeef refs/remotes/origin/feature
 	`)) // determineTrackingBranch
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	_, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
 
@@ -585,6 +581,7 @@ func TestPRCreate_pushedToDifferentBranchName(t *testing.T) {
 		deadbeef refs/remotes/origin/my-feat2
 	`)) // determineTrackingBranch
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	_, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
 
@@ -618,21 +615,17 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "1234567890,commit 0\n2345678901,commit 1")
 	cs.Register(`git status --porcelain`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, teardown := prompt.InitAskStubber()
 	defer teardown()
-	as.StubOne(0) // template
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:    "Body",
-			Default: true,
-		},
-	}) // body
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "confirmation",
-			Value: 0,
-		},
-	}) // confirm
+
+	as.StubPrompt("Choose a template").
+		AssertOptions([]string{"Bug fix", "Open a blank pull request"}).
+		AnswerWith("Bug fix")
+	as.StubPrompt("Body").AnswerDefault()
+	as.StubPrompt("What's next?").
+		AssertOptions([]string{"Submit", "Continue in browser", "Add metadata", "Cancel"}).
+		AnswerDefault()
 
 	output, err := runCommandWithRootDirOverridden(http, nil, "feature", true, `-t "my title" -H feature`, "./fixtures/repoWithNonLegacyPRTemplates")
 	require.NoError(t, err)
@@ -771,9 +764,13 @@ func TestPRCreate_web(t *testing.T) {
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
-	ask.StubOne(0)
+
+	ask.StubPrompt("Where should we push the 'feature' branch?").
+		AssertOptions([]string{"OWNER/REPO", "Skip pushing the branch", "Cancel"}).
+		AnswerDefault()
 
 	output, err := runCommand(http, nil, "feature", true, `--web`)
 	require.NoError(t, err)
@@ -842,9 +839,11 @@ func TestPRCreate_webProject(t *testing.T) {
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
-	ask.StubOne(0)
+
+	ask.StubPrompt("Where should we push the 'feature' branch?").AnswerDefault()
 
 	output, err := runCommand(http, nil, "feature", true, `--web -p Triage`)
 	require.NoError(t, err)

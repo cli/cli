@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/ghrepo"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
 // Remotes represents a set of git remotes

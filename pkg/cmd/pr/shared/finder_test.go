@@ -6,10 +6,10 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/httpmock"
+	"github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/httpmock"
 )
 
 func TestFind(t *testing.T) {
@@ -223,6 +223,42 @@ func TestFind(t *testing.T) {
 			},
 			wantPR:   13,
 			wantRepo: "https://github.com/OWNER/REPO",
+		},
+		{
+			name: "current branch with merged pr",
+			args: args{
+				selector: "",
+				fields:   []string{"id", "number"},
+				baseRepoFn: func() (ghrepo.Interface, error) {
+					return ghrepo.FromFullName("OWNER/REPO")
+				},
+				branchFn: func() (string, error) {
+					return "blueberries", nil
+				},
+				branchConfig: func(branch string) (c git.BranchConfig) {
+					return
+				},
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query PullRequestForBranch\b`),
+					httpmock.StringResponse(`{"data":{"repository":{
+						"pullRequests":{"nodes":[
+							{
+								"number": 13,
+								"state": "MERGED",
+								"baseRefName": "main",
+								"headRefName": "blueberries",
+								"isCrossRepository": false,
+								"headRepositoryOwner": {"login":"OWNER"}
+							}
+						]},
+						"defaultBranchRef":{
+							"name": "blueberries"
+						}
+					}}}`))
+			},
+			wantErr: true,
 		},
 		{
 			name: "current branch is error",

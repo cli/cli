@@ -9,10 +9,10 @@ import (
 	"runtime"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/cmd/ssh-key/add"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/ssh-key/add"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/safeexec"
 )
 

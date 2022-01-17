@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -47,14 +47,13 @@ func TestLogin_ssh(t *testing.T) {
 		httpmock.REST("POST", "api/v3/user/keys"),
 		httpmock.StringResponse(`{}`))
 
-	ask, askRestore := prompt.InitAskStubber()
-	defer askRestore()
+	ask := prompt.NewAskStubber(t)
 
-	ask.StubOne("SSH")    // preferred protocol
-	ask.StubOne(true)     // generate a new key
-	ask.StubOne("monkey") // enter a passphrase
-	ask.StubOne(1)        // paste a token
-	ask.StubOne("ATOKEN") // token
+	ask.StubPrompt("What is your preferred protocol for Git operations?").AnswerWith("SSH")
+	ask.StubPrompt("Generate a new SSH key to add to your GitHub account?").AnswerWith(true)
+	ask.StubPrompt("Enter a passphrase for your new SSH key (Optional)").AnswerWith("monkey")
+	ask.StubPrompt("How would you like to authenticate GitHub CLI?").AnswerWith("Paste an authentication token")
+	ask.StubPrompt("Paste your authentication token:").AnswerWith("ATOKEN")
 
 	rs, runRestore := run.Stub()
 	defer runRestore(t)

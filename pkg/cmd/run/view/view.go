@@ -16,14 +16,14 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/pkg/cmd/run/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
-	"github.com/cli/cli/utils"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/run/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -78,7 +78,8 @@ type ViewOptions struct {
 	LogFailed  bool
 	Web        bool
 
-	Prompt bool
+	Prompt   bool
+	Exporter cmdutil.Exporter
 
 	Now func() time.Time
 }
@@ -118,7 +119,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 			if len(args) == 0 && opts.JobID == "" {
 				if !opts.IO.CanPrompt() {
-					return &cmdutil.FlagError{Err: errors.New("run or job ID required when not running interactively")}
+					return cmdutil.FlagErrorf("run or job ID required when not running interactively")
 				} else {
 					opts.Prompt = true
 				}
@@ -135,11 +136,11 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			}
 
 			if opts.Web && opts.Log {
-				return &cmdutil.FlagError{Err: errors.New("specify only one of --web or --log")}
+				return cmdutil.FlagErrorf("specify only one of --web or --log")
 			}
 
 			if opts.Log && opts.LogFailed {
-				return &cmdutil.FlagError{Err: errors.New("specify only one of --log or --log-failed")}
+				return cmdutil.FlagErrorf("specify only one of --log or --log-failed")
 			}
 
 			if runF != nil {
@@ -155,6 +156,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.Log, "log", false, "View full log for either a run or specific job")
 	cmd.Flags().BoolVar(&opts.LogFailed, "log-failed", false, "View the log for any failed steps in a run or specific job")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open run in the browser")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.RunFields)
 
 	return cmd
 }
@@ -226,6 +228,10 @@ func runView(opts *ViewOptions) error {
 				return err
 			}
 		}
+	}
+
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, run)
 	}
 
 	if opts.Web {

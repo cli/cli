@@ -8,17 +8,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/context"
-	"github.com/cli/cli/git"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/internal/ghrepo"
-	"github.com/cli/cli/internal/run"
-	"github.com/cli/cli/pkg/cmd/pr/shared"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/test"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -97,6 +97,7 @@ func Test_checkoutRun(t *testing.T) {
 				cs.Register(`git config branch\.feature\.merge`, 1, "")
 				cs.Register(`git checkout feature`, 0, "")
 				cs.Register(`git config branch\.feature\.remote origin`, 0, "")
+				cs.Register(`git config branch\.feature\.pushRemote origin`, 0, "")
 				cs.Register(`git config branch\.feature\.merge refs/pull/123/head`, 0, "")
 			},
 		},
@@ -152,6 +153,7 @@ func Test_checkoutRun(t *testing.T) {
 				cs.Register(`git fetch origin refs/pull/123/head:foobar`, 0, "")
 				cs.Register(`git checkout foobar`, 0, "")
 				cs.Register(`git config branch\.foobar\.remote https://github.com/hubot/REPO.git`, 0, "")
+				cs.Register(`git config branch\.foobar\.pushRemote https://github.com/hubot/REPO.git`, 0, "")
 				cs.Register(`git config branch\.foobar\.merge refs/heads/feature`, 0, "")
 			},
 		},
@@ -343,6 +345,7 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 	cs.Register(`git config branch\.feature\.merge`, 1, "")
 	cs.Register(`git checkout feature`, 0, "")
 	cs.Register(`git config branch\.feature\.remote origin`, 0, "")
+	cs.Register(`git config branch\.feature\.pushRemote origin`, 0, "")
 	cs.Register(`git config branch\.feature\.merge refs/pull/123/head`, 0, "")
 
 	output, err := runCommand(http, nil, "master", `123`)
@@ -442,6 +445,7 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 	cs.Register(`git config branch\.feature\.merge`, 1, "")
 	cs.Register(`git checkout feature`, 0, "")
 	cs.Register(`git config branch\.feature\.remote https://github\.com/hubot/REPO\.git`, 0, "")
+	cs.Register(`git config branch\.feature\.pushRemote https://github\.com/hubot/REPO\.git`, 0, "")
 	cs.Register(`git config branch\.feature\.merge refs/heads/feature`, 0, "")
 
 	output, err := runCommand(http, nil, "master", `123`)

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -95,10 +95,10 @@ func TestNewHTTPClient(t *testing.T) {
 				> Accept: application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview
 				> Authorization: token ████████████████████
 				> User-Agent: GitHub CLI v1.2.3
-				
+
 				< HTTP/1.1 204 No Content
 				< Date: <time>
-				
+
 				* Request took <duration>
 			`),
 		},
@@ -156,6 +156,10 @@ func TestNewHTTPClient(t *testing.T) {
 }
 
 type tinyConfig map[string]string
+
+func (c tinyConfig) GetOrDefault(host, key string) (string, error) {
+	return c[fmt.Sprintf("%s:%s", host, key)], nil
+}
 
 func (c tinyConfig) Get(host, key string) (string, error) {
 	return c[fmt.Sprintf("%s:%s", host, key)], nil

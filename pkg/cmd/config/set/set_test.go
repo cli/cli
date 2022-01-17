@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -145,11 +145,11 @@ func Test_setRun(t *testing.T) {
 			assert.Equal(t, tt.stdout, stdout.String())
 			assert.Equal(t, tt.stderr, stderr.String())
 
-			val, err := tt.input.Config.Get(tt.input.Hostname, tt.input.Key)
+			val, err := tt.input.Config.GetOrDefault(tt.input.Hostname, tt.input.Key)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedValue, val)
 
-			val, err = tt.input.Config.Get("", "_written")
+			val, err = tt.input.Config.GetOrDefault("", "_written")
 			assert.NoError(t, err)
 			assert.Equal(t, "true", val)
 		})

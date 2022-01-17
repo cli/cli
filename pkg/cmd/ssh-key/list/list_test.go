@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/pkg/httpmock"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 func TestListRun(t *testing.T) {
@@ -118,7 +118,7 @@ func TestListRun(t *testing.T) {
 
 			err := listRun(&opts)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("linRun() return error: %v", err)
+				t.Errorf("listRun() return error: %v", err)
 				return
 			}
 

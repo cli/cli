@@ -7,11 +7,11 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/api"
-	"github.com/cli/cli/internal/authflow"
-	"github.com/cli/cli/internal/ghinstance"
-	"github.com/cli/cli/pkg/iostreams"
-	"github.com/cli/cli/pkg/prompt"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/authflow"
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 )
 
 type iconfig interface {
@@ -99,7 +99,7 @@ func Login(opts *LoginOptions) error {
 	var authMode int
 	if opts.Web {
 		authMode = 0
-	} else {
+	} else if opts.Interactive {
 		err := prompt.SurveyAskOne(&survey.Select{
 			Message: "How would you like to authenticate GitHub CLI?",
 			Options: []string{
@@ -117,10 +117,11 @@ func Login(opts *LoginOptions) error {
 
 	if authMode == 0 {
 		var err error
-		authToken, err = authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", append(opts.Scopes, additionalScopes...))
+		authToken, err = authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", append(opts.Scopes, additionalScopes...), opts.Interactive)
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
+		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
 		userValidated = true
 	} else {
 		minimumScopes := append([]string{"repo", "read:org"}, additionalScopes...)

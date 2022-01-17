@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -198,10 +198,10 @@ type exportableItem struct {
 	Name string
 }
 
-func (e *exportableItem) ExportData(fields []string) *map[string]interface{} {
+func (e *exportableItem) ExportData(fields []string) map[string]interface{} {
 	m := map[string]interface{}{}
 	for _, f := range fields {
 		m[f] = fmt.Sprintf("%s:%s", e.Name, f)
 	}
-	return &m
+	return m
 }

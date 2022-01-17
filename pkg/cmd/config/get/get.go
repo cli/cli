@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/internal/config"
-	"github.com/cli/cli/pkg/cmdutil"
-	"github.com/cli/cli/pkg/iostreams"
+	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
@@ -53,7 +53,7 @@ func NewCmdConfigGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Co
 }
 
 func getRun(opts *GetOptions) error {
-	val, err := opts.Config.Get(opts.Hostname, opts.Key)
+	val, err := opts.Config.GetOrDefault(opts.Hostname, opts.Key)
 	if err != nil {
 		return err
 	}
