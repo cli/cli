@@ -181,6 +181,35 @@ func TestEnableRun(t *testing.T) {
 			wantOut: "✓ Enabled a disabled workflow\n",
 		},
 		{
+			name: "tty name arg inactivity workflow",
+			opts: &EnableOptions{
+				Selector: "a disabled inactivity workflow",
+			},
+			tty: true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/a disabled inactivity workflow"),
+					httpmock.StatusStringResponse(404, "not found"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(shared.WorkflowsPayload{
+						Workflows: []shared.Workflow{
+							shared.AWorkflow,
+							shared.DisabledInactivityWorkflow,
+							shared.UniqueDisabledWorkflow,
+							shared.AnotherWorkflow,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("PUT", "repos/OWNER/REPO/actions/workflows/1206/enable"),
+					httpmock.StatusStringResponse(204, "{}"))
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubOne(1)
+			},
+			wantOut: "✓ Enabled a disabled inactivity workflow\n",
+		},
+		{
 			name: "tty ID arg",
 			opts: &EnableOptions{
 				Selector: "456",
@@ -232,6 +261,30 @@ func TestEnableRun(t *testing.T) {
 					}))
 				reg.Register(
 					httpmock.REST("PUT", "repos/OWNER/REPO/actions/workflows/1314/enable"),
+					httpmock.StatusStringResponse(204, "{}"))
+			},
+		},
+		{
+			name: "nontty name arg inactivity workflow",
+			opts: &EnableOptions{
+				Selector: "a disabled inactivity workflow",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/a disabled inactivity workflow"),
+					httpmock.StatusStringResponse(404, "not found"))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(shared.WorkflowsPayload{
+						Workflows: []shared.Workflow{
+							shared.AWorkflow,
+							shared.DisabledInactivityWorkflow,
+							shared.UniqueDisabledWorkflow,
+							shared.AnotherWorkflow,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("PUT", "repos/OWNER/REPO/actions/workflows/1206/enable"),
 					httpmock.StatusStringResponse(204, "{}"))
 			},
 		},
