@@ -179,10 +179,6 @@ func TestNewHTTPClient(t *testing.T) {
 
 type tinyConfig map[string]string
 
-func (c tinyConfig) GetOrDefault(host, key string) (string, error) {
-	return c[fmt.Sprintf("%s:%s", host, key)], nil
-}
-
 func (c tinyConfig) Get(host, key string) (string, error) {
 	return c[fmt.Sprintf("%s:%s", host, key)], nil
 }

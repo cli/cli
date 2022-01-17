@@ -55,7 +55,6 @@ var timezoneNames = map[int]string{
 }
 
 type configGetter interface {
-	GetOrDefault(string, string) (string, error)
 	Get(string, string) (string, error)
 }
 
