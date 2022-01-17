@@ -166,7 +166,7 @@ func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 		return io
 	}
 
-	if prompt, _ := cfg.Get("", "prompt"); prompt == "disabled" {
+	if prompt, _ := cfg.GetOrDefault("", "prompt"); prompt == "disabled" {
 		io.SetNeverPrompt(true)
 	}
 

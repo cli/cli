@@ -8,10 +8,16 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
+// why not just use the config stub argh
 type tinyConfig map[string]string
 
 func (c tinyConfig) GetWithSource(host, key string) (string, string, error) {
 	return c[fmt.Sprintf("%s:%s", host, key)], c["_source"], nil
+}
+
+func (c tinyConfig) Get(host, key string) (val string, err error) {
+	val, _, err = c.GetWithSource(host, key)
+	return
 }
 
 func Test_helperRun(t *testing.T) {
