@@ -6,7 +6,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.3.2
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/briandowns/spinner v1.18.0
-	github.com/charmbracelet/glamour v0.3.0
+	github.com/charmbracelet/glamour v0.4.0
 	github.com/cli/browser v1.1.0
 	github.com/cli/oauth v0.9.0
 	github.com/cli/safeexec v1.0.0
@@ -26,8 +26,7 @@ require (
 	github.com/mattn/go-colorable v0.1.12
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
-	github.com/microcosm-cc/bluemonday v1.0.16 // indirect
-	github.com/muesli/reflow v0.2.1-0.20210502190812-c80126ec2ad5
+	github.com/muesli/reflow v0.3.0
 	github.com/muesli/termenv v0.9.0
 	github.com/muhammadmuzzammil1998/jsonc v0.0.0-20201229145248-615b0916ca38
 	github.com/opentracing/opentracing-go v1.1.0

@@ -26,7 +26,7 @@ type RefreshOptions struct {
 
 	Hostname string
 	Scopes   []string
-	AuthFlow func(config.Config, *iostreams.IOStreams, string, []string) error
+	AuthFlow func(config.Config, *iostreams.IOStreams, string, []string, bool) error
 
 	Interactive bool
 }
@@ -35,8 +35,8 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 	opts := &RefreshOptions{
 		IO:     f.IOStreams,
 		Config: f.Config,
-		AuthFlow: func(cfg config.Config, io *iostreams.IOStreams, hostname string, scopes []string) error {
-			_, err := authflow.AuthFlowWithConfig(cfg, io, hostname, "", scopes)
+		AuthFlow: func(cfg config.Config, io *iostreams.IOStreams, hostname string, scopes []string, interactive bool) error {
+			_, err := authflow.AuthFlowWithConfig(cfg, io, hostname, "", scopes, interactive)
 			return err
 		},
 		httpClient: http.DefaultClient,
@@ -154,9 +154,12 @@ func refreshRun(opts *RefreshOptions) error {
 		additionalScopes = append(additionalScopes, credentialFlow.Scopes()...)
 	}
 
-	if err := opts.AuthFlow(cfg, opts.IO, hostname, append(opts.Scopes, additionalScopes...)); err != nil {
+	if err := opts.AuthFlow(cfg, opts.IO, hostname, append(opts.Scopes, additionalScopes...), opts.Interactive); err != nil {
 		return err
 	}
+
+	cs := opts.IO.ColorScheme()
+	fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
 
 	if credentialFlow.ShouldSetup() {
 		username, _ := cfg.Get(hostname, "user")

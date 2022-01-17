@@ -215,8 +215,7 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 	if pr.Body == "" {
 		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
 	} else {
-		style := markdown.GetStyle(opts.IO.TerminalTheme())
-		md, err = markdown.Render(pr.Body, style)
+		md, err = markdown.Render(pr.Body, markdown.WithIO(opts.IO))
 		if err != nil {
 			return err
 		}
