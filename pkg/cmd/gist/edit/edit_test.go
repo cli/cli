@@ -146,8 +146,8 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "multiple files, submit",
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne("unix.md")
-				as.StubOne("Submit")
+				as.StubPrompt("Edit which file?").AnswerWith("unix.md")
+				as.StubPrompt("What next?").AnswerWith("Submit")
 			},
 			gist: &shared.Gist{
 				ID:          "1234",
@@ -191,8 +191,8 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "multiple files, cancel",
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne("unix.md")
-				as.StubOne("Cancel")
+				as.StubPrompt("Edit which file?").AnswerWith("unix.md")
+				as.StubPrompt("What next?").AnswerWith("Cancel")
 			},
 			wantErr: "CancelError",
 			gist: &shared.Gist{
@@ -280,12 +280,6 @@ func Test_editRun(t *testing.T) {
 			tt.httpStubs(reg)
 		}
 
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
-		}
-
 		if tt.opts == nil {
 			tt.opts = &EditOptions{}
 		}
@@ -308,6 +302,11 @@ func Test_editRun(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
+			as := prompt.NewAskStubber(t)
+			if tt.askStubs != nil {
+				tt.askStubs(as)
+			}
+
 			err := editRun(tt.opts)
 			reg.Verify(t)
 			if tt.wantErr != "" {

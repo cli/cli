@@ -515,27 +515,16 @@ func Test_createRun_interactive(t *testing.T) {
 			name: "create a release from existing tag",
 			opts: &CreateOptions{},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne("v1.2.3") // Tag prompt
-				as.Stub([]*prompt.QuestionStub{
-					{
-						Name:  "name",
-						Value: "title",
-					},
-					{
-						Name:  "releaseNotesAction",
-						Value: "Leave blank",
-					},
-				})
-				as.Stub([]*prompt.QuestionStub{
-					{
-						Name:  "prerelease",
-						Value: false,
-					},
-					{
-						Name:  "submitAction",
-						Value: "Publish release",
-					},
-				})
+				as.StubPrompt("Choose a tag").
+					AssertOptions([]string{"v1.2.3", "v1.2.2", "v1.0.0", "v0.1.2", "Create a new tag"}).
+					AnswerWith("v1.2.3")
+				as.StubPrompt("Title (optional)").AnswerWith("")
+				as.StubPrompt("Release notes").
+					AssertOptions([]string{"Write my own", "Write using generated notes as template", "Leave blank"}).
+					AnswerWith("Leave blank")
+				as.StubPrompt("Is this a prerelease?").AnswerWith(false)
+				as.StubPrompt("Submit?").
+					AssertOptions([]string{"Publish release", "Save as draft", "Cancel"}).AnswerWith("Publish release")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/tags"), httpmock.StatusStringResponse(200, `[
@@ -558,28 +547,12 @@ func Test_createRun_interactive(t *testing.T) {
 			name: "create a release from new tag",
 			opts: &CreateOptions{},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne("Create a new tag") // Tag prompt
-				as.StubOne("v1.2.3")           // New tag prompt
-				as.Stub([]*prompt.QuestionStub{
-					{
-						Name:  "name",
-						Value: "title",
-					},
-					{
-						Name:  "releaseNotesAction",
-						Value: "Leave blank",
-					},
-				})
-				as.Stub([]*prompt.QuestionStub{
-					{
-						Name:  "prerelease",
-						Value: false,
-					},
-					{
-						Name:  "submitAction",
-						Value: "Publish release",
-					},
-				})
+				as.StubPrompt("Choose a tag").AnswerWith("Create a new tag")
+				as.StubPrompt("Tag name").AnswerWith("v1.2.3")
+				as.StubPrompt("Title (optional)").AnswerWith("")
+				as.StubPrompt("Release notes").AnswerWith("Leave blank")
+				as.StubPrompt("Is this a prerelease?").AnswerWith(false)
+				as.StubPrompt("Submit?").AnswerWith("Publish release")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/tags"), httpmock.StatusStringResponse(200, `[
@@ -604,26 +577,10 @@ func Test_createRun_interactive(t *testing.T) {
 				TagName: "v1.2.3",
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.Stub([]*prompt.QuestionStub{
-					{
-						Name:  "name",
-						Value: "title",
-					},
-					{
-						Name:  "releaseNotesAction",
-						Value: "Write using generated notes as template",
-					},
-				})
-				as.Stub([]*prompt.QuestionStub{
-					{
-						Name:  "prerelease",
-						Value: false,
-					},
-					{
-						Name:  "submitAction",
-						Value: "Publish release",
-					},
-				})
+				as.StubPrompt("Title (optional)").AnswerDefault()
+				as.StubPrompt("Release notes").AnswerWith("Write using generated notes as template")
+				as.StubPrompt("Is this a prerelease?").AnswerWith(false)
+				as.StubPrompt("Submit?").AnswerWith("Publish release")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
@@ -641,7 +598,7 @@ func Test_createRun_interactive(t *testing.T) {
 			wantParams: map[string]interface{}{
 				"body":       "generated body",
 				"draft":      false,
-				"name":       "title",
+				"name":       "generated name",
 				"prerelease": false,
 				"tag_name":   "v1.2.3",
 			},
@@ -674,6 +631,7 @@ func Test_createRun_interactive(t *testing.T) {
 			return val, nil
 		}
 
+		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 		as, teardown := prompt.InitAskStubber()
 		defer teardown()
 		if tt.askStubs != nil {

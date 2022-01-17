@@ -487,10 +487,8 @@ func Test_getBodyPrompt(t *testing.T) {
 	io.SetStdinTTY(true)
 	io.SetStdoutTTY(true)
 
-	as, teardown := prompt.InitAskStubber()
-	defer teardown()
-
-	as.StubOne("cool secret")
+	as := prompt.NewAskStubber(t)
+	as.StubPrompt("Paste your secret").AnswerWith("cool secret")
 
 	body, err := getBody(&SetOptions{
 		IO: io,

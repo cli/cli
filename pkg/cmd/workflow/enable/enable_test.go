@@ -121,7 +121,7 @@ func TestEnableRun(t *testing.T) {
 					httpmock.StatusStringResponse(204, "{}"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(0)
+				as.StubPrompt("Select a workflow").AnswerWith("a disabled workflow (disabled.yml)")
 			},
 			wantOut: "✓ Enabled a disabled workflow\n",
 		},
@@ -176,7 +176,7 @@ func TestEnableRun(t *testing.T) {
 					httpmock.StatusStringResponse(204, "{}"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(1)
+				as.StubPrompt("Which workflow do you mean?").AnswerWith("a disabled workflow (anotherDisabled.yml)")
 			},
 			wantOut: "✓ Enabled a disabled workflow\n",
 		},
@@ -193,9 +193,6 @@ func TestEnableRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("PUT", "repos/OWNER/REPO/actions/workflows/456/enable"),
 					httpmock.StatusStringResponse(204, "{}"))
-			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(0)
 			},
 			wantOut: "✓ Enabled a disabled workflow\n",
 		},
@@ -279,13 +276,12 @@ func TestEnableRun(t *testing.T) {
 			return ghrepo.FromFullName("OWNER/REPO")
 		}
 
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
-		}
-
 		t.Run(tt.name, func(t *testing.T) {
+			as := prompt.NewAskStubber(t)
+			if tt.askStubs != nil {
+				tt.askStubs(as)
+			}
+
 			err := runEnable(tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
