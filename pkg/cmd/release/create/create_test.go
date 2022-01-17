@@ -528,18 +528,18 @@ func Test_createRun_interactive(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/tags"), httpmock.StatusStringResponse(200, `[
-            { "name": "v1.2.3" }, { "name": "v1.2.2" }, { "name": "v1.0.0" }, { "name": "v0.1.2" }
-         ]`))
+					{ "name": "v1.2.3" }, { "name": "v1.2.2" }, { "name": "v1.0.0" }, { "name": "v0.1.2" }
+				]`))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
 					httpmock.StatusStringResponse(200, `{
-            "name": "generated name",
-            "body": "generated body"
-         }`))
+						"name": "generated name",
+						"body": "generated body"
+					}`))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, `{
-           "url": "https://api.github.com/releases/123",
-           "upload_url": "https://api.github.com/assets/upload",
-           "html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
-         }`))
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`))
 			},
 			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 		},
@@ -550,24 +550,26 @@ func Test_createRun_interactive(t *testing.T) {
 				as.StubPrompt("Choose a tag").AnswerWith("Create a new tag")
 				as.StubPrompt("Tag name").AnswerWith("v1.2.3")
 				as.StubPrompt("Title (optional)").AnswerWith("")
-				as.StubPrompt("Release notes").AnswerWith("Leave blank")
+				as.StubPrompt("Release notes").
+					AssertOptions([]string{"Write my own", "Write using generated notes as template", "Leave blank"}).
+					AnswerWith("Leave blank")
 				as.StubPrompt("Is this a prerelease?").AnswerWith(false)
 				as.StubPrompt("Submit?").AnswerWith("Publish release")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/tags"), httpmock.StatusStringResponse(200, `[
-            { "name": "v1.2.2" }, { "name": "v1.0.0" }, { "name": "v0.1.2" }
-         ]`))
+					{ "name": "v1.2.2" }, { "name": "v1.0.0" }, { "name": "v0.1.2" }
+				]`))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
 					httpmock.StatusStringResponse(200, `{
-            "name": "generated name",
-            "body": "generated body"
-         }`))
+						"name": "generated name",
+						"body": "generated body"
+					}`))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, `{
-           "url": "https://api.github.com/releases/123",
-           "upload_url": "https://api.github.com/assets/upload",
-           "html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
-         }`))
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`))
 			},
 			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 		},
@@ -578,22 +580,24 @@ func Test_createRun_interactive(t *testing.T) {
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubPrompt("Title (optional)").AnswerDefault()
-				as.StubPrompt("Release notes").AnswerWith("Write using generated notes as template")
+				as.StubPrompt("Release notes").
+					AssertOptions([]string{"Write my own", "Write using generated notes as template", "Leave blank"}).
+					AnswerWith("Write using generated notes as template")
 				as.StubPrompt("Is this a prerelease?").AnswerWith(false)
 				as.StubPrompt("Submit?").AnswerWith("Publish release")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
 					httpmock.StatusStringResponse(200, `{
-            "name": "generated name",
-            "body": "generated body"
-         }`))
+						"name": "generated name",
+						"body": "generated body"
+					}`))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"),
 					httpmock.StatusStringResponse(201, `{
-           "url": "https://api.github.com/releases/123",
-           "upload_url": "https://api.github.com/assets/upload",
-           "html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
-         }`))
+						"url": "https://api.github.com/releases/123",
+						"upload_url": "https://api.github.com/assets/upload",
+						"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+					}`))
 			},
 			wantParams: map[string]interface{}{
 				"body":       "generated body",
@@ -631,14 +635,12 @@ func Test_createRun_interactive(t *testing.T) {
 			return val, nil
 		}
 
-		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
-		}
-
 		t.Run(tt.name, func(t *testing.T) {
+			as := prompt.NewAskStubber(t)
+			if tt.askStubs != nil {
+				tt.askStubs(as)
+			}
+
 			err := createRun(tt.opts)
 
 			if tt.wantErr != "" {
