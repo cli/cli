@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -108,6 +109,7 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg configGetter, appVersion string,
 			}
 			return "", nil
 		}),
+		api.ExtractHeader("X-GitHub-SSO", &ssoHeader),
 	)
 
 	if setAccept {
@@ -125,6 +127,22 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg configGetter, appVersion string,
 	}
 
 	return api.NewHTTPClient(opts...), nil
+}
+
+var ssoHeader string
+var ssoURLRE = regexp.MustCompile(`\burl=(\S+)`)
+
+// SSOURL returns the URL of a SAML SSO challenge received by the server for clients that use ExtractHeader
+// to extract the value of the "X-GitHub-SSO" response header.
+func SSOURL() string {
+	if ssoHeader == "" {
+		return ""
+	}
+	m := ssoURLRE.FindStringSubmatch(ssoHeader)
+	if m == nil {
+		return ""
+	}
+	return m[1]
 }
 
 func getHost(r *http.Request) string {

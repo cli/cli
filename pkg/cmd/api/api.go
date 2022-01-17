@@ -21,6 +21,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/export"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -392,6 +393,9 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
 		if msg := api.ScopesSuggestion(resp); msg != "" {
 			fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", msg)
+		}
+		if u := factory.SSOURL(); u != "" {
+			fmt.Fprintf(opts.IO.ErrOut, "Authorize in your web browser: %s\n", u)
 		}
 		err = cmdutil.SilentError
 		return
