@@ -204,9 +204,6 @@ func TestEnableRun(t *testing.T) {
 					httpmock.REST("PUT", "repos/OWNER/REPO/actions/workflows/1206/enable"),
 					httpmock.StatusStringResponse(204, "{}"))
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(1)
-			},
 			wantOut: "✓ Enabled a disabled inactivity workflow\n",
 		},
 		{
