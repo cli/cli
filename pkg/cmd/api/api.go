@@ -71,10 +71,12 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			The endpoint argument should either be a path of a GitHub API v3 endpoint, or
 			"graphql" to access the GitHub API v4.
 
-			Placeholder values "{owner}", "{repo}", and "{branch}" in the endpoint argument will
-			get replaced with values from the repository of the current directory. Note that in
-			some shells, for example PowerShell, you may need to enclose any value that contains
-			"{...}" in quotes to prevent the shell from applying special meaning to curly braces.
+			Placeholder values "{owner}", "{repo}", and "{branch}" in the endpoint
+			argument will get replaced with values from the repository of the current
+			directory or the repository specified in the GH_REPO environment variable.
+			Note that in some shells, for example PowerShell, you may need to enclose
+			any value that contains "{...}" in quotes to prevent the shell from
+			applying special meaning to curly braces.
 
 			The default HTTP request method is "GET" normally and "POST" if any parameters
 			were added. Override the method with %[1]s--method%[1]s.
@@ -167,6 +169,9 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			`),
 		},
 		Args: cobra.ExactArgs(1),
+		PreRun: func(c *cobra.Command, args []string) {
+			opts.BaseRepo = cmdutil.OverrideBaseRepoFunc(f, "")
+		},
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.RequestPath = args[0]
 			opts.RequestMethodPassed = c.Flags().Changed("method")
