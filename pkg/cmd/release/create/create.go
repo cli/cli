@@ -401,6 +401,10 @@ func createRun(opts *CreateOptions) error {
 		params["draft"] = true
 	}
 
+	if gitTagAlreadyExistLocally(opts.TagName) && gitTagNotExistsRemote(opts.TagName, baseRepo.RepoName()) {
+		return errors.New("tag exists locally but not in remote")
+	}
+
 	newRelease, err := createRelease(httpClient, baseRepo, params)
 	if err != nil {
 		return err
@@ -431,6 +435,25 @@ func createRun(opts *CreateOptions) error {
 	fmt.Fprintf(opts.IO.Out, "%s\n", newRelease.URL)
 
 	return nil
+}
+
+func gitTagAlreadyExistLocally(tagName string) bool {
+	b, err := gitTagInfo(tagName)
+	if err != nil {
+		return false
+	}
+
+	return len(b) != 0
+}
+
+func gitTagNotExistsRemote(tagName string, baseRepoName string) bool {
+	cmd, err := git.GitCommand("git ls-remote --tags", baseRepoName, tagName)
+	if err != nil {
+		return false
+	}
+
+	b, err := run.PrepareCmd(cmd).Output()
+	return len(b) == 0
 }
 
 func gitTagInfo(tagName string) (string, error) {
