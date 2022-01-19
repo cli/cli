@@ -126,7 +126,7 @@ func TestNewHTTPClient(t *testing.T) {
 				appVersion: "v1.2.3",
 			},
 			host:       "github.com",
-			sso:        "required; url=https://github.com/login/sso?return_to=xyz&param=123abc",
+			sso:        "required; url=https://github.com/login/sso?return_to=xyz&param=123abc; another",
 			wantStderr: "",
 			wantSSO:    "https://github.com/login/sso?return_to=xyz&param=123abc",
 		},

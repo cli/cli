@@ -129,7 +129,7 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg configGetter, appVersion string,
 }
 
 var ssoHeader string
-var ssoURLRE = regexp.MustCompile(`\burl=(\S+)`)
+var ssoURLRE = regexp.MustCompile(`\burl=([^;]+)`)
 
 // SSOURL returns the URL of a SAML SSO challenge received by the server for clients that use ExtractHeader
 // to extract the value of the "X-GitHub-SSO" response header.
