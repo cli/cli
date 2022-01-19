@@ -120,9 +120,12 @@ func TestRetries(t *testing.T) {
 	csName := "test_codespace"
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if retryCount == 3 {
-			json.NewEncoder(w).Encode(Codespace{
+			err := json.NewEncoder(w).Encode(Codespace{
 				Name: csName,
 			})
+			if err != nil {
+				t.Fatal(err)
+			}
 			return
 		}
 		retryCount++
