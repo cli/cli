@@ -259,11 +259,18 @@ func (c codespace) displayName(includeName, includeGitStatus bool) string {
 	}
 
 	if includeName {
+		var displayName = c.Name
+		if c.DisplayName != "" {
+			displayName = c.DisplayName
+		}
 		return fmt.Sprintf(
-			"%s: %s [%s]", c.Repository.FullName, branch, c.DisplayName,
+			"%s: %s (%s)", c.Repository.FullName, displayName, branch,
 		)
 	}
-	return c.Repository.FullName + ": " + branch
+	return fmt.Sprintf(
+		"%s: %s", c.Repository.FullName, branch,
+	)
+
 }
 
 // gitStatusDirty represents an unsaved changes status.
