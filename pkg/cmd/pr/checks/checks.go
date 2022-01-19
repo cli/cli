@@ -2,6 +2,9 @@ package checks
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -11,6 +14,8 @@ import (
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
+
+const defaultInterval int = 30
 
 type browser interface {
 	Browse(string) error
@@ -24,6 +29,8 @@ type ChecksOptions struct {
 
 	SelectorArg string
 	WebMode     bool
+	Interval    int
+	Watch       bool
 }
 
 func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Command {
@@ -61,11 +68,17 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 				return checksRunWebMode(opts)
 			}
 
+			if opts.Watch {
+				return checksRunWatchMode(opts)
+			}
+
 			return checksRun(opts)
 		},
 	}
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to show details about checks")
+	cmd.Flags().BoolVarP(&opts.Watch, "watch", "", false, "Watch checks and wait until are finished running")
+	cmd.Flags().IntVarP(&opts.Interval, "interval", "i", defaultInterval, "The number of seconds between each reprint When using --watch")
 
 	return cmd
 }
@@ -87,6 +100,61 @@ func checksRunWebMode(opts *ChecksOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 	}
 	return opts.Browser.Browse(openURL)
+}
+
+func checksRunWatchMode(opts *ChecksOptions) error {
+	duration, err := time.ParseDuration(fmt.Sprintf("%ds", opts.Interval))
+	if err != nil {
+		return fmt.Errorf("could not parse interval: %w", err)
+	}
+
+	checks, meta, err := collect(opts)
+	if err != nil {
+		return fmt.Errorf("cannot collect checks information: %w", err)
+	}
+
+	isTerminal := opts.IO.IsStdoutTTY()
+	cs := opts.IO.ColorScheme()
+
+	err = printTable(isTerminal, cs, meta, checks, opts)
+	if err != nil {
+		return fmt.Errorf("cannot print table: %w", err)
+	}
+
+	// Intercept SIGINT to trap CTRL+C and exit appropriately
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		<-c
+		if meta.Failed+meta.Pending > 0 {
+			// NOTE: given is not possible to return an error from here
+			// exit with error as checksRun() does
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}()
+
+	for meta.Pending > 0 {
+		time.Sleep(duration)
+
+		if err := opts.IO.EnableVirtualTerminalProcessing(); err == nil {
+			// ANSI escape code to clean terminal window
+			// https://stackoverflow.com/a/22892171
+			fmt.Print(opts.IO.Out, "\033[H\033[2J")
+		}
+
+		checks, meta, err = collect(opts)
+		if err != nil {
+			return fmt.Errorf("cannot collect checks information: %w", err)
+		}
+
+		err = printTable(isTerminal, cs, meta, checks, opts)
+		if err != nil {
+			return fmt.Errorf("cannot print table: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func checksRun(opts *ChecksOptions) error {
