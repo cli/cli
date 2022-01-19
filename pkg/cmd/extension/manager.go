@@ -334,7 +334,7 @@ func (m *Manager) Install(repo ghrepo.Interface) error {
 		return err
 	}
 	if !hs {
-		return errors.New("extension is uninstallable: missing executable")
+		return errors.New("extension is not installable: missing executable")
 	}
 
 	protocol, _ := m.config.GetOrDefault(repo.RepoHost(), "git_protocol")
