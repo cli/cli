@@ -114,3 +114,33 @@ func TestListCodespaces_unlimited(t *testing.T) {
 		t.Fatalf("expected codespace-249, got %s", codespaces[0].Name)
 	}
 }
+
+func TestRetries(t *testing.T) {
+	var retryCount int
+	csName := "test_codespace"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if retryCount == 3 {
+			json.NewEncoder(w).Encode(Codespace{
+				Name: csName,
+			})
+			return
+		}
+		retryCount++
+		w.WriteHeader(502)
+	}))
+	t.Cleanup(srv.Close)
+	a := &API{
+		githubAPI: srv.URL,
+		client:    &http.Client{},
+	}
+	cs, err := a.GetCodespace(context.Background(), "test", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if retryCount != 3 {
+		t.Fatalf("expected at least 2 retries but got %d", retryCount)
+	}
+	if cs.Name != csName {
+		t.Fatalf("expected codespace name to be %q but got %q", csName, cs.Name)
+	}
+}

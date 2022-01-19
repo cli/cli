@@ -57,6 +57,7 @@ type API struct {
 	vscsAPI      string
 	githubAPI    string
 	githubServer string
+	retryBackoff time.Duration
 }
 
 type httpClient interface {
@@ -79,6 +80,7 @@ func New(serverURL, apiURL, vscsURL string, httpClient httpClient) *API {
 		vscsAPI:      strings.TrimSuffix(vscsURL, "/"),
 		githubAPI:    strings.TrimSuffix(apiURL, "/"),
 		githubServer: strings.TrimSuffix(serverURL, "/"),
+		retryBackoff: 100 * time.Millisecond,
 	}
 }
 
@@ -301,24 +303,24 @@ func findNextPage(linkValue string) string {
 // If the codespace is not found, an error is returned.
 // If includeConnection is true, it will return the connection information for the codespace.
 func (a *API) GetCodespace(ctx context.Context, codespaceName string, includeConnection bool) (*Codespace, error) {
-	req, err := http.NewRequest(
-		http.MethodGet,
-		a.githubAPI+"/user/codespaces/"+codespaceName,
-		nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
-	}
-
-	if includeConnection {
-		q := req.URL.Query()
-		q.Add("internal", "true")
-		q.Add("refresh", "true")
-		req.URL.RawQuery = q.Encode()
-	}
-
-	a.setHeaders(req)
-	resp, err := a.do(ctx, req, "/user/codespaces/*")
+	resp, err := a.withRetry(func() (*http.Response, error) {
+		req, err := http.NewRequest(
+			http.MethodGet,
+			a.githubAPI+"/user/codespaces/"+codespaceName,
+			nil,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("error creating request: %w", err)
+		}
+		if includeConnection {
+			q := req.URL.Query()
+			q.Add("internal", "true")
+			q.Add("refresh", "true")
+			req.URL.RawQuery = q.Encode()
+		}
+		a.setHeaders(req)
+		return a.do(ctx, req, "/user/codespaces/*")
+	})
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
 	}
@@ -344,17 +346,18 @@ func (a *API) GetCodespace(ctx context.Context, codespaceName string, includeCon
 // StartCodespace starts a codespace for the user.
 // If the codespace is already running, the returned error from the API is ignored.
 func (a *API) StartCodespace(ctx context.Context, codespaceName string) error {
-	req, err := http.NewRequest(
-		http.MethodPost,
-		a.githubAPI+"/user/codespaces/"+codespaceName+"/start",
-		nil,
-	)
-	if err != nil {
-		return fmt.Errorf("error creating request: %w", err)
-	}
-
-	a.setHeaders(req)
-	resp, err := a.do(ctx, req, "/user/codespaces/*/start")
+	resp, err := a.withRetry(func() (*http.Response, error) {
+		req, err := http.NewRequest(
+			http.MethodPost,
+			a.githubAPI+"/user/codespaces/"+codespaceName+"/start",
+			nil,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("error creating request: %w", err)
+		}
+		a.setHeaders(req)
+		return a.do(ctx, req, "/user/codespaces/*/start")
+	})
 	if err != nil {
 		return fmt.Errorf("error making request: %w", err)
 	}
@@ -685,4 +688,20 @@ func (a *API) do(ctx context.Context, req *http.Request, spanName string) (*http
 // setHeaders sets the required headers for the API.
 func (a *API) setHeaders(req *http.Request) {
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
+}
+
+// withRetry takes a generic function that sends an http request and retries
+// only when the returned response has a >=500 status code.
+func (a *API) withRetry(f func() (*http.Response, error)) (resp *http.Response, err error) {
+	for i := time.Duration(0); i < 5; i++ {
+		resp, err = f()
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode >= 500 {
+			time.Sleep(a.retryBackoff * (i + 1))
+			continue
+		}
+	}
+	return resp, err
 }
