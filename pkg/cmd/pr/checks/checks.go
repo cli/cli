@@ -139,6 +139,11 @@ func checksRunWatchMode(opts *ChecksOptions) error {
 		}
 	}
 
+	// NOTE: all tasks have finished at this point, per the for loop above
+	if meta.Failed > 0 {
+		return cmdutil.SilentError
+	}
+
 	return nil
 }
 
