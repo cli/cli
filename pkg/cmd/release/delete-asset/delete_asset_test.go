@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_NewCmdDelete(t *testing.T) {
+func Test_NewCmdDeleteAsset(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    string
@@ -24,7 +24,7 @@ func Test_NewCmdDelete(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name:  "version argument",
+			name:  "tag and asset arguments",
 			args:  "v1.2.3 test-asset",
 			isTTY: true,
 			want: DeleteAssetOptions{
@@ -48,6 +48,12 @@ func Test_NewCmdDelete(t *testing.T) {
 			args:    "",
 			isTTY:   true,
 			wantErr: "accepts 2 arg(s), received 0",
+		},
+		{
+			name:    "one arguments",
+			args:    "v1.2.3",
+			isTTY:   true,
+			wantErr: "accepts 2 arg(s), received 1",
 		},
 	}
 	for _, tt := range tests {
@@ -90,7 +96,7 @@ func Test_NewCmdDelete(t *testing.T) {
 	}
 }
 
-func Test_deleteRun(t *testing.T) {
+func Test_deleteAssetRun(t *testing.T) {
 	tests := []struct {
 		name       string
 		isTTY      bool
@@ -135,12 +141,12 @@ func Test_deleteRun(t *testing.T) {
 				"draft": false,
 				"url": "https://api.github.com/repos/OWNER/REPO/releases/23456",
 				"assets": [
-							{
-								"url": "https://api.github.com/repos/OWNER/REPO/releases/assets/1",
-								"id": 1,
-								"name": "test-asset"
-							}
-						  ]
+          {
+            "url": "https://api.github.com/repos/OWNER/REPO/releases/assets/1",
+            "id": 1,
+            "name": "test-asset"
+          }
+				]
 			}`))
 			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/releases/assets/1"), httpmock.StatusStringResponse(204, ""))
 

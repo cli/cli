@@ -31,15 +31,14 @@ func NewCmdDeleteAsset(f *cmdutil.Factory, runF func(*DeleteAssetOptions) error)
 	}
 
 	cmd := &cobra.Command{
-		Use:   "delete-asset <tag>",
-		Short: "Delete an asset from the release",
+		Use:   "delete-asset <tag> <asset-name>",
+		Short: "Delete an asset from a release",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
-
 			opts.TagName = args[0]
 			opts.AssetName = args[1]
-
 			if runF != nil {
 				return runF(opts)
 			}
@@ -82,12 +81,12 @@ func deleteAssetRun(opts *DeleteAssetOptions) error {
 			return cmdutil.CancelError
 		}
 	}
-	iofmt := opts.IO.ColorScheme()
 
 	var assetURL string
 	for _, a := range release.Assets {
 		if a.Name == opts.AssetName {
 			assetURL = a.APIURL
+			break
 		}
 	}
 	if assetURL == "" {
@@ -103,7 +102,8 @@ func deleteAssetRun(opts *DeleteAssetOptions) error {
 		return nil
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Deleted asset %s from release %s\n", iofmt.SuccessIconWithColor(iofmt.Red), opts.AssetName, release.TagName)
+	cs := opts.IO.ColorScheme()
+	fmt.Fprintf(opts.IO.ErrOut, "%s Deleted asset %s from release %s\n", cs.SuccessIconWithColor(cs.Red), opts.AssetName, release.TagName)
 
 	return nil
 }
