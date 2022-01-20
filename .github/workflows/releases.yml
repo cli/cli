@@ -133,15 +133,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Prepare PATH
+        id: setupmsbuild
         uses: microsoft/setup-msbuild@v1.0.3
       - name: Build MSI
         id: buildmsi
         shell: bash
         env:
           ZIP_FILE: ${{ steps.download_exe.outputs.zip }}
+          MSBUILD_PATH: ${{ steps.setupmsbuild.outputs.msbuildPath }}
         run: |
           name="$(basename "$ZIP_FILE" ".zip")"
-          msbuild .\build\windows\gh.wixproj /p:SourceDir="$PWD" /p:OutputPath="$PWD" /p:OutputName="$name" /p:ProductVersion="${GITHUB_REF#refs/tags/v}"
+          $MSBUILD_PATH/msbuild .\build\windows\gh.wixproj /p:SourceDir="$PWD" /p:OutputPath="$PWD" /p:OutputName="$name" /p:ProductVersion="${GITHUB_REF#refs/tags/v}"
       - name: Obtain signing cert
         id: obtain_cert
         env:
