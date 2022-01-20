@@ -79,18 +79,7 @@ type PullRequest struct {
 			Commit struct {
 				StatusCheckRollup struct {
 					Contexts struct {
-						Nodes []struct {
-							TypeName    string    `json:"__typename"`
-							Name        string    `json:"name"`
-							Context     string    `json:"context,omitempty"`
-							State       string    `json:"state,omitempty"`
-							Status      string    `json:"status"`
-							Conclusion  string    `json:"conclusion"`
-							StartedAt   time.Time `json:"startedAt"`
-							CompletedAt time.Time `json:"completedAt"`
-							DetailsURL  string    `json:"detailsUrl"`
-							TargetURL   string    `json:"targetUrl,omitempty"`
-						}
+						Nodes    []CheckContext
 						PageInfo struct {
 							HasNextPage bool
 							EndCursor   string
@@ -109,6 +98,19 @@ type PullRequest struct {
 	ReactionGroups ReactionGroups
 	Reviews        PullRequestReviews
 	ReviewRequests ReviewRequests
+}
+
+type CheckContext struct {
+	TypeName    string    `json:"__typename"`
+	Name        string    `json:"name"`
+	Context     string    `json:"context,omitempty"`
+	State       string    `json:"state,omitempty"`
+	Status      string    `json:"status"`
+	Conclusion  string    `json:"conclusion"`
+	StartedAt   time.Time `json:"startedAt"`
+	CompletedAt time.Time `json:"completedAt"`
+	DetailsURL  string    `json:"detailsUrl"`
+	TargetURL   string    `json:"targetUrl,omitempty"`
 }
 
 type PRRepository struct {
