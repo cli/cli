@@ -143,7 +143,7 @@ jobs:
           MSBUILD_PATH: ${{ steps.setupmsbuild.outputs.msbuildPath }}
         run: |
           name="$(basename "$ZIP_FILE" ".zip")"
-          "${MSBUILD_PATH}\MSBuild.exe" .\build\windows\gh.wixproj -p:SourceDir="$PWD" -p:OutputPath="$PWD" -p:OutputName="$name" -p:ProductVersion="${GITHUB_REF#refs/tags/v}"
+          "${MSBUILD_PATH}\MSBuild.exe" ./build/windows/gh.wixproj -p:SourceDir="$PWD" -p:OutputPath="$PWD" -p:OutputName="$name" -p:ProductVersion="${GITHUB_REF#refs/tags/v}"
       - name: Obtain signing cert
         id: obtain_cert
         env:
