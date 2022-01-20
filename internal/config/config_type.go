@@ -9,7 +9,10 @@ import (
 // This interface describes interacting with some persistent configuration for gh.
 type Config interface {
 	Get(string, string) (string, error)
+	GetOrDefault(string, string) (string, error)
 	GetWithSource(string, string) (string, string, error)
+	GetOrDefaultWithSource(string, string) (string, string, error)
+	Default(string) string
 	Set(string, string, string) error
 	UnsetHost(string)
 	Hosts() ([]string, error)

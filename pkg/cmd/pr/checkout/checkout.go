@@ -85,7 +85,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 	if err != nil {
 		return err
 	}
-	protocol, _ := cfg.Get(baseRepo.RepoHost(), "git_protocol")
+	protocol, _ := cfg.GetOrDefault(baseRepo.RepoHost(), "git_protocol")
 
 	remotes, err := opts.Remotes()
 	if err != nil {
@@ -220,7 +220,11 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 		mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
 	}
 	if missingMergeConfigForBranch(localBranch) {
+		// .remote is needed for `git pull` to work
+		// .pushRemote is needed for `git push` to work, if user has set `remote.pushDefault`.
+		// see https://git-scm.com/docs/git-config#Documentation/git-config.txt-branchltnamegtremote
 		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.remote", localBranch), remote})
+		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.pushRemote", localBranch), remote})
 		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.merge", localBranch), mergeRef})
 	}
 

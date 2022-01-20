@@ -61,7 +61,7 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 		if err == pflag.ErrHelp {
 			return err
 		}
-		return &cmdutil.FlagError{Err: fmt.Errorf("%w\nSeparate git clone flags with '--'.", err)}
+		return cmdutil.FlagErrorf("%w\nSeparate git clone flags with '--'.", err)
 	})
 
 	return cmd
@@ -79,7 +79,7 @@ func cloneRun(opts *CloneOptions) error {
 		if err != nil {
 			return err
 		}
-		protocol, err := cfg.Get(hostname, "git_protocol")
+		protocol, err := cfg.GetOrDefault(hostname, "git_protocol")
 		if err != nil {
 			return err
 		}

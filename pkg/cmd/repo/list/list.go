@@ -54,17 +54,17 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Short: "List repositories owned by user or organization",
 		RunE: func(c *cobra.Command, args []string) error {
 			if opts.Limit < 1 {
-				return &cmdutil.FlagError{Err: fmt.Errorf("invalid limit: %v", opts.Limit)}
+				return cmdutil.FlagErrorf("invalid limit: %v", opts.Limit)
 			}
 
 			if flagPrivate && flagPublic {
-				return &cmdutil.FlagError{Err: fmt.Errorf("specify only one of `--public` or `--private`")}
+				return cmdutil.FlagErrorf("specify only one of `--public` or `--private`")
 			}
 			if opts.Source && opts.Fork {
-				return &cmdutil.FlagError{Err: fmt.Errorf("specify only one of `--source` or `--fork`")}
+				return cmdutil.FlagErrorf("specify only one of `--source` or `--fork`")
 			}
 			if opts.Archived && opts.NonArchived {
-				return &cmdutil.FlagError{Err: fmt.Errorf("specify only one of `--archived` or `--no-archived`")}
+				return cmdutil.FlagErrorf("specify only one of `--archived` or `--no-archived`")
 			}
 
 			if flagPrivate {
@@ -171,6 +171,9 @@ func listRun(opts *ListOptions) error {
 		tp.EndRow()
 	}
 
+	if listResult.FromSearch && opts.Limit > 1000 {
+		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
+	}
 	if opts.IO.IsStdoutTTY() {
 		hasFilters := filter.Visibility != "" || filter.Fork || filter.Source || filter.Language != "" || filter.Topic != ""
 		title := listHeader(listResult.Owner, len(listResult.Repositories), listResult.TotalCount, hasFilters)

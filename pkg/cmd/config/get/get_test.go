@@ -115,6 +115,8 @@ func Test_getRun(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.stdout, stdout.String())
 			assert.Equal(t, tt.stderr, stderr.String())
+			_, err = tt.input.Config.GetOrDefault("", "_written")
+			assert.Error(t, err)
 			_, err = tt.input.Config.Get("", "_written")
 			assert.Error(t, err)
 		})

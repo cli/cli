@@ -2,18 +2,23 @@ package root
 
 import (
 	"net/http"
+	"os"
+	"sync"
 
 	"github.com/MakeNowJust/heredoc"
+	codespacesAPI "github.com/cli/cli/v2/internal/codespaces/api"
 	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
 	aliasCmd "github.com/cli/cli/v2/pkg/cmd/alias"
 	apiCmd "github.com/cli/cli/v2/pkg/cmd/api"
 	authCmd "github.com/cli/cli/v2/pkg/cmd/auth"
 	browseCmd "github.com/cli/cli/v2/pkg/cmd/browse"
+	codespaceCmd "github.com/cli/cli/v2/pkg/cmd/codespace"
 	completionCmd "github.com/cli/cli/v2/pkg/cmd/completion"
 	configCmd "github.com/cli/cli/v2/pkg/cmd/config"
 	extensionCmd "github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	gistCmd "github.com/cli/cli/v2/pkg/cmd/gist"
+	gpgKeyCmd "github.com/cli/cli/v2/pkg/cmd/gpg-key"
 	issueCmd "github.com/cli/cli/v2/pkg/cmd/issue"
 	prCmd "github.com/cli/cli/v2/pkg/cmd/pr"
 	releaseCmd "github.com/cli/cli/v2/pkg/cmd/release"
@@ -74,10 +79,12 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(configCmd.NewCmdConfig(f))
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
+	cmd.AddCommand(gpgKeyCmd.NewCmdGPGKey(f))
 	cmd.AddCommand(completionCmd.NewCmdCompletion(f.IOStreams))
 	cmd.AddCommand(extensionCmd.NewCmdExtension(f))
 	cmd.AddCommand(secretCmd.NewCmdSecret(f))
 	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
+	cmd.AddCommand(newCodespaceCmd(f))
 
 	// the `api` command should not inherit any extra HTTP headers
 	bareHTTPCmdFactory := *f
@@ -120,4 +127,50 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 		}
 		return factory.NewHTTPClient(f.IOStreams, cfg, version, false)
 	}
+}
+
+func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
+	serverURL := os.Getenv("GITHUB_SERVER_URL")
+	apiURL := os.Getenv("GITHUB_API_URL")
+	vscsURL := os.Getenv("INTERNAL_VSCS_TARGET_URL")
+	app := codespaceCmd.NewApp(
+		f.IOStreams,
+		f,
+		codespacesAPI.New(
+			serverURL,
+			apiURL,
+			vscsURL,
+			&lazyLoadedHTTPClient{factory: f},
+		),
+	)
+	cmd := codespaceCmd.NewRootCmd(app)
+	cmd.Use = "codespace"
+	cmd.Aliases = []string{"cs"}
+	cmd.Annotations = map[string]string{"IsCore": "true"}
+	return cmd
+}
+
+type lazyLoadedHTTPClient struct {
+	factory *cmdutil.Factory
+
+	httpClientMu sync.RWMutex // guards httpClient
+	httpClient   *http.Client
+}
+
+func (l *lazyLoadedHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	l.httpClientMu.RLock()
+	httpClient := l.httpClient
+	l.httpClientMu.RUnlock()
+
+	if httpClient == nil {
+		var err error
+		l.httpClientMu.Lock()
+		l.httpClient, err = l.factory.HttpClient()
+		l.httpClientMu.Unlock()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return l.httpClient.Do(req)
 }

@@ -557,7 +557,7 @@ jobs:
 					httpmock.StatusStringResponse(204, "cool"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(0)
+				as.StubPrompt("Select a workflow").AnswerDefault()
 			},
 			wantBody: map[string]interface{}{
 				"inputs": map[string]interface{}{},
@@ -594,17 +594,9 @@ jobs:
 					httpmock.StatusStringResponse(204, "cool"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(0)
-				as.Stub([]*prompt.QuestionStub{
-					{
-						Name:    "greeting",
-						Default: true,
-					},
-					{
-						Name:  "name",
-						Value: "scully",
-					},
-				})
+				as.StubPrompt("Select a workflow").AnswerDefault()
+				as.StubPrompt("greeting").AnswerWith("hi")
+				as.StubPrompt("name").AnswerWith("scully")
 			},
 			wantBody: map[string]interface{}{
 				"inputs": map[string]interface{}{
@@ -638,12 +630,12 @@ jobs:
 			}, "github.com"), nil
 		}
 
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
-		}
 		t.Run(tt.name, func(t *testing.T) {
+			as := prompt.NewAskStubber(t)
+			if tt.askStubs != nil {
+				tt.askStubs(as)
+			}
+
 			err := runRun(tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)

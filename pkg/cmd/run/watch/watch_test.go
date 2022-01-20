@@ -234,9 +234,11 @@ func TestWatchRun(t *testing.T) {
 			},
 			httpStubs: successfulRunStubs,
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(1)
+				as.StubPrompt("Select a workflow run").
+					AssertOptions([]string{"* cool commit, run (trunk) Feb 23, 2021", "* cool commit, more runs (trunk) Feb 23, 2021"}).
+					AnswerWith("* cool commit, more runs (trunk) Feb 23, 2021")
 			},
-			wantOut: "\x1b[2J\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n- trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n✓ trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\n✓ Run more runs (2) completed with 'success'\n",
+			wantOut: "\x1b[2J\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n* trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n✓ trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\n✓ Run more runs (2) completed with 'success'\n",
 		},
 		{
 			name:        "interval respected, windows",
@@ -247,9 +249,11 @@ func TestWatchRun(t *testing.T) {
 			},
 			httpStubs: successfulRunStubs,
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(1)
+				as.StubPrompt("Select a workflow run").
+					AssertOptions([]string{"* cool commit, run (trunk) Feb 23, 2021", "* cool commit, more runs (trunk) Feb 23, 2021"}).
+					AnswerWith("* cool commit, more runs (trunk) Feb 23, 2021")
 			},
-			wantOut: "\x1b[2J\x1b[2JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n- trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\x1b[2JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n✓ trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n",
+			wantOut: "\x1b[2J\x1b[2JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n* trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\x1b[2JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n✓ trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n",
 		},
 		{
 			name:        "exit status respected",
@@ -262,9 +266,11 @@ func TestWatchRun(t *testing.T) {
 			},
 			httpStubs: failedRunStubs,
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(1)
+				as.StubPrompt("Select a workflow run").
+					AssertOptions([]string{"* cool commit, run (trunk) Feb 23, 2021", "* cool commit, more runs (trunk) Feb 23, 2021"}).
+					AnswerWith("* cool commit, more runs (trunk) Feb 23, 2021")
 			},
-			wantOut: "\x1b[2J\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n- trunk more runs · 2\nTriggered via push about 59 minutes ago\n\n\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\nX trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nX Run more runs (2) completed with 'failure'\n",
+			wantOut: "\x1b[2J\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n* trunk more runs · 2\nTriggered via push about 59 minutes ago\n\n\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\nX trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nX Run more runs (2) completed with 'failure'\n",
 			wantErr: true,
 			errMsg:  "SilentError",
 		},
@@ -278,9 +284,11 @@ func TestWatchRun(t *testing.T) {
 			},
 			httpStubs: failedRunStubs,
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(1)
+				as.StubPrompt("Select a workflow run").
+					AssertOptions([]string{"* cool commit, run (trunk) Feb 23, 2021", "* cool commit, more runs (trunk) Feb 23, 2021"}).
+					AnswerWith("* cool commit, more runs (trunk) Feb 23, 2021")
 			},
-			wantOut: "\x1b[2J\x1b[2JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n- trunk more runs · 2\nTriggered via push about 59 minutes ago\n\n\x1b[2JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\nX trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n",
+			wantOut: "\x1b[2J\x1b[2JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n* trunk more runs · 2\nTriggered via push about 59 minutes ago\n\n\x1b[2JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\nX trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n",
 			wantErr: true,
 			errMsg:  "SilentError",
 		},
@@ -313,13 +321,12 @@ func TestWatchRun(t *testing.T) {
 			return ghrepo.FromFullName("OWNER/REPO")
 		}
 
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
-		}
-
 		t.Run(tt.name, func(t *testing.T) {
+			as := prompt.NewAskStubber(t)
+			if tt.askStubs != nil {
+				tt.askStubs(as)
+			}
+
 			err := watchRun(tt.opts)
 			if tt.wantErr {
 				assert.EqualError(t, err, tt.errMsg)

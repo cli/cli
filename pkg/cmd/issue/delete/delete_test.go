@@ -75,9 +75,9 @@ func TestIssueDelete(t *testing.T) {
 				assert.Equal(t, inputs["issueId"], "THE-ID")
 			}),
 	)
-	as, teardown := prompt.InitAskStubber()
-	defer teardown()
-	as.StubOne("13")
+
+	as := prompt.NewAskStubber(t)
+	as.StubPrompt("You're going to delete issue #13. This action cannot be reversed. To confirm, type the issue number:").AnswerWith("13")
 
 	output, err := runCommand(httpRegistry, true, "13")
 	if err != nil {
@@ -103,9 +103,9 @@ func TestIssueDelete_cancel(t *testing.T) {
 				"issue": { "id": "THE-ID", "number": 13, "title": "The title of the issue"}
 			} } }`),
 	)
-	as, teardown := prompt.InitAskStubber()
-	defer teardown()
-	as.StubOne("14")
+
+	as := prompt.NewAskStubber(t)
+	as.StubPrompt("You're going to delete issue #13. This action cannot be reversed. To confirm, type the issue number:").AnswerWith("14")
 
 	output, err := runCommand(httpRegistry, true, "13")
 	if err != nil {
@@ -133,7 +133,7 @@ func TestIssueDelete_doesNotExist(t *testing.T) {
 	)
 
 	_, err := runCommand(httpRegistry, true, "13")
-	if err == nil || err.Error() != "GraphQL error: Could not resolve to an Issue with the number of 13." {
+	if err == nil || err.Error() != "GraphQL: Could not resolve to an Issue with the number of 13." {
 		t.Errorf("error running command `issue delete`: %v", err)
 	}
 }
@@ -145,9 +145,24 @@ func TestIssueDelete_issuesDisabled(t *testing.T) {
 	httpRegistry.Register(
 		httpmock.GraphQL(`query IssueByNumber\b`),
 		httpmock.StringResponse(`
-			{ "data": { "repository": {
-				"hasIssuesEnabled": false
-			} } }`),
+		{
+			"data": {
+				"repository": {
+					"hasIssuesEnabled": false,
+					"issue": null
+				}
+			},
+			"errors": [
+				{
+					"type": "NOT_FOUND",
+					"path": [
+						"repository",
+						"issue"
+					],
+					"message": "Could not resolve to an issue or pull request with the number of 13."
+				}
+			]
+		}`),
 	)
 
 	_, err := runCommand(httpRegistry, true, "13")

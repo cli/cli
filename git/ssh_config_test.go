@@ -128,12 +128,14 @@ func Test_Translator(t *testing.T) {
 	m := SSHAliasMap{
 		"gh":         "github.com",
 		"github.com": "ssh.github.com",
+		"my.gh.com":  "ssh.github.com",
 	}
 	tr := m.Translator()
 
 	cases := [][]string{
 		{"ssh://gh/o/r", "ssh://github.com/o/r"},
 		{"ssh://github.com/o/r", "ssh://github.com/o/r"},
+		{"ssh://my.gh.com", "ssh://github.com"},
 		{"https://gh/o/r", "https://gh/o/r"},
 	}
 	for _, c := range cases {
