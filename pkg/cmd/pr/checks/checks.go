@@ -2,8 +2,6 @@ package checks
 
 import (
 	"fmt"
-	"os"
-	"os/signal"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -120,19 +118,6 @@ func checksRunWatchMode(opts *ChecksOptions) error {
 	if err != nil {
 		return fmt.Errorf("cannot print table: %w", err)
 	}
-
-	// Intercept SIGINT to trap CTRL+C and exit appropriately
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go func() {
-		<-c
-		if meta.Failed+meta.Pending > 0 {
-			// NOTE: given is not possible to return an error from here
-			// exit with error as checksRun() does
-			os.Exit(1)
-		}
-		os.Exit(0)
-	}()
 
 	for meta.Pending > 0 {
 		time.Sleep(duration)
