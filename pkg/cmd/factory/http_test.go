@@ -25,8 +25,10 @@ func TestNewHTTPClient(t *testing.T) {
 		args       args
 		envDebug   string
 		host       string
+		sso        string
 		wantHeader map[string]string
 		wantStderr string
+		wantSSO    string
 	}{
 		{
 			name: "github.com with Accept header",
@@ -117,11 +119,25 @@ func TestNewHTTPClient(t *testing.T) {
 			},
 			wantStderr: "",
 		},
+		{
+			name: "SSO challenge in response header",
+			args: args{
+				config:     tinyConfig{},
+				appVersion: "v1.2.3",
+			},
+			host:       "github.com",
+			sso:        "required; url=https://github.com/login/sso?return_to=xyz&param=123abc; another",
+			wantStderr: "",
+			wantSSO:    "https://github.com/login/sso?return_to=xyz&param=123abc",
+		},
 	}
 
 	var gotReq *http.Request
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotReq = r
+		if sso := r.URL.Query().Get("sso"); sso != "" {
+			w.Header().Set("X-GitHub-SSO", sso)
+		}
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer ts.Close()
@@ -139,6 +155,11 @@ func TestNewHTTPClient(t *testing.T) {
 			require.NoError(t, err)
 
 			req, err := http.NewRequest("GET", ts.URL, nil)
+			if tt.sso != "" {
+				q := req.URL.Query()
+				q.Set("sso", tt.sso)
+				req.URL.RawQuery = q.Encode()
+			}
 			req.Host = tt.host
 			require.NoError(t, err)
 
@@ -151,15 +172,12 @@ func TestNewHTTPClient(t *testing.T) {
 
 			assert.Equal(t, 204, res.StatusCode)
 			assert.Equal(t, tt.wantStderr, normalizeVerboseLog(stderr.String()))
+			assert.Equal(t, tt.wantSSO, SSOURL())
 		})
 	}
 }
 
 type tinyConfig map[string]string
-
-func (c tinyConfig) GetOrDefault(host, key string) (string, error) {
-	return c[fmt.Sprintf("%s:%s", host, key)], nil
-}
 
 func (c tinyConfig) Get(host, key string) (string, error) {
 	return c[fmt.Sprintf("%s:%s", host, key)], nil
