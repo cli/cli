@@ -109,6 +109,7 @@ type PullRequest struct {
 	Comments       Comments
 	ReactionGroups ReactionGroups
 	Reviews        PullRequestReviews
+	LatestReviews  PullRequestReviews
 	ReviewRequests ReviewRequests
 }
 
@@ -525,7 +526,7 @@ func pullRequestFragment(httpClient *http.Client, hostname string) (string, erro
 
 	var reviewFields []string
 	if prFeatures.HasReviewDecision {
-		reviewFields = append(reviewFields, "reviewDecision")
+		reviewFields = append(reviewFields, "reviewDecision", "latestReviews")
 	}
 
 	fragments := fmt.Sprintf(`

@@ -199,27 +199,13 @@ func prSelectorForCurrentBranch(baseRepo ghrepo.Interface, prHeadRef string, rem
 	return
 }
 
-// Users can review PRs multiple times. To get an accurate count of current
-// approvals of a PR, this code doesn't count duplicate approvals by the same
-// user, and ensures only the chronologically latest review is considered for
-// each user.
-func effectiveApprovals(pr *api.PullRequest) int {
-	// Map of names who have approved the PR and the state of their review.
-	reviewerStates := make(map[string]string)
-
+func totalApprovals(pr *api.PullRequest) int {
 	approvals := 0
-
-	for _, review := range pr.Reviews.Nodes {
-		reviewerStates[review.Author.Login] = review.State
-	}
-
-	// Count the approvals
-	for _, reviewState := range reviewerStates {
-		if reviewState == "APPROVED" {
+	for _, review := range pr.LatestReviews.Nodes {
+		if review.State == "APPROVED" {
 			approvals++
 		}
 	}
-
 	return approvals
 }
 
@@ -270,15 +256,13 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 			} else if reviews.ReviewRequired {
 				fmt.Fprint(w, cs.Yellow("- Review required"))
 			} else if reviews.Approved {
-				reqApprovals := pr.BaseRef.BranchProtectionRule.RequiredApprovingReviewCount
-				approvals := effectiveApprovals(&pr)
-				s := cs.Green(fmt.Sprintf("✓ %d", approvals))
-
-				if reqApprovals > 0 {
-					s = cs.Green(fmt.Sprintf("✓ %d/%d", approvals, reqApprovals))
+				numRequiredApprovals := pr.BaseRef.BranchProtectionRule.RequiredApprovingReviewCount
+				gotApprovals := totalApprovals(&pr)
+				s := fmt.Sprintf("%d", gotApprovals)
+				if numRequiredApprovals > 0 {
+					s = fmt.Sprintf("%d/%d", gotApprovals, numRequiredApprovals)
 				}
-
-				fmt.Fprint(w, s+" Approved")
+				fmt.Fprint(w, cs.Green(fmt.Sprintf("✓ %s Approved", s)))
 			}
 
 			if pr.BaseRef.BranchProtectionRule.RequiresStrictStatusChecks {

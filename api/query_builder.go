@@ -82,6 +82,18 @@ var prReviews = shortenQuery(`
 	}
 `)
 
+var prLatestReviews = shortenQuery(`
+	latestReviews(first: 100) {
+		nodes {
+			author{login},
+			authorAssociation,
+			submittedAt,
+			body,
+			state
+		}
+	}
+`)
+
 var prFiles = shortenQuery(`
 	files(first: 100) {
 		nodes {
@@ -180,6 +192,7 @@ var PullRequestFields = append(IssueFields,
 	"headRepositoryOwner",
 	"isCrossRepository",
 	"isDraft",
+	"latestReviews",
 	"maintainerCanModify",
 	"mergeable",
 	"mergeCommit",
@@ -229,6 +242,8 @@ func PullRequestGraphQL(fields []string) string {
 			q = append(q, prReviewRequests)
 		case "reviews":
 			q = append(q, prReviews)
+		case "latestReviews":
+			q = append(q, prLatestReviews)
 		case "files":
 			q = append(q, prFiles)
 		case "commits":

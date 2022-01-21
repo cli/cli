@@ -49,7 +49,7 @@
                 "requiredApprovingReviewCount": 0
               }
             },
-            "reviews": {
+            "latestReviews": {
               "nodes": [
                 {
                   "author": {
@@ -59,15 +59,9 @@
                 },
                 {
                   "author": {
-                    "login": "bob"
+                    "login": "stella"
                   },
                   "state": "CHANGES_REQUESTED"
-                },
-                {
-                  "author": {
-                    "login": "bob"
-                  },
-                  "state": "APPROVED"
                 },
                 {
                   "author": {
