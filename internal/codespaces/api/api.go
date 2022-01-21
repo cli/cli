@@ -698,10 +698,10 @@ func (a *API) withRetry(f func() (*http.Response, error)) (resp *http.Response, 
 		if err != nil {
 			return nil, err
 		}
-		if resp.StatusCode >= 500 {
-			time.Sleep(a.retryBackoff * (i + 1))
-			continue
+		if resp.StatusCode < 500 {
+			break
 		}
+		time.Sleep(a.retryBackoff * (i + 1))
 	}
 	return resp, err
 }
