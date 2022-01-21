@@ -72,7 +72,7 @@ func TestApp_Create(t *testing.T) {
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
 		},
 		{
-			name: "create codespace with default branch with default devcontainer if no path provided",
+			name: "create codespace with default branch with default devcontainer if no path provided and no devcontainer files exist in the repo",
 			fields: fields{
 				apiClient: &apiClientMock{
 					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
