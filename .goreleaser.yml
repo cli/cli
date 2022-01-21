@@ -8,7 +8,8 @@ release:
 before:
   hooks:
     - go mod tidy
-    - make manpages
+    - make manpages GH_VERSION={{.Version}}
+    - ./script/prepare-windows-cert.sh '{{ if index .Env "GITHUB_CERT_PASSWORD"  }}{{ .Env.GITHUB_CERT_PASSWORD}}{{ end }}' '{{ if index .Env "DESKTOP_CERT_TOKEN"  }}{{ .Env.DESKTOP_CERT_TOKEN}}{{ end }}'
 
 builds:
   - <<: &build_defaults
@@ -32,6 +33,9 @@ builds:
     id: windows
     goos: [windows]
     goarch: [386, amd64]
+    hooks:
+      post:
+        - ./script/sign-windows-executable.sh '{{ .Path }}'
 
 archives:
   - id: nix

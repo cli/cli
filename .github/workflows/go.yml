@@ -17,6 +17,15 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
 
+      - name: Cache Go modules
+        uses: actions/cache@v2
+        with:
+          path: ~/go
+          key: ${{ runner.os }}-build-${{ hashFiles('go.mod') }}
+          restore-keys: |
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+
       - name: Download dependencies
         run: go mod download
 

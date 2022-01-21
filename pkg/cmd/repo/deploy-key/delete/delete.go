@@ -38,7 +38,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				return &cmdutil.FlagError{Err: errors.New("deploy key id missing")}
+				return cmdutil.FlagErrorf("deploy key id missing")
 			}
 			opts.ID = args[0]
 

@@ -401,27 +401,11 @@ func TestIssueCreate_recover(t *testing.T) {
 			assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
 		}))
 
-	as, teardown := prompt.InitAskStubber()
-	defer teardown()
+	as := prompt.NewAskStubber(t)
 
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:    "Title",
-			Default: true,
-		},
-	})
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:    "Body",
-			Default: true,
-		},
-	})
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "confirmation",
-			Value: 0,
-		},
-	})
+	as.StubPrompt("Title").AnswerDefault()
+	as.StubPrompt("Body").AnswerDefault()
+	as.StubPrompt("What's next?").AnswerWith("Submit")
 
 	tmpfile, err := ioutil.TempFile(t.TempDir(), "testrecover*")
 	assert.NoError(t, err)
@@ -484,25 +468,11 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 			}),
 	)
 
-	as, teardown := prompt.InitAskStubber()
-	defer teardown()
+	as := prompt.NewAskStubber(t)
 
-	// template
-	as.StubOne(1)
-	// body
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:    "Body",
-			Default: true,
-		},
-	}) // body
-	// confirm
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "confirmation",
-			Value: 0,
-		},
-	})
+	as.StubPrompt("Choose a template").AnswerWith("Submit a request")
+	as.StubPrompt("Body").AnswerDefault()
+	as.StubPrompt("What's next?").AnswerWith("Submit")
 
 	output, err := runCommandWithRootDirOverridden(http, true, `-t hello`, "./fixtures/repoWithNonLegacyIssueTemplates")
 	if err != nil {
@@ -526,23 +496,10 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 			} } }`),
 	)
 
-	as, teardown := prompt.InitAskStubber()
-	defer teardown()
+	as := prompt.NewAskStubber(t)
 
-	// title
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "Title",
-			Value: "hello",
-		},
-	})
-	// confirm
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "confirmation",
-			Value: 1,
-		},
-	})
+	as.StubPrompt("Title").AnswerWith("hello")
+	as.StubPrompt("What's next?").AnswerWith("Continue in browser")
 
 	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)

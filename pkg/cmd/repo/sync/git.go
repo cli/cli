@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 type gitClient interface {
@@ -20,7 +21,9 @@ type gitClient interface {
 	ResetHard(string) error
 }
 
-type gitExecuter struct{}
+type gitExecuter struct {
+	io *iostreams.IOStreams
+}
 
 func (g *gitExecuter) BranchRemote(branch string) (string, error) {
 	args := []string{"rev-parse", "--symbolic-full-name", "--abbrev-ref", fmt.Sprintf("%s@{u}", branch)}
@@ -64,11 +67,14 @@ func (g *gitExecuter) CurrentBranch() (string, error) {
 }
 
 func (g *gitExecuter) Fetch(remote, ref string) error {
-	args := []string{"fetch", remote, ref}
+	args := []string{"fetch", "-q", remote, ref}
 	cmd, err := git.GitCommand(args...)
 	if err != nil {
 		return err
 	}
+	cmd.Stdin = g.io.In
+	cmd.Stdout = g.io.Out
+	cmd.Stderr = g.io.ErrOut
 	return cmd.Run()
 }
 

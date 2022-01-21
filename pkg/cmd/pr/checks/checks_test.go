@@ -90,25 +90,25 @@ func Test_checksRun(t *testing.T) {
 		{
 			name:    "some failing",
 			fixture: "./fixtures/someFailing.json",
-			wantOut: "Some checks were not successful\n1 failing, 1 successful, and 1 pending checks\n\nX  sad tests   1m26s  sweet link\n✓  cool tests  1m26s  sweet link\n-  slow tests  1m26s  sweet link\n",
+			wantOut: "Some checks were not successful\n1 failing, 1 successful, 0 skipped, and 1 pending checks\n\nX  sad tests   1m26s  sweet link\n✓  cool tests  1m26s  sweet link\n*  slow tests  1m26s  sweet link\n",
 			wantErr: "SilentError",
 		},
 		{
 			name:    "some pending",
 			fixture: "./fixtures/somePending.json",
-			wantOut: "Some checks are still pending\n0 failing, 2 successful, and 1 pending checks\n\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n-  slow tests  1m26s  sweet link\n",
+			wantOut: "Some checks are still pending\n0 failing, 2 successful, 0 skipped, and 1 pending checks\n\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n*  slow tests  1m26s  sweet link\n",
 			wantErr: "SilentError",
 		},
 		{
 			name:    "all passing",
 			fixture: "./fixtures/allPassing.json",
-			wantOut: "All checks were successful\n0 failing, 3 successful, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link\n✓  cool tests     1m26s  sweet link\n✓  rad tests      1m26s  sweet link\n",
+			wantOut: "All checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link\n✓  cool tests     1m26s  sweet link\n✓  rad tests      1m26s  sweet link\n",
 			wantErr: "",
 		},
 		{
 			name:    "with statuses",
 			fixture: "./fixtures/withStatuses.json",
-			wantOut: "Some checks were not successful\n1 failing, 2 successful, and 0 pending checks\n\nX  a status           sweet link\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n",
+			wantOut: "Some checks were not successful\n1 failing, 2 successful, 0 skipped, and 0 pending checks\n\nX  a status           sweet link\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n",
 			wantErr: "SilentError",
 		},
 		{
@@ -145,6 +145,12 @@ func Test_checksRun(t *testing.T) {
 			fixture: "./fixtures/withStatuses.json",
 			wantOut: "a status\tfail\t0\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\n",
 			wantErr: "SilentError",
+		},
+		{
+			name:    "some skipped",
+			fixture: "./fixtures/someSkipping.json",
+			wantOut: "All checks were successful\n0 failing, 1 successful, 2 skipped, and 0 pending checks\n\n✓  cool tests  1m26s  sweet link\n-  rad tests   1m26s  sweet link\n-  skip tests  1m26s  sweet link\n",
+			wantErr: "",
 		},
 	}
 

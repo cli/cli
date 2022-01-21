@@ -38,7 +38,7 @@ func rootFlagErrorFunc(cmd *cobra.Command, err error) error {
 	if err == pflag.ErrHelp {
 		return err
 	}
-	return &cmdutil.FlagError{Err: err}
+	return cmdutil.FlagErrorWrap(err)
 }
 
 var hasFailed bool

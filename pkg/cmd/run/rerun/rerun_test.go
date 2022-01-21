@@ -137,6 +137,7 @@ func TestRerun(t *testing.T) {
 					httpmock.StringResponse("{}"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(2)
 			},
 			wantOut: "✓ Requested rerun of run 1234\n",
@@ -193,6 +194,7 @@ func TestRerun(t *testing.T) {
 			return ghrepo.FromFullName("OWNER/REPO")
 		}
 
+		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 		as, teardown := prompt.InitAskStubber()
 		defer teardown()
 		if tt.askStubs != nil {

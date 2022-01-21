@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/context"
@@ -18,11 +19,9 @@ import (
 
 func New(appVersion string) *cmdutil.Factory {
 	f := &cmdutil.Factory{
-		Config:     configFunc(), // No factory dependencies
-		Branch:     branchFunc(), // No factory dependencies
-		Executable: executable(), // No factory dependencies
-
-		ExtensionManager: extension.NewManager(),
+		Config:         configFunc(), // No factory dependencies
+		Branch:         branchFunc(), // No factory dependencies
+		ExecutableName: "gh",
 	}
 
 	f.IOStreams = ioStreams(f)                   // Depends on Config
@@ -30,6 +29,7 @@ func New(appVersion string) *cmdutil.Factory {
 	f.Remotes = remotesFunc(f)                   // Depends on Config
 	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
 	f.Browser = browser(f)                       // Depends on Config, and IOStreams
+	f.ExtensionManager = extensionManager(f)     // Depends on Config, HttpClient, and IOStreams
 
 	return f
 }
@@ -113,14 +113,6 @@ func browserLauncher(f *cmdutil.Factory) string {
 	return os.Getenv("BROWSER")
 }
 
-func executable() string {
-	gh := "gh"
-	if exe, err := os.Executable(); err == nil {
-		gh = exe
-	}
-	return gh
-}
-
 func configFunc() func() (config.Config, error) {
 	var cachedConfig config.Config
 	var configError error
@@ -148,6 +140,25 @@ func branchFunc() func() (string, error) {
 	}
 }
 
+func extensionManager(f *cmdutil.Factory) *extension.Manager {
+	em := extension.NewManager(f.IOStreams)
+
+	cfg, err := f.Config()
+	if err != nil {
+		return em
+	}
+	em.SetConfig(cfg)
+
+	client, err := f.HttpClient()
+	if err != nil {
+		return em
+	}
+
+	em.SetClient(api.NewCachedClient(client, time.Second*30))
+
+	return em
+}
+
 func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 	io := iostreams.System()
 	cfg, err := f.Config()
@@ -155,7 +166,7 @@ func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 		return io
 	}
 
-	if prompt, _ := cfg.Get("", "prompt"); prompt == "disabled" {
+	if prompt, _ := cfg.GetOrDefault("", "prompt"); prompt == "disabled" {
 		io.SetNeverPrompt(true)
 	}
 

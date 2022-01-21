@@ -65,11 +65,24 @@ func (c *fileConfig) GetWithSource(hostname, key string) (string, string, error)
 		return "", defaultSource, err
 	}
 
-	if value == "" {
-		return defaultFor(key), defaultSource, nil
-	}
-
 	return value, defaultSource, nil
+}
+
+func (c *fileConfig) GetOrDefault(hostname, key string) (val string, err error) {
+	val, _, err = c.GetOrDefaultWithSource(hostname, key)
+	return
+}
+
+func (c *fileConfig) GetOrDefaultWithSource(hostname, key string) (val string, src string, err error) {
+	val, src, err = c.GetWithSource(hostname, key)
+	if err != nil && val == "" {
+		val = c.Default(key)
+	}
+	return
+}
+
+func (c *fileConfig) Default(key string) string {
+	return defaultFor(key)
 }
 
 func (c *fileConfig) Set(hostname, key, value string) error {
