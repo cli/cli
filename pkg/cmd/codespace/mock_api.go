@@ -46,6 +46,9 @@ import (
 // 			ListCodespacesFunc: func(ctx context.Context, limit int) ([]*api.Codespace, error) {
 // 				panic("mock out the ListCodespaces method")
 // 			},
+// 			ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]string, error) {
+// 				panic("mock out the ListDevContainers method")
+// 			},
 // 			StartCodespaceFunc: func(ctx context.Context, name string) error {
 // 				panic("mock out the StartCodespace method")
 // 			},
@@ -88,6 +91,9 @@ type apiClientMock struct {
 
 	// ListCodespacesFunc mocks the ListCodespaces method.
 	ListCodespacesFunc func(ctx context.Context, limit int) ([]*api.Codespace, error)
+
+	// ListDevContainersFunc mocks the ListDevContainers method.
+	ListDevContainersFunc func(ctx context.Context, repoID int, branch string, limit int) ([]string, error)
 
 	// StartCodespaceFunc mocks the StartCodespace method.
 	StartCodespaceFunc func(ctx context.Context, name string) error
@@ -171,6 +177,17 @@ type apiClientMock struct {
 			// Limit is the limit argument value.
 			Limit int
 		}
+		// ListDevContainers holds details about calls to the ListDevContainers method.
+		ListDevContainers []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// RepoID is the repoID argument value.
+			RepoID int
+			// Branch is the branch argument value.
+			Branch string
+			// Limit is the limit argument value.
+			Limit int
+		}
 		// StartCodespace holds details about calls to the StartCodespace method.
 		StartCodespace []struct {
 			// Ctx is the ctx argument value.
@@ -196,6 +213,7 @@ type apiClientMock struct {
 	lockGetRepository                  sync.RWMutex
 	lockGetUser                        sync.RWMutex
 	lockListCodespaces                 sync.RWMutex
+	lockListDevContainers              sync.RWMutex
 	lockStartCodespace                 sync.RWMutex
 	lockStopCodespace                  sync.RWMutex
 }
@@ -555,6 +573,49 @@ func (mock *apiClientMock) ListCodespacesCalls() []struct {
 	mock.lockListCodespaces.RLock()
 	calls = mock.calls.ListCodespaces
 	mock.lockListCodespaces.RUnlock()
+	return calls
+}
+
+// ListDevContainers calls ListDevContainersFunc.
+func (mock *apiClientMock) ListDevContainers(ctx context.Context, repoID int, branch string, limit int) ([]string, error) {
+	if mock.ListDevContainersFunc == nil {
+		panic("apiClientMock.ListDevContainersFunc: method is nil but apiClient.ListDevContainers was just called")
+	}
+	callInfo := struct {
+		Ctx    context.Context
+		RepoID int
+		Branch string
+		Limit  int
+	}{
+		Ctx:    ctx,
+		RepoID: repoID,
+		Branch: branch,
+		Limit:  limit,
+	}
+	mock.lockListDevContainers.Lock()
+	mock.calls.ListDevContainers = append(mock.calls.ListDevContainers, callInfo)
+	mock.lockListDevContainers.Unlock()
+	return mock.ListDevContainersFunc(ctx, repoID, branch, limit)
+}
+
+// ListDevContainersCalls gets all the calls that were made to ListDevContainers.
+// Check the length with:
+//     len(mockedapiClient.ListDevContainersCalls())
+func (mock *apiClientMock) ListDevContainersCalls() []struct {
+	Ctx    context.Context
+	RepoID int
+	Branch string
+	Limit  int
+} {
+	var calls []struct {
+		Ctx    context.Context
+		RepoID int
+		Branch string
+		Limit  int
+	}
+	mock.lockListDevContainers.RLock()
+	calls = mock.calls.ListDevContainers
+	mock.lockListDevContainers.RUnlock()
 	return calls
 }
 

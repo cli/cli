@@ -91,6 +91,37 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		branch = repository.DefaultBranch
 	}
 
+	devContainerPath := opts.devContainerPath
+
+	// now that we have repo+branch, we can list available devcontainer.json files (if any)
+	if len(opts.devContainerPath) < 1 {
+		a.StartProgressIndicatorWithLabel("Fetching devcontainer.json files")
+		devContainerPaths, err := a.apiClient.ListDevContainers(ctx, repository.ID, branch, 100)
+		if err != nil {
+			return fmt.Errorf("error getting devcontainer.json paths: %w", err)
+		}
+		a.StopProgressIndicator()
+
+		if len(devContainerPaths) > 0 {
+			devContainerPathQuestion := &survey.Question{
+				Name: "devContainerPath",
+				Prompt: &survey.Select{
+					Message: "Devcontainer.json file:",
+					Options: append([]string{"none"}, devContainerPaths...),
+				},
+			}
+
+			if err := ask([]*survey.Question{devContainerPathQuestion}, &devContainerPath); err != nil {
+				return fmt.Errorf("failed to prompt: %w", err)
+			}
+		}
+
+		if devContainerPath == "none" {
+			// special arg allows users to opt out of devcontainer.json selection
+			devContainerPath = ""
+		}
+	}
+
 	locationResult := <-locationCh
 	if locationResult.Err != nil {
 		return fmt.Errorf("error getting codespace region location: %w", locationResult.Err)
@@ -111,7 +142,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		Machine:            machine,
 		Location:           locationResult.Location,
 		IdleTimeoutMinutes: int(opts.idleTimeout.Minutes()),
-		DevContainerPath:   opts.devContainerPath,
+		DevContainerPath:   devContainerPath,
 	})
 	a.StopProgressIndicator()
 	if err != nil {
