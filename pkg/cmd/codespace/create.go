@@ -13,11 +13,12 @@ import (
 )
 
 type createOptions struct {
-	repo        string
-	branch      string
-	machine     string
-	showStatus  bool
-	idleTimeout time.Duration
+	repo             string
+	branch           string
+	machine          string
+	showStatus       bool
+	idleTimeout      time.Duration
+	devContainerPath string
 }
 
 func newCreateCmd(app *App) *cobra.Command {
@@ -37,6 +38,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "hardware specifications for the VM")
 	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
 	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 0, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
+	createCmd.Flags().StringVar(&opts.devContainerPath, "devcontainer-path", "", "path to the devcontainer.json file to use when creating codespace")
 
 	return createCmd
 }
@@ -109,6 +111,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		Machine:            machine,
 		Location:           locationResult.Location,
 		IdleTimeoutMinutes: int(opts.idleTimeout.Minutes()),
+		DevContainerPath:   opts.devContainerPath,
 	})
 	a.StopProgressIndicator()
 	if err != nil {

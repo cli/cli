@@ -481,6 +481,7 @@ type CreateCodespaceParams struct {
 	Branch             string
 	Machine            string
 	Location           string
+	DevContainerPath   string
 }
 
 // CreateCodespace creates a codespace with the given parameters and returns a non-nil error if it
@@ -526,6 +527,7 @@ type startCreateRequest struct {
 	Ref                string `json:"ref"`
 	Location           string `json:"location"`
 	Machine            string `json:"machine"`
+	DevContainerPath   string `json:"devcontainer_path,omitempty"`
 }
 
 var errProvisioningInProgress = errors.New("provisioning in progress")
@@ -545,6 +547,7 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 		Ref:                params.Branch,
 		Location:           params.Location,
 		Machine:            params.Machine,
+		DevContainerPath:   params.DevContainerPath,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
