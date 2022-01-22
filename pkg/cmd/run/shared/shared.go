@@ -210,19 +210,6 @@ type FilterOptions struct {
 	Actor  string
 }
 
-func EmptyFilters() *FilterOptions {
-	return &FilterOptions{}
-}
-
-func (opts *FilterOptions) updateQuery(query *url.Values) {
-	if opts.Branch != "" {
-		query.Set("branch", opts.Branch)
-	}
-	if opts.Actor != "" {
-		query.Set("actor", opts.Actor)
-	}
-}
-
 func GetRunsWithFilter(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, limit int, f func(Run) bool) ([]Run, error) {
 	path := fmt.Sprintf("repos/%s/actions/runs", ghrepo.FullName(repo))
 	runs, err := getRuns(client, repo, path, opts, 50)
@@ -271,7 +258,14 @@ func getRuns(client *api.Client, repo ghrepo.Interface, path string, opts *Filte
 		query := parsed.Query()
 		query.Set("per_page", fmt.Sprintf("%d", perPage))
 		query.Set("page", fmt.Sprintf("%d", page))
-		opts.updateQuery(&query)
+		if opts != nil {
+			if opts.Branch != "" {
+				query.Set("branch", opts.Branch)
+			}
+			if opts.Actor != "" {
+				query.Set("actor", opts.Actor)
+			}
+		}
 		parsed.RawQuery = query.Encode()
 		pagedPath := parsed.String()
 
