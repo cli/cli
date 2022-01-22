@@ -51,6 +51,22 @@ func TestNewCmdList(t *testing.T) {
 				WorkflowSelector: "foo.yml",
 			},
 		},
+		{
+			name: "branch",
+			cli:  "--branch new-cool-stuff",
+			wants: ListOptions{
+				Limit:  defaultLimit,
+				Branch: "new-cool-stuff",
+			},
+		},
+		{
+			name: "actor",
+			cli:  "--actor bak1an",
+			wants: ListOptions{
+				Limit: defaultLimit,
+				Actor: "bak1an",
+			},
+		},
 	}
 
 	for _, tt := range tests {
