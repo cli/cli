@@ -83,6 +83,9 @@ func TestNewCmdList(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.wants.Limit, gotOpts.Limit)
+			assert.Equal(t, tt.wants.WorkflowSelector, gotOpts.WorkflowSelector)
+			assert.Equal(t, tt.wants.Branch, gotOpts.Branch)
+			assert.Equal(t, tt.wants.Actor, gotOpts.Actor)
 		})
 	}
 }
