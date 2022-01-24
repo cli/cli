@@ -1,7 +1,7 @@
 package delete
 
 import (
-	"fmt"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -80,7 +80,7 @@ func deleteRun(opts *DeleteOptions) error {
 	}
 
 	if username != gist.Owner.Login {
-		return fmt.Errorf("You do not own this gist.")
+		return errors.New("you do not own this gist")
 	}
 
 	err = deleteGist(apiClient, host, gistID)
