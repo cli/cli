@@ -460,9 +460,9 @@ func Test_getBody(t *testing.T) {
 			stdin: "a secret",
 		},
 		{
-			name:  "from stdin with leading and trailing whitespace",
+			name:  "from stdin with trailing newline character",
 			want:  "a secret",
-			stdin: "\ta secret\n",
+			stdin: "a secret\n",
 		},
 	}
 

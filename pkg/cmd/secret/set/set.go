@@ -376,7 +376,7 @@ func getBody(opts *SetOptions) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read from standard input: %w", err)
 	}
 
-	return bytes.TrimSpace(body), nil
+	return bytes.TrimRight(body, "\r\n"), nil
 }
 
 func mapRepoNamesToIDs(client *api.Client, host, defaultOwner string, repositoryNames []string) ([]int64, error) {
