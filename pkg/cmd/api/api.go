@@ -366,13 +366,13 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 		responseBody = io.TeeReader(responseBody, bodyCopy)
 	}
 
-	if opts.FilterOutput != "" {
+	if opts.FilterOutput != "" && serverError == "" {
 		// TODO: reuse parsed query across pagination invocations
 		err = export.FilterJSON(opts.IO.Out, responseBody, opts.FilterOutput)
 		if err != nil {
 			return
 		}
-	} else if opts.Template != "" {
+	} else if opts.Template != "" && serverError == "" {
 		// TODO: reuse parsed template across pagination invocations
 		err = template.Execute(responseBody)
 		if err != nil {

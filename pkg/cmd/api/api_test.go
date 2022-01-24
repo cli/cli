@@ -491,6 +491,20 @@ func Test_apiRun(t *testing.T) {
 			stderr: ``,
 		},
 		{
+			name: "output template when REST error",
+			options: ApiOptions{
+				Template: `{{.status}}`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 400,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`{"message": "THIS IS FINE"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: `{"message": "THIS IS FINE"}`,
+			stderr: "gh: THIS IS FINE (HTTP 400)\n",
+		},
+		{
 			name: "jq filter",
 			options: ApiOptions{
 				FilterOutput: `.[].name`,
@@ -503,6 +517,20 @@ func Test_apiRun(t *testing.T) {
 			err:    nil,
 			stdout: "Mona\nHubot\n",
 			stderr: ``,
+		},
+		{
+			name: "jq filter when REST error",
+			options: ApiOptions{
+				FilterOutput: `.[].name`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 400,
+				Body:       ioutil.NopCloser(bytes.NewBufferString(`{"message": "THIS IS FINE"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: `{"message": "THIS IS FINE"}`,
+			stderr: "gh: THIS IS FINE (HTTP 400)\n",
 		},
 	}
 
