@@ -12,8 +12,8 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/internal/ghinstance"
+	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/henvic/httpretty"
-	"github.com/shurcooL/graphql"
 )
 
 // ClientOption represents an argument to NewClient
@@ -98,6 +98,22 @@ func ReplaceTripper(tr http.RoundTripper) ClientOption {
 	}
 }
 
+// ExtractHeader extracts a named header from any response received by this client and, if non-blank, saves
+// it to dest.
+func ExtractHeader(name string, dest *string) ClientOption {
+	return func(tr http.RoundTripper) http.RoundTripper {
+		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+			res, err := tr.RoundTrip(req)
+			if err == nil {
+				if value := res.Header.Get(name); value != "" {
+					*dest = value
+				}
+			}
+			return res, err
+		}}
+	}
+}
+
 type funcTripper struct {
 	roundTrip func(*http.Request) (*http.Response, error)
 }
@@ -124,7 +140,18 @@ type graphQLResponse struct {
 type GraphQLError struct {
 	Type    string
 	Message string
-	// Path []interface // mixed strings and numbers
+	Path    []interface{} // mixed strings and numbers
+}
+
+func (ge GraphQLError) PathString() string {
+	var res strings.Builder
+	for i, v := range ge.Path {
+		if i > 0 {
+			res.WriteRune('.')
+		}
+		fmt.Fprintf(&res, "%v", v)
+	}
+	return res.String()
 }
 
 // GraphQLErrorResponse contains errors returned in a GraphQL response
@@ -135,9 +162,31 @@ type GraphQLErrorResponse struct {
 func (gr GraphQLErrorResponse) Error() string {
 	errorMessages := make([]string, 0, len(gr.Errors))
 	for _, e := range gr.Errors {
-		errorMessages = append(errorMessages, e.Message)
+		msg := e.Message
+		if p := e.PathString(); p != "" {
+			msg = fmt.Sprintf("%s (%s)", msg, p)
+		}
+		errorMessages = append(errorMessages, msg)
 	}
-	return fmt.Sprintf("GraphQL error: %s", strings.Join(errorMessages, "\n"))
+	return fmt.Sprintf("GraphQL: %s", strings.Join(errorMessages, ", "))
+}
+
+// Match checks if this error is only about a specific type on a specific path. If the path argument ends
+// with a ".", it will match all its subpaths as well.
+func (gr GraphQLErrorResponse) Match(expectType, expectPath string) bool {
+	for _, e := range gr.Errors {
+		if e.Type != expectType || !matchPath(e.PathString(), expectPath) {
+			return false
+		}
+	}
+	return true
+}
+
+func matchPath(p, expect string) bool {
+	if strings.HasSuffix(expect, ".") {
+		return strings.HasPrefix(p, expect) || p == strings.TrimSuffix(expect, ".")
+	}
+	return p == expect
 }
 
 // HTTPError is an error returned by a failed API call
@@ -173,7 +222,7 @@ func (err HTTPError) ScopesSuggestion() string {
 // ScopesSuggestion is an error messaging utility that prints the suggestion to request additional OAuth
 // scopes in case a server response indicates that there are missing scopes.
 func ScopesSuggestion(resp *http.Response) string {
-	if resp.StatusCode < 400 || resp.StatusCode > 499 {
+	if resp.StatusCode < 400 || resp.StatusCode > 499 || resp.StatusCode == 422 {
 		return ""
 	}
 
@@ -221,7 +270,8 @@ func EndpointNeedsScopes(resp *http.Response, s string) *http.Response {
 	return resp
 }
 
-// GraphQL performs a GraphQL request and parses the response
+// GraphQL performs a GraphQL request and parses the response. If there are errors in the response,
+// *GraphQLErrorResponse will be returned, but the data will also be parsed into the receiver.
 func (c Client) GraphQL(hostname string, query string, variables map[string]interface{}, data interface{}) error {
 	reqBody, err := json.Marshal(map[string]interface{}{"query": query, "variables": variables})
 	if err != nil {

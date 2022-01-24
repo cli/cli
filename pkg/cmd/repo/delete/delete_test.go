@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -24,21 +25,22 @@ func TestNewCmdDelete(t *testing.T) {
 	}{
 		{
 			name:   "confirm flag",
+			tty:    true,
 			input:  "OWNER/REPO --confirm",
 			output: DeleteOptions{RepoArg: "OWNER/REPO", Confirmed: true},
 		},
 		{
-			name:    "no confirmation no tty",
+			name:    "no confirmation notty",
 			input:   "OWNER/REPO",
 			output:  DeleteOptions{RepoArg: "OWNER/REPO"},
 			wantErr: true,
-			errMsg:  "could not prompt: confirmation with prompt or --confirm flag required"},
+			errMsg:  "--confirm required when not running interactively",
+		},
 		{
-			name:    "no argument",
-			input:   "",
-			wantErr: true,
-			errMsg:  "cannot delete: repository argument required",
-			tty:     true,
+			name:   "base repo resolution",
+			input:  "",
+			tty:    true,
+			output: DeleteOptions{},
 		},
 	}
 	for _, tt := range tests {
@@ -92,6 +94,7 @@ func Test_deleteRun(t *testing.T) {
 			askStubs: func(q *prompt.AskStubber) {
 				// TODO: survey stubber doesn't have WithValidator support
 				// so this always passes regardless of prompt input
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
 				q.StubOne("OWNER/REPO")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -101,7 +104,22 @@ func Test_deleteRun(t *testing.T) {
 			},
 		},
 		{
-			name: "confimation no tty",
+			name:       "infer base repo",
+			tty:        true,
+			opts:       &DeleteOptions{},
+			wantStdout: "✓ Deleted repository OWNER/REPO\n",
+			askStubs: func(q *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
+				q.StubOne("OWNER/REPO")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("DELETE", "repos/OWNER/REPO"),
+					httpmock.StatusStringResponse(204, "{}"))
+			},
+		},
+		{
+			name: "confirmation no tty",
 			opts: &DeleteOptions{
 				RepoArg:   "OWNER/REPO",
 				Confirmed: true,
@@ -118,6 +136,7 @@ func Test_deleteRun(t *testing.T) {
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
 			tty:        true,
 			askStubs: func(q *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
 				q.StubOne("OWNER/REPO")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -131,10 +150,15 @@ func Test_deleteRun(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 		q, teardown := prompt.InitAskStubber()
 		defer teardown()
 		if tt.askStubs != nil {
 			tt.askStubs(q)
+		}
+
+		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+			return ghrepo.New("OWNER", "REPO"), nil
 		}
 
 		reg := &httpmock.Registry{}

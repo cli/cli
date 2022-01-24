@@ -3,6 +3,7 @@ package view
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -101,7 +102,7 @@ func runView(opts *ViewOptions) error {
 	}
 
 	if opts.Web {
-		var url string
+		var address string
 		if opts.YAML {
 			ref := opts.Ref
 			if ref == "" {
@@ -112,14 +113,14 @@ func runView(opts *ViewOptions) error {
 					return err
 				}
 			}
-			url = ghrepo.GenerateRepoURL(repo, "blob/%s/%s", ref, workflow.Path)
+			address = ghrepo.GenerateRepoURL(repo, "blob/%s/%s", url.QueryEscape(ref), url.QueryEscape(workflow.Path))
 		} else {
-			url = ghrepo.GenerateRepoURL(repo, "actions/workflows/%s", workflow.Base())
+			address = ghrepo.GenerateRepoURL(repo, "actions/workflows/%s", url.QueryEscape(workflow.Base()))
 		}
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(url))
+			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(address))
 		}
-		return opts.Browser.Browse(url)
+		return opts.Browser.Browse(address)
 	}
 
 	if opts.YAML {
@@ -155,8 +156,7 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, workflow *shared
 
 	yaml := string(yamlBytes)
 
-	theme := opts.IO.DetectTerminalTheme()
-	markdownStyle := markdown.GetStyle(theme)
+	opts.IO.DetectTerminalTheme()
 	if err := opts.IO.StartPager(); err != nil {
 		fmt.Fprintf(opts.IO.ErrOut, "starting pager failed: %v\n", err)
 	}
@@ -171,11 +171,7 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, workflow *shared
 		fmt.Fprintf(out, "ID: %s", cs.Cyanf("%d", workflow.ID))
 
 		codeBlock := fmt.Sprintf("```yaml\n%s\n```", yaml)
-		rendered, err := markdown.RenderWithOpts(codeBlock, markdownStyle,
-			markdown.RenderOpts{
-				markdown.WithoutIndentation(),
-				markdown.WithoutWrap(),
-			})
+		rendered, err := markdown.Render(codeBlock, markdown.WithIO(opts.IO), markdown.WithoutIndentation(), markdown.WithWrap(0))
 		if err != nil {
 			return err
 		}

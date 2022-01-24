@@ -3,6 +3,8 @@ package browse
 import (
 	"fmt"
 	"net/http"
+	"net/url"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -27,6 +29,7 @@ type BrowseOptions struct {
 	HttpClient       func() (*http.Client, error)
 	IO               *iostreams.IOStreams
 	PathFromRepoRoot func() string
+	GitClient        gitClient
 
 	SelectorArg string
 
@@ -44,6 +47,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 		HttpClient:       f.HttpClient,
 		IO:               f.IOStreams,
 		PathFromRepoRoot: git.PathFromRepoRoot,
+		GitClient:        &localGitClient{},
 	}
 
 	cmd := &cobra.Command{
@@ -95,6 +99,9 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			); err != nil {
 				return err
 			}
+			if cmd.Flags().Changed("repo") {
+				opts.GitClient = &remoteGitClient{opts.BaseRepo, opts.HttpClient}
+			}
 
 			if runF != nil {
 				return runF(opts)
@@ -121,17 +128,18 @@ func runBrowse(opts *BrowseOptions) error {
 	}
 
 	if opts.CommitFlag {
-		commit, err := git.LastCommit()
-		if err == nil {
-			opts.Branch = commit.Sha
+		commit, err := opts.GitClient.LastCommit()
+		if err != nil {
+			return err
 		}
+		opts.Branch = commit.Sha
 	}
 
 	section, err := parseSection(baseRepo, opts)
 	if err != nil {
 		return err
 	}
-	url := ghrepo.GenerateRepoURL(baseRepo, section)
+	url := ghrepo.GenerateRepoURL(baseRepo, "%s", section)
 
 	if opts.NoBrowserFlag {
 		_, err := fmt.Fprintln(opts.IO.Out, url)
@@ -186,23 +194,30 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 		} else {
 			rangeFragment = fmt.Sprintf("L%d", rangeStart)
 		}
-		return fmt.Sprintf("blob/%s/%s?plain=1#%s", branchName, filePath, rangeFragment), nil
+		return fmt.Sprintf("blob/%s/%s?plain=1#%s", escapePath(branchName), escapePath(filePath), rangeFragment), nil
 	}
-	return fmt.Sprintf("tree/%s/%s", branchName, filePath), nil
+	return strings.TrimSuffix(fmt.Sprintf("tree/%s/%s", escapePath(branchName), escapePath(filePath)), "/"), nil
+}
+
+// escapePath URL-encodes special characters but leaves slashes unchanged
+func escapePath(p string) string {
+	return strings.ReplaceAll(url.PathEscape(p), "%2F", "/")
 }
 
 func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err error) {
+	if f == "" {
+		return
+	}
+
 	parts := strings.SplitN(f, ":", 3)
 	if len(parts) > 2 {
 		err = fmt.Errorf("invalid file argument: %q", f)
 		return
 	}
 
-	p = parts[0]
-	if !filepath.IsAbs(p) {
-		p = filepath.Clean(filepath.Join(opts.PathFromRepoRoot(), p))
-		// Ensure that a path using \ can be used in a URL
-		p = strings.ReplaceAll(p, "\\", "/")
+	p = filepath.ToSlash(parts[0])
+	if !path.IsAbs(p) {
+		p = path.Join(opts.PathFromRepoRoot(), p)
 		if p == "." || strings.HasPrefix(p, "..") {
 			p = ""
 		}
@@ -235,4 +250,34 @@ func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err 
 func isNumber(arg string) bool {
 	_, err := strconv.Atoi(arg)
 	return err == nil
+}
+
+// gitClient is used to implement functions that can be performed on both local and remote git repositories
+type gitClient interface {
+	LastCommit() (*git.Commit, error)
+}
+
+type localGitClient struct{}
+
+type remoteGitClient struct {
+	repo       func() (ghrepo.Interface, error)
+	httpClient func() (*http.Client, error)
+}
+
+func (gc *localGitClient) LastCommit() (*git.Commit, error) { return git.LastCommit() }
+
+func (gc *remoteGitClient) LastCommit() (*git.Commit, error) {
+	httpClient, err := gc.httpClient()
+	if err != nil {
+		return nil, err
+	}
+	repo, err := gc.repo()
+	if err != nil {
+		return nil, err
+	}
+	commit, err := api.LastCommit(api.NewClientFromHTTP(httpClient), repo)
+	if err != nil {
+		return nil, err
+	}
+	return &git.Commit{Sha: commit.OID}, nil
 }

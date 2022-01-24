@@ -13,7 +13,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -179,7 +178,7 @@ func TestViewRun(t *testing.T) {
 		X  cool commit  timed out    trunk  push  1
 		*  cool commit  in progress  trunk  push  2
 		✓  cool commit  successful   trunk  push  3
-		-  cool commit  cancelled    trunk  push  4
+		X  cool commit  cancelled    trunk  push  4
 
 		To see more runs for this workflow, try: gh run list --workflow flow.yml
 		To see the YAML for this workflow, try: gh workflow view flow.yml --yaml
@@ -189,7 +188,6 @@ func TestViewRun(t *testing.T) {
 		name       string
 		opts       *ViewOptions
 		httpStubs  func(*httpmock.Registry)
-		askStubs   func(*prompt.AskStubber)
 		tty        bool
 		wantOut    string
 		wantErrOut string
@@ -416,12 +414,6 @@ func TestViewRun(t *testing.T) {
 
 		browser := &cmdutil.TestBrowser{}
 		tt.opts.Browser = browser
-
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
-		}
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := runView(tt.opts)

@@ -25,6 +25,7 @@ type ListOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	PlainOutput bool
+	Exporter    cmdutil.Exporter
 
 	Limit            int
 	WorkflowSelector string
@@ -61,6 +62,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", defaultLimit, "Maximum number of runs to fetch")
 	cmd.Flags().StringVarP(&opts.WorkflowSelector, "workflow", "w", "", "Filter runs by workflow")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.RunFields)
 
 	return cmd
 }
@@ -94,6 +96,10 @@ func listRun(opts *ListOptions) error {
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to get runs: %w", err)
+	}
+
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, runs)
 	}
 
 	tp := utils.NewTablePrinter(opts.IO)

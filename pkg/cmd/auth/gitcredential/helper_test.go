@@ -8,10 +8,16 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
+// why not just use the config stub argh
 type tinyConfig map[string]string
 
 func (c tinyConfig) GetWithSource(host, key string) (string, string, error) {
 	return c[fmt.Sprintf("%s:%s", host, key)], c["_source"], nil
+}
+
+func (c tinyConfig) Get(host, key string) (val string, err error) {
+	val, _, err = c.GetWithSource(host, key)
+	return
 }
 
 func Test_helperRun(t *testing.T) {
@@ -69,6 +75,32 @@ func Test_helperRun(t *testing.T) {
 			wantStdout: heredoc.Doc(`
 				protocol=https
 				host=example.com
+				username=monalisa
+				password=OTOKEN
+			`),
+			wantStderr: "",
+		},
+		{
+			name: "gist host",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":                "/Users/monalisa/.config/gh/hosts.yml",
+						"github.com:user":        "monalisa",
+						"github.com:oauth_token": "OTOKEN",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=gist.github.com
+				username=monalisa
+			`),
+			wantErr: false,
+			wantStdout: heredoc.Doc(`
+				protocol=https
+				host=gist.github.com
 				username=monalisa
 				password=OTOKEN
 			`),

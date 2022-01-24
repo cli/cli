@@ -2,6 +2,7 @@ package extension
 
 import (
 	"bytes"
+	_ "embed"
 	"errors"
 	"fmt"
 	"io"
@@ -16,8 +17,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/extensions"
@@ -32,7 +33,7 @@ type Manager struct {
 	lookPath   func(string) (string, error)
 	findSh     func() (string, error)
 	newCommand func(string, ...string) *exec.Cmd
-	platform   func() string
+	platform   func() (string, string)
 	client     *http.Client
 	config     config.Config
 	io         *iostreams.IOStreams
@@ -44,8 +45,12 @@ func NewManager(io *iostreams.IOStreams) *Manager {
 		lookPath:   safeexec.LookPath,
 		findSh:     findsh.Find,
 		newCommand: exec.Command,
-		platform: func() string {
-			return fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH)
+		platform: func() (string, string) {
+			ext := ""
+			if runtime.GOOS == "windows" {
+				ext = ".exe"
+			}
+			return fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH), ext
 		},
 		io: io,
 	}
@@ -268,7 +273,7 @@ func (m *Manager) populateLatestVersions(exts []Extension) {
 
 func (m *Manager) getLatestVersion(ext Extension) (string, error) {
 	if ext.isLocal {
-		return "", fmt.Errorf("unable to get latest version for local extensions")
+		return "", localExtensionUpgradeError
 	}
 	if ext.IsBinary() {
 		repo, err := ghrepo.FromFullName(ext.url)
@@ -329,11 +334,10 @@ func (m *Manager) Install(repo ghrepo.Interface) error {
 		return err
 	}
 	if !hs {
-		// TODO open an issue hint, here?
-		return errors.New("extension is uninstallable: missing executable")
+		return errors.New("extension is not installable: missing executable")
 	}
 
-	protocol, _ := m.config.Get(repo.RepoHost(), "git_protocol")
+	protocol, _ := m.config.GetOrDefault(repo.RepoHost(), "git_protocol")
 	return m.installGit(ghrepo.FormatRemoteURL(repo, protocol), m.io.Out, m.io.ErrOut)
 }
 
@@ -344,19 +348,19 @@ func (m *Manager) installBin(repo ghrepo.Interface) error {
 		return err
 	}
 
-	suffix := m.platform()
+	platform, ext := m.platform()
 	var asset *releaseAsset
 	for _, a := range r.Assets {
-		if strings.HasSuffix(a.Name, suffix) {
+		if strings.HasSuffix(a.Name, platform+ext) {
 			asset = &a
 			break
 		}
 	}
 
 	if asset == nil {
-		return fmt.Errorf("%s unsupported for %s. Open an issue: `gh issue create -R %s/%s -t'Support %s'`",
-			repo.RepoName(),
-			suffix, repo.RepoOwner(), repo.RepoName(), suffix)
+		return fmt.Errorf(
+			"%[1]s unsupported for %[2]s. Open an issue: `gh issue create -R %[3]s/%[1]s -t'Support %[2]s'`",
+			repo.RepoName(), platform, repo.RepoOwner())
 	}
 
 	name := repo.RepoName()
@@ -368,6 +372,7 @@ func (m *Manager) installBin(repo ghrepo.Interface) error {
 	}
 
 	binPath := filepath.Join(targetDir, name)
+	binPath += ext
 
 	err = downloadAsset(m.client, *asset, binPath)
 	if err != nil {
@@ -482,6 +487,19 @@ func (m *Manager) upgradeExtension(ext Extension, force bool) error {
 	if ext.IsBinary() {
 		err = m.upgradeBinExtension(ext)
 	} else {
+		// Check if git extension has changed to a binary extension
+		var isBin bool
+		repo, repoErr := repoFromPath(filepath.Join(ext.Path(), ".."))
+		if repoErr == nil {
+			isBin, _ = isBinExtension(m.client, repo)
+		}
+		if isBin {
+			err = m.Remove(ext.Name())
+			if err != nil {
+				return fmt.Errorf("failed to migrate to new precompiled extension format: %w", err)
+			}
+			return m.installBin(repo)
+		}
 		err = m.upgradeGitExtension(ext, force)
 	}
 	return err
@@ -492,17 +510,14 @@ func (m *Manager) upgradeGitExtension(ext Extension, force bool) error {
 	if err != nil {
 		return err
 	}
-	var cmds []*exec.Cmd
 	dir := filepath.Dir(ext.path)
 	if force {
-		fetchCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "fetch", "origin", "HEAD")
-		resetCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "reset", "--hard", "origin/HEAD")
-		cmds = []*exec.Cmd{fetchCmd, resetCmd}
-	} else {
-		pullCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "pull", "--ff-only")
-		cmds = []*exec.Cmd{pullCmd}
+		if err := m.newCommand(exe, "-C", dir, "fetch", "origin", "HEAD").Run(); err != nil {
+			return err
+		}
+		return m.newCommand(exe, "-C", dir, "reset", "--hard", "origin/HEAD").Run()
 	}
-	return runCmds(cmds)
+	return m.newCommand(exe, "-C", dir, "pull", "--ff-only").Run()
 }
 
 func (m *Manager) upgradeBinExtension(ext Extension) error {
@@ -525,87 +540,117 @@ func (m *Manager) installDir() string {
 	return filepath.Join(m.dataDir(), "extensions")
 }
 
-func (m *Manager) Create(name string) error {
+//go:embed ext_tmpls/goBinMain.go.txt
+var mainGoTmpl string
+
+//go:embed ext_tmpls/goBinWorkflow.yml
+var goBinWorkflow []byte
+
+//go:embed ext_tmpls/otherBinWorkflow.yml
+var otherBinWorkflow []byte
+
+//go:embed ext_tmpls/script.sh
+var scriptTmpl string
+
+//go:embed ext_tmpls/buildScript.sh
+var buildScript []byte
+
+func (m *Manager) Create(name string, tmplType extensions.ExtTemplateType) error {
 	exe, err := m.lookPath("git")
 	if err != nil {
 		return err
 	}
 
-	err = os.Mkdir(name, 0755)
-	if err != nil {
+	if err := m.newCommand(exe, "init", "--quiet", name).Run(); err != nil {
 		return err
 	}
 
-	initCmd := m.newCommand(exe, "init", "--quiet", name)
-	err = initCmd.Run()
-	if err != nil {
+	if tmplType == extensions.GoBinTemplateType {
+		return m.goBinScaffolding(exe, name)
+	} else if tmplType == extensions.OtherBinTemplateType {
+		return m.otherBinScaffolding(exe, name)
+	}
+
+	script := fmt.Sprintf(scriptTmpl, name)
+	if err := writeFile(filepath.Join(name, name), []byte(script), 0755); err != nil {
 		return err
 	}
 
-	fileTmpl := heredoc.Docf(`
-		#!/usr/bin/env bash
-		set -e
-
-		echo "Hello %[1]s!"
-
-		# Snippets to help get started:
-
-		# Determine if an executable is in the PATH
-		# if ! type -p ruby >/dev/null; then
-		#   echo "Ruby not found on the system" >&2
-		#   exit 1
-		# fi
-
-		# Pass arguments through to another command
-		# gh issue list "$@" -R cli/cli
-
-		# Using the gh api command to retrieve and format information
-		# QUERY='
-		#   query($endCursor: String) {
-		#     viewer {
-		#       repositories(first: 100, after: $endCursor) {
-		#         nodes {
-		#           nameWithOwner
-		#           stargazerCount
-		#         }
-		#       }
-		#     }
-		#   }
-		# '
-		# TEMPLATE='
-		#   {{- range $repo := .data.viewer.repositories.nodes -}}
-		#     {{- printf "name: %[2]s - stargazers: %[3]s\n" $repo.nameWithOwner $repo.stargazerCount -}}
-		#   {{- end -}}
-		# '
-		# exec gh api graphql -f query="${QUERY}" --paginate --template="${TEMPLATE}"
-	`, name, "%s", "%v")
-	filePath := filepath.Join(name, name)
-	err = ioutil.WriteFile(filePath, []byte(fileTmpl), 0755)
-	if err != nil {
-		return err
-	}
-
-	wd, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-	dir := filepath.Join(wd, name)
-	addCmd := m.newCommand(exe, "-C", dir, "--git-dir="+filepath.Join(dir, ".git"), "add", name, "--chmod=+x")
-	err = addCmd.Run()
-	return err
+	return m.newCommand(exe, "-C", name, "add", name, "--chmod=+x").Run()
 }
 
-func runCmds(cmds []*exec.Cmd) error {
-	for _, cmd := range cmds {
-		if err := cmd.Run(); err != nil {
-			return err
+func (m *Manager) otherBinScaffolding(gitExe, name string) error {
+	if err := writeFile(filepath.Join(name, ".github", "workflows", "release.yml"), otherBinWorkflow, 0644); err != nil {
+		return err
+	}
+	buildScriptPath := filepath.Join("script", "build.sh")
+	if err := writeFile(filepath.Join(name, buildScriptPath), buildScript, 0755); err != nil {
+		return err
+	}
+	if err := m.newCommand(gitExe, "-C", name, "add", buildScriptPath, "--chmod=+x").Run(); err != nil {
+		return err
+	}
+	return m.newCommand(gitExe, "-C", name, "add", ".").Run()
+}
+
+func (m *Manager) goBinScaffolding(gitExe, name string) error {
+	goExe, err := m.lookPath("go")
+	if err != nil {
+		return fmt.Errorf("go is required for creating Go extensions: %w", err)
+	}
+
+	if err := writeFile(filepath.Join(name, ".github", "workflows", "release.yml"), goBinWorkflow, 0644); err != nil {
+		return err
+	}
+
+	mainGo := fmt.Sprintf(mainGoTmpl, name)
+	if err := writeFile(filepath.Join(name, "main.go"), []byte(mainGo), 0644); err != nil {
+		return err
+	}
+
+	host, err := m.config.DefaultHost()
+	if err != nil {
+		return err
+	}
+
+	currentUser, err := api.CurrentLoginName(api.NewClientFromHTTP(m.client), host)
+	if err != nil {
+		return err
+	}
+
+	goCmds := [][]string{
+		{"mod", "init", fmt.Sprintf("%s/%s/%s", host, currentUser, name)},
+		{"mod", "tidy"},
+		{"build"},
+	}
+
+	ignore := fmt.Sprintf("/%[1]s\n/%[1]s.exe\n", name)
+	if err := writeFile(filepath.Join(name, ".gitignore"), []byte(ignore), 0644); err != nil {
+		return err
+	}
+
+	for _, args := range goCmds {
+		goCmd := m.newCommand(goExe, args...)
+		goCmd.Dir = name
+		if err := goCmd.Run(); err != nil {
+			return fmt.Errorf("failed to set up go module: %w", err)
 		}
 	}
-	return nil
+
+	return m.newCommand(gitExe, "-C", name, "add", ".").Run()
 }
 
 func isSymlink(m os.FileMode) bool {
 	return m&os.ModeSymlink != 0
+}
+
+func writeFile(p string, contents []byte, mode os.FileMode) error {
+	if dir := filepath.Dir(p); dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	}
+	return os.WriteFile(p, contents, mode)
 }
 
 // reads the product of makeSymlink on Windows
@@ -635,7 +680,11 @@ func isBinExtension(client *http.Client, repo ghrepo.Interface) (isBin bool, err
 	for _, a := range r.Assets {
 		dists := possibleDists()
 		for _, d := range dists {
-			if strings.HasSuffix(a.Name, d) {
+			suffix := d
+			if strings.HasPrefix(d, "windows") {
+				suffix += ".exe"
+			}
+			if strings.HasSuffix(a.Name, suffix) {
 				isBin = true
 				break
 			}
@@ -643,6 +692,32 @@ func isBinExtension(client *http.Client, repo ghrepo.Interface) (isBin bool, err
 	}
 
 	return
+}
+
+func repoFromPath(path string) (ghrepo.Interface, error) {
+	remotes, err := git.RemotesForPath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(remotes) == 0 {
+		return nil, fmt.Errorf("no remotes configured for %s", path)
+	}
+
+	var remote *git.Remote
+
+	for _, r := range remotes {
+		if r.Name == "origin" {
+			remote = r
+			break
+		}
+	}
+
+	if remote == nil {
+		remote = remotes[0]
+	}
+
+	return ghrepo.FromURL(remote.FetchURL)
 }
 
 func possibleDists() []string {

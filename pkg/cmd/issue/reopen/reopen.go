@@ -1,15 +1,19 @@
 package reopen
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	graphql "github.com/cli/shurcooL-graphql"
+	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
 
@@ -58,9 +62,8 @@ func reopenRun(opts *ReopenOptions) error {
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
-	issue, baseRepo, err := shared.IssueFromArg(apiClient, opts.BaseRepo, opts.SelectorArg)
+	issue, baseRepo, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, []string{"id", "number", "title", "state"})
 	if err != nil {
 		return err
 	}
@@ -70,7 +73,7 @@ func reopenRun(opts *ReopenOptions) error {
 		return nil
 	}
 
-	err = api.IssueReopen(apiClient, baseRepo, *issue)
+	err = apiReopen(httpClient, baseRepo, issue)
 	if err != nil {
 		return err
 	}
@@ -78,4 +81,27 @@ func reopenRun(opts *ReopenOptions) error {
 	fmt.Fprintf(opts.IO.ErrOut, "%s Reopened issue #%d (%s)\n", cs.SuccessIconWithColor(cs.Green), issue.Number, issue.Title)
 
 	return nil
+}
+
+func apiReopen(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue) error {
+	if issue.IsPullRequest() {
+		return api.PullRequestReopen(httpClient, repo, issue.ID)
+	}
+
+	var mutation struct {
+		ReopenIssue struct {
+			Issue struct {
+				ID githubv4.ID
+			}
+		} `graphql:"reopenIssue(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": githubv4.ReopenIssueInput{
+			IssueID: issue.ID,
+		},
+	}
+
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
+	return gql.MutateNamed(context.Background(), "IssueReopen", &mutation, variables)
 }

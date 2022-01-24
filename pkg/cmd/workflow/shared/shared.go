@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	Active           WorkflowState = "active"
-	DisabledManually WorkflowState = "disabled_manually"
+	Active             WorkflowState = "active"
+	DisabledManually   WorkflowState = "disabled_manually"
+	DisabledInactivity WorkflowState = "disabled_inactivity"
 )
 
 type WorkflowState string

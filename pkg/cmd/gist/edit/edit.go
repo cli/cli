@@ -34,6 +34,7 @@ type EditOptions struct {
 	EditFilename string
 	AddFilename  string
 	SourceFile   string
+	Description  string
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
@@ -46,7 +47,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				editorCmd,
 				"*."+filename,
 				defaultContent,
-				io.In, io.Out, io.ErrOut, nil)
+				io.In, io.Out, io.ErrOut)
 		},
 	}
 
@@ -77,6 +78,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().StringVarP(&opts.AddFilename, "add", "a", "", "Add a new file to the gist")
+	cmd.Flags().StringVarP(&opts.Description, "desc", "d", "", "New description for the gist")
 	cmd.Flags().StringVarP(&opts.EditFilename, "filename", "f", "", "Select a file to edit")
 
 	return cmd
@@ -125,6 +127,12 @@ func editRun(opts *EditOptions) error {
 
 	if username != gist.Owner.Login {
 		return fmt.Errorf("You do not own this gist.")
+	}
+
+	shouldUpdate := false
+	if opts.Description != "" {
+		shouldUpdate = true
+		gist.Description = opts.Description
 	}
 
 	if opts.AddFilename != "" {
@@ -275,16 +283,15 @@ func editRun(opts *EditOptions) error {
 		}
 	}
 
-	if len(filesToUpdate) == 0 {
+	if len(filesToUpdate) > 0 {
+		shouldUpdate = true
+	}
+
+	if !shouldUpdate {
 		return nil
 	}
 
-	err = updateGist(apiClient, host, gist)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return updateGist(apiClient, host, gist)
 }
 
 func updateGist(apiClient *api.Client, hostname string, gist *shared.Gist) error {

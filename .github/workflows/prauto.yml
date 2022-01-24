@@ -45,6 +45,10 @@ jobs:
 
           if [ "$PR_AUTHOR_TYPE" = "Bot" ] || gh api orgs/cli/public_members/$PRAUTHOR --silent 2>/dev/null
           then
+            if [ "$PR_AUTHOR_TYPE" != "Bot" ]
+            then
+              gh pr edit $PRNUM --add-assignee $PRAUTHOR
+            fi
             if ! errtext="$(addToBoard 2>&1)"
             then
               cat <<<"$errtext" >&2
@@ -55,6 +59,8 @@ jobs:
             fi
             exit 0
           fi
+
+          gh pr edit $PRNUM --add-label "external"
 
           if [ "$PRHEAD" = "cli:trunk" ]
           then

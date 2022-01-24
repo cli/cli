@@ -8,8 +8,10 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -26,6 +28,7 @@ type MergeOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	Branch     func() (string, error)
+	Remotes    func() (context.Remotes, error)
 
 	Finder shared.PRFinder
 
@@ -38,6 +41,7 @@ type MergeOptions struct {
 
 	Body    string
 	BodySet bool
+	Subject string
 	Editor  editor
 
 	UseAdmin                bool
@@ -51,6 +55,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Branch:     f.Branch,
+		Remotes:    f.Remotes,
 	}
 
 	var (
@@ -154,6 +159,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	cmd.Flags().BoolVarP(&opts.DeleteBranch, "delete-branch", "d", false, "Delete the local and remote branch after merge")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Body `text` for the merge commit")
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
+	cmd.Flags().StringVarP(&opts.Subject, "subject", "t", "", "Subject `text` for the merge commit")
 	cmd.Flags().BoolVarP(&flagMerge, "merge", "m", false, "Merge the commits with the base branch")
 	cmd.Flags().BoolVarP(&flagRebase, "rebase", "r", false, "Rebase the commits onto the base branch")
 	cmd.Flags().BoolVarP(&flagSquash, "squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
@@ -216,6 +222,10 @@ func mergeRun(opts *MergeOptions) error {
 	deleteBranch := opts.DeleteBranch
 	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
 	autoMerge := opts.AutoMergeEnable && !isImmediatelyMergeable(pr.MergeStateStatus)
+	localBranchExists := false
+	if opts.CanDeleteLocalBranch {
+		localBranchExists = git.HasLocalBranch(pr.HeadRefName)
+	}
 
 	if !isPRAlreadyMerged {
 		payload := mergePayload{
@@ -223,6 +233,7 @@ func mergeRun(opts *MergeOptions) error {
 			pullRequestID: pr.ID,
 			method:        opts.MergeMethod,
 			auto:          autoMerge,
+			commitSubject: opts.Subject,
 			commitBody:    opts.Body,
 			setCommitBody: opts.BodySet,
 		}
@@ -236,40 +247,26 @@ func mergeRun(opts *MergeOptions) error {
 			if err != nil {
 				return err
 			}
-			deleteBranch, err = deleteBranchSurvey(opts, crossRepoPR)
+			deleteBranch, err = deleteBranchSurvey(opts, crossRepoPR, localBranchExists)
 			if err != nil {
 				return err
 			}
 
 			allowEditMsg := payload.method != PullRequestMergeMethodRebase
 
-			action, err := confirmSurvey(allowEditMsg)
-			if err != nil {
-				return fmt.Errorf("unable to confirm: %w", err)
-			}
-
-			if action == shared.EditCommitMessageAction {
-				if !payload.setCommitBody {
-					payload.commitBody, err = getMergeText(httpClient, baseRepo, pr.ID, payload.method)
-					if err != nil {
-						return err
-					}
-				}
-
-				payload.commitBody, err = opts.Editor.Edit("*.md", payload.commitBody)
-				if err != nil {
-					return err
-				}
-				payload.setCommitBody = true
-
-				action, err = confirmSurvey(false)
+			for {
+				action, err := confirmSurvey(allowEditMsg)
 				if err != nil {
 					return fmt.Errorf("unable to confirm: %w", err)
 				}
-			}
-			if action == shared.CancelAction {
-				fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
-				return cmdutil.CancelError
+
+				submit, err := confirmSubmission(httpClient, opts, action, &payload)
+				if err != nil {
+					return err
+				}
+				if submit {
+					break
+				}
 			}
 		}
 
@@ -317,7 +314,7 @@ func mergeRun(opts *MergeOptions) error {
 
 	branchSwitchString := ""
 
-	if opts.CanDeleteLocalBranch {
+	if opts.CanDeleteLocalBranch && localBranchExists {
 		currentBranch, err := opts.Branch()
 		if err != nil {
 			return err
@@ -329,26 +326,27 @@ func mergeRun(opts *MergeOptions) error {
 			if err != nil {
 				return err
 			}
+
 			err = git.CheckoutBranch(branchToSwitchTo)
 			if err != nil {
 				return err
 			}
+
+			err := pullLatestChanges(opts, baseRepo, branchToSwitchTo)
+			if err != nil {
+				fmt.Fprintf(opts.IO.ErrOut, "%s warning: not posible to fast-forward to: %q\n", cs.WarningIcon(), branchToSwitchTo)
+			}
 		}
 
-		localBranchExists := git.HasLocalBranch(pr.HeadRefName)
-		if localBranchExists {
-			err = git.DeleteLocalBranch(pr.HeadRefName)
-			if err != nil {
-				err = fmt.Errorf("failed to delete local branch %s: %w", cs.Cyan(pr.HeadRefName), err)
-				return err
-			}
+		if err := git.DeleteLocalBranch(pr.HeadRefName); err != nil {
+			err = fmt.Errorf("failed to delete local branch %s: %w", cs.Cyan(pr.HeadRefName), err)
+			return err
 		}
 
 		if branchToSwitchTo != "" {
 			branchSwitchString = fmt.Sprintf(" and switched to branch %s", cs.Cyan(branchToSwitchTo))
 		}
 	}
-
 	if !isPRAlreadyMerged {
 		err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
 		var httpErr api.HTTPError
@@ -361,6 +359,25 @@ func mergeRun(opts *MergeOptions) error {
 
 	if isTerminal {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted branch %s%s\n", cs.SuccessIconWithColor(cs.Red), cs.Cyan(pr.HeadRefName), branchSwitchString)
+	}
+
+	return nil
+}
+
+func pullLatestChanges(opts *MergeOptions, repo ghrepo.Interface, branch string) error {
+	remotes, err := opts.Remotes()
+	if err != nil {
+		return err
+	}
+
+	baseRemote, err := remotes.FindByRepo(repo.RepoOwner(), repo.RepoName())
+	if err != nil {
+		return err
+	}
+
+	err = git.Pull(baseRemote.Name, branch)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -401,10 +418,10 @@ func mergeMethodSurvey(baseRepo *api.Repository) (PullRequestMergeMethod, error)
 	return mergeOpts[result].method, err
 }
 
-func deleteBranchSurvey(opts *MergeOptions, crossRepoPR bool) (bool, error) {
+func deleteBranchSurvey(opts *MergeOptions, crossRepoPR, localBranchExists bool) (bool, error) {
 	if !crossRepoPR && !opts.IsDeleteBranchIndicated {
 		var message string
-		if opts.CanDeleteLocalBranch {
+		if opts.CanDeleteLocalBranch && localBranchExists {
 			message = "Delete the branch locally and on GitHub?"
 		} else {
 			message = "Delete the branch on GitHub?"
@@ -424,14 +441,15 @@ func deleteBranchSurvey(opts *MergeOptions, crossRepoPR bool) (bool, error) {
 
 func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 	const (
-		submitLabel        = "Submit"
-		editCommitMsgLabel = "Edit commit message"
-		cancelLabel        = "Cancel"
+		submitLabel            = "Submit"
+		editCommitSubjectLabel = "Edit commit subject"
+		editCommitMsgLabel     = "Edit commit message"
+		cancelLabel            = "Cancel"
 	)
 
 	options := []string{submitLabel}
 	if allowEditMsg {
-		options = append(options, editCommitMsgLabel)
+		options = append(options, editCommitSubjectLabel, editCommitMsgLabel)
 	}
 	options = append(options, cancelLabel)
 
@@ -448,10 +466,59 @@ func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 	switch result {
 	case submitLabel:
 		return shared.SubmitAction, nil
+	case editCommitSubjectLabel:
+		return shared.EditCommitSubjectAction, nil
 	case editCommitMsgLabel:
 		return shared.EditCommitMessageAction, nil
 	default:
 		return shared.CancelAction, nil
+	}
+}
+
+func confirmSubmission(client *http.Client, opts *MergeOptions, action shared.Action, payload *mergePayload) (bool, error) {
+	var err error
+
+	switch action {
+	case shared.EditCommitMessageAction:
+		if !payload.setCommitBody {
+			_, payload.commitBody, err = getMergeText(client, payload.repo, payload.pullRequestID, payload.method)
+			if err != nil {
+				return false, err
+			}
+		}
+
+		payload.commitBody, err = opts.Editor.Edit("*.md", payload.commitBody)
+		if err != nil {
+			return false, err
+		}
+		payload.setCommitBody = true
+
+		return false, nil
+
+	case shared.EditCommitSubjectAction:
+		if payload.commitSubject == "" {
+			payload.commitSubject, _, err = getMergeText(client, payload.repo, payload.pullRequestID, payload.method)
+			if err != nil {
+				return false, err
+			}
+		}
+
+		payload.commitSubject, err = opts.Editor.Edit("*.md", payload.commitSubject)
+		if err != nil {
+			return false, err
+		}
+
+		return false, nil
+
+	case shared.CancelAction:
+		fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
+		return false, cmdutil.CancelError
+
+	case shared.SubmitAction:
+		return true, nil
+
+	default:
+		return false, fmt.Errorf("unable to confirm: %w", err)
 	}
 }
 
@@ -466,7 +533,7 @@ func (e *userEditor) Edit(filename, startingText string) (string, error) {
 		return "", err
 	}
 
-	return surveyext.Edit(editorCommand, filename, startingText, e.io.In, e.io.Out, e.io.ErrOut, nil)
+	return surveyext.Edit(editorCommand, filename, startingText, e.io.In, e.io.Out, e.io.ErrOut)
 }
 
 // blockedReason translates various MergeStateStatus GraphQL values into human-readable reason

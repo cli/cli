@@ -23,7 +23,7 @@ func TestGitHubRepo_notFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("GitHubRepo did not return an error")
 	}
-	if wants := "GraphQL error: Could not resolve to a Repository with the name 'OWNER/REPO'."; err.Error() != wants {
+	if wants := "GraphQL: Could not resolve to a Repository with the name 'OWNER/REPO'."; err.Error() != wants {
 		t.Errorf("GitHubRepo error: want %q, got %q", wants, err.Error())
 	}
 	if repo != nil {
@@ -359,6 +359,31 @@ func Test_RepoMilestones(t *testing.T) {
 		}
 		if !strings.Contains(query, tt.want) {
 			t.Errorf("query does not contain %v", tt.want)
+		}
+	}
+}
+
+func TestDisplayName(t *testing.T) {
+	tests := []struct {
+		name     string
+		assignee RepoAssignee
+		want     string
+	}{
+		{
+			name:     "assignee with name",
+			assignee: RepoAssignee{"123", "octocat123", "Octavious Cath"},
+			want:     "octocat123 (Octavious Cath)",
+		},
+		{
+			name:     "assignee without name",
+			assignee: RepoAssignee{"123", "octocat123", ""},
+			want:     "octocat123",
+		},
+	}
+	for _, tt := range tests {
+		actual := tt.assignee.DisplayName()
+		if actual != tt.want {
+			t.Errorf("display name was %s wanted %s", actual, tt.want)
 		}
 	}
 }
