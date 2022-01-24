@@ -61,8 +61,8 @@ func TestNewCmdList(t *testing.T) {
 			},
 		},
 		{
-			name: "actor",
-			cli:  "--actor bak1an",
+			name: "user",
+			cli:  "--user bak1an",
 			wants: ListOptions{
 				Limit: defaultLimit,
 				Actor: "bak1an",
