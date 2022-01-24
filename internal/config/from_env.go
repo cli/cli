@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/pkg/set"
 )
 
 const (
@@ -34,19 +35,29 @@ type envConfig struct {
 }
 
 func (c *envConfig) Hosts() ([]string, error) {
-	hasDefault := false
 	hosts, err := c.Config.Hosts()
-	for _, h := range hosts {
-		if h == ghinstance.Default() {
-			hasDefault = true
+	if err != nil {
+		return nil, err
+	}
+
+	hostSet := set.NewStringSet()
+	hostSet.AddValues(hosts)
+
+	// If GH_HOST is set and there is a valid environment variable
+	// token for the host then add it to list.
+	if host := os.Getenv(GH_HOST); host != "" {
+		if token, _ := AuthTokenFromEnv(host); token != "" {
+			hostSet.Add(host)
 		}
 	}
-	token, _ := AuthTokenFromEnv(ghinstance.Default())
-	if (err != nil || !hasDefault) && token != "" {
-		hosts = append([]string{ghinstance.Default()}, hosts...)
-		return hosts, nil
+
+	// If there is a valid environment variable token for the
+	// default host then add default host to list.
+	if token, _ := AuthTokenFromEnv(ghinstance.Default()); token != "" {
+		hostSet.Add(ghinstance.Default())
 	}
-	return hosts, err
+
+	return hostSet.ToSlice(), nil
 }
 
 func (c *envConfig) DefaultHost() (string, error) {

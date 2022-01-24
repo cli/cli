@@ -10,6 +10,7 @@ type stringSet struct {
 func NewStringSet() *stringSet {
 	s := &stringSet{}
 	s.m = make(map[string]struct{})
+	s.v = []string{}
 	return s
 }
 
