@@ -1,6 +1,7 @@
 package set
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -375,7 +376,7 @@ func getBody(opts *SetOptions) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read from standard input: %w", err)
 	}
 
-	return body, nil
+	return bytes.TrimSpace(body), nil
 }
 
 func mapRepoNamesToIDs(client *api.Client, host, defaultOwner string, repositoryNames []string) ([]int64, error) {
