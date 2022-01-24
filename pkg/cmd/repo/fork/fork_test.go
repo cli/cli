@@ -242,7 +242,7 @@ func TestRepoFork(t *testing.T) {
 				},
 			},
 			cfg: func(c config.Config) config.Config {
-				c.Set("", "git_protocol", "")
+				_ = c.Set("", "git_protocol", "")
 				return c
 			},
 			httpStubs: forkPost,
