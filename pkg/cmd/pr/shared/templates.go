@@ -23,6 +23,12 @@ type issueTemplate struct {
 	Gbody string `graphql:"body"`
 }
 
+type pullRequestTemplate struct {
+	// I would have un-exported these fields, except `cli/shurcool-graphql` then cannot unmarshal them :/
+	Gname string `graphql:"filename"`
+	Gbody string `graphql:"body"`
+}
+
 func (t *issueTemplate) Name() string {
 	return t.Gname
 }
@@ -35,7 +41,19 @@ func (t *issueTemplate) Body() []byte {
 	return []byte(t.Gbody)
 }
 
-func listIssueTemplates(httpClient *http.Client, repo ghrepo.Interface) ([]issueTemplate, error) {
+func (t *pullRequestTemplate) Name() string {
+	return t.Gname
+}
+
+func (t *pullRequestTemplate) NameForSubmit() string {
+	return t.Gname
+}
+
+func (t *pullRequestTemplate) Body() []byte {
+	return []byte(t.Gbody)
+}
+
+func listIssueTemplates(httpClient *http.Client, repo ghrepo.Interface) ([]Template, error) {
 	var query struct {
 		Repository struct {
 			IssueTemplates []issueTemplate
@@ -54,7 +72,41 @@ func listIssueTemplates(httpClient *http.Client, repo ghrepo.Interface) ([]issue
 		return nil, err
 	}
 
-	return query.Repository.IssueTemplates, nil
+	ts := query.Repository.IssueTemplates
+	templates := make([]Template, len(ts))
+	for i := range templates {
+		templates[i] = &ts[i]
+	}
+
+	return templates, nil
+}
+
+func listPullRequestTemplates(httpClient *http.Client, repo ghrepo.Interface) ([]Template, error) {
+	var query struct {
+		Repository struct {
+			PullRequestTemplates []pullRequestTemplate
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner": githubv4.String(repo.RepoOwner()),
+		"name":  githubv4.String(repo.RepoName()),
+	}
+
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
+
+	err := gql.QueryNamed(context.Background(), "PullRequestTemplates", &query, variables)
+	if err != nil {
+		return nil, err
+	}
+
+	ts := query.Repository.PullRequestTemplates
+	templates := make([]Template, len(ts))
+	for i := range templates {
+		templates[i] = &ts[i]
+	}
+
+	return templates, nil
 }
 
 func hasIssueTemplateSupport(httpClient *http.Client, hostname string) (bool, error) {
@@ -97,6 +149,35 @@ func hasIssueTemplateSupport(httpClient *http.Client, hostname string) (bool, er
 	return hasQuerySupport && hasMutationSupport, nil
 }
 
+func hasPullRequestTemplateSupport(httpClient *http.Client, hostname string) (bool, error) {
+	if !ghinstance.IsEnterprise(hostname) {
+		return true, nil
+	}
+
+	var featureDetection struct {
+		Repository struct {
+			Fields []struct {
+				Name string
+			} `graphql:"fields(includeDeprecated: true)"`
+		} `graphql:"Repository: __type(name: \"Repository\")"`
+	}
+
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), httpClient)
+	err := gql.QueryNamed(context.Background(), "PullRequestTemplates_fields", &featureDetection, nil)
+	if err != nil {
+		return false, err
+	}
+
+	var hasQuerySupport bool
+	for _, field := range featureDetection.Repository.Fields {
+		if field.Name == "pullRequestTemplates" {
+			hasQuerySupport = true
+		}
+	}
+
+	return hasQuerySupport, nil
+}
+
 type Template interface {
 	Name() string
 	NameForSubmit() string
@@ -129,11 +210,11 @@ func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, dir stri
 }
 
 func (m *templateManager) hasAPI() (bool, error) {
-	if m.isPR {
-		return false, nil
-	}
 	if m.cachedClient == nil {
 		m.cachedClient = api.NewCachedClient(m.httpClient, time.Hour*24)
+	}
+	if m.isPR {
+		return hasPullRequestTemplateSupport(m.cachedClient, m.repo.RepoHost())
 	}
 	return hasIssueTemplateSupport(m.cachedClient, m.repo.RepoHost())
 }
@@ -201,14 +282,15 @@ func (m *templateManager) fetch() error {
 	}
 
 	if hasAPI {
-		issueTemplates, err := listIssueTemplates(m.httpClient, m.repo)
+		lister := listIssueTemplates
+		if m.isPR {
+			lister = listPullRequestTemplates
+		}
+		templates, err := lister(m.httpClient, m.repo)
 		if err != nil {
 			return err
 		}
-		m.templates = make([]Template, len(issueTemplates))
-		for i := range issueTemplates {
-			m.templates[i] = &issueTemplates[i]
-		}
+		m.templates = templates
 	}
 
 	if !m.allowFS {
