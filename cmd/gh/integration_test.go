@@ -19,6 +19,7 @@ import (
 	expect "github.com/Netflix/go-expect"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/safeexec"
+	"github.com/creack/pty"
 	"github.com/hinshun/vt10x"
 	"github.com/stretchr/testify/assert"
 )
@@ -213,7 +214,7 @@ func setupConfigFiles(t *testing.T, config, hosts string) {
 // To fix this issue use the verbose option, -v, with go test.
 func setupVirtualConsole(t *testing.T, w io.Writer) *expect.Console {
 	t.Helper()
-	c, _, err := vt10x.NewVT10XConsole(expect.WithStdout(w))
+	c, err := NewVT10XConsole(expect.WithStdout(w))
 	if err != nil {
 		t.Fatalf("unable to create virtual console: %v", err)
 	}
@@ -230,6 +231,22 @@ func setupVirtualConsole(t *testing.T, w io.Writer) *expect.Console {
 	os.Stdout = c.Tty()
 	os.Stderr = c.Tty()
 	return c
+}
+
+// NewVT10XConsole returns a new expect.Console that multiplexes the
+// Stdin/Stdout to a VT10X terminal, allowing Console to interact with an
+// application sending ANSI escape sequences.
+func NewVT10XConsole(opts ...expect.ConsoleOpt) (*expect.Console, error) {
+	ptm, pts, err := pty.Open()
+	if err != nil {
+		return nil, err
+	}
+	term := vt10x.New(vt10x.WithWriter(pts))
+	c, err := expect.NewConsole(append(opts, expect.WithStdin(ptm), expect.WithStdout(term), expect.WithCloser(pts, ptm))...)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
 }
 
 // setupEnvVars sets environment variables to disable
