@@ -198,15 +198,15 @@ func TestRepoFork(t *testing.T) {
 		httpStubs  func(*httpmock.Registry)
 		execStubs  func(*run.CommandStubber)
 		askStubs   func(*prompt.AskStubber)
+		cfg        func(config.Config) config.Config
 		remotes    []*context.Remote
 		wantOut    string
 		wantErrOut string
 		wantErr    bool
 		errMsg     string
 	}{
-		// TODO implicit, override existing remote's protocol with configured protocol
 		{
-			name: "implicit match existing remote's protocol",
+			name: "implicit match, configured protocol overrides provided",
 			tty:  true,
 			opts: &ForkOptions{
 				Remote:     true,
@@ -219,6 +219,31 @@ func TestRepoFork(t *testing.T) {
 					}},
 					Repo: ghrepo.New("OWNER", "REPO"),
 				},
+			},
+			httpStubs: forkPost,
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git remote add -f fork https://github\.com/someone/REPO\.git`, 0, "")
+			},
+			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote fork\n",
+		},
+		{
+			name: "implicit match, no configured protocol",
+			tty:  true,
+			opts: &ForkOptions{
+				Remote:     true,
+				RemoteName: "fork",
+			},
+			remotes: []*context.Remote{
+				{
+					Remote: &git.Remote{Name: "origin", PushURL: &url.URL{
+						Scheme: "ssh",
+					}},
+					Repo: ghrepo.New("OWNER", "REPO"),
+				},
+			},
+			cfg: func(c config.Config) config.Config {
+				c.Set("", "git_protocol", "")
+				return c
 			},
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
@@ -556,6 +581,9 @@ func TestRepoFork(t *testing.T) {
 		}
 
 		cfg := config.NewBlankConfig()
+		if tt.cfg != nil {
+			cfg = tt.cfg(cfg)
+		}
 		tt.opts.Config = func() (config.Config, error) {
 			return cfg, nil
 		}

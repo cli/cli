@@ -209,7 +209,7 @@ func forkRun(opts *ForkOptions) error {
 	if err != nil {
 		return err
 	}
-	protocol, err := cfg.GetOrDefault(repoToFork.RepoHost(), "git_protocol")
+	protocol, err := cfg.Get(repoToFork.RepoHost(), "git_protocol")
 	if err != nil {
 		return err
 	}
@@ -220,17 +220,20 @@ func forkRun(opts *ForkOptions) error {
 			return err
 		}
 
-		if remote, err := remotes.FindByRepo(repoToFork.RepoOwner(), repoToFork.RepoName()); err == nil {
-
-			scheme := ""
-			if remote.FetchURL != nil {
-				scheme = remote.FetchURL.Scheme
-			}
-			if remote.PushURL != nil {
-				scheme = remote.PushURL.Scheme
-			}
-			if scheme != "" {
-				protocol = scheme
+		if protocol == "" { // user has no set preference
+			if remote, err := remotes.FindByRepo(repoToFork.RepoOwner(), repoToFork.RepoName()); err == nil {
+				scheme := ""
+				if remote.FetchURL != nil {
+					scheme = remote.FetchURL.Scheme
+				}
+				if remote.PushURL != nil {
+					scheme = remote.PushURL.Scheme
+				}
+				if scheme != "" {
+					protocol = scheme
+				} else {
+					protocol = cfg.Default("git_protocol")
+				}
 			}
 		}
 
