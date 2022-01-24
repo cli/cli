@@ -254,7 +254,7 @@ func Test_editRun(t *testing.T) {
 				},
 				Owner: &shared.GistOwner{Login: "octocat2"},
 			},
-			wantErr: "You do not own this gist.",
+			wantErr: "you do not own this gist",
 		},
 		{
 			name: "add file to existing gist",

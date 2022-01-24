@@ -126,7 +126,7 @@ func editRun(opts *EditOptions) error {
 	}
 
 	if username != gist.Owner.Login {
-		return fmt.Errorf("You do not own this gist.")
+		return errors.New("you do not own this gist")
 	}
 
 	shouldUpdate := false
