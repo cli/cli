@@ -264,7 +264,7 @@ func TestInheritEnv(t *testing.T) {
 			GITHUB_TOKEN: "ENVTOKEN",
 			hostname:     "github.com",
 			wants: wants{
-				hosts:     []string{"example.org", "github.com"},
+				hosts:     []string{"github.com", "example.org"},
 				token:     "ENVTOKEN",
 				source:    "GITHUB_TOKEN",
 				writeable: false,
@@ -280,7 +280,7 @@ func TestInheritEnv(t *testing.T) {
 			GH_TOKEN: "ENVTOKEN",
 			hostname: "github.com",
 			wants: wants{
-				hosts:     []string{"example.org", "github.com"},
+				hosts:     []string{"github.com", "example.org"},
 				token:     "ENVTOKEN",
 				source:    "GH_TOKEN",
 				writeable: false,

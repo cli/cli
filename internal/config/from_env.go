@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -57,7 +58,10 @@ func (c *envConfig) Hosts() ([]string, error) {
 		hostSet.Add(ghinstance.Default())
 	}
 
-	return hostSet.ToSlice(), nil
+	s := hostSet.ToSlice()
+	// If default host is in list then move it to the front.
+	sort.SliceStable(s, func(i, j int) bool { return s[i] == ghinstance.Default() })
+	return s, nil
 }
 
 func (c *envConfig) DefaultHost() (string, error) {
