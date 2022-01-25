@@ -614,7 +614,7 @@ func TestRepoFork(t *testing.T) {
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
 					httpmock.StringResponse(renameResult))
 			},
-			wantErrOut: "✓ Created fork OWNER/NEW_REPO\n",
+			wantErrOut: "✓ Created fork OWNER/REPO\n✓ Renamed fork to OWNER/NEW_REPO\n",
 		},
 	}
 

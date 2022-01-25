@@ -182,14 +182,6 @@ func forkRun(opts *ForkOptions) error {
 		return fmt.Errorf("failed to fork: %w", err)
 	}
 
-	// Rename the forked repo if ForkName is specified in opts.
-	if opts.ForkName != "" {
-		forkedRepo, err = api.RenameRepo(apiClient, forkedRepo, opts.ForkName)
-		if err != nil {
-			return err
-		}
-	}
-
 	// This is weird. There is not an efficient way to determine via the GitHub API whether or not a
 	// given user has forked a given repo. We noticed, also, that the create fork API endpoint just
 	// returns the fork repo data even if it already exists -- with no change in status code or
@@ -208,6 +200,17 @@ func forkRun(opts *ForkOptions) error {
 	} else {
 		if connectedToTerminal {
 			fmt.Fprintf(stderr, "%s Created fork %s\n", cs.SuccessIconWithColor(cs.Green), cs.Bold(ghrepo.FullName(forkedRepo)))
+		}
+	}
+
+	// Rename the forked repo if ForkName is specified in opts.
+	if opts.ForkName != "" {
+		forkedRepo, err = api.RenameRepo(apiClient, forkedRepo, opts.ForkName)
+		if err != nil {
+			return fmt.Errorf("could not rename fork: %w", err)
+		}
+		if connectedToTerminal {
+			fmt.Fprintf(stderr, "%s Renamed fork to %s\n", cs.SuccessIconWithColor(cs.Green), cs.Bold(ghrepo.FullName(forkedRepo)))
 		}
 	}
 
