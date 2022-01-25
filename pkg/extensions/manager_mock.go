@@ -284,9 +284,7 @@ func (mock *ExtensionManagerMock) List(includeMetadata bool) []Extension {
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
 //     len(mockedExtensionManager.ListCalls())
-func (mock *ExtensionManagerMock) ListCalls() []struct {
-	IncludeMetadata bool
-} {
+func (mock *ExtensionManagerMock) ListCalls() []struct{ IncludeMetadata bool } {
 	var calls []struct {
 		IncludeMetadata bool
 	}

@@ -296,10 +296,12 @@ func TestNewCmdExtension(t *testing.T) {
 					return []extensions.Extension{ex1, ex2}
 				}
 				return func(t *testing.T) {
-					assert.Equal(t, 1, len(em.ListCalls()))
+					calls := em.ListCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.False(t, calls[0].IncludeMetadata)
 				}
 			},
-			wantStdout: "gh test\tcli/gh-test\t\ngh test2\tcli/gh-test2\tUpgrade available\n",
+			wantStdout: "gh test\tcli/gh-test\ngh test2\tcli/gh-test2\n",
 		},
 		{
 			name: "create extension interactive",

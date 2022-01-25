@@ -45,11 +45,10 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			Aliases: []string{"ls"},
 			Args:    cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, args []string) error {
-				cmds := m.List(true)
+				cmds := m.List(false)
 				if len(cmds) == 0 {
 					return errors.New("no extensions installed")
 				}
-				cs := io.ColorScheme()
 				t := utils.NewTablePrinter(io)
 				for _, c := range cmds {
 					var repo string
@@ -61,11 +60,6 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					t.AddField(fmt.Sprintf("gh %s", c.Name()), nil, nil)
 					t.AddField(repo, nil, nil)
-					var updateAvailable string
-					if c.UpdateAvailable() {
-						updateAvailable = "Upgrade available"
-					}
-					t.AddField(updateAvailable, nil, cs.Green)
 					t.EndRow()
 				}
 				return t.Render()
