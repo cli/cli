@@ -50,6 +50,35 @@ func TestFind(t *testing.T) {
 			wantRepo: "https://github.com/OWNER/REPO",
 		},
 		{
+			name: "number argument with base branch",
+			args: args{
+				selector:   "13",
+				baseBranch: "main",
+				fields:     []string{"id", "number"},
+				baseRepoFn: func() (ghrepo.Interface, error) {
+					return ghrepo.FromFullName("OWNER/REPO")
+				},
+			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query PullRequestForBranch\b`),
+					httpmock.StringResponse(`{"data":{"repository":{
+						"pullRequests":{"nodes":[
+							{
+								"number": 123,
+								"state": "OPEN",
+								"baseRefName": "main",
+								"headRefName": "13",
+								"isCrossRepository": false,
+								"headRepositoryOwner": {"login":"OWNER"}
+							}
+						]}
+					}}}`))
+			},
+			wantPR:   123,
+			wantRepo: "https://github.com/OWNER/REPO",
+		},
+		{
 			name: "baseRepo is error",
 			args: args{
 				selector: "13",
