@@ -132,6 +132,16 @@ func TestNewCmdFork(t *testing.T) {
 			wantErr: true,
 			errMsg:  "unknown flag: --depth\nSeparate git clone flags with '--'.",
 		},
+		{
+			name: "with fork name",
+			cli:  "--fork-name new-fork",
+			wants: ForkOptions{
+				Remote:     false,
+				RemoteName: "origin",
+				ForkName:   "new-fork",
+				Rename:     false,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -533,6 +543,78 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 			},
+		},
+		{
+			name: "non tty repo arg with fork-name",
+			opts: &ForkOptions{
+				Repository: "someone/REPO",
+				Clone:      false,
+				ForkName:   "NEW_REPO",
+			},
+			tty: false,
+			httpStubs: func(reg *httpmock.Registry) {
+				forkResult := `{
+					"node_id": "123",
+					"name": "REPO",
+					"clone_url": "https://github.com/OWNER/REPO.git",
+					"created_at": "2011-01-26T19:01:12Z",
+					"owner": {
+						"login": "OWNER"
+					}
+				}`
+				renameResult := `{
+					"node_id": "1234",
+					"name": "NEW_REPO",
+					"clone_url": "https://github.com/OWNER/NEW_REPO.git",
+					"created_at": "2012-01-26T19:01:12Z",
+					"owner": {
+						"login": "OWNER"
+					}
+				}`
+				reg.Register(
+					httpmock.REST("POST", "repos/someone/REPO/forks"),
+					httpmock.StringResponse(forkResult))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.StringResponse(renameResult))
+			},
+			wantErrOut: "",
+		},
+		{
+			name: "tty repo arg with fork-name",
+			opts: &ForkOptions{
+				Repository: "someone/REPO",
+				Clone:      false,
+				ForkName:   "NEW_REPO",
+			},
+			tty: true,
+			httpStubs: func(reg *httpmock.Registry) {
+				forkResult := `{
+					"node_id": "123",
+					"name": "REPO",
+					"clone_url": "https://github.com/OWNER/REPO.git",
+					"created_at": "2011-01-26T19:01:12Z",
+					"owner": {
+						"login": "OWNER"
+					}
+				}`
+				renameResult := `{
+					"node_id": "1234",
+					"name": "NEW_REPO",
+					"clone_url": "https://github.com/OWNER/NEW_REPO.git",
+					"created_at": "2012-01-26T19:01:12Z",
+					"owner": {
+						"login": "OWNER"
+					}
+				}`
+				reg.Register(
+					httpmock.REST("POST", "repos/someone/REPO/forks"),
+					httpmock.StringResponse(forkResult))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.StringResponse(renameResult))
+			},
+			wantErrOut: "✓ Created fork OWNER/REPO\n✓ Renamed fork to OWNER/NEW_REPO\n",
 		},
 	}
 

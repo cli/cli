@@ -39,6 +39,7 @@ type ForkOptions struct {
 	PromptRemote bool
 	RemoteName   string
 	Organization string
+	ForkName     string
 	Rename       bool
 }
 
@@ -115,6 +116,7 @@ Additional 'git clone' flags can be passed in by listing them after '--'.`,
 	cmd.Flags().BoolVar(&opts.Remote, "remote", false, "Add remote for fork {true|false}")
 	cmd.Flags().StringVar(&opts.RemoteName, "remote-name", defaultRemoteName, "Specify a name for a fork's new remote.")
 	cmd.Flags().StringVar(&opts.Organization, "org", "", "Create the fork in an organization")
+	cmd.Flags().StringVar(&opts.ForkName, "fork-name", "", "Specify a name for the forked repo")
 
 	return cmd
 }
@@ -198,6 +200,17 @@ func forkRun(opts *ForkOptions) error {
 	} else {
 		if connectedToTerminal {
 			fmt.Fprintf(stderr, "%s Created fork %s\n", cs.SuccessIconWithColor(cs.Green), cs.Bold(ghrepo.FullName(forkedRepo)))
+		}
+	}
+
+	// Rename the forked repo if ForkName is specified in opts.
+	if opts.ForkName != "" {
+		forkedRepo, err = api.RenameRepo(apiClient, forkedRepo, opts.ForkName)
+		if err != nil {
+			return fmt.Errorf("could not rename fork: %w", err)
+		}
+		if connectedToTerminal {
+			fmt.Fprintf(stderr, "%s Renamed fork to %s\n", cs.SuccessIconWithColor(cs.Green), cs.Bold(ghrepo.FullName(forkedRepo)))
 		}
 	}
 
