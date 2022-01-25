@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -32,9 +31,6 @@ func Test_deleteRun(t *testing.T) {
 
 	err := deleteRun(&DeleteOptions{
 		IO: io,
-		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
-		},
 		HTTPClient: func() (*http.Client, error) {
 			return &http.Client{Transport: &tr}, nil
 		},
@@ -46,5 +42,5 @@ func Test_deleteRun(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stderr.String())
-	assert.Equal(t, "✓ Public key deleted from your repository\n", stdout.String())
+	assert.Equal(t, "✓ Deploy key deleted from OWNER/REPO\n", stdout.String())
 }

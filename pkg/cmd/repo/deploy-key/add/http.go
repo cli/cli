@@ -16,19 +16,20 @@ import (
 
 var scopesError = errors.New("insufficient OAuth scopes")
 
-func uploadDeployKey(httpClient *http.Client, hostname string, keyFile io.Reader, opts *AddOptions, repo ghrepo.Interface) error {
-	resource := fmt.Sprintf("repos/%s/%s/keys", repo.RepoOwner(), repo.RepoName())
-	url := fmt.Sprintf("%s%s", ghinstance.RESTPrefix(hostname), resource)
+func uploadDeployKey(httpClient *http.Client, repo ghrepo.Interface, keyFile io.ReadCloser, title string, isWritable bool) error {
+	path := fmt.Sprintf("repos/%s/%s/keys", repo.RepoOwner(), repo.RepoName())
+	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
 
+	defer keyFile.Close()
 	keyBytes, err := ioutil.ReadAll(keyFile)
 	if err != nil {
 		return err
 	}
 
 	payload := map[string]interface{}{
-		"title":     opts.Title,
+		"title":     title,
 		"key":       string(keyBytes),
-		"read_only": !opts.ReadWrite,
+		"read_only": !isWritable,
 	}
 
 	payloadBytes, err := json.Marshal(payload)
@@ -50,12 +51,7 @@ func uploadDeployKey(httpClient *http.Client, hostname string, keyFile io.Reader
 	if resp.StatusCode == 404 {
 		return scopesError
 	} else if resp.StatusCode > 299 {
-		var httpError api.HTTPError
-		err := api.HandleHTTPError(resp)
-		if errors.As(err, &httpError) && isDuplicateError(&httpError) {
-			return nil
-		}
-		return err
+		return api.HandleHTTPError(resp)
 	}
 
 	_, err = io.Copy(ioutil.Discard, resp.Body)
@@ -64,9 +60,4 @@ func uploadDeployKey(httpClient *http.Client, hostname string, keyFile io.Reader
 	}
 
 	return nil
-}
-
-func isDuplicateError(err *api.HTTPError) bool {
-	return err.StatusCode == 422 && len(err.Errors) == 1 &&
-		err.Errors[0].Field == "key" && err.Errors[0].Message == "key is already in use"
 }

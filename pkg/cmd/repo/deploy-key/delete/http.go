@@ -24,9 +24,9 @@ type deployKey struct {
 	ReadOnly  bool      `json:"read_only"`
 }
 
-func deleteDeployKey(httpClient *http.Client, hostname, id string, repo ghrepo.Interface) error {
-	resource := fmt.Sprintf("repos/%s/%s/keys/%s", repo.RepoOwner(), repo.RepoName(), id)
-	url := fmt.Sprintf("%s%s", ghinstance.RESTPrefix(hostname), resource)
+func deleteDeployKey(httpClient *http.Client, repo ghrepo.Interface, id string) error {
+	path := fmt.Sprintf("repos/%s/%s/keys/%s", repo.RepoOwner(), repo.RepoName(), id)
+	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
 
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
@@ -53,9 +53,9 @@ func deleteDeployKey(httpClient *http.Client, hostname, id string, repo ghrepo.I
 	return nil
 }
 
-func deployKeyByID(httpClient *http.Client, hostname, ID string, repo ghrepo.Interface) (*deployKey, error) {
-	resource := fmt.Sprintf("repos/%s/%s/keys/%s", repo.RepoOwner(), repo.RepoName(), ID)
-	url := fmt.Sprintf("%s%s", ghinstance.RESTPrefix(hostname), resource)
+func deployKeyByID(httpClient *http.Client, repo ghrepo.Interface, ID string) (*deployKey, error) {
+	path := fmt.Sprintf("repos/%s/%s/keys/%s", repo.RepoOwner(), repo.RepoName(), ID)
+	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {

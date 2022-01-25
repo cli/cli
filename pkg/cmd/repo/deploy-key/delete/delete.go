@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -16,7 +15,6 @@ import (
 
 type DeleteOptions struct {
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
 	HTTPClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
@@ -27,7 +25,6 @@ type DeleteOptions struct {
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
 	opts := &DeleteOptions{
 		HTTPClient: f.HttpClient,
-		Config:     f.Config,
 		IO:         f.IOStreams,
 		BaseRepo:   f.BaseRepo,
 	}
@@ -59,22 +56,12 @@ func deleteRun(opts *DeleteOptions) error {
 		return err
 	}
 
-	cfg, err := opts.Config()
-	if err != nil {
-		return err
-	}
-
-	hostname, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
-
 	repo, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
 
-	deployKey, err := deployKeyByID(httpClient, hostname, opts.ID, repo)
+	deployKey, err := deployKeyByID(httpClient, repo, opts.ID)
 	if err != nil {
 		if errors.Is(err, scopesError) {
 			cs := opts.IO.ColorScheme()
@@ -96,14 +83,13 @@ func deleteRun(opts *DeleteOptions) error {
 		if err != nil {
 			return err
 		}
-		if err != nil || answer != deployKey.Title {
+		if answer != deployKey.Title {
 			fmt.Fprintf(opts.IO.Out, "Deploy Key #%d was not deleted.\n", deployKey.ID)
 			return nil
 		}
 	}
 
-	err = deleteDeployKey(httpClient, hostname, opts.ID, repo)
-	if err != nil {
+	if err := deleteDeployKey(httpClient, repo, opts.ID); err != nil {
 		if errors.Is(err, scopesError) {
 			cs := opts.IO.ColorScheme()
 			fmt.Fprint(opts.IO.ErrOut, "Error: insufficient OAuth scopes to delete deploy key\n")
@@ -113,9 +99,11 @@ func deleteRun(opts *DeleteOptions) error {
 		return err
 	}
 
-	if opts.IO.IsStdoutTTY() {
-		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.Out, "%s Public key deleted from your repository\n", cs.SuccessIcon())
+	if !opts.IO.IsStdoutTTY() {
+		return nil
 	}
+
+	cs := opts.IO.ColorScheme()
+	fmt.Fprintf(opts.IO.Out, "%s Deploy key deleted from %s\n", cs.SuccessIconWithColor(cs.Red), ghrepo.FullName(repo))
 	return nil
 }

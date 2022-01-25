@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -33,7 +32,7 @@ func Test_addRun(t *testing.T) {
 				KeyFile: "-",
 				Title:   "my sacred key",
 			},
-			wantStdout: "✓ Public key added to your repository\n",
+			wantStdout: "✓ Deploy key added to OWNER/REPO\n",
 			wantStderr: "",
 			wantErr:    false,
 		},
@@ -50,7 +49,6 @@ func Test_addRun(t *testing.T) {
 
 			opts := tt.opts
 			opts.IO = io
-			opts.Config = func() (config.Config, error) { return config.NewBlankConfig(), nil }
 			opts.BaseRepo = func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
 
 			err := addRun(&opts)

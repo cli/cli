@@ -8,13 +8,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdDeployKeys(f *cmdutil.Factory) *cobra.Command {
+func NewCmdDeployKey(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "deploy-key <command>",
-		Short: "Deploy a new ssh key to current repository",
+		Short: "Manage deploy keys in a repository",
 	}
+
+	cmdutil.EnableRepoOverride(cmd, f)
+
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
 	cmd.AddCommand(cmdAdd.NewCmdAdd(f, nil))
 	cmd.AddCommand(cmdDelete.NewCmdDelete(f, nil))
+
 	return cmd
 }

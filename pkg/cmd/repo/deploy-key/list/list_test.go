@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -105,7 +104,7 @@ func TestListRun(t *testing.T) {
 				},
 			},
 			wantStdout: "",
-			wantStderr: "No deploy keys present in GitHub repository.\n",
+			wantStderr: "No deploy keys found in OWNER/REPO\n",
 			wantErr:    true,
 		},
 	}
@@ -119,7 +118,6 @@ func TestListRun(t *testing.T) {
 
 			opts := tt.opts
 			opts.IO = io
-			opts.Config = func() (config.Config, error) { return config.NewBlankConfig(), nil }
 			opts.BaseRepo = func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
 
 			err := listRun(&opts)

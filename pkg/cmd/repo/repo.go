@@ -49,7 +49,7 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(repoSyncCmd.NewCmdSync(f, nil))
 	cmd.AddCommand(creditsCmd.NewCmdRepoCredits(f, nil))
 	cmd.AddCommand(gardenCmd.NewCmdGarden(f, nil))
-	cmd.AddCommand(deployKeyCmd.NewCmdDeployKeys(f))
+	cmd.AddCommand(deployKeyCmd.NewCmdDeployKey(f))
 	cmd.AddCommand(repoRenameCmd.NewCmdRename(f, nil))
 	cmd.AddCommand(repoDeleteCmd.NewCmdDelete(f, nil))
 	cmd.AddCommand(repoArchiveCmd.NewCmdArchive(f, nil))

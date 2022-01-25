@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -17,7 +16,6 @@ import (
 
 type ListOptions struct {
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
 	HTTPClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 }
@@ -25,16 +23,16 @@ type ListOptions struct {
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
 		IO:         f.IOStreams,
-		Config:     f.Config,
 		HTTPClient: f.HttpClient,
-		BaseRepo:   f.BaseRepo,
 	}
 
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List deploy keys in your GitHub repository",
+		Short: "List deploy keys in a GitHub repository",
 		Args:  cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.BaseRepo = f.BaseRepo
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -51,22 +49,12 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	cfg, err := opts.Config()
-	if err != nil {
-		return err
-	}
-
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
-
 	repo, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
 
-	deployKeys, err := repoKeys(apiClient, host, repo)
+	deployKeys, err := repoKeys(apiClient, repo)
 	if err != nil {
 		if errors.Is(err, scopesError) {
 			cs := opts.IO.ColorScheme()
@@ -78,7 +66,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(deployKeys) == 0 {
-		fmt.Fprintln(opts.IO.ErrOut, "No deploy keys present in GitHub repository.")
+		fmt.Fprintf(opts.IO.ErrOut, "No deploy keys found in %s\n", ghrepo.FullName(repo))
 		return cmdutil.SilentError
 	}
 

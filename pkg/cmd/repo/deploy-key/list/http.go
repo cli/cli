@@ -23,9 +23,9 @@ type deployKey struct {
 	ReadOnly  bool      `json:"read_only"`
 }
 
-func repoKeys(httpClient *http.Client, host string, repo ghrepo.Interface) ([]deployKey, error) {
-	resource := fmt.Sprintf("repos/%s/%s/keys", repo.RepoOwner(), repo.RepoName())
-	url := fmt.Sprintf("%s%s?per_page=%d", ghinstance.RESTPrefix(host), resource, 100)
+func repoKeys(httpClient *http.Client, repo ghrepo.Interface) ([]deployKey, error) {
+	path := fmt.Sprintf("repos/%s/%s/keys?per_page=100", repo.RepoOwner(), repo.RepoName())
+	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
