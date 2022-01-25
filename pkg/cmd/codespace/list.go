@@ -54,7 +54,6 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 	tp := utils.NewTablePrinter(a.io)
 	if tp.IsTTY() {
 		tp.AddField("NAME", nil, nil)
-		tp.AddField("DISPLAY NAME", nil, nil)
 		tp.AddField("REPOSITORY", nil, nil)
 		tp.AddField("BRANCH", nil, nil)
 		tp.AddField("STATE", nil, nil)
@@ -74,8 +73,11 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 			stateColor = cs.Green
 		}
 
-		tp.AddField(c.Name, nil, cs.Yellow)
-		tp.AddField(c.DisplayName, nil, cs.Blue)
+		nameField := c.Name
+		if c.DisplayName != "" {
+			nameField = fmt.Sprintf("%s (%s)", nameField, c.DisplayName)
+		}
+		tp.AddField(nameField, nil, cs.Yellow)
 		tp.AddField(c.Repository.FullName, nil, nil)
 		tp.AddField(c.branchWithGitStatus(), nil, cs.Cyan)
 		tp.AddField(c.State, nil, stateColor)
