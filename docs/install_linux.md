@@ -187,7 +187,7 @@ Alpine Linux users can install from the [stable releases' community packaage rep
 apk add github-cli
 ```
 
-Users wanting the latest version of the CLI without waiting to be backported into their stable release they're using should use the edge release's
+Users wanting the latest version of the CLI without waiting to be backported into the stable release they're using should use the edge release's
 community repo through this method below, without mixing packages from stable and unstable repos.[^1]
 
 ```bash
@@ -195,7 +195,7 @@ echo "@community http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/ap
 apk add github-cli@community
 ```
 
+[^1]: https://wiki.alpinelinux.org/wiki/Package_management#Repository_pinning
 [releases page]: https://github.com/cli/cli/releases/latest
 [arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli
 [arch linux aur]: https://aur.archlinux.org/packages/github-cli-git
-[^1]: https://wiki.alpinelinux.org/wiki/Package_management#Repository_pinning
