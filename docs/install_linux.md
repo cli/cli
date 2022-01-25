@@ -195,7 +195,7 @@ echo "@community http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/ap
 apk add github-cli@community
 ```
 
-[^1]: https://wiki.alpinelinux.org/wiki/Package_management#Repository_pinning
 [releases page]: https://github.com/cli/cli/releases/latest
 [arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli
 [arch linux aur]: https://aur.archlinux.org/packages/github-cli-git
+[^1]: https://wiki.alpinelinux.org/wiki/Package_management#Repository_pinning
