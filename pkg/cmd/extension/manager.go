@@ -427,7 +427,7 @@ var localExtensionUpgradeError = errors.New("local extensions can not be upgrade
 var upToDateError = errors.New("already up to date")
 var noExtensionsInstalledError = errors.New("no extensions installed")
 
-func (m *Manager) Upgrade(name string, force bool) error {
+func (m *Manager) Upgrade(name string, force, dryRun bool) error {
 	// Fetch metadata during list only when upgrading all extensions.
 	// This is a performance improvement so that we don't make a
 	// bunch of unecessary network requests when trying to upgrade a single extension.
@@ -437,7 +437,7 @@ func (m *Manager) Upgrade(name string, force bool) error {
 		return noExtensionsInstalledError
 	}
 	if name == "" {
-		return m.upgradeExtensions(exts, force)
+		return m.upgradeExtensions(exts, force, dryRun)
 	}
 	for _, f := range exts {
 		if f.Name() != name {
@@ -450,16 +450,16 @@ func (m *Manager) Upgrade(name string, force bool) error {
 		if err != nil {
 			return err
 		}
-		return m.upgradeExtension(f, force)
+		return m.upgradeExtension(f, force, dryRun)
 	}
 	return fmt.Errorf("no extension matched %q", name)
 }
 
-func (m *Manager) upgradeExtensions(exts []Extension, force bool) error {
+func (m *Manager) upgradeExtensions(exts []Extension, force, dryRun bool) error {
 	var failed bool
 	for _, f := range exts {
 		fmt.Fprintf(m.io.Out, "[%s]: ", f.Name())
-		err := m.upgradeExtension(f, force)
+		err := m.upgradeExtension(f, force, dryRun)
 		if err != nil {
 			if !errors.Is(err, localExtensionUpgradeError) &&
 				!errors.Is(err, upToDateError) {
@@ -468,7 +468,11 @@ func (m *Manager) upgradeExtensions(exts []Extension, force bool) error {
 			fmt.Fprintf(m.io.Out, "%s\n", err)
 			continue
 		}
-		fmt.Fprintf(m.io.Out, "upgrade complete\n")
+		if dryRun {
+			fmt.Fprintf(m.io.Out, "would have upgraded from %s to %s\n", f.currentVersion, f.latestVersion)
+		} else {
+			fmt.Fprintf(m.io.Out, "upgrade complete\n")
+		}
 	}
 	if failed {
 		return errors.New("some extensions failed to upgrade")
@@ -476,12 +480,15 @@ func (m *Manager) upgradeExtensions(exts []Extension, force bool) error {
 	return nil
 }
 
-func (m *Manager) upgradeExtension(ext Extension, force bool) error {
+func (m *Manager) upgradeExtension(ext Extension, force, dryRun bool) error {
 	if ext.isLocal {
 		return localExtensionUpgradeError
 	}
 	if !ext.UpdateAvailable() {
 		return upToDateError
+	}
+	if dryRun {
+		return nil
 	}
 	var err error
 	if ext.IsBinary() {

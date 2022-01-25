@@ -37,7 +37,7 @@ var _ ExtensionManager = &ExtensionManagerMock{}
 // 			RemoveFunc: func(name string) error {
 // 				panic("mock out the Remove method")
 // 			},
-// 			UpgradeFunc: func(name string, force bool) error {
+// 			UpgradeFunc: func(name string, force bool, dryRun bool) error {
 // 				panic("mock out the Upgrade method")
 // 			},
 // 		}
@@ -66,7 +66,7 @@ type ExtensionManagerMock struct {
 	RemoveFunc func(name string) error
 
 	// UpgradeFunc mocks the Upgrade method.
-	UpgradeFunc func(name string, force bool) error
+	UpgradeFunc func(name string, force bool, dryRun bool) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -114,6 +114,8 @@ type ExtensionManagerMock struct {
 			Name string
 			// Force is the force argument value.
 			Force bool
+			// DryRun is the dryRun argument value.
+			DryRun bool
 		}
 	}
 	lockCreate       sync.RWMutex
@@ -284,7 +286,9 @@ func (mock *ExtensionManagerMock) List(includeMetadata bool) []Extension {
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
 //     len(mockedExtensionManager.ListCalls())
-func (mock *ExtensionManagerMock) ListCalls() []struct{ IncludeMetadata bool } {
+func (mock *ExtensionManagerMock) ListCalls() []struct {
+	IncludeMetadata bool
+} {
 	var calls []struct {
 		IncludeMetadata bool
 	}
@@ -326,33 +330,37 @@ func (mock *ExtensionManagerMock) RemoveCalls() []struct {
 }
 
 // Upgrade calls UpgradeFunc.
-func (mock *ExtensionManagerMock) Upgrade(name string, force bool) error {
+func (mock *ExtensionManagerMock) Upgrade(name string, force bool, dryRun bool) error {
 	if mock.UpgradeFunc == nil {
 		panic("ExtensionManagerMock.UpgradeFunc: method is nil but ExtensionManager.Upgrade was just called")
 	}
 	callInfo := struct {
-		Name  string
-		Force bool
+		Name   string
+		Force  bool
+		DryRun bool
 	}{
-		Name:  name,
-		Force: force,
+		Name:   name,
+		Force:  force,
+		DryRun: dryRun,
 	}
 	mock.lockUpgrade.Lock()
 	mock.calls.Upgrade = append(mock.calls.Upgrade, callInfo)
 	mock.lockUpgrade.Unlock()
-	return mock.UpgradeFunc(name, force)
+	return mock.UpgradeFunc(name, force, dryRun)
 }
 
 // UpgradeCalls gets all the calls that were made to Upgrade.
 // Check the length with:
 //     len(mockedExtensionManager.UpgradeCalls())
 func (mock *ExtensionManagerMock) UpgradeCalls() []struct {
-	Name  string
-	Force bool
+	Name   string
+	Force  bool
+	DryRun bool
 } {
 	var calls []struct {
-		Name  string
-		Force bool
+		Name   string
+		Force  bool
+		DryRun bool
 	}
 	mock.lockUpgrade.RLock()
 	calls = mock.calls.Upgrade

@@ -117,6 +117,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 		func() *cobra.Command {
 			var flagAll bool
 			var flagForce bool
+			var flagDryRun bool
 			cmd := &cobra.Command{
 				Use:   "upgrade {<name> | --all}",
 				Short: "Upgrade installed extensions",
@@ -126,6 +127,9 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					}
 					if len(args) > 0 && flagAll {
 						return cmdutil.FlagErrorf("cannot use `--all` with extension name")
+					}
+					if flagForce && flagDryRun {
+						return cmdutil.FlagErrorf("cannot use `--force` and `--dry-run`")
 					}
 					if len(args) > 1 {
 						return cmdutil.FlagErrorf("too many arguments")
@@ -138,7 +142,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						name = normalizeExtensionSelector(args[0])
 					}
 					cs := io.ColorScheme()
-					err := m.Upgrade(name, flagForce)
+					err := m.Upgrade(name, flagForce, flagDryRun)
 					if err != nil && !errors.Is(err, upToDateError) {
 						if name != "" {
 							fmt.Fprintf(io.ErrOut, "%s Failed upgrading extension %s: %s\n", cs.FailureIcon(), name, err)
@@ -148,12 +152,16 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						return cmdutil.SilentError
 					}
 					if io.IsStdoutTTY() {
+						successStr := "Successfully"
+						if flagDryRun {
+							successStr = "Would have"
+						}
 						if errors.Is(err, upToDateError) {
 							fmt.Fprintf(io.Out, "%s Extension already up to date\n", cs.SuccessIcon())
 						} else if name != "" {
-							fmt.Fprintf(io.Out, "%s Successfully upgraded extension %s\n", cs.SuccessIcon(), name)
+							fmt.Fprintf(io.Out, "%s %s upgraded extension %s\n", cs.SuccessIcon(), successStr, name)
 						} else {
-							fmt.Fprintf(io.Out, "%s Successfully upgraded extensions\n", cs.SuccessIcon())
+							fmt.Fprintf(io.Out, "%s %s upgraded extensions\n", cs.SuccessIcon(), successStr)
 						}
 					}
 					return nil
@@ -161,6 +169,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			}
 			cmd.Flags().BoolVar(&flagAll, "all", false, "Upgrade all extensions")
 			cmd.Flags().BoolVar(&flagForce, "force", false, "Force upgrade extension")
+			cmd.Flags().BoolVar(&flagDryRun, "dry-run", false, "Only display upgrades")
 			return cmd
 		}(),
 		&cobra.Command{
