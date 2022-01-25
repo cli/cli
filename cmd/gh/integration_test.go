@@ -17,10 +17,10 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	expect "github.com/Netflix/go-expect"
+	"github.com/cli/cli/v2/internal/vt10x"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/safeexec"
 	"github.com/creack/pty"
-	"github.com/hinshun/vt10x"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -241,6 +241,8 @@ func NewVT10XConsole(opts ...expect.ConsoleOpt) (*expect.Console, error) {
 	if err != nil {
 		return nil, err
 	}
+	// 80 col
+	// 24 rows
 	term := vt10x.New(vt10x.WithWriter(pts))
 	c, err := expect.NewConsole(append(opts, expect.WithStdin(ptm), expect.WithStdout(term), expect.WithCloser(pts, ptm))...)
 	if err != nil {
