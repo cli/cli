@@ -2,7 +2,6 @@ package list
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -12,8 +11,6 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
-
-var scopesError = errors.New("insufficient OAuth scopes")
 
 type deployKey struct {
 	ID        int
@@ -37,9 +34,7 @@ func repoKeys(httpClient *http.Client, repo ghrepo.Interface) ([]deployKey, erro
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 404 {
-		return nil, scopesError
-	} else if resp.StatusCode > 299 {
+	if resp.StatusCode > 299 {
 		return nil, api.HandleHTTPError(resp)
 	}
 

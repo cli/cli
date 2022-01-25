@@ -3,7 +3,6 @@ package add
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -14,13 +13,10 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
-var scopesError = errors.New("insufficient OAuth scopes")
-
-func uploadDeployKey(httpClient *http.Client, repo ghrepo.Interface, keyFile io.ReadCloser, title string, isWritable bool) error {
+func uploadDeployKey(httpClient *http.Client, repo ghrepo.Interface, keyFile io.Reader, title string, isWritable bool) error {
 	path := fmt.Sprintf("repos/%s/%s/keys", repo.RepoOwner(), repo.RepoName())
 	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
 
-	defer keyFile.Close()
 	keyBytes, err := ioutil.ReadAll(keyFile)
 	if err != nil {
 		return err
@@ -48,9 +44,7 @@ func uploadDeployKey(httpClient *http.Client, repo ghrepo.Interface, keyFile io.
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 404 {
-		return scopesError
-	} else if resp.StatusCode > 299 {
+	if resp.StatusCode > 299 {
 		return api.HandleHTTPError(resp)
 	}
 

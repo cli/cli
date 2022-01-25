@@ -11,19 +11,13 @@ import (
 )
 
 func Test_deleteRun(t *testing.T) {
-	io, stdin, stdout, stderr := iostreams.Test()
+	io, _, stdout, stderr := iostreams.Test()
 	io.SetStdinTTY(false)
 	io.SetStdoutTTY(true)
 	io.SetStderrTTY(true)
 
-	stdin.WriteString("PUBKEY")
-
 	tr := httpmock.Registry{}
 	defer tr.Verify(t)
-
-	tr.Register(
-		httpmock.REST("GET", "repos/OWNER/REPO/keys/1234"),
-		httpmock.StringResponse(`{}`))
 
 	tr.Register(
 		httpmock.REST("DELETE", "repos/OWNER/REPO/keys/1234"),
@@ -37,7 +31,7 @@ func Test_deleteRun(t *testing.T) {
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
 		},
-		ID: "1234",
+		KeyID: "1234",
 	})
 	assert.NoError(t, err)
 

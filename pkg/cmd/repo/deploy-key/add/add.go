@@ -1,7 +1,6 @@
 package add
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,9 +17,9 @@ type AddOptions struct {
 	HTTPClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	KeyFile   string
-	Title     string
-	ReadWrite bool
+	KeyFile    string
+	Title      string
+	AllowWrite bool
 }
 
 func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command {
@@ -45,7 +44,7 @@ func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command 
 	}
 
 	cmd.Flags().StringVarP(&opts.Title, "title", "t", "", "Title of the new key")
-	cmd.Flags().BoolVarP(&opts.ReadWrite, "allow-write", "w", false, "Allow write access for the key")
+	cmd.Flags().BoolVarP(&opts.AllowWrite, "allow-write", "w", false, "Allow write access for the key")
 	return cmd
 }
 
@@ -55,14 +54,16 @@ func addRun(opts *AddOptions) error {
 		return err
 	}
 
-	var keyReader io.ReadCloser
+	var keyReader io.Reader
 	if opts.KeyFile == "-" {
 		keyReader = opts.IO.In
+		defer opts.IO.In.Close()
 	} else {
 		f, err := os.Open(opts.KeyFile)
 		if err != nil {
 			return err
 		}
+		defer f.Close()
 		keyReader = f
 	}
 
@@ -71,13 +72,7 @@ func addRun(opts *AddOptions) error {
 		return err
 	}
 
-	if err := uploadDeployKey(httpClient, repo, keyReader, opts.Title, opts.ReadWrite); err != nil {
-		if errors.Is(err, scopesError) {
-			cs := opts.IO.ColorScheme()
-			fmt.Fprint(opts.IO.ErrOut, "Error: insufficient OAuth scopes to add deploy keys\n")
-			fmt.Fprintf(opts.IO.ErrOut, "Run the following to grant scopes: %s\n", cs.Bold("gh auth refresh -s write:public_key"))
-			return cmdutil.SilentError
-		}
+	if err := uploadDeployKey(httpClient, repo, keyReader, opts.Title, opts.AllowWrite); err != nil {
 		return err
 	}
 
@@ -86,6 +81,6 @@ func addRun(opts *AddOptions) error {
 	}
 
 	cs := opts.IO.ColorScheme()
-	fmt.Fprintf(opts.IO.Out, "%s Deploy key added to %s\n", cs.SuccessIcon(), cs.Bold(ghrepo.FullName(repo)))
-	return nil
+	_, err = fmt.Fprintf(opts.IO.Out, "%s Deploy key added to %s\n", cs.SuccessIcon(), cs.Bold(ghrepo.FullName(repo)))
+	return err
 }

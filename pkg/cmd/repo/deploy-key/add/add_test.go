@@ -14,23 +14,35 @@ func Test_addRun(t *testing.T) {
 		name       string
 		opts       AddOptions
 		isTTY      bool
+		stdin      string
+		httpStubs  func(t *testing.T, reg *httpmock.Registry)
 		wantStdout string
 		wantStderr string
 		wantErr    bool
 	}{
 		{
-			name: "add correctly",
+			name:  "add from stdin",
+			isTTY: true,
 			opts: AddOptions{
-				HTTPClient: func() (*http.Client, error) {
-					reg := httpmock.Registry{}
-					reg.Register(
-						httpmock.REST("POST", "repos/OWNER/REPO/keys"),
-						httpmock.StringResponse(`{}`))
-
-					return &http.Client{Transport: &reg}, nil
-				},
-				KeyFile: "-",
-				Title:   "my sacred key",
+				KeyFile:    "-",
+				Title:      "my sacred key",
+				AllowWrite: false,
+			},
+			stdin: "PUBKEY\n",
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/keys"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						if title := payload["title"].(string); title != "my sacred key" {
+							t.Errorf("POST title %q, want %q", title, "my sacred key")
+						}
+						if key := payload["key"].(string); key != "PUBKEY\n" {
+							t.Errorf("POST key %q, want %q", key, "PUBKEY\n")
+						}
+						if isReadOnly := payload["read_only"].(bool); !isReadOnly {
+							t.Errorf("POST read_only %v, want %v", isReadOnly, true)
+						}
+					}))
 			},
 			wantStdout: "✓ Deploy key added to OWNER/REPO\n",
 			wantStderr: "",
@@ -41,15 +53,20 @@ func Test_addRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			io, stdin, stdout, stderr := iostreams.Test()
-			io.SetStdinTTY(false)
-			io.SetStdoutTTY(true)
-			io.SetStderrTTY(true)
+			stdin.WriteString(tt.stdin)
+			io.SetStdinTTY(tt.isTTY)
+			io.SetStdoutTTY(tt.isTTY)
+			io.SetStderrTTY(tt.isTTY)
 
-			stdin.WriteString("PUBKEY")
+			reg := &httpmock.Registry{}
+			if tt.httpStubs != nil {
+				tt.httpStubs(t, reg)
+			}
 
 			opts := tt.opts
 			opts.IO = io
 			opts.BaseRepo = func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
+			opts.HTTPClient = func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
 
 			err := addRun(&opts)
 			if (err != nil) != tt.wantErr {

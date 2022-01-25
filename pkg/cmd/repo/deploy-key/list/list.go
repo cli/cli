@@ -1,7 +1,6 @@
 package list
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -56,12 +55,6 @@ func listRun(opts *ListOptions) error {
 
 	deployKeys, err := repoKeys(apiClient, repo)
 	if err != nil {
-		if errors.Is(err, scopesError) {
-			cs := opts.IO.ColorScheme()
-			fmt.Fprint(opts.IO.ErrOut, "Error: insufficient OAuth scopes to list deploy keys\n")
-			fmt.Fprintf(opts.IO.ErrOut, "Run the following to grant scopes: %s\n", cs.Bold("gh auth refresh -s read:public_key"))
-			return cmdutil.SilentError
-		}
 		return err
 	}
 

@@ -1,15 +1,12 @@
 package delete
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/spf13/cobra"
 )
 
@@ -18,8 +15,7 @@ type DeleteOptions struct {
 	HTTPClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	ID          string
-	SkipConfirm bool
+	KeyID string
 }
 
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
@@ -30,14 +26,11 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	}
 
 	cmd := &cobra.Command{
-		Use:   "delete [<deploy-key-id>]",
-		Short: "Delete a deploy key from your GitHub repository",
-		Args:  cobra.MaximumNArgs(1),
+		Use:   "delete <key-id>",
+		Short: "Delete a deploy key from a GitHub repository",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return cmdutil.FlagErrorf("deploy key id missing")
-			}
-			opts.ID = args[0]
+			opts.KeyID = args[0]
 
 			if runF != nil {
 				return runF(opts)
@@ -45,7 +38,6 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			return deleteRun(opts)
 		},
 	}
-	cmd.Flags().BoolVarP(&opts.SkipConfirm, "skip-confirmation", "s", false, "dangerously skip confirmation to delete deploy key")
 
 	return cmd
 }
@@ -61,41 +53,7 @@ func deleteRun(opts *DeleteOptions) error {
 		return err
 	}
 
-	deployKey, err := deployKeyByID(httpClient, repo, opts.ID)
-	if err != nil {
-		if errors.Is(err, scopesError) {
-			cs := opts.IO.ColorScheme()
-			fmt.Fprint(opts.IO.ErrOut, "Error: insufficient OAuth scopes to delete deploy key\n")
-			fmt.Fprintf(opts.IO.ErrOut, "Run the following to grant scopes: %s\n", cs.Bold("gh auth refresh -s write:public_key"))
-			return cmdutil.SilentError
-		}
-		return err
-	}
-
-	if opts.IO.CanPrompt() && !opts.SkipConfirm {
-		answer := ""
-		err = prompt.SurveyAskOne(
-			&survey.Input{
-				Message: fmt.Sprintf("You're going to delete deploy key #%d. This action cannot be reversed. To confirm, type the title (%q):", deployKey.ID, deployKey.Title),
-			},
-			&answer,
-		)
-		if err != nil {
-			return err
-		}
-		if answer != deployKey.Title {
-			fmt.Fprintf(opts.IO.Out, "Deploy Key #%d was not deleted.\n", deployKey.ID)
-			return nil
-		}
-	}
-
-	if err := deleteDeployKey(httpClient, repo, opts.ID); err != nil {
-		if errors.Is(err, scopesError) {
-			cs := opts.IO.ColorScheme()
-			fmt.Fprint(opts.IO.ErrOut, "Error: insufficient OAuth scopes to delete deploy key\n")
-			fmt.Fprintf(opts.IO.ErrOut, "Run the following to grant scopes: %s\n", cs.Bold("gh auth refresh -s write:public_key"))
-			return cmdutil.SilentError
-		}
+	if err := deleteDeployKey(httpClient, repo, opts.KeyID); err != nil {
 		return err
 	}
 
@@ -104,6 +62,6 @@ func deleteRun(opts *DeleteOptions) error {
 	}
 
 	cs := opts.IO.ColorScheme()
-	fmt.Fprintf(opts.IO.Out, "%s Deploy key deleted from %s\n", cs.SuccessIconWithColor(cs.Red), ghrepo.FullName(repo))
-	return nil
+	_, err = fmt.Fprintf(opts.IO.Out, "%s Deploy key deleted from %s\n", cs.SuccessIconWithColor(cs.Red), cs.Bold(ghrepo.FullName(repo)))
+	return err
 }
