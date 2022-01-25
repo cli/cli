@@ -28,7 +28,6 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 			$ gh repo create
 			$ gh repo clone cli/cli
 			$ gh repo view --web
-			$ gh repo deploy-key list
 		`),
 		Annotations: map[string]string{
 			"IsCore": "true",
