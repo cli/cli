@@ -246,6 +246,7 @@ func TestRepoFork(t *testing.T) {
 			},
 			httpStubs: forkPost,
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(false)
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n",
@@ -264,6 +265,7 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git remote add -f origin https://github.com/someone/REPO.git`, 0, "")
 			},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(true)
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote origin\n",
@@ -452,6 +454,7 @@ func TestRepoFork(t *testing.T) {
 			},
 			httpStubs: forkPost,
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(false)
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n",
@@ -465,6 +468,7 @@ func TestRepoFork(t *testing.T) {
 			},
 			httpStubs: forkPost,
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(true)
 			},
 			execStubs: func(cs *run.CommandStubber) {
@@ -485,6 +489,7 @@ func TestRepoFork(t *testing.T) {
 			},
 			httpStubs: forkPost,
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(true)
 			},
 			execStubs: func(cs *run.CommandStubber) {
@@ -652,6 +657,7 @@ func TestRepoFork(t *testing.T) {
 			return tt.remotes, nil
 		}
 
+		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 		as, teardown := prompt.InitAskStubber()
 		defer teardown()
 		if tt.askStubs != nil {

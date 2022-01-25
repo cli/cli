@@ -21,6 +21,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/export"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -71,10 +72,12 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			The endpoint argument should either be a path of a GitHub API v3 endpoint, or
 			"graphql" to access the GitHub API v4.
 
-			Placeholder values "{owner}", "{repo}", and "{branch}" in the endpoint argument will
-			get replaced with values from the repository of the current directory. Note that in
-			some shells, for example PowerShell, you may need to enclose any value that contains
-			"{...}" in quotes to prevent the shell from applying special meaning to curly braces.
+			Placeholder values "{owner}", "{repo}", and "{branch}" in the endpoint
+			argument will get replaced with values from the repository of the current
+			directory or the repository specified in the GH_REPO environment variable.
+			Note that in some shells, for example PowerShell, you may need to enclose
+			any value that contains "{...}" in quotes to prevent the shell from
+			applying special meaning to curly braces.
 
 			The default HTTP request method is "GET" normally and "POST" if any parameters
 			were added. Override the method with %[1]s--method%[1]s.
@@ -167,6 +170,9 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			`),
 		},
 		Args: cobra.ExactArgs(1),
+		PreRun: func(c *cobra.Command, args []string) {
+			opts.BaseRepo = cmdutil.OverrideBaseRepoFunc(f, "")
+		},
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.RequestPath = args[0]
 			opts.RequestMethodPassed = c.Flags().Changed("method")
@@ -392,6 +398,9 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
 		if msg := api.ScopesSuggestion(resp); msg != "" {
 			fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", msg)
+		}
+		if u := factory.SSOURL(); u != "" {
+			fmt.Fprintf(opts.IO.ErrOut, "Authorize in your web browser: %s\n", u)
 		}
 		err = cmdutil.SilentError
 		return

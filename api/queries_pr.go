@@ -64,7 +64,8 @@ type PullRequest struct {
 
 	BaseRef struct {
 		BranchProtectionRule struct {
-			RequiresStrictStatusChecks bool
+			RequiresStrictStatusChecks   bool
+			RequiredApprovingReviewCount int
 		}
 	}
 
@@ -108,6 +109,7 @@ type PullRequest struct {
 	Comments       Comments
 	ReactionGroups ReactionGroups
 	Reviews        PullRequestReviews
+	LatestReviews  PullRequestReviews
 	ReviewRequests ReviewRequests
 }
 
@@ -405,6 +407,11 @@ func PullRequestStatus(client *Client, repo ghrepo.Interface, options StatusOpti
 				}
 				pullRequest(number: $number) {
 					...prWithReviews
+					baseRef {
+						branchProtectionRule {
+							requiredApprovingReviewCount
+						}
+					}
 				}
 			}
 		`
@@ -519,7 +526,7 @@ func pullRequestFragment(httpClient *http.Client, hostname string) (string, erro
 
 	var reviewFields []string
 	if prFeatures.HasReviewDecision {
-		reviewFields = append(reviewFields, "reviewDecision")
+		reviewFields = append(reviewFields, "reviewDecision", "latestReviews")
 	}
 
 	fragments := fmt.Sprintf(`

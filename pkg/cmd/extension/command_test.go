@@ -1,6 +1,7 @@
 package extension
 
 import (
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -86,10 +87,10 @@ func TestNewCmdExtension(t *testing.T) {
 			},
 		},
 		{
-			name:    "upgrade error",
+			name:    "upgrade argument error",
 			args:    []string{"upgrade"},
 			wantErr: true,
-			errMsg:  "must specify an extension to upgrade",
+			errMsg:  "specify an extension to upgrade or `--all`",
 		},
 		{
 			name: "upgrade an extension",
@@ -121,6 +122,42 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY: false,
+		},
+		{
+			name: "upgrade an up-to-date extension",
+			args: []string{"upgrade", "hello"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.UpgradeFunc = func(name string, force bool) error {
+					return upToDateError
+				}
+				return func(t *testing.T) {
+					calls := em.UpgradeCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "hello", calls[0].Name)
+				}
+			},
+			isTTY:      true,
+			wantStdout: "✓ Extension already up to date\n",
+			wantStderr: "",
+		},
+		{
+			name: "upgrade extension error",
+			args: []string{"upgrade", "hello"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.UpgradeFunc = func(name string, force bool) error {
+					return errors.New("oh no")
+				}
+				return func(t *testing.T) {
+					calls := em.UpgradeCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "hello", calls[0].Name)
+				}
+			},
+			isTTY:      false,
+			wantErr:    true,
+			errMsg:     "SilentError",
+			wantStdout: "",
+			wantStderr: "X Failed upgrading extension hello: oh no\n",
 		},
 		{
 			name: "upgrade an extension gh-prefix",
@@ -279,8 +316,10 @@ func TestNewCmdExtension(t *testing.T) {
 			},
 			isTTY: true,
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne("test")
-				as.StubOne(0)
+				as.StubPrompt("Extension name:").AnswerWith("test")
+				as.StubPrompt("What kind of extension?").
+					AssertOptions([]string{"Script (Bash, Ruby, Python, etc)", "Go", "Other Precompiled (C++, Rust, etc)"}).
+					AnswerDefault()
 			},
 			wantStdout: heredoc.Doc(`
 				✓ Created directory gh-test
@@ -419,8 +458,7 @@ func TestNewCmdExtension(t *testing.T) {
 				assertFunc = tt.managerStubs(em)
 			}
 
-			as, teardown := prompt.InitAskStubber()
-			defer teardown()
+			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
 				tt.askStubs(as)
 			}

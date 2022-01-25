@@ -104,6 +104,20 @@ Or via [pkg(8)](https://www.freebsd.org/cgi/man.cgi?pkg(8)):
 pkg install gh
 ```
 
+### NetBSD/pkgsrc
+
+NetBSD users and those on [platforms supported by pkgsrc](https://pkgsrc.org/#index4h1) can install the [gh package](https://pkgsrc.se/net/gh):
+
+```bash
+pkgin install gh
+```
+
+To install from source:
+
+```bash
+cd /usr/pkgsrc/net/gh && make package-install
+```
+
 ### OpenBSD
 
 In -current, or in releases starting from 7.0, OpenBSD users can install from packages:
@@ -165,6 +179,23 @@ openSUSE Tumbleweed users can install from the [official distribution repo](http
 sudo zypper in gh
 ```
 
+### Alpine Linux
+
+Alpine Linux users can install from the [stable releases' community packaage repository](https://pkgs.alpinelinux.org/packages?name=github-cli&branch=v3.15).
+
+```bash
+apk add github-cli
+```
+
+Users wanting the latest version of the CLI without waiting to be backported into the stable release they're using should use the edge release's
+community repo through this method below, without mixing packages from stable and unstable repos.[^1]
+
+```bash
+echo "@community http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
+apk add github-cli@community
+```
+
 [releases page]: https://github.com/cli/cli/releases/latest
 [arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli
 [arch linux aur]: https://aur.archlinux.org/packages/github-cli-git
+[^1]: https://wiki.alpinelinux.org/wiki/Package_management#Repository_pinning

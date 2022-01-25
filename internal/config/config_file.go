@@ -49,7 +49,7 @@ func ConfigDir() string {
 }
 
 // State path precedence
-// 1. XDG_CONFIG_HOME
+// 1. XDG_STATE_HOME
 // 2. LocalAppData (windows only)
 // 3. HOME
 func StateDir() string {

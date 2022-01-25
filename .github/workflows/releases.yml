@@ -25,6 +25,8 @@ jobs:
             -q .body > CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Install osslsigncode
+        run: sudo apt-get install -y osslsigncode
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
         with:
@@ -33,6 +35,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
           GORELEASER_CURRENT_TAG: ${{steps.changelog.outputs.tag-name}}
+          GITHUB_CERT_PASSWORD: ${{secrets.GITHUB_CERT_PASSWORD}}
+          DESKTOP_CERT_TOKEN: ${{secrets.DESKTOP_CERT_TOKEN}}
       - name: Checkout documentation site
         uses: actions/checkout@v2
         with:
@@ -61,7 +65,6 @@ jobs:
             api-write --silent projects/columns/cards/$card/moves -f position=top -F column_id=$DONE_COLUMN
           done
           echo "moved ${#cards[@]} cards to the Done column"
-      
       - name: Install packaging dependencies
         run: sudo apt-get install -y rpm reprepro
       - name: Set up GPG
@@ -129,23 +132,19 @@ jobs:
           unzip -o *.zip && rm -v *.zip
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-      - name: Install go-msi
-        run: choco install -y "go-msi"
       - name: Prepare PATH
-        shell: bash
-        run: |
-          echo "$WIX\\bin" >> $GITHUB_PATH
-          echo "C:\\Program Files\\go-msi" >> $GITHUB_PATH
+        id: setupmsbuild
+        uses: microsoft/setup-msbuild@v1.0.3
       - name: Build MSI
         id: buildmsi
         shell: bash
         env:
           ZIP_FILE: ${{ steps.download_exe.outputs.zip }}
+          MSBUILD_PATH: ${{ steps.setupmsbuild.outputs.msbuildPath }}
         run: |
-          mkdir -p build
-          msi="$(basename "$ZIP_FILE" ".zip").msi"
-          printf "::set-output name=msi::%s\n" "$msi"
-          go-msi make --msi "$PWD/$msi" --out "$PWD/build" --version "${GITHUB_REF#refs/tags/}"
+          name="$(basename "$ZIP_FILE" ".zip")"
+          version="$(echo -e ${GITHUB_REF#refs/tags/v} | sed s/-.*$//)"
+          "${MSBUILD_PATH}\MSBuild.exe" ./build/windows/gh.wixproj -p:SourceDir="$PWD" -p:OutputPath="$PWD" -p:OutputName="$name" -p:ProductVersion="$version"
       - name: Obtain signing cert
         id: obtain_cert
         env:

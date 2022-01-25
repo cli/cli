@@ -117,6 +117,7 @@ func TestRenameRun(t *testing.T) {
 			name:    "none argument",
 			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n✓ Updated the \"origin\" remote\n",
 			askStubs: func(q *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
 				q.StubOne("NEW_REPO")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -136,6 +137,7 @@ func TestRenameRun(t *testing.T) {
 			},
 			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n",
 			askStubs: func(q *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
 				q.StubOne("NEW_REPO")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -184,6 +186,7 @@ func TestRenameRun(t *testing.T) {
 			},
 			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n✓ Updated the \"origin\" remote\n",
 			askStubs: func(q *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
 				q.StubOne(true)
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -204,6 +207,7 @@ func TestRenameRun(t *testing.T) {
 				DoConfirm:       true,
 			},
 			askStubs: func(q *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
 				q.StubOne(false)
 			},
 			wantOut: "",
@@ -211,6 +215,7 @@ func TestRenameRun(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
+		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 		q, teardown := prompt.InitAskStubber()
 		defer teardown()
 		if tt.askStubs != nil {

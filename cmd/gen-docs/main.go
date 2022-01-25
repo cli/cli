@@ -58,13 +58,7 @@ func run(args []string) error {
 	}
 
 	if *manPage {
-		header := &docs.GenManHeader{
-			Title:   "gh",
-			Section: "1",
-			Source:  "",
-			Manual:  "",
-		}
-		if err := docs.GenManTree(rootCmd, header, *dir); err != nil {
+		if err := docs.GenManTree(rootCmd, *dir); err != nil {
 			return err
 		}
 	}

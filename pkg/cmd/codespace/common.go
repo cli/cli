@@ -21,19 +21,25 @@ import (
 	"golang.org/x/term"
 )
 
-type App struct {
-	io        *iostreams.IOStreams
-	apiClient apiClient
-	errLogger *log.Logger
+type executable interface {
+	Executable() string
 }
 
-func NewApp(io *iostreams.IOStreams, apiClient apiClient) *App {
+type App struct {
+	io         *iostreams.IOStreams
+	apiClient  apiClient
+	errLogger  *log.Logger
+	executable executable
+}
+
+func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient) *App {
 	errLogger := log.New(io.ErrOut, "", 0)
 
 	return &App{
-		io:        io,
-		apiClient: apiClient,
-		errLogger: errLogger,
+		io:         io,
+		apiClient:  apiClient,
+		errLogger:  errLogger,
+		executable: exe,
 	}
 }
 
@@ -209,8 +215,13 @@ func ask(qs []*survey.Question, response interface{}) error {
 // checkAuthorizedKeys reports an error if the user has not registered any SSH keys;
 // see https://github.com/cli/cli/v2/issues/166#issuecomment-921769703.
 // The check is not required for security but it improves the error message.
-func checkAuthorizedKeys(ctx context.Context, client apiClient, user string) error {
-	keys, err := client.AuthorizedKeys(ctx, user)
+func checkAuthorizedKeys(ctx context.Context, client apiClient) error {
+	user, err := client.GetUser(ctx)
+	if err != nil {
+		return fmt.Errorf("error getting user: %w", err)
+	}
+
+	keys, err := client.AuthorizedKeys(ctx, user.Login)
 	if err != nil {
 		return fmt.Errorf("failed to read GitHub-authorized SSH keys for %s: %w", user, err)
 	}

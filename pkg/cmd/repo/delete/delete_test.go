@@ -94,6 +94,7 @@ func Test_deleteRun(t *testing.T) {
 			askStubs: func(q *prompt.AskStubber) {
 				// TODO: survey stubber doesn't have WithValidator support
 				// so this always passes regardless of prompt input
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
 				q.StubOne("OWNER/REPO")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -108,6 +109,7 @@ func Test_deleteRun(t *testing.T) {
 			opts:       &DeleteOptions{},
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
 			askStubs: func(q *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
 				q.StubOne("OWNER/REPO")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -134,6 +136,7 @@ func Test_deleteRun(t *testing.T) {
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
 			tty:        true,
 			askStubs: func(q *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
 				q.StubOne("OWNER/REPO")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -147,6 +150,7 @@ func Test_deleteRun(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 		q, teardown := prompt.InitAskStubber()
 		defer teardown()
 		if tt.askStubs != nil {

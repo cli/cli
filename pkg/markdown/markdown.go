@@ -7,8 +7,6 @@ import (
 	"github.com/charmbracelet/glamour"
 )
 
-type RenderOpts []glamour.TermRendererOption
-
 func WithoutIndentation() glamour.TermRendererOption {
 	overrides := []byte(`
 	  {
@@ -23,75 +21,42 @@ func WithoutIndentation() glamour.TermRendererOption {
 	return glamour.WithStylesFromJSONBytes(overrides)
 }
 
-func WithoutWrap() glamour.TermRendererOption {
-	return glamour.WithWordWrap(0)
+func WithWrap(w int) glamour.TermRendererOption {
+	return glamour.WithWordWrap(w)
 }
 
-func render(text string, opts RenderOpts) (string, error) {
+type IOStreams interface {
+	TerminalTheme() string
+}
+
+func WithIO(io IOStreams) glamour.TermRendererOption {
+	style := os.Getenv("GLAMOUR_STYLE")
+	if style == "" || style == "auto" {
+		theme := io.TerminalTheme()
+		switch theme {
+		case "light", "dark":
+			style = theme
+		default:
+			style = "notty"
+		}
+	}
+	return glamour.WithStylePath(style)
+}
+
+func WithBaseURL(u string) glamour.TermRendererOption {
+	return glamour.WithBaseURL(u)
+}
+
+func Render(text string, opts ...glamour.TermRendererOption) (string, error) {
 	// Glamour rendering preserves carriage return characters in code blocks, but
 	// we need to ensure that no such characters are present in the output.
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 
+	opts = append(opts, glamour.WithEmoji(), glamour.WithPreservedNewLines())
 	tr, err := glamour.NewTermRenderer(opts...)
 	if err != nil {
 		return "", err
 	}
 
 	return tr.Render(text)
-}
-
-func Render(text, style string) (string, error) {
-	opts := RenderOpts{
-		glamour.WithStylePath(style),
-		glamour.WithEmoji(),
-	}
-
-	return render(text, opts)
-}
-
-func RenderWithOpts(text, style string, opts RenderOpts) (string, error) {
-	defaultOpts := RenderOpts{
-		glamour.WithStylePath(style),
-		glamour.WithEmoji(),
-	}
-	opts = append(defaultOpts, opts...)
-
-	return render(text, opts)
-}
-
-func RenderWithBaseURL(text, style, baseURL string) (string, error) {
-	opts := RenderOpts{
-		glamour.WithStylePath(style),
-		glamour.WithEmoji(),
-		glamour.WithBaseURL(baseURL),
-	}
-
-	return render(text, opts)
-}
-
-func RenderWithWrap(text, style string, wrap int) (string, error) {
-	opts := RenderOpts{
-		glamour.WithStylePath(style),
-		glamour.WithEmoji(),
-		glamour.WithWordWrap(wrap),
-	}
-
-	return render(text, opts)
-}
-
-func GetStyle(defaultStyle string) string {
-	style := fromEnv()
-	if style != "" && style != "auto" {
-		return style
-	}
-
-	if defaultStyle == "light" || defaultStyle == "dark" {
-		return defaultStyle
-	}
-
-	return "notty"
-}
-
-var fromEnv = func() string {
-	return os.Getenv("GLAMOUR_STYLE")
 }

@@ -219,7 +219,7 @@ func forkRun(opts *ForkOptions) error {
 	if err != nil {
 		return err
 	}
-	protocol, err := cfg.Get(repoToFork.RepoHost(), "git_protocol")
+	protocol, err := cfg.GetOrDefault(repoToFork.RepoHost(), "git_protocol")
 	if err != nil {
 		return err
 	}
