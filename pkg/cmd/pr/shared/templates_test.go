@@ -24,7 +24,7 @@ func TestTemplateManager_hasAPI(t *testing.T) {
 	defer tr.Verify(t)
 
 	tr.Register(
-		httpmock.GraphQL(`query IssueTemplates_fields\b`),
+		httpmock.GraphQL(`query Templates_fields\b`),
 		httpmock.StringResponse(`{"data":{
 			"Repository": {
 				"fields": [
@@ -86,7 +86,7 @@ func TestTemplateManager_hasAPI_PullRequest(t *testing.T) {
 	defer tr.Verify(t)
 
 	tr.Register(
-		httpmock.GraphQL(`query PullRequestTemplates_fields\b`),
+		httpmock.GraphQL(`query Templates_fields\b`),
 		httpmock.StringResponse(`{"data":{
 			"Repository": {
 				"fields": [
@@ -127,6 +127,6 @@ func TestTemplateManager_hasAPI_PullRequest(t *testing.T) {
 	tpl, err := m.Choose()
 
 	assert.NoError(t, err)
-	assert.Equal(t, "bug_pr.md", tpl.NameForSubmit())
+	assert.Equal(t, "", tpl.NameForSubmit())
 	assert.Equal(t, "I fixed a problem", string(tpl.Body()))
 }

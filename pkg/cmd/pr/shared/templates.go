@@ -46,7 +46,7 @@ func (t *pullRequestTemplate) Name() string {
 }
 
 func (t *pullRequestTemplate) NameForSubmit() string {
-	return t.Gname
+	return ""
 }
 
 func (t *pullRequestTemplate) Body() []byte {
@@ -109,7 +109,7 @@ func listPullRequestTemplates(httpClient *http.Client, repo ghrepo.Interface) ([
 	return templates, nil
 }
 
-func hasIssueTemplateSupport(httpClient *http.Client, hostname string) (bool, error) {
+func hasTemplateSupport(httpClient *http.Client, hostname string, isPR bool) (bool, error) {
 	if !ghinstance.IsEnterprise(hostname) {
 		return true, nil
 	}
@@ -128,54 +128,34 @@ func hasIssueTemplateSupport(httpClient *http.Client, hostname string) (bool, er
 	}
 
 	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), httpClient)
-	err := gql.QueryNamed(context.Background(), "IssueTemplates_fields", &featureDetection, nil)
+	err := gql.QueryNamed(context.Background(), "Templates_fields", &featureDetection, nil)
 	if err != nil {
 		return false, err
 	}
 
-	var hasQuerySupport bool
-	var hasMutationSupport bool
+	var hasIssueQuerySupport bool
+	var hasIssueMutationSupport bool
+	var hasPullRequestQuerySupport bool
+
 	for _, field := range featureDetection.Repository.Fields {
 		if field.Name == "issueTemplates" {
-			hasQuerySupport = true
+			hasIssueQuerySupport = true
+		}
+		if field.Name == "pullRequestTemplates" {
+			hasPullRequestQuerySupport = true
 		}
 	}
 	for _, field := range featureDetection.CreateIssueInput.InputFields {
 		if field.Name == "issueTemplate" {
-			hasMutationSupport = true
+			hasIssueMutationSupport = true
 		}
 	}
 
-	return hasQuerySupport && hasMutationSupport, nil
-}
-
-func hasPullRequestTemplateSupport(httpClient *http.Client, hostname string) (bool, error) {
-	if !ghinstance.IsEnterprise(hostname) {
-		return true, nil
+	if isPR {
+		return hasPullRequestQuerySupport, nil
+	} else {
+		return hasIssueQuerySupport && hasIssueMutationSupport, nil
 	}
-
-	var featureDetection struct {
-		Repository struct {
-			Fields []struct {
-				Name string
-			} `graphql:"fields(includeDeprecated: true)"`
-		} `graphql:"Repository: __type(name: \"Repository\")"`
-	}
-
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), httpClient)
-	err := gql.QueryNamed(context.Background(), "PullRequestTemplates_fields", &featureDetection, nil)
-	if err != nil {
-		return false, err
-	}
-
-	var hasQuerySupport bool
-	for _, field := range featureDetection.Repository.Fields {
-		if field.Name == "pullRequestTemplates" {
-			hasQuerySupport = true
-		}
-	}
-
-	return hasQuerySupport, nil
 }
 
 type Template interface {
@@ -213,10 +193,7 @@ func (m *templateManager) hasAPI() (bool, error) {
 	if m.cachedClient == nil {
 		m.cachedClient = api.NewCachedClient(m.httpClient, time.Hour*24)
 	}
-	if m.isPR {
-		return hasPullRequestTemplateSupport(m.cachedClient, m.repo.RepoHost())
-	}
-	return hasIssueTemplateSupport(m.cachedClient, m.repo.RepoHost())
+	return hasTemplateSupport(m.cachedClient, m.repo.RepoHost(), m.isPR)
 }
 
 func (m *templateManager) HasTemplates() (bool, error) {
