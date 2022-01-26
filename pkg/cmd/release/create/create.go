@@ -244,6 +244,22 @@ func createRun(opts *CreateOptions) error {
 				} else {
 					headRef = "HEAD"
 				}
+			} else {
+				// Local tag exists and target not specified so use tag
+				// SHA as target. This prevents the scenario where the
+				// user has a local unpushed tag and then when creating a
+				// release the API creates a new tag with the same name
+				// pointing to the repos default branch. This is confusing
+				// when the local unpushed tag was pointing to a different SHA.
+				// This will ensure that when the remote tag gets created
+				// it points to the correct commit.
+				if opts.Target == "" {
+					tagSha, err := gitTagSha(opts.TagName)
+					if err != nil {
+						return err
+					}
+					opts.Target = tagSha
+				}
 			}
 			if generatedNotes == nil {
 				if prevTag, err := detectPreviousTag(headRef); err == nil {
@@ -440,6 +456,15 @@ func gitTagInfo(tagName string) (string, error) {
 	}
 	b, err := run.PrepareCmd(cmd).Output()
 	return string(b), err
+}
+
+func gitTagSha(tagName string) (string, error) {
+	cmd, err := git.GitCommand("rev-list", "-n", "1", tagName)
+	if err != nil {
+		return "", err
+	}
+	b, err := run.PrepareCmd(cmd).Output()
+	return strings.TrimSpace(string(b)), err
 }
 
 func detectPreviousTag(headRef string) (string, error) {
