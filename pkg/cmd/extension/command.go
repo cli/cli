@@ -128,9 +128,6 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if len(args) > 0 && flagAll {
 						return cmdutil.FlagErrorf("cannot use `--all` with extension name")
 					}
-					if flagForce && flagDryRun {
-						return cmdutil.FlagErrorf("cannot use `--force` and `--dry-run`")
-					}
 					if len(args) > 1 {
 						return cmdutil.FlagErrorf("too many arguments")
 					}

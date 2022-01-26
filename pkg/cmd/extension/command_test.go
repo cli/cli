@@ -99,12 +99,6 @@ func TestNewCmdExtension(t *testing.T) {
 			errMsg:  "cannot use `--all` with extension name",
 		},
 		{
-			name:    "upgrade --force and --dry-run error",
-			args:    []string{"upgrade", "test", "--force", "--dry-run"},
-			wantErr: true,
-			errMsg:  "cannot use `--force` and `--dry-run`",
-		},
-		{
 			name: "upgrade an extension",
 			args: []string{"upgrade", "hello"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
