@@ -365,7 +365,7 @@ func runView(opts *ViewOptions) error {
 		if shared.IsFailureState(run.Conclusion) {
 			fmt.Fprintf(out, "To see what failed, try: gh run view %d --log-failed\n", run.ID)
 		} else if len(jobs) == 1 {
-			fmt.Fprintf(out, "%s=%d\n", suggestCmd, run.ID)
+			fmt.Fprintf(out, "%s=%d\n", suggestCmd, jobs[0].ID)
 		} else {
 			fmt.Fprintf(out, "%s=<job-id>\n", suggestCmd)
 		}
