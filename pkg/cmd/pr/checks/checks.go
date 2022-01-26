@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -41,7 +42,7 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 			Show CI status for a single pull request.
 
 			Without an argument, the pull request that belongs to the current branch
-			is selected.			
+			is selected.
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -118,7 +119,8 @@ func checksRun(opts *ChecksOptions) error {
 
 	outputs := []output{}
 
-	for _, c := range pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes {
+	checkContexts := pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
+	for _, c := range eliminateDuplicates(checkContexts) {
 		mark := "✓"
 		bucket := "pass"
 		state := c.State
@@ -244,4 +246,27 @@ func checksRun(opts *ChecksOptions) error {
 	}
 
 	return nil
+}
+
+func eliminateDuplicates(checkContexts []api.CheckContext) []api.CheckContext {
+	// To return the most recent check, sort in descending order by StartedAt.
+	sort.Slice(checkContexts, func(i, j int) bool { return checkContexts[i].StartedAt.After(checkContexts[j].StartedAt) })
+
+	m := make(map[string]struct{})
+	unique := make([]api.CheckContext, 0, len(checkContexts))
+
+	// Eliminate duplicates using Name or Context.
+	for _, ctx := range checkContexts {
+		key := ctx.Name
+		if key == "" {
+			key = ctx.Context
+		}
+		if _, ok := m[key]; ok {
+			continue
+		}
+		unique = append(unique, ctx)
+		m[key] = struct{}{}
+	}
+
+	return unique
 }

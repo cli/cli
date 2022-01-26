@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"reflect"
 	"testing"
+	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -236,6 +238,216 @@ func TestChecksRun_web(t *testing.T) {
 			assert.Equal(t, tc.wantStdout, stdout.String())
 			assert.Equal(t, tc.wantStderr, stderr.String())
 			browser.Verify(t, tc.wantBrowse)
+		})
+	}
+}
+
+func TestEliminateDupulicates(t *testing.T) {
+	tests := []struct {
+		name          string
+		checkContexts []api.CheckContext
+		want          []api.CheckContext
+	}{
+		{
+			name: "duplicate CheckRun (lint)",
+			checkContexts: []api.CheckContext{
+				{
+					TypeName:    "CheckRun",
+					Name:        "build (ubuntu-latest)",
+					Status:      "COMPLETED",
+					Conclusion:  "SUCCESS",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "https://github.com/cli/cli/runs/1",
+				},
+				{
+					TypeName:    "CheckRun",
+					Name:        "lint",
+					Status:      "COMPLETED",
+					Conclusion:  "FAILURE",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "https://github.com/cli/cli/runs/2",
+				},
+				{
+					TypeName:    "CheckRun",
+					Name:        "lint",
+					Status:      "COMPLETED",
+					Conclusion:  "SUCCESS",
+					StartedAt:   time.Date(2022, 2, 2, 2, 2, 2, 2, time.UTC),
+					CompletedAt: time.Date(2022, 2, 2, 2, 2, 2, 2, time.UTC),
+					DetailsURL:  "https://github.com/cli/cli/runs/3",
+				},
+			},
+			want: []api.CheckContext{
+				{
+					TypeName:    "CheckRun",
+					Name:        "lint",
+					Status:      "COMPLETED",
+					Conclusion:  "SUCCESS",
+					StartedAt:   time.Date(2022, 2, 2, 2, 2, 2, 2, time.UTC),
+					CompletedAt: time.Date(2022, 2, 2, 2, 2, 2, 2, time.UTC),
+					DetailsURL:  "https://github.com/cli/cli/runs/3",
+				},
+				{
+					TypeName:    "CheckRun",
+					Name:        "build (ubuntu-latest)",
+					Status:      "COMPLETED",
+					Conclusion:  "SUCCESS",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "https://github.com/cli/cli/runs/1",
+				},
+			},
+		},
+		{
+			name: "duplicate StatusContext (Windows GPU)",
+			checkContexts: []api.CheckContext{
+				{
+					TypeName:    "StatusContext",
+					Name:        "",
+					Context:     "Windows GPU",
+					State:       "FAILURE",
+					Status:      "",
+					Conclusion:  "",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "",
+					TargetURL:   "https://github.com/cli/cli/2",
+				},
+				{
+					TypeName:    "StatusContext",
+					Name:        "",
+					Context:     "Windows GPU",
+					State:       "SUCCESS",
+					Status:      "",
+					Conclusion:  "",
+					StartedAt:   time.Date(2022, 2, 2, 2, 2, 2, 2, time.UTC),
+					CompletedAt: time.Date(2022, 2, 2, 2, 2, 2, 2, time.UTC),
+					DetailsURL:  "",
+					TargetURL:   "https://github.com/cli/cli/3",
+				},
+				{
+					TypeName:    "StatusContext",
+					Name:        "",
+					Context:     "Linux GPU",
+					State:       "SUCCESS",
+					Status:      "",
+					Conclusion:  "",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "",
+					TargetURL:   "https://github.com/cli/cli/1",
+				},
+			},
+			want: []api.CheckContext{
+				{
+					TypeName:    "StatusContext",
+					Name:        "",
+					Context:     "Windows GPU",
+					State:       "SUCCESS",
+					Status:      "",
+					Conclusion:  "",
+					StartedAt:   time.Date(2022, 2, 2, 2, 2, 2, 2, time.UTC),
+					CompletedAt: time.Date(2022, 2, 2, 2, 2, 2, 2, time.UTC),
+					DetailsURL:  "",
+					TargetURL:   "https://github.com/cli/cli/3",
+				},
+				{
+					TypeName:    "StatusContext",
+					Name:        "",
+					Context:     "Linux GPU",
+					State:       "SUCCESS",
+					Status:      "",
+					Conclusion:  "",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "",
+					TargetURL:   "https://github.com/cli/cli/1",
+				},
+			},
+		},
+		{
+			name: "unique CheckContext",
+			checkContexts: []api.CheckContext{
+				{
+					TypeName:    "CheckRun",
+					Name:        "build (ubuntu-latest)",
+					Status:      "COMPLETED",
+					Conclusion:  "SUCCESS",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "https://github.com/cli/cli/runs/1",
+				},
+				{
+					TypeName:    "StatusContext",
+					Name:        "",
+					Context:     "Windows GPU",
+					State:       "SUCCESS",
+					Status:      "",
+					Conclusion:  "",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "",
+					TargetURL:   "https://github.com/cli/cli/2",
+				},
+				{
+					TypeName:    "StatusContext",
+					Name:        "",
+					Context:     "Linux GPU",
+					State:       "SUCCESS",
+					Status:      "",
+					Conclusion:  "",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "",
+					TargetURL:   "https://github.com/cli/cli/3",
+				},
+			},
+			want: []api.CheckContext{
+				{
+					TypeName:    "CheckRun",
+					Name:        "build (ubuntu-latest)",
+					Status:      "COMPLETED",
+					Conclusion:  "SUCCESS",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "https://github.com/cli/cli/runs/1",
+				},
+				{
+					TypeName:    "StatusContext",
+					Name:        "",
+					Context:     "Windows GPU",
+					State:       "SUCCESS",
+					Status:      "",
+					Conclusion:  "",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "",
+					TargetURL:   "https://github.com/cli/cli/2",
+				},
+				{
+					TypeName:    "StatusContext",
+					Name:        "",
+					Context:     "Linux GPU",
+					State:       "SUCCESS",
+					Status:      "",
+					Conclusion:  "",
+					StartedAt:   time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					CompletedAt: time.Date(2022, 1, 1, 1, 1, 1, 1, time.UTC),
+					DetailsURL:  "",
+					TargetURL:   "https://github.com/cli/cli/3",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := eliminateDuplicates(tt.checkContexts)
+			if !reflect.DeepEqual(tt.want, got) {
+				t.Errorf("got eliminateDuplicates %+v, want %+v\n", got, tt.want)
+			}
 		})
 	}
 }
