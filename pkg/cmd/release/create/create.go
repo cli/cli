@@ -241,6 +241,7 @@ func createRun(opts *CreateOptions) error {
 			var tagSha string
 			headRef := opts.TagName
 			tagSha, tagDescription, _ = gitTagInfo(opts.TagName)
+
 			if tagDescription == "" {
 				if opts.Target != "" {
 					// TODO: use the remote-tracking version of the branch ref
@@ -248,19 +249,20 @@ func createRun(opts *CreateOptions) error {
 				} else {
 					headRef = "HEAD"
 				}
-			} else {
-				// Local tag exists and target not specified so use tag
-				// SHA as target. This prevents the scenario where the
-				// user has a local unpushed tag and then when creating a
-				// release the API creates a new tag with the same name
-				// pointing to the repos default branch. This is confusing
-				// when the local unpushed tag was pointing to a different SHA.
-				// This will ensure that when the remote tag gets created
-				// it points to the correct commit.
-				if opts.Target == "" {
-					opts.Target = tagSha
-				}
 			}
+
+			// Local tag exists and target not specified so use tag
+			// SHA as target. This prevents the scenario where the
+			// user has a local unpushed tag and then when creating a
+			// release the API creates a new tag with the same name
+			// pointing to the repos default branch. This is confusing
+			// when the local unpushed tag was pointing to a different SHA.
+			// This will ensure that when the remote tag gets created
+			// it points to the correct commit.
+			if opts.Target == "" && tagSha != "" {
+				opts.Target = tagSha
+			}
+
 			if generatedNotes == nil {
 				if prevTag, err := detectPreviousTag(headRef); err == nil {
 					commits, _ := changelogForRange(fmt.Sprintf("%s..%s", prevTag, headRef))
