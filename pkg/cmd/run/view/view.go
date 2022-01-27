@@ -359,15 +359,13 @@ func runView(opts *ViewOptions) error {
 			}
 		}
 
-		suggestCmd := "For more information about a job, try: gh run view --job"
-
 		fmt.Fprintln(out)
 		if shared.IsFailureState(run.Conclusion) {
 			fmt.Fprintf(out, "To see what failed, try: gh run view %d --log-failed\n", run.ID)
 		} else if len(jobs) == 1 {
-			fmt.Fprintf(out, "%s=%d\n", suggestCmd, jobs[0].ID)
+			fmt.Fprintf(out, "For more information about the job, try: gh run view --job=%d\n", jobs[0].ID)
 		} else {
-			fmt.Fprintf(out, "%s=<job-id>\n", suggestCmd)
+			fmt.Fprintf(out, "For more information about a job, try: gh run view --job=<job-id>\n")
 		}
 		fmt.Fprintf(out, cs.Gray("View this run on GitHub: %s\n"), run.URL)
 
