@@ -106,29 +106,11 @@ func checksRunWebMode(opts *ChecksOptions) error {
 }
 
 func checksRunWatchMode(duration time.Duration, opts *ChecksOptions) error {
-	checks, meta, err := collect(opts)
-	if err != nil {
-		return fmt.Errorf("cannot collect checks information: %w", err)
-	}
-
 	isTerminal := opts.IO.IsStdoutTTY()
 	cs := opts.IO.ColorScheme()
 
-	err = printTable(isTerminal, cs, meta, checks, opts)
-	if err != nil {
-		return fmt.Errorf("cannot print table: %w", err)
-	}
-
-	for meta.Pending > 0 {
-		time.Sleep(duration)
-
-		if err := opts.IO.EnableVirtualTerminalProcessing(); err == nil {
-			// ANSI escape code to clean terminal window
-			// https://stackoverflow.com/a/22892171
-			fmt.Print(opts.IO.Out, "\033[H\033[2J")
-		}
-
-		checks, meta, err = collect(opts)
+	for {
+		checks, meta, err := collect(opts)
 		if err != nil {
 			return fmt.Errorf("cannot collect checks information: %w", err)
 		}
@@ -137,11 +119,22 @@ func checksRunWatchMode(duration time.Duration, opts *ChecksOptions) error {
 		if err != nil {
 			return fmt.Errorf("cannot print table: %w", err)
 		}
-	}
 
-	// NOTE: all tasks have finished at this point, per the for loop above
-	if meta.Failed > 0 {
-		return cmdutil.SilentError
+		if meta.Pending == 0 && meta.Failed > 0 {
+			return cmdutil.SilentError
+		}
+
+		if meta.Pending == 0 {
+			break
+		}
+
+		time.Sleep(duration)
+
+		if err := opts.IO.EnableVirtualTerminalProcessing(); err == nil {
+			// ANSI escape code to clean terminal window
+			// https://stackoverflow.com/a/22892171
+			fmt.Print(opts.IO.Out, "\033[H\033[2J")
+		}
 	}
 
 	return nil
