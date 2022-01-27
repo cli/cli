@@ -75,8 +75,8 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to show details about checks")
-	cmd.Flags().BoolVarP(&opts.Watch, "watch", "", false, "Watch checks and wait until are finished running")
-	cmd.Flags().IntVarP(&opts.Interval, "interval", "i", defaultInterval, "The number of seconds between each reprint When using --watch")
+	cmd.Flags().BoolVarP(&opts.Watch, "watch", "", false, "Watch checks until they finish")
+	cmd.Flags().IntVarP(&opts.Interval, "interval", "i", defaultInterval, "Refresh interval in seconds when using watch flag")
 
 	return cmd
 }
