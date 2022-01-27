@@ -60,8 +60,14 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		}
 		questions := []*survey.Question{
 			{
-				Name:     "repository",
-				Prompt:   &survey.Input{Message: "Repository:"},
+				Name: "repository",
+				Prompt: &survey.Input{
+					Message: "Repository:",
+					Help:    "Search for repos by name. To search within an org or user, or to see private repos, enter at least ':user/'.",
+					Suggest: func(toComplete string) []string {
+						return getRepoSuggestions(ctx, a.apiClient, toComplete)
+					},
+				},
 				Validate: survey.Required,
 			},
 			{
@@ -263,6 +269,14 @@ func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machin
 	selectedMachine := machineByName[machineAnswers.Machine]
 
 	return selectedMachine.Name, nil
+}
+
+func getRepoSuggestions(ctx context.Context, apiClient apiClient, partialSearch string) []string {
+	repos, err := apiClient.GetCodespaceRepoSuggestions(ctx, partialSearch)
+	if err != nil {
+		return []string{}
+	}
+	return repos
 }
 
 // buildDisplayName returns display name to be used in the machine survey prompt.

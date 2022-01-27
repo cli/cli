@@ -474,6 +474,74 @@ func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, loc
 	return response.Machines, nil
 }
 
+// TODO - should this be/is this in a more general API?
+func (a *API) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch string) ([]string, error) {
+	reqURL := fmt.Sprintf("%s/search/repositories", a.githubAPI)
+	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	var nameSearch string
+
+	parts := strings.Split(partialSearch, "/")
+	partsLen := len(parts)
+	if partsLen > 2 {
+		return nil, errors.New("search value is an incorrect format")
+	}
+
+	if partsLen == 2 {
+		user := parts[0]
+		repo := parts[1]
+		nameSearch = fmt.Sprintf("%s user:%s", repo, user)
+	} else {
+		/*
+		 * This results in searching for the text within the owner or the name. It's possible to
+		 * do an owner search and then look up some repos for those owners, but that adds a
+		 * good amount of latency to the fetch which slows down showing the suggestions.
+		 */
+		nameSearch = partialSearch
+	}
+
+	queryStr := fmt.Sprintf("%s in:name", nameSearch)
+
+	q := req.URL.Query()
+	q.Add("q", queryStr)
+	q.Add("sort", "stars")
+	q.Add("per_page", "7") // The prompt shows 7 items so 7 effectively turns off scrolling which is similar behavior to other clients
+	req.URL.RawQuery = q.Encode()
+
+	a.setHeaders(req)
+	resp, err := a.do(ctx, req, "/search/repositories/*")
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, api.HandleHTTPError(resp)
+	}
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	var response struct {
+		Items []*Repository `json:"items"`
+	}
+	if err := json.Unmarshal(b, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %w", err)
+	}
+
+	repoNwos := make([]string, len(response.Items))
+	for i, repo := range response.Items {
+		repoNwos[i] = repo.FullName
+	}
+
+	return repoNwos, nil
+}
+
 // CreateCodespaceParams are the required parameters for provisioning a Codespace.
 type CreateCodespaceParams struct {
 	RepositoryID       int
