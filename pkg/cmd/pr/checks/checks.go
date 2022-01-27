@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const defaultInterval int = 30
+const defaultInterval int = 10
 
 type browser interface {
 	Browse(string) error
