@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -22,6 +23,8 @@ import (
 	"github.com/cli/cli/v2/pkg/text"
 	"github.com/spf13/cobra"
 )
+
+var newlineRE = regexp.MustCompile(`\r?\n`)
 
 type CreateOptions struct {
 	IO         *iostreams.IOStreams
@@ -235,8 +238,9 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		if opts.RepoOverride == "" {
+			var tagSha string
 			headRef := opts.TagName
-			tagDescription, _ = gitTagInfo(opts.TagName)
+			tagSha, tagDescription, _ = gitTagInfo(opts.TagName)
 			if tagDescription == "" {
 				if opts.Target != "" {
 					// TODO: use the remote-tracking version of the branch ref
@@ -254,10 +258,6 @@ func createRun(opts *CreateOptions) error {
 				// This will ensure that when the remote tag gets created
 				// it points to the correct commit.
 				if opts.Target == "" {
-					tagSha, err := gitTagSha(opts.TagName)
-					if err != nil {
-						return err
-					}
 					opts.Target = tagSha
 				}
 			}
@@ -449,22 +449,17 @@ func createRun(opts *CreateOptions) error {
 	return nil
 }
 
-func gitTagInfo(tagName string) (string, error) {
-	cmd, err := git.GitCommand("tag", "--list", tagName, "--format=%(contents:subject)%0a%0a%(contents:body)")
+func gitTagInfo(tagName string) (string, string, error) {
+	cmd, err := git.GitCommand("tag", "--list", tagName, "--format=%(objectname)%0a%(contents:subject)%0a%0a%(contents:body)")
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	b, err := run.PrepareCmd(cmd).Output()
-	return string(b), err
-}
-
-func gitTagSha(tagName string) (string, error) {
-	cmd, err := git.GitCommand("rev-list", "-n", "1", tagName)
-	if err != nil {
-		return "", err
+	if err != nil || len(b) == 0 {
+		return "", "", err
 	}
-	b, err := run.PrepareCmd(cmd).Output()
-	return strings.TrimSpace(string(b)), err
+	parts := newlineRE.Split(string(b), 2)
+	return parts[0], parts[1], nil
 }
 
 func detectPreviousTag(headRef string) (string, error) {

@@ -529,7 +529,7 @@ func Test_createRun_interactive(t *testing.T) {
 					AssertOptions([]string{"Publish release", "Save as draft", "Cancel"}).AnswerWith("Publish release")
 			},
 			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 1, "")
+				rs.Register(`git tag --list`, 0, "tagsha123\n")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/tags"), httpmock.StatusStringResponse(200, `[
@@ -669,9 +669,8 @@ func Test_createRun_interactive(t *testing.T) {
 				as.StubPrompt("Submit?").AnswerWith("Publish release")
 			},
 			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "hello from annotated tag")
+				rs.Register(`git tag --list`, 0, "tagsha123\nhello from annotated tag")
 				rs.Register(`git describe --tags --abbrev=0 v1\.2\.3\^`, 1, "")
-				rs.Register(`git rev-list -n 1 v1.2.3`, 0, "tagsha123")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
