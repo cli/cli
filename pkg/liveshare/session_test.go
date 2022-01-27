@@ -375,7 +375,7 @@ func TestSessionHeartbeat(t *testing.T) {
 		requestsMu.Lock()
 		rc := requests
 		requestsMu.Unlock()
-		// though this could be also dropped, the sync.Waigroup above guarantees
+		// though this could be also dropped, the sync.WaitGroup above guarantees
 		// that it gets called a second time.
 		if rc != 2 {
 			t.Errorf("unexpected number of requests, expected: 2, got: %d", requests)
