@@ -67,7 +67,12 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 			}
 
 			if opts.Watch {
-				return checksRunWatchMode(opts)
+				duration, err := time.ParseDuration(fmt.Sprintf("%ds", opts.Interval))
+				if err != nil {
+					return fmt.Errorf("could not parse interval: %w", err)
+				}
+
+				return checksRunWatchMode(duration, opts)
 			}
 
 			return checksRun(opts)
@@ -100,12 +105,7 @@ func checksRunWebMode(opts *ChecksOptions) error {
 	return opts.Browser.Browse(openURL)
 }
 
-func checksRunWatchMode(opts *ChecksOptions) error {
-	duration, err := time.ParseDuration(fmt.Sprintf("%ds", opts.Interval))
-	if err != nil {
-		return fmt.Errorf("could not parse interval: %w", err)
-	}
-
+func checksRunWatchMode(duration time.Duration, opts *ChecksOptions) error {
 	checks, meta, err := collect(opts)
 	if err != nil {
 		return fmt.Errorf("cannot collect checks information: %w", err)
