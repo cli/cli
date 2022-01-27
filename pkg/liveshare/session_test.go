@@ -274,7 +274,7 @@ func TestNotifyHostOfActivity(t *testing.T) {
 	)
 	testServer, session, err := makeMockSession(svc)
 	if err != nil {
-		t.Errorf("creating mock session: %v", err)
+		t.Fatalf("creating mock session: %v", err)
 	}
 	defer testServer.Close()
 	ctx := context.Background()
@@ -338,7 +338,7 @@ func TestSessionHeartbeat(t *testing.T) {
 	)
 	testServer, session, err := makeMockSession(svc)
 	if err != nil {
-		t.Errorf("creating mock session: %v", err)
+		t.Fatalf("creating mock session: %v", err)
 	}
 	defer testServer.Close()
 
