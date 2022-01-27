@@ -274,7 +274,7 @@ func TestNotifyHostOfActivity(t *testing.T) {
 	)
 	testServer, session, err := makeMockSession(svc)
 	if err != nil {
-		t.Errorf("creating mock session: %w", err)
+		t.Errorf("creating mock session: %v", err)
 	}
 	defer testServer.Close()
 	ctx := context.Background()
@@ -284,10 +284,10 @@ func TestNotifyHostOfActivity(t *testing.T) {
 	}()
 	select {
 	case err := <-testServer.Err():
-		t.Errorf("error from server: %w", err)
+		t.Errorf("error from server: %v", err)
 	case err := <-done:
 		if err != nil {
-			t.Errorf("error from client: %w", err)
+			t.Errorf("error from client: %v", err)
 		}
 	}
 }
@@ -296,8 +296,11 @@ func TestSessionHeartbeat(t *testing.T) {
 	var (
 		requestsMu sync.Mutex
 		requests   int
+		wg         sync.WaitGroup
 	)
+	wg.Add(1)
 	notifyHostOfActivity := func(rpcReq *jsonrpc2.Request) (interface{}, error) {
+		defer wg.Done()
 		requestsMu.Lock()
 		requests++
 		requestsMu.Unlock()
@@ -335,7 +338,7 @@ func TestSessionHeartbeat(t *testing.T) {
 	)
 	testServer, session, err := makeMockSession(svc)
 	if err != nil {
-		t.Errorf("creating mock session: %w", err)
+		t.Errorf("creating mock session: %v", err)
 	}
 	defer testServer.Close()
 
@@ -350,24 +353,30 @@ func TestSessionHeartbeat(t *testing.T) {
 	go session.heartbeat(ctx, 50*time.Millisecond)
 	go func() {
 		session.keepAlive("input")
-		<-time.Tick(200 * time.Millisecond)
+		wg.Wait()
+		wg.Add(1)
 		session.keepAlive("input")
-		<-time.Tick(100 * time.Millisecond)
+		wg.Wait()
 		done <- struct{}{}
 	}()
 
 	select {
 	case err := <-testServer.Err():
-		t.Errorf("error from server: %w", err)
+		t.Errorf("error from server: %v", err)
 	case <-done:
 		activityCount := strings.Count(logger.String(), "input")
-		if activityCount != 2 {
-			t.Errorf("unexpected number of activities, expected: 2, got: %d", activityCount)
+		// by design keepAlive can drop requests, and therefore there is zero guarantee
+		// that we actually get two requests if the network happened to be slow (rarely)
+		// during testing.
+		if activityCount != 1 && activityCount != 2 {
+			t.Errorf("unexpected number of activities, expected: 1-2, got: %d", activityCount)
 		}
 
 		requestsMu.Lock()
 		rc := requests
 		requestsMu.Unlock()
+		// though this could be also dropped, the sync.Waigroup above guarantees
+		// that it gets called a second time.
 		if rc != 2 {
 			t.Errorf("unexpected number of requests, expected: 2, got: %d", requests)
 		}
