@@ -197,7 +197,7 @@ func runView(opts *ViewOptions) error {
 	if opts.Prompt {
 		// TODO arbitrary limit
 		opts.IO.StartProgressIndicator()
-		runs, err := shared.GetRuns(client, repo, 10)
+		runs, err := shared.GetRuns(client, repo, nil, 10)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get runs: %w", err)
@@ -362,8 +362,10 @@ func runView(opts *ViewOptions) error {
 		fmt.Fprintln(out)
 		if shared.IsFailureState(run.Conclusion) {
 			fmt.Fprintf(out, "To see what failed, try: gh run view %d --log-failed\n", run.ID)
+		} else if len(jobs) == 1 {
+			fmt.Fprintf(out, "For more information about the job, try: gh run view --job=%d\n", jobs[0].ID)
 		} else {
-			fmt.Fprintln(out, "For more information about a job, try: gh run view --job=<job-id>")
+			fmt.Fprintf(out, "For more information about a job, try: gh run view --job=<job-id>\n")
 		}
 		fmt.Fprintf(out, cs.Gray("View this run on GitHub: %s\n"), run.URL)
 

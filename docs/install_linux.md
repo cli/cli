@@ -14,8 +14,8 @@ our release schedule.
 Install:
 
 ```bash
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/etc/apt/trusted.gpg.d/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/trusted.gpg.d/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
 sudo apt update
 sudo apt install gh
 ```
@@ -179,6 +179,23 @@ openSUSE Tumbleweed users can install from the [official distribution repo](http
 sudo zypper in gh
 ```
 
+### Alpine Linux
+
+Alpine Linux users can install from the [stable releases' community packaage repository](https://pkgs.alpinelinux.org/packages?name=github-cli&branch=v3.15).
+
+```bash
+apk add github-cli
+```
+
+Users wanting the latest version of the CLI without waiting to be backported into the stable release they're using should use the edge release's
+community repo through this method below, without mixing packages from stable and unstable repos.[^1]
+
+```bash
+echo "@community http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
+apk add github-cli@community
+```
+
 [releases page]: https://github.com/cli/cli/releases/latest
 [arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli
 [arch linux aur]: https://aur.archlinux.org/packages/github-cli-git
+[^1]: https://wiki.alpinelinux.org/wiki/Package_management#Repository_pinning

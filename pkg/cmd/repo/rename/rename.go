@@ -2,6 +2,7 @@ package rename
 
 import (
 	"fmt"
+	"github.com/cli/cli/v2/api"
 	"net/http"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -114,10 +115,14 @@ func renameRun(opts *RenameOptions) error {
 		}
 	}
 
-	newRepo, err := apiRename(httpClient, currRepo, newRepoName)
+	apiClient := api.NewClientFromHTTP(httpClient)
+
+	newRepo, err := api.RenameRepo(apiClient, currRepo, newRepoName)
 	if err != nil {
 		return err
 	}
+
+	renamedRepo := ghrepo.New(newRepo.Owner.Login, newRepo.Name)
 
 	cs := opts.IO.ColorScheme()
 	if opts.IO.IsStdoutTTY() {
@@ -128,7 +133,7 @@ func renameRun(opts *RenameOptions) error {
 		return nil
 	}
 
-	remote, err := updateRemote(currRepo, newRepo, opts)
+	remote, err := updateRemote(currRepo, renamedRepo, opts)
 	if err != nil {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Warning: unable to update remote %q: %v\n", cs.WarningIcon(), remote.Name, err)
 	} else if opts.IO.IsStdoutTTY() {
