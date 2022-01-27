@@ -529,7 +529,7 @@ func Test_createRun_interactive(t *testing.T) {
 					AssertOptions([]string{"Publish release", "Save as draft", "Cancel"}).AnswerWith("Publish release")
 			},
 			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "tagsha123\n")
+				rs.Register(`git tag --list`, 1, "")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/tags"), httpmock.StatusStringResponse(200, `[
