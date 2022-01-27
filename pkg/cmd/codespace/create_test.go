@@ -55,6 +55,9 @@ func TestApp_Create(t *testing.T) {
 							Name: "monalisa-dotfiles-abcd1234",
 						}, nil
 					},
+					GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string) ([]string, error) {
+						return []string{}, nil // There is no TTY we won't/can't ask for suggestions
+					},
 				},
 			},
 			opts: createOptions{
