@@ -32,6 +32,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -485,14 +486,13 @@ func (a *API) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch str
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	var nameSearch string
-
 	parts := strings.Split(partialSearch, "/")
 	partsLen := len(parts)
 	if partsLen > 2 {
-		return nil, errors.New("search value is an incorrect format")
+		return nil, errors.New("repository name cannot have multiple slashes")
 	}
 
+	var nameSearch string
 	if partsLen == 2 {
 		user := parts[0]
 		repo := parts[1]
@@ -517,7 +517,7 @@ func (a *API) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch str
 	a.setHeaders(req)
 	resp, err := a.do(ctx, req, "/search/repositories/*")
 	if err != nil {
-		return nil, fmt.Errorf("error making request: %w", err)
+		return nil, fmt.Errorf("error searching repositories: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -525,7 +525,7 @@ func (a *API) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch str
 		return nil, api.HandleHTTPError(resp)
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
@@ -537,12 +537,12 @@ func (a *API) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch str
 		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
 
-	repoNwos := make([]string, len(response.Items))
+	repoNames := make([]string, len(response.Items))
 	for i, repo := range response.Items {
-		repoNwos[i] = repo.FullName
+		repoNames[i] = repo.FullName
 	}
 
-	return repoNwos, nil
+	return repoNames, nil
 }
 
 // CreateCodespaceParams are the required parameters for provisioning a Codespace.

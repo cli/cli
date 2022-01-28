@@ -56,7 +56,7 @@ func TestApp_Create(t *testing.T) {
 						}, nil
 					},
 					GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string) ([]string, error) {
-						return []string{}, nil // There is no TTY we won't/can't ask for suggestions
+						return nil, nil // We can't ask for suggestions without a terminal.
 					},
 				},
 			},

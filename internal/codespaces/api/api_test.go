@@ -115,40 +115,18 @@ func TestListCodespaces_unlimited(t *testing.T) {
 	}
 }
 
-func createFakeSearchReposServer(t *testing.T, searchText string, responseRepos []*Repository) *httptest.Server {
+func createFakeSearchReposServer(t *testing.T, wantSearchText string, responseRepos []*Repository) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/search/repositories" {
-			t.Fatal("Incorrect path")
+			t.Error("Incorrect path")
+			return
 		}
 
-		if r.URL.Query().Get("q") == "" {
-			t.Fatal("Missing 'q' param")
-		}
-
-		q := r.URL.Query().Get("q")
-		expectedQ := fmt.Sprintf("%s in:name", searchText)
-		if q != expectedQ {
-			t.Fatalf("expected q = '%s', got '%s", expectedQ, q)
-		}
-
-		if r.URL.Query().Get("per_page") == "" {
-			t.Fatal("Missing 'per_page' param")
-		}
-
-		per_page, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
-		expectedPerPage := 7 // This is currently hardcoded in the API logic
-		if per_page != expectedPerPage {
-			t.Fatalf("expected per_page = %d, got %d", expectedPerPage, per_page)
-		}
-
-		if r.URL.Query().Get("sort") == "" {
-			t.Fatal("Missing 'sort' param")
-		}
-
-		sort := r.URL.Query().Get("sort")
-		expectedSort := "stars" // This is currently hardcoded in the API logic
-		if sort != expectedSort {
-			t.Fatalf("expected sort = '%s', got '%s'", expectedSort, sort)
+		query := r.URL.Query()
+		got := fmt.Sprintf("q=%q sort=%s per_page=%s", query.Get("q"), query.Get("sort"), query.Get("per_page"))
+		want := fmt.Sprintf("q=%q sort=stars per_page=7", wantSearchText+" in:name")
+		if got != want {
+			t.Errorf("for query, got %s, want %s", got, want)
 		}
 
 		response := struct {
@@ -158,77 +136,71 @@ func createFakeSearchReposServer(t *testing.T, searchText string, responseRepos 
 		}
 
 		data, _ := json.Marshal(response)
-		fmt.Fprint(w, string(data))
+		w.Write(data)
 	}))
 }
 
 func TestGetRepoSuggestions_noSlash(t *testing.T) {
 	searchText := "text"
-	repos := []*Repository{
-		{FullName: "repo1"},
-		{FullName: "repo2"},
+	wantQueryText := "text"
+	wantRepoNames := []string{"repo1", "repo2"}
+
+	apiResponseRepositories := make([]*Repository, 0)
+	for _, name := range wantRepoNames {
+		apiResponseRepositories = append(apiResponseRepositories, &Repository{FullName: name})
 	}
 
-	svr := createFakeSearchReposServer(t, searchText, repos)
+	svr := createFakeSearchReposServer(t, wantQueryText, apiResponseRepositories)
 	defer svr.Close()
 
 	api := API{
 		githubAPI: svr.URL,
 		client:    &http.Client{},
 	}
-	ctx := context.TODO()
-	repoNames, err := api.GetCodespaceRepoSuggestions(ctx, searchText)
+	ctx := context.Background()
+	gotRepoNames, err := api.GetCodespaceRepoSuggestions(ctx, searchText)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(repoNames) != len(repos) {
-		t.Fatalf("expected %d repos, got %d", len(repos), len(repoNames))
+	if len(gotRepoNames) != len(wantRepoNames) {
+		t.Fatalf("got %d repos, want %d", len(gotRepoNames), len(wantRepoNames))
 	}
 
-	for i, expectedRepo := range repos {
-		expectedName := expectedRepo.FullName
-		actualName := repoNames[i]
-
-		if expectedName != actualName {
-			t.Fatalf("expected repo name for index %d to be %s, got %s", i, expectedName, actualName)
-		}
+	gotNamesStr := fmt.Sprintf("%v", gotRepoNames)
+	wantNamesStr := fmt.Sprintf("%v", wantRepoNames)
+	if gotNamesStr != wantNamesStr {
+		t.Fatalf("got repo names %s, want %s", gotNamesStr, wantNamesStr)
 	}
 }
 
 func TestGetRepoSuggestions_withSlash(t *testing.T) {
 	searchText := "org/repo"
-	queryText := "repo user:org"
+	wantQueryText := "repo user:org"
+	wantRepoNames := []string{"repo1", "repo2"}
 
-	repos := []*Repository{
-		{FullName: "repo1"},
-		{FullName: "repo2"},
+	apiResponseRepositories := make([]*Repository, 0)
+	for _, name := range wantRepoNames {
+		apiResponseRepositories = append(apiResponseRepositories, &Repository{FullName: name})
 	}
 
-	svr := createFakeSearchReposServer(t, queryText, repos)
+	svr := createFakeSearchReposServer(t, wantQueryText, apiResponseRepositories)
 	defer svr.Close()
 
 	api := API{
 		githubAPI: svr.URL,
 		client:    &http.Client{},
 	}
-	ctx := context.TODO()
-	repoNames, err := api.GetCodespaceRepoSuggestions(ctx, searchText)
+	ctx := context.Background()
+	gotRepoNames, err := api.GetCodespaceRepoSuggestions(ctx, searchText)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if len(repoNames) != len(repos) {
-		t.Fatalf("expected %d repos, got %d", len(repos), len(repoNames))
-	}
-
-	for i, expectedRepo := range repos {
-		expectedName := expectedRepo.FullName
-		actualName := repoNames[i]
-
-		if expectedName != actualName {
-			t.Fatalf("expected repo name for index %d to be %s, got %s", i, expectedName, actualName)
-		}
+	gotNamesStr := fmt.Sprintf("%v", gotRepoNames)
+	wantNamesStr := fmt.Sprintf("%v", wantRepoNames)
+	if gotNamesStr != wantNamesStr {
+		t.Fatalf("got repo names %s, want %s", gotNamesStr, wantNamesStr)
 	}
 }
 
@@ -242,15 +214,13 @@ func TestGetRepoSuggestions_badFormat(t *testing.T) {
 		githubAPI: svr.URL,
 		client:    &http.Client{},
 	}
-	ctx := context.TODO()
+	ctx := context.Background()
 	_, err := api.GetCodespaceRepoSuggestions(ctx, searchText)
-	if err == nil {
-		t.Fatal("Expected error")
-	}
 
-	expected := "search value is an incorrect format"
-	if err.Error() != expected {
-		t.Fatalf("expected error '%s', go '%s'", expected, err.Error())
+	want := "repository name cannot have multiple slashes"
+	got := fmt.Sprint(err) // (this may be "<nil>")
+	if got != want {
+		t.Fatalf("GetCodespaceRepoSuggestions error was %s, want %s", got, want)
 	}
 }
 

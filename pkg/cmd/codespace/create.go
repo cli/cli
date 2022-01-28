@@ -274,7 +274,7 @@ func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machin
 func getRepoSuggestions(ctx context.Context, apiClient apiClient, partialSearch string) []string {
 	repos, err := apiClient.GetCodespaceRepoSuggestions(ctx, partialSearch)
 	if err != nil {
-		return []string{}
+		return nil
 	}
 	return repos
 }
