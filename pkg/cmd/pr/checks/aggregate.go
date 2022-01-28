@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 )
 
 type check struct {
@@ -18,33 +17,24 @@ type check struct {
 	Bucket      string    `json:"bucket"`
 }
 
-type checksMeta struct {
+type checkCounts struct {
 	Failed   int
 	Passed   int
 	Pending  int
 	Skipping int
 }
 
-func collect(opts *ChecksOptions) ([]check, checksMeta, error) {
+func aggregateChecks(pr *api.PullRequest) ([]check, checkCounts, error) {
 	checks := []check{}
-	meta := checksMeta{}
-
-	findOptions := shared.FindOptions{
-		Selector: opts.SelectorArg,
-		Fields:   []string{"number", "baseRefName", "statusCheckRollup"},
-	}
-	pr, _, err := opts.Finder.Find(findOptions)
-	if err != nil {
-		return checks, meta, err
-	}
+	counts := checkCounts{}
 
 	if len(pr.StatusCheckRollup.Nodes) == 0 {
-		return checks, meta, fmt.Errorf("no commit found on the pull request")
+		return checks, counts, fmt.Errorf("no commit found on the pull request")
 	}
 
 	rollup := pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
 	if len(rollup) == 0 {
-		return checks, meta, fmt.Errorf("no checks reported on the '%s' branch", pr.BaseRefName)
+		return checks, counts, fmt.Errorf("no checks reported on the '%s' branch", pr.HeadRefName)
 	}
 
 	checkContexts := pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
@@ -78,22 +68,22 @@ func collect(opts *ChecksOptions) ([]check, checksMeta, error) {
 		switch state {
 		case "SUCCESS":
 			item.Bucket = "pass"
-			meta.Passed++
+			counts.Passed++
 		case "SKIPPED", "NEUTRAL":
 			item.Bucket = "skipping"
-			meta.Skipping++
+			counts.Skipping++
 		case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
 			item.Bucket = "fail"
-			meta.Failed++
+			counts.Failed++
 		default: // "EXPECTED", "REQUESTED", "WAITING", "QUEUED", "PENDING", "IN_PROGRESS", "STALE"
 			item.Bucket = "pending"
-			meta.Pending++
+			counts.Pending++
 		}
 
 		checks = append(checks, item)
 	}
 
-	return checks, meta, nil
+	return checks, counts, nil
 }
 
 func eliminateDuplicates(checkContexts []api.CheckContext) []api.CheckContext {
