@@ -31,7 +31,7 @@ import (
 // 			GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
 // 				panic("mock out the GetCodespaceRegionLocation method")
 // 			},
-// 			GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string) ([]string, error) {
+// 			GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
 // 				panic("mock out the GetCodespaceRepoSuggestions method")
 // 			},
 // 			GetCodespaceRepositoryContentsFunc: func(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error) {
@@ -78,7 +78,7 @@ type apiClientMock struct {
 	GetCodespaceRegionLocationFunc func(ctx context.Context) (string, error)
 
 	// GetCodespaceRepoSuggestionsFunc mocks the GetCodespaceRepoSuggestions method.
-	GetCodespaceRepoSuggestionsFunc func(ctx context.Context, partialSearch string) ([]string, error)
+	GetCodespaceRepoSuggestionsFunc func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error)
 
 	// GetCodespaceRepositoryContentsFunc mocks the GetCodespaceRepositoryContents method.
 	GetCodespaceRepositoryContentsFunc func(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
@@ -144,6 +144,8 @@ type apiClientMock struct {
 			Ctx context.Context
 			// PartialSearch is the partialSearch argument value.
 			PartialSearch string
+			// Params is the params argument value.
+			Params api.RepoSearchParameters
 		}
 		// GetCodespaceRepositoryContents holds details about calls to the GetCodespaceRepositoryContents method.
 		GetCodespaceRepositoryContents []struct {
@@ -390,21 +392,23 @@ func (mock *apiClientMock) GetCodespaceRegionLocationCalls() []struct {
 }
 
 // GetCodespaceRepoSuggestions calls GetCodespaceRepoSuggestionsFunc.
-func (mock *apiClientMock) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch string) ([]string, error) {
+func (mock *apiClientMock) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
 	if mock.GetCodespaceRepoSuggestionsFunc == nil {
 		panic("apiClientMock.GetCodespaceRepoSuggestionsFunc: method is nil but apiClient.GetCodespaceRepoSuggestions was just called")
 	}
 	callInfo := struct {
 		Ctx           context.Context
 		PartialSearch string
+		Params        api.RepoSearchParameters
 	}{
 		Ctx:           ctx,
 		PartialSearch: partialSearch,
+		Params:        params,
 	}
 	mock.lockGetCodespaceRepoSuggestions.Lock()
 	mock.calls.GetCodespaceRepoSuggestions = append(mock.calls.GetCodespaceRepoSuggestions, callInfo)
 	mock.lockGetCodespaceRepoSuggestions.Unlock()
-	return mock.GetCodespaceRepoSuggestionsFunc(ctx, partialSearch)
+	return mock.GetCodespaceRepoSuggestionsFunc(ctx, partialSearch, params)
 }
 
 // GetCodespaceRepoSuggestionsCalls gets all the calls that were made to GetCodespaceRepoSuggestions.
@@ -413,10 +417,12 @@ func (mock *apiClientMock) GetCodespaceRepoSuggestions(ctx context.Context, part
 func (mock *apiClientMock) GetCodespaceRepoSuggestionsCalls() []struct {
 	Ctx           context.Context
 	PartialSearch string
+	Params        api.RepoSearchParameters
 } {
 	var calls []struct {
 		Ctx           context.Context
 		PartialSearch string
+		Params        api.RepoSearchParameters
 	}
 	mock.lockGetCodespaceRepoSuggestions.RLock()
 	calls = mock.calls.GetCodespaceRepoSuggestions

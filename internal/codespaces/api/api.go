@@ -478,22 +478,26 @@ func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, loc
 	return response.Machines, nil
 }
 
-// TODO - should this be/is this in a more general API?
-func (a *API) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch string) ([]string, error) {
+// RepoSearchParameters are the optional parameters for searching for repositories.
+type RepoSearchParameters struct {
+	// The maximum number of repos to return. At most 100 repos are returned even if this value is greater than 100.
+	MaxRepos int
+	// The sort order for returned repos. Possible values are 'stars', 'forks', 'help-wanted-issues', or 'updated'. If empty the API's default ordering is used.
+	Sort string
+}
+
+// GetCodespaceRepoSuggestions searches for and returns repo names based on the provided search text.
+func (a *API) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch string, parameters RepoSearchParameters) ([]string, error) {
 	reqURL := fmt.Sprintf("%s/search/repositories", a.githubAPI)
 	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 
-	parts := strings.Split(partialSearch, "/")
-	partsLen := len(parts)
-	if partsLen > 2 {
-		return nil, errors.New("repository name cannot have multiple slashes")
-	}
+	parts := strings.SplitN(partialSearch, "/", 2)
 
 	var nameSearch string
-	if partsLen == 2 {
+	if len(parts) == 2 {
 		user := parts[0]
 		repo := parts[1]
 		nameSearch = fmt.Sprintf("%s user:%s", repo, user)
@@ -510,8 +514,15 @@ func (a *API) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch str
 
 	q := req.URL.Query()
 	q.Add("q", queryStr)
-	q.Add("sort", "stars")
-	q.Add("per_page", "7") // The prompt shows 7 items so 7 effectively turns off scrolling which is similar behavior to other clients
+
+	if len(parameters.Sort) > 0 {
+		q.Add("sort", parameters.Sort)
+	}
+
+	if parameters.MaxRepos > 0 {
+		q.Add("per_page", strconv.Itoa(parameters.MaxRepos))
+	}
+
 	req.URL.RawQuery = q.Encode()
 
 	a.setHeaders(req)

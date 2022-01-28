@@ -272,10 +272,17 @@ func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machin
 }
 
 func getRepoSuggestions(ctx context.Context, apiClient apiClient, partialSearch string) []string {
-	repos, err := apiClient.GetCodespaceRepoSuggestions(ctx, partialSearch)
+	searchParams := api.RepoSearchParameters{
+		// The prompt shows 7 items so 7 effectively turns off scrolling which is similar behavior to other clients
+		MaxRepos: 7,
+		Sort:     "repo",
+	}
+
+	repos, err := apiClient.GetCodespaceRepoSuggestions(ctx, partialSearch, searchParams)
 	if err != nil {
 		return nil
 	}
+
 	return repos
 }
 

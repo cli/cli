@@ -115,7 +115,39 @@ func TestListCodespaces_unlimited(t *testing.T) {
 	}
 }
 
-func createFakeSearchReposServer(t *testing.T, wantSearchText string, responseRepos []*Repository) *httptest.Server {
+func TestGetRepoSuggestions(t *testing.T) {
+	tests := []struct {
+		searchText string // The input search string
+		queryText  string // The wanted query string (based off searchText)
+		sort       string // (Optional) The RepoSearchParameters.Sort param
+		maxRepos   string // (Optional) The RepoSearchParameters.MaxRepos param
+	}{
+		{
+			searchText: "test",
+			queryText:  "test",
+		},
+		{
+			searchText: "org/repo",
+			queryText:  "repo user:org",
+		},
+		{
+			searchText: "org/repo/extra",
+			queryText:  "repo/extra user:org",
+		},
+		{
+			searchText: "test",
+			queryText:  "test",
+			sort:       "stars",
+			maxRepos:   "1000",
+		},
+	}
+
+	for _, tt := range tests {
+		runRepoSearchTest(t, tt.searchText, tt.queryText, tt.sort, tt.maxRepos)
+	}
+}
+
+func createFakeSearchReposServer(t *testing.T, wantSearchText string, wantSort string, wantPerPage string, responseRepos []*Repository) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/search/repositories" {
 			t.Error("Incorrect path")
@@ -124,9 +156,10 @@ func createFakeSearchReposServer(t *testing.T, wantSearchText string, responseRe
 
 		query := r.URL.Query()
 		got := fmt.Sprintf("q=%q sort=%s per_page=%s", query.Get("q"), query.Get("sort"), query.Get("per_page"))
-		want := fmt.Sprintf("q=%q sort=stars per_page=7", wantSearchText+" in:name")
+		want := fmt.Sprintf("q=%q sort=%s per_page=%s", wantSearchText+" in:name", wantSort, wantPerPage)
 		if got != want {
 			t.Errorf("for query, got %s, want %s", got, want)
+			return
 		}
 
 		response := struct {
@@ -140,9 +173,7 @@ func createFakeSearchReposServer(t *testing.T, wantSearchText string, responseRe
 	}))
 }
 
-func TestGetRepoSuggestions_noSlash(t *testing.T) {
-	searchText := "text"
-	wantQueryText := "text"
+func runRepoSearchTest(t *testing.T, searchText, wantQueryText, wantSort, wantMaxRepos string) {
 	wantRepoNames := []string{"repo1", "repo2"}
 
 	apiResponseRepositories := make([]*Repository, 0)
@@ -150,49 +181,25 @@ func TestGetRepoSuggestions_noSlash(t *testing.T) {
 		apiResponseRepositories = append(apiResponseRepositories, &Repository{FullName: name})
 	}
 
-	svr := createFakeSearchReposServer(t, wantQueryText, apiResponseRepositories)
+	svr := createFakeSearchReposServer(t, wantQueryText, wantSort, wantMaxRepos, apiResponseRepositories)
 	defer svr.Close()
 
 	api := API{
 		githubAPI: svr.URL,
 		client:    &http.Client{},
 	}
+
 	ctx := context.Background()
-	gotRepoNames, err := api.GetCodespaceRepoSuggestions(ctx, searchText)
-	if err != nil {
-		t.Fatal(err)
+
+	searchParameters := RepoSearchParameters{}
+	if len(wantSort) > 0 {
+		searchParameters.Sort = wantSort
+	}
+	if len(wantMaxRepos) > 0 {
+		searchParameters.MaxRepos, _ = strconv.Atoi(wantMaxRepos)
 	}
 
-	if len(gotRepoNames) != len(wantRepoNames) {
-		t.Fatalf("got %d repos, want %d", len(gotRepoNames), len(wantRepoNames))
-	}
-
-	gotNamesStr := fmt.Sprintf("%v", gotRepoNames)
-	wantNamesStr := fmt.Sprintf("%v", wantRepoNames)
-	if gotNamesStr != wantNamesStr {
-		t.Fatalf("got repo names %s, want %s", gotNamesStr, wantNamesStr)
-	}
-}
-
-func TestGetRepoSuggestions_withSlash(t *testing.T) {
-	searchText := "org/repo"
-	wantQueryText := "repo user:org"
-	wantRepoNames := []string{"repo1", "repo2"}
-
-	apiResponseRepositories := make([]*Repository, 0)
-	for _, name := range wantRepoNames {
-		apiResponseRepositories = append(apiResponseRepositories, &Repository{FullName: name})
-	}
-
-	svr := createFakeSearchReposServer(t, wantQueryText, apiResponseRepositories)
-	defer svr.Close()
-
-	api := API{
-		githubAPI: svr.URL,
-		client:    &http.Client{},
-	}
-	ctx := context.Background()
-	gotRepoNames, err := api.GetCodespaceRepoSuggestions(ctx, searchText)
+	gotRepoNames, err := api.GetCodespaceRepoSuggestions(ctx, searchText, searchParameters)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,26 +208,6 @@ func TestGetRepoSuggestions_withSlash(t *testing.T) {
 	wantNamesStr := fmt.Sprintf("%v", wantRepoNames)
 	if gotNamesStr != wantNamesStr {
 		t.Fatalf("got repo names %s, want %s", gotNamesStr, wantNamesStr)
-	}
-}
-
-func TestGetRepoSuggestions_badFormat(t *testing.T) {
-	searchText := "org/repo/bad"
-
-	svr := createFakeSearchReposServer(t, "", nil)
-	defer svr.Close()
-
-	api := API{
-		githubAPI: svr.URL,
-		client:    &http.Client{},
-	}
-	ctx := context.Background()
-	_, err := api.GetCodespaceRepoSuggestions(ctx, searchText)
-
-	want := "repository name cannot have multiple slashes"
-	got := fmt.Sprint(err) // (this may be "<nil>")
-	if got != want {
-		t.Fatalf("GetCodespaceRepoSuggestions error was %s, want %s", got, want)
 	}
 }
 
