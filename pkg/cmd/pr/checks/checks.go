@@ -55,15 +55,14 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("argument required when using the `--repo` flag")
 			}
 
-			if cmd.Flags().Changed("interval") {
-				if !opts.Watch {
-					return cmdutil.FlagErrorf("cannot use `--interval` flag without `--watch` flag")
-				}
-				var err error
-				opts.Interval, err = time.ParseDuration(fmt.Sprintf("%ds", interval))
-				if err != nil {
-					return cmdutil.FlagErrorf("could not parse `--interval` flag: %w", err)
-				}
+			if !opts.Watch && cmd.Flags().Changed("interval") {
+				return cmdutil.FlagErrorf("cannot use `--interval` flag without `--watch` flag")
+			}
+
+			var err error
+			opts.Interval, err = time.ParseDuration(fmt.Sprintf("%ds", interval))
+			if err != nil {
+				return cmdutil.FlagErrorf("could not parse `--interval` flag: %w", err)
 			}
 
 			if len(args) > 0 {

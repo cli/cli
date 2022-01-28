@@ -28,22 +28,26 @@ func TestNewCmdChecks(t *testing.T) {
 		wantsError string
 	}{
 		{
-			name:  "no arguments",
-			cli:   "",
-			wants: ChecksOptions{},
+			name: "no arguments",
+			cli:  "",
+			wants: ChecksOptions{
+				Interval: time.Duration(10000000000),
+			},
 		},
 		{
 			name: "pr argument",
 			cli:  "1234",
 			wants: ChecksOptions{
 				SelectorArg: "1234",
+				Interval:    time.Duration(10000000000),
 			},
 		},
 		{
 			name: "watch flag",
 			cli:  "--watch",
 			wants: ChecksOptions{
-				Watch: true,
+				Watch:    true,
+				Interval: time.Duration(10000000000),
 			},
 		},
 		{
