@@ -22,9 +22,10 @@ import (
 
 func TestNewCmdChecks(t *testing.T) {
 	tests := []struct {
-		name  string
-		cli   string
-		wants ChecksOptions
+		name       string
+		cli        string
+		wants      ChecksOptions
+		wantsError string
 	}{
 		{
 			name:  "no arguments",
@@ -37,6 +38,26 @@ func TestNewCmdChecks(t *testing.T) {
 			wants: ChecksOptions{
 				SelectorArg: "1234",
 			},
+		},
+		{
+			name: "watch flag",
+			cli:  "--watch",
+			wants: ChecksOptions{
+				Watch: true,
+			},
+		},
+		{
+			name: "watch flag and interval flag",
+			cli:  "--watch --interval 5",
+			wants: ChecksOptions{
+				Watch:    true,
+				Interval: time.Duration(5000000000),
+			},
+		},
+		{
+			name:       "interval flag without watch flag",
+			cli:        "--interval 5",
+			wantsError: "cannot use `--interval` flag without `--watch` flag",
 		},
 	}
 
@@ -61,9 +82,14 @@ func TestNewCmdChecks(t *testing.T) {
 			cmd.SetErr(&bytes.Buffer{})
 
 			_, err = cmd.ExecuteC()
+			if tt.wantsError != "" {
+				assert.EqualError(t, err, tt.wantsError)
+				return
+			}
 			assert.NoError(t, err)
-
 			assert.Equal(t, tt.wants.SelectorArg, gotOpts.SelectorArg)
+			assert.Equal(t, tt.wants.Watch, gotOpts.Watch)
+			assert.Equal(t, tt.wants.Interval, gotOpts.Interval)
 		})
 	}
 }
