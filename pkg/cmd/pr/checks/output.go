@@ -9,7 +9,8 @@ import (
 	"github.com/cli/cli/v2/utils"
 )
 
-func addRow(tp utils.TablePrinter, isTerminal bool, cs *iostreams.ColorScheme, o check) {
+func addRow(tp utils.TablePrinter, io *iostreams.IOStreams, o check) {
+	cs := io.ColorScheme()
 	elapsed := ""
 	zeroTime := time.Time{}
 
@@ -34,7 +35,7 @@ func addRow(tp utils.TablePrinter, isTerminal bool, cs *iostreams.ColorScheme, o
 		markColor = cs.Gray
 	}
 
-	if isTerminal {
+	if io.IsStdoutTTY() {
 		tp.AddField(mark, nil, markColor)
 		tp.AddField(o.Name, nil, nil)
 		tp.AddField(elapsed, nil, nil)
@@ -53,29 +54,31 @@ func addRow(tp utils.TablePrinter, isTerminal bool, cs *iostreams.ColorScheme, o
 	tp.EndRow()
 }
 
-func printTable(isTerminal bool, cs *iostreams.ColorScheme, meta checksMeta, checks []check, opts *ChecksOptions) error {
+func printSummary(io *iostreams.IOStreams, counts checkCounts) {
 	summary := ""
-	if meta.Failed+meta.Passed+meta.Skipping+meta.Pending > 0 {
-		if meta.Failed > 0 {
+	if counts.Failed+counts.Passed+counts.Skipping+counts.Pending > 0 {
+		if counts.Failed > 0 {
 			summary = "Some checks were not successful"
-		} else if meta.Pending > 0 {
+		} else if counts.Pending > 0 {
 			summary = "Some checks are still pending"
 		} else {
 			summary = "All checks were successful"
 		}
 
 		tallies := fmt.Sprintf("%d failing, %d successful, %d skipped, and %d pending checks",
-			meta.Failed, meta.Passed, meta.Skipping, meta.Pending)
+			counts.Failed, counts.Passed, counts.Skipping, counts.Pending)
 
-		summary = fmt.Sprintf("%s\n%s", cs.Bold(summary), tallies)
+		summary = fmt.Sprintf("%s\n%s", io.ColorScheme().Bold(summary), tallies)
 	}
 
-	if isTerminal {
-		fmt.Fprintln(opts.IO.Out, summary)
-		fmt.Fprintln(opts.IO.Out)
+	if io.IsStdoutTTY() {
+		fmt.Fprintln(io.Out, summary)
+		fmt.Fprintln(io.Out)
 	}
+}
 
-	tp := utils.NewTablePrinter(opts.IO)
+func printTable(io *iostreams.IOStreams, checks []check) error {
+	tp := utils.NewTablePrinter(io)
 
 	sort.Slice(checks, func(i, j int) bool {
 		b0 := checks[i].Bucket
@@ -96,7 +99,7 @@ func printTable(isTerminal bool, cs *iostreams.ColorScheme, meta checksMeta, che
 	})
 
 	for _, o := range checks {
-		addRow(tp, isTerminal, cs, o)
+		addRow(tp, io, o)
 	}
 
 	err := tp.Render()
