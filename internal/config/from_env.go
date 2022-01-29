@@ -44,12 +44,9 @@ func (c *envConfig) Hosts() ([]string, error) {
 	hostSet := set.NewStringSet()
 	hostSet.AddValues(hosts)
 
-	// If GH_HOST is set and there is a valid environment variable
-	// token for the host then add it to list.
+	// If GH_HOST is set then add it to list.
 	if host := os.Getenv(GH_HOST); host != "" {
-		if token, _ := AuthTokenFromEnv(host); token != "" {
-			hostSet.Add(host)
-		}
+		hostSet.Add(host)
 	}
 
 	// If there is a valid environment variable token for the
