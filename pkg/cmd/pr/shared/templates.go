@@ -128,7 +128,7 @@ func hasTemplateSupport(httpClient *http.Client, hostname string, isPR bool) (bo
 	}
 
 	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), httpClient)
-	err := gql.QueryNamed(context.Background(), "Templates_fields", &featureDetection, nil)
+	err := gql.QueryNamed(context.Background(), "IssueTemplates_fields", &featureDetection, nil)
 	if err != nil {
 		return false, err
 	}
