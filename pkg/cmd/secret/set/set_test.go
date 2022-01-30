@@ -143,6 +143,29 @@ func TestNewCmdSet(t *testing.T) {
 				DoNotStore: true,
 			},
 		},
+		{
+			name: "Dependabot repo",
+			cli:  `cool_secret -b"a secret" --app Dependabot`,
+			wants: SetOptions{
+				SecretName:  "cool_secret",
+				Visibility:  shared.Private,
+				Body:        "a secret",
+				OrgName:     "",
+				Application: "Dependabot",
+			},
+		},
+		{
+			name: "Dependabot org",
+			cli:  "-ocoolOrg -bs -vselected -rcoolRepo cool_secret -aDependabot",
+			wants: SetOptions{
+				SecretName:      "cool_secret",
+				Visibility:      shared.Selected,
+				RepositoryNames: []string{"coolRepo"},
+				Body:            "s",
+				OrgName:         "coolOrg",
+				Application:     "Dependabot",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -181,46 +204,81 @@ func TestNewCmdSet(t *testing.T) {
 			assert.Equal(t, tt.wants.EnvName, gotOpts.EnvName)
 			assert.Equal(t, tt.wants.DoNotStore, gotOpts.DoNotStore)
 			assert.ElementsMatch(t, tt.wants.RepositoryNames, gotOpts.RepositoryNames)
+			assert.Equal(t, tt.wants.Application, gotOpts.Application)
 		})
 	}
 }
 
 func Test_setRun_repo(t *testing.T) {
-	reg := &httpmock.Registry{}
-
-	reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/secrets/public-key"),
-		httpmock.JSONResponse(PubKey{ID: "123", Key: "CDjXqf7AJBXWhMczcy+Fs7JlACEptgceysutztHaFQI="}))
-
-	reg.Register(httpmock.REST("PUT", "repos/owner/repo/actions/secrets/cool_secret"), httpmock.StatusStringResponse(201, `{}`))
-
-	io, _, _, _ := iostreams.Test()
-
-	opts := &SetOptions{
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
+	tests := []struct {
+		name    string
+		opts    *SetOptions
+		wantApp string
+	}{
+		{
+			name: "Actions",
+			opts: &SetOptions{
+				Application: "actions",
+			},
+			wantApp: "actions",
 		},
-		Config: func() (config.Config, error) { return config.NewBlankConfig(), nil },
-		BaseRepo: func() (ghrepo.Interface, error) {
-			return ghrepo.FromFullName("owner/repo")
+		{
+			name: "Dependabot",
+			opts: &SetOptions{
+				Application: "dependabot",
+			},
+			wantApp: "dependabot",
 		},
-		IO:             io,
-		SecretName:     "cool_secret",
-		Body:           "a secret",
-		RandomOverride: fakeRandom,
+		{
+			name: "defaults to Actions",
+			opts: &SetOptions{
+				Application: "",
+			},
+			wantApp: "actions",
+		},
 	}
 
-	err := setRun(opts)
-	assert.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
 
-	reg.Verify(t)
+			reg.Register(httpmock.REST("GET", fmt.Sprintf("repos/owner/repo/%s/secrets/public-key", tt.wantApp)),
+				httpmock.JSONResponse(PubKey{ID: "123", Key: "CDjXqf7AJBXWhMczcy+Fs7JlACEptgceysutztHaFQI="}))
 
-	data, err := ioutil.ReadAll(reg.Requests[1].Body)
-	assert.NoError(t, err)
-	var payload SecretPayload
-	err = json.Unmarshal(data, &payload)
-	assert.NoError(t, err)
-	assert.Equal(t, payload.KeyID, "123")
-	assert.Equal(t, payload.EncryptedValue, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=")
+			reg.Register(httpmock.REST("PUT", fmt.Sprintf("repos/owner/repo/%s/secrets/cool_secret", tt.wantApp)),
+				httpmock.StatusStringResponse(201, `{}`))
+
+			io, _, _, _ := iostreams.Test()
+
+			opts := &SetOptions{
+				HttpClient: func() (*http.Client, error) {
+					return &http.Client{Transport: reg}, nil
+				},
+				Config: func() (config.Config, error) { return config.NewBlankConfig(), nil },
+				BaseRepo: func() (ghrepo.Interface, error) {
+					return ghrepo.FromFullName("owner/repo")
+				},
+				IO:             io,
+				SecretName:     "cool_secret",
+				Body:           "a secret",
+				RandomOverride: fakeRandom,
+				Application:    tt.opts.Application,
+			}
+
+			err := setRun(opts)
+			assert.NoError(t, err)
+
+			reg.Verify(t)
+
+			data, err := ioutil.ReadAll(reg.Requests[1].Body)
+			assert.NoError(t, err)
+			var payload SecretPayload
+			err = json.Unmarshal(data, &payload)
+			assert.NoError(t, err)
+			assert.Equal(t, payload.KeyID, "123")
+			assert.Equal(t, payload.EncryptedValue, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=")
+		})
+	}
 }
 
 func Test_setRun_env(t *testing.T) {
@@ -268,6 +326,7 @@ func Test_setRun_org(t *testing.T) {
 		opts             *SetOptions
 		wantVisibility   shared.Visibility
 		wantRepositories []int64
+		wantApp          string
 	}{
 		{
 			name: "all vis",
@@ -275,6 +334,7 @@ func Test_setRun_org(t *testing.T) {
 				OrgName:    "UmbrellaCorporation",
 				Visibility: shared.All,
 			},
+			wantApp: "actions",
 		},
 		{
 			name: "selected visibility",
@@ -284,6 +344,16 @@ func Test_setRun_org(t *testing.T) {
 				RepositoryNames: []string{"birkin", "UmbrellaCorporation/wesker"},
 			},
 			wantRepositories: []int64{1, 2},
+			wantApp:          "actions",
+		},
+		{
+			name: "Dependabot",
+			opts: &SetOptions{
+				OrgName:     "UmbrellaCorporation",
+				Visibility:  shared.All,
+				Application: "dependabot",
+			},
+			wantApp: "dependabot",
 		},
 	}
 
@@ -294,11 +364,11 @@ func Test_setRun_org(t *testing.T) {
 			orgName := tt.opts.OrgName
 
 			reg.Register(httpmock.REST("GET",
-				fmt.Sprintf("orgs/%s/actions/secrets/public-key", orgName)),
+				fmt.Sprintf("orgs/%s/%s/secrets/public-key", orgName, tt.wantApp)),
 				httpmock.JSONResponse(PubKey{ID: "123", Key: "CDjXqf7AJBXWhMczcy+Fs7JlACEptgceysutztHaFQI="}))
 
 			reg.Register(httpmock.REST("PUT",
-				fmt.Sprintf("orgs/%s/actions/secrets/cool_secret", orgName)),
+				fmt.Sprintf("orgs/%s/%s/secrets/cool_secret", orgName, tt.wantApp)),
 				httpmock.StatusStringResponse(201, `{}`))
 
 			if len(tt.opts.RepositoryNames) > 0 {
@@ -321,6 +391,7 @@ func Test_setRun_org(t *testing.T) {
 			tt.opts.SecretName = "cool_secret"
 			tt.opts.Body = "a secret"
 			tt.opts.RandomOverride = fakeRandom
+			tt.opts.Application = tt.opts.Application
 
 			err := setRun(tt.opts)
 			assert.NoError(t, err)
