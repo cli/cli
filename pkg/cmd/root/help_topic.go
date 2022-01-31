@@ -11,7 +11,7 @@ var HelpTopics = map[string]map[string]string{
 		"short": "Information about using gh with MinTTY",
 		"long": heredoc.Doc(`
 			MinTTY is the terminal emulator that comes by default with Git
-			for Windows.  It has known issues with gh's ability to prompt a
+			for Windows. It has known issues with gh's ability to prompt a
 			user for input.
 
 			There are a few workarounds to make gh work with MinTTY:
