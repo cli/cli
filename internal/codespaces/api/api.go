@@ -32,6 +32,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -475,6 +476,84 @@ func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, loc
 	}
 
 	return response.Machines, nil
+}
+
+// RepoSearchParameters are the optional parameters for searching for repositories.
+type RepoSearchParameters struct {
+	// The maximum number of repos to return. At most 100 repos are returned even if this value is greater than 100.
+	MaxRepos int
+	// The sort order for returned repos. Possible values are 'stars', 'forks', 'help-wanted-issues', or 'updated'. If empty the API's default ordering is used.
+	Sort string
+}
+
+// GetCodespaceRepoSuggestions searches for and returns repo names based on the provided search text.
+func (a *API) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch string, parameters RepoSearchParameters) ([]string, error) {
+	reqURL := fmt.Sprintf("%s/search/repositories", a.githubAPI)
+	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	parts := strings.SplitN(partialSearch, "/", 2)
+
+	var nameSearch string
+	if len(parts) == 2 {
+		user := parts[0]
+		repo := parts[1]
+		nameSearch = fmt.Sprintf("%s user:%s", repo, user)
+	} else {
+		/*
+		 * This results in searching for the text within the owner or the name. It's possible to
+		 * do an owner search and then look up some repos for those owners, but that adds a
+		 * good amount of latency to the fetch which slows down showing the suggestions.
+		 */
+		nameSearch = partialSearch
+	}
+
+	queryStr := fmt.Sprintf("%s in:name", nameSearch)
+
+	q := req.URL.Query()
+	q.Add("q", queryStr)
+
+	if len(parameters.Sort) > 0 {
+		q.Add("sort", parameters.Sort)
+	}
+
+	if parameters.MaxRepos > 0 {
+		q.Add("per_page", strconv.Itoa(parameters.MaxRepos))
+	}
+
+	req.URL.RawQuery = q.Encode()
+
+	a.setHeaders(req)
+	resp, err := a.do(ctx, req, "/search/repositories/*")
+	if err != nil {
+		return nil, fmt.Errorf("error searching repositories: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, api.HandleHTTPError(resp)
+	}
+
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	var response struct {
+		Items []*Repository `json:"items"`
+	}
+	if err := json.Unmarshal(b, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %w", err)
+	}
+
+	repoNames := make([]string, len(response.Items))
+	for i, repo := range response.Items {
+		repoNames[i] = repo.FullName
+	}
+
+	return repoNames, nil
 }
 
 // CreateCodespaceParams are the required parameters for provisioning a Codespace.
