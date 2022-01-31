@@ -145,7 +145,7 @@ func mainRun() exitCode {
 				if errors.As(err, &execError) {
 					return exitCode(execError.ExitCode())
 				}
-				fmt.Fprintf(stderr, "failed to run external command: %s", err)
+				fmt.Fprintf(stderr, "failed to run external command: %s\n", err)
 				return exitError
 			}
 
