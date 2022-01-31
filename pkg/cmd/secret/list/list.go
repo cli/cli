@@ -122,6 +122,12 @@ func listRun(opts *ListOptions) error {
 		return fmt.Errorf("failed to get secrets: %w", err)
 	}
 
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+	}
+
 	tp := utils.NewTablePrinter(opts.IO)
 	for _, secret := range secrets {
 		tp.AddField(secret.Name, nil, nil)
