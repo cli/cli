@@ -195,6 +195,13 @@ echo "@community http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/ap
 apk add github-cli@community
 ```
 
+### Void Linux
+Void Linux users can install from the [official distribution repo](https://voidlinux.org/packages/?arch=x86_64&q=github-cli):
+
+```bash
+sudo xbps-install github-cli
+```
+
 [releases page]: https://github.com/cli/cli/releases/latest
 [arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli
 [arch linux aur]: https://aur.archlinux.org/packages/github-cli-git
