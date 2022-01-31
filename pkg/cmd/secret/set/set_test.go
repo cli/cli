@@ -391,7 +391,6 @@ func Test_setRun_org(t *testing.T) {
 			tt.opts.SecretName = "cool_secret"
 			tt.opts.Body = "a secret"
 			tt.opts.RandomOverride = fakeRandom
-			tt.opts.Application = tt.opts.Application
 
 			err := setRun(tt.opts)
 			assert.NoError(t, err)
