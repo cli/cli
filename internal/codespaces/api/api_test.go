@@ -168,8 +168,9 @@ func createFakeSearchReposServer(t *testing.T, wantSearchText string, wantSort s
 			responseRepos,
 		}
 
-		data, _ := json.Marshal(response)
-		w.Write(data)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			t.Error(err)
+		}
 	}))
 }
 
