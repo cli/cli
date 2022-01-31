@@ -2,11 +2,11 @@ package rename
 
 import (
 	"fmt"
-	"github.com/cli/cli/v2/api"
 	"net/http"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
