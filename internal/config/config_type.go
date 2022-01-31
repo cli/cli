@@ -55,7 +55,7 @@ var configOptions = []ConfigOption{
 	},
 	{
 		Key:          "http_unix_socket",
-		Description:  "the path to a unix socket through which to make HTTP connection",
+		Description:  "the path to a Unix socket through which to make an HTTP connection",
 		DefaultValue: "",
 	},
 	{
