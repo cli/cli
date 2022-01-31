@@ -3,7 +3,6 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,7 +12,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -384,11 +382,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 		_, err = io.Copy(opts.IO.Out, responseBody)
 	}
 	if err != nil {
-		if errors.Is(err, syscall.EPIPE) {
-			err = nil
-		} else {
-			return
-		}
+		return
 	}
 
 	if serverError == "" && resp.StatusCode > 299 {

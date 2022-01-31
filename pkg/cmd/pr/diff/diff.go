@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"syscall"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -112,9 +111,6 @@ func diffRun(opts *DiffOptions) error {
 
 	if !opts.UseColor {
 		_, err = io.Copy(opts.IO.Out, diff)
-		if errors.Is(err, syscall.EPIPE) {
-			return nil
-		}
 		return err
 	}
 

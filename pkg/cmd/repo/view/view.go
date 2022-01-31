@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"syscall"
 	"text/template"
 
 	"github.com/MakeNowJust/heredoc"
@@ -213,12 +212,7 @@ func viewRun(opts *ViewOptions) error {
 		View:        cs.Gray(fmt.Sprintf("View this repository on GitHub: %s", openURL)),
 	}
 
-	err = tmpl.Execute(stdout, repoData)
-	if err != nil && !errors.Is(err, syscall.EPIPE) {
-		return err
-	}
-
-	return nil
+	return tmpl.Execute(stdout, repoData)
 }
 
 func isMarkdownFile(filename string) bool {
