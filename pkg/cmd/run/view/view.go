@@ -230,6 +230,12 @@ func runView(opts *ViewOptions) error {
 		}
 	}
 
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+	}
+
 	if opts.Exporter != nil {
 		return opts.Exporter.Write(opts.IO, run)
 	}
@@ -276,7 +282,7 @@ func runView(opts *ViewOptions) error {
 
 		attachRunLog(runLogZip, jobs)
 
-		return displayRunLog(opts.IO, jobs, opts.LogFailed)
+		return displayRunLog(opts.IO.Out, jobs, opts.LogFailed)
 	}
 
 	prNumber := ""
@@ -502,13 +508,7 @@ func attachRunLog(rlz *zip.ReadCloser, jobs []shared.Job) {
 	}
 }
 
-func displayRunLog(io *iostreams.IOStreams, jobs []shared.Job, failed bool) error {
-	err := io.StartPager()
-	if err != nil {
-		return err
-	}
-	defer io.StopPager()
-
+func displayRunLog(w io.Writer, jobs []shared.Job, failed bool) error {
 	for _, job := range jobs {
 		steps := job.Steps
 		sort.Sort(steps)
@@ -526,7 +526,7 @@ func displayRunLog(io *iostreams.IOStreams, jobs []shared.Job, failed bool) erro
 			}
 			scanner := bufio.NewScanner(f)
 			for scanner.Scan() {
-				fmt.Fprintf(io.Out, "%s%s\n", prefix, scanner.Text())
+				fmt.Fprintf(w, "%s%s\n", prefix, scanner.Text())
 			}
 			f.Close()
 		}

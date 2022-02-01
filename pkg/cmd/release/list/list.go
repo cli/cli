@@ -63,6 +63,12 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+	}
+
 	now := time.Now()
 	table := utils.NewTablePrinter(opts.IO)
 	iofmt := opts.IO.ColorScheme()

@@ -279,11 +279,11 @@ func apiRun(opts *ApiOptions) error {
 	if opts.Silent {
 		opts.IO.Out = ioutil.Discard
 	} else {
-		err := opts.IO.StartPager()
-		if err != nil {
-			return err
+		if err := opts.IO.StartPager(); err == nil {
+			defer opts.IO.StopPager()
+		} else {
+			fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 		}
-		defer opts.IO.StopPager()
 	}
 
 	cfg, err := opts.Config()
