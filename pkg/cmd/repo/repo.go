@@ -7,6 +7,8 @@ import (
 	repoCreateCmd "github.com/cli/cli/v2/pkg/cmd/repo/create"
 	creditsCmd "github.com/cli/cli/v2/pkg/cmd/repo/credits"
 	repoDeleteCmd "github.com/cli/cli/v2/pkg/cmd/repo/delete"
+	deployKeyCmd "github.com/cli/cli/v2/pkg/cmd/repo/deploy-key"
+	repoEditCmd "github.com/cli/cli/v2/pkg/cmd/repo/edit"
 	repoForkCmd "github.com/cli/cli/v2/pkg/cmd/repo/fork"
 	gardenCmd "github.com/cli/cli/v2/pkg/cmd/repo/garden"
 	repoListCmd "github.com/cli/cli/v2/pkg/cmd/repo/list"
@@ -21,7 +23,7 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "repo <command>",
 		Short: "Create, clone, fork, and view repositories",
-		Long:  `Work with GitHub repositories`,
+		Long:  `Work with GitHub repositories.`,
 		Example: heredoc.Doc(`
 			$ gh repo create
 			$ gh repo clone cli/cli
@@ -41,10 +43,12 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(repoForkCmd.NewCmdFork(f, nil))
 	cmd.AddCommand(repoCloneCmd.NewCmdClone(f, nil))
 	cmd.AddCommand(repoCreateCmd.NewCmdCreate(f, nil))
+	cmd.AddCommand(repoEditCmd.NewCmdEdit(f, nil))
 	cmd.AddCommand(repoListCmd.NewCmdList(f, nil))
 	cmd.AddCommand(repoSyncCmd.NewCmdSync(f, nil))
 	cmd.AddCommand(creditsCmd.NewCmdRepoCredits(f, nil))
 	cmd.AddCommand(gardenCmd.NewCmdGarden(f, nil))
+	cmd.AddCommand(deployKeyCmd.NewCmdDeployKey(f))
 	cmd.AddCommand(repoRenameCmd.NewCmdRename(f, nil))
 	cmd.AddCommand(repoDeleteCmd.NewCmdDelete(f, nil))
 	cmd.AddCommand(repoArchiveCmd.NewCmdArchive(f, nil))

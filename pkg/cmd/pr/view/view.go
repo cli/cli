@@ -109,12 +109,11 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	opts.IO.DetectTerminalTheme()
-
-	err = opts.IO.StartPager()
-	if err != nil {
-		return err
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
-	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
 		return opts.Exporter.Write(opts.IO, pr)
@@ -215,8 +214,7 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 	if pr.Body == "" {
 		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
 	} else {
-		style := markdown.GetStyle(opts.IO.TerminalTheme())
-		md, err = markdown.Render(pr.Body, style)
+		md, err = markdown.Render(pr.Body, markdown.WithIO(opts.IO))
 		if err != nil {
 			return err
 		}

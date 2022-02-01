@@ -26,7 +26,7 @@ type RefreshOptions struct {
 
 	Hostname string
 	Scopes   []string
-	AuthFlow func(config.Config, *iostreams.IOStreams, string, []string) error
+	AuthFlow func(config.Config, *iostreams.IOStreams, string, []string, bool) error
 
 	Interactive bool
 }
@@ -35,8 +35,8 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 	opts := &RefreshOptions{
 		IO:     f.IOStreams,
 		Config: f.Config,
-		AuthFlow: func(cfg config.Config, io *iostreams.IOStreams, hostname string, scopes []string) error {
-			_, err := authflow.AuthFlowWithConfig(cfg, io, hostname, "", scopes)
+		AuthFlow: func(cfg config.Config, io *iostreams.IOStreams, hostname string, scopes []string, interactive bool) error {
+			_, err := authflow.AuthFlowWithConfig(cfg, io, hostname, "", scopes, interactive)
 			return err
 		},
 		httpClient: http.DefaultClient,
@@ -46,7 +46,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 		Use:   "refresh",
 		Args:  cobra.ExactArgs(0),
 		Short: "Refresh stored authentication credentials",
-		Long: heredoc.Doc(`Expand or fix the permission scopes for stored credentials
+		Long: heredoc.Doc(`Expand or fix the permission scopes for stored credentials.
 
 			The --scopes flag accepts a comma separated list of scopes you want your gh credentials to have. If
 			absent, this command ensures that gh has access to a minimum set of scopes.
@@ -146,7 +146,7 @@ func refreshRun(opts *RefreshOptions) error {
 	credentialFlow := &shared.GitCredentialFlow{
 		Executable: opts.MainExecutable,
 	}
-	gitProtocol, _ := cfg.Get(hostname, "git_protocol")
+	gitProtocol, _ := cfg.GetOrDefault(hostname, "git_protocol")
 	if opts.Interactive && gitProtocol == "https" {
 		if err := credentialFlow.Prompt(hostname); err != nil {
 			return err
@@ -154,9 +154,12 @@ func refreshRun(opts *RefreshOptions) error {
 		additionalScopes = append(additionalScopes, credentialFlow.Scopes()...)
 	}
 
-	if err := opts.AuthFlow(cfg, opts.IO, hostname, append(opts.Scopes, additionalScopes...)); err != nil {
+	if err := opts.AuthFlow(cfg, opts.IO, hostname, append(opts.Scopes, additionalScopes...), opts.Interactive); err != nil {
 		return err
 	}
+
+	cs := opts.IO.ColorScheme()
+	fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
 
 	if credentialFlow.ShouldSetup() {
 		username, _ := cfg.Get(hostname, "user")

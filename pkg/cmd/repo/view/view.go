@@ -142,10 +142,11 @@ func viewRun(opts *ViewOptions) error {
 	}
 
 	opts.IO.DetectTerminalTheme()
-	if err := opts.IO.StartPager(); err != nil {
-		return err
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
-	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
 		return opts.Exporter.Write(opts.IO, repo)
@@ -187,8 +188,7 @@ func viewRun(opts *ViewOptions) error {
 		readmeContent = cs.Gray("This repository does not have a README")
 	} else if isMarkdownFile(readme.Filename) {
 		var err error
-		style := markdown.GetStyle(opts.IO.TerminalTheme())
-		readmeContent, err = markdown.RenderWithBaseURL(readme.Content, style, readme.BaseURL)
+		readmeContent, err = markdown.Render(readme.Content, markdown.WithIO(opts.IO), markdown.WithBaseURL(readme.BaseURL))
 		if err != nil {
 			return fmt.Errorf("error rendering markdown: %w", err)
 		}

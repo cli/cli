@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -21,9 +20,8 @@ import (
 // correctly if your command names have `-` in them. If you have `cmd` with two
 // subcmds, `sub` and `sub-third`, and `sub` has a subcommand called `third`
 // it is undefined which help output will be in the file `cmd-sub-third.1`.
-func GenManTree(cmd *cobra.Command, header *GenManHeader, dir string) error {
+func GenManTree(cmd *cobra.Command, dir string) error {
 	return GenManTreeFromOpts(cmd, GenManTreeOptions{
-		Header:           header,
 		Path:             dir,
 		CommandSeparator: "-",
 	})
@@ -32,10 +30,6 @@ func GenManTree(cmd *cobra.Command, header *GenManHeader, dir string) error {
 // GenManTreeFromOpts generates a man page for the command and all descendants.
 // The pages are written to the opts.Path directory.
 func GenManTreeFromOpts(cmd *cobra.Command, opts GenManTreeOptions) error {
-	header := opts.Header
-	if header == nil {
-		header = &GenManHeader{}
-	}
 	for _, c := range cmd.Commands() {
 		if !c.IsAvailableCommand() || c.IsAdditionalHelpTopicCommand() {
 			continue
@@ -44,11 +38,8 @@ func GenManTreeFromOpts(cmd *cobra.Command, opts GenManTreeOptions) error {
 			return err
 		}
 	}
-	section := "1"
-	if header.Section != "" {
-		section = header.Section
-	}
 
+	section := "1"
 	separator := "_"
 	if opts.CommandSeparator != "" {
 		separator = opts.CommandSeparator
@@ -61,14 +52,21 @@ func GenManTreeFromOpts(cmd *cobra.Command, opts GenManTreeOptions) error {
 	}
 	defer f.Close()
 
-	headerCopy := *header
-	return GenMan(cmd, &headerCopy, f)
+	var versionString string
+	if v := os.Getenv("GH_VERSION"); v != "" {
+		versionString = "GitHub CLI " + v
+	}
+
+	return GenMan(cmd, &GenManHeader{
+		Section: section,
+		Source:  versionString,
+		Manual:  "GitHub CLI manual",
+	}, f)
 }
 
 // GenManTreeOptions is the options for generating the man pages.
 // Used only in GenManTreeFromOpts.
 type GenManTreeOptions struct {
-	Header           *GenManHeader
 	Path             string
 	CommandSeparator string
 }
@@ -80,7 +78,6 @@ type GenManHeader struct {
 	Title   string
 	Section string
 	Date    *time.Time
-	date    string
 	Source  string
 	Manual  string
 }
@@ -88,9 +85,6 @@ type GenManHeader struct {
 // GenMan will generate a man page for the given command and write it to
 // w. The header argument may be nil, however obviously w may not.
 func GenMan(cmd *cobra.Command, header *GenManHeader, w io.Writer) error {
-	if header == nil {
-		header = &GenManHeader{}
-	}
 	if err := fillHeader(header, cmd.CommandPath()); err != nil {
 		return err
 	}
@@ -119,57 +113,40 @@ func fillHeader(header *GenManHeader, name string) error {
 		}
 		header.Date = &now
 	}
-	header.date = (*header.Date).Format("Jan 2006")
 	return nil
 }
 
 func manPreamble(buf *bytes.Buffer, header *GenManHeader, cmd *cobra.Command, dashedName string) {
-	description := cmd.Long
-	if len(description) == 0 {
-		description = cmd.Short
-	}
-
 	buf.WriteString(fmt.Sprintf(`%% "%s" "%s" "%s" "%s" "%s"
 # NAME
-`, header.Title, header.Section, header.date, header.Source, header.Manual))
+`, header.Title, header.Section, header.Date.Format("Jan 2006"), header.Source, header.Manual))
 	buf.WriteString(fmt.Sprintf("%s \\- %s\n\n", dashedName, cmd.Short))
 	buf.WriteString("# SYNOPSIS\n")
+	buf.WriteString(fmt.Sprintf("`%s`\n\n", cmd.UseLine()))
 
-	// "<>" is rendered as HTML in md
-	synopsis := cmd.UseLine()
-	escAngle := strings.Replace(synopsis, "<", "\\<", -1)
-	escAngle = strings.Replace(escAngle, ">", "\\>", -1)
-	buf.WriteString(fmt.Sprintf("**%s**\n\n", escAngle))
-
-	buf.WriteString("# DESCRIPTION\n")
-	buf.WriteString(description + "\n\n")
+	if cmd.Long != "" && cmd.Long != cmd.Short {
+		buf.WriteString("# DESCRIPTION\n")
+		buf.WriteString(cmd.Long + "\n\n")
+	}
 }
 
 func manPrintFlags(buf *bytes.Buffer, flags *pflag.FlagSet) {
 	flags.VisitAll(func(flag *pflag.Flag) {
-		if len(flag.Deprecated) > 0 || flag.Hidden {
+		if len(flag.Deprecated) > 0 || flag.Hidden || flag.Name == "help" {
 			return
 		}
-		format := ""
+		varname, usage := pflag.UnquoteUsage(flag)
 		if len(flag.Shorthand) > 0 && len(flag.ShorthandDeprecated) == 0 {
-			format = fmt.Sprintf("**-%s**, **--%s**", flag.Shorthand, flag.Name)
+			buf.WriteString(fmt.Sprintf("`-%s`, `--%s`", flag.Shorthand, flag.Name))
 		} else {
-			format = fmt.Sprintf("**--%s**", flag.Name)
+			buf.WriteString(fmt.Sprintf("`--%s`", flag.Name))
 		}
-		if len(flag.NoOptDefVal) > 0 {
-			format += "["
-		}
-		if flag.Value.Type() == "string" {
-			// put quotes on the value
-			format += "=%q"
+		if varname == "" {
+			buf.WriteString("\n")
 		} else {
-			format += "=%s"
+			buf.WriteString(fmt.Sprintf(" `<%s>`\n", varname))
 		}
-		if len(flag.NoOptDefVal) > 0 {
-			format += "]"
-		}
-		format += "\n\t%s\n\n"
-		buf.WriteString(fmt.Sprintf(format, flag.DefValue, flag.Usage))
+		buf.WriteString(fmt.Sprintf(":   %s\n\n", usage))
 	})
 }
 
@@ -181,7 +158,7 @@ func manPrintOptions(buf *bytes.Buffer, command *cobra.Command) {
 		buf.WriteString("\n")
 	}
 	flags = command.InheritedFlags()
-	if flags.HasAvailableFlags() {
+	if hasNonHelpFlags(flags) {
 		buf.WriteString("# OPTIONS INHERITED FROM PARENT COMMANDS\n")
 		manPrintFlags(buf, flags)
 		buf.WriteString("\n")
@@ -198,52 +175,28 @@ func genMan(cmd *cobra.Command, header *GenManHeader) []byte {
 	buf := new(bytes.Buffer)
 
 	manPreamble(buf, header, cmd, dashCommandName)
+	for _, g := range subcommandGroups(cmd) {
+		if len(g.Commands) == 0 {
+			continue
+		}
+		fmt.Fprintf(buf, "# %s\n", strings.ToUpper(g.Name))
+		for _, subcmd := range g.Commands {
+			fmt.Fprintf(buf, "`%s`\n:   %s\n\n", manLink(subcmd), subcmd.Short)
+		}
+	}
 	manPrintOptions(buf, cmd)
 	if len(cmd.Example) > 0 {
 		buf.WriteString("# EXAMPLE\n")
 		buf.WriteString(fmt.Sprintf("```\n%s\n```\n", cmd.Example))
 	}
-	if hasSeeAlso(cmd) {
+	if cmd.HasParent() {
 		buf.WriteString("# SEE ALSO\n")
-		seealsos := make([]string, 0)
-		if cmd.HasParent() {
-			parentPath := cmd.Parent().CommandPath()
-			dashParentPath := strings.Replace(parentPath, " ", "-", -1)
-			seealso := fmt.Sprintf("**%s(%s)**", dashParentPath, header.Section)
-			seealsos = append(seealsos, seealso)
-		}
-		children := cmd.Commands()
-		sort.Sort(byName(children))
-		for _, c := range children {
-			if !c.IsAvailableCommand() || c.IsAdditionalHelpTopicCommand() {
-				continue
-			}
-			seealso := fmt.Sprintf("**%s-%s(%s)**", dashCommandName, c.Name(), header.Section)
-			seealsos = append(seealsos, seealso)
-		}
-		buf.WriteString(strings.Join(seealsos, ", ") + "\n")
+		buf.WriteString(fmt.Sprintf("`%s`\n", manLink(cmd.Parent())))
 	}
 	return buf.Bytes()
 }
 
-// Test to see if we have a reason to print See Also information in docs
-// Basically this is a test for a parent command or a subcommand which is
-// both not deprecated and not the autogenerated help command.
-func hasSeeAlso(cmd *cobra.Command) bool {
-	if cmd.HasParent() {
-		return true
-	}
-	for _, c := range cmd.Commands() {
-		if !c.IsAvailableCommand() || c.IsAdditionalHelpTopicCommand() {
-			continue
-		}
-		return true
-	}
-	return false
+func manLink(cmd *cobra.Command) string {
+	p := cmd.CommandPath()
+	return fmt.Sprintf("%s(%d)", strings.Replace(p, " ", "-", -1), 1)
 }
-
-type byName []*cobra.Command
-
-func (s byName) Len() int           { return len(s) }
-func (s byName) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s byName) Less(i, j int) bool { return s[i].Name() < s[j].Name() }

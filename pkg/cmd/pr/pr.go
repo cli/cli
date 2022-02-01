@@ -24,7 +24,7 @@ func NewCmdPR(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pr <command>",
 		Short: "Manage pull requests",
-		Long:  "Work with GitHub pull requests",
+		Long:  "Work with GitHub pull requests.",
 		Example: heredoc.Doc(`
 			$ gh pr checkout 353
 			$ gh pr create --fill

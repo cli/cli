@@ -143,6 +143,7 @@ func TestNewCmdBrowse(t *testing.T) {
 			assert.Equal(t, tt.wants.WikiFlag, opts.WikiFlag)
 			assert.Equal(t, tt.wants.NoBrowserFlag, opts.NoBrowserFlag)
 			assert.Equal(t, tt.wants.SettingsFlag, opts.SettingsFlag)
+			assert.Equal(t, tt.wants.CommitFlag, opts.CommitFlag)
 		})
 	}
 }
@@ -154,6 +155,12 @@ func setGitDir(t *testing.T, dir string) {
 	t.Cleanup(func() {
 		os.Setenv("GIT_DIR", old_GIT_DIR)
 	})
+}
+
+type testGitClient struct{}
+
+func (gc *testGitClient) LastCommit() (*git.Commit, error) {
+	return &git.Commit{Sha: "6f1a2405cace1633d89a79c74c65f22fe78f9659"}, nil
 }
 
 func Test_runBrowse(t *testing.T) {
@@ -354,6 +361,7 @@ func Test_runBrowse(t *testing.T) {
 			name: "open last commit",
 			opts: BrowseOptions{
 				CommitFlag: true,
+				GitClient:  &testGitClient{},
 			},
 			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
 			wantsErr:    false,
@@ -364,6 +372,7 @@ func Test_runBrowse(t *testing.T) {
 			opts: BrowseOptions{
 				CommitFlag:  true,
 				SelectorArg: "main.go",
+				GitClient:   &testGitClient{},
 			},
 			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
 			wantsErr:    false,

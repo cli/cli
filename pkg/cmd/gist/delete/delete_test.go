@@ -10,7 +10,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -61,7 +60,6 @@ func Test_deleteRun(t *testing.T) {
 		opts       *DeleteOptions
 		gist       *shared.Gist
 		httpStubs  func(*httpmock.Registry)
-		askStubs   func(*prompt.AskStubber)
 		nontty     bool
 		wantErr    bool
 		wantStderr string
@@ -84,7 +82,7 @@ func Test_deleteRun(t *testing.T) {
 				Owner: &shared.GistOwner{Login: "octocat2"},
 			},
 			wantErr:    true,
-			wantStderr: "You do not own this gist.",
+			wantStderr: "you do not own this gist",
 		}, {
 			name: "successfully delete",
 			gist: &shared.Gist{
@@ -120,12 +118,6 @@ func Test_deleteRun(t *testing.T) {
 
 		if tt.httpStubs != nil {
 			tt.httpStubs(reg)
-		}
-
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
 		}
 
 		if tt.opts == nil {

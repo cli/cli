@@ -85,7 +85,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 	if err != nil {
 		return err
 	}
-	protocol, _ := cfg.Get(baseRepo.RepoHost(), "git_protocol")
+	protocol, _ := cfg.GetOrDefault(baseRepo.RepoHost(), "git_protocol")
 
 	remotes, err := opts.Remotes()
 	if err != nil {

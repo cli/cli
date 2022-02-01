@@ -104,11 +104,11 @@ func diffRun(opts *DiffOptions) error {
 	}
 	defer diff.Close()
 
-	err = opts.IO.StartPager()
-	if err != nil {
-		return err
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
-	defer opts.IO.StopPager()
 
 	if !opts.UseColor {
 		_, err = io.Copy(opts.IO.Out, diff)

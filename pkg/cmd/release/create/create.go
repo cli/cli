@@ -234,7 +234,7 @@ func createRun(opts *CreateOptions) error {
 			return err
 		}
 
-		if opts.RepoOverride == "" && generatedNotes == nil {
+		if opts.RepoOverride == "" {
 			headRef := opts.TagName
 			tagDescription, _ = gitTagInfo(opts.TagName)
 			if tagDescription == "" {
@@ -245,9 +245,11 @@ func createRun(opts *CreateOptions) error {
 					headRef = "HEAD"
 				}
 			}
-			if prevTag, err := detectPreviousTag(headRef); err == nil {
-				commits, _ := changelogForRange(fmt.Sprintf("%s..%s", prevTag, headRef))
-				generatedChangelog = generateChangelog(commits)
+			if generatedNotes == nil {
+				if prevTag, err := detectPreviousTag(headRef); err == nil {
+					commits, _ := changelogForRange(fmt.Sprintf("%s..%s", prevTag, headRef))
+					generatedChangelog = generateChangelog(commits)
+				}
 			}
 		}
 
