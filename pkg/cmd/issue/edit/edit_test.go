@@ -300,6 +300,12 @@ func Test_editRun(t *testing.T) {
 				mockRepoMetadata(t, reg)
 				mockIssueUpdate(t, reg)
 				mockIssueUpdateLabels(t, reg)
+				reg.Register(
+					httpmock.GraphQL(`mutation AssigneeAdd\b`),
+					httpmock.StringResponse(`{}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation AssigneeRemove\b`),
+					httpmock.StringResponse(`{}`))
 			},
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
 		},
@@ -381,6 +387,7 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
 		{ "data": { "repository": { "assignableUsers": {
 			"nodes": [
 				{ "login": "hubot", "id": "HUBOTID" },
+				{ "login": "octocat", "id": "OCTOCATID" },
 				{ "login": "MonaLisa", "id": "MONAID" }
 			],
 			"pageInfo": { "hasNextPage": false }

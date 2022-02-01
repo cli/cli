@@ -358,6 +358,12 @@ func Test_editRun(t *testing.T) {
 				mockPullRequestUpdate(t, reg)
 				mockPullRequestReviewersUpdate(t, reg)
 				mockPullRequestUpdateLabels(t, reg)
+				reg.Register(
+					httpmock.GraphQL(`mutation AssigneeAdd\b`),
+					httpmock.StringResponse(`{}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation AssigneeRemove\b`),
+					httpmock.StringResponse(`{}`))
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -408,6 +414,12 @@ func Test_editRun(t *testing.T) {
 				mockRepoMetadata(t, reg, true)
 				mockPullRequestUpdate(t, reg)
 				mockPullRequestUpdateLabels(t, reg)
+				reg.Register(
+					httpmock.GraphQL(`mutation AssigneeAdd\b`),
+					httpmock.StringResponse(`{}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation AssigneeRemove\b`),
+					httpmock.StringResponse(`{}`))
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -480,6 +492,7 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry, skipReviewers bool) 
 		{ "data": { "repository": { "assignableUsers": {
 			"nodes": [
 				{ "login": "hubot", "id": "HUBOTID" },
+				{ "login": "octocat", "id": "OCTOCATID" },
 				{ "login": "MonaLisa", "id": "MONAID" }
 			],
 			"pageInfo": { "hasNextPage": false }
