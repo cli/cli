@@ -32,9 +32,11 @@ type ChecksOptions struct {
 }
 
 func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Command {
+	var interval int
 	opts := &ChecksOptions{
-		IO:      f.IOStreams,
-		Browser: f.Browser,
+		IO:       f.IOStreams,
+		Browser:  f.Browser,
+		Interval: defaultInterval,
 	}
 
 	cmd := &cobra.Command{
@@ -54,8 +56,17 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("argument required when using the `--repo` flag")
 			}
 
-			if !opts.Watch && cmd.Flags().Changed("interval") {
+			intervalChanged := cmd.Flags().Changed("interval")
+			if !opts.Watch && intervalChanged {
 				return cmdutil.FlagErrorf("cannot use `--interval` flag without `--watch` flag")
+			}
+
+			if intervalChanged {
+				var err error
+				opts.Interval, err = time.ParseDuration(fmt.Sprintf("%ds", interval))
+				if err != nil {
+					return cmdutil.FlagErrorf("could not parse `--interval` flag: %w", err)
+				}
 			}
 
 			if len(args) > 0 {
@@ -72,7 +83,7 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to show details about checks")
 	cmd.Flags().BoolVarP(&opts.Watch, "watch", "", false, "Watch checks until they finish")
-	cmd.Flags().DurationVarP(&opts.Interval, "interval", "i", defaultInterval, "Refresh interval in seconds when using `--watch` flag")
+	cmd.Flags().IntVarP(&interval, "interval", "i", 10, "Refresh interval in seconds when using `--watch` flag")
 
 	return cmd
 }
