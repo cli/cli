@@ -31,6 +31,9 @@ type LoginOptions struct {
 	Scopes   []string
 	Token    string
 	Web      bool
+	UseGH    bool
+	UseHTTPS bool
+	UseSSH   bool
 }
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
@@ -111,6 +114,9 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes for gh to have")
 	cmd.Flags().BoolVar(&tokenStdin, "with-token", false, "Read token from standard input")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a browser to authenticate")
+	cmd.Flags().BoolVar(&opts.UseGH, "use-gh", false, "Use GitHub.com (don't ask about GitHub Enterprise Server).")
+	cmd.Flags().BoolVar(&opts.UseHTTPS, "use-https", false, "Use HTTPS when connecting with git.")
+	cmd.Flags().BoolVar(&opts.UseSSH, "use-ssh", false, "Use SSH when connecting with git.")
 
 	return cmd
 }
@@ -122,7 +128,7 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	hostname := opts.Hostname
-	if opts.Interactive && hostname == "" {
+	if opts.Interactive && hostname == "" && !opts.UseGH {
 		var err error
 		hostname, err = promptForHostname()
 		if err != nil {
@@ -186,6 +192,8 @@ func loginRun(opts *LoginOptions) error {
 		Web:         opts.Web,
 		Scopes:      opts.Scopes,
 		Executable:  opts.MainExecutable,
+		UseHTTPS:    opts.UseHTTPS,
+		UseSSH:      opts.UseSSH,
 	})
 }
 

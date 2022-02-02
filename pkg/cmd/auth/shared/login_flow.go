@@ -29,6 +29,8 @@ type LoginOptions struct {
 	Web         bool
 	Scopes      []string
 	Executable  string
+	UseHTTPS    bool
+	UseSSH      bool
 
 	sshContext sshContext
 }
@@ -40,7 +42,11 @@ func Login(opts *LoginOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	var gitProtocol string
-	if opts.Interactive {
+	if opts.UseHTTS {
+		gitProtocol = "https"
+	} else if opts.UseSSH {
+		gitProtocol = "ssh"
+	} else if opts.Interactive {
 		var proto string
 		err := prompt.SurveyAskOne(&survey.Select{
 			Message: "What is your preferred protocol for Git operations?",
@@ -119,11 +125,15 @@ func Login(opts *LoginOptions) error {
 		var err error
 		authToken, err = authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", append(opts.Scopes, additionalScopes...), opts.Interactive)
 		if err != nil {
-			return fmt.Errorf("failed to authenticate via web browser: %w", err)
+			fmt.Fprintf(opts.IO.ErrOut, "failed to authenticate via web browser: %w\n", err)
+			fmt.Fprintf(opts.IO.ErrOut, "Falling back to \"Paste an authentication token\".")
+			authMode = 1
+		} else {
+			fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
+			userValidated = true
 		}
-		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
-		userValidated = true
-	} else {
+	}
+	if authMode == 1 {
 		minimumScopes := append([]string{"repo", "read:org"}, additionalScopes...)
 		fmt.Fprint(opts.IO.ErrOut, heredoc.Docf(`
 			Tip: you can generate a Personal Access Token here https://%s/settings/tokens
