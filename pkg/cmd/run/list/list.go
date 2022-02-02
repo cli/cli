@@ -107,6 +107,12 @@ func listRun(opts *ListOptions) error {
 		return fmt.Errorf("failed to get runs: %w", err)
 	}
 
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+	}
+
 	if opts.Exporter != nil {
 		return opts.Exporter.Write(opts.IO, runs)
 	}

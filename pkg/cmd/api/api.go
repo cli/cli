@@ -279,11 +279,11 @@ func apiRun(opts *ApiOptions) error {
 	if opts.Silent {
 		opts.IO.Out = ioutil.Discard
 	} else {
-		err := opts.IO.StartPager()
-		if err != nil {
-			return err
+		if err := opts.IO.StartPager(); err == nil {
+			defer opts.IO.StopPager()
+		} else {
+			fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 		}
-		defer opts.IO.StopPager()
 	}
 
 	cfg, err := opts.Config()
@@ -366,13 +366,13 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 		responseBody = io.TeeReader(responseBody, bodyCopy)
 	}
 
-	if opts.FilterOutput != "" {
+	if opts.FilterOutput != "" && serverError == "" {
 		// TODO: reuse parsed query across pagination invocations
 		err = export.FilterJSON(opts.IO.Out, responseBody, opts.FilterOutput)
 		if err != nil {
 			return
 		}
-	} else if opts.Template != "" {
+	} else if opts.Template != "" && serverError == "" {
 		// TODO: reuse parsed template across pagination invocations
 		err = template.Execute(responseBody)
 		if err != nil {
