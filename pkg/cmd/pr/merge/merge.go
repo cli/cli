@@ -334,7 +334,7 @@ func mergeRun(opts *MergeOptions) error {
 
 			err := pullLatestChanges(opts, baseRepo, branchToSwitchTo)
 			if err != nil {
-				fmt.Fprintf(opts.IO.ErrOut, "%s warning: not posible to fast-forward to: %q\n", cs.WarningIcon(), branchToSwitchTo)
+				fmt.Fprintf(opts.IO.ErrOut, "%s warning: not possible to fast-forward to: %q\n", cs.WarningIcon(), branchToSwitchTo)
 			}
 		}
 
