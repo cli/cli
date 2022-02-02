@@ -2,6 +2,8 @@ package checks
 
 import (
 	"fmt"
+	"io"
+	"runtime"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -113,6 +115,12 @@ func checksRun(opts *ChecksOptions) error {
 		return checksRunWebMode(opts)
 	}
 
+	if opts.Watch {
+		if err := opts.IO.EnableVirtualTerminalProcessing(); err != nil {
+			return err
+		}
+	}
+
 	var checks []check
 	var counts checkCounts
 
@@ -131,6 +139,12 @@ func checksRun(opts *ChecksOptions) error {
 			return err
 		}
 
+		if counts.Pending != 0 && opts.Watch {
+			refreshScreen(opts.IO.Out)
+			cs := opts.IO.ColorScheme()
+			fmt.Fprintln(opts.IO.Out, cs.Boldf("Refreshing checks status every %v seconds. Press Ctrl+C to quit.\n", opts.Interval.Seconds()))
+		}
+
 		printSummary(opts.IO, counts)
 		err = printTable(opts.IO, checks)
 		if err != nil {
@@ -142,12 +156,6 @@ func checksRun(opts *ChecksOptions) error {
 		}
 
 		time.Sleep(opts.Interval)
-
-		if err := opts.IO.EnableVirtualTerminalProcessing(); err == nil {
-			// ANSI escape code to clean terminal window
-			// https://stackoverflow.com/a/22892171
-			fmt.Print(opts.IO.Out, "\033[H\033[2J")
-		}
 	}
 
 	if counts.Failed+counts.Pending > 0 {
@@ -155,4 +163,16 @@ func checksRun(opts *ChecksOptions) error {
 	}
 
 	return nil
+}
+
+func refreshScreen(w io.Writer) {
+	if runtime.GOOS == "windows" {
+		// Just clear whole screen; I wasn't able to get the nicer cursor movement thing working
+		fmt.Fprintf(w, "\x1b[2J")
+	} else {
+		// Move cursor to 0,0
+		fmt.Fprint(w, "\x1b[0;0H")
+		// Clear from cursor to bottom of screen
+		fmt.Fprint(w, "\x1b[J")
+	}
 }
