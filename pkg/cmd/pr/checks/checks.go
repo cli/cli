@@ -119,6 +119,13 @@ func checksRun(opts *ChecksOptions) error {
 		if err := opts.IO.EnableVirtualTerminalProcessing(); err != nil {
 			return err
 		}
+	} else {
+		// Only start pager in non-watch mode
+		if err := opts.IO.StartPager(); err == nil {
+			defer opts.IO.StopPager()
+		} else {
+			fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+		}
 	}
 
 	var checks []check
