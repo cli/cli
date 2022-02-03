@@ -692,6 +692,20 @@ func Test_createRun_interactive(t *testing.T) {
 			},
 			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 		},
+		{
+			name: "error when unpublished local tag",
+			opts: &CreateOptions{
+				TagName: "v1.2.3",
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "tagsha123\n")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/git/tags/tagsha123"),
+					httpmock.StatusStringResponse(404, `{}`))
+			},
+			wantErr: "tag v1.2.3 exists locally but has not been pushed to OWNER/REPO, please push it before continuing",
+		},
 	}
 	for _, tt := range tests {
 		ios, _, stdout, stderr := iostreams.Test()
@@ -741,7 +755,17 @@ func Test_createRun_interactive(t *testing.T) {
 			}
 
 			if tt.wantParams != nil {
-				bb, err := ioutil.ReadAll(reg.Requests[1].Body)
+				var r *http.Request
+				for _, req := range reg.Requests {
+					if req.URL.Path == "/repos/OWNER/REPO/releases" {
+						r = req
+						break
+					}
+				}
+				if r == nil {
+					t.Fatalf("no http requests for creating a release found")
+				}
+				bb, err := ioutil.ReadAll(r.Body)
 				assert.NoError(t, err)
 				var params map[string]interface{}
 				err = json.Unmarshal(bb, &params)
