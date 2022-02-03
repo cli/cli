@@ -42,7 +42,7 @@ func Login(opts *LoginOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	var gitProtocol string
-	if opts.UseHTTS {
+	if opts.UseHTTPS {
 		gitProtocol = "https"
 	} else if opts.UseSSH {
 		gitProtocol = "ssh"
@@ -125,7 +125,7 @@ func Login(opts *LoginOptions) error {
 		var err error
 		authToken, err = authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", append(opts.Scopes, additionalScopes...), opts.Interactive)
 		if err != nil {
-			fmt.Fprintf(opts.IO.ErrOut, "failed to authenticate via web browser: %w\n", err)
+			fmt.Fprintf(opts.IO.ErrOut, "failed to authenticate via web browser: %s\n", err)
 			fmt.Fprintf(opts.IO.ErrOut, "Falling back to \"Paste an authentication token\".")
 			authMode = 1
 		} else {
