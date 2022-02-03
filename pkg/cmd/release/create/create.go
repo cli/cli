@@ -179,14 +179,14 @@ func createRun(opts *CreateOptions) error {
 
 	var existingTag bool
 	if opts.TagName == "" {
-		remoteTags, err := getTags(httpClient, baseRepo, 5)
+		tags, err := getTags(httpClient, baseRepo, 5)
 		if err != nil {
 			return err
 		}
 
-		if len(remoteTags) != 0 {
-			options := make([]string, len(remoteTags))
-			for i, tag := range remoteTags {
+		if len(tags) != 0 {
+			options := make([]string, len(tags))
+			for i, tag := range tags {
 				options[i] = tag.Name
 			}
 			createNewTagOption := "Create a new tag"
@@ -218,13 +218,13 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
-	var localTagDescription string
+	var tagDescription string
 	if opts.RepoOverride == "" {
-		var localTagSHA string
-		localTagSHA, localTagDescription, _ = gitTagInfo(opts.TagName)
+		var tagSHA string
+		tagSHA, tagDescription, _ = gitTagInfo(opts.TagName)
 		// existingTag is a short cut to knowing that a tag already exists on the remote
-		if localTagSHA != "" && !existingTag {
-			remoteExists, err := remoteTagExists(httpClient, baseRepo, localTagSHA)
+		if tagSHA != "" && !existingTag {
+			remoteExists, err := remoteTagExists(httpClient, baseRepo, tagSHA)
 			if err != nil {
 				return err
 			}
@@ -256,7 +256,7 @@ func createRun(opts *CreateOptions) error {
 
 		if opts.RepoOverride == "" {
 			headRef := opts.TagName
-			if localTagDescription == "" {
+			if tagDescription == "" {
 				if opts.Target != "" {
 					// TODO: use the remote-tracking version of the branch ref
 					headRef = opts.Target
@@ -279,7 +279,7 @@ func createRun(opts *CreateOptions) error {
 		if generatedChangelog != "" {
 			editorOptions = append(editorOptions, "Write using commit log as template")
 		}
-		if localTagDescription != "" {
+		if tagDescription != "" {
 			editorOptions = append(editorOptions, "Write using git tag message as template")
 		}
 		editorOptions = append(editorOptions, "Leave blank")
@@ -323,7 +323,7 @@ func createRun(opts *CreateOptions) error {
 			editorContents = generatedChangelog
 		case "Write using git tag message as template":
 			openEditor = true
-			editorContents = localTagDescription
+			editorContents = tagDescription
 		case "Leave blank":
 			openEditor = false
 		default:
