@@ -673,6 +673,8 @@ func Test_createRun_interactive(t *testing.T) {
 				rs.Register(`git describe --tags --abbrev=0 v1\.2\.3\^`, 1, "")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/git/tags/tagsha123"),
+					httpmock.StatusStringResponse(200, `{}`))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
 					httpmock.StatusStringResponse(404, `{}`))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"),
@@ -683,11 +685,10 @@ func Test_createRun_interactive(t *testing.T) {
 					}`))
 			},
 			wantParams: map[string]interface{}{
-				"body":             "hello from annotated tag",
-				"draft":            false,
-				"prerelease":       false,
-				"tag_name":         "v1.2.3",
-				"target_commitish": "tagsha123",
+				"body":       "hello from annotated tag",
+				"draft":      false,
+				"prerelease": false,
+				"tag_name":   "v1.2.3",
 			},
 			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 		},

@@ -177,15 +177,16 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
+	var existingTag bool
 	if opts.TagName == "" {
-		tags, err := getTags(httpClient, baseRepo, 5)
+		remoteTags, err := getTags(httpClient, baseRepo, 5)
 		if err != nil {
 			return err
 		}
 
-		if len(tags) != 0 {
-			options := make([]string, len(tags))
-			for i, tag := range tags {
+		if len(remoteTags) != 0 {
+			options := make([]string, len(remoteTags))
+			for i, tag := range remoteTags {
 				options[i] = tag.Name
 			}
 			createNewTagOption := "Create a new tag"
@@ -201,6 +202,7 @@ func createRun(opts *CreateOptions) error {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
 			if tag != createNewTagOption {
+				existingTag = true
 				opts.TagName = tag
 			}
 		}
@@ -216,6 +218,22 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
+	var localTagDescription string
+	if opts.RepoOverride == "" {
+		var localTagSHA string
+		localTagSHA, localTagDescription, _ = gitTagInfo(opts.TagName)
+		// existingTag is a short cut to knowing that a tag already exists on the remote
+		if localTagSHA != "" && !existingTag {
+			remoteExists, err := remoteTagExists(httpClient, baseRepo, localTagSHA)
+			if err != nil {
+				return err
+			}
+			if !remoteExists {
+				return fmt.Errorf("tag %s exists locally but has not been pushed to %s, please push it before continuing", opts.TagName, ghrepo.FullName(baseRepo))
+			}
+		}
+	}
+
 	if !opts.BodyProvided && opts.IO.CanPrompt() {
 		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
 		if err != nil {
@@ -223,7 +241,6 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		var generatedNotes *releaseNotes
-		var tagDescription string
 		var generatedChangelog string
 
 		params := map[string]interface{}{
@@ -238,11 +255,8 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		if opts.RepoOverride == "" {
-			var tagSha string
 			headRef := opts.TagName
-			tagSha, tagDescription, _ = gitTagInfo(opts.TagName)
-
-			if tagDescription == "" {
+			if localTagDescription == "" {
 				if opts.Target != "" {
 					// TODO: use the remote-tracking version of the branch ref
 					headRef = opts.Target
@@ -250,19 +264,6 @@ func createRun(opts *CreateOptions) error {
 					headRef = "HEAD"
 				}
 			}
-
-			// Local tag exists and target not specified so use tag
-			// SHA as target. This prevents the scenario where the
-			// user has a local unpushed tag and then when creating a
-			// release the API creates a new tag with the same name
-			// pointing to the repos default branch. This is confusing
-			// when the local unpushed tag was pointing to a different SHA.
-			// This will ensure that when the remote tag gets created
-			// it points to the correct commit.
-			if opts.Target == "" && tagSha != "" {
-				opts.Target = tagSha
-			}
-
 			if generatedNotes == nil {
 				if prevTag, err := detectPreviousTag(headRef); err == nil {
 					commits, _ := changelogForRange(fmt.Sprintf("%s..%s", prevTag, headRef))
@@ -278,7 +279,7 @@ func createRun(opts *CreateOptions) error {
 		if generatedChangelog != "" {
 			editorOptions = append(editorOptions, "Write using commit log as template")
 		}
-		if tagDescription != "" {
+		if localTagDescription != "" {
 			editorOptions = append(editorOptions, "Write using git tag message as template")
 		}
 		editorOptions = append(editorOptions, "Leave blank")
@@ -322,7 +323,7 @@ func createRun(opts *CreateOptions) error {
 			editorContents = generatedChangelog
 		case "Write using git tag message as template":
 			openEditor = true
-			editorContents = tagDescription
+			editorContents = localTagDescription
 		case "Leave blank":
 			openEditor = false
 		default:
