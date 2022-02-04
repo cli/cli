@@ -43,6 +43,11 @@ func remoteTagExists(httpClient *http.Client, repo ghrepo.Interface, tagSHA stri
 	}
 	defer resp.Body.Close()
 
+	_, err = io.Copy(io.Discard, resp.Body)
+	if err != nil {
+		return false, err
+	}
+
 	return resp.StatusCode == 200, nil
 }
 

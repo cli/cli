@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -23,8 +22,6 @@ import (
 	"github.com/cli/cli/v2/pkg/text"
 	"github.com/spf13/cobra"
 )
-
-var newlineRE = regexp.MustCompile(`\r?\n`)
 
 type CreateOptions struct {
 	IO         *iostreams.IOStreams
@@ -222,8 +219,15 @@ func createRun(opts *CreateOptions) error {
 	if opts.RepoOverride == "" {
 		var tagSHA string
 		tagSHA, tagDescription, _ = gitTagInfo(opts.TagName)
-		// existingTag is a short cut to knowing that a tag already exists on the remote
-		if tagSHA != "" && !existingTag {
+		// If there is a local tag with the same name as specified
+		// the user may not want to create a new tag on the remote
+		// as the local one might be annotated or signed.
+		// If the user specifies the target take that as explict instruction
+		// to create the tag on the remote pointing to the target regardless
+		// of local tag status.
+		// If a remote tag with the same name as specified exists already
+		// then a new tag will not be created so ignore local tag status.
+		if tagSHA != "" && !existingTag && opts.Target == "" {
 			remoteExists, err := remoteTagExists(httpClient, baseRepo, tagSHA)
 			if err != nil {
 				return err
@@ -461,7 +465,7 @@ func gitTagInfo(tagName string) (string, string, error) {
 	if err != nil || len(b) == 0 {
 		return "", "", err
 	}
-	parts := newlineRE.Split(string(b), 2)
+	parts := strings.SplitN(string(b), "\n", 2)
 	return parts[0], parts[1], nil
 }
 

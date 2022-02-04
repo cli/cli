@@ -693,7 +693,7 @@ func Test_createRun_interactive(t *testing.T) {
 			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 		},
 		{
-			name: "error when unpublished local tag",
+			name: "error when unpublished local tag and target not specified",
 			opts: &CreateOptions{
 				TagName: "v1.2.3",
 			},
@@ -705,6 +705,43 @@ func Test_createRun_interactive(t *testing.T) {
 					httpmock.StatusStringResponse(404, `{}`))
 			},
 			wantErr: "tag v1.2.3 exists locally but has not been pushed to OWNER/REPO, please push it before continuing",
+		},
+		{
+			name: "create a release when unpublished local tag and target specified",
+			opts: &CreateOptions{
+				TagName: "v1.2.3",
+				Target:  "main",
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Title (optional)").AnswerWith("")
+				as.StubPrompt("Release notes").
+					AssertOptions([]string{"Write my own", "Write using generated notes as template", "Leave blank"}).
+					AnswerWith("Leave blank")
+				as.StubPrompt("Is this a prerelease?").AnswerWith(false)
+				as.StubPrompt("Submit?").AnswerWith("Publish release")
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "tagsha123\n")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
+					httpmock.StatusStringResponse(200, `{
+						"name": "generated name",
+						"body": "generated body"
+					}`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`))
+			},
+			wantParams: map[string]interface{}{
+				"draft":            false,
+				"prerelease":       false,
+				"tag_name":         "v1.2.3",
+				"target_commitish": "main",
+			},
+			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 		},
 	}
 	for _, tt := range tests {
