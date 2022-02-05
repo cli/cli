@@ -38,12 +38,6 @@ func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
 			return nil, remotesError
 		}
 
-		sshTranslate := rr.urlTranslator
-		if sshTranslate == nil {
-			sshTranslate = git.ParseSSHConfig().Translator()
-		}
-		resolvedRemotes := context.TranslateRemotes(gitRemotes, sshTranslate)
-
 		cfg, err := rr.getConfig()
 		if err != nil {
 			return nil, err
@@ -62,6 +56,12 @@ func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
 		hostsSet.AddValues(authedHosts)
 		hostsSet.AddValues([]string{defaultHost, ghinstance.Default()})
 		hosts := hostsSet.ToSlice()
+
+		sshTranslate := rr.urlTranslator
+		if sshTranslate == nil {
+			sshTranslate = git.ParseSSHConfig().Translator()
+		}
+		resolvedRemotes := context.TranslateRemotes(gitRemotes, sshTranslate, hosts)
 
 		// Sort remotes
 		sort.Sort(resolvedRemotes)

@@ -89,15 +89,34 @@ func (r Remote) RepoHost() string {
 	return r.Repo.RepoHost()
 }
 
+func isConfigured(hosts []string, url *url.URL) bool {
+	for _, host := range hosts {
+		if host == url.Host {
+			return true
+		}
+	}
+	return false
+}
+
 // TODO: accept an interface instead of git.RemoteSet
-func TranslateRemotes(gitRemotes git.RemoteSet, urlTranslate func(*url.URL) *url.URL) (remotes Remotes) {
+func TranslateRemotes(
+	gitRemotes git.RemoteSet, urlTranslate func(*url.URL) *url.URL, configuredHosts []string,
+) (remotes Remotes) {
+	// Translate a URL unless it's configured.
+	translator := func(u *url.URL) *url.URL {
+		if !isConfigured(configuredHosts, u) {
+			u = urlTranslate(u)
+		}
+		return u
+	}
+
 	for _, r := range gitRemotes {
 		var repo ghrepo.Interface
 		if r.FetchURL != nil {
-			repo, _ = ghrepo.FromURL(urlTranslate(r.FetchURL))
+			repo, _ = ghrepo.FromURL(translator(r.FetchURL))
 		}
 		if r.PushURL != nil && repo == nil {
-			repo, _ = ghrepo.FromURL(urlTranslate(r.PushURL))
+			repo, _ = ghrepo.FromURL(translator(r.PushURL))
 		}
 		if repo == nil {
 			continue
