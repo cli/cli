@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -163,9 +163,9 @@ func TestNewCmdCreate(t *testing.T) {
 
 func Test_createRun(t *testing.T) {
 	tempDir := t.TempDir()
-	fixtureFile := path.Join(tempDir, "fixture.txt")
+	fixtureFile := filepath.Join(tempDir, "fixture.txt")
 	assert.NoError(t, ioutil.WriteFile(fixtureFile, []byte("{}"), 0644))
-	emptyFile := path.Join(tempDir, "empty.txt")
+	emptyFile := filepath.Join(tempDir, "empty.txt")
 	assert.NoError(t, ioutil.WriteFile(emptyFile, []byte(" \t\n"), 0644))
 
 	tests := []struct {
