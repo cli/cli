@@ -73,11 +73,7 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 			stateColor = cs.Green
 		}
 
-		nameField := c.Name
-		if c.DisplayName != "" {
-			nameField = fmt.Sprintf("%s (%s)", nameField, c.DisplayName)
-		}
-		tp.AddField(nameField, nil, cs.Yellow)
+		tp.AddField(c.Name, nil, cs.Yellow)
 		tp.AddField(c.Repository.FullName, nil, nil)
 		tp.AddField(c.branchWithGitStatus(), nil, cs.Cyan)
 		tp.AddField(c.State, nil, stateColor)
