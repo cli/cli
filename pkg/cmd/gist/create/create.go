@@ -8,7 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"path"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -215,7 +215,7 @@ func processFiles(stdin io.ReadCloser, filenameOverride string, filenames []stri
 				return fs, fmt.Errorf("failed to read file %s: %w", f, err)
 			}
 
-			filename = path.Base(f)
+			filename = filepath.Base(f)
 		}
 
 		fs[filename] = &shared.GistFile{
