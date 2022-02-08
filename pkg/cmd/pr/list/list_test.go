@@ -229,6 +229,53 @@ func TestPRList_filteringDraft(t *testing.T) {
 	}
 }
 
+func TestPRList_filteringAuthor(t *testing.T) {
+	tests := []struct {
+		name          string
+		cli           string
+		expectedQuery string
+	}{
+		{
+			name:          "author @me",
+			cli:           `--author "@me"`,
+			expectedQuery: `repo:OWNER/REPO is:pr is:open author:@me`,
+		},
+		{
+			name:          "author user",
+			cli:           `--author "monalisa"`,
+			expectedQuery: `repo:OWNER/REPO is:pr is:open author:monalisa`,
+		},
+		{
+			name:          "app author",
+			cli:           `--author "app/dependabot"`,
+			expectedQuery: `repo:OWNER/REPO is:pr is:open author:app/dependabot`,
+		},
+		{
+			name:          "app author with app option",
+			cli:           `--app "dependabot"`,
+			expectedQuery: `repo:OWNER/REPO is:pr is:open author:app/dependabot`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			http := initFakeHTTP()
+			defer http.Verify(t)
+
+			http.Register(
+				httpmock.GraphQL(`query PullRequestSearch\b`),
+				httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
+					assert.Equal(t, test.expectedQuery, params["q"].(string))
+				}))
+
+			_, err := runCommand(http, true, test.cli)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestPRList_withInvalidLimitFlag(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)

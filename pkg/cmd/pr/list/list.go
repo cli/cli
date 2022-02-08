@@ -36,6 +36,7 @@ type ListOptions struct {
 	HeadBranch string
 	Labels     []string
 	Author     string
+	App        string
 	Assignee   string
 	Search     string
 	Draft      string
@@ -68,6 +69,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 			Open the list of PRs in a web browser
 			$ gh pr list --web
+
+			List PRs authored by a GitHub App
+			$ gh pr list --app "dependabot"
     	`),
 		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -99,6 +103,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.HeadBranch, "head", "H", "", "Filter by head branch")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by labels")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
+	cmd.Flags().StringVar(&opts.App, "app", "", "Filter by GitHub App author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
 	cmd.Flags().BoolVarP(&draft, "draft", "d", false, "Filter by draft state")
@@ -161,6 +166,14 @@ func listRun(opts *ListOptions) error {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
 		return opts.Browser.Browse(openURL)
+	}
+
+	if opts.App != "" {
+		if filters.Author != "" {
+			return fmt.Errorf("--app can't be specified when --author is specified")
+		}
+
+		filters.Author = fmt.Sprintf("app/%s", opts.App)
 	}
 
 	listResult, err := listPullRequests(httpClient, baseRepo, filters, opts.LimitResults)
