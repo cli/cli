@@ -5,7 +5,7 @@ go 1.16
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.2
 	github.com/MakeNowJust/heredoc v1.0.0
-	github.com/briandowns/spinner v1.18.0
+	github.com/briandowns/spinner v1.18.1
 	github.com/charmbracelet/glamour v0.4.0
 	github.com/cli/browser v1.1.0
 	github.com/cli/oauth v0.9.0
