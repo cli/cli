@@ -250,7 +250,7 @@ type codespace struct {
 }
 
 // displayName returns the repository nwo and branch.
-// If includeName is true, the name of the codespace is included.
+// If includeName is true, the name of the codespace (including displayName) is included.
 // If includeGitStatus is true, the branch will include a star if
 // the codespace has unsaved changes.
 func (c codespace) displayName(includeName, includeGitStatus bool) string {
@@ -260,11 +260,18 @@ func (c codespace) displayName(includeName, includeGitStatus bool) string {
 	}
 
 	if includeName {
+		var displayName = c.Name
+		if c.DisplayName != "" {
+			displayName = c.DisplayName
+		}
 		return fmt.Sprintf(
-			"%s: %s [%s]", c.Repository.FullName, branch, c.Name,
+			"%s: %s (%s)", c.Repository.FullName, displayName, branch,
 		)
 	}
-	return c.Repository.FullName + ": " + branch
+	return fmt.Sprintf(
+		"%s: %s", c.Repository.FullName, branch,
+	)
+
 }
 
 // gitStatusDirty represents an unsaved changes status.
