@@ -83,6 +83,14 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				opts.Draft = strconv.FormatBool(draft)
 			}
 
+			if err := cmdutil.MutuallyExclusive(
+				"specify only `--author` or `--app`",
+				opts.Author != "",
+				opts.AppAuthor != "",
+			); err != nil {
+				return err
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -166,10 +174,6 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if opts.AppAuthor != "" {
-		if filters.Author != "" {
-			return fmt.Errorf("--app can't be specified when --author is specified")
-		}
-
 		filters.Author = fmt.Sprintf("app/%s", opts.AppAuthor)
 	}
 
