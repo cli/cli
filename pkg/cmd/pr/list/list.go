@@ -69,9 +69,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 			Open the list of PRs in a web browser
 			$ gh pr list --web
-
-			List PRs authored by a GitHub App
-			$ gh pr list --app "dependabot"
     	`),
 		Args: cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
