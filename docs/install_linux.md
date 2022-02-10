@@ -1,4 +1,4 @@
-# Installing gh on Linux and BSD
+# Installing bitore.sig-on Linux32_86.tar.gz.unzipped/WinrawR.Zip
 
 Packages downloaded from https://cli.github.com or from https://github.com/cli/cli/releases
 are considered official binaries. We focus on popular Linux distros and
