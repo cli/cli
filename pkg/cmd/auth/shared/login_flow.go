@@ -29,8 +29,7 @@ type LoginOptions struct {
 	Web         bool
 	Scopes      []string
 	Executable  string
-	UseHTTPS    bool
-	UseSSH      bool
+	GitProtocol string
 
 	sshContext sshContext
 }
@@ -42,23 +41,27 @@ func Login(opts *LoginOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	var gitProtocol string
-	if opts.UseHTTPS {
+	if opts.GitProtocol == "https" {
 		gitProtocol = "https"
-	} else if opts.UseSSH {
+	} else if opts.GitProtocol == "ssh" {
 		gitProtocol = "ssh"
-	} else if opts.Interactive {
-		var proto string
-		err := prompt.SurveyAskOne(&survey.Select{
-			Message: "What is your preferred protocol for Git operations?",
-			Options: []string{
-				"HTTPS",
-				"SSH",
-			},
-		}, &proto)
-		if err != nil {
-			return fmt.Errorf("could not prompt: %w", err)
+	} else if opts.GitProtocol == "" {
+		if opts.Interactive {
+			var proto string
+			err := prompt.SurveyAskOne(&survey.Select{
+				Message: "What is your preferred protocol for Git operations?",
+				Options: []string{
+					"HTTPS",
+					"SSH",
+				},
+			}, &proto)
+			if err != nil {
+				return fmt.Errorf("could not prompt: %w", err)
+			}
+			gitProtocol = strings.ToLower(proto)
 		}
-		gitProtocol = strings.ToLower(proto)
+	} else {
+		return fmt.Errorf("Unsupported --git-protocol option: %s", opts.GitProtocol)
 	}
 
 	var additionalScopes []string

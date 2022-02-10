@@ -27,13 +27,11 @@ type LoginOptions struct {
 
 	Interactive bool
 
-	Hostname string
-	Scopes   []string
-	Token    string
-	Web      bool
-	UseGH    bool
-	UseHTTPS bool
-	UseSSH   bool
+	Hostname    string
+	Scopes      []string
+	Token       string
+	Web         bool
+	GitProtocol string
 }
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
@@ -69,6 +67,9 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 
 			# authenticate with a specific GitHub Enterprise Server instance
 			$ gh auth login --hostname enterprise.internal
+
+      # authenticate to the public github.com server
+      $ gh auth login --hostname github.com
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if tokenStdin && opts.Web {
@@ -114,9 +115,8 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes for gh to have")
 	cmd.Flags().BoolVar(&tokenStdin, "with-token", false, "Read token from standard input")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a browser to authenticate")
-	cmd.Flags().BoolVar(&opts.UseGH, "use-gh", false, "Use GitHub.com (don't ask about GitHub Enterprise Server)")
-	cmd.Flags().BoolVar(&opts.UseHTTPS, "use-https", false, "Use HTTPS when connecting with git")
-	cmd.Flags().BoolVar(&opts.UseSSH, "use-ssh", false, "Use SSH when connecting with git")
+	cmd.Flags().StringVarP(&opts.GitProtocol, "git-protocol", "p", "",
+		"Select the protocol git should use (options: ssh, https)")
 
 	return cmd
 }
@@ -128,7 +128,7 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	hostname := opts.Hostname
-	if opts.Interactive && hostname == "" && !opts.UseGH {
+	if opts.Interactive && hostname == "" {
 		var err error
 		hostname, err = promptForHostname()
 		if err != nil {
@@ -192,8 +192,7 @@ func loginRun(opts *LoginOptions) error {
 		Web:         opts.Web,
 		Scopes:      opts.Scopes,
 		Executable:  opts.MainExecutable,
-		UseHTTPS:    opts.UseHTTPS,
-		UseSSH:      opts.UseSSH,
+		GitProtocol: opts.GitProtocol,
 	})
 }
 
