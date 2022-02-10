@@ -68,8 +68,8 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			# authenticate with a specific GitHub Enterprise Server instance
 			$ gh auth login --hostname enterprise.internal
 
-      # authenticate to the public github.com server
-      $ gh auth login --hostname github.com
+			# authenticate with the public GitHub server instance
+			$ gh auth login --hostname github.com
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if tokenStdin && opts.Web {
