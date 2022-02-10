@@ -128,15 +128,11 @@ func Login(opts *LoginOptions) error {
 		var err error
 		authToken, err = authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", append(opts.Scopes, additionalScopes...), opts.Interactive)
 		if err != nil {
-			fmt.Fprintf(opts.IO.ErrOut, "failed to authenticate via web browser: %s\n", err)
-			fmt.Fprintf(opts.IO.ErrOut, "Falling back to \"Paste an authentication token\".")
-			authMode = 1
-		} else {
-			fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
-			userValidated = true
-		}
-	}
-	if authMode == 1 {
+      return fmt.Errorf("failed to authenticate via web browser: %w", err)
+    }
+		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
+		userValidated = true
+	} else {
 		minimumScopes := append([]string{"repo", "read:org"}, additionalScopes...)
 		fmt.Fprint(opts.IO.ErrOut, heredoc.Docf(`
 			Tip: you can generate a Personal Access Token here https://%s/settings/tokens
