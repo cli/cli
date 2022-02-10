@@ -50,6 +50,23 @@ func TestNewCmdRerun(t *testing.T) {
 				RunID: "1234",
 			},
 		},
+		{
+			name: "failed arg nontty",
+			cli:  "4321 --failed",
+			wants: RerunOptions{
+				RunID:      "4321",
+				OnlyFailed: true,
+			},
+		},
+		{
+			name: "failed arg",
+			tty:  true,
+			cli:  "--failed",
+			wants: RerunOptions{
+				Prompt:     true,
+				OnlyFailed: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -116,6 +133,23 @@ func TestRerun(t *testing.T) {
 					httpmock.StringResponse("{}"))
 			},
 			wantOut: "✓ Requested rerun of run 1234\n",
+		},
+		{
+			name: "arg including onlyFailed",
+			tty:  true,
+			opts: &RerunOptions{
+				RunID:      "1234",
+				OnlyFailed: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/1234/rerun-failed-jobs"),
+					httpmock.StringResponse("{}"))
+			},
+			wantOut: "✓ Requested rerun (failed jobs) of run 1234\n",
 		},
 		{
 			name: "prompt",

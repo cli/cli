@@ -18,7 +18,8 @@ type RerunOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	RunID string
+	RunID      string
+	OnlyFailed bool
 
 	Prompt bool
 }
@@ -51,6 +52,8 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 			return runRerun(opts)
 		},
 	}
+
+	cmd.Flags().BoolVar(&opts.OnlyFailed, "failed", false, "Rerun only failed jobs")
 
 	return cmd
 }
@@ -98,7 +101,12 @@ func runRerun(opts *RerunOptions) error {
 		return fmt.Errorf("failed to get run: %w", err)
 	}
 
-	path := fmt.Sprintf("repos/%s/actions/runs/%d/rerun", ghrepo.FullName(repo), run.ID)
+	runVerb := "rerun"
+	if opts.OnlyFailed {
+		runVerb = "rerun-failed-jobs"
+	}
+
+	path := fmt.Sprintf("repos/%s/actions/runs/%d/%s", ghrepo.FullName(repo), run.ID, runVerb)
 
 	err = client.REST(repo.RepoHost(), "POST", path, nil, nil)
 	if err != nil {
@@ -111,8 +119,13 @@ func runRerun(opts *RerunOptions) error {
 
 	if opts.IO.CanPrompt() {
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.Out, "%s Requested rerun of run %s\n",
+		onlyFailedMsg := ""
+		if opts.OnlyFailed {
+			onlyFailedMsg = "(failed jobs) "
+		}
+		fmt.Fprintf(opts.IO.Out, "%s Requested rerun %sof run %s\n",
 			cs.SuccessIcon(),
+			onlyFailedMsg,
 			cs.Cyanf("%d", run.ID))
 	}
 
