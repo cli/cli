@@ -217,8 +217,7 @@ func createRun(opts *CreateOptions) error {
 
 	var tagDescription string
 	if opts.RepoOverride == "" {
-		var tagSHA string
-		tagSHA, tagDescription, _ = gitTagInfo(opts.TagName)
+		tagDescription, _ = gitTagInfo(opts.TagName)
 		// If there is a local tag with the same name as specified
 		// the user may not want to create a new tag on the remote
 		// as the local one might be annotated or signed.
@@ -227,13 +226,14 @@ func createRun(opts *CreateOptions) error {
 		// of local tag status.
 		// If a remote tag with the same name as specified exists already
 		// then a new tag will not be created so ignore local tag status.
-		if tagSHA != "" && !existingTag && opts.Target == "" {
-			remoteExists, err := remoteTagExists(httpClient, baseRepo, tagSHA)
+		if tagDescription != "" && !existingTag && opts.Target == "" {
+			remoteExists, err := remoteTagExists(httpClient, baseRepo, opts.TagName)
 			if err != nil {
 				return err
 			}
 			if !remoteExists {
-				return fmt.Errorf("tag %s exists locally but has not been pushed to %s, please push it before continuing", opts.TagName, ghrepo.FullName(baseRepo))
+				return fmt.Errorf("tag %s exists locally but has not been pushed to %s, please push it before continuing or specify the `--target` flag to create a new tag",
+					opts.TagName, ghrepo.FullName(baseRepo))
 			}
 		}
 	}
@@ -456,17 +456,13 @@ func createRun(opts *CreateOptions) error {
 	return nil
 }
 
-func gitTagInfo(tagName string) (string, string, error) {
-	cmd, err := git.GitCommand("tag", "--list", tagName, "--format=%(objectname)%0a%(contents:subject)%0a%0a%(contents:body)")
+func gitTagInfo(tagName string) (string, error) {
+	cmd, err := git.GitCommand("tag", "--list", tagName, "--format=%(contents:subject)%0a%0a%(contents:body)")
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
 	b, err := run.PrepareCmd(cmd).Output()
-	if err != nil || len(b) == 0 {
-		return "", "", err
-	}
-	parts := strings.SplitN(string(b), "\n", 2)
-	return parts[0], parts[1], nil
+	return string(b), err
 }
 
 func detectPreviousTag(headRef string) (string, error) {

@@ -26,29 +26,9 @@ type releaseNotes struct {
 
 var notImplementedError = errors.New("not implemented")
 
-func remoteTagExists(httpClient *http.Client, repo ghrepo.Interface, tagSHA string) (bool, error) {
-	path := fmt.Sprintf("repos/%s/%s/git/tags/%s", repo.RepoOwner(), repo.RepoName(), tagSHA)
-	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return false, err
-	}
-
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return false, err
-	}
-	defer resp.Body.Close()
-
-	_, err = io.Copy(io.Discard, resp.Body)
-	if err != nil {
-		return false, err
-	}
-
-	return resp.StatusCode == 200, nil
+func remoteTagExists(httpClient *http.Client, repo ghrepo.Interface, tag string) (bool, error) {
+	qualifiedTagName := fmt.Sprintf("refs/tags/%s", tag)
+	return api.RepoTagExists(httpClient, repo, qualifiedTagName)
 }
 
 func getTags(httpClient *http.Client, repo ghrepo.Interface, limit int) ([]tag, error) {

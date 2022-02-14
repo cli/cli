@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"io"
 	"net/http"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/cli/cli/v2/internal/ghinstance"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
@@ -1197,4 +1198,25 @@ func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, 
 		URL:       responsev3.HTMLUrl,
 		IsPrivate: responsev3.Private,
 	}, nil
+}
+
+func RepoTagExists(httpClient *http.Client, repo ghrepo.Interface, tagName string) (bool, error) {
+	var query struct {
+		Repository struct {
+			Ref struct {
+				ID string
+			} `graphql:"ref(qualifiedName: $tagName)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":   githubv4.String(repo.RepoOwner()),
+		"name":    githubv4.String(repo.RepoName()),
+		"tagName": githubv4.String(tagName),
+	}
+
+	gql := graphQLClient(httpClient, repo.RepoHost())
+	err := gql.QueryNamed(context.Background(), "RepositoryFindTag", &query, variables)
+
+	return query.Repository.Ref.ID != "", err
 }

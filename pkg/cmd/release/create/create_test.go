@@ -669,12 +669,12 @@ func Test_createRun_interactive(t *testing.T) {
 				as.StubPrompt("Submit?").AnswerWith("Publish release")
 			},
 			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "tagsha123\nhello from annotated tag")
+				rs.Register(`git tag --list`, 0, "hello from annotated tag")
 				rs.Register(`git describe --tags --abbrev=0 v1\.2\.3\^`, 1, "")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/git/tags/tagsha123"),
-					httpmock.StatusStringResponse(200, `{}`))
+				reg.Register(httpmock.GraphQL("RepositoryFindTag"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": "tag id"}}}}`))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
 					httpmock.StatusStringResponse(404, `{}`))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"),
@@ -698,13 +698,13 @@ func Test_createRun_interactive(t *testing.T) {
 				TagName: "v1.2.3",
 			},
 			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "tagsha123\n")
+				rs.Register(`git tag --list`, 0, "tag exists")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/git/tags/tagsha123"),
-					httpmock.StatusStringResponse(404, `{}`))
+				reg.Register(httpmock.GraphQL("RepositoryFindTag"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": ""}}}}`))
 			},
-			wantErr: "tag v1.2.3 exists locally but has not been pushed to OWNER/REPO, please push it before continuing",
+			wantErr: "tag v1.2.3 exists locally but has not been pushed to OWNER/REPO, please push it before continuing or specify the `--target` flag to create a new tag",
 		},
 		{
 			name: "create a release when unpublished local tag and target specified",
@@ -715,13 +715,13 @@ func Test_createRun_interactive(t *testing.T) {
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubPrompt("Title (optional)").AnswerWith("")
 				as.StubPrompt("Release notes").
-					AssertOptions([]string{"Write my own", "Write using generated notes as template", "Leave blank"}).
+					AssertOptions([]string{"Write my own", "Write using generated notes as template", "Write using git tag message as template", "Leave blank"}).
 					AnswerWith("Leave blank")
 				as.StubPrompt("Is this a prerelease?").AnswerWith(false)
 				as.StubPrompt("Submit?").AnswerWith("Publish release")
 			},
 			runStubs: func(rs *run.CommandStubber) {
-				rs.Register(`git tag --list`, 0, "tagsha123\n")
+				rs.Register(`git tag --list`, 0, "tag exists")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
