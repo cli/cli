@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
@@ -253,6 +255,15 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 	for _, port := range ports {
 		a.StartProgressIndicatorWithLabel(fmt.Sprintf("Updating port %d visibility to: %s", port.number, port.visibility))
 		err := session.UpdateSharedServerPrivacy(ctx, port.number, port.visibility)
+
+		// wait for succeed or failure
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+
+		if err := a.waitForPortUpdate(ctx, session, port.number); err != nil {
+			return fmt.Errorf("error waiting for port update: %w", err)
+		}
+
 		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error update port to public: %w", err)
@@ -260,6 +271,48 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 	}
 
 	return nil
+}
+
+type portChangeKind string
+
+const (
+	portChangeKindUpdate portChangeKind = "update"
+)
+
+type portData struct {
+	Port        int            `json:"port"`
+	ChangeKind  portChangeKind `json:"changeKind"`
+	ErrorDetail string         `json:"errorDetail"`
+	StatusCode  int            `json:"statusCode"`
+}
+
+func (a *App) waitForPortUpdate(ctx context.Context, session *liveshare.Session, port int) error {
+	success := session.WaitForEvent("sharingSucceeded")
+	failure := session.WaitForEvent("sharingFailed")
+
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timeout waiting for server sharing to succeed or fail")
+		case b := <-success:
+			if err := json.Unmarshal(b, &portData); err != nil {
+				return fmt.Errorf("error unmarshaling port data: %w", err)
+			}
+			if portData.Port == port && portData.ChangeKind == portChangeKindUpdate {
+				return nil
+			}
+		case b := <-failure:
+			if err := json.Unmarshal(b, &portData); err != nil {
+				return fmt.Errorf("error unmarshaling port data: %w", err)
+			}
+			if portData.Port == port && portData.ChangeKind == portChangeKindUpdate {
+				if portData.StatusCode == http.StatusForbidden {
+					return errors.New("organization admin has forbidden this privacy setting")
+				}
+				return errors.New(portData.ErrorDetail)
+			}
+		}
+	}
 }
 
 type portVisibility struct {

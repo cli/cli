@@ -78,6 +78,10 @@ func (s *Session) UpdateSharedServerPrivacy(ctx context.Context, port int, visib
 	return nil
 }
 
+func (s *Session) WaitForEvent(eventName string) chan []byte {
+	return s.rpc.registerEventHandler(eventName)
+}
+
 // StartsSSHServer starts an SSH server in the container, installing sshd if necessary,
 // and returns the port on which it listens and the user name clients should provide.
 func (s *Session) StartSSHServer(ctx context.Context) (int, string, error) {

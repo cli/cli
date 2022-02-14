@@ -97,6 +97,9 @@ func (fwd *PortForwarder) shareRemotePort(ctx context.Context) (channelID, error
 	if err != nil {
 		err = fmt.Errorf("failed to share remote port %d: %w", fwd.remotePort, err)
 	}
+
+	// wait for port change kind start
+
 	return id, err
 }
 
