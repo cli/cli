@@ -31,7 +31,7 @@ jobs:
         run: |
           cert="$(mktemp -t cert.XXX)"
           base64 -d <<<"$CERT_CONTENTS" > "$cert"
-          printf "::set-env name=CERT_FILE::%s\n" "$cert"
+          echo "CERT_FILE=$cert" >> $GITHUB_ENV
         env:
           CERT_CONTENTS: ${{ secrets.WINDOWS_CERT_PFX }}
       - name: Run GoReleaser
