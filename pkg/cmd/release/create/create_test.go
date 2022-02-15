@@ -673,6 +673,8 @@ func Test_createRun_interactive(t *testing.T) {
 				rs.Register(`git describe --tags --abbrev=0 v1\.2\.3\^`, 1, "")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.GraphQL("RepositoryFindRef"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": "tag id"}}}}`))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
 					httpmock.StatusStringResponse(404, `{}`))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"),
@@ -687,6 +689,57 @@ func Test_createRun_interactive(t *testing.T) {
 				"draft":      false,
 				"prerelease": false,
 				"tag_name":   "v1.2.3",
+			},
+			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+		},
+		{
+			name: "error when unpublished local tag and target not specified",
+			opts: &CreateOptions{
+				TagName: "v1.2.3",
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "tag exists")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.GraphQL("RepositoryFindRef"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": ""}}}}`))
+			},
+			wantErr: "tag v1.2.3 exists locally but has not been pushed to OWNER/REPO, please push it before continuing or specify the `--target` flag to create a new tag",
+		},
+		{
+			name: "create a release when unpublished local tag and target specified",
+			opts: &CreateOptions{
+				TagName: "v1.2.3",
+				Target:  "main",
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Title (optional)").AnswerWith("")
+				as.StubPrompt("Release notes").
+					AssertOptions([]string{"Write my own", "Write using generated notes as template", "Write using git tag message as template", "Leave blank"}).
+					AnswerWith("Leave blank")
+				as.StubPrompt("Is this a prerelease?").AnswerWith(false)
+				as.StubPrompt("Submit?").AnswerWith("Publish release")
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "tag exists")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
+					httpmock.StatusStringResponse(200, `{
+						"name": "generated name",
+						"body": "generated body"
+					}`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`))
+			},
+			wantParams: map[string]interface{}{
+				"draft":            false,
+				"prerelease":       false,
+				"tag_name":         "v1.2.3",
+				"target_commitish": "main",
 			},
 			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 		},
@@ -739,7 +792,17 @@ func Test_createRun_interactive(t *testing.T) {
 			}
 
 			if tt.wantParams != nil {
-				bb, err := ioutil.ReadAll(reg.Requests[1].Body)
+				var r *http.Request
+				for _, req := range reg.Requests {
+					if req.URL.Path == "/repos/OWNER/REPO/releases" {
+						r = req
+						break
+					}
+				}
+				if r == nil {
+					t.Fatalf("no http requests for creating a release found")
+				}
+				bb, err := ioutil.ReadAll(r.Body)
 				assert.NoError(t, err)
 				var params map[string]interface{}
 				err = json.Unmarshal(bb, &params)

@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"io"
 	"net/http"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/cli/cli/v2/internal/ghinstance"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
