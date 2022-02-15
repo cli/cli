@@ -134,7 +134,12 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 	return &newRelease, err
 }
 
-func publishRelease(httpClient *http.Client, releaseURL string, params map[string]interface{}) (*shared.Release, error) {
+func publishRelease(httpClient *http.Client, releaseURL string, discussionCategory string) (*shared.Release, error) {
+	params := map[string]interface{}{"draft": false}
+	if discussionCategory != "" {
+		params["discussion_category_name"] = discussionCategory
+	}
+
 	bodyBytes, err := json.Marshal(params)
 	if err != nil {
 		return nil, err

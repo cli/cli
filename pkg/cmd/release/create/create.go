@@ -364,13 +364,6 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
-	if opts.Draft && len(opts.DiscussionCategory) > 0 {
-		return fmt.Errorf(
-			"%s Discussions not supported with draft releases",
-			opts.IO.ColorScheme().FailureIcon(),
-		)
-	}
-
 	params := map[string]interface{}{
 		"tag_name":   opts.TagName,
 		"draft":      opts.Draft,
@@ -418,12 +411,7 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		if !opts.Draft {
-			params := map[string]interface{}{}
-			params["draft"] = false
-			if opts.DiscussionCategory != "" {
-				params["discussion_category_name"] = opts.DiscussionCategory
-			}
-			rel, err := publishRelease(httpClient, newRelease.APIURL, params)
+			rel, err := publishRelease(httpClient, newRelease.APIURL, opts.DiscussionCategory)
 			if err != nil {
 				return err
 			}
