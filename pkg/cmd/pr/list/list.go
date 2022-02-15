@@ -36,6 +36,7 @@ type ListOptions struct {
 	HeadBranch string
 	Labels     []string
 	Author     string
+	AppAuthor  string
 	Assignee   string
 	Search     string
 	Draft      string
@@ -82,6 +83,14 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				opts.Draft = strconv.FormatBool(draft)
 			}
 
+			if err := cmdutil.MutuallyExclusive(
+				"specify only `--author` or `--app`",
+				opts.Author != "",
+				opts.AppAuthor != "",
+			); err != nil {
+				return err
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -99,6 +108,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.HeadBranch, "head", "H", "", "Filter by head branch")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by labels")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
+	cmd.Flags().StringVar(&opts.AppAuthor, "app", "", "Filter by GitHub App author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
 	cmd.Flags().BoolVarP(&draft, "draft", "d", false, "Filter by draft state")
@@ -161,6 +171,10 @@ func listRun(opts *ListOptions) error {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
 		return opts.Browser.Browse(openURL)
+	}
+
+	if opts.AppAuthor != "" {
+		filters.Author = fmt.Sprintf("app/%s", opts.AppAuthor)
 	}
 
 	listResult, err := listPullRequests(httpClient, baseRepo, filters, opts.LimitResults)
