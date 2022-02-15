@@ -128,8 +128,7 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	theme := opts.IO.DetectTerminalTheme()
-	markdownStyle := markdown.GetStyle(theme)
+	opts.IO.DetectTerminalTheme()
 	if err := opts.IO.StartPager(); err != nil {
 		fmt.Fprintf(opts.IO.ErrOut, "starting pager failed: %v\n", err)
 	}
@@ -145,7 +144,7 @@ func viewRun(opts *ViewOptions) error {
 		}
 
 		if strings.Contains(gf.Type, "markdown") && !opts.Raw {
-			rendered, err := markdown.Render(gf.Content, markdownStyle)
+			rendered, err := markdown.Render(gf.Content, markdown.WithIO(opts.IO))
 			if err != nil {
 				return err
 			}

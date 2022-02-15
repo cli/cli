@@ -135,6 +135,7 @@ func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
 	vscsURL := os.Getenv("INTERNAL_VSCS_TARGET_URL")
 	app := codespaceCmd.NewApp(
 		f.IOStreams,
+		f,
 		codespacesAPI.New(
 			serverURL,
 			apiURL,

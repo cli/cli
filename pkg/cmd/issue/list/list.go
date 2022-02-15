@@ -1,6 +1,7 @@
 package list
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -16,6 +18,8 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
+	graphql "github.com/cli/shurcooL-graphql"
+	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
 
@@ -156,11 +160,11 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	err = opts.IO.StartPager()
-	if err != nil {
-		return err
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
-	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
 		return opts.Exporter.Write(opts.IO, listResult.Issues)
@@ -182,9 +186,9 @@ func listRun(opts *ListOptions) error {
 func issueList(client *http.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.IssuesAndTotalCount, error) {
 	apiClient := api.NewClientFromHTTP(client)
 
-	if filters.Search != "" || len(filters.Labels) > 0 {
+	if filters.Search != "" || len(filters.Labels) > 0 || filters.Milestone != "" {
 		if milestoneNumber, err := strconv.ParseInt(filters.Milestone, 10, 32); err == nil {
-			milestone, err := api.MilestoneByNumber(apiClient, repo, int32(milestoneNumber))
+			milestone, err := milestoneByNumber(client, repo, int32(milestoneNumber))
 			if err != nil {
 				return nil, err
 			}
@@ -210,4 +214,28 @@ func issueList(client *http.Client, repo ghrepo.Interface, filters prShared.Filt
 	}
 
 	return listIssues(apiClient, repo, filters, limit)
+}
+
+func milestoneByNumber(client *http.Client, repo ghrepo.Interface, number int32) (*api.RepoMilestone, error) {
+	var query struct {
+		Repository struct {
+			Milestone *api.RepoMilestone `graphql:"milestone(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":  githubv4.String(repo.RepoOwner()),
+		"name":   githubv4.String(repo.RepoName()),
+		"number": githubv4.Int(number),
+	}
+
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), client)
+	if err := gql.QueryNamed(context.Background(), "RepositoryMilestoneByNumber", &query, variables); err != nil {
+		return nil, err
+	}
+	if query.Repository.Milestone == nil {
+		return nil, fmt.Errorf("no milestone found with number '%d'", number)
+	}
+
+	return query.Repository.Milestone, nil
 }

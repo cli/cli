@@ -43,15 +43,18 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 		},
 	}
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, restoreAsk := prompt.InitAskStubber()
 	defer restoreAsk()
 
+	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "metadata",
 			Value: []string{"Labels", "Projects", "Assignees", "Reviewers", "Milestone"},
 		},
 	})
+	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "reviewers",
@@ -71,7 +74,7 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 		},
 		{
 			Name:  "milestone",
-			Value: []string{"(none)"},
+			Value: "(none)",
 		},
 	})
 
@@ -109,15 +112,18 @@ func TestMetadataSurvey_keepExisting(t *testing.T) {
 		},
 	}
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, restoreAsk := prompt.InitAskStubber()
 	defer restoreAsk()
 
+	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "metadata",
 			Value: []string{"Labels", "Projects"},
 		},
 	})
+	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "labels",

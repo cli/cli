@@ -24,6 +24,11 @@ import (
 
 const DefaultWidth = 80
 
+// ErrClosedPagerPipe is the error returned when writing to a pager that has been closed.
+type ErrClosedPagerPipe struct {
+	error
+}
+
 type IOStreams struct {
 	In     io.ReadCloser
 	Out    io.Writer
@@ -69,35 +74,37 @@ func (s *IOStreams) HasTrueColor() bool {
 	return s.hasTrueColor
 }
 
-func (s *IOStreams) DetectTerminalTheme() string {
+// DetectTerminalTheme is a utility to call before starting the output pager so that the terminal background
+// can be reliably detected.
+func (s *IOStreams) DetectTerminalTheme() {
 	if !s.ColorEnabled() {
 		s.terminalTheme = "none"
-		return "none"
+		return
 	}
 
 	if s.pagerProcess != nil {
 		s.terminalTheme = "none"
-		return "none"
+		return
 	}
 
 	style := os.Getenv("GLAMOUR_STYLE")
 	if style != "" && style != "auto" {
 		s.terminalTheme = "none"
-		return "none"
+		return
 	}
 
 	if termenv.HasDarkBackground() {
 		s.terminalTheme = "dark"
-		return "dark"
+		return
 	}
 
 	s.terminalTheme = "light"
-	return "light"
 }
 
+// TerminalTheme returns "light", "dark", or "none" depending on the background color of the terminal.
 func (s *IOStreams) TerminalTheme() string {
 	if s.terminalTheme == "" {
-		return "none"
+		s.DetectTerminalTheme()
 	}
 
 	return s.terminalTheme
@@ -195,7 +202,7 @@ func (s *IOStreams) StartPager() error {
 	if err != nil {
 		return err
 	}
-	s.Out = pagedOut
+	s.Out = &pagerWriter{pagedOut}
 	err = pagerCmd.Start()
 	if err != nil {
 		return err
@@ -209,7 +216,7 @@ func (s *IOStreams) StopPager() {
 		return
 	}
 
-	_ = s.Out.(io.ReadCloser).Close()
+	_ = s.Out.(io.WriteCloser).Close()
 	_, _ = s.pagerProcess.Wait()
 	s.pagerProcess = nil
 }
@@ -427,4 +434,17 @@ func terminalSize(w io.Writer) (int, int, error) {
 		return term.GetSize(int(f.Fd()))
 	}
 	return 0, 0, fmt.Errorf("%v is not a file", w)
+}
+
+// pagerWriter implements a WriteCloser that wraps all EPIPE errors in an ErrClosedPagerPipe type.
+type pagerWriter struct {
+	io.WriteCloser
+}
+
+func (w *pagerWriter) Write(d []byte) (int, error) {
+	n, err := w.WriteCloser.Write(d)
+	if err != nil && (errors.Is(err, io.ErrClosedPipe) || isEpipeError(err)) {
+		return n, &ErrClosedPagerPipe{err}
+	}
+	return n, err
 }

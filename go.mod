@@ -5,8 +5,8 @@ go 1.16
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.2
 	github.com/MakeNowJust/heredoc v1.0.0
-	github.com/briandowns/spinner v1.18.0
-	github.com/charmbracelet/glamour v0.3.0
+	github.com/briandowns/spinner v1.18.1
+	github.com/charmbracelet/glamour v0.4.0
 	github.com/cli/browser v1.1.0
 	github.com/cli/oauth v0.9.0
 	github.com/cli/safeexec v1.0.0
@@ -14,7 +14,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.1
 	github.com/creack/pty v1.1.17
 	github.com/gabriel-vasile/mimetype v1.4.0
-	github.com/google/go-cmp v0.5.6
+	github.com/google/go-cmp v0.5.7
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/go-multierror v1.1.1
@@ -26,8 +26,7 @@ require (
 	github.com/mattn/go-colorable v0.1.12
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
-	github.com/microcosm-cc/bluemonday v1.0.16 // indirect
-	github.com/muesli/reflow v0.2.1-0.20210502190812-c80126ec2ad5
+	github.com/muesli/reflow v0.3.0
 	github.com/muesli/termenv v0.9.0
 	github.com/muhammadmuzzammil1998/jsonc v0.0.0-20201229145248-615b0916ca38
 	github.com/opentracing/opentracing-go v1.1.0

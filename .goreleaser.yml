@@ -32,6 +32,9 @@ builds:
     id: windows
     goos: [windows]
     goarch: [386, amd64]
+    hooks:
+      post:
+        - ./script/sign-windows-executable.sh '{{ .Path }}'
 
 archives:
   - id: nix

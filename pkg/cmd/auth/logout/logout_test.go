@@ -106,8 +106,8 @@ func Test_logoutRun_tty(t *testing.T) {
 			cfgHosts:  []string{"cheryl.mason", "github.com"},
 			wantHosts: "cheryl.mason:\n    oauth_token: abc123\n",
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne("github.com")
-				as.StubOne(true)
+				as.StubPrompt("What account do you want to log out of?").AnswerWith("github.com")
+				as.StubPrompt("Are you sure you want to log out of github.com account 'cybilb'?").AnswerWith(true)
 			},
 			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'cybilb'`),
 		},
@@ -116,7 +116,7 @@ func Test_logoutRun_tty(t *testing.T) {
 			opts:     &LogoutOptions{},
 			cfgHosts: []string{"github.com"},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(true)
+				as.StubPrompt("Are you sure you want to log out of github.com account 'cybilb'?").AnswerWith(true)
 			},
 			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'cybilb'`),
 		},
@@ -133,7 +133,7 @@ func Test_logoutRun_tty(t *testing.T) {
 			cfgHosts:  []string{"cheryl.mason", "github.com"},
 			wantHosts: "github.com:\n    oauth_token: abc123\n",
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(true)
+				as.StubPrompt("Are you sure you want to log out of cheryl.mason account 'cybilb'?").AnswerWith(true)
 			},
 			wantErrOut: regexp.MustCompile(`Logged out of cheryl.mason account 'cybilb'`),
 		},
@@ -169,8 +169,7 @@ func Test_logoutRun_tty(t *testing.T) {
 			hostsBuf := bytes.Buffer{}
 			defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
-			as, teardown := prompt.InitAskStubber()
-			defer teardown()
+			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
 				tt.askStubs(as)
 			}

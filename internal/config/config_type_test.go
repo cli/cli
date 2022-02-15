@@ -58,7 +58,7 @@ func Test_defaultConfig(t *testing.T) {
 	assert.Equal(t, expected, mainBuf.String())
 	assert.Equal(t, "", hostsBuf.String())
 
-	proto, err := cfg.Get("", "git_protocol")
+	proto, err := cfg.GetOrDefault("", "git_protocol")
 	assert.NoError(t, err)
 	assert.Equal(t, "https", proto)
 

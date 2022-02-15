@@ -14,13 +14,12 @@ import (
 func referenceHelpFn(io *iostreams.IOStreams) func(*cobra.Command, []string) {
 	return func(cmd *cobra.Command, args []string) {
 		wrapWidth := 0
-		style := "notty"
 		if io.IsStdoutTTY() {
+			io.DetectTerminalTheme()
 			wrapWidth = io.TerminalWidth()
-			style = markdown.GetStyle(io.DetectTerminalTheme())
 		}
 
-		md, err := markdown.RenderWithWrap(cmd.Long, style, wrapWidth)
+		md, err := markdown.Render(cmd.Long, markdown.WithIO(io), markdown.WithWrap(wrapWidth))
 		if err != nil {
 			fmt.Fprintln(io.ErrOut, err)
 			return

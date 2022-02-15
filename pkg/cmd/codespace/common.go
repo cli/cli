@@ -21,19 +21,25 @@ import (
 	"golang.org/x/term"
 )
 
-type App struct {
-	io        *iostreams.IOStreams
-	apiClient apiClient
-	errLogger *log.Logger
+type executable interface {
+	Executable() string
 }
 
-func NewApp(io *iostreams.IOStreams, apiClient apiClient) *App {
+type App struct {
+	io         *iostreams.IOStreams
+	apiClient  apiClient
+	errLogger  *log.Logger
+	executable executable
+}
+
+func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient) *App {
 	errLogger := log.New(io.ErrOut, "", 0)
 
 	return &App{
-		io:        io,
-		apiClient: apiClient,
-		errLogger: errLogger,
+		io:         io,
+		apiClient:  apiClient,
+		errLogger:  errLogger,
+		executable: exe,
 	}
 }
 
@@ -61,6 +67,7 @@ type apiClient interface {
 	GetCodespaceRegionLocation(ctx context.Context) (string, error)
 	GetCodespacesMachines(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error)
 	GetCodespaceRepositoryContents(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
+	GetCodespaceRepoSuggestions(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error)
 }
 
 var errNoCodespaces = errors.New("you have no codespaces")
@@ -209,8 +216,13 @@ func ask(qs []*survey.Question, response interface{}) error {
 // checkAuthorizedKeys reports an error if the user has not registered any SSH keys;
 // see https://github.com/cli/cli/v2/issues/166#issuecomment-921769703.
 // The check is not required for security but it improves the error message.
-func checkAuthorizedKeys(ctx context.Context, client apiClient, user string) error {
-	keys, err := client.AuthorizedKeys(ctx, user)
+func checkAuthorizedKeys(ctx context.Context, client apiClient) error {
+	user, err := client.GetUser(ctx)
+	if err != nil {
+		return fmt.Errorf("error getting user: %w", err)
+	}
+
+	keys, err := client.AuthorizedKeys(ctx, user.Login)
 	if err != nil {
 		return fmt.Errorf("failed to read GitHub-authorized SSH keys for %s: %w", user, err)
 	}
@@ -238,7 +250,7 @@ type codespace struct {
 }
 
 // displayName returns the repository nwo and branch.
-// If includeName is true, the name of the codespace is included.
+// If includeName is true, the name of the codespace (including displayName) is included.
 // If includeGitStatus is true, the branch will include a star if
 // the codespace has unsaved changes.
 func (c codespace) displayName(includeName, includeGitStatus bool) string {
@@ -248,11 +260,18 @@ func (c codespace) displayName(includeName, includeGitStatus bool) string {
 	}
 
 	if includeName {
+		var displayName = c.Name
+		if c.DisplayName != "" {
+			displayName = c.DisplayName
+		}
 		return fmt.Sprintf(
-			"%s: %s [%s]", c.Repository.FullName, branch, c.Name,
+			"%s: %s (%s)", c.Repository.FullName, displayName, branch,
 		)
 	}
-	return c.Repository.FullName + ": " + branch
+	return fmt.Sprintf(
+		"%s: %s", c.Repository.FullName, branch,
+	)
+
 }
 
 // gitStatusDirty represents an unsaved changes status.

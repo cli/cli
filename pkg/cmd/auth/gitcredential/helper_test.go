@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
+// why not just use the config stub argh
 type tinyConfig map[string]string
 
 func (c tinyConfig) GetWithSource(host, key string) (string, string, error) {
@@ -75,6 +76,32 @@ func Test_helperRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
+			name: "gist host",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":                "/Users/monalisa/.config/gh/hosts.yml",
+						"github.com:user":        "monalisa",
+						"github.com:oauth_token": "OTOKEN",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=gist.github.com
+				username=monalisa
+			`),
+			wantErr: false,
+			wantStdout: heredoc.Doc(`
+				protocol=https
+				host=gist.github.com
+				username=monalisa
+				password=OTOKEN
+			`),
+			wantStderr: "",
+		},
+		{
 			name: "url input",
 			opts: CredentialOptions{
 				Operation: "get",
@@ -136,6 +163,30 @@ func Test_helperRun(t *testing.T) {
 			`),
 			wantErr:    true,
 			wantStdout: "",
+			wantStderr: "",
+		},
+		{
+			name: "no username configured",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":                 "/Users/monalisa/.config/gh/hosts.yml",
+						"example.com:oauth_token": "OTOKEN",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=example.com
+			`),
+			wantErr: false,
+			wantStdout: heredoc.Doc(`
+				protocol=https
+				host=example.com
+				username=x-access-token
+				password=OTOKEN
+			`),
 			wantStderr: "",
 		},
 		{

@@ -197,7 +197,7 @@ func runView(opts *ViewOptions) error {
 	if opts.Prompt {
 		// TODO arbitrary limit
 		opts.IO.StartProgressIndicator()
-		runs, err := shared.GetRuns(client, repo, 10)
+		runs, err := shared.GetRuns(client, repo, nil, 10)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get runs: %w", err)
@@ -228,6 +228,12 @@ func runView(opts *ViewOptions) error {
 				return err
 			}
 		}
+	}
+
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
 
 	if opts.Exporter != nil {
@@ -276,7 +282,7 @@ func runView(opts *ViewOptions) error {
 
 		attachRunLog(runLogZip, jobs)
 
-		return displayRunLog(opts.IO, jobs, opts.LogFailed)
+		return displayRunLog(opts.IO.Out, jobs, opts.LogFailed)
 	}
 
 	prNumber := ""
@@ -362,8 +368,10 @@ func runView(opts *ViewOptions) error {
 		fmt.Fprintln(out)
 		if shared.IsFailureState(run.Conclusion) {
 			fmt.Fprintf(out, "To see what failed, try: gh run view %d --log-failed\n", run.ID)
+		} else if len(jobs) == 1 {
+			fmt.Fprintf(out, "For more information about the job, try: gh run view --job=%d\n", jobs[0].ID)
 		} else {
-			fmt.Fprintln(out, "For more information about a job, try: gh run view --job=<job-id>")
+			fmt.Fprintf(out, "For more information about a job, try: gh run view --job=<job-id>\n")
 		}
 		fmt.Fprintf(out, cs.Gray("View this run on GitHub: %s\n"), run.URL)
 
@@ -500,13 +508,7 @@ func attachRunLog(rlz *zip.ReadCloser, jobs []shared.Job) {
 	}
 }
 
-func displayRunLog(io *iostreams.IOStreams, jobs []shared.Job, failed bool) error {
-	err := io.StartPager()
-	if err != nil {
-		return err
-	}
-	defer io.StopPager()
-
+func displayRunLog(w io.Writer, jobs []shared.Job, failed bool) error {
 	for _, job := range jobs {
 		steps := job.Steps
 		sort.Sort(steps)
@@ -524,7 +526,7 @@ func displayRunLog(io *iostreams.IOStreams, jobs []shared.Job, failed bool) erro
 			}
 			scanner := bufio.NewScanner(f)
 			for scanner.Scan() {
-				fmt.Fprintf(io.Out, "%s%s\n", prefix, scanner.Text())
+				fmt.Fprintf(w, "%s%s\n", prefix, scanner.Text())
 			}
 			f.Close()
 		}

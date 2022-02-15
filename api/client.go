@@ -98,6 +98,22 @@ func ReplaceTripper(tr http.RoundTripper) ClientOption {
 	}
 }
 
+// ExtractHeader extracts a named header from any response received by this client and, if non-blank, saves
+// it to dest.
+func ExtractHeader(name string, dest *string) ClientOption {
+	return func(tr http.RoundTripper) http.RoundTripper {
+		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+			res, err := tr.RoundTrip(req)
+			if err == nil {
+				if value := res.Header.Get(name); value != "" {
+					*dest = value
+				}
+			}
+			return res, err
+		}}
+	}
+}
+
 type funcTripper struct {
 	roundTrip func(*http.Request) (*http.Response, error)
 }
@@ -310,6 +326,7 @@ func (c Client) REST(hostname string, method string, p string, body io.Reader, d
 	if err != nil {
 		return err
 	}
+
 	err = json.Unmarshal(b, &data)
 	if err != nil {
 		return err

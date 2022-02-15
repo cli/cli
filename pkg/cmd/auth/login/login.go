@@ -68,37 +68,34 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			$ gh auth login --hostname enterprise.internal
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !opts.IO.CanPrompt() && !(tokenStdin || opts.Web) {
-				return cmdutil.FlagErrorf("--web or --with-token required when not running interactively")
-			}
-
 			if tokenStdin && opts.Web {
-				return cmdutil.FlagErrorf("specify only one of --web or --with-token")
+				return cmdutil.FlagErrorf("specify only one of `--web` or `--with-token`")
+			}
+			if tokenStdin && len(opts.Scopes) > 0 {
+				return cmdutil.FlagErrorf("specify only one of `--scopes` or `--with-token`")
 			}
 
 			if tokenStdin {
 				defer opts.IO.In.Close()
 				token, err := ioutil.ReadAll(opts.IO.In)
 				if err != nil {
-					return fmt.Errorf("failed to read token from STDIN: %w", err)
+					return fmt.Errorf("failed to read token from standard input: %w", err)
 				}
 				opts.Token = strings.TrimSpace(string(token))
 			}
 
-			if opts.IO.CanPrompt() && opts.Token == "" && !opts.Web {
+			if opts.IO.CanPrompt() && opts.Token == "" {
 				opts.Interactive = true
 			}
 
 			if cmd.Flags().Changed("hostname") {
 				if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
-					return cmdutil.FlagErrorf("error parsing --hostname: %w", err)
+					return cmdutil.FlagErrorf("error parsing hostname: %w", err)
 				}
 			}
 
-			if !opts.Interactive {
-				if opts.Hostname == "" {
-					opts.Hostname = ghinstance.Default()
-				}
+			if opts.Hostname == "" && (!opts.Interactive || opts.Web) {
+				opts.Hostname = ghinstance.Default()
 			}
 
 			opts.MainExecutable = f.Executable()
@@ -125,15 +122,11 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	hostname := opts.Hostname
-	if hostname == "" {
-		if opts.Interactive {
-			var err error
-			hostname, err = promptForHostname()
-			if err != nil {
-				return err
-			}
-		} else {
-			return errors.New("must specify --hostname")
+	if opts.Interactive && hostname == "" {
+		var err error
+		hostname, err = promptForHostname()
+		if err != nil {
+			return err
 		}
 	}
 

@@ -75,6 +75,8 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 			data[f] = pr.ProjectCards.Nodes
 		case "reviews":
 			data[f] = pr.Reviews.Nodes
+		case "latestReviews":
+			data[f] = pr.LatestReviews.Nodes
 		case "files":
 			data[f] = pr.Files.Nodes
 		case "reviewRequests":

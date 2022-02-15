@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -51,6 +52,22 @@ func TestNewCmdList(t *testing.T) {
 				WorkflowSelector: "foo.yml",
 			},
 		},
+		{
+			name: "branch",
+			cli:  "--branch new-cool-stuff",
+			wants: ListOptions{
+				Limit:  defaultLimit,
+				Branch: "new-cool-stuff",
+			},
+		},
+		{
+			name: "user",
+			cli:  "--user bak1an",
+			wants: ListOptions{
+				Limit: defaultLimit,
+				Actor: "bak1an",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -83,11 +100,32 @@ func TestNewCmdList(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.wants.Limit, gotOpts.Limit)
+			assert.Equal(t, tt.wants.WorkflowSelector, gotOpts.WorkflowSelector)
+			assert.Equal(t, tt.wants.Branch, gotOpts.Branch)
+			assert.Equal(t, tt.wants.Actor, gotOpts.Actor)
 		})
 	}
 }
 
 func TestListRun(t *testing.T) {
+	// helper to match mocked requests by their query params along with method and path
+	queryMatcher := func(method string, path string, query url.Values) httpmock.Matcher {
+		return func(req *http.Request) bool {
+			if !httpmock.REST(method, path)(req) {
+				return false
+			}
+
+			actualQuery := req.URL.Query()
+
+			for param := range query {
+				if !(actualQuery.Get(param) == query.Get(param)) {
+					return false
+				}
+			}
+
+			return true
+		}
+	}
 	tests := []struct {
 		name       string
 		opts       *ListOptions
@@ -197,6 +235,40 @@ func TestListRun(t *testing.T) {
 					}))
 			},
 			wantOut: "STATUS  NAME         WORKFLOW     BRANCH  EVENT  ID    ELAPSED  AGE\n*       cool commit  in progress  trunk   push   2     4m34s    Feb 23, 2021\n✓       cool commit  successful   trunk   push   3     4m34s    Feb 23, 2021\nX       cool commit  failed       trunk   push   1234  4m34s    Feb 23, 2021\n\nFor details on a run, try: gh run view <run-id>\n",
+		},
+		{
+			name: "branch filter applied",
+			opts: &ListOptions{
+				Limit:  defaultLimit,
+				Branch: "the-branch",
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					queryMatcher("GET", "repos/OWNER/REPO/actions/runs", url.Values{
+						"branch": []string{"the-branch"},
+					}),
+					httpmock.JSONResponse(shared.RunsPayload{}),
+				)
+			},
+			wantOut:    "",
+			wantErrOut: "No runs found\n",
+		},
+		{
+			name: "actor filter applied",
+			opts: &ListOptions{
+				Limit: defaultLimit,
+				Actor: "bak1an",
+			},
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					queryMatcher("GET", "repos/OWNER/REPO/actions/runs", url.Values{
+						"actor": []string{"bak1an"},
+					}),
+					httpmock.JSONResponse(shared.RunsPayload{}),
+				)
+			},
+			wantOut:    "",
+			wantErrOut: "No runs found\n",
 		},
 	}
 
