@@ -78,9 +78,5 @@ func (e *requestHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *j
 		return // noop
 	}
 
-	select {
-	case handler <- *req.Params:
-	default:
-		// event handler
-	}
+	handler <- *req.Params
 }

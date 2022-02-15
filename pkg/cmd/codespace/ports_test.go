@@ -83,7 +83,6 @@ func TestPortsUpdateVisibility(t *testing.T) {
 		},
 	}
 
-	fmt.Println(testServer)
 	io, _, _, _ := iostreams.Test()
 	a := &App{
 		io:        io,

@@ -260,7 +260,6 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
-		fmt.Println("watiing for update")
 		if err := a.waitForPortUpdate(ctx, session, port.number); err != nil {
 			return fmt.Errorf("error waiting for port update: %w", err)
 		}
