@@ -1199,24 +1199,3 @@ func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, 
 		IsPrivate: responsev3.Private,
 	}, nil
 }
-
-func RepoTagExists(httpClient *http.Client, repo ghrepo.Interface, tagName string) (bool, error) {
-	var query struct {
-		Repository struct {
-			Ref struct {
-				ID string
-			} `graphql:"ref(qualifiedName: $tagName)"`
-		} `graphql:"repository(owner: $owner, name: $name)"`
-	}
-
-	variables := map[string]interface{}{
-		"owner":   githubv4.String(repo.RepoOwner()),
-		"name":    githubv4.String(repo.RepoName()),
-		"tagName": githubv4.String(tagName),
-	}
-
-	gql := graphQLClient(httpClient, repo.RepoHost())
-	err := gql.QueryNamed(context.Background(), "RepositoryFindTag", &query, variables)
-
-	return query.Repository.Ref.ID != "", err
-}

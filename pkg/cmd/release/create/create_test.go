@@ -673,7 +673,7 @@ func Test_createRun_interactive(t *testing.T) {
 				rs.Register(`git describe --tags --abbrev=0 v1\.2\.3\^`, 1, "")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.GraphQL("RepositoryFindTag"),
+				reg.Register(httpmock.GraphQL("RepositoryFindRef"),
 					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": "tag id"}}}}`))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
 					httpmock.StatusStringResponse(404, `{}`))
@@ -701,7 +701,7 @@ func Test_createRun_interactive(t *testing.T) {
 				rs.Register(`git tag --list`, 0, "tag exists")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.GraphQL("RepositoryFindTag"),
+				reg.Register(httpmock.GraphQL("RepositoryFindRef"),
 					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": ""}}}}`))
 			},
 			wantErr: "tag v1.2.3 exists locally but has not been pushed to OWNER/REPO, please push it before continuing or specify the `--target` flag to create a new tag",

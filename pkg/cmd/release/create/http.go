@@ -2,6 +2,7 @@ package create
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
+	graphql "github.com/cli/shurcooL-graphql"
 )
 
 type tag struct {
@@ -26,9 +28,23 @@ type releaseNotes struct {
 
 var notImplementedError = errors.New("not implemented")
 
-func remoteTagExists(httpClient *http.Client, repo ghrepo.Interface, tag string) (bool, error) {
-	qualifiedTagName := fmt.Sprintf("refs/tags/%s", tag)
-	return api.RepoTagExists(httpClient, repo, qualifiedTagName)
+func remoteTagExists(httpClient *http.Client, repo ghrepo.Interface, tagName string) (bool, error) {
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
+	qualifiedTagName := fmt.Sprintf("refs/tags/%s", tagName)
+	var query struct {
+		Repository struct {
+			Ref struct {
+				ID string
+			} `graphql:"ref(qualifiedName: $tagName)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+	variables := map[string]interface{}{
+		"owner":   graphql.String(repo.RepoOwner()),
+		"name":    graphql.String(repo.RepoName()),
+		"tagName": graphql.String(qualifiedTagName),
+	}
+	err := gql.QueryNamed(context.Background(), "RepositoryFindRef", &query, variables)
+	return query.Repository.Ref.ID != "", err
 }
 
 func getTags(httpClient *http.Client, repo ghrepo.Interface, limit int) ([]tag, error) {
