@@ -287,7 +287,7 @@ func Test_createRun(t *testing.T) {
 		name       string
 		isTTY      bool
 		opts       CreateOptions
-		wantParams interface{}
+		httpStubs  func(t *testing.T, reg *httpmock.Registry)
 		wantErr    string
 		wantStdout string
 		wantStderr string
@@ -302,12 +302,20 @@ func Test_createRun(t *testing.T) {
 				BodyProvided: true,
 				Target:       "",
 			},
-			wantParams: map[string]interface{}{
-				"tag_name":   "v1.2.3",
-				"name":       "The Big 1.2",
-				"body":       "* Fixed bugs",
-				"draft":      false,
-				"prerelease": false,
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"tag_name":   "v1.2.3",
+						"name":       "The Big 1.2",
+						"body":       "* Fixed bugs",
+						"draft":      false,
+						"prerelease": false,
+					}, params)
+				}))
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: ``,
@@ -323,13 +331,21 @@ func Test_createRun(t *testing.T) {
 				Target:             "",
 				DiscussionCategory: "General",
 			},
-			wantParams: map[string]interface{}{
-				"tag_name":                 "v1.2.3",
-				"name":                     "The Big 1.2",
-				"body":                     "* Fixed bugs",
-				"draft":                    false,
-				"prerelease":               false,
-				"discussion_category_name": "General",
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"tag_name":                 "v1.2.3",
+						"name":                     "The Big 1.2",
+						"body":                     "* Fixed bugs",
+						"draft":                    false,
+						"prerelease":               false,
+						"discussion_category_name": "General",
+					}, params)
+				}))
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: ``,
@@ -344,11 +360,19 @@ func Test_createRun(t *testing.T) {
 				BodyProvided: true,
 				Target:       "main",
 			},
-			wantParams: map[string]interface{}{
-				"tag_name":         "v1.2.3",
-				"draft":            false,
-				"prerelease":       false,
-				"target_commitish": "main",
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"tag_name":         "v1.2.3",
+						"draft":            false,
+						"prerelease":       false,
+						"target_commitish": "main",
+					}, params)
+				}))
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: ``,
@@ -364,34 +388,21 @@ func Test_createRun(t *testing.T) {
 				Draft:        true,
 				Target:       "",
 			},
-			wantParams: map[string]interface{}{
-				"tag_name":   "v1.2.3",
-				"draft":      true,
-				"prerelease": false,
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"tag_name":   "v1.2.3",
+						"draft":      true,
+						"prerelease": false,
+					}, params)
+				}))
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: ``,
-		},
-		{
-			name:  "discussion category for draft release",
-			isTTY: true,
-			opts: CreateOptions{
-				TagName:            "v1.2.3",
-				Name:               "",
-				Body:               "",
-				BodyProvided:       true,
-				Draft:              true,
-				Target:             "",
-				DiscussionCategory: "general",
-			},
-			wantParams: map[string]interface{}{
-				"tag_name":                 "v1.2.3",
-				"draft":                    true,
-				"prerelease":               false,
-				"discussion_category_name": "general",
-			},
-			wantErr:    "X Discussions not supported with draft releases",
-			wantStdout: "",
 		},
 		{
 			name:  "with generate notes",
@@ -404,11 +415,19 @@ func Test_createRun(t *testing.T) {
 				BodyProvided:  true,
 				GenerateNotes: true,
 			},
-			wantParams: map[string]interface{}{
-				"tag_name":               "v1.2.3",
-				"draft":                  false,
-				"prerelease":             false,
-				"generate_release_notes": true,
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"tag_name":               "v1.2.3",
+						"draft":                  false,
+						"prerelease":             false,
+						"generate_release_notes": true,
+					}, params)
+				}))
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantErr:    "",
@@ -433,10 +452,97 @@ func Test_createRun(t *testing.T) {
 				},
 				Concurrency: 1,
 			},
-			wantParams: map[string]interface{}{
-				"tag_name":   "v1.2.3",
-				"draft":      true,
-				"prerelease": false,
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"tag_name":   "v1.2.3",
+						"draft":      true,
+						"prerelease": false,
+					}, params)
+				}))
+				reg.Register(httpmock.REST("POST", "assets/upload"), func(req *http.Request) (*http.Response, error) {
+					q := req.URL.Query()
+					assert.Equal(t, "ball.tgz", q.Get("name"))
+					assert.Equal(t, "", q.Get("label"))
+					return &http.Response{
+						StatusCode: 201,
+						Request:    req,
+						Body:       ioutil.NopCloser(bytes.NewBufferString(`{}`)),
+						Header: map[string][]string{
+							"Content-Type": {"application/json"},
+						},
+					}, nil
+				})
+				reg.Register(httpmock.REST("PATCH", "releases/123"), httpmock.RESTPayload(201, `{
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3-final"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"draft": false,
+					}, params)
+				}))
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3-final\n",
+			wantStderr: ``,
+		},
+		{
+			name:  "upload files and create discussion",
+			isTTY: true,
+			opts: CreateOptions{
+				TagName:      "v1.2.3",
+				Name:         "",
+				Body:         "",
+				BodyProvided: true,
+				Draft:        false,
+				Target:       "",
+				Assets: []*shared.AssetForUpload{
+					{
+						Name: "ball.tgz",
+						Open: func() (io.ReadCloser, error) {
+							return ioutil.NopCloser(bytes.NewBufferString(`TARBALL`)), nil
+						},
+					},
+				},
+				DiscussionCategory: "general",
+				Concurrency:        1,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"tag_name":                 "v1.2.3",
+						"draft":                    true,
+						"prerelease":               false,
+						"discussion_category_name": "general",
+					}, params)
+				}))
+				reg.Register(httpmock.REST("POST", "assets/upload"), func(req *http.Request) (*http.Response, error) {
+					q := req.URL.Query()
+					assert.Equal(t, "ball.tgz", q.Get("name"))
+					assert.Equal(t, "", q.Get("label"))
+					return &http.Response{
+						StatusCode: 201,
+						Request:    req,
+						Body:       ioutil.NopCloser(bytes.NewBufferString(`{}`)),
+						Header: map[string][]string{
+							"Content-Type": {"application/json"},
+						},
+					}, nil
+				})
+				reg.Register(httpmock.REST("PATCH", "releases/123"), httpmock.RESTPayload(201, `{
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3-final"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"draft":                    false,
+						"discussion_category_name": "general",
+					}, params)
+				}))
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3-final\n",
 			wantStderr: ``,
@@ -450,15 +556,10 @@ func Test_createRun(t *testing.T) {
 			io.SetStderrTTY(tt.isTTY)
 
 			fakeHTTP := &httpmock.Registry{}
-			fakeHTTP.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, `{
-				"url": "https://api.github.com/releases/123",
-				"upload_url": "https://api.github.com/assets/upload",
-				"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
-			}`))
-			fakeHTTP.Register(httpmock.REST("POST", "assets/upload"), httpmock.StatusStringResponse(201, `{}`))
-			fakeHTTP.Register(httpmock.REST("PATCH", "releases/123"), httpmock.StatusStringResponse(201, `{
-				"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3-final"
-			}`))
+			if tt.httpStubs != nil {
+				tt.httpStubs(t, fakeHTTP)
+			}
+			defer fakeHTTP.Verify(t)
 
 			tt.opts.IO = io
 			tt.opts.HttpClient = func() (*http.Client, error) {
@@ -474,26 +575,6 @@ func Test_createRun(t *testing.T) {
 				return
 			} else {
 				require.NoError(t, err)
-			}
-
-			bb, err := ioutil.ReadAll(fakeHTTP.Requests[0].Body)
-			require.NoError(t, err)
-			var params interface{}
-			err = json.Unmarshal(bb, &params)
-			require.NoError(t, err)
-			assert.Equal(t, tt.wantParams, params)
-
-			if len(tt.opts.Assets) > 0 {
-				q := fakeHTTP.Requests[1].URL.Query()
-				assert.Equal(t, tt.opts.Assets[0].Name, q.Get("name"))
-				assert.Equal(t, tt.opts.Assets[0].Label, q.Get("label"))
-
-				bb, err := ioutil.ReadAll(fakeHTTP.Requests[2].Body)
-				require.NoError(t, err)
-				var updateParams interface{}
-				err = json.Unmarshal(bb, &updateParams)
-				require.NoError(t, err)
-				assert.Equal(t, map[string]interface{}{"draft": false}, updateParams)
 			}
 
 			assert.Equal(t, tt.wantStdout, stdout.String())
