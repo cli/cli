@@ -686,6 +686,60 @@ func (a *API) DeleteCodespace(ctx context.Context, codespaceName string) error {
 	return nil
 }
 
+type EditCodespaceParams struct {
+	DisplayName        string
+	IdleTimeoutMinutes int
+	Machine            string
+}
+
+type editRequest struct {
+	DisplayName        string `json:"display_name,omitempty"`
+	IdleTimeoutMinutes int    `json:"idle_timeout_minutes,omitempty"`
+	Machine            string `json:"machine"`
+}
+
+func (a *API) EditCodespace(ctx context.Context, codespaceName string, params *EditCodespaceParams) (*Codespace, error) {
+	requestBody, err := json.Marshal(editRequest{
+		DisplayName:        params.DisplayName,
+		IdleTimeoutMinutes: params.IdleTimeoutMinutes,
+		Machine:            params.Machine,
+	})
+	fmt.Printf("requestBody: %s\n", requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, a.githubAPI+"/user/codespaces/"+codespaceName, bytes.NewBuffer(requestBody))
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	a.setHeaders(req)
+	resp, err := a.do(ctx, req, "/user/codespaces")
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusAccepted {
+		return nil, errProvisioningInProgress // RPC finished before result of creation known
+	} else if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return nil, api.HandleHTTPError(resp)
+	}
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	var response Codespace
+	if err := json.Unmarshal(b, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %w", err)
+	}
+
+	return &response, nil
+}
+
 type getCodespaceRepositoryContentsResponse struct {
 	Content string `json:"content"`
 }
