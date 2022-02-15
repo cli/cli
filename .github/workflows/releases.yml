@@ -155,9 +155,8 @@ jobs:
         id: obtain_cert
         shell: bash
         run: |
-          cert="$(mktemp -t cert.XXX)"
-          base64 -d <<<"$CERT_CONTENTS" > "$cert"
-          printf "::set-output name=cert-file::%s\n" "$cert"
+          base64 -d <<<"$CERT_CONTENTS" > ./cert.pfx
+          printf "::set-output name=cert-file::%s\n" ".\\cert.pfx"
         env:
           CERT_CONTENTS: ${{ secrets.WINDOWS_CERT_PFX }}
       - name: Sign MSI
@@ -165,7 +164,7 @@ jobs:
           CERT_FILE: ${{ steps.obtain_cert.outputs.cert-file }}
           EXE_FILE: ${{ steps.buildmsi.outputs.msi }}
           CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
-        run: .\script\sign.ps1 -Certificate $env:CERT_FILE -Executable $env:EXE_FILE
+        run: .\script\signtool sign /d "GitHub CLI" /f $env:CERT_FILE /p $env:CERT_PASSWORD /fd sha256 /tr http://timestamp.digicert.com /v $env:EXE_FILE
       - name: Upload MSI
         shell: bash
         run: |
