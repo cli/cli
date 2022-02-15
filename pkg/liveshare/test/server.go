@@ -42,6 +42,9 @@ type Server struct {
 	sshConfig      *ssh.ServerConfig
 	httptestServer *httptest.Server
 	errCh          chan error
+	nonSecure      bool
+
+	objectStream jsonrpc2.ObjectStream
 }
 
 // NewServer creates a new Server. ServerOptions can be passed to configure
@@ -65,7 +68,12 @@ func NewServer(opts ...ServerOption) (*Server, error) {
 	server.sshConfig.AddHostKey(privateKey)
 
 	server.errCh = make(chan error, 1)
-	server.httptestServer = httptest.NewTLSServer(http.HandlerFunc(makeConnection(server)))
+
+	if server.nonSecure {
+		server.httptestServer = httptest.NewServer(http.HandlerFunc(makeConnection(server)))
+	} else {
+		server.httptestServer = httptest.NewTLSServer(http.HandlerFunc(makeConnection(server)))
+	}
 	return server, nil
 }
 
@@ -76,6 +84,13 @@ type ServerOption func(*Server) error
 func WithPassword(password string) ServerOption {
 	return func(s *Server) error {
 		s.password = password
+		return nil
+	}
+}
+
+func WithNonSecure() ServerOption {
+	return func(s *Server) error {
+		s.nonSecure = true
 		return nil
 	}
 }
@@ -132,6 +147,13 @@ func (s *Server) URL() string {
 
 func (s *Server) Err() <-chan error {
 	return s.errCh
+}
+
+func (s *Server) WriteToObjectStream(obj interface{}) error {
+	if s.objectStream == nil {
+		return errors.New("object stream not set")
+	}
+	return s.objectStream.WriteObject(obj)
 }
 
 var upgrader = websocket.Upgrader{}
@@ -300,6 +322,8 @@ func forwardStream(ctx context.Context, server *Server, streamName string, chann
 
 func handleChannel(server *Server, channel ssh.Channel) {
 	stream := jsonrpc2.NewBufferedStream(channel, jsonrpc2.VSCodeObjectCodec{})
+	server.objectStream = stream
+
 	jsonrpc2.NewConn(context.Background(), stream, newRPCHandler(server))
 }
 

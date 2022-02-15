@@ -260,6 +260,7 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
+		fmt.Println("watiing for update")
 		if err := a.waitForPortUpdate(ctx, session, port.number); err != nil {
 			return fmt.Errorf("error waiting for port update: %w", err)
 		}
@@ -291,25 +292,26 @@ func (a *App) waitForPortUpdate(ctx context.Context, session *liveshare.Session,
 	failure := session.WaitForEvent("sharingFailed")
 
 	for {
+		var pd portData
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("timeout waiting for server sharing to succeed or fail")
 		case b := <-success:
-			if err := json.Unmarshal(b, &portData); err != nil {
+			if err := json.Unmarshal(b, &pd); err != nil {
 				return fmt.Errorf("error unmarshaling port data: %w", err)
 			}
-			if portData.Port == port && portData.ChangeKind == portChangeKindUpdate {
+			if pd.Port == port && pd.ChangeKind == portChangeKindUpdate {
 				return nil
 			}
 		case b := <-failure:
-			if err := json.Unmarshal(b, &portData); err != nil {
+			if err := json.Unmarshal(b, &pd); err != nil {
 				return fmt.Errorf("error unmarshaling port data: %w", err)
 			}
-			if portData.Port == port && portData.ChangeKind == portChangeKindUpdate {
-				if portData.StatusCode == http.StatusForbidden {
+			if pd.Port == port && pd.ChangeKind == portChangeKindUpdate {
+				if pd.StatusCode == http.StatusForbidden {
 					return errors.New("organization admin has forbidden this privacy setting")
 				}
-				return errors.New(portData.ErrorDetail)
+				return errors.New(pd.ErrorDetail)
 			}
 		}
 	}
