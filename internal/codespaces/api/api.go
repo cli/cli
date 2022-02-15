@@ -695,7 +695,7 @@ type EditCodespaceParams struct {
 type editRequest struct {
 	DisplayName        string `json:"display_name,omitempty"`
 	IdleTimeoutMinutes int    `json:"idle_timeout_minutes,omitempty"`
-	Machine            string `json:"machine"`
+	Machine            string `json:"machine,omitempty"`
 }
 
 func (a *API) EditCodespace(ctx context.Context, codespaceName string, params *EditCodespaceParams) (*Codespace, error) {
