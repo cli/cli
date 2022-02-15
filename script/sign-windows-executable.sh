@@ -19,7 +19,7 @@ if [ -z "$CERT_PASSWORD" ]; then
 fi
 
 osslsigncode sign -n "GitHub CLI" -t http://timestamp.digicert.com \
-  -pkcs12 "$CERT_FILE" -readpass <(cat <<<"$CERT_PASSWORD") -h sha256 \
+  -pkcs12 "$CERT_FILE" -readpass <(printf "%s" "$CERT_PASSWORD") -h sha256 \
   -in "$EXE" -out "$EXE"~
 
 mv "$EXE"~ "$EXE"
