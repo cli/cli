@@ -25,7 +25,7 @@ func NewCmdConfigList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.
 	cmd := &cobra.Command{
 		Use:     "list",
 		Short:   "Print a list of configuration keys and values",
-		Aliases: []string{"list"},
+		Aliases: []string{"ls"},
 		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runF != nil {
