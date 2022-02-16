@@ -231,6 +231,28 @@ func newPortsVisibilityCmd(app *App) *cobra.Command {
 	}
 }
 
+type ErrUpdatingPortVisibility struct {
+	port       int
+	visibility string
+	err        error
+}
+
+func newErrUpdatingPortVisibility(port int, visibility string, err error) *ErrUpdatingPortVisibility {
+	return &ErrUpdatingPortVisibility{
+		port:       port,
+		visibility: visibility,
+		err:        err,
+	}
+}
+
+func (e *ErrUpdatingPortVisibility) Error() string {
+	return fmt.Sprintf("error waiting for port %d to update to %s: %s", e.port, e.visibility, e.err)
+}
+
+func (e *ErrUpdatingPortVisibility) Unwrap() error {
+	return e.err
+}
+
 func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, args []string) (err error) {
 	ports, err := a.parsePortVisibilities(args)
 	if err != nil {
@@ -251,6 +273,9 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 	}
 	defer safeClose(session, &err)
 
+	success := session.RegisterEvent("sharingSucceeded")
+	failure := session.RegisterEvent("sharingFailed")
+
 	// TODO: check if port visibility can be updated in parallel instead of sequentially
 	for _, port := range ports {
 		a.StartProgressIndicatorWithLabel(fmt.Sprintf("Updating port %d visibility to: %s", port.number, port.visibility))
@@ -264,8 +289,8 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
-		if err := a.waitForPortUpdate(ctx, session, port.number); err != nil {
-			return fmt.Errorf("error waiting for port %d to update to %s: %w", port.number, port.visibility, err)
+		if err := a.waitForPortUpdate(ctx, success, failure, session, port.number); err != nil {
+			return newErrUpdatingPortVisibility(port.number, port.visibility, err)
 		}
 
 		a.StopProgressIndicator()
@@ -287,10 +312,9 @@ type portData struct {
 	StatusCode  int            `json:"statusCode"`
 }
 
-func (a *App) waitForPortUpdate(ctx context.Context, session *liveshare.Session, port int) error {
-	success := session.WaitForEvent("sharingSucceeded")
-	failure := session.WaitForEvent("sharingFailed")
+var errUpdatePortVisibilityForbidden = errors.New("organization admin has forbidden this privacy setting")
 
+func (a *App) waitForPortUpdate(ctx context.Context, success, failure chan []byte, session *liveshare.Session, port int) error {
 	for {
 		var pd portData
 		select {
@@ -309,7 +333,7 @@ func (a *App) waitForPortUpdate(ctx context.Context, session *liveshare.Session,
 			}
 			if pd.Port == port && pd.ChangeKind == portChangeKindUpdate {
 				if pd.StatusCode == http.StatusForbidden {
-					return errors.New("organization admin has forbidden this privacy setting")
+					return errUpdatePortVisibilityForbidden
 				}
 				return errors.New(pd.ErrorDetail)
 			}

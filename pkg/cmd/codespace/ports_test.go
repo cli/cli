@@ -3,6 +3,7 @@ package codespace
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -40,7 +41,7 @@ func TestPortsUpdateVisibilitySuccess(t *testing.T) {
 		},
 	}
 
-	err := RunUpdateVisibilityTest(t, portVisibilities, eventResponses, portsData)
+	err := runUpdateVisibilityTest(portVisibilities, eventResponses, portsData)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -77,14 +78,13 @@ func TestPortsUpdateVisibilityFailure403(t *testing.T) {
 		},
 	}
 
-	err := RunUpdateVisibilityTest(t, portVisibilities, eventResponses, portsData)
+	err := runUpdateVisibilityTest(portVisibilities, eventResponses, portsData)
 	if err == nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	expectedErr := "error waiting for port 9999 to update to public: organization admin has forbidden this privacy setting"
-	if err.Error() != expectedErr {
-		t.Errorf("expected: %v, got: %v", expectedErr, err)
+	if errors.Unwrap(err) != errUpdatePortVisibilityForbidden {
+		t.Errorf("expected: %v, got: %v", errUpdatePortVisibilityForbidden, errors.Unwrap(err))
 	}
 }
 
@@ -117,13 +117,13 @@ func TestPortsUpdateVisibilityFailure(t *testing.T) {
 		},
 	}
 
-	err := RunUpdateVisibilityTest(t, portVisibilities, eventResponses, portsData)
+	err := runUpdateVisibilityTest(portVisibilities, eventResponses, portsData)
 	if err == nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	expectedErr := "error waiting for port 9999 to update to public: test error"
-	if err.Error() != expectedErr {
+	var expectedErr *ErrUpdatingPortVisibility
+	if !errors.As(err, &expectedErr) {
 		t.Errorf("expected: %v, got: %v", expectedErr, err)
 	}
 }
@@ -132,7 +132,7 @@ type joinWorkspaceResult struct {
 	SessionNumber int `json:"sessionNumber"`
 }
 
-func RunUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, eventResponses []string, portsData []portData) error {
+func runUpdateVisibilityTest(portVisibilities []portVisibility, eventResponses []string, portsData []portData) error {
 	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
 		return joinWorkspaceResult{1}, nil
 	}
@@ -158,7 +158,7 @@ func RunUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, ev
 		livesharetest.WithService("serverSharing.updateSharedServerPrivacy", updateSharedVisibility),
 	)
 	if err != nil {
-		t.Fatal(err)
+		return fmt.Errorf("unable to create test server: %w", err)
 	}
 
 	type rpcMessage struct {
@@ -166,21 +166,25 @@ func RunUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, ev
 		Params portData
 	}
 
-	for index, pd := range portsData {
-		go func(index int, pd portData) {
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ch:
-					testServer.WriteToObjectStream(rpcMessage{
-						Method: eventResponses[index],
-						Params: pd,
-					})
+	go func() {
+		var i int
+		for ; ; i++ {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ch:
+				pd := portsData[i]
+				// TODO: handle error
+				err := testServer.WriteToObjectStream(rpcMessage{
+					Method: eventResponses[i],
+					Params: pd,
+				})
+				if err != nil {
+					panic(err)
 				}
 			}
-		}(index, pd)
-	}
+		}
+	}()
 
 	mockApi := &apiClientMock{
 		GetCodespaceFunc: func(ctx context.Context, codespaceName string, includeConnection bool) (*api.Codespace, error) {

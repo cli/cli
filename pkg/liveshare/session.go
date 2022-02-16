@@ -78,8 +78,8 @@ func (s *Session) UpdateSharedServerPrivacy(ctx context.Context, port int, visib
 	return nil
 }
 
-func (s *Session) WaitForEvent(eventName string) chan []byte {
-	return s.rpc.registerEventHandler(eventName)
+func (s *Session) RegisterEvent(eventName string) chan []byte {
+	return s.rpc.requestHandler.registerEvent(eventName)
 }
 
 // StartsSSHServer starts an SSH server in the container, installing sshd if necessary,

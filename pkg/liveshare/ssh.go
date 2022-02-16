@@ -50,6 +50,7 @@ func (s *sshSession) connect(ctx context.Context) error {
 		return fmt.Errorf("error creating ssh client connection: %w", err)
 	}
 	s.conn = sshClientConn
+	go s.handleGlobalRequests(reqs)
 
 	sshClient := ssh.NewClient(sshClientConn, chans, reqs)
 	s.Session, err = sshClient.NewSession()
@@ -68,6 +69,15 @@ func (s *sshSession) connect(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (s *sshSession) handleGlobalRequests(incoming <-chan *ssh.Request) {
+	for r := range incoming {
+		fmt.Println(r.Type)
+		// This handles keepalive messages and matches
+		// the behaviour of OpenSSH.
+		r.Reply(false, nil)
+	}
 }
 
 func (s *sshSession) Read(p []byte) (n int, err error) {
