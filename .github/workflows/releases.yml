@@ -27,6 +27,13 @@ jobs:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Install osslsigncode
         run: sudo apt-get install -y osslsigncode
+      - name: Obtain signing cert
+        run: |
+          cert="$(mktemp -t cert.XXX)"
+          base64 -d <<<"$CERT_CONTENTS" > "$cert"
+          echo "CERT_FILE=$cert" >> $GITHUB_ENV
+        env:
+          CERT_CONTENTS: ${{ secrets.WINDOWS_CERT_PFX }}
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v2
         with:
@@ -35,8 +42,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
           GORELEASER_CURRENT_TAG: ${{steps.changelog.outputs.tag-name}}
-          GITHUB_CERT_PASSWORD: ${{secrets.GITHUB_CERT_PASSWORD}}
-          DESKTOP_CERT_TOKEN: ${{secrets.DESKTOP_CERT_TOKEN}}
+          CERT_PASSWORD: ${{secrets.WINDOWS_CERT_PASSWORD}}
       - name: Checkout documentation site
         uses: actions/checkout@v2
         with:
@@ -147,15 +153,18 @@ jobs:
           "${MSBUILD_PATH}\MSBuild.exe" ./build/windows/gh.wixproj -p:SourceDir="$PWD" -p:OutputPath="$PWD" -p:OutputName="$name" -p:ProductVersion="$version"
       - name: Obtain signing cert
         id: obtain_cert
+        shell: bash
+        run: |
+          base64 -d <<<"$CERT_CONTENTS" > ./cert.pfx
+          printf "::set-output name=cert-file::%s\n" ".\\cert.pfx"
         env:
-          DESKTOP_CERT_TOKEN: ${{ secrets.DESKTOP_CERT_TOKEN }}
-        run: .\script\setup-windows-certificate.ps1
+          CERT_CONTENTS: ${{ secrets.WINDOWS_CERT_PFX }}
       - name: Sign MSI
         env:
           CERT_FILE: ${{ steps.obtain_cert.outputs.cert-file }}
           EXE_FILE: ${{ steps.buildmsi.outputs.msi }}
-          GITHUB_CERT_PASSWORD: ${{ secrets.GITHUB_CERT_PASSWORD }}
-        run: .\script\sign.ps1 -Certificate $env:CERT_FILE -Executable $env:EXE_FILE
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: .\script\signtool sign /d "GitHub CLI" /f $env:CERT_FILE /p $env:CERT_PASSWORD /fd sha256 /tr http://timestamp.digicert.com /v $env:EXE_FILE
       - name: Upload MSI
         shell: bash
         run: |
