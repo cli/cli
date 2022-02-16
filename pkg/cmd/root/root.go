@@ -142,6 +142,7 @@ func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
 			vscsURL,
 			&lazyLoadedHTTPClient{factory: f},
 		),
+		f.Browser,
 	)
 	cmd := codespaceCmd.NewRootCmd(app)
 	cmd.Use = "codespace"

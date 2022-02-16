@@ -614,6 +614,15 @@ type startCreateRequest struct {
 
 var errProvisioningInProgress = errors.New("provisioning in progress")
 
+type AcceptPermissionsRequiredError struct {
+	Message             string `json:"message"`
+	AllowPermissionsURL string `json:"allow_permissions_url"`
+}
+
+func (e AcceptPermissionsRequiredError) Error() string {
+	return e.Message
+}
+
 // startCreate starts the creation of a codespace.
 // It may return success or an error, or errProvisioningInProgress indicating that the operation
 // did not complete before the GitHub API's time limit for RPCs (10s), in which case the caller
@@ -648,6 +657,23 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 
 	if resp.StatusCode == http.StatusAccepted {
 		return nil, errProvisioningInProgress // RPC finished before result of creation known
+	} else if resp.StatusCode == http.StatusUnauthorized {
+		var ue AcceptPermissionsRequiredError
+
+		b, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("error reading response body: %w", err)
+		}
+		if err := json.Unmarshal(b, &ue); err != nil {
+			return nil, fmt.Errorf("error unmarshaling response: %w", err)
+		}
+
+		if ue.AllowPermissionsURL != "" {
+			return nil, ue
+		}
+
+		return nil, api.HandleHTTPError(resp)
+
 	} else if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return nil, api.HandleHTTPError(resp)
 	}

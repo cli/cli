@@ -1,14 +1,17 @@
 package codespace
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -117,7 +120,32 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		IdleTimeoutMinutes: int(opts.idleTimeout.Minutes()),
 	})
 	a.StopProgressIndicator()
+
+	out := a.io.Out
+
 	if err != nil {
+		var aerr api.AcceptPermissionsRequiredError
+		if errors.As(err, &aerr) && aerr.AllowPermissionsURL != "" {
+
+			var (
+				isInteractive = a.io.CanPrompt()
+				cs            = a.io.ColorScheme()
+				displayURL    = utils.DisplayURL(aerr.AllowPermissionsURL)
+			)
+
+			if !isInteractive {
+				fmt.Fprintf(out, "%s to continue in your web browser: %s\n", cs.Bold("Open this URL"), displayURL)
+				return nil
+			}
+
+			fmt.Fprintf(out, "You must accept the permissions requested by the repository before you can create a codespace.\n")
+			fmt.Fprintf(out, "%s to open %s in your browser... ", cs.Bold("Press Enter"), displayURL)
+			_ = waitForEnter(a.io.In)
+
+			if err := a.browser.Browse(aerr.AllowPermissionsURL); err != nil {
+				return fmt.Errorf("error opening browser: %w", err)
+			}
+		}
 		return fmt.Errorf("error creating codespace: %w", err)
 	}
 
@@ -127,7 +155,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		}
 	}
 
-	fmt.Fprintln(a.io.Out, codespace.Name)
+	fmt.Fprintln(out, codespace.Name)
 	return nil
 }
 
@@ -295,4 +323,10 @@ func buildDisplayName(displayName string, prebuildAvailability string) string {
 	}
 
 	return fmt.Sprintf("%s%s", displayName, prebuildText)
+}
+
+func waitForEnter(r io.Reader) error {
+	scanner := bufio.NewScanner(r)
+	scanner.Scan()
+	return scanner.Err()
 }
