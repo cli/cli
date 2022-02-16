@@ -26,9 +26,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List deploy keys in a GitHub repository",
-		Args:  cobra.ExactArgs(0),
+		Use:     "list",
+		Short:   "List deploy keys in a GitHub repository",
+		Aliases: []string{"ls"},
+		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo
 
