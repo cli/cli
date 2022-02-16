@@ -60,6 +60,6 @@ func (a *App) Edit(ctx context.Context, opts editOptions) error {
 		return fmt.Errorf("error editing codespace: %w", err)
 	}
 
-	fmt.Fprintln(a.io.Out, codespace.Name)
+	fmt.Fprintln(a.io.Out, codespace.DisplayName)
 	return nil
 }
