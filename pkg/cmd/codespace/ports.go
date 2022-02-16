@@ -256,18 +256,19 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 		a.StartProgressIndicatorWithLabel(fmt.Sprintf("Updating port %d visibility to: %s", port.number, port.visibility))
 		err := session.UpdateSharedServerPrivacy(ctx, port.number, port.visibility)
 
-		// wait for succeed or failure
+		if err != nil {
+			return fmt.Errorf("error updating port %d to %s: %w", port.number, port.visibility, err)
+		}
+
+		// wait for success or failure
 		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
 		if err := a.waitForPortUpdate(ctx, session, port.number); err != nil {
-			return fmt.Errorf("error waiting for port update: %w", err)
+			return fmt.Errorf("error waiting for port %d to update to %s: %w", port.number, port.visibility, err)
 		}
 
 		a.StopProgressIndicator()
-		if err != nil {
-			return fmt.Errorf("error update port to public: %w", err)
-		}
 	}
 
 	return nil

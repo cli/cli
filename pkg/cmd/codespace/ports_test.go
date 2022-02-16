@@ -12,11 +12,127 @@ import (
 	"github.com/sourcegraph/jsonrpc2"
 )
 
+func TestPortsUpdateVisibilitySuccess(t *testing.T) {
+	portVisibilities := []portVisibility{
+		{
+			number:     80,
+			visibility: "org",
+		},
+		{
+			number:     9999,
+			visibility: "public",
+		},
+	}
+
+	eventResponses := []string{
+		"sharingSucceeded",
+		"sharingSucceeded",
+	}
+
+	portsData := []portData{
+		{
+			Port:       80,
+			ChangeKind: portChangeKindUpdate,
+		},
+		{
+			Port:       9999,
+			ChangeKind: portChangeKindUpdate,
+		},
+	}
+
+	err := RunUpdateVisibilityTest(t, portVisibilities, eventResponses, portsData)
+
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestPortsUpdateVisibilityFailure403(t *testing.T) {
+	portVisibilities := []portVisibility{
+		{
+			number:     80,
+			visibility: "org",
+		},
+		{
+			number:     9999,
+			visibility: "public",
+		},
+	}
+
+	eventResponses := []string{
+		"sharingSucceeded",
+		"sharingFailed",
+	}
+
+	portsData := []portData{
+		{
+			Port:       80,
+			ChangeKind: portChangeKindUpdate,
+		},
+		{
+			Port:        9999,
+			ChangeKind:  portChangeKindUpdate,
+			ErrorDetail: "test error",
+			StatusCode:  403,
+		},
+	}
+
+	err := RunUpdateVisibilityTest(t, portVisibilities, eventResponses, portsData)
+	if err == nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	expectedErr := "error waiting for port 9999 to update to public: organization admin has forbidden this privacy setting"
+	if err.Error() != expectedErr {
+		t.Errorf("expected: %v, got: %v", expectedErr, err)
+	}
+}
+
+func TestPortsUpdateVisibilityFailure(t *testing.T) {
+	portVisibilities := []portVisibility{
+		{
+			number:     80,
+			visibility: "org",
+		},
+		{
+			number:     9999,
+			visibility: "public",
+		},
+	}
+
+	eventResponses := []string{
+		"sharingSucceeded",
+		"sharingFailed",
+	}
+
+	portsData := []portData{
+		{
+			Port:       80,
+			ChangeKind: portChangeKindUpdate,
+		},
+		{
+			Port:        9999,
+			ChangeKind:  portChangeKindUpdate,
+			ErrorDetail: "test error",
+		},
+	}
+
+	err := RunUpdateVisibilityTest(t, portVisibilities, eventResponses, portsData)
+	if err == nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	expectedErr := "error waiting for port 9999 to update to public: test error"
+	if err.Error() != expectedErr {
+		t.Errorf("expected: %v, got: %v", expectedErr, err)
+	}
+}
+
 type joinWorkspaceResult struct {
 	SessionNumber int `json:"sessionNumber"`
 }
 
-func TestPortsUpdateVisibility(t *testing.T) {
+func RunUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, eventResponses []string, portsData []portData) error {
 	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
 		return joinWorkspaceResult{1}, nil
 	}
@@ -50,22 +166,21 @@ func TestPortsUpdateVisibility(t *testing.T) {
 		Params portData
 	}
 
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case port := <-ch:
-				testServer.WriteToObjectStream(rpcMessage{
-					Method: "sharingSucceeded",
-					Params: portData{
-						Port:       int(port),
-						ChangeKind: portChangeKindUpdate,
-					},
-				})
+	for index, pd := range portsData {
+		go func(index int, pd portData) {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ch:
+					testServer.WriteToObjectStream(rpcMessage{
+						Method: eventResponses[index],
+						Params: pd,
+					})
+				}
 			}
-		}
-	}()
+		}(index, pd)
+	}
 
 	mockApi := &apiClientMock{
 		GetCodespaceFunc: func(ctx context.Context, codespaceName string, includeConnection bool) (*api.Codespace, error) {
@@ -89,8 +204,12 @@ func TestPortsUpdateVisibility(t *testing.T) {
 		apiClient: mockApi,
 	}
 
-	err = a.UpdatePortVisibility(ctx, "codespace-name", []string{"80:80", "9999:9999"})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	var portArgs []string
+	for _, pv := range portVisibilities {
+		portArgs = append(portArgs, fmt.Sprintf("%d:%s", pv.number, pv.visibility))
 	}
+
+	err = a.UpdatePortVisibility(ctx, "codespace-name", portArgs)
+
+	return err
 }
