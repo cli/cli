@@ -289,7 +289,18 @@ func TestCodespace_ExportData(t *testing.T) {
 		args   args
 		want   map[string]interface{}
 	}{
-		// TODO: Add test cases.
+		{
+			name: "just name",
+			fields: fields{
+				Name: "test",
+			},
+			args: args{
+				fields: []string{"name"},
+			},
+			want: map[string]interface{}{
+				"name": "test",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
