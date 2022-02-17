@@ -40,28 +40,20 @@ func Login(opts *LoginOptions) error {
 	httpClient := opts.HTTPClient
 	cs := opts.IO.ColorScheme()
 
-	var gitProtocol string
-	if opts.GitProtocol == "https" {
-		gitProtocol = "https"
-	} else if opts.GitProtocol == "ssh" {
-		gitProtocol = "ssh"
-	} else if opts.GitProtocol == "" {
-		if opts.Interactive {
-			var proto string
-			err := prompt.SurveyAskOne(&survey.Select{
-				Message: "What is your preferred protocol for Git operations?",
-				Options: []string{
-					"HTTPS",
-					"SSH",
-				},
-			}, &proto)
-			if err != nil {
-				return fmt.Errorf("could not prompt: %w", err)
-			}
-			gitProtocol = strings.ToLower(proto)
+	gitProtocol := strings.ToLower(opts.GitProtocol)
+	if opts.Interactive && gitProtocol == "" {
+		var proto string
+		err := prompt.SurveyAskOne(&survey.Select{
+			Message: "What is your preferred protocol for Git operations?",
+			Options: []string{
+				"HTTPS",
+				"SSH",
+			},
+		}, &proto)
+		if err != nil {
+			return fmt.Errorf("could not prompt: %w", err)
 		}
-	} else {
-		return fmt.Errorf("Unsupported --git-protocol option: %s", opts.GitProtocol)
+		gitProtocol = strings.ToLower(proto)
 	}
 
 	var additionalScopes []string
@@ -128,8 +120,8 @@ func Login(opts *LoginOptions) error {
 		var err error
 		authToken, err = authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", append(opts.Scopes, additionalScopes...), opts.Interactive)
 		if err != nil {
-      return fmt.Errorf("failed to authenticate via web browser: %w", err)
-    }
+			return fmt.Errorf("failed to authenticate via web browser: %w", err)
+		}
 		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
 		userValidated = true
 	} else {

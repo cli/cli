@@ -55,8 +55,8 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			Alternatively, pass in a token on standard input by using %[1]s--with-token%[1]s.
 			The minimum required scopes for the token are: "repo", "read:org".
 
-			The --scopes flag accepts a comma separated list of scopes you want your gh credentials to have. If
-			absent, this command ensures that gh has access to a minimum set of scopes.
+			The %[1]s--scopes%[1]s flag accepts a comma separated list of scopes you want your gh credentials to
+			have. If absent, this command ensures that gh has access to a minimum set of scopes.
 		`, "`"),
 		Example: heredoc.Doc(`
 			# start interactive setup
@@ -65,11 +65,8 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			# authenticate against github.com by reading the token from a file
 			$ gh auth login --with-token < mytoken.txt
 
-			# authenticate with a specific GitHub Enterprise Server instance
+			# authenticate with a specific GitHub instance
 			$ gh auth login --hostname enterprise.internal
-
-			# authenticate with the public GitHub server instance
-			$ gh auth login --hostname github.com
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if tokenStdin && opts.Web {
@@ -115,8 +112,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes for gh to have")
 	cmd.Flags().BoolVar(&tokenStdin, "with-token", false, "Read token from standard input")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a browser to authenticate")
-	cmd.Flags().StringVarP(&opts.GitProtocol, "git-protocol", "p", "",
-		"Select the protocol git should use (options: ssh, https)")
+	cmdutil.StringEnumFlag(cmd, &opts.GitProtocol, "git-protocol", "p", "", []string{"ssh", "https"}, "The protocol to use for git operations")
 
 	return cmd
 }
