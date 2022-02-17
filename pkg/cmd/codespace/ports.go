@@ -273,8 +273,8 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 	}
 	defer safeClose(session, &err)
 
-	success := session.RegisterEvent("sharingSucceeded")
-	failure := session.RegisterEvent("sharingFailed")
+	success := session.RegisterEvent("serverSharing.sharingSucceeded")
+	failure := session.RegisterEvent("serverSharing.sharingFailed")
 
 	// TODO: check if port visibility can be updated in parallel instead of sequentially
 	for _, port := range ports {

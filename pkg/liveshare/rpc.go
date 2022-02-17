@@ -73,9 +73,6 @@ func (r *requestHandler) eventHandler(eventName string) chan []byte {
 
 func (r *requestHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
 	fmt.Println(req.Method)
-	if req.Params != nil {
-		fmt.Println(string(*req.Params))
-	}
 	handler := r.eventHandler(req.Method)
 	if handler == nil {
 		return // noop
