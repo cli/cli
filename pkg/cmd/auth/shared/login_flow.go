@@ -29,6 +29,7 @@ type LoginOptions struct {
 	Web         bool
 	Scopes      []string
 	Executable  string
+	GitProtocol string
 
 	sshContext sshContext
 }
@@ -39,8 +40,8 @@ func Login(opts *LoginOptions) error {
 	httpClient := opts.HTTPClient
 	cs := opts.IO.ColorScheme()
 
-	var gitProtocol string
-	if opts.Interactive {
+	gitProtocol := strings.ToLower(opts.GitProtocol)
+	if opts.Interactive && gitProtocol == "" {
 		var proto string
 		err := prompt.SurveyAskOne(&survey.Select{
 			Message: "What is your preferred protocol for Git operations?",
