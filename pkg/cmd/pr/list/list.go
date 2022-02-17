@@ -70,7 +70,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			Open the list of PRs in a web browser
 			$ gh pr list --web
     	`),
-		Args: cmdutil.NoArgsQuoteReminder,
+		Aliases: []string{"ls"},
+		Args:    cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo

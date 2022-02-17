@@ -40,9 +40,10 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 	extCmd.AddCommand(
 		&cobra.Command{
-			Use:   "list",
-			Short: "List installed extension commands",
-			Args:  cobra.NoArgs,
+			Use:     "list",
+			Short:   "List installed extension commands",
+			Aliases: []string{"ls"},
+			Args:    cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, args []string) error {
 				cmds := m.List(true)
 				if len(cmds) == 0 {
