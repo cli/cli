@@ -29,10 +29,16 @@ sudo apt install gh
 
 ### Fedora, CentOS, Red Hat Enterprise Linux (dnf)
 
-Install:
+Install from our package repository for immediate access to latest releases:
 
 ```bash
 sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+sudo dnf install gh
+```
+
+Alternatively, install from the [community repository](https://packages.fedoraproject.org/pkgs/gh/gh/):
+
+```bash
 sudo dnf install gh
 ```
 
