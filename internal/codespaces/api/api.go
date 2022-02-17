@@ -565,6 +565,7 @@ type CreateCodespaceParams struct {
 	Branch             string
 	Machine            string
 	Location           string
+	PermissionsOptOut  bool
 }
 
 // CreateCodespace creates a codespace with the given parameters and returns a non-nil error if it
@@ -610,6 +611,7 @@ type startCreateRequest struct {
 	Ref                string `json:"ref"`
 	Location           string `json:"location"`
 	Machine            string `json:"machine"`
+	PermissionsOptOut  bool   `json:"devcontainer_permissions_opt_out"`
 }
 
 var errProvisioningInProgress = errors.New("provisioning in progress")
@@ -638,6 +640,7 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 		Ref:                params.Branch,
 		Location:           params.Location,
 		Machine:            params.Machine,
+		PermissionsOptOut:  params.PermissionsOptOut,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)

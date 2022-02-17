@@ -16,11 +16,12 @@ import (
 )
 
 type createOptions struct {
-	repo        string
-	branch      string
-	machine     string
-	showStatus  bool
-	idleTimeout time.Duration
+	repo              string
+	branch            string
+	machine           string
+	showStatus        bool
+	permissionsOptOut bool
+	idleTimeout       time.Duration
 }
 
 func newCreateCmd(app *App) *cobra.Command {
@@ -38,6 +39,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().StringVarP(&opts.repo, "repo", "r", "", "repository name with owner: user/repo")
 	createCmd.Flags().StringVarP(&opts.branch, "branch", "b", "", "repository branch")
 	createCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "hardware specifications for the VM")
+	createCmd.Flags().BoolVarP(&opts.permissionsOptOut, "skip-permissions", "", false, "do not accept additional permissions requested by the codespace")
 	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
 	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 0, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
 
@@ -118,35 +120,81 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		Machine:            machine,
 		Location:           locationResult.Location,
 		IdleTimeoutMinutes: int(opts.idleTimeout.Minutes()),
+		PermissionsOptOut:  opts.permissionsOptOut,
 	})
 	a.StopProgressIndicator()
 
-	out := a.io.Out
-
 	if err != nil {
 		var aerr api.AcceptPermissionsRequiredError
-		if errors.As(err, &aerr) && aerr.AllowPermissionsURL != "" {
+		if !errors.As(err, &aerr) || aerr.AllowPermissionsURL == "" {
+			return fmt.Errorf("error creating codespace: %w", err)
+		}
 
-			var (
-				isInteractive = a.io.CanPrompt()
-				cs            = a.io.ColorScheme()
-				displayURL    = utils.DisplayURL(aerr.AllowPermissionsURL)
-			)
+		var (
+			isInteractive = a.io.CanPrompt()
+			cs            = a.io.ColorScheme()
+			displayURL    = utils.DisplayURL(aerr.AllowPermissionsURL)
+		)
 
-			if !isInteractive {
-				fmt.Fprintf(out, "%s to continue in your web browser: %s\n", cs.Bold("Open this URL"), displayURL)
-				return nil
-			}
+		fmt.Fprintf(a.io.Out, "You must accept or deny additional permissions requested by the repository before you can create a codespace.\n")
 
-			fmt.Fprintf(out, "You must accept the permissions requested by the repository before you can create a codespace.\n")
-			fmt.Fprintf(out, "%s to open %s in your browser... ", cs.Bold("Press Enter"), displayURL)
-			_ = waitForEnter(a.io.In)
+		if !isInteractive {
+			fmt.Fprintf(a.io.Out, "%s to continue in your web browser to accept: %s\n", cs.Bold("Open this URL"), displayURL)
+			fmt.Fprintf(a.io.Out, "Alternatively, you can run %q with the %q option to create the codespace without these additional permissions.\n", a.io.ColorScheme().Bold("create"), cs.Bold("--skip-permissions"))
+			return nil
+		}
 
+		choices := []string{
+			"Continue in browser to accept the additional permissions",
+			"Create the codespace without these additional permissions",
+		}
+
+		permsSurvey := []*survey.Question{
+			{
+				Name: "accept",
+				Prompt: &survey.Select{
+					Message: "What would you like to do?",
+					Options: choices,
+					Default: choices[0],
+				},
+				Validate: survey.Required,
+			},
+		}
+
+		var answers struct {
+			Accept string
+		}
+
+		if err := ask(permsSurvey, &answers); err != nil {
+			return fmt.Errorf("error getting answers: %w", err)
+		}
+
+		// if the user chose to continue in the browser, open the URL
+		if answers.Accept == choices[0] {
 			if err := a.browser.Browse(aerr.AllowPermissionsURL); err != nil {
 				return fmt.Errorf("error opening browser: %w", err)
 			}
+			// browser opened successfully but we do not know if they accepted the permissions
+			// so we must exit and wait for the user to attempt the create again
+			return nil
 		}
-		return fmt.Errorf("error creating codespace: %w", err)
+
+		// if the user chose to create the codespace without the permissions,
+		// we can continue with the create opting out of the additional permissions
+		a.StartProgressIndicatorWithLabel("Creating codespace")
+		codespace, err = a.apiClient.CreateCodespace(ctx, &api.CreateCodespaceParams{
+			RepositoryID:       repository.ID,
+			Branch:             branch,
+			Machine:            machine,
+			Location:           locationResult.Location,
+			IdleTimeoutMinutes: int(opts.idleTimeout.Minutes()),
+			PermissionsOptOut:  true,
+		})
+		a.StopProgressIndicator()
+
+		if err != nil {
+			return fmt.Errorf("error creating codespace: %w", err)
+		}
 	}
 
 	if opts.showStatus {
@@ -155,7 +203,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		}
 	}
 
-	fmt.Fprintln(out, codespace.Name)
+	fmt.Fprintln(a.io.Out, codespace.Name)
 	return nil
 }
 
