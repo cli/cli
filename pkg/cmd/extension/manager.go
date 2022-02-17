@@ -223,7 +223,7 @@ func (m *Manager) getCurrentVersion(extension string) string {
 	}
 	dir := m.installDir()
 	gitDir := "--git-dir=" + filepath.Join(dir, extension, ".git")
-	cmd := m.newCommand(gitExe, gitDir, "rev-parse", "HEAD")
+	cmd := m.newCommand(gitExe, gitDir, "rev-parse", "--short", "HEAD")
 	localSha, err := cmd.Output()
 	if err != nil {
 		return ""
@@ -292,13 +292,18 @@ func (m *Manager) getLatestVersion(ext Extension) (string, error) {
 		}
 		extDir := filepath.Dir(ext.path)
 		gitDir := "--git-dir=" + filepath.Join(extDir, ".git")
-		cmd := m.newCommand(gitExe, gitDir, "ls-remote", "origin", "HEAD")
-		lsRemote, err := cmd.Output()
+		lsRemoteCmd := m.newCommand(gitExe, gitDir, "ls-remote", "origin", "HEAD")
+		lsRemote, err := lsRemoteCmd.Output()
 		if err != nil {
 			return "", err
 		}
 		remoteSha := bytes.SplitN(lsRemote, []byte("\t"), 2)[0]
-		return string(remoteSha), nil
+		shortShaCmd := m.newCommand(gitExe, gitDir, "rev-parse", "--short", string(remoteSha))
+		shortSha, err := shortShaCmd.Output()
+		if err != nil {
+			return "", err
+		}
+		return string(bytes.TrimSpace(shortSha)), nil
 	}
 }
 

@@ -60,6 +60,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					t.AddField(fmt.Sprintf("gh %s", c.Name()), nil, nil)
 					t.AddField(repo, nil, nil)
+					t.AddField(c.CurrentVersion(), nil, nil)
 					var updateAvailable string
 					if c.UpdateAvailable() {
 						updateAvailable = "Upgrade available"
