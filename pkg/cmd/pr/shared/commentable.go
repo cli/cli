@@ -68,10 +68,6 @@ func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
 			return cmdutil.FlagErrorf("flags required when not running interactively")
 		}
 		opts.Interactive = true
-	} else if inputFlags == 1 {
-		if !opts.IO.CanPrompt() && opts.InputType == InputTypeEditor {
-			return cmdutil.FlagErrorf("`--body`, `--body-file` or `--web` required when not running interactively")
-		}
 	} else if inputFlags > 1 {
 		return cmdutil.FlagErrorf("specify only one of `--body`, `--body-file`, `--editor`, or `--web`")
 	}
