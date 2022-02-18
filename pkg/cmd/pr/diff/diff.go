@@ -66,7 +66,7 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 			case "never":
 				opts.UseColor = false
 			default:
-				return cmdutil.FlagErrorf("the value for `--color` must be one of \"auto\", \"always\", or \"never\"")
+				return fmt.Errorf("unsupported color %q", colorFlag)
 			}
 
 			if runF != nil {
@@ -76,7 +76,7 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().StringVar(&colorFlag, "color", "auto", "Use color in diff output: {always|never|auto}")
+	cmdutil.StringEnumFlag(cmd, &colorFlag, "color", "", "auto", []string{"always", "never", "auto"}, "Use color in diff output")
 	cmd.Flags().BoolVar(&opts.Patch, "patch", false, "Display diff in patch format")
 
 	return cmd
