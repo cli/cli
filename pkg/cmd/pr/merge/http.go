@@ -20,13 +20,14 @@ const (
 )
 
 type mergePayload struct {
-	repo          ghrepo.Interface
-	pullRequestID string
-	method        PullRequestMergeMethod
-	auto          bool
-	commitSubject string
-	commitBody    string
-	setCommitBody bool
+	repo              ghrepo.Interface
+	pullRequestID     string
+	method            PullRequestMergeMethod
+	auto              bool
+	commitSubject     string
+	commitBody        string
+	commitAuthorEmail string
+	setCommitBody     bool
 }
 
 // TODO: drop after githubv4 gets updated
@@ -58,6 +59,10 @@ func mergePullRequest(client *http.Client, payload mergePayload) error {
 	if payload.setCommitBody {
 		commitBody := githubv4.String(payload.commitBody)
 		input.CommitBody = &commitBody
+	}
+	if payload.commitAuthorEmail != "" {
+		authorEmail := githubv4.String(payload.commitAuthorEmail)
+		input.AuthorEmail = &authorEmail
 	}
 
 	variables := map[string]interface{}{

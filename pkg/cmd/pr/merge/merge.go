@@ -228,14 +228,20 @@ func mergeRun(opts *MergeOptions) error {
 	}
 
 	if !isPRAlreadyMerged {
+		authorEmail, err := git.Config("user.email")
+		if err != nil {
+			// work out what to do if an error occurs
+		}
+
 		payload := mergePayload{
-			repo:          baseRepo,
-			pullRequestID: pr.ID,
-			method:        opts.MergeMethod,
-			auto:          autoMerge,
-			commitSubject: opts.Subject,
-			commitBody:    opts.Body,
-			setCommitBody: opts.BodySet,
+			repo:              baseRepo,
+			pullRequestID:     pr.ID,
+			method:            opts.MergeMethod,
+			auto:              autoMerge,
+			commitSubject:     opts.Subject,
+			commitBody:        opts.Body,
+			commitAuthorEmail: authorEmail,
+			setCommitBody:     opts.BodySet,
 		}
 
 		if opts.InteractiveMode {

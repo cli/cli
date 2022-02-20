@@ -278,11 +278,13 @@ func TestPrMerge(t *testing.T) {
 		baseRepo("OWNER", "REPO", "master"),
 	)
 
+	expectedAuthorEmail := "valid@email.com"
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.Equal(t, expectedAuthorEmail, input["authorEmail"])
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
@@ -290,6 +292,7 @@ func TestPrMerge(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+	cs.Register(`git config user.email`, 0, expectedAuthorEmail)
 
 	output, err := runCommand(http, "master", true, "pr merge 1 --merge")
 	if err != nil {
@@ -361,6 +364,7 @@ func TestPrMerge_nontty(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+	cs.Register(`git config user.email`, 0, "valid@email.com")
 
 	output, err := runCommand(http, "master", false, "pr merge 1 --merge")
 	if err != nil {
@@ -400,6 +404,7 @@ func TestPrMerge_editMessage_nontty(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+	cs.Register(`git config user.email`, 0, "valid@email.com")
 
 	output, err := runCommand(http, "master", false, "pr merge 1 --merge -t mytitle -b mybody")
 	if err != nil {
@@ -434,8 +439,10 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git config user.email`, 0, "valid@email.com")
 
 	output, err := runCommand(http, "master", true, "pr merge 1 --merge -R OWNER/REPO")
 	if err != nil {
@@ -484,6 +491,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
+	cs.Register(`git config user.email`, 0, "valid@email.com")
 
 	output, err := runCommand(http, "blueberries", true, `pr merge --merge --delete-branch`)
 	if err != nil {
@@ -529,6 +537,7 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git config user.email`, 0, "valid@email.com")
 	cs.Register(`git branch -D blueberries`, 0, "")
 
 	output, err := runCommand(http, "master", true, `pr merge --merge --delete-branch blueberries`)
@@ -572,6 +581,7 @@ func Test_nonDivergingPullRequest(t *testing.T) {
 
 	cs.Register(`git .+ show .+ HEAD`, 0, "COMMITSHA1,title")
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+	cs.Register(`git config user.email`, 0, "valid@email.com")
 
 	output, err := runCommand(http, "blueberries", true, "pr merge --merge")
 	if err != nil {
@@ -612,6 +622,7 @@ func Test_divergingPullRequestWarning(t *testing.T) {
 
 	cs.Register(`git .+ show .+ HEAD`, 0, "COMMITSHA2,title")
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+	cs.Register(`git config user.email`, 0, "valid@email.com")
 
 	output, err := runCommand(http, "blueberries", true, "pr merge --merge")
 	if err != nil {
@@ -652,6 +663,7 @@ func Test_pullRequestWithoutCommits(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+	cs.Register(`git config user.email`, 0, "valid@email.com")
 
 	output, err := runCommand(http, "blueberries", true, "pr merge --merge")
 	if err != nil {
@@ -691,6 +703,7 @@ func TestPrMerge_rebase(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+	cs.Register(`git config user.email`, 0, "valid@email.com")
 
 	output, err := runCommand(http, "master", true, "pr merge 2 --rebase")
 	if err != nil {
@@ -732,6 +745,7 @@ func TestPrMerge_squash(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+	cs.Register(`git config user.email`, 0, "valid@email.com")
 
 	output, err := runCommand(http, "master", true, "pr merge 3 --squash")
 	if err != nil {
@@ -847,6 +861,7 @@ func TestPRMerge_interactive(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git config user.email`, 0, "valid@email.com")
 
 	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, surveyTeardown := prompt.InitAskStubber()
@@ -908,6 +923,7 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 
 	cs.Register(`git checkout master`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git config user.email`, 0, "valid@email.com")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
@@ -970,8 +986,10 @@ func TestPRMerge_interactiveSquashEditCommitMsgAndSubject(t *testing.T) {
 			assert.Equal(t, "DEFAULT BODY TEXT", input["commitBody"].(string))
 		}))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git config user.email`, 0, "valid@email.com")
 
 	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, surveyTeardown := prompt.InitAskStubber()
@@ -1031,6 +1049,7 @@ func TestPRMerge_interactiveCancelled(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+	cs.Register(`git config user.email`, 0, "valid@email.com")
 
 	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, surveyTeardown := prompt.InitAskStubber()
@@ -1081,8 +1100,10 @@ func TestMergeRun_autoMerge(t *testing.T) {
 			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
 		}))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git config user.email`, 0, "valid@email.com")
 
 	err := mergeRun(&MergeOptions{
 		IO: io,
@@ -1119,8 +1140,10 @@ func TestMergeRun_autoMerge_directMerge(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+
+	cs.Register(`git config user.email`, 0, "valid@email.com")
 
 	err := mergeRun(&MergeOptions{
 		IO: io,
