@@ -1200,6 +1200,41 @@ func TestMergeRun_disableAutoMerge(t *testing.T) {
 	assert.Equal(t, "✓ Auto-merge disabled for pull request #123\n", stderr.String())
 }
 
+func TestPrMerge_emptyGitUserEmail(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.NotContains(t, input, "authorEmail")
+		}))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+	cs.Register(`git config user.email`, 1, "")
+
+	_, err := runCommand(http, "master", true, "pr merge 1 --merge")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+}
+
 type testEditor struct{}
 
 func (e testEditor) Edit(filename, text string) (string, error) {

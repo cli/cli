@@ -228,10 +228,10 @@ func mergeRun(opts *MergeOptions) error {
 	}
 
 	if !isPRAlreadyMerged {
-		authorEmail, err := git.Config("user.email")
-		if err != nil {
-			// work out what to do if an error occurs
-		}
+
+		// ignore error, since git.Config will return "" for
+		// authorEmail if any error occurs
+		authorEmail, _ := git.Config("user.email")
 
 		payload := mergePayload{
 			repo:              baseRepo,
