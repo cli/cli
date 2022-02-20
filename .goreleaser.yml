@@ -19,7 +19,7 @@ builds:
         - -X main.updaterEnabled=cli/cli
     id: macos
     goos: [darwin]
-    goarch: [amd64]
+    goarch: [amd64, arm64]
 
   - <<: *build_defaults
     id: linux
