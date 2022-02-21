@@ -45,7 +45,7 @@ func TestNewCmdFork(t *testing.T) {
 			name:    "git args without repo",
 			cli:     "-- --foo bar",
 			wantErr: true,
-			errMsg:  "repository argument required when passing 'git clone' flags",
+			errMsg:  "repository argument required when passing git clone flags",
 		},
 		{
 			name: "repo",
@@ -130,7 +130,7 @@ func TestNewCmdFork(t *testing.T) {
 			name:    "git flags in wrong place",
 			cli:     "--depth 1 OWNER/REPO",
 			wantErr: true,
-			errMsg:  "unknown flag: --depth\nSeparate git clone flags with '--'.",
+			errMsg:  "unknown flag: --depth\nSeparate git clone flags with `--`.",
 		},
 		{
 			name: "with fork name",

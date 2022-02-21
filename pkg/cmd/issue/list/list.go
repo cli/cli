@@ -57,12 +57,17 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List and filter issues in this repository",
+		Short: "List issues in a repository",
+		Long: heredoc.Doc(`
+			List issues in a GitHub repository.
+
+			The search query syntax is documented here:
+			<https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests>
+		`),
 		Example: heredoc.Doc(`
-			$ gh issue list -l "bug" -l "help wanted"
-			$ gh issue list -A monalisa
-			$ gh issue list -a "@me"
-			$ gh issue list --web
+			$ gh issue list --label "bug" --label "help wanted"
+			$ gh issue list --author monalisa
+			$ gh issue list --assignee "@me"
 			$ gh issue list --milestone "The big 1.0"
 			$ gh issue list --search "error no:assignee sort:created-asc"
 		`),
@@ -83,14 +88,14 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the browser to list the issue(s)")
+	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "List issues in the web browser")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
-	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by labels")
+	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by label")
 	cmdutil.StringEnumFlag(cmd, &opts.State, "state", "s", "open", []string{"open", "closed", "all"}, "Filter by state")
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of issues to fetch")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVar(&opts.Mention, "mention", "", "Filter by mention")
-	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Filter by milestone `number` or `title`")
+	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Filter by milestone number or title")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search issues with `query`")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.IssueFields)
 

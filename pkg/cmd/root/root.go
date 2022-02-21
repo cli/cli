@@ -50,9 +50,6 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 			"help:feedback": heredoc.Doc(`
 				Open an issue using 'gh issue create -R github.com/cli/cli'
 			`),
-			"help:environment": heredoc.Doc(`
-				See 'gh help environment' for the list of supported environment variables.
-			`),
 		},
 	}
 
