@@ -14,8 +14,7 @@ import (
 func NewCmdAuth(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "auth <command>",
-		Short: "Authenticate gh with GitHub",
-		Long:  `Manage gh's authentication state.`,
+		Short: "Authenticate gh and git with GitHub",
 		Annotations: map[string]string{
 			"IsCore": "true",
 		},
