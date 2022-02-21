@@ -121,10 +121,6 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 					return cmdutil.FlagErrorf("`--visibility` is only supported with `--org`")
 				}
 
-				if opts.Visibility != shared.All && opts.Visibility != shared.Private && opts.Visibility != shared.Selected {
-					return cmdutil.FlagErrorf("`--visibility` must be one of \"all\", \"private\", or \"selected\"")
-				}
-
 				if opts.Visibility != shared.Selected && len(opts.RepositoryNames) > 0 {
 					return cmdutil.FlagErrorf("`--repos` is only supported with `--visibility=selected`")
 				}
@@ -149,7 +145,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Set `organization` secret")
 	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Set deployment `environment` secret")
 	cmd.Flags().BoolVarP(&opts.UserSecrets, "user", "u", false, "Set a secret for your user")
-	cmd.Flags().StringVarP(&opts.Visibility, "visibility", "v", "private", "Set visibility for an organization secret: `{all|private|selected}`")
+	cmdutil.StringEnumFlag(cmd, &opts.Visibility, "visibility", "v", shared.Private, []string{shared.All, shared.Private, shared.Selected}, "Set visibility for an organization secret")
 	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of `repositories` that can access an organization or user secret")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "The value for the secret (reads from standard input if not specified)")
 	cmd.Flags().BoolVar(&opts.DoNotStore, "no-store", false, "Print the encrypted, base64-encoded value instead of storing it on Github")
