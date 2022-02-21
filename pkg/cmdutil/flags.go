@@ -25,6 +25,7 @@ func NilBoolFlag(cmd *cobra.Command, p **bool, name string, shorthand string, us
 
 // StringEnumFlag defines a new string flag that only allows values listed in options.
 func StringEnumFlag(cmd *cobra.Command, p *string, name, shorthand, defaultValue string, options []string, usage string) *pflag.Flag {
+	*p = defaultValue
 	val := &enumValue{string: p, options: options}
 	f := cmd.Flags().VarPF(val, name, shorthand, fmt.Sprintf("%s: %s", usage, formatValuesForUsageDocs(options)))
 	_ = cmd.RegisterFlagCompletionFunc(name, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
