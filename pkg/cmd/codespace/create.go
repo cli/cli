@@ -1,16 +1,15 @@
 package codespace
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
@@ -39,7 +38,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().StringVarP(&opts.repo, "repo", "r", "", "repository name with owner: user/repo")
 	createCmd.Flags().StringVarP(&opts.branch, "branch", "b", "", "repository branch")
 	createCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "hardware specifications for the VM")
-	createCmd.Flags().BoolVarP(&opts.permissionsOptOut, "skip-permissions", "", false, "do not accept additional permissions requested by the codespace")
+	createCmd.Flags().BoolVarP(&opts.permissionsOptOut, "default-permissions", "", false, "do not prompt to accept additional permissions requested by the codespace")
 	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
 	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 0, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
 
@@ -130,53 +129,9 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 			return fmt.Errorf("error creating codespace: %w", err)
 		}
 
-		var (
-			isInteractive = a.io.CanPrompt()
-			cs            = a.io.ColorScheme()
-			displayURL    = utils.DisplayURL(aerr.AllowPermissionsURL)
-		)
-
-		fmt.Fprintf(a.io.Out, "You must accept or deny additional permissions requested by the repository before you can create a codespace.\n")
-
-		if !isInteractive {
-			fmt.Fprintf(a.io.Out, "%s to continue in your web browser to accept: %s\n", cs.Bold("Open this URL"), displayURL)
-			fmt.Fprintf(a.io.Out, "Alternatively, you can run %q with the %q option to create the codespace without these additional permissions.\n", a.io.ColorScheme().Bold("create"), cs.Bold("--skip-permissions"))
-			return nil
-		}
-
-		choices := []string{
-			"Continue in browser to accept the additional permissions",
-			"Create the codespace without these additional permissions",
-		}
-
-		permsSurvey := []*survey.Question{
-			{
-				Name: "accept",
-				Prompt: &survey.Select{
-					Message: "What would you like to do?",
-					Options: choices,
-					Default: choices[0],
-				},
-				Validate: survey.Required,
-			},
-		}
-
-		var answers struct {
-			Accept string
-		}
-
-		if err := ask(permsSurvey, &answers); err != nil {
-			return fmt.Errorf("error getting answers: %w", err)
-		}
-
-		// if the user chose to continue in the browser, open the URL
-		if answers.Accept == choices[0] {
-			if err := a.browser.Browse(aerr.AllowPermissionsURL); err != nil {
-				return fmt.Errorf("error opening browser: %w", err)
-			}
-			// browser opened successfully but we do not know if they accepted the permissions
-			// so we must exit and wait for the user to attempt the create again
-			return nil
+		if err := a.handleAdditionalPermissions(ctx, aerr.AllowPermissionsURL); err != nil {
+			// this error could be a cmdutil.SilentError (in the case that the user opened the browser) so we don't want to wrap it
+			return err
 		}
 
 		// if the user chose to create the codespace without the permissions,
@@ -204,6 +159,59 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	}
 
 	fmt.Fprintln(a.io.Out, codespace.Name)
+	return nil
+}
+
+func (a *App) handleAdditionalPermissions(ctx context.Context, allowPermissionsURL string) error {
+	var (
+		isInteractive = a.io.CanPrompt()
+		cs            = a.io.ColorScheme()
+		displayURL    = utils.DisplayURL(allowPermissionsURL)
+	)
+
+	fmt.Fprintf(a.io.ErrOut, "You must accept or deny additional permissions requested by the repository before you can create a codespace.\n")
+
+	if !isInteractive {
+		fmt.Fprintf(a.io.ErrOut, "%s to continue in your web browser to accept: %s\n", cs.Bold("Open this URL"), displayURL)
+		fmt.Fprintf(a.io.ErrOut, "Alternatively, you can run %q with the %q option to create the codespace without these additional permissions.\n", a.io.ColorScheme().Bold("create"), cs.Bold("--default-permissions"))
+		return nil
+	}
+
+	choices := []string{
+		"Continue in browser to accept the additional permissions",
+		"Create the codespace without these additional permissions",
+	}
+
+	permsSurvey := []*survey.Question{
+		{
+			Name: "accept",
+			Prompt: &survey.Select{
+				Message: "What would you like to do?",
+				Options: choices,
+				Default: choices[0],
+			},
+			Validate: survey.Required,
+		},
+	}
+
+	var answers struct {
+		Accept string
+	}
+
+	if err := ask(permsSurvey, &answers); err != nil {
+		return fmt.Errorf("error getting answers: %w", err)
+	}
+
+	// if the user chose to continue in the browser, open the URL
+	if answers.Accept == choices[0] {
+		if err := a.browser.Browse(allowPermissionsURL); err != nil {
+			return fmt.Errorf("error opening browser: %w", err)
+		}
+		// browser opened successfully but we do not know if they accepted the permissions
+		// so we must exit and wait for the user to attempt the create again
+		return cmdutil.SilentError
+	}
+
 	return nil
 }
 
@@ -371,10 +379,4 @@ func buildDisplayName(displayName string, prebuildAvailability string) string {
 	}
 
 	return fmt.Sprintf("%s%s", displayName, prebuildText)
-}
-
-func waitForEnter(r io.Reader) error {
-	scanner := bufio.NewScanner(r)
-	scanner.Scan()
-	return scanner.Err()
 }

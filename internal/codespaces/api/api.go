@@ -661,9 +661,13 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 	if resp.StatusCode == http.StatusAccepted {
 		return nil, errProvisioningInProgress // RPC finished before result of creation known
 	} else if resp.StatusCode == http.StatusUnauthorized {
-		var ue AcceptPermissionsRequiredError
+		var (
+			ue       AcceptPermissionsRequiredError
+			bodyCopy = &bytes.Buffer{}
+			r        = io.TeeReader(resp.Body, bodyCopy)
+		)
 
-		b, err := ioutil.ReadAll(resp.Body)
+		b, err := ioutil.ReadAll(r)
 		if err != nil {
 			return nil, fmt.Errorf("error reading response body: %w", err)
 		}
@@ -674,6 +678,8 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 		if ue.AllowPermissionsURL != "" {
 			return nil, ue
 		}
+
+		resp.Body = ioutil.NopCloser(bodyCopy)
 
 		return nil, api.HandleHTTPError(resp)
 
