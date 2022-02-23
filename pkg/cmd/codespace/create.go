@@ -112,15 +112,17 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return errors.New("there are no available machine types for this repository")
 	}
 
-	a.StartProgressIndicatorWithLabel("Creating codespace")
-	codespace, err := a.apiClient.CreateCodespace(ctx, &api.CreateCodespaceParams{
+	createParams := &api.CreateCodespaceParams{
 		RepositoryID:       repository.ID,
 		Branch:             branch,
 		Machine:            machine,
 		Location:           locationResult.Location,
 		IdleTimeoutMinutes: int(opts.idleTimeout.Minutes()),
 		PermissionsOptOut:  opts.permissionsOptOut,
-	})
+	}
+
+	a.StartProgressIndicatorWithLabel("Creating codespace")
+	codespace, err := a.apiClient.CreateCodespace(ctx, createParams)
 	a.StopProgressIndicator()
 
 	if err != nil {
@@ -129,26 +131,10 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 			return fmt.Errorf("error creating codespace: %w", err)
 		}
 
-		if err := a.handleAdditionalPermissions(ctx, aerr.AllowPermissionsURL); err != nil {
+		codespace, err = a.handleAdditionalPermissions(ctx, createParams, aerr.AllowPermissionsURL)
+		if err != nil {
 			// this error could be a cmdutil.SilentError (in the case that the user opened the browser) so we don't want to wrap it
 			return err
-		}
-
-		// if the user chose to create the codespace without the permissions,
-		// we can continue with the create opting out of the additional permissions
-		a.StartProgressIndicatorWithLabel("Creating codespace")
-		codespace, err = a.apiClient.CreateCodespace(ctx, &api.CreateCodespaceParams{
-			RepositoryID:       repository.ID,
-			Branch:             branch,
-			Machine:            machine,
-			Location:           locationResult.Location,
-			IdleTimeoutMinutes: int(opts.idleTimeout.Minutes()),
-			PermissionsOptOut:  true,
-		})
-		a.StopProgressIndicator()
-
-		if err != nil {
-			return fmt.Errorf("error creating codespace: %w", err)
 		}
 	}
 
@@ -162,7 +148,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	return nil
 }
 
-func (a *App) handleAdditionalPermissions(ctx context.Context, allowPermissionsURL string) error {
+func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api.CreateCodespaceParams, allowPermissionsURL string) (*api.Codespace, error) {
 	var (
 		isInteractive = a.io.CanPrompt()
 		cs            = a.io.ColorScheme()
@@ -174,7 +160,7 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, allowPermissionsU
 	if !isInteractive {
 		fmt.Fprintf(a.io.ErrOut, "%s to continue in your web browser to accept: %s\n", cs.Bold("Open this URL"), displayURL)
 		fmt.Fprintf(a.io.ErrOut, "Alternatively, you can run %q with the %q option to create the codespace without these additional permissions.\n", a.io.ColorScheme().Bold("create"), cs.Bold("--default-permissions"))
-		return nil
+		return nil, cmdutil.SilentError
 	}
 
 	choices := []string{
@@ -199,20 +185,32 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, allowPermissionsU
 	}
 
 	if err := ask(permsSurvey, &answers); err != nil {
-		return fmt.Errorf("error getting answers: %w", err)
+		return nil, fmt.Errorf("error getting answers: %w", err)
 	}
 
 	// if the user chose to continue in the browser, open the URL
 	if answers.Accept == choices[0] {
 		if err := a.browser.Browse(allowPermissionsURL); err != nil {
-			return fmt.Errorf("error opening browser: %w", err)
+			return nil, fmt.Errorf("error opening browser: %w", err)
 		}
 		// browser opened successfully but we do not know if they accepted the permissions
 		// so we must exit and wait for the user to attempt the create again
-		return cmdutil.SilentError
+		return nil, cmdutil.SilentError
 	}
 
-	return nil
+	// if the user chose to create the codespace without the permissions,
+	// we can continue with the create opting out of the additional permissions
+	createParams.PermissionsOptOut = true
+
+	a.StartProgressIndicatorWithLabel("Creating codespace")
+	codespace, err := a.apiClient.CreateCodespace(ctx, createParams)
+	a.StopProgressIndicator()
+
+	if err != nil {
+		return nil, fmt.Errorf("error creating codespace: %w", err)
+	}
+
+	return codespace, nil
 }
 
 // showStatus polls the codespace for a list of post create states and their status. It will keep polling

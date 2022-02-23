@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
@@ -18,7 +19,7 @@ func TestApp_Create(t *testing.T) {
 		name       string
 		fields     fields
 		opts       createOptions
-		wantErr    bool
+		wantErr    error
 		wantStdout string
 		wantStderr string
 	}{
@@ -114,9 +115,10 @@ func TestApp_Create(t *testing.T) {
 				showStatus:  false,
 				idleTimeout: 30 * time.Minute,
 			},
-			wantStdout: `You must accept or deny additional permissions requested by the repository before you can create a codespace.
+			wantErr: cmdutil.SilentError,
+			wantStderr: `You must accept or deny additional permissions requested by the repository before you can create a codespace.
 Open this URL to continue in your web browser to accept: example.com/permissions
-Alternatively, you can run "create" with the "--skip-permissions" option to create the codespace without these additional permissions.
+Alternatively, you can run "create" with the "--default-permissions" option to create the codespace without these additional permissions.
 `,
 		},
 	}
@@ -127,7 +129,7 @@ Alternatively, you can run "create" with the "--skip-permissions" option to crea
 				io:        io,
 				apiClient: tt.fields.apiClient,
 			}
-			if err := a.Create(context.Background(), tt.opts); (err != nil) != tt.wantErr {
+			if err := a.Create(context.Background(), tt.opts); err != tt.wantErr {
 				t.Errorf("App.Create() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if got := stdout.String(); got != tt.wantStdout {
