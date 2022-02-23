@@ -175,6 +175,13 @@ func Test_HextoRGB(t *testing.T) {
 			wants: "red",
 			cs:    NewColorScheme(false, false, false),
 		},
+		{
+			name:  "invalid hex",
+			hex:   "fc0",
+			text:  "red",
+			wants: "red",
+			cs:    NewColorScheme(false, false, false),
+		},
 	}
 
 	for _, tt := range tests {
