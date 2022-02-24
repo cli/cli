@@ -322,9 +322,13 @@ func mergeRun(opts *MergeOptions) error {
 
 		var branchToSwitchTo string
 		if currentBranch == pr.HeadRefName {
-			branchToSwitchTo, err = api.RepoDefaultBranch(apiClient, baseRepo)
-			if err != nil {
-				return err
+			if pr.BaseRefName != "" && git.HasLocalBranch(pr.BaseRefName) {
+				branchToSwitchTo = pr.BaseRefName
+			} else {
+				branchToSwitchTo, err = api.RepoDefaultBranch(apiClient, baseRepo)
+				if err != nil {
+					return err
+				}
 			}
 
 			err = git.CheckoutBranch(branchToSwitchTo)
