@@ -42,41 +42,39 @@ func (r *rpcClient) do(ctx context.Context, method string, args, result interfac
 	return waiter.Wait(waitCtx, result)
 }
 
+type handlerFn func(req *jsonrpc2.Request)
+
 type requestHandler struct {
-	eventHandlersMu sync.RWMutex
-	eventHandlers   map[string]chan []byte
+	handlersMu sync.RWMutex
+	handlers   map[string]handlerFn
 }
 
 func newRequestHandler() *requestHandler {
-	return &requestHandler{eventHandlers: make(map[string]chan []byte)}
+	return &requestHandler{handlers: make(map[string]handlerFn)}
 }
 
-func (r *requestHandler) registerEvent(eventName string) chan []byte {
-	r.eventHandlersMu.Lock()
-	defer r.eventHandlersMu.Unlock()
+func (r *requestHandler) register(requestType string, handler handlerFn) {
+	r.handlersMu.Lock()
+	defer r.handlersMu.Unlock()
 
-	if ch, ok := r.eventHandlers[eventName]; ok {
-		return ch
+	if _, ok := r.handlers[requestType]; ok {
+		return
 	}
 
-	ch := make(chan []byte)
-	r.eventHandlers[eventName] = ch
-	return ch
+	r.handlers[requestType] = handler
 }
 
-func (r *requestHandler) eventHandler(eventName string) chan []byte {
-	r.eventHandlersMu.RLock()
-	defer r.eventHandlersMu.RUnlock()
+func (r *requestHandler) handler(requestType string) handlerFn {
+	r.handlersMu.RLock()
+	defer r.handlersMu.RUnlock()
 
-	return r.eventHandlers[eventName]
+	return r.handlers[requestType]
 }
 
 func (r *requestHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
-	fmt.Println(req.Method)
-	handler := r.eventHandler(req.Method)
-	if handler == nil {
-		return // noop
+	if handler := r.handler(req.Method); handler != nil {
+		go func() {
+			handler(req)
+		}()
 	}
-
-	handler <- *req.Params
 }

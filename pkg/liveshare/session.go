@@ -44,6 +44,19 @@ type Port struct {
 	Privacy                          string `json:"privacy"`
 }
 
+type PortChangeKind string
+
+const (
+	PortChangeKindUpdate PortChangeKind = "update"
+)
+
+type PortUpdate struct {
+	Port        int            `json:"port"`
+	ChangeKind  PortChangeKind `json:"changeKind"`
+	ErrorDetail string         `json:"errorDetail"`
+	StatusCode  int            `json:"statusCode"`
+}
+
 // startSharing tells the Live Share host to start sharing the specified port from the container.
 // The sessionName describes the purpose of the remote port or service.
 // It returns an identifier that can be used to open an SSH channel to the remote port.
@@ -78,8 +91,12 @@ func (s *Session) UpdateSharedServerPrivacy(ctx context.Context, port int, visib
 	return nil
 }
 
-func (s *Session) RegisterEvent(eventName string) chan []byte {
-	return s.rpc.requestHandler.registerEvent(eventName)
+// RegisterRequestHandler allows the caller to register a jsonrpc request handler
+// for a given request type. The handler will be called when the request is received
+// by the session's RPC server. If the request type has already been registered, the function will
+// noop.
+func (s *Session) RegisterRequestHandler(requestType string, h handlerFn) {
+	s.rpc.requestHandler.register(requestType, h)
 }
 
 // StartsSSHServer starts an SSH server in the container, installing sshd if necessary,

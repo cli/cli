@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/liveshare"
 	livesharetest "github.com/cli/cli/v2/pkg/liveshare/test"
 	"github.com/sourcegraph/jsonrpc2"
 )
@@ -26,18 +27,24 @@ func TestPortsUpdateVisibilitySuccess(t *testing.T) {
 	}
 
 	eventResponses := []string{
-		"sharingSucceeded",
-		"sharingSucceeded",
+		"serverSharing.sharingSucceeded",
+		"serverSharing.sharingSucceeded",
 	}
 
-	portsData := []portData{
+	portsData := []portUpdateNotification{
 		{
-			Port:       80,
-			ChangeKind: portChangeKindUpdate,
+			success: true,
+			PortUpdate: liveshare.PortUpdate{
+				Port:       80,
+				ChangeKind: liveshare.PortChangeKindUpdate,
+			},
 		},
 		{
-			Port:       9999,
-			ChangeKind: portChangeKindUpdate,
+			success: true,
+			PortUpdate: liveshare.PortUpdate{
+				Port:       9999,
+				ChangeKind: liveshare.PortChangeKindUpdate,
+			},
 		},
 	}
 
@@ -61,20 +68,26 @@ func TestPortsUpdateVisibilityFailure403(t *testing.T) {
 	}
 
 	eventResponses := []string{
-		"sharingSucceeded",
-		"sharingFailed",
+		"serverSharing.sharingSucceeded",
+		"serverSharing.sharingFailed",
 	}
 
-	portsData := []portData{
+	portsData := []portUpdateNotification{
 		{
-			Port:       80,
-			ChangeKind: portChangeKindUpdate,
+			success: true,
+			PortUpdate: liveshare.PortUpdate{
+				Port:       80,
+				ChangeKind: liveshare.PortChangeKindUpdate,
+			},
 		},
 		{
-			Port:        9999,
-			ChangeKind:  portChangeKindUpdate,
-			ErrorDetail: "test error",
-			StatusCode:  403,
+			success: false,
+			PortUpdate: liveshare.PortUpdate{
+				Port:        9999,
+				ChangeKind:  liveshare.PortChangeKindUpdate,
+				ErrorDetail: "test error",
+				StatusCode:  403,
+			},
 		},
 	}
 
@@ -101,19 +114,25 @@ func TestPortsUpdateVisibilityFailure(t *testing.T) {
 	}
 
 	eventResponses := []string{
-		"sharingSucceeded",
-		"sharingFailed",
+		"serverSharing.sharingSucceeded",
+		"serverSharing.sharingFailed",
 	}
 
-	portsData := []portData{
+	portsData := []portUpdateNotification{
 		{
-			Port:       80,
-			ChangeKind: portChangeKindUpdate,
+			success: true,
+			PortUpdate: liveshare.PortUpdate{
+				Port:       80,
+				ChangeKind: liveshare.PortChangeKindUpdate,
+			},
 		},
 		{
-			Port:        9999,
-			ChangeKind:  portChangeKindUpdate,
-			ErrorDetail: "test error",
+			success: false,
+			PortUpdate: liveshare.PortUpdate{
+				Port:        9999,
+				ChangeKind:  liveshare.PortChangeKindUpdate,
+				ErrorDetail: "test error",
+			},
 		},
 	}
 
@@ -132,7 +151,7 @@ type joinWorkspaceResult struct {
 	SessionNumber int `json:"sessionNumber"`
 }
 
-func runUpdateVisibilityTest(portVisibilities []portVisibility, eventResponses []string, portsData []portData) error {
+func runUpdateVisibilityTest(portVisibilities []portVisibility, eventResponses []string, portsData []portUpdateNotification) error {
 	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
 		return joinWorkspaceResult{1}, nil
 	}
@@ -163,7 +182,7 @@ func runUpdateVisibilityTest(portVisibilities []portVisibility, eventResponses [
 
 	type rpcMessage struct {
 		Method string
-		Params portData
+		Params liveshare.PortUpdate
 	}
 
 	go func() {
@@ -174,14 +193,10 @@ func runUpdateVisibilityTest(portVisibilities []portVisibility, eventResponses [
 				return
 			case <-ch:
 				pd := portsData[i]
-				// TODO: handle error
-				err := testServer.WriteToObjectStream(rpcMessage{
+				_ := testServer.WriteToObjectStream(rpcMessage{
 					Method: eventResponses[i],
-					Params: pd,
+					Params: pd.PortUpdate,
 				})
-				if err != nil {
-					panic(err)
-				}
 			}
 		}
 	}()
