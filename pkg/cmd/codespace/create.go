@@ -155,17 +155,17 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 		displayURL    = utils.DisplayURL(allowPermissionsURL)
 	)
 
-	fmt.Fprintf(a.io.ErrOut, "You must accept or deny additional permissions requested by the repository before you can create a codespace.\n")
+	fmt.Fprintf(a.io.ErrOut, "You must authorize or deny additional permissions requested by this codespace before continuing.\n")
 
 	if !isInteractive {
-		fmt.Fprintf(a.io.ErrOut, "%s to continue in your web browser to accept: %s\n", cs.Bold("Open this URL"), displayURL)
-		fmt.Fprintf(a.io.ErrOut, "Alternatively, you can run %q with the %q option to create the codespace without these additional permissions.\n", a.io.ColorScheme().Bold("create"), cs.Bold("--default-permissions"))
+		fmt.Fprintf(a.io.ErrOut, "%s in your browser to review and authorize additional permissions: %s\n", cs.Bold("Open this URL"), displayURL)
+		fmt.Fprintf(a.io.ErrOut, "Alternatively, you can run %q with the %q option to continue without authorizing additional permissions.\n", a.io.ColorScheme().Bold("create"), cs.Bold("--default-permissions"))
 		return nil, cmdutil.SilentError
 	}
 
 	choices := []string{
-		"Continue in browser to accept the additional permissions",
-		"Create the codespace without these additional permissions",
+		"Continue in browser to review and authorize additional permissions",
+		"Continue without authorizing additional permissions",
 	}
 
 	permsSurvey := []*survey.Question{

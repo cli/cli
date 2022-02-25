@@ -116,9 +116,9 @@ func TestApp_Create(t *testing.T) {
 				idleTimeout: 30 * time.Minute,
 			},
 			wantErr: cmdutil.SilentError,
-			wantStderr: `You must accept or deny additional permissions requested by the repository before you can create a codespace.
-Open this URL to continue in your web browser to accept: example.com/permissions
-Alternatively, you can run "create" with the "--default-permissions" option to create the codespace without these additional permissions.
+			wantStderr: `You must authorize or deny additional permissions requested by this codespace before continuing.
+Open this URL in your browser to review and authorize additional permissions: example.com/permissions
+Alternatively, you can run "create" with the "--default-permissions" option to continue without authorizing additional permissions.
 `,
 		},
 	}
