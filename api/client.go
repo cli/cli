@@ -236,7 +236,19 @@ func ScopesSuggestion(resp *http.Response) string {
 	for _, s := range strings.Split(tokenHasScopes, ",") {
 		s = strings.TrimSpace(s)
 		gotScopes[s] = struct{}{}
-		if strings.HasPrefix(s, "admin:") {
+		if s == "repo" {
+			gotScopes["repo:status"] = struct{}{}
+			gotScopes["repo_deployment"] = struct{}{}
+			gotScopes["public_repo"] = struct{}{}
+			gotScopes["repo:invite"] = struct{}{}
+			gotScopes["security_events"] = struct{}{}
+		} else if s == "user" {
+			gotScopes["read:user"] = struct{}{}
+			gotScopes["user:email"] = struct{}{}
+			gotScopes["user:follow"] = struct{}{}
+		} else if s == "codespace" {
+			gotScopes["codespace:secrets"] = struct{}{}
+		} else if strings.HasPrefix(s, "admin:") {
 			gotScopes["read:"+strings.TrimPrefix(s, "admin:")] = struct{}{}
 			gotScopes["write:"+strings.TrimPrefix(s, "admin:")] = struct{}{}
 		} else if strings.HasPrefix(s, "write:") {
