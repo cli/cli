@@ -85,8 +85,8 @@ func (s *Session) WaitForPortNotification(ctx context.Context, port int, notifTy
 	notificationUpdate := make(chan PortNotification, 1)
 	errc := make(chan error, 1)
 
-	h := func(success bool) func(*jsonrpc2.Request) {
-		return func(req *jsonrpc2.Request) {
+	h := func(success bool) func(*jsonrpc2.Conn, *jsonrpc2.Request) {
+		return func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
 			var notification PortNotification
 			if err := json.Unmarshal(*req.Params, &notification); err != nil {
 				errc <- fmt.Errorf("error unmarshaling notification: %w", err)

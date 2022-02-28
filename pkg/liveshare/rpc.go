@@ -42,7 +42,7 @@ func (r *rpcClient) do(ctx context.Context, method string, args, result interfac
 	return waiter.Wait(waitCtx, result)
 }
 
-type handlerFn func(req *jsonrpc2.Request)
+type handlerFn func(conn *jsonrpc2.Conn, req *jsonrpc2.Request)
 
 type requestHandler struct {
 	handlersMu sync.RWMutex
@@ -73,6 +73,6 @@ func (r *requestHandler) handlerFn(requestType string) []handlerFn {
 
 func (r *requestHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
 	for _, handler := range r.handlerFn(req.Method) {
-		go handler(req)
+		go handler(conn, req)
 	}
 }

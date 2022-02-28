@@ -49,8 +49,14 @@ func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server,
 	return testServer, session, nil
 }
 
+type rpcPortTestMessage struct {
+	Method string
+	Params PortUpdate
+}
+
 func TestServerStartSharing(t *testing.T) {
 	serverPort, serverProtocol := 2222, "sshd"
+	sendNotification := make(chan PortUpdate)
 	startSharing := func(req *jsonrpc2.Request) (interface{}, error) {
 		var args []interface{}
 		if err := json.Unmarshal(*req.Params, &args); err != nil {
@@ -59,9 +65,11 @@ func TestServerStartSharing(t *testing.T) {
 		if len(args) < 3 {
 			return nil, errors.New("not enough arguments to start sharing")
 		}
-		if port, ok := args[0].(float64); !ok {
+		port, ok := args[0].(float64)
+		if !ok {
 			return nil, errors.New("port argument is not an int")
-		} else if port != float64(serverPort) {
+		}
+		if port != float64(serverPort) {
 			return nil, errors.New("port does not match serverPort")
 		}
 		if protocol, ok := args[1].(string); !ok {
@@ -74,6 +82,10 @@ func TestServerStartSharing(t *testing.T) {
 		} else if browseURL != fmt.Sprintf("http://localhost:%d", serverPort) {
 			return nil, errors.New("browseURL does not match expected")
 		}
+		sendNotification <- PortUpdate{
+			Port:       int(port),
+			ChangeKind: PortChangeKindStart,
+		}
 		return Port{StreamName: "stream-name", StreamCondition: "stream-condition"}, nil
 	}
 	testServer, session, err := makeMockSession(
@@ -85,6 +97,13 @@ func TestServerStartSharing(t *testing.T) {
 		t.Errorf("error creating mock session: %v", err)
 	}
 	ctx := context.Background()
+
+	go func() {
+		testServer.WriteToObjectStream(rpcPortTestMessage{
+			Method: "serverSharing.sharingSucceeded",
+			Params: <-sendNotification,
+		})
+	}()
 
 	done := make(chan error)
 	go func() {

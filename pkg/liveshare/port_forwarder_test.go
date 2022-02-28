@@ -28,7 +28,13 @@ func TestNewPortForwarder(t *testing.T) {
 
 func TestPortForwarderStart(t *testing.T) {
 	streamName, streamCondition := "stream-name", "stream-condition"
+	port := 8000
+	sendNotification := make(chan PortUpdate)
 	serverSharing := func(req *jsonrpc2.Request) (interface{}, error) {
+		sendNotification <- PortUpdate{
+			Port:       int(port),
+			ChangeKind: PortChangeKindStart,
+		}
 		return Port{StreamName: streamName, StreamCondition: streamCondition}, nil
 	}
 	getStream := func(req *jsonrpc2.Request) (interface{}, error) {
@@ -55,10 +61,16 @@ func TestPortForwarderStart(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	go func() {
+		testServer.WriteToObjectStream(rpcPortTestMessage{
+			Method: "serverSharing.sharingSucceeded",
+			Params: <-sendNotification,
+		})
+	}()
+
 	done := make(chan error)
 	go func() {
-		const name, remote = "ssh", 8000
-		done <- NewPortForwarder(session, name, remote, false).ForwardToListener(ctx, listen)
+		done <- NewPortForwarder(session, "ssh", port, false).ForwardToListener(ctx, listen)
 	}()
 
 	go func() {
