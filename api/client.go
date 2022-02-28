@@ -236,7 +236,7 @@ func ScopesSuggestion(resp *http.Response) string {
 	for _, s := range strings.Split(tokenHasScopes, ",") {
 		s = strings.TrimSpace(s)
 		gotScopes[s] = struct{}{}
-		
+
 		// Certain scopes may be grouped under a single "top-level" scope. The following branch
 		// statements include these grouped/implied scopes when the top-level scope is encountered.
 		// See https://docs.github.com/en/developers/apps/building-oauth-apps/scopes-for-oauth-apps.
