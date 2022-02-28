@@ -565,6 +565,7 @@ type CreateCodespaceParams struct {
 	Branch             string
 	Machine            string
 	Location           string
+	PermissionsOptOut  bool
 }
 
 // CreateCodespace creates a codespace with the given parameters and returns a non-nil error if it
@@ -610,9 +611,19 @@ type startCreateRequest struct {
 	Ref                string `json:"ref"`
 	Location           string `json:"location"`
 	Machine            string `json:"machine"`
+	PermissionsOptOut  bool   `json:"devcontainer_permissions_opt_out"`
 }
 
 var errProvisioningInProgress = errors.New("provisioning in progress")
+
+type AcceptPermissionsRequiredError struct {
+	Message             string `json:"message"`
+	AllowPermissionsURL string `json:"allow_permissions_url"`
+}
+
+func (e AcceptPermissionsRequiredError) Error() string {
+	return e.Message
+}
 
 // startCreate starts the creation of a codespace.
 // It may return success or an error, or errProvisioningInProgress indicating that the operation
@@ -629,6 +640,7 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 		Ref:                params.Branch,
 		Location:           params.Location,
 		Machine:            params.Machine,
+		PermissionsOptOut:  params.PermissionsOptOut,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
@@ -648,6 +660,29 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 
 	if resp.StatusCode == http.StatusAccepted {
 		return nil, errProvisioningInProgress // RPC finished before result of creation known
+	} else if resp.StatusCode == http.StatusUnauthorized {
+		var (
+			ue       AcceptPermissionsRequiredError
+			bodyCopy = &bytes.Buffer{}
+			r        = io.TeeReader(resp.Body, bodyCopy)
+		)
+
+		b, err := ioutil.ReadAll(r)
+		if err != nil {
+			return nil, fmt.Errorf("error reading response body: %w", err)
+		}
+		if err := json.Unmarshal(b, &ue); err != nil {
+			return nil, fmt.Errorf("error unmarshaling response: %w", err)
+		}
+
+		if ue.AllowPermissionsURL != "" {
+			return nil, ue
+		}
+
+		resp.Body = ioutil.NopCloser(bodyCopy)
+
+		return nil, api.HandleHTTPError(resp)
+
 	} else if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return nil, api.HandleHTTPError(resp)
 	}

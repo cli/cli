@@ -21,6 +21,10 @@ import (
 	"golang.org/x/term"
 )
 
+type browser interface {
+	Browse(string) error
+}
+
 type executable interface {
 	Executable() string
 }
@@ -30,9 +34,10 @@ type App struct {
 	apiClient  apiClient
 	errLogger  *log.Logger
 	executable executable
+	browser    browser
 }
 
-func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient) *App {
+func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browser browser) *App {
 	errLogger := log.New(io.ErrOut, "", 0)
 
 	return &App{
@@ -40,6 +45,7 @@ func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient) *App {
 		apiClient:  apiClient,
 		errLogger:  errLogger,
 		executable: exe,
+		browser:    browser,
 	}
 }
 
