@@ -31,16 +31,16 @@ func TestPortsUpdateVisibilitySuccess(t *testing.T) {
 		"serverSharing.sharingSucceeded",
 	}
 
-	portsData := []portUpdateNotification{
+	portsData := []liveshare.PortNotification{
 		{
-			success: true,
+			Success: true,
 			PortUpdate: liveshare.PortUpdate{
 				Port:       80,
 				ChangeKind: liveshare.PortChangeKindUpdate,
 			},
 		},
 		{
-			success: true,
+			Success: true,
 			PortUpdate: liveshare.PortUpdate{
 				Port:       9999,
 				ChangeKind: liveshare.PortChangeKindUpdate,
@@ -72,16 +72,16 @@ func TestPortsUpdateVisibilityFailure403(t *testing.T) {
 		"serverSharing.sharingFailed",
 	}
 
-	portsData := []portUpdateNotification{
+	portsData := []liveshare.PortNotification{
 		{
-			success: true,
+			Success: true,
 			PortUpdate: liveshare.PortUpdate{
 				Port:       80,
 				ChangeKind: liveshare.PortChangeKindUpdate,
 			},
 		},
 		{
-			success: false,
+			Success: false,
 			PortUpdate: liveshare.PortUpdate{
 				Port:        9999,
 				ChangeKind:  liveshare.PortChangeKindUpdate,
@@ -118,16 +118,16 @@ func TestPortsUpdateVisibilityFailure(t *testing.T) {
 		"serverSharing.sharingFailed",
 	}
 
-	portsData := []portUpdateNotification{
+	portsData := []liveshare.PortNotification{
 		{
-			success: true,
+			Success: true,
 			PortUpdate: liveshare.PortUpdate{
 				Port:       80,
 				ChangeKind: liveshare.PortChangeKindUpdate,
 			},
 		},
 		{
-			success: false,
+			Success: false,
 			PortUpdate: liveshare.PortUpdate{
 				Port:        9999,
 				ChangeKind:  liveshare.PortChangeKindUpdate,
@@ -151,7 +151,7 @@ type joinWorkspaceResult struct {
 	SessionNumber int `json:"sessionNumber"`
 }
 
-func runUpdateVisibilityTest(portVisibilities []portVisibility, eventResponses []string, portsData []portUpdateNotification) error {
+func runUpdateVisibilityTest(portVisibilities []portVisibility, eventResponses []string, portsData []liveshare.PortNotification) error {
 	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
 		return joinWorkspaceResult{1}, nil
 	}
@@ -193,7 +193,7 @@ func runUpdateVisibilityTest(portVisibilities []portVisibility, eventResponses [
 				return
 			case <-ch:
 				pd := portsData[i]
-				_ := testServer.WriteToObjectStream(rpcMessage{
+				testServer.WriteToObjectStream(rpcMessage{
 					Method: eventResponses[i],
 					Params: pd.PortUpdate,
 				})

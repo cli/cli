@@ -18,7 +18,6 @@ import (
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/cli/cli/v2/utils"
 	"github.com/muhammadmuzzammil1998/jsonc"
-	"github.com/sourcegraph/jsonrpc2"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
@@ -254,6 +253,8 @@ func (e *ErrUpdatingPortVisibility) Unwrap() error {
 	return e.err
 }
 
+var errUpdatePortVisibilityForbidden = errors.New("organization admin has forbidden this privacy setting")
+
 func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, args []string) (err error) {
 	ports, err := a.parsePortVisibilities(args)
 	if err != nil {
@@ -274,70 +275,52 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 	}
 	defer safeClose(session, &err)
 
-	notificationUpdate := make(chan portUpdateNotification)
-	h := func(success bool) func(*jsonrpc2.Request) {
-		return func(req *jsonrpc2.Request) {
-			var notification portUpdateNotification
-			if err := json.Unmarshal(*req.Params, &notification); err != nil {
-				return
-			}
-			notification.success = success
-			notificationUpdate <- notification
-		}
-	}
-	session.RegisterRequestHandler("serverSharing.sharingSucceeded", h(true))
-	session.RegisterRequestHandler("serverSharing.sharingFailed", h(false))
+	errc := make(chan error, 1)
 
 	// TODO: check if port visibility can be updated in parallel instead of sequentially
 	for _, port := range ports {
 		a.StartProgressIndicatorWithLabel(fmt.Sprintf("Updating port %d visibility to: %s", port.number, port.visibility))
-		err := session.UpdateSharedServerPrivacy(ctx, port.number, port.visibility)
-
-		if err != nil {
-			return fmt.Errorf("error updating port %d to %s: %w", port.number, port.visibility, err)
-		}
 
 		// wait for success or failure
 		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
-		if err := a.waitForPortUpdate(ctx, notificationUpdate, session, port.number); err != nil {
-			return newErrUpdatingPortVisibility(port.number, port.visibility, err)
+		go func() {
+			updateNotif, err := session.WaitForPortNotification(ctx, port.number, liveshare.PortChangeKindUpdate)
+			if err != nil {
+				errc <- fmt.Errorf("error waiting for port %d to update: %w", port.number, err)
+				return
+			}
+			if !updateNotif.Success {
+				if updateNotif.StatusCode == http.StatusForbidden {
+					errc <- newErrUpdatingPortVisibility(port.number, port.visibility, errUpdatePortVisibilityForbidden)
+					return
+				}
+				errc <- newErrUpdatingPortVisibility(port.number, port.visibility, errors.New(updateNotif.ErrorDetail))
+				return
+			}
+			errc <- nil // success
+		}()
+
+		err := session.UpdateSharedServerPrivacy(ctx, port.number, port.visibility)
+		if err != nil {
+			return fmt.Errorf("error updating port %d to %s: %w", port.number, port.visibility, err)
+		}
+
+		// wait for success or failure
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case err := <-errc:
+			if err != nil {
+				return err
+			}
 		}
 
 		a.StopProgressIndicator()
 	}
 
 	return nil
-}
-
-type portUpdateNotification struct {
-	liveshare.PortUpdate
-	success bool
-}
-
-var errUpdatePortVisibilityForbidden = errors.New("organization admin has forbidden this privacy setting")
-
-func (a *App) waitForPortUpdate(ctx context.Context, n chan portUpdateNotification, session *liveshare.Session, port int) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("timeout waiting for server sharing to succeed or fail")
-		case update := <-n:
-			if update.success {
-				if update.Port == port && update.ChangeKind == liveshare.PortChangeKindUpdate {
-					return nil
-				}
-			} else {
-				if update.Port == port && update.ChangeKind == liveshare.PortChangeKindUpdate {
-					if update.StatusCode == http.StatusForbidden {
-						return errUpdatePortVisibilityForbidden
-					}
-					return errors.New(update.ErrorDetail)
-				}
-			}
-		}
-	}
 }
 
 type portVisibility struct {

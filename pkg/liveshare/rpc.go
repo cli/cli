@@ -46,25 +46,25 @@ type handlerFn func(req *jsonrpc2.Request)
 
 type requestHandler struct {
 	handlersMu sync.RWMutex
-	handlers   map[string]handlerFn
+	handlers   map[string][]handlerFn
 }
 
 func newRequestHandler() *requestHandler {
-	return &requestHandler{handlers: make(map[string]handlerFn)}
+	return &requestHandler{handlers: make(map[string][]handlerFn)}
 }
 
 func (r *requestHandler) register(requestType string, handler handlerFn) {
 	r.handlersMu.Lock()
 	defer r.handlersMu.Unlock()
 
-	if _, ok := r.handlers[requestType]; ok {
-		return
+	if _, ok := r.handlers[requestType]; !ok {
+		r.handlers[requestType] = []handlerFn{}
 	}
 
-	r.handlers[requestType] = handler
+	r.handlers[requestType] = append(r.handlers[requestType], handler)
 }
 
-func (r *requestHandler) handler(requestType string) handlerFn {
+func (r *requestHandler) handlerFn(requestType string) []handlerFn {
 	r.handlersMu.RLock()
 	defer r.handlersMu.RUnlock()
 
@@ -72,9 +72,7 @@ func (r *requestHandler) handler(requestType string) handlerFn {
 }
 
 func (r *requestHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
-	if handler := r.handler(req.Method); handler != nil {
-		go func() {
-			handler(req)
-		}()
+	for _, handler := range r.handlerFn(req.Method) {
+		go handler(req)
 	}
 }
