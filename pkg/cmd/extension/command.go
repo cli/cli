@@ -70,10 +70,12 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				return t.Render()
 			},
 		},
-		&cobra.Command{
-			Use:   "install <repository>",
-			Short: "Install a gh extension from a repository",
-			Long: heredoc.Doc(`
+		func() *cobra.Command {
+			var pinFlag string
+			cmd := &cobra.Command{
+				Use:   "install <repository>",
+				Short: "Install a gh extension from a repository",
+				Long: heredoc.Doc(`
 				Install a GitHub repository locally as a GitHub CLI extension.
 				
 				The repository argument can be specified in "owner/repo" format as well as a full URL.
@@ -84,41 +86,44 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 				See the list of available extensions at <https://github.com/topics/gh-extension>
 			`),
-			Example: heredoc.Doc(`
+				Example: heredoc.Doc(`
 				$ gh extension install owner/gh-extension
 				$ gh extension install https://git.example.com/owner/gh-extension
 				$ gh extension install .
 			`),
-			Args: cmdutil.MinimumArgs(1, "must specify a repository to install from"),
-			RunE: func(cmd *cobra.Command, args []string) error {
-				if args[0] == "." {
-					wd, err := os.Getwd()
+				Args: cmdutil.MinimumArgs(1, "must specify a repository to install from"),
+				RunE: func(cmd *cobra.Command, args []string) error {
+					if args[0] == "." {
+						wd, err := os.Getwd()
+						if err != nil {
+							return err
+						}
+						return m.InstallLocal(wd)
+					}
+
+					repo, err := ghrepo.FromFullName(args[0])
 					if err != nil {
 						return err
 					}
-					return m.InstallLocal(wd)
-				}
 
-				repo, err := ghrepo.FromFullName(args[0])
-				if err != nil {
-					return err
-				}
+					if err := checkValidExtension(cmd.Root(), m, repo.RepoName()); err != nil {
+						return err
+					}
 
-				if err := checkValidExtension(cmd.Root(), m, repo.RepoName()); err != nil {
-					return err
-				}
+					if err := m.Install(repo, pinFlag); err != nil {
+						return err
+					}
 
-				if err := m.Install(repo); err != nil {
-					return err
-				}
-
-				if io.IsStdoutTTY() {
-					cs := io.ColorScheme()
-					fmt.Fprintf(io.Out, "%s Installed extension %s\n", cs.SuccessIcon(), args[0])
-				}
-				return nil
-			},
-		},
+					if io.IsStdoutTTY() {
+						cs := io.ColorScheme()
+						fmt.Fprintf(io.Out, "%s Installed extension %s\n", cs.SuccessIcon(), args[0])
+					}
+					return nil
+				},
+			}
+			cmd.Flags().StringVar(&pinFlag, "pin", "", "pin extension to a release tag or commit sha")
+			return cmd
+		}(),
 		func() *cobra.Command {
 			var flagAll bool
 			var flagForce bool

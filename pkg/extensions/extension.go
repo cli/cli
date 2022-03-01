@@ -27,7 +27,7 @@ type Extension interface {
 //go:generate moq -rm -out manager_mock.go . ExtensionManager
 type ExtensionManager interface {
 	List(includeMetadata bool) []Extension
-	Install(ghrepo.Interface) error
+	Install(ghrepo.Interface, string) error
 	InstallLocal(dir string) error
 	Upgrade(name string, force bool) error
 	Remove(name string) error

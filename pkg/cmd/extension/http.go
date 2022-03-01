@@ -112,3 +112,37 @@ func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*re
 
 	return &r, nil
 }
+
+// fetchRelease finds release by tag name for a repository
+func fetchReleaseFromTag(httpClient *http.Client, baseRepo ghrepo.Interface, tagName string) (*release, error) {
+	fullRepoName := fmt.Sprintf("%s/%s", baseRepo.RepoOwner(), baseRepo.RepoName())
+	path := fmt.Sprintf("repos/%s/releases/tags/%s", fullRepoName, tagName)
+	url := ghinstance.RESTPrefix(baseRepo.RepoHost()) + path
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := httpClient.Do(req)
+	defer resp.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode > 299 {
+		return nil, api.HandleHTTPError(resp)
+	}
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var r release
+	err = json.Unmarshal(b, &r)
+	if err != nil {
+		return nil, err
+	}
+
+	return &r, nil
+}
