@@ -1,5 +1,5 @@
 name: manual winget bump
-on: workflow_dispatch
+on: pull_request
 
 jobs:
   wingetbump:
