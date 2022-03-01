@@ -320,13 +320,13 @@ type binManifest struct {
 	Path string
 }
 
-func (m *Manager) Install(repo ghrepo.Interface) error {
+func (m *Manager) Install(repo ghrepo.Interface, targetCommitish string) error {
 	isBin, err := isBinExtension(m.client, repo)
 	if err != nil {
 		return fmt.Errorf("could not check for binary extension: %w", err)
 	}
 	if isBin {
-		return m.installBin(repo)
+		return m.installBin(repo, targetCommitish)
 	}
 
 	hs, err := hasScript(m.client, repo)
@@ -341,9 +341,14 @@ func (m *Manager) Install(repo ghrepo.Interface) error {
 	return m.installGit(ghrepo.FormatRemoteURL(repo, protocol), m.io.Out, m.io.ErrOut)
 }
 
-func (m *Manager) installBin(repo ghrepo.Interface) error {
+func (m *Manager) installBin(repo ghrepo.Interface, targetCommitish string) error {
 	var r *release
-	r, err := fetchLatestRelease(m.client, repo)
+	var err error
+	if targetCommitish == "" {
+		r, err = fetchLatestRelease(m.client, repo)
+	} else {
+		r, err = fetchReleaseFromTag(m.client, repo, targetCommitish)
+	}
 	if err != nil {
 		return err
 	}
@@ -498,7 +503,7 @@ func (m *Manager) upgradeExtension(ext Extension, force bool) error {
 			if err != nil {
 				return fmt.Errorf("failed to migrate to new precompiled extension format: %w", err)
 			}
-			return m.installBin(repo)
+			return m.installBin(repo, "")
 		}
 		err = m.upgradeGitExtension(ext, force)
 	}
@@ -525,7 +530,7 @@ func (m *Manager) upgradeBinExtension(ext Extension) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse URL %s: %w", ext.url, err)
 	}
-	return m.installBin(repo)
+	return m.installBin(repo, "")
 }
 
 func (m *Manager) Remove(name string) error {
