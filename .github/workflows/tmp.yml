@@ -1,0 +1,22 @@
+name: manual winget bump
+on: workflow_dispatch
+
+jobs:
+  wingetbump:
+    runs-on: windows-latest
+    steps:
+      - name: get winget
+        shell: pwsh
+        env:
+          WINGETCREATE_VERSION: v0.2.0.29-preview
+        run: iwr https://github.com/microsoft/winget-create/releases/download/${env:WINGETCREATE_VERSION}/wingetcreate.exe -OutFile wingetcreate.exe
+      - name: bump
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
+        run: |
+          $tagname = "v2.5.2"
+          $version = "2.5.2"
+          $url = "https://github.com/cli/cli/releases/download/${tagname}/gh_${version}_windows_amd64.msi"
+          .\wingetcreate.exe update GitHub.cli --url $url --version $version
+          .\wingetcreate.exe submit .\manifests\g\GitHub\cli\${version}\ --token $env:GITHUB_TOKEN
