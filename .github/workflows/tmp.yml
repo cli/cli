@@ -19,5 +19,5 @@ jobs:
           $tagname = "v2.5.2"
           $version = "2.5.2"
           $url = "https://github.com/cli/cli/releases/download/${tagname}/gh_${version}_windows_amd64.msi"
-          .\wingetcreate.exe update GitHub.cli --url $url --version $version
+          .\wingetcreate.exe update GitHub.cli -u $url --version $version
           .\wingetcreate.exe submit .\manifests\g\GitHub\cli\${version}\ --token $env:GITHUB_TOKEN
