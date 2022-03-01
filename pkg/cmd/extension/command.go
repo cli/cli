@@ -33,16 +33,17 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 			An extension cannot override any of the core gh commands.
 
-			See the list of available extensions at <https://github.com/topics/gh-extension>
+			See the list of available extensions at <https://github.com/topics/gh-extension>.
 		`, "`"),
 		Aliases: []string{"extensions"},
 	}
 
 	extCmd.AddCommand(
 		&cobra.Command{
-			Use:   "list",
-			Short: "List installed extension commands",
-			Args:  cobra.NoArgs,
+			Use:     "list",
+			Short:   "List installed extension commands",
+			Aliases: []string{"ls"},
+			Args:    cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, args []string) error {
 				cmds := m.List(true)
 				if len(cmds) == 0 {
@@ -84,7 +85,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				To install an extension in development from the current directory, use "." as the
 				value of the repository argument.
 
-				See the list of available extensions at <https://github.com/topics/gh-extension>
+				See the list of available extensions at <https://github.com/topics/gh-extension>.
 			`),
 				Example: heredoc.Doc(`
 				$ gh extension install owner/gh-extension

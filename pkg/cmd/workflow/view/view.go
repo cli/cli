@@ -123,10 +123,17 @@ func runView(opts *ViewOptions) error {
 		return opts.Browser.Browse(address)
 	}
 
-	if opts.YAML {
-		err = viewWorkflowContent(opts, client, workflow)
+	opts.IO.DetectTerminalTheme()
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
 	} else {
-		err = viewWorkflowInfo(opts, client, workflow)
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+	}
+
+	if opts.YAML {
+		err = viewWorkflowContent(opts, client, repo, workflow, opts.Ref)
+	} else {
+		err = viewWorkflowInfo(opts, client, repo, workflow)
 	}
 	if err != nil {
 		return err
@@ -135,19 +142,12 @@ func runView(opts *ViewOptions) error {
 	return nil
 }
 
-func viewWorkflowContent(opts *ViewOptions, client *api.Client, workflow *shared.Workflow) error {
-	repo, err := opts.BaseRepo()
-	if err != nil {
-		return fmt.Errorf("could not determine base repo: %w", err)
-	}
-
-	opts.IO.StartProgressIndicator()
-	yamlBytes, err := shared.GetWorkflowContent(client, repo, *workflow, opts.Ref)
-	opts.IO.StopProgressIndicator()
+func viewWorkflowContent(opts *ViewOptions, client *api.Client, repo ghrepo.Interface, workflow *shared.Workflow, ref string) error {
+	yamlBytes, err := shared.GetWorkflowContent(client, repo, *workflow, ref)
 	if err != nil {
 		if s, ok := err.(api.HTTPError); ok && s.StatusCode == 404 {
-			if opts.Ref != "" {
-				return fmt.Errorf("could not find workflow file %s on %s, try specifying a different ref", workflow.Base(), opts.Ref)
+			if ref != "" {
+				return fmt.Errorf("could not find workflow file %s on %s, try specifying a different ref", workflow.Base(), ref)
 			}
 			return fmt.Errorf("could not find workflow file %s, try specifying a branch or tag using `--ref`", workflow.Base())
 		}
@@ -155,13 +155,6 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, workflow *shared
 	}
 
 	yaml := string(yamlBytes)
-
-	theme := opts.IO.DetectTerminalTheme()
-	markdownStyle := markdown.GetStyle(theme)
-	if err := opts.IO.StartPager(); err != nil {
-		fmt.Fprintf(opts.IO.ErrOut, "starting pager failed: %v\n", err)
-	}
-	defer opts.IO.StopPager()
 
 	if !opts.Raw {
 		cs := opts.IO.ColorScheme()
@@ -172,11 +165,7 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, workflow *shared
 		fmt.Fprintf(out, "ID: %s", cs.Cyanf("%d", workflow.ID))
 
 		codeBlock := fmt.Sprintf("```yaml\n%s\n```", yaml)
-		rendered, err := markdown.RenderWithOpts(codeBlock, markdownStyle,
-			markdown.RenderOpts{
-				markdown.WithoutIndentation(),
-				markdown.WithoutWrap(),
-			})
+		rendered, err := markdown.Render(codeBlock, markdown.WithIO(opts.IO), markdown.WithoutIndentation(), markdown.WithWrap(0))
 		if err != nil {
 			return err
 		}
@@ -196,15 +185,8 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, workflow *shared
 	return nil
 }
 
-func viewWorkflowInfo(opts *ViewOptions, client *api.Client, workflow *shared.Workflow) error {
-	repo, err := opts.BaseRepo()
-	if err != nil {
-		return fmt.Errorf("could not determine base repo: %w", err)
-	}
-
-	opts.IO.StartProgressIndicator()
+func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interface, workflow *shared.Workflow) error {
 	wr, err := getWorkflowRuns(client, repo, workflow)
-	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to get runs: %w", err)
 	}

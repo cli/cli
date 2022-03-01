@@ -50,9 +50,6 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 			"help:feedback": heredoc.Doc(`
 				Open an issue using 'gh issue create -R github.com/cli/cli'
 			`),
-			"help:environment": heredoc.Doc(`
-				See 'gh help environment' for the list of supported environment variables.
-			`),
 		},
 	}
 
@@ -135,12 +132,14 @@ func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
 	vscsURL := os.Getenv("INTERNAL_VSCS_TARGET_URL")
 	app := codespaceCmd.NewApp(
 		f.IOStreams,
+		f,
 		codespacesAPI.New(
 			serverURL,
 			apiURL,
 			vscsURL,
 			&lazyLoadedHTTPClient{factory: f},
 		),
+		f.Browser,
 	)
 	cmd := codespaceCmd.NewRootCmd(app)
 	cmd.Use = "codespace"

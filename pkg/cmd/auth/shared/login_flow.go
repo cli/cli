@@ -29,6 +29,7 @@ type LoginOptions struct {
 	Web         bool
 	Scopes      []string
 	Executable  string
+	GitProtocol string
 
 	sshContext sshContext
 }
@@ -39,8 +40,8 @@ func Login(opts *LoginOptions) error {
 	httpClient := opts.HTTPClient
 	cs := opts.IO.ColorScheme()
 
-	var gitProtocol string
-	if opts.Interactive {
+	gitProtocol := strings.ToLower(opts.GitProtocol)
+	if opts.Interactive && gitProtocol == "" {
 		var proto string
 		err := prompt.SurveyAskOne(&survey.Select{
 			Message: "What is your preferred protocol for Git operations?",
@@ -99,7 +100,7 @@ func Login(opts *LoginOptions) error {
 	var authMode int
 	if opts.Web {
 		authMode = 0
-	} else {
+	} else if opts.Interactive {
 		err := prompt.SurveyAskOne(&survey.Select{
 			Message: "How would you like to authenticate GitHub CLI?",
 			Options: []string{
@@ -117,10 +118,11 @@ func Login(opts *LoginOptions) error {
 
 	if authMode == 0 {
 		var err error
-		authToken, err = authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", append(opts.Scopes, additionalScopes...))
+		authToken, err = authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", append(opts.Scopes, additionalScopes...), opts.Interactive)
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
+		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
 		userValidated = true
 	} else {
 		minimumScopes := append([]string{"repo", "read:org"}, additionalScopes...)

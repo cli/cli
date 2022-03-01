@@ -1,6 +1,7 @@
 package list
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -34,9 +35,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	var flagSecret bool
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List your gists",
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Short:   "List your gists",
+		Aliases: []string{"ls"},
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.Limit < 1 {
 				return cmdutil.FlagErrorf("invalid limit: %v", opts.Limit)
@@ -82,6 +84,12 @@ func listRun(opts *ListOptions) error {
 	gists, err := shared.ListGists(client, host, opts.Limit, opts.Visibility)
 	if err != nil {
 		return err
+	}
+
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
 
 	cs := opts.IO.ColorScheme()

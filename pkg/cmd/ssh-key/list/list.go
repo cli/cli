@@ -26,9 +26,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "Lists SSH keys in your GitHub account",
-		Args:  cobra.ExactArgs(0),
+		Use:     "list",
+		Short:   "Lists SSH keys in your GitHub account",
+		Aliases: []string{"ls"},
+		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runF != nil {
 				return runF(opts)

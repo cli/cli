@@ -105,7 +105,7 @@ func TestPortForwarderTrafficMonitor(t *testing.T) {
 	bb := make([]byte, l)
 	n, err := tm.Read(bb)
 	if err != nil {
-		t.Errorf("failed to read from traffic monitor: %w", err)
+		t.Errorf("failed to read from traffic monitor: %v", err)
 	}
 	if n != l {
 		t.Errorf("expected to read %d bytes, got %d", l, n)

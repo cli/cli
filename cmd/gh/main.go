@@ -24,6 +24,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmd/root"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
 	"github.com/cli/safeexec"
 	"github.com/mattn/go-colorable"
@@ -145,7 +146,7 @@ func mainRun() exitCode {
 				if errors.As(err, &execError) {
 					return exitCode(execError.ExitCode())
 				}
-				fmt.Fprintf(stderr, "failed to run external command: %s", err)
+				fmt.Fprintf(stderr, "failed to run external command: %s\n", err)
 				return exitError
 			}
 
@@ -157,7 +158,7 @@ func mainRun() exitCode {
 				if errors.As(err, &execError) {
 					return exitCode(execError.ExitCode())
 				}
-				fmt.Fprintf(stderr, "failed to run extension: %s", err)
+				fmt.Fprintf(stderr, "failed to run extension: %s\n", err)
 				return exitError
 			} else if found {
 				return exitOK
@@ -201,6 +202,7 @@ func mainRun() exitCode {
 	rootCmd.SetArgs(expandedArgs)
 
 	if cmd, err := rootCmd.ExecuteC(); err != nil {
+		var pagerPipeError *iostreams.ErrClosedPagerPipe
 		if err == cmdutil.SilentError {
 			return exitError
 		} else if cmdutil.IsUserCancellation(err) {
@@ -211,6 +213,9 @@ func mainRun() exitCode {
 			return exitCancel
 		} else if errors.Is(err, authError) {
 			return exitAuth
+		} else if errors.As(err, &pagerPipeError) {
+			// ignore the error raised when piping to a closed pager
+			return exitOK
 		}
 
 		printError(stderr, err, cmd, hasDebug)
@@ -224,8 +229,9 @@ func mainRun() exitCode {
 		var httpErr api.HTTPError
 		if errors.As(err, &httpErr) && httpErr.StatusCode == 401 {
 			fmt.Fprintln(stderr, "Try authenticating with:  gh auth login")
-		} else if strings.Contains(err.Error(), "Resource protected by organization SAML enforcement") {
-			fmt.Fprintln(stderr, "Try re-authenticating with:  gh auth refresh")
+		} else if u := factory.SSOURL(); u != "" {
+			// handles organization SAML enforcement error
+			fmt.Fprintf(stderr, "Authorize in your web browser:  %s\n", u)
 		} else if msg := httpErr.ScopesSuggestion(); msg != "" {
 			fmt.Fprintln(stderr, msg)
 		}

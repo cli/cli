@@ -31,7 +31,7 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 		Use:   "ready [<number> | <url> | <branch>]",
 		Short: "Mark a pull request as ready for review",
 		Long: heredoc.Doc(`
-			Mark a pull request as ready for review
+			Mark a pull request as ready for review.
 
 			Without an argument, the pull request that belongs to the current branch
 			is marked as ready.

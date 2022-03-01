@@ -316,8 +316,10 @@ func TestNewCmdExtension(t *testing.T) {
 			},
 			isTTY: true,
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne("test")
-				as.StubOne(0)
+				as.StubPrompt("Extension name:").AnswerWith("test")
+				as.StubPrompt("What kind of extension?").
+					AssertOptions([]string{"Script (Bash, Ruby, Python, etc)", "Go", "Other Precompiled (C++, Rust, etc)"}).
+					AnswerDefault()
 			},
 			wantStdout: heredoc.Doc(`
 				✓ Created directory gh-test
@@ -456,8 +458,7 @@ func TestNewCmdExtension(t *testing.T) {
 				assertFunc = tt.managerStubs(em)
 			}
 
-			as, teardown := prompt.InitAskStubber()
-			defer teardown()
+			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
 				tt.askStubs(as)
 			}

@@ -68,12 +68,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			To create a remote repository non-interactively, supply the repository name and one of %[1]s--public%[1]s, %[1]s--private%[1]s, or %[1]s--internal%[1]s.
 			Pass %[1]s--clone%[1]s to clone the new repository locally.
 
-			To create a remote repository from an existing local repository, specify the source directory with %[1]s--source%[1]s. 
-			By default, the remote repository name will be the name of the source directory. 
+			To create a remote repository from an existing local repository, specify the source directory with %[1]s--source%[1]s.
+			By default, the remote repository name will be the name of the source directory.
 			Pass %[1]s--push%[1]s to push any local commits to the new repository.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# create a repository interactively 
+			# create a repository interactively
 			gh repo create
 
 			# create a new remote repository and clone it locally
@@ -361,7 +361,7 @@ func createFromScratch(opts *CreateOptions) error {
 	}
 
 	if opts.Clone {
-		protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
+		protocol, err := cfg.GetOrDefault(repo.RepoHost(), "git_protocol")
 		if err != nil {
 			return err
 		}
@@ -498,7 +498,7 @@ func createFromLocal(opts *CreateOptions) error {
 		fmt.Fprintln(stdout, repo.URL)
 	}
 
-	protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
+	protocol, err := cfg.GetOrDefault(repo.RepoHost(), "git_protocol")
 	if err != nil {
 		return err
 	}

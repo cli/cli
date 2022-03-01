@@ -91,8 +91,7 @@ func Test_NewCmdRefresh(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			io, _, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
-				IOStreams:  io,
-				Executable: func() string { return "/path/to/gh" },
+				IOStreams: io,
 			}
 			io.SetStdinTTY(tt.tty)
 			io.SetStdoutTTY(tt.tty)
@@ -195,7 +194,7 @@ func Test_refreshRun(t *testing.T) {
 				Hostname: "",
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne("github.com")
+				as.StubPrompt("What account do you want to refresh auth for?").AnswerWith("github.com")
 			},
 			wantAuthArgs: authArgs{
 				hostname: "github.com",
@@ -233,7 +232,7 @@ func Test_refreshRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			aa := authArgs{}
-			tt.opts.AuthFlow = func(_ config.Config, _ *iostreams.IOStreams, hostname string, scopes []string) error {
+			tt.opts.AuthFlow = func(_ config.Config, _ *iostreams.IOStreams, hostname string, scopes []string, interactive bool) error {
 				aa.hostname = hostname
 				aa.scopes = scopes
 				return nil
@@ -277,8 +276,7 @@ func Test_refreshRun(t *testing.T) {
 			hostsBuf := bytes.Buffer{}
 			defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
-			as, teardown := prompt.InitAskStubber()
-			defer teardown()
+			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
 				tt.askStubs(as)
 			}

@@ -40,8 +40,10 @@ func TestApp_VSCode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := &cmdutil.TestBrowser{}
-			a := &App{}
-			if err := a.VSCode(context.Background(), b, tt.args.codespaceName, tt.args.useInsiders); (err != nil) != tt.wantErr {
+			a := &App{
+				browser: b,
+			}
+			if err := a.VSCode(context.Background(), tt.args.codespaceName, tt.args.useInsiders); (err != nil) != tt.wantErr {
 				t.Errorf("App.VSCode() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			b.Verify(t, tt.wantURL)

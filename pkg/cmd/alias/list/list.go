@@ -24,8 +24,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List your aliases",
+		Use:     "list",
+		Short:   "List your aliases",
+		Aliases: []string{"ls"},
 		Long: heredoc.Doc(`
 			This command prints out all of the aliases gh is configured to use.
 		`),

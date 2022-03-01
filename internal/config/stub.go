@@ -25,6 +25,23 @@ func (c ConfigStub) GetWithSource(host, key string) (string, string, error) {
 	return "", "", errors.New("not found")
 }
 
+func (c ConfigStub) GetOrDefault(hostname, key string) (val string, err error) {
+	val, _, err = c.GetOrDefaultWithSource(hostname, key)
+	return
+}
+
+func (c ConfigStub) GetOrDefaultWithSource(hostname, key string) (val string, src string, err error) {
+	val, src, err = c.GetWithSource(hostname, key)
+	if err == nil && val == "" {
+		val = c.Default(key)
+	}
+	return
+}
+
+func (c ConfigStub) Default(key string) string {
+	return defaultFor(key)
+}
+
 func (c ConfigStub) Set(host, key, value string) error {
 	c[genKey(host, key)] = value
 	return nil

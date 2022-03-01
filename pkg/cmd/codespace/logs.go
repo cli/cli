@@ -41,14 +41,9 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 		return fmt.Errorf("get or choose codespace: %w", err)
 	}
 
-	user, err := a.apiClient.GetUser(ctx)
-	if err != nil {
-		return fmt.Errorf("getting user: %w", err)
-	}
-
 	authkeys := make(chan error, 1)
 	go func() {
-		authkeys <- checkAuthorizedKeys(ctx, a.apiClient, user.Login)
+		authkeys <- checkAuthorizedKeys(ctx, a.apiClient)
 	}()
 
 	session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, codespace)

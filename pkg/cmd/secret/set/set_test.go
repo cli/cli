@@ -459,6 +459,11 @@ func Test_getBody(t *testing.T) {
 			want:  "a secret",
 			stdin: "a secret",
 		},
+		{
+			name:  "from stdin with trailing newline character",
+			want:  "a secret",
+			stdin: "a secret\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -476,7 +481,7 @@ func Test_getBody(t *testing.T) {
 			})
 			assert.NoError(t, err)
 
-			assert.Equal(t, string(body), tt.want)
+			assert.Equal(t, tt.want, string(body))
 		})
 	}
 }
@@ -487,10 +492,8 @@ func Test_getBodyPrompt(t *testing.T) {
 	io.SetStdinTTY(true)
 	io.SetStdoutTTY(true)
 
-	as, teardown := prompt.InitAskStubber()
-	defer teardown()
-
-	as.StubOne("cool secret")
+	as := prompt.NewAskStubber(t)
+	as.StubPrompt("Paste your secret").AnswerWith("cool secret")
 
 	body, err := getBody(&SetOptions{
 		IO: io,

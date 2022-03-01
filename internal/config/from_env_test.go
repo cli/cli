@@ -44,6 +44,7 @@ func TestInheritEnv(t *testing.T) {
 	tests := []struct {
 		name                    string
 		baseConfig              string
+		GH_HOST                 string
 		GITHUB_TOKEN            string
 		GITHUB_ENTERPRISE_TOKEN string
 		GH_TOKEN                string
@@ -285,9 +286,23 @@ func TestInheritEnv(t *testing.T) {
 				writeable: false,
 			},
 		},
+		{
+			name:                "GH_HOST adds host entry when paired with environment token",
+			baseConfig:          ``,
+			GH_HOST:             "example.org",
+			GH_ENTERPRISE_TOKEN: "GH_ENTERPRISE_TOKEN",
+			hostname:            "example.org",
+			wants: wants{
+				hosts:     []string{"example.org"},
+				token:     "GH_ENTERPRISE_TOKEN",
+				source:    "GH_ENTERPRISE_TOKEN",
+				writeable: false,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			setenv(t, "GH_HOST", tt.GH_HOST)
 			setenv(t, "GITHUB_TOKEN", tt.GITHUB_TOKEN)
 			setenv(t, "GITHUB_ENTERPRISE_TOKEN", tt.GITHUB_ENTERPRISE_TOKEN)
 			setenv(t, "GH_TOKEN", tt.GH_TOKEN)

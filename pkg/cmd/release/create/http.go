@@ -2,6 +2,7 @@ package create
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
+	graphql "github.com/cli/shurcooL-graphql"
 )
 
 type tag struct {
@@ -25,6 +27,25 @@ type releaseNotes struct {
 }
 
 var notImplementedError = errors.New("not implemented")
+
+func remoteTagExists(httpClient *http.Client, repo ghrepo.Interface, tagName string) (bool, error) {
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
+	qualifiedTagName := fmt.Sprintf("refs/tags/%s", tagName)
+	var query struct {
+		Repository struct {
+			Ref struct {
+				ID string
+			} `graphql:"ref(qualifiedName: $tagName)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+	variables := map[string]interface{}{
+		"owner":   graphql.String(repo.RepoOwner()),
+		"name":    graphql.String(repo.RepoName()),
+		"tagName": graphql.String(qualifiedTagName),
+	}
+	err := gql.QueryNamed(context.Background(), "RepositoryFindRef", &query, variables)
+	return query.Repository.Ref.ID != "", err
+}
 
 func getTags(httpClient *http.Client, repo ghrepo.Interface, limit int) ([]tag, error) {
 	path := fmt.Sprintf("repos/%s/%s/tags?per_page=%d", repo.RepoOwner(), repo.RepoName(), limit)
@@ -134,8 +155,17 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 	return &newRelease, err
 }
 
-func publishRelease(httpClient *http.Client, releaseURL string) (*shared.Release, error) {
-	req, err := http.NewRequest("PATCH", releaseURL, bytes.NewBufferString(`{"draft":false}`))
+func publishRelease(httpClient *http.Client, releaseURL string, discussionCategory string) (*shared.Release, error) {
+	params := map[string]interface{}{"draft": false}
+	if discussionCategory != "" {
+		params["discussion_category_name"] = discussionCategory
+	}
+
+	bodyBytes, err := json.Marshal(params)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest("PATCH", releaseURL, bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		return nil, err
 	}

@@ -3,6 +3,7 @@ package root
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -88,6 +89,7 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 		return
 	}
 
+	namePadding := 12
 	coreCommands := []string{}
 	actionsCommands := []string{}
 	additionalCommands := []string{}
@@ -99,7 +101,7 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 			continue
 		}
 
-		s := rpad(c.Name()+":", c.NamePadding()) + c.Short
+		s := rpad(c.Name()+":", namePadding) + c.Short
 		if _, ok := c.Annotations["IsCore"]; ok {
 			coreCommands = append(coreCommands, s)
 		} else if _, ok := c.Annotations["IsActions"]; ok {
@@ -145,6 +147,16 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 	}
 
 	if isRootCmd(command) {
+		var helpTopics []string
+		if c := findCommand(command, "actions"); c != nil {
+			helpTopics = append(helpTopics, rpad(c.Name()+":", namePadding)+c.Short)
+		}
+		for topic, params := range HelpTopics {
+			helpTopics = append(helpTopics, rpad(topic+":", namePadding)+params["short"])
+		}
+		sort.Strings(helpTopics)
+		helpEntries = append(helpEntries, helpEntry{"HELP TOPICS", strings.Join(helpTopics, "\n")})
+
 		if exts := f.ExtensionManager.List(false); len(exts) > 0 {
 			var names []string
 			for _, ext := range exts {
@@ -190,6 +202,15 @@ Read the manual at https://cli.github.com/manual`})
 		}
 		fmt.Fprintln(out)
 	}
+}
+
+func findCommand(cmd *cobra.Command, name string) *cobra.Command {
+	for _, c := range cmd.Commands() {
+		if c.Name() == name {
+			return c
+		}
+	}
+	return nil
 }
 
 // rpad adds padding to the right of a string.
