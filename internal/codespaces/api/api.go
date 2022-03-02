@@ -701,23 +701,13 @@ func (a *API) DeleteCodespace(ctx context.Context, codespaceName string) error {
 }
 
 type EditCodespaceParams struct {
-	DisplayName        string
-	IdleTimeoutMinutes int
-	Machine            string
-}
-
-type editRequest struct {
 	DisplayName        string `json:"display_name,omitempty"`
 	IdleTimeoutMinutes int    `json:"idle_timeout_minutes,omitempty"`
 	Machine            string `json:"machine,omitempty"`
 }
 
 func (a *API) EditCodespace(ctx context.Context, codespaceName string, params *EditCodespaceParams) (*Codespace, error) {
-	requestBody, err := json.Marshal(editRequest{
-		DisplayName:        params.DisplayName,
-		IdleTimeoutMinutes: params.IdleTimeoutMinutes,
-		Machine:            params.Machine,
-	})
+	requestBody, err := json.Marshal(params)
 
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
@@ -735,7 +725,7 @@ func (a *API) EditCodespace(ctx context.Context, codespaceName string, params *E
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+	if resp.StatusCode != http.StatusOK {
 		return nil, api.HandleHTTPError(resp)
 	}
 

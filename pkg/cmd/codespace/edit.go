@@ -50,7 +50,7 @@ func (a *App) Edit(ctx context.Context, opts editOptions) error {
 		SKU:           opts.machine,
 	}
 	a.StartProgressIndicatorWithLabel("Editing codespace")
-	codespace, err := a.apiClient.EditCodespace(ctx, userInputs.CodespaceName, &api.EditCodespaceParams{
+	_, err := a.apiClient.EditCodespace(ctx, userInputs.CodespaceName, &api.EditCodespaceParams{
 		DisplayName:        userInputs.DisplayName,
 		IdleTimeoutMinutes: int(userInputs.IdleTimeout.Minutes()),
 		Machine:            userInputs.SKU,
@@ -60,6 +60,5 @@ func (a *App) Edit(ctx context.Context, opts editOptions) error {
 		return fmt.Errorf("error editing codespace: %w", err)
 	}
 
-	fmt.Fprintln(a.io.Out, codespace.DisplayName)
 	return nil
 }
