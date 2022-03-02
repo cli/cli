@@ -193,7 +193,7 @@ func runUpdateVisibilityTest(portVisibilities []portVisibility, eventResponses [
 				return
 			case <-ch:
 				pd := portsData[i]
-				testServer.WriteToObjectStream(rpcMessage{
+				_ = testServer.WriteToObjectStream(rpcMessage{
 					Method: eventResponses[i],
 					Params: pd.PortUpdate,
 				})

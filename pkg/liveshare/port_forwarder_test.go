@@ -62,7 +62,7 @@ func TestPortForwarderStart(t *testing.T) {
 	defer cancel()
 
 	go func() {
-		testServer.WriteToObjectStream(rpcPortTestMessage{
+		_ = testServer.WriteToObjectStream(rpcPortTestMessage{
 			Method: "serverSharing.sharingSucceeded",
 			Params: <-sendNotification,
 		})

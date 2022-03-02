@@ -99,7 +99,7 @@ func TestServerStartSharing(t *testing.T) {
 	ctx := context.Background()
 
 	go func() {
-		testServer.WriteToObjectStream(rpcPortTestMessage{
+		_ = testServer.WriteToObjectStream(rpcPortTestMessage{
 			Method: "serverSharing.sharingSucceeded",
 			Params: <-sendNotification,
 		})
