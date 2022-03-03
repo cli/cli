@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Set up Go 1.16
         uses: actions/setup-go@v2
         with:
@@ -34,7 +34,7 @@ jobs:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
           GORELEASER_CURRENT_TAG: ${{steps.changelog.outputs.tag-name}}
       - name: Checkout documentation site
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: github/cli.github.com
           path: site
@@ -119,7 +119,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Download gh.exe
         id: download_exe
         shell: bash
@@ -180,7 +180,7 @@ jobs:
         env:
           COMMITTER_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
       - name: Checkout scoop bucket
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: cli/scoop-gh
           path: scoop-gh
