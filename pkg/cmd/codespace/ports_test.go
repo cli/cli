@@ -48,7 +48,7 @@ func TestPortsUpdateVisibilitySuccess(t *testing.T) {
 		},
 	}
 
-	err := runUpdateVisibilityTest(portVisibilities, eventResponses, portsData)
+	err := runUpdateVisibilityTest(t, portVisibilities, eventResponses, portsData)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -91,7 +91,7 @@ func TestPortsUpdateVisibilityFailure403(t *testing.T) {
 		},
 	}
 
-	err := runUpdateVisibilityTest(portVisibilities, eventResponses, portsData)
+	err := runUpdateVisibilityTest(t, portVisibilities, eventResponses, portsData)
 	if err == nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -136,7 +136,7 @@ func TestPortsUpdateVisibilityFailure(t *testing.T) {
 		},
 	}
 
-	err := runUpdateVisibilityTest(portVisibilities, eventResponses, portsData)
+	err := runUpdateVisibilityTest(t, portVisibilities, eventResponses, portsData)
 	if err == nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -151,7 +151,9 @@ type joinWorkspaceResult struct {
 	SessionNumber int `json:"sessionNumber"`
 }
 
-func runUpdateVisibilityTest(portVisibilities []portVisibility, eventResponses []string, portsData []liveshare.PortNotification) error {
+func runUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, eventResponses []string, portsData []liveshare.PortNotification) error {
+	t.Helper()
+
 	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
 		return joinWorkspaceResult{1}, nil
 	}

@@ -285,7 +285,7 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
-		go func() {
+		go func(port portVisibility) {
 			updateNotif, err := session.WaitForPortNotification(ctx, port.number, liveshare.PortChangeKindUpdate)
 			if err != nil {
 				errc <- fmt.Errorf("error waiting for port %d to update: %w", port.number, err)
@@ -300,7 +300,7 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 				return
 			}
 			errc <- nil // success
-		}()
+		}(port)
 
 		err := session.UpdateSharedServerPrivacy(ctx, port.number, port.visibility)
 		if err != nil {
