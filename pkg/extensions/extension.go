@@ -19,10 +19,11 @@ type Extension interface {
 	Name() string // Extension Name without gh-
 	Path() string // Path to executable
 	URL() string
-	IsLocal() bool
 	CurrentVersion() string
+	IsPinned() bool
 	UpdateAvailable() bool
 	IsBinary() bool
+	IsLocal() bool
 }
 
 //go:generate moq -rm -out manager_mock.go . ExtensionManager

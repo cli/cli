@@ -26,6 +26,9 @@ var _ Extension = &ExtensionMock{}
 // 			IsLocalFunc: func() bool {
 // 				panic("mock out the IsLocal method")
 // 			},
+// 			IsPinnedFunc: func() bool {
+// 				panic("mock out the IsPinned method")
+// 			},
 // 			NameFunc: func() string {
 // 				panic("mock out the Name method")
 // 			},
@@ -54,6 +57,9 @@ type ExtensionMock struct {
 	// IsLocalFunc mocks the IsLocal method.
 	IsLocalFunc func() bool
 
+	// IsPinnedFunc mocks the IsPinned method.
+	IsPinnedFunc func() bool
+
 	// NameFunc mocks the Name method.
 	NameFunc func() string
 
@@ -77,6 +83,9 @@ type ExtensionMock struct {
 		// IsLocal holds details about calls to the IsLocal method.
 		IsLocal []struct {
 		}
+		// IsPinned holds details about calls to the IsPinned method.
+		IsPinned []struct {
+		}
 		// Name holds details about calls to the Name method.
 		Name []struct {
 		}
@@ -93,6 +102,7 @@ type ExtensionMock struct {
 	lockCurrentVersion  sync.RWMutex
 	lockIsBinary        sync.RWMutex
 	lockIsLocal         sync.RWMutex
+	lockIsPinned        sync.RWMutex
 	lockName            sync.RWMutex
 	lockPath            sync.RWMutex
 	lockURL             sync.RWMutex
@@ -174,6 +184,32 @@ func (mock *ExtensionMock) IsLocalCalls() []struct {
 	mock.lockIsLocal.RLock()
 	calls = mock.calls.IsLocal
 	mock.lockIsLocal.RUnlock()
+	return calls
+}
+
+// IsPinned calls IsPinnedFunc.
+func (mock *ExtensionMock) IsPinned() bool {
+	if mock.IsPinnedFunc == nil {
+		panic("ExtensionMock.IsPinnedFunc: method is nil but Extension.IsPinned was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockIsPinned.Lock()
+	mock.calls.IsPinned = append(mock.calls.IsPinned, callInfo)
+	mock.lockIsPinned.Unlock()
+	return mock.IsPinnedFunc()
+}
+
+// IsPinnedCalls gets all the calls that were made to IsPinned.
+// Check the length with:
+//     len(mockedExtension.IsPinnedCalls())
+func (mock *ExtensionMock) IsPinnedCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockIsPinned.RLock()
+	calls = mock.calls.IsPinned
+	mock.lockIsPinned.RUnlock()
 	return calls
 }
 

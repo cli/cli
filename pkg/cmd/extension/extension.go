@@ -18,6 +18,7 @@ type Extension struct {
 	path           string
 	url            string
 	isLocal        bool
+	isPinned       bool
 	currentVersion string
 	latestVersion  string
 	kind           ExtensionKind
@@ -43,8 +44,13 @@ func (e *Extension) CurrentVersion() string {
 	return e.currentVersion
 }
 
+func (e *Extension) IsPinned() bool {
+	return e.isPinned
+}
+
 func (e *Extension) UpdateAvailable() bool {
-	if e.isLocal ||
+	if e.isPinned ||
+		e.isLocal ||
 		e.currentVersion == "" ||
 		e.latestVersion == "" ||
 		e.currentVersion == e.latestVersion {

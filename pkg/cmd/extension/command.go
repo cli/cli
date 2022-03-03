@@ -65,7 +65,13 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if !c.IsBinary() && len(version) > 8 {
 						version = version[:8]
 					}
-					t.AddField(version, nil, nil)
+
+					if c.IsPinned() {
+						t.AddField(version, nil, cs.Cyan)
+					} else {
+						t.AddField(version, nil, nil)
+					}
+
 					var updateAvailable string
 					if c.UpdateAvailable() {
 						updateAvailable = "Upgrade available"
