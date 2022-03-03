@@ -20,6 +20,7 @@ type RerunOptions struct {
 
 	RunID      string
 	OnlyFailed bool
+	JobID      string
 
 	Prompt bool
 }
@@ -38,12 +39,22 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			if len(args) > 0 {
+			if len(args) == 0 && opts.JobID == "" {
+				if !opts.IO.CanPrompt() {
+					return cmdutil.FlagErrorf("run or job ID required when not running interactively")
+				} else {
+					opts.Prompt = true
+				}
+			} else if len(args) > 0 {
 				opts.RunID = args[0]
-			} else if !opts.IO.CanPrompt() {
-				return cmdutil.FlagErrorf("run ID required when not running interactively")
-			} else {
-				opts.Prompt = true
+			}
+
+			if opts.RunID != "" && opts.JobID != "" {
+				opts.RunID = ""
+				if opts.IO.CanPrompt() {
+					cs := opts.IO.ColorScheme()
+					fmt.Fprintf(opts.IO.ErrOut, "%s both run and job IDs specified; ignoring run ID\n", cs.WarningIcon())
+				}
 			}
 
 			if runF != nil {
@@ -54,6 +65,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().BoolVar(&opts.OnlyFailed, "failed", false, "Rerun only failed jobs")
+	cmd.Flags().StringVarP(&opts.JobID, "job", "j", "", "Rerun a specific job from a run, including dependencies")
 
 	return cmd
 }
@@ -70,10 +82,23 @@ func runRerun(opts *RerunOptions) error {
 		return fmt.Errorf("failed to determine base repo: %w", err)
 	}
 
+	cs := opts.IO.ColorScheme()
+
 	runID := opts.RunID
+	jobID := opts.JobID
+	var selectedJob *shared.Job
+
+	if jobID != "" {
+		opts.IO.StartProgressIndicator()
+		selectedJob, err = shared.GetJob(client, repo, jobID)
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return fmt.Errorf("failed to get job: %w", err)
+		}
+		runID = fmt.Sprintf("%d", selectedJob.RunID)
+	}
 
 	if opts.Prompt {
-		cs := opts.IO.ColorScheme()
 		runs, err := shared.GetRunsWithFilter(client, repo, nil, 10, func(run shared.Run) bool {
 			if run.Status != shared.Completed {
 				return false
@@ -94,40 +119,73 @@ func runRerun(opts *RerunOptions) error {
 		}
 	}
 
-	opts.IO.StartProgressIndicator()
-	run, err := shared.GetRun(client, repo, runID)
-	opts.IO.StopProgressIndicator()
-	if err != nil {
-		return fmt.Errorf("failed to get run: %w", err)
+	if opts.JobID != "" {
+		err = rerunJob(client, repo, selectedJob)
+		if err != nil {
+			return err
+		}
+		if opts.IO.CanPrompt() {
+			fmt.Fprintf(opts.IO.Out, "%s Requested rerun of job %s on run %s\n",
+				cs.SuccessIcon(),
+				cs.Cyanf("%d", selectedJob.ID),
+				cs.Cyanf("%d", selectedJob.RunID))
+		}
+	} else {
+		opts.IO.StartProgressIndicator()
+		run, err := shared.GetRun(client, repo, runID)
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return fmt.Errorf("failed to get run: %w", err)
+		}
+
+		err = rerunRun(client, repo, run, opts.OnlyFailed)
+		if err != nil {
+			return err
+		}
+		if opts.IO.CanPrompt() {
+			onlyFailedMsg := ""
+			if opts.OnlyFailed {
+				onlyFailedMsg = "(failed jobs) "
+			}
+			fmt.Fprintf(opts.IO.Out, "%s Requested rerun %sof run %s\n",
+				cs.SuccessIcon(),
+				onlyFailedMsg,
+				cs.Cyanf("%d", run.ID))
+		}
 	}
 
+	return nil
+}
+
+func rerunRun(client *api.Client, repo ghrepo.Interface, run *shared.Run, onlyFailed bool) error {
 	runVerb := "rerun"
-	if opts.OnlyFailed {
+	if onlyFailed {
 		runVerb = "rerun-failed-jobs"
 	}
 
 	path := fmt.Sprintf("repos/%s/actions/runs/%d/%s", ghrepo.FullName(repo), run.ID, runVerb)
 
-	err = client.REST(repo.RepoHost(), "POST", path, nil, nil)
+	err := client.REST(repo.RepoHost(), "POST", path, nil, nil)
 	if err != nil {
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) && httpError.StatusCode == 403 {
-			return fmt.Errorf("run %d cannot be rerun; its workflow file may be broken.", run.ID)
+			return fmt.Errorf("run %d cannot be rerun; its workflow file may be broken", run.ID)
 		}
 		return fmt.Errorf("failed to rerun: %w", err)
 	}
+	return nil
+}
 
-	if opts.IO.CanPrompt() {
-		cs := opts.IO.ColorScheme()
-		onlyFailedMsg := ""
-		if opts.OnlyFailed {
-			onlyFailedMsg = "(failed jobs) "
+func rerunJob(client *api.Client, repo ghrepo.Interface, job *shared.Job) error {
+	path := fmt.Sprintf("repos/%s/actions/jobs/%d/rerun", ghrepo.FullName(repo), job.ID)
+
+	err := client.REST(repo.RepoHost(), "POST", path, nil, nil)
+	if err != nil {
+		var httpError api.HTTPError
+		if errors.As(err, &httpError) && httpError.StatusCode == 403 {
+			return fmt.Errorf("job %d cannot be rerun", job.ID)
 		}
-		fmt.Fprintf(opts.IO.Out, "%s Requested rerun %sof run %s\n",
-			cs.SuccessIcon(),
-			onlyFailedMsg,
-			cs.Cyanf("%d", run.ID))
+		return fmt.Errorf("failed to rerun: %w", err)
 	}
-
 	return nil
 }
