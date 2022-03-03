@@ -34,11 +34,7 @@ func newJupyterCmd(app *App) *cobra.Command {
 }
 
 func (a *App) Jupyter(ctx context.Context, opts jupyterOptions) error {
-	// TODO: Whatever it takes to call StartJupyterServer
-	// That returns the port and server url
-
-	// TODO: Share this code with ssh.go and logs.go
-	// We're all doing the same thing: starting agent session
+	// TODO: Share liveshare setup code with ssh.go and logs.go
 
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
@@ -78,36 +74,30 @@ func (a *App) Jupyter(ctx context.Context, opts jupyterOptions) error {
 	defer safeClose(session, &err)
 
 	a.StartProgressIndicatorWithLabel("Fetching Jupyter Details")
-	remoteJupyterPort, jupyterServerUrl, err := session.StartJupyterServer(ctx)
+	jupyterServerPort, jupyterServerUrl, err := session.StartJupyterServer(ctx)
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting jupyter server details: %w", err)
 	}
 
-	localJupyterServerPort := 0
-	// localSSHServerPort := opts.serverPort
-	// usingCustomPort := localSSHServerPort != 0 // suppress log of command line in Shell
-
 	// Ensure local port is listening before client (Shell) connects.
-	// Unless the user specifies a server port, localSSHServerPort is 0
-	// and thus the client will pick a random port.
-	listen, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", localJupyterServerPort))
+	// The client picks a random port when jupyterDestPort is 0.
+	jupyterDestPort := 0
+	listen, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", jupyterDestPort))
 	if err != nil {
 		return err
 	}
 	defer listen.Close()
-	localJupyterServerPort = listen.Addr().(*net.TCPAddr).Port
+	jupyterDestPort = listen.Addr().(*net.TCPAddr).Port
 
 	tunnelClosed := make(chan error, 1)
 	go func() {
-		fwd := liveshare.NewPortForwarder(session, "jupyter", remoteJupyterPort, true)
-
-		// TODO: Cancel context when browser closes
+		fwd := liveshare.NewPortForwarder(session, "jupyter", jupyterServerPort, true)
 		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // always non-nil
 	}()
 
-	// Launch browser and connect to JupyterLab
-	targetUrl := strings.Replace(jupyterServerUrl, fmt.Sprintf("%d", remoteJupyterPort), fmt.Sprintf("%d", localJupyterServerPort), 1)
+	// Preserve the server URL's token
+	targetUrl := strings.Replace(jupyterServerUrl, fmt.Sprintf("%d", jupyterServerPort), fmt.Sprintf("%d", jupyterDestPort), 1)
 	err = a.browser.Browse(targetUrl)
 	if err != nil {
 		return err
