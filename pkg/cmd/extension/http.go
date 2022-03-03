@@ -2,6 +2,7 @@ package extension
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -80,6 +81,9 @@ func downloadAsset(httpClient *http.Client, asset releaseAsset, destPath string)
 	return err
 }
 
+var releaseNotFoundErr = errors.New("release not found")
+var commitNotFoundErr = errors.New("commit not found")
+
 // fetchLatestRelease finds the latest published release for a repository.
 func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*release, error) {
 	path := fmt.Sprintf("repos/%s/%s/releases/latest", baseRepo.RepoOwner(), baseRepo.RepoName())
@@ -113,7 +117,7 @@ func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*re
 	return &r, nil
 }
 
-// fetchRelease finds release by tag name for a repository
+// fetchReleaseFromTag finds release by tag name for a repository
 func fetchReleaseFromTag(httpClient *http.Client, baseRepo ghrepo.Interface, tagName string) (*release, error) {
 	fullRepoName := fmt.Sprintf("%s/%s", baseRepo.RepoOwner(), baseRepo.RepoName())
 	path := fmt.Sprintf("repos/%s/releases/tags/%s", fullRepoName, tagName)
@@ -129,6 +133,9 @@ func fetchReleaseFromTag(httpClient *http.Client, baseRepo ghrepo.Interface, tag
 		return nil, err
 	}
 
+	if resp.StatusCode == 404 {
+		return nil, releaseNotFoundErr
+	}
 	if resp.StatusCode > 299 {
 		return nil, api.HandleHTTPError(resp)
 	}
@@ -145,4 +152,35 @@ func fetchReleaseFromTag(httpClient *http.Client, baseRepo ghrepo.Interface, tag
 	}
 
 	return &r, nil
+}
+
+// fetchCommitSHA finds full commit SHA from a target ref in a repo
+func fetchCommitSHA(httpClient *http.Client, baseRepo ghrepo.Interface, targetRef string) (string, error) {
+	path := fmt.Sprintf("repos/%s/%s/commits/%s", baseRepo.RepoOwner(), baseRepo.RepoName(), targetRef)
+	url := ghinstance.RESTPrefix(baseRepo.RepoHost()) + path
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Accept", "application/vnd.github.VERSION.sha")
+	resp, err := httpClient.Do(req)
+	defer resp.Body.Close()
+	if err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode == 422 {
+		return "", commitNotFoundErr
+	}
+	if resp.StatusCode > 299 {
+		return "", api.HandleHTTPError(resp)
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(body), nil
 }

@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -320,6 +321,7 @@ type binManifest struct {
 	Path string
 }
 
+// Install an extension from repo, and pin to commitish if provided
 func (m *Manager) Install(repo ghrepo.Interface, targetCommitish string) error {
 	isBin, err := isBinExtension(m.client, repo)
 	if err != nil {
@@ -337,11 +339,11 @@ func (m *Manager) Install(repo ghrepo.Interface, targetCommitish string) error {
 		return errors.New("extension is not installable: missing executable")
 	}
 
-	protocol, _ := m.config.GetOrDefault(repo.RepoHost(), "git_protocol")
-	return m.installGit(ghrepo.FormatRemoteURL(repo, protocol), m.io.Out, m.io.ErrOut)
+	return m.installGit(repo, targetCommitish, m.io.Out, m.io.ErrOut)
 }
 
 func (m *Manager) installBin(repo ghrepo.Interface, targetCommitish string) error {
+	log.Println("Installing binary extension")
 	var r *release
 	var err error
 	if targetCommitish == "" {
@@ -413,10 +415,21 @@ func (m *Manager) installBin(repo ghrepo.Interface, targetCommitish string) erro
 	return nil
 }
 
-func (m *Manager) installGit(cloneURL string, stdout, stderr io.Writer) error {
+func (m *Manager) installGit(repo ghrepo.Interface, targetCommitish string, stdout, stderr io.Writer) error {
+	protocol, _ := m.config.GetOrDefault(repo.RepoHost(), "git_protocol")
+	cloneURL := ghrepo.FormatRemoteURL(repo, protocol)
+
 	exe, err := m.lookPath("git")
 	if err != nil {
 		return err
+	}
+
+	var commitSHA string
+	if targetCommitish != "" {
+		commitSHA, err = fetchCommitSHA(m.client, repo, targetCommitish)
+		if err != nil {
+			return err
+		}
 	}
 
 	name := strings.TrimSuffix(path.Base(cloneURL), ".git")
@@ -425,7 +438,17 @@ func (m *Manager) installGit(cloneURL string, stdout, stderr io.Writer) error {
 	externalCmd := m.newCommand(exe, "clone", cloneURL, targetDir)
 	externalCmd.Stdout = stdout
 	externalCmd.Stderr = stderr
-	return externalCmd.Run()
+	if err := externalCmd.Run(); err != nil {
+		return err
+	}
+	if commitSHA == "" {
+		return nil
+	}
+
+	checkoutCmd := m.newCommand(exe, "-C", targetDir, "checkout", commitSHA)
+	checkoutCmd.Stdout = stdout
+	checkoutCmd.Stderr = stderr
+	return checkoutCmd.Run()
 }
 
 var localExtensionUpgradeError = errors.New("local extensions can not be upgraded")
