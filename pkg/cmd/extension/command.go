@@ -116,18 +116,28 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						return err
 					}
 
+					cs := io.ColorScheme()
 					if err := m.Install(repo, pinFlag); err != nil {
+						if errors.Is(err, releaseNotFoundErr) {
+							return fmt.Errorf("%s Could not find a release of %s for %s",
+								cs.FailureIcon(), args[0], cs.Cyan(pinFlag))
+						} else if errors.Is(err, commitNotFoundErr) {
+							return fmt.Errorf("%s %s does not exist in %s",
+								cs.FailureIcon(), cs.Cyan(pinFlag), args[0])
+						}
 						return err
 					}
 
 					if io.IsStdoutTTY() {
-						cs := io.ColorScheme()
 						fmt.Fprintf(io.Out, "%s Installed extension %s\n", cs.SuccessIcon(), args[0])
+						if pinFlag != "" {
+							fmt.Fprintf(io.Out, "%s Pinned extension at %s\n", cs.SuccessIcon(), cs.Cyan(pinFlag))
+						}
 					}
 					return nil
 				},
 			}
-			cmd.Flags().StringVar(&pinFlag, "pin", "", "pin extension to a release tag or commit sha")
+			cmd.Flags().StringVar(&pinFlag, "pin", "", "pin extension to a release tag or commit ref")
 			return cmd
 		}(),
 		func() *cobra.Command {
