@@ -164,7 +164,7 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 	}
 
 	choices := []string{
-		"Continue in browser to review and authorize additional permissions",
+		"Continue in browser to review and authorize additional permissions (Recommended)",
 		"Continue without authorizing additional permissions",
 	}
 
@@ -190,6 +190,7 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 
 	// if the user chose to continue in the browser, open the URL
 	if answers.Accept == choices[0] {
+		fmt.Fprintln(a.io.ErrOut, "Please re-run the create request after accepting permissions in the browser.")
 		if err := a.browser.Browse(allowPermissionsURL); err != nil {
 			return nil, fmt.Errorf("error opening browser: %w", err)
 		}
