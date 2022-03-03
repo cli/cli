@@ -8,7 +8,6 @@ import (
 	"io"
 	"io/fs"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -199,6 +198,9 @@ func (m *Manager) parseBinaryExtensionDir(fi fs.FileInfo) (Extension, error) {
 	remoteURL := ghrepo.GenerateRepoURL(repo, "")
 	ext.url = remoteURL
 	ext.currentVersion = bm.Tag
+	if bm.Pinned {
+		ext.pin = bm.Tag
+	}
 	return ext, nil
 }
 
@@ -207,12 +209,20 @@ func (m *Manager) parseGitExtensionDir(fi fs.FileInfo) (Extension, error) {
 	exePath := filepath.Join(id, fi.Name(), fi.Name())
 	remoteUrl := m.getRemoteUrl(fi.Name())
 	currentVersion := m.getCurrentVersion(fi.Name())
+
+	var pinnedVersion string
+	pinPath := filepath.Join(id, fi.Name(), fmt.Sprintf(".pin-%s", currentVersion))
+	if _, err := os.Stat(pinPath); err == nil {
+		pinnedVersion = currentVersion[:7]
+	}
+
 	return Extension{
 		path:           exePath,
 		url:            remoteUrl,
 		isLocal:        false,
 		currentVersion: currentVersion,
 		kind:           GitKind,
+		pin:            pinnedVersion,
 	}, nil
 }
 
@@ -313,15 +323,16 @@ func (m *Manager) InstallLocal(dir string) error {
 }
 
 type binManifest struct {
-	Owner string
-	Name  string
-	Host  string
-	Tag   string
+	Owner  string
+	Name   string
+	Host   string
+	Tag    string
+	Pinned bool
 	// TODO I may end up not using this; just thinking ahead to local installs
 	Path string
 }
 
-// Install an extension from repo, and pin to commitish if provided
+// Install installs an extension from repo, and pins to commitish if provided
 func (m *Manager) Install(repo ghrepo.Interface, targetCommitish string) error {
 	isBin, err := isBinExtension(m.client, repo)
 	if err != nil {
@@ -343,10 +354,10 @@ func (m *Manager) Install(repo ghrepo.Interface, targetCommitish string) error {
 }
 
 func (m *Manager) installBin(repo ghrepo.Interface, targetCommitish string) error {
-	log.Println("Installing binary extension")
 	var r *release
 	var err error
-	if targetCommitish == "" {
+	isPinned := targetCommitish != ""
+	if isPinned {
 		r, err = fetchLatestRelease(m.client, repo)
 	} else {
 		r, err = fetchReleaseFromTag(m.client, repo, targetCommitish)
@@ -372,6 +383,7 @@ func (m *Manager) installBin(repo ghrepo.Interface, targetCommitish string) erro
 
 	name := repo.RepoName()
 	targetDir := filepath.Join(m.installDir(), name)
+
 	// TODO clean this up if function errs?
 	err = os.MkdirAll(targetDir, 0755)
 	if err != nil {
@@ -387,11 +399,12 @@ func (m *Manager) installBin(repo ghrepo.Interface, targetCommitish string) erro
 	}
 
 	manifest := binManifest{
-		Name:  name,
-		Owner: repo.RepoOwner(),
-		Host:  repo.RepoHost(),
-		Path:  binPath,
-		Tag:   r.Tag,
+		Name:   name,
+		Owner:  repo.RepoOwner(),
+		Host:   repo.RepoHost(),
+		Path:   binPath,
+		Tag:    r.Tag,
+		Pinned: isPinned,
 	}
 
 	bs, err := yaml.Marshal(manifest)
@@ -448,9 +461,20 @@ func (m *Manager) installGit(repo ghrepo.Interface, targetCommitish string, stdo
 	checkoutCmd := m.newCommand(exe, "-C", targetDir, "checkout", commitSHA)
 	checkoutCmd.Stdout = stdout
 	checkoutCmd.Stderr = stderr
-	return checkoutCmd.Run()
+	if err := checkoutCmd.Run(); err != nil {
+		return err
+	}
+
+	pinPath := filepath.Join(targetDir, fmt.Sprintf(".pin-%s", commitSHA))
+	f, err := os.OpenFile(pinPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	defer f.Close()
+	if err != nil {
+		return fmt.Errorf("failed to create pin in directory: %w", err)
+	}
+	return nil
 }
 
+var pinnedExtensionUpgradeError = errors.New("pinned extensions can not be upgraded")
 var localExtensionUpgradeError = errors.New("local extensions can not be upgraded")
 var upToDateError = errors.New("already up to date")
 var noExtensionsInstalledError = errors.New("no extensions installed")
@@ -507,6 +531,9 @@ func (m *Manager) upgradeExtensions(exts []Extension, force bool) error {
 func (m *Manager) upgradeExtension(ext Extension, force bool) error {
 	if ext.isLocal {
 		return localExtensionUpgradeError
+	}
+	if ext.pin != "" {
+		return pinnedExtensionUpgradeError
 	}
 	if !ext.UpdateAvailable() {
 		return upToDateError
