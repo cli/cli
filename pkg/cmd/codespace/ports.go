@@ -57,11 +57,11 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, exporter cmdu
 
 	devContainerCh := getDevContainer(ctx, a.apiClient, codespace)
 
-	session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, codespace)
+	session, closeSession, err := startSession(ctx, codespace, a, false, "")
 	if err != nil {
-		return fmt.Errorf("error connecting to codespace: %w", err)
+		return err
 	}
-	defer safeClose(session, &err)
+	defer closeSession(&err)
 
 	a.StartProgressIndicatorWithLabel("Fetching ports")
 	ports, err := session.GetSharedServers(ctx)

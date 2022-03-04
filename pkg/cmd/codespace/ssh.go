@@ -116,38 +116,16 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// While connecting, ensure in the background that the user has keys installed.
-	// That lets us report a more useful error message if they don't.
-	authkeys := make(chan error, 1)
-	go func() {
-		authkeys <- checkAuthorizedKeys(ctx, a.apiClient)
-	}()
-
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
 	if err != nil {
 		return fmt.Errorf("get or choose codespace: %w", err)
 	}
 
-	liveshareLogger := noopLogger()
-	if opts.debug {
-		debugLogger, err := newFileLogger(opts.debugFile)
-		if err != nil {
-			return fmt.Errorf("error creating debug logger: %w", err)
-		}
-		defer safeClose(debugLogger, &err)
-
-		liveshareLogger = debugLogger.Logger
-		a.errLogger.Printf("Debug file located at: %s", debugLogger.Name())
-	}
-
-	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
+	session, closeSession, err := startSession(ctx, codespace, a, opts.debug, opts.debugFile)
 	if err != nil {
-		if authErr := <-authkeys; authErr != nil {
-			return authErr
-		}
-		return fmt.Errorf("error connecting to codespace: %w", err)
+		return err
 	}
-	defer safeClose(session, &err)
+	defer closeSession(&err)
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)

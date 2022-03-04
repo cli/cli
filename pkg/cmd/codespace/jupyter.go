@@ -6,7 +6,6 @@ import (
 	"net"
 	"strings"
 
-	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
 )
@@ -15,7 +14,6 @@ type jupyterOptions struct {
 	codespace string
 	debug     bool
 	debugFile string
-	stdio     bool
 }
 
 func newJupyterCmd(app *App) *cobra.Command {
@@ -34,8 +32,6 @@ func newJupyterCmd(app *App) *cobra.Command {
 }
 
 func (a *App) Jupyter(ctx context.Context, opts jupyterOptions) error {
-	// TODO: Share liveshare setup code with ssh.go and logs.go
-
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -45,33 +41,11 @@ func (a *App) Jupyter(ctx context.Context, opts jupyterOptions) error {
 		return fmt.Errorf("get or choose codespace: %w", err)
 	}
 
-	// While connecting, ensure in the background that the user has keys installed.
-	// That lets us report a more useful error message if they don't.
-	authkeys := make(chan error, 1)
-	go func() {
-		authkeys <- checkAuthorizedKeys(ctx, a.apiClient)
-	}()
-
-	liveshareLogger := noopLogger()
-	if opts.debug {
-		debugLogger, err := newFileLogger(opts.debugFile)
-		if err != nil {
-			return fmt.Errorf("error creating debug logger: %w", err)
-		}
-		defer safeClose(debugLogger, &err)
-
-		liveshareLogger = debugLogger.Logger
-		a.errLogger.Printf("Debug file located at: %s", debugLogger.Name())
-	}
-
-	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
+	session, closeSession, err := startSession(ctx, codespace, a, opts.debug, opts.debugFile)
 	if err != nil {
-		if authErr := <-authkeys; authErr != nil {
-			return authErr
-		}
-		return fmt.Errorf("error connecting to codespace: %w", err)
+		return err
 	}
-	defer safeClose(session, &err)
+	defer closeSession(&err)
 
 	a.StartProgressIndicatorWithLabel("Fetching Jupyter Details")
 	jupyterServerPort, jupyterServerUrl, err := session.StartJupyterServer(ctx)

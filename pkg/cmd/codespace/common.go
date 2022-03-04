@@ -15,8 +15,10 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -57,6 +59,36 @@ func (a *App) StartProgressIndicatorWithLabel(s string) {
 // StopProgressIndicator stops the progress indicator.
 func (a *App) StopProgressIndicator() {
 	a.io.StopProgressIndicator()
+}
+
+func startSession(ctx context.Context, codespace *api.Codespace, a *App, debug bool, debugFile string) (*liveshare.Session, func(*error), error) {
+	// While connecting, ensure in the background that the user has keys installed.
+	// That lets us report a more useful error message if they don't.
+	authkeys := make(chan error, 1)
+	go func() {
+		authkeys <- checkAuthorizedKeys(ctx, a.apiClient)
+	}()
+
+	liveshareLogger := noopLogger()
+	if debug {
+		debugLogger, err := newFileLogger(debugFile)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error creating debug logger: %w", err)
+		}
+		defer safeClose(debugLogger, &err)
+
+		liveshareLogger = debugLogger.Logger
+		a.errLogger.Printf("Debug file located at: %s", debugLogger.Name())
+	}
+
+	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
+	if err != nil {
+		if authErr := <-authkeys; authErr != nil {
+			return nil, nil, authErr
+		}
+		return nil, nil, fmt.Errorf("error connecting to codespace: %w", err)
+	}
+	return session, func(e *error) { safeClose(session, e) }, nil
 }
 
 //go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
