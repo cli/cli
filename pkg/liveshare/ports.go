@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/sourcegraph/jsonrpc2"
+	"golang.org/x/sync/errgroup"
 )
 
 // Port describes a port exposed by the container.
@@ -41,33 +42,27 @@ type PortUpdate struct {
 // It returns an identifier that can be used to open an SSH channel to the remote port.
 func (s *Session) startSharing(ctx context.Context, sessionName string, port int) (channelID, error) {
 	args := []interface{}{port, sessionName, fmt.Sprintf("http://localhost:%d", port)}
-	errc := make(chan error, 1)
+	g, ctx := errgroup.WithContext(ctx)
 
-	go func() {
+	g.Go(func() error {
 		startNotification, err := s.WaitForPortNotification(ctx, port, PortChangeKindStart)
 		if err != nil {
-			errc <- fmt.Errorf("error while waiting for port notification: %w", err)
-			return
+			return fmt.Errorf("error while waiting for port notification: %w", err)
+
 		}
 		if !startNotification.Success {
-			errc <- fmt.Errorf("error while starting port sharing: %s", startNotification.ErrorDetail)
-			return
+			return fmt.Errorf("error while starting port sharing: %s", startNotification.ErrorDetail)
 		}
-		errc <- nil // success
-	}()
+		return nil // success
+	})
 
 	var response Port
-	if err := s.rpc.do(ctx, "serverSharing.startSharing", args, &response); err != nil {
-		return channelID{}, err
-	}
+	g.Go(func() error {
+		return s.rpc.do(ctx, "serverSharing.startSharing", args, &response)
+	})
 
-	select {
-	case <-ctx.Done():
-		return channelID{}, ctx.Err()
-	case err := <-errc:
-		if err != nil {
-			return channelID{}, err
-		}
+	if err := g.Wait(); err != nil {
+		return channelID{}, err
 	}
 
 	return channelID{response.StreamName, response.StreamCondition}, nil

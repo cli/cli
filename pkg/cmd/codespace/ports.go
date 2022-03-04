@@ -275,7 +275,7 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 	}
 	defer safeClose(session, &err)
 
-	errc := make(chan error, 1)
+	g, ctx := errgroup.WithContext(ctx)
 
 	// TODO: check if port visibility can be updated in parallel instead of sequentially
 	for _, port := range ports {
@@ -285,36 +285,33 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
-		go func(port portVisibility) {
+		g.Go(func() error {
 			updateNotif, err := session.WaitForPortNotification(ctx, port.number, liveshare.PortChangeKindUpdate)
 			if err != nil {
-				errc <- fmt.Errorf("error waiting for port %d to update: %w", port.number, err)
-				return
+				return fmt.Errorf("error waiting for port %d to update: %w", port.number, err)
+
 			}
 			if !updateNotif.Success {
 				if updateNotif.StatusCode == http.StatusForbidden {
-					errc <- newErrUpdatingPortVisibility(port.number, port.visibility, errUpdatePortVisibilityForbidden)
-					return
+					return newErrUpdatingPortVisibility(port.number, port.visibility, errUpdatePortVisibilityForbidden)
 				}
-				errc <- newErrUpdatingPortVisibility(port.number, port.visibility, errors.New(updateNotif.ErrorDetail))
-				return
-			}
-			errc <- nil // success
-		}(port)
+				return newErrUpdatingPortVisibility(port.number, port.visibility, errors.New(updateNotif.ErrorDetail))
 
-		err := session.UpdateSharedServerPrivacy(ctx, port.number, port.visibility)
-		if err != nil {
-			return fmt.Errorf("error updating port %d to %s: %w", port.number, port.visibility, err)
-		}
+			}
+			return nil // success
+		})
+
+		g.Go(func() error {
+			err := session.UpdateSharedServerPrivacy(ctx, port.number, port.visibility)
+			if err != nil {
+				return fmt.Errorf("error updating port %d to %s: %w", port.number, port.visibility, err)
+			}
+			return nil
+		})
 
 		// wait for success or failure
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case err := <-errc:
-			if err != nil {
-				return err
-			}
+		if err := g.Wait(); err != nil {
+			return err
 		}
 
 		a.StopProgressIndicator()
