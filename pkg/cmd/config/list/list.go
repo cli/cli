@@ -59,7 +59,7 @@ func listRun(opts *ListOptions) error {
 	configOptions := config.ConfigOptions()
 
 	for _, key := range configOptions {
-		val, err := cfg.Get(host, key.Key)
+		val, err := cfg.GetOrDefault(host, key.Key)
 		if err != nil {
 			return err
 		}

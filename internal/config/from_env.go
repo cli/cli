@@ -3,9 +3,11 @@ package config
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/pkg/set"
 )
 
 const (
@@ -34,19 +36,29 @@ type envConfig struct {
 }
 
 func (c *envConfig) Hosts() ([]string, error) {
-	hasDefault := false
 	hosts, err := c.Config.Hosts()
-	for _, h := range hosts {
-		if h == ghinstance.Default() {
-			hasDefault = true
-		}
+	if err != nil {
+		return nil, err
 	}
-	token, _ := AuthTokenFromEnv(ghinstance.Default())
-	if (err != nil || !hasDefault) && token != "" {
-		hosts = append([]string{ghinstance.Default()}, hosts...)
-		return hosts, nil
+
+	hostSet := set.NewStringSet()
+	hostSet.AddValues(hosts)
+
+	// If GH_HOST is set then add it to list.
+	if host := os.Getenv(GH_HOST); host != "" {
+		hostSet.Add(host)
 	}
-	return hosts, err
+
+	// If there is a valid environment variable token for the
+	// default host then add default host to list.
+	if token, _ := AuthTokenFromEnv(ghinstance.Default()); token != "" {
+		hostSet.Add(ghinstance.Default())
+	}
+
+	s := hostSet.ToSlice()
+	// If default host is in list then move it to the front.
+	sort.SliceStable(s, func(i, j int) bool { return s[i] == ghinstance.Default() })
+	return s, nil
 }
 
 func (c *envConfig) DefaultHost() (string, error) {
@@ -74,6 +86,24 @@ func (c *envConfig) GetWithSource(hostname, key string) (string, string, error) 
 	}
 
 	return c.Config.GetWithSource(hostname, key)
+}
+
+func (c *envConfig) GetOrDefault(hostname, key string) (val string, err error) {
+	val, _, err = c.GetOrDefaultWithSource(hostname, key)
+	return
+}
+
+func (c *envConfig) GetOrDefaultWithSource(hostname, key string) (val string, src string, err error) {
+	val, src, err = c.GetWithSource(hostname, key)
+	if err == nil && val == "" {
+		val = c.Default(key)
+	}
+
+	return
+}
+
+func (c *envConfig) Default(key string) string {
+	return c.Config.Default(key)
 }
 
 func (c *envConfig) CheckWriteable(hostname, key string) error {

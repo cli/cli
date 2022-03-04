@@ -20,14 +20,13 @@ const (
 )
 
 type mergePayload struct {
-	repo             ghrepo.Interface
-	pullRequestID    string
-	method           PullRequestMergeMethod
-	auto             bool
-	commitSubject    string
-	setCommitSubject bool
-	commitBody       string
-	setCommitBody    bool
+	repo          ghrepo.Interface
+	pullRequestID string
+	method        PullRequestMergeMethod
+	auto          bool
+	commitSubject string
+	commitBody    string
+	setCommitBody bool
 }
 
 // TODO: drop after githubv4 gets updated
@@ -52,7 +51,7 @@ func mergePullRequest(client *http.Client, payload mergePayload) error {
 		input.MergeMethod = &m
 	}
 
-	if payload.setCommitSubject {
+	if payload.commitSubject != "" {
 		commitHeadline := githubv4.String(payload.commitSubject)
 		input.CommitHeadline = &commitHeadline
 	}
@@ -100,7 +99,7 @@ func disableAutoMerge(client *http.Client, repo ghrepo.Interface, prID string) e
 	return gql.MutateNamed(context.Background(), "PullRequestAutoMergeDisable", &mutation, variables)
 }
 
-func getMergeText(client *http.Client, repo ghrepo.Interface, prID string, mergeMethod PullRequestMergeMethod) (string, error) {
+func getMergeText(client *http.Client, repo ghrepo.Interface, prID string, mergeMethod PullRequestMergeMethod) (string, string, error) {
 	var method githubv4.PullRequestMergeMethod
 	switch mergeMethod {
 	case PullRequestMergeMethodMerge:
@@ -114,7 +113,8 @@ func getMergeText(client *http.Client, repo ghrepo.Interface, prID string, merge
 	var query struct {
 		Node struct {
 			PullRequest struct {
-				ViewerMergeBodyText string `graphql:"viewerMergeBodyText(mergeType: $method)"`
+				ViewerMergeHeadlineText string `graphql:"viewerMergeHeadlineText(mergeType: $method)"`
+				ViewerMergeBodyText     string `graphql:"viewerMergeBodyText(mergeType: $method)"`
 			} `graphql:"...on PullRequest"`
 		} `graphql:"node(id: $prID)"`
 	}
@@ -128,11 +128,12 @@ func getMergeText(client *http.Client, repo ghrepo.Interface, prID string, merge
 	err := gql.QueryNamed(context.Background(), "PullRequestMergeText", &query, variables)
 	if err != nil {
 		// Tolerate this API missing in older GitHub Enterprise
-		if strings.Contains(err.Error(), "Field 'viewerMergeBodyText' doesn't exist") {
-			return "", nil
+		if strings.Contains(err.Error(), "Field 'viewerMergeHeadlineText' doesn't exist") ||
+			strings.Contains(err.Error(), "Field 'viewerMergeBodyText' doesn't exist") {
+			return "", "", nil
 		}
-		return "", err
+		return "", "", err
 	}
 
-	return query.Node.PullRequest.ViewerMergeBodyText, nil
+	return query.Node.PullRequest.ViewerMergeHeadlineText, query.Node.PullRequest.ViewerMergeBodyText, nil
 }

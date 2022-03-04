@@ -29,6 +29,7 @@ type BrowseOptions struct {
 	HttpClient       func() (*http.Client, error)
 	IO               *iostreams.IOStreams
 	PathFromRepoRoot func() string
+	GitClient        gitClient
 
 	SelectorArg string
 
@@ -46,6 +47,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 		HttpClient:       f.HttpClient,
 		IO:               f.IOStreams,
 		PathFromRepoRoot: git.PathFromRepoRoot,
+		GitClient:        &localGitClient{},
 	}
 
 	cmd := &cobra.Command{
@@ -97,6 +99,9 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			); err != nil {
 				return err
 			}
+			if cmd.Flags().Changed("repo") {
+				opts.GitClient = &remoteGitClient{opts.BaseRepo, opts.HttpClient}
+			}
 
 			if runF != nil {
 				return runF(opts)
@@ -123,10 +128,11 @@ func runBrowse(opts *BrowseOptions) error {
 	}
 
 	if opts.CommitFlag {
-		commit, err := git.LastCommit()
-		if err == nil {
-			opts.Branch = commit.Sha
+		commit, err := opts.GitClient.LastCommit()
+		if err != nil {
+			return err
 		}
+		opts.Branch = commit.Sha
 	}
 
 	section, err := parseSection(baseRepo, opts)
@@ -244,4 +250,34 @@ func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err 
 func isNumber(arg string) bool {
 	_, err := strconv.Atoi(arg)
 	return err == nil
+}
+
+// gitClient is used to implement functions that can be performed on both local and remote git repositories
+type gitClient interface {
+	LastCommit() (*git.Commit, error)
+}
+
+type localGitClient struct{}
+
+type remoteGitClient struct {
+	repo       func() (ghrepo.Interface, error)
+	httpClient func() (*http.Client, error)
+}
+
+func (gc *localGitClient) LastCommit() (*git.Commit, error) { return git.LastCommit() }
+
+func (gc *remoteGitClient) LastCommit() (*git.Commit, error) {
+	httpClient, err := gc.httpClient()
+	if err != nil {
+		return nil, err
+	}
+	repo, err := gc.repo()
+	if err != nil {
+		return nil, err
+	}
+	commit, err := api.LastCommit(api.NewClientFromHTTP(httpClient), repo)
+	if err != nil {
+		return nil, err
+	}
+	return &git.Commit{Sha: commit.OID}, nil
 }

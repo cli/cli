@@ -11,7 +11,7 @@ func NewCmdGPGKey(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "gpg-key <command>",
 		Short: "Manage GPG keys",
-		Long:  "Manage GPG keys registered with your GitHub account",
+		Long:  "Manage GPG keys registered with your GitHub account.",
 	}
 
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))

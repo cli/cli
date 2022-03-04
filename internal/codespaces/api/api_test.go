@@ -114,3 +114,154 @@ func TestListCodespaces_unlimited(t *testing.T) {
 		t.Fatalf("expected codespace-249, got %s", codespaces[0].Name)
 	}
 }
+
+func TestGetRepoSuggestions(t *testing.T) {
+	tests := []struct {
+		searchText string // The input search string
+		queryText  string // The wanted query string (based off searchText)
+		sort       string // (Optional) The RepoSearchParameters.Sort param
+		maxRepos   string // (Optional) The RepoSearchParameters.MaxRepos param
+	}{
+		{
+			searchText: "test",
+			queryText:  "test",
+		},
+		{
+			searchText: "org/repo",
+			queryText:  "repo user:org",
+		},
+		{
+			searchText: "org/repo/extra",
+			queryText:  "repo/extra user:org",
+		},
+		{
+			searchText: "test",
+			queryText:  "test",
+			sort:       "stars",
+			maxRepos:   "1000",
+		},
+	}
+
+	for _, tt := range tests {
+		runRepoSearchTest(t, tt.searchText, tt.queryText, tt.sort, tt.maxRepos)
+	}
+}
+
+func createFakeSearchReposServer(t *testing.T, wantSearchText string, wantSort string, wantPerPage string, responseRepos []*Repository) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/search/repositories" {
+			t.Error("Incorrect path")
+			return
+		}
+
+		query := r.URL.Query()
+		got := fmt.Sprintf("q=%q sort=%s per_page=%s", query.Get("q"), query.Get("sort"), query.Get("per_page"))
+		want := fmt.Sprintf("q=%q sort=%s per_page=%s", wantSearchText+" in:name", wantSort, wantPerPage)
+		if got != want {
+			t.Errorf("for query, got %s, want %s", got, want)
+			return
+		}
+
+		response := struct {
+			Items []*Repository `json:"items"`
+		}{
+			responseRepos,
+		}
+
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			t.Error(err)
+		}
+	}))
+}
+
+func runRepoSearchTest(t *testing.T, searchText, wantQueryText, wantSort, wantMaxRepos string) {
+	wantRepoNames := []string{"repo1", "repo2"}
+
+	apiResponseRepositories := make([]*Repository, 0)
+	for _, name := range wantRepoNames {
+		apiResponseRepositories = append(apiResponseRepositories, &Repository{FullName: name})
+	}
+
+	svr := createFakeSearchReposServer(t, wantQueryText, wantSort, wantMaxRepos, apiResponseRepositories)
+	defer svr.Close()
+
+	api := API{
+		githubAPI: svr.URL,
+		client:    &http.Client{},
+	}
+
+	ctx := context.Background()
+
+	searchParameters := RepoSearchParameters{}
+	if len(wantSort) > 0 {
+		searchParameters.Sort = wantSort
+	}
+	if len(wantMaxRepos) > 0 {
+		searchParameters.MaxRepos, _ = strconv.Atoi(wantMaxRepos)
+	}
+
+	gotRepoNames, err := api.GetCodespaceRepoSuggestions(ctx, searchText, searchParameters)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	gotNamesStr := fmt.Sprintf("%v", gotRepoNames)
+	wantNamesStr := fmt.Sprintf("%v", wantRepoNames)
+	if gotNamesStr != wantNamesStr {
+		t.Fatalf("got repo names %s, want %s", gotNamesStr, wantNamesStr)
+	}
+}
+
+func TestRetries(t *testing.T) {
+	var callCount int
+	csName := "test_codespace"
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		if callCount == 3 {
+			err := json.NewEncoder(w).Encode(Codespace{
+				Name: csName,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+		callCount++
+		w.WriteHeader(502)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler(w, r) }))
+	t.Cleanup(srv.Close)
+	a := &API{
+		githubAPI: srv.URL,
+		client:    &http.Client{},
+	}
+	cs, err := a.GetCodespace(context.Background(), "test", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if callCount != 3 {
+		t.Fatalf("expected at least 2 retries but got %d", callCount)
+	}
+	if cs.Name != csName {
+		t.Fatalf("expected codespace name to be %q but got %q", csName, cs.Name)
+	}
+	callCount = 0
+	handler = func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		err := json.NewEncoder(w).Encode(Codespace{
+			Name: csName,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	cs, err = a.GetCodespace(context.Background(), "test", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if callCount != 1 {
+		t.Fatalf("expected no retries but got %d calls", callCount)
+	}
+	if cs.Name != csName {
+		t.Fatalf("expected codespace name to be %q but got %q", csName, cs.Name)
+	}
+}

@@ -41,6 +41,7 @@ type MergeOptions struct {
 
 	Body    string
 	BodySet bool
+	Subject string
 	Editor  editor
 
 	UseAdmin                bool
@@ -158,6 +159,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	cmd.Flags().BoolVarP(&opts.DeleteBranch, "delete-branch", "d", false, "Delete the local and remote branch after merge")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Body `text` for the merge commit")
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
+	cmd.Flags().StringVarP(&opts.Subject, "subject", "t", "", "Subject `text` for the merge commit")
 	cmd.Flags().BoolVarP(&flagMerge, "merge", "m", false, "Merge the commits with the base branch")
 	cmd.Flags().BoolVarP(&flagRebase, "rebase", "r", false, "Rebase the commits onto the base branch")
 	cmd.Flags().BoolVarP(&flagSquash, "squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
@@ -231,6 +233,7 @@ func mergeRun(opts *MergeOptions) error {
 			pullRequestID: pr.ID,
 			method:        opts.MergeMethod,
 			auto:          autoMerge,
+			commitSubject: opts.Subject,
 			commitBody:    opts.Body,
 			setCommitBody: opts.BodySet,
 		}
@@ -251,33 +254,19 @@ func mergeRun(opts *MergeOptions) error {
 
 			allowEditMsg := payload.method != PullRequestMergeMethodRebase
 
-			action, err := confirmSurvey(allowEditMsg)
-			if err != nil {
-				return fmt.Errorf("unable to confirm: %w", err)
-			}
-
-			if action == shared.EditCommitMessageAction {
-				if !payload.setCommitBody {
-					payload.commitBody, err = getMergeText(httpClient, baseRepo, pr.ID, payload.method)
-					if err != nil {
-						return err
-					}
-				}
-
-				payload.commitBody, err = opts.Editor.Edit("*.md", payload.commitBody)
-				if err != nil {
-					return err
-				}
-				payload.setCommitBody = true
-
-				action, err = confirmSurvey(false)
+			for {
+				action, err := confirmSurvey(allowEditMsg)
 				if err != nil {
 					return fmt.Errorf("unable to confirm: %w", err)
 				}
-			}
-			if action == shared.CancelAction {
-				fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
-				return cmdutil.CancelError
+
+				submit, err := confirmSubmission(httpClient, opts, action, &payload)
+				if err != nil {
+					return err
+				}
+				if submit {
+					break
+				}
 			}
 		}
 
@@ -452,14 +441,15 @@ func deleteBranchSurvey(opts *MergeOptions, crossRepoPR, localBranchExists bool)
 
 func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 	const (
-		submitLabel        = "Submit"
-		editCommitMsgLabel = "Edit commit message"
-		cancelLabel        = "Cancel"
+		submitLabel            = "Submit"
+		editCommitSubjectLabel = "Edit commit subject"
+		editCommitMsgLabel     = "Edit commit message"
+		cancelLabel            = "Cancel"
 	)
 
 	options := []string{submitLabel}
 	if allowEditMsg {
-		options = append(options, editCommitMsgLabel)
+		options = append(options, editCommitSubjectLabel, editCommitMsgLabel)
 	}
 	options = append(options, cancelLabel)
 
@@ -476,10 +466,59 @@ func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 	switch result {
 	case submitLabel:
 		return shared.SubmitAction, nil
+	case editCommitSubjectLabel:
+		return shared.EditCommitSubjectAction, nil
 	case editCommitMsgLabel:
 		return shared.EditCommitMessageAction, nil
 	default:
 		return shared.CancelAction, nil
+	}
+}
+
+func confirmSubmission(client *http.Client, opts *MergeOptions, action shared.Action, payload *mergePayload) (bool, error) {
+	var err error
+
+	switch action {
+	case shared.EditCommitMessageAction:
+		if !payload.setCommitBody {
+			_, payload.commitBody, err = getMergeText(client, payload.repo, payload.pullRequestID, payload.method)
+			if err != nil {
+				return false, err
+			}
+		}
+
+		payload.commitBody, err = opts.Editor.Edit("*.md", payload.commitBody)
+		if err != nil {
+			return false, err
+		}
+		payload.setCommitBody = true
+
+		return false, nil
+
+	case shared.EditCommitSubjectAction:
+		if payload.commitSubject == "" {
+			payload.commitSubject, _, err = getMergeText(client, payload.repo, payload.pullRequestID, payload.method)
+			if err != nil {
+				return false, err
+			}
+		}
+
+		payload.commitSubject, err = opts.Editor.Edit("*.md", payload.commitSubject)
+		if err != nil {
+			return false, err
+		}
+
+		return false, nil
+
+	case shared.CancelAction:
+		fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
+		return false, cmdutil.CancelError
+
+	case shared.SubmitAction:
+		return true, nil
+
+	default:
+		return false, fmt.Errorf("unable to confirm: %w", err)
 	}
 }
 
