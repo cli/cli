@@ -167,12 +167,8 @@ func Test_editRunInteractive(t *testing.T) {
 				InteractiveMode: true,
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "Choice", Value: []string{"Description"}},
-				})
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "repoDescription", Value: "awesome repo description"},
-				})
+				as.StubPrompt("What do you want to edit?").AnswerWith([]string{"Description"})
+				as.StubPrompt("Description of the repository").AnswerWith("awesome repo description")
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
@@ -211,14 +207,10 @@ func Test_editRunInteractive(t *testing.T) {
 				InteractiveMode: true,
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "Choice", Value: []string{"Description", "Topics"}},
-				})
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "repoDescription", Value: "awesome repo description"},
-					{Name: "addTopics", Value: "a,b,c,d"},
-					{Name: "removeTopics", Value: []string{"b", "c"}},
-				})
+				as.StubPrompt("What do you want to edit?").AnswerWith([]string{"Description", "Topics"})
+				as.StubPrompt("Description of the repository").AnswerWith("awesome repo description")
+				as.StubPrompt("Add topics?(csv format)").AnswerWith("a,b,c,d")
+				as.StubPrompt("Remove Topics").AnswerWith([]string{"b", "c"})
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
@@ -262,14 +254,10 @@ func Test_editRunInteractive(t *testing.T) {
 				InteractiveMode: true,
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "Choice", Value: []string{"Merge Options"}},
-				})
-				as.Stub([]*prompt.QuestionStub{
-					{Name: "mergeOptions", Value: []int{0, 1}},
-					{Name: "enableAutoMerge", Value: false},
-					{Name: "autoDeleteBranch", Value: false},
-				})
+				as.StubPrompt("What do you want to edit?").AnswerWith([]string{"Merge Options"})
+				as.StubPrompt("Choose a merge option").AnswerWith([]int{0, 1})
+				as.StubPrompt("Enable Auto Merge?").AnswerWith(false)
+				as.StubPrompt("Automatically delete head branches after merging?").AnswerWith(false)
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
