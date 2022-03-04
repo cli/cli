@@ -128,11 +128,11 @@ func fetchReleaseFromTag(httpClient *http.Client, baseRepo ghrepo.Interface, tag
 	}
 
 	resp, err := httpClient.Do(req)
-	defer resp.Body.Close()
 	if err != nil {
 		return nil, err
 	}
 
+	defer resp.Body.Close()
 	if resp.StatusCode == 404 {
 		return nil, releaseNotFoundErr
 	}
@@ -165,11 +165,11 @@ func fetchCommitSHA(httpClient *http.Client, baseRepo ghrepo.Interface, targetRe
 
 	req.Header.Set("Accept", "application/vnd.github.VERSION.sha")
 	resp, err := httpClient.Do(req)
-	defer resp.Body.Close()
 	if err != nil {
 		return "", err
 	}
 
+	defer resp.Body.Close()
 	if resp.StatusCode == 422 {
 		return "", commitNotFoundErr
 	}
