@@ -310,12 +310,6 @@ func Test_editRunInteractive(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		q, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(q)
-		}
-
 		io, _, _, _ := iostreams.Test()
 		tt.opts.IO = io
 
@@ -329,6 +323,11 @@ func Test_editRunInteractive(t *testing.T) {
 			defer httpReg.Verify(t)
 			if tt.httpStubs != nil {
 				tt.httpStubs(t, httpReg)
+			}
+
+			as := prompt.NewAskStubber(t)
+			if tt.askStubs != nil {
+				tt.askStubs(as)
 			}
 
 			opts := &tt.opts
