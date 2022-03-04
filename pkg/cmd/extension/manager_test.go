@@ -445,6 +445,50 @@ func TestManager_UpgradeExtension_BinaryExtension(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 }
 
+func TestManager_UpgradeExtension_PinnedBinaryExtension(t *testing.T) {
+	tempDir := t.TempDir()
+
+	assert.NoError(t, stubBinaryExtension(
+		filepath.Join(tempDir, "extensions", "gh-bin-ext"),
+		binManifest{
+			Owner:  "owner",
+			Name:   "gh-bin-ext",
+			Host:   "example.com",
+			Tag:    "v1.6.3",
+			Pinned: true,
+		}))
+
+	io, _, _, _ := iostreams.Test()
+	m := newTestManager(tempDir, nil, io)
+	exts, err := m.list(false)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(exts))
+	ext := exts[0]
+
+	err = m.upgradeExtension(ext, false)
+	assert.NotNil(t, err)
+	assert.Equal(t, err, pinnedExtensionUpgradeError)
+}
+
+func TestManager_UpgradeExtenion_PinnedGitExtension(t *testing.T) {
+	tempDir := t.TempDir()
+	extDir := filepath.Join(tempDir, "extensions", "gh-remote")
+	assert.NoError(t, stubPinnedExtension(filepath.Join(extDir, "gh-remote"), "abc1234"))
+
+	io, _, _, _ := iostreams.Test()
+	m := newTestManager(tempDir, nil, io)
+	exts, err := m.list(false)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(exts))
+	ext := exts[0]
+	ext.latestVersion = "new version"
+	ext.pin = "abc1234"
+
+	err = m.upgradeExtension(ext, false)
+	assert.NotNil(t, err)
+	assert.Equal(t, err, pinnedExtensionUpgradeError)
+}
+
 func TestManager_Install_git(t *testing.T) {
 	tempDir := t.TempDir()
 
@@ -472,7 +516,7 @@ func TestManager_Install_git(t *testing.T) {
 
 	repo := ghrepo.New("owner", "gh-some-ext")
 
-	err := m.Install(repo)
+	err := m.Install(repo, "")
 	assert.NoError(t, err)
 	assert.Equal(t, fmt.Sprintf("[git clone https://github.com/owner/gh-some-ext.git %s]\n", filepath.Join(tempDir, "extensions", "gh-some-ext")), stdout.String())
 	assert.Equal(t, "", stderr.String())
@@ -514,7 +558,7 @@ func TestManager_Install_binary_unsupported(t *testing.T) {
 
 	m := newTestManager(tempDir, &client, io)
 
-	err := m.Install(repo)
+	err := m.Install(repo, "")
 	assert.EqualError(t, err, "gh-bin-ext unsupported for windows-amd64. Open an issue: `gh issue create -R owner/gh-bin-ext -t'Support windows-amd64'`")
 
 	assert.Equal(t, "", stdout.String())
@@ -559,7 +603,7 @@ func TestManager_Install_binary(t *testing.T) {
 
 	m := newTestManager(tempDir, &http.Client{Transport: &reg}, io)
 
-	err := m.Install(repo)
+	err := m.Install(repo, "")
 	assert.NoError(t, err)
 
 	manifest, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext", manifestName))
@@ -696,6 +740,24 @@ func stubExtension(path string) error {
 		return err
 	}
 	f, err := os.OpenFile(path, os.O_CREATE, 0755)
+	if err != nil {
+		return err
+	}
+	return f.Close()
+}
+
+func stubPinnedExtension(path string, pinnedVersion string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_CREATE, 0755)
+	if err != nil {
+		return err
+	}
+	f.Close()
+
+	pinPath := filepath.Join(filepath.Dir(path), fmt.Sprintf(".pin-%s", pinnedVersion))
+	f, err = os.OpenFile(pinPath, os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		return err
 	}
