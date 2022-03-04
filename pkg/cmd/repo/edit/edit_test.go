@@ -217,7 +217,7 @@ func Test_editRunInteractive(t *testing.T) {
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoDescription", Value: "awesome repo description"},
 					{Name: "addTopics", Value: "a,b,c,d"},
-					{Name: "removeTopics", Value: "b,c"},
+					{Name: "removeTopics", Value: []string{"b", "c"}},
 				})
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {

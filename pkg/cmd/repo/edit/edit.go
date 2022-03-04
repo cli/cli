@@ -127,7 +127,7 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 		apiClient := api.NewClientFromHTTP(opts.HTTPClient)
 
 		opts.IO.StartProgressIndicator()
-		fetchedRepo, err := api.FetchRepository(apiClient, opts.Repository, []string{"" +
+		fieldsToRetrieve := []string{
 			"description",
 			"homepageUrl",
 			"defaultBranchRef",
@@ -142,21 +142,20 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 			"rebaseMergeAllowed",
 			"deleteBranchOnMerge",
 			"isTemplate",
-		})
+		}
+		fetchedRepo, err := api.FetchRepository(apiClient, opts.Repository, fieldsToRetrieve)
+		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
 		}
-		opts.IO.StopProgressIndicator()
 		for _, v := range fetchedRepo.RepositoryTopics.Nodes {
 			repoTopics = append(repoTopics, v.Topic.Name)
 		}
-		editOpts, addTopics, removeTopics, err := interactiveRepoEdit(fetchedRepo, repoTopics)
+		editOpts, err := interactiveRepoEdit(fetchedRepo, opts, repoTopics)
 		if err != nil {
 			return err
 		}
 		opts.Edits = *editOpts
-		opts.AddTopics = addTopics
-		opts.RemoveTopics = removeTopics
 	}
 
 	apiPath := fmt.Sprintf("repos/%s/%s", repo.RepoOwner(), repo.RepoName())
@@ -233,7 +232,7 @@ func interactiveChoice(r *api.Repository) ([]string, error) {
 	return answers, nil
 }
 
-func interactiveRepoEdit(r *api.Repository, topics []string) (repoInput *EditRepositoryInput, addTopics, removeTopics []string, err error) {
+func interactiveRepoEdit(r *api.Repository, opts *EditOptions, topics []string) (repoInput *EditRepositoryInput, err error) {
 	var defaultTopics string
 	for k, v := range topics {
 		if k == len(topics)-1 {
@@ -245,7 +244,7 @@ func interactiveRepoEdit(r *api.Repository, topics []string) (repoInput *EditRep
 
 	choices, err := interactiveChoice(r)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
 	var qs []*survey.Question
@@ -295,9 +294,10 @@ func interactiveRepoEdit(r *api.Repository, topics []string) (repoInput *EditRep
 					},
 				}, &survey.Question{
 					Name: "removeTopics",
-					Prompt: &survey.Input{
-						Message: "Remove topics?(csv format)",
-						Default: "",
+					Prompt: &survey.MultiSelect{
+						Message: "Remove Topics",
+						Default: defaultMergeSurvey,
+						Options: topics,
 					},
 				})
 			case "Default Branch Name":
@@ -385,7 +385,7 @@ func interactiveRepoEdit(r *api.Repository, topics []string) (repoInput *EditRep
 		RepoDescription   string
 		RepoURL           string
 		AddTopics         string
-		RemoveTopics      string
+		RemoveTopics      []string
 		RepoVisibility    string
 		MergeOptions      []int
 		DefaultBranchName string
@@ -413,18 +413,16 @@ func interactiveRepoEdit(r *api.Repository, topics []string) (repoInput *EditRep
 
 	err = prompt.SurveyAsk(qs, &answers)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
-	addTopics = strings.Split(answers.AddTopics, ",")
+	addTopics := strings.Split(answers.AddTopics, ",")
 	for k, v := range addTopics {
 		addTopics[k] = strings.TrimSpace(v)
 	}
 
-	removeTopics = strings.Split(answers.RemoveTopics, ",")
-	for k, v := range removeTopics {
-		removeTopics[k] = strings.TrimSpace(v)
-	}
+	opts.AddTopics = addTopics
+	opts.RemoveTopics = answers.RemoveTopics
 
 	repoInput = &EditRepositoryInput{
 		Description:         &answers.RepoDescription,
