@@ -275,13 +275,12 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 	}
 	defer safeClose(session, &err)
 
-	g, ctx := errgroup.WithContext(ctx)
-
 	// TODO: check if port visibility can be updated in parallel instead of sequentially
 	for _, port := range ports {
 		a.StartProgressIndicatorWithLabel(fmt.Sprintf("Updating port %d visibility to: %s", port.number, port.visibility))
 
 		// wait for success or failure
+		g, ctx := errgroup.WithContext(ctx)
 		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
