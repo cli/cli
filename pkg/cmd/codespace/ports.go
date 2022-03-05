@@ -309,11 +309,12 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 		})
 
 		// wait for success or failure
-		if err := g.Wait(); err != nil {
+		err := g.Wait()
+		a.StopProgressIndicator()
+		if err != nil {
 			return err
 		}
 
-		a.StopProgressIndicator()
 	}
 
 	return nil
