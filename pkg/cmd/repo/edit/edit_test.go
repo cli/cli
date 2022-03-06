@@ -3,10 +3,11 @@ package edit
 import (
 	"bytes"
 	"context"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"io/ioutil"
 	"net/http"
 	"testing"
+
+	"github.com/cli/cli/v2/pkg/prompt"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -131,6 +132,11 @@ func Test_editRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			io, _, _, _ := iostreams.Test()
+			io.SetStdoutTTY(true)
+			io.SetStdinTTY(true)
+			io.SetStderrTTY(true)
+
 			httpReg := &httpmock.Registry{}
 			defer httpReg.Verify(t)
 			if tt.httpStubs != nil {
@@ -139,6 +145,7 @@ func Test_editRun(t *testing.T) {
 
 			opts := &tt.opts
 			opts.HTTPClient = &http.Client{Transport: httpReg}
+			opts.IO = io
 
 			err := editRun(context.Background(), opts)
 			if tt.wantsErr == "" {
@@ -151,7 +158,7 @@ func Test_editRun(t *testing.T) {
 	}
 }
 
-func Test_editRunInteractive(t *testing.T) {
+func Test_editRun_interactive(t *testing.T) {
 	tests := []struct {
 		name        string
 		opts        EditOptions
@@ -161,7 +168,7 @@ func Test_editRunInteractive(t *testing.T) {
 		wantsErr    string
 	}{
 		{
-			name: "Interactive repo edit",
+			name: "updates repo description",
 			opts: EditOptions{
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				InteractiveMode: true,
@@ -201,7 +208,7 @@ func Test_editRunInteractive(t *testing.T) {
 			},
 		},
 		{
-			name: "Interactive repo edit with topics",
+			name: "updates repo topics",
 			opts: EditOptions{
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				InteractiveMode: true,
@@ -248,14 +255,14 @@ func Test_editRunInteractive(t *testing.T) {
 			},
 		},
 		{
-			name: "Interactive repo edit with merge options",
+			name: "updates repo merge options",
 			opts: EditOptions{
 				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
 				InteractiveMode: true,
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubPrompt("What do you want to edit?").AnswerWith([]string{"Merge Options"})
-				as.StubPrompt("Choose a merge option").AnswerWith([]int{0, 1})
+				as.StubPrompt("Allowed merge strategies").AnswerWith([]string{allowMergeCommits, allowRebaseMerge})
 				as.StubPrompt("Enable Auto Merge?").AnswerWith(false)
 				as.StubPrompt("Automatically delete head branches after merging?").AnswerWith(false)
 			},
@@ -290,7 +297,7 @@ func Test_editRunInteractive(t *testing.T) {
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
 					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
 						assert.Equal(t, true, payload["allow_merge_commit"])
-						assert.Equal(t, true, payload["allow_squash_merge"])
+						assert.Equal(t, false, payload["allow_squash_merge"])
 						assert.Equal(t, true, payload["allow_rebase_merge"])
 					}))
 			},
@@ -298,28 +305,26 @@ func Test_editRunInteractive(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		io, _, _, _ := iostreams.Test()
-		tt.opts.IO = io
-
-		reg := &httpmock.Registry{}
-		if tt.httpStubs != nil {
-			tt.httpStubs(t, reg)
-		}
-
 		t.Run(tt.name, func(t *testing.T) {
+			io, _, _, _ := iostreams.Test()
+			io.SetStdoutTTY(true)
+			io.SetStdinTTY(true)
+			io.SetStderrTTY(true)
+
 			httpReg := &httpmock.Registry{}
 			defer httpReg.Verify(t)
 			if tt.httpStubs != nil {
 				tt.httpStubs(t, httpReg)
 			}
 
+			opts := &tt.opts
+			opts.HTTPClient = &http.Client{Transport: httpReg}
+			opts.IO = io
+
 			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
 				tt.askStubs(as)
 			}
-
-			opts := &tt.opts
-			opts.HTTPClient = &http.Client{Transport: httpReg}
 
 			err := editRun(context.Background(), opts)
 			if tt.wantsErr == "" {

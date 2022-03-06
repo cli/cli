@@ -5,6 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"strings"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -16,11 +21,24 @@ import (
 	"github.com/cli/cli/v2/pkg/set"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"strconv"
-	"strings"
+)
+
+const (
+	allowMergeCommits = "Allow Merge Commits"
+	allowSquashMerge  = "Allow Squash Merging"
+	allowRebaseMerge  = "Allow Rebase Merging"
+
+	optionAllowForking      = "Allow Forking"
+	optionDefaultBranchName = "Default Branch Name"
+	optionDescription       = "Description"
+	optionHomePageURL       = "Home Page URL"
+	optionIssues            = "Issues"
+	optionMergeOptions      = "Merge Options"
+	optionProjects          = "Projects"
+	optionTemplateRepo      = "Template Repository"
+	optionTopics            = "Topics"
+	optionVisibility        = "Visibility"
+	optionWikis             = "Wikis"
 )
 
 type EditOptions struct {
@@ -28,26 +46,27 @@ type EditOptions struct {
 	Repository      ghrepo.Interface
 	IO              *iostreams.IOStreams
 	Edits           EditRepositoryInput
+	Topics          []string
 	AddTopics       []string
 	RemoveTopics    []string
 	InteractiveMode bool
 }
 
 type EditRepositoryInput struct {
-	Description         *string `json:"description,omitempty"`
-	Homepage            *string `json:"homepage,omitempty"`
-	Visibility          *string `json:"visibility,omitempty"`
-	EnableIssues        *bool   `json:"has_issues,omitempty"`
-	EnableProjects      *bool   `json:"has_projects,omitempty"`
-	EnableWiki          *bool   `json:"has_wiki,omitempty"`
-	IsTemplate          *bool   `json:"is_template,omitempty"`
-	DefaultBranch       *string `json:"default_branch,omitempty"`
-	EnableSquashMerge   *bool   `json:"allow_squash_merge,omitempty"`
-	EnableMergeCommit   *bool   `json:"allow_merge_commit,omitempty"`
-	EnableRebaseMerge   *bool   `json:"allow_rebase_merge,omitempty"`
-	EnableAutoMerge     *bool   `json:"allow_auto_merge,omitempty"`
-	DeleteBranchOnMerge *bool   `json:"delete_branch_on_merge,omitempty"`
 	AllowForking        *bool   `json:"allow_forking,omitempty"`
+	DefaultBranch       *string `json:"default_branch,omitempty"`
+	DeleteBranchOnMerge *bool   `json:"delete_branch_on_merge,omitempty"`
+	Description         *string `json:"description,omitempty"`
+	EnableAutoMerge     *bool   `json:"allow_auto_merge,omitempty"`
+	EnableIssues        *bool   `json:"has_issues,omitempty"`
+	EnableMergeCommit   *bool   `json:"allow_merge_commit,omitempty"`
+	EnableProjects      *bool   `json:"has_projects,omitempty"`
+	EnableRebaseMerge   *bool   `json:"allow_rebase_merge,omitempty"`
+	EnableSquashMerge   *bool   `json:"allow_squash_merge,omitempty"`
+	EnableWiki          *bool   `json:"has_wiki,omitempty"`
+	Homepage            *string `json:"homepage,omitempty"`
+	IsTemplate          *bool   `json:"is_template,omitempty"`
+	Visibility          *string `json:"visibility,omitempty"`
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobra.Command {
@@ -67,10 +86,6 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 		},
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if cmd.Flags().NFlag() == 0 {
-				opts.InteractiveMode = true
-			}
-
 			if len(args) > 0 {
 				var err error
 				opts.Repository, err = ghrepo.FromFullName(args[0])
@@ -89,6 +104,14 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 				opts.HTTPClient = httpClient
 			} else {
 				return err
+			}
+
+			if cmd.Flags().NFlag() == 0 {
+				opts.InteractiveMode = true
+			}
+
+			if opts.InteractiveMode && !opts.IO.CanPrompt() {
+				return cmdutil.FlagErrorf("specify properties to edit when not running interactively")
 			}
 
 			if runF != nil {
@@ -119,43 +142,37 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 }
 
 func editRun(ctx context.Context, opts *EditOptions) error {
-	var repoTopics []string
-
 	repo := opts.Repository
 
 	if opts.InteractiveMode {
 		apiClient := api.NewClientFromHTTP(opts.HTTPClient)
-
 		opts.IO.StartProgressIndicator()
 		fieldsToRetrieve := []string{
-			"description",
-			"homepageUrl",
+			"autoMergeAllowed",
 			"defaultBranchRef",
-			"isInOrganization",
-			"repositoryTopics",
-			"hasWikiEnabled",
+			"deleteBranchOnMerge",
+			"description",
 			"hasIssuesEnabled",
 			"hasProjectsEnabled",
-			"autoMergeAllowed",
-			"mergeCommitAllowed",
-			"squashMergeAllowed",
-			"rebaseMergeAllowed",
-			"deleteBranchOnMerge",
+			"hasWikiEnabled",
+			"homepageUrl",
+			"isInOrganization",
 			"isTemplate",
+			"mergeCommitAllowed",
+			"rebaseMergeAllowed",
+			"repositoryTopics",
+			"squashMergeAllowed",
+			"visibility",
 		}
 		fetchedRepo, err := api.FetchRepository(apiClient, opts.Repository, fieldsToRetrieve)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
 		}
-		for _, v := range fetchedRepo.RepositoryTopics.Nodes {
-			repoTopics = append(repoTopics, v.Topic.Name)
-		}
-		editOpts, err := interactiveRepoEdit(fetchedRepo, opts, repoTopics)
+		err = interactiveRepoEdit(opts, fetchedRepo)
 		if err != nil {
 			return err
 		}
-		opts.Edits = *editOpts
 	}
 
 	apiPath := fmt.Sprintf("repos/%s/%s", repo.RepoOwner(), repo.RepoName())
@@ -178,20 +195,18 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 
 	if len(opts.AddTopics) > 0 || len(opts.RemoveTopics) > 0 {
 		g.Go(func() error {
-			var existingTopics []string
-			existingTopics = repoTopics
 			if !opts.InteractiveMode {
 				var err error
-				existingTopics, err = getTopics(ctx, opts.HTTPClient, repo)
+				opts.Topics, err = getTopics(ctx, opts.HTTPClient, repo)
 				if err != nil {
 					return err
 				}
 			}
 			oldTopics := set.NewStringSet()
-			oldTopics.AddValues(existingTopics)
+			oldTopics.AddValues(opts.Topics)
 
 			newTopics := set.NewStringSet()
-			newTopics.AddValues(existingTopics)
+			newTopics.AddValues(opts.Topics)
 			newTopics.AddValues(opts.AddTopics)
 			newTopics.RemoveValues(opts.RemoveTopics)
 
@@ -202,269 +217,209 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 		})
 	}
 
-	return g.Wait()
+	err := g.Wait()
+	if err != nil {
+		return err
+	}
+
+	if opts.IO.IsStdoutTTY() {
+		cs := opts.IO.ColorScheme()
+		fmt.Fprintf(opts.IO.Out,
+			"%s Edited repository %s\n",
+			cs.SuccessIcon(),
+			ghrepo.FullName(repo))
+	}
+
+	return nil
 }
 
 func interactiveChoice(r *api.Repository) ([]string, error) {
-	options := []string{"Description", "Home Page URL", "Topics", "Default Branch Name", "Wikis", "Issues", "Projects", "Visibility", "Merge Options", "Template Repository"}
-
+	options := []string{
+		optionDefaultBranchName,
+		optionDescription,
+		optionHomePageURL,
+		optionIssues,
+		optionMergeOptions,
+		optionProjects,
+		optionTemplateRepo,
+		optionTopics,
+		optionVisibility,
+		optionWikis,
+	}
 	if r.IsInOrganization {
-		options = append(options, "Allow Forking")
+		options = append(options, optionAllowForking)
 	}
-
-	qs := []*survey.Question{
-		{
-			Name: "Choice",
-			Prompt: &survey.MultiSelect{
-				Message: "What do you want to edit?",
-				Options: options,
-			},
-		},
-	}
-
 	var answers []string
-
-	err := prompt.SurveyAsk(qs, &answers, survey.WithPageSize(11))
-	if err != nil {
-		return []string{}, err
-	}
-
-	return answers, nil
+	err := prompt.SurveyAskOne(&survey.MultiSelect{
+		Message: "What do you want to edit?",
+		Options: options,
+	}, &answers, survey.WithPageSize(11))
+	return answers, err
 }
 
-func interactiveRepoEdit(r *api.Repository, opts *EditOptions, topics []string) (repoInput *EditRepositoryInput, err error) {
-	var defaultTopics string
-	for k, v := range topics {
-		if k == len(topics)-1 {
-			defaultTopics += v
-		} else {
-			defaultTopics += v + ","
-		}
+func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
+	for _, v := range r.RepositoryTopics.Nodes {
+		opts.Topics = append(opts.Topics, v.Topic.Name)
 	}
-
 	choices, err := interactiveChoice(r)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	for _, c := range choices {
+		switch c {
+		case optionDescription:
+			opts.Edits.Description = &r.Description
+			err = prompt.SurveyAskOne(&survey.Input{
+				Message: "Description of the repository",
+				Default: r.Description,
+			}, opts.Edits.Description)
+			if err != nil {
+				return err
+			}
+		case optionHomePageURL:
+			opts.Edits.Homepage = &r.HomepageURL
+			err = prompt.SurveyAskOne(&survey.Input{
+				Message: "Repository home page URL?",
+				Default: r.HomepageURL,
+			}, opts.Edits.Homepage)
+			if err != nil {
+				return err
+			}
+		case optionTopics:
+			var addTopics string
+			err = prompt.SurveyAskOne(&survey.Input{
+				Message: "Add topics?(csv format)",
+			}, &addTopics)
+			if err != nil {
+				return err
+			}
+			if len(strings.TrimSpace(addTopics)) > 0 {
+				opts.AddTopics = strings.Split(addTopics, ",")
+			}
 
-	var qs []*survey.Question
-	var defaultMergeOptions []int
-	var defaultMergeSurvey []string
+			if len(opts.Topics) > 0 {
+				err = prompt.SurveyAskOne(&survey.MultiSelect{
+					Message: "Remove Topics",
+					Options: opts.Topics,
+				}, &opts.RemoveTopics)
+				if err != nil {
+					return err
+				}
+			}
+		case optionDefaultBranchName:
+			opts.Edits.DefaultBranch = &r.DefaultBranchRef.Name
+			err = prompt.SurveyAskOne(&survey.Input{
+				Message: "Default branch name?",
+				Default: r.DefaultBranchRef.Name,
+			}, opts.Edits.DefaultBranch)
+			if err != nil {
+				return err
+			}
+		case optionWikis:
+			opts.Edits.EnableWiki = &r.HasWikiEnabled
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: "Enable Wikis?",
+				Default: r.HasWikiEnabled,
+			}, opts.Edits.EnableWiki)
+			if err != nil {
+				return err
+			}
+		case optionIssues:
+			opts.Edits.EnableIssues = &r.HasIssuesEnabled
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: "Enable Issues?",
+				Default: r.HasIssuesEnabled,
+			}, opts.Edits.EnableIssues)
+			if err != nil {
+				return err
+			}
+		case optionProjects:
+			opts.Edits.EnableProjects = &r.HasProjectsEnabled
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: "Enable Projects?",
+				Default: r.HasProjectsEnabled,
+			}, opts.Edits.EnableProjects)
+			if err != nil {
+				return err
+			}
+		case optionVisibility:
+			opts.Edits.Visibility = &r.Visibility
+			err = prompt.SurveyAskOne(&survey.Select{
+				Message: "Visibility",
+				Options: []string{"public", "private", "internal"},
+				Default: strings.ToLower(r.Visibility),
+			}, opts.Edits.Visibility)
+			if err != nil {
+				return err
+			}
+		case optionMergeOptions:
+			var defaultMergeOptions []string
+			var selectedMergeOptions []string
+			if r.MergeCommitAllowed {
+				defaultMergeOptions = append(defaultMergeOptions, allowMergeCommits)
+			}
+			if r.SquashMergeAllowed {
+				defaultMergeOptions = append(defaultMergeOptions, allowSquashMerge)
+			}
+			if r.RebaseMergeAllowed {
+				defaultMergeOptions = append(defaultMergeOptions, allowRebaseMerge)
+			}
+			err = prompt.SurveyAskOne(&survey.MultiSelect{
+				Message: "Allowed merge strategies",
+				Default: defaultMergeOptions,
+				Options: []string{allowMergeCommits, allowSquashMerge, allowRebaseMerge},
+			}, &selectedMergeOptions)
+			if err != nil {
+				return err
+			}
+			enableMergeCommit := isIncluded(allowMergeCommits, selectedMergeOptions)
+			opts.Edits.EnableMergeCommit = &enableMergeCommit
+			enableSquashMerge := isIncluded(allowSquashMerge, selectedMergeOptions)
+			opts.Edits.EnableSquashMerge = &enableSquashMerge
+			enableRebaseMerge := isIncluded(allowRebaseMerge, selectedMergeOptions)
+			opts.Edits.EnableRebaseMerge = &enableRebaseMerge
+			if !enableMergeCommit && !enableSquashMerge && !enableRebaseMerge {
+				return fmt.Errorf("you need to allow at least one merge strategy")
+			}
 
-	if r.MergeCommitAllowed {
-		defaultMergeOptions = append(defaultMergeOptions, 0)
-		defaultMergeSurvey = append(defaultMergeSurvey, "Allow Merge Commits")
-	}
+			opts.Edits.EnableAutoMerge = &r.AutoMergeAllowed
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: "Enable Auto Merge?",
+				Default: r.AutoMergeAllowed,
+			}, opts.Edits.EnableAutoMerge)
+			if err != nil {
+				return err
+			}
 
-	if r.SquashMergeAllowed {
-		defaultMergeOptions = append(defaultMergeOptions, 1)
-		defaultMergeSurvey = append(defaultMergeSurvey, "Allow Squash Merging")
-	}
-
-	if r.RebaseMergeAllowed {
-		defaultMergeOptions = append(defaultMergeOptions, 2)
-		defaultMergeSurvey = append(defaultMergeSurvey, "Allow Rebase Merging")
-	}
-
-	if len(choices) > 0 {
-		for _, c := range choices {
-			switch c {
-			case "Description":
-				qs = append(qs, &survey.Question{
-					Name: "repoDescription",
-					Prompt: &survey.Input{
-						Message: "Description of the repository",
-						Default: r.Description,
-					},
-				})
-			case "Home Page URL":
-				qs = append(qs, &survey.Question{
-					Name: "repoURL",
-					Prompt: &survey.Input{
-						Message: "Repository home page URL?",
-						Default: r.HomepageURL,
-					},
-				})
-			case "Topics":
-				qs = append(qs, &survey.Question{
-					Name: "addTopics",
-					Prompt: &survey.Input{
-						Message: "Add topics?(csv format)",
-						Default: defaultTopics,
-					},
-				}, &survey.Question{
-					Name: "removeTopics",
-					Prompt: &survey.MultiSelect{
-						Message: "Remove Topics",
-						Default: defaultMergeSurvey,
-						Options: topics,
-					},
-				})
-			case "Default Branch Name":
-				qs = append(qs, &survey.Question{
-					Name: "defaultBranchName",
-					Prompt: &survey.Input{
-						Message: "Default branch name?",
-						Default: r.DefaultBranchRef.Name,
-					},
-				})
-			case "Wikis":
-				qs = append(qs, &survey.Question{
-					Name: "enableWikis",
-					Prompt: &survey.Confirm{
-						Message: "Enable Wikis?",
-						Default: r.HasWikiEnabled,
-					},
-				})
-			case "Issues":
-				qs = append(qs, &survey.Question{
-					Name: "enableIssues",
-					Prompt: &survey.Confirm{
-						Message: "Enable Issues?",
-						Default: r.HasIssuesEnabled,
-					},
-				})
-			case "Projects":
-				qs = append(qs, &survey.Question{
-					Name: "enableProjects",
-					Prompt: &survey.Confirm{
-						Message: "Enable Projects?",
-						Default: r.HasProjectsEnabled,
-					},
-				})
-			case "Visibility":
-				qs = append(qs, &survey.Question{
-					Name: "repoVisibility",
-					Prompt: &survey.Select{
-						Message: "Visibility",
-						Options: []string{"public", "private", "internal"},
-					},
-				})
-			case "Merge Options":
-				qs = append(qs, &survey.Question{
-					Name: "mergeOptions",
-					Prompt: &survey.MultiSelect{
-						Message: "Choose a merge option",
-						Default: defaultMergeSurvey,
-						Options: []string{"Allow Merge Commits", "Allow Squash Merging", "Allow Rebase Merging"},
-					},
-				}, &survey.Question{
-					Name: "enableAutoMerge",
-					Prompt: &survey.Confirm{
-						Message: "Enable Auto Merge?",
-						Default: r.AutoMergeAllowed,
-					},
-				}, &survey.Question{
-					Name: "autoDeleteBranch",
-					Prompt: &survey.Confirm{
-						Message: "Automatically delete head branches after merging?",
-						Default: r.DeleteBranchOnMerge,
-					},
-				})
-			case "Template Repository":
-				qs = append(qs, &survey.Question{
-					Name: "isTemplateRepo",
-					Prompt: &survey.Confirm{
-						Message: "Convert into a template repository?",
-						Default: r.IsTemplate,
-					},
-				})
-			case "Allow Forking":
-				qs = append(qs, &survey.Question{
-					Name: "allowForking",
-					Prompt: &survey.Confirm{
-						Message: "Allow forking (of an organization repository)?",
-						Default: r.ForkingAllowed,
-					},
-				})
+			opts.Edits.DeleteBranchOnMerge = &r.DeleteBranchOnMerge
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: "Automatically delete head branches after merging?",
+				Default: r.DeleteBranchOnMerge,
+			}, opts.Edits.DeleteBranchOnMerge)
+			if err != nil {
+				return err
+			}
+		case optionTemplateRepo:
+			opts.Edits.IsTemplate = &r.IsTemplate
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: "Convert into a template repository?",
+				Default: r.IsTemplate,
+			}, opts.Edits.IsTemplate)
+			if err != nil {
+				return err
+			}
+		case optionAllowForking:
+			opts.Edits.AllowForking = &r.ForkingAllowed
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: "Allow forking (of an organization repository)?",
+				Default: r.ForkingAllowed,
+			}, opts.Edits.AllowForking)
+			if err != nil {
+				return err
 			}
 		}
 	}
-
-	answers := struct {
-		RepoDescription   string
-		RepoURL           string
-		AddTopics         string
-		RemoveTopics      []string
-		RepoVisibility    string
-		MergeOptions      []int
-		DefaultBranchName string
-		EnableWikis       bool
-		EnableIssues      bool
-		EnableProjects    bool
-		EnableAutoMerge   bool
-		IsTemplateRepo    bool
-		AutoDeleteBranch  bool
-		AllowForking      bool
-	}{
-		RepoDescription:   r.Description,
-		RepoURL:           r.HomepageURL,
-		AddTopics:         defaultTopics,
-		MergeOptions:      defaultMergeOptions,
-		DefaultBranchName: r.DefaultBranchRef.Name,
-		EnableWikis:       r.HasWikiEnabled,
-		EnableIssues:      r.HasIssuesEnabled,
-		EnableProjects:    r.HasProjectsEnabled,
-		EnableAutoMerge:   r.AutoMergeAllowed,
-		IsTemplateRepo:    r.IsTemplate,
-		AutoDeleteBranch:  r.DeleteBranchOnMerge,
-		AllowForking:      r.ForkingAllowed,
-	}
-
-	err = prompt.SurveyAsk(qs, &answers)
-	if err != nil {
-		return nil, err
-	}
-
-	addTopics := strings.Split(answers.AddTopics, ",")
-	for k, v := range addTopics {
-		addTopics[k] = strings.TrimSpace(v)
-	}
-
-	opts.AddTopics = addTopics
-	opts.RemoveTopics = answers.RemoveTopics
-
-	repoInput = &EditRepositoryInput{
-		Description:         &answers.RepoDescription,
-		Homepage:            &answers.RepoURL,
-		Visibility:          &answers.RepoVisibility,
-		EnableIssues:        &answers.EnableIssues,
-		EnableProjects:      &answers.EnableProjects,
-		EnableWiki:          &answers.EnableWikis,
-		IsTemplate:          &answers.IsTemplateRepo,
-		DefaultBranch:       &answers.DefaultBranchName,
-		EnableAutoMerge:     &answers.EnableAutoMerge,
-		DeleteBranchOnMerge: &answers.AutoDeleteBranch,
-	}
-
-	if r.IsInOrganization {
-		repoInput.AllowForking = &answers.AllowForking
-	}
-
-	mergeOptions := map[string]bool{
-		"0": false,
-		"1": false,
-		"2": false,
-	}
-
-	for _, v := range answers.MergeOptions {
-		index := strconv.Itoa(v)
-		mergeOptions[index] = true
-	}
-
-	if emc, ok := mergeOptions["0"]; ok {
-		repoInput.EnableMergeCommit = &emc
-	}
-
-	if esm, ok := mergeOptions["1"]; ok {
-		repoInput.EnableSquashMerge = &esm
-	}
-
-	if erm, ok := mergeOptions["2"]; ok {
-		repoInput.EnableRebaseMerge = &erm
-	}
-
-	return
+	return nil
 }
 
 func getTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface) ([]string, error) {
@@ -527,4 +482,13 @@ func setTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interfa
 	}
 
 	return nil
+}
+
+func isIncluded(value string, opts []string) bool {
+	for _, opt := range opts {
+		if strings.EqualFold(opt, value) {
+			return true
+		}
+	}
+	return false
 }
