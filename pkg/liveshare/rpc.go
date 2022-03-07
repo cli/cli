@@ -53,7 +53,7 @@ func newRequestHandler() *requestHandler {
 	return &requestHandler{handlers: make(map[string][]handlerFn)}
 }
 
-func (r *requestHandler) register(requestType string, handler handlerFn) {
+func (r *requestHandler) register(requestType string, handler handlerFn) func() {
 	r.handlersMu.Lock()
 	defer r.handlersMu.Unlock()
 
@@ -62,6 +62,29 @@ func (r *requestHandler) register(requestType string, handler handlerFn) {
 	}
 
 	r.handlers[requestType] = append(r.handlers[requestType], handler)
+
+	return func() {
+		r.deregister(requestType, handler)
+	}
+}
+
+func (r *requestHandler) deregister(requestType string, handler handlerFn) {
+	r.handlersMu.Lock()
+	defer r.handlersMu.Unlock()
+
+	if handlers, ok := r.handlers[requestType]; ok {
+		newHandlers := []handlerFn{}
+		for _, h := range handlers {
+			if &h != &handler {
+				newHandlers = append(newHandlers, h)
+			}
+		}
+		r.handlers[requestType] = newHandlers
+
+		if len(r.handlers[requestType]) == 0 {
+			delete(r.handlers, requestType)
+		}
+	}
 }
 
 func (r *requestHandler) handlerFn(requestType string) []handlerFn {

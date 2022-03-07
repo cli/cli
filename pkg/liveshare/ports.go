@@ -91,8 +91,10 @@ func (s *Session) WaitForPortNotification(ctx context.Context, port int, notifTy
 			notificationUpdate <- notification
 		}
 	}
-	s.registerRequestHandler("serverSharing.sharingSucceeded", h(true))
-	s.registerRequestHandler("serverSharing.sharingFailed", h(false))
+	deregisterSuccess := s.registerRequestHandler("serverSharing.sharingSucceeded", h(true))
+	deregisterFailure := s.registerRequestHandler("serverSharing.sharingFailed", h(false))
+	defer deregisterSuccess()
+	defer deregisterFailure()
 
 	for {
 		select {
