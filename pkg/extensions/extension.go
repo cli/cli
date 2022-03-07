@@ -20,6 +20,7 @@ type Extension interface {
 	Path() string // Path to executable
 	URL() string
 	IsLocal() bool
+	CurrentVersion() string
 	UpdateAvailable() bool
 	IsBinary() bool
 }
