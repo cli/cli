@@ -170,6 +170,7 @@ type Codespace struct {
 	State       string              `json:"state"`
 	GitStatus   CodespaceGitStatus  `json:"git_status"`
 	Connection  CodespaceConnection `json:"connection"`
+	Machine     CodespaceMachine    `json:"machine"`
 }
 
 type CodespaceGitStatus struct {
@@ -178,6 +179,15 @@ type CodespaceGitStatus struct {
 	Ref                  string `json:"ref"`
 	HasUnpushedChanges   bool   `json:"has_unpushed_changes"`
 	HasUncommitedChanges bool   `json:"has_uncommited_changes"`
+}
+
+type CodespaceMachine struct {
+	Name            string `json:"name"`
+	DisplayName     string `json:"display_name"`
+	OperatingSystem string `json:"operating_system"`
+	StorageInBytes  int    `json:"storage_in_bytes"`
+	MemoryInBytes   int    `json:"memory_in_bytes"`
+	CPUCount        int    `json:"cpus"`
 }
 
 const (
@@ -207,6 +217,7 @@ var CodespaceFields = []string{
 	"gitStatus",
 	"createdAt",
 	"lastUsedAt",
+	"machineName",
 }
 
 func (c *Codespace) ExportData(fields []string) map[string]interface{} {
@@ -219,6 +230,8 @@ func (c *Codespace) ExportData(fields []string) map[string]interface{} {
 			data[f] = c.Owner.Login
 		case "repository":
 			data[f] = c.Repository.FullName
+		case "machineName":
+			data[f] = c.Machine.Name
 		case "gitStatus":
 			data[f] = map[string]interface{}{
 				"ref":                  c.GitStatus.Ref,
@@ -265,6 +278,7 @@ func (a *API) ListCodespaces(ctx context.Context, limit int) (codespaces []*Code
 		var response struct {
 			Codespaces []*Codespace `json:"codespaces"`
 		}
+
 		dec := json.NewDecoder(resp.Body)
 		if err := dec.Decode(&response); err != nil {
 			return nil, fmt.Errorf("error unmarshaling response: %w", err)
@@ -565,6 +579,7 @@ type CreateCodespaceParams struct {
 	Branch             string
 	Machine            string
 	Location           string
+	PermissionsOptOut  bool
 }
 
 // CreateCodespace creates a codespace with the given parameters and returns a non-nil error if it
@@ -610,9 +625,19 @@ type startCreateRequest struct {
 	Ref                string `json:"ref"`
 	Location           string `json:"location"`
 	Machine            string `json:"machine"`
+	PermissionsOptOut  bool   `json:"devcontainer_permissions_opt_out"`
 }
 
 var errProvisioningInProgress = errors.New("provisioning in progress")
+
+type AcceptPermissionsRequiredError struct {
+	Message             string `json:"message"`
+	AllowPermissionsURL string `json:"allow_permissions_url"`
+}
+
+func (e AcceptPermissionsRequiredError) Error() string {
+	return e.Message
+}
 
 // startCreate starts the creation of a codespace.
 // It may return success or an error, or errProvisioningInProgress indicating that the operation
@@ -629,6 +654,7 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 		Ref:                params.Branch,
 		Location:           params.Location,
 		Machine:            params.Machine,
+		PermissionsOptOut:  params.PermissionsOptOut,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
@@ -648,6 +674,29 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 
 	if resp.StatusCode == http.StatusAccepted {
 		return nil, errProvisioningInProgress // RPC finished before result of creation known
+	} else if resp.StatusCode == http.StatusUnauthorized {
+		var (
+			ue       AcceptPermissionsRequiredError
+			bodyCopy = &bytes.Buffer{}
+			r        = io.TeeReader(resp.Body, bodyCopy)
+		)
+
+		b, err := ioutil.ReadAll(r)
+		if err != nil {
+			return nil, fmt.Errorf("error reading response body: %w", err)
+		}
+		if err := json.Unmarshal(b, &ue); err != nil {
+			return nil, fmt.Errorf("error unmarshaling response: %w", err)
+		}
+
+		if ue.AllowPermissionsURL != "" {
+			return nil, ue
+		}
+
+		resp.Body = ioutil.NopCloser(bodyCopy)
+
+		return nil, api.HandleHTTPError(resp)
+
 	} else if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return nil, api.HandleHTTPError(resp)
 	}
@@ -684,6 +733,48 @@ func (a *API) DeleteCodespace(ctx context.Context, codespaceName string) error {
 	}
 
 	return nil
+}
+
+type EditCodespaceParams struct {
+	DisplayName        string `json:"display_name,omitempty"`
+	IdleTimeoutMinutes int    `json:"idle_timeout_minutes,omitempty"`
+	Machine            string `json:"machine,omitempty"`
+}
+
+func (a *API) EditCodespace(ctx context.Context, codespaceName string, params *EditCodespaceParams) (*Codespace, error) {
+	requestBody, err := json.Marshal(params)
+
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, a.githubAPI+"/user/codespaces/"+codespaceName, bytes.NewBuffer(requestBody))
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	a.setHeaders(req)
+	resp, err := a.do(ctx, req, "/user/codespaces")
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, api.HandleHTTPError(resp)
+	}
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	var response Codespace
+	if err := json.Unmarshal(b, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %w", err)
+	}
+
+	return &response, nil
 }
 
 type getCodespaceRepositoryContentsResponse struct {

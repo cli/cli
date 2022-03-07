@@ -39,6 +39,10 @@ func (e *Extension) IsLocal() bool {
 	return e.isLocal
 }
 
+func (e *Extension) CurrentVersion() string {
+	return e.currentVersion
+}
+
 func (e *Extension) UpdateAvailable() bool {
 	if e.isLocal ||
 		e.currentVersion == "" ||
