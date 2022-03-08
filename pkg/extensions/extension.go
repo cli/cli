@@ -19,7 +19,8 @@ type Extension interface {
 	Name() string // Extension Name without gh-
 	Path() string // Path to executable
 	URL() string
-	Pin() string // Pinned version
+	CurrentVersion() string
+	IsPinned() bool
 	UpdateAvailable() bool
 	IsBinary() bool
 	IsLocal() bool

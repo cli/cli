@@ -198,9 +198,13 @@ func (m *Manager) parseBinaryExtensionDir(fi fs.FileInfo) (Extension, error) {
 	remoteURL := ghrepo.GenerateRepoURL(repo, "")
 	ext.url = remoteURL
 	ext.currentVersion = bm.Tag
+<<<<<<< HEAD
 	if bm.Pinned {
 		ext.pin = bm.Tag
 	}
+=======
+	ext.isPinned = bm.IsPinned
+>>>>>>> tmp
 	return ext, nil
 }
 
@@ -210,10 +214,17 @@ func (m *Manager) parseGitExtensionDir(fi fs.FileInfo) (Extension, error) {
 	remoteUrl := m.getRemoteUrl(fi.Name())
 	currentVersion := m.getCurrentVersion(fi.Name())
 
+<<<<<<< HEAD
 	var pinnedVersion string
 	pinPath := filepath.Join(id, fi.Name(), fmt.Sprintf(".pin-%s", currentVersion))
 	if _, err := os.Stat(pinPath); err == nil && len(currentVersion) > 6 {
 		pinnedVersion = currentVersion[:7]
+=======
+	var isPinned bool
+	pinPath := filepath.Join(id, fi.Name(), fmt.Sprintf(".pin-%s", currentVersion))
+	if _, err := os.Stat(pinPath); err == nil {
+		isPinned = true
+>>>>>>> tmp
 	}
 
 	return Extension{
@@ -222,7 +233,11 @@ func (m *Manager) parseGitExtensionDir(fi fs.FileInfo) (Extension, error) {
 		isLocal:        false,
 		currentVersion: currentVersion,
 		kind:           GitKind,
+<<<<<<< HEAD
 		pin:            pinnedVersion,
+=======
+		isPinned:       isPinned,
+>>>>>>> tmp
 	}, nil
 }
 
@@ -324,11 +339,19 @@ func (m *Manager) InstallLocal(dir string) error {
 }
 
 type binManifest struct {
+<<<<<<< HEAD
 	Owner  string
 	Name   string
 	Host   string
 	Tag    string
 	Pinned bool
+=======
+	Owner    string
+	Name     string
+	Host     string
+	Tag      string
+	IsPinned bool
+>>>>>>> tmp
 	// TODO I may end up not using this; just thinking ahead to local installs
 	Path string
 }
@@ -400,12 +423,21 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	}
 
 	manifest := binManifest{
+<<<<<<< HEAD
 		Name:   name,
 		Owner:  repo.RepoOwner(),
 		Host:   repo.RepoHost(),
 		Path:   binPath,
 		Tag:    r.Tag,
 		Pinned: isPinned,
+=======
+		Name:     name,
+		Owner:    repo.RepoOwner(),
+		Host:     repo.RepoHost(),
+		Path:     binPath,
+		Tag:      r.Tag,
+		IsPinned: isPinned,
+>>>>>>> tmp
 	}
 
 	bs, err := yaml.Marshal(manifest)
@@ -469,7 +501,11 @@ func (m *Manager) installGit(repo ghrepo.Interface, target string, stdout, stder
 	pinPath := filepath.Join(targetDir, fmt.Sprintf(".pin-%s", commitSHA))
 	f, err := os.OpenFile(pinPath, os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
+<<<<<<< HEAD
 		return fmt.Errorf("failed to create pin in directory: %w", err)
+=======
+		return fmt.Errorf("failed to create pin file in directory: %w", err)
+>>>>>>> tmp
 	}
 	return f.Close()
 }
@@ -533,7 +569,11 @@ func (m *Manager) upgradeExtension(ext Extension, force bool) error {
 	if ext.isLocal {
 		return localExtensionUpgradeError
 	}
+<<<<<<< HEAD
 	if ext.pin != "" {
+=======
+	if ext.IsPinned() {
+>>>>>>> tmp
 		return pinnedExtensionUpgradeError
 	}
 	if !ext.UpdateAvailable() {

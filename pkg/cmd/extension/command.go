@@ -61,13 +61,20 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					t.AddField(fmt.Sprintf("gh %s", c.Name()), nil, nil)
 					t.AddField(repo, nil, nil)
+					version := c.CurrentVersion()
+					if !c.IsBinary() && len(version) > 8 {
+						version = version[:8]
+					}
 
-					if c.Pin() != "" {
-						t.AddField(c.Pin(), nil, cs.Cyan)
-					} else if c.UpdateAvailable() {
-						t.AddField("Upgrade available", nil, cs.Green)
+					if c.IsPinned() {
+						t.AddField(version, nil, cs.Cyan)
 					} else {
-						t.AddField("", nil, nil)
+						t.AddField(version, nil, nil)
+					}
+
+					var updateAvailable string
+					if c.UpdateAvailable() {
+						updateAvailable = "Upgrade available"
 					}
 					t.EndRow()
 				}
