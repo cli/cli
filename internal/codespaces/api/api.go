@@ -579,8 +579,8 @@ type CreateCodespaceParams struct {
 	Branch             string
 	Machine            string
 	Location           string
-	VscsTarget         string
-	VscsTargetUrl      string
+	VSCSTarget         string
+	VSCSTargetURL      string
 	PermissionsOptOut  bool
 }
 
@@ -627,8 +627,8 @@ type startCreateRequest struct {
 	Ref                string `json:"ref"`
 	Location           string `json:"location"`
 	Machine            string `json:"machine"`
-	VscsTarget         string `json:"vscs_target,omitempty"`
-	VscsTargetUrl      string `json:"vscs_target_url,omitempty"`
+	VSCSTarget         string `json:"vscs_target,omitempty"`
+	VSCSTargetURL      string `json:"vscs_target_url,omitempty"`
 	PermissionsOptOut  bool   `json:"devcontainer_permissions_opt_out"`
 }
 
@@ -658,8 +658,8 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 		Ref:                params.Branch,
 		Location:           params.Location,
 		Machine:            params.Machine,
-		VscsTarget:         params.VscsTarget,
-		VscsTargetUrl:      params.VscsTargetUrl,
+		VSCSTarget:         params.VSCSTarget,
+		VSCSTargetURL:      params.VSCSTargetURL,
 		PermissionsOptOut:  params.PermissionsOptOut,
 	})
 

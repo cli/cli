@@ -48,7 +48,17 @@ func newCreateCmd(app *App) *cobra.Command {
 
 // Create creates a new Codespace
 func (a *App) Create(ctx context.Context, opts createOptions) error {
-	locationCh := getLocation(ctx, a.apiClient)
+
+	// Overrides for Codespace developers to target test environments
+	vscsLocation := os.Getenv("VSCS_LOCATION")
+	vscsTarget := os.Getenv("VSCS_TARGET")
+	vscsTargetUrl := os.Getenv("VSCS_TARGET_URL")
+
+	locationResult := locationResult{vscsLocation, nil}
+	if vscsLocation == "" {
+		// Automatic region detection
+		locationResult = <-getLocation(ctx, a.apiClient)
+	}
 
 	userInputs := struct {
 		Repository string
@@ -100,7 +110,6 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		branch = repository.DefaultBranch
 	}
 
-	locationResult := <-locationCh
 	if locationResult.Err != nil {
 		return fmt.Errorf("error getting codespace region location: %w", locationResult.Err)
 	}
@@ -113,16 +122,13 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return errors.New("there are no available machine types for this repository")
 	}
 
-	vscsTarget := os.Getenv("VSCS_TARGET")
-	vscsTargetUrl := os.Getenv("VSCS_TARGET_URL")
-
 	createParams := &api.CreateCodespaceParams{
 		RepositoryID:       repository.ID,
 		Branch:             branch,
 		Machine:            machine,
 		Location:           locationResult.Location,
-		VscsTarget:         vscsTarget,
-		VscsTargetUrl:      vscsTargetUrl,
+		VSCSTarget:         vscsTarget,
+		VSCSTargetURL:      vscsTargetUrl,
 		IdleTimeoutMinutes: int(opts.idleTimeout.Minutes()),
 		PermissionsOptOut:  opts.permissionsOptOut,
 	}
@@ -291,15 +297,6 @@ type locationResult struct {
 // getLocation fetches the closest Codespace datacenter region/location to the user.
 func getLocation(ctx context.Context, apiClient apiClient) <-chan locationResult {
 	ch := make(chan locationResult, 1)
-
-	// Allow manually setting location string for testing with vscs_target
-	vscsLocation := os.Getenv("VSCS_LOCATION")
-	if vscsLocation != "" {
-		ch <- locationResult{vscsLocation, nil}
-		return ch
-	}
-
-	// Region detection
 	go func() {
 		location, err := apiClient.GetCodespaceRegionLocation(ctx)
 		ch <- locationResult{location, err}
