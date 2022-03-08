@@ -291,6 +291,15 @@ type locationResult struct {
 // getLocation fetches the closest Codespace datacenter region/location to the user.
 func getLocation(ctx context.Context, apiClient apiClient) <-chan locationResult {
 	ch := make(chan locationResult, 1)
+
+	// Allow manually setting location string for testing with vscs_target
+	vscsLocation := os.Getenv("VSCS_LOCATION")
+	if vscsLocation != "" {
+		ch <- locationResult{vscsLocation, nil}
+		return ch
+	}
+
+	// Region detection
 	go func() {
 		location, err := apiClient.GetCodespaceRegionLocation(ctx)
 		ch <- locationResult{location, err}
