@@ -169,9 +169,9 @@ func SetRemoteResolution(name, resolution string) error {
 }
 
 func UnsetRemoteResolution(name string) error {
-	addCmd, err := GitCommand("config", "--unset-all", fmt.Sprintf("remote.%s.gh-resolved", name))
+	unsetCmd, err := GitCommand("config", "--unset-all", fmt.Sprintf("remote.%s.gh-resolved", name))
 	if err != nil {
 		return err
 	}
-	return run.PrepareCmd(addCmd).Run()
+	return run.PrepareCmd(unsetCmd).Run()
 }

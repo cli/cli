@@ -59,6 +59,93 @@ type ResolvedRemotes struct {
 	apiClient    *api.Client
 }
 
+func GetBaseRepo(remotes Remotes) (ghrepo.Interface, error) {
+	for _, r := range remotes {
+		if r.Resolved == "base" {
+			return r, nil
+		} else if r.Resolved != "" {
+			repo, err := ghrepo.FromFullName(r.Resolved)
+			if err != nil {
+				return nil, err
+			}
+			return ghrepo.NewWithHost(repo.RepoOwner(), repo.RepoName(), r.RepoHost()), nil
+		}
+	}
+	return nil, errors.New("a default repo has not been set, use `gh repo default` to set a default repo")
+}
+
+func RemoveBaseRepo(remotes Remotes) {
+	for _, remote := range remotes {
+		if remote.Resolved == "base" {
+			remote.Resolved = ""
+			git.UnsetRemoteResolution(remote.Remote.Name)
+		}
+	}
+}
+
+func (r *ResolvedRemotes) SetGitConfigBaseRepo(io *iostreams.IOStreams) error {
+	resolution := "base"
+	if !io.CanPrompt() {
+		git.SetRemoteResolution(r.remotes[0].Name, resolution)
+		return nil
+	}
+
+	// from here on, consult the API
+	if r.network == nil {
+		err := resolveNetwork(r)
+		if err != nil {
+			return err
+		}
+	}
+
+	var repoNames []string
+	repoMap := map[string]*api.Repository{}
+	add := func(r *api.Repository) {
+		fn := ghrepo.FullName(r)
+		if _, ok := repoMap[fn]; !ok {
+			repoMap[fn] = r
+			repoNames = append(repoNames, fn)
+		}
+	}
+
+	for _, repo := range r.network.Repositories {
+		if repo == nil {
+			continue
+		}
+		if repo.Parent != nil {
+			add(repo.Parent)
+		}
+		add(repo)
+	}
+
+	if len(repoNames) == 0 {
+		git.SetRemoteResolution(r.remotes[0].Name, resolution)
+		return nil
+	}
+
+	baseName := repoNames[0]
+	if len(repoNames) > 1 {
+		err := prompt.SurveyAskOne(&survey.Select{
+			Message: "Which should be the base repository (used for e.g. querying issues) for this directory?",
+			Options: repoNames,
+		}, &baseName)
+		if err != nil {
+			return err
+		}
+	}
+
+	// determine corresponding git remote
+	selectedRepo := repoMap[baseName]
+	remote, _ := r.RemoteForRepo(selectedRepo)
+	if remote == nil {
+		remote = r.remotes[0]
+		resolution = ghrepo.FullName(selectedRepo)
+	}
+
+	// cache the result to git config
+	return git.SetRemoteResolution(remote.Name, resolution)
+}
+
 func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, error) {
 	if r.baseOverride != nil {
 		return r.baseOverride, nil

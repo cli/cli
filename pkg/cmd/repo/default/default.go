@@ -3,12 +3,10 @@ package base
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/context"
-	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -17,12 +15,11 @@ import (
 
 type DefaultOptions struct {
 	IO         *iostreams.IOStreams
-	Remotes    func() (context.Remotes, error)
 	BaseRepo   func() (ghrepo.Interface, error)
+	Remotes    func() (context.Remotes, error)
 	HttpClient func() (*http.Client, error)
 
-	RemoteName string
-	ListFlag   bool
+	ViewFlag bool
 }
 
 func NewCmdDefault(f *cmdutil.Factory, runF func(*DefaultOptions) error) *cobra.Command {
@@ -34,7 +31,7 @@ func NewCmdDefault(f *cmdutil.Factory, runF func(*DefaultOptions) error) *cobra.
 	}
 
 	cmd := &cobra.Command{
-		Use:   "default <git remote name>",
+		Use:   "default",
 		Short: "Configure the default repository used for various commands",
 		Long: heredoc.Doc(`
 		The default repository is used to determine which repository gh
@@ -42,22 +39,12 @@ func NewCmdDefault(f *cmdutil.Factory, runF func(*DefaultOptions) error) *cobra.
 			issue, pr, browse, run, repo rename, secret, workflow
 		`),
 		Example: heredoc.Doc(`
-			$ gh repo default upstream
+			$ gh repo default cli/cli
 		`),
-		Args: cobra.MaximumNArgs(1),
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) > 0 {
-				opts.RemoteName = args[0]
-			}
-			if !opts.IO.CanPrompt() && !opts.ListFlag && opts.RemoteName == "" {
-				return cmdutil.FlagErrorf("remote name is required when not running interactively, use `--list` to see available remotes")
-			}
-			if err := cmdutil.MutuallyExclusive(
-				"args cannot be passed in with --list",
-				opts.RemoteName != "",
-				opts.ListFlag,
-			); err != nil {
-				return err
+			if !opts.IO.CanPrompt() && !opts.ViewFlag {
+				return cmdutil.FlagErrorf("a repository name is required when not running interactively")
 			}
 
 			if runF != nil {
@@ -67,7 +54,7 @@ func NewCmdDefault(f *cmdutil.Factory, runF func(*DefaultOptions) error) *cobra.
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.ListFlag, "list", "l", false, "list the current and available repositories")
+	cmd.Flags().BoolVarP(&opts.ViewFlag, "view", "v", false, "view the default repository used for various commands")
 	return cmd
 }
 
@@ -77,53 +64,24 @@ func defaultRun(opts *DefaultOptions) error {
 		return err
 	}
 
-	if opts.ListFlag {
-		found := false
-		list := &strings.Builder{}
-		for _, remote := range remotes {
-			if remote.Resolved == "base" {
-				list.WriteString(fmt.Sprintf("* %s\n", remote.Remote.Name))
-				found = true
-			} else {
-				list.WriteString(fmt.Sprintf("  %s\n", remote.Remote.Name))
-			}
+	if opts.ViewFlag {
+		baseRepo, err := context.GetBaseRepo(remotes)
+		if err != nil {
+			return err
 		}
-		if !found {
-			fmt.Fprint(opts.IO.Out, "the default repo has not been set\n")
-		}
-		fmt.Fprint(opts.IO.Out, list.String())
+		fmt.Fprintln(opts.IO.Out, ghrepo.FullName(baseRepo))
 		return nil
 	}
 
-	if opts.RemoteName != "" {
-		for _, remote := range remotes {
-			if opts.RemoteName == remote.Remote.Name {
-				removeBaseRepo(remotes)
-				git.SetRemoteResolution(remote.Name, "base")
-				return nil
-			}
-		}
-		return fmt.Errorf("could not find local remote name %s", opts.RemoteName)
-	}
-	removeBaseRepo(remotes)
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
+	context.RemoveBaseRepo(remotes)
 	repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, "")
 	if err != nil {
 		return err
 	}
-	_, err = repoContext.BaseRepo(opts.IO)
-	return err
-}
-
-func removeBaseRepo(remotes context.Remotes) {
-	for _, remote := range remotes {
-		if remote.Resolved == "base" {
-			remote.Resolved = ""
-			git.UnsetRemoteResolution(remote.Remote.Name)
-		}
-	}
+	return repoContext.SetGitConfigBaseRepo(opts.IO)
 }
