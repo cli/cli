@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -112,11 +113,16 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return errors.New("there are no available machine types for this repository")
 	}
 
+	vscsTarget := os.Getenv("VSCS_TARGET")
+	vscsTargetUrl := os.Getenv("VSCS_TARGET_URL")
+
 	createParams := &api.CreateCodespaceParams{
 		RepositoryID:       repository.ID,
 		Branch:             branch,
 		Machine:            machine,
 		Location:           locationResult.Location,
+		VscsTarget:         vscsTarget,
+		VscsTargetUrl:      vscsTargetUrl,
 		IdleTimeoutMinutes: int(opts.idleTimeout.Minutes()),
 		PermissionsOptOut:  opts.permissionsOptOut,
 	}
