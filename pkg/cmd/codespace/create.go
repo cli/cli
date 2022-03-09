@@ -54,11 +54,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	vscsTarget := os.Getenv("VSCS_TARGET")
 	vscsTargetUrl := os.Getenv("VSCS_TARGET_URL")
 
-	locationResult := locationResult{vscsLocation, nil}
-	if vscsLocation == "" {
-		// Automatic region detection
-		locationResult = <-getLocation(ctx, a.apiClient)
-	}
+	locationCh := getLocation(ctx, vscsLocation, a.apiClient)
 
 	userInputs := struct {
 		Repository string
@@ -110,6 +106,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		branch = repository.DefaultBranch
 	}
 
+	locationResult := <-locationCh
 	if locationResult.Err != nil {
 		return fmt.Errorf("error getting codespace region location: %w", locationResult.Err)
 	}
@@ -294,9 +291,18 @@ type locationResult struct {
 	Err      error
 }
 
-// getLocation fetches the closest Codespace datacenter region/location to the user.
-func getLocation(ctx context.Context, apiClient apiClient) <-chan locationResult {
+// getLocation fetches the closest Codespace datacenter
+// region/location to the user, unless the 'vscsLocationOverride' override is set
+func getLocation(ctx context.Context, vscsLocationOverride string, apiClient apiClient) <-chan locationResult {
 	ch := make(chan locationResult, 1)
+
+	// Developer override is set, return the override
+	if vscsLocationOverride != "" {
+		ch <- locationResult{vscsLocationOverride, nil}
+		return ch
+	}
+
+	// Dynamically fetch the region location
 	go func() {
 		location, err := apiClient.GetCodespaceRegionLocation(ctx)
 		ch <- locationResult{location, err}
