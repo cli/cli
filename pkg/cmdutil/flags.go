@@ -34,6 +34,16 @@ func StringEnumFlag(cmd *cobra.Command, p *string, name, shorthand, defaultValue
 	return f
 }
 
+func StringSliceEnumFlag(cmd *cobra.Command, p *[]string, name, shorthand string, defaultValues, options []string, usage string) *pflag.Flag {
+	*p = defaultValues
+	val := &enumMultiValue{value: p, options: options}
+	f := cmd.Flags().VarPF(val, name, shorthand, fmt.Sprintf("%s: %s", usage, formatValuesForUsageDocs(options)))
+	_ = cmd.RegisterFlagCompletionFunc(name, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return options, cobra.ShellCompDirectiveNoFileComp
+	})
+	return f
+}
+
 func formatValuesForUsageDocs(values []string) string {
 	return fmt.Sprintf("{%s}", strings.Join(values, "|"))
 }
@@ -99,14 +109,7 @@ type enumValue struct {
 }
 
 func (e *enumValue) Set(value string) error {
-	found := false
-	for _, opt := range e.options {
-		if strings.EqualFold(opt, value) {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !isIncluded(value, e.options) {
 		return fmt.Errorf("valid values are %s", formatValuesForUsageDocs(e.options))
 	}
 	*e.string = value
@@ -119,4 +122,40 @@ func (e *enumValue) String() string {
 
 func (e *enumValue) Type() string {
 	return "string"
+}
+
+type enumMultiValue struct {
+	value   *[]string
+	options []string
+}
+
+func (e *enumMultiValue) Set(value string) error {
+	items := strings.Split(value, ",")
+	for _, item := range items {
+		if !isIncluded(item, e.options) {
+			return fmt.Errorf("valid values are %s", formatValuesForUsageDocs(e.options))
+		}
+	}
+	*e.value = append(*e.value, items...)
+	return nil
+}
+
+func (e *enumMultiValue) String() string {
+	if len(*e.value) == 0 {
+		return ""
+	}
+	return fmt.Sprintf("{%s}", strings.Join(*e.value, ", "))
+}
+
+func (e *enumMultiValue) Type() string {
+	return "stringSlice"
+}
+
+func isIncluded(value string, opts []string) bool {
+	for _, opt := range opts {
+		if strings.EqualFold(opt, value) {
+			return true
+		}
+	}
+	return false
 }
