@@ -105,6 +105,9 @@ func formatQualifiers(qs Qualifiers) []string {
 
 func formatKeywords(ks []string) []string {
 	for i, k := range ks {
+		if strings.Contains(k, ":") {
+			k = strings.TrimPrefix(k, "not")
+		}
 		ks[i] = quote(k)
 	}
 	return ks

@@ -56,6 +56,13 @@ func TestQueryString(t *testing.T) {
 			},
 			out: "topic:\"quote qualifier\"",
 		},
+		{
+			name: "negates keywords",
+			query: Query{
+				Keywords: []string{"not-org:cli"},
+			},
+			out: "-org:cli",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
