@@ -26,6 +26,7 @@ var jsonTypeRE = regexp.MustCompile(`[/+]json($|;)`)
 //go:generate moq -rm -out searcher_mock.go . Searcher
 type Searcher interface {
 	Repositories(Query) (RepositoriesResult, error)
+	Issues(Query) (IssuesResult, error)
 	URL(Query) string
 }
 
@@ -67,6 +68,30 @@ func (s searcher) Repositories(query Query) (RepositoriesResult, error) {
 			break
 		}
 		page := RepositoriesResult{}
+		resp, err = s.search(query, &page)
+		if err != nil {
+			return result, err
+		}
+		result.IncompleteResults = page.IncompleteResults
+		result.Total = page.Total
+		result.Items = append(result.Items, page.Items...)
+		toRetrieve = toRetrieve - len(page.Items)
+	}
+	return result, nil
+}
+
+func (s searcher) Issues(query Query) (IssuesResult, error) {
+	result := IssuesResult{}
+	toRetrieve := query.Limit
+	var resp *http.Response
+	var err error
+	for toRetrieve > 0 {
+		query.Limit = min(toRetrieve, maxPerPage)
+		query.Page = nextPage(resp)
+		if query.Page == 0 {
+			break
+		}
+		page := IssuesResult{}
 		resp, err = s.search(query, &page)
 		if err != nil {
 			return result, err

@@ -110,7 +110,7 @@ func TestNewCmdRepos(t *testing.T) {
 						Stars:            "6",
 						Topic:            []string{"topic"},
 						Topics:           "7",
-						Is:               "public",
+						Is:               []string{"public"},
 					},
 				},
 			},
@@ -147,7 +147,7 @@ func TestNewCmdRepos(t *testing.T) {
 	}
 }
 
-func Test_ReposRun(t *testing.T) {
+func TestReposRun(t *testing.T) {
 	var query = search.Query{
 		Keywords: []string{"cli"},
 		Kind:     "repositories",
