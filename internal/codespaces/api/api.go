@@ -171,6 +171,7 @@ type Codespace struct {
 	GitStatus   CodespaceGitStatus  `json:"git_status"`
 	Connection  CodespaceConnection `json:"connection"`
 	Machine     CodespaceMachine    `json:"machine"`
+	VSCSTarget  string              `json:"vscs_target,omitempty"`
 }
 
 type CodespaceGitStatus struct {
