@@ -43,6 +43,13 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}
 
+	hasNonDefaultVSCSTarget := false
+	for _, apiCodespace := range codespaces {
+		if apiCodespace.VSCSTarget != "prod" {
+			hasNonDefaultVSCSTarget = true
+		}
+	}
+
 	if err := a.io.StartPager(); err != nil {
 		a.errLogger.Printf("error starting pager: %v", err)
 	}
@@ -59,6 +66,11 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 		tp.AddField("BRANCH", nil, nil)
 		tp.AddField("STATE", nil, nil)
 		tp.AddField("CREATED AT", nil, nil)
+
+		if hasNonDefaultVSCSTarget {
+			tp.AddField("VSCS TARGET", nil, nil)
+		}
+
 		tp.EndRow()
 	}
 
@@ -88,6 +100,11 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 		} else {
 			tp.AddField(c.CreatedAt, nil, nil)
 		}
+
+		if hasNonDefaultVSCSTarget {
+			tp.AddField(c.VSCSTarget, nil, nil)
+		}
+
 		tp.EndRow()
 	}
 
