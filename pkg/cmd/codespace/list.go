@@ -43,10 +43,10 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}
 
-	hasNonDefaultVSCSTarget := false
+	hasNonProdVSCSTarget := false
 	for _, apiCodespace := range codespaces {
 		if apiCodespace.VSCSTarget != "prod" {
-			hasNonDefaultVSCSTarget = true
+			hasNonProdVSCSTarget = true
 		}
 	}
 
@@ -67,7 +67,7 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 		tp.AddField("STATE", nil, nil)
 		tp.AddField("CREATED AT", nil, nil)
 
-		if hasNonDefaultVSCSTarget {
+		if hasNonProdVSCSTarget {
 			tp.AddField("VSCS TARGET", nil, nil)
 		}
 
@@ -101,7 +101,7 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 			tp.AddField(c.CreatedAt, nil, nil)
 		}
 
-		if hasNonDefaultVSCSTarget {
+		if hasNonProdVSCSTarget {
 			tp.AddField(c.VSCSTarget, nil, nil)
 		}
 
