@@ -77,18 +77,26 @@ type PortNotification struct {
 // or an error if the notification is not received before the context is cancelled or it fails
 // to parse the notification.
 func (s *Session) WaitForPortNotification(ctx context.Context, port int, notifType PortChangeKind) (*PortNotification, error) {
-	notificationUpdate := make(chan PortNotification, 1)
-	errc := make(chan error, 1)
+	notificationCh := make(chan *PortNotification, 1)
+	errCh := make(chan error, 1)
 
 	h := func(success bool) func(*jsonrpc2.Conn, *jsonrpc2.Request) {
 		return func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
-			var notification PortNotification
+			notification := new(PortNotification)
 			if err := json.Unmarshal(*req.Params, &notification); err != nil {
-				errc <- fmt.Errorf("error unmarshaling notification: %w", err)
+				select {
+				case errCh <- fmt.Errorf("error unmarshaling notification: %w", err):
+				default:
+				}
 				return
 			}
 			notification.Success = success
-			notificationUpdate <- notification
+			if notification.Port == port && notification.ChangeKind == notifType {
+				select {
+				case notificationCh <- notification:
+				default:
+				}
+			}
 		}
 	}
 	deregisterSuccess := s.registerRequestHandler("serverSharing.sharingSucceeded", h(true))
@@ -100,12 +108,10 @@ func (s *Session) WaitForPortNotification(ctx context.Context, port int, notifTy
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		case err := <-errc:
+		case err := <-errCh:
 			return nil, err
-		case notification := <-notificationUpdate:
-			if notification.Port == port && notification.ChangeKind == notifType {
-				return &notification, nil
-			}
+		case notification := <-notificationCh:
+			return notification, nil
 		}
 	}
 }
