@@ -52,6 +52,13 @@ const (
 	vscsAPI      = "https://online.visualstudio.com"
 )
 
+const (
+	VSCSTargetLocal       = "local"
+	VSCSTargetDevelopment = "development"
+	VSCSTargetPPE         = "ppe"
+	VSCSTargetProduction  = "production"
+)
+
 // API is the interface to the codespace service.
 type API struct {
 	client       httpClient

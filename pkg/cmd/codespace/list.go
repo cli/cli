@@ -45,8 +45,9 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 
 	hasNonProdVSCSTarget := false
 	for _, apiCodespace := range codespaces {
-		if apiCodespace.VSCSTarget != "prod" {
+		if apiCodespace.VSCSTarget != "" && apiCodespace.VSCSTarget != api.VSCSTargetProduction {
 			hasNonProdVSCSTarget = true
+			break
 		}
 	}
 
@@ -114,11 +115,11 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 }
 
 func formatNameForVSCSTarget(name, vscsTarget string) string {
-	if vscsTarget == "dev" || vscsTarget == "local" {
+	if vscsTarget == api.VSCSTargetDevelopment || vscsTarget == api.VSCSTargetLocal {
 		return fmt.Sprintf("%s 🚧", name)
 	}
 
-	if vscsTarget == "ppe" {
+	if vscsTarget == api.VSCSTargetPPE {
 		return fmt.Sprintf("%s ✨", name)
 	}
 
