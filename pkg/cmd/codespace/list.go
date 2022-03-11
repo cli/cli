@@ -86,7 +86,9 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 			stateColor = cs.Green
 		}
 
-		tp.AddField(c.Name, nil, cs.Yellow)
+		formattedName := formatNameForVSCSTarget(c.Name, c.VSCSTarget)
+
+		tp.AddField(formattedName, nil, cs.Yellow)
 		tp.AddField(c.Repository.FullName, nil, nil)
 		tp.AddField(c.branchWithGitStatus(), nil, cs.Cyan)
 		tp.AddField(c.State, nil, stateColor)
@@ -109,4 +111,16 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 	}
 
 	return tp.Render()
+}
+
+func formatNameForVSCSTarget(name, vscsTarget string) string {
+	if vscsTarget == "dev" || vscsTarget == "local" {
+		return fmt.Sprintf("%s 🚧", name)
+	}
+
+	if vscsTarget == "ppe" {
+		return fmt.Sprintf("%s ✨", name)
+	}
+
+	return name
 }
