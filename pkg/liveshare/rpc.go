@@ -44,38 +44,39 @@ func (r *rpcClient) do(ctx context.Context, method string, args, result interfac
 
 type handlerFn func(conn *jsonrpc2.Conn, req *jsonrpc2.Request)
 
+type handlerSt struct {
+	fn handlerFn
+}
+
 type requestHandler struct {
-	handlersMu sync.RWMutex
-	handlers   map[string][]handlerFn
+	handlersMu sync.Mutex
+	handlers   map[string][]*handlerSt
 }
 
 func newRequestHandler() *requestHandler {
-	return &requestHandler{handlers: make(map[string][]handlerFn)}
+	return &requestHandler{handlers: make(map[string][]*handlerSt)}
 }
 
-func (r *requestHandler) register(requestType string, handler handlerFn) func() {
+func (r *requestHandler) register(requestType string, fn handlerFn) func() {
 	r.handlersMu.Lock()
 	defer r.handlersMu.Unlock()
 
-	if _, ok := r.handlers[requestType]; !ok {
-		r.handlers[requestType] = []handlerFn{}
-	}
-
-	r.handlers[requestType] = append(r.handlers[requestType], handler)
+	h := &handlerSt{fn: fn}
+	r.handlers[requestType] = append(r.handlers[requestType], h)
 
 	return func() {
-		r.deregister(requestType, handler)
+		r.deregister(requestType, h)
 	}
 }
 
-func (r *requestHandler) deregister(requestType string, handler handlerFn) {
+func (r *requestHandler) deregister(requestType string, handler *handlerSt) {
 	r.handlersMu.Lock()
 	defer r.handlersMu.Unlock()
 
 	if handlers, ok := r.handlers[requestType]; ok {
-		newHandlers := []handlerFn{}
+		newHandlers := []*handlerSt{}
 		for _, h := range handlers {
-			if &h != &handler {
+			if h != handler {
 				newHandlers = append(newHandlers, h)
 			}
 		}
@@ -87,15 +88,15 @@ func (r *requestHandler) deregister(requestType string, handler handlerFn) {
 	}
 }
 
-func (r *requestHandler) handlerFn(requestType string) []handlerFn {
-	r.handlersMu.RLock()
-	defer r.handlersMu.RUnlock()
+func (r *requestHandler) getHandlers(requestType string) []*handlerSt {
+	r.handlersMu.Lock()
+	defer r.handlersMu.Unlock()
 
 	return r.handlers[requestType]
 }
 
 func (r *requestHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
-	for _, handler := range r.handlerFn(req.Method) {
-		go handler(conn, req)
+	for _, handler := range r.getHandlers(req.Method) {
+		go handler.fn(conn, req)
 	}
 }

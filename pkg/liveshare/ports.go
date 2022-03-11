@@ -124,9 +124,5 @@ func (s *Session) GetSharedServers(ctx context.Context) ([]*Port, error) {
 // UpdateSharedServerPrivacy controls port permissions and visibility scopes for who can access its URLs
 // in the browser.
 func (s *Session) UpdateSharedServerPrivacy(ctx context.Context, port int, visibility string) error {
-	if err := s.rpc.do(ctx, "serverSharing.updateSharedServerPrivacy", []interface{}{port, visibility}, nil); err != nil {
-		return err
-	}
-
-	return nil
+	return s.rpc.do(ctx, "serverSharing.updateSharedServerPrivacy", []interface{}{port, visibility}, nil)
 }
