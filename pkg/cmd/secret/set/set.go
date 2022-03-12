@@ -194,7 +194,11 @@ func setRun(opts *SetOptions) error {
 		}
 	}
 
-	secretEntity := shared.GetSecretEntity(orgName, envName, opts.UserSecrets)
+	secretEntity, err := shared.GetSecretEntity(orgName, envName, opts.UserSecrets)
+	if err != nil {
+		return err
+	}
+
 	secretApp := shared.GetSecretApp(opts.Application, secretEntity)
 	if secretApp == shared.Unknown {
 		return fmt.Errorf("invalid application: %s", opts.Application)
@@ -248,7 +252,7 @@ func setRun(opts *SetOptions) error {
 		key := secretKey
 		value := secret
 		go func() {
-			setc <- setSecret(opts, pk, host, client, baseRepo, key, value, repositoryIDs, secretApp)
+			setc <- setSecret(opts, pk, host, client, baseRepo, key, value, repositoryIDs, secretApp, secretEntity)
 		}()
 	}
 
@@ -284,7 +288,7 @@ type setResult struct {
 	err       error
 }
 
-func setSecret(opts *SetOptions, pk *PubKey, host string, client *api.Client, baseRepo ghrepo.Interface, secretKey string, secret []byte, repositoryIDs []int64, app shared.App) (res setResult) {
+func setSecret(opts *SetOptions, pk *PubKey, host string, client *api.Client, baseRepo ghrepo.Interface, secretKey string, secret []byte, repositoryIDs []int64, app shared.App, entity shared.SecretEntity) (res setResult) {
 	orgName := opts.OrgName
 	envName := opts.EnvName
 	res.key = secretKey
@@ -313,7 +317,7 @@ func setSecret(opts *SetOptions, pk *PubKey, host string, client *api.Client, ba
 		return
 	}
 
-	switch shared.GetSecretEntity(orgName, envName, opts.UserSecrets) {
+	switch entity {
 	case shared.Organization:
 		err = putOrgSecret(client, host, pk, orgName, opts.Visibility, secretKey, encoded, repositoryIDs, app)
 	case shared.Environment:

@@ -1,6 +1,9 @@
 package shared
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
 
 type Visibility string
 
@@ -36,17 +39,24 @@ const (
 	Environment  = "environment"
 )
 
-func GetSecretEntity(orgName, envName string, userSecrets bool) SecretEntity {
-	if orgName != "" {
-		return Organization
+func GetSecretEntity(orgName, envName string, userSecrets bool) (SecretEntity, error) {
+	orgSet := orgName != ""
+	envSet := envName != ""
+
+	if orgSet && envSet || orgSet && userSecrets || envSet && userSecrets {
+		return "", errors.New("cannot specify multiple secret entities")
 	}
-	if envName != "" {
-		return Environment
+
+	if orgSet {
+		return Organization, nil
+	}
+	if envSet {
+		return Environment, nil
 	}
 	if userSecrets {
-		return User
+		return User, nil
 	}
-	return Repository
+	return Repository, nil
 }
 
 func GetSecretApp(app string, entity SecretEntity) App {

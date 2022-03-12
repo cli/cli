@@ -13,6 +13,7 @@ func TestGetSecretEntity(t *testing.T) {
 		envName     string
 		userSecrets bool
 		want        SecretEntity
+		wantErr     bool
 	}{
 		{
 			name:    "org",
@@ -34,17 +35,35 @@ func TestGetSecretEntity(t *testing.T) {
 			want: Repository,
 		},
 		{
-			name:        "Prefers organization over other inputs",
+			name:    "Errors if both org and env are set",
+			orgName: "myOrg",
+			envName: "myEnv",
+			wantErr: true,
+		},
+		{
+			name:        "Errors if both org and user secrets are set",
 			orgName:     "myOrg",
+			userSecrets: true,
+			wantErr:     true,
+		},
+		{
+			name:        "Errors if both env and user secrets are set",
 			envName:     "myEnv",
 			userSecrets: true,
-			want:        Organization,
+			wantErr:     true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, GetSecretEntity(tt.orgName, tt.envName, tt.userSecrets))
+			entity, err := GetSecretEntity(tt.orgName, tt.envName, tt.userSecrets)
+
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.want, entity)
+			}
 		})
 	}
 }
