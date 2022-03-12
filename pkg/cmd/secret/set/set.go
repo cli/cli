@@ -194,23 +194,6 @@ func setRun(opts *SetOptions) error {
 		}
 	}
 
-	type repoNamesResult struct {
-		ids []int64
-		err error
-	}
-	repoNamesC := make(chan repoNamesResult, 1)
-	go func() {
-		if len(opts.RepositoryNames) == 0 {
-			repoNamesC <- repoNamesResult{}
-			return
-		}
-		repositoryIDs, err := mapRepoNamesToIDs(client, host, opts.OrgName, opts.RepositoryNames)
-		repoNamesC <- repoNamesResult{
-			ids: repositoryIDs,
-			err: err,
-		}
-	}()
-
 	secretEntity := shared.GetSecretEntity(orgName, envName, opts.UserSecrets)
 	secretApp := shared.GetSecretApp(opts.Application, secretEntity)
 	if secretApp == shared.Unknown {
@@ -235,6 +218,23 @@ func setRun(opts *SetOptions) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch public key: %w", err)
 	}
+
+	type repoNamesResult struct {
+		ids []int64
+		err error
+	}
+	repoNamesC := make(chan repoNamesResult, 1)
+	go func() {
+		if len(opts.RepositoryNames) == 0 {
+			repoNamesC <- repoNamesResult{}
+			return
+		}
+		repositoryIDs, err := mapRepoNamesToIDs(client, host, opts.OrgName, opts.RepositoryNames)
+		repoNamesC <- repoNamesResult{
+			ids: repositoryIDs,
+			err: err,
+		}
+	}()
 
 	var repositoryIDs []int64
 	if result := <-repoNamesC; result.err == nil {
