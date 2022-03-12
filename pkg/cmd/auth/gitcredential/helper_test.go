@@ -15,11 +15,6 @@ func (c tinyConfig) GetWithSource(host, key string) (string, string, error) {
 	return c[fmt.Sprintf("%s:%s", host, key)], c["_source"], nil
 }
 
-func (c tinyConfig) Get(host, key string) (val string, err error) {
-	val, _, err = c.GetWithSource(host, key)
-	return
-}
-
 func Test_helperRun(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -168,6 +163,30 @@ func Test_helperRun(t *testing.T) {
 			`),
 			wantErr:    true,
 			wantStdout: "",
+			wantStderr: "",
+		},
+		{
+			name: "no username configured",
+			opts: CredentialOptions{
+				Operation: "get",
+				Config: func() (config, error) {
+					return tinyConfig{
+						"_source":                 "/Users/monalisa/.config/gh/hosts.yml",
+						"example.com:oauth_token": "OTOKEN",
+					}, nil
+				},
+			},
+			input: heredoc.Doc(`
+				protocol=https
+				host=example.com
+			`),
+			wantErr: false,
+			wantStdout: heredoc.Doc(`
+				protocol=https
+				host=example.com
+				username=x-access-token
+				password=OTOKEN
+			`),
 			wantStderr: "",
 		},
 		{

@@ -2,11 +2,11 @@ package checks
 
 import (
 	"fmt"
-	"sort"
+	"io"
+	"runtime"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -14,6 +14,8 @@ import (
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
+
+const defaultInterval time.Duration = 10 * time.Second
 
 type browser interface {
 	Browse(string) error
@@ -27,12 +29,16 @@ type ChecksOptions struct {
 
 	SelectorArg string
 	WebMode     bool
+	Interval    time.Duration
+	Watch       bool
 }
 
 func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Command {
+	var interval int
 	opts := &ChecksOptions{
-		IO:      f.IOStreams,
-		Browser: f.Browser,
+		IO:       f.IOStreams,
+		Browser:  f.Browser,
+		Interval: defaultInterval,
 	}
 
 	cmd := &cobra.Command{
@@ -49,7 +55,20 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 			opts.Finder = shared.NewFinder(f)
 
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
-				return cmdutil.FlagErrorf("argument required when using the --repo flag")
+				return cmdutil.FlagErrorf("argument required when using the `--repo` flag")
+			}
+
+			intervalChanged := cmd.Flags().Changed("interval")
+			if !opts.Watch && intervalChanged {
+				return cmdutil.FlagErrorf("cannot use `--interval` flag without `--watch` flag")
+			}
+
+			if intervalChanged {
+				var err error
+				opts.Interval, err = time.ParseDuration(fmt.Sprintf("%ds", interval))
+				if err != nil {
+					return cmdutil.FlagErrorf("could not parse `--interval` flag: %w", err)
+				}
 			}
 
 			if len(args) > 0 {
@@ -65,17 +84,16 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to show details about checks")
+	cmd.Flags().BoolVarP(&opts.Watch, "watch", "", false, "Watch checks until they finish")
+	cmd.Flags().IntVarP(&interval, "interval", "i", 10, "Refresh interval in seconds when using `--watch` flag")
 
 	return cmd
 }
 
-func checksRun(opts *ChecksOptions) error {
+func checksRunWebMode(opts *ChecksOptions) error {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
-		Fields:   []string{"number", "baseRefName", "statusCheckRollup"},
-	}
-	if opts.WebMode {
-		findOptions.Fields = []string{"number"}
+		Fields:   []string{"number"},
 	}
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
@@ -83,190 +101,85 @@ func checksRun(opts *ChecksOptions) error {
 	}
 
 	isTerminal := opts.IO.IsStdoutTTY()
-
-	if opts.WebMode {
-		openURL := ghrepo.GenerateRepoURL(baseRepo, "pull/%d/checks", pr.Number)
-		if isTerminal {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
-		}
-		return opts.Browser.Browse(openURL)
-	}
-
-	if len(pr.StatusCheckRollup.Nodes) == 0 {
-		return fmt.Errorf("no commit found on the pull request")
-	}
-
-	rollup := pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
-	if len(rollup) == 0 {
-		return fmt.Errorf("no checks reported on the '%s' branch", pr.BaseRefName)
-	}
-
-	passing := 0
-	failing := 0
-	skipping := 0
-	pending := 0
-
-	type output struct {
-		mark      string
-		bucket    string
-		name      string
-		elapsed   string
-		link      string
-		markColor func(string) string
-	}
-
-	cs := opts.IO.ColorScheme()
-
-	outputs := []output{}
-
-	checkContexts := pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
-	for _, c := range eliminateDuplicates(checkContexts) {
-		mark := "✓"
-		bucket := "pass"
-		state := c.State
-		markColor := cs.Green
-		if state == "" {
-			if c.Status == "COMPLETED" {
-				state = c.Conclusion
-			} else {
-				state = c.Status
-			}
-		}
-		switch state {
-		case "SUCCESS":
-			passing++
-		case "SKIPPED", "NEUTRAL":
-			mark = "-"
-			markColor = cs.Gray
-			skipping++
-			bucket = "skipping"
-		case "ERROR", "FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED":
-			mark = "X"
-			markColor = cs.Red
-			failing++
-			bucket = "fail"
-		default: // "EXPECTED", "REQUESTED", "WAITING", "QUEUED", "PENDING", "IN_PROGRESS", "STALE"
-			mark = "*"
-			markColor = cs.Yellow
-			pending++
-			bucket = "pending"
-		}
-
-		elapsed := ""
-		zeroTime := time.Time{}
-
-		if c.StartedAt != zeroTime && c.CompletedAt != zeroTime {
-			e := c.CompletedAt.Sub(c.StartedAt)
-			if e > 0 {
-				elapsed = e.String()
-			}
-		}
-
-		link := c.DetailsURL
-		if link == "" {
-			link = c.TargetURL
-		}
-
-		name := c.Name
-		if name == "" {
-			name = c.Context
-		}
-
-		outputs = append(outputs, output{mark, bucket, name, elapsed, link, markColor})
-	}
-
-	sort.Slice(outputs, func(i, j int) bool {
-		b0 := outputs[i].bucket
-		n0 := outputs[i].name
-		l0 := outputs[i].link
-		b1 := outputs[j].bucket
-		n1 := outputs[j].name
-		l1 := outputs[j].link
-
-		if b0 == b1 {
-			if n0 == n1 {
-				return l0 < l1
-			}
-			return n0 < n1
-		}
-
-		return (b0 == "fail") || (b0 == "pending" && b1 == "success")
-	})
-
-	tp := utils.NewTablePrinter(opts.IO)
-
-	for _, o := range outputs {
-		if isTerminal {
-			tp.AddField(o.mark, nil, o.markColor)
-			tp.AddField(o.name, nil, nil)
-			tp.AddField(o.elapsed, nil, nil)
-			tp.AddField(o.link, nil, nil)
-		} else {
-			tp.AddField(o.name, nil, nil)
-			tp.AddField(o.bucket, nil, nil)
-			if o.elapsed == "" {
-				tp.AddField("0", nil, nil)
-			} else {
-				tp.AddField(o.elapsed, nil, nil)
-			}
-			tp.AddField(o.link, nil, nil)
-		}
-
-		tp.EndRow()
-	}
-
-	summary := ""
-	if failing+passing+skipping+pending > 0 {
-		if failing > 0 {
-			summary = "Some checks were not successful"
-		} else if pending > 0 {
-			summary = "Some checks are still pending"
-		} else {
-			summary = "All checks were successful"
-		}
-
-		tallies := fmt.Sprintf("%d failing, %d successful, %d skipped, and %d pending checks",
-			failing, passing, skipping, pending)
-
-		summary = fmt.Sprintf("%s\n%s", cs.Bold(summary), tallies)
-	}
+	openURL := ghrepo.GenerateRepoURL(baseRepo, "pull/%d/checks", pr.Number)
 
 	if isTerminal {
-		fmt.Fprintln(opts.IO.Out, summary)
-		fmt.Fprintln(opts.IO.Out)
+		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 	}
 
-	err = tp.Render()
-	if err != nil {
-		return err
+	return opts.Browser.Browse(openURL)
+}
+
+func checksRun(opts *ChecksOptions) error {
+	if opts.WebMode {
+		return checksRunWebMode(opts)
 	}
 
-	if failing+pending > 0 {
+	if opts.Watch {
+		if err := opts.IO.EnableVirtualTerminalProcessing(); err != nil {
+			return err
+		}
+	} else {
+		// Only start pager in non-watch mode
+		if err := opts.IO.StartPager(); err == nil {
+			defer opts.IO.StopPager()
+		} else {
+			fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+		}
+	}
+
+	var checks []check
+	var counts checkCounts
+
+	for {
+		findOptions := shared.FindOptions{
+			Selector: opts.SelectorArg,
+			Fields:   []string{"number", "headRefName", "statusCheckRollup"},
+		}
+		pr, _, err := opts.Finder.Find(findOptions)
+		if err != nil {
+			return err
+		}
+
+		checks, counts, err = aggregateChecks(pr)
+		if err != nil {
+			return err
+		}
+
+		if counts.Pending != 0 && opts.Watch {
+			refreshScreen(opts.IO.Out)
+			cs := opts.IO.ColorScheme()
+			fmt.Fprintln(opts.IO.Out, cs.Boldf("Refreshing checks status every %v seconds. Press Ctrl+C to quit.\n", opts.Interval.Seconds()))
+		}
+
+		printSummary(opts.IO, counts)
+		err = printTable(opts.IO, checks)
+		if err != nil {
+			return err
+		}
+
+		if counts.Pending == 0 || !opts.Watch {
+			break
+		}
+
+		time.Sleep(opts.Interval)
+	}
+
+	if counts.Failed+counts.Pending > 0 {
 		return cmdutil.SilentError
 	}
 
 	return nil
 }
 
-func eliminateDuplicates(checkContexts []api.CheckContext) []api.CheckContext {
-	// To return the most recent check, sort in descending order by StartedAt.
-	sort.Slice(checkContexts, func(i, j int) bool { return checkContexts[i].StartedAt.After(checkContexts[j].StartedAt) })
-
-	m := make(map[string]struct{})
-	unique := make([]api.CheckContext, 0, len(checkContexts))
-
-	// Eliminate duplicates using Name or Context.
-	for _, ctx := range checkContexts {
-		key := ctx.Name
-		if key == "" {
-			key = ctx.Context
-		}
-		if _, ok := m[key]; ok {
-			continue
-		}
-		unique = append(unique, ctx)
-		m[key] = struct{}{}
+func refreshScreen(w io.Writer) {
+	if runtime.GOOS == "windows" {
+		// Just clear whole screen; I wasn't able to get the nicer cursor movement thing working
+		fmt.Fprintf(w, "\x1b[2J")
+	} else {
+		// Move cursor to 0,0
+		fmt.Fprint(w, "\x1b[0;0H")
+		// Clear from cursor to bottom of screen
+		fmt.Fprint(w, "\x1b[J")
 	}
-
-	return unique
 }

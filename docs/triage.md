@@ -6,31 +6,23 @@ triage role. The initial expectation is that the person in the role for the week
 
 ## Expectations for incoming issues
 
-All incoming issues need either an **enhancement**, **bug**, or **docs** label.
+All incoming issues need either an `enhancement`, `bug`, or `docs` label.
 
-To be considered triaged, **enhancement** issues require at least one of the following additional labels:
+To be considered triaged, `enhancement` issues require at least one of the following additional labels:
 
-- **core**: work reserved for the core CLI team
-- **help wanted**: work that we would accept contributions for
-- **needs-design**: work that requires input from a UX designer before it can move forward
-- **needs-investigation**: work that requires a mystery be solved by the core team before it can move forward
-- **needs-user-input**: work that requires more information from the reporter before it can move forward
+- `core`: reserved for the core CLI team
+- `help wanted`: signal that we are accepting contributions for this
+- `discuss`: add to our team's queue to discuss during a sync
+- `needs-investigation`: work that requires a mystery be solved by the core team before it can move forward
+- `needs-user-input`: we need more information from our users before the task can move forward
 
-To be considered triaged, **bug** issues require a severity label: one of **p1**, **p2**, or **p3**
-
-For a more detailed breakdown of **how** to triage an issue, see the _Issue triage flowchart_ below.
+To be considered triaged, `bug` issues require a severity label: one of `p1`, `p2`, or `p3`
 
 ## Expectations for community pull requests
 
-To be considered triaged, incoming pull requests should:
-
-- be checked for a corresponding **help wanted** issue
-- be checked for basic quality: are the builds passing? have tests been added?
-- be checked for redundancy: is there already a PR dealing with this?
-
-Once a pull request has been triaged, it should be moved to the **Needs Review** column of the project board.
-
-For a more detailed breakdown of **how** to triage an issue, see the _PR triage flowchart_ below.
+All incoming pull requests are assigned to one of the engineers for review on a round-robin basis.
+The person in a triage role for a week could take a glance at these pull requests, mostly to see whether
+the changeset is feasible and to allow the associated CI run for new contributors.
 
 ## Issue triage flowchart
 
@@ -46,30 +38,17 @@ For a more detailed breakdown of **how** to triage an issue, see the _PR triage 
   - add `help wanted` label
   - consider adding `good first issue` label
 - do we want to do it?
-  - comment acknowledging it
+  - comment acknowledging that
   - add `core` label
-  - add to project TODO column if this is something that should ship soon
+  - add to the project “TODO” column if this is something that should ship soon
 - is it intriguing, but requires discussion?
-  - label `needs-design` if design input is needed, ping
+  - label `discuss`
   - label `needs-investigation` if engineering research is required before action can be taken
 - does it need more info from the issue author?
   - ask the user for details
   - add `needs-user-input` label
 - is it a usage/support question?
-  - offer some instructions/workaround and close
-
-## Pull request triage flowchart
-
-- can it be closed outright?
-  - e.g. spam/junk
-  - close
-- do we not want to do it?
-  - comment and close
-- is it intriguing, but requires discussion and there is no referenced issue?
-  - request an issue
-  - close
-- is it something we want to include?
-  - add to `needs review` column
+  - consider converting the Issue to a Discussion
 
 ## Weekly PR audit
 

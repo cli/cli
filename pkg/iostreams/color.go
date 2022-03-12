@@ -211,7 +211,7 @@ func (c *ColorScheme) ColorFromString(s string) func(string) string {
 }
 
 func (c *ColorScheme) HexToRGB(hex string, x string) string {
-	if !c.enabled || !c.hasTrueColor {
+	if !c.enabled || !c.hasTrueColor || len(hex) != 6 {
 		return x
 	}
 

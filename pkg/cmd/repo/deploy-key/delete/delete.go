@@ -22,7 +22,6 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	opts := &DeleteOptions{
 		HTTPClient: f.HttpClient,
 		IO:         f.IOStreams,
-		BaseRepo:   f.BaseRepo,
 	}
 
 	cmd := &cobra.Command{
@@ -30,6 +29,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		Short: "Delete a deploy key from a GitHub repository",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.BaseRepo = f.BaseRepo
 			opts.KeyID = args[0]
 
 			if runF != nil {

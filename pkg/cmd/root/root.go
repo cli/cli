@@ -25,6 +25,7 @@ import (
 	repoCmd "github.com/cli/cli/v2/pkg/cmd/repo"
 	creditsCmd "github.com/cli/cli/v2/pkg/cmd/repo/credits"
 	runCmd "github.com/cli/cli/v2/pkg/cmd/run"
+	searchCmd "github.com/cli/cli/v2/pkg/cmd/search"
 	secretCmd "github.com/cli/cli/v2/pkg/cmd/secret"
 	sshKeyCmd "github.com/cli/cli/v2/pkg/cmd/ssh-key"
 	versionCmd "github.com/cli/cli/v2/pkg/cmd/version"
@@ -49,9 +50,6 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 		Annotations: map[string]string{
 			"help:feedback": heredoc.Doc(`
 				Open an issue using 'gh issue create -R github.com/cli/cli'
-			`),
-			"help:environment": heredoc.Doc(`
-				See 'gh help environment' for the list of supported environment variables.
 			`),
 		},
 	}
@@ -82,6 +80,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(gpgKeyCmd.NewCmdGPGKey(f))
 	cmd.AddCommand(completionCmd.NewCmdCompletion(f.IOStreams))
 	cmd.AddCommand(extensionCmd.NewCmdExtension(f))
+	cmd.AddCommand(searchCmd.NewCmdSearch(f))
 	cmd.AddCommand(secretCmd.NewCmdSecret(f))
 	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
 	cmd.AddCommand(newCodespaceCmd(f))
@@ -142,6 +141,7 @@ func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
 			vscsURL,
 			&lazyLoadedHTTPClient{factory: f},
 		),
+		f.Browser,
 	)
 	cmd := codespaceCmd.NewRootCmd(app)
 	cmd.Use = "codespace"

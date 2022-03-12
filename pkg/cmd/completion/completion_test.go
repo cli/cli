@@ -39,7 +39,7 @@ func TestNewCmdCompletion(t *testing.T) {
 		{
 			name:    "unsupported shell",
 			args:    "completion -s csh",
-			wantErr: "unsupported shell type \"csh\"",
+			wantErr: "invalid argument \"csh\" for \"-s, --shell\" flag: valid values are {bash|zsh|fish|powershell}",
 		},
 	}
 	for _, tt := range tests {

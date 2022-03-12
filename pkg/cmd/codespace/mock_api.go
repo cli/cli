@@ -25,11 +25,17 @@ import (
 // 			DeleteCodespaceFunc: func(ctx context.Context, name string) error {
 // 				panic("mock out the DeleteCodespace method")
 // 			},
+// 			EditCodespaceFunc: func(ctx context.Context, codespaceName string, params *api.EditCodespaceParams) (*api.Codespace, error) {
+// 				panic("mock out the EditCodespace method")
+// 			},
 // 			GetCodespaceFunc: func(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error) {
 // 				panic("mock out the GetCodespace method")
 // 			},
 // 			GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
 // 				panic("mock out the GetCodespaceRegionLocation method")
+// 			},
+// 			GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
+// 				panic("mock out the GetCodespaceRepoSuggestions method")
 // 			},
 // 			GetCodespaceRepositoryContentsFunc: func(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error) {
 // 				panic("mock out the GetCodespaceRepositoryContents method")
@@ -68,11 +74,17 @@ type apiClientMock struct {
 	// DeleteCodespaceFunc mocks the DeleteCodespace method.
 	DeleteCodespaceFunc func(ctx context.Context, name string) error
 
+	// EditCodespaceFunc mocks the EditCodespace method.
+	EditCodespaceFunc func(ctx context.Context, codespaceName string, params *api.EditCodespaceParams) (*api.Codespace, error)
+
 	// GetCodespaceFunc mocks the GetCodespace method.
 	GetCodespaceFunc func(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
 
 	// GetCodespaceRegionLocationFunc mocks the GetCodespaceRegionLocation method.
 	GetCodespaceRegionLocationFunc func(ctx context.Context) (string, error)
+
+	// GetCodespaceRepoSuggestionsFunc mocks the GetCodespaceRepoSuggestions method.
+	GetCodespaceRepoSuggestionsFunc func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error)
 
 	// GetCodespaceRepositoryContentsFunc mocks the GetCodespaceRepositoryContents method.
 	GetCodespaceRepositoryContentsFunc func(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
@@ -118,6 +130,15 @@ type apiClientMock struct {
 			// Name is the name argument value.
 			Name string
 		}
+		// EditCodespace holds details about calls to the EditCodespace method.
+		EditCodespace []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// CodespaceName is the codespaceName argument value.
+			CodespaceName string
+			// Params is the params argument value.
+			Params *api.EditCodespaceParams
+		}
 		// GetCodespace holds details about calls to the GetCodespace method.
 		GetCodespace []struct {
 			// Ctx is the ctx argument value.
@@ -131,6 +152,15 @@ type apiClientMock struct {
 		GetCodespaceRegionLocation []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+		}
+		// GetCodespaceRepoSuggestions holds details about calls to the GetCodespaceRepoSuggestions method.
+		GetCodespaceRepoSuggestions []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// PartialSearch is the partialSearch argument value.
+			PartialSearch string
+			// Params is the params argument value.
+			Params api.RepoSearchParameters
 		}
 		// GetCodespaceRepositoryContents holds details about calls to the GetCodespaceRepositoryContents method.
 		GetCodespaceRepositoryContents []struct {
@@ -189,8 +219,10 @@ type apiClientMock struct {
 	lockAuthorizedKeys                 sync.RWMutex
 	lockCreateCodespace                sync.RWMutex
 	lockDeleteCodespace                sync.RWMutex
+	lockEditCodespace                  sync.RWMutex
 	lockGetCodespace                   sync.RWMutex
 	lockGetCodespaceRegionLocation     sync.RWMutex
+	lockGetCodespaceRepoSuggestions    sync.RWMutex
 	lockGetCodespaceRepositoryContents sync.RWMutex
 	lockGetCodespacesMachines          sync.RWMutex
 	lockGetRepository                  sync.RWMutex
@@ -305,6 +337,45 @@ func (mock *apiClientMock) DeleteCodespaceCalls() []struct {
 	return calls
 }
 
+// EditCodespace calls EditCodespaceFunc.
+func (mock *apiClientMock) EditCodespace(ctx context.Context, codespaceName string, params *api.EditCodespaceParams) (*api.Codespace, error) {
+	if mock.EditCodespaceFunc == nil {
+		panic("apiClientMock.EditCodespaceFunc: method is nil but apiClient.EditCodespace was just called")
+	}
+	callInfo := struct {
+		Ctx           context.Context
+		CodespaceName string
+		Params        *api.EditCodespaceParams
+	}{
+		Ctx:           ctx,
+		CodespaceName: codespaceName,
+		Params:        params,
+	}
+	mock.lockEditCodespace.Lock()
+	mock.calls.EditCodespace = append(mock.calls.EditCodespace, callInfo)
+	mock.lockEditCodespace.Unlock()
+	return mock.EditCodespaceFunc(ctx, codespaceName, params)
+}
+
+// EditCodespaceCalls gets all the calls that were made to EditCodespace.
+// Check the length with:
+//     len(mockedapiClient.EditCodespaceCalls())
+func (mock *apiClientMock) EditCodespaceCalls() []struct {
+	Ctx           context.Context
+	CodespaceName string
+	Params        *api.EditCodespaceParams
+} {
+	var calls []struct {
+		Ctx           context.Context
+		CodespaceName string
+		Params        *api.EditCodespaceParams
+	}
+	mock.lockEditCodespace.RLock()
+	calls = mock.calls.EditCodespace
+	mock.lockEditCodespace.RUnlock()
+	return calls
+}
+
 // GetCodespace calls GetCodespaceFunc.
 func (mock *apiClientMock) GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error) {
 	if mock.GetCodespaceFunc == nil {
@@ -372,6 +443,45 @@ func (mock *apiClientMock) GetCodespaceRegionLocationCalls() []struct {
 	mock.lockGetCodespaceRegionLocation.RLock()
 	calls = mock.calls.GetCodespaceRegionLocation
 	mock.lockGetCodespaceRegionLocation.RUnlock()
+	return calls
+}
+
+// GetCodespaceRepoSuggestions calls GetCodespaceRepoSuggestionsFunc.
+func (mock *apiClientMock) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
+	if mock.GetCodespaceRepoSuggestionsFunc == nil {
+		panic("apiClientMock.GetCodespaceRepoSuggestionsFunc: method is nil but apiClient.GetCodespaceRepoSuggestions was just called")
+	}
+	callInfo := struct {
+		Ctx           context.Context
+		PartialSearch string
+		Params        api.RepoSearchParameters
+	}{
+		Ctx:           ctx,
+		PartialSearch: partialSearch,
+		Params:        params,
+	}
+	mock.lockGetCodespaceRepoSuggestions.Lock()
+	mock.calls.GetCodespaceRepoSuggestions = append(mock.calls.GetCodespaceRepoSuggestions, callInfo)
+	mock.lockGetCodespaceRepoSuggestions.Unlock()
+	return mock.GetCodespaceRepoSuggestionsFunc(ctx, partialSearch, params)
+}
+
+// GetCodespaceRepoSuggestionsCalls gets all the calls that were made to GetCodespaceRepoSuggestions.
+// Check the length with:
+//     len(mockedapiClient.GetCodespaceRepoSuggestionsCalls())
+func (mock *apiClientMock) GetCodespaceRepoSuggestionsCalls() []struct {
+	Ctx           context.Context
+	PartialSearch string
+	Params        api.RepoSearchParameters
+} {
+	var calls []struct {
+		Ctx           context.Context
+		PartialSearch string
+		Params        api.RepoSearchParameters
+	}
+	mock.lockGetCodespaceRepoSuggestions.RLock()
+	calls = mock.calls.GetCodespaceRepoSuggestions
+	mock.lockGetCodespaceRepoSuggestions.RUnlock()
 	return calls
 }
 

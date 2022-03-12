@@ -57,7 +57,19 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 				- by URL, e.g. "https://github.com/OWNER/REPO"
 			`),
 		},
+		Long: heredoc.Docf(`
+			Edit repository settings.
+
+			To toggle a setting off, use the %[1]s--flag=false%[1]s syntax.
+		`, "`"),
 		Args: cobra.MaximumNArgs(1),
+		Example: heredoc.Doc(`
+			# enable issues and wiki
+			gh repo edit --enable-issues --enable-wiki
+
+			# disable projects
+			gh repo edit --enable-projects=false
+		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cmd.Flags().NFlag() == 0 {
 				return cmdutil.FlagErrorf("at least one flag is required")

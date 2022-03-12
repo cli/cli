@@ -16,9 +16,10 @@ func newListCmd(app *App) *cobra.Command {
 	var exporter cmdutil.Exporter
 
 	listCmd := &cobra.Command{
-		Use:   "list",
-		Short: "List your codespaces",
-		Args:  noArgsConstraint,
+		Use:     "list",
+		Short:   "List your codespaces",
+		Aliases: []string{"ls"},
+		Args:    noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if limit < 1 {
 				return cmdutil.FlagErrorf("invalid limit: %v", limit)

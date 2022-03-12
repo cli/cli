@@ -22,8 +22,8 @@ import (
 func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "repo <command>",
-		Short: "Create, clone, fork, and view repositories",
-		Long:  `Work with GitHub repositories`,
+		Short: "Manage repositories",
+		Long:  `Work with GitHub repositories.`,
 		Example: heredoc.Doc(`
 			$ gh repo create
 			$ gh repo clone cli/cli

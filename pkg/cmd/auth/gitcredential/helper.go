@@ -112,6 +112,9 @@ func helperRun(opts *CredentialOptions) error {
 		gotUser = tokenUser
 	} else {
 		gotUser, _, _ = cfg.GetWithSource(lookupHost, "user")
+		if gotUser == "" {
+			gotUser = tokenUser
+		}
 	}
 
 	if gotUser == "" || gotToken == "" {

@@ -21,6 +21,10 @@ import (
 	"golang.org/x/term"
 )
 
+type browser interface {
+	Browse(string) error
+}
+
 type executable interface {
 	Executable() string
 }
@@ -30,9 +34,10 @@ type App struct {
 	apiClient  apiClient
 	errLogger  *log.Logger
 	executable executable
+	browser    browser
 }
 
-func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient) *App {
+func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browser browser) *App {
 	errLogger := log.New(io.ErrOut, "", 0)
 
 	return &App{
@@ -40,6 +45,7 @@ func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient) *App {
 		apiClient:  apiClient,
 		errLogger:  errLogger,
 		executable: exe,
+		browser:    browser,
 	}
 }
 
@@ -62,11 +68,13 @@ type apiClient interface {
 	StartCodespace(ctx context.Context, name string) error
 	StopCodespace(ctx context.Context, name string) error
 	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
+	EditCodespace(ctx context.Context, codespaceName string, params *api.EditCodespaceParams) (*api.Codespace, error)
 	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
 	AuthorizedKeys(ctx context.Context, user string) ([]byte, error)
 	GetCodespaceRegionLocation(ctx context.Context) (string, error)
 	GetCodespacesMachines(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error)
 	GetCodespaceRepositoryContents(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
+	GetCodespaceRepoSuggestions(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error)
 }
 
 var errNoCodespaces = errors.New("you have no codespaces")
@@ -249,7 +257,7 @@ type codespace struct {
 }
 
 // displayName returns the repository nwo and branch.
-// If includeName is true, the name of the codespace is included.
+// If includeName is true, the name of the codespace (including displayName) is included.
 // If includeGitStatus is true, the branch will include a star if
 // the codespace has unsaved changes.
 func (c codespace) displayName(includeName, includeGitStatus bool) string {
@@ -259,11 +267,18 @@ func (c codespace) displayName(includeName, includeGitStatus bool) string {
 	}
 
 	if includeName {
+		var displayName = c.Name
+		if c.DisplayName != "" {
+			displayName = c.DisplayName
+		}
 		return fmt.Sprintf(
-			"%s: %s [%s]", c.Repository.FullName, branch, c.Name,
+			"%s: %s (%s)", c.Repository.FullName, displayName, branch,
 		)
 	}
-	return c.Repository.FullName + ": " + branch
+	return fmt.Sprintf(
+		"%s: %s", c.Repository.FullName, branch,
+	)
+
 }
 
 // gitStatusDirty represents an unsaved changes status.
