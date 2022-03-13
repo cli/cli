@@ -12,7 +12,6 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/cli/cli/v2/utils"
 )
 
 func TestNewHTTPClient(t *testing.T) {
@@ -25,6 +24,7 @@ func TestNewHTTPClient(t *testing.T) {
 		name       string
 		args       args
 		envDebug   string
+		setGhDebug bool
 		envGhDebug string
 		host       string
 		sso        string
@@ -86,6 +86,7 @@ func TestNewHTTPClient(t *testing.T) {
 			},
 			host:     "github.com",
 			envDebug: "api",
+			setGhDebug: false,
 			wantHeader: map[string]string{
 				"authorization": "token MYTOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
@@ -115,6 +116,7 @@ func TestNewHTTPClient(t *testing.T) {
 			},
 			host:     "github.com",
 			envGhDebug: "api",
+			setGhDebug: true,
 			wantHeader: map[string]string{
 				"authorization": "token MYTOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
@@ -176,9 +178,13 @@ func TestNewHTTPClient(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			oldDebug := os.Getenv("DEBUG")
-			oldGhDeub := os.Getenv("GH_DEBUG")
+			oldGhDebug := os.Getenv("GH_DEBUG")
 			os.Setenv("DEBUG", tt.envDebug)
-			os.Setenv("GH_DEBUG", tt.envGhDebug)
+			if tt.setGhDebug {
+				os.Setenv("GH_DEBUG", tt.envGhDebug)
+			} else {
+				os.Unsetenv("GH_DEBUG")
+			}
 			t.Cleanup(func() {
 				os.Setenv("DEBUG", oldDebug)
 				os.Setenv("GH_DEBUG", oldGhDebug)
