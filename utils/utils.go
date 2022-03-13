@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"os"
 )
 
 func Pluralize(num int, thing string) string {
@@ -82,4 +83,18 @@ func DisplayURL(urlStr string) string {
 // Maximum length of a URL: 8192 bytes
 func ValidURL(urlStr string) bool {
 	return len(urlStr) < 8192
+}
+
+func IsDebugEnabled() (bool, string) {
+	gh_val, gh_present := os.LookupEnv("GH_DEBUG")
+	legacy_val, legacy_present := os.LookupEnv("DEBUG")
+	if gh_present && (gh_val == "0" || gh_val == "false" || gh_val == "") {
+		return false, gh_val
+	} else if gh_present {
+		return true, gh_val
+	} else if !legacy_present || legacy_val == "0" || legacy_val == "false" || legacy_val == "" {
+		return false, legacy_val
+	} else {
+		return true, legacy_val
+	}
 }

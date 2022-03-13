@@ -58,7 +58,7 @@ func mainRun() exitCode {
 		updateMessageChan <- rel
 	}()
 
-	hasDebug := os.Getenv("DEBUG") != ""
+	hasDebug, _ := utils.IsDebugEnabled()
 
 	cmdFactory := factory.New(buildVersion)
 	stderr := cmdFactory.IOStreams.ErrOut
@@ -327,7 +327,8 @@ func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
 // does not depend on user configuration
 func basicClient(currentVersion string) (*api.Client, error) {
 	var opts []api.ClientOption
-	if verbose := os.Getenv("DEBUG"); verbose != "" {
+	verbose, _ := utils.IsDebugEnabled()
+	if verbose {
 		opts = append(opts, apiVerboseLog())
 	}
 	opts = append(opts, api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", currentVersion)))
@@ -345,7 +346,8 @@ func basicClient(currentVersion string) (*api.Client, error) {
 }
 
 func apiVerboseLog() api.ClientOption {
-	logTraffic := strings.Contains(os.Getenv("DEBUG"), "api")
+	debugEnabled, debugValue := utils.IsDebugEnabled()
+	logTraffic := debugEnabled && strings.Contains(debugValue, "api")
 	colorize := utils.IsTerminal(os.Stderr)
 	return api.VerboseLog(colorable.NewColorable(os.Stderr), logTraffic, colorize)
 }

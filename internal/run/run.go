@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"github.com/cli/cli/v2/utils"
 )
 
 // Runnable is typically an exec.Cmd or its stub in tests
@@ -28,7 +29,8 @@ type cmdWithStderr struct {
 }
 
 func (c cmdWithStderr) Output() ([]byte, error) {
-	if os.Getenv("DEBUG") != "" {
+	debugEnabled, _ := utils.IsDebugEnabled()
+	if debugEnabled {
 		_ = printArgs(os.Stderr, c.Cmd.Args)
 	}
 	if c.Cmd.Stderr != nil {
@@ -44,7 +46,8 @@ func (c cmdWithStderr) Output() ([]byte, error) {
 }
 
 func (c cmdWithStderr) Run() error {
-	if os.Getenv("DEBUG") != "" {
+	debugEnabled, _ := utils.IsDebugEnabled()
+	if debugEnabled {
 		_ = printArgs(os.Stderr, c.Cmd.Args)
 	}
 	if c.Cmd.Stderr != nil {

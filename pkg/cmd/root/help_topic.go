@@ -47,8 +47,11 @@ var HelpTopics = map[string]map[string]string{
 
 			GH_BROWSER, BROWSER (in order of precedence): the web browser to use for opening links.
 
-			DEBUG: set to any value to enable verbose output to standard error. Include values "api"
-			or "oauth" to print detailed information about HTTP requests or authentication flow.
+			GH_DEBUG: Set to 0, false or the empty string to disable verbose output to standard error. Set to
+			any other value to enable. If not set, then DEBUG is used.
+
+			DEBUG: Deprecated, see GH_DEBUG - set to any value to enable verbose output to standard error. 
+			Include values "api" or "oauth" to print detailed information about HTTP requests or authentication flow.
 
 			GH_PAGER, PAGER (in order of precedence): a terminal paging program to send standard output
 			to, e.g. "less".

@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/cli/cli/v2/utils"
 )
 
 func TestNewHTTPClient(t *testing.T) {
@@ -24,6 +25,7 @@ func TestNewHTTPClient(t *testing.T) {
 		name       string
 		args       args
 		envDebug   string
+		envGhDebug string
 		host       string
 		sso        string
 		wantHeader map[string]string
@@ -105,6 +107,35 @@ func TestNewHTTPClient(t *testing.T) {
 			`),
 		},
 		{
+			name: "github.com in verbose mode",
+			args: args{
+				config:     tinyConfig{"github.com:oauth_token": "MYTOKEN"},
+				appVersion: "v1.2.3",
+				setAccept:  true,
+			},
+			host:     "github.com",
+			envGhDebug: "api",
+			wantHeader: map[string]string{
+				"authorization": "token MYTOKEN",
+				"user-agent":    "GitHub CLI v1.2.3",
+				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
+			},
+			wantStderr: heredoc.Doc(`
+				* Request at <time>
+				* Request to http://<host>:<port>
+				> GET / HTTP/1.1
+				> Host: github.com
+				> Accept: application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview
+				> Authorization: token ████████████████████
+				> User-Agent: GitHub CLI v1.2.3
+
+				< HTTP/1.1 204 No Content
+				< Date: <time>
+
+				* Request took <duration>
+			`),
+		},
+		{
 			name: "GHES Accept header",
 			args: args{
 				config:     tinyConfig{"example.com:oauth_token": "GHETOKEN"},
@@ -145,9 +176,12 @@ func TestNewHTTPClient(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			oldDebug := os.Getenv("DEBUG")
+			oldGhDeub := os.Getenv("GH_DEBUG")
 			os.Setenv("DEBUG", tt.envDebug)
+			os.Setenv("GH_DEBUG", tt.envGhDebug)
 			t.Cleanup(func() {
 				os.Setenv("DEBUG", oldDebug)
+				os.Setenv("GH_DEBUG", oldGhDebug)
 			})
 
 			io, _, _, stderr := iostreams.Test()

@@ -3,7 +3,6 @@ package factory
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/httpunix"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/utils"
 )
 
 var timezoneNames = map[int]string{
@@ -83,9 +83,9 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg configGetter, appVersion string,
 			return httpunix.NewRoundTripper(unixSocket)
 		}))
 	}
-
-	if verbose := os.Getenv("DEBUG"); verbose != "" {
-		logTraffic := strings.Contains(verbose, "api")
+	debugEnabled, debugValue := utils.IsDebugEnabled()
+	if debugEnabled {
+		logTraffic := strings.Contains(debugValue, "api")
 		opts = append(opts, api.VerboseLog(io.ErrOut, logTraffic, io.IsStderrTTY()))
 	}
 
