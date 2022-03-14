@@ -2,6 +2,7 @@ package shared
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -59,21 +60,21 @@ func GetSecretEntity(orgName, envName string, userSecrets bool) (SecretEntity, e
 	return Repository, nil
 }
 
-func GetSecretApp(app string, entity SecretEntity) App {
+func GetSecretApp(app string, entity SecretEntity) (App, error) {
 	switch strings.ToLower(app) {
 	case Actions:
-		return Actions
+		return Actions, nil
 	case Codespaces:
-		return Codespaces
+		return Codespaces, nil
 	case Dependabot:
-		return Dependabot
+		return Dependabot, nil
 	case "":
 		if entity == User {
-			return Codespaces
+			return Codespaces, nil
 		}
-		return Actions
+		return Actions, nil
 	default:
-		return Unknown
+		return Unknown, fmt.Errorf("invalid application: %s", app)
 	}
 }
 

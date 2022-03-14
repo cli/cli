@@ -70,10 +70,11 @@ func TestGetSecretEntity(t *testing.T) {
 
 func TestGetSecretApp(t *testing.T) {
 	tests := []struct {
-		name   string
-		app    string
-		entity SecretEntity
-		want   App
+		name    string
+		app     string
+		entity  SecretEntity
+		want    App
+		wantErr bool
 	}{
 		{
 			name: "Actions",
@@ -115,9 +116,10 @@ func TestGetSecretApp(t *testing.T) {
 			want:   Codespaces,
 		},
 		{
-			name: "Unknown for invalid apps",
-			app:  "invalid",
-			want: Unknown,
+			name:    "Unknown for invalid apps",
+			app:     "invalid",
+			want:    Unknown,
+			wantErr: true,
 		},
 		{
 			name: "case insensitive",
@@ -128,7 +130,13 @@ func TestGetSecretApp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, GetSecretApp(tt.app, tt.entity))
+			app, err := GetSecretApp(tt.app, tt.entity)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tt.want, app)
 		})
 	}
 }

@@ -199,9 +199,9 @@ func setRun(opts *SetOptions) error {
 		return err
 	}
 
-	secretApp := shared.GetSecretApp(opts.Application, secretEntity)
-	if secretApp == shared.Unknown {
-		return fmt.Errorf("invalid application: %s", opts.Application)
+	secretApp, err := shared.GetSecretApp(opts.Application, secretEntity)
+	if err != nil {
+		return err
 	}
 
 	if !shared.IsSupportedSecretEntity(secretApp, secretEntity) {
