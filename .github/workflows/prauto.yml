@@ -2,13 +2,14 @@ name: PR Automation
 on:
   pull_request_target:
     types: [ready_for_review, opened, reopened]
+
 permissions:
-  contents: read
+  contents: none
+  issues: write
+  pull-requests: write
 
 jobs:
   pr-auto:
-    permissions:
-      contents: none
     runs-on: ubuntu-latest
     steps:
       - name: lint pr

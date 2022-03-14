@@ -2,13 +2,13 @@ name: Issue Automation
 on:
   issues:
     types: [opened]
+
 permissions:
-  contents: read
+  contents: none
+  issues: write
 
 jobs:
   issue-auto:
-    permissions:
-      contents: none
     runs-on: ubuntu-latest
     steps:
       - name: label incoming issue
