@@ -124,7 +124,7 @@ func runRerun(opts *RerunOptions) error {
 		if err != nil {
 			return err
 		}
-		if opts.IO.CanPrompt() {
+		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.Out, "%s Requested rerun of job %s on run %s\n",
 				cs.SuccessIcon(),
 				cs.Cyanf("%d", selectedJob.ID),
@@ -142,7 +142,7 @@ func runRerun(opts *RerunOptions) error {
 		if err != nil {
 			return err
 		}
-		if opts.IO.CanPrompt() {
+		if opts.IO.IsStdoutTTY() {
 			onlyFailedMsg := ""
 			if opts.OnlyFailed {
 				onlyFailedMsg = "(failed jobs) "
