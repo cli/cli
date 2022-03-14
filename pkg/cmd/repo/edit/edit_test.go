@@ -217,7 +217,7 @@ func Test_editRun_interactive(t *testing.T) {
 				as.StubPrompt("What do you want to edit?").AnswerWith([]string{"Description", "Topics"})
 				as.StubPrompt("Description of the repository").AnswerWith("awesome repo description")
 				as.StubPrompt("Add topics?(csv format)").AnswerWith("a,b,c,d")
-				as.StubPrompt("Remove Topics").AnswerWith([]string{"b", "c"})
+				as.StubPrompt("Remove Topics").AnswerWith([]string{"x"})
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
@@ -250,7 +250,7 @@ func Test_editRun_interactive(t *testing.T) {
 				reg.Register(
 					httpmock.REST("PUT", "repos/OWNER/REPO/topics"),
 					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
-						assert.Equal(t, []interface{}{"x", "a", "d"}, payload["names"])
+						assert.Equal(t, []interface{}{"a", "b", "c", "d"}, payload["names"])
 					}))
 			},
 		},

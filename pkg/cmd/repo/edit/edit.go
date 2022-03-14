@@ -46,7 +46,6 @@ type EditOptions struct {
 	Repository      ghrepo.Interface
 	IO              *iostreams.IOStreams
 	Edits           EditRepositoryInput
-	Topics          []string
 	AddTopics       []string
 	RemoveTopics    []string
 	InteractiveMode bool
@@ -146,7 +145,6 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 
 	if opts.InteractiveMode {
 		apiClient := api.NewClientFromHTTP(opts.HTTPClient)
-		opts.IO.StartProgressIndicator()
 		fieldsToRetrieve := []string{
 			"autoMergeAllowed",
 			"defaultBranchRef",
@@ -164,6 +162,7 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 			"squashMergeAllowed",
 			"visibility",
 		}
+		opts.IO.StartProgressIndicator()
 		fetchedRepo, err := api.FetchRepository(apiClient, opts.Repository, fieldsToRetrieve)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
@@ -195,18 +194,19 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 
 	if len(opts.AddTopics) > 0 || len(opts.RemoveTopics) > 0 {
 		g.Go(func() error {
+			var topics []string
 			if !opts.InteractiveMode {
 				var err error
-				opts.Topics, err = getTopics(ctx, opts.HTTPClient, repo)
+				topics, err = getTopics(ctx, opts.HTTPClient, repo)
 				if err != nil {
 					return err
 				}
 			}
 			oldTopics := set.NewStringSet()
-			oldTopics.AddValues(opts.Topics)
+			oldTopics.AddValues(topics)
 
 			newTopics := set.NewStringSet()
-			newTopics.AddValues(opts.Topics)
+			newTopics.AddValues(topics)
 			newTopics.AddValues(opts.AddTopics)
 			newTopics.RemoveValues(opts.RemoveTopics)
 
@@ -258,8 +258,9 @@ func interactiveChoice(r *api.Repository) ([]string, error) {
 }
 
 func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
+	var topics []string
 	for _, v := range r.RepositoryTopics.Nodes {
-		opts.Topics = append(opts.Topics, v.Topic.Name)
+		topics = append(topics, v.Topic.Name)
 	}
 	choices, err := interactiveChoice(r)
 	if err != nil {
@@ -279,7 +280,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 		case optionHomePageURL:
 			opts.Edits.Homepage = &r.HomepageURL
 			err = prompt.SurveyAskOne(&survey.Input{
-				Message: "Repository home page URL?",
+				Message: "Repository home page URL",
 				Default: r.HomepageURL,
 			}, opts.Edits.Homepage)
 			if err != nil {
@@ -297,10 +298,10 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 				opts.AddTopics = strings.Split(addTopics, ",")
 			}
 
-			if len(opts.Topics) > 0 {
+			if len(topics) > 0 {
 				err = prompt.SurveyAskOne(&survey.MultiSelect{
 					Message: "Remove Topics",
-					Options: opts.Topics,
+					Options: topics,
 				}, &opts.RemoveTopics)
 				if err != nil {
 					return err
@@ -309,7 +310,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 		case optionDefaultBranchName:
 			opts.Edits.DefaultBranch = &r.DefaultBranchRef.Name
 			err = prompt.SurveyAskOne(&survey.Input{
-				Message: "Default branch name?",
+				Message: "Default branch name",
 				Default: r.DefaultBranchRef.Name,
 			}, opts.Edits.DefaultBranch)
 			if err != nil {
