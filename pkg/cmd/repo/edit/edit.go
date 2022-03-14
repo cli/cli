@@ -49,6 +49,9 @@ type EditOptions struct {
 	AddTopics       []string
 	RemoveTopics    []string
 	InteractiveMode bool
+	// Cache of current repo topics to avoid retrieving them
+	// in multiple flows.
+	topicsCache []string
 }
 
 type EditRepositoryInput struct {
@@ -194,19 +197,19 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 
 	if len(opts.AddTopics) > 0 || len(opts.RemoveTopics) > 0 {
 		g.Go(func() error {
-			var topics []string
+			// opts.topicsCache gets populated in interactive mode
 			if !opts.InteractiveMode {
 				var err error
-				topics, err = getTopics(ctx, opts.HTTPClient, repo)
+				opts.topicsCache, err = getTopics(ctx, opts.HTTPClient, repo)
 				if err != nil {
 					return err
 				}
 			}
 			oldTopics := set.NewStringSet()
-			oldTopics.AddValues(topics)
+			oldTopics.AddValues(opts.topicsCache)
 
 			newTopics := set.NewStringSet()
-			newTopics.AddValues(topics)
+			newTopics.AddValues(opts.topicsCache)
 			newTopics.AddValues(opts.AddTopics)
 			newTopics.RemoveValues(opts.RemoveTopics)
 
@@ -258,9 +261,8 @@ func interactiveChoice(r *api.Repository) ([]string, error) {
 }
 
 func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
-	var topics []string
 	for _, v := range r.RepositoryTopics.Nodes {
-		topics = append(topics, v.Topic.Name)
+		opts.topicsCache = append(opts.topicsCache, v.Topic.Name)
 	}
 	choices, err := interactiveChoice(r)
 	if err != nil {
@@ -298,10 +300,10 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 				opts.AddTopics = strings.Split(addTopics, ",")
 			}
 
-			if len(topics) > 0 {
+			if len(opts.topicsCache) > 0 {
 				err = prompt.SurveyAskOne(&survey.MultiSelect{
 					Message: "Remove Topics",
-					Options: topics,
+					Options: opts.topicsCache,
 				}, &opts.RemoveTopics)
 				if err != nil {
 					return err
