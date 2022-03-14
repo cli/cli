@@ -3,7 +3,7 @@ package shared
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetSecretEntity(t *testing.T) {
@@ -59,10 +59,10 @@ func TestGetSecretEntity(t *testing.T) {
 			entity, err := GetSecretEntity(tt.orgName, tt.envName, tt.userSecrets)
 
 			if tt.wantErr {
-				require.Error(t, err)
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
-				require.Equal(t, tt.want, entity)
+				assert.NoError(t, err)
+				assert.Equal(t, tt.want, entity)
 			}
 		})
 	}
@@ -132,11 +132,11 @@ func TestGetSecretApp(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			app, err := GetSecretApp(tt.app, tt.entity)
 			if tt.wantErr {
-				require.Error(t, err)
+				assert.Error(t, err)
 			} else {
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}
-			require.Equal(t, tt.want, app)
+			assert.Equal(t, tt.want, app)
 		})
 	}
 }
@@ -192,11 +192,11 @@ func TestIsSupportedSecretEntity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for _, entity := range tt.supportedEntities {
-				require.True(t, IsSupportedSecretEntity(tt.app, entity))
+				assert.True(t, IsSupportedSecretEntity(tt.app, entity))
 			}
 
 			for _, entity := range tt.unsupportedEntities {
-				require.False(t, IsSupportedSecretEntity(tt.app, entity))
+				assert.False(t, IsSupportedSecretEntity(tt.app, entity))
 			}
 		})
 	}
