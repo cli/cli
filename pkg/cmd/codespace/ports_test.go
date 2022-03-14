@@ -154,7 +154,7 @@ type joinWorkspaceResult struct {
 func runUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, eventResponses []string, portsData []liveshare.PortNotification) error {
 	t.Helper()
 
-	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
+	joinWorkspace := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 		return joinWorkspaceResult{1}, nil
 	}
 	const sessionToken = "session-token"
@@ -162,14 +162,14 @@ func runUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, ev
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	ch := make(chan float64, 1)
-	updateSharedVisibility := func(rpcReq *jsonrpc2.Request) (interface{}, error) {
+	ch := make(chan *jsonrpc2.Conn, 1)
+	updateSharedVisibility := func(conn *jsonrpc2.Conn, rpcReq *jsonrpc2.Request) (interface{}, error) {
 		var req []interface{}
 		if err := json.Unmarshal(*rpcReq.Params, &req); err != nil {
 			return nil, fmt.Errorf("unmarshal req: %w", err)
 		}
 
-		ch <- req[0].(float64)
+		ch <- conn
 		return nil, nil
 	}
 	testServer, err := livesharetest.NewServer(
@@ -193,12 +193,9 @@ func runUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, ev
 			select {
 			case <-ctx.Done():
 				return
-			case <-ch:
+			case conn := <-ch:
 				pd := portsData[i]
-				_ = testServer.WriteToObjectStream(rpcMessage{
-					Method: eventResponses[i],
-					Params: pd.PortUpdate,
-				})
+				_, _ = conn.DispatchCall(context.Background(), eventResponses[i], pd.PortUpdate, nil)
 			}
 		}
 	}()

@@ -43,8 +43,6 @@ type Server struct {
 	httptestServer *httptest.Server
 	errCh          chan error
 	nonSecure      bool
-
-	objectStream jsonrpc2.ObjectStream
 }
 
 // NewServer creates a new Server. ServerOptions can be passed to configure
@@ -147,13 +145,6 @@ func (s *Server) URL() string {
 
 func (s *Server) Err() <-chan error {
 	return s.errCh
-}
-
-func (s *Server) WriteToObjectStream(obj interface{}) error {
-	if s.objectStream == nil {
-		return errors.New("object stream not set")
-	}
-	return s.objectStream.WriteObject(obj)
 }
 
 var upgrader = websocket.Upgrader{}
@@ -322,12 +313,10 @@ func forwardStream(ctx context.Context, server *Server, streamName string, chann
 
 func handleChannel(server *Server, channel ssh.Channel) {
 	stream := jsonrpc2.NewBufferedStream(channel, jsonrpc2.VSCodeObjectCodec{})
-	server.objectStream = stream
-
 	jsonrpc2.NewConn(context.Background(), stream, newRPCHandler(server))
 }
 
-type RPCHandleFunc func(req *jsonrpc2.Request) (interface{}, error)
+type RPCHandleFunc func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error)
 
 type rpcHandler struct {
 	server *Server
@@ -346,7 +335,7 @@ func (r *rpcHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonr
 		return
 	}
 
-	result, err := handler(req)
+	result, err := handler(conn, req)
 	if err != nil {
 		sendError(r.server.errCh, fmt.Errorf("error handling: '%s': %w", req.Method, err))
 		return
