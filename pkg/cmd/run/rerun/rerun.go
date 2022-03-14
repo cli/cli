@@ -41,7 +41,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 
 			if len(args) == 0 && opts.JobID == "" {
 				if !opts.IO.CanPrompt() {
-					return cmdutil.FlagErrorf("run or job ID required when not running interactively")
+					return cmdutil.FlagErrorf("`<run-id>` or `--job` required when not running interactively")
 				} else {
 					opts.Prompt = true
 				}
@@ -50,7 +50,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 			}
 
 			if opts.RunID != "" && opts.JobID != "" {
-				return cmdutil.FlagErrorf("specify only one of <run-id> or <job-id>")
+				return cmdutil.FlagErrorf("specify only one of `<run-id>` or `--job`")
 			}
 
 			if runF != nil {
@@ -60,7 +60,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.OnlyFailed, "failed", false, "Rerun only failed jobs")
+	cmd.Flags().BoolVar(&opts.OnlyFailed, "failed", false, "Rerun only failed jobs, including dependencies")
 	cmd.Flags().StringVarP(&opts.JobID, "job", "j", "", "Rerun a specific job from a run, including dependencies")
 
 	return cmd
@@ -107,7 +107,7 @@ func runRerun(opts *RerunOptions) error {
 			return fmt.Errorf("failed to get runs: %w", err)
 		}
 		if len(runs) == 0 {
-			return errors.New("no recent runs have failed; please specify a specific run ID")
+			return errors.New("no recent runs have failed; please specify a specific `<run-id>`")
 		}
 		runID, err = shared.PromptForRun(cs, runs)
 		if err != nil {
