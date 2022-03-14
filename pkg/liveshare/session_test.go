@@ -49,11 +49,6 @@ func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server,
 	return testServer, session, nil
 }
 
-type rpcPortTestMessage struct {
-	Method string
-	Params PortUpdate
-}
-
 func TestServerStartSharing(t *testing.T) {
 	serverPort, serverProtocol := 2222, "sshd"
 	sendNotification := make(chan portUpdateNotification)

@@ -182,11 +182,6 @@ func runUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, ev
 		return fmt.Errorf("unable to create test server: %w", err)
 	}
 
-	type rpcMessage struct {
-		Method string
-		Params liveshare.PortUpdate
-	}
-
 	go func() {
 		var i int
 		for ; ; i++ {
