@@ -76,12 +76,10 @@ func TestNewCmdRerun(t *testing.T) {
 			},
 		},
 		{
-			name: "with args job and runID ignores runID",
-			tty:  true,
-			cli:  "1234 --job 5678",
-			wants: RerunOptions{
-				JobID: "5678",
-			},
+			name:     "with args jobID and runID fails",
+			tty:      true,
+			cli:      "1234 --job 5678",
+			wantsErr: true,
 		},
 		{
 			name:     "with arg job with no ID fails",

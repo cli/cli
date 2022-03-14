@@ -50,11 +50,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 			}
 
 			if opts.RunID != "" && opts.JobID != "" {
-				opts.RunID = ""
-				if opts.IO.CanPrompt() {
-					cs := opts.IO.ColorScheme()
-					fmt.Fprintf(opts.IO.ErrOut, "%s both run and job IDs specified; ignoring run ID\n", cs.WarningIcon())
-				}
+				return cmdutil.FlagErrorf("specify only one of <run-id> or <job-id>")
 			}
 
 			if runF != nil {
