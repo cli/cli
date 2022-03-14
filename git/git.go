@@ -307,6 +307,15 @@ func CheckoutBranch(branch string) error {
 	return run.PrepareCmd(configCmd).Run()
 }
 
+func CheckoutNewBranch(remoteName, branch string) error {
+	track := fmt.Sprintf("%s/%s", remoteName, branch)
+	configCmd, err := GitCommand("checkout", "-b", branch, "--track", track)
+	if err != nil {
+		return err
+	}
+	return run.PrepareCmd(configCmd).Run()
+}
+
 // pull changes from remote branch without version history
 func Pull(remote, branch string) error {
 	pullCmd, err := GitCommand("pull", "--ff-only", remote, branch)

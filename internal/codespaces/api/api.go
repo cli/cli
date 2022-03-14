@@ -52,6 +52,13 @@ const (
 	vscsAPI      = "https://online.visualstudio.com"
 )
 
+const (
+	VSCSTargetLocal       = "local"
+	VSCSTargetDevelopment = "development"
+	VSCSTargetPPE         = "ppe"
+	VSCSTargetProduction  = "production"
+)
+
 // API is the interface to the codespace service.
 type API struct {
 	client       httpClient
@@ -171,6 +178,7 @@ type Codespace struct {
 	GitStatus   CodespaceGitStatus  `json:"git_status"`
 	Connection  CodespaceConnection `json:"connection"`
 	Machine     CodespaceMachine    `json:"machine"`
+	VSCSTarget  string              `json:"vscs_target"`
 }
 
 type CodespaceGitStatus struct {
@@ -218,6 +226,7 @@ var CodespaceFields = []string{
 	"createdAt",
 	"lastUsedAt",
 	"machineName",
+	"vscsTarget",
 }
 
 func (c *Codespace) ExportData(fields []string) map[string]interface{} {
@@ -237,6 +246,10 @@ func (c *Codespace) ExportData(fields []string) map[string]interface{} {
 				"ref":                  c.GitStatus.Ref,
 				"hasUnpushedChanges":   c.GitStatus.HasUnpushedChanges,
 				"hasUncommitedChanges": c.GitStatus.HasUncommitedChanges,
+			}
+		case "vscsTarget":
+			if c.VSCSTarget != "" && c.VSCSTarget != VSCSTargetProduction {
+				data[f] = c.VSCSTarget
 			}
 		default:
 			sf := v.FieldByNameFunc(func(s string) bool {
@@ -579,6 +592,8 @@ type CreateCodespaceParams struct {
 	Branch             string
 	Machine            string
 	Location           string
+	VSCSTarget         string
+	VSCSTargetURL      string
 	PermissionsOptOut  bool
 }
 
@@ -625,6 +640,8 @@ type startCreateRequest struct {
 	Ref                string `json:"ref"`
 	Location           string `json:"location"`
 	Machine            string `json:"machine"`
+	VSCSTarget         string `json:"vscs_target,omitempty"`
+	VSCSTargetURL      string `json:"vscs_target_url,omitempty"`
 	PermissionsOptOut  bool   `json:"devcontainer_permissions_opt_out"`
 }
 
@@ -654,8 +671,11 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 		Ref:                params.Branch,
 		Location:           params.Location,
 		Machine:            params.Machine,
+		VSCSTarget:         params.VSCSTarget,
+		VSCSTargetURL:      params.VSCSTargetURL,
 		PermissionsOptOut:  params.PermissionsOptOut,
 	})
+
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}

@@ -43,6 +43,14 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}
 
+	hasNonProdVSCSTarget := false
+	for _, apiCodespace := range codespaces {
+		if apiCodespace.VSCSTarget != "" && apiCodespace.VSCSTarget != api.VSCSTargetProduction {
+			hasNonProdVSCSTarget = true
+			break
+		}
+	}
+
 	if err := a.io.StartPager(); err != nil {
 		a.errLogger.Printf("error starting pager: %v", err)
 	}
@@ -59,6 +67,11 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 		tp.AddField("BRANCH", nil, nil)
 		tp.AddField("STATE", nil, nil)
 		tp.AddField("CREATED AT", nil, nil)
+
+		if hasNonProdVSCSTarget {
+			tp.AddField("VSCS TARGET", nil, nil)
+		}
+
 		tp.EndRow()
 	}
 
@@ -74,7 +87,9 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 			stateColor = cs.Green
 		}
 
-		tp.AddField(c.Name, nil, cs.Yellow)
+		formattedName := formatNameForVSCSTarget(c.Name, c.VSCSTarget)
+
+		tp.AddField(formattedName, nil, cs.Yellow)
 		tp.AddField(c.Repository.FullName, nil, nil)
 		tp.AddField(c.branchWithGitStatus(), nil, cs.Cyan)
 		tp.AddField(c.State, nil, stateColor)
@@ -88,8 +103,25 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 		} else {
 			tp.AddField(c.CreatedAt, nil, nil)
 		}
+
+		if hasNonProdVSCSTarget {
+			tp.AddField(c.VSCSTarget, nil, nil)
+		}
+
 		tp.EndRow()
 	}
 
 	return tp.Render()
+}
+
+func formatNameForVSCSTarget(name, vscsTarget string) string {
+	if vscsTarget == api.VSCSTargetDevelopment || vscsTarget == api.VSCSTargetLocal {
+		return fmt.Sprintf("%s 🚧", name)
+	}
+
+	if vscsTarget == api.VSCSTargetPPE {
+		return fmt.Sprintf("%s ✨", name)
+	}
+
+	return name
 }
