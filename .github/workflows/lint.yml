@@ -11,6 +11,9 @@ on:
       - go.mod
       - go.sum
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest
