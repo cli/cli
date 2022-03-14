@@ -340,19 +340,16 @@ func mergeRun(opts *MergeOptions) error {
 			}
 
 			if git.HasLocalBranch(branchToSwitchTo) {
-				err = git.CheckoutBranch(branchToSwitchTo)
-				if err != nil {
+				if err := git.CheckoutBranch(branchToSwitchTo); err != nil {
 					return err
 				}
 			} else {
-				err = git.CheckoutNewBranch(baseRemote.Name, branchToSwitchTo)
-				if err != nil {
+				if err := git.CheckoutNewBranch(baseRemote.Name, branchToSwitchTo); err != nil {
 					return err
 				}
 			}
 
-			err = git.Pull(baseRemote.Name, branchToSwitchTo)
-			if err != nil {
+			if err := git.Pull(baseRemote.Name, branchToSwitchTo); err != nil {
 				fmt.Fprintf(opts.IO.ErrOut, "%s warning: not possible to fast-forward to: %q\n", cs.WarningIcon(), branchToSwitchTo)
 			}
 		}
