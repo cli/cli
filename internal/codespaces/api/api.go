@@ -168,17 +168,19 @@ func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error
 
 // Codespace represents a codespace.
 type Codespace struct {
-	Name        string              `json:"name"`
-	CreatedAt   string              `json:"created_at"`
-	DisplayName string              `json:"display_name"`
-	LastUsedAt  string              `json:"last_used_at"`
-	Owner       User                `json:"owner"`
-	Repository  Repository          `json:"repository"`
-	State       string              `json:"state"`
-	GitStatus   CodespaceGitStatus  `json:"git_status"`
-	Connection  CodespaceConnection `json:"connection"`
-	Machine     CodespaceMachine    `json:"machine"`
-	VSCSTarget  string              `json:"vscs_target"`
+	Name                           string              `json:"name"`
+	CreatedAt                      string              `json:"created_at"`
+	DisplayName                    string              `json:"display_name"`
+	LastUsedAt                     string              `json:"last_used_at"`
+	Owner                          User                `json:"owner"`
+	Repository                     Repository          `json:"repository"`
+	State                          string              `json:"state"`
+	GitStatus                      CodespaceGitStatus  `json:"git_status"`
+	Connection                     CodespaceConnection `json:"connection"`
+	Machine                        CodespaceMachine    `json:"machine"`
+	VSCSTarget                     string              `json:"vscs_target"`
+	PendingOperation               bool                `json:"pending_operation"`
+	PendingOperationDisabledReason string              `json:"pending_operation_disabled_reason"`
 }
 
 type CodespaceGitStatus struct {
