@@ -50,6 +50,48 @@ func TestNewCmdRerun(t *testing.T) {
 				RunID: "1234",
 			},
 		},
+		{
+			name: "failed arg nontty",
+			cli:  "4321 --failed",
+			wants: RerunOptions{
+				RunID:      "4321",
+				OnlyFailed: true,
+			},
+		},
+		{
+			name: "failed arg",
+			tty:  true,
+			cli:  "--failed",
+			wants: RerunOptions{
+				Prompt:     true,
+				OnlyFailed: true,
+			},
+		},
+		{
+			name: "with arg job",
+			tty:  true,
+			cli:  "--job 1234",
+			wants: RerunOptions{
+				JobID: "1234",
+			},
+		},
+		{
+			name:     "with args jobID and runID fails",
+			tty:      true,
+			cli:      "1234 --job 5678",
+			wantsErr: true,
+		},
+		{
+			name:     "with arg job with no ID fails",
+			tty:      true,
+			cli:      "--job",
+			wantsErr: true,
+		},
+		{
+			name:     "with arg job with no ID no tty fails",
+			cli:      "--job",
+			wantsErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -118,6 +160,39 @@ func TestRerun(t *testing.T) {
 			wantOut: "✓ Requested rerun of run 1234\n",
 		},
 		{
+			name: "arg including onlyFailed",
+			tty:  true,
+			opts: &RerunOptions{
+				RunID:      "1234",
+				OnlyFailed: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/1234/rerun-failed-jobs"),
+					httpmock.StringResponse("{}"))
+			},
+			wantOut: "✓ Requested rerun (failed jobs) of run 1234\n",
+		},
+		{
+			name: "arg including a specific job",
+			tty:  true,
+			opts: &RerunOptions{
+				JobID: "20", // 20 is shared.FailedJob.ID
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/jobs/20"),
+					httpmock.JSONResponse(shared.FailedJob))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/jobs/20/rerun"),
+					httpmock.StringResponse("{}"))
+			},
+			wantOut: "✓ Requested rerun of job 20 on run 1234\n",
+		},
+		{
 			name: "prompt",
 			tty:  true,
 			opts: &RerunOptions{
@@ -158,7 +233,7 @@ func TestRerun(t *testing.T) {
 						}}))
 			},
 			wantErr: true,
-			errOut:  "no recent runs have failed; please specify a specific run ID",
+			errOut:  "no recent runs have failed; please specify a specific `<run-id>`",
 		},
 		{
 			name: "unrerunnable",
@@ -175,7 +250,7 @@ func TestRerun(t *testing.T) {
 					httpmock.StatusStringResponse(403, "no"))
 			},
 			wantErr: true,
-			errOut:  "run 3 cannot be rerun; its workflow file may be broken.",
+			errOut:  "run 3 cannot be rerun; its workflow file may be broken",
 		},
 	}
 
