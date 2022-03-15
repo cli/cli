@@ -30,13 +30,6 @@ const (
 	PortChangeKindUpdate PortChangeKind = "update"
 )
 
-type PortUpdate struct {
-	Port        int            `json:"port"`
-	ChangeKind  PortChangeKind `json:"changeKind"`
-	ErrorDetail string         `json:"errorDetail"`
-	StatusCode  int            `json:"statusCode"`
-}
-
 // startSharing tells the Live Share host to start sharing the specified port from the container.
 // The sessionName describes the purpose of the remote port or service.
 // It returns an identifier that can be used to open an SSH channel to the remote port.
@@ -69,14 +62,20 @@ func (s *Session) startSharing(ctx context.Context, sessionName string, port int
 }
 
 type PortNotification struct {
-	PortUpdate
 	Success bool
+	// The following are properties sent by the SharingSucceeded/SharingFailed events in the Codespaces agent
+	Port        int            `json:"port"`
+	ChangeKind  PortChangeKind `json:"changeKind"`
+	ErrorDetail string         `json:"errorDetail"`
+	StatusCode  int            `json:"statusCode"`
 }
 
 // WaitForPortNotification waits for a port notification to be received. It returns the notification
 // or an error if the notification is not received before the context is cancelled or it fails
 // to parse the notification.
 func (s *Session) WaitForPortNotification(ctx context.Context, port int, notifType PortChangeKind) (*PortNotification, error) {
+	// We use 1-buffered channels and non-blocking sends so that
+	// no goroutine gets stuck.
 	notificationCh := make(chan *PortNotification, 1)
 	errCh := make(chan error, 1)
 

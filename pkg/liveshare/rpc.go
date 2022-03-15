@@ -13,17 +13,18 @@ import (
 
 type rpcClient struct {
 	*jsonrpc2.Conn
-	conn           io.ReadWriteCloser
-	requestHandler *requestHandler
+	conn       io.ReadWriteCloser
+	handlersMu sync.Mutex
+	handlers   map[string][]*handlerSt
 }
 
 func newRPCClient(conn io.ReadWriteCloser) *rpcClient {
-	return &rpcClient{conn: conn, requestHandler: newRequestHandler()}
+	return &rpcClient{conn: conn, handlers: make(map[string][]*handlerSt)}
 }
 
 func (r *rpcClient) connect(ctx context.Context) {
 	stream := jsonrpc2.NewBufferedStream(r.conn, jsonrpc2.VSCodeObjectCodec{})
-	r.Conn = jsonrpc2.NewConn(ctx, stream, r.requestHandler)
+	r.Conn = jsonrpc2.NewConn(ctx, stream, r)
 }
 
 func (r *rpcClient) do(ctx context.Context, method string, args, result interface{}) error {
@@ -48,16 +49,7 @@ type handlerSt struct {
 	fn handlerFn
 }
 
-type requestHandler struct {
-	handlersMu sync.Mutex
-	handlers   map[string][]*handlerSt
-}
-
-func newRequestHandler() *requestHandler {
-	return &requestHandler{handlers: make(map[string][]*handlerSt)}
-}
-
-func (r *requestHandler) register(requestType string, fn handlerFn) func() {
+func (r *rpcClient) register(requestType string, fn handlerFn) func() {
 	r.handlersMu.Lock()
 	defer r.handlersMu.Unlock()
 
@@ -69,7 +61,7 @@ func (r *requestHandler) register(requestType string, fn handlerFn) func() {
 	}
 }
 
-func (r *requestHandler) deregister(requestType string, handler *handlerSt) {
+func (r *rpcClient) deregister(requestType string, handler *handlerSt) {
 	r.handlersMu.Lock()
 	defer r.handlersMu.Unlock()
 
@@ -88,14 +80,14 @@ func (r *requestHandler) deregister(requestType string, handler *handlerSt) {
 	}
 }
 
-func (r *requestHandler) getHandlers(requestType string) []*handlerSt {
+func (r *rpcClient) getHandlers(requestType string) []*handlerSt {
 	r.handlersMu.Lock()
 	defer r.handlersMu.Unlock()
 
 	return r.handlers[requestType]
 }
 
-func (r *requestHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
+func (r *rpcClient) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
 	for _, handler := range r.getHandlers(req.Method) {
 		go handler.fn(conn, req)
 	}

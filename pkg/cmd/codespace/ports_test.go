@@ -33,18 +33,14 @@ func TestPortsUpdateVisibilitySuccess(t *testing.T) {
 
 	portsData := []liveshare.PortNotification{
 		{
-			Success: true,
-			PortUpdate: liveshare.PortUpdate{
-				Port:       80,
-				ChangeKind: liveshare.PortChangeKindUpdate,
-			},
+			Success:    true,
+			Port:       80,
+			ChangeKind: liveshare.PortChangeKindUpdate,
 		},
 		{
-			Success: true,
-			PortUpdate: liveshare.PortUpdate{
-				Port:       9999,
-				ChangeKind: liveshare.PortChangeKindUpdate,
-			},
+			Success:    true,
+			Port:       9999,
+			ChangeKind: liveshare.PortChangeKindUpdate,
 		},
 	}
 
@@ -74,20 +70,16 @@ func TestPortsUpdateVisibilityFailure403(t *testing.T) {
 
 	portsData := []liveshare.PortNotification{
 		{
-			Success: true,
-			PortUpdate: liveshare.PortUpdate{
-				Port:       80,
-				ChangeKind: liveshare.PortChangeKindUpdate,
-			},
+			Success:    true,
+			Port:       80,
+			ChangeKind: liveshare.PortChangeKindUpdate,
 		},
 		{
-			Success: false,
-			PortUpdate: liveshare.PortUpdate{
-				Port:        9999,
-				ChangeKind:  liveshare.PortChangeKindUpdate,
-				ErrorDetail: "test error",
-				StatusCode:  403,
-			},
+			Success:     false,
+			Port:        9999,
+			ChangeKind:  liveshare.PortChangeKindUpdate,
+			ErrorDetail: "test error",
+			StatusCode:  403,
 		},
 	}
 
@@ -120,19 +112,15 @@ func TestPortsUpdateVisibilityFailure(t *testing.T) {
 
 	portsData := []liveshare.PortNotification{
 		{
-			Success: true,
-			PortUpdate: liveshare.PortUpdate{
-				Port:       80,
-				ChangeKind: liveshare.PortChangeKindUpdate,
-			},
+			Success:    true,
+			Port:       80,
+			ChangeKind: liveshare.PortChangeKindUpdate,
 		},
 		{
-			Success: false,
-			PortUpdate: liveshare.PortUpdate{
-				Port:        9999,
-				ChangeKind:  liveshare.PortChangeKindUpdate,
-				ErrorDetail: "test error",
-			},
+			Success:     false,
+			Port:        9999,
+			ChangeKind:  liveshare.PortChangeKindUpdate,
+			ErrorDetail: "test error",
 		},
 	}
 
@@ -190,7 +178,7 @@ func runUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, ev
 				return
 			case conn := <-ch:
 				pd := portsData[i]
-				_, _ = conn.DispatchCall(context.Background(), eventResponses[i], pd.PortUpdate, nil)
+				_, _ = conn.DispatchCall(context.Background(), eventResponses[i], pd, nil)
 			}
 		}
 	}()

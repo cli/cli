@@ -33,7 +33,7 @@ func (s *Session) Close() error {
 // registerRequestHandler registers a handler for the given request type with the RPC
 // server and returns a callback function to deregister the handler
 func (s *Session) registerRequestHandler(requestType string, h handlerFn) func() {
-	return s.rpc.requestHandler.register(requestType, h)
+	return s.rpc.register(requestType, h)
 }
 
 // StartsSSHServer starts an SSH server in the container, installing sshd if necessary,

@@ -27,18 +27,18 @@ func TestNewPortForwarder(t *testing.T) {
 }
 
 type portUpdateNotification struct {
-	PortUpdate
+	PortNotification
 	conn *jsonrpc2.Conn
 }
 
 func TestPortForwarderStart(t *testing.T) {
 	streamName, streamCondition := "stream-name", "stream-condition"
-	port := 8000
+	const port = 8000
 	sendNotification := make(chan portUpdateNotification)
 	serverSharing := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 		sendNotification <- portUpdateNotification{
-			PortUpdate: PortUpdate{
-				Port:       int(port),
+			PortNotification: PortNotification{
+				Port:       port,
 				ChangeKind: PortChangeKindStart,
 			},
 			conn: conn,
@@ -71,7 +71,7 @@ func TestPortForwarderStart(t *testing.T) {
 
 	go func() {
 		notif := <-sendNotification
-		_, _ = notif.conn.DispatchCall(context.Background(), "serverSharing.sharingSucceeded", notif.PortUpdate)
+		_, _ = notif.conn.DispatchCall(context.Background(), "serverSharing.sharingSucceeded", notif)
 	}()
 
 	done := make(chan error)

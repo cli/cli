@@ -78,7 +78,7 @@ func TestServerStartSharing(t *testing.T) {
 			return nil, errors.New("browseURL does not match expected")
 		}
 		sendNotification <- portUpdateNotification{
-			PortUpdate: PortUpdate{
+			PortNotification: PortNotification{
 				Port:       int(port),
 				ChangeKind: PortChangeKindStart,
 			},
@@ -98,7 +98,7 @@ func TestServerStartSharing(t *testing.T) {
 
 	go func() {
 		notif := <-sendNotification
-		_, _ = notif.conn.DispatchCall(context.Background(), "serverSharing.sharingSucceeded", notif.PortUpdate)
+		_, _ = notif.conn.DispatchCall(context.Background(), "serverSharing.sharingSucceeded", notif)
 	}()
 
 	done := make(chan error)
