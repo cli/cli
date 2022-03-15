@@ -176,7 +176,7 @@ func runUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, ev
 			case <-ctx.Done():
 				return
 			case conn := <-ch:
-				_, _ = conn.DispatchCall(context.Background(), eventResponses[i], pd, nil)
+				_, _ = conn.DispatchCall(ctx, eventResponses[i], pd, nil)
 			}
 		}
 	}()
