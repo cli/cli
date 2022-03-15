@@ -6,6 +6,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/label/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
@@ -89,17 +90,8 @@ func listRun(opts *ListOptions) error {
 	return nil
 }
 
-type Label struct {
-	Id          int
-	Name        string
-	Color       string
-	Default     bool
-	Url         string
-	Description string
-}
-
-func getLabels(client *api.Client, repo ghrepo.Interface) ([]Label, error) {
-	labels := []Label{}
+func getLabels(client *api.Client, repo ghrepo.Interface) ([]shared.Label, error) {
+	labels := []shared.Label{}
 
 	path := fmt.Sprintf("repos/%s/%s/labels", repo.RepoOwner(), repo.RepoName())
 
@@ -110,7 +102,7 @@ func getLabels(client *api.Client, repo ghrepo.Interface) ([]Label, error) {
 	return labels, nil
 }
 
-func printLabels(labels []Label, io *iostreams.IOStreams) error {
+func printLabels(labels []shared.Label, io *iostreams.IOStreams) error {
 	cs := io.ColorScheme()
 	table := utils.NewTablePrinter(io)
 

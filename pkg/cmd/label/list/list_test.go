@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/label/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -64,7 +65,7 @@ func TestLabelList_nontty(t *testing.T) {
 
 	http.Register(
 		httpmock.REST("GET", "repos/OWNER/REPO/labels"),
-		httpmock.JSONResponse([]Label{
+		httpmock.JSONResponse([]shared.Label{
 			{
 				Name:        "bug",
 				Color:       "#B60205",
@@ -99,7 +100,7 @@ func TestLabelList_tty(t *testing.T) {
 
 	http.Register(
 		httpmock.REST("GET", "repos/OWNER/REPO/labels"),
-		httpmock.JSONResponse([]Label{
+		httpmock.JSONResponse([]shared.Label{
 			{
 				Name:        "bug",
 				Color:       "#B60205",
