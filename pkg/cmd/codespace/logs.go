@@ -41,6 +41,13 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 		return fmt.Errorf("get or choose codespace: %w", err)
 	}
 
+	if codespace.PendingOperation {
+		return fmt.Errorf(
+			"codespace is disabled while it has a pending operation: %s",
+			codespace.PendingOperationDisabledReason,
+		)
+	}
+
 	authkeys := make(chan error, 1)
 	go func() {
 		authkeys <- checkAuthorizedKeys(ctx, a.apiClient)
