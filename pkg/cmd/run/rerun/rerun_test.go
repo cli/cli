@@ -233,7 +233,7 @@ func TestRerun(t *testing.T) {
 						}}))
 			},
 			wantErr: true,
-			errOut:  "no recent runs have failed; please specify a specific run ID",
+			errOut:  "no recent runs have failed; please specify a specific `<run-id>`",
 		},
 		{
 			name: "unrerunnable",
