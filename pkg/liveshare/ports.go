@@ -62,8 +62,8 @@ func (s *Session) startSharing(ctx context.Context, sessionName string, port int
 }
 
 type PortNotification struct {
-	Success bool
-	// The following are properties sent by the SharingSucceeded/SharingFailed events in the Codespaces agent
+	Success bool // Helps us disambiguate between the SharingSucceeded/SharingFailed events
+	// The following are properties included in the SharingSucceeded/SharingFailed events sent by the server sharing service in the Codespace
 	Port        int            `json:"port"`
 	ChangeKind  PortChangeKind `json:"changeKind"`
 	ErrorDetail string         `json:"errorDetail"`
