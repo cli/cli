@@ -85,7 +85,7 @@ func TestPortsUpdateVisibilityFailure403(t *testing.T) {
 
 	err := runUpdateVisibilityTest(t, portVisibilities, eventResponses, portsData)
 	if err == nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("runUpdateVisibilityTest succeeded unexpectedly")
 	}
 
 	if errors.Unwrap(err) != errUpdatePortVisibilityForbidden {
@@ -126,7 +126,7 @@ func TestPortsUpdateVisibilityFailure(t *testing.T) {
 
 	err := runUpdateVisibilityTest(t, portVisibilities, eventResponses, portsData)
 	if err == nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Fatalf("runUpdateVisibilityTest succeeded unexpectedly")
 	}
 
 	var expectedErr *ErrUpdatingPortVisibility
@@ -146,9 +146,6 @@ func runUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, ev
 		return joinWorkspaceResult{1}, nil
 	}
 	const sessionToken = "session-token"
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	ch := make(chan *jsonrpc2.Conn, 1)
 	updateSharedVisibility := func(conn *jsonrpc2.Conn, rpcReq *jsonrpc2.Request) (interface{}, error) {
@@ -170,14 +167,15 @@ func runUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, ev
 		return fmt.Errorf("unable to create test server: %w", err)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	go func() {
-		var i int
-		for ; ; i++ {
+		for i, pd := range portsData {
 			select {
 			case <-ctx.Done():
 				return
 			case conn := <-ch:
-				pd := portsData[i]
 				_, _ = conn.DispatchCall(context.Background(), eventResponses[i], pd, nil)
 			}
 		}
@@ -210,7 +208,5 @@ func runUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, ev
 		portArgs = append(portArgs, fmt.Sprintf("%d:%s", pv.number, pv.visibility))
 	}
 
-	err = a.UpdatePortVisibility(ctx, "codespace-name", portArgs)
-
-	return err
+	return a.UpdatePortVisibility(ctx, "codespace-name", portArgs)
 }

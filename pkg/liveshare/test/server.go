@@ -86,6 +86,7 @@ func WithPassword(password string) ServerOption {
 	}
 }
 
+// WithNonSecure configures the Server as non-secure.
 func WithNonSecure() ServerOption {
 	return func(s *Server) error {
 		s.nonSecure = true

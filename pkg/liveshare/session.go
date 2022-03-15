@@ -32,7 +32,7 @@ func (s *Session) Close() error {
 
 // registerRequestHandler registers a handler for the given request type with the RPC
 // server and returns a callback function to deregister the handler
-func (s *Session) registerRequestHandler(requestType string, h handlerFn) func() {
+func (s *Session) registerRequestHandler(requestType string, h handler) func() {
 	return s.rpc.register(requestType, h)
 }
 

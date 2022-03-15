@@ -15,11 +15,11 @@ type rpcClient struct {
 	*jsonrpc2.Conn
 	conn       io.ReadWriteCloser
 	handlersMu sync.Mutex
-	handlers   map[string][]*handlerSt
+	handlers   map[string][]*handlerWrapper
 }
 
 func newRPCClient(conn io.ReadWriteCloser) *rpcClient {
-	return &rpcClient{conn: conn, handlers: make(map[string][]*handlerSt)}
+	return &rpcClient{conn: conn, handlers: make(map[string][]*handlerWrapper)}
 }
 
 func (r *rpcClient) connect(ctx context.Context) {
@@ -43,17 +43,17 @@ func (r *rpcClient) do(ctx context.Context, method string, args, result interfac
 	return waiter.Wait(waitCtx, result)
 }
 
-type handlerFn func(conn *jsonrpc2.Conn, req *jsonrpc2.Request)
+type handler func(conn *jsonrpc2.Conn, req *jsonrpc2.Request)
 
-type handlerSt struct {
-	fn handlerFn
+type handlerWrapper struct {
+	fn handler
 }
 
-func (r *rpcClient) register(requestType string, fn handlerFn) func() {
+func (r *rpcClient) register(requestType string, fn handler) func() {
 	r.handlersMu.Lock()
 	defer r.handlersMu.Unlock()
 
-	h := &handlerSt{fn: fn}
+	h := &handlerWrapper{fn: fn}
 	r.handlers[requestType] = append(r.handlers[requestType], h)
 
 	return func() {
@@ -61,34 +61,27 @@ func (r *rpcClient) register(requestType string, fn handlerFn) func() {
 	}
 }
 
-func (r *rpcClient) deregister(requestType string, handler *handlerSt) {
+func (r *rpcClient) deregister(requestType string, handler *handlerWrapper) {
 	r.handlersMu.Lock()
 	defer r.handlersMu.Unlock()
 
-	if handlers, ok := r.handlers[requestType]; ok {
-		newHandlers := []*handlerSt{}
-		for _, h := range handlers {
-			if h != handler {
-				newHandlers = append(newHandlers, h)
-			}
-		}
-		r.handlers[requestType] = newHandlers
-
-		if len(r.handlers[requestType]) == 0 {
-			delete(r.handlers, requestType)
+	handlers := r.handlers[requestType]
+	for i, h := range handlers {
+		if h == handler {
+			// Swap h with last element and pop.
+			last := len(handlers) - 1
+			handlers[i], handlers[last] = handlers[last], nil
+			r.handlers[requestType] = handlers[:last]
+			break
 		}
 	}
 }
 
-func (r *rpcClient) getHandlers(requestType string) []*handlerSt {
+func (r *rpcClient) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
 	r.handlersMu.Lock()
 	defer r.handlersMu.Unlock()
 
-	return r.handlers[requestType]
-}
-
-func (r *rpcClient) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
-	for _, handler := range r.getHandlers(req.Method) {
+	for _, handler := range r.handlers[req.Method] {
 		go handler.fn(conn, req)
 	}
 }
