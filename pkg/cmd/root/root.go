@@ -20,6 +20,7 @@ import (
 	gistCmd "github.com/cli/cli/v2/pkg/cmd/gist"
 	gpgKeyCmd "github.com/cli/cli/v2/pkg/cmd/gpg-key"
 	issueCmd "github.com/cli/cli/v2/pkg/cmd/issue"
+	labelCmd "github.com/cli/cli/v2/pkg/cmd/label"
 	prCmd "github.com/cli/cli/v2/pkg/cmd/pr"
 	releaseCmd "github.com/cli/cli/v2/pkg/cmd/release"
 	repoCmd "github.com/cli/cli/v2/pkg/cmd/repo"
@@ -102,6 +103,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
 	cmd.AddCommand(runCmd.NewCmdRun(&repoResolvingCmdFactory))
 	cmd.AddCommand(workflowCmd.NewCmdWorkflow(&repoResolvingCmdFactory))
+	cmd.AddCommand(labelCmd.NewCmdLabel(&repoResolvingCmdFactory))
 
 	// Help topics
 	cmd.AddCommand(NewHelpTopic("environment"))
