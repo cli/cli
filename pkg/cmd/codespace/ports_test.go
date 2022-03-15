@@ -2,7 +2,6 @@ package codespace
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -149,11 +148,6 @@ func runUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, ev
 
 	ch := make(chan *jsonrpc2.Conn, 1)
 	updateSharedVisibility := func(conn *jsonrpc2.Conn, rpcReq *jsonrpc2.Request) (interface{}, error) {
-		var req []interface{}
-		if err := json.Unmarshal(*rpcReq.Params, &req); err != nil {
-			return nil, fmt.Errorf("unmarshal req: %w", err)
-		}
-
 		ch <- conn
 		return nil, nil
 	}
