@@ -89,10 +89,22 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 
 		formattedName := formatNameForVSCSTarget(c.Name, c.VSCSTarget)
 
-		tp.AddField(formattedName, nil, cs.Yellow)
+		var nameColor func(string) string
+		switch c.PendingOperation {
+		case false:
+			nameColor = cs.Yellow
+		case true:
+			nameColor = cs.Gray
+		}
+
+		tp.AddField(formattedName, nil, nameColor)
 		tp.AddField(c.Repository.FullName, nil, nil)
 		tp.AddField(c.branchWithGitStatus(), nil, cs.Cyan)
-		tp.AddField(c.State, nil, stateColor)
+		if c.PendingOperation {
+			tp.AddField(c.PendingOperationDisabledReason, nil, cs.Gray)
+		} else {
+			tp.AddField(c.State, nil, stateColor)
+		}
 
 		if tp.IsTTY() {
 			ct, err := time.Parse(time.RFC3339, c.CreatedAt)
