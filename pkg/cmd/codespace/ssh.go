@@ -128,6 +128,13 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		return fmt.Errorf("get or choose codespace: %w", err)
 	}
 
+	if codespace.PendingOperation {
+		return fmt.Errorf(
+			"codespace is disabled while it has a pending operation: %s",
+			codespace.PendingOperationDisabledReason,
+		)
+	}
+
 	liveshareLogger := noopLogger()
 	if opts.debug {
 		debugLogger, err := newFileLogger(opts.debugFile)
