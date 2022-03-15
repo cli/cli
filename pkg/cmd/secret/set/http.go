@@ -10,6 +10,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/secret/shared"
 )
 
 type SecretPayload struct {
@@ -40,17 +41,17 @@ func getPubKey(client *api.Client, host, path string) (*PubKey, error) {
 	return &pk, nil
 }
 
-func getOrgPublicKey(client *api.Client, host, orgName string) (*PubKey, error) {
-	return getPubKey(client, host, fmt.Sprintf("orgs/%s/actions/secrets/public-key", orgName))
+func getOrgPublicKey(client *api.Client, host, orgName string, app shared.App) (*PubKey, error) {
+	return getPubKey(client, host, fmt.Sprintf("orgs/%s/%s/secrets/public-key", orgName, app))
 }
 
 func getUserPublicKey(client *api.Client, host string) (*PubKey, error) {
 	return getPubKey(client, host, "user/codespaces/secrets/public-key")
 }
 
-func getRepoPubKey(client *api.Client, repo ghrepo.Interface) (*PubKey, error) {
-	return getPubKey(client, repo.RepoHost(), fmt.Sprintf("repos/%s/actions/secrets/public-key",
-		ghrepo.FullName(repo)))
+func getRepoPubKey(client *api.Client, repo ghrepo.Interface, app shared.App) (*PubKey, error) {
+	return getPubKey(client, repo.RepoHost(), fmt.Sprintf("repos/%s/%s/secrets/public-key",
+		ghrepo.FullName(repo), app))
 }
 
 func getEnvPubKey(client *api.Client, repo ghrepo.Interface, envName string) (*PubKey, error) {
@@ -68,14 +69,14 @@ func putSecret(client *api.Client, host, path string, payload interface{}) error
 	return client.REST(host, "PUT", path, requestBody, nil)
 }
 
-func putOrgSecret(client *api.Client, host string, pk *PubKey, orgName, visibility, secretName, eValue string, repositoryIDs []int64) error {
+func putOrgSecret(client *api.Client, host string, pk *PubKey, orgName, visibility, secretName, eValue string, repositoryIDs []int64, app shared.App) error {
 	payload := SecretPayload{
 		EncryptedValue: eValue,
 		KeyID:          pk.ID,
 		Repositories:   repositoryIDs,
 		Visibility:     visibility,
 	}
-	path := fmt.Sprintf("orgs/%s/actions/secrets/%s", orgName, secretName)
+	path := fmt.Sprintf("orgs/%s/%s/secrets/%s", orgName, app, secretName)
 
 	return putSecret(client, host, path, payload)
 }
@@ -107,12 +108,12 @@ func putEnvSecret(client *api.Client, pk *PubKey, repo ghrepo.Interface, envName
 	return putSecret(client, repo.RepoHost(), path, payload)
 }
 
-func putRepoSecret(client *api.Client, pk *PubKey, repo ghrepo.Interface, secretName, eValue string) error {
+func putRepoSecret(client *api.Client, pk *PubKey, repo ghrepo.Interface, secretName, eValue string, app shared.App) error {
 	payload := SecretPayload{
 		EncryptedValue: eValue,
 		KeyID:          pk.ID,
 	}
-	path := fmt.Sprintf("repos/%s/actions/secrets/%s", ghrepo.FullName(repo), secretName)
+	path := fmt.Sprintf("repos/%s/%s/secrets/%s", ghrepo.FullName(repo), app, secretName)
 	return putSecret(client, repo.RepoHost(), path, payload)
 }
 
