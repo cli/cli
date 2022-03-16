@@ -388,6 +388,7 @@ func createFakeEditServer(t *testing.T, codespaceName string) *httptest.Server {
 		fmt.Fprint(w, string(responseData))
 	}))
 }
+
 func TestAPI_EditCodespace(t *testing.T) {
 	type args struct {
 		ctx           context.Context
@@ -432,5 +433,43 @@ func TestAPI_EditCodespace(t *testing.T) {
 				t.Errorf("API.EditCodespace() = %v, want %v", got.DisplayName, tt.want.DisplayName)
 			}
 		})
+	}
+}
+
+func createFakeEditPendingOpServer(t *testing.T) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPatch {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			return
+		}
+
+		if r.Method == http.MethodGet {
+			response := Codespace{
+				PendingOperation:               true,
+				PendingOperationDisabledReason: "Some pending operation",
+			}
+
+			responseData, _ := json.Marshal(response)
+			fmt.Fprint(w, string(responseData))
+			return
+		}
+	}))
+}
+
+func TestAPI_EditCodespacePendingOperation(t *testing.T) {
+	svr := createFakeEditPendingOpServer(t)
+	defer svr.Close()
+
+	a := &API{
+		client:    &http.Client{},
+		githubAPI: svr.URL,
+	}
+
+	_, err := a.EditCodespace(context.Background(), "disabledCodespace", &EditCodespaceParams{DisplayName: "some silly name"})
+	if err == nil {
+		t.Error("Expected pending operation error, but got nothing")
+	}
+	if err.Error() != "codespace is disabled while it has a pending operation: Some pending operation" {
+		t.Errorf("Expected pending operation error, but got %v", err)
 	}
 }

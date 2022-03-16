@@ -167,18 +167,22 @@ func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error
 }
 
 // Codespace represents a codespace.
+// You can see more about the fields in this type in the codespaces api docs:
+// https://docs.github.com/en/rest/reference/codespaces
 type Codespace struct {
-	Name        string              `json:"name"`
-	CreatedAt   string              `json:"created_at"`
-	DisplayName string              `json:"display_name"`
-	LastUsedAt  string              `json:"last_used_at"`
-	Owner       User                `json:"owner"`
-	Repository  Repository          `json:"repository"`
-	State       string              `json:"state"`
-	GitStatus   CodespaceGitStatus  `json:"git_status"`
-	Connection  CodespaceConnection `json:"connection"`
-	Machine     CodespaceMachine    `json:"machine"`
-	VSCSTarget  string              `json:"vscs_target"`
+	Name                           string              `json:"name"`
+	CreatedAt                      string              `json:"created_at"`
+	DisplayName                    string              `json:"display_name"`
+	LastUsedAt                     string              `json:"last_used_at"`
+	Owner                          User                `json:"owner"`
+	Repository                     Repository          `json:"repository"`
+	State                          string              `json:"state"`
+	GitStatus                      CodespaceGitStatus  `json:"git_status"`
+	Connection                     CodespaceConnection `json:"connection"`
+	Machine                        CodespaceMachine    `json:"machine"`
+	VSCSTarget                     string              `json:"vscs_target"`
+	PendingOperation               bool                `json:"pending_operation"`
+	PendingOperationDisabledReason string              `json:"pending_operation_disabled_reason"`
 }
 
 type CodespaceGitStatus struct {
@@ -781,6 +785,20 @@ func (a *API) EditCodespace(ctx context.Context, codespaceName string, params *E
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		// 422 (unprocessable entity) is likely caused by the codespace having a
+		// pending op, so we'll fetch the codespace to see if that's the case
+		// and return a more understandable error message.
+		if resp.StatusCode == http.StatusUnprocessableEntity {
+			pendingOp, reason, err := a.checkForPendingOperation(ctx, codespaceName)
+			// If there's an error or there's not a pending op, we want to let
+			// this fall through to the normal api.HandleHTTPError flow
+			if err == nil && pendingOp {
+				return nil, fmt.Errorf(
+					"codespace is disabled while it has a pending operation: %s",
+					reason,
+				)
+			}
+		}
 		return nil, api.HandleHTTPError(resp)
 	}
 
@@ -795,6 +813,14 @@ func (a *API) EditCodespace(ctx context.Context, codespaceName string, params *E
 	}
 
 	return &response, nil
+}
+
+func (a *API) checkForPendingOperation(ctx context.Context, codespaceName string) (bool, string, error) {
+	codespace, err := a.GetCodespace(ctx, codespaceName, false)
+	if err != nil {
+		return false, "", err
+	}
+	return codespace.PendingOperation, codespace.PendingOperationDisabledReason, nil
 }
 
 type getCodespaceRepositoryContentsResponse struct {

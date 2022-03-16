@@ -125,7 +125,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
 	if err != nil {
-		return fmt.Errorf("get or choose codespace: %w", err)
+		return err
 	}
 
 	liveshareLogger := noopLogger()
