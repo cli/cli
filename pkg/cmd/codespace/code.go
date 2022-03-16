@@ -33,7 +33,7 @@ func newCodeCmd(app *App) *cobra.Command {
 func (a *App) VSCode(ctx context.Context, codespaceName string, useInsiders bool) error {
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
-		return fmt.Errorf("get or choose codespace: %w", err)
+		return err
 	}
 
 	url := vscodeProtocolURL(codespace.Name, useInsiders)
