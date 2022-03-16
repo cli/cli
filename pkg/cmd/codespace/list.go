@@ -101,7 +101,7 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 		tp.AddField(c.Repository.FullName, nil, nil)
 		tp.AddField(c.branchWithGitStatus(), nil, cs.Cyan)
 		if c.PendingOperation {
-			tp.AddField(c.PendingOperationDisabledReason, nil, cs.Gray)
+			tp.AddField(c.PendingOperationDisabledReason, nil, nameColor)
 		} else {
 			tp.AddField(c.State, nil, stateColor)
 		}
