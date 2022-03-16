@@ -36,6 +36,7 @@ func TestPortForwarderStart(t *testing.T) {
 	const port = 8000
 	sendNotification := make(chan portUpdateNotification)
 	serverSharing := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
+		// Send the PortNotification that will be awaited on in session.StartSharing
 		sendNotification <- portUpdateNotification{
 			PortNotification: PortNotification{
 				Port:       port,
@@ -74,7 +75,7 @@ func TestPortForwarderStart(t *testing.T) {
 		_, _ = notif.conn.DispatchCall(context.Background(), "serverSharing.sharingSucceeded", notif)
 	}()
 
-	done := make(chan error)
+	done := make(chan error, 2)
 	go func() {
 		done <- NewPortForwarder(session, "ssh", port, false).ForwardToListener(ctx, listen)
 	}()
@@ -88,16 +89,20 @@ func TestPortForwarderStart(t *testing.T) {
 		}
 		if conn == nil {
 			done <- errors.New("failed to connect to forwarded port")
+			return
 		}
 		b := make([]byte, len("stream-data"))
 		if _, err := conn.Read(b); err != nil && err != io.EOF {
 			done <- fmt.Errorf("reading stream: %w", err)
+			return
 		}
 		if string(b) != "stream-data" {
 			done <- fmt.Errorf("stream data is not expected value, got: %s", string(b))
+			return
 		}
 		if _, err := conn.Write([]byte("new-data")); err != nil {
 			done <- fmt.Errorf("writing to stream: %w", err)
+			return
 		}
 		done <- nil
 	}()
