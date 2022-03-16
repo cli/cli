@@ -46,7 +46,7 @@ func newPortsCmd(app *App) *cobra.Command {
 
 // ListPorts lists known ports in a codespace.
 func (a *App) ListPorts(ctx context.Context, codespaceName string, exporter cmdutil.Exporter) (err error) {
-	codespace, err := getCodespaceForPorts(ctx, a.apiClient, codespaceName)
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
 		return err
 	}
@@ -231,7 +231,7 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 		return fmt.Errorf("error parsing port arguments: %w", err)
 	}
 
-	codespace, err := getCodespaceForPorts(ctx, a.apiClient, codespaceName)
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
 		return err
 	}
@@ -304,7 +304,7 @@ func (a *App) ForwardPorts(ctx context.Context, codespaceName string, ports []st
 		return fmt.Errorf("get port pairs: %w", err)
 	}
 
-	codespace, err := getCodespaceForPorts(ctx, a.apiClient, codespaceName)
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
 		return err
 	}
@@ -369,24 +369,4 @@ func getPortPairs(ports []string) ([]portPair, error) {
 func normalizeJSON(j []byte) []byte {
 	// remove trailing commas
 	return bytes.ReplaceAll(j, []byte("},}"), []byte("}}"))
-}
-
-func getCodespaceForPorts(ctx context.Context, apiClient apiClient, codespaceName string) (*api.Codespace, error) {
-	codespace, err := getOrChooseCodespace(ctx, apiClient, codespaceName)
-	if err != nil {
-		// TODO(josebalius): remove special handling of this error here and it other places
-		if err == errNoCodespaces {
-			return nil, err
-		}
-		return nil, fmt.Errorf("error choosing codespace: %w", err)
-	}
-
-	if codespace.PendingOperation {
-		return nil, fmt.Errorf(
-			"codespace is disabled while it has a pending operation: %s",
-			codespace.PendingOperationDisabledReason,
-		)
-	}
-
-	return codespace, nil
 }

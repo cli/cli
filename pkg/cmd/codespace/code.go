@@ -36,13 +36,6 @@ func (a *App) VSCode(ctx context.Context, codespaceName string, useInsiders bool
 		return fmt.Errorf("get or choose codespace: %w", err)
 	}
 
-	if codespace.PendingOperation {
-		return fmt.Errorf(
-			"codespace is disabled while it has a pending operation: %s",
-			codespace.PendingOperationDisabledReason,
-		)
-	}
-
 	url := vscodeProtocolURL(codespace.Name, useInsiders)
 	if err := a.browser.Browse(url); err != nil {
 		return fmt.Errorf("error opening Visual Studio Code: %w", err)
