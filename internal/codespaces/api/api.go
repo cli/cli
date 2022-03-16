@@ -167,6 +167,8 @@ func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error
 }
 
 // Codespace represents a codespace.
+// You can see more about the fields in this type in the codespaces api docs:
+// https://docs.github.com/en/rest/reference/codespaces
 type Codespace struct {
 	Name                           string              `json:"name"`
 	CreatedAt                      string              `json:"created_at"`
