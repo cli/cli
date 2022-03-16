@@ -55,7 +55,7 @@ func TestApp_VSCode(t *testing.T) {
 }
 
 func TestPendingOperationDisallowsCode(t *testing.T) {
-	app := testingLogsApp()
+	app := testingCodeApp()
 
 	if err := app.VSCode(context.Background(), "disabledCodespace", false); err != nil {
 		if err.Error() != "get or choose codespace: codespace is disabled while it has a pending operation: Some pending operation" {
