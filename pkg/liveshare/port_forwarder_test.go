@@ -26,12 +26,27 @@ func TestNewPortForwarder(t *testing.T) {
 	}
 }
 
+type portUpdateNotification struct {
+	PortNotification
+	conn *jsonrpc2.Conn
+}
+
 func TestPortForwarderStart(t *testing.T) {
 	streamName, streamCondition := "stream-name", "stream-condition"
-	serverSharing := func(req *jsonrpc2.Request) (interface{}, error) {
+	const port = 8000
+	sendNotification := make(chan portUpdateNotification)
+	serverSharing := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
+		// Send the PortNotification that will be awaited on in session.StartSharing
+		sendNotification <- portUpdateNotification{
+			PortNotification: PortNotification{
+				Port:       port,
+				ChangeKind: PortChangeKindStart,
+			},
+			conn: conn,
+		}
 		return Port{StreamName: streamName, StreamCondition: streamCondition}, nil
 	}
-	getStream := func(req *jsonrpc2.Request) (interface{}, error) {
+	getStream := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 		return "stream-id", nil
 	}
 
@@ -55,10 +70,14 @@ func TestPortForwarderStart(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	done := make(chan error)
 	go func() {
-		const name, remote = "ssh", 8000
-		done <- NewPortForwarder(session, name, remote, false).ForwardToListener(ctx, listen)
+		notif := <-sendNotification
+		_, _ = notif.conn.DispatchCall(context.Background(), "serverSharing.sharingSucceeded", notif)
+	}()
+
+	done := make(chan error, 2)
+	go func() {
+		done <- NewPortForwarder(session, "ssh", port, false).ForwardToListener(ctx, listen)
 	}()
 
 	go func() {
@@ -70,16 +89,20 @@ func TestPortForwarderStart(t *testing.T) {
 		}
 		if conn == nil {
 			done <- errors.New("failed to connect to forwarded port")
+			return
 		}
 		b := make([]byte, len("stream-data"))
 		if _, err := conn.Read(b); err != nil && err != io.EOF {
 			done <- fmt.Errorf("reading stream: %w", err)
+			return
 		}
 		if string(b) != "stream-data" {
 			done <- fmt.Errorf("stream data is not expected value, got: %s", string(b))
+			return
 		}
 		if _, err := conn.Write([]byte("new-data")); err != nil {
 			done <- fmt.Errorf("writing to stream: %w", err)
+			return
 		}
 		done <- nil
 	}()
