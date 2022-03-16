@@ -783,6 +783,20 @@ func (a *API) EditCodespace(ctx context.Context, codespaceName string, params *E
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		// 422 (unprocessable entity) is likely caused by the codespace having a
+		// pending op, so we'll fetch the codespace to see if that's the case
+		// and return a more understandable error message.
+		if resp.StatusCode == http.StatusUnprocessableEntity {
+			pendingOp, reason, err := a.checkForPendingOperation(ctx, codespaceName)
+			// If there's an error or there's not a pending op, we want to let
+			// this fall through to the normal api.HandleHTTPError flow
+			if err == nil && pendingOp {
+				return nil, fmt.Errorf(
+					"codespace is disabled while it has a pending operation: %s",
+					reason,
+				)
+			}
+		}
 		return nil, api.HandleHTTPError(resp)
 	}
 
@@ -797,6 +811,14 @@ func (a *API) EditCodespace(ctx context.Context, codespaceName string, params *E
 	}
 
 	return &response, nil
+}
+
+func (a *API) checkForPendingOperation(ctx context.Context, codespaceName string) (bool, string, error) {
+	codespace, err := a.GetCodespace(ctx, codespaceName, false)
+	if err != nil {
+		return false, "", err
+	}
+	return codespace.PendingOperation, codespace.PendingOperationDisabledReason, nil
 }
 
 type getCodespaceRepositoryContentsResponse struct {
