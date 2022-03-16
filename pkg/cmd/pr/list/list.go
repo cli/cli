@@ -36,6 +36,7 @@ type ListOptions struct {
 	HeadBranch string
 	Labels     []string
 	Author     string
+	AppAuthor  string
 	Assignee   string
 	Search     string
 	Draft      string
@@ -52,24 +53,28 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List and filter pull requests in this repository",
+		Short: "List pull requests in a repository",
+		Long: heredoc.Doc(`
+			List pull requests in a GitHub repository.
+
+			The search query syntax is documented here:
+			<https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests>
+		`),
 		Example: heredoc.Doc(`
 			List PRs authored by you
 			$ gh pr list --author "@me"
 
-			List PRs assigned to you
-			$ gh pr list --assignee "@me"
-
-			List PRs by label, combining multiple labels with AND
+			List only PRs with all of the given labels
 			$ gh pr list --label bug --label "priority 1"
 
-			List PRs using search syntax
+			Filter PRs using search syntax
 			$ gh pr list --search "status:success review:required"
 
-			Open the list of PRs in a web browser
-			$ gh pr list --web
+			Find a PR that introduced a given commit
+			$ gh pr list --search "<SHA>" --state merged
     	`),
-		Args: cmdutil.NoArgsQuoteReminder,
+		Aliases: []string{"ls"},
+		Args:    cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
@@ -82,6 +87,14 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				opts.Draft = strconv.FormatBool(draft)
 			}
 
+			if err := cmdutil.MutuallyExclusive(
+				"specify only `--author` or `--app`",
+				opts.Author != "",
+				opts.AppAuthor != "",
+			); err != nil {
+				return err
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -89,16 +102,14 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the browser to list the pull requests")
+	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "List pull requests in the web browser")
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of items to fetch")
-	cmd.Flags().StringVarP(&opts.State, "state", "s", "open", "Filter by state: {open|closed|merged|all}")
-	_ = cmd.RegisterFlagCompletionFunc("state", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"open", "closed", "merged", "all"}, cobra.ShellCompDirectiveNoFileComp
-	})
+	cmdutil.StringEnumFlag(cmd, &opts.State, "state", "s", "open", []string{"open", "closed", "merged", "all"}, "Filter by state")
 	cmd.Flags().StringVarP(&opts.BaseBranch, "base", "B", "", "Filter by base branch")
 	cmd.Flags().StringVarP(&opts.HeadBranch, "head", "H", "", "Filter by head branch")
-	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by labels")
+	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by label")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
+	cmd.Flags().StringVar(&opts.AppAuthor, "app", "", "Filter by GitHub App author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
 	cmd.Flags().BoolVarP(&draft, "draft", "d", false, "Filter by draft state")
@@ -161,6 +172,10 @@ func listRun(opts *ListOptions) error {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
 		return opts.Browser.Browse(openURL)
+	}
+
+	if opts.AppAuthor != "" {
+		filters.Author = fmt.Sprintf("app/%s", opts.AppAuthor)
 	}
 
 	listResult, err := listPullRequests(httpClient, baseRepo, filters, opts.LimitResults)

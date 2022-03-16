@@ -17,6 +17,9 @@ var _ Extension = &ExtensionMock{}
 //
 // 		// make and configure a mocked Extension
 // 		mockedExtension := &ExtensionMock{
+// 			CurrentVersionFunc: func() string {
+// 				panic("mock out the CurrentVersion method")
+// 			},
 // 			IsBinaryFunc: func() bool {
 // 				panic("mock out the IsBinary method")
 // 			},
@@ -42,6 +45,9 @@ var _ Extension = &ExtensionMock{}
 //
 // 	}
 type ExtensionMock struct {
+	// CurrentVersionFunc mocks the CurrentVersion method.
+	CurrentVersionFunc func() string
+
 	// IsBinaryFunc mocks the IsBinary method.
 	IsBinaryFunc func() bool
 
@@ -62,6 +68,9 @@ type ExtensionMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// CurrentVersion holds details about calls to the CurrentVersion method.
+		CurrentVersion []struct {
+		}
 		// IsBinary holds details about calls to the IsBinary method.
 		IsBinary []struct {
 		}
@@ -81,12 +90,39 @@ type ExtensionMock struct {
 		UpdateAvailable []struct {
 		}
 	}
+	lockCurrentVersion  sync.RWMutex
 	lockIsBinary        sync.RWMutex
 	lockIsLocal         sync.RWMutex
 	lockName            sync.RWMutex
 	lockPath            sync.RWMutex
 	lockURL             sync.RWMutex
 	lockUpdateAvailable sync.RWMutex
+}
+
+// CurrentVersion calls CurrentVersionFunc.
+func (mock *ExtensionMock) CurrentVersion() string {
+	if mock.CurrentVersionFunc == nil {
+		panic("ExtensionMock.CurrentVersionFunc: method is nil but Extension.CurrentVersion was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockCurrentVersion.Lock()
+	mock.calls.CurrentVersion = append(mock.calls.CurrentVersion, callInfo)
+	mock.lockCurrentVersion.Unlock()
+	return mock.CurrentVersionFunc()
+}
+
+// CurrentVersionCalls gets all the calls that were made to CurrentVersion.
+// Check the length with:
+//     len(mockedExtension.CurrentVersionCalls())
+func (mock *ExtensionMock) CurrentVersionCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockCurrentVersion.RLock()
+	calls = mock.calls.CurrentVersion
+	mock.lockCurrentVersion.RUnlock()
+	return calls
 }
 
 // IsBinary calls IsBinaryFunc.

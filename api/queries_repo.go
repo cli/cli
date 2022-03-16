@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cli/cli/v2/internal/ghinstance"
+
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
 )
@@ -44,6 +46,7 @@ type Repository struct {
 	MergeCommitAllowed      bool
 	SquashMergeAllowed      bool
 	RebaseMergeAllowed      bool
+	AutoMergeAllowed        bool
 
 	ForkCount      int
 	StargazerCount int
@@ -66,6 +69,7 @@ type Repository struct {
 	IsArchived                    bool
 	IsEmpty                       bool
 	IsFork                        bool
+	ForkingAllowed                bool
 	IsInOrganization              bool
 	IsMirror                      bool
 	IsPrivate                     bool
@@ -79,6 +83,7 @@ type Repository struct {
 	ViewerPermission              string
 	ViewerPossibleCommitEmails    []string
 	ViewerSubscription            string
+	Visibility                    string
 
 	RepositoryTopics struct {
 		Nodes []struct {
@@ -508,6 +513,37 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, e
 
 	result := repositoryV3{}
 	err := client.REST(repo.RepoHost(), "POST", path, body, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Repository{
+		ID:        result.NodeID,
+		Name:      result.Name,
+		CreatedAt: result.CreatedAt,
+		Owner: RepositoryOwner{
+			Login: result.Owner.Login,
+		},
+		ViewerPermission: "WRITE",
+		hostname:         repo.RepoHost(),
+	}, nil
+}
+
+// RenameRepo renames the repository on GitHub and returns the renamed repository
+func RenameRepo(client *Client, repo ghrepo.Interface, newRepoName string) (*Repository, error) {
+	input := map[string]string{"name": newRepoName}
+	body := &bytes.Buffer{}
+	enc := json.NewEncoder(body)
+	if err := enc.Encode(input); err != nil {
+		return nil, err
+	}
+
+	path := fmt.Sprintf("%srepos/%s",
+		ghinstance.RESTPrefix(repo.RepoHost()),
+		ghrepo.FullName(repo))
+
+	result := repositoryV3{}
+	err := client.REST(repo.RepoHost(), "PATCH", path, body, &result)
 	if err != nil {
 		return nil, err
 	}

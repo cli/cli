@@ -46,7 +46,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 		Use:   "refresh",
 		Args:  cobra.ExactArgs(0),
 		Short: "Refresh stored authentication credentials",
-		Long: heredoc.Doc(`Expand or fix the permission scopes for stored credentials
+		Long: heredoc.Doc(`Expand or fix the permission scopes for stored credentials.
 
 			The --scopes flag accepts a comma separated list of scopes you want your gh credentials to have. If
 			absent, this command ensures that gh has access to a minimum set of scopes.

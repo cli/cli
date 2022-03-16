@@ -82,7 +82,7 @@ func Test_deleteRun(t *testing.T) {
 				Owner: &shared.GistOwner{Login: "octocat2"},
 			},
 			wantErr:    true,
-			wantStderr: "You do not own this gist.",
+			wantStderr: "you do not own this gist",
 		}, {
 			name: "successfully delete",
 			gist: &shared.Gist{

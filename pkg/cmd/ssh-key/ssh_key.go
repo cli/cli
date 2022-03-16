@@ -11,7 +11,7 @@ func NewCmdSSHKey(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "ssh-key <command>",
 		Short: "Manage SSH keys",
-		Long:  "Manage SSH keys registered with your GitHub account",
+		Long:  "Manage SSH keys registered with your GitHub account.",
 	}
 
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))

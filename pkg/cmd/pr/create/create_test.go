@@ -599,6 +599,16 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 	http.StubRepoInfoResponse("OWNER", "REPO", "master")
 	shared.RunCommandFinder("feature", nil, nil)
 	http.Register(
+		httpmock.GraphQL(`query PullRequestTemplates\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "pullRequestTemplates": [
+				{ "filename": "template1",
+				  "body": "this is a bug" },
+				{ "filename": "template2",
+				  "body": "this is a enhancement" }
+			] } } }`),
+	)
+	http.Register(
 		httpmock.GraphQL(`mutation PullRequestCreate\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "createPullRequest": { "pullRequest": {
@@ -606,7 +616,7 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 		} } } }
 		`, func(input map[string]interface{}) {
 			assert.Equal(t, "my title", input["title"].(string))
-			assert.Equal(t, "- commit 1\n- commit 0\n\nFixes a bug and Closes an issue", input["body"].(string))
+			assert.Equal(t, "- commit 1\n- commit 0\n\nthis is a bug", input["body"].(string))
 		}))
 
 	cs, cmdTeardown := run.Stub()
@@ -615,13 +625,11 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "1234567890,commit 0\n2345678901,commit 1")
 	cs.Register(`git status --porcelain`, 0, "")
 
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-	as, teardown := prompt.InitAskStubber()
-	defer teardown()
+	as := prompt.NewAskStubber(t)
 
 	as.StubPrompt("Choose a template").
-		AssertOptions([]string{"Bug fix", "Open a blank pull request"}).
-		AnswerWith("Bug fix")
+		AssertOptions([]string{"template1", "template2", "Open a blank pull request"}).
+		AnswerWith("template1")
 	as.StubPrompt("Body").AnswerDefault()
 	as.StubPrompt("What's next?").
 		AssertOptions([]string{"Submit", "Continue in browser", "Add metadata", "Cancel"}).

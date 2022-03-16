@@ -3,7 +3,6 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,7 +12,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -216,7 +214,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a typed parameter in `key=value` format")
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in `key=value` format")
 	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add a HTTP request header in `key:value` format")
-	cmd.Flags().StringSliceVarP(&opts.Previews, "preview", "p", nil, "Opt into GitHub API previews")
+	cmd.Flags().StringSliceVarP(&opts.Previews, "preview", "p", nil, "GitHub API preview `names` to request (without the \"-preview\" suffix)")
 	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response headers in the output")
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request (use \"-\" to read from standard input)")
@@ -279,11 +277,11 @@ func apiRun(opts *ApiOptions) error {
 	if opts.Silent {
 		opts.IO.Out = ioutil.Discard
 	} else {
-		err := opts.IO.StartPager()
-		if err != nil {
-			return err
+		if err := opts.IO.StartPager(); err == nil {
+			defer opts.IO.StopPager()
+		} else {
+			fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 		}
-		defer opts.IO.StopPager()
 	}
 
 	cfg, err := opts.Config()
@@ -366,13 +364,13 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 		responseBody = io.TeeReader(responseBody, bodyCopy)
 	}
 
-	if opts.FilterOutput != "" {
+	if opts.FilterOutput != "" && serverError == "" {
 		// TODO: reuse parsed query across pagination invocations
 		err = export.FilterJSON(opts.IO.Out, responseBody, opts.FilterOutput)
 		if err != nil {
 			return
 		}
-	} else if opts.Template != "" {
+	} else if opts.Template != "" && serverError == "" {
 		// TODO: reuse parsed template across pagination invocations
 		err = template.Execute(responseBody)
 		if err != nil {
@@ -384,11 +382,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 		_, err = io.Copy(opts.IO.Out, responseBody)
 	}
 	if err != nil {
-		if errors.Is(err, syscall.EPIPE) {
-			err = nil
-		} else {
-			return
-		}
+		return
 	}
 
 	if serverError == "" && resp.StatusCode > 299 {

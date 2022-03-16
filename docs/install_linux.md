@@ -29,10 +29,16 @@ sudo apt install gh
 
 ### Fedora, CentOS, Red Hat Enterprise Linux (dnf)
 
-Install:
+Install from our package repository for immediate access to latest releases:
 
 ```bash
 sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+sudo dnf install gh
+```
+
+Alternatively, install from the [community repository](https://packages.fedoraproject.org/pkgs/gh/gh/):
+
+```bash
 sudo dnf install gh
 ```
 
@@ -179,6 +185,30 @@ openSUSE Tumbleweed users can install from the [official distribution repo](http
 sudo zypper in gh
 ```
 
+### Alpine Linux
+
+Alpine Linux users can install from the [stable releases' community packaage repository](https://pkgs.alpinelinux.org/packages?name=github-cli&branch=v3.15).
+
+```bash
+apk add github-cli
+```
+
+Users wanting the latest version of the CLI without waiting to be backported into the stable release they're using should use the edge release's
+community repo through this method below, without mixing packages from stable and unstable repos.[^1]
+
+```bash
+echo "@community http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
+apk add github-cli@community
+```
+
+### Void Linux
+Void Linux users can install from the [official distribution repo](https://voidlinux.org/packages/?arch=x86_64&q=github-cli):
+
+```bash
+sudo xbps-install github-cli
+```
+
 [releases page]: https://github.com/cli/cli/releases/latest
 [arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli
 [arch linux aur]: https://aur.archlinux.org/packages/github-cli-git
+[^1]: https://wiki.alpinelinux.org/wiki/Package_management#Repository_pinning

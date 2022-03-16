@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
@@ -110,6 +111,9 @@ func TestApp_Create(t *testing.T) {
 							Name: "monalisa-dotfiles-abcd1234",
 						}, nil
 					},
+					GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
+						return nil, nil // We can't ask for suggestions without a terminal.
+					},
 				},
 			},
 			opts: createOptions{
@@ -150,6 +154,57 @@ func TestApp_Create(t *testing.T) {
 			wantErr:    true,
 			wantErrMsg: "error getting devcontainer.json paths: some error",
 		},
+    {
+			name: "create codespace that requires accepting additional permissions",
+			fields: fields{
+				apiClient: &apiClientMock{
+					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
+						return "EUROPE", nil
+					},
+					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+						return &api.Repository{
+							ID:            1234,
+							FullName:      nwo,
+							DefaultBranch: "main",
+						}, nil
+					},
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
+						return []*api.Machine{
+							{
+								Name:        "GIGA",
+								DisplayName: "Gigabits of a machine",
+							},
+						}, nil
+					},
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						if params.Branch != "main" {
+							return nil, fmt.Errorf("got branch %q, want %q", params.Branch, "main")
+						}
+						if params.IdleTimeoutMinutes != 30 {
+							return nil, fmt.Errorf("idle timeout minutes was %v", params.IdleTimeoutMinutes)
+						}
+						return &api.Codespace{}, api.AcceptPermissionsRequiredError{
+							AllowPermissionsURL: "https://example.com/permissions",
+						}
+					},
+					GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
+						return nil, nil // We can't ask for suggestions without a terminal.
+					},
+				},
+			},
+			opts: createOptions{
+				repo:        "monalisa/dotfiles",
+				branch:      "",
+				machine:     "GIGA",
+				showStatus:  false,
+				idleTimeout: 30 * time.Minute,
+			},
+			wantErr: cmdutil.SilentError,
+			wantStderr: `You must authorize or deny additional permissions requested by this codespace before continuing.
+Open this URL in your browser to review and authorize additional permissions: example.com/permissions
+Alternatively, you can run "create" with the "--default-permissions" option to continue without authorizing additional permissions.
+`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -161,8 +216,8 @@ func TestApp_Create(t *testing.T) {
 				io:        io,
 				apiClient: tt.fields.apiClient,
 			}
-			err := a.Create(context.Background(), tt.opts)
-			if (err != nil) != tt.wantErr {
+
+			if err := a.Create(context.Background(), tt.opts); err != tt.wantErr {
 				t.Errorf("App.Create() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if tt.wantErrMsg != "" && err.Error() != tt.wantErrMsg {

@@ -205,9 +205,14 @@ type RunsPayload struct {
 	WorkflowRuns []Run `json:"workflow_runs"`
 }
 
-func GetRunsWithFilter(client *api.Client, repo ghrepo.Interface, limit int, f func(Run) bool) ([]Run, error) {
+type FilterOptions struct {
+	Branch string
+	Actor  string
+}
+
+func GetRunsWithFilter(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, limit int, f func(Run) bool) ([]Run, error) {
 	path := fmt.Sprintf("repos/%s/actions/runs", ghrepo.FullName(repo))
-	runs, err := getRuns(client, repo, path, 50)
+	runs, err := getRuns(client, repo, path, opts, 50)
 	if err != nil {
 		return nil, err
 	}
@@ -224,17 +229,17 @@ func GetRunsWithFilter(client *api.Client, repo ghrepo.Interface, limit int, f f
 	return filtered, nil
 }
 
-func GetRunsByWorkflow(client *api.Client, repo ghrepo.Interface, limit int, workflowID int64) ([]Run, error) {
+func GetRunsByWorkflow(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, limit int, workflowID int64) ([]Run, error) {
 	path := fmt.Sprintf("repos/%s/actions/workflows/%d/runs", ghrepo.FullName(repo), workflowID)
-	return getRuns(client, repo, path, limit)
+	return getRuns(client, repo, path, opts, limit)
 }
 
-func GetRuns(client *api.Client, repo ghrepo.Interface, limit int) ([]Run, error) {
+func GetRuns(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, limit int) ([]Run, error) {
 	path := fmt.Sprintf("repos/%s/actions/runs", ghrepo.FullName(repo))
-	return getRuns(client, repo, path, limit)
+	return getRuns(client, repo, path, opts, limit)
 }
 
-func getRuns(client *api.Client, repo ghrepo.Interface, path string, limit int) ([]Run, error) {
+func getRuns(client *api.Client, repo ghrepo.Interface, path string, opts *FilterOptions, limit int) ([]Run, error) {
 	perPage := limit
 	page := 1
 	if limit > 100 {
@@ -253,6 +258,14 @@ func getRuns(client *api.Client, repo ghrepo.Interface, path string, limit int) 
 		query := parsed.Query()
 		query.Set("per_page", fmt.Sprintf("%d", perPage))
 		query.Set("page", fmt.Sprintf("%d", page))
+		if opts != nil {
+			if opts.Branch != "" {
+				query.Set("branch", opts.Branch)
+			}
+			if opts.Actor != "" {
+				query.Set("actor", opts.Actor)
+			}
+		}
 		parsed.RawQuery = query.Encode()
 		pagedPath := parsed.String()
 
@@ -292,6 +305,18 @@ func GetJobs(client *api.Client, repo ghrepo.Interface, run Run) ([]Job, error) 
 		return nil, err
 	}
 	return result.Jobs, nil
+}
+
+func GetJob(client *api.Client, repo ghrepo.Interface, jobID string) (*Job, error) {
+	path := fmt.Sprintf("repos/%s/actions/jobs/%s", ghrepo.FullName(repo), jobID)
+
+	var result Job
+	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
 }
 
 func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {

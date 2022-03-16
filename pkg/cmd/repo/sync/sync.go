@@ -44,7 +44,7 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 		Long: heredoc.Docf(`
 			Sync destination repository from source repository. Syncing uses the main branch
 			of the source repository to update the matching branch on the destination
-			repository so they are equal. A fast forward update will be used execept when the
+			repository so they are equal. A fast forward update will be used except when the
 			%[1]s--force%[1]s flag is specified, then the two branches will
 			by synced using a hard reset.
 

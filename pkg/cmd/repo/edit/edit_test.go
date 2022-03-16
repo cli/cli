@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/v2/pkg/prompt"
+
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -23,11 +25,6 @@ func TestNewCmdEdit(t *testing.T) {
 		wantOpts EditOptions
 		wantErr  string
 	}{
-		{
-			name:    "no argument",
-			args:    "",
-			wantErr: "at least one flag is required",
-		},
 		{
 			name: "change repo description",
 			args: "--description hello",
@@ -135,6 +132,11 @@ func Test_editRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			io, _, _, _ := iostreams.Test()
+			io.SetStdoutTTY(true)
+			io.SetStdinTTY(true)
+			io.SetStderrTTY(true)
+
 			httpReg := &httpmock.Registry{}
 			defer httpReg.Verify(t)
 			if tt.httpStubs != nil {
@@ -143,6 +145,186 @@ func Test_editRun(t *testing.T) {
 
 			opts := &tt.opts
 			opts.HTTPClient = &http.Client{Transport: httpReg}
+			opts.IO = io
+
+			err := editRun(context.Background(), opts)
+			if tt.wantsErr == "" {
+				require.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tt.wantsErr)
+				return
+			}
+		})
+	}
+}
+
+func Test_editRun_interactive(t *testing.T) {
+	tests := []struct {
+		name        string
+		opts        EditOptions
+		askStubs    func(*prompt.AskStubber)
+		httpStubs   func(*testing.T, *httpmock.Registry)
+		wantsStderr string
+		wantsErr    string
+	}{
+		{
+			name: "updates repo description",
+			opts: EditOptions{
+				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				InteractiveMode: true,
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("What do you want to edit?").AnswerWith([]string{"Description"})
+				as.StubPrompt("Description of the repository").AnswerWith("awesome repo description")
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"repository": {
+								"description": "old description",
+								"homePageUrl": "https://url.com",
+								"defaultBranchRef": {
+									"name": "main"
+								},
+								"isInOrganization": false,
+								"repositoryTopics": {
+									"nodes": [{
+										"topic": {
+											"name": "x"
+										}
+									}]
+								}
+							}
+						}
+					}`))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, "awesome repo description", payload["description"])
+					}))
+			},
+		},
+		{
+			name: "updates repo topics",
+			opts: EditOptions{
+				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				InteractiveMode: true,
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("What do you want to edit?").AnswerWith([]string{"Description", "Topics"})
+				as.StubPrompt("Description of the repository").AnswerWith("awesome repo description")
+				as.StubPrompt("Add topics?(csv format)").AnswerWith("a,b,c,d")
+				as.StubPrompt("Remove Topics").AnswerWith([]string{"x"})
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"repository": {
+								"description": "old description",
+								"homePageUrl": "https://url.com",
+								"defaultBranchRef": {
+									"name": "main"
+								},
+								"isInOrganization": false,
+								"repositoryTopics": {
+									"nodes": [{
+										"topic": {
+											"name": "x"
+										}
+									}]
+								}
+							}
+						}
+					}`))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, "awesome repo description", payload["description"])
+					}))
+				reg.Register(
+					httpmock.REST("PUT", "repos/OWNER/REPO/topics"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, []interface{}{"a", "b", "c", "d"}, payload["names"])
+					}))
+			},
+		},
+		{
+			name: "updates repo merge options",
+			opts: EditOptions{
+				Repository:      ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				InteractiveMode: true,
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("What do you want to edit?").AnswerWith([]string{"Merge Options"})
+				as.StubPrompt("Allowed merge strategies").AnswerWith([]string{allowMergeCommits, allowRebaseMerge})
+				as.StubPrompt("Enable Auto Merge?").AnswerWith(false)
+				as.StubPrompt("Automatically delete head branches after merging?").AnswerWith(false)
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"repository": {
+								"description": "old description",
+								"homePageUrl": "https://url.com",
+								"defaultBranchRef": {
+									"name": "main"
+								},
+								"isInOrganization": false,
+								"squashMergeAllowed": false,
+								"rebaseMergeAllowed": true,
+								"mergeCommitAllowed": true,
+								"deleteBranchOnMerge": false,
+								"repositoryTopics": {
+									"nodes": [{
+										"topic": {
+											"name": "x"
+										}
+									}]
+								}
+							}
+						}
+					}`))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, true, payload["allow_merge_commit"])
+						assert.Equal(t, false, payload["allow_squash_merge"])
+						assert.Equal(t, true, payload["allow_rebase_merge"])
+					}))
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, _, _, _ := iostreams.Test()
+			io.SetStdoutTTY(true)
+			io.SetStdinTTY(true)
+			io.SetStderrTTY(true)
+
+			httpReg := &httpmock.Registry{}
+			defer httpReg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(t, httpReg)
+			}
+
+			opts := &tt.opts
+			opts.HTTPClient = &http.Client{Transport: httpReg}
+			opts.IO = io
+
+			as := prompt.NewAskStubber(t)
+			if tt.askStubs != nil {
+				tt.askStubs(as)
+			}
 
 			err := editRun(context.Background(), opts)
 			if tt.wantsErr == "" {

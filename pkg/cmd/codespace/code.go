@@ -3,16 +3,10 @@ package codespace
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 
-	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
-
-type browser interface {
-	Browse(string) error
-}
 
 func newCodeCmd(app *App) *cobra.Command {
 	var (
@@ -25,8 +19,7 @@ func newCodeCmd(app *App) *cobra.Command {
 		Short: "Open a codespace in Visual Studio Code",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			b := cmdutil.NewBrowser("", ioutil.Discard, app.io.ErrOut)
-			return app.VSCode(cmd.Context(), b, codespace, useInsiders)
+			return app.VSCode(cmd.Context(), codespace, useInsiders)
 		},
 	}
 
@@ -37,20 +30,14 @@ func newCodeCmd(app *App) *cobra.Command {
 }
 
 // VSCode opens a codespace in the local VS VSCode application.
-func (a *App) VSCode(ctx context.Context, browser browser, codespaceName string, useInsiders bool) error {
-	if codespaceName == "" {
-		codespace, err := chooseCodespace(ctx, a.apiClient)
-		if err != nil {
-			if err == errNoCodespaces {
-				return err
-			}
-			return fmt.Errorf("error choosing codespace: %w", err)
-		}
-		codespaceName = codespace.Name
+func (a *App) VSCode(ctx context.Context, codespaceName string, useInsiders bool) error {
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
+	if err != nil {
+		return err
 	}
 
-	url := vscodeProtocolURL(codespaceName, useInsiders)
-	if err := browser.Browse(url); err != nil {
+	url := vscodeProtocolURL(codespace.Name, useInsiders)
+	if err := a.browser.Browse(url); err != nil {
 		return fmt.Errorf("error opening Visual Studio Code: %w", err)
 	}
 

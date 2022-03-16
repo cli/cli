@@ -27,10 +27,11 @@ type LoginOptions struct {
 
 	Interactive bool
 
-	Hostname string
-	Scopes   []string
-	Token    string
-	Web      bool
+	Hostname    string
+	Scopes      []string
+	Token       string
+	Web         bool
+	GitProtocol string
 }
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
@@ -49,13 +50,17 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		Long: heredoc.Docf(`
 			Authenticate with a GitHub host.
 
-			The default authentication mode is a web-based browser flow.
+			The default authentication mode is a web-based browser flow. After completion, an
+			authentication token will be stored internally.
 
-			Alternatively, pass in a token on standard input by using %[1]s--with-token%[1]s.
+			Alternatively, use %[1]s--with-token%[1]s to pass in a token on standard input.
 			The minimum required scopes for the token are: "repo", "read:org".
 
-			The --scopes flag accepts a comma separated list of scopes you want your gh credentials to have. If
-			absent, this command ensures that gh has access to a minimum set of scopes.
+			Alternatively, gh will use the authentication token found in environment variables.
+			This method is most suitable for "headless" use of gh such as in automation. See
+			%[1]sgh help environment%[1]s for more info.
+
+			To use gh in GitHub Actions, add %[1]sGH_TOKEN: ${{secrets.GITHUB_TOKEN}}%[1]s to "env".
 		`, "`"),
 		Example: heredoc.Doc(`
 			# start interactive setup
@@ -64,7 +69,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			# authenticate against github.com by reading the token from a file
 			$ gh auth login --with-token < mytoken.txt
 
-			# authenticate with a specific GitHub Enterprise Server instance
+			# authenticate with a specific GitHub instance
 			$ gh auth login --hostname enterprise.internal
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -108,9 +113,10 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to authenticate with")
-	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes for gh to have")
+	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes to request")
 	cmd.Flags().BoolVar(&tokenStdin, "with-token", false, "Read token from standard input")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a browser to authenticate")
+	cmdutil.StringEnumFlag(cmd, &opts.GitProtocol, "git-protocol", "p", "", []string{"ssh", "https"}, "The protocol to use for git operations")
 
 	return cmd
 }
@@ -186,6 +192,7 @@ func loginRun(opts *LoginOptions) error {
 		Web:         opts.Web,
 		Scopes:      opts.Scopes,
 		Executable:  opts.MainExecutable,
+		GitProtocol: opts.GitProtocol,
 	})
 }
 
