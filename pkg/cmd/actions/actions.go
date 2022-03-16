@@ -11,12 +11,10 @@ func NewCmdActions(f *cmdutil.Factory) *cobra.Command {
 	cs := f.IOStreams.ColorScheme()
 
 	cmd := &cobra.Command{
-		Use:   "actions",
-		Short: "Learn about working with GitHub Actions",
-		Long:  actionsExplainer(cs),
-		Annotations: map[string]string{
-			"IsActions": "true",
-		},
+		Use:    "actions",
+		Short:  "Learn about working with GitHub Actions",
+		Long:   actionsExplainer(cs),
+		Hidden: true,
 	}
 
 	cmdutil.DisableAuthCheck(cmd)

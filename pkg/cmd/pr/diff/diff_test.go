@@ -83,7 +83,7 @@ func Test_NewCmdDiff(t *testing.T) {
 			name:    "invalid --color argument",
 			args:    "--color doublerainbow",
 			isTTY:   true,
-			wantErr: "the value for `--color` must be one of \"auto\", \"always\", or \"never\"",
+			wantErr: "invalid argument \"doublerainbow\" for \"--color\" flag: valid values are {always|never|auto}",
 		},
 	}
 	for _, tt := range tests {

@@ -33,10 +33,11 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List workflows",
-		Long:  "List workflow files, hiding disabled workflows by default.",
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Short:   "List workflows",
+		Long:    "List workflow files, hiding disabled workflows by default.",
+		Aliases: []string{"ls"},
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo

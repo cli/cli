@@ -14,8 +14,8 @@ our release schedule.
 Install:
 
 ```bash
-curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/etc/apt/trusted.gpg.d/githubcli-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/trusted.gpg.d/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
 sudo apt update
 sudo apt install gh
 ```
@@ -29,10 +29,16 @@ sudo apt install gh
 
 ### Fedora, CentOS, Red Hat Enterprise Linux (dnf)
 
-Install:
+Install from our package repository for immediate access to latest releases:
 
 ```bash
 sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+sudo dnf install gh
+```
+
+Alternatively, install from the [community repository](https://packages.fedoraproject.org/pkgs/gh/gh/):
+
+```bash
 sudo dnf install gh
 ```
 

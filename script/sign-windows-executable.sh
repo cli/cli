@@ -1,26 +1,25 @@
 #!/bin/bash
 set -e
 
-if [[ ! -e certificate.pem || ! -e private-key.pem ]]; then
-  echo "skipping windows signing; cert or key not found"
+EXE="$1"
+
+if [ -z "$CERT_FILE" ]; then
+  echo "skipping Windows code-signing; CERT_FILE not set" >&2
   exit 0
 fi
 
-EXECUTABLE_PATH=$1
-ARCH="386"
-
-if [[ $EXECUTABLE_PATH =~ "amd64" ]]; then
-  ARCH="amd64"
+if [ ! -f "$CERT_FILE" ]; then
+  echo "error Windows code-signing; file '$CERT_FILE' not found" >&2
+  exit 1
 fi
 
-OUT_PATH=gh_signed-${ARCH}.exe
+if [ -z "$CERT_PASSWORD" ]; then
+  echo "error Windows code-signing; no value for CERT_PASSWORD" >&2
+  exit 1
+fi
 
-osslsigncode sign \
-  -certs certificate.pem \
-  -key private-key.pem \
-  -n "GitHub CLI" \
-  -t http://timestamp.digicert.com \
-  -in $EXECUTABLE_PATH \
-  -out $OUT_PATH
+osslsigncode sign -n "GitHub CLI" -t http://timestamp.digicert.com \
+  -pkcs12 "$CERT_FILE" -readpass <(printf "%s" "$CERT_PASSWORD") -h sha256 \
+  -in "$EXE" -out "$EXE"~
 
-mv $OUT_PATH $EXECUTABLE_PATH
+mv "$EXE"~ "$EXE"

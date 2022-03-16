@@ -35,9 +35,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	var flagSecret bool
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List your gists",
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Short:   "List your gists",
+		Aliases: []string{"ls"},
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.Limit < 1 {
 				return cmdutil.FlagErrorf("invalid limit: %v", opts.Limit)

@@ -16,9 +16,10 @@ func newListCmd(app *App) *cobra.Command {
 	var exporter cmdutil.Exporter
 
 	listCmd := &cobra.Command{
-		Use:   "list",
-		Short: "List your codespaces",
-		Args:  noArgsConstraint,
+		Use:     "list",
+		Short:   "List your codespaces",
+		Aliases: []string{"ls"},
+		Args:    noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if limit < 1 {
 				return cmdutil.FlagErrorf("invalid limit: %v", limit)
@@ -42,6 +43,14 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}
 
+	hasNonProdVSCSTarget := false
+	for _, apiCodespace := range codespaces {
+		if apiCodespace.VSCSTarget != "" && apiCodespace.VSCSTarget != api.VSCSTargetProduction {
+			hasNonProdVSCSTarget = true
+			break
+		}
+	}
+
 	if err := a.io.StartPager(); err != nil {
 		a.errLogger.Printf("error starting pager: %v", err)
 	}
@@ -58,6 +67,11 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 		tp.AddField("BRANCH", nil, nil)
 		tp.AddField("STATE", nil, nil)
 		tp.AddField("CREATED AT", nil, nil)
+
+		if hasNonProdVSCSTarget {
+			tp.AddField("VSCS TARGET", nil, nil)
+		}
+
 		tp.EndRow()
 	}
 
@@ -73,10 +87,24 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 			stateColor = cs.Green
 		}
 
-		tp.AddField(c.Name, nil, cs.Yellow)
+		formattedName := formatNameForVSCSTarget(c.Name, c.VSCSTarget)
+
+		var nameColor func(string) string
+		switch c.PendingOperation {
+		case false:
+			nameColor = cs.Yellow
+		case true:
+			nameColor = cs.Gray
+		}
+
+		tp.AddField(formattedName, nil, nameColor)
 		tp.AddField(c.Repository.FullName, nil, nil)
 		tp.AddField(c.branchWithGitStatus(), nil, cs.Cyan)
-		tp.AddField(c.State, nil, stateColor)
+		if c.PendingOperation {
+			tp.AddField(c.PendingOperationDisabledReason, nil, nameColor)
+		} else {
+			tp.AddField(c.State, nil, stateColor)
+		}
 
 		if tp.IsTTY() {
 			ct, err := time.Parse(time.RFC3339, c.CreatedAt)
@@ -87,8 +115,25 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 		} else {
 			tp.AddField(c.CreatedAt, nil, nil)
 		}
+
+		if hasNonProdVSCSTarget {
+			tp.AddField(c.VSCSTarget, nil, nil)
+		}
+
 		tp.EndRow()
 	}
 
 	return tp.Render()
+}
+
+func formatNameForVSCSTarget(name, vscsTarget string) string {
+	if vscsTarget == api.VSCSTargetDevelopment || vscsTarget == api.VSCSTargetLocal {
+		return fmt.Sprintf("%s 🚧", name)
+	}
+
+	if vscsTarget == api.VSCSTargetPPE {
+		return fmt.Sprintf("%s ✨", name)
+	}
+
+	return name
 }

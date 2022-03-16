@@ -236,7 +236,23 @@ func ScopesSuggestion(resp *http.Response) string {
 	for _, s := range strings.Split(tokenHasScopes, ",") {
 		s = strings.TrimSpace(s)
 		gotScopes[s] = struct{}{}
-		if strings.HasPrefix(s, "admin:") {
+
+		// Certain scopes may be grouped under a single "top-level" scope. The following branch
+		// statements include these grouped/implied scopes when the top-level scope is encountered.
+		// See https://docs.github.com/en/developers/apps/building-oauth-apps/scopes-for-oauth-apps.
+		if s == "repo" {
+			gotScopes["repo:status"] = struct{}{}
+			gotScopes["repo_deployment"] = struct{}{}
+			gotScopes["public_repo"] = struct{}{}
+			gotScopes["repo:invite"] = struct{}{}
+			gotScopes["security_events"] = struct{}{}
+		} else if s == "user" {
+			gotScopes["read:user"] = struct{}{}
+			gotScopes["user:email"] = struct{}{}
+			gotScopes["user:follow"] = struct{}{}
+		} else if s == "codespace" {
+			gotScopes["codespace:secrets"] = struct{}{}
+		} else if strings.HasPrefix(s, "admin:") {
 			gotScopes["read:"+strings.TrimPrefix(s, "admin:")] = struct{}{}
 			gotScopes["write:"+strings.TrimPrefix(s, "admin:")] = struct{}{}
 		} else if strings.HasPrefix(s, "write:") {

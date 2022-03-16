@@ -134,7 +134,7 @@ func checksRun(opts *ChecksOptions) error {
 	for {
 		findOptions := shared.FindOptions{
 			Selector: opts.SelectorArg,
-			Fields:   []string{"number", "baseRefName", "statusCheckRollup"},
+			Fields:   []string{"number", "headRefName", "statusCheckRollup"},
 		}
 		pr, _, err := opts.Finder.Find(findOptions)
 		if err != nil {

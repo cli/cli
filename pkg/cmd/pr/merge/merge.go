@@ -11,7 +11,6 @@ import (
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -322,18 +321,35 @@ func mergeRun(opts *MergeOptions) error {
 
 		var branchToSwitchTo string
 		if currentBranch == pr.HeadRefName {
-			branchToSwitchTo, err = api.RepoDefaultBranch(apiClient, baseRepo)
+			branchToSwitchTo = pr.BaseRefName
+			if branchToSwitchTo == "" {
+				branchToSwitchTo, err = api.RepoDefaultBranch(apiClient, baseRepo)
+				if err != nil {
+					return err
+				}
+			}
+
+			remotes, err := opts.Remotes()
 			if err != nil {
 				return err
 			}
 
-			err = git.CheckoutBranch(branchToSwitchTo)
+			baseRemote, err := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
 			if err != nil {
 				return err
 			}
 
-			err := pullLatestChanges(opts, baseRepo, branchToSwitchTo)
-			if err != nil {
+			if git.HasLocalBranch(branchToSwitchTo) {
+				if err := git.CheckoutBranch(branchToSwitchTo); err != nil {
+					return err
+				}
+			} else {
+				if err := git.CheckoutNewBranch(baseRemote.Name, branchToSwitchTo); err != nil {
+					return err
+				}
+			}
+
+			if err := git.Pull(baseRemote.Name, branchToSwitchTo); err != nil {
 				fmt.Fprintf(opts.IO.ErrOut, "%s warning: not possible to fast-forward to: %q\n", cs.WarningIcon(), branchToSwitchTo)
 			}
 		}
@@ -359,25 +375,6 @@ func mergeRun(opts *MergeOptions) error {
 
 	if isTerminal {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted branch %s%s\n", cs.SuccessIconWithColor(cs.Red), cs.Cyan(pr.HeadRefName), branchSwitchString)
-	}
-
-	return nil
-}
-
-func pullLatestChanges(opts *MergeOptions, repo ghrepo.Interface, branch string) error {
-	remotes, err := opts.Remotes()
-	if err != nil {
-		return err
-	}
-
-	baseRemote, err := remotes.FindByRepo(repo.RepoOwner(), repo.RepoName())
-	if err != nil {
-		return err
-	}
-
-	err = git.Pull(baseRemote.Name, branch)
-	if err != nil {
-		return err
 	}
 
 	return nil

@@ -40,9 +40,10 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 	extCmd.AddCommand(
 		&cobra.Command{
-			Use:   "list",
-			Short: "List installed extension commands",
-			Args:  cobra.NoArgs,
+			Use:     "list",
+			Short:   "List installed extension commands",
+			Aliases: []string{"ls"},
+			Args:    cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, args []string) error {
 				cmds := m.List(true)
 				if len(cmds) == 0 {
@@ -60,6 +61,11 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					t.AddField(fmt.Sprintf("gh %s", c.Name()), nil, nil)
 					t.AddField(repo, nil, nil)
+					version := c.CurrentVersion()
+					if !c.IsBinary() && len(version) > 8 {
+						version = version[:8]
+					}
+					t.AddField(version, nil, nil)
 					var updateAvailable string
 					if c.UpdateAvailable() {
 						updateAvailable = "Upgrade available"

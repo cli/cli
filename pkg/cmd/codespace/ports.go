@@ -50,11 +50,7 @@ func newPortsCmd(app *App) *cobra.Command {
 func (a *App) ListPorts(ctx context.Context, codespaceName string, exporter cmdutil.Exporter) (err error) {
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
-		// TODO(josebalius): remove special handling of this error here and it other places
-		if err == errNoCodespaces {
-			return err
-		}
-		return fmt.Errorf("error choosing codespace: %w", err)
+		return err
 	}
 
 	devContainerCh := getDevContainer(ctx, a.apiClient, codespace)
@@ -263,10 +259,7 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
-		if err == errNoCodespaces {
-			return err
-		}
-		return fmt.Errorf("error getting codespace: %w", err)
+		return err
 	}
 
 	session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, codespace)
@@ -371,10 +364,7 @@ func (a *App) ForwardPorts(ctx context.Context, codespaceName string, ports []st
 
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
-		if err == errNoCodespaces {
-			return err
-		}
-		return fmt.Errorf("error getting codespace: %w", err)
+		return err
 	}
 
 	session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, codespace)
