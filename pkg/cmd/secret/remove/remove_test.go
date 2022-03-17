@@ -205,23 +205,11 @@ func Test_removeRun_org(t *testing.T) {
 		wantPath string
 	}{
 		{
-			name:     "repo",
-			opts:     &RemoveOptions{},
-			wantPath: "repos/owner/repo/actions/secrets/tVirus",
-		},
-		{
 			name: "org",
 			opts: &RemoveOptions{
 				OrgName: "UmbrellaCorporation",
 			},
 			wantPath: "orgs/UmbrellaCorporation/actions/secrets/tVirus",
-		},
-		{
-			name: "Dependabot repo",
-			opts: &RemoveOptions{
-				Application: "dependabot",
-			},
-			wantPath: "repos/owner/repo/dependabot/secrets/tVirus",
 		},
 		{
 			name: "Dependabot org",
