@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestApp_Create(t *testing.T) {
@@ -19,8 +20,7 @@ func TestApp_Create(t *testing.T) {
 		name       string
 		fields     fields
 		opts       createOptions
-		wantErr    bool
-		wantErrMsg string
+		wantErr    error
 		wantStdout string
 		wantStderr string
 	}{
@@ -151,8 +151,7 @@ func TestApp_Create(t *testing.T) {
 				showStatus:  false,
 				idleTimeout: 30 * time.Minute,
 			},
-			wantErr:    true,
-			wantErrMsg: "error getting devcontainer.json paths: some error",
+			wantErr: fmt.Errorf("error getting devcontainer.json paths: some error"),
 		},
 		{
 			name: "create codespace that requires accepting additional permissions",
@@ -167,6 +166,9 @@ func TestApp_Create(t *testing.T) {
 							FullName:      nwo,
 							DefaultBranch: "main",
 						}, nil
+					},
+					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]string, error) {
+						return []string{}, nil
 					},
 					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
 						return []*api.Machine{
@@ -209,19 +211,13 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdinTTY(true)
-			io.SetStdoutTTY(true)
-
 			a := &App{
 				io:        io,
 				apiClient: tt.fields.apiClient,
 			}
 
-			if err := a.Create(context.Background(), tt.opts); err != tt.wantErr {
-				t.Errorf("App.Create() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if tt.wantErrMsg != "" && err.Error() != tt.wantErrMsg {
-				t.Errorf("err message = %v, wantErrMsg %v", err.Error(), tt.wantErrMsg)
+			if err := a.Create(context.Background(), tt.opts); err != nil && tt.wantErr != nil {
+				assert.EqualError(t, err, tt.wantErr.Error())
 			}
 			if got := stdout.String(); got != tt.wantStdout {
 				t.Errorf("stdout = %v, want %v", got, tt.wantStdout)
