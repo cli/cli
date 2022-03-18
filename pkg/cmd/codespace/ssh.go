@@ -59,7 +59,7 @@ func newSSHCmd(app *App) *cobra.Command {
 			$ gh codespace ssh
 
 			$ gh codespace ssh --config > ~/.ssh/codespaces
-			$ echo 'include ~/.ssh/codespaces' >> ~/.ssh/config'
+			$ echo 'include ~/.ssh/codespaces' >> ~/.ssh/config
 		`),
 		PreRunE: func(c *cobra.Command, args []string) error {
 			if opts.stdio {
