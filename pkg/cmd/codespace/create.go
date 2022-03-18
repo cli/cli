@@ -21,7 +21,7 @@ type createOptions struct {
 	machine           string
 	showStatus        bool
 	permissionsOptOut bool
-  devContainerPath string
+	devContainerPath  string
 	idleTimeout       time.Duration
 }
 
@@ -123,8 +123,8 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 			devContainerPathQuestion := &survey.Question{
 				Name: "devContainerPath",
 				Prompt: &survey.Select{
-					Message: "Devcontainer.json file:",
-					Options: append([]string{"none"}, devContainerPaths...),
+					Message: "Devcontainer definition file:",
+					Options: append([]string{"default"}, devContainerPaths...),
 				},
 			}
 
@@ -133,7 +133,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 			}
 		}
 
-		if devContainerPath == "none" {
+		if devContainerPath == "default" {
 			// special arg allows users to opt out of devcontainer.json selection
 			devContainerPath = ""
 		}

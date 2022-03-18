@@ -154,7 +154,7 @@ func TestApp_Create(t *testing.T) {
 			wantErr:    true,
 			wantErrMsg: "error getting devcontainer.json paths: some error",
 		},
-    {
+		{
 			name: "create codespace that requires accepting additional permissions",
 			fields: fields{
 				apiClient: &apiClientMock{
