@@ -72,7 +72,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			Merge a pull request on GitHub.
 
 			Without an argument, the pull request that belongs to the current branch
-			is selected.			
+			is selected.
     	`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -130,6 +130,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			); err != nil {
 				return err
 			}
+
 			if bodyProvided || bodyFileProvided {
 				opts.BodySet = true
 				if bodyFileProvided {
@@ -139,7 +140,6 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 					}
 					opts.Body = string(b)
 				}
-
 			}
 
 			opts.Editor = &userEditor{
@@ -210,6 +210,24 @@ func mergeRun(opts *MergeOptions) error {
 	isPRAlreadyMerged := pr.State == "MERGED"
 	if reason := blockedReason(pr.MergeStateStatus, opts.UseAdmin); !opts.AutoMergeEnable && !isPRAlreadyMerged && reason != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is not mergeable: %s.\n", cs.FailureIcon(), pr.Number, reason)
+		if mergeConflictStatus(pr.MergeStateStatus) && opts.CanDeleteLocalBranch {
+			remotes, err := opts.Remotes()
+			if err != nil {
+				return cmdutil.SilentError
+			}
+			remote, err := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
+			if err != nil {
+				return cmdutil.SilentError
+			}
+			mergeOrRebase := "merge"
+			if opts.MergeMethod == PullRequestMergeMethodRebase {
+				mergeOrRebase = "rebase"
+			}
+			fetchBranch := fmt.Sprintf("%s %s", remote.Name, pr.HeadRefName)
+			mergeBranch := fmt.Sprintf("%s/%s", remote.Name, pr.HeadRefName)
+			cmd := fmt.Sprintf("gh pr checkout %s && git fetch %s && git %s %s", opts.SelectorArg, fetchBranch, mergeOrRebase, mergeBranch)
+			fmt.Fprintf(opts.IO.ErrOut, "Run the following to resolve the merge conflicts locally: %s\n", cs.Bold(cmd))
+		}
 		fmt.Fprintf(opts.IO.ErrOut, "To have the pull request merged after all the requirements have been met, add the `--auto` flag.\n")
 		if !opts.UseAdmin && allowsAdminOverride(pr.MergeStateStatus) {
 			// TODO: show this flag only to repo admins
@@ -560,6 +578,10 @@ func allowsAdminOverride(status string) bool {
 	default:
 		return false
 	}
+}
+
+func mergeConflictStatus(status string) bool {
+	return status == "DIRTY"
 }
 
 func isImmediatelyMergeable(status string) bool {
