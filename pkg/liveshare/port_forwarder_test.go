@@ -82,6 +82,8 @@ func TestPortForwarderStart(t *testing.T) {
 
 	go func() {
 		var conn net.Conn
+
+		// We retry DialTimeout in a loop to deal with a race in PortForwarder startup.
 		for tries := 0; conn == nil && tries < 2; tries++ {
 			conn, err = net.DialTimeout("tcp", ":8000", 2*time.Second)
 			if conn == nil {
