@@ -82,11 +82,9 @@ func TestPortForwarderStart(t *testing.T) {
 
 	go func() {
 		var conn net.Conn
-		retries := 0
-		for conn == nil && retries < 2 {
+		for tries := 0; conn == nil && tries < 2; tries++ {
 			conn, err = net.DialTimeout("tcp", ":8000", 2*time.Second)
 			if conn == nil {
-				retries++
 				time.Sleep(1 * time.Second)
 			}
 		}
