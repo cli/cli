@@ -85,7 +85,9 @@ func TestPortForwarderStart(t *testing.T) {
 		retries := 0
 		for conn == nil && retries < 2 {
 			conn, err = net.DialTimeout("tcp", ":8000", 2*time.Second)
-			time.Sleep(1 * time.Second)
+			if conn == nil {
+				time.Sleep(1 * time.Second)
+			}
 		}
 		if conn == nil {
 			done <- errors.New("failed to connect to forwarded port")
