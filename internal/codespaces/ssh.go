@@ -38,18 +38,35 @@ func Shell(ctx context.Context, p printer, sshArgs []string, port int, destinati
 func Copy(ctx context.Context, scpArgs []string, port int, destination string) error {
 	// Beware: invalid syntax causes scp to exit 1 with
 	// no error message, so don't let that happen.
-	cmd := exec.CommandContext(ctx, "scp",
+	connArgs := []string{
 		"-P", strconv.Itoa(port),
 		"-o", "NoHostAuthenticationForLocalhost=yes",
 		"-C", // compression
-	)
-	for _, arg := range scpArgs {
-		// Replace "remote:" prefix with (e.g.) "root@localhost:".
-		if rest := strings.TrimPrefix(arg, "remote:"); rest != arg {
-			arg = destination + ":" + rest
-		}
-		cmd.Args = append(cmd.Args, arg)
 	}
+
+	cmdArgs, command, err := parseSCPArgs(scpArgs)
+	if err != nil {
+		return err
+	}
+
+	cmdArgs = append(cmdArgs, connArgs...)
+
+	if len(command) > 0 {
+		cmdArgs = append(cmdArgs, "--")
+
+		for _, arg := range command {
+			// Replace "remote:" prefix with (e.g.) "root@localhost:".
+			if rest := strings.TrimPrefix(arg, "remote:"); rest != arg {
+				arg = destination + ":" + rest
+			}
+			cmdArgs = append(cmdArgs, arg)
+		}
+	}
+
+	fmt.Println(cmdArgs)
+
+	cmd := exec.CommandContext(ctx, "scp", cmdArgs...)
+
 	cmd.Stdin = nil
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
@@ -95,9 +112,18 @@ func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 	return cmd, connArgs, nil
 }
 
-// parseSSHArgs parses SSH arguments into two distinct slices of flags and command.
-// It returns an error if a unary flag is provided without an argument.
 func parseSSHArgs(args []string) (cmdArgs, command []string, err error) {
+	return parseArgs(args, "bcDeFIiLlmOopRSWw")
+}
+
+func parseSCPArgs(args []string) (cmdArgs, command []string, err error) {
+	return parseArgs(args, "cFiJloPS")
+}
+
+// parseArgs parses arguments into two distinct slices of flags and command.  Parsing stops
+// as soon as a non-flag argument is found assuming the remaining arguments are the command.
+// It returns an error if a unary flag is provided without an argument.
+func parseArgs(args []string, unaryFlags string) (cmdArgs, command []string, err error) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 
@@ -108,9 +134,9 @@ func parseSSHArgs(args []string) (cmdArgs, command []string, err error) {
 		}
 
 		cmdArgs = append(cmdArgs, arg)
-		if len(arg) == 2 && strings.Contains("bcDeFIiLlmOopRSWw", arg[1:2]) {
+		if len(arg) == 2 && strings.Contains(unaryFlags, arg[1:2]) {
 			if i++; i == len(args) {
-				return nil, nil, fmt.Errorf("ssh flag: %s requires an argument", arg)
+				return nil, nil, fmt.Errorf("flag: %s requires an argument", arg)
 			}
 
 			cmdArgs = append(cmdArgs, args[i])
