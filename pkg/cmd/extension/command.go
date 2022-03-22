@@ -106,6 +106,9 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				Args: cmdutil.MinimumArgs(1, "must specify a repository to install from"),
 				RunE: func(cmd *cobra.Command, args []string) error {
 					if args[0] == "." {
+						if pinFlag != "" {
+							return fmt.Errorf("local extensions cannot be pinned")
+						}
 						wd, err := os.Getwd()
 						if err != nil {
 							return err

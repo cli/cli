@@ -87,6 +87,13 @@ func TestNewCmdExtension(t *testing.T) {
 			},
 		},
 		{
+			name:    "install local extension with pin",
+			args:    []string{"install", ".", "--pin", "v1.0.0"},
+			wantErr: true,
+			errMsg:  "local extensions cannot be pinned",
+			isTTY:   true,
+		},
+		{
 			name:    "upgrade argument error",
 			args:    []string{"upgrade"},
 			wantErr: true,
