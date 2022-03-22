@@ -183,7 +183,7 @@ func runView(opts *ViewOptions) error {
 
 	if jobID != "" {
 		opts.IO.StartProgressIndicator()
-		selectedJob, err = getJob(client, repo, jobID)
+		selectedJob, err = shared.GetJob(client, repo, jobID)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get job: %w", err)
@@ -393,18 +393,6 @@ func runView(opts *ViewOptions) error {
 	}
 
 	return nil
-}
-
-func getJob(client *api.Client, repo ghrepo.Interface, jobID string) (*shared.Job, error) {
-	path := fmt.Sprintf("repos/%s/actions/jobs/%s", ghrepo.FullName(repo), jobID)
-
-	var result shared.Job
-	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return &result, nil
 }
 
 func getLog(httpClient *http.Client, logURL string) (io.ReadCloser, error) {

@@ -5,6 +5,10 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write  # publishing releases
+  repository-projects: write  # move cards between columns
+
 jobs:
   goreleaser:
     runs-on: ubuntu-latest

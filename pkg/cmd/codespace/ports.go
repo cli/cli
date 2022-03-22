@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
@@ -48,11 +50,7 @@ func newPortsCmd(app *App) *cobra.Command {
 func (a *App) ListPorts(ctx context.Context, codespaceName string, exporter cmdutil.Exporter) (err error) {
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
-		// TODO(josebalius): remove special handling of this error here and it other places
-		if err == errNoCodespaces {
-			return err
-		}
-		return fmt.Errorf("error choosing codespace: %w", err)
+		return err
 	}
 
 	devContainerCh := getDevContainer(ctx, a.apiClient, codespace)
@@ -229,6 +227,30 @@ func newPortsVisibilityCmd(app *App) *cobra.Command {
 	}
 }
 
+type ErrUpdatingPortVisibility struct {
+	port       int
+	visibility string
+	err        error
+}
+
+func newErrUpdatingPortVisibility(port int, visibility string, err error) *ErrUpdatingPortVisibility {
+	return &ErrUpdatingPortVisibility{
+		port:       port,
+		visibility: visibility,
+		err:        err,
+	}
+}
+
+func (e *ErrUpdatingPortVisibility) Error() string {
+	return fmt.Sprintf("error waiting for port %d to update to %s: %s", e.port, e.visibility, e.err)
+}
+
+func (e *ErrUpdatingPortVisibility) Unwrap() error {
+	return e.err
+}
+
+var errUpdatePortVisibilityForbidden = errors.New("organization admin has forbidden this privacy setting")
+
 func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, args []string) (err error) {
 	ports, err := a.parsePortVisibilities(args)
 	if err != nil {
@@ -237,10 +259,7 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
-		if err == errNoCodespaces {
-			return err
-		}
-		return fmt.Errorf("error getting codespace: %w", err)
+		return err
 	}
 
 	session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, codespace)
@@ -252,11 +271,43 @@ func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, ar
 	// TODO: check if port visibility can be updated in parallel instead of sequentially
 	for _, port := range ports {
 		a.StartProgressIndicatorWithLabel(fmt.Sprintf("Updating port %d visibility to: %s", port.number, port.visibility))
-		err := session.UpdateSharedServerPrivacy(ctx, port.number, port.visibility)
+
+		// wait for success or failure
+		g, ctx := errgroup.WithContext(ctx)
+		ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+
+		g.Go(func() error {
+			updateNotif, err := session.WaitForPortNotification(ctx, port.number, liveshare.PortChangeKindUpdate)
+			if err != nil {
+				return fmt.Errorf("error waiting for port %d to update: %w", port.number, err)
+
+			}
+			if !updateNotif.Success {
+				if updateNotif.StatusCode == http.StatusForbidden {
+					return newErrUpdatingPortVisibility(port.number, port.visibility, errUpdatePortVisibilityForbidden)
+				}
+				return newErrUpdatingPortVisibility(port.number, port.visibility, errors.New(updateNotif.ErrorDetail))
+
+			}
+			return nil // success
+		})
+
+		g.Go(func() error {
+			err := session.UpdateSharedServerPrivacy(ctx, port.number, port.visibility)
+			if err != nil {
+				return fmt.Errorf("error updating port %d to %s: %w", port.number, port.visibility, err)
+			}
+			return nil
+		})
+
+		// wait for success or failure
+		err := g.Wait()
 		a.StopProgressIndicator()
 		if err != nil {
-			return fmt.Errorf("error update port to public: %w", err)
+			return err
 		}
+
 	}
 
 	return nil
@@ -313,10 +364,7 @@ func (a *App) ForwardPorts(ctx context.Context, codespaceName string, ports []st
 
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
-		if err == errNoCodespaces {
-			return err
-		}
-		return fmt.Errorf("error getting codespace: %w", err)
+		return err
 	}
 
 	session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, codespace)
