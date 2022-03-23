@@ -88,11 +88,9 @@ func parseSSHArgs(args []string) (cmdArgs, command []string, err error) {
 }
 
 // newSCPCommand populates an exec.Cmd to run an scp command for the files specified in cmdArgs.
-// cmdArgs is parsed such that scp flags and the files to copy are separated by a "--" in the command.
-// For example: scp -F ./config -- local/file remote:file
+// cmdArgs is parsed such that scp flags precede the files to copy in the command.
+// For example: scp -F ./config local/file remote:file
 func newSCPCommand(ctx context.Context, port int, dst string, cmdArgs []string) (*exec.Cmd, error) {
-	// Beware: invalid syntax causes scp to exit 1 with
-	// no error message, so don't let that happen.
 	connArgs := []string{
 		"-P", strconv.Itoa(port),
 		"-o", "NoHostAuthenticationForLocalhost=yes",
@@ -106,8 +104,6 @@ func newSCPCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 
 	cmdArgs = append(cmdArgs, connArgs...)
 
-	cmdArgs = append(cmdArgs, "--")
-
 	for _, arg := range command {
 		// Replace "remote:" prefix with (e.g.) "root@localhost:".
 		if rest := strings.TrimPrefix(arg, "remote:"); rest != arg {
@@ -116,6 +112,8 @@ func newSCPCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 		cmdArgs = append(cmdArgs, arg)
 	}
 
+	// Beware: invalid syntax causes scp to exit 1 with
+	// no error message, so don't let that happen.
 	cmd := exec.CommandContext(ctx, "scp", cmdArgs...)
 
 	cmd.Stdin = nil
