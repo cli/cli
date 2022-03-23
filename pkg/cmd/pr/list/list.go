@@ -39,7 +39,7 @@ type ListOptions struct {
 	AppAuthor  string
 	Assignee   string
 	Search     string
-	Draft      string
+	Draft      *bool
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -48,8 +48,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
 	}
-
-	var draft bool
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -83,10 +81,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("invalid value for --limit: %v", opts.LimitResults)
 			}
 
-			if cmd.Flags().Changed("draft") {
-				opts.Draft = strconv.FormatBool(draft)
-			}
-
 			if err := cmdutil.MutuallyExclusive(
 				"specify only `--author` or `--app`",
 				opts.Author != "",
@@ -112,7 +106,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVar(&opts.AppAuthor, "app", "", "Filter by GitHub App author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
-	cmd.Flags().BoolVarP(&draft, "draft", "d", false, "Filter by draft state")
+	cmdutil.NilBoolFlag(cmd, &opts.Draft, "draft", "d", "Filter by draft state")
 
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 

@@ -3,15 +3,16 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
-	"github.com/cli/cli/v2/pkg/githubsearch"
+	"github.com/cli/cli/v2/pkg/search"
 )
 
 func shouldUseSearch(filters prShared.FilterOptions) bool {
-	return filters.Draft != "" || filters.Author != "" || filters.Assignee != "" || filters.Search != "" || len(filters.Labels) > 0
+	return filters.Draft != nil || filters.Author != "" || filters.Assignee != "" || filters.Search != "" || len(filters.Labels) > 0
 }
 
 func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.PullRequestAndTotalCount, error) {
@@ -159,35 +160,18 @@ func searchPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters 
 			}
 		}`
 
-	q := githubsearch.NewQuery()
-	q.SetType(githubsearch.PullRequest)
-	q.InRepository(ghrepo.FullName(repo))
-	q.AddQuery(filters.Search)
-
-	switch filters.State {
-	case "open":
-		q.SetState(githubsearch.Open)
-	case "closed":
-		q.SetState(githubsearch.Closed)
-	case "merged":
-		q.SetState(githubsearch.Merged)
-	}
-
-	if filters.Author != "" {
-		q.AuthoredBy(filters.Author)
-	}
-	if filters.Assignee != "" {
-		q.AssignedTo(filters.Assignee)
-	}
-	for _, label := range filters.Labels {
-		q.AddLabel(label)
-	}
-	if filters.BaseBranch != "" {
-		q.SetBaseBranch(filters.BaseBranch)
-	}
-
-	if filters.Draft != "" {
-		q.SetDraft(filters.Draft)
+	q := search.Query{
+		Keywords: strings.Split(filters.Search, " "),
+		Qualifiers: search.Qualifiers{
+			Assignee: filters.Assignee,
+			Author:   filters.Author,
+			Base:     filters.BaseBranch,
+			Draft:    filters.Draft,
+			Label:    filters.Labels,
+			Repo:     []string{ghrepo.FullName(repo)},
+			State:    filters.State,
+			Type:     "pr",
+		},
 	}
 
 	pageLimit := min(limit, 100)
