@@ -646,7 +646,7 @@ type startCreateRequest struct {
 	Machine            string `json:"machine"`
 	VSCSTarget         string `json:"vscs_target,omitempty"`
 	VSCSTargetURL      string `json:"vscs_target_url,omitempty"`
-	PermissionsOptOut  bool   `json:"devcontainer_permissions_opt_out"`
+	PermissionsOptOut  bool   `json:"multi_repo_permissions_opt_out"`
 }
 
 var errProvisioningInProgress = errors.New("provisioning in progress")
