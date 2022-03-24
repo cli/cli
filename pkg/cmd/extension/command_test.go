@@ -141,6 +141,23 @@ func TestNewCmdExtension(t *testing.T) {
 			wantStderr: "",
 		},
 		{
+			name: "upgrade all extension with none installed",
+			args: []string{"upgrade", "--all"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.UpgradeFunc = func(name string, force bool) error {
+					return noExtensionsInstalledError
+				}
+				return func(t *testing.T) {
+					calls := em.UpgradeCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "", calls[0].Name)
+				}
+			},
+			isTTY:      true,
+			wantStdout: "✓ No installed extensions found\n",
+			wantStderr: "",
+		},
+		{
 			name: "upgrade extension error",
 			args: []string{"upgrade", "hello"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
