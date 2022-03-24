@@ -15,18 +15,16 @@ import (
 
 type DefaultOptions struct {
 	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (context.Remotes, error)
 	HttpClient func() (*http.Client, error)
 
 	ViewFlag bool
 }
 
-func NewCmdDefault(f *cmdutil.Factory, runF func(*DefaultOptions) error) *cobra.Command {
+func NewCmdDefault(f *cmdutil.Factory) *cobra.Command {
 	opts := &DefaultOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		BaseRepo:   f.BaseRepo,
 		Remotes:    f.Remotes,
 	}
 
@@ -34,23 +32,15 @@ func NewCmdDefault(f *cmdutil.Factory, runF func(*DefaultOptions) error) *cobra.
 		Use:   "default",
 		Short: "Configure the default repository used for various commands",
 		Long: heredoc.Doc(`
-		The default repository is used to determine which repository gh
-		should automatically query for the commands:
-			issue, pr, browse, run, repo rename, secret, workflow
+		The default repository is used to determine which remote 
+		repository gh should automatically point to.
 		`),
 		Example: heredoc.Doc(`
 			$ gh repo default cli/cli
 		`),
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !opts.IO.CanPrompt() && !opts.ViewFlag {
-				return cmdutil.FlagErrorf("a repository name is required when not running interactively")
-			}
-
-			if runF != nil {
-				return runF(opts)
-			}
-			return defaultRun(opts)
+			return runDefault(opts)
 		},
 	}
 
@@ -58,7 +48,7 @@ func NewCmdDefault(f *cmdutil.Factory, runF func(*DefaultOptions) error) *cobra.
 	return cmd
 }
 
-func defaultRun(opts *DefaultOptions) error {
+func runDefault(opts *DefaultOptions) error {
 	remotes, err := opts.Remotes()
 	if err != nil {
 		return err
@@ -78,10 +68,10 @@ func defaultRun(opts *DefaultOptions) error {
 		return err
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
-	context.RemoveBaseRepo(remotes)
 	repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, "")
 	if err != nil {
 		return err
 	}
-	return repoContext.SetGitConfigBaseRepo(opts.IO)
+	context.RemoveBaseRepo(remotes)
+	return repoContext.SetBaseRepo(opts.IO)
 }

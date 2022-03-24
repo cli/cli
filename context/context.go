@@ -74,16 +74,7 @@ func GetBaseRepo(remotes Remotes) (ghrepo.Interface, error) {
 	return nil, errors.New("a default repo has not been set, use `gh repo default` to set a default repo")
 }
 
-func RemoveBaseRepo(remotes Remotes) {
-	for _, remote := range remotes {
-		if remote.Resolved == "base" {
-			remote.Resolved = ""
-			git.UnsetRemoteResolution(remote.Remote.Name)
-		}
-	}
-}
-
-func (r *ResolvedRemotes) SetGitConfigBaseRepo(io *iostreams.IOStreams) error {
+func (r *ResolvedRemotes) SetBaseRepo(io *iostreams.IOStreams) error {
 	resolution := "base"
 	if !io.CanPrompt() {
 		git.SetRemoteResolution(r.remotes[0].Name, resolution)
@@ -144,6 +135,14 @@ func (r *ResolvedRemotes) SetGitConfigBaseRepo(io *iostreams.IOStreams) error {
 
 	// cache the result to git config
 	return git.SetRemoteResolution(remote.Name, resolution)
+}
+
+func RemoveBaseRepo(remotes Remotes) {
+	for _, remote := range remotes {
+		if remote.Resolved == "base" {
+			git.UnsetRemoteResolution(remote.Remote.Name)
+		}
+	}
 }
 
 func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, error) {
