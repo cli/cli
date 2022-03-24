@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
@@ -17,7 +16,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/label/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/spf13/cobra"
 )
 
@@ -70,15 +68,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Args: cobra.NoArgs,
 		RunE: func(c *cobra.Command, args []string) error {
 			nameProvided := c.Flags().Changed("name")
-			if !nameProvided {
-				opts.Interactive = true
-			}
 
-			if opts.Interactive && !opts.IO.CanPrompt() {
-				return cmdutil.FlagErrorf("must provide name when not running interactively")
+			if !nameProvided || strings.TrimSpace(opts.Name) == "" {
+				return cmdutil.FlagErrorf("must specify name for label.")
 			}
-
-			opts.Name = strings.Trim(opts.Name, " ")
 
 			if runF != nil {
 				return runF(&opts)
@@ -105,18 +98,6 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
-	if opts.Interactive {
-		err := interactiveLabelInfo(opts)
-		if err != nil {
-			return err
-		}
-
-	} else {
-		if opts.Name == "" {
-			return fmt.Errorf("Name can't be blank")
-		}
-	}
-
 	if opts.Color == "" {
 		rand.Seed(time.Now().UnixNano())
 		opts.Color = randomColor[rand.Intn(len(randomColor)-1)]
@@ -141,51 +122,6 @@ func createRun(opts *CreateOptions) error {
 		successMsg := fmt.Sprintf("\n%s Label created.\n", cs.SuccessIcon())
 
 		fmt.Fprintf(opts.IO.ErrOut, successMsg)
-	}
-
-	return nil
-}
-
-func interactiveLabelInfo(opts *CreateOptions) error {
-	qs := []*survey.Question{}
-	if opts.Name == "" {
-		qs = append(qs, &survey.Question{
-			Name:   "labelName",
-			Prompt: &survey.Input{Message: "Label name"},
-		})
-	}
-	if opts.Description == "" {
-		qs = append(qs, &survey.Question{
-			Name:   "labelDescription",
-			Prompt: &survey.Input{Message: "Label description"},
-		})
-	}
-	if opts.Color == "" {
-		qs = append(qs, &survey.Question{
-			Name:   "labelColor",
-			Prompt: &survey.Input{Message: "Label color"},
-		})
-	}
-
-	answer := struct {
-		LabelName        string
-		LabelDescription string
-		LabelColor       string
-	}{}
-
-	err := prompt.SurveyAsk(qs, &answer)
-	if err != nil {
-		return err
-	}
-
-	if opts.Name == "" {
-		opts.Name = answer.LabelName
-	}
-	if opts.Description == "" {
-		opts.Description = answer.LabelDescription
-	}
-	if opts.Color == "" {
-		opts.Color = answer.LabelColor
 	}
 
 	return nil
