@@ -343,7 +343,7 @@ func newCpCmd(app *App) *cobra.Command {
 	var opts cpOptions
 
 	cpCmd := &cobra.Command{
-		Use:   "cp [-e] [-r] <sources>... <dest>",
+		Use:   "cp [-e] [-r] [-- [<scp flags>...]] <sources>... <dest>",
 		Short: "Copy files between local and remote file systems",
 		Long: heredoc.Docf(`
 			The cp command copies files between the local and remote file systems.
@@ -368,6 +368,7 @@ func newCpCmd(app *App) *cobra.Command {
 			$ gh codespace cp -e README.md 'remote:/workspaces/$RepositoryName/'
 			$ gh codespace cp -e 'remote:~/*.go' ./gofiles/
 			$ gh codespace cp -e 'remote:/workspaces/myproj/go.{mod,sum}' ./gofiles/
+			$ gh codespace cp -e -- -F ~/.ssh/codespaces_config 'remote:~/*.go' ./gofiles/
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.Copy(cmd.Context(), args, opts)
@@ -392,7 +393,7 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) error {
 	if opts.recursive {
 		opts.scpArgs = append(opts.scpArgs, "-r")
 	}
-	opts.scpArgs = append(opts.scpArgs, "--")
+
 	hasRemote := false
 	for _, arg := range args {
 		if rest := strings.TrimPrefix(arg, "remote:"); rest != arg {
