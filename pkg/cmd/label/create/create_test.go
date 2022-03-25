@@ -105,7 +105,41 @@ func TestLabelCreate_tty(t *testing.T) {
 		t.Errorf("error running command `label create`: %v", err)
 	}
 
-	assert.Equal(t, "\n✓ Label created.\n", output.Stderr())
+	assert.Equal(t, "\n✓ Label bugs created.\n", output.Stderr())
+	assert.Equal(t, "", output.String())
+
+	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
+	reqBody := CreateLabelRequest{}
+	err = json.Unmarshal(bodyBytes, &reqBody)
+	if err != nil {
+		t.Fatalf("error decoding JSON: %v", err)
+	}
+
+	expectReqBody := CreateLabelRequest{
+		Name:        "bugs",
+		Description: "Something isn't working",
+		Color:       "0052cc",
+	}
+
+	assert.Equal(t, expectReqBody, reqBody)
+}
+
+func TestLabelCreate_when_color_with_prefix(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.REST("POST", "repos/OWNER/REPO/labels"),
+		httpmock.StatusStringResponse(201, "{}"),
+	)
+
+	output, err := runCommand(http, false, "-n bugs -d \"Something isn't working\" -c \"#0052cc\"")
+
+	if err != nil {
+		t.Errorf("error running command `label create`: %v", err)
+	}
+
+	assert.Equal(t, "", output.Stderr())
 	assert.Equal(t, "", output.String())
 
 	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)

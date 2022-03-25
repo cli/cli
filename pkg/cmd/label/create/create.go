@@ -60,9 +60,14 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a new label",
+		Long: heredoc.Docf(`
+		Create a new label on GitHub.
+
+		Must specify name for label, description and color is optional, if color isn't provided, a random color will be chosen.
+
+		Color needs to be 6 hex characters.
+		`),
 		Example: heredoc.Doc(`
-		$ gh label create --name bug
-		$ gh label create --name bug --description "Something isn't working"
 		$ gh label create --name bug --description "Something isn't working" --color "E99695"
 	`),
 		Args: cobra.NoArgs,
@@ -72,6 +77,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			if !nameProvided || strings.TrimSpace(opts.Name) == "" {
 				return cmdutil.FlagErrorf("must specify name for label.")
 			}
+
+			opts.Color = strings.TrimPrefix(opts.Color, "#")
 
 			if runF != nil {
 				return runF(&opts)
@@ -119,7 +126,7 @@ func createRun(opts *CreateOptions) error {
 
 	if isTerminal {
 		cs := opts.IO.ColorScheme()
-		successMsg := fmt.Sprintf("\n%s Label created.\n", cs.SuccessIcon())
+		successMsg := fmt.Sprintf("\n%s Label %s created.\n", cs.SuccessIcon(), opts.Name)
 
 		fmt.Fprintf(opts.IO.ErrOut, successMsg)
 	}
