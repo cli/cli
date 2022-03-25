@@ -98,7 +98,7 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	connectedToTerminal := opts.IO.IsStdoutTTY() && opts.IO.IsStderrTTY()
+	connectedToTerminal := opts.IO.IsStdoutTTY()
 
 	if opts.BrowserMode {
 		openURL := pr.URL
