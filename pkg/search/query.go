@@ -11,6 +11,7 @@ import (
 
 const (
 	KindRepositories = "repositories"
+	KindIssues       = "issues"
 )
 
 type Query struct {
@@ -25,22 +26,48 @@ type Query struct {
 
 type Qualifiers struct {
 	Archived         *bool
+	Assignee         string
+	Author           string
+	Base             string
+	Closed           string
+	Commenter        string
+	Comments         string
 	Created          string
+	Draft            *bool
 	Followers        string
 	Fork             string
 	Forks            string
 	GoodFirstIssues  string
+	Head             string
 	HelpWantedIssues string
 	In               []string
-	Is               string
+	Interactions     string
+	Involves         string
+	Is               []string
+	Label            []string
 	Language         string
 	License          []string
+	Mentions         string
+	Merged           string
+	Milestone        string
+	No               []string
 	Org              string
+	Project          string
 	Pushed           string
+	Reactions        string
+	Repo             []string
+	Review           string
+	ReviewRequested  string
+	ReviewedBy       string
 	Size             string
 	Stars            string
+	State            string
+	Status           string
+	Team             string
 	Topic            []string
 	Topics           string
+	Type             string
+	Updated          string
 }
 
 func (q Query) String() string {

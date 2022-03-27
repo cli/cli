@@ -10,24 +10,24 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var query = Query{
-	Keywords: []string{"keyword"},
-	Kind:     "repositories",
-	Limit:    30,
-	Order:    "stars",
-	Sort:     "desc",
-	Qualifiers: Qualifiers{
-		Stars: ">=5",
-		Topic: []string{"topic"},
-	},
-}
-
 func TestSearcherRepositories(t *testing.T) {
+	query := Query{
+		Keywords: []string{"keyword"},
+		Kind:     "repositories",
+		Limit:    30,
+		Order:    "desc",
+		Sort:     "stars",
+		Qualifiers: Qualifiers{
+			Stars: ">=5",
+			Topic: []string{"topic"},
+		},
+	}
+
 	values := url.Values{
 		"page":     []string{"1"},
 		"per_page": []string{"30"},
-		"order":    []string{"stars"},
-		"sort":     []string{"desc"},
+		"order":    []string{"desc"},
+		"sort":     []string{"stars"},
 		"q":        []string{"keyword stars:>=5 topic:topic"},
 	}
 
@@ -99,8 +99,8 @@ func TestSearcherRepositories(t *testing.T) {
 				secondReq := httpmock.QueryMatcher("GET", "search/repositories", url.Values{
 					"page":     []string{"2"},
 					"per_page": []string{"29"},
-					"order":    []string{"stars"},
-					"sort":     []string{"desc"},
+					"order":    []string{"desc"},
+					"sort":     []string{"stars"},
 					"q":        []string{"keyword stars:>=5 topic:topic"},
 				},
 				)
@@ -167,7 +167,176 @@ func TestSearcherRepositories(t *testing.T) {
 	}
 }
 
+func TestSearcherIssues(t *testing.T) {
+	query := Query{
+		Keywords: []string{"keyword"},
+		Kind:     "issues",
+		Limit:    30,
+		Order:    "desc",
+		Sort:     "comments",
+		Qualifiers: Qualifiers{
+			Language: "go",
+			Is:       []string{"public", "locked"},
+		},
+	}
+
+	values := url.Values{
+		"page":     []string{"1"},
+		"per_page": []string{"30"},
+		"order":    []string{"desc"},
+		"sort":     []string{"comments"},
+		"q":        []string{"keyword is:locked is:public language:go"},
+	}
+
+	tests := []struct {
+		name      string
+		host      string
+		query     Query
+		result    IssuesResult
+		wantErr   bool
+		errMsg    string
+		httpStubs func(*httpmock.Registry)
+	}{
+		{
+			name:  "searches issues",
+			query: query,
+			result: IssuesResult{
+				IncompleteResults: false,
+				Items:             []Issue{{Number: 1234}},
+				Total:             1,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.QueryMatcher("GET", "search/issues", values),
+					httpmock.JSONResponse(IssuesResult{
+						IncompleteResults: false,
+						Items:             []Issue{{Number: 1234}},
+						Total:             1,
+					}),
+				)
+			},
+		},
+		{
+			name:  "searches issues for enterprise host",
+			host:  "enterprise.com",
+			query: query,
+			result: IssuesResult{
+				IncompleteResults: false,
+				Items:             []Issue{{Number: 1234}},
+				Total:             1,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.QueryMatcher("GET", "api/v3/search/issues", values),
+					httpmock.JSONResponse(IssuesResult{
+						IncompleteResults: false,
+						Items:             []Issue{{Number: 1234}},
+						Total:             1,
+					}),
+				)
+			},
+		},
+		{
+			name:  "paginates results",
+			query: query,
+			result: IssuesResult{
+				IncompleteResults: false,
+				Items:             []Issue{{Number: 1234}, {Number: 5678}},
+				Total:             2,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				firstReq := httpmock.QueryMatcher("GET", "search/issues", values)
+				firstRes := httpmock.JSONResponse(IssuesResult{
+					IncompleteResults: false,
+					Items:             []Issue{{Number: 1234}},
+					Total:             2,
+				},
+				)
+				firstRes = httpmock.WithHeader(firstRes, "Link", `<https://api.github.com/search/issues?page=2&per_page=100&q=org%3Agithub>; rel="next"`)
+				secondReq := httpmock.QueryMatcher("GET", "search/issues", url.Values{
+					"page":     []string{"2"},
+					"per_page": []string{"29"},
+					"order":    []string{"desc"},
+					"sort":     []string{"comments"},
+					"q":        []string{"keyword is:locked is:public language:go"},
+				},
+				)
+				secondRes := httpmock.JSONResponse(IssuesResult{
+					IncompleteResults: false,
+					Items:             []Issue{{Number: 5678}},
+					Total:             2,
+				},
+				)
+				reg.Register(firstReq, firstRes)
+				reg.Register(secondReq, secondRes)
+			},
+		},
+		{
+			name:    "handles search errors",
+			query:   query,
+			wantErr: true,
+			errMsg: heredoc.Doc(`
+        Invalid search query "keyword is:locked is:public language:go".
+        "blah" is not a recognized date/time format. Please provide an ISO 8601 date/time value, such as YYYY-MM-DD.`),
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.QueryMatcher("GET", "search/issues", values),
+					httpmock.WithHeader(
+						httpmock.StatusStringResponse(422,
+							`{
+                "message":"Validation Failed",
+                "errors":[
+                  {
+                    "message":"\"blah\" is not a recognized date/time format. Please provide an ISO 8601 date/time value, such as YYYY-MM-DD.",
+                    "resource":"Search",
+                    "field":"q",
+                    "code":"invalid"
+                  }
+                ],
+                "documentation_url":"https://docs.github.com/v3/search/"
+              }`,
+						), "Content-Type", "application/json"),
+				)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
+			}
+			client := &http.Client{Transport: reg}
+			if tt.host == "" {
+				tt.host = "github.com"
+			}
+			searcher := NewSearcher(client, tt.host)
+			result, err := searcher.Issues(tt.query)
+			if tt.wantErr {
+				assert.EqualError(t, err, tt.errMsg)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.result, result)
+		})
+	}
+}
+
 func TestSearcherURL(t *testing.T) {
+	query := Query{
+		Keywords: []string{"keyword"},
+		Kind:     "repositories",
+		Limit:    30,
+		Order:    "desc",
+		Sort:     "stars",
+		Qualifiers: Qualifiers{
+			Stars: ">=5",
+			Topic: []string{"topic"},
+		},
+	}
+
 	tests := []struct {
 		name  string
 		host  string
@@ -177,13 +346,13 @@ func TestSearcherURL(t *testing.T) {
 		{
 			name:  "outputs encoded query url",
 			query: query,
-			url:   "https://github.com/search?order=stars&q=keyword+stars%3A%3E%3D5+topic%3Atopic&sort=desc&type=repositories",
+			url:   "https://github.com/search?order=desc&q=keyword+stars%3A%3E%3D5+topic%3Atopic&sort=stars&type=repositories",
 		},
 		{
 			name:  "supports enterprise hosts",
 			host:  "enterprise.com",
 			query: query,
-			url:   "https://enterprise.com/search?order=stars&q=keyword+stars%3A%3E%3D5+topic%3Atopic&sort=desc&type=repositories",
+			url:   "https://enterprise.com/search?order=desc&q=keyword+stars%3A%3E%3D5+topic%3Atopic&sort=stars&type=repositories",
 		},
 	}
 	for _, tt := range tests {

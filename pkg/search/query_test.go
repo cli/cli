@@ -35,7 +35,7 @@ func TestQueryString(t *testing.T) {
 					Stars:            "6",
 					Topic:            []string{"topic"},
 					Topics:           "7",
-					Is:               "public",
+					Is:               []string{"public"},
 				},
 			},
 			out: "some keywords archived:true created:created followers:1 fork:true forks:2 good-first-issues:3 help-wanted-issues:4 in:description in:readme is:public language:language license:license org:org pushed:updated size:5 stars:6 topic:topic topics:7",
@@ -89,7 +89,7 @@ func TestQualifiersMap(t *testing.T) {
 				Stars:            "6",
 				Topic:            []string{"topic"},
 				Topics:           "7",
-				Is:               "public",
+				Is:               []string{"public"},
 			},
 			out: map[string][]string{
 				"archived":           {"true"},
