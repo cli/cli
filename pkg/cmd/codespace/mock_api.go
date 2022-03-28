@@ -52,7 +52,7 @@ import (
 // 			ListCodespacesFunc: func(ctx context.Context, limit int) ([]*api.Codespace, error) {
 // 				panic("mock out the ListCodespaces method")
 // 			},
-// 			ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]string, error) {
+// 			ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
 // 				panic("mock out the ListDevContainers method")
 // 			},
 // 			StartCodespaceFunc: func(ctx context.Context, name string) error {
@@ -105,7 +105,7 @@ type apiClientMock struct {
 	ListCodespacesFunc func(ctx context.Context, limit int) ([]*api.Codespace, error)
 
 	// ListDevContainersFunc mocks the ListDevContainers method.
-	ListDevContainersFunc func(ctx context.Context, repoID int, branch string, limit int) ([]string, error)
+	ListDevContainersFunc func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error)
 
 	// StartCodespaceFunc mocks the StartCodespace method.
 	StartCodespaceFunc func(ctx context.Context, name string) error
@@ -687,7 +687,7 @@ func (mock *apiClientMock) ListCodespacesCalls() []struct {
 }
 
 // ListDevContainers calls ListDevContainersFunc.
-func (mock *apiClientMock) ListDevContainers(ctx context.Context, repoID int, branch string, limit int) ([]string, error) {
+func (mock *apiClientMock) ListDevContainers(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
 	if mock.ListDevContainersFunc == nil {
 		panic("apiClientMock.ListDevContainersFunc: method is nil but apiClient.ListDevContainers was just called")
 	}

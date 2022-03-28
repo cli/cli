@@ -86,8 +86,8 @@ func TestApp_Create(t *testing.T) {
 							DefaultBranch: "main",
 						}, nil
 					},
-					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]string, error) {
-						return []string{}, nil
+					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+						return []api.DevContainerEntry{}, nil
 					},
 					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
 						return []*api.Machine{
@@ -139,7 +139,7 @@ func TestApp_Create(t *testing.T) {
 							DefaultBranch: "main",
 						}, nil
 					},
-					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]string, error) {
+					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
 						return nil, fmt.Errorf("some error")
 					},
 				},
@@ -167,8 +167,8 @@ func TestApp_Create(t *testing.T) {
 							DefaultBranch: "main",
 						}, nil
 					},
-					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]string, error) {
-						return []string{}, nil
+					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+						return []api.DevContainerEntry{}, nil
 					},
 					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
 						return []*api.Machine{

@@ -762,9 +762,14 @@ func (a *API) DeleteCodespace(ctx context.Context, codespaceName string) error {
 	return nil
 }
 
+type DevContainerEntry struct {
+	Path string `json:"path"`
+	Name string `json:"name,omitempty"`
+}
+
 // ListDevContainers returns a list of valid devcontainer.json files for the repo. Pass a negative limit to request all pages from
 // the API until all devcontainer.json files have been fetched.
-func (a *API) ListDevContainers(ctx context.Context, repoID int, branch string, limit int) (devcontainers []string, err error) {
+func (a *API) ListDevContainers(ctx context.Context, repoID int, branch string, limit int) (devcontainers []DevContainerEntry, err error) {
 	perPage := 100
 	if limit > 0 && limit < 100 {
 		perPage = limit
@@ -792,8 +797,9 @@ func (a *API) ListDevContainers(ctx context.Context, repoID int, branch string, 
 		}
 
 		var response struct {
-			Devcontainers []string `json:"devcontainers"`
+			Devcontainers []DevContainerEntry `json:"devcontainers"`
 		}
+
 		dec := json.NewDecoder(resp.Body)
 		if err := dec.Decode(&response); err != nil {
 			return nil, fmt.Errorf("error unmarshaling response: %w", err)

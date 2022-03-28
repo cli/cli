@@ -1,6 +1,0 @@
-{
-	"repository_id": 392831291,
-	"location": "WestUs2",
-	"devcontainer_path": ".devcontainer/foo ' \" bar/devcontainer.json",
-	"vscs_target": "development"
-}

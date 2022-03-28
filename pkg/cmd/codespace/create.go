@@ -58,6 +58,8 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 
 	locationCh := getLocation(ctx, vscsLocation, a.apiClient)
 
+	DEFAULT_DEVCONTAINER_DEFINITIONS := []string{".devcontainer.json", ".devcontainer/devcontainer.json"}
+
 	userInputs := struct {
 		Repository string
 		Branch     string
@@ -113,23 +115,35 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	// now that we have repo+branch, we can list available devcontainer.json files (if any)
 	if len(opts.devContainerPath) < 1 {
 		a.StartProgressIndicatorWithLabel("Fetching devcontainer.json files")
-		devContainerPaths, err := a.apiClient.ListDevContainers(ctx, repository.ID, branch, 100)
+		devcontainers, err := a.apiClient.ListDevContainers(ctx, repository.ID, branch, 100)
 		if err != nil {
 			return fmt.Errorf("error getting devcontainer.json paths: %w", err)
 		}
 		a.StopProgressIndicator()
 
-		if len(devContainerPaths) > 0 {
-			devContainerPathQuestion := &survey.Question{
-				Name: "devContainerPath",
-				Prompt: &survey.Select{
-					Message: "Devcontainer definition file:",
-					Options: append([]string{"default"}, devContainerPaths...),
-				},
-			}
+		if len(devcontainers) > 0 {
 
-			if err := ask([]*survey.Question{devContainerPathQuestion}, &devContainerPath); err != nil {
-				return fmt.Errorf("failed to prompt: %w", err)
+			// if there is only one devcontainer.json file and it is one of the default paths we can auto-select it
+			if len(devcontainers) == 1 && utils.StringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
+				devContainerPath = devcontainers[0].Path
+			} else {
+				promptOptions := []string{"default"}
+
+				for _, devcontainer := range devcontainers {
+					promptOptions = append(promptOptions, devcontainer.Path)
+				}
+
+				devContainerPathQuestion := &survey.Question{
+					Name: "devContainerPath",
+					Prompt: &survey.Select{
+						Message: "Devcontainer definition file:",
+						Options: promptOptions,
+					},
+				}
+
+				if err := ask([]*survey.Question{devContainerPathQuestion}, &devContainerPath); err != nil {
+					return fmt.Errorf("failed to prompt: %w", err)
+				}
 			}
 		}
 
