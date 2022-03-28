@@ -47,7 +47,6 @@ type CreateOptions struct {
 	Name        string
 	Description string
 	Color       string
-	Interactive bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
