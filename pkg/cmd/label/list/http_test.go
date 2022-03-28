@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIssueList_pagination(t *testing.T) {
+func TestLabelList_pagination(t *testing.T) {
 	http := &httpmock.Registry{}
 	client := api.NewClient(api.ReplaceTripper(http))
 
