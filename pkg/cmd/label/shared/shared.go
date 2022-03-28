@@ -1,10 +1,8 @@
 package shared
 
 type Label struct {
-	Id          int
+	Id          string
 	Name        string
 	Color       string
-	Default     bool
-	Url         string
 	Description string
 }

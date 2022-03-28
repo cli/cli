@@ -24,6 +24,7 @@ type ListOptions struct {
 	Browser    browser
 
 	WebMode bool
+	Limit   int
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -41,6 +42,13 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Args:    cobra.NoArgs,
 		Aliases: []string{"ls"},
 		RunE: func(c *cobra.Command, args []string) error {
+			// support `-R, --repo` override
+			opts.BaseRepo = f.BaseRepo
+
+			if opts.Limit < 1 {
+				return cmdutil.FlagErrorf("invalid limit: %v", opts.Limit)
+			}
+
 			if runF != nil {
 				return runF(&opts)
 			}
@@ -49,6 +57,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "List labels in the web browser")
+	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 30, "Maximum number of items to fetch")
 
 	return cmd
 }
@@ -78,28 +87,21 @@ func listRun(opts *ListOptions) error {
 
 	opts.IO.StartProgressIndicator()
 
-	labels, err := getLabels(client, baseRepo)
+	labels, totalCount, err := listLabels(client, baseRepo, opts.Limit)
 	if err != nil {
 		return err
 	}
 
 	opts.IO.StopProgressIndicator()
 
+	if opts.IO.IsStdoutTTY() {
+		title := listHeader(ghrepo.FullName(baseRepo), "label", len(labels), totalCount)
+		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
+	}
+
 	printLabels(labels, opts.IO)
 
 	return nil
-}
-
-func getLabels(client *api.Client, repo ghrepo.Interface) ([]shared.Label, error) {
-	labels := []shared.Label{}
-
-	path := fmt.Sprintf("repos/%s/%s/labels", repo.RepoOwner(), repo.RepoName())
-
-	err := client.REST(repo.RepoHost(), "GET", path, nil, &labels)
-	if err != nil {
-		return nil, err
-	}
-	return labels, nil
 }
 
 func printLabels(labels []shared.Label, io *iostreams.IOStreams) error {
@@ -121,4 +123,12 @@ func printLabels(labels []shared.Label, io *iostreams.IOStreams) error {
 	}
 
 	return table.Render()
+}
+
+func listHeader(repoName string, itemName string, count int, totalCount int) string {
+	if totalCount == 0 {
+		return fmt.Sprintf("There are no %ss in %s", itemName, repoName)
+	}
+
+	return fmt.Sprintf("Showing %d of %s in %s", count, utils.Pluralize(totalCount, itemName), repoName)
 }
