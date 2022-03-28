@@ -96,7 +96,15 @@ func TestLabelCreate_tty(t *testing.T) {
 
 	http.Register(
 		httpmock.REST("POST", "repos/OWNER/REPO/labels"),
-		httpmock.StatusStringResponse(201, "{}"),
+		httpmock.StatusStringResponse(201, `{
+			"id": 3973380732,
+			"node_id": "LA_kwDOHAVYr87s1Pp8",
+			"url": "https://api.github.com/repos/OWNER/REPO/labels/bugs",
+			"name": "bugs",
+			"color": "0052cc",
+			"default": false,
+			"description": "Something isn't working"
+		}`),
 	)
 
 	output, err := runCommand(http, true, "-n bugs -d \"Something isn't working\" -c \"0052cc\"")
@@ -130,7 +138,15 @@ func TestLabelCreate_when_color_with_prefix(t *testing.T) {
 
 	http.Register(
 		httpmock.REST("POST", "repos/OWNER/REPO/labels"),
-		httpmock.StatusStringResponse(201, "{}"),
+		httpmock.StatusStringResponse(201, `{
+			"id": 3973380732,
+			"node_id": "LA_kwDOHAVYr87s1Pp8",
+			"url": "https://api.github.com/repos/OWNER/REPO/labels/bugs",
+			"name": "bugs",
+			"color": "0052cc",
+			"default": false,
+			"description": "Something isn't working"
+		}`),
 	)
 
 	output, err := runCommand(http, false, "-n bugs -d \"Something isn't working\" -c \"#0052cc\"")
