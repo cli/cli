@@ -30,52 +30,10 @@ func (s *Session) Close() error {
 	return nil
 }
 
-// Port describes a port exposed by the container.
-type Port struct {
-	SourcePort                       int    `json:"sourcePort"`
-	DestinationPort                  int    `json:"destinationPort"`
-	SessionName                      string `json:"sessionName"`
-	StreamName                       string `json:"streamName"`
-	StreamCondition                  string `json:"streamCondition"`
-	BrowseURL                        string `json:"browseUrl"`
-	IsPublic                         bool   `json:"isPublic"`
-	IsTCPServerConnectionEstablished bool   `json:"isTCPServerConnectionEstablished"`
-	HasTLSHandshakePassed            bool   `json:"hasTLSHandshakePassed"`
-	Privacy                          string `json:"privacy"`
-}
-
-// startSharing tells the Live Share host to start sharing the specified port from the container.
-// The sessionName describes the purpose of the remote port or service.
-// It returns an identifier that can be used to open an SSH channel to the remote port.
-func (s *Session) startSharing(ctx context.Context, sessionName string, port int) (channelID, error) {
-	args := []interface{}{port, sessionName, fmt.Sprintf("http://localhost:%d", port)}
-	var response Port
-	if err := s.rpc.do(ctx, "serverSharing.startSharing", args, &response); err != nil {
-		return channelID{}, err
-	}
-
-	return channelID{response.StreamName, response.StreamCondition}, nil
-}
-
-// GetSharedServers returns a description of each container port
-// shared by a prior call to StartSharing by some client.
-func (s *Session) GetSharedServers(ctx context.Context) ([]*Port, error) {
-	var response []*Port
-	if err := s.rpc.do(ctx, "serverSharing.getSharedServers", []string{}, &response); err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
-// UpdateSharedServerPrivacy controls port permissions and visibility scopes for who can access its URLs
-// in the browser.
-func (s *Session) UpdateSharedServerPrivacy(ctx context.Context, port int, visibility string) error {
-	if err := s.rpc.do(ctx, "serverSharing.updateSharedServerPrivacy", []interface{}{port, visibility}, nil); err != nil {
-		return err
-	}
-
-	return nil
+// registerRequestHandler registers a handler for the given request type with the RPC
+// server and returns a callback function to deregister the handler
+func (s *Session) registerRequestHandler(requestType string, h handler) func() {
+	return s.rpc.register(requestType, h)
 }
 
 // StartsSSHServer starts an SSH server in the container, installing sshd if necessary,

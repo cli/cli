@@ -6,18 +6,13 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/pkg/cmd/search/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/search"
 	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
-)
-
-const (
-	// Limitation of GitHub search see:
-	// https://docs.github.com/en/rest/reference/search
-	searchMaxResults = 1000
 )
 
 type ReposOptions struct {
@@ -48,7 +43,7 @@ func NewCmdRepos(f *cmdutil.Factory, runF func(*ReposOptions) error) *cobra.Comm
 			using the parameter and qualifier flags, or a combination of the two.
 
 			GitHub search syntax is documented at:
-			https://docs.github.com/search-github/searching-on-github/searching-for-repositories
+			<https://docs.github.com/search-github/searching-on-github/searching-for-repositories>
     `),
 		Example: heredoc.Doc(`
 			# search repositories matching set of keywords "cli" and "shell"
@@ -70,7 +65,7 @@ func NewCmdRepos(f *cmdutil.Factory, runF func(*ReposOptions) error) *cobra.Comm
 			if len(args) == 0 && c.Flags().NFlag() == 0 {
 				return cmdutil.FlagErrorf("specify search keywords or flags")
 			}
-			if opts.Query.Limit < 1 || opts.Query.Limit > searchMaxResults {
+			if opts.Query.Limit < 1 || opts.Query.Limit > shared.SearchMaxResults {
 				return cmdutil.FlagErrorf("`--limit` must be between 1 and 1000")
 			}
 			if c.Flags().Changed("order") {
@@ -84,7 +79,7 @@ func NewCmdRepos(f *cmdutil.Factory, runF func(*ReposOptions) error) *cobra.Comm
 				return runF(opts)
 			}
 			var err error
-			opts.Searcher, err = searcher(f)
+			opts.Searcher, err = shared.Searcher(f)
 			if err != nil {
 				return err
 			}
@@ -118,7 +113,7 @@ func NewCmdRepos(f *cmdutil.Factory, runF func(*ReposOptions) error) *cobra.Comm
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Stars, "stars", "", "Filter on `number` of stars")
 	cmd.Flags().StringSliceVar(&opts.Query.Qualifiers.Topic, "topic", nil, "Filter on topic")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Topics, "number-topics", "", "Filter on `number` of topics")
-	cmdutil.StringEnumFlag(cmd, &opts.Query.Qualifiers.Is, "visibility", "", "", []string{"public", "private", "internal"}, "Filter based on visibility")
+	cmdutil.StringSliceEnumFlag(cmd, &opts.Query.Qualifiers.Is, "visibility", "", nil, []string{"public", "private", "internal"}, "Filter based on visibility")
 
 	return cmd
 }
@@ -184,20 +179,4 @@ func displayResults(io *iostreams.IOStreams, results search.RepositoriesResult) 
 		fmt.Fprintf(io.Out, "\n%s", header)
 	}
 	return tp.Render()
-}
-
-func searcher(f *cmdutil.Factory) (search.Searcher, error) {
-	cfg, err := f.Config()
-	if err != nil {
-		return nil, err
-	}
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return nil, err
-	}
-	client, err := f.HttpClient()
-	if err != nil {
-		return nil, err
-	}
-	return search.NewSearcher(client, host), nil
 }
