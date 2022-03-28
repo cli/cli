@@ -47,8 +47,6 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 			- Review Requests
 			- Mentions
 			- Repository Activity (new issues/prs, comments)
-
-			This data can be limited to a single org with -o; specific repositories can be excluded from this list with -e.
 		`),
 		Example: heredoc.Doc(`
 			Exclude some repositories:
