@@ -33,7 +33,7 @@ func TestNewCmdStatus(t *testing.T) {
 			name: "exclude",
 			cli:  "-e cli/cli,cli/go-gh",
 			wants: StatusOptions{
-				Exclude: "cli/cli,cli/go-gh",
+				Exclude: []string{"cli/cli", "cli/go-gh"},
 			},
 		},
 	}
@@ -42,6 +42,10 @@ func TestNewCmdStatus(t *testing.T) {
 		io, _, _, _ := iostreams.Test()
 		io.SetStdinTTY(true)
 		io.SetStdoutTTY(true)
+
+		if tt.wants.Exclude == nil {
+			tt.wants.Exclude = []string{}
+		}
 
 		f := &cmdutil.Factory{
 			IOStreams: io,
@@ -183,7 +187,7 @@ func TestStatusRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/events.json"))
 			},
 			opts: &StatusOptions{
-				Exclude: "cli/cli",
+				Exclude: []string{"cli/cli"},
 			},
 			// NOTA BENE: you'll see cli/cli in search results because that happens
 			// server side and the fixture doesn't account for that
@@ -212,7 +216,7 @@ func TestStatusRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/events.json"))
 			},
 			opts: &StatusOptions{
-				Exclude: "cli/cli,rpd/todo",
+				Exclude: []string{"cli/cli", "rpd/todo"},
 			},
 			// NOTA BENE: you'll see cli/cli in search results because that happens
 			// server side and the fixture doesn't account for that
@@ -302,7 +306,7 @@ func Test_buildSearchQuery(t *testing.T) {
 		{
 			name: "exclude one",
 			sg: StatusGetter{
-				Exclude: "cli/cli",
+				Exclude: []string{"cli/cli"},
 			},
 			wantReviewQ:   "first: 25, type: ISSUE, query:\"state:open review-requested:@me -repo:cli/cli",
 			wantAssignedQ: "assignee:@me state:open",
@@ -310,7 +314,7 @@ func Test_buildSearchQuery(t *testing.T) {
 		{
 			name: "exclude several",
 			sg: StatusGetter{
-				Exclude: "cli/cli,vilmibm/testing",
+				Exclude: []string{"cli/cli", "vilmibm/testing"},
 			},
 			wantReviewQ:   "first: 25, type: ISSUE, query:\"state:open review-requested:@me -repo:cli/cli -repo:vilmibm/testing",
 			wantAssignedQ: "assignee:@me state:open",

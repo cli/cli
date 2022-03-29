@@ -25,7 +25,7 @@ type StatusOptions struct {
 	CachedClient func(*http.Client, time.Duration) *http.Client
 	IO           *iostreams.IOStreams
 	Org          string
-	Exclude      string
+	Exclude      []string
 }
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
@@ -49,13 +49,8 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 			- Repository Activity (new issues/prs, comments)
 		`),
 		Example: heredoc.Doc(`
-			Exclude some repositories:
-
-			gh status -e"cli/cli,cli/go-gh"
-
-			Limit information to a single organization's repositories:
-
-			gh status -ocli
+			$ gh status -e cli/cli -e cli/go-gh # Exclude multiple repositories
+			$ gh status -o cli # Limit results to a single organization
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runF != nil {
@@ -67,7 +62,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().StringVarP(&opts.Org, "org", "o", "", "Report status within an organization")
-	cmd.Flags().StringVarP(&opts.Exclude, "exclude", "e", "", "Comma separated list of repos to exclude in owner/name format")
+	cmd.Flags().StringSliceVarP(&opts.Exclude, "exclude", "e", []string{}, "Comma separated list of repos to exclude in owner/name format")
 
 	return cmd
 }
@@ -152,7 +147,7 @@ type StatusGetter struct {
 	Client         *http.Client
 	cachedClient   func(*http.Client, time.Duration) *http.Client
 	Org            string
-	Exclude        string
+	Exclude        []string
 	AssignedPRs    []StatusItem
 	AssignedIssues []StatusItem
 	Mentions       []StatusItem
@@ -174,7 +169,12 @@ func (s *StatusGetter) CachedClient(ttl time.Duration) *http.Client {
 }
 
 func (s *StatusGetter) ShouldExclude(repo string) bool {
-	return strings.Contains(s.Exclude, repo)
+	for _, exclude := range s.Exclude {
+		if repo == exclude {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *StatusGetter) CurrentUsername() (string, error) {
@@ -332,10 +332,8 @@ func (s *StatusGetter) buildSearchQuery() string {
 		orgFilter = " org:" + s.Org
 	}
 	excludeFilter := ""
-	if s.Exclude != "" {
-		for _, repo := range strings.Split(s.Exclude, ",") {
-			excludeFilter += " -repo:" + repo
-		}
+	for _, repo := range s.Exclude {
+		excludeFilter += " -repo:" + repo
 	}
 	assignmentsQ = fmt.Sprintf(assignmentsQ, orgFilter, excludeFilter)
 	requestedQ = fmt.Sprintf(requestedQ, orgFilter, excludeFilter)
