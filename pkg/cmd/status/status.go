@@ -19,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 type StatusOptions struct {
@@ -516,39 +517,38 @@ func statusRun(opts *StatusOptions) error {
 	}
 
 	sg := NewStatusGetter(client, opts)
-	errc := make(chan error)
 
 	// TODO break out sections into individual subcommands
 
+	g := new(errgroup.Group)
 	opts.IO.StartProgressIndicator()
-	go func() {
+	g.Go(func() error {
 		err := sg.LoadNotifications()
 		if err != nil {
 			err = fmt.Errorf("could not load notifications: %w", err)
 		}
-		errc <- err
-	}()
+		return err
+	})
 
-	go func() {
+	g.Go(func() error {
 		err := sg.LoadEvents()
 		if err != nil {
 			err = fmt.Errorf("could not load events: %w", err)
 		}
-		errc <- err
-	}()
+		return err
+	})
 
-	go func() {
+	g.Go(func() error {
 		err := sg.LoadSearchResults()
 		if err != nil {
 			err = fmt.Errorf("failed to search: %w", err)
 		}
-		errc <- err
-	}()
+		return err
+	})
 
-	for i := 0; i < 3; i++ {
-		if err := <-errc; err != nil {
-			return err
-		}
+	err = g.Wait()
+	if err != nil {
+		return err
 	}
 	opts.IO.StopProgressIndicator()
 
