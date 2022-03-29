@@ -316,40 +316,54 @@ func graphQLClient(h *http.Client, hostname string) *graphql.Client {
 
 // REST performs a REST request and parses the response.
 func (c Client) REST(hostname string, method string, p string, body io.Reader, data interface{}) error {
+	_, err := c.RESTWithNext(hostname, method, p, body, data)
+	return err
+}
+
+func (c Client) RESTWithNext(hostname string, method string, p string, body io.Reader, data interface{}) (string, error) {
 	req, err := http.NewRequest(method, restURL(hostname, p), body)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	success := resp.StatusCode >= 200 && resp.StatusCode < 300
 	if !success {
-		return HandleHTTPError(resp)
+		return "", HandleHTTPError(resp)
 	}
 
 	if resp.StatusCode == http.StatusNoContent {
-		return nil
+		return "", nil
 	}
 
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	err = json.Unmarshal(b, &data)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	var next string
+	for _, m := range linkRE.FindAllStringSubmatch(resp.Header.Get("Link"), -1) {
+		if len(m) > 2 && m[2] == "next" {
+			next = m[1]
+		}
+	}
+
+	return next, nil
 }
+
+var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
 
 func restURL(hostname string, pathOrURL string) string {
 	if strings.HasPrefix(pathOrURL, "https://") || strings.HasPrefix(pathOrURL, "http://") {

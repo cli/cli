@@ -7,6 +7,7 @@ require (
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/briandowns/spinner v1.18.1
 	github.com/charmbracelet/glamour v0.4.0
+	github.com/charmbracelet/lipgloss v0.5.0
 	github.com/cli/browser v1.1.0
 	github.com/cli/oauth v0.9.0
 	github.com/cli/safeexec v1.0.0
@@ -27,7 +28,7 @@ require (
 	github.com/mattn/go-isatty v0.0.14
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/muesli/reflow v0.3.0
-	github.com/muesli/termenv v0.9.0
+	github.com/muesli/termenv v0.11.1-0.20220204035834-5ac8409525e0
 	github.com/muhammadmuzzammil1998/jsonc v0.0.0-20201229145248-615b0916ca38
 	github.com/opentracing/opentracing-go v1.1.0
 	github.com/shurcooL/githubv4 v0.0.0-20200928013246-d292edc3691b
