@@ -11,7 +11,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/label/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -19,7 +18,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var randomColor = []string{
+var randomColors = []string{
 	"B60205",
 	"D93F0B",
 	"FBCA04",
@@ -39,46 +38,40 @@ var randomColor = []string{
 }
 
 type CreateOptions struct {
-	HttpClient func() (*http.Client, error)
-	Config     func() (config.Config, error)
-	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	HttpClient func() (*http.Client, error)
+	IO         *iostreams.IOStreams
 
-	Name        string
-	Description string
 	Color       string
+	Description string
+	Name        string
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := CreateOptions{
-		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		BaseRepo:   f.BaseRepo,
+		IO:         f.IOStreams,
 	}
 
 	cmd := &cobra.Command{
-		Use:   "create",
+		Use:   "create <name>",
 		Short: "Create a new label",
 		Long: heredoc.Docf(`
-		Create a new label on GitHub.
+			Create a new label on GitHub.
 
-		Must specify name for label, description and color is optional, if color isn't provided, a random color will be chosen.
+			Must specify name for the label, the description and color are optional.
+			If a color isn't provided, a random one will be chosen.
 
-		Color needs to be 6 hex characters.
+			Color needs to be 6 character hex value.
 		`),
 		Example: heredoc.Doc(`
-		$ gh label create --name bug --description "Something isn't working" --color "E99695"
-	`),
-		Args: cobra.NoArgs,
+			$ gh label create bug --description "Something isn't working" --color E99695
+	  `),
+		Args: cmdutil.ExactArgs(1, "cannot create label: name argument required"),
 		RunE: func(c *cobra.Command, args []string) error {
-			nameProvided := c.Flags().Changed("name")
-
-			if !nameProvided || strings.TrimSpace(opts.Name) == "" {
-				return cmdutil.FlagErrorf("must specify name for label.")
-			}
-
+			opts.BaseRepo = f.BaseRepo
+			opts.Name = args[0]
 			opts.Color = strings.TrimPrefix(opts.Color, "#")
-
 			if runF != nil {
 				return runF(&opts)
 			}
@@ -86,9 +79,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Name, "name", "n", "", "Name of the label")
 	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "Description of the label")
-	cmd.Flags().StringVarP(&opts.Color, "color", "c", "", "Color of the label, if not specified will be random")
+	cmd.Flags().StringVarP(&opts.Color, "color", "c", "", "Color of the label, if not specified one will be selected at random")
 
 	return cmd
 }
@@ -106,59 +98,37 @@ func createRun(opts *CreateOptions) error {
 
 	if opts.Color == "" {
 		rand.Seed(time.Now().UnixNano())
-		opts.Color = randomColor[rand.Intn(len(randomColor)-1)]
+		opts.Color = randomColors[rand.Intn(len(randomColors)-1)]
 	}
 
-	client := api.NewClientFromHTTP(httpClient)
-
 	opts.IO.StartProgressIndicator()
-
-	err = createLabel(opts, client, baseRepo)
-
+	err = createLabel(httpClient, baseRepo, opts)
 	opts.IO.StopProgressIndicator()
-
 	if err != nil {
 		return err
 	}
 
-	isTerminal := opts.IO.IsStdoutTTY()
-
-	if isTerminal {
+	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		successMsg := fmt.Sprintf("\n%s Label %s created.\n", cs.SuccessIcon(), opts.Name)
-
-		fmt.Fprintf(opts.IO.ErrOut, successMsg)
+		successMsg := fmt.Sprintf("\n%s Label %q created\n", cs.SuccessIcon(), opts.Name)
+		fmt.Fprintf(opts.IO.Out, successMsg)
 	}
 
 	return nil
 }
 
-type CreateLabelRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Color       string `json:"color,omitempty"`
-}
-
-func createLabel(opts *CreateOptions, client *api.Client, repo ghrepo.Interface) error {
+func createLabel(client *http.Client, repo ghrepo.Interface, opts *CreateOptions) error {
+	apiClient := api.NewClientFromHTTP(client)
 	path := fmt.Sprintf("repos/%s/%s/labels", repo.RepoOwner(), repo.RepoName())
-
-	body := CreateLabelRequest{
-		Name:        opts.Name,
-		Description: opts.Description,
-		Color:       opts.Color,
-	}
-
-	requestByte, err := json.Marshal(body)
+	requestByte, err := json.Marshal(map[string]string{
+		"name":        opts.Name,
+		"description": opts.Description,
+		"color":       opts.Color,
+	})
 	if err != nil {
 		return err
 	}
 	requestBody := bytes.NewReader(requestByte)
-
 	result := shared.Label{}
-
-	err = client.REST(repo.RepoHost(), "POST", path, requestBody, &result)
-	if err != nil {
-		return err
-	}
-	return nil
+	return apiClient.REST(repo.RepoHost(), "POST", path, requestBody, &result)
 }

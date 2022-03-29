@@ -1,21 +1,19 @@
 package list
 
 import (
-	"encoding/json"
-	"io/ioutil"
+	"net/http"
 	"testing"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestLabelList_pagination(t *testing.T) {
-	http := &httpmock.Registry{}
-	client := api.NewClient(api.ReplaceTripper(http))
+	reg := &httpmock.Registry{}
+	client := &http.Client{Transport: reg}
 
-	http.Register(
+	reg.Register(
 		httpmock.GraphQL(`query LabelList\b`),
 		httpmock.StringResponse(`
 		{
@@ -40,7 +38,7 @@ func TestLabelList_pagination(t *testing.T) {
 		}`),
 	)
 
-	http.Register(
+	reg.Register(
 		httpmock.GraphQL(`query LabelList\b`),
 		httpmock.StringResponse(`
 		{
@@ -67,9 +65,7 @@ func TestLabelList_pagination(t *testing.T) {
 
 	repo := ghrepo.New("OWNER", "REPO")
 	labels, totalCount, err := listLabels(client, repo, 10)
-	if err != nil {
-		t.Fatalf("LabelList() error = %v", err)
-	}
+	assert.NoError(t, err)
 
 	assert.Equal(t, 2, totalCount)
 	assert.Equal(t, 2, len(labels))
@@ -81,19 +77,4 @@ func TestLabelList_pagination(t *testing.T) {
 	assert.Equal(t, "docs", labels[1].Name)
 	assert.Equal(t, "ffa8da", labels[1].Color)
 	assert.Equal(t, "This is a docs label", labels[1].Description)
-
-	var reqBody struct {
-		Query     string
-		Variables map[string]interface{}
-	}
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-
-	assert.Nil(t, reqBody.Variables["endCursor"])
-
-	bodyBytes, _ = ioutil.ReadAll(http.Requests[1].Body)
-	_ = json.Unmarshal(bodyBytes, &reqBody)
-
-	assert.Equal(t, "Y3Vyc29yOnYyOpK5MjAxOS0xMC0xMVQwMTozODowMyswODowMM5f3HZq", reqBody.Variables["endCursor"].(string))
 }

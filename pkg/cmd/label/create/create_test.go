@@ -3,214 +3,149 @@ package create
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"testing"
 
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
 
-func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(isTTY)
-	io.SetStdinTTY(isTTY)
-	io.SetStderrTTY(isTTY)
-
-	factory := &cmdutil.Factory{
-		IOStreams: io,
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: rt}, nil
+func TestNewCmdCreate(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		output  CreateOptions
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "no argument",
+			input:   "",
+			wantErr: true,
+			errMsg:  "cannot create label: name argument required",
 		},
-		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
+		{
+			name:   "name argument",
+			input:  "test",
+			output: CreateOptions{Name: "test"},
 		},
-		BaseRepo: func() (ghrepo.Interface, error) {
-			return ghrepo.New("OWNER", "REPO"), nil
+		{
+			name:   "description flag",
+			input:  "test --description 'some description'",
+			output: CreateOptions{Name: "test", Description: "some description"},
+		},
+		{
+			name:   "color flag",
+			input:  "test --color FFFFFF",
+			output: CreateOptions{Name: "test", Color: "FFFFFF"},
+		},
+		{
+			name:   "color flag with pound sign",
+			input:  "test --color '#AAAAAA'",
+			output: CreateOptions{Name: "test", Color: "AAAAAA"},
 		},
 	}
 
-	cmd := NewCmdCreate(factory, nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			io, _, _, _ := iostreams.Test()
+			f := &cmdutil.Factory{
+				IOStreams: io,
+			}
+			argv, err := shlex.Split(tt.input)
+			assert.NoError(t, err)
+			var gotOpts *CreateOptions
+			cmd := NewCmdCreate(f, func(opts *CreateOptions) error {
+				gotOpts = opts
+				return nil
+			})
+			cmd.SetArgs(argv)
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
 
-	argv, err := shlex.Split(cli)
-	if err != nil {
-		return nil, err
+			_, err = cmd.ExecuteC()
+			if tt.wantErr {
+				assert.EqualError(t, err, tt.errMsg)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.output.Color, gotOpts.Color)
+			assert.Equal(t, tt.output.Description, gotOpts.Description)
+			assert.Equal(t, tt.output.Name, gotOpts.Name)
+		})
 	}
-	cmd.SetArgs(argv)
-
-	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
-
-	_, err = cmd.ExecuteC()
-	return &test.CmdOut{
-		OutBuf: stdout,
-		ErrBuf: stderr,
-	}, err
 }
 
-func TestLabelCreate_nontty(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.REST("POST", "repos/OWNER/REPO/labels"),
-		httpmock.StatusStringResponse(201, "{}"),
-	)
-
-	output, err := runCommand(http, false, "-n bugs -d \"Something isn't working\" -c \"0052cc\"")
-
-	if err != nil {
-		t.Errorf("error running command `label create`: %v", err)
+func TestCreateRun(t *testing.T) {
+	tests := []struct {
+		name       string
+		tty        bool
+		opts       *CreateOptions
+		httpStubs  func(*httpmock.Registry)
+		wantStdout string
+	}{
+		{
+			name: "creates label",
+			tty:  true,
+			opts: &CreateOptions{Name: "test", Description: "some description"},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/labels"),
+					httpmock.StatusStringResponse(201, "{}"),
+				)
+			},
+			wantStdout: "\n✓ Label \"test\" created\n",
+		},
+		{
+			name: "creates label notty",
+			tty:  false,
+			opts: &CreateOptions{Name: "test", Description: "some description"},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/labels"),
+					httpmock.StatusStringResponse(201, "{}"),
+				)
+			},
+			wantStdout: "",
+		},
 	}
 
-	assert.Equal(t, "", output.Stderr())
-	assert.Equal(t, "", output.String())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
+			}
+			tt.opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			}
+			io, _, stdout, _ := iostreams.Test()
+			io.SetStdoutTTY(tt.tty)
+			io.SetStdinTTY(tt.tty)
+			io.SetStderrTTY(tt.tty)
+			tt.opts.IO = io
+			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+				return ghrepo.New("OWNER", "REPO"), nil
+			}
+			defer reg.Verify(t)
+			err := createRun(tt.opts)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantStdout, stdout.String())
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
-	reqBody := CreateLabelRequest{}
-	err = json.Unmarshal(bodyBytes, &reqBody)
-	if err != nil {
-		t.Fatalf("error decoding JSON: %v", err)
+			bodyBytes, _ := ioutil.ReadAll(reg.Requests[0].Body)
+			reqBody := map[string]string{}
+			err = json.Unmarshal(bodyBytes, &reqBody)
+			assert.NoError(t, err)
+			assert.NotEqual(t, "", reqBody["color"])
+			assert.Equal(t, "some description", reqBody["description"])
+			assert.Equal(t, "test", reqBody["name"])
+		})
 	}
-
-	expectReqBody := CreateLabelRequest{
-		Name:        "bugs",
-		Description: "Something isn't working",
-		Color:       "0052cc",
-	}
-
-	assert.Equal(t, expectReqBody, reqBody)
-}
-
-func TestLabelCreate_tty(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.REST("POST", "repos/OWNER/REPO/labels"),
-		httpmock.StatusStringResponse(201, `{
-			"id": 3973380732,
-			"node_id": "LA_kwDOHAVYr87s1Pp8",
-			"url": "https://api.github.com/repos/OWNER/REPO/labels/bugs",
-			"name": "bugs",
-			"color": "0052cc",
-			"default": false,
-			"description": "Something isn't working"
-		}`),
-	)
-
-	output, err := runCommand(http, true, "-n bugs -d \"Something isn't working\" -c \"0052cc\"")
-
-	if err != nil {
-		t.Errorf("error running command `label create`: %v", err)
-	}
-
-	assert.Equal(t, "\n✓ Label bugs created.\n", output.Stderr())
-	assert.Equal(t, "", output.String())
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
-	reqBody := CreateLabelRequest{}
-	err = json.Unmarshal(bodyBytes, &reqBody)
-	if err != nil {
-		t.Fatalf("error decoding JSON: %v", err)
-	}
-
-	expectReqBody := CreateLabelRequest{
-		Name:        "bugs",
-		Description: "Something isn't working",
-		Color:       "0052cc",
-	}
-
-	assert.Equal(t, expectReqBody, reqBody)
-}
-
-func TestLabelCreate_when_color_with_prefix(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.REST("POST", "repos/OWNER/REPO/labels"),
-		httpmock.StatusStringResponse(201, `{
-			"id": 3973380732,
-			"node_id": "LA_kwDOHAVYr87s1Pp8",
-			"url": "https://api.github.com/repos/OWNER/REPO/labels/bugs",
-			"name": "bugs",
-			"color": "0052cc",
-			"default": false,
-			"description": "Something isn't working"
-		}`),
-	)
-
-	output, err := runCommand(http, false, "-n bugs -d \"Something isn't working\" -c \"#0052cc\"")
-
-	if err != nil {
-		t.Errorf("error running command `label create`: %v", err)
-	}
-
-	assert.Equal(t, "", output.Stderr())
-	assert.Equal(t, "", output.String())
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
-	reqBody := CreateLabelRequest{}
-	err = json.Unmarshal(bodyBytes, &reqBody)
-	if err != nil {
-		t.Fatalf("error decoding JSON: %v", err)
-	}
-
-	expectReqBody := CreateLabelRequest{
-		Name:        "bugs",
-		Description: "Something isn't working",
-		Color:       "0052cc",
-	}
-
-	assert.Equal(t, expectReqBody, reqBody)
-}
-
-func TestLabelCreate_random_color(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	http.Register(
-		httpmock.REST("POST", "repos/OWNER/REPO/labels"),
-		httpmock.StatusStringResponse(201, "{}"),
-	)
-
-	for i := 0; i < 2; i++ {
-
-	}
-	output, err := runCommand(http, false, "-n bugs")
-
-	if err != nil {
-		t.Errorf("error running command `label create`: %v", err)
-	}
-
-	assert.Equal(t, "", output.Stderr())
-	assert.Equal(t, "", output.String())
-
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
-	reqBody := CreateLabelRequest{}
-	err = json.Unmarshal(bodyBytes, &reqBody)
-	if err != nil {
-		t.Fatalf("error decoding JSON: %v", err)
-	}
-
-	assert.Contains(t, randomColor, reqBody.Color)
-}
-
-func TestLabelCreate_failed_when_not_provide_name(t *testing.T) {
-	http := &httpmock.Registry{}
-	defer http.Verify(t)
-
-	_, err := runCommand(http, false, "")
-
-	assert.NotNil(t, err)
-	assert.Equal(t, "must specify name for label.", fmt.Sprintf("%v", err))
 }

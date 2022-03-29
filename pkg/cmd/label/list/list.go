@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/label/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -18,27 +17,26 @@ type browser interface {
 }
 
 type ListOptions struct {
-	HttpClient func() (*http.Client, error)
-	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser
+	HttpClient func() (*http.Client, error)
+	IO         *iostreams.IOStreams
 
-	WebMode bool
 	Limit   int
+	WebMode bool
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := ListOptions{
-		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
-		BaseRepo:   f.BaseRepo,
 		Browser:    f.Browser,
+		HttpClient: f.HttpClient,
+		IO:         f.IOStreams,
 	}
 
 	cmd := &cobra.Command{
 		Use:     "list",
-		Short:   "Show all labels",
-		Long:    "Display all labels of a GitHub repository.",
+		Short:   "List labels in a repository",
+		Long:    "Display labels in a GitHub repository.",
 		Args:    cobra.NoArgs,
 		Aliases: []string{"ls"},
 		RunE: func(c *cobra.Command, args []string) error {
@@ -83,28 +81,22 @@ func listRun(opts *ListOptions) error {
 		return opts.Browser.Browse(labelListURL)
 	}
 
-	client := api.NewClientFromHTTP(httpClient)
-
 	opts.IO.StartProgressIndicator()
-
-	labels, totalCount, err := listLabels(client, baseRepo, opts.Limit)
+	labels, totalCount, err := listLabels(httpClient, baseRepo, opts.Limit)
+	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
 
-	opts.IO.StopProgressIndicator()
-
 	if opts.IO.IsStdoutTTY() {
-		title := listHeader(ghrepo.FullName(baseRepo), "label", len(labels), totalCount)
+		title := listHeader(ghrepo.FullName(baseRepo), len(labels), totalCount)
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
-	printLabels(labels, opts.IO)
-
-	return nil
+	return printLabels(opts.IO, labels)
 }
 
-func printLabels(labels []shared.Label, io *iostreams.IOStreams) error {
+func printLabels(io *iostreams.IOStreams, labels []shared.Label) error {
 	cs := io.ColorScheme()
 	table := utils.NewTablePrinter(io)
 
@@ -125,10 +117,10 @@ func printLabels(labels []shared.Label, io *iostreams.IOStreams) error {
 	return table.Render()
 }
 
-func listHeader(repoName string, itemName string, count int, totalCount int) string {
+func listHeader(repoName string, count int, totalCount int) string {
 	if totalCount == 0 {
-		return fmt.Sprintf("There are no %ss in %s", itemName, repoName)
+		return fmt.Sprintf("There are no %ss in %s", "label", repoName)
 	}
 
-	return fmt.Sprintf("Showing %d of %s in %s", count, utils.Pluralize(totalCount, itemName), repoName)
+	return fmt.Sprintf("Showing %d of %s in %s", count, utils.Pluralize(totalCount, "label"), repoName)
 }

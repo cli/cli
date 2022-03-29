@@ -1,12 +1,15 @@
 package list
 
 import (
+	"net/http"
+
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/label/shared"
 )
 
-func listLabels(client *api.Client, repo ghrepo.Interface, limit int) ([]shared.Label, int, error) {
+func listLabels(client *http.Client, repo ghrepo.Interface, limit int) ([]shared.Label, int, error) {
+	apiClient := api.NewClientFromHTTP(client)
 	query := `
 	query LabelList($owner: String!,$repo: String!, $limit: Int!, $endCursor: String) {
 		repository(owner: $owner, name: $repo) {
@@ -52,7 +55,7 @@ loop:
 	for {
 		var response responseData
 		variables["limit"] = pageLimit
-		err := client.GraphQL(repo.RepoHost(), query, variables, &response)
+		err := apiClient.GraphQL(repo.RepoHost(), query, variables, &response)
 		if err != nil {
 			return nil, 0, err
 		}
