@@ -36,7 +36,6 @@ type ListOptions struct {
 	HeadBranch string
 	Labels     []string
 	Author     string
-	AppAuthor  string
 	Assignee   string
 	Search     string
 	Draft      *bool
@@ -48,6 +47,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
 	}
+
+	var appAuthor string
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -81,12 +82,12 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("invalid value for --limit: %v", opts.LimitResults)
 			}
 
-			if err := cmdutil.MutuallyExclusive(
-				"specify only `--author` or `--app`",
-				opts.Author != "",
-				opts.AppAuthor != "",
-			); err != nil {
-				return err
+			if cmd.Flags().Changed("author") && cmd.Flags().Changed("app") {
+				return cmdutil.FlagErrorf("specify only `--author` or `--app`")
+			}
+
+			if cmd.Flags().Changed("app") {
+				opts.Author = fmt.Sprintf("app/%s", appAuthor)
 			}
 
 			if runF != nil {
@@ -103,7 +104,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.HeadBranch, "head", "H", "", "Filter by head branch")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by label")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
-	cmd.Flags().StringVar(&opts.AppAuthor, "app", "", "Filter by GitHub App author")
+	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
 	cmdutil.NilBoolFlag(cmd, &opts.Draft, "draft", "d", "Filter by draft state")
@@ -166,10 +167,6 @@ func listRun(opts *ListOptions) error {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
 		return opts.Browser.Browse(openURL)
-	}
-
-	if opts.AppAuthor != "" {
-		filters.Author = fmt.Sprintf("app/%s", opts.AppAuthor)
 	}
 
 	listResult, err := listPullRequests(httpClient, baseRepo, filters, opts.LimitResults)

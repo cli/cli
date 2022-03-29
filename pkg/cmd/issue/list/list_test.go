@@ -136,6 +136,32 @@ No issues match your search in OWNER/REPO
 `, output.String())
 }
 
+func TestIssueList_tty_withAppFlag(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.GraphQLQuery(`
+		{ "data": {	"repository": {
+			"hasIssuesEnabled": true,
+			"issues": { "nodes": [] }
+		} } }`, func(_ string, params map[string]interface{}) {
+			assert.Equal(t, "app/dependabot", params["author"].(string))
+		}))
+
+	output, err := runCommand(http, true, "--app dependabot")
+	if err != nil {
+		t.Errorf("error running command `issue list`: %v", err)
+	}
+
+	assert.Equal(t, "", output.Stderr())
+	assert.Equal(t, `
+No issues match your search in OWNER/REPO
+
+`, output.String())
+}
+
 func TestIssueList_withInvalidLimitFlag(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)

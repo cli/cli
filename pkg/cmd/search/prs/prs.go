@@ -1,6 +1,8 @@
 package prs
 
 import (
+	"fmt"
+
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/search/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -9,11 +11,10 @@ import (
 )
 
 func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobra.Command {
-	var locked bool
-	var merged bool
+	var locked, merged bool
 	var noAssignee, noLabel, noMilestone, noProject bool
-	var order string
-	var sort string
+	var order, sort string
+	var appAuthor string
 	opts := &shared.IssuesOptions{
 		Browser: f.Browser,
 		Entity:  shared.Issues,
@@ -56,6 +57,12 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 			}
 			if opts.Query.Limit < 1 || opts.Query.Limit > shared.SearchMaxResults {
 				return cmdutil.FlagErrorf("`--limit` must be between 1 and 1000")
+			}
+			if c.Flags().Changed("author") && c.Flags().Changed("app") {
+				return cmdutil.FlagErrorf("specify only `--author` or `--app`")
+			}
+			if c.Flags().Changed("app") {
+				opts.Query.Qualifiers.Author = fmt.Sprintf("app/%s", appAuthor)
 			}
 			if c.Flags().Changed("order") {
 				opts.Query.Order = order
@@ -125,6 +132,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 		}, "Sort fetched results")
 
 	// Issue query qualifier flags
+	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
 	cmdutil.NilBoolFlag(cmd, &opts.Query.Qualifiers.Archived, "archived", "", "Restrict search to archived repositories")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Assignee, "assignee", "", "Filter by assignee")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Author, "author", "", "Filter by author")

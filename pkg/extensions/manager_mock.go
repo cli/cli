@@ -25,7 +25,7 @@ var _ ExtensionManager = &ExtensionManagerMock{}
 // 			DispatchFunc: func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (bool, error) {
 // 				panic("mock out the Dispatch method")
 // 			},
-// 			InstallFunc: func(interfaceMoqParam ghrepo.Interface) error {
+// 			InstallFunc: func(interfaceMoqParam ghrepo.Interface, s string) error {
 // 				panic("mock out the Install method")
 // 			},
 // 			InstallLocalFunc: func(dir string) error {
@@ -54,7 +54,7 @@ type ExtensionManagerMock struct {
 	DispatchFunc func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (bool, error)
 
 	// InstallFunc mocks the Install method.
-	InstallFunc func(interfaceMoqParam ghrepo.Interface) error
+	InstallFunc func(interfaceMoqParam ghrepo.Interface, s string) error
 
 	// InstallLocalFunc mocks the InstallLocal method.
 	InstallLocalFunc func(dir string) error
@@ -92,6 +92,8 @@ type ExtensionManagerMock struct {
 		Install []struct {
 			// InterfaceMoqParam is the interfaceMoqParam argument value.
 			InterfaceMoqParam ghrepo.Interface
+			// S is the s argument value.
+			S string
 		}
 		// InstallLocal holds details about calls to the InstallLocal method.
 		InstallLocal []struct {
@@ -204,19 +206,21 @@ func (mock *ExtensionManagerMock) DispatchCalls() []struct {
 }
 
 // Install calls InstallFunc.
-func (mock *ExtensionManagerMock) Install(interfaceMoqParam ghrepo.Interface) error {
+func (mock *ExtensionManagerMock) Install(interfaceMoqParam ghrepo.Interface, s string) error {
 	if mock.InstallFunc == nil {
 		panic("ExtensionManagerMock.InstallFunc: method is nil but ExtensionManager.Install was just called")
 	}
 	callInfo := struct {
 		InterfaceMoqParam ghrepo.Interface
+		S                 string
 	}{
 		InterfaceMoqParam: interfaceMoqParam,
+		S:                 s,
 	}
 	mock.lockInstall.Lock()
 	mock.calls.Install = append(mock.calls.Install, callInfo)
 	mock.lockInstall.Unlock()
-	return mock.InstallFunc(interfaceMoqParam)
+	return mock.InstallFunc(interfaceMoqParam, s)
 }
 
 // InstallCalls gets all the calls that were made to Install.
@@ -224,9 +228,11 @@ func (mock *ExtensionManagerMock) Install(interfaceMoqParam ghrepo.Interface) er
 //     len(mockedExtensionManager.InstallCalls())
 func (mock *ExtensionManagerMock) InstallCalls() []struct {
 	InterfaceMoqParam ghrepo.Interface
+	S                 string
 } {
 	var calls []struct {
 		InterfaceMoqParam ghrepo.Interface
+		S                 string
 	}
 	mock.lockInstall.RLock()
 	calls = mock.calls.Install
