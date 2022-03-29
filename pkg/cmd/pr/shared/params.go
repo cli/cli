@@ -148,18 +148,19 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 }
 
 type FilterOptions struct {
-	Entity     string
-	State      string
 	Assignee   string
-	Labels     []string
 	Author     string
 	BaseBranch string
+	Draft      *bool
+	Entity     string
+	Fields     []string
 	HeadBranch string
+	Labels     []string
 	Mention    string
 	Milestone  string
 	Search     string
-	Draft      *bool
-	Fields     []string
+	State      string
+	Repo       string
 }
 
 func (opts *FilterOptions) IsDefault() bool {
@@ -208,7 +209,7 @@ func ListURLWithQuery(listURL string, options FilterOptions) (string, error) {
 
 func SearchQueryBuild(options FilterOptions) string {
 	q := search.Query{
-		Keywords: strings.Split(options.Search, " "),
+		Keywords: splitKeywords(options.Search),
 		Qualifiers: search.Qualifiers{
 			Assignee:  options.Assignee,
 			Author:    options.Author,
@@ -218,11 +219,32 @@ func SearchQueryBuild(options FilterOptions) string {
 			Label:     options.Labels,
 			Mentions:  options.Mention,
 			Milestone: options.Milestone,
+			Repo:      []string{options.Repo},
 			State:     options.State,
 			Type:      options.Entity,
 		},
 	}
 	return q.String()
+}
+
+func splitKeywords(keywords string) []string {
+	a := []string{}
+	sb := &strings.Builder{}
+	quoted := false
+	for _, r := range keywords {
+		if r == '"' || r == '\'' {
+			quoted = !quoted
+		} else if !quoted && r == ' ' {
+			a = append(a, sb.String())
+			sb.Reset()
+		} else {
+			sb.WriteRune(r)
+		}
+	}
+	if sb.Len() > 0 {
+		a = append(a, sb.String())
+	}
+	return a
 }
 
 func QueryHasStateClause(searchQuery string) bool {

@@ -3,12 +3,10 @@ package list
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
-	"github.com/cli/cli/v2/pkg/search"
 )
 
 func shouldUseSearch(filters prShared.FilterOptions) bool {
@@ -160,24 +158,12 @@ func searchPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters 
 			}
 		}`
 
-	q := search.Query{
-		Keywords: strings.Split(filters.Search, " "),
-		Qualifiers: search.Qualifiers{
-			Assignee: filters.Assignee,
-			Author:   filters.Author,
-			Base:     filters.BaseBranch,
-			Draft:    filters.Draft,
-			Label:    filters.Labels,
-			Repo:     []string{ghrepo.FullName(repo)},
-			State:    filters.State,
-			Type:     "pr",
-		},
-	}
+	filters.Repo = ghrepo.FullName(repo)
+	filters.Entity = "pr"
+	q := prShared.SearchQueryBuild(filters)
 
 	pageLimit := min(limit, 100)
-	variables := map[string]interface{}{
-		"q": q.String(),
-	}
+	variables := map[string]interface{}{"q": q}
 
 	res := api.PullRequestAndTotalCount{SearchCapped: limit > 1000}
 	var check = make(map[int]struct{})

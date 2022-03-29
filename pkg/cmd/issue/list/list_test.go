@@ -276,7 +276,7 @@ func Test_issueList(t *testing.T) {
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
-							"query": "repo:OWNER/REPO milestone:1.x state:open type:issue",
+							"query": "milestone:1.x repo:OWNER/REPO state:open type:issue",
 							"type":  "ISSUE",
 						}, params)
 					}))
@@ -308,7 +308,7 @@ func Test_issueList(t *testing.T) {
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
-							"query": "repo:OWNER/REPO milestone:1.x state:open type:issue",
+							"query": "milestone:1.x repo:OWNER/REPO state:open type:issue",
 							"type":  "ISSUE",
 						}, params)
 					}))
@@ -379,7 +379,7 @@ func Test_issueList(t *testing.T) {
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
-							"query": "repo:OWNER/REPO auth bug assignee:@me author:@me mentions:@me state:open type:issue",
+							"query": "auth bug assignee:@me author:@me mentions:@me repo:OWNER/REPO state:open type:issue",
 							"type":  "ISSUE",
 						}, params)
 					}))
@@ -411,7 +411,7 @@ func Test_issueList(t *testing.T) {
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
-							"query": `repo:OWNER/REPO label:"one world" label:hello state:open type:issue`,
+							"query": `label:"one world" label:hello repo:OWNER/REPO state:open type:issue`,
 							"type":  "ISSUE",
 						}, params)
 					}))
