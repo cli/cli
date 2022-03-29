@@ -84,8 +84,8 @@ func TestNewHTTPClient(t *testing.T) {
 				appVersion: "v1.2.3",
 				setAccept:  true,
 			},
-			host:     "github.com",
-			envDebug: "api",
+			host:       "github.com",
+			envDebug:   "api",
 			setGhDebug: false,
 			wantHeader: map[string]string{
 				"authorization": "token MYTOKEN",
@@ -114,7 +114,7 @@ func TestNewHTTPClient(t *testing.T) {
 				appVersion: "v1.2.3",
 				setAccept:  true,
 			},
-			host:     "github.com",
+			host:       "github.com",
 			envGhDebug: "api",
 			setGhDebug: true,
 			wantHeader: map[string]string{
