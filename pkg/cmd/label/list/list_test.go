@@ -92,31 +92,32 @@ func TestListRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`query LabelList\b`),
 					httpmock.StringResponse(`
-          {
-            "data": {
-              "repository": {
-                "labels": {
-                  "totalCount": 2,
-                  "nodes": [
-                    {
-                      "name": "bug",
-                      "color": "d73a4a",
-                      "description": "This is a bug label"
-                    },
-                    {
-                      "name": "docs",
-                      "color": "ffa8da",
-                      "description": "This is a docs label"
-                    }
-                  ],
-                  "pageInfo": {
-                    "hasNextPage": false,
-                    "endCursor": "Y3Vyc29yOnYyOpK5MjAxOS0xMC0xMVQwMTozODowMyswODowMM5f3HZq"
-                  }
-                }
-              }
-            }
-          }`),
+						{
+							"data": {
+								"repository": {
+									"labels": {
+										"totalCount": 2,
+										"nodes": [
+											{
+												"name": "bug",
+												"color": "d73a4a",
+												"description": "This is a bug label"
+											},
+											{
+												"name": "docs",
+												"color": "ffa8da",
+												"description": "This is a docs label"
+											}
+										],
+										"pageInfo": {
+											"hasNextPage": false,
+											"endCursor": "Y3Vyc29yOnYyOpK5MjAxOS0xMC0xMVQwMTozODowMyswODowMM5f3HZq"
+										}
+									}
+								}
+							}
+						}`,
+					),
 				)
 			},
 			wantStdout: "\nShowing 2 of 2 labels in OWNER/REPO\n\nbug   This is a bug label\ndocs  This is a docs label\n",
@@ -129,31 +130,32 @@ func TestListRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`query LabelList\b`),
 					httpmock.StringResponse(`
-          {
-            "data": {
-              "repository": {
-                "labels": {
-                  "totalCount": 2,
-                  "nodes": [
-                    {
-                      "name": "bug",
-                      "color": "d73a4a",
-                      "description": "This is a bug label"
-                    },
-                    {
-                      "name": "docs",
-                      "color": "ffa8da",
-                      "description": "This is a docs label"
-                    }
-                  ],
-                  "pageInfo": {
-                    "hasNextPage": false,
-                    "endCursor": "Y3Vyc29yOnYyOpK5MjAxOS0xMC0xMVQwMTozODowMyswODowMM5f3HZq"
-                  }
-                }
-              }
-            }
-          }`),
+						{
+							"data": {
+								"repository": {
+									"labels": {
+										"totalCount": 2,
+										"nodes": [
+											{
+												"name": "bug",
+												"color": "d73a4a",
+												"description": "This is a bug label"
+											},
+											{
+												"name": "docs",
+												"color": "ffa8da",
+												"description": "This is a docs label"
+											}
+										],
+										"pageInfo": {
+											"hasNextPage": false,
+											"endCursor": "Y3Vyc29yOnYyOpK5MjAxOS0xMC0xMVQwMTozODowMyswODowMM5f3HZq"
+										}
+									}
+								}
+							}
+						}`,
+					),
 				)
 			},
 			wantStdout: "bug\tThis is a bug label\ndocs\tThis is a docs label\n",
@@ -166,20 +168,8 @@ func TestListRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`query LabelList\b`),
 					httpmock.StringResponse(`
-          {
-            "data": {
-              "repository": {
-                "labels": {
-                  "totalCount": 0,
-                  "nodes": [],
-                  "pageInfo": {
-                    "hasNextPage": false,
-                    "endCursor": null
-                  }
-                }
-              }
-            }
-          }`),
+						{"data":{"repository":{"labels":{"totalCount":0,"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}`,
+					),
 				)
 			},
 			wantStdout: "\nThere are no labels in OWNER/REPO\n\n",
