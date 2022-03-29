@@ -110,7 +110,7 @@ func createRun(opts *CreateOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		successMsg := fmt.Sprintf("\n%s Label %q created\n", cs.SuccessIcon(), opts.Name)
+		successMsg := fmt.Sprintf("\n%s Label %q created in %s\n", cs.SuccessIcon(), opts.Name, ghrepo.FullName(baseRepo))
 		fmt.Fprintf(opts.IO.Out, successMsg)
 	}
 
