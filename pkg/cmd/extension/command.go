@@ -65,7 +65,13 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if !c.IsBinary() && len(version) > 8 {
 						version = version[:8]
 					}
-					t.AddField(version, nil, nil)
+
+					if c.IsPinned() {
+						t.AddField(version, nil, cs.Cyan)
+					} else {
+						t.AddField(version, nil, nil)
+					}
+
 					var updateAvailable string
 					if c.UpdateAvailable() {
 						updateAvailable = "Upgrade available"
@@ -76,10 +82,12 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				return t.Render()
 			},
 		},
-		&cobra.Command{
-			Use:   "install <repository>",
-			Short: "Install a gh extension from a repository",
-			Long: heredoc.Doc(`
+		func() *cobra.Command {
+			var pinFlag string
+			cmd := &cobra.Command{
+				Use:   "install <repository>",
+				Short: "Install a gh extension from a repository",
+				Long: heredoc.Doc(`
 				Install a GitHub repository locally as a GitHub CLI extension.
 				
 				The repository argument can be specified in "owner/repo" format as well as a full URL.
@@ -90,41 +98,57 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 				See the list of available extensions at <https://github.com/topics/gh-extension>.
 			`),
-			Example: heredoc.Doc(`
+				Example: heredoc.Doc(`
 				$ gh extension install owner/gh-extension
 				$ gh extension install https://git.example.com/owner/gh-extension
 				$ gh extension install .
 			`),
-			Args: cmdutil.MinimumArgs(1, "must specify a repository to install from"),
-			RunE: func(cmd *cobra.Command, args []string) error {
-				if args[0] == "." {
-					wd, err := os.Getwd()
+				Args: cmdutil.MinimumArgs(1, "must specify a repository to install from"),
+				RunE: func(cmd *cobra.Command, args []string) error {
+					if args[0] == "." {
+						if pinFlag != "" {
+							return fmt.Errorf("local extensions cannot be pinned")
+						}
+						wd, err := os.Getwd()
+						if err != nil {
+							return err
+						}
+						return m.InstallLocal(wd)
+					}
+
+					repo, err := ghrepo.FromFullName(args[0])
 					if err != nil {
 						return err
 					}
-					return m.InstallLocal(wd)
-				}
 
-				repo, err := ghrepo.FromFullName(args[0])
-				if err != nil {
-					return err
-				}
+					if err := checkValidExtension(cmd.Root(), m, repo.RepoName()); err != nil {
+						return err
+					}
 
-				if err := checkValidExtension(cmd.Root(), m, repo.RepoName()); err != nil {
-					return err
-				}
-
-				if err := m.Install(repo); err != nil {
-					return err
-				}
-
-				if io.IsStdoutTTY() {
 					cs := io.ColorScheme()
-					fmt.Fprintf(io.Out, "%s Installed extension %s\n", cs.SuccessIcon(), args[0])
-				}
-				return nil
-			},
-		},
+					if err := m.Install(repo, pinFlag); err != nil {
+						if errors.Is(err, releaseNotFoundErr) {
+							return fmt.Errorf("%s Could not find a release of %s for %s",
+								cs.FailureIcon(), args[0], cs.Cyan(pinFlag))
+						} else if errors.Is(err, commitNotFoundErr) {
+							return fmt.Errorf("%s %s does not exist in %s",
+								cs.FailureIcon(), cs.Cyan(pinFlag), args[0])
+						}
+						return err
+					}
+
+					if io.IsStdoutTTY() {
+						fmt.Fprintf(io.Out, "%s Installed extension %s\n", cs.SuccessIcon(), args[0])
+						if pinFlag != "" {
+							fmt.Fprintf(io.Out, "%s Pinned extension at %s\n", cs.SuccessIcon(), cs.Cyan(pinFlag))
+						}
+					}
+					return nil
+				},
+			}
+			cmd.Flags().StringVar(&pinFlag, "pin", "", "pin extension to a release tag or commit ref")
+			return cmd
+		}(),
 		func() *cobra.Command {
 			var flagAll bool
 			var flagForce bool
@@ -153,6 +177,9 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if err != nil && !errors.Is(err, upToDateError) {
 						if name != "" {
 							fmt.Fprintf(io.ErrOut, "%s Failed upgrading extension %s: %s\n", cs.FailureIcon(), name, err)
+						} else if errors.Is(err, noExtensionsInstalledError) {
+							fmt.Fprintf(io.ErrOut, "%s No installed extensions found\n", cs.WarningIcon())
+							return nil
 						} else {
 							fmt.Fprintf(io.ErrOut, "%s Failed upgrading extensions\n", cs.FailureIcon())
 						}

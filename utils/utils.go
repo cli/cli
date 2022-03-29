@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -91,4 +92,25 @@ func StringInSlice(a string, slice []string) bool {
 		}
 	}
 	return false
+}
+  
+func IsDebugEnabled() (bool, string) {
+	debugValue, isDebugSet := os.LookupEnv("GH_DEBUG")
+	legacyDebugValue := os.Getenv("DEBUG")
+
+	if !isDebugSet {
+		switch legacyDebugValue {
+		case "true", "1", "yes", "api":
+			return true, legacyDebugValue
+		default:
+			return false, legacyDebugValue
+		}
+	}
+
+	switch debugValue {
+	case "false", "0", "no", "":
+		return false, debugValue
+	default:
+		return true, debugValue
+	}
 }

@@ -102,6 +102,24 @@ func TestNewCmdIssues(t *testing.T) {
 			},
 		},
 		{
+			name:  "app flag",
+			input: "--app dependabot",
+			output: shared.IssuesOptions{
+				Query: search.Query{
+					Keywords:   []string{},
+					Kind:       "issues",
+					Limit:      30,
+					Qualifiers: search.Qualifiers{Type: "issue", Author: "app/dependabot"},
+				},
+			},
+		},
+		{
+			name:    "invalid author and app flags",
+			input:   "--author test --app dependabot",
+			wantErr: true,
+			errMsg:  "specify only `--author` or `--app`",
+		},
+		{
 			name: "qualifier flags",
 			input: `
       --archived
