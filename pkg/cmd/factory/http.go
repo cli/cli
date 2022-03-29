@@ -83,8 +83,8 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg configGetter, appVersion string,
 			return httpunix.NewRoundTripper(unixSocket)
 		}))
 	}
-	debugEnabled, debugValue := utils.IsDebugEnabled()
-	if debugEnabled {
+
+	if isVerbose, debugValue := utils.IsDebugEnabled(); isVerbose {
 		logTraffic := strings.Contains(debugValue, "api")
 		opts = append(opts, api.VerboseLog(io.ErrOut, logTraffic, io.IsStderrTTY()))
 	}

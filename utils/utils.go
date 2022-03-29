@@ -3,9 +3,9 @@ package utils
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 	"time"
-	"os"
 )
 
 func Pluralize(num int, thing string) string {
@@ -86,15 +86,22 @@ func ValidURL(urlStr string) bool {
 }
 
 func IsDebugEnabled() (bool, string) {
-	gh_val, gh_present := os.LookupEnv("GH_DEBUG")
-	legacy_val, legacy_present := os.LookupEnv("DEBUG")
-	if gh_present && (gh_val == "0" || gh_val == "false" || gh_val == "") {
-		return false, gh_val
-	} else if gh_present {
-		return true, gh_val
-	} else if !legacy_present || legacy_val == "0" || legacy_val == "false" || legacy_val == "" {
-		return false, legacy_val
-	} else {
-		return true, legacy_val
+	debugValue, isDebugSet := os.LookupEnv("GH_DEBUG")
+	legacyDebugValue := os.Getenv("DEBUG")
+
+	if !isDebugSet {
+		switch legacyDebugValue {
+		case "true", "1", "yes", "api":
+			return true, legacyDebugValue
+		default:
+			return false, legacyDebugValue
+		}
+	}
+
+	switch debugValue {
+	case "false", "0", "no", "":
+		return false, debugValue
+	default:
+		return true, debugValue
 	}
 }

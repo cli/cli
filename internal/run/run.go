@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
 	"github.com/cli/cli/v2/utils"
 )
 
@@ -29,8 +30,7 @@ type cmdWithStderr struct {
 }
 
 func (c cmdWithStderr) Output() ([]byte, error) {
-	debugEnabled, _ := utils.IsDebugEnabled()
-	if debugEnabled {
+	if isVerbose, _ := utils.IsDebugEnabled(); isVerbose {
 		_ = printArgs(os.Stderr, c.Cmd.Args)
 	}
 	if c.Cmd.Stderr != nil {
@@ -46,8 +46,7 @@ func (c cmdWithStderr) Output() ([]byte, error) {
 }
 
 func (c cmdWithStderr) Run() error {
-	debugEnabled, _ := utils.IsDebugEnabled()
-	if debugEnabled {
+	if isVerbose, _ := utils.IsDebugEnabled(); isVerbose {
 		_ = printArgs(os.Stderr, c.Cmd.Args)
 	}
 	if c.Cmd.Stderr != nil {

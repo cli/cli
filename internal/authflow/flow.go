@@ -12,8 +12,8 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/oauth"
 	"github.com/cli/cli/v2/utils"
+	"github.com/cli/oauth"
 )
 
 var (
@@ -54,9 +54,9 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 	cs := IO.ColorScheme()
 
 	httpClient := http.DefaultClient
-	debugEnabled, envDebug := utils.IsDebugEnabled()
+	debugEnabled, debugValue := utils.IsDebugEnabled()
 	if debugEnabled {
-		logTraffic := strings.Contains(envDebug, "api") || strings.Contains(envDebug, "oauth")
+		logTraffic := strings.Contains(debugValue, "api")
 		httpClient.Transport = api.VerboseLog(IO.ErrOut, logTraffic, IO.ColorEnabled())(httpClient.Transport)
 	}
 

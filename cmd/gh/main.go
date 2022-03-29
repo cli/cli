@@ -327,9 +327,10 @@ func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
 // does not depend on user configuration
 func basicClient(currentVersion string) (*api.Client, error) {
 	var opts []api.ClientOption
-	verbose, _ := utils.IsDebugEnabled()
-	if verbose {
-		opts = append(opts, apiVerboseLog())
+	if isVerbose, debugValue := utils.IsDebugEnabled(); isVerbose {
+		colorize := utils.IsTerminal(os.Stderr)
+		logTraffic := strings.Contains(debugValue, "api")
+		opts = append(opts, api.VerboseLog(colorable.NewColorable(os.Stderr), logTraffic, colorize))
 	}
 	opts = append(opts, api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", currentVersion)))
 
@@ -343,13 +344,6 @@ func basicClient(currentVersion string) (*api.Client, error) {
 		opts = append(opts, api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
 	}
 	return api.NewClient(opts...), nil
-}
-
-func apiVerboseLog() api.ClientOption {
-	debugEnabled, debugValue := utils.IsDebugEnabled()
-	logTraffic := debugEnabled && strings.Contains(debugValue, "api")
-	colorize := utils.IsTerminal(os.Stderr)
-	return api.VerboseLog(colorable.NewColorable(os.Stderr), logTraffic, colorize)
 }
 
 func isRecentRelease(publishedAt time.Time) bool {
