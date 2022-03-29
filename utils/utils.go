@@ -93,7 +93,7 @@ func StringInSlice(a string, slice []string) bool {
 	}
 	return false
 }
-  
+
 func IsDebugEnabled() (bool, string) {
 	debugValue, isDebugSet := os.LookupEnv("GH_DEBUG")
 	legacyDebugValue := os.Getenv("DEBUG")
