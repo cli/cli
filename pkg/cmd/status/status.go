@@ -546,8 +546,8 @@ func statusRun(opts *StatusOptions) error {
 	halfWidth := (fullWidth / 2) - 2
 
 	idStyle := cs.Cyan
-	leftHalfStyle := lipgloss.NewStyle().Width(halfWidth).Padding(0).BorderRight(true).BorderStyle(lipgloss.NormalBorder())
-	rightHalfStyle := lipgloss.NewStyle().Width(halfWidth).Padding(0)
+	leftHalfStyle := lipgloss.NewStyle().Width(halfWidth).Padding(0).MarginRight(1).BorderRight(true).BorderStyle(lipgloss.NormalBorder())
+	rightHalfStyle := lipgloss.NewStyle().Width(halfWidth).Padding(0).BorderLeft(true)
 
 	section := func(header string, items []StatusItem, width, rowLimit int) (string, error) {
 		tableOut := &bytes.Buffer{}
