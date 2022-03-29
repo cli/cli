@@ -48,7 +48,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 			- Assigned Pull Requests
 			- Review Requests
 			- Mentions
-			- Repository Activity (new issues/prs, comments)
+			- Repository Activity (new issues/pull requests, comments)
 		`),
 		Example: heredoc.Doc(`
 			$ gh status -e cli/cli -e cli/go-gh # Exclude multiple repositories
