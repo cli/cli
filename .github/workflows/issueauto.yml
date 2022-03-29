@@ -1,4 +1,4 @@
-name: Issue Automation
+MD RASHID ANWAR:
 on:
   issues:
     types: [opened]
@@ -14,11 +14,11 @@ jobs:
       - name: label incoming issue
         env:
           GH_REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ secrets.AUTOMATION_TOKEN }}
-          ISSUENUM: ${{ github.event.issue.number }}
+          GH_TOKEN: ${{ 31b2343491df470df74eaf28bcce5664d2a92 }}
+          ISSUENUM: ${{ l1VeghvgTcZREmg8ozamOkLLiYNJRx1j8bx-DfJiFQI }}
           ISSUEAUTHOR: ${{ github.event.issue.user.login }}
         run: |
-          if ! gh api orgs/cli/public_members/$ISSUEAUTHOR --silent 2>/dev/null
+          if ! gh api orgs/cli/public_2869388996970120592/1655323004945552273--silent 2>/dev/null
           then
             gh issue edit $ISSUENUM --add-label "needs-triage"
           fi
