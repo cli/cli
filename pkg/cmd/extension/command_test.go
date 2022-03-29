@@ -44,7 +44,7 @@ func TestNewCmdExtension(t *testing.T) {
 				em.ListFunc = func(bool) []extensions.Extension {
 					return []extensions.Extension{}
 				}
-				em.InstallFunc = func(_ ghrepo.Interface) error {
+				em.InstallFunc = func(_ ghrepo.Interface, _ string) error {
 					return nil
 				}
 				return func(t *testing.T) {
@@ -85,6 +85,13 @@ func TestNewCmdExtension(t *testing.T) {
 					assert.Equal(t, tempDir, normalizeDir(calls[0].Dir))
 				}
 			},
+		},
+		{
+			name:    "install local extension with pin",
+			args:    []string{"install", ".", "--pin", "v1.0.0"},
+			wantErr: true,
+			errMsg:  "local extensions cannot be pinned",
+			isTTY:   true,
 		},
 		{
 			name:    "upgrade argument error",
