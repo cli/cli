@@ -55,6 +55,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Browser:    f.Browser,
 	}
 
+	var appAuthor string
+
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List issues in a repository",
@@ -81,6 +83,14 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("invalid limit: %v", opts.LimitResults)
 			}
 
+			if cmd.Flags().Changed("author") && cmd.Flags().Changed("app") {
+				return cmdutil.FlagErrorf("specify only `--author` or `--app`")
+			}
+
+			if cmd.Flags().Changed("app") {
+				opts.Author = fmt.Sprintf("app/%s", appAuthor)
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -94,6 +104,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmdutil.StringEnumFlag(cmd, &opts.State, "state", "s", "open", []string{"open", "closed", "all"}, "Filter by state")
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of issues to fetch")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
+	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
 	cmd.Flags().StringVar(&opts.Mention, "mention", "", "Filter by mention")
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Filter by milestone number or title")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search issues with `query`")
