@@ -153,6 +153,9 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if err != nil && !errors.Is(err, upToDateError) {
 						if name != "" {
 							fmt.Fprintf(io.ErrOut, "%s Failed upgrading extension %s: %s\n", cs.FailureIcon(), name, err)
+						} else if errors.Is(err, noExtensionsInstalledError) {
+							fmt.Fprintf(io.ErrOut, "%s No installed extensions found\n", cs.WarningIcon())
+							return nil
 						} else {
 							fmt.Fprintf(io.ErrOut, "%s Failed upgrading extensions\n", cs.FailureIcon())
 						}
