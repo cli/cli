@@ -594,9 +594,9 @@ func statusRun(opts *StatusOptions) error {
 	}
 	rrSection = leftHalfStyle.Render(rrSection)
 
-	prSection, err := section("Assigned PRs", sg.AssignedPRs, halfWidth, 5)
+	prSection, err := section("Assigned Pull Requests", sg.AssignedPRs, halfWidth, 5)
 	if err != nil {
-		return fmt.Errorf("failed to render 'Assigned PRs': %w", err)
+		return fmt.Errorf("failed to render 'Assigned Pull Requests': %w", err)
 	}
 	prSection = rightHalfStyle.Render(prSection)
 
