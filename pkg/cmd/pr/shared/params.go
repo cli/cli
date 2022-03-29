@@ -158,9 +158,9 @@ type FilterOptions struct {
 	Labels     []string
 	Mention    string
 	Milestone  string
+	Repo       string
 	Search     string
 	State      string
-	Repo       string
 }
 
 func (opts *FilterOptions) IsDefault() bool {
