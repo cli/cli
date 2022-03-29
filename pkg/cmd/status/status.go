@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -217,6 +218,17 @@ func (s *StatusGetter) ActualMention(n Notification) (string, error) {
 // These are split up by endpoint since it is along that boundary we parallelize
 // work
 
+var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
+
+func findNextPage(resp *http.Response) (string, bool) {
+	for _, m := range linkRE.FindAllStringSubmatch(resp.Header.Get("Link"), -1) {
+		if len(m) > 2 && m[2] == "next" {
+			return m[1], true
+		}
+	}
+	return "", false
+}
+
 // Populate .Mentions
 func (s *StatusGetter) LoadNotifications() error {
 	perPage := 100
@@ -233,11 +245,10 @@ func (s *StatusGetter) LoadNotifications() error {
 	// not work with PATs right now.
 	var ns []Notification
 	var resp []Notification
-	pages := 3
-	for page := 1; page <= pages; page++ {
-		query.Add("page", fmt.Sprintf("%d", page))
-		p := fmt.Sprintf("notifications?%s", query.Encode())
-		err := c.REST(ghinstance.Default(), "GET", p, nil, &resp)
+	pages := 0
+	p := fmt.Sprintf("notifications?%s", query.Encode())
+	for pages < 3 {
+		next, err := c.RESTWithNext(ghinstance.Default(), "GET", p, nil, &resp)
 		if err != nil {
 			var httpErr api.HTTPError
 			if !errors.As(err, &httpErr) || httpErr.StatusCode != 404 {
@@ -245,9 +256,13 @@ func (s *StatusGetter) LoadNotifications() error {
 			}
 		}
 		ns = append(ns, resp...)
-		if len(resp) == 0 || len(resp) < perPage {
+
+		if next == "" || len(resp) < perPage {
 			break
 		}
+
+		pages++
+		p = next
 	}
 
 	s.Mentions = []StatusItem{}
@@ -430,11 +445,10 @@ func (s *StatusGetter) LoadEvents() error {
 
 	var events []Event
 	var resp []Event
-	pages := 2
-	for page := 1; page <= pages; page++ {
-		query.Add("page", fmt.Sprintf("%d", page))
-		p := fmt.Sprintf("users/%s/received_events?%s", currentUsername, query.Encode())
-		err := c.REST(ghinstance.Default(), "GET", p, nil, &resp)
+	pages := 0
+	p := fmt.Sprintf("users/%s/received_events?%s", currentUsername, query.Encode())
+	for pages < 2 {
+		next, err := c.RESTWithNext(ghinstance.Default(), "GET", p, nil, &resp)
 		if err != nil {
 			var httpErr api.HTTPError
 			if !errors.As(err, &httpErr) || httpErr.StatusCode != 404 {
@@ -442,9 +456,12 @@ func (s *StatusGetter) LoadEvents() error {
 			}
 		}
 		events = append(events, resp...)
-		if len(resp) == 0 || len(resp) < perPage {
+		if next == "" || len(resp) < perPage {
 			break
 		}
+
+		pages++
+		p = next
 	}
 
 	s.RepoActivity = []StatusItem{}
