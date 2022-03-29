@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -218,17 +217,6 @@ func (s *StatusGetter) ActualMention(n Notification) (string, error) {
 
 // These are split up by endpoint since it is along that boundary we parallelize
 // work
-
-var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
-
-func findNextPage(resp *http.Response) (string, bool) {
-	for _, m := range linkRE.FindAllStringSubmatch(resp.Header.Get("Link"), -1) {
-		if len(m) > 2 && m[2] == "next" {
-			return m[1], true
-		}
-	}
-	return "", false
-}
 
 // Populate .Mentions
 func (s *StatusGetter) LoadNotifications() error {
