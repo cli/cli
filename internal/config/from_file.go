@@ -135,13 +135,10 @@ func (c *fileConfig) CheckWriteable(hostname, key string) error {
 
 func (c *fileConfig) Write() error {
 	mainData := yaml.Node{Kind: yaml.MappingNode}
-	hostsData := yaml.Node{Kind: yaml.MappingNode}
 
 	nodes := c.documentRoot.Content[0].Content
 	for i := 0; i < len(nodes)-1; i += 2 {
-		if nodes[i].Value == "hosts" {
-			hostsData.Content = append(hostsData.Content, nodes[i+1].Content...)
-		} else {
+		if nodes[i].Value != "hosts" {
 			mainData.Content = append(mainData.Content, nodes[i], nodes[i+1])
 		}
 	}
@@ -151,10 +148,24 @@ func (c *fileConfig) Write() error {
 		return err
 	}
 
-	filename := ConfigFile()
-	err = WriteConfigFile(filename, yamlNormalize(mainBytes))
+	err = WriteConfigFile(ConfigFile(), yamlNormalize(mainBytes))
 	if err != nil {
 		return err
+	}
+
+	return c.WriteHosts()
+}
+
+// Write the hosts config file only, so as to allow logging in when the main
+// config file is not writable.
+func (c *fileConfig) WriteHosts() error {
+	hostsData := yaml.Node{Kind: yaml.MappingNode}
+
+	nodes := c.documentRoot.Content[0].Content
+	for i := 0; i < len(nodes)-1; i += 2 {
+		if nodes[i].Value == "hosts" {
+			hostsData.Content = append(hostsData.Content, nodes[i+1].Content...)
+		}
 	}
 
 	hostsBytes, err := yaml.Marshal(&hostsData)

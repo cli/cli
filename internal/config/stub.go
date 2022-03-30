@@ -67,6 +67,10 @@ func (c ConfigStub) Write() error {
 	return nil
 }
 
+func (c ConfigStub) WriteHosts() error {
+	return nil
+}
+
 func (c ConfigStub) DefaultHost() (string, error) {
 	return "", nil
 }

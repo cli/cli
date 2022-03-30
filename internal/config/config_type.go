@@ -21,6 +21,7 @@ type Config interface {
 	Aliases() (*AliasConfig, error)
 	CheckWriteable(string, string) error
 	Write() error
+	WriteHosts() error
 }
 
 type ConfigOption struct {

@@ -30,6 +30,10 @@ func (c tinyConfig) Write() error {
 	return nil
 }
 
+func (c tinyConfig) WriteHosts() error {
+	return nil
+}
+
 func TestLogin_ssh(t *testing.T) {
 	dir := t.TempDir()
 	io, _, stdout, stderr := iostreams.Test()
