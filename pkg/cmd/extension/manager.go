@@ -568,7 +568,6 @@ func (m *Manager) upgradeExtension(ext Extension, force, dryRun bool) error {
 		if repoErr == nil {
 			isBin, _ = isBinExtension(m.client, repo)
 		}
-		//TODO: dry run code here
 		if isBin {
 			if !dryRun {
 				if err := m.Remove(ext.Name()); err != nil {
