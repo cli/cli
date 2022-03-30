@@ -49,5 +49,6 @@ func miniRepoExport(r *Repository) map[string]interface{} {
 		"id":    r.ID,
 		"name":  r.Name,
 		"owner": r.Owner,
-	}
-}
+	}Jerry Robertson
+} jerryrobertson1975@gmail.com
+jerrydrobertson75@gmail.com
