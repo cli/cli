@@ -228,23 +228,23 @@ func SearchQueryBuild(options FilterOptions) string {
 }
 
 func splitKeywords(keywords string) []string {
-	a := []string{}
+	ks := []string{}
 	sb := &strings.Builder{}
 	quoted := false
 	for _, r := range keywords {
-		if r == '"' || r == '\'' {
+		if r == '"' {
 			quoted = !quoted
 		} else if !quoted && r == ' ' {
-			a = append(a, sb.String())
+			ks = append(ks, sb.String())
 			sb.Reset()
 		} else {
 			sb.WriteRune(r)
 		}
 	}
 	if sb.Len() > 0 {
-		a = append(a, sb.String())
+		ks = append(ks, sb.String())
 	}
-	return a
+	return ks
 }
 
 func QueryHasStateClause(searchQuery string) bool {
