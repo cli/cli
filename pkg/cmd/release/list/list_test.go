@@ -134,6 +134,7 @@ func Test_listRun(t *testing.T) {
 					{
 						"name": "",
 						"tagName": "v1.1.0",
+						"isLatest": false,
 						"isDraft": true,
 						"isPrerelease": false,
 						"createdAt": "%[1]s",
@@ -142,6 +143,7 @@ func Test_listRun(t *testing.T) {
 					{
 						"name": "The big 1.0",
 						"tagName": "v1.0.0",
+						"isLatest": true,
 						"isDraft": false,
 						"isPrerelease": false,
 						"createdAt": "%[1]s",
@@ -150,6 +152,7 @@ func Test_listRun(t *testing.T) {
 					{
 						"name": "1.0 release candidate",
 						"tagName": "v1.0.0-pre.2",
+						"isLatest": false,
 						"isDraft": false,
 						"isPrerelease": true,
 						"createdAt": "%[1]s",
@@ -158,6 +161,7 @@ func Test_listRun(t *testing.T) {
 					{
 						"name": "New features",
 						"tagName": "v0.9.2",
+						"isLatest": false,
 						"isDraft": false,
 						"isPrerelease": false,
 						"createdAt": "%[1]s",
