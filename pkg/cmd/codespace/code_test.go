@@ -13,6 +13,7 @@ func TestApp_VSCode(t *testing.T) {
 	type args struct {
 		codespaceName string
 		useInsiders   bool
+		useWeb        bool
 	}
 	tests := []struct {
 		name    string
@@ -38,6 +39,16 @@ func TestApp_VSCode(t *testing.T) {
 			wantErr: false,
 			wantURL: "vscode-insiders://github.codespaces/connect?name=monalisa-cli-cli-abcdef",
 		},
+		{
+			name: "open VS Code Web",
+			args: args{
+				codespaceName: "monalisa-cli-cli-abcdef",
+				useInsiders:   false,
+				useWeb:        true,
+			},
+			wantErr: false,
+			wantURL: "https://monalisa-cli-cli-abcdef.github.dev",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -46,7 +57,7 @@ func TestApp_VSCode(t *testing.T) {
 				browser:   b,
 				apiClient: testCodeApiMock(),
 			}
-			if err := a.VSCode(context.Background(), tt.args.codespaceName, tt.args.useInsiders); (err != nil) != tt.wantErr {
+			if err := a.VSCode(context.Background(), tt.args.codespaceName, tt.args.useInsiders, tt.args.useWeb); (err != nil) != tt.wantErr {
 				t.Errorf("App.VSCode() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			b.Verify(t, tt.wantURL)
@@ -57,7 +68,7 @@ func TestApp_VSCode(t *testing.T) {
 func TestPendingOperationDisallowsCode(t *testing.T) {
 	app := testingCodeApp()
 
-	if err := app.VSCode(context.Background(), "disabledCodespace", false); err != nil {
+	if err := app.VSCode(context.Background(), "disabledCodespace", false, false); err != nil {
 		if err.Error() != "codespace is disabled while it has a pending operation: Some pending operation" {
 			t.Errorf("expected pending operation error, but got: %v", err)
 		}
@@ -75,6 +86,7 @@ func testCodeApiMock() *apiClientMock {
 	user := &api.User{Login: "monalisa"}
 	testingCodespace := &api.Codespace{
 		Name: "monalisa-cli-cli-abcdef",
+		WebUrl: "https://monalisa-cli-cli-abcdef.github.dev",
 	}
 	disabledCodespace := &api.Codespace{
 		Name:                           "disabledCodespace",

@@ -183,6 +183,7 @@ type Codespace struct {
 	VSCSTarget                     string              `json:"vscs_target"`
 	PendingOperation               bool                `json:"pending_operation"`
 	PendingOperationDisabledReason string              `json:"pending_operation_disabled_reason"`
+	WebUrl                         string              `json:"web_url"`
 }
 
 type CodespaceGitStatus struct {
