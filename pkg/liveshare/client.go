@@ -57,7 +57,13 @@ func (opts *Options) uri(action string) (string, error) {
 
 	sas := url.QueryEscape(opts.RelaySAS)
 	uri := opts.RelayEndpoint
-	uri = strings.Replace(uri, "sb:", "wss:", -1)
+
+	if strings.HasPrefix(uri, "http:") {
+		uri = strings.Replace(uri, "http:", "ws:", 1)
+	} else {
+		uri = strings.Replace(uri, "sb:", "wss:", -1)
+	}
+
 	uri = strings.Replace(uri, ".net/", ".net:443/$hc/", 1)
 	uri = uri + "?sb-hc-action=" + action + "&sb-hc-token=" + sas
 	return uri, nil

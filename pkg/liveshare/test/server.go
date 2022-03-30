@@ -42,6 +42,7 @@ type Server struct {
 	sshConfig      *ssh.ServerConfig
 	httptestServer *httptest.Server
 	errCh          chan error
+	nonSecure      bool
 }
 
 // NewServer creates a new Server. ServerOptions can be passed to configure
@@ -65,7 +66,12 @@ func NewServer(opts ...ServerOption) (*Server, error) {
 	server.sshConfig.AddHostKey(privateKey)
 
 	server.errCh = make(chan error, 1)
-	server.httptestServer = httptest.NewTLSServer(http.HandlerFunc(makeConnection(server)))
+
+	if server.nonSecure {
+		server.httptestServer = httptest.NewServer(http.HandlerFunc(makeConnection(server)))
+	} else {
+		server.httptestServer = httptest.NewTLSServer(http.HandlerFunc(makeConnection(server)))
+	}
 	return server, nil
 }
 
@@ -76,6 +82,14 @@ type ServerOption func(*Server) error
 func WithPassword(password string) ServerOption {
 	return func(s *Server) error {
 		s.password = password
+		return nil
+	}
+}
+
+// WithNonSecure configures the Server as non-secure.
+func WithNonSecure() ServerOption {
+	return func(s *Server) error {
+		s.nonSecure = true
 		return nil
 	}
 }
@@ -303,7 +317,7 @@ func handleChannel(server *Server, channel ssh.Channel) {
 	jsonrpc2.NewConn(context.Background(), stream, newRPCHandler(server))
 }
 
-type RPCHandleFunc func(req *jsonrpc2.Request) (interface{}, error)
+type RPCHandleFunc func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error)
 
 type rpcHandler struct {
 	server *Server
@@ -322,7 +336,7 @@ func (r *rpcHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonr
 		return
 	}
 
-	result, err := handler(req)
+	result, err := handler(conn, req)
 	if err != nil {
 		sendError(r.server.errCh, fmt.Errorf("error handling: '%s': %w", req.Method, err))
 		return

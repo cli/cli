@@ -42,6 +42,7 @@ type SetOptions struct {
 	Visibility      string
 	RepositoryNames []string
 	EnvFile         string
+	Application     string
 }
 
 func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command {
@@ -56,9 +57,9 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 		Short: "Create or update secrets",
 		Long: heredoc.Doc(`
 			Set a value for a secret on one of the following levels:
-			- repository (default): available to Actions runs in a repository
+			- repository (default): available to Actions runs or Dependabot in a repository
 			- environment: available to Actions runs for a deployment environment in a repository
-			- organization: available to Actions runs within an organization
+			- organization: available to Actions runs or Dependabot within an organization
 			- user: available to Codespaces for your user
 
 			Organization and user secrets can optionally be restricted to only be available to
@@ -87,6 +88,9 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 
 			# Set user-level secret for Codespaces
 			$ gh secret set MYSECRET --user
+
+			# Set repository-level secret for Dependabot
+			$ gh secret set MYSECRET --app dependabot
 
 			# Set multiple secrets imported from the ".env" file
 			$ gh secret set -f .env
@@ -150,6 +154,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "The value for the secret (reads from standard input if not specified)")
 	cmd.Flags().BoolVar(&opts.DoNotStore, "no-store", false, "Print the encrypted, base64-encoded value instead of storing it on Github")
 	cmd.Flags().StringVarP(&opts.EnvFile, "env-file", "f", "", "Load secret names and values from a dotenv-formatted `file`")
+	cmdutil.StringEnumFlag(cmd, &opts.Application, "app", "a", "", []string{shared.Actions, shared.Codespaces, shared.Dependabot}, "Set the application for a secret")
 
 	return cmd
 }
@@ -189,6 +194,35 @@ func setRun(opts *SetOptions) error {
 		}
 	}
 
+	secretEntity, err := shared.GetSecretEntity(orgName, envName, opts.UserSecrets)
+	if err != nil {
+		return err
+	}
+
+	secretApp, err := shared.GetSecretApp(opts.Application, secretEntity)
+	if err != nil {
+		return err
+	}
+
+	if !shared.IsSupportedSecretEntity(secretApp, secretEntity) {
+		return fmt.Errorf("%s secrets are not supported for %s", secretEntity, secretApp)
+	}
+
+	var pk *PubKey
+	switch secretEntity {
+	case shared.Organization:
+		pk, err = getOrgPublicKey(client, host, orgName, secretApp)
+	case shared.Environment:
+		pk, err = getEnvPubKey(client, baseRepo, envName)
+	case shared.User:
+		pk, err = getUserPublicKey(client, host)
+	default:
+		pk, err = getRepoPubKey(client, baseRepo, secretApp)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to fetch public key: %w", err)
+	}
+
 	type repoNamesResult struct {
 		ids []int64
 		err error
@@ -206,20 +240,6 @@ func setRun(opts *SetOptions) error {
 		}
 	}()
 
-	var pk *PubKey
-	if orgName != "" {
-		pk, err = getOrgPublicKey(client, host, orgName)
-	} else if envName != "" {
-		pk, err = getEnvPubKey(client, baseRepo, envName)
-	} else if opts.UserSecrets {
-		pk, err = getUserPublicKey(client, host)
-	} else {
-		pk, err = getRepoPubKey(client, baseRepo)
-	}
-	if err != nil {
-		return fmt.Errorf("failed to fetch public key: %w", err)
-	}
-
 	var repositoryIDs []int64
 	if result := <-repoNamesC; result.err == nil {
 		repositoryIDs = result.ids
@@ -232,7 +252,7 @@ func setRun(opts *SetOptions) error {
 		key := secretKey
 		value := secret
 		go func() {
-			setc <- setSecret(opts, pk, host, client, baseRepo, key, value, repositoryIDs)
+			setc <- setSecret(opts, pk, host, client, baseRepo, key, value, repositoryIDs, secretApp, secretEntity)
 		}()
 	}
 
@@ -257,7 +277,7 @@ func setRun(opts *SetOptions) error {
 		} else if orgName == "" {
 			target = ghrepo.FullName(baseRepo)
 		}
-		fmt.Fprintf(opts.IO.Out, "%s Set secret %s for %s\n", cs.SuccessIcon(), result.key, target)
+		fmt.Fprintf(opts.IO.Out, "%s Set %s secret %s for %s\n", cs.SuccessIcon(), secretApp.Title(), result.key, target)
 	}
 	return err
 }
@@ -268,7 +288,7 @@ type setResult struct {
 	err       error
 }
 
-func setSecret(opts *SetOptions, pk *PubKey, host string, client *api.Client, baseRepo ghrepo.Interface, secretKey string, secret []byte, repositoryIDs []int64) (res setResult) {
+func setSecret(opts *SetOptions, pk *PubKey, host string, client *api.Client, baseRepo ghrepo.Interface, secretKey string, secret []byte, repositoryIDs []int64, app shared.App, entity shared.SecretEntity) (res setResult) {
 	orgName := opts.OrgName
 	envName := opts.EnvName
 	res.key = secretKey
@@ -297,14 +317,15 @@ func setSecret(opts *SetOptions, pk *PubKey, host string, client *api.Client, ba
 		return
 	}
 
-	if orgName != "" {
-		err = putOrgSecret(client, host, pk, opts.OrgName, opts.Visibility, secretKey, encoded, repositoryIDs)
-	} else if envName != "" {
+	switch entity {
+	case shared.Organization:
+		err = putOrgSecret(client, host, pk, orgName, opts.Visibility, secretKey, encoded, repositoryIDs, app)
+	case shared.Environment:
 		err = putEnvSecret(client, pk, baseRepo, envName, secretKey, encoded)
-	} else if opts.UserSecrets {
+	case shared.User:
 		err = putUserSecret(client, host, pk, secretKey, encoded, repositoryIDs)
-	} else {
-		err = putRepoSecret(client, pk, baseRepo, secretKey, encoded)
+	default:
+		err = putRepoSecret(client, pk, baseRepo, secretKey, encoded, app)
 	}
 	if err != nil {
 		res.err = fmt.Errorf("failed to set secret %q: %w", secretKey, err)

@@ -5,15 +5,15 @@ import (
 	"testing"
 )
 
-func TestParseSSHArgs(t *testing.T) {
-	type testCase struct {
-		Args       []string
-		ParsedArgs []string
-		Command    []string
-		Error      string
-	}
+type parseTestCase struct {
+	Args       []string
+	ParsedArgs []string
+	Command    []string
+	Error      string
+}
 
-	testCases := []testCase{
+func TestParseSSHArgs(t *testing.T) {
+	testCases := []parseTestCase{
 		{}, // empty test case
 		{
 			Args:       []string{"-X", "-Y"},
@@ -69,37 +69,85 @@ func TestParseSSHArgs(t *testing.T) {
 			Args:       []string{"-b"},
 			ParsedArgs: nil,
 			Command:    nil,
-			Error:      "ssh flag: -b requires an argument",
+			Error:      "flag: -b requires an argument",
 		},
 	}
 
 	for _, tcase := range testCases {
 		args, command, err := parseSSHArgs(tcase.Args)
-		if tcase.Error != "" {
-			if err == nil {
-				t.Errorf("expected error and got nil: %#v", tcase)
-			}
 
-			if err.Error() != tcase.Error {
-				t.Errorf("error does not match expected error, got: '%s', expected: '%s'", err.Error(), tcase.Error)
-			}
+		checkParseResult(t, tcase, args, command, err)
+	}
+}
 
-			continue
+func TestParseSCPArgs(t *testing.T) {
+	testCases := []parseTestCase{
+		{}, // empty test case
+		{
+			Args:       []string{"-X", "-Y"},
+			ParsedArgs: []string{"-X", "-Y"},
+			Command:    nil,
+		},
+		{
+			Args:       []string{"-X", "-Y", "-o", "someoption=test"},
+			ParsedArgs: []string{"-X", "-Y", "-o", "someoption=test"},
+			Command:    nil,
+		},
+		{
+			Args:       []string{"-X", "-Y", "-o", "someoption=test", "local/file", "remote:file"},
+			ParsedArgs: []string{"-X", "-Y", "-o", "someoption=test"},
+			Command:    []string{"local/file", "remote:file"},
+		},
+		{
+			Args:       []string{"-X", "-Y", "-o", "someoption=test", "local/file", "remote:file"},
+			ParsedArgs: []string{"-X", "-Y", "-o", "someoption=test"},
+			Command:    []string{"local/file", "remote:file"},
+		},
+		{
+			Args:       []string{"local/file", "remote:file"},
+			ParsedArgs: []string{},
+			Command:    []string{"local/file", "remote:file"},
+		},
+		{
+			Args:       []string{"-c"},
+			ParsedArgs: nil,
+			Command:    nil,
+			Error:      "flag: -c requires an argument",
+		},
+	}
+
+	for _, tcase := range testCases {
+		args, command, err := parseSCPArgs(tcase.Args)
+
+		checkParseResult(t, tcase, args, command, err)
+	}
+}
+
+func checkParseResult(t *testing.T, tcase parseTestCase, gotArgs, gotCmd []string, gotErr error) {
+	if tcase.Error != "" {
+		if gotErr == nil {
+			t.Errorf("expected error and got nil: %#v", tcase)
 		}
 
-		if err != nil {
-			t.Errorf("unexpected error: %v on test case: %#v", err, tcase)
-			continue
+		if gotErr.Error() != tcase.Error {
+			t.Errorf("error does not match expected error, got: '%s', expected: '%s'", gotErr.Error(), tcase.Error)
 		}
 
-		argsStr, parsedArgsStr := fmt.Sprintf("%s", args), fmt.Sprintf("%s", tcase.ParsedArgs)
-		if argsStr != parsedArgsStr {
-			t.Errorf("args do not match parsed args. got: '%s', expected: '%s'", argsStr, parsedArgsStr)
-		}
+		return
+	}
 
-		commandStr, parsedCommandStr := fmt.Sprintf("%s", command), fmt.Sprintf("%s", tcase.Command)
-		if commandStr != parsedCommandStr {
-			t.Errorf("command does not match parsed command. got: '%s', expected: '%s'", commandStr, parsedCommandStr)
-		}
+	if gotErr != nil {
+		t.Errorf("unexpected error: %v on test case: %#v", gotErr, tcase)
+		return
+	}
+
+	argsStr, parsedArgsStr := fmt.Sprintf("%s", gotArgs), fmt.Sprintf("%s", tcase.ParsedArgs)
+	if argsStr != parsedArgsStr {
+		t.Errorf("args do not match parsed args. got: '%s', expected: '%s'", argsStr, parsedArgsStr)
+	}
+
+	commandStr, parsedCommandStr := fmt.Sprintf("%s", gotCmd), fmt.Sprintf("%s", tcase.Command)
+	if commandStr != parsedCommandStr {
+		t.Errorf("command does not match parsed command. got: '%s', expected: '%s'", commandStr, parsedCommandStr)
 	}
 }

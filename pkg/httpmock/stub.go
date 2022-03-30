@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -29,10 +30,7 @@ func REST(method, p string) Matcher {
 		if !strings.EqualFold(req.Method, method) {
 			return false
 		}
-		if req.URL.Path != "/"+p {
-			return false
-		}
-		return true
+		return req.URL.Path == "/"+p
 	}
 }
 
@@ -53,6 +51,24 @@ func GraphQL(q string) Matcher {
 		_ = decodeJSONBody(req, &bodyData)
 
 		return re.MatchString(bodyData.Query)
+	}
+}
+
+func QueryMatcher(method string, path string, query url.Values) Matcher {
+	return func(req *http.Request) bool {
+		if !REST(method, path)(req) {
+			return false
+		}
+
+		actualQuery := req.URL.Query()
+
+		for param := range query {
+			if !(actualQuery.Get(param) == query.Get(param)) {
+				return false
+			}
+		}
+
+		return true
 	}
 }
 

@@ -54,6 +54,21 @@ func Test_NewCmdList(t *testing.T) {
 				UserSecrets: true,
 			},
 		},
+		{
+			name: "Dependabot repo",
+			cli:  "--app Dependabot",
+			wants: ListOptions{
+				Application: "Dependabot",
+			},
+		},
+		{
+			name: "Dependabot org",
+			cli:  "--app Dependabot --org UmbrellaCorporation",
+			wants: ListOptions{
+				Application: "Dependabot",
+				OrgName:     "UmbrellaCorporation",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -184,6 +199,56 @@ func Test_listRun(t *testing.T) {
 				"SECRET_THREE\t1975-11-30\t",
 			},
 		},
+		{
+			name: "Dependabot repo tty",
+			tty:  true,
+			opts: &ListOptions{
+				Application: "Dependabot",
+			},
+			wantOut: []string{
+				"SECRET_ONE.*Updated 1988-10-11",
+				"SECRET_TWO.*Updated 2020-12-04",
+				"SECRET_THREE.*Updated 1975-11-30",
+			},
+		},
+		{
+			name: "Dependabot repo not tty",
+			tty:  false,
+			opts: &ListOptions{
+				Application: "Dependabot",
+			},
+			wantOut: []string{
+				"SECRET_ONE\t1988-10-11",
+				"SECRET_TWO\t2020-12-04",
+				"SECRET_THREE\t1975-11-30",
+			},
+		},
+		{
+			name: "Dependabot org tty",
+			tty:  true,
+			opts: &ListOptions{
+				Application: "Dependabot",
+				OrgName:     "UmbrellaCorporation",
+			},
+			wantOut: []string{
+				"SECRET_ONE.*Updated 1988-10-11.*Visible to all repositories",
+				"SECRET_TWO.*Updated 2020-12-04.*Visible to private repositories",
+				"SECRET_THREE.*Updated 1975-11-30.*Visible to 2 selected repositories",
+			},
+		},
+		{
+			name: "Dependabot org not tty",
+			tty:  false,
+			opts: &ListOptions{
+				Application: "Dependabot",
+				OrgName:     "UmbrellaCorporation",
+			},
+			wantOut: []string{
+				"SECRET_ONE\t1988-10-11\tALL",
+				"SECRET_TWO\t2020-12-04\tPRIVATE",
+				"SECRET_THREE\t1975-11-30\tSELECTED",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -278,6 +343,10 @@ func Test_listRun(t *testing.T) {
 							}{repositoryCount}))
 					}
 				}
+			}
+
+			if tt.opts.Application == "Dependabot" {
+				path = strings.Replace(path, "actions", "dependabot", 1)
 			}
 
 			reg.Register(httpmock.REST("GET", path), httpmock.JSONResponse(payload))

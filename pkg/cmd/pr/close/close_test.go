@@ -230,3 +230,37 @@ func TestPrClose_deleteBranch_sameBranch(t *testing.T) {
 		✓ Deleted branch trunk and switched to branch main
 	`), output.Stderr())
 }
+
+func TestPrClose_deleteBranch_notInGitRepo(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	baseRepo, pr := stubPR("OWNER/REPO:main", "OWNER/REPO:trunk")
+	pr.Title = "The title of the PR"
+	shared.RunCommandFinder("96", pr, baseRepo)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestClose\b`),
+		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
+			}),
+	)
+	http.Register(
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/trunk"),
+		httpmock.StringResponse(`{}`))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/trunk`, 128, "could not determine current branch: fatal: not a git repository (or any of the parent directories): .git")
+
+	output, err := runCommand(http, true, `96 --delete-branch`)
+	assert.NoError(t, err)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Doc(`
+		✓ Closed pull request #96 (The title of the PR)
+		! Skipped deleting the local branch since current directory is not a git repository 
+		✓ Deleted branch trunk
+	`), output.Stderr())
+}

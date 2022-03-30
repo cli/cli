@@ -22,7 +22,7 @@ func TestConnect(t *testing.T) {
 		HostPublicKeys: []string{livesharetest.SSHPublicKey},
 		Logger:         newMockLogger(),
 	}
-	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
+	joinWorkspace := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 		var joinWorkspaceReq joinWorkspaceArgs
 		if err := json.Unmarshal(*req.Params, &joinWorkspaceReq); err != nil {
 			return nil, fmt.Errorf("error unmarshaling req: %w", err)
