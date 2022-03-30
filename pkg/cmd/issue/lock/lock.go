@@ -53,7 +53,12 @@ type LockOptions struct {
 	IssueNumber  string
 }
 
-func setCommonOptions(f *cmdutil.Factory, cmd *cobra.Command, opts *LockOptions, args []string) {
+func (opts *LockOptions) setCommonOptions(f *cmdutil.Factory, cmd *cobra.Command, args []string) {
+
+	opts.IO = f.IOStreams
+	opts.HttpClient = f.HttpClient
+	opts.Config = f.Config
+
 	// support `-R, --repo` override
 	opts.BaseRepo = f.BaseRepo
 
@@ -63,15 +68,9 @@ func setCommonOptions(f *cmdutil.Factory, cmd *cobra.Command, opts *LockOptions,
 	opts.IssueNumber = args[0]
 }
 
-// NewCmdLock will lock the conversation for an issue or pull request
 func NewCmdLock(f *cmdutil.Factory, runF func(*LockOptions) error) *cobra.Command {
 
-	// TODO: Currently doesn't work.  Besides some minor changes, code is copy
-	// and pasted from NewCmdReopen().
 	opts := &LockOptions{
-		IO:           f.IOStreams,
-		HttpClient:   f.HttpClient,
-		Config:       f.Config,
 		PadlockState: Lock,
 	}
 
@@ -92,7 +91,7 @@ func NewCmdLock(f *cmdutil.Factory, runF func(*LockOptions) error) *cobra.Comman
 				opts.Reason = jsonReason
 			}
 
-			setCommonOptions(f, cmd, opts, args)
+			opts.setCommonOptions(f, cmd, args)
 
 			if runF != nil {
 				return runF(opts)
@@ -107,15 +106,9 @@ func NewCmdLock(f *cmdutil.Factory, runF func(*LockOptions) error) *cobra.Comman
 	return cmd
 }
 
-// NewCmdUnlock will unlock the conversation for an issue or pull request
 func NewCmdUnlock(f *cmdutil.Factory, runF func(*LockOptions) error) *cobra.Command {
 
-	// TODO: Currently doesn't work.  Besides some minor changes, code is copy
-	// and pasted from NewCmdReopen().
 	opts := &LockOptions{
-		IO:           f.IOStreams,
-		HttpClient:   f.HttpClient,
-		Config:       f.Config,
 		PadlockState: Unlock,
 	}
 
@@ -125,7 +118,7 @@ func NewCmdUnlock(f *cmdutil.Factory, runF func(*LockOptions) error) *cobra.Comm
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			setCommonOptions(f, cmd, opts, args)
+			opts.setCommonOptions(f, cmd, args)
 
 			if runF != nil {
 				return runF(opts)
