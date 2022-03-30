@@ -232,10 +232,10 @@ func TestManager_UpgradeExtensions(t *testing.T) {
 	assert.Equal(t, heredoc.Docf(
 		`
 		[hello]: [git -C %s pull --ff-only]
-		upgrade complete
+		upgraded from old vers to new vers
 		[local]: local extensions can not be upgraded
 		[two]: [git -C %s pull --ff-only]
-		upgrade complete
+		upgraded from old vers to new vers
 		`,
 		filepath.Join(tempDir, "extensions", "gh-hello"),
 		filepath.Join(tempDir, "extensions", "gh-two"),
@@ -505,6 +505,8 @@ func TestManager_UpgradeExtension_BinaryExtension(t *testing.T) {
 
 func TestManager_UpgradeExtension_BinaryExtension_DryRun(t *testing.T) {
 	tempDir := t.TempDir()
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
 	assert.NoError(t, stubBinaryExtension(
 		filepath.Join(tempDir, "extensions", "gh-bin-ext"),
 		binManifest{
@@ -515,7 +517,19 @@ func TestManager_UpgradeExtension_BinaryExtension_DryRun(t *testing.T) {
 		}))
 
 	io, _, stdout, stderr := iostreams.Test()
-	m := newTestManager(tempDir, nil, io)
+	m := newTestManager(tempDir, &http.Client{Transport: &reg}, io)
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Tag: "v1.0.2",
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-windows-amd64.exe",
+						APIURL: "https://example.com/release/cool2",
+					},
+				},
+			}))
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(exts))

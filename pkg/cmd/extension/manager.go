@@ -338,7 +338,7 @@ func (m *Manager) Install(repo ghrepo.Interface, target string) error {
 		return fmt.Errorf("could not check for binary extension: %w", err)
 	}
 	if isBin {
-		return m.installBin(repo, target)
+		return m.installBin(repo, target, false)
 	}
 
 	hs, err := hasScript(m.client, repo)
@@ -352,7 +352,7 @@ func (m *Manager) Install(repo ghrepo.Interface, target string) error {
 	return m.installGit(repo, target, m.io.Out, m.io.ErrOut)
 }
 
-func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
+func (m *Manager) installBin(repo ghrepo.Interface, target string, dryRun bool) error {
 	var r *release
 	var err error
 	isPinned := target != ""
@@ -384,17 +384,21 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	targetDir := filepath.Join(m.installDir(), name)
 
 	// TODO clean this up if function errs?
-	err = os.MkdirAll(targetDir, 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create installation directory: %w", err)
+	if !dryRun {
+		err = os.MkdirAll(targetDir, 0755)
+		if err != nil {
+			return fmt.Errorf("failed to create installation directory: %w", err)
+		}
 	}
 
 	binPath := filepath.Join(targetDir, name)
 	binPath += ext
 
-	err = downloadAsset(m.client, *asset, binPath)
-	if err != nil {
-		return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
+	if !dryRun {
+		err = downloadAsset(m.client, *asset, binPath)
+		if err != nil {
+			return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
+		}
 	}
 
 	manifest := binManifest{
@@ -411,17 +415,19 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 		return fmt.Errorf("failed to serialize manifest: %w", err)
 	}
 
-	manifestPath := filepath.Join(targetDir, manifestName)
+	if !dryRun {
+		manifestPath := filepath.Join(targetDir, manifestName)
 
-	f, err := os.OpenFile(manifestPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to open manifest for writing: %w", err)
-	}
-	defer f.Close()
+		f, err := os.OpenFile(manifestPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+		if err != nil {
+			return fmt.Errorf("failed to open manifest for writing: %w", err)
+		}
+		defer f.Close()
 
-	_, err = f.Write(bs)
-	if err != nil {
-		return fmt.Errorf("failed write manifest file: %w", err)
+		_, err = f.Write(bs)
+		if err != nil {
+			return fmt.Errorf("failed write manifest file: %w", err)
+		}
 	}
 
 	return nil
@@ -519,13 +525,24 @@ func (m *Manager) upgradeExtensions(exts []Extension, force, dryRun bool) error 
 			fmt.Fprintf(m.io.Out, "%s\n", err)
 			continue
 		}
+		currentVersion := f.currentVersion
+		latestVersion := f.latestVersion
+		if !f.IsBinary() && len(currentVersion) > 8 {
+			currentVersion = currentVersion[:8]
+		}
+		if !f.IsBinary() && len(latestVersion) > 8 {
+			latestVersion = latestVersion[:8]
+		}
 		if dryRun {
-			fmt.Fprintf(m.io.Out, "would have upgraded from %s to %s\n", f.currentVersion, f.latestVersion)
+			fmt.Fprintf(m.io.Out, "would have upgraded from %s to %s\n", currentVersion, latestVersion)
 		} else {
-			fmt.Fprintf(m.io.Out, "upgrade complete\n")
+			fmt.Fprintf(m.io.Out, "upgraded from %s to %s\n", currentVersion, latestVersion)
 		}
 	}
 	if failed {
+		if dryRun {
+			return errors.New("some extensions would have failed to upgrade")
+		}
 		return errors.New("some extensions failed to upgrade")
 	}
 	return nil
@@ -541,12 +558,9 @@ func (m *Manager) upgradeExtension(ext Extension, force, dryRun bool) error {
 	if !ext.UpdateAvailable() {
 		return upToDateError
 	}
-	if dryRun {
-		return nil
-	}
 	var err error
 	if ext.IsBinary() {
-		err = m.upgradeBinExtension(ext)
+		err = m.upgradeBinExtension(ext, dryRun)
 	} else {
 		// Check if git extension has changed to a binary extension
 		var isBin bool
@@ -554,24 +568,29 @@ func (m *Manager) upgradeExtension(ext Extension, force, dryRun bool) error {
 		if repoErr == nil {
 			isBin, _ = isBinExtension(m.client, repo)
 		}
+		//TODO: dry run code here
 		if isBin {
-			err = m.Remove(ext.Name())
-			if err != nil {
-				return fmt.Errorf("failed to migrate to new precompiled extension format: %w", err)
+			if !dryRun {
+				if err := m.Remove(ext.Name()); err != nil {
+					return fmt.Errorf("failed to migrate to new precompiled extension format: %w", err)
+				}
 			}
-			return m.installBin(repo, "")
+			return m.installBin(repo, "", dryRun)
 		}
-		err = m.upgradeGitExtension(ext, force)
+		err = m.upgradeGitExtension(ext, force, dryRun)
 	}
 	return err
 }
 
-func (m *Manager) upgradeGitExtension(ext Extension, force bool) error {
+func (m *Manager) upgradeGitExtension(ext Extension, force bool, dryRun bool) error {
 	exe, err := m.lookPath("git")
 	if err != nil {
 		return err
 	}
 	dir := filepath.Dir(ext.path)
+	if dryRun {
+		return nil
+	}
 	if force {
 		if err := m.newCommand(exe, "-C", dir, "fetch", "origin", "HEAD").Run(); err != nil {
 			return err
@@ -581,12 +600,12 @@ func (m *Manager) upgradeGitExtension(ext Extension, force bool) error {
 	return m.newCommand(exe, "-C", dir, "pull", "--ff-only").Run()
 }
 
-func (m *Manager) upgradeBinExtension(ext Extension) error {
+func (m *Manager) upgradeBinExtension(ext Extension, dryRun bool) error {
 	repo, err := ghrepo.FromFullName(ext.url)
 	if err != nil {
 		return fmt.Errorf("failed to parse URL %s: %w", ext.url, err)
 	}
-	return m.installBin(repo, "")
+	return m.installBin(repo, "", dryRun)
 }
 
 func (m *Manager) Remove(name string) error {
