@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -39,12 +40,14 @@ func (a *App) VSCode(ctx context.Context, codespaceName string, useInsiders bool
 	}
 
 	if useWeb {
-		if err := a.browser.Browse(codespace.WebUrl); err != nil {
+		openURL := codespace.WebUrl
+		if a.io.IsStdoutTTY() {
+			fmt.Fprintf(a.io.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+		}
+		if err := a.browser.Browse(openURL); err != nil {
 			return fmt.Errorf("error opening Codespace: %w", err)
 		}
-
-		return nil
-	}
+	}	
 
 	url := vscodeProtocolURL(codespace.Name, useInsiders)
 	if err := a.browser.Browse(url); err != nil {
