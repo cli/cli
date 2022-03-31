@@ -26,7 +26,7 @@ func newCodeCmd(app *App) *cobra.Command {
 
 	codeCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
 	codeCmd.Flags().BoolVar(&useInsiders, "insiders", false, "Use the insiders version of Visual Studio Code")
-	codeCmd.Flags().BoolVar(&useWeb, "web", false, "Use the web version of Visual Studio Code")
+	codeCmd.Flags().BoolVarP(&useWeb, "web", "w", false, "Use the web version of Visual Studio Code")
 
 	return codeCmd
 }
