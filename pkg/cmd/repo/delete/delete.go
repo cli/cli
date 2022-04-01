@@ -40,7 +40,8 @@ With no argument, deletes the current repository. Otherwise, deletes the specifi
 
 Deletion requires authorization with the "delete_repo" scope. 
 To authorize, run "gh auth refresh -s delete_repo"`,
-		Args: cobra.MaximumNArgs(1),
+		Args:    cobra.MaximumNArgs(1),
+		Aliases: []string{"rm"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				opts.RepoArg = args[0]
