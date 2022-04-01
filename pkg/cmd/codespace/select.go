@@ -29,10 +29,10 @@ func newSelectCmd(app *App) *cobra.Command {
 	return selectCmd
 }
 
-// Hidden codespace `select` command allows to reuse the common codespace selection
+// Hidden codespace `select` command allows to reuse existing codespace selection
 // dialog by external GH CLI extensions. By default output selected codespace name
 // into `stdout`. Pass `--file`(`-f`) flag along with a file path to output selected
-// codespace into a file instead.
+// codespace name into a file instead.
 // 
 // ## Examples
 //
@@ -42,7 +42,7 @@ func newSelectCmd(app *App) *cobra.Command {
 // 		gh codespace select
 // ```
 //
-// With `into-a-file`` output:
+// With `into-a-file` output:
 //
 // ```shell
 // 		gh codespace select --file /tmp/selected_codespace.txt
