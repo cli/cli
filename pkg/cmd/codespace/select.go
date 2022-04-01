@@ -3,31 +3,66 @@ package codespace
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 )
 
+type selectOptions struct {
+	filePath string
+}
+
 func newSelectCmd(app *App) *cobra.Command {
-	codeCmd := &cobra.Command{
+	opts := selectOptions{}
+
+	selectCmd := &cobra.Command{
 		Use:   "select",
 		Short: "Select a codespace",
 		Hidden: true,
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.Select(cmd.Context(), "")
+			return app.Select(cmd.Context(), "", opts)
 		},
 	}
 
-	return codeCmd
+	selectCmd.Flags().StringVarP(&opts.filePath, "file", "f", "", "Output file path")
+	return selectCmd
 }
 
-func (a *App) Select(ctx context.Context, name string) error {
+// Hidden codespace `select` command allows to reuse the common codespace selection
+// dialog by external GH CLI extensions. By default output selected codespace name
+// into `stdout`. Pass `--file`(`-f`) flag along with a file path to output selected
+// codespace into a file instead.
+// 
+// ## Examples
+//
+// With `stdout` output:
+//
+// ```shell
+// 		gh codespace select
+// ```
+//
+// With `into-a-file`` output:
+//
+// ```shell
+// 		gh codespace select --file /tmp/selected_codespace.txt
+// ```
+func (a *App) Select(ctx context.Context, name string, opts selectOptions) error {
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, name)
 	if err != nil {
 		return err
 	}
 
-	a.io.Out.Write([]byte(fmt.Sprintf("%s\n", codespace.Name)));
+	if opts.filePath != "" {
+		f, err := os.Create(opts.filePath)
+		if err != nil {
+			return err
+		}
 
+		f.WriteString(codespace.Name);
+		return nil
+	}
+
+	a.io.Out.Write([]byte(fmt.Sprintf("%s\n", codespace.Name)));
 	return nil
 }

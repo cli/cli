@@ -3,6 +3,7 @@ package codespace
 import (
 	"context"
 	"errors"
+	"os"
 	"fmt"
 	"testing"
 
@@ -11,14 +12,17 @@ import (
 )
 
 const CODESPACE_NAME = "monalisa-cli-cli-abcdef"
+const OUTPUT_FILE_PATH = "../../../bin/codespace-selection-test.log"
 
 func TestApp_Select(t *testing.T) {
 	tests := []struct {
 		name    string
 		arg     string
+		opts 	selectOptions
 		wantErr bool
 		wantStdout string
 		wantStderr string
+		wantFileContents string
 	}{
 		{
 			name: "Select a codespace",
@@ -31,6 +35,13 @@ func TestApp_Select(t *testing.T) {
 			arg: "non-existent-codespace-name",
 			wantErr: true,
 		},
+		{
+			name: "Select a codespace",
+			arg: CODESPACE_NAME,
+			wantErr: false,
+			wantFileContents: CODESPACE_NAME,
+			opts: selectOptions { filePath: OUTPUT_FILE_PATH },
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -39,7 +50,7 @@ func TestApp_Select(t *testing.T) {
 			io.SetStdoutTTY(true)
 			a := NewApp(io, nil, testSelectApiMock(), nil)
 
-			if err := a.Select(context.Background(), tt.arg); (err != nil) != tt.wantErr {
+			if err := a.Select(context.Background(), tt.arg, tt.opts); (err != nil) != tt.wantErr {
 				t.Errorf("App.Select() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
@@ -48,6 +59,21 @@ func TestApp_Select(t *testing.T) {
 			}
 			if out := sortLines(stderr.String()); out != tt.wantStderr {
 				t.Errorf("stderr = %q, want %q", out, tt.wantStderr)
+			}
+
+			if tt.wantFileContents != "" {
+				if tt.opts.filePath == "" {
+					t.Errorf("wantFileContents is set but opts.filePath is not")
+				}
+
+				dat, err := os.ReadFile(tt.opts.filePath)
+				if err != nil {
+					panic(err)
+				}
+
+				if string(dat) != tt.wantFileContents {
+					t.Errorf("file contents = %q, want %q", string(dat), CODESPACE_NAME)
+				}
 			}
 		})
 	}
