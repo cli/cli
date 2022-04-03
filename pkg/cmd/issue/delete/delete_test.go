@@ -91,6 +91,38 @@ func TestIssueDelete(t *testing.T) {
 	}
 }
 
+func TestIssueDelete_confirm(t *testing.T) {
+	httpRegistry := &httpmock.Registry{}
+	defer httpRegistry.Verify(t)
+
+	httpRegistry.Register(
+		httpmock.GraphQL(`query IssueByNumber\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"hasIssuesEnabled": true,
+				"issue": { "id": "THE-ID", "number": 13, "title": "The title of the issue"}
+			} } }`),
+	)
+	httpRegistry.Register(
+		httpmock.GraphQL(`mutation IssueDelete\b`),
+		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, inputs["issueId"], "THE-ID")
+			}),
+	)
+
+	output, err := runCommand(httpRegistry, true, "13 --confirm")
+	if err != nil {
+		t.Fatalf("error running command `issue delete`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Deleted issue #13 \(The title of the issue\)`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
 func TestIssueDelete_cancel(t *testing.T) {
 	httpRegistry := &httpmock.Registry{}
 	defer httpRegistry.Verify(t)
