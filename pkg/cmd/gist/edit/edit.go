@@ -1,6 +1,7 @@
 package edit
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -227,16 +228,29 @@ func editRun(opts *EditOptions) error {
 				text = string(data)
 			}
 		} else {
-			editorCommand, err := cmdutil.DetermineEditor(opts.Config)
-			if err != nil {
-				return err
-			}
+			stat, _ := os.Stdin.Stat()
+			if (stat.Mode() & os.ModeCharDevice) == 0 {
+				var lines []string
+				scanner := bufio.NewScanner(os.Stdin)
+				for scanner.Scan() {
+					lines = append(lines, scanner.Text())
+				}
+				text = strings.Join(lines, "\n")
+				if shared.IsBinaryContents([]byte(text)) {
+					return fmt.Errorf("uploading binary files not supported")
+				}
+			} else {
+				editorCommand, err := cmdutil.DetermineEditor(opts.Config)
+				if err != nil {
+					return err
+				}
 
-			data, err := opts.Edit(editorCommand, filename, gistFile.Content, opts.IO)
-			if err != nil {
-				return err
+				data, err := opts.Edit(editorCommand, filename, gistFile.Content, opts.IO)
+				if err != nil {
+					return err
+				}
+				text = data
 			}
-			text = data
 		}
 
 		if text != gistFile.Content {
