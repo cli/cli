@@ -59,10 +59,13 @@ func (a *App) Select(ctx context.Context, name string, opts selectOptions) (err 
 			return fmt.Errorf("failed to create output file: %w", err)
 		}
 
-		f.WriteString(codespace.Name);
-		
 		defer safeClose(f, &err)
 
+		_, err = f.WriteString(codespace.Name);
+		if err != nil {
+			return fmt.Errorf("failed to write codespace name to output file: %w", err)
+		}
+		
 		return nil
 	}
 
