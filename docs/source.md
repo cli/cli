@@ -2,7 +2,7 @@
 
 1. Verify that you have Go 1.16+ installed
 
-   ```sh
+   ```sh186789
    $ go version
    ```
 
