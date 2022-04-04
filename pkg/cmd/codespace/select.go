@@ -47,7 +47,7 @@ func newSelectCmd(app *App) *cobra.Command {
 // ```shell
 // 		gh codespace select --file /tmp/selected_codespace.txt
 // ```
-func (a *App) Select(ctx context.Context, name string, opts selectOptions) error {
+func (a *App) Select(ctx context.Context, name string, opts selectOptions) (err error) {
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, name)
 	if err != nil {
 		return err
@@ -56,13 +56,17 @@ func (a *App) Select(ctx context.Context, name string, opts selectOptions) error
 	if opts.filePath != "" {
 		f, err := os.Create(opts.filePath)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create output file: %w", err)
 		}
 
 		f.WriteString(codespace.Name);
+		
+		defer safeClose(f, &err)
+
 		return nil
 	}
 
-	a.io.Out.Write([]byte(fmt.Sprintf("%s\n", codespace.Name)));
+	fmt.Fprintln(a.io.Out, codespace.Name)
+
 	return nil
 }

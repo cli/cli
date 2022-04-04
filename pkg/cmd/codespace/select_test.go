@@ -12,7 +12,7 @@ import (
 )
 
 const CODESPACE_NAME = "monalisa-cli-cli-abcdef"
-const OUTPUT_FILE_PATH = "../../../bin/codespace-selection-test.log"
+const OUTPUT_FILE_PATH = "codespace-selection-test.log"
 
 func TestApp_Select(t *testing.T) {
 	tests := []struct {
@@ -68,7 +68,7 @@ func TestApp_Select(t *testing.T) {
 
 				dat, err := os.ReadFile(tt.opts.filePath)
 				if err != nil {
-					panic(err)
+					t.Fatal(err)
 				}
 
 				if string(dat) != tt.wantFileContents {
@@ -89,7 +89,7 @@ func testSelectApiMock() *apiClientMock {
 				return testingCodespace, nil
 			}
 
-			return nil, errors.New("Cannot find codespace.")
+			return nil, errors.New("cannot find codespace")
 		},
 	}
 }
