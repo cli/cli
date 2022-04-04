@@ -127,7 +127,11 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 			if len(devcontainers) == 1 && utils.StringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
 				devContainerPath = devcontainers[0].Path
 			} else {
-				promptOptions := []string{"default"}
+				promptOptions := []string{}
+
+				if !utils.StringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
+					promptOptions = []string{"Default Codespaces configuration"}
+				}
 
 				for _, devcontainer := range devcontainers {
 					promptOptions = append(promptOptions, devcontainer.Path)
@@ -147,7 +151,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 			}
 		}
 
-		if devContainerPath == "default" {
+		if devContainerPath == "Default Codespaces configuration" {
 			// special arg allows users to opt out of devcontainer.json selection
 			devContainerPath = ""
 		}
