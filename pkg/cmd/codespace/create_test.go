@@ -71,6 +71,54 @@ func TestApp_Create(t *testing.T) {
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
 		},
 		{
+			name: "create codespace with default branch shows idle timeout notice if present",
+			fields: fields{
+				apiClient: &apiClientMock{
+					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
+						return "EUROPE", nil
+					},
+					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+						return &api.Repository{
+							ID:            1234,
+							FullName:      nwo,
+							DefaultBranch: "main",
+						}, nil
+					},
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
+						return []*api.Machine{
+							{
+								Name:        "GIGA",
+								DisplayName: "Gigabits of a machine",
+							},
+						}, nil
+					},
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						if params.Branch != "main" {
+							return nil, fmt.Errorf("got branch %q, want %q", params.Branch, "main")
+						}
+						if params.IdleTimeoutMinutes != 30 {
+							return nil, fmt.Errorf("idle timeout minutes was %v", params.IdleTimeoutMinutes)
+						}
+						return &api.Codespace{
+							Name:              "monalisa-dotfiles-abcd1234",
+							IdleTimeoutNotice: "Idle timeout for this codespace is set to 10 minutes in compliance with your organization's policy",
+						}, nil
+					},
+					GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
+						return nil, nil // We can't ask for suggestions without a terminal.
+					},
+				},
+			},
+			opts: createOptions{
+				repo:        "monalisa/dotfiles",
+				branch:      "",
+				machine:     "GIGA",
+				showStatus:  false,
+				idleTimeout: 30 * time.Minute,
+			},
+			wantStdout: "monalisa-dotfiles-abcd1234\nNotice: Idle timeout for this codespace is set to 10 minutes in compliance with your organization's policy\n",
+		},
+		{
 			name: "create codespace that requires accepting additional permissions",
 			fields: fields{
 				apiClient: &apiClientMock{

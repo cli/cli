@@ -48,7 +48,6 @@ func newCreateCmd(app *App) *cobra.Command {
 
 // Create creates a new Codespace
 func (a *App) Create(ctx context.Context, opts createOptions) error {
-
 	// Overrides for Codespace developers to target test environments
 	vscsLocation := os.Getenv("VSCS_LOCATION")
 	vscsTarget := os.Getenv("VSCS_TARGET")
@@ -153,7 +152,13 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		}
 	}
 
+	cs := a.io.ColorScheme()
+
 	fmt.Fprintln(a.io.Out, codespace.Name)
+	if codespace.IdleTimeoutNotice != "" {
+		fmt.Fprintln(a.io.Out, cs.Cyan("Notice:"), codespace.IdleTimeoutNotice)
+	}
+
 	return nil
 }
 
