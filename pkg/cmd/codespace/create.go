@@ -288,11 +288,6 @@ func (a *App) showStatus(ctx context.Context, codespace *api.Codespace) error {
 	return nil
 }
 
-type locationResult struct {
-	Location string
-	Err      error
-}
-
 // getMachineName prompts the user to select the machine type, or validates the machine if non-empty.
 func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machine, branch, location string) (string, error) {
 	machines, err := apiClient.GetCodespacesMachines(ctx, repoID, branch, location)
