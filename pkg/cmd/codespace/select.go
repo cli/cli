@@ -17,7 +17,7 @@ func newSelectCmd(app *App) *cobra.Command {
 
 	selectCmd := &cobra.Command{
 		Use:   "select",
-		Short: "Select a codespace",
+		Short: "Select a Codespace",
 		Hidden: true,
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {

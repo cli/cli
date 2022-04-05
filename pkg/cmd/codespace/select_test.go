@@ -6,20 +6,20 @@ import (
 	"os"
 	"fmt"
 	"testing"
-
+	"io/ioutil"
+	
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 const CODESPACE_NAME = "monalisa-cli-cli-abcdef"
-const OUTPUT_FILE_PATH = "codespace-selection-test.log"
 
 func TestApp_Select(t *testing.T) {
 	tests := []struct {
 		name    string
 		arg     string
-		opts 	selectOptions
 		wantErr bool
+		outputToFile bool
 		wantStdout string
 		wantStderr string
 		wantFileContents string
@@ -40,7 +40,7 @@ func TestApp_Select(t *testing.T) {
 			arg: CODESPACE_NAME,
 			wantErr: false,
 			wantFileContents: CODESPACE_NAME,
-			opts: selectOptions { filePath: OUTPUT_FILE_PATH },
+			outputToFile: true,
 		},
 	}
 	for _, tt := range tests {
@@ -50,7 +50,19 @@ func TestApp_Select(t *testing.T) {
 			io.SetStdoutTTY(true)
 			a := NewApp(io, nil, testSelectApiMock(), nil)
 
-			if err := a.Select(context.Background(), tt.arg, tt.opts); (err != nil) != tt.wantErr {
+			opts := selectOptions{}
+			if tt.outputToFile {
+				file, err := ioutil.TempFile("", "codespace-selection-test")
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				defer os.Remove(file.Name())
+
+				opts = selectOptions { filePath: file.Name() }
+			}
+
+			if err := a.Select(context.Background(), tt.arg, opts); (err != nil) != tt.wantErr {
 				t.Errorf("App.Select() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
@@ -62,11 +74,11 @@ func TestApp_Select(t *testing.T) {
 			}
 
 			if tt.wantFileContents != "" {
-				if tt.opts.filePath == "" {
+				if opts.filePath == "" {
 					t.Errorf("wantFileContents is set but opts.filePath is not")
 				}
 
-				dat, err := os.ReadFile(tt.opts.filePath)
+				dat, err := os.ReadFile(opts.filePath)
 				if err != nil {
 					t.Fatal(err)
 				}
