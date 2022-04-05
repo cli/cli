@@ -3,11 +3,11 @@ package codespace
 import (
 	"context"
 	"errors"
-	"os"
 	"fmt"
-	"testing"
 	"io/ioutil"
-	
+	"os"
+	"testing"
+
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
@@ -16,31 +16,31 @@ const CODESPACE_NAME = "monalisa-cli-cli-abcdef"
 
 func TestApp_Select(t *testing.T) {
 	tests := []struct {
-		name    string
-		arg     string
-		wantErr bool
-		outputToFile bool
-		wantStdout string
-		wantStderr string
+		name             string
+		arg              string
+		wantErr          bool
+		outputToFile     bool
+		wantStdout       string
+		wantStderr       string
 		wantFileContents string
 	}{
 		{
-			name: "Select a codespace",
-			arg: CODESPACE_NAME,
-			wantErr: false,
+			name:       "Select a codespace",
+			arg:        CODESPACE_NAME,
+			wantErr:    false,
 			wantStdout: fmt.Sprintf("%s\n", CODESPACE_NAME),
 		},
 		{
-			name: "Select a codespace error",
-			arg: "non-existent-codespace-name",
+			name:    "Select a codespace error",
+			arg:     "non-existent-codespace-name",
 			wantErr: true,
 		},
 		{
-			name: "Select a codespace",
-			arg: CODESPACE_NAME,
-			wantErr: false,
+			name:             "Select a codespace",
+			arg:              CODESPACE_NAME,
+			wantErr:          false,
 			wantFileContents: CODESPACE_NAME,
-			outputToFile: true,
+			outputToFile:     true,
 		},
 	}
 	for _, tt := range tests {
@@ -59,7 +59,7 @@ func TestApp_Select(t *testing.T) {
 
 				defer os.Remove(file.Name())
 
-				opts = selectOptions { filePath: file.Name() }
+				opts = selectOptions{filePath: file.Name()}
 			}
 
 			if err := a.Select(context.Background(), tt.arg, opts); (err != nil) != tt.wantErr {

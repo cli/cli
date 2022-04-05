@@ -16,10 +16,10 @@ func newSelectCmd(app *App) *cobra.Command {
 	opts := selectOptions{}
 
 	selectCmd := &cobra.Command{
-		Use:   "select",
-		Short: "Select a Codespace",
+		Use:    "select",
+		Short:  "Select a Codespace",
 		Hidden: true,
-		Args:  noArgsConstraint,
+		Args:   noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.Select(cmd.Context(), "", opts)
 		},
@@ -33,7 +33,7 @@ func newSelectCmd(app *App) *cobra.Command {
 // dialog by external GH CLI extensions. By default output selected codespace name
 // into `stdout`. Pass `--file`(`-f`) flag along with a file path to output selected
 // codespace name into a file instead.
-// 
+//
 // ## Examples
 //
 // With `stdout` output:
@@ -61,11 +61,11 @@ func (a *App) Select(ctx context.Context, name string, opts selectOptions) (err 
 
 		defer safeClose(f, &err)
 
-		_, err = f.WriteString(codespace.Name);
+		_, err = f.WriteString(codespace.Name)
 		if err != nil {
 			return fmt.Errorf("failed to write codespace name to output file: %w", err)
 		}
-		
+
 		return nil
 	}
 
