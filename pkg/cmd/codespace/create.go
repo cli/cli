@@ -155,8 +155,9 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	cs := a.io.ColorScheme()
 
 	fmt.Fprintln(a.io.Out, codespace.Name)
-	if codespace.IdleTimeoutNotice != "" {
-		fmt.Fprintln(a.io.Out, cs.Cyan("Notice:"), codespace.IdleTimeoutNotice)
+
+	if a.io.IsStderrTTY() && codespace.IdleTimeoutNotice != "" {
+		fmt.Fprintln(a.io.ErrOut, cs.Yellow("Notice:"), codespace.IdleTimeoutNotice)
 	}
 
 	return nil
