@@ -227,7 +227,7 @@ func TestIssueList_web(t *testing.T) {
 
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/issues in your browser.\n", stderr.String())
-	browser.Verify(t, "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+mentions%3Afrank+milestone%3Av1.1")
+	browser.Verify(t, "https://github.com/OWNER/REPO/issues?q=assignee%3Apeter+author%3Ajohn+label%3Abug+label%3Adocs+mentions%3Afrank+milestone%3Av1.1+state%3Aall+type%3Aissue")
 }
 
 func Test_issueList(t *testing.T) {
@@ -302,7 +302,7 @@ func Test_issueList(t *testing.T) {
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
-							"query": "repo:OWNER/REPO is:issue is:open milestone:1.x",
+							"query": "milestone:1.x repo:OWNER/REPO state:open type:issue",
 							"type":  "ISSUE",
 						}, params)
 					}))
@@ -334,7 +334,7 @@ func Test_issueList(t *testing.T) {
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
-							"query": "repo:OWNER/REPO is:issue is:open milestone:1.x",
+							"query": "milestone:1.x repo:OWNER/REPO state:open type:issue",
 							"type":  "ISSUE",
 						}, params)
 					}))
@@ -405,7 +405,7 @@ func Test_issueList(t *testing.T) {
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
-							"query": "repo:OWNER/REPO is:issue is:open assignee:@me author:@me mentions:@me auth bug",
+							"query": "auth bug assignee:@me author:@me mentions:@me repo:OWNER/REPO state:open type:issue",
 							"type":  "ISSUE",
 						}, params)
 					}))
@@ -437,7 +437,7 @@ func Test_issueList(t *testing.T) {
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
-							"query": `repo:OWNER/REPO is:issue is:open label:hello label:"one world"`,
+							"query": `label:"one world" label:hello repo:OWNER/REPO state:open type:issue`,
 							"type":  "ISSUE",
 						}, params)
 					}))

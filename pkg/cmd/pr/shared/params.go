@@ -7,7 +7,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/pkg/githubsearch"
+	"github.com/cli/cli/v2/pkg/search"
 	"github.com/google/shlex"
 )
 
@@ -148,18 +148,19 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 }
 
 type FilterOptions struct {
-	Entity     string
-	State      string
 	Assignee   string
-	Labels     []string
 	Author     string
 	BaseBranch string
+	Draft      *bool
+	Entity     string
+	Fields     []string
 	HeadBranch string
+	Labels     []string
 	Mention    string
 	Milestone  string
+	Repo       string
 	Search     string
-	Draft      string
-	Fields     []string
+	State      string
 }
 
 func (opts *FilterOptions) IsDefault() bool {
@@ -207,49 +208,23 @@ func ListURLWithQuery(listURL string, options FilterOptions) (string, error) {
 }
 
 func SearchQueryBuild(options FilterOptions) string {
-	q := githubsearch.NewQuery()
-	switch options.Entity {
-	case "issue":
-		q.SetType(githubsearch.Issue)
-	case "pr":
-		q.SetType(githubsearch.PullRequest)
-	}
-
-	switch options.State {
-	case "open":
-		q.SetState(githubsearch.Open)
-	case "closed":
-		q.SetState(githubsearch.Closed)
-	case "merged":
-		q.SetState(githubsearch.Merged)
-	}
-
-	if options.Assignee != "" {
-		q.AssignedTo(options.Assignee)
-	}
-	for _, label := range options.Labels {
-		q.AddLabel(label)
-	}
-	if options.Author != "" {
-		q.AuthoredBy(options.Author)
-	}
-	if options.BaseBranch != "" {
-		q.SetBaseBranch(options.BaseBranch)
-	}
-	if options.HeadBranch != "" {
-		q.SetHeadBranch(options.HeadBranch)
-	}
-	if options.Mention != "" {
-		q.Mentions(options.Mention)
-	}
-	if options.Milestone != "" {
-		q.InMilestone(options.Milestone)
+	q := search.Query{
+		Qualifiers: search.Qualifiers{
+			Assignee:  options.Assignee,
+			Author:    options.Author,
+			Base:      options.BaseBranch,
+			Draft:     options.Draft,
+			Head:      options.HeadBranch,
+			Label:     options.Labels,
+			Mentions:  options.Mention,
+			Milestone: options.Milestone,
+			Repo:      []string{options.Repo},
+			State:     options.State,
+			Type:      options.Entity,
+		},
 	}
 	if options.Search != "" {
-		q.AddQuery(options.Search)
-	}
-	if options.Draft != "" {
-		q.SetDraft(options.Draft)
+		return fmt.Sprintf("%s %s", options.Search, q.String())
 	}
 	return q.String()
 }

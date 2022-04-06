@@ -74,7 +74,7 @@ func (q Query) String() string {
 	qualifiers := formatQualifiers(q.Qualifiers)
 	keywords := formatKeywords(q.Keywords)
 	all := append(keywords, qualifiers...)
-	return strings.Join(all, " ")
+	return strings.TrimSpace(strings.Join(all, " "))
 }
 
 func (q Qualifiers) Map() map[string][]string {
@@ -99,6 +99,9 @@ func (q Qualifiers) Map() map[string][]string {
 			}
 			s := []string{}
 			for i := 0; i < value.Len(); i++ {
+				if value.Index(i).IsZero() {
+					continue
+				}
 				s = append(s, fmt.Sprintf("%v", value.Index(i)))
 			}
 			m[key] = s
