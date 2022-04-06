@@ -121,7 +121,7 @@ func setGitDir(t *testing.T, dir string) {
 	old_GIT_DIR := os.Getenv("GIT_DIR")
 	os.Setenv("GIT_DIR", dir)
 	t.Cleanup(func() {
-		git.UnsetRemoteResolution("upstream")
+		_ = git.UnsetRemoteResolution("upstream") 
 		os.Setenv("GIT_DIR", old_GIT_DIR)
 	})
 }

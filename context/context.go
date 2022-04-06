@@ -77,8 +77,7 @@ func GetBaseRepo(remotes Remotes) (ghrepo.Interface, error) {
 func (r *ResolvedRemotes) SetBaseRepo(io *iostreams.IOStreams) error {
 	resolution := "base"
 	if !io.CanPrompt() {
-		git.SetRemoteResolution(r.remotes[0].Name, resolution)
-		return nil
+		return git.SetRemoteResolution(r.remotes[0].Name, resolution)
 	}
 
 	// from here on, consult the API
@@ -110,8 +109,7 @@ func (r *ResolvedRemotes) SetBaseRepo(io *iostreams.IOStreams) error {
 	}
 
 	if len(repoNames) == 0 {
-		git.SetRemoteResolution(r.remotes[0].Name, resolution)
-		return nil
+		return git.SetRemoteResolution(r.remotes[0].Name, resolution)
 	}
 
 	baseName := repoNames[0]
@@ -137,12 +135,15 @@ func (r *ResolvedRemotes) SetBaseRepo(io *iostreams.IOStreams) error {
 	return git.SetRemoteResolution(remote.Name, resolution)
 }
 
-func RemoveBaseRepo(remotes Remotes) {
+func RemoveBaseRepo(remotes Remotes) error {
 	for _, remote := range remotes {
 		if remote.Resolved == "base" {
-			git.UnsetRemoteResolution(remote.Remote.Name)
+			if err := git.UnsetRemoteResolution(remote.Remote.Name); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, error) {
