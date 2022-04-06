@@ -86,6 +86,8 @@ func runDefault(opts *DefaultOptions) error {
 	if err != nil {
 		return err
 	}
-	context.RemoveBaseRepo(remotes)
+	if err = context.RemoveBaseRepo(remotes); err != nil {
+		return err
+	}
 	return repoContext.SetBaseRepo(opts.IO)
 }
