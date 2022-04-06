@@ -209,7 +209,6 @@ func ListURLWithQuery(listURL string, options FilterOptions) (string, error) {
 
 func SearchQueryBuild(options FilterOptions) string {
 	q := search.Query{
-		Keywords: splitKeywords(options.Search),
 		Qualifiers: search.Qualifiers{
 			Assignee:  options.Assignee,
 			Author:    options.Author,
@@ -224,27 +223,10 @@ func SearchQueryBuild(options FilterOptions) string {
 			Type:      options.Entity,
 		},
 	}
+	if options.Search != "" {
+		return fmt.Sprintf("%s %s", options.Search, q.String())
+	}
 	return q.String()
-}
-
-func splitKeywords(keywords string) []string {
-	ks := []string{}
-	sb := &strings.Builder{}
-	quoted := false
-	for _, r := range keywords {
-		if r == '"' {
-			quoted = !quoted
-		} else if !quoted && r == ' ' {
-			ks = append(ks, sb.String())
-			sb.Reset()
-		} else {
-			sb.WriteRune(r)
-		}
-	}
-	if sb.Len() > 0 {
-		ks = append(ks, sb.String())
-	}
-	return ks
 }
 
 func QueryHasStateClause(searchQuery string) bool {
