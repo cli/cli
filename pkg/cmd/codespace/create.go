@@ -39,7 +39,7 @@ func newCreateCmd(app *App) *cobra.Command {
 
 	createCmd.Flags().StringVarP(&opts.repo, "repo", "r", "", "repository name with owner: user/repo")
 	createCmd.Flags().StringVarP(&opts.branch, "branch", "b", "", "repository branch")
-	createCmd.Flags().StringVarP(&opts.location, "location", "l", "", "location (assigned by IP or user settings if not provided)")
+	createCmd.Flags().StringVarP(&opts.location, "location", "l", "", "location (EastUs, SouthEastAsia, WestEurope, or WestUs2). Assigned by IP or user settings if not provided")
 	createCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "hardware specifications for the VM")
 	createCmd.Flags().BoolVarP(&opts.permissionsOptOut, "default-permissions", "", false, "do not prompt to accept additional permissions requested by the codespace")
 	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
