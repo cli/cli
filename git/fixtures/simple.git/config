@@ -7,3 +7,9 @@
 [user]
 	name = Mona the Cat
 	email = monalisa@github.com
+[remote "origin"]
+	url = git@github.com:monathecat/cli.git
+    fetch = +refs/heads/*:refs/remotes/origin/*
+[remote "upstream"]
+	url = git@github.com:cli/cli.git
+    fetch = +refs/heads/trunk:refs/remotes/upstream/trunk

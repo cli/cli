@@ -36,8 +36,22 @@ func NewCmdDefault(f *cmdutil.Factory) *cobra.Command {
 		repository gh should automatically point to.
 		`),
 		Example: heredoc.Doc(`
-			$ gh repo default cli/cli
+			$ gh repo default
+			#=> prompts remote options
+
+			$ gh repo default -v
+			#=> cli/cli
 		`),
+		Annotations: map[string]string{
+			"help:environment": heredoc.Doc(`
+				To manually configure a remote for gh to use, modify your local repo's git config
+
+				; Ex: setting gh to use the upstream remote
+				[remote "upstream"]
+ 					gh-resolved = base
+				...
+			`),
+		},
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDefault(opts)
