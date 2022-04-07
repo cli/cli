@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
@@ -272,23 +273,26 @@ func Test_configFile_Write_toDisk(t *testing.T) {
 func Test_configFile_WriteHosts_toDisk(t *testing.T) {
 	configDir := filepath.Join(t.TempDir(), ".config", "gh")
 	_ = os.MkdirAll(configDir, 0755)
-	err := ioutil.WriteFile(filepath.Join(configDir, "config.yml"), nil, 0444) // read-only
-	assert.NoError(t, err)
 	os.Setenv(GH_CONFIG_DIR, configDir)
 	defer os.Unsetenv(GH_CONFIG_DIR)
 
-	cfg := NewFromString(`hosts:\n github.com:\n  user: monalisa`)
-	err = cfg.WriteHosts()
+	cfg := NewFromString(heredoc.Doc(`
+    hosts:
+      github.com:
+        user: monalisa
+        oauth_token: TOKEN
+		`))
+	err := cfg.WriteHosts()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	expectedConfig := "" // TODO why is this empty?
-	if configBytes, err := ioutil.ReadFile(filepath.Join(configDir, "hosts.yml")); err != nil {
-		t.Error(err)
-	} else if string(configBytes) != expectedConfig {
-		t.Errorf("expected hosts.yml %q, got %q", expectedConfig, string(configBytes))
-	}
+	expectedConfig := "github.com:\n    user: monalisa\n    oauth_token: TOKEN\n"
+	actualConfig, err := ioutil.ReadFile(filepath.Join(configDir, "hosts.yml"))
+	assert.NoError(t, err)
+	assert.Equal(t, expectedConfig, string(actualConfig))
+	_, nonExistErr := os.Stat(filepath.Join(configDir, "config.yml"))
+	assert.Error(t, nonExistErr)
 }
 
 func Test_autoMigrateConfigDir_noMigration_notExist(t *testing.T) {
