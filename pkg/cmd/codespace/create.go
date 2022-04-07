@@ -18,6 +18,7 @@ import (
 type createOptions struct {
 	repo              string
 	branch            string
+	location          string
 	machine           string
 	showStatus        bool
 	permissionsOptOut bool
@@ -38,6 +39,7 @@ func newCreateCmd(app *App) *cobra.Command {
 
 	createCmd.Flags().StringVarP(&opts.repo, "repo", "r", "", "repository name with owner: user/repo")
 	createCmd.Flags().StringVarP(&opts.branch, "branch", "b", "", "repository branch")
+	createCmd.Flags().StringVarP(&opts.location, "location", "l", "", "location: {EastUs|SouthEastAsia|WestEurope|WestUs2} (determined automatically if not provided)")
 	createCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "hardware specifications for the VM")
 	createCmd.Flags().BoolVarP(&opts.permissionsOptOut, "default-permissions", "", false, "do not prompt to accept additional permissions requested by the codespace")
 	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
@@ -53,14 +55,14 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	vscsTarget := os.Getenv("VSCS_TARGET")
 	vscsTargetUrl := os.Getenv("VSCS_TARGET_URL")
 
-	locationCh := getLocation(ctx, vscsLocation, a.apiClient)
-
 	userInputs := struct {
 		Repository string
 		Branch     string
+		Location   string
 	}{
 		Repository: opts.repo,
 		Branch:     opts.branch,
+		Location:   opts.location,
 	}
 
 	if userInputs.Repository == "" {
@@ -93,6 +95,10 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		}
 	}
 
+	if userInputs.Location == "" && vscsLocation != "" {
+		userInputs.Location = vscsLocation
+	}
+
 	a.StartProgressIndicatorWithLabel("Fetching repository")
 	repository, err := a.apiClient.GetRepository(ctx, userInputs.Repository)
 	a.StopProgressIndicator()
@@ -105,12 +111,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		branch = repository.DefaultBranch
 	}
 
-	locationResult := <-locationCh
-	if locationResult.Err != nil {
-		return fmt.Errorf("error getting codespace region location: %w", locationResult.Err)
-	}
-
-	machine, err := getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, locationResult.Location)
+	machine, err := getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, userInputs.Location)
 	if err != nil {
 		return fmt.Errorf("error getting machine type: %w", err)
 	}
@@ -122,7 +123,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		RepositoryID:       repository.ID,
 		Branch:             branch,
 		Machine:            machine,
-		Location:           locationResult.Location,
+		Location:           userInputs.Location,
 		VSCSTarget:         vscsTarget,
 		VSCSTargetURL:      vscsTargetUrl,
 		IdleTimeoutMinutes: int(opts.idleTimeout.Minutes()),
@@ -291,30 +292,6 @@ func (a *App) showStatus(ctx context.Context, codespace *api.Codespace) error {
 	}
 
 	return nil
-}
-
-type locationResult struct {
-	Location string
-	Err      error
-}
-
-// getLocation fetches the closest Codespace datacenter
-// region/location to the user, unless the 'vscsLocationOverride' override is set
-func getLocation(ctx context.Context, vscsLocationOverride string, apiClient apiClient) <-chan locationResult {
-	ch := make(chan locationResult, 1)
-
-	// Developer override is set, return the override
-	if vscsLocationOverride != "" {
-		ch <- locationResult{vscsLocationOverride, nil}
-		return ch
-	}
-
-	// Dynamically fetch the region location
-	go func() {
-		location, err := apiClient.GetCodespaceRegionLocation(ctx)
-		ch <- locationResult{location, err}
-	}()
-	return ch
 }
 
 // getMachineName prompts the user to select the machine type, or validates the machine if non-empty.

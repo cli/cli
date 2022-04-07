@@ -433,40 +433,6 @@ func (a *API) StopCodespace(ctx context.Context, codespaceName string) error {
 	return nil
 }
 
-type getCodespaceRegionLocationResponse struct {
-	Current string `json:"current"`
-}
-
-// GetCodespaceRegionLocation returns the closest codespace location for the user.
-func (a *API) GetCodespaceRegionLocation(ctx context.Context) (string, error) {
-	req, err := http.NewRequest(http.MethodGet, a.vscsAPI+"/api/v1/locations", nil)
-	if err != nil {
-		return "", fmt.Errorf("error creating request: %w", err)
-	}
-
-	resp, err := a.do(ctx, req, req.URL.String())
-	if err != nil {
-		return "", fmt.Errorf("error making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", api.HandleHTTPError(resp)
-	}
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("error reading response body: %w", err)
-	}
-
-	var response getCodespaceRegionLocationResponse
-	if err := json.Unmarshal(b, &response); err != nil {
-		return "", fmt.Errorf("error unmarshaling response: %w", err)
-	}
-
-	return response.Current, nil
-}
-
 type Machine struct {
 	Name                 string `json:"name"`
 	DisplayName          string `json:"display_name"`
