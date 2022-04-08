@@ -48,7 +48,6 @@ func Test_NewCmdCreate(t *testing.T) {
 				BodyProvided: true,
 				Draft:        nil,
 				Prerelease:   nil,
-				RepoOverride: "",
 			},
 		},
 		{
@@ -63,7 +62,6 @@ func Test_NewCmdCreate(t *testing.T) {
 				BodyProvided: false,
 				Draft:        nil,
 				Prerelease:   nil,
-				RepoOverride: "",
 			},
 		},
 		{
@@ -78,7 +76,6 @@ func Test_NewCmdCreate(t *testing.T) {
 				BodyProvided: false,
 				Draft:        nil,
 				Prerelease:   boolPtr(true),
-				RepoOverride: "",
 			},
 		},
 		{
@@ -93,7 +90,6 @@ func Test_NewCmdCreate(t *testing.T) {
 				BodyProvided: false,
 				Draft:        nil,
 				Prerelease:   boolPtr(false),
-				RepoOverride: "",
 			},
 		},
 		{
@@ -108,7 +104,6 @@ func Test_NewCmdCreate(t *testing.T) {
 				BodyProvided: false,
 				Draft:        boolPtr(true),
 				Prerelease:   nil,
-				RepoOverride: "",
 			},
 		},
 		{
@@ -123,7 +118,6 @@ func Test_NewCmdCreate(t *testing.T) {
 				BodyProvided: false,
 				Draft:        boolPtr(false),
 				Prerelease:   nil,
-				RepoOverride: "",
 			},
 		},
 		{
@@ -138,7 +132,6 @@ func Test_NewCmdCreate(t *testing.T) {
 				BodyProvided: true,
 				Draft:        nil,
 				Prerelease:   nil,
-				RepoOverride: "",
 			},
 		},
 		{
@@ -154,7 +147,6 @@ func Test_NewCmdCreate(t *testing.T) {
 				BodyProvided: true,
 				Draft:        nil,
 				Prerelease:   nil,
-				RepoOverride: "",
 			},
 		},
 	}
@@ -205,7 +197,6 @@ func Test_NewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.want.BodyProvided, opts.BodyProvided)
 			assert.Equal(t, tt.want.Draft, opts.Draft)
 			assert.Equal(t, tt.want.Prerelease, opts.Prerelease)
-			assert.Equal(t, tt.want.RepoOverride, opts.RepoOverride)
 		})
 	}
 }

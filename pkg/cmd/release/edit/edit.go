@@ -24,9 +24,6 @@ type EditOptions struct {
 	BodyProvided bool
 	Draft        *bool
 	Prerelease   *bool
-
-	// the value from the --repo flag
-	RepoOverride string
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
@@ -57,7 +54,6 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			opts.ReleaseId = args[0]
 
 			opts.BaseRepo = f.BaseRepo
-			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
 
 			opts.BodyProvided = cmd.Flags().Changed("notes")
 			if notesFile != "" {
