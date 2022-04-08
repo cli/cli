@@ -49,21 +49,6 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 			Mark a release as a prerelease
 			$ gh release update 63899317 --prerelease
 
-			Mark a release as a full release
-			$ gh release update 63899317 --prerelease=false
-
-			Update the target commitish of a release
-			$ gh release update 63899317 --target 97ea5e77b4d61d5d80ed08f7512847dee3ec9af5
-
-			Update the name of the tag
-			$ gh release update 63899317 --tag v9.8.7
-
-			Update the name/title of a release
-			$ gh release update 63899317 --title 'Some new title'
-
-			Update the release notes
-			$ gh release update 63899317 --notes 'Some short release notes'
-
 			Update the release notes from the content of a file
 			$ gh release update 63899317 --notes-file /path/to/release_notes.md
 		`),
