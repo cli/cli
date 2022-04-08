@@ -38,10 +38,9 @@ func Test_NewCmdCreate(t *testing.T) {
 		},
 		{
 			name:  "provide title and notes",
-			args:  "12345 --title 'Some Title' --notes 'Some Notes'",
+			args:  "v1.2.3 --title 'Some Title' --notes 'Some Notes'",
 			isTTY: false,
 			want: EditOptions{
-				TagName:    "",
 				Target:     "",
 				Name:       stringPtr("Some Title"),
 				Body:       stringPtr("Some Notes"),
@@ -51,7 +50,7 @@ func Test_NewCmdCreate(t *testing.T) {
 		},
 		{
 			name:  "provide tag and target commitish",
-			args:  "12345 --tag v9.8.7 --target 97ea5e77b4d61d5d80ed08f7512847dee3ec9af5",
+			args:  "v1.2.3 --tag v9.8.7 --target 97ea5e77b4d61d5d80ed08f7512847dee3ec9af5",
 			isTTY: false,
 			want: EditOptions{
 				TagName:    "v9.8.7",
@@ -64,7 +63,7 @@ func Test_NewCmdCreate(t *testing.T) {
 		},
 		{
 			name:  "provide prerelease",
-			args:  "12345 --prerelease",
+			args:  "v1.2.3 --prerelease",
 			isTTY: false,
 			want: EditOptions{
 				TagName:    "",
@@ -77,7 +76,7 @@ func Test_NewCmdCreate(t *testing.T) {
 		},
 		{
 			name:  "provide prerelease=false",
-			args:  "12345 --prerelease=false",
+			args:  "v1.2.3 --prerelease=false",
 			isTTY: false,
 			want: EditOptions{
 				TagName:    "",
@@ -90,7 +89,7 @@ func Test_NewCmdCreate(t *testing.T) {
 		},
 		{
 			name:  "provide draft",
-			args:  "12345 --draft",
+			args:  "v1.2.3 --draft",
 			isTTY: false,
 			want: EditOptions{
 				TagName:    "",
@@ -103,7 +102,7 @@ func Test_NewCmdCreate(t *testing.T) {
 		},
 		{
 			name:  "provide draft=false",
-			args:  "12345 --draft=false",
+			args:  "v1.2.3 --draft=false",
 			isTTY: false,
 			want: EditOptions{
 				TagName:    "",
@@ -116,7 +115,7 @@ func Test_NewCmdCreate(t *testing.T) {
 		},
 		{
 			name:  "provide notes from file",
-			args:  fmt.Sprintf(`12345 -F '%s'`, tf.Name()),
+			args:  fmt.Sprintf(`v1.2.3 -F '%s'`, tf.Name()),
 			isTTY: false,
 			want: EditOptions{
 				TagName:    "",
@@ -129,7 +128,7 @@ func Test_NewCmdCreate(t *testing.T) {
 		},
 		{
 			name:  "provide notes from stdin",
-			args:  "12345 -F -",
+			args:  "v1.2.3 -F -",
 			isTTY: false,
 			stdin: "MY NOTES",
 			want: EditOptions{
@@ -206,8 +205,7 @@ func Test_updateRun(t *testing.T) {
 			name:  "edit the tag name",
 			isTTY: true,
 			opts: EditOptions{
-				ReleaseId: "12345",
-				TagName:   "v1.2.3",
+				TagName: "v1.2.3",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
@@ -227,8 +225,7 @@ func Test_updateRun(t *testing.T) {
 			name:  "edit the target",
 			isTTY: true,
 			opts: EditOptions{
-				ReleaseId: "12345",
-				Target:    "c0ff33",
+				Target: "c0ff33",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
@@ -248,8 +245,7 @@ func Test_updateRun(t *testing.T) {
 			name:  "edit the release name",
 			isTTY: true,
 			opts: EditOptions{
-				ReleaseId: "12345",
-				Name:      stringPtr("Hot Release #1"),
+				Name: stringPtr("Hot Release #1"),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
@@ -269,8 +265,7 @@ func Test_updateRun(t *testing.T) {
 			name:  "edit the release name (empty)",
 			isTTY: true,
 			opts: EditOptions{
-				ReleaseId: "12345",
-				Name:      stringPtr(""),
+				Name: stringPtr(""),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
@@ -290,8 +285,7 @@ func Test_updateRun(t *testing.T) {
 			name:  "edit the release notes",
 			isTTY: true,
 			opts: EditOptions{
-				ReleaseId: "12345",
-				Body:      stringPtr("Release Notes:\n- Fix Bug #1\n- Fix Bug #2"),
+				Body: stringPtr("Release Notes:\n- Fix Bug #1\n- Fix Bug #2"),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
@@ -311,8 +305,7 @@ func Test_updateRun(t *testing.T) {
 			name:  "edit the release notes (empty)",
 			isTTY: true,
 			opts: EditOptions{
-				ReleaseId: "12345",
-				Body:      stringPtr(""),
+				Body: stringPtr(""),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
@@ -332,8 +325,7 @@ func Test_updateRun(t *testing.T) {
 			name:  "edit draft (true)",
 			isTTY: true,
 			opts: EditOptions{
-				ReleaseId: "12345",
-				Draft:     boolPtr(true),
+				Draft: boolPtr(true),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
@@ -353,8 +345,7 @@ func Test_updateRun(t *testing.T) {
 			name:  "edit draft (false)",
 			isTTY: true,
 			opts: EditOptions{
-				ReleaseId: "12345",
-				Draft:     boolPtr(false),
+				Draft: boolPtr(false),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
@@ -374,7 +365,6 @@ func Test_updateRun(t *testing.T) {
 			name:  "edit prerelease (true)",
 			isTTY: true,
 			opts: EditOptions{
-				ReleaseId:  "12345",
 				Prerelease: boolPtr(true),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -395,7 +385,6 @@ func Test_updateRun(t *testing.T) {
 			name:  "edit prerelease (false)",
 			isTTY: true,
 			opts: EditOptions{
-				ReleaseId:  "12345",
 				Prerelease: boolPtr(false),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -413,11 +402,9 @@ func Test_updateRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
-			name:  "without any changes",
-			isTTY: true,
-			opts: EditOptions{
-				ReleaseId: "12345",
-			},
+			name:    "without any changes",
+			isTTY:   true,
+			opts:    EditOptions{},
 			wantErr: "nothing to edit",
 		},
 	}
@@ -430,6 +417,9 @@ func Test_updateRun(t *testing.T) {
 			io.SetStderrTTY(tt.isTTY)
 
 			fakeHTTP := &httpmock.Registry{}
+			fakeHTTP.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.JSONResponse(map[string]interface{}{
+				"id": 12345,
+			}))
 			if tt.httpStubs != nil {
 				tt.httpStubs(t, fakeHTTP)
 			}
@@ -443,7 +433,7 @@ func Test_updateRun(t *testing.T) {
 				return ghrepo.FromFullName("OWNER/REPO")
 			}
 
-			err := editRun(&tt.opts)
+			err := editRun("v1.2.3", &tt.opts)
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
 				return

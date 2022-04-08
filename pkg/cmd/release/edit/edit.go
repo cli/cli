@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -16,7 +17,6 @@ type EditOptions struct {
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	ReleaseId  string
 	TagName    string
 	Target     string
 	Name       *string
@@ -36,19 +36,17 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		DisableFlagsInUseLine: true,
 
-		Use:   "edit <release_id>",
+		Use:   "edit <tag>",
 		Short: "Edit a release",
 		Example: heredoc.Doc(`
 			Publish a release that was previously a draft
-			$ gh release edit 63899317 --draft=false
+			$ gh release edit v1.0 --draft=false
 
 			Update the release notes from the content of a file
-			$ gh release edit 63899317 --notes-file /path/to/release_notes.md
+			$ gh release edit v1.0 --notes-file /path/to/release_notes.md
 		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.ReleaseId = args[0]
-
 			opts.BaseRepo = f.BaseRepo
 
 			if notesFile != "" {
@@ -63,7 +61,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			if runF != nil {
 				return runF(opts)
 			}
-			return editRun(opts)
+			return editRun(args[0], opts)
 		},
 	}
 
@@ -78,7 +76,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	return cmd
 }
 
-func editRun(opts *EditOptions) error {
+func editRun(tag string, opts *EditOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -89,13 +87,18 @@ func editRun(opts *EditOptions) error {
 		return err
 	}
 
+	release, err := shared.FetchRelease(httpClient, baseRepo, tag)
+	if err != nil {
+		return err
+	}
+
 	params := getParams(opts)
 
 	if len(params) == 0 {
 		return errors.New("nothing to edit")
 	}
 
-	editedRelease, err := editRelease(httpClient, baseRepo, opts.ReleaseId, params)
+	editedRelease, err := editRelease(httpClient, baseRepo, release.ReleaseID, params)
 	if err != nil {
 		return err
 	}
