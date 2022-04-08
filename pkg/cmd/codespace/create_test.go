@@ -23,9 +23,54 @@ func TestApp_Create(t *testing.T) {
 		wantErr    error
 		wantStdout string
 		wantStderr string
+		isTTY      bool
 	}{
 		{
 			name: "create codespace with default branch and 30m idle timeout",
+			fields: fields{
+				apiClient: &apiClientMock{
+					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+						return &api.Repository{
+							ID:            1234,
+							FullName:      nwo,
+							DefaultBranch: "main",
+						}, nil
+					},
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
+						return []*api.Machine{
+							{
+								Name:        "GIGA",
+								DisplayName: "Gigabits of a machine",
+							},
+						}, nil
+					},
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						if params.Branch != "main" {
+							return nil, fmt.Errorf("got branch %q, want %q", params.Branch, "main")
+						}
+						if params.IdleTimeoutMinutes != 30 {
+							return nil, fmt.Errorf("idle timeout minutes was %v", params.IdleTimeoutMinutes)
+						}
+						return &api.Codespace{
+							Name: "monalisa-dotfiles-abcd1234",
+						}, nil
+					},
+					GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
+						return nil, nil // We can't ask for suggestions without a terminal.
+					},
+				},
+			},
+			opts: createOptions{
+				repo:        "monalisa/dotfiles",
+				branch:      "",
+				machine:     "GIGA",
+				showStatus:  false,
+				idleTimeout: 30 * time.Minute,
+			},
+			wantStdout: "monalisa-dotfiles-abcd1234\n",
+		},
+		{
+			name: "create codespace with default branch shows idle timeout notice if present",
 			fields: fields{
 				apiClient: &apiClientMock{
 					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
@@ -108,7 +153,8 @@ func TestApp_Create(t *testing.T) {
 							return nil, fmt.Errorf("got dev container path %q, want %q", params.DevContainerPath, ".devcontainer/foobar/devcontainer.json")
 						}
 						return &api.Codespace{
-							Name: "monalisa-dotfiles-abcd1234",
+							Name:              "monalisa-dotfiles-abcd1234",
+							IdleTimeoutNotice: "Idle timeout for this codespace is set to 10 minutes in compliance with your organization's policy",
 						}, nil
 					},
 					GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
@@ -124,6 +170,8 @@ func TestApp_Create(t *testing.T) {
 				idleTimeout: 30 * time.Minute,
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
+			wantStderr: "Notice: Idle timeout for this codespace is set to 10 minutes in compliance with your organization's policy\n",
+			isTTY:      true,
 		},
 		{
 			name: "returns error when getting devcontainer paths fails",
@@ -154,7 +202,7 @@ func TestApp_Create(t *testing.T) {
 			wantErr: fmt.Errorf("error getting devcontainer.json paths: some error"),
 		},
 		{
-			name: "create codespace that requires accepting additional permissions",
+			name: "create codespace with default branch does not show idle timeout notice if not conntected to terminal",
 			fields: fields{
 				apiClient: &apiClientMock{
 					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
@@ -169,6 +217,53 @@ func TestApp_Create(t *testing.T) {
 					},
 					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
 						return []api.DevContainerEntry{}, nil
+					},
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
+						return []*api.Machine{
+							{
+								Name:        "GIGA",
+								DisplayName: "Gigabits of a machine",
+							},
+						}, nil
+					},
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						if params.Branch != "main" {
+							return nil, fmt.Errorf("got branch %q, want %q", params.Branch, "main")
+						}
+						if params.IdleTimeoutMinutes != 30 {
+							return nil, fmt.Errorf("idle timeout minutes was %v", params.IdleTimeoutMinutes)
+						}
+						return &api.Codespace{
+							Name:              "monalisa-dotfiles-abcd1234",
+							IdleTimeoutNotice: "Idle timeout for this codespace is set to 10 minutes in compliance with your organization's policy",
+						}, nil
+					},
+					GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
+						return nil, nil // We can't ask for suggestions without a terminal.
+					},
+				},
+			},
+			opts: createOptions{
+				repo:        "monalisa/dotfiles",
+				branch:      "",
+				machine:     "GIGA",
+				showStatus:  false,
+				idleTimeout: 30 * time.Minute,
+			},
+			wantStdout: "monalisa-dotfiles-abcd1234\n",
+			wantStderr: "",
+			isTTY:      false,
+		},
+		{
+			name: "create codespace that requires accepting additional permissions",
+			fields: fields{
+				apiClient: &apiClientMock{
+					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+						return &api.Repository{
+							ID:            1234,
+							FullName:      nwo,
+							DefaultBranch: "main",
+						}, nil
 					},
 					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
 						return []*api.Machine{
@@ -211,6 +306,10 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			io, _, stdout, stderr := iostreams.Test()
+			io.SetStdoutTTY(tt.isTTY)
+			io.SetStdinTTY(tt.isTTY)
+			io.SetStderrTTY(tt.isTTY)
+
 			a := &App{
 				io:        io,
 				apiClient: tt.fields.apiClient,

@@ -989,13 +989,29 @@ func Test_generateCompareURL(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "complex branch names",
+			name: "'/'s in branch names/labels are percent-encoded",
 			ctx: CreateContext{
 				BaseRepo:        api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
 				BaseBranch:      "main/trunk",
 				HeadBranchLabel: "owner:feature",
 			},
-			want:    "https://github.com/OWNER/REPO/compare/main%2Ftrunk...owner%3Afeature?body=&expand=1",
+			want:    "https://github.com/OWNER/REPO/compare/main%2Ftrunk...owner:feature?body=&expand=1",
+			wantErr: false,
+		},
+		{
+			name: "Any of !'(),; but none of $&+=@ and : in branch names/labels are percent-encoded ",
+			/*
+					- Technically, per section 3.3 of RFC 3986, none of !$&'()*+,;= (sub-delims) and :[]@ (part of gen-delims) in path segments are optionally percent-encoded, but url.PathEscape percent-encodes !'(),; anyway
+					- !$&'()+,;=@ is a valid Git branch name—essentially RFC 3986 sub-delims without * and gen-delims without :/?#[]
+					- : is GitHub separator between a fork name and a branch name
+				    - See https://github.com/golang/go/issues/27559.
+			*/
+			ctx: CreateContext{
+				BaseRepo:        api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+				BaseBranch:      "main/trunk",
+				HeadBranchLabel: "owner:!$&'()+,;=@",
+			},
+			want:    "https://github.com/OWNER/REPO/compare/main%2Ftrunk...owner:%21$&%27%28%29+%2C%3B=@?body=&expand=1",
 			wantErr: false,
 		},
 	}

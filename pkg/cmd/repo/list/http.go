@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/pkg/githubsearch"
+	"github.com/cli/cli/v2/pkg/search"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -179,40 +179,37 @@ pagination:
 }
 
 func searchQuery(owner string, filter FilterOptions) string {
-	q := githubsearch.NewQuery()
-	q.SortBy(githubsearch.UpdatedAt, githubsearch.Desc)
-
 	if owner == "" {
-		q.OwnedBy("@me")
-	} else {
-		q.OwnedBy(owner)
+		owner = "@me"
 	}
 
+	fork := "true"
 	if filter.Fork {
-		q.OnlyForks()
-	} else {
-		q.IncludeForks(!filter.Source)
+		fork = "only"
+	} else if filter.Source {
+		fork = "false"
 	}
 
-	if filter.Language != "" {
-		q.SetLanguage(filter.Language)
-	}
-
-	if filter.Topic != "" {
-		q.SetTopic(filter.Topic)
-	}
-
-	switch filter.Visibility {
-	case "public":
-		q.SetVisibility(githubsearch.Public)
-	case "private":
-		q.SetVisibility(githubsearch.Private)
-	}
-
+	var archived *bool
 	if filter.Archived {
-		q.SetArchived(true)
-	} else if filter.NonArchived {
-		q.SetArchived(false)
+		trueBool := true
+		archived = &trueBool
+	}
+	if filter.NonArchived {
+		falseBool := false
+		archived = &falseBool
+	}
+
+	q := search.Query{
+		Keywords: []string{"sort:updated-desc"},
+		Qualifiers: search.Qualifiers{
+			Archived: archived,
+			Fork:     fork,
+			Is:       []string{filter.Visibility},
+			Language: filter.Language,
+			Org:      owner,
+			Topic:    []string{filter.Topic},
+		},
 	}
 
 	return q.String()
