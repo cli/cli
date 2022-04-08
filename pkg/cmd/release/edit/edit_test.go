@@ -41,13 +41,12 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "12345 --title 'Some Title' --notes 'Some Notes'",
 			isTTY: false,
 			want: EditOptions{
-				TagName:      "",
-				Target:       "",
-				Name:         "Some Title",
-				Body:         "Some Notes",
-				BodyProvided: true,
-				Draft:        nil,
-				Prerelease:   nil,
+				TagName:    "",
+				Target:     "",
+				Name:       "Some Title",
+				Body:       stringPtr("Some Notes"),
+				Draft:      nil,
+				Prerelease: nil,
 			},
 		},
 		{
@@ -55,13 +54,12 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "12345 --tag v9.8.7 --target 97ea5e77b4d61d5d80ed08f7512847dee3ec9af5",
 			isTTY: false,
 			want: EditOptions{
-				TagName:      "v9.8.7",
-				Target:       "97ea5e77b4d61d5d80ed08f7512847dee3ec9af5",
-				Name:         "",
-				Body:         "",
-				BodyProvided: false,
-				Draft:        nil,
-				Prerelease:   nil,
+				TagName:    "v9.8.7",
+				Target:     "97ea5e77b4d61d5d80ed08f7512847dee3ec9af5",
+				Name:       "",
+				Body:       nil,
+				Draft:      nil,
+				Prerelease: nil,
 			},
 		},
 		{
@@ -69,13 +67,12 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "12345 --prerelease",
 			isTTY: false,
 			want: EditOptions{
-				TagName:      "",
-				Target:       "",
-				Name:         "",
-				Body:         "",
-				BodyProvided: false,
-				Draft:        nil,
-				Prerelease:   boolPtr(true),
+				TagName:    "",
+				Target:     "",
+				Name:       "",
+				Body:       nil,
+				Draft:      nil,
+				Prerelease: boolPtr(true),
 			},
 		},
 		{
@@ -83,13 +80,12 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "12345 --prerelease=false",
 			isTTY: false,
 			want: EditOptions{
-				TagName:      "",
-				Target:       "",
-				Name:         "",
-				Body:         "",
-				BodyProvided: false,
-				Draft:        nil,
-				Prerelease:   boolPtr(false),
+				TagName:    "",
+				Target:     "",
+				Name:       "",
+				Body:       nil,
+				Draft:      nil,
+				Prerelease: boolPtr(false),
 			},
 		},
 		{
@@ -97,13 +93,12 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "12345 --draft",
 			isTTY: false,
 			want: EditOptions{
-				TagName:      "",
-				Target:       "",
-				Name:         "",
-				Body:         "",
-				BodyProvided: false,
-				Draft:        boolPtr(true),
-				Prerelease:   nil,
+				TagName:    "",
+				Target:     "",
+				Name:       "",
+				Body:       nil,
+				Draft:      boolPtr(true),
+				Prerelease: nil,
 			},
 		},
 		{
@@ -111,13 +106,12 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "12345 --draft=false",
 			isTTY: false,
 			want: EditOptions{
-				TagName:      "",
-				Target:       "",
-				Name:         "",
-				Body:         "",
-				BodyProvided: false,
-				Draft:        boolPtr(false),
-				Prerelease:   nil,
+				TagName:    "",
+				Target:     "",
+				Name:       "",
+				Body:       nil,
+				Draft:      boolPtr(false),
+				Prerelease: nil,
 			},
 		},
 		{
@@ -125,13 +119,12 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  fmt.Sprintf(`12345 -F '%s'`, tf.Name()),
 			isTTY: false,
 			want: EditOptions{
-				TagName:      "",
-				Target:       "",
-				Name:         "",
-				Body:         "MY NOTES",
-				BodyProvided: true,
-				Draft:        nil,
-				Prerelease:   nil,
+				TagName:    "",
+				Target:     "",
+				Name:       "",
+				Body:       stringPtr("MY NOTES"),
+				Draft:      nil,
+				Prerelease: nil,
 			},
 		},
 		{
@@ -140,13 +133,12 @@ func Test_NewCmdCreate(t *testing.T) {
 			isTTY: false,
 			stdin: "MY NOTES",
 			want: EditOptions{
-				TagName:      "",
-				Target:       "",
-				Name:         "",
-				Body:         "MY NOTES",
-				BodyProvided: true,
-				Draft:        nil,
-				Prerelease:   nil,
+				TagName:    "",
+				Target:     "",
+				Name:       "",
+				Body:       stringPtr("MY NOTES"),
+				Draft:      nil,
+				Prerelease: nil,
 			},
 		},
 	}
@@ -194,7 +186,6 @@ func Test_NewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.want.Target, opts.Target)
 			assert.Equal(t, tt.want.Name, opts.Name)
 			assert.Equal(t, tt.want.Body, opts.Body)
-			assert.Equal(t, tt.want.BodyProvided, opts.BodyProvided)
 			assert.Equal(t, tt.want.Draft, opts.Draft)
 			assert.Equal(t, tt.want.Prerelease, opts.Prerelease)
 		})
@@ -278,9 +269,8 @@ func Test_updateRun(t *testing.T) {
 			name:  "edit the release notes",
 			isTTY: true,
 			opts: EditOptions{
-				ReleaseId:    "12345",
-				Body:         "Release Notes:\n- Fix Bug #1\n- Fix Bug #2",
-				BodyProvided: true,
+				ReleaseId: "12345",
+				Body:      stringPtr("Release Notes:\n- Fix Bug #1\n- Fix Bug #2"),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
@@ -290,6 +280,27 @@ func Test_updateRun(t *testing.T) {
 				}`, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
 						"body": "Release Notes:\n- Fix Bug #1\n- Fix Bug #2",
+					}, params)
+				}))
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantStderr: "",
+		},
+		{
+			name:  "edit the release notes (empty)",
+			isTTY: true,
+			opts: EditOptions{
+				ReleaseId: "12345",
+				Body:      stringPtr(""),
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"body": "",
 					}, params)
 				}))
 			},
@@ -426,6 +437,9 @@ func Test_updateRun(t *testing.T) {
 }
 
 func boolPtr(b bool) *bool {
-	boolVar := b
-	return &boolVar
+	return &b
+}
+
+func stringPtr(s string) *string {
+	return &s
 }

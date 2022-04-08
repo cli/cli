@@ -16,14 +16,13 @@ type EditOptions struct {
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	ReleaseId    string
-	TagName      string
-	Target       string
-	Name         string
-	Body         string
-	BodyProvided bool
-	Draft        *bool
-	Prerelease   *bool
+	ReleaseId  string
+	TagName    string
+	Target     string
+	Name       string
+	Body       *string
+	Draft      *bool
+	Prerelease *bool
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
@@ -55,14 +54,13 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 			opts.BaseRepo = f.BaseRepo
 
-			opts.BodyProvided = cmd.Flags().Changed("notes")
 			if notesFile != "" {
 				b, err := cmdutil.ReadFile(notesFile, opts.IO.In)
 				if err != nil {
 					return err
 				}
-				opts.Body = string(b)
-				opts.BodyProvided = true
+				body := string(b)
+				opts.Body = &body
 			}
 
 			if runF != nil {
@@ -74,10 +72,10 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 	cmdutil.NilBoolFlag(cmd, &opts.Draft, "draft", "", "Save the release as a draft instead of publishing it")
 	cmdutil.NilBoolFlag(cmd, &opts.Prerelease, "prerelease", "", "Mark the release as a prerelease")
+	cmdutil.NilStringFlag(cmd, &opts.Body, "notes", "n", "Release notes")
 	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or full commit SHA (default: main branch)")
 	cmd.Flags().StringVar(&opts.TagName, "tag", "", "The name of the tag")
 	cmd.Flags().StringVarP(&opts.Name, "title", "t", "", "Release title")
-	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
 
 	return cmd
@@ -113,7 +111,7 @@ func editRun(opts *EditOptions) error {
 func getParams(opts *EditOptions) map[string]interface{} {
 	params := map[string]interface{}{}
 
-	if opts.Body != "" {
+	if opts.Body != nil {
 		params["body"] = opts.Body
 	}
 
