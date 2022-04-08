@@ -4,22 +4,17 @@ import (
 	"errors"
 	"fmt"
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/surveyext"
 	"github.com/spf13/cobra"
-	"io"
 	"net/http"
 )
 
 type UpdateOptions struct {
 	IO         *iostreams.IOStreams
-	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
-	Edit       func(string, string, string, io.Reader, io.Writer, io.Writer) (string, error)
 
 	ReleaseId    string
 	TagName      string
@@ -38,8 +33,6 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 	opts := &UpdateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		Config:     f.Config,
-		Edit:       surveyext.Edit,
 	}
 
 	var notesFile string
