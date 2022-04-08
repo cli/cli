@@ -13,7 +13,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
@@ -21,8 +20,13 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+type hostConfig interface {
+	DefaultHost() (string, error)
+}
+
 type StatusOptions struct {
 	HttpClient   func() (*http.Client, error)
+	HostConfig   hostConfig
 	CachedClient func(*http.Client, time.Duration) *http.Client
 	IO           *iostreams.IOStreams
 	Org          string
@@ -54,6 +58,13 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 			$ gh status -o cli # Limit results to a single organization
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := f.Config()
+			if err != nil {
+				return err
+			}
+
+			opts.HostConfig = cfg
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -147,6 +158,7 @@ func (rs Results) Swap(i, j int) {
 type StatusGetter struct {
 	Client         *http.Client
 	cachedClient   func(*http.Client, time.Duration) *http.Client
+	host           string
 	Org            string
 	Exclude        []string
 	AssignedPRs    []StatusItem
@@ -156,13 +168,18 @@ type StatusGetter struct {
 	RepoActivity   []StatusItem
 }
 
-func NewStatusGetter(client *http.Client, opts *StatusOptions) *StatusGetter {
+func NewStatusGetter(client *http.Client, hostname string, opts *StatusOptions) *StatusGetter {
 	return &StatusGetter{
 		Client:       client,
 		Org:          opts.Org,
 		Exclude:      opts.Exclude,
 		cachedClient: opts.CachedClient,
+		host:         hostname,
 	}
+}
+
+func (s *StatusGetter) hostname() string {
+	return s.host
 }
 
 func (s *StatusGetter) CachedClient(ttl time.Duration) *http.Client {
@@ -181,7 +198,7 @@ func (s *StatusGetter) ShouldExclude(repo string) bool {
 func (s *StatusGetter) CurrentUsername() (string, error) {
 	cachedClient := s.CachedClient(time.Hour * 48)
 	cachingAPIClient := api.NewClientFromHTTP(cachedClient)
-	currentUsername, err := api.CurrentLoginName(cachingAPIClient, ghinstance.Default())
+	currentUsername, err := api.CurrentLoginName(cachingAPIClient, s.hostname())
 	if err != nil {
 		return "", fmt.Errorf("failed to get current username: %w", err)
 	}
@@ -202,7 +219,7 @@ func (s *StatusGetter) ActualMention(n Notification) (string, error) {
 	resp := struct {
 		Body string
 	}{}
-	if err := c.REST(ghinstance.Default(), "GET", n.Subject.LatestCommentURL, nil, &resp); err != nil {
+	if err := c.REST(s.hostname(), "GET", n.Subject.LatestCommentURL, nil, &resp); err != nil {
 		return "", err
 	}
 
@@ -237,7 +254,7 @@ func (s *StatusGetter) LoadNotifications() error {
 	pages := 0
 	p := fmt.Sprintf("notifications?%s", query.Encode())
 	for pages < 3 {
-		next, err := c.RESTWithNext(ghinstance.Default(), "GET", p, nil, &resp)
+		next, err := c.RESTWithNext(s.hostname(), "GET", p, nil, &resp)
 		if err != nil {
 			var httpErr api.HTTPError
 			if !errors.As(err, &httpErr) || httpErr.StatusCode != 404 {
@@ -362,7 +379,7 @@ func (s *StatusGetter) LoadSearchResults() error {
 			}
 		}
 	}
-	err := c.GraphQL(ghinstance.Default(), q, nil, &resp)
+	err := c.GraphQL(s.hostname(), q, nil, &resp)
 	if err != nil {
 		return fmt.Errorf("could not search for assignments: %w", err)
 	}
@@ -437,7 +454,7 @@ func (s *StatusGetter) LoadEvents() error {
 	pages := 0
 	p := fmt.Sprintf("users/%s/received_events?%s", currentUsername, query.Encode())
 	for pages < 2 {
-		next, err := c.RESTWithNext(ghinstance.Default(), "GET", p, nil, &resp)
+		next, err := c.RESTWithNext(s.hostname(), "GET", p, nil, &resp)
 		if err != nil {
 			var httpErr api.HTTPError
 			if !errors.As(err, &httpErr) || httpErr.StatusCode != 404 {
@@ -504,7 +521,12 @@ func statusRun(opts *StatusOptions) error {
 		return fmt.Errorf("could not create client: %w", err)
 	}
 
-	sg := NewStatusGetter(client, opts)
+	hostname, err := opts.HostConfig.DefaultHost()
+	if err != nil {
+		return err
+	}
+
+	sg := NewStatusGetter(client, hostname, opts)
 
 	// TODO break out sections into individual subcommands
 
