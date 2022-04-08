@@ -74,11 +74,6 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 			opts.BaseRepo = f.BaseRepo
 			opts.RepoOverride, _ = cmd.Flags().GetString("repo")
 
-			err := parseOptionalBoolFlags(cmd, opts)
-			if err != nil {
-				return err
-			}
-
 			opts.BodyProvided = cmd.Flags().Changed("notes")
 			if notesFile != "" {
 				b, err := cmdutil.ReadFile(notesFile, opts.IO.In)
@@ -96,9 +91,8 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 		},
 	}
 
-	cmd.Flags().Bool("draft", false, "Save the release as a draft instead of publishing it")
-	cmd.Flags().Bool("publish", false, "Publish the release")
-	cmd.Flags().Bool("prerelease", false, "Mark the release as a prerelease")
+	cmdutil.NilBoolFlag(cmd, &opts.Draft, "draft", "", "Save the release as a draft instead of publishing it")
+	cmdutil.NilBoolFlag(cmd, &opts.Prerelease, "prerelease", "", "Mark the release as a prerelease")
 	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or full commit SHA (default: main branch)")
 	cmd.Flags().StringVar(&opts.TagName, "tag", "", "The name of the tag")
 	cmd.Flags().StringVarP(&opts.Name, "title", "t", "", "Release title")
@@ -131,26 +125,6 @@ func updateRun(opts *UpdateOptions) error {
 	}
 
 	fmt.Fprintf(opts.IO.Out, "%s\n", updatedRelease.URL)
-
-	return nil
-}
-
-func parseOptionalBoolFlags(cmd *cobra.Command, opts *UpdateOptions) error {
-	if cmd.Flags().Changed("draft") {
-		draft, err := cmd.Flags().GetBool("draft")
-		if err != nil {
-			return err
-		}
-		opts.Draft = &draft
-	}
-
-	if cmd.Flags().Changed("prerelease") {
-		prerelease, err := cmd.Flags().GetBool("prerelease")
-		if err != nil {
-			return err
-		}
-		opts.Prerelease = &prerelease
-	}
 
 	return nil
 }
