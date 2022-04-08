@@ -43,7 +43,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			want: EditOptions{
 				TagName:    "",
 				Target:     "",
-				Name:       "Some Title",
+				Name:       stringPtr("Some Title"),
 				Body:       stringPtr("Some Notes"),
 				Draft:      nil,
 				Prerelease: nil,
@@ -56,7 +56,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			want: EditOptions{
 				TagName:    "v9.8.7",
 				Target:     "97ea5e77b4d61d5d80ed08f7512847dee3ec9af5",
-				Name:       "",
+				Name:       nil,
 				Body:       nil,
 				Draft:      nil,
 				Prerelease: nil,
@@ -69,7 +69,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			want: EditOptions{
 				TagName:    "",
 				Target:     "",
-				Name:       "",
+				Name:       nil,
 				Body:       nil,
 				Draft:      nil,
 				Prerelease: boolPtr(true),
@@ -82,7 +82,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			want: EditOptions{
 				TagName:    "",
 				Target:     "",
-				Name:       "",
+				Name:       nil,
 				Body:       nil,
 				Draft:      nil,
 				Prerelease: boolPtr(false),
@@ -95,7 +95,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			want: EditOptions{
 				TagName:    "",
 				Target:     "",
-				Name:       "",
+				Name:       nil,
 				Body:       nil,
 				Draft:      boolPtr(true),
 				Prerelease: nil,
@@ -108,7 +108,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			want: EditOptions{
 				TagName:    "",
 				Target:     "",
-				Name:       "",
+				Name:       nil,
 				Body:       nil,
 				Draft:      boolPtr(false),
 				Prerelease: nil,
@@ -121,7 +121,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			want: EditOptions{
 				TagName:    "",
 				Target:     "",
-				Name:       "",
+				Name:       nil,
 				Body:       stringPtr("MY NOTES"),
 				Draft:      nil,
 				Prerelease: nil,
@@ -135,7 +135,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			want: EditOptions{
 				TagName:    "",
 				Target:     "",
-				Name:       "",
+				Name:       nil,
 				Body:       stringPtr("MY NOTES"),
 				Draft:      nil,
 				Prerelease: nil,
@@ -249,7 +249,7 @@ func Test_updateRun(t *testing.T) {
 			isTTY: true,
 			opts: EditOptions{
 				ReleaseId: "12345",
-				Name:      "Hot Release #1",
+				Name:      stringPtr("Hot Release #1"),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
@@ -259,6 +259,27 @@ func Test_updateRun(t *testing.T) {
 				}`, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
 						"name": "Hot Release #1",
+					}, params)
+				}))
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantStderr: "",
+		},
+		{
+			name:  "edit the release name (empty)",
+			isTTY: true,
+			opts: EditOptions{
+				ReleaseId: "12345",
+				Name:      stringPtr(""),
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"name": "",
 					}, params)
 				}))
 			},

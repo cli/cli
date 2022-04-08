@@ -19,7 +19,7 @@ type EditOptions struct {
 	ReleaseId  string
 	TagName    string
 	Target     string
-	Name       string
+	Name       *string
 	Body       *string
 	Draft      *bool
 	Prerelease *bool
@@ -73,9 +73,9 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmdutil.NilBoolFlag(cmd, &opts.Draft, "draft", "", "Save the release as a draft instead of publishing it")
 	cmdutil.NilBoolFlag(cmd, &opts.Prerelease, "prerelease", "", "Mark the release as a prerelease")
 	cmdutil.NilStringFlag(cmd, &opts.Body, "notes", "n", "Release notes")
+	cmdutil.NilStringFlag(cmd, &opts.Name, "title", "t", "Release title")
 	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or full commit SHA (default: main branch)")
 	cmd.Flags().StringVar(&opts.TagName, "tag", "", "The name of the tag")
-	cmd.Flags().StringVarP(&opts.Name, "title", "t", "", "Release title")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
 
 	return cmd
@@ -119,7 +119,7 @@ func getParams(opts *EditOptions) map[string]interface{} {
 		params["draft"] = *opts.Draft
 	}
 
-	if opts.Name != "" {
+	if opts.Name != nil {
 		params["name"] = opts.Name
 	}
 
