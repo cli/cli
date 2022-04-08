@@ -42,9 +42,6 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			Publish a release that was previously a draft
 			$ gh release edit 63899317 --draft=false
 
-			Mark a release as a prerelease
-			$ gh release edit 63899317 --prerelease
-
 			Update the release notes from the content of a file
 			$ gh release edit 63899317 --notes-file /path/to/release_notes.md
 		`),
