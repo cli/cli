@@ -1,4 +1,4 @@
-package update
+package edit
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"net/http"
 )
 
-func updateRelease(httpClient *http.Client, repo ghrepo.Interface, releaseId string, params map[string]interface{}) (*shared.Release, error) {
+func editRelease(httpClient *http.Client, repo ghrepo.Interface, releaseId string, params map[string]interface{}) (*shared.Release, error) {
 	bodyBytes, err := json.Marshal(params)
 	if err != nil {
 		return nil, err

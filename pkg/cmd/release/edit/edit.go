@@ -1,4 +1,4 @@
-package update
+package edit
 
 import (
 	"errors"
@@ -11,7 +11,7 @@ import (
 	"net/http"
 )
 
-type UpdateOptions struct {
+type EditOptions struct {
 	IO         *iostreams.IOStreams
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -29,8 +29,8 @@ type UpdateOptions struct {
 	RepoOverride string
 }
 
-func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Command {
-	opts := &UpdateOptions{
+func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
+	opts := &EditOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 	}
@@ -40,17 +40,17 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		DisableFlagsInUseLine: true,
 
-		Use:   "update <release_id>",
+		Use:   "edit <release_id>",
 		Short: "Edit a release",
 		Example: heredoc.Doc(`
 			Publish a release that was previously a draft
-			$ gh release update 63899317 --draft=false
+			$ gh release edit 63899317 --draft=false
 
 			Mark a release as a prerelease
-			$ gh release update 63899317 --prerelease
+			$ gh release edit 63899317 --prerelease
 
 			Update the release notes from the content of a file
-			$ gh release update 63899317 --notes-file /path/to/release_notes.md
+			$ gh release edit 63899317 --notes-file /path/to/release_notes.md
 		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -72,7 +72,7 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 			if runF != nil {
 				return runF(opts)
 			}
-			return updateRun(opts)
+			return editRun(opts)
 		},
 	}
 
@@ -87,7 +87,7 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*UpdateOptions) error) *cobra.Co
 	return cmd
 }
 
-func updateRun(opts *UpdateOptions) error {
+func editRun(opts *EditOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -101,20 +101,20 @@ func updateRun(opts *UpdateOptions) error {
 	params := getParams(opts)
 
 	if len(params) == 0 {
-		return errors.New("nothing to update")
+		return errors.New("nothing to edit")
 	}
 
-	updatedRelease, err := updateRelease(httpClient, baseRepo, opts.ReleaseId, params)
+	editedRelease, err := editRelease(httpClient, baseRepo, opts.ReleaseId, params)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.Out, "%s\n", updatedRelease.URL)
+	fmt.Fprintf(opts.IO.Out, "%s\n", editedRelease.URL)
 
 	return nil
 }
 
-func getParams(opts *UpdateOptions) map[string]interface{} {
+func getParams(opts *EditOptions) map[string]interface{} {
 	params := map[string]interface{}{}
 
 	if opts.Body != "" {

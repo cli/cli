@@ -5,8 +5,8 @@ import (
 	cmdDelete "github.com/cli/cli/v2/pkg/cmd/release/delete"
 	cmdDeleteAsset "github.com/cli/cli/v2/pkg/cmd/release/delete-asset"
 	cmdDownload "github.com/cli/cli/v2/pkg/cmd/release/download"
+	cmdUpdate "github.com/cli/cli/v2/pkg/cmd/release/edit"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/release/list"
-	cmdUpdate "github.com/cli/cli/v2/pkg/cmd/release/update"
 	cmdUpload "github.com/cli/cli/v2/pkg/cmd/release/upload"
 	cmdView "github.com/cli/cli/v2/pkg/cmd/release/view"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -29,7 +29,7 @@ func NewCmdRelease(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(cmdDeleteAsset.NewCmdDeleteAsset(f, nil))
 	cmd.AddCommand(cmdDownload.NewCmdDownload(f, nil))
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
-	cmd.AddCommand(cmdUpdate.NewCmdUpdate(f, nil))
+	cmd.AddCommand(cmdUpdate.NewCmdEdit(f, nil))
 	cmd.AddCommand(cmdView.NewCmdView(f, nil))
 	cmd.AddCommand(cmdUpload.NewCmdUpload(f, nil))
 

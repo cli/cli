@@ -1,4 +1,4 @@
-package update
+package edit
 
 import (
 	"bytes"
@@ -27,7 +27,7 @@ func Test_NewCmdCreate(t *testing.T) {
 		args    string
 		isTTY   bool
 		stdin   string
-		want    UpdateOptions
+		want    EditOptions
 		wantErr string
 	}{
 		{
@@ -40,7 +40,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			name:  "provide title and notes",
 			args:  "12345 --title 'Some Title' --notes 'Some Notes'",
 			isTTY: false,
-			want: UpdateOptions{
+			want: EditOptions{
 				TagName:      "",
 				Target:       "",
 				Name:         "Some Title",
@@ -55,7 +55,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			name:  "provide tag and target commitish",
 			args:  "12345 --tag v9.8.7 --target 97ea5e77b4d61d5d80ed08f7512847dee3ec9af5",
 			isTTY: false,
-			want: UpdateOptions{
+			want: EditOptions{
 				TagName:      "v9.8.7",
 				Target:       "97ea5e77b4d61d5d80ed08f7512847dee3ec9af5",
 				Name:         "",
@@ -70,7 +70,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			name:  "provide prerelease",
 			args:  "12345 --prerelease",
 			isTTY: false,
-			want: UpdateOptions{
+			want: EditOptions{
 				TagName:      "",
 				Target:       "",
 				Name:         "",
@@ -85,7 +85,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			name:  "provide prerelease=false",
 			args:  "12345 --prerelease=false",
 			isTTY: false,
-			want: UpdateOptions{
+			want: EditOptions{
 				TagName:      "",
 				Target:       "",
 				Name:         "",
@@ -100,7 +100,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			name:  "provide draft",
 			args:  "12345 --draft",
 			isTTY: false,
-			want: UpdateOptions{
+			want: EditOptions{
 				TagName:      "",
 				Target:       "",
 				Name:         "",
@@ -115,7 +115,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			name:  "provide draft=false",
 			args:  "12345 --draft=false",
 			isTTY: false,
-			want: UpdateOptions{
+			want: EditOptions{
 				TagName:      "",
 				Target:       "",
 				Name:         "",
@@ -130,7 +130,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			name:  "provide notes from file",
 			args:  fmt.Sprintf(`12345 -F '%s'`, tf.Name()),
 			isTTY: false,
-			want: UpdateOptions{
+			want: EditOptions{
 				TagName:      "",
 				Target:       "",
 				Name:         "",
@@ -146,7 +146,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "12345 -F -",
 			isTTY: false,
 			stdin: "MY NOTES",
-			want: UpdateOptions{
+			want: EditOptions{
 				TagName:      "",
 				Target:       "",
 				Name:         "",
@@ -175,8 +175,8 @@ func Test_NewCmdCreate(t *testing.T) {
 				IOStreams: io,
 			}
 
-			var opts *UpdateOptions
-			cmd := NewCmdUpdate(f, func(o *UpdateOptions) error {
+			var opts *EditOptions
+			cmd := NewCmdEdit(f, func(o *EditOptions) error {
 				opts = o
 				return nil
 			})
@@ -214,16 +214,16 @@ func Test_updateRun(t *testing.T) {
 	tests := []struct {
 		name       string
 		isTTY      bool
-		opts       UpdateOptions
+		opts       EditOptions
 		httpStubs  func(t *testing.T, reg *httpmock.Registry)
 		wantErr    string
 		wantStdout string
 		wantStderr string
 	}{
 		{
-			name:  "update the tag name",
+			name:  "edit the tag name",
 			isTTY: true,
-			opts: UpdateOptions{
+			opts: EditOptions{
 				ReleaseId: "12345",
 				TagName:   "v1.2.3",
 			},
@@ -242,9 +242,9 @@ func Test_updateRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
-			name:  "update the target",
+			name:  "edit the target",
 			isTTY: true,
-			opts: UpdateOptions{
+			opts: EditOptions{
 				ReleaseId: "12345",
 				Target:    "c0ff33",
 			},
@@ -263,9 +263,9 @@ func Test_updateRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
-			name:  "update the release name",
+			name:  "edit the release name",
 			isTTY: true,
-			opts: UpdateOptions{
+			opts: EditOptions{
 				ReleaseId: "12345",
 				Name:      "Hot Release #1",
 			},
@@ -284,9 +284,9 @@ func Test_updateRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
-			name:  "update the release notes",
+			name:  "edit the release notes",
 			isTTY: true,
-			opts: UpdateOptions{
+			opts: EditOptions{
 				ReleaseId:    "12345",
 				Body:         "Release Notes:\n- Fix Bug #1\n- Fix Bug #2",
 				BodyProvided: true,
@@ -306,9 +306,9 @@ func Test_updateRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
-			name:  "update draft (true)",
+			name:  "edit draft (true)",
 			isTTY: true,
-			opts: UpdateOptions{
+			opts: EditOptions{
 				ReleaseId: "12345",
 				Draft:     boolPtr(true),
 			},
@@ -327,9 +327,9 @@ func Test_updateRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
-			name:  "update draft (false)",
+			name:  "edit draft (false)",
 			isTTY: true,
-			opts: UpdateOptions{
+			opts: EditOptions{
 				ReleaseId: "12345",
 				Draft:     boolPtr(false),
 			},
@@ -348,9 +348,9 @@ func Test_updateRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
-			name:  "update prerelease (true)",
+			name:  "edit prerelease (true)",
 			isTTY: true,
-			opts: UpdateOptions{
+			opts: EditOptions{
 				ReleaseId:  "12345",
 				Prerelease: boolPtr(true),
 			},
@@ -369,9 +369,9 @@ func Test_updateRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
-			name:  "update prerelease (false)",
+			name:  "edit prerelease (false)",
 			isTTY: true,
-			opts: UpdateOptions{
+			opts: EditOptions{
 				ReleaseId:  "12345",
 				Prerelease: boolPtr(false),
 			},
@@ -392,10 +392,10 @@ func Test_updateRun(t *testing.T) {
 		{
 			name:  "without any changes",
 			isTTY: true,
-			opts: UpdateOptions{
+			opts: EditOptions{
 				ReleaseId: "12345",
 			},
-			wantErr: "nothing to update",
+			wantErr: "nothing to edit",
 		},
 	}
 
@@ -420,7 +420,7 @@ func Test_updateRun(t *testing.T) {
 				return ghrepo.FromFullName("OWNER/REPO")
 			}
 
-			err := updateRun(&tt.opts)
+			err := editRun(&tt.opts)
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
 				return
