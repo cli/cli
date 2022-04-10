@@ -35,6 +35,12 @@ var reasonsString = strings.Join(reasons, ", ")
 var reasonsJson = []string{"off-topic", "resolved", "spam", "too heated"}
 var reasonsMap map[string]string
 
+// typenames maps from the parent command to issue.Typename
+var typenames = map[string]string{
+	"issue": api.TypeIssue,
+	"pr":    api.TypePullRequest,
+}
+
 func init() {
 	reasonsMap = make(map[string]string)
 	for i, reason := range reasons {
