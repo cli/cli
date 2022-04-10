@@ -11,52 +11,75 @@
 package lock
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	graphql "github.com/cli/shurcooL-graphql"
+	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
 
-type state uint
+// the reason for not just declaring a map is so that I can put the keys in
+// alphabetical order
+var reasons = []string{"off-topic", "resolved", "spam", "too-heated"}
+var reasonsString = strings.Join(reasons, ", ")
+
+var reasonsApi = []githubv4.LockReason{
+	githubv4.LockReasonOffTopic,
+	githubv4.LockReasonResolved,
+	githubv4.LockReasonSpam,
+	githubv4.LockReasonTooHeated,
+}
+var reasonsMap map[string]*githubv4.LockReason
+
+func init() {
+	reasonsMap = make(map[string]*githubv4.LockReason)
+	for i, reason := range reasons {
+		reasonsMap[reason] = &reasonsApi[i]
+	}
+
+	// If no reason given, set lock_reason to null in graphql
+	reasonsMap[""] = nil
+}
+
+type command struct {
+	FullName string // complete name for the command
+	Typename string // return value from issue.Typename
+}
+
+var cmds map[string]command = map[string]command{
+	"issue": {"Issue", api.TypeIssue},
+	"pr":    {"Pull request", api.TypePullRequest},
+}
 
 // Acceptable lock states for conversations
 const (
-	Unlock state = iota
-	Lock
+	Unlock string = "Unlock"
+	Lock   string = "Lock"
+	Relock string = "Relock"
 )
 
-var reasons = []string{"off-topic", "resolved", "spam", "too-heated"}
-var reasonsJson = []string{"off-topic", "resolved", "spam", "too heated"}
-var reasonsString = strings.Join(reasons, ", ")
-var reasonsMap map[string]string
-
-// typenames maps from the parent command to issue.Typename
-var typenames = map[string]string{
-	"issue": api.TypeIssue,
-	"pr":    api.TypePullRequest,
-}
-
-func init() {
-	reasonsMap = make(map[string]string)
-	for i, reason := range reasons {
-		reasonsMap[reason] = reasonsJson[i]
-	}
-}
-
 type LockOptions struct {
-	HttpClient   func() (*http.Client, error)
-	Config       func() (config.Config, error)
-	IO           *iostreams.IOStreams
-	BaseRepo     func() (ghrepo.Interface, error)
-	PadlockState state
-	Reason       string
+	HttpClient func() (*http.Client, error)
+	Config     func() (config.Config, error)
+	IO         *iostreams.IOStreams
+	BaseRepo   func() (ghrepo.Interface, error)
+
+	Fields       []string
+	PadlockState string
 	ParentCmd    string
-	IssueNumber  string
+	Reason       string
+	SelectorArg  string
 }
 
 func (opts *LockOptions) setCommonOptions(f *cmdutil.Factory, cmd *cobra.Command, args []string) {
@@ -68,10 +91,11 @@ func (opts *LockOptions) setCommonOptions(f *cmdutil.Factory, cmd *cobra.Command
 	// support `-R, --repo` override
 	opts.BaseRepo = f.BaseRepo
 
-	// Set what type of conversation
-	opts.ParentCmd = cmd.Parent().Name()
+	opts.SelectorArg = args[0]
 
-	opts.IssueNumber = args[0]
+	opts.Fields = []string{
+		"id", "number", "title", "url", "locked", "activeLockReason"}
+
 }
 
 func NewCmdLock(f *cmdutil.Factory, runF func(*LockOptions) error) *cobra.Command {
@@ -86,15 +110,17 @@ func NewCmdLock(f *cmdutil.Factory, runF func(*LockOptions) error) *cobra.Comman
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 
+			opts.setCommonOptions(f, cmd, args)
+
 			reasonProvided := cmd.Flags().Changed("message")
 			if reasonProvided {
-				jsonReason, ok := reasonsMap[opts.Reason]
+				_, ok := reasonsMap[opts.Reason]
 				if !ok {
-					return cmdutil.FlagErrorf("Invalid reason: %v.\nMust be one of the following: %v.\nAborting lock.",
-						opts.Reason, reasonsString)
-				}
+					cs := opts.IO.ColorScheme()
 
-				opts.Reason = jsonReason
+					return cmdutil.FlagErrorf("%s Invalid reason: %v.\nSee help for options.\nAborting lock.",
+						cs.FailureIconWithColor(cs.Red), opts.Reason)
+				}
 			}
 
 			opts.setCommonOptions(f, cmd, args)
@@ -138,12 +164,127 @@ func NewCmdUnlock(f *cmdutil.Factory, runF func(*LockOptions) error) *cobra.Comm
 
 // padlock will lock or unlock a conversation.
 func padlock(opts *LockOptions) error {
-	switch opts.PadlockState {
-	case Lock:
-		fmt.Printf("Locking %v #%v\n", opts.ParentCmd, opts.IssueNumber)
-	case Unlock:
-		fmt.Printf("Unlocking %v #%v\n", opts.ParentCmd, opts.IssueNumber)
+	cs := opts.IO.ColorScheme()
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
 	}
 
+	issuePr, baseRepo, err := issueShared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, opts.Fields)
+
+	parent := cmds[opts.ParentCmd]
+
+	switch {
+	case err != nil:
+		return err
+	case parent.Typename != issuePr.Typename:
+		return fmt.Errorf("%s #%d not found, but found %s #%d",
+			parent.Typename, issuePr.Number,
+			issuePr.Typename, issuePr.Number)
+	case opts.PadlockState == Lock && issuePr.Locked:
+		opts.PadlockState = Relock
+	}
+
+	var confirm bool
+	reason := " "
+	if opts.Reason != "" {
+		reason = fmt.Sprintf(" (%s) ", opts.Reason)
+	}
+	successMsg := fmt.Sprintf("%s %sed%s%s #%d (%s)\n",
+		cs.SuccessIconWithColor(cs.Green), opts.PadlockState, reason,
+		parent.FullName, issuePr.Number, issuePr.Title)
+
+	switch opts.PadlockState {
+	case Lock:
+		err = lockLockable(httpClient, baseRepo, issuePr, opts)
+	case Relock:
+		shouldRelock := &survey.Confirm{
+			Message: fmt.Sprintf("%s #%d already locked.  Unlock and lock again?", parent.FullName, issuePr.Number),
+			Default: true,
+		}
+		err = survey.AskOne(shouldRelock, &confirm)
+		if err != nil {
+			return err
+		}
+
+		if confirm {
+			err = relockLockable(httpClient, baseRepo, issuePr, opts)
+		} else {
+			successMsg = fmt.Sprintf("%s %s #%d (%s) unchanged\n",
+				cs.SuccessIconWithColor(cs.Green), parent.FullName, issuePr.Number, issuePr.Title)
+		}
+	case Unlock:
+		err = unlockLockable(httpClient, baseRepo, issuePr, opts)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprint(opts.IO.ErrOut, successMsg)
+
+	return nil
+}
+
+// lockLockable will lock an issue or pull request
+func lockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *api.Issue, opts *LockOptions) error {
+
+	var mutation struct {
+		LockLockable struct {
+			LockedRecord struct {
+				Locked bool
+			}
+		} `graphql:"lockLockable(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": githubv4.LockLockableInput{
+			LockableID: lockable.ID,
+			LockReason: reasonsMap[opts.Reason],
+		},
+	}
+
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
+
+	return gql.MutateNamed(context.Background(), "LockLockable", &mutation, variables)
+}
+
+// unlockLockable will lock an issue or pull request
+func unlockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *api.Issue, opts *LockOptions) error {
+
+	var mutation struct {
+		UnlockLockable struct {
+			UnlockedRecord struct {
+				Locked bool
+			}
+		} `graphql:"unlockLockable(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": githubv4.UnlockLockableInput{
+			LockableID: lockable.ID,
+		},
+	}
+
+	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
+
+	return gql.MutateNamed(context.Background(), "UnlockLockable", &mutation, variables)
+}
+
+func relockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *api.Issue, opts *LockOptions) error {
+	opts.PadlockState = Unlock
+	err := unlockLockable(httpClient, repo, lockable, opts)
+	if err != nil {
+		return err
+	}
+
+	opts.PadlockState = Lock
+	err = lockLockable(httpClient, repo, lockable, opts)
+	if err != nil {
+		return err
+	}
+
+	opts.PadlockState = Relock
 	return nil
 }
