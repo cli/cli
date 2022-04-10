@@ -40,8 +40,14 @@ type Issue struct {
 	ReactionGroups ReactionGroups
 }
 
+// return values for Issue.Typename
+const (
+	TypeIssue       string = "Issue"
+	TypePullRequest string = "PullRequest"
+)
+
 func (i Issue) IsPullRequest() bool {
-	return i.Typename == "PullRequest"
+	return i.Typename == TypePullRequest
 }
 
 type Assignees struct {
