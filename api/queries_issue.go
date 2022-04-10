@@ -20,24 +20,26 @@ type IssuesAndTotalCount struct {
 }
 
 type Issue struct {
-	Typename       string `json:"__typename"`
-	ID             string
-	Number         int
-	Title          string
-	URL            string
-	State          string
-	Closed         bool
-	Body           string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	ClosedAt       *time.Time
-	Comments       Comments
-	Author         Author
-	Assignees      Assignees
-	Labels         Labels
-	ProjectCards   ProjectCards
-	Milestone      *Milestone
-	ReactionGroups ReactionGroups
+	Typename         string `json:"__typename"`
+	ID               string
+	Number           int
+	Title            string
+	URL              string
+	State            string
+	Closed           bool
+	Body             string
+	ActiveLockReason string
+	Locked           bool
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	ClosedAt         *time.Time
+	Comments         Comments
+	Author           Author
+	Assignees        Assignees
+	Labels           Labels
+	ProjectCards     ProjectCards
+	Milestone        *Milestone
+	ReactionGroups   ReactionGroups
 }
 
 // return values for Issue.Typename
