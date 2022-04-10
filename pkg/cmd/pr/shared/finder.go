@@ -138,6 +138,7 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 	fields.AddValues(opts.Fields)
 	numberFieldOnly := fields.Len() == 1 && fields.Contains("number")
 	fields.Add("id") // for additional preload queries below
+	fields.Add("isInMergeQueue")
 
 	var pr *api.PullRequest
 	if f.prNumber > 0 {

@@ -72,7 +72,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			Merge a pull request on GitHub.
 
 			Without an argument, the pull request that belongs to the current branch
-			is selected.			
+			is selected.
     	`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -172,11 +172,16 @@ func mergeRun(opts *MergeOptions) error {
 
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
-		Fields:   []string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName"},
+		Fields:   []string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName", "baseRefName"},
 	}
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
+	}
+
+	if pr.IsInMergeQueue {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull Request #%d is already queued to merge\n", cs.FailureIconWithColor(cs.Red), pr.Number)
+		return cmdutil.SilentError
 	}
 
 	isTerminal := opts.IO.IsStdoutTTY()
@@ -207,15 +212,22 @@ func mergeRun(opts *MergeOptions) error {
 		}
 	}
 
+	repo, err := api.GitHubRepoWithMergeQueue(apiClient, baseRepo, pr.BaseRefName)
+	if err != nil {
+		return err
+	}
+
 	isPRAlreadyMerged := pr.State == "MERGED"
-	if reason := blockedReason(pr.MergeStateStatus, opts.UseAdmin); !opts.AutoMergeEnable && !isPRAlreadyMerged && reason != "" {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is not mergeable: %s.\n", cs.FailureIcon(), pr.Number, reason)
-		fmt.Fprintf(opts.IO.ErrOut, "To have the pull request merged after all the requirements have been met, add the `--auto` flag.\n")
-		if !opts.UseAdmin && allowsAdminOverride(pr.MergeStateStatus) {
-			// TODO: show this flag only to repo admins
-			fmt.Fprintf(opts.IO.ErrOut, "To use administrator privileges to immediately merge the pull request, add the `--admin` flag.\n")
+	if !repo.MergeQueueRequired() {
+		if reason := blockedReason(pr.MergeStateStatus, opts.UseAdmin); !opts.AutoMergeEnable && !isPRAlreadyMerged && reason != "" {
+			fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is not mergeable: %s.\n", cs.FailureIcon(), pr.Number, reason)
+			fmt.Fprintf(opts.IO.ErrOut, "To have the pull request merged after all the requirements have been met, add the `--auto` flag.\n")
+			if !opts.UseAdmin && allowsAdminOverride(pr.MergeStateStatus) {
+				// TODO: show this flag only to repo admins
+				fmt.Fprintf(opts.IO.ErrOut, "To use administrator privileges to immediately merge the pull request, add the `--admin` flag.\n")
+			}
+			return cmdutil.SilentError
 		}
-		return cmdutil.SilentError
 	}
 
 	deleteBranch := opts.DeleteBranch
@@ -226,6 +238,7 @@ func mergeRun(opts *MergeOptions) error {
 		localBranchExists = git.HasLocalBranch(pr.HeadRefName)
 	}
 
+	// need to handle the case where the the PR is attempting to merge and it is already in merge queue
 	if !isPRAlreadyMerged {
 		payload := mergePayload{
 			repo:          baseRepo,
@@ -238,20 +251,21 @@ func mergeRun(opts *MergeOptions) error {
 		}
 
 		if opts.InteractiveMode {
-			r, err := api.GitHubRepo(apiClient, baseRepo)
-			if err != nil {
-				return err
-			}
-			payload.method, err = mergeMethodSurvey(r)
-			if err != nil {
-				return err
-			}
-			deleteBranch, err = deleteBranchSurvey(opts, crossRepoPR, localBranchExists)
-			if err != nil {
-				return err
+			if repo.MergeQueueRequired() {
+				payload.auto = true
+				fmt.Fprintf(opts.IO.ErrOut, "Pull Request will be added to the merge queue for %s and merged with %s when ready\n", pr.BaseRefName, repo.MergeQueue.MergeMethod)
+			} else {
+				payload.method, err = mergeMethodSurvey(repo)
+				if err != nil {
+					return err
+				}
+				deleteBranch, err = deleteBranchSurvey(opts, crossRepoPR, localBranchExists)
+				if err != nil {
+					return err
+				}
 			}
 
-			allowEditMsg := payload.method != PullRequestMergeMethodRebase
+			allowEditMsg := (payload.method != PullRequestMergeMethodRebase) && !repo.MergeQueueRequired()
 
 			for {
 				action, err := confirmSurvey(allowEditMsg)
@@ -268,7 +282,7 @@ func mergeRun(opts *MergeOptions) error {
 				}
 			}
 		}
-
+		// TODO: confirm that a merge method supplied on the command line will fail with a good error message
 		err = mergePullRequest(httpClient, payload)
 		if err != nil {
 			return err

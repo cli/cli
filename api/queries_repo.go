@@ -47,7 +47,9 @@ type Repository struct {
 	SquashMergeAllowed      bool
 	RebaseMergeAllowed      bool
 	AutoMergeAllowed        bool
-
+	MergeQueue              struct {
+		MergeMethod string `json:"mergeMethod"`
+	}
 	ForkCount      int
 	StargazerCount int
 	Watchers       struct {
@@ -235,6 +237,10 @@ func (r Repository) ViewerCanTriage() bool {
 	}
 }
 
+func (r Repository) MergeQueueRequired() bool {
+	return r.MergeQueue.MergeMethod != ""
+}
+
 func FetchRepository(client *Client, repo ghrepo.Interface, fields []string) (*Repository, error) {
 	query := fmt.Sprintf(`query RepositoryInfo($owner: String!, $name: String!) {
 		repository(owner: $owner, name: $name) {%s}
@@ -294,6 +300,62 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	variables := map[string]interface{}{
 		"owner": repo.RepoOwner(),
 		"name":  repo.RepoName(),
+	}
+
+	var result struct {
+		Repository *Repository
+	}
+	if err := client.GraphQL(repo.RepoHost(), query, variables, &result); err != nil {
+		return nil, err
+	}
+	// The GraphQL API should have returned an error in case of a missing repository, but this isn't
+	// guaranteed to happen when an authentication token with insufficient permissions is being used.
+	if result.Repository == nil {
+		return nil, GraphQLErrorResponse{
+			Errors: []GraphQLError{{
+				Type:    "NOT_FOUND",
+				Message: fmt.Sprintf("Could not resolve to a Repository with the name '%s/%s'.", repo.RepoOwner(), repo.RepoName()),
+			}},
+		}
+	}
+
+	return InitRepoHostname(result.Repository, repo.RepoHost()), nil
+}
+
+// prefer to copy the existing code rather than modify and break the interface?
+func GitHubRepoWithMergeQueue(client *Client, repo ghrepo.Interface, baseBranch string) (*Repository, error) {
+	query := `
+	fragment repo on Repository {
+		id
+		name
+		owner { login }
+		hasIssuesEnabled
+		description
+		hasWikiEnabled
+		viewerPermission
+		defaultBranchRef {
+			name
+		}
+	}
+
+	query RepositoryInfo($owner: String!, $name: String!, $baseBranch: String!) {
+		repository(owner: $owner, name: $name) {
+			...repo
+			parent {
+				...repo
+			}
+			mergeCommitAllowed
+			rebaseMergeAllowed
+			squashMergeAllowed
+			mergeQueue(branch: $baseBranch) {
+				mergeMethod
+			}
+		}
+	}`
+	variables := map[string]interface{}{
+		"owner":      repo.RepoOwner(),
+		"name":       repo.RepoName(),
+		"baseBranch": baseBranch,
 	}
 
 	var result struct {
