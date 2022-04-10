@@ -31,8 +31,8 @@ const (
 )
 
 var reasons = []string{"off-topic", "resolved", "spam", "too-heated"}
-var reasonsString = strings.Join(reasons, ", ")
 var reasonsJson = []string{"off-topic", "resolved", "spam", "too heated"}
+var reasonsString = strings.Join(reasons, ", ")
 var reasonsMap map[string]string
 
 // typenames maps from the parent command to issue.Typename
