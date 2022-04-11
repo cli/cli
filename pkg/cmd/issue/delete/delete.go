@@ -26,6 +26,7 @@ type DeleteOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	SelectorArg string
+	Confirmed   bool
 }
 
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
@@ -54,6 +55,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		},
 	}
 
+	cmd.Flags().BoolVar(&opts.Confirmed, "confirm", false, "confirm deletion without prompting")
 	return cmd
 }
 
@@ -73,8 +75,9 @@ func deleteRun(opts *DeleteOptions) error {
 		return fmt.Errorf("issue #%d is a pull request and cannot be deleted", issue.Number)
 	}
 
-	// When executed in an interactive shell, require confirmation. Otherwise skip confirmation.
-	if opts.IO.CanPrompt() {
+	// When executed in an interactive shell, require confirmation, unless
+	// already provided. Otherwise skip confirmation.
+	if opts.IO.CanPrompt() && !opts.Confirmed {
 		answer := ""
 		err = prompt.SurveyAskOne(
 			&survey.Input{
