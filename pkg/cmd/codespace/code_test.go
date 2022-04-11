@@ -40,7 +40,7 @@ func TestApp_VSCode(t *testing.T) {
 			wantURL: "vscode-insiders://github.codespaces/connect?name=monalisa-cli-cli-abcdef",
 		},
 		{
-			name: "open VS Code Web",
+			name: "open VS Code web",
 			args: args{
 				codespaceName: "monalisa-cli-cli-abcdef",
 				useInsiders:   false,
@@ -49,18 +49,36 @@ func TestApp_VSCode(t *testing.T) {
 			wantErr: false,
 			wantURL: "https://monalisa-cli-cli-abcdef.github.dev",
 		},
+		{
+			name: "open VS Code web with Insiders",
+			args: args{
+				codespaceName: "monalisa-cli-cli-abcdef",
+				useInsiders:   true,
+				useWeb:        true,
+			},
+			wantErr: false,
+			wantURL: "https://monalisa-cli-cli-abcdef.github.dev?vscodeChannel=insiders",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := &cmdutil.TestBrowser{}
+			io, _, stdout, stderr := iostreams.Test()
 			a := &App{
 				browser:   b,
 				apiClient: testCodeApiMock(),
+				io:        io,
 			}
 			if err := a.VSCode(context.Background(), tt.args.codespaceName, tt.args.useInsiders, tt.args.useWeb); (err != nil) != tt.wantErr {
 				t.Errorf("App.VSCode() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			b.Verify(t, tt.wantURL)
+			if got := stdout.String(); got != "" {
+				t.Errorf("stdout = %q, want %q", got, "")
+			}
+			if got := stderr.String(); got != "" {
+				t.Errorf("stderr = %q, want %q", got, "")
+			}
 		})
 	}
 }
@@ -85,8 +103,8 @@ func testingCodeApp() *App {
 func testCodeApiMock() *apiClientMock {
 	user := &api.User{Login: "monalisa"}
 	testingCodespace := &api.Codespace{
-		Name: "monalisa-cli-cli-abcdef",
-		WebUrl: "https://monalisa-cli-cli-abcdef.github.dev",
+		Name:   "monalisa-cli-cli-abcdef",
+		WebURL: "https://monalisa-cli-cli-abcdef.github.dev",
 	}
 	disabledCodespace := &api.Codespace{
 		Name:                           "disabledCodespace",
