@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	graphql "github.com/cli/shurcooL-graphql"
@@ -24,6 +25,7 @@ type ReopenOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	SelectorArg string
+	Comment     string
 }
 
 func NewCmdReopen(f *cmdutil.Factory, runF func(*ReopenOptions) error) *cobra.Command {
@@ -52,6 +54,8 @@ func NewCmdReopen(f *cmdutil.Factory, runF func(*ReopenOptions) error) *cobra.Co
 		},
 	}
 
+	cmd.Flags().StringVarP(&opts.Comment, "comment", "c", "", "Add a reopening comment")
+
 	return cmd
 }
 
@@ -71,6 +75,22 @@ func reopenRun(opts *ReopenOptions) error {
 	if issue.State == "OPEN" {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Issue #%d (%s) is already open\n", cs.Yellow("!"), issue.Number, issue.Title)
 		return nil
+	}
+
+	if opts.Comment != "" {
+		commentOpts := &prShared.CommentableOptions{
+			Body:       opts.Comment,
+			HttpClient: opts.HttpClient,
+			InputType:  prShared.InputTypeInline,
+			Quiet:      true,
+			RetrieveCommentable: func() (prShared.Commentable, ghrepo.Interface, error) {
+				return issue, baseRepo, nil
+			},
+		}
+		err := prShared.CommentableRun(commentOpts)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = apiReopen(httpClient, baseRepo, issue)
