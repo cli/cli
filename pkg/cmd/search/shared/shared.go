@@ -96,9 +96,9 @@ func displayIssueResults(io *iostreams.IOStreams, et EntityType, results search.
 			issueNum = "#" + issueNum
 		}
 		if issue.IsPullRequest() {
-			tp.AddField(issueNum, nil, cs.ColorFromString(colorForPRState(issue.State)))
+			tp.AddField(issueNum, nil, cs.ColorFromString(colorForPRState(issue)))
 		} else {
-			tp.AddField(issueNum, nil, cs.ColorFromString(colorForIssueState(issue.State)))
+			tp.AddField(issueNum, nil, cs.ColorFromString(colorForIssueState(issue)))
 		}
 		if !tp.IsTTY() {
 			tp.AddField(issue.State, nil, nil)
@@ -155,18 +155,23 @@ func listIssueLabels(issue *search.Issue, cs *iostreams.ColorScheme, colorize bo
 	return strings.Join(labelNames, ", ")
 }
 
-func colorForIssueState(state string) string {
+func colorForIssueState(issue search.Issue) string {
+	state := issue.State
 	switch state {
 	case "open":
 		return "green"
 	case "closed":
+		if issue.StateReason == "not_planned" {
+			return "gray"
+		}
 		return "magenta"
 	default:
 		return ""
 	}
 }
 
-func colorForPRState(state string) string {
+func colorForPRState(pr search.Issue) string {
+	state := pr.State
 	switch state {
 	case "open":
 		return "green"

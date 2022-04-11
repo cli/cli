@@ -55,6 +55,7 @@ var defaultFields = []string{
 	"title",
 	"url",
 	"state",
+	"stateReason",
 	"updatedAt",
 	"labels",
 }

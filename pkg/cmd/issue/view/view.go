@@ -79,7 +79,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 }
 
 var defaultFields = []string{
-	"number", "url", "state", "createdAt", "title", "body", "author", "milestone",
+	"number", "url", "state", "stateReason", "createdAt", "title", "body", "author", "milestone",
 	"assignees", "labels", "projectCards", "reactionGroups", "lastComment",
 }
 

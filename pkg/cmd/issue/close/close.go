@@ -2,6 +2,7 @@ package close
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -14,7 +15,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	graphql "github.com/cli/shurcooL-graphql"
-	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
 
@@ -26,9 +26,12 @@ type CloseOptions struct {
 
 	SelectorArg string
 	Comment     string
+	Reason      string
 }
 
 func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Command {
+	var completed, notPlanned bool
+
 	opts := &CloseOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
@@ -43,6 +46,21 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of '--completed' or '--not-planned'",
+				completed,
+				notPlanned,
+			); err != nil {
+				return err
+			}
+
+			if completed {
+				opts.Reason = "COMPLETED"
+			}
+			if notPlanned {
+				opts.Reason = "NOT_PLANNED"
+			}
+
 			if len(args) > 0 {
 				opts.SelectorArg = args[0]
 			}
@@ -55,6 +73,8 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().StringVarP(&opts.Comment, "comment", "c", "", "Leave a closing comment")
+	cmd.Flags().BoolVar(&completed, "completed", false, "Close issue with completed reason")
+	cmd.Flags().BoolVar(&notPlanned, "not-planned", false, "Close issue with not planned reason")
 
 	return cmd
 }
@@ -72,9 +92,13 @@ func closeRun(opts *CloseOptions) error {
 		return err
 	}
 
-	if issue.State == "CLOSED" {
+	if issue.State == "CLOSED" && opts.Reason == "" {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Issue #%d (%s) is already closed\n", cs.Yellow("!"), issue.Number, issue.Title)
 		return nil
+	}
+
+	if issue.IsPullRequest() && opts.Reason != "" {
+		return errors.New("can not close pull request with reason")
 	}
 
 	if opts.Comment != "" {
@@ -93,7 +117,7 @@ func closeRun(opts *CloseOptions) error {
 		}
 	}
 
-	err = apiClose(httpClient, baseRepo, issue)
+	err = apiClose(httpClient, baseRepo, issue, opts.Reason)
 	if err != nil {
 		return err
 	}
@@ -103,7 +127,7 @@ func closeRun(opts *CloseOptions) error {
 	return nil
 }
 
-func apiClose(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue) error {
+func apiClose(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue, reason string) error {
 	if issue.IsPullRequest() {
 		return api.PullRequestClose(httpClient, repo, issue.ID)
 	}
@@ -111,14 +135,20 @@ func apiClose(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue) 
 	var mutation struct {
 		CloseIssue struct {
 			Issue struct {
-				ID githubv4.ID
+				ID string
 			}
 		} `graphql:"closeIssue(input: $input)"`
 	}
 
+	type CloseIssueInput struct {
+		IssueID     string `json:"issueId"`
+		StateReason string `json:"stateReason"`
+	}
+
 	variables := map[string]interface{}{
-		"input": githubv4.CloseIssueInput{
-			IssueID: issue.ID,
+		"input": CloseIssueInput{
+			IssueID:     issue.ID,
+			StateReason: reason,
 		},
 	}
 

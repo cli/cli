@@ -79,10 +79,10 @@ func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 			issue: issueOrPullRequest(number: $number) {
 				__typename
 				...on Issue{%[1]s}
-				...on PullRequest{%[1]s}
+				...on PullRequest{%[2]s}
 			}
 		}
-	}`, api.PullRequestGraphQL(fields))
+	}`, api.IssueGraphQL(fields), api.PullRequestGraphQL(fields))
 
 	variables := map[string]interface{}{
 		"owner":  repo.RepoOwner(),

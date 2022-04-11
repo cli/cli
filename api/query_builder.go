@@ -175,6 +175,7 @@ var IssueFields = []string{
 	"projectCards",
 	"reactionGroups",
 	"state",
+	"stateReason",
 	"title",
 	"updatedAt",
 	"url",
@@ -209,6 +210,62 @@ var PullRequestFields = append(IssueFields,
 // PullRequestGraphQL constructs a GraphQL query fragment for a set of pull request fields. Since GitHub
 // pull requests are also technically issues, this function can be used to query issues as well.
 func PullRequestGraphQL(fields []string) string {
+	var q []string
+	for _, field := range fields {
+		switch field {
+		case "author":
+			q = append(q, `author{login}`)
+		case "mergedBy":
+			q = append(q, `mergedBy{login}`)
+		case "headRepositoryOwner":
+			q = append(q, `headRepositoryOwner{id,login,...on User{name}}`)
+		case "headRepository":
+			q = append(q, `headRepository{id,name}`)
+		case "assignees":
+			q = append(q, `assignees(first:100){nodes{id,login,name},totalCount}`)
+		case "labels":
+			q = append(q, `labels(first:100){nodes{id,name,description,color},totalCount}`)
+		case "projectCards":
+			q = append(q, `projectCards(first:100){nodes{project{name}column{name}},totalCount}`)
+		case "milestone":
+			q = append(q, `milestone{number,title,description,dueOn}`)
+		case "reactionGroups":
+			q = append(q, `reactionGroups{content,users{totalCount}}`)
+		case "mergeCommit":
+			q = append(q, `mergeCommit{oid}`)
+		case "potentialMergeCommit":
+			q = append(q, `potentialMergeCommit{oid}`)
+		case "comments":
+			q = append(q, issueComments)
+		case "lastComment": // pseudo-field
+			q = append(q, issueCommentLast)
+		case "reviewRequests":
+			q = append(q, prReviewRequests)
+		case "reviews":
+			q = append(q, prReviews)
+		case "latestReviews":
+			q = append(q, prLatestReviews)
+		case "files":
+			q = append(q, prFiles)
+		case "commits":
+			q = append(q, prCommits)
+		case "lastCommit": // pseudo-field
+			q = append(q, `commits(last:1){nodes{commit{oid}}}`)
+		case "commitsCount": // pseudo-field
+			q = append(q, `commits{totalCount}`)
+		case "requiresStrictStatusChecks": // pseudo-field
+			q = append(q, `baseRef{branchProtectionRule{requiresStrictStatusChecks}}`)
+		case "statusCheckRollup":
+			q = append(q, StatusCheckRollupGraphQL(""))
+		case "stateReason":
+		default:
+			q = append(q, field)
+		}
+	}
+	return strings.Join(q, ",")
+}
+
+func IssueGraphQL(fields []string) string {
 	var q []string
 	for _, field := range fields {
 		switch field {

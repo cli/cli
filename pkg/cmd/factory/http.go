@@ -90,6 +90,7 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg configGetter, appVersion string,
 	}
 
 	opts = append(opts,
+		api.AddHeader("GraphQL-Features", "issues_close_state"),
 		api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", appVersion)),
 		api.AddHeaderFunc("Authorization", func(req *http.Request) (string, error) {
 			hostname := ghinstance.NormalizeHostname(getHost(req))
