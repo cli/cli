@@ -30,9 +30,9 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	}
 
 	cmd := &cobra.Command{
-		Use:     "delete <tag>",
-		Short:   "Delete a release",
-		Args:    cobra.ExactArgs(1),
+		Use:   "delete <tag>",
+		Short: "Delete a release",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
