@@ -109,7 +109,7 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "upgrade an extension",
 			args: []string{"upgrade", "hello"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.UpgradeFunc = func(name string, force, dryRun bool) error {
+				em.UpgradeFunc = func(name string, force bool) error {
 					return nil
 				}
 				return func(t *testing.T) {
@@ -125,15 +125,17 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "upgrade an extension dry run",
 			args: []string{"upgrade", "hello", "--dry-run"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.UpgradeFunc = func(name string, force, dryRun bool) error {
+				em.EnableDryRunModeFunc = func() {}
+				em.UpgradeFunc = func(name string, force bool) error {
 					return nil
 				}
 				return func(t *testing.T) {
-					calls := em.UpgradeCalls()
-					assert.Equal(t, 1, len(calls))
-					assert.Equal(t, "hello", calls[0].Name)
-					assert.False(t, calls[0].Force)
-					assert.True(t, calls[0].DryRun)
+					dryRunCalls := em.EnableDryRunModeCalls()
+					assert.Equal(t, 1, len(dryRunCalls))
+					upgradeCalls := em.UpgradeCalls()
+					assert.Equal(t, 1, len(upgradeCalls))
+					assert.Equal(t, "hello", upgradeCalls[0].Name)
+					assert.False(t, upgradeCalls[0].Force)
 				}
 			},
 			isTTY:      true,
@@ -143,7 +145,7 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "upgrade an extension notty",
 			args: []string{"upgrade", "hello"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.UpgradeFunc = func(name string, force, dryRun bool) error {
+				em.UpgradeFunc = func(name string, force bool) error {
 					return nil
 				}
 				return func(t *testing.T) {
@@ -158,7 +160,7 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "upgrade an up-to-date extension",
 			args: []string{"upgrade", "hello"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.UpgradeFunc = func(name string, force, dryRun bool) error {
+				em.UpgradeFunc = func(name string, force bool) error {
 					return upToDateError
 				}
 				return func(t *testing.T) {
@@ -175,7 +177,7 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "upgrade extension error",
 			args: []string{"upgrade", "hello"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.UpgradeFunc = func(name string, force, dryRun bool) error {
+				em.UpgradeFunc = func(name string, force bool) error {
 					return errors.New("oh no")
 				}
 				return func(t *testing.T) {
@@ -194,7 +196,7 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "upgrade an extension gh-prefix",
 			args: []string{"upgrade", "gh-hello"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.UpgradeFunc = func(name string, force, dryRun bool) error {
+				em.UpgradeFunc = func(name string, force bool) error {
 					return nil
 				}
 				return func(t *testing.T) {
@@ -210,7 +212,7 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "upgrade an extension full name",
 			args: []string{"upgrade", "monalisa/gh-hello"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.UpgradeFunc = func(name string, force, dryRun bool) error {
+				em.UpgradeFunc = func(name string, force bool) error {
 					return nil
 				}
 				return func(t *testing.T) {
@@ -226,7 +228,7 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "upgrade all",
 			args: []string{"upgrade", "--all"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.UpgradeFunc = func(name string, force, dryRun bool) error {
+				em.UpgradeFunc = func(name string, force bool) error {
 					return nil
 				}
 				return func(t *testing.T) {
@@ -242,15 +244,17 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "upgrade all dry run",
 			args: []string{"upgrade", "--all", "--dry-run"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.UpgradeFunc = func(name string, force, dryRun bool) error {
+				em.EnableDryRunModeFunc = func() {}
+				em.UpgradeFunc = func(name string, force bool) error {
 					return nil
 				}
 				return func(t *testing.T) {
-					calls := em.UpgradeCalls()
-					assert.Equal(t, 1, len(calls))
-					assert.Equal(t, "", calls[0].Name)
-					assert.False(t, calls[0].Force)
-					assert.True(t, calls[0].DryRun)
+					dryRunCalls := em.EnableDryRunModeCalls()
+					assert.Equal(t, 1, len(dryRunCalls))
+					upgradeCalls := em.UpgradeCalls()
+					assert.Equal(t, 1, len(upgradeCalls))
+					assert.Equal(t, "", upgradeCalls[0].Name)
+					assert.False(t, upgradeCalls[0].Force)
 				}
 			},
 			isTTY:      true,
@@ -260,7 +264,7 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "upgrade all none installed",
 			args: []string{"upgrade", "--all"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.UpgradeFunc = func(name string, force bool, dryRun bool) error {
+				em.UpgradeFunc = func(name string, force bool) error {
 					return noExtensionsInstalledError
 				}
 				return func(t *testing.T) {
@@ -276,7 +280,7 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "upgrade all notty",
 			args: []string{"upgrade", "--all"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.UpgradeFunc = func(name string, force, dryRun bool) error {
+				em.UpgradeFunc = func(name string, force bool) error {
 					return nil
 				}
 				return func(t *testing.T) {

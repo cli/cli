@@ -168,8 +168,11 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if len(args) > 0 {
 						name = normalizeExtensionSelector(args[0])
 					}
+					if flagDryRun {
+						m.EnableDryRunMode()
+					}
 					cs := io.ColorScheme()
-					err := m.Upgrade(name, flagForce, flagDryRun)
+					err := m.Upgrade(name, flagForce)
 					if err != nil && !errors.Is(err, upToDateError) {
 						if name != "" {
 							fmt.Fprintf(io.ErrOut, "%s Failed upgrading extension %s: %s\n", cs.FailureIcon(), name, err)

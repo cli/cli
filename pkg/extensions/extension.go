@@ -31,8 +31,10 @@ type ExtensionManager interface {
 	List(includeMetadata bool) []Extension
 	Install(ghrepo.Interface, string) error
 	InstallLocal(dir string) error
-	Upgrade(name string, force, dryRun bool) error
+	Upgrade(name string, force bool) error
 	Remove(name string) error
 	Dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) (bool, error)
 	Create(name string, tmplType ExtTemplateType) error
+	EnableDryRunMode()
+	DisableDryRunMode()
 }

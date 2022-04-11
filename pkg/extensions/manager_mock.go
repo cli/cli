@@ -22,8 +22,14 @@ var _ ExtensionManager = &ExtensionManagerMock{}
 // 			CreateFunc: func(name string, tmplType ExtTemplateType) error {
 // 				panic("mock out the Create method")
 // 			},
+// 			DisableDryRunModeFunc: func()  {
+// 				panic("mock out the DisableDryRunMode method")
+// 			},
 // 			DispatchFunc: func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (bool, error) {
 // 				panic("mock out the Dispatch method")
+// 			},
+// 			EnableDryRunModeFunc: func()  {
+// 				panic("mock out the EnableDryRunMode method")
 // 			},
 // 			InstallFunc: func(interfaceMoqParam ghrepo.Interface, s string) error {
 // 				panic("mock out the Install method")
@@ -37,7 +43,7 @@ var _ ExtensionManager = &ExtensionManagerMock{}
 // 			RemoveFunc: func(name string) error {
 // 				panic("mock out the Remove method")
 // 			},
-// 			UpgradeFunc: func(name string, force bool, dryRun bool) error {
+// 			UpgradeFunc: func(name string, force bool) error {
 // 				panic("mock out the Upgrade method")
 // 			},
 // 		}
@@ -50,8 +56,14 @@ type ExtensionManagerMock struct {
 	// CreateFunc mocks the Create method.
 	CreateFunc func(name string, tmplType ExtTemplateType) error
 
+	// DisableDryRunModeFunc mocks the DisableDryRunMode method.
+	DisableDryRunModeFunc func()
+
 	// DispatchFunc mocks the Dispatch method.
 	DispatchFunc func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (bool, error)
+
+	// EnableDryRunModeFunc mocks the EnableDryRunMode method.
+	EnableDryRunModeFunc func()
 
 	// InstallFunc mocks the Install method.
 	InstallFunc func(interfaceMoqParam ghrepo.Interface, s string) error
@@ -66,7 +78,7 @@ type ExtensionManagerMock struct {
 	RemoveFunc func(name string) error
 
 	// UpgradeFunc mocks the Upgrade method.
-	UpgradeFunc func(name string, force bool, dryRun bool) error
+	UpgradeFunc func(name string, force bool) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -76,6 +88,9 @@ type ExtensionManagerMock struct {
 			Name string
 			// TmplType is the tmplType argument value.
 			TmplType ExtTemplateType
+		}
+		// DisableDryRunMode holds details about calls to the DisableDryRunMode method.
+		DisableDryRunMode []struct {
 		}
 		// Dispatch holds details about calls to the Dispatch method.
 		Dispatch []struct {
@@ -87,6 +102,9 @@ type ExtensionManagerMock struct {
 			Stdout io.Writer
 			// Stderr is the stderr argument value.
 			Stderr io.Writer
+		}
+		// EnableDryRunMode holds details about calls to the EnableDryRunMode method.
+		EnableDryRunMode []struct {
 		}
 		// Install holds details about calls to the Install method.
 		Install []struct {
@@ -116,17 +134,17 @@ type ExtensionManagerMock struct {
 			Name string
 			// Force is the force argument value.
 			Force bool
-			// DryRun is the dryRun argument value.
-			DryRun bool
 		}
 	}
-	lockCreate       sync.RWMutex
-	lockDispatch     sync.RWMutex
-	lockInstall      sync.RWMutex
-	lockInstallLocal sync.RWMutex
-	lockList         sync.RWMutex
-	lockRemove       sync.RWMutex
-	lockUpgrade      sync.RWMutex
+	lockCreate            sync.RWMutex
+	lockDisableDryRunMode sync.RWMutex
+	lockDispatch          sync.RWMutex
+	lockEnableDryRunMode  sync.RWMutex
+	lockInstall           sync.RWMutex
+	lockInstallLocal      sync.RWMutex
+	lockList              sync.RWMutex
+	lockRemove            sync.RWMutex
+	lockUpgrade           sync.RWMutex
 }
 
 // Create calls CreateFunc.
@@ -161,6 +179,32 @@ func (mock *ExtensionManagerMock) CreateCalls() []struct {
 	mock.lockCreate.RLock()
 	calls = mock.calls.Create
 	mock.lockCreate.RUnlock()
+	return calls
+}
+
+// DisableDryRunMode calls DisableDryRunModeFunc.
+func (mock *ExtensionManagerMock) DisableDryRunMode() {
+	if mock.DisableDryRunModeFunc == nil {
+		panic("ExtensionManagerMock.DisableDryRunModeFunc: method is nil but ExtensionManager.DisableDryRunMode was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockDisableDryRunMode.Lock()
+	mock.calls.DisableDryRunMode = append(mock.calls.DisableDryRunMode, callInfo)
+	mock.lockDisableDryRunMode.Unlock()
+	mock.DisableDryRunModeFunc()
+}
+
+// DisableDryRunModeCalls gets all the calls that were made to DisableDryRunMode.
+// Check the length with:
+//     len(mockedExtensionManager.DisableDryRunModeCalls())
+func (mock *ExtensionManagerMock) DisableDryRunModeCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockDisableDryRunMode.RLock()
+	calls = mock.calls.DisableDryRunMode
+	mock.lockDisableDryRunMode.RUnlock()
 	return calls
 }
 
@@ -204,6 +248,32 @@ func (mock *ExtensionManagerMock) DispatchCalls() []struct {
 	mock.lockDispatch.RLock()
 	calls = mock.calls.Dispatch
 	mock.lockDispatch.RUnlock()
+	return calls
+}
+
+// EnableDryRunMode calls EnableDryRunModeFunc.
+func (mock *ExtensionManagerMock) EnableDryRunMode() {
+	if mock.EnableDryRunModeFunc == nil {
+		panic("ExtensionManagerMock.EnableDryRunModeFunc: method is nil but ExtensionManager.EnableDryRunMode was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockEnableDryRunMode.Lock()
+	mock.calls.EnableDryRunMode = append(mock.calls.EnableDryRunMode, callInfo)
+	mock.lockEnableDryRunMode.Unlock()
+	mock.EnableDryRunModeFunc()
+}
+
+// EnableDryRunModeCalls gets all the calls that were made to EnableDryRunMode.
+// Check the length with:
+//     len(mockedExtensionManager.EnableDryRunModeCalls())
+func (mock *ExtensionManagerMock) EnableDryRunModeCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockEnableDryRunMode.RLock()
+	calls = mock.calls.EnableDryRunMode
+	mock.lockEnableDryRunMode.RUnlock()
 	return calls
 }
 
@@ -336,37 +406,33 @@ func (mock *ExtensionManagerMock) RemoveCalls() []struct {
 }
 
 // Upgrade calls UpgradeFunc.
-func (mock *ExtensionManagerMock) Upgrade(name string, force bool, dryRun bool) error {
+func (mock *ExtensionManagerMock) Upgrade(name string, force bool) error {
 	if mock.UpgradeFunc == nil {
 		panic("ExtensionManagerMock.UpgradeFunc: method is nil but ExtensionManager.Upgrade was just called")
 	}
 	callInfo := struct {
-		Name   string
-		Force  bool
-		DryRun bool
+		Name  string
+		Force bool
 	}{
-		Name:   name,
-		Force:  force,
-		DryRun: dryRun,
+		Name:  name,
+		Force: force,
 	}
 	mock.lockUpgrade.Lock()
 	mock.calls.Upgrade = append(mock.calls.Upgrade, callInfo)
 	mock.lockUpgrade.Unlock()
-	return mock.UpgradeFunc(name, force, dryRun)
+	return mock.UpgradeFunc(name, force)
 }
 
 // UpgradeCalls gets all the calls that were made to Upgrade.
 // Check the length with:
 //     len(mockedExtensionManager.UpgradeCalls())
 func (mock *ExtensionManagerMock) UpgradeCalls() []struct {
-	Name   string
-	Force  bool
-	DryRun bool
+	Name  string
+	Force bool
 } {
 	var calls []struct {
-		Name   string
-		Force  bool
-		DryRun bool
+		Name  string
+		Force bool
 	}
 	mock.lockUpgrade.RLock()
 	calls = mock.calls.Upgrade

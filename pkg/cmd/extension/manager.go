@@ -37,6 +37,7 @@ type Manager struct {
 	client     *http.Client
 	config     config.Config
 	io         *iostreams.IOStreams
+	dryRunMode bool
 }
 
 func NewManager(io *iostreams.IOStreams) *Manager {
@@ -62,6 +63,14 @@ func (m *Manager) SetConfig(cfg config.Config) {
 
 func (m *Manager) SetClient(client *http.Client) {
 	m.client = client
+}
+
+func (m *Manager) EnableDryRunMode() {
+	m.dryRunMode = true
+}
+
+func (m *Manager) DisableDryRunMode() {
+	m.dryRunMode = false
 }
 
 func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) (bool, error) {
@@ -338,7 +347,7 @@ func (m *Manager) Install(repo ghrepo.Interface, target string) error {
 		return fmt.Errorf("could not check for binary extension: %w", err)
 	}
 	if isBin {
-		return m.installBin(repo, target, false)
+		return m.installBin(repo, target)
 	}
 
 	hs, err := hasScript(m.client, repo)
@@ -352,7 +361,7 @@ func (m *Manager) Install(repo ghrepo.Interface, target string) error {
 	return m.installGit(repo, target, m.io.Out, m.io.ErrOut)
 }
 
-func (m *Manager) installBin(repo ghrepo.Interface, target string, dryRun bool) error {
+func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	var r *release
 	var err error
 	isPinned := target != ""
@@ -384,7 +393,7 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string, dryRun bool) 
 	targetDir := filepath.Join(m.installDir(), name)
 
 	// TODO clean this up if function errs?
-	if !dryRun {
+	if !m.dryRunMode {
 		err = os.MkdirAll(targetDir, 0755)
 		if err != nil {
 			return fmt.Errorf("failed to create installation directory: %w", err)
@@ -394,7 +403,7 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string, dryRun bool) 
 	binPath := filepath.Join(targetDir, name)
 	binPath += ext
 
-	if !dryRun {
+	if !m.dryRunMode {
 		err = downloadAsset(m.client, *asset, binPath)
 		if err != nil {
 			return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
@@ -415,7 +424,7 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string, dryRun bool) 
 		return fmt.Errorf("failed to serialize manifest: %w", err)
 	}
 
-	if !dryRun {
+	if !m.dryRunMode {
 		manifestPath := filepath.Join(targetDir, manifestName)
 
 		f, err := os.OpenFile(manifestPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
@@ -483,7 +492,7 @@ var localExtensionUpgradeError = errors.New("local extensions can not be upgrade
 var upToDateError = errors.New("already up to date")
 var noExtensionsInstalledError = errors.New("no extensions installed")
 
-func (m *Manager) Upgrade(name string, force, dryRun bool) error {
+func (m *Manager) Upgrade(name string, force bool) error {
 	// Fetch metadata during list only when upgrading all extensions.
 	// This is a performance improvement so that we don't make a
 	// bunch of unecessary network requests when trying to upgrade a single extension.
@@ -493,7 +502,7 @@ func (m *Manager) Upgrade(name string, force, dryRun bool) error {
 		return noExtensionsInstalledError
 	}
 	if name == "" {
-		return m.upgradeExtensions(exts, force, dryRun)
+		return m.upgradeExtensions(exts, force)
 	}
 	for _, f := range exts {
 		if f.Name() != name {
@@ -506,16 +515,16 @@ func (m *Manager) Upgrade(name string, force, dryRun bool) error {
 		if err != nil {
 			return err
 		}
-		return m.upgradeExtension(f, force, dryRun)
+		return m.upgradeExtension(f, force)
 	}
 	return fmt.Errorf("no extension matched %q", name)
 }
 
-func (m *Manager) upgradeExtensions(exts []Extension, force, dryRun bool) error {
+func (m *Manager) upgradeExtensions(exts []Extension, force bool) error {
 	var failed bool
 	for _, f := range exts {
 		fmt.Fprintf(m.io.Out, "[%s]: ", f.Name())
-		err := m.upgradeExtension(f, force, dryRun)
+		err := m.upgradeExtension(f, force)
 		if err != nil {
 			if !errors.Is(err, localExtensionUpgradeError) &&
 				!errors.Is(err, upToDateError) &&
@@ -533,14 +542,14 @@ func (m *Manager) upgradeExtensions(exts []Extension, force, dryRun bool) error 
 		if !f.IsBinary() && len(latestVersion) > 8 {
 			latestVersion = latestVersion[:8]
 		}
-		if dryRun {
+		if m.dryRunMode {
 			fmt.Fprintf(m.io.Out, "would have upgraded from %s to %s\n", currentVersion, latestVersion)
 		} else {
 			fmt.Fprintf(m.io.Out, "upgraded from %s to %s\n", currentVersion, latestVersion)
 		}
 	}
 	if failed {
-		if dryRun {
+		if m.dryRunMode {
 			return errors.New("some extensions would have failed to upgrade")
 		}
 		return errors.New("some extensions failed to upgrade")
@@ -548,7 +557,7 @@ func (m *Manager) upgradeExtensions(exts []Extension, force, dryRun bool) error 
 	return nil
 }
 
-func (m *Manager) upgradeExtension(ext Extension, force, dryRun bool) error {
+func (m *Manager) upgradeExtension(ext Extension, force bool) error {
 	if ext.isLocal {
 		return localExtensionUpgradeError
 	}
@@ -560,7 +569,7 @@ func (m *Manager) upgradeExtension(ext Extension, force, dryRun bool) error {
 	}
 	var err error
 	if ext.IsBinary() {
-		err = m.upgradeBinExtension(ext, dryRun)
+		err = m.upgradeBinExtension(ext)
 	} else {
 		// Check if git extension has changed to a binary extension
 		var isBin bool
@@ -569,25 +578,23 @@ func (m *Manager) upgradeExtension(ext Extension, force, dryRun bool) error {
 			isBin, _ = isBinExtension(m.client, repo)
 		}
 		if isBin {
-			if !dryRun {
-				if err := m.Remove(ext.Name()); err != nil {
-					return fmt.Errorf("failed to migrate to new precompiled extension format: %w", err)
-				}
+			if err := m.Remove(ext.Name()); err != nil {
+				return fmt.Errorf("failed to migrate to new precompiled extension format: %w", err)
 			}
-			return m.installBin(repo, "", dryRun)
+			return m.installBin(repo, "")
 		}
-		err = m.upgradeGitExtension(ext, force, dryRun)
+		err = m.upgradeGitExtension(ext, force)
 	}
 	return err
 }
 
-func (m *Manager) upgradeGitExtension(ext Extension, force bool, dryRun bool) error {
+func (m *Manager) upgradeGitExtension(ext Extension, force bool) error {
 	exe, err := m.lookPath("git")
 	if err != nil {
 		return err
 	}
 	dir := filepath.Dir(ext.path)
-	if dryRun {
+	if m.dryRunMode {
 		return nil
 	}
 	if force {
@@ -599,18 +606,21 @@ func (m *Manager) upgradeGitExtension(ext Extension, force bool, dryRun bool) er
 	return m.newCommand(exe, "-C", dir, "pull", "--ff-only").Run()
 }
 
-func (m *Manager) upgradeBinExtension(ext Extension, dryRun bool) error {
+func (m *Manager) upgradeBinExtension(ext Extension) error {
 	repo, err := ghrepo.FromFullName(ext.url)
 	if err != nil {
 		return fmt.Errorf("failed to parse URL %s: %w", ext.url, err)
 	}
-	return m.installBin(repo, "", dryRun)
+	return m.installBin(repo, "")
 }
 
 func (m *Manager) Remove(name string) error {
 	targetDir := filepath.Join(m.installDir(), "gh-"+name)
 	if _, err := os.Lstat(targetDir); os.IsNotExist(err) {
 		return fmt.Errorf("no extension found: %q", targetDir)
+	}
+	if m.dryRunMode {
+		return nil
 	}
 	return os.RemoveAll(targetDir)
 }
