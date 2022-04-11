@@ -253,7 +253,7 @@ func mergeRun(opts *MergeOptions) error {
 		if opts.InteractiveMode {
 			if repo.MergeQueueRequired() && !opts.UseAdmin {
 				payload.auto = true
-				fmt.Fprintf(opts.IO.ErrOut, "Pull Request will be added to the merge queue for %s and merged with %s when ready\n", pr.BaseRefName, repo.MergeQueue.MergeMethod)
+				fmt.Fprintf(opts.IO.ErrOut, "Pull Request will be added to the merge queue for %s and %s when ready\n", pr.BaseRefName, repo.MergeQueue.MergeMethod)
 			} else {
 				payload.method, err = mergeMethodSurvey(repo)
 				if err != nil {
