@@ -251,7 +251,7 @@ func mergeRun(opts *MergeOptions) error {
 		}
 
 		if opts.InteractiveMode {
-			if repo.MergeQueueRequired() {
+			if repo.MergeQueueRequired() && !opts.UseAdmin {
 				payload.auto = true
 				fmt.Fprintf(opts.IO.ErrOut, "Pull Request will be added to the merge queue for %s and merged with %s when ready\n", pr.BaseRefName, repo.MergeQueue.MergeMethod)
 			} else {
@@ -265,7 +265,7 @@ func mergeRun(opts *MergeOptions) error {
 				}
 			}
 
-			allowEditMsg := (payload.method != PullRequestMergeMethodRebase) && !repo.MergeQueueRequired()
+			allowEditMsg := (payload.method != PullRequestMergeMethodRebase) && (!repo.MergeQueueRequired() || opts.UseAdmin)
 
 			for {
 				action, err := confirmSurvey(allowEditMsg)
