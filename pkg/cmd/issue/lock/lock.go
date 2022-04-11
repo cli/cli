@@ -98,15 +98,19 @@ func (opts *LockOptions) setCommonOptions(f *cmdutil.Factory, cmd *cobra.Command
 
 }
 
-func NewCmdLock(f *cmdutil.Factory, runF func(*LockOptions) error) *cobra.Command {
+func NewCmdLock(f *cmdutil.Factory, parentName string) *cobra.Command {
 
 	opts := &LockOptions{
+		ParentCmd:    parentName,
 		PadlockState: Lock,
 	}
 
+	c := cmds[opts.ParentCmd]
+	short := fmt.Sprintf("Lock %s conversation", strings.ToLower(c.FullName))
+
 	cmd := &cobra.Command{
 		Use:   "lock {<number> | <url>}",
-		Short: "Lock a conversation",
+		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -123,11 +127,6 @@ func NewCmdLock(f *cmdutil.Factory, runF func(*LockOptions) error) *cobra.Comman
 				}
 			}
 
-			opts.setCommonOptions(f, cmd, args)
-
-			if runF != nil {
-				return runF(opts)
-			}
 			return padlock(opts)
 		},
 	}
@@ -138,23 +137,24 @@ func NewCmdLock(f *cmdutil.Factory, runF func(*LockOptions) error) *cobra.Comman
 	return cmd
 }
 
-func NewCmdUnlock(f *cmdutil.Factory, runF func(*LockOptions) error) *cobra.Command {
+func NewCmdUnlock(f *cmdutil.Factory, parentName string) *cobra.Command {
 
 	opts := &LockOptions{
+		ParentCmd:    parentName,
 		PadlockState: Unlock,
 	}
 
+	c := cmds[opts.ParentCmd]
+	short := fmt.Sprintf("Unlock %s conversation", strings.ToLower(c.FullName))
+
 	cmd := &cobra.Command{
 		Use:   "unlock {<number> | <url>}",
-		Short: "Unlock a conversation",
+		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			opts.setCommonOptions(f, cmd, args)
 
-			if runF != nil {
-				return runF(opts)
-			}
 			return padlock(opts)
 		},
 	}
