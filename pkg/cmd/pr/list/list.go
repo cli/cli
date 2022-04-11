@@ -199,7 +199,7 @@ func listRun(opts *ListOptions) error {
 		if table.IsTTY() {
 			prNum = "#" + prNum
 		}
-		table.AddField(prNum, nil, cs.ColorFromString(shared.ColorForPR(pr)))
+		table.AddField(prNum, nil, cs.ColorFromString(shared.ColorForPRState(pr)))
 		table.AddField(text.ReplaceExcessiveWhitespace(pr.Title), nil, nil)
 		table.AddField(pr.HeadLabel(), nil, cs.Cyan)
 		if !table.IsTTY() {
