@@ -116,7 +116,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh pr create --project "Roadmap"
 			$ gh pr create --base develop --head monalisa:feature
 		`),
-		Args: cmdutil.NoArgsQuoteReminder,
+		Args:    cmdutil.NoArgsQuoteReminder,
+		Aliases: []string{"new"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
 
