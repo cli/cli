@@ -250,6 +250,7 @@ func TestManager_UpgradeExtensions_DryRun(t *testing.T) {
 	assert.NoError(t, stubLocalExtension(tempDir, filepath.Join(tempDir, "extensions", "gh-local", "gh-local")))
 	io, _, stdout, stderr := iostreams.Test()
 	m := newTestManager(tempDir, nil, io)
+	m.EnableDryRunMode()
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(exts))
@@ -257,7 +258,6 @@ func TestManager_UpgradeExtensions_DryRun(t *testing.T) {
 		exts[i].currentVersion = fmt.Sprintf("%d", i)
 		exts[i].latestVersion = fmt.Sprintf("%d", i+1)
 	}
-	m.EnableDryRunMode()
 	err = m.upgradeExtensions(exts, false)
 	assert.NoError(t, err)
 	assert.Equal(t, heredoc.Doc(
@@ -291,10 +291,10 @@ func TestManager_UpgradeExtension_LocalExtension_DryRun(t *testing.T) {
 
 	io, _, stdout, stderr := iostreams.Test()
 	m := newTestManager(tempDir, nil, io)
+	m.EnableDryRunMode()
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(exts))
-	m.EnableDryRunMode()
 	err = m.upgradeExtension(exts[0], false)
 	assert.EqualError(t, err, "local extensions can not be upgraded")
 	assert.Equal(t, "", stdout.String())
@@ -328,13 +328,13 @@ func TestManager_UpgradeExtension_GitExtension_DryRun(t *testing.T) {
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-remote", "gh-remote")))
 	io, _, stdout, stderr := iostreams.Test()
 	m := newTestManager(tempDir, nil, io)
+	m.EnableDryRunMode()
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(exts))
 	ext := exts[0]
 	ext.currentVersion = "old version"
 	ext.latestVersion = "new version"
-	m.EnableDryRunMode()
 	err = m.upgradeExtension(ext, false)
 	assert.NoError(t, err)
 	assert.Equal(t, "", stdout.String())
@@ -521,6 +521,7 @@ func TestManager_UpgradeExtension_BinaryExtension_DryRun(t *testing.T) {
 
 	io, _, stdout, stderr := iostreams.Test()
 	m := newTestManager(tempDir, &http.Client{Transport: &reg}, io)
+	m.EnableDryRunMode()
 	reg.Register(
 		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
 		httpmock.JSONResponse(
@@ -538,7 +539,6 @@ func TestManager_UpgradeExtension_BinaryExtension_DryRun(t *testing.T) {
 	assert.Equal(t, 1, len(exts))
 	ext := exts[0]
 	ext.latestVersion = "v1.0.2"
-	m.EnableDryRunMode()
 	err = m.upgradeExtension(ext, false)
 	assert.NoError(t, err)
 
