@@ -57,7 +57,7 @@ func Test_listReposWithLanguage(t *testing.T) {
 	assert.Equal(t, "octocat/hello-world", res.Repositories[0].NameWithOwner)
 
 	assert.Equal(t, float64(10), searchData.Variables["perPage"])
-	assert.Equal(t, `user:@me language:go fork:true sort:updated-desc`, searchData.Variables["query"])
+	assert.Equal(t, `sort:updated-desc fork:true language:go org:@me`, searchData.Variables["query"])
 }
 
 func Test_searchQuery(t *testing.T) {
@@ -72,14 +72,14 @@ func Test_searchQuery(t *testing.T) {
 	}{
 		{
 			name: "blank",
-			want: "user:@me fork:true sort:updated-desc",
+			want: "sort:updated-desc fork:true org:@me",
 		},
 		{
 			name: "in org",
 			args: args{
 				owner: "cli",
 			},
-			want: "user:cli fork:true sort:updated-desc",
+			want: "sort:updated-desc fork:true org:cli",
 		},
 		{
 			name: "only public",
@@ -89,7 +89,7 @@ func Test_searchQuery(t *testing.T) {
 					Visibility: "public",
 				},
 			},
-			want: "user:@me is:public fork:true sort:updated-desc",
+			want: "sort:updated-desc fork:true is:public org:@me",
 		},
 		{
 			name: "only private",
@@ -99,7 +99,7 @@ func Test_searchQuery(t *testing.T) {
 					Visibility: "private",
 				},
 			},
-			want: "user:@me is:private fork:true sort:updated-desc",
+			want: "sort:updated-desc fork:true is:private org:@me",
 		},
 		{
 			name: "only forks",
@@ -109,7 +109,7 @@ func Test_searchQuery(t *testing.T) {
 					Fork: true,
 				},
 			},
-			want: "user:@me fork:only sort:updated-desc",
+			want: "sort:updated-desc fork:only org:@me",
 		},
 		{
 			name: "no forks",
@@ -119,7 +119,7 @@ func Test_searchQuery(t *testing.T) {
 					Source: true,
 				},
 			},
-			want: "user:@me fork:false sort:updated-desc",
+			want: "sort:updated-desc fork:false org:@me",
 		},
 		{
 			name: "with language",
@@ -129,7 +129,7 @@ func Test_searchQuery(t *testing.T) {
 					Language: "ruby",
 				},
 			},
-			want: `user:@me language:ruby fork:true sort:updated-desc`,
+			want: `sort:updated-desc fork:true language:ruby org:@me`,
 		},
 		{
 			name: "only archived",
@@ -139,7 +139,7 @@ func Test_searchQuery(t *testing.T) {
 					Archived: true,
 				},
 			},
-			want: "user:@me fork:true archived:true sort:updated-desc",
+			want: "sort:updated-desc archived:true fork:true org:@me",
 		},
 		{
 			name: "only non-archived",
@@ -149,7 +149,7 @@ func Test_searchQuery(t *testing.T) {
 					NonArchived: true,
 				},
 			},
-			want: "user:@me fork:true archived:false sort:updated-desc",
+			want: "sort:updated-desc archived:false fork:true org:@me",
 		},
 	}
 	for _, tt := range tests {

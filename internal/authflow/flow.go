@@ -26,6 +26,7 @@ var (
 type iconfig interface {
 	Set(string, string, string) error
 	Write() error
+	WriteHosts() error
 }
 
 func AuthFlowWithConfig(cfg iconfig, IO *iostreams.IOStreams, hostname, notice string, additionalScopes []string, isInteractive bool) (string, error) {
@@ -46,7 +47,7 @@ func AuthFlowWithConfig(cfg iconfig, IO *iostreams.IOStreams, hostname, notice s
 		return "", err
 	}
 
-	return token, cfg.Write()
+	return token, cfg.WriteHosts()
 }
 
 func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string, isInteractive bool) (string, string, error) {

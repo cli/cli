@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/cli/safeexec"
 )
 
 type printer interface {
@@ -75,7 +77,12 @@ func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 		cmdArgs = append(cmdArgs, command...)
 	}
 
-	cmd := exec.CommandContext(ctx, "ssh", cmdArgs...)
+	exe, err := safeexec.LookPath("ssh")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to execute ssh: %w", err)
+	}
+
+	cmd := exec.CommandContext(ctx, exe, cmdArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
@@ -112,9 +119,14 @@ func newSCPCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 		cmdArgs = append(cmdArgs, arg)
 	}
 
+	exe, err := safeexec.LookPath("scp")
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute scp: %w", err)
+	}
+
 	// Beware: invalid syntax causes scp to exit 1 with
 	// no error message, so don't let that happen.
-	cmd := exec.CommandContext(ctx, "scp", cmdArgs...)
+	cmd := exec.CommandContext(ctx, exe, cmdArgs...)
 
 	cmd.Stdin = nil
 	cmd.Stdout = os.Stderr

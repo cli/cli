@@ -161,7 +161,7 @@ func loginRun(opts *LoginOptions) error {
 			return fmt.Errorf("error validating token: %w", err)
 		}
 
-		return cfg.Write()
+		return cfg.WriteHosts()
 	}
 
 	existingToken, _ := cfg.Get(hostname, "oauth_token")

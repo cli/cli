@@ -18,6 +18,7 @@ type iconfig interface {
 	Get(string, string) (string, error)
 	Set(string, string, string) error
 	Write() error
+	WriteHosts() error
 }
 
 type LoginOptions struct {
@@ -173,7 +174,7 @@ func Login(opts *LoginOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", cs.SuccessIcon())
 	}
 
-	err := cfg.Write()
+	err := cfg.WriteHosts()
 	if err != nil {
 		return err
 	}

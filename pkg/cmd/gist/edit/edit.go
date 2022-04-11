@@ -244,11 +244,9 @@ func editRun(opts *EditOptions) error {
 			filesToUpdate[filename] = text
 		}
 
-		if !opts.IO.CanPrompt() {
-			break
-		}
-
-		if len(candidates) == 1 {
+		if !opts.IO.CanPrompt() ||
+			len(candidates) == 1 ||
+			opts.EditFilename != "" {
 			break
 		}
 

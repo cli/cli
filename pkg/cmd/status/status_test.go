@@ -6,12 +6,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
+
+type testHostConfig string
+
+func (c testHostConfig) DefaultHost() (string, error) {
+	return string(c), nil
+}
 
 func TestNewCmdStatus(t *testing.T) {
 	tests := []struct {
@@ -49,6 +56,9 @@ func TestNewCmdStatus(t *testing.T) {
 
 		f := &cmdutil.Factory{
 			IOStreams: io,
+			Config: func() (config.Config, error) {
+				return config.NewBlankConfig(), nil
+			},
 		}
 		t.Run(tt.name, func(t *testing.T) {
 			argv, err := shlex.Split(tt.cli)
@@ -272,6 +282,7 @@ func TestStatusRun(t *testing.T) {
 		tt.opts.CachedClient = func(c *http.Client, _ time.Duration) *http.Client {
 			return c
 		}
+		tt.opts.HostConfig = testHostConfig("github.com")
 		io, _, stdout, _ := iostreams.Test()
 		io.SetStdoutTTY(true)
 		tt.opts.IO = io
