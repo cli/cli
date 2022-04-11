@@ -184,6 +184,7 @@ type Codespace struct {
 	PendingOperation               bool                `json:"pending_operation"`
 	PendingOperationDisabledReason string              `json:"pending_operation_disabled_reason"`
 	IdleTimeoutNotice              string              `json:"idle_timeout_notice"`
+	WebURL                         string              `json:"web_url"`
 }
 
 type CodespaceGitStatus struct {
