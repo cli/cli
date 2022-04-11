@@ -83,10 +83,10 @@ func reopenRun(opts *ReopenOptions) error {
 			Body:       opts.Comment,
 			HttpClient: opts.HttpClient,
 			InputType:  shared.InputTypeInline,
+			Quiet:      true,
 			RetrieveCommentable: func() (shared.Commentable, ghrepo.Interface, error) {
 				return pr, baseRepo, nil
 			},
-			Quiet: true,
 		}
 		err := shared.CommentableRun(commentOpts)
 		if err != nil {

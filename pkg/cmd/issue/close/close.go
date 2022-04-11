@@ -82,10 +82,10 @@ func closeRun(opts *CloseOptions) error {
 			Body:       opts.Comment,
 			HttpClient: opts.HttpClient,
 			InputType:  prShared.InputTypeInline,
+			Quiet:      true,
 			RetrieveCommentable: func() (prShared.Commentable, ghrepo.Interface, error) {
 				return issue, baseRepo, nil
 			},
-			Quiet: true,
 		}
 		err := prShared.CommentableRun(commentOpts)
 		if err != nil {
