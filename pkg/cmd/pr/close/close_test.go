@@ -264,3 +264,36 @@ func TestPrClose_deleteBranch_notInGitRepo(t *testing.T) {
 		✓ Deleted branch trunk
 	`), output.Stderr())
 }
+
+func TestPrClose_withComment(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	baseRepo, pr := stubPR("OWNER/REPO", "OWNER/REPO:feature")
+	pr.Title = "The title of the PR"
+	shared.RunCommandFinder("96", pr, baseRepo)
+
+	http.Register(
+		httpmock.GraphQL(`mutation CommentCreate\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "addComment": { "commentEdge": { "node": {
+			"url": "https://github.com/OWNER/REPO/issues/123#issuecomment-456"
+		} } } } }`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, "THE-ID", inputs["subjectId"])
+				assert.Equal(t, "closing comment", inputs["body"])
+			}),
+	)
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestClose\b`),
+		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
+			}),
+	)
+
+	output, err := runCommand(http, true, "96 --comment 'closing comment'")
+	assert.NoError(t, err)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "✓ Closed pull request #96 (The title of the PR)\n", output.Stderr())
+}
