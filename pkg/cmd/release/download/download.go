@@ -27,6 +27,7 @@ type DownloadOptions struct {
 	TagName      string
 	FilePatterns []string
 	Destination  string
+	ReleaseId    string
 
 	// maximum number of simultaneous downloads
 	Concurrency int
@@ -61,6 +62,9 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 
 			# download the archive of the source code for a release
 			$ gh release download v1.2.3 --archive=zip
+
+			# download all assets from a specific release ID
+			$ gh release download --release-id 123456
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -80,6 +84,11 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 				return err
 			}
 
+			// check release id option validity
+			if err := checkReleaseIdOption(opts); err != nil {
+				return err
+			}
+
 			opts.Concurrency = 5
 
 			if runF != nil {
@@ -92,6 +101,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 	cmd.Flags().StringVarP(&opts.Destination, "dir", "D", ".", "The directory to download files into")
 	cmd.Flags().StringArrayVarP(&opts.FilePatterns, "pattern", "p", nil, "Download only assets that match a glob pattern")
 	cmd.Flags().StringVarP(&opts.ArchiveType, "archive", "A", "", "Download the source code archive in the specified `format` (zip or tar.gz)")
+	cmd.Flags().StringVarP(&opts.ReleaseId, "release-id", "", "", "The release ID")
 
 	return cmd
 }
@@ -112,6 +122,22 @@ func checkArchiveTypeOption(opts *DownloadOptions) error {
 	if opts.ArchiveType != "zip" && opts.ArchiveType != "tar.gz" {
 		return cmdutil.FlagErrorf("the value for `--archive` must be one of \"zip\" or \"tar.gz\"")
 	}
+	return nil
+}
+
+func checkReleaseIdOption(opts *DownloadOptions) error {
+	if len(opts.ReleaseId) == 0 {
+		return nil
+	}
+
+	if err := cmdutil.MutuallyExclusive(
+		"specify only one of '<tag>' or '--release-id'",
+		true, // ReleaseId len > 0
+		len(opts.TagName) > 0,
+	); err != nil {
+		return err
+	}
+
 	return nil
 }
 

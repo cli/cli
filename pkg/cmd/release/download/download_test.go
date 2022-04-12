@@ -110,6 +110,12 @@ func Test_NewCmdDownload(t *testing.T) {
 			isTTY:   true,
 			wantErr: "the value for `--archive` must be one of \"zip\" or \"tar.gz\"",
 		},
+		{
+			name:    "simultaneous tag and release-id arguments",
+			args:    "v1.2.3 --release-id 1234",
+			isTTY:   true,
+			wantErr: "specify only one of '<tag>' or '--release-id'",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
