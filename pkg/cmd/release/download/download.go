@@ -157,9 +157,16 @@ func downloadRun(opts *DownloadOptions) error {
 
 	var release *shared.Release
 	if opts.TagName == "" {
-		release, err = shared.FetchLatestRelease(httpClient, baseRepo)
-		if err != nil {
-			return err
+		if opts.ReleaseId == "" {
+			release, err = shared.FetchLatestRelease(httpClient, baseRepo)
+			if err != nil {
+				return err
+			}
+		} else {
+			release, err = shared.FetchReleaseById(httpClient, baseRepo, opts.ReleaseId)
+			if err != nil {
+				return err
+			}
 		}
 	} else {
 		release, err = shared.FetchRelease(httpClient, baseRepo, opts.TagName)

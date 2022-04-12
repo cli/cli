@@ -154,6 +154,43 @@ func FetchRelease(httpClient *http.Client, baseRepo ghrepo.Interface, tagName st
 	return &release, nil
 }
 
+// FetchReleaseById finds a repository release by its releaseId.
+func FetchReleaseById(httpClient *http.Client, baseRepo ghrepo.Interface, releaseId string) (*Release, error) {
+	path := fmt.Sprintf("repos/%s/%s/releases/%s", baseRepo.RepoOwner(), baseRepo.RepoName(), releaseId)
+	url := ghinstance.RESTPrefix(baseRepo.RepoHost()) + path
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		return FindDraftReleaseById(httpClient, baseRepo, releaseId)
+	}
+
+	if resp.StatusCode > 299 {
+		return nil, api.HandleHTTPError(resp)
+	}
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var release Release
+	err = json.Unmarshal(b, &release)
+	if err != nil {
+		return nil, err
+	}
+
+	return &release, nil
+}
+
 // FetchLatestRelease finds the latest published release for a repository.
 func FetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*Release, error) {
 	path := fmt.Sprintf("repos/%s/%s/releases/latest", baseRepo.RepoOwner(), baseRepo.RepoName())
@@ -223,6 +260,52 @@ func FindDraftRelease(httpClient *http.Client, baseRepo ghrepo.Interface, tagNam
 
 		for _, r := range releases {
 			if r.IsDraft && r.TagName == tagName {
+				return &r, nil
+			}
+		}
+		//nolint:staticcheck
+		break
+	}
+
+	return nil, errors.New("release not found")
+}
+
+// FindDraftReleaseById returns the latest draft release that matches releaseId.
+func FindDraftReleaseById(httpClient *http.Client, baseRepo ghrepo.Interface, releaseId string) (*Release, error) {
+	path := fmt.Sprintf("repos/%s/%s/releases", baseRepo.RepoOwner(), baseRepo.RepoName())
+	url := ghinstance.RESTPrefix(baseRepo.RepoHost()) + path
+
+	perPage := 100
+	page := 1
+	for {
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s?per_page=%d&page=%d", url, perPage, page), nil)
+		if err != nil {
+			return nil, err
+		}
+
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode > 299 {
+			return nil, api.HandleHTTPError(resp)
+		}
+
+		b, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		var releases []Release
+		err = json.Unmarshal(b, &releases)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, r := range releases {
+			if r.IsDraft && r.ID == releaseId {
 				return &r, nil
 			}
 		}
