@@ -34,6 +34,7 @@ func Test_NewCmdDownload(t *testing.T) {
 				FilePatterns: []string(nil),
 				Destination:  ".",
 				Concurrency:  5,
+				ReleaseId:    "",
 			},
 		},
 		{
@@ -45,6 +46,7 @@ func Test_NewCmdDownload(t *testing.T) {
 				FilePatterns: []string{"*.tgz"},
 				Destination:  ".",
 				Concurrency:  5,
+				ReleaseId:    "",
 			},
 		},
 		{
@@ -56,6 +58,7 @@ func Test_NewCmdDownload(t *testing.T) {
 				FilePatterns: []string{"1", "2,3"},
 				Destination:  ".",
 				Concurrency:  5,
+				ReleaseId:    "",
 			},
 		},
 		{
@@ -67,6 +70,7 @@ func Test_NewCmdDownload(t *testing.T) {
 				FilePatterns: []string(nil),
 				Destination:  "tmp/assets",
 				Concurrency:  5,
+				ReleaseId:    "",
 			},
 		},
 		{
@@ -78,6 +82,7 @@ func Test_NewCmdDownload(t *testing.T) {
 				FilePatterns: []string{"*"},
 				Destination:  ".",
 				Concurrency:  5,
+				ReleaseId:    "",
 			},
 		},
 		{
@@ -90,6 +95,19 @@ func Test_NewCmdDownload(t *testing.T) {
 				Destination:  ".",
 				ArchiveType:  "zip",
 				Concurrency:  5,
+				ReleaseId:    "",
+			},
+		},
+		{
+			name:  "download a release id",
+			args:  "--release-id 87654321",
+			isTTY: true,
+			want: DownloadOptions{
+				TagName:      "",
+				FilePatterns: []string(nil),
+				Destination:  ".",
+				Concurrency:  5,
+				ReleaseId:    "87654321",
 			},
 		},
 		{
@@ -155,6 +173,7 @@ func Test_NewCmdDownload(t *testing.T) {
 			assert.Equal(t, tt.want.FilePatterns, opts.FilePatterns)
 			assert.Equal(t, tt.want.Destination, opts.Destination)
 			assert.Equal(t, tt.want.Concurrency, opts.Concurrency)
+			assert.Equal(t, tt.want.ReleaseId, opts.ReleaseId)
 		})
 	}
 }
@@ -186,6 +205,23 @@ func Test_downloadRun(t *testing.T) {
 			},
 		},
 		{
+			name:  "download all assets from a release Id",
+			isTTY: true,
+			opts: DownloadOptions{
+				TagName:     "",
+				Destination: ".",
+				Concurrency: 2,
+				ReleaseId:   "87654321",
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+			wantFiles: []string{
+				"linux.tgz",
+				"windows-32bit.zip",
+				"windows-64bit.zip",
+			},
+		},
+		{
 			name:  "download assets matching pattern into destination directory",
 			isTTY: true,
 			opts: DownloadOptions{
@@ -193,6 +229,7 @@ func Test_downloadRun(t *testing.T) {
 				FilePatterns: []string{"windows-*.zip"},
 				Destination:  "tmp/assets",
 				Concurrency:  2,
+				ReleaseId:    "",
 			},
 			wantStdout: ``,
 			wantStderr: ``,
@@ -209,6 +246,7 @@ func Test_downloadRun(t *testing.T) {
 				FilePatterns: []string{"linux*.zip"},
 				Destination:  ".",
 				Concurrency:  2,
+				ReleaseId:    "",
 			},
 			wantStdout: ``,
 			wantStderr: ``,
@@ -222,6 +260,7 @@ func Test_downloadRun(t *testing.T) {
 				ArchiveType: "zip",
 				Destination: "tmp/packages",
 				Concurrency: 2,
+				ReleaseId:   "",
 			},
 			wantStdout: ``,
 			wantStderr: ``,
@@ -237,6 +276,7 @@ func Test_downloadRun(t *testing.T) {
 				ArchiveType: "tar.gz",
 				Destination: "tmp/packages",
 				Concurrency: 2,
+				ReleaseId:   "",
 			},
 			wantStdout: ``,
 			wantStderr: ``,
@@ -257,6 +297,18 @@ func Test_downloadRun(t *testing.T) {
 
 			fakeHTTP := &httpmock.Registry{}
 			fakeHTTP.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StringResponse(`{
+				"assets": [
+					{ "name": "windows-32bit.zip", "size": 12,
+					  "url": "https://api.github.com/assets/1234" },
+					{ "name": "windows-64bit.zip", "size": 34,
+					  "url": "https://api.github.com/assets/3456" },
+					{ "name": "linux.tgz", "size": 56,
+					  "url": "https://api.github.com/assets/5678" }
+				],
+				"tarball_url": "https://api.github.com/repos/OWNER/REPO/tarball/v1.2.3",
+				"zipball_url": "https://api.github.com/repos/OWNER/REPO/zipball/v1.2.3"
+			}`))
+			fakeHTTP.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/87654321"), httpmock.StringResponse(`{
 				"assets": [
 					{ "name": "windows-32bit.zip", "size": 12,
 					  "url": "https://api.github.com/assets/1234" },
