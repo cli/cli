@@ -14,6 +14,7 @@ import (
 	surveyCore "github.com/AlecAivazis/survey/v2/core"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/build"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -170,15 +171,21 @@ func mainRun() exitCode {
 	rootCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var results []string
 		if aliases, err := cfg.Aliases(); err == nil {
-			for aliasName := range aliases.All() {
+			for aliasName, aliasValue := range aliases.All() {
 				if strings.HasPrefix(aliasName, toComplete) {
-					results = append(results, aliasName)
+					results = append(results, aliasName+"\tAlias for "+aliasValue)
 				}
 			}
 		}
 		for _, ext := range cmdFactory.ExtensionManager.List() {
 			if strings.HasPrefix(ext.Name(), toComplete) {
-				results = append(results, ext.Name())
+				repo := ext.URL()
+				if u, err := git.ParseURL(ext.URL()); err == nil {
+					if r, err := ghrepo.FromURL(u); err == nil {
+						repo = ghrepo.FullName(r)
+					}
+				}
+				results = append(results, ext.Name()+"\tExtension "+repo+", version "+ext.CurrentVersion())
 			}
 		}
 		return results, cobra.ShellCompDirectiveNoFileComp
