@@ -98,7 +98,7 @@ func editRun(tag string, opts *EditOptions) error {
 		return errors.New("nothing to edit")
 	}
 
-	editedRelease, err := editRelease(httpClient, baseRepo, release.ReleaseID, params)
+	editedRelease, err := editRelease(httpClient, baseRepo, release.DatabaseID, params)
 	if err != nil {
 		return err
 	}

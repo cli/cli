@@ -35,7 +35,7 @@ var ReleaseFields = []string{
 }
 
 type Release struct {
-	ReleaseID    int64      `json:"id"`
+	DatabaseID   int64      `json:"id"`
 	ID           string     `json:"node_id"`
 	TagName      string     `json:"tag_name"`
 	Name         string     `json:"name"`
