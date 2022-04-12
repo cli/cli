@@ -202,6 +202,13 @@ func padlock(state string, opts *LockOptions) error {
 	case Lock:
 		err = lockLockable(httpClient, baseRepo, issuePr, opts)
 	case Unlock:
+		// if already unlocked, skip the api call to unlock
+		if !issuePr.Locked {
+			successMsg = fmt.Sprintf("%s #%d already unlocked.  Nothing changed.\n",
+				parent.FullName, issuePr.Number)
+			break
+		}
+
 		err = unlockLockable(httpClient, baseRepo, issuePr, opts)
 	case Relock:
 		relocked, errRelock := relockLockable(httpClient, baseRepo, issuePr, opts)
