@@ -252,6 +252,13 @@ func mergeRun(opts *MergeOptions) error {
 			setCommitBody: opts.BodySet,
 		}
 
+		if repo.MergeQueueRequired() && !opts.InteractiveMode {
+			// TODO: should this continue if the strategy the user set is the same as the one for the merge queue?
+			// if repo.MergeQueue.MergeMethod != opts.MergeMethod
+			fmt.Fprintf(opts.IO.ErrOut, "%s a merge strategy cannot be set when adding a pull request to the merge queue\n", cs.FailureIconWithColor(cs.Red))
+			return cmdutil.SilentError
+		}
+
 		if opts.InteractiveMode {
 			// if merge queue is required and opts.UseAdmin is false, enqueue using auto merge
 			// if opts.UseAdmin is true, attempt to merge directly and bypass the queue
@@ -288,7 +295,7 @@ func mergeRun(opts *MergeOptions) error {
 				}
 			}
 		}
-		// TODO: confirm that a merge method supplied on the command line will fail with a good error message
+
 		err = mergePullRequest(httpClient, payload)
 		if err != nil {
 			return err
