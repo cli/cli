@@ -41,6 +41,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "v1.2.3 --title 'Some Title' --notes 'Some Notes'",
 			isTTY: false,
 			want: EditOptions{
+				TagName:    "v1.2.3",
 				Target:     "",
 				Name:       stringPtr("Some Title"),
 				Body:       stringPtr("Some Notes"),
@@ -66,7 +67,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "v1.2.3 --prerelease",
 			isTTY: false,
 			want: EditOptions{
-				TagName:    "",
+				TagName:    "v1.2.3",
 				Target:     "",
 				Name:       nil,
 				Body:       nil,
@@ -79,7 +80,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "v1.2.3 --prerelease=false",
 			isTTY: false,
 			want: EditOptions{
-				TagName:    "",
+				TagName:    "v1.2.3",
 				Target:     "",
 				Name:       nil,
 				Body:       nil,
@@ -92,7 +93,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "v1.2.3 --draft",
 			isTTY: false,
 			want: EditOptions{
-				TagName:    "",
+				TagName:    "v1.2.3",
 				Target:     "",
 				Name:       nil,
 				Body:       nil,
@@ -105,7 +106,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "v1.2.3 --draft=false",
 			isTTY: false,
 			want: EditOptions{
-				TagName:    "",
+				TagName:    "v1.2.3",
 				Target:     "",
 				Name:       nil,
 				Body:       nil,
@@ -118,7 +119,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  fmt.Sprintf(`v1.2.3 -F '%s'`, tf.Name()),
 			isTTY: false,
 			want: EditOptions{
-				TagName:    "",
+				TagName:    "v1.2.3",
 				Target:     "",
 				Name:       nil,
 				Body:       stringPtr("MY NOTES"),
@@ -132,7 +133,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			isTTY: false,
 			stdin: "MY NOTES",
 			want: EditOptions{
-				TagName:    "",
+				TagName:    "v1.2.3",
 				Target:     "",
 				Name:       nil,
 				Body:       stringPtr("MY NOTES"),

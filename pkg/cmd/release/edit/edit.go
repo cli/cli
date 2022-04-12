@@ -58,6 +58,11 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				opts.Body = &body
 			}
 
+			// If we don't provide any tag name, the API will remove the current tag from the release
+			if opts.TagName == "" {
+				opts.TagName = args[0]
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
