@@ -45,7 +45,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			Aliases: []string{"ls"},
 			Args:    cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, args []string) error {
-				cmds := m.List(true)
+				cmds := m.List()
 				if len(cmds) == 0 {
 					return errors.New("no extensions installed")
 				}
@@ -61,22 +61,13 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					t.AddField(fmt.Sprintf("gh %s", c.Name()), nil, nil)
 					t.AddField(repo, nil, nil)
-					version := c.CurrentVersion()
-					if !c.IsBinary() && len(version) > 8 {
-						version = version[:8]
-					}
-
+					version := displayExtensionVersion(c, c.CurrentVersion())
 					if c.IsPinned() {
 						t.AddField(version, nil, cs.Cyan)
 					} else {
 						t.AddField(version, nil, nil)
 					}
 
-					var updateAvailable string
-					if c.UpdateAvailable() {
-						updateAvailable = "Upgrade available"
-					}
-					t.AddField(updateAvailable, nil, cs.Green)
 					t.EndRow()
 				}
 				return t.Render()
@@ -152,6 +143,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 		func() *cobra.Command {
 			var flagAll bool
 			var flagForce bool
+			var flagDryRun bool
 			cmd := &cobra.Command{
 				Use:   "upgrade {<name> | --all}",
 				Short: "Upgrade installed extensions",
@@ -172,6 +164,9 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if len(args) > 0 {
 						name = normalizeExtensionSelector(args[0])
 					}
+					if flagDryRun {
+						m.EnableDryRunMode()
+					}
 					cs := io.ColorScheme()
 					err := m.Upgrade(name, flagForce)
 					if err != nil && !errors.Is(err, upToDateError) {
@@ -186,12 +181,16 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						return cmdutil.SilentError
 					}
 					if io.IsStdoutTTY() {
+						successStr := "Successfully"
+						if flagDryRun {
+							successStr = "Would have"
+						}
 						if errors.Is(err, upToDateError) {
 							fmt.Fprintf(io.Out, "%s Extension already up to date\n", cs.SuccessIcon())
 						} else if name != "" {
-							fmt.Fprintf(io.Out, "%s Successfully upgraded extension %s\n", cs.SuccessIcon(), name)
+							fmt.Fprintf(io.Out, "%s %s upgraded extension %s\n", cs.SuccessIcon(), successStr, name)
 						} else {
-							fmt.Fprintf(io.Out, "%s Successfully upgraded extensions\n", cs.SuccessIcon())
+							fmt.Fprintf(io.Out, "%s %s upgraded extensions\n", cs.SuccessIcon(), successStr)
 						}
 					}
 					return nil
@@ -199,6 +198,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			}
 			cmd.Flags().BoolVar(&flagAll, "all", false, "Upgrade all extensions")
 			cmd.Flags().BoolVar(&flagForce, "force", false, "Force upgrade extension")
+			cmd.Flags().BoolVar(&flagDryRun, "dry-run", false, "Only display upgrades")
 			return cmd
 		}(),
 		&cobra.Command{
@@ -355,7 +355,7 @@ func checkValidExtension(rootCmd *cobra.Command, m extensions.ExtensionManager, 
 		return fmt.Errorf("%q matches the name of a built-in command", commandName)
 	}
 
-	for _, ext := range m.List(false) {
+	for _, ext := range m.List() {
 		if ext.Name() == commandName {
 			return fmt.Errorf("there is already an installed extension that provides the %q command", commandName)
 		}
@@ -369,4 +369,11 @@ func normalizeExtensionSelector(n string) string {
 		n = n[idx+1:]
 	}
 	return strings.TrimPrefix(n, "gh-")
+}
+
+func displayExtensionVersion(ext extensions.Extension, version string) string {
+	if !ext.IsBinary() && len(version) > 8 {
+		return version[:8]
+	}
+	return version
 }

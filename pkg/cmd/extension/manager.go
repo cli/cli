@@ -37,6 +37,7 @@ type Manager struct {
 	client     *http.Client
 	config     config.Config
 	io         *iostreams.IOStreams
+	dryRunMode bool
 }
 
 func NewManager(io *iostreams.IOStreams) *Manager {
@@ -62,6 +63,10 @@ func (m *Manager) SetConfig(cfg config.Config) {
 
 func (m *Manager) SetClient(client *http.Client) {
 	m.client = client
+}
+
+func (m *Manager) EnableDryRunMode() {
+	m.dryRunMode = true
 }
 
 func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) (bool, error) {
@@ -109,8 +114,8 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 	return true, externalCmd.Run()
 }
 
-func (m *Manager) List(includeMetadata bool) []extensions.Extension {
-	exts, _ := m.list(includeMetadata)
+func (m *Manager) List() []extensions.Extension {
+	exts, _ := m.list(false)
 	r := make([]extensions.Extension, len(exts))
 	for i, v := range exts {
 		val := v
@@ -384,17 +389,21 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	targetDir := filepath.Join(m.installDir(), name)
 
 	// TODO clean this up if function errs?
-	err = os.MkdirAll(targetDir, 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create installation directory: %w", err)
+	if !m.dryRunMode {
+		err = os.MkdirAll(targetDir, 0755)
+		if err != nil {
+			return fmt.Errorf("failed to create installation directory: %w", err)
+		}
 	}
 
 	binPath := filepath.Join(targetDir, name)
 	binPath += ext
 
-	err = downloadAsset(m.client, *asset, binPath)
-	if err != nil {
-		return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
+	if !m.dryRunMode {
+		err = downloadAsset(m.client, *asset, binPath)
+		if err != nil {
+			return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
+		}
 	}
 
 	manifest := binManifest{
@@ -411,17 +420,19 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 		return fmt.Errorf("failed to serialize manifest: %w", err)
 	}
 
-	manifestPath := filepath.Join(targetDir, manifestName)
+	if !m.dryRunMode {
+		manifestPath := filepath.Join(targetDir, manifestName)
 
-	f, err := os.OpenFile(manifestPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to open manifest for writing: %w", err)
-	}
-	defer f.Close()
+		f, err := os.OpenFile(manifestPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+		if err != nil {
+			return fmt.Errorf("failed to open manifest for writing: %w", err)
+		}
+		defer f.Close()
 
-	_, err = f.Write(bs)
-	if err != nil {
-		return fmt.Errorf("failed write manifest file: %w", err)
+		_, err = f.Write(bs)
+		if err != nil {
+			return fmt.Errorf("failed write manifest file: %w", err)
+		}
 	}
 
 	return nil
@@ -519,7 +530,13 @@ func (m *Manager) upgradeExtensions(exts []Extension, force bool) error {
 			fmt.Fprintf(m.io.Out, "%s\n", err)
 			continue
 		}
-		fmt.Fprintf(m.io.Out, "upgrade complete\n")
+		currentVersion := displayExtensionVersion(&f, f.currentVersion)
+		latestVersion := displayExtensionVersion(&f, f.latestVersion)
+		if m.dryRunMode {
+			fmt.Fprintf(m.io.Out, "would have upgraded from %s to %s\n", currentVersion, latestVersion)
+		} else {
+			fmt.Fprintf(m.io.Out, "upgraded from %s to %s\n", currentVersion, latestVersion)
+		}
 	}
 	if failed {
 		return errors.New("some extensions failed to upgrade")
@@ -548,8 +565,7 @@ func (m *Manager) upgradeExtension(ext Extension, force bool) error {
 			isBin, _ = isBinExtension(m.client, repo)
 		}
 		if isBin {
-			err = m.Remove(ext.Name())
-			if err != nil {
+			if err := m.Remove(ext.Name()); err != nil {
 				return fmt.Errorf("failed to migrate to new precompiled extension format: %w", err)
 			}
 			return m.installBin(repo, "")
@@ -565,6 +581,9 @@ func (m *Manager) upgradeGitExtension(ext Extension, force bool) error {
 		return err
 	}
 	dir := filepath.Dir(ext.path)
+	if m.dryRunMode {
+		return nil
+	}
 	if force {
 		if err := m.newCommand(exe, "-C", dir, "fetch", "origin", "HEAD").Run(); err != nil {
 			return err
@@ -586,6 +605,9 @@ func (m *Manager) Remove(name string) error {
 	targetDir := filepath.Join(m.installDir(), "gh-"+name)
 	if _, err := os.Lstat(targetDir); os.IsNotExist(err) {
 		return fmt.Errorf("no extension found: %q", targetDir)
+	}
+	if m.dryRunMode {
+		return nil
 	}
 	return os.RemoveAll(targetDir)
 }
