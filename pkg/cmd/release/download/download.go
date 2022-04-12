@@ -72,7 +72,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 			opts.BaseRepo = f.BaseRepo
 
 			if len(args) == 0 {
-				if len(opts.FilePatterns) == 0 && opts.ArchiveType == "" {
+				if len(opts.ReleaseId) == 0 && len(opts.FilePatterns) == 0 && opts.ArchiveType == "" {
 					return cmdutil.FlagErrorf("`--pattern` or `--archive` is required when downloading the latest release")
 				}
 			} else {
