@@ -237,6 +237,8 @@ func (r Repository) ViewerCanTriage() bool {
 	}
 }
 
+// If MergeMethod isn't set then a MergeQueue
+// isn't required on that branch
 func (r Repository) MergeQueueRequired() bool {
 	return r.MergeQueue.MergeMethod != ""
 }
@@ -322,7 +324,8 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	return InitRepoHostname(result.Repository, repo.RepoHost()), nil
 }
 
-// prefer to copy the existing code rather than modify and break the interface?
+// TODO: prefer to copy the existing code rather than modify and require callers to pass a baseBranch?
+// if so this function and the return value should be called something else
 func GitHubRepoWithMergeQueue(client *Client, repo ghrepo.Interface, baseBranch string) (*Repository, error) {
 	query := `
 	fragment repo on Repository {

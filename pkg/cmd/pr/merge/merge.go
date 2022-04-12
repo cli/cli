@@ -180,7 +180,8 @@ func mergeRun(opts *MergeOptions) error {
 	}
 
 	if pr.IsInMergeQueue {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull Request #%d is already queued to merge\n", cs.FailureIconWithColor(cs.Red), pr.Number)
+		// once the pull request is in the queue no further action is possible
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull Request #%d is queued to merge\n", cs.FailureIconWithColor(cs.Red), pr.Number)
 		return cmdutil.SilentError
 	}
 
@@ -218,6 +219,8 @@ func mergeRun(opts *MergeOptions) error {
 	}
 
 	isPRAlreadyMerged := pr.State == "MERGED"
+
+	// pull request state only matters if merge queue is not required
 	if !repo.MergeQueueRequired() {
 		if reason := blockedReason(pr.MergeStateStatus, opts.UseAdmin); !opts.AutoMergeEnable && !isPRAlreadyMerged && reason != "" {
 			fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is not mergeable: %s.\n", cs.FailureIcon(), pr.Number, reason)
@@ -238,7 +241,6 @@ func mergeRun(opts *MergeOptions) error {
 		localBranchExists = git.HasLocalBranch(pr.HeadRefName)
 	}
 
-	// need to handle the case where the the PR is attempting to merge and it is already in merge queue
 	if !isPRAlreadyMerged {
 		payload := mergePayload{
 			repo:          baseRepo,
@@ -251,6 +253,8 @@ func mergeRun(opts *MergeOptions) error {
 		}
 
 		if opts.InteractiveMode {
+			// if merge queue is required and opts.UseAdmin is false, enqueue using auto merge
+			// if opts.UseAdmin is true, attempt to merge directly and bypass the queue
 			if repo.MergeQueueRequired() && !opts.UseAdmin {
 				payload.auto = true
 				fmt.Fprintf(opts.IO.ErrOut, "Pull Request will be added to the merge queue for %s and %s when ready\n", pr.BaseRefName, repo.MergeQueue.MergeMethod)
@@ -265,7 +269,9 @@ func mergeRun(opts *MergeOptions) error {
 				}
 			}
 
-			allowEditMsg := (payload.method != PullRequestMergeMethodRebase) && (!repo.MergeQueueRequired() || opts.UseAdmin)
+			allowEditMsg := (payload.method != PullRequestMergeMethodRebase) &&
+				// merging as admin ignores the merge queue if it is required
+				(!repo.MergeQueueRequired() || opts.UseAdmin)
 
 			for {
 				action, err := confirmSurvey(allowEditMsg)
