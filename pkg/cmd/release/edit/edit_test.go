@@ -41,12 +41,9 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "v1.2.3 --title 'Some Title' --notes 'Some Notes'",
 			isTTY: false,
 			want: EditOptions{
-				TagName:    "v1.2.3",
-				Target:     "",
-				Name:       stringPtr("Some Title"),
-				Body:       stringPtr("Some Notes"),
-				Draft:      nil,
-				Prerelease: nil,
+				TagName: "v1.2.3",
+				Name:    stringPtr("Some Title"),
+				Body:    stringPtr("Some Notes"),
 			},
 		},
 		{
@@ -55,12 +52,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			isTTY: false,
 			want: EditOptions{
 				TagName:            "v1.2.3",
-				Target:             "",
-				Name:               nil,
-				Body:               nil,
-				Draft:              nil,
 				DiscussionCategory: stringPtr("some-category"),
-				Prerelease:         nil,
 			},
 		},
 		{
@@ -68,12 +60,8 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "v1.2.3 --tag v9.8.7 --target 97ea5e77b4d61d5d80ed08f7512847dee3ec9af5",
 			isTTY: false,
 			want: EditOptions{
-				TagName:    "v9.8.7",
-				Target:     "97ea5e77b4d61d5d80ed08f7512847dee3ec9af5",
-				Name:       nil,
-				Body:       nil,
-				Draft:      nil,
-				Prerelease: nil,
+				TagName: "v9.8.7",
+				Target:  "97ea5e77b4d61d5d80ed08f7512847dee3ec9af5",
 			},
 		},
 		{
@@ -82,10 +70,6 @@ func Test_NewCmdCreate(t *testing.T) {
 			isTTY: false,
 			want: EditOptions{
 				TagName:    "v1.2.3",
-				Target:     "",
-				Name:       nil,
-				Body:       nil,
-				Draft:      nil,
 				Prerelease: boolPtr(true),
 			},
 		},
@@ -95,10 +79,6 @@ func Test_NewCmdCreate(t *testing.T) {
 			isTTY: false,
 			want: EditOptions{
 				TagName:    "v1.2.3",
-				Target:     "",
-				Name:       nil,
-				Body:       nil,
-				Draft:      nil,
 				Prerelease: boolPtr(false),
 			},
 		},
@@ -107,12 +87,8 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "v1.2.3 --draft",
 			isTTY: false,
 			want: EditOptions{
-				TagName:    "v1.2.3",
-				Target:     "",
-				Name:       nil,
-				Body:       nil,
-				Draft:      boolPtr(true),
-				Prerelease: nil,
+				TagName: "v1.2.3",
+				Draft:   boolPtr(true),
 			},
 		},
 		{
@@ -120,12 +96,8 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "v1.2.3 --draft=false",
 			isTTY: false,
 			want: EditOptions{
-				TagName:    "v1.2.3",
-				Target:     "",
-				Name:       nil,
-				Body:       nil,
-				Draft:      boolPtr(false),
-				Prerelease: nil,
+				TagName: "v1.2.3",
+				Draft:   boolPtr(false),
 			},
 		},
 		{
@@ -133,12 +105,8 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  fmt.Sprintf(`v1.2.3 -F '%s'`, tf.Name()),
 			isTTY: false,
 			want: EditOptions{
-				TagName:    "v1.2.3",
-				Target:     "",
-				Name:       nil,
-				Body:       stringPtr("MY NOTES"),
-				Draft:      nil,
-				Prerelease: nil,
+				TagName: "v1.2.3",
+				Body:    stringPtr("MY NOTES"),
 			},
 		},
 		{
@@ -147,12 +115,8 @@ func Test_NewCmdCreate(t *testing.T) {
 			isTTY: false,
 			stdin: "MY NOTES",
 			want: EditOptions{
-				TagName:    "v1.2.3",
-				Target:     "",
-				Name:       nil,
-				Body:       stringPtr("MY NOTES"),
-				Draft:      nil,
-				Prerelease: nil,
+				TagName: "v1.2.3",
+				Body:    stringPtr("MY NOTES"),
 			},
 		},
 	}
@@ -224,15 +188,11 @@ func Test_updateRun(t *testing.T) {
 				TagName: "v1.2.3",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
-					"url": "https://api.github.com/releases/123",
-					"upload_url": "https://api.github.com/assets/upload",
-					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
-				}`, func(params map[string]interface{}) {
+				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
 						"tag_name": "v1.2.3",
 					}, params)
-				}))
+				})
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: "",
@@ -244,15 +204,11 @@ func Test_updateRun(t *testing.T) {
 				Target: "c0ff33",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
-					"url": "https://api.github.com/releases/123",
-					"upload_url": "https://api.github.com/assets/upload",
-					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
-				}`, func(params map[string]interface{}) {
+				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
 						"target_commitish": "c0ff33",
 					}, params)
-				}))
+				})
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: "",
@@ -264,15 +220,11 @@ func Test_updateRun(t *testing.T) {
 				Name: stringPtr("Hot Release #1"),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
-					"url": "https://api.github.com/releases/123",
-					"upload_url": "https://api.github.com/assets/upload",
-					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
-				}`, func(params map[string]interface{}) {
+				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
 						"name": "Hot Release #1",
 					}, params)
-				}))
+				})
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: "",
@@ -284,15 +236,11 @@ func Test_updateRun(t *testing.T) {
 				DiscussionCategory: stringPtr("some-category"),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
-					"url": "https://api.github.com/releases/123",
-					"upload_url": "https://api.github.com/assets/upload",
-					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
-				}`, func(params map[string]interface{}) {
+				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
 						"discussion_category_name": "some-category",
 					}, params)
-				}))
+				})
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: "",
@@ -304,15 +252,11 @@ func Test_updateRun(t *testing.T) {
 				Name: stringPtr(""),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
-					"url": "https://api.github.com/releases/123",
-					"upload_url": "https://api.github.com/assets/upload",
-					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
-				}`, func(params map[string]interface{}) {
+				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
 						"name": "",
 					}, params)
-				}))
+				})
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: "",
@@ -324,15 +268,11 @@ func Test_updateRun(t *testing.T) {
 				Body: stringPtr("Release Notes:\n- Fix Bug #1\n- Fix Bug #2"),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
-					"url": "https://api.github.com/releases/123",
-					"upload_url": "https://api.github.com/assets/upload",
-					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
-				}`, func(params map[string]interface{}) {
+				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
 						"body": "Release Notes:\n- Fix Bug #1\n- Fix Bug #2",
 					}, params)
-				}))
+				})
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: "",
@@ -344,15 +284,11 @@ func Test_updateRun(t *testing.T) {
 				Body: stringPtr(""),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
-					"url": "https://api.github.com/releases/123",
-					"upload_url": "https://api.github.com/assets/upload",
-					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
-				}`, func(params map[string]interface{}) {
+				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
 						"body": "",
 					}, params)
-				}))
+				})
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: "",
@@ -364,15 +300,11 @@ func Test_updateRun(t *testing.T) {
 				Draft: boolPtr(true),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
-					"url": "https://api.github.com/releases/123",
-					"upload_url": "https://api.github.com/assets/upload",
-					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
-				}`, func(params map[string]interface{}) {
+				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
 						"draft": true,
 					}, params)
-				}))
+				})
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: "",
@@ -384,15 +316,11 @@ func Test_updateRun(t *testing.T) {
 				Draft: boolPtr(false),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
-					"url": "https://api.github.com/releases/123",
-					"upload_url": "https://api.github.com/assets/upload",
-					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
-				}`, func(params map[string]interface{}) {
+				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
 						"draft": false,
 					}, params)
-				}))
+				})
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: "",
@@ -404,15 +332,11 @@ func Test_updateRun(t *testing.T) {
 				Prerelease: boolPtr(true),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
-					"url": "https://api.github.com/releases/123",
-					"upload_url": "https://api.github.com/assets/upload",
-					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
-				}`, func(params map[string]interface{}) {
+				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
 						"prerelease": true,
 					}, params)
-				}))
+				})
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: "",
@@ -424,15 +348,11 @@ func Test_updateRun(t *testing.T) {
 				Prerelease: boolPtr(false),
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
-					"url": "https://api.github.com/releases/123",
-					"upload_url": "https://api.github.com/assets/upload",
-					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
-				}`, func(params map[string]interface{}) {
+				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
 						"prerelease": false,
 					}, params)
-				}))
+				})
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: "",
@@ -481,6 +401,14 @@ func Test_updateRun(t *testing.T) {
 			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
+}
+
+func mockSuccessfulEditResponse(reg *httpmock.Registry, cb func(params map[string]interface{})) {
+	matcher := httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345")
+	responder := httpmock.RESTPayload(201, `{
+		"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+	}`, cb)
+	reg.Register(matcher, responder)
 }
 
 func boolPtr(b bool) *bool {
