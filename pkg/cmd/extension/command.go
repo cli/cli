@@ -47,7 +47,8 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			RunE: func(cmd *cobra.Command, args []string) error {
 				cmds := m.List()
 				if len(cmds) == 0 {
-					return errors.New("no extensions installed")
+					fmt.Fprintf(io.Out, "no extensions installed\n")
+					return nil
 				}
 				cs := io.ColorScheme()
 				t := utils.NewTablePrinter(io)
@@ -80,10 +81,10 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				Short: "Install a gh extension from a repository",
 				Long: heredoc.Doc(`
 				Install a GitHub repository locally as a GitHub CLI extension.
-				
+
 				The repository argument can be specified in "owner/repo" format as well as a full URL.
 				The URL format is useful when the repository is not hosted on github.com.
-				
+
 				To install an extension in development from the current directory, use "." as the
 				value of the repository argument.
 
