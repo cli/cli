@@ -188,7 +188,7 @@ sudo zypper in gh
 
 ### Alpine Linux
 
-Alpine Linux users can install from the [stable releases' community packaage repository](https://pkgs.alpinelinux.org/packages?name=github-cli&branch=v3.15).
+Alpine Linux users can install from the [stable releases' community package repository](https://pkgs.alpinelinux.org/packages?name=github-cli&branch=v3.15).
 
 ```bash
 apk add github-cli
