@@ -58,7 +58,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	vscsTargetUrl := os.Getenv("VSCS_TARGET_URL")
 
 	DEFAULT_DEVCONTAINER_DEFINITIONS := []string{".devcontainer.json", ".devcontainer/devcontainer.json"}
-  
+
 	userInputs := struct {
 		Repository string
 		Branch     string

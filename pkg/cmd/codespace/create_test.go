@@ -36,6 +36,9 @@ func TestApp_Create(t *testing.T) {
 							DefaultBranch: "main",
 						}, nil
 					},
+					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+						return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
+					},
 					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
 						return []*api.Machine{
 							{
@@ -264,6 +267,9 @@ func TestApp_Create(t *testing.T) {
 							FullName:      nwo,
 							DefaultBranch: "main",
 						}, nil
+					},
+					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+						return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
 					},
 					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
 						return []*api.Machine{
