@@ -41,7 +41,7 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "install an extension",
 			args: []string{"install", "owner/gh-some-ext"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.ListFunc = func(bool) []extensions.Extension {
+				em.ListFunc = func() []extensions.Extension {
 					return []extensions.Extension{}
 				}
 				em.InstallFunc = func(_ ghrepo.Interface, _ string) error {
@@ -60,7 +60,7 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "install an extension with same name as existing extension",
 			args: []string{"install", "owner/gh-existing-ext"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.ListFunc = func(bool) []extensions.Extension {
+				em.ListFunc = func() []extensions.Extension {
 					e := &Extension{path: "owner2/gh-existing-ext"}
 					return []extensions.Extension{e}
 				}
@@ -359,15 +359,14 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "list extensions",
 			args: []string{"list"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.ListFunc = func(bool) []extensions.Extension {
-					ex1 := &Extension{path: "cli/gh-test", url: "https://github.com/cli/gh-test", currentVersion: "1", latestVersion: "1"}
-					ex2 := &Extension{path: "cli/gh-test2", url: "https://github.com/cli/gh-test2", currentVersion: "1", latestVersion: "2"}
+				em.ListFunc = func() []extensions.Extension {
+					ex1 := &Extension{path: "cli/gh-test", url: "https://github.com/cli/gh-test", currentVersion: "1"}
+					ex2 := &Extension{path: "cli/gh-test2", url: "https://github.com/cli/gh-test2", currentVersion: "1"}
 					return []extensions.Extension{ex1, ex2}
 				}
 				return func(t *testing.T) {
 					calls := em.ListCalls()
 					assert.Equal(t, 1, len(calls))
-					assert.False(t, calls[0].IncludeMetadata)
 				}
 			},
 			wantStdout: "gh test\tcli/gh-test\t1\ngh test2\tcli/gh-test2\t1\n",
@@ -581,7 +580,7 @@ func Test_checkValidExtension(t *testing.T) {
 	rootCmd.AddCommand(&cobra.Command{Use: "auth"})
 
 	m := &extensions.ExtensionManagerMock{
-		ListFunc: func(bool) []extensions.Extension {
+		ListFunc: func() []extensions.Extension {
 			return []extensions.Extension{
 				&extensions.ExtensionMock{
 					NameFunc: func() string { return "screensaver" },

@@ -114,8 +114,8 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 	return true, externalCmd.Run()
 }
 
-func (m *Manager) List(includeMetadata bool) []extensions.Extension {
-	exts, _ := m.list(includeMetadata)
+func (m *Manager) List() []extensions.Extension {
+	exts, _ := m.list(false)
 	r := make([]extensions.Extension, len(exts))
 	for i, v := range exts {
 		val := v

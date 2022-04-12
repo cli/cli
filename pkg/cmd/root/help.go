@@ -157,7 +157,7 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 		sort.Strings(helpTopics)
 		helpEntries = append(helpEntries, helpEntry{"HELP TOPICS", strings.Join(helpTopics, "\n")})
 
-		if exts := f.ExtensionManager.List(false); len(exts) > 0 {
+		if exts := f.ExtensionManager.List(); len(exts) > 0 {
 			var names []string
 			for _, ext := range exts {
 				names = append(names, ext.Name())

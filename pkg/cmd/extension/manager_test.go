@@ -87,14 +87,14 @@ func TestManager_List(t *testing.T) {
 		}))
 
 	m := newTestManager(tempDir, nil, nil)
-	exts := m.List(false)
+	exts := m.List()
 	assert.Equal(t, 3, len(exts))
 	assert.Equal(t, "bin-ext", exts[0].Name())
 	assert.Equal(t, "hello", exts[1].Name())
 	assert.Equal(t, "two", exts[2].Name())
 }
 
-func TestManager_List_binary_update(t *testing.T) {
+func TestManager_list_includeMetadata(t *testing.T) {
 	tempDir := t.TempDir()
 
 	assert.NoError(t, stubBinaryExtension(
@@ -125,7 +125,8 @@ func TestManager_List_binary_update(t *testing.T) {
 
 	m := newTestManager(tempDir, &client, nil)
 
-	exts := m.List(true)
+	exts, err := m.list(true)
+	assert.NoError(t, err)
 	assert.Equal(t, 1, len(exts))
 	assert.Equal(t, "bin-ext", exts[0].Name())
 	assert.True(t, exts[0].UpdateAvailable())

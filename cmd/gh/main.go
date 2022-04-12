@@ -176,7 +176,7 @@ func mainRun() exitCode {
 				}
 			}
 		}
-		for _, ext := range cmdFactory.ExtensionManager.List(false) {
+		for _, ext := range cmdFactory.ExtensionManager.List() {
 			if strings.HasPrefix(ext.Name(), toComplete) {
 				results = append(results, ext.Name())
 			}
