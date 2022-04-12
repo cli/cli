@@ -50,6 +50,20 @@ func Test_NewCmdCreate(t *testing.T) {
 			},
 		},
 		{
+			name:  "provide discussion category",
+			args:  "v1.2.3 --discussion-category some-category",
+			isTTY: false,
+			want: EditOptions{
+				TagName:            "v1.2.3",
+				Target:             "",
+				Name:               nil,
+				Body:               nil,
+				Draft:              nil,
+				DiscussionCategory: stringPtr("some-category"),
+				Prerelease:         nil,
+			},
+		},
+		{
 			name:  "provide tag and target commitish",
 			args:  "v1.2.3 --tag v9.8.7 --target 97ea5e77b4d61d5d80ed08f7512847dee3ec9af5",
 			isTTY: false,
@@ -186,6 +200,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.want.Target, opts.Target)
 			assert.Equal(t, tt.want.Name, opts.Name)
 			assert.Equal(t, tt.want.Body, opts.Body)
+			assert.Equal(t, tt.want.DiscussionCategory, opts.DiscussionCategory)
 			assert.Equal(t, tt.want.Draft, opts.Draft)
 			assert.Equal(t, tt.want.Prerelease, opts.Prerelease)
 		})
@@ -256,6 +271,26 @@ func Test_updateRun(t *testing.T) {
 				}`, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
 						"name": "Hot Release #1",
+					}, params)
+				}))
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantStderr: "",
+		},
+		{
+			name:  "edit the discussion category",
+			isTTY: true,
+			opts: EditOptions{
+				DiscussionCategory: stringPtr("some-category"),
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("PATCH", "repos/OWNER/REPO/releases/12345"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"discussion_category_name": "some-category",
 					}, params)
 				}))
 			},

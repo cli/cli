@@ -17,12 +17,13 @@ type EditOptions struct {
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	TagName    string
-	Target     string
-	Name       *string
-	Body       *string
-	Draft      *bool
-	Prerelease *bool
+	TagName            string
+	Target             string
+	Name               *string
+	Body               *string
+	DiscussionCategory *string
+	Draft              *bool
+	Prerelease         *bool
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
@@ -74,6 +75,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmdutil.NilBoolFlag(cmd, &opts.Prerelease, "prerelease", "", "Mark the release as a prerelease")
 	cmdutil.NilStringFlag(cmd, &opts.Body, "notes", "n", "Release notes")
 	cmdutil.NilStringFlag(cmd, &opts.Name, "title", "t", "Release title")
+	cmdutil.NilStringFlag(cmd, &opts.DiscussionCategory, "discussion-category", "", "Start a discussion of the specified category")
 	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or full commit SHA (default: main branch)")
 	cmd.Flags().StringVar(&opts.TagName, "tag", "", "The name of the tag")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
@@ -118,6 +120,10 @@ func getParams(opts *EditOptions) map[string]interface{} {
 
 	if opts.Body != nil {
 		params["body"] = opts.Body
+	}
+
+	if opts.DiscussionCategory != nil {
+		params["discussion_category_name"] = *opts.DiscussionCategory
 	}
 
 	if opts.Draft != nil {
