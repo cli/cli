@@ -53,20 +53,26 @@ func init() {
 }
 
 type command struct {
+	Name     string // actual command name
 	FullName string // complete name for the command
 	Typename string // return value from issue.Typename
 }
 
-var cmds map[string]command = map[string]command{
-	"issue": {"Issue", api.TypeIssue},
-	"pr":    {"Pull request", api.TypePullRequest},
+var aliasIssue = command{"issue", "Issue", api.TypeIssue}
+var aliasPr = command{"pr", "Pull request", api.TypePullRequest}
+
+var alias map[string]*command = map[string]*command{
+	"issue":             &aliasIssue,
+	"pr":                &aliasPr,
+	api.TypeIssue:       &aliasIssue,
+	api.TypePullRequest: &aliasPr,
 }
 
-// Acceptable lock states for conversations
+// Acceptable lock states for conversations.  These are used in print
+// statements, hence the use of strings instead of booleans.
 const (
 	Unlock string = "Unlock"
 	Lock   string = "Lock"
-	Relock string = "Relock"
 )
 
 type LockOptions struct {
@@ -101,7 +107,7 @@ func NewCmdLock(f *cmdutil.Factory, parentName string) *cobra.Command {
 
 	opts := &LockOptions{ParentCmd: parentName}
 
-	c := cmds[opts.ParentCmd]
+	c := alias[opts.ParentCmd]
 	short := fmt.Sprintf("Lock %s conversation", strings.ToLower(c.FullName))
 
 	cmd := &cobra.Command{
@@ -137,7 +143,7 @@ func NewCmdUnlock(f *cmdutil.Factory, parentName string) *cobra.Command {
 
 	opts := &LockOptions{ParentCmd: parentName}
 
-	c := cmds[opts.ParentCmd]
+	c := alias[opts.ParentCmd]
 	short := fmt.Sprintf("Unlock %s conversation", strings.ToLower(c.FullName))
 
 	cmd := &cobra.Command{
@@ -158,7 +164,7 @@ func NewCmdUnlock(f *cmdutil.Factory, parentName string) *cobra.Command {
 func reason(reason string) string {
 	result := ""
 	if reason != "" {
-		result = fmt.Sprintf(" as %s", reason)
+		result = fmt.Sprintf(" as %s", strings.ToUpper(reason))
 	}
 	return result
 }
@@ -166,7 +172,7 @@ func reason(reason string) string {
 func status(state string, lockable *api.Issue, opts *LockOptions) string {
 
 	return fmt.Sprintf("%sed%s: %s #%d (%s)",
-		state, reason(opts.Reason), cmds[opts.ParentCmd].FullName, lockable.Number, lockable.Title)
+		state, reason(opts.Reason), alias[opts.ParentCmd].FullName, lockable.Number, lockable.Title)
 }
 
 // padlock will lock or unlock a conversation.
@@ -180,43 +186,39 @@ func padlock(state string, opts *LockOptions) error {
 
 	issuePr, baseRepo, err := issueShared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, opts.Fields)
 
-	parent := cmds[opts.ParentCmd]
+	parent := alias[opts.ParentCmd]
 
 	switch {
 	case err != nil:
 		return err
+
 	case parent.Typename != issuePr.Typename:
 		return fmt.Errorf("%s #%d not found, but found %s #%d",
-			parent.Typename, issuePr.Number, issuePr.Typename, issuePr.Number)
-	}
-
-	// If trying to lock an already locked conversation, mark as relock.
-	if state == Lock && issuePr.Locked {
-		state = Relock
+			alias[parent.Typename].FullName, issuePr.Number,
+			strings.ToLower(alias[issuePr.Typename].FullName), issuePr.Number)
 	}
 
 	successMsg := fmt.Sprintf("%s %s\n",
 		cs.SuccessIconWithColor(cs.Green), status(state, issuePr, opts))
 
-	switch state {
-	case Lock:
+	switch {
+	case state == Lock && !issuePr.Locked:
 		err = lockLockable(httpClient, baseRepo, issuePr, opts)
-	case Unlock:
-		// if already unlocked, skip the api call to unlock
-		if !issuePr.Locked {
-			successMsg = fmt.Sprintf("%s #%d already unlocked.  Nothing changed.\n",
-				parent.FullName, issuePr.Number)
-			break
-		}
 
-		err = unlockLockable(httpClient, baseRepo, issuePr, opts)
-	case Relock:
+	case state == Lock && issuePr.Locked:
 		relocked, errRelock := relockLockable(httpClient, baseRepo, issuePr, opts)
 		err = errRelock
 		if !relocked {
-			successMsg = fmt.Sprintf("%s Unchanged: %s #%d (%s)\n",
-				cs.SuccessIconWithColor(cs.Green), parent.FullName, issuePr.Number, issuePr.Title)
+			successMsg = fmt.Sprintf("%s #%d already locked%s.  Nothing changed.\n",
+				parent.FullName, issuePr.Number, reason(issuePr.ActiveLockReason))
 		}
+
+	case state == Unlock && issuePr.Locked:
+		err = unlockLockable(httpClient, baseRepo, issuePr, opts)
+
+	case state == Unlock && !issuePr.Locked:
+		successMsg = fmt.Sprintf("%s #%d already unlocked.  Nothing changed.\n",
+			parent.FullName, issuePr.Number)
 	}
 
 	if err != nil {
@@ -279,8 +281,8 @@ func relockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *ap
 
 	var relocked bool
 	shouldRelock := &survey.Confirm{
-		Message: fmt.Sprintf("%s #%d locked%s.  Unlock and lock again?",
-			cmds[opts.ParentCmd].FullName, lockable.Number, reason(strings.ToLower(lockable.ActiveLockReason))),
+		Message: fmt.Sprintf("%s #%d locked%s.  Unlock and lock again%s?",
+			alias[opts.ParentCmd].FullName, lockable.Number, reason(lockable.ActiveLockReason), reason(opts.Reason)),
 		Default: true,
 	}
 
