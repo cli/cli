@@ -69,10 +69,6 @@ func (m *Manager) EnableDryRunMode() {
 	m.dryRunMode = true
 }
 
-func (m *Manager) DisableDryRunMode() {
-	m.dryRunMode = false
-}
-
 func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) (bool, error) {
 	if len(args) == 0 {
 		return false, errors.New("too few arguments in list")
@@ -534,14 +530,8 @@ func (m *Manager) upgradeExtensions(exts []Extension, force bool) error {
 			fmt.Fprintf(m.io.Out, "%s\n", err)
 			continue
 		}
-		currentVersion := f.currentVersion
-		latestVersion := f.latestVersion
-		if !f.IsBinary() && len(currentVersion) > 8 {
-			currentVersion = currentVersion[:8]
-		}
-		if !f.IsBinary() && len(latestVersion) > 8 {
-			latestVersion = latestVersion[:8]
-		}
+		currentVersion := displayExtensionVersion(&f, f.currentVersion)
+		latestVersion := displayExtensionVersion(&f, f.latestVersion)
 		if m.dryRunMode {
 			fmt.Fprintf(m.io.Out, "would have upgraded from %s to %s\n", currentVersion, latestVersion)
 		} else {
@@ -549,9 +539,6 @@ func (m *Manager) upgradeExtensions(exts []Extension, force bool) error {
 		}
 	}
 	if failed {
-		if m.dryRunMode {
-			return errors.New("some extensions would have failed to upgrade")
-		}
 		return errors.New("some extensions failed to upgrade")
 	}
 	return nil

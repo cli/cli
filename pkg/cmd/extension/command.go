@@ -61,11 +61,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					t.AddField(fmt.Sprintf("gh %s", c.Name()), nil, nil)
 					t.AddField(repo, nil, nil)
-					version := c.CurrentVersion()
-					if !c.IsBinary() && len(version) > 8 {
-						version = version[:8]
-					}
-
+					version := displayExtensionVersion(c, c.CurrentVersion())
 					if c.IsPinned() {
 						t.AddField(version, nil, cs.Cyan)
 					} else {
@@ -373,4 +369,11 @@ func normalizeExtensionSelector(n string) string {
 		n = n[idx+1:]
 	}
 	return strings.TrimPrefix(n, "gh-")
+}
+
+func displayExtensionVersion(ext extensions.Extension, version string) string {
+	if !ext.IsBinary() && len(version) > 8 {
+		return version[:8]
+	}
+	return version
 }

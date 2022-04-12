@@ -22,9 +22,6 @@ var _ ExtensionManager = &ExtensionManagerMock{}
 // 			CreateFunc: func(name string, tmplType ExtTemplateType) error {
 // 				panic("mock out the Create method")
 // 			},
-// 			DisableDryRunModeFunc: func()  {
-// 				panic("mock out the DisableDryRunMode method")
-// 			},
 // 			DispatchFunc: func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (bool, error) {
 // 				panic("mock out the Dispatch method")
 // 			},
@@ -56,9 +53,6 @@ type ExtensionManagerMock struct {
 	// CreateFunc mocks the Create method.
 	CreateFunc func(name string, tmplType ExtTemplateType) error
 
-	// DisableDryRunModeFunc mocks the DisableDryRunMode method.
-	DisableDryRunModeFunc func()
-
 	// DispatchFunc mocks the Dispatch method.
 	DispatchFunc func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (bool, error)
 
@@ -88,9 +82,6 @@ type ExtensionManagerMock struct {
 			Name string
 			// TmplType is the tmplType argument value.
 			TmplType ExtTemplateType
-		}
-		// DisableDryRunMode holds details about calls to the DisableDryRunMode method.
-		DisableDryRunMode []struct {
 		}
 		// Dispatch holds details about calls to the Dispatch method.
 		Dispatch []struct {
@@ -136,15 +127,14 @@ type ExtensionManagerMock struct {
 			Force bool
 		}
 	}
-	lockCreate            sync.RWMutex
-	lockDisableDryRunMode sync.RWMutex
-	lockDispatch          sync.RWMutex
-	lockEnableDryRunMode  sync.RWMutex
-	lockInstall           sync.RWMutex
-	lockInstallLocal      sync.RWMutex
-	lockList              sync.RWMutex
-	lockRemove            sync.RWMutex
-	lockUpgrade           sync.RWMutex
+	lockCreate           sync.RWMutex
+	lockDispatch         sync.RWMutex
+	lockEnableDryRunMode sync.RWMutex
+	lockInstall          sync.RWMutex
+	lockInstallLocal     sync.RWMutex
+	lockList             sync.RWMutex
+	lockRemove           sync.RWMutex
+	lockUpgrade          sync.RWMutex
 }
 
 // Create calls CreateFunc.
@@ -179,32 +169,6 @@ func (mock *ExtensionManagerMock) CreateCalls() []struct {
 	mock.lockCreate.RLock()
 	calls = mock.calls.Create
 	mock.lockCreate.RUnlock()
-	return calls
-}
-
-// DisableDryRunMode calls DisableDryRunModeFunc.
-func (mock *ExtensionManagerMock) DisableDryRunMode() {
-	if mock.DisableDryRunModeFunc == nil {
-		panic("ExtensionManagerMock.DisableDryRunModeFunc: method is nil but ExtensionManager.DisableDryRunMode was just called")
-	}
-	callInfo := struct {
-	}{}
-	mock.lockDisableDryRunMode.Lock()
-	mock.calls.DisableDryRunMode = append(mock.calls.DisableDryRunMode, callInfo)
-	mock.lockDisableDryRunMode.Unlock()
-	mock.DisableDryRunModeFunc()
-}
-
-// DisableDryRunModeCalls gets all the calls that were made to DisableDryRunMode.
-// Check the length with:
-//     len(mockedExtensionManager.DisableDryRunModeCalls())
-func (mock *ExtensionManagerMock) DisableDryRunModeCalls() []struct {
-} {
-	var calls []struct {
-	}
-	mock.lockDisableDryRunMode.RLock()
-	calls = mock.calls.DisableDryRunMode
-	mock.lockDisableDryRunMode.RUnlock()
 	return calls
 }
 
