@@ -1,15 +1,15 @@
 package edit
 
 import (
-	"errors"
 	"fmt"
+	"net/http"
+
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
-	"net/http"
 )
 
 type EditOptions struct {
@@ -50,6 +50,10 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo
 
+			if cmd.Flags().NFlag() == 0 {
+				return cmdutil.FlagErrorf("use flags to specify properties to edit")
+			}
+
 			if notesFile != "" {
 				b, err := cmdutil.ReadFile(notesFile, opts.IO.In)
 				if err != nil {
@@ -57,11 +61,6 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				}
 				body := string(b)
 				opts.Body = &body
-			}
-
-			// If we don't provide any tag name, the API will remove the current tag from the release
-			if opts.TagName == "" {
-				opts.TagName = args[0]
 			}
 
 			if runF != nil {
@@ -75,7 +74,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmdutil.NilBoolFlag(cmd, &opts.Prerelease, "prerelease", "", "Mark the release as a prerelease")
 	cmdutil.NilStringFlag(cmd, &opts.Body, "notes", "n", "Release notes")
 	cmdutil.NilStringFlag(cmd, &opts.Name, "title", "t", "Release title")
-	cmdutil.NilStringFlag(cmd, &opts.DiscussionCategory, "discussion-category", "", "Start a discussion of the specified category")
+	cmdutil.NilStringFlag(cmd, &opts.DiscussionCategory, "discussion-category", "", "Start a discussion in the specified category when publishing a draft")
 	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or full commit SHA (default: main branch)")
 	cmd.Flags().StringVar(&opts.TagName, "tag", "", "The name of the tag")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
@@ -101,8 +100,9 @@ func editRun(tag string, opts *EditOptions) error {
 
 	params := getParams(opts)
 
-	if len(params) == 0 {
-		return errors.New("nothing to edit")
+	// If we don't provide any tag name, the API will remove the current tag from the release
+	if _, ok := params["tag_name"]; !ok {
+		params["tag_name"] = release.TagName
 	}
 
 	editedRelease, err := editRelease(httpClient, baseRepo, release.DatabaseID, params)
