@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -210,25 +211,17 @@ func mergeRun(opts *MergeOptions) error {
 	isPRAlreadyMerged := pr.State == "MERGED"
 	if reason := blockedReason(pr.MergeStateStatus, opts.UseAdmin); !opts.AutoMergeEnable && !isPRAlreadyMerged && reason != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is not mergeable: %s.\n", cs.FailureIcon(), pr.Number, reason)
-		if mergeConflictStatus(pr.MergeStateStatus) && opts.CanDeleteLocalBranch {
-			remotes, err := opts.Remotes()
-			if err != nil {
-				return cmdutil.SilentError
-			}
-			remote, err := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
-			if err != nil {
-				return cmdutil.SilentError
-			}
+		fmt.Fprintf(opts.IO.ErrOut, "To have the pull request merged after all the requirements have been met, add the `--auto` flag.\n")
+		if remote := remoteForMergeConflictResolution(baseRepo, pr, opts); remote != nil {
 			mergeOrRebase := "merge"
 			if opts.MergeMethod == PullRequestMergeMethodRebase {
 				mergeOrRebase = "rebase"
 			}
-			fetchBranch := fmt.Sprintf("%s %s", remote.Name, pr.HeadRefName)
-			mergeBranch := fmt.Sprintf("%s/%s", remote.Name, pr.HeadRefName)
-			cmd := fmt.Sprintf("gh pr checkout %s && git fetch %s && git %s %s", opts.SelectorArg, fetchBranch, mergeOrRebase, mergeBranch)
-			fmt.Fprintf(opts.IO.ErrOut, "Run the following to resolve the merge conflicts locally: %s\n", cs.Bold(cmd))
+			fetchBranch := fmt.Sprintf("%s %s", remote.Name, pr.BaseRefName)
+			mergeBranch := fmt.Sprintf("%s %s/%s", mergeOrRebase, remote.Name, pr.BaseRefName)
+			cmd := fmt.Sprintf("gh pr checkout %d && git fetch %s && git %s", pr.Number, fetchBranch, mergeBranch)
+			fmt.Fprintf(opts.IO.ErrOut, "Run the following to resolve the merge conflicts locally:\n  %s\n", cs.Bold(cmd))
 		}
-		fmt.Fprintf(opts.IO.ErrOut, "To have the pull request merged after all the requirements have been met, add the `--auto` flag.\n")
 		if !opts.UseAdmin && allowsAdminOverride(pr.MergeStateStatus) {
 			// TODO: show this flag only to repo admins
 			fmt.Fprintf(opts.IO.ErrOut, "To use administrator privileges to immediately merge the pull request, add the `--admin` flag.\n")
@@ -578,6 +571,21 @@ func allowsAdminOverride(status string) bool {
 	default:
 		return false
 	}
+}
+
+func remoteForMergeConflictResolution(baseRepo ghrepo.Interface, pr *api.PullRequest, opts *MergeOptions) *context.Remote {
+	if !mergeConflictStatus(pr.MergeStateStatus) || !opts.CanDeleteLocalBranch {
+		return nil
+	}
+	remotes, err := opts.Remotes()
+	if err != nil {
+		return nil
+	}
+	remote, err := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
+	if err != nil {
+		return nil
+	}
+	return remote
 }
 
 func mergeConflictStatus(status string) bool {

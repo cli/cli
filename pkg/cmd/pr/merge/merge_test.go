@@ -341,11 +341,12 @@ func TestPrMerge_dirty(t *testing.T) {
 		"1",
 		&api.PullRequest{
 			ID:               "THE-ID",
-			Number:           1,
+			Number:           123,
 			State:            "OPEN",
 			Title:            "The title of the PR",
 			MergeStateStatus: "DIRTY",
-			HeadRefName:      "trunk",
+			BaseRefName:      "trunk",
+			HeadRefName:      "feature",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -358,10 +359,11 @@ func TestPrMerge_dirty(t *testing.T) {
 
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Docf(`
-		X Pull request #1 is not mergeable: the merge commit cannot be cleanly created.
-		Run the following to resolve the merge conflicts locally: gh pr checkout 1 && git fetch origin trunk && git merge origin/trunk
+		X Pull request #123 is not mergeable: the merge commit cannot be cleanly created.
 		To have the pull request merged after all the requirements have been met, add the %[1]s--auto%[1]s flag.
-		`, "`"), output.Stderr())
+		Run the following to resolve the merge conflicts locally:
+		  gh pr checkout 123 && git fetch origin trunk && git merge origin/trunk
+	`, "`"), output.Stderr())
 }
 
 func TestPrMerge_nontty(t *testing.T) {
