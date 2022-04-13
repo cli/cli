@@ -218,7 +218,7 @@ jobs:
       - name: Bump Winget manifest
         shell: pwsh
         env:
-          WINGETCREATE_VERSION: v0.2.0.29-preview
+          WINGETCREATE_VERSION: v1.0.3.0
           GITHUB_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
         run: |
           $tagname = $env:GITHUB_REF.Replace("refs/tags/", "")
