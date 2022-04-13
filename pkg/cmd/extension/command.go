@@ -47,7 +47,8 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			RunE: func(cmd *cobra.Command, args []string) error {
 				cmds := m.List()
 				if len(cmds) == 0 {
-					fmt.Fprintf(io.Out, "no extensions installed\n")
+					cs := io.ColorScheme()
+					fmt.Fprintf(io.ErrOut, "%s No installed extensions found\n", cs.WarningIcon())
 					return nil
 				}
 				cs := io.ColorScheme()
