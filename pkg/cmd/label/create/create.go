@@ -45,6 +45,7 @@ type CreateOptions struct {
 	Color       string
 	Description string
 	Name        string
+	Force       bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -81,6 +82,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "Description of the label")
 	cmd.Flags().StringVarP(&opts.Color, "color", "c", "", "Color of the label, if not specified one will be selected at random")
+	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Set the label color and description even if the name already exists.")
 
 	return cmd
 }
@@ -130,5 +132,27 @@ func createLabel(client *http.Client, repo ghrepo.Interface, opts *CreateOptions
 	}
 	requestBody := bytes.NewReader(requestByte)
 	result := shared.Label{}
-	return apiClient.REST(repo.RepoHost(), "POST", path, requestBody, &result)
+	err = apiClient.REST(repo.RepoHost(), "POST", path, requestBody, &result)
+
+	if opts.Force {
+		if httpError, ok := err.(api.HTTPError); ok && httpError.StatusCode == 422 {
+			return updateLabel(apiClient, repo, opts)
+		}
+	}
+
+	return err
+}
+
+func updateLabel(apiClient *api.Client, repo ghrepo.Interface, opts *CreateOptions) error {
+	path := fmt.Sprintf("repos/%s/%s/labels/%s", repo.RepoOwner(), repo.RepoName(), opts.Name)
+	requestByte, err := json.Marshal(map[string]string{
+		"description": opts.Description,
+		"color":       opts.Color,
+	})
+	if err != nil {
+		return err
+	}
+	requestBody := bytes.NewReader(requestByte)
+	result := shared.Label{}
+	return apiClient.REST(repo.RepoHost(), "PATCH", path, requestBody, &result)
 }

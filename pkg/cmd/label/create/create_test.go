@@ -115,6 +115,20 @@ func TestCreateRun(t *testing.T) {
 			},
 			wantStdout: "",
 		},
+		{
+			name: "creates existing label",
+			opts: &CreateOptions{Name: "test", Description: "some description", Force: true},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/labels"),
+					httpmock.StatusStringResponse(422, "{}"),
+				)
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO/labels/test"),
+					httpmock.StatusStringResponse(201, "{}"),
+				)
+			},
+		},
 	}
 
 	for _, tt := range tests {
