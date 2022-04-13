@@ -3,6 +3,10 @@ package edit
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"testing"
+
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -10,12 +14,9 @@ import (
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"io/ioutil"
-	"net/http"
-	"testing"
 )
 
-func Test_NewCmdCreate(t *testing.T) {
+func Test_NewCmdEdit(t *testing.T) {
 	tempDir := t.TempDir()
 	tf, err := ioutil.TempFile(tempDir, "release-create")
 	require.NoError(t, err)
@@ -41,7 +42,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "v1.2.3 --title 'Some Title' --notes 'Some Notes'",
 			isTTY: false,
 			want: EditOptions{
-				TagName: "v1.2.3",
+				TagName: "",
 				Name:    stringPtr("Some Title"),
 				Body:    stringPtr("Some Notes"),
 			},
@@ -51,7 +52,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "v1.2.3 --discussion-category some-category",
 			isTTY: false,
 			want: EditOptions{
-				TagName:            "v1.2.3",
+				TagName:            "",
 				DiscussionCategory: stringPtr("some-category"),
 			},
 		},
@@ -69,7 +70,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "v1.2.3 --prerelease",
 			isTTY: false,
 			want: EditOptions{
-				TagName:    "v1.2.3",
+				TagName:    "",
 				Prerelease: boolPtr(true),
 			},
 		},
@@ -78,7 +79,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "v1.2.3 --prerelease=false",
 			isTTY: false,
 			want: EditOptions{
-				TagName:    "v1.2.3",
+				TagName:    "",
 				Prerelease: boolPtr(false),
 			},
 		},
@@ -87,7 +88,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "v1.2.3 --draft",
 			isTTY: false,
 			want: EditOptions{
-				TagName: "v1.2.3",
+				TagName: "",
 				Draft:   boolPtr(true),
 			},
 		},
@@ -96,7 +97,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  "v1.2.3 --draft=false",
 			isTTY: false,
 			want: EditOptions{
-				TagName: "v1.2.3",
+				TagName: "",
 				Draft:   boolPtr(false),
 			},
 		},
@@ -105,7 +106,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			args:  fmt.Sprintf(`v1.2.3 -F '%s'`, tf.Name()),
 			isTTY: false,
 			want: EditOptions{
-				TagName: "v1.2.3",
+				TagName: "",
 				Body:    stringPtr("MY NOTES"),
 			},
 		},
@@ -115,7 +116,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			isTTY: false,
 			stdin: "MY NOTES",
 			want: EditOptions{
-				TagName: "v1.2.3",
+				TagName: "",
 				Body:    stringPtr("MY NOTES"),
 			},
 		},
@@ -171,7 +172,7 @@ func Test_NewCmdCreate(t *testing.T) {
 	}
 }
 
-func Test_updateRun(t *testing.T) {
+func Test_editRun(t *testing.T) {
 	tests := []struct {
 		name       string
 		isTTY      bool
@@ -185,12 +186,12 @@ func Test_updateRun(t *testing.T) {
 			name:  "edit the tag name",
 			isTTY: true,
 			opts: EditOptions{
-				TagName: "v1.2.3",
+				TagName: "v1.2.4",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
-						"tag_name": "v1.2.3",
+						"tag_name": "v1.2.4",
 					}, params)
 				})
 			},
@@ -206,6 +207,7 @@ func Test_updateRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
+						"tag_name":         "v1.2.3",
 						"target_commitish": "c0ff33",
 					}, params)
 				})
@@ -222,7 +224,8 @@ func Test_updateRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
-						"name": "Hot Release #1",
+						"tag_name": "v1.2.3",
+						"name":     "Hot Release #1",
 					}, params)
 				})
 			},
@@ -238,6 +241,7 @@ func Test_updateRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
+						"tag_name":                 "v1.2.3",
 						"discussion_category_name": "some-category",
 					}, params)
 				})
@@ -254,7 +258,8 @@ func Test_updateRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
-						"name": "",
+						"tag_name": "v1.2.3",
+						"name":     "",
 					}, params)
 				})
 			},
@@ -270,7 +275,8 @@ func Test_updateRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
-						"body": "Release Notes:\n- Fix Bug #1\n- Fix Bug #2",
+						"tag_name": "v1.2.3",
+						"body":     "Release Notes:\n- Fix Bug #1\n- Fix Bug #2",
 					}, params)
 				})
 			},
@@ -286,7 +292,8 @@ func Test_updateRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
-						"body": "",
+						"tag_name": "v1.2.3",
+						"body":     "",
 					}, params)
 				})
 			},
@@ -302,7 +309,8 @@ func Test_updateRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
-						"draft": true,
+						"tag_name": "v1.2.3",
+						"draft":    true,
 					}, params)
 				})
 			},
@@ -318,7 +326,8 @@ func Test_updateRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
-						"draft": false,
+						"tag_name": "v1.2.3",
+						"draft":    false,
 					}, params)
 				})
 			},
@@ -334,6 +343,7 @@ func Test_updateRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
+						"tag_name":   "v1.2.3",
 						"prerelease": true,
 					}, params)
 				})
@@ -350,18 +360,13 @@ func Test_updateRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
 					assert.Equal(t, map[string]interface{}{
+						"tag_name":   "v1.2.3",
 						"prerelease": false,
 					}, params)
 				})
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 			wantStderr: "",
-		},
-		{
-			name:    "without any changes",
-			isTTY:   true,
-			opts:    EditOptions{},
-			wantErr: "nothing to edit",
 		},
 	}
 
@@ -374,7 +379,8 @@ func Test_updateRun(t *testing.T) {
 
 			fakeHTTP := &httpmock.Registry{}
 			fakeHTTP.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.JSONResponse(map[string]interface{}{
-				"id": 12345,
+				"id":       12345,
+				"tag_name": "v1.2.3",
 			}))
 			if tt.httpStubs != nil {
 				tt.httpStubs(t, fakeHTTP)
