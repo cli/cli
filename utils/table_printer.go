@@ -204,7 +204,7 @@ func (t *ttyTablePrinter) calculateColumnWidths(delimSize int) []int {
 				}
 				if max := maxColWidths[col]; max < perColumn {
 					colWidths[col] = max
-				} else {
+				} else if perColumn > 0 {
 					colWidths[col] = perColumn
 				}
 			}
