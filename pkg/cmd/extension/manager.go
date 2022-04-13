@@ -371,11 +371,25 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	}
 
 	platform, ext := m.platform()
+	isMacARM := platform == "darwin-arm64"
+	trueARMBinary := false
+
 	var asset *releaseAsset
 	for _, a := range r.Assets {
 		if strings.HasSuffix(a.Name, platform+ext) {
 			asset = &a
+			trueARMBinary = isMacARM
 			break
+		}
+	}
+
+	// if an arm64 binary is unavailable, fall back to amd64 if it can be executed through Rosetta 2
+	if asset == nil && isMacARM && hasRosetta() {
+		for _, a := range r.Assets {
+			if strings.HasSuffix(a.Name, "darwin-amd64") {
+				asset = &a
+				break
+			}
 		}
 	}
 
@@ -403,6 +417,11 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 		err = downloadAsset(m.client, *asset, binPath)
 		if err != nil {
 			return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
+		}
+		if trueARMBinary {
+			if err := codesignBinary(binPath); err != nil {
+				return fmt.Errorf("failed to codesign downloaded binary: %w", err)
+			}
 		}
 	}
 
@@ -843,4 +862,18 @@ func possibleDists() []string {
 		"windows-amd64",
 		"windows-arm",
 	}
+}
+
+func hasRosetta() bool {
+	_, err := os.Stat("/Library/Apple/usr/libexec/oah/libRosettaRuntime")
+	return err == nil
+}
+
+func codesignBinary(binPath string) error {
+	codesignExe, err := safeexec.LookPath("codesign")
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(codesignExe, "--sign", "-", "--force", "--preserve-metadata=entitlements,requirements,flags,runtime", binPath)
+	return cmd.Run()
 }
