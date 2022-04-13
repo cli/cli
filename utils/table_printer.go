@@ -196,16 +196,17 @@ func (t *ttyTablePrinter) calculateColumnWidths(delimSize int) []int {
 	firstFlexCol := -1
 	// truncate long columns to the remaining available width
 	if numFlexColumns := numCols - numFixedCols(); numFlexColumns > 0 {
-		perColumn := availWidth() / numFlexColumns
-		for col := 0; col < numCols; col++ {
-			if colWidths[col] == 0 {
-				if firstFlexCol == -1 {
-					firstFlexCol = col
-				}
-				if max := maxColWidths[col]; max < perColumn {
-					colWidths[col] = max
-				} else {
-					colWidths[col] = perColumn
+		if perColumn := availWidth() / numFlexColumns; perColumn > 0 {
+			for col := 0; col < numCols; col++ {
+				if colWidths[col] == 0 {
+					if firstFlexCol == -1 {
+						firstFlexCol = col
+					}
+					if max := maxColWidths[col]; max < perColumn {
+						colWidths[col] = max
+					} else {
+						colWidths[col] = perColumn
+					}
 				}
 			}
 		}
