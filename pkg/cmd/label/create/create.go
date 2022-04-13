@@ -3,6 +3,7 @@ package create
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -87,6 +88,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	return cmd
 }
 
+var errLabelAlreadyExists = errors.New("the label already exists. Use --force to overwrite")
+
 func createRun(opts *CreateOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
@@ -134,10 +137,12 @@ func createLabel(client *http.Client, repo ghrepo.Interface, opts *CreateOptions
 	result := shared.Label{}
 	err = apiClient.REST(repo.RepoHost(), "POST", path, requestBody, &result)
 
-	if opts.Force {
-		if httpError, ok := err.(api.HTTPError); ok && httpError.StatusCode == 422 {
-			return updateLabel(apiClient, repo, opts)
-		}
+	if httpError, ok := err.(api.HTTPError); ok && isLabelAlreadyExistsError(httpError) {
+		err = errLabelAlreadyExists
+	}
+
+	if opts.Force && errors.Is(err, errLabelAlreadyExists) {
+		return updateLabel(apiClient, repo, opts)
 	}
 
 	return err
@@ -155,4 +160,8 @@ func updateLabel(apiClient *api.Client, repo ghrepo.Interface, opts *CreateOptio
 	requestBody := bytes.NewReader(requestByte)
 	result := shared.Label{}
 	return apiClient.REST(repo.RepoHost(), "PATCH", path, requestBody, &result)
+}
+
+func isLabelAlreadyExistsError(err api.HTTPError) bool {
+	return err.StatusCode == 422 && len(err.Errors) == 1 && err.Errors[0].Field == "name" && err.Errors[0].Code == "already_exists"
 }

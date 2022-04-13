@@ -121,7 +121,11 @@ func TestCreateRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/labels"),
-					httpmock.StatusStringResponse(422, "{}"),
+					httpmock.WithHeader(
+						httpmock.StatusStringResponse(422, `{"message":"Validation Failed","errors":[{"resource":"Label","code":"already_exists","field":"name"}]}`),
+						"Content-Type",
+						"application/json",
+					),
 				)
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO/labels/test"),
