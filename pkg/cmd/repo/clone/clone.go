@@ -44,6 +44,9 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 			If the "OWNER/" portion of the "OWNER/REPO" repository argument is omitted, it
 			defaults to the name of the authenticating user.
 
+			If the repository is a fork, add the upstream repository as a remote,
+			named "upstream".
+
 			Pass additional 'git clone' flags by listing them after '--'.
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
