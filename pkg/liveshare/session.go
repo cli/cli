@@ -114,7 +114,7 @@ func (s *Session) StartJupyterServer(ctx context.Context) (int, string, error) {
 		ServerUrl string `json:"serverUrl"`
 	}
 
-	if err := s.rpc.do(ctx, "IJupyterServerHostService.getRunningServers", []string{}, &response); err != nil {
+	if err := s.rpc.do(ctx, "IJupyterServerHostService.getRunningServer", []string{}, &response); err != nil {
 		return 0, "", err
 	}
 
