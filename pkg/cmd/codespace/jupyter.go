@@ -38,7 +38,7 @@ func (a *App) Jupyter(ctx context.Context, opts jupyterOptions) error {
 
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
 	if err != nil {
-		return fmt.Errorf("get or choose codespace: %w", err)
+		return err
 	}
 
 	session, closeSession, err := startSession(ctx, codespace, a, opts.debug, opts.debugFile)
@@ -47,31 +47,29 @@ func (a *App) Jupyter(ctx context.Context, opts jupyterOptions) error {
 	}
 	defer closeSession(&err)
 
-	a.StartProgressIndicatorWithLabel("Fetching Jupyter Details")
-	jupyterServerPort, jupyterServerUrl, err := session.StartJupyterServer(ctx)
+	a.StartProgressIndicatorWithLabel("Starting JupyterLab on codespace")
+	serverPort, serverUrl, err := session.StartJupyterServer(ctx)
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting jupyter server details: %w", err)
 	}
 
-	// Ensure local port is listening before client (Shell) connects.
-	// The client picks a random port when jupyterDestPort is 0.
-	jupyterDestPort := 0
-	listen, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", jupyterDestPort))
+	// Pass 0 to pick a random port
+	listen, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", 0))
 	if err != nil {
 		return err
 	}
 	defer listen.Close()
-	jupyterDestPort = listen.Addr().(*net.TCPAddr).Port
+	destPort := listen.Addr().(*net.TCPAddr).Port
 
 	tunnelClosed := make(chan error, 1)
 	go func() {
-		fwd := liveshare.NewPortForwarder(session, "jupyter", jupyterServerPort, true)
+		fwd := liveshare.NewPortForwarder(session, "jupyter", serverPort, true)
 		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // always non-nil
 	}()
 
-	// Preserve the server URL's token
-	targetUrl := strings.Replace(jupyterServerUrl, fmt.Sprintf("%d", jupyterServerPort), fmt.Sprintf("%d", jupyterDestPort), 1)
+	// Server URL contains an authentication token that must be preserved
+	targetUrl := strings.Replace(serverUrl, fmt.Sprintf("%d", serverPort), fmt.Sprintf("%d", destPort), 1)
 	err = a.browser.Browse(targetUrl)
 	if err != nil {
 		return err
