@@ -47,7 +47,7 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) error {
 	serverPort, serverUrl, err := session.StartJupyterServer(ctx)
 	a.StopProgressIndicator()
 	if err != nil {
-		return fmt.Errorf("error getting jupyter server details: %w", err)
+		return err
 	}
 
 	// Pass 0 to pick a random port

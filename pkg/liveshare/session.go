@@ -77,12 +77,12 @@ func (s *Session) StartJupyterServer(ctx context.Context) (int, string, error) {
 	}
 
 	if !response.Result {
-		return 0, "", fmt.Errorf("failed to start jupyter server: %s", response.Message)
+		return 0, "", fmt.Errorf("failed to start JupyterLab: %s", response.Message)
 	}
 
 	port, err := strconv.Atoi(response.Port)
 	if err != nil {
-		return 0, "", fmt.Errorf("failed to parse port: %w", err)
+		return 0, "", err
 	}
 
 	return port, response.ServerUrl, nil
