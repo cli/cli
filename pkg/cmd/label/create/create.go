@@ -88,7 +88,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	return cmd
 }
 
-var errLabelAlreadyExists = errors.New("the label already exists. Use --force to overwrite")
+var errLabelAlreadyExists = errors.New("label already exists")
 
 func createRun(opts *CreateOptions) error {
 	httpClient, err := opts.HttpClient()
@@ -110,12 +110,15 @@ func createRun(opts *CreateOptions) error {
 	err = createLabel(httpClient, baseRepo, opts)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
+		if errors.Is(err, errLabelAlreadyExists) {
+			return fmt.Errorf("label with name %q already exists; use `--force` to update its color and description", opts.Name)
+		}
 		return err
 	}
 
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		successMsg := fmt.Sprintf("\n%s Label %q created in %s\n", cs.SuccessIcon(), opts.Name, ghrepo.FullName(baseRepo))
+		successMsg := fmt.Sprintf("%s Label %q created in %s\n", cs.SuccessIcon(), opts.Name, ghrepo.FullName(baseRepo))
 		fmt.Fprint(opts.IO.Out, successMsg)
 	}
 

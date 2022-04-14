@@ -101,7 +101,7 @@ func TestCreateRun(t *testing.T) {
 					httpmock.StatusStringResponse(201, "{}"),
 				)
 			},
-			wantStdout: "\n✓ Label \"test\" created in OWNER/REPO\n",
+			wantStdout: "✓ Label \"test\" created in OWNER/REPO\n",
 		},
 		{
 			name: "creates label notty",
