@@ -101,7 +101,7 @@ func TestCreateRun(t *testing.T) {
 					httpmock.StatusStringResponse(201, "{}"),
 				)
 			},
-			wantStdout: "\n✓ Label \"test\" created in OWNER/REPO\n",
+			wantStdout: "✓ Label \"test\" created in OWNER/REPO\n",
 		},
 		{
 			name: "creates label notty",
@@ -114,6 +114,24 @@ func TestCreateRun(t *testing.T) {
 				)
 			},
 			wantStdout: "",
+		},
+		{
+			name: "creates existing label",
+			opts: &CreateOptions{Name: "test", Description: "some description", Force: true},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/labels"),
+					httpmock.WithHeader(
+						httpmock.StatusStringResponse(422, `{"message":"Validation Failed","errors":[{"resource":"Label","code":"already_exists","field":"name"}]}`),
+						"Content-Type",
+						"application/json",
+					),
+				)
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO/labels/test"),
+					httpmock.StatusStringResponse(201, "{}"),
+				)
+			},
 		},
 	}
 
