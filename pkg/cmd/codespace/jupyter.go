@@ -10,38 +10,34 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type jupyterOptions struct {
-	codespace string
-	debug     bool
-	debugFile string
-}
-
 func newJupyterCmd(app *App) *cobra.Command {
-	var opts jupyterOptions
+	var codespace string
 
 	jupyterCmd := &cobra.Command{
 		Use:   "jupyter",
 		Short: "Open a codespace in JupyterLab",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.Jupyter(cmd.Context(), opts)
+			return app.Jupyter(cmd.Context(), codespace)
 		},
 	}
+
+	jupyterCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
 
 	return jupyterCmd
 }
 
-func (a *App) Jupyter(ctx context.Context, opts jupyterOptions) error {
+func (a *App) Jupyter(ctx context.Context, codespaceName string) error {
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
 		return err
 	}
 
-	session, closeSession, err := startSession(ctx, codespace, a, opts.debug, opts.debugFile)
+	session, closeSession, err := startSession(ctx, codespace, a, false, "")
 	if err != nil {
 		return err
 	}
