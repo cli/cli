@@ -120,7 +120,7 @@ func TestListRun(t *testing.T) {
 					),
 				)
 			},
-			wantStdout: "\nShowing 2 of 2 labels in OWNER/REPO\n\nbug   This is a bug label\ndocs  This is a docs label\n",
+			wantStdout: "\nShowing 2 of 2 labels in OWNER/REPO\n\nbug   This is a bug label   #d73a4a\ndocs  This is a docs label  #ffa8da\n",
 		},
 		{
 			name: "lists labels notty",
@@ -158,7 +158,7 @@ func TestListRun(t *testing.T) {
 					),
 				)
 			},
-			wantStdout: "bug\tThis is a bug label\ndocs\tThis is a docs label\n",
+			wantStdout: "bug\tThis is a bug label\t#d73a4a\ndocs\tThis is a docs label\t#ffa8da\n",
 		},
 		{
 			name: "empty label list",
