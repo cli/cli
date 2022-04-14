@@ -333,6 +333,39 @@ func TestPrMerge_blocked(t *testing.T) {
 		`, "`"), output.Stderr())
 }
 
+func TestPrMerge_dirty(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           123,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "DIRTY",
+			BaseRefName:      "trunk",
+			HeadRefName:      "feature",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	output, err := runCommand(http, "master", true, "pr merge 1 --merge")
+	assert.EqualError(t, err, "SilentError")
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Docf(`
+		X Pull request #123 is not mergeable: the merge commit cannot be cleanly created.
+		To have the pull request merged after all the requirements have been met, add the %[1]s--auto%[1]s flag.
+		Run the following to resolve the merge conflicts locally:
+		  gh pr checkout 123 && git fetch origin trunk && git merge origin/trunk
+	`, "`"), output.Stderr())
+}
+
 func TestPrMerge_nontty(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
@@ -480,6 +513,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
+	cs.Register(`git rev-parse --verify refs/heads/master`, 0, "")
 	cs.Register(`git checkout master`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
@@ -494,6 +528,106 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	assert.Equal(t, heredoc.Doc(`
 		✓ Merged pull request #10 (Blueberries are a good fruit)
 		✓ Deleted branch blueberries and switched to branch master
+	`), output.Stderr())
+}
+
+func TestPrMerge_deleteBranch_nonDefault(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"",
+		&api.PullRequest{
+			ID:               "PR_10",
+			Number:           10,
+			State:            "OPEN",
+			Title:            "Blueberries are a good fruit",
+			HeadRefName:      "blueberries",
+			MergeStateStatus: "CLEAN",
+			BaseRefName:      "fruit",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
+		}))
+	http.Register(
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.StringResponse(`{}`))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/fruit`, 0, "")
+	cs.Register(`git checkout fruit`, 0, "")
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
+
+	output, err := runCommand(http, "blueberries", true, `pr merge --merge --delete-branch`)
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Doc(`
+		✓ Merged pull request #10 (Blueberries are a good fruit)
+		✓ Deleted branch blueberries and switched to branch fruit
+	`), output.Stderr())
+}
+
+func TestPrMerge_deleteBranch_checkoutNewBranch(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"",
+		&api.PullRequest{
+			ID:               "PR_10",
+			Number:           10,
+			State:            "OPEN",
+			Title:            "Blueberries are a good fruit",
+			HeadRefName:      "blueberries",
+			MergeStateStatus: "CLEAN",
+			BaseRefName:      "fruit",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
+		}))
+	http.Register(
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.StringResponse(`{}`))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/fruit`, 1, "")
+	cs.Register(`git checkout -b fruit --track origin/fruit`, 0, "")
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
+
+	output, err := runCommand(http, "blueberries", true, `pr merge --merge --delete-branch`)
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Doc(`
+		✓ Merged pull request #10 (Blueberries are a good fruit)
+		✓ Deleted branch blueberries and switched to branch fruit
 	`), output.Stderr())
 }
 
@@ -764,6 +898,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
+	cs.Register(`git rev-parse --verify refs/heads/master`, 0, "")
 	cs.Register(`git checkout master`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
@@ -906,6 +1041,7 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
+	cs.Register(`git rev-parse --verify refs/heads/master`, 0, "")
 	cs.Register(`git checkout master`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")

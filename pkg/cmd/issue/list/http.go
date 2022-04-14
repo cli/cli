@@ -143,15 +143,18 @@ func searchIssues(client *api.Client, repo ghrepo.Interface, filters prShared.Fi
 		}
 	}
 
+	filters.Repo = ghrepo.FullName(repo)
+	filters.Entity = "issue"
+	q := prShared.SearchQueryBuild(filters)
+
 	perPage := min(limit, 100)
-	searchQuery := fmt.Sprintf("repo:%s/%s %s", repo.RepoOwner(), repo.RepoName(), prShared.SearchQueryBuild(filters))
 
 	variables := map[string]interface{}{
 		"owner": repo.RepoOwner(),
 		"repo":  repo.RepoName(),
 		"type":  "ISSUE",
 		"limit": perPage,
-		"query": searchQuery,
+		"query": q,
 	}
 
 	ic := api.IssuesAndTotalCount{SearchCapped: limit > 1000}

@@ -2,6 +2,12 @@ name: PR Automation
 on:
   pull_request_target:
     types: [ready_for_review, opened, reopened]
+
+permissions:
+  contents: none
+  issues: write
+  pull-requests: write
+
 jobs:
   pr-auto:
     runs-on: ubuntu-latest

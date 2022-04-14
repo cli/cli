@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/cli/safeexec"
 )
 
 type printer interface {
@@ -29,30 +31,18 @@ func Shell(ctx context.Context, p printer, sshArgs []string, port int, destinati
 	return cmd.Run()
 }
 
-// Copy runs an scp command over the specified port. The arguments may
-// include flags and non-flags, optionally separated by "--".
+// Copy runs an scp command over the specified port. scpArgs should contain both scp flags
+// as well as the list of files to copy, with the flags first.
 //
 // Remote files indicated by a "remote:" prefix are resolved relative
 // to the remote user's home directory, and are subject to shell expansion
 // on the remote host; see https://lwn.net/Articles/835962/.
 func Copy(ctx context.Context, scpArgs []string, port int, destination string) error {
-	// Beware: invalid syntax causes scp to exit 1 with
-	// no error message, so don't let that happen.
-	cmd := exec.CommandContext(ctx, "scp",
-		"-P", strconv.Itoa(port),
-		"-o", "NoHostAuthenticationForLocalhost=yes",
-		"-C", // compression
-	)
-	for _, arg := range scpArgs {
-		// Replace "remote:" prefix with (e.g.) "root@localhost:".
-		if rest := strings.TrimPrefix(arg, "remote:"); rest != arg {
-			arg = destination + ":" + rest
-		}
-		cmd.Args = append(cmd.Args, arg)
+	cmd, err := newSCPCommand(ctx, port, destination, scpArgs)
+	if err != nil {
+		return fmt.Errorf("failed to create scp command: %w", err)
 	}
-	cmd.Stdin = nil
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
+
 	return cmd.Run()
 }
 
@@ -87,7 +77,12 @@ func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 		cmdArgs = append(cmdArgs, command...)
 	}
 
-	cmd := exec.CommandContext(ctx, "ssh", cmdArgs...)
+	exe, err := safeexec.LookPath("ssh")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to execute ssh: %w", err)
+	}
+
+	cmd := exec.CommandContext(ctx, exe, cmdArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
@@ -95,9 +90,59 @@ func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 	return cmd, connArgs, nil
 }
 
-// parseSSHArgs parses SSH arguments into two distinct slices of flags and command.
-// It returns an error if a unary flag is provided without an argument.
 func parseSSHArgs(args []string) (cmdArgs, command []string, err error) {
+	return parseArgs(args, "bcDeFIiLlmOopRSWw")
+}
+
+// newSCPCommand populates an exec.Cmd to run an scp command for the files specified in cmdArgs.
+// cmdArgs is parsed such that scp flags precede the files to copy in the command.
+// For example: scp -F ./config local/file remote:file
+func newSCPCommand(ctx context.Context, port int, dst string, cmdArgs []string) (*exec.Cmd, error) {
+	connArgs := []string{
+		"-P", strconv.Itoa(port),
+		"-o", "NoHostAuthenticationForLocalhost=yes",
+		"-C", // compression
+	}
+
+	cmdArgs, command, err := parseSCPArgs(cmdArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	cmdArgs = append(cmdArgs, connArgs...)
+
+	for _, arg := range command {
+		// Replace "remote:" prefix with (e.g.) "root@localhost:".
+		if rest := strings.TrimPrefix(arg, "remote:"); rest != arg {
+			arg = dst + ":" + rest
+		}
+		cmdArgs = append(cmdArgs, arg)
+	}
+
+	exe, err := safeexec.LookPath("scp")
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute scp: %w", err)
+	}
+
+	// Beware: invalid syntax causes scp to exit 1 with
+	// no error message, so don't let that happen.
+	cmd := exec.CommandContext(ctx, exe, cmdArgs...)
+
+	cmd.Stdin = nil
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+
+	return cmd, nil
+}
+
+func parseSCPArgs(args []string) (cmdArgs, command []string, err error) {
+	return parseArgs(args, "cFiJloPS")
+}
+
+// parseArgs parses arguments into two distinct slices of flags and command. Parsing stops
+// as soon as a non-flag argument is found assuming the remaining arguments are the command.
+// It returns an error if a unary flag is provided without an argument.
+func parseArgs(args []string, unaryFlags string) (cmdArgs, command []string, err error) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 
@@ -108,9 +153,9 @@ func parseSSHArgs(args []string) (cmdArgs, command []string, err error) {
 		}
 
 		cmdArgs = append(cmdArgs, arg)
-		if len(arg) == 2 && strings.Contains("bcDeFIiLlmOopRSWw", arg[1:2]) {
+		if len(arg) == 2 && strings.Contains(unaryFlags, arg[1:2]) {
 			if i++; i == len(args) {
-				return nil, nil, fmt.Errorf("ssh flag: %s requires an argument", arg)
+				return nil, nil, fmt.Errorf("flag: %s requires an argument", arg)
 			}
 
 			cmdArgs = append(cmdArgs, args[i])

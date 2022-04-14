@@ -42,6 +42,7 @@ type CommentableOptions struct {
 	Interactive           bool
 	InputType             InputType
 	Body                  string
+	Quiet                 bool
 }
 
 func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
@@ -84,7 +85,7 @@ func CommentableRun(opts *CommentableOptions) error {
 	switch opts.InputType {
 	case InputTypeWeb:
 		openURL := commentable.Link() + "#issuecomment-new"
-		if opts.IO.IsStdoutTTY() {
+		if opts.IO.IsStdoutTTY() && !opts.Quiet {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
 		return opts.OpenInBrowser(openURL)
@@ -121,7 +122,9 @@ func CommentableRun(opts *CommentableOptions) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(opts.IO.Out, url)
+	if !opts.Quiet {
+		fmt.Fprintln(opts.IO.Out, url)
+	}
 	return nil
 }
 

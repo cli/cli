@@ -6,6 +6,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -20,6 +21,7 @@ type CloseOptions struct {
 	Finder shared.PRFinder
 
 	SelectorArg       string
+	Comment           string
 	DeleteBranch      bool
 	DeleteLocalBranch bool
 }
@@ -50,6 +52,8 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 			return closeRun(opts)
 		},
 	}
+
+	cmd.Flags().StringVarP(&opts.Comment, "comment", "c", "", "Leave a closing comment")
 	cmd.Flags().BoolVarP(&opts.DeleteBranch, "delete-branch", "d", false, "Delete the local and remote branch after close")
 
 	return cmd
@@ -80,6 +84,22 @@ func closeRun(opts *CloseOptions) error {
 		return err
 	}
 
+	if opts.Comment != "" {
+		commentOpts := &shared.CommentableOptions{
+			Body:       opts.Comment,
+			HttpClient: opts.HttpClient,
+			InputType:  shared.InputTypeInline,
+			Quiet:      true,
+			RetrieveCommentable: func() (shared.Commentable, ghrepo.Interface, error) {
+				return pr, baseRepo, nil
+			},
+		}
+		err := shared.CommentableRun(commentOpts)
+		if err != nil {
+			return err
+		}
+	}
+
 	err = api.PullRequestClose(httpClient, baseRepo, pr.ID)
 	if err != nil {
 		return fmt.Errorf("API call failed: %w", err)
@@ -90,34 +110,36 @@ func closeRun(opts *CloseOptions) error {
 	if opts.DeleteBranch {
 		branchSwitchString := ""
 		apiClient := api.NewClientFromHTTP(httpClient)
+		localBranchExists := git.HasLocalBranch(pr.HeadRefName)
 
 		if opts.DeleteLocalBranch {
-			currentBranch, err := opts.Branch()
-			if err != nil {
-				return err
-			}
-
-			var branchToSwitchTo string
-			if currentBranch == pr.HeadRefName {
-				branchToSwitchTo, err = api.RepoDefaultBranch(apiClient, baseRepo)
-				if err != nil {
-					return err
-				}
-				err = git.CheckoutBranch(branchToSwitchTo)
-				if err != nil {
-					return err
-				}
-			}
-
-			localBranchExists := git.HasLocalBranch(pr.HeadRefName)
 			if localBranchExists {
+				currentBranch, err := opts.Branch()
+				if err != nil {
+					return err
+				}
+
+				var branchToSwitchTo string
+				if currentBranch == pr.HeadRefName {
+					branchToSwitchTo, err = api.RepoDefaultBranch(apiClient, baseRepo)
+					if err != nil {
+						return err
+					}
+					err = git.CheckoutBranch(branchToSwitchTo)
+					if err != nil {
+						return err
+					}
+				}
+
 				if err := git.DeleteLocalBranch(pr.HeadRefName); err != nil {
 					return fmt.Errorf("failed to delete local branch %s: %w", cs.Cyan(pr.HeadRefName), err)
 				}
-			}
 
-			if branchToSwitchTo != "" {
-				branchSwitchString = fmt.Sprintf(" and switched to branch %s", cs.Cyan(branchToSwitchTo))
+				if branchToSwitchTo != "" {
+					branchSwitchString = fmt.Sprintf(" and switched to branch %s", cs.Cyan(branchToSwitchTo))
+				}
+			} else {
+				fmt.Fprintf(opts.IO.ErrOut, "%s Skipped deleting the local branch since current directory is not a git repository \n", cs.WarningIcon())
 			}
 		}
 

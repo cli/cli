@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/utils"
 	"github.com/cli/oauth"
 )
 
@@ -25,6 +26,7 @@ var (
 type iconfig interface {
 	Set(string, string, string) error
 	Write() error
+	WriteHosts() error
 }
 
 func AuthFlowWithConfig(cfg iconfig, IO *iostreams.IOStreams, hostname, notice string, additionalScopes []string, isInteractive bool) (string, error) {
@@ -45,7 +47,7 @@ func AuthFlowWithConfig(cfg iconfig, IO *iostreams.IOStreams, hostname, notice s
 		return "", err
 	}
 
-	return token, cfg.Write()
+	return token, cfg.WriteHosts()
 }
 
 func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string, isInteractive bool) (string, string, error) {
@@ -53,8 +55,9 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 	cs := IO.ColorScheme()
 
 	httpClient := http.DefaultClient
-	if envDebug := os.Getenv("DEBUG"); envDebug != "" {
-		logTraffic := strings.Contains(envDebug, "api") || strings.Contains(envDebug, "oauth")
+	debugEnabled, debugValue := utils.IsDebugEnabled()
+	if debugEnabled {
+		logTraffic := strings.Contains(debugValue, "api")
 		httpClient.Transport = api.VerboseLog(IO.ErrOut, logTraffic, IO.ColorEnabled())(httpClient.Transport)
 	}
 

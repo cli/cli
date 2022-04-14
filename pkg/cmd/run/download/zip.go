@@ -16,14 +16,9 @@ const (
 )
 
 func extractZip(zr *zip.Reader, destDir string) error {
-	destDirAbs, err := filepath.Abs(destDir)
-	if err != nil {
-		return err
-	}
-	pathPrefix := destDirAbs + string(filepath.Separator)
 	for _, zf := range zr.File {
-		fpath := filepath.Join(destDirAbs, filepath.FromSlash(zf.Name))
-		if !strings.HasPrefix(fpath, pathPrefix) {
+		fpath := filepath.Join(destDir, filepath.FromSlash(zf.Name))
+		if !filepathDescendsFrom(fpath, destDir) {
 			continue
 		}
 		if err := extractZipFile(zf, fpath); err != nil {
@@ -66,4 +61,16 @@ func getPerm(m os.FileMode) os.FileMode {
 		return fileMode
 	}
 	return execMode
+}
+
+func filepathDescendsFrom(p, dir string) bool {
+	p = filepath.Clean(p)
+	dir = filepath.Clean(dir)
+	if dir == "." && !filepath.IsAbs(p) {
+		return !strings.HasPrefix(p, ".."+string(filepath.Separator))
+	}
+	if !strings.HasSuffix(dir, string(filepath.Separator)) {
+		dir += string(filepath.Separator)
+	}
+	return strings.HasPrefix(p, dir)
 }

@@ -52,6 +52,13 @@ const (
 	vscsAPI      = "https://online.visualstudio.com"
 )
 
+const (
+	VSCSTargetLocal       = "local"
+	VSCSTargetDevelopment = "development"
+	VSCSTargetPPE         = "ppe"
+	VSCSTargetProduction  = "production"
+)
+
 // API is the interface to the codespace service.
 type API struct {
 	client       httpClient
@@ -160,16 +167,24 @@ func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error
 }
 
 // Codespace represents a codespace.
+// You can see more about the fields in this type in the codespaces api docs:
+// https://docs.github.com/en/rest/reference/codespaces
 type Codespace struct {
-	Name        string              `json:"name"`
-	CreatedAt   string              `json:"created_at"`
-	DisplayName string              `json:"display_name"`
-	LastUsedAt  string              `json:"last_used_at"`
-	Owner       User                `json:"owner"`
-	Repository  Repository          `json:"repository"`
-	State       string              `json:"state"`
-	GitStatus   CodespaceGitStatus  `json:"git_status"`
-	Connection  CodespaceConnection `json:"connection"`
+	Name                           string              `json:"name"`
+	CreatedAt                      string              `json:"created_at"`
+	DisplayName                    string              `json:"display_name"`
+	LastUsedAt                     string              `json:"last_used_at"`
+	Owner                          User                `json:"owner"`
+	Repository                     Repository          `json:"repository"`
+	State                          string              `json:"state"`
+	GitStatus                      CodespaceGitStatus  `json:"git_status"`
+	Connection                     CodespaceConnection `json:"connection"`
+	Machine                        CodespaceMachine    `json:"machine"`
+	VSCSTarget                     string              `json:"vscs_target"`
+	PendingOperation               bool                `json:"pending_operation"`
+	PendingOperationDisabledReason string              `json:"pending_operation_disabled_reason"`
+	IdleTimeoutNotice              string              `json:"idle_timeout_notice"`
+	WebURL                         string              `json:"web_url"`
 }
 
 type CodespaceGitStatus struct {
@@ -178,6 +193,15 @@ type CodespaceGitStatus struct {
 	Ref                  string `json:"ref"`
 	HasUnpushedChanges   bool   `json:"has_unpushed_changes"`
 	HasUncommitedChanges bool   `json:"has_uncommited_changes"`
+}
+
+type CodespaceMachine struct {
+	Name            string `json:"name"`
+	DisplayName     string `json:"display_name"`
+	OperatingSystem string `json:"operating_system"`
+	StorageInBytes  int    `json:"storage_in_bytes"`
+	MemoryInBytes   int    `json:"memory_in_bytes"`
+	CPUCount        int    `json:"cpus"`
 }
 
 const (
@@ -207,6 +231,8 @@ var CodespaceFields = []string{
 	"gitStatus",
 	"createdAt",
 	"lastUsedAt",
+	"machineName",
+	"vscsTarget",
 }
 
 func (c *Codespace) ExportData(fields []string) map[string]interface{} {
@@ -219,11 +245,17 @@ func (c *Codespace) ExportData(fields []string) map[string]interface{} {
 			data[f] = c.Owner.Login
 		case "repository":
 			data[f] = c.Repository.FullName
+		case "machineName":
+			data[f] = c.Machine.Name
 		case "gitStatus":
 			data[f] = map[string]interface{}{
 				"ref":                  c.GitStatus.Ref,
 				"hasUnpushedChanges":   c.GitStatus.HasUnpushedChanges,
 				"hasUncommitedChanges": c.GitStatus.HasUncommitedChanges,
+			}
+		case "vscsTarget":
+			if c.VSCSTarget != "" && c.VSCSTarget != VSCSTargetProduction {
+				data[f] = c.VSCSTarget
 			}
 		default:
 			sf := v.FieldByNameFunc(func(s string) bool {
@@ -265,6 +297,7 @@ func (a *API) ListCodespaces(ctx context.Context, limit int) (codespaces []*Code
 		var response struct {
 			Codespaces []*Codespace `json:"codespaces"`
 		}
+
 		dec := json.NewDecoder(resp.Body)
 		if err := dec.Decode(&response); err != nil {
 			return nil, fmt.Errorf("error unmarshaling response: %w", err)
@@ -401,40 +434,6 @@ func (a *API) StopCodespace(ctx context.Context, codespaceName string) error {
 	return nil
 }
 
-type getCodespaceRegionLocationResponse struct {
-	Current string `json:"current"`
-}
-
-// GetCodespaceRegionLocation returns the closest codespace location for the user.
-func (a *API) GetCodespaceRegionLocation(ctx context.Context) (string, error) {
-	req, err := http.NewRequest(http.MethodGet, a.vscsAPI+"/api/v1/locations", nil)
-	if err != nil {
-		return "", fmt.Errorf("error creating request: %w", err)
-	}
-
-	resp, err := a.do(ctx, req, req.URL.String())
-	if err != nil {
-		return "", fmt.Errorf("error making request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", api.HandleHTTPError(resp)
-	}
-
-	b, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("error reading response body: %w", err)
-	}
-
-	var response getCodespaceRegionLocationResponse
-	if err := json.Unmarshal(b, &response); err != nil {
-		return "", fmt.Errorf("error unmarshaling response: %w", err)
-	}
-
-	return response.Current, nil
-}
-
 type Machine struct {
 	Name                 string `json:"name"`
 	DisplayName          string `json:"display_name"`
@@ -565,6 +564,8 @@ type CreateCodespaceParams struct {
 	Branch             string
 	Machine            string
 	Location           string
+	VSCSTarget         string
+	VSCSTargetURL      string
 	PermissionsOptOut  bool
 }
 
@@ -611,7 +612,9 @@ type startCreateRequest struct {
 	Ref                string `json:"ref"`
 	Location           string `json:"location"`
 	Machine            string `json:"machine"`
-	PermissionsOptOut  bool   `json:"devcontainer_permissions_opt_out"`
+	VSCSTarget         string `json:"vscs_target,omitempty"`
+	VSCSTargetURL      string `json:"vscs_target_url,omitempty"`
+	PermissionsOptOut  bool   `json:"multi_repo_permissions_opt_out"`
 }
 
 var errProvisioningInProgress = errors.New("provisioning in progress")
@@ -640,8 +643,11 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 		Ref:                params.Branch,
 		Location:           params.Location,
 		Machine:            params.Machine,
+		VSCSTarget:         params.VSCSTarget,
+		VSCSTargetURL:      params.VSCSTargetURL,
 		PermissionsOptOut:  params.PermissionsOptOut,
 	})
+
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
@@ -719,6 +725,70 @@ func (a *API) DeleteCodespace(ctx context.Context, codespaceName string) error {
 	}
 
 	return nil
+}
+
+type EditCodespaceParams struct {
+	DisplayName        string `json:"display_name,omitempty"`
+	IdleTimeoutMinutes int    `json:"idle_timeout_minutes,omitempty"`
+	Machine            string `json:"machine,omitempty"`
+}
+
+func (a *API) EditCodespace(ctx context.Context, codespaceName string, params *EditCodespaceParams) (*Codespace, error) {
+	requestBody, err := json.Marshal(params)
+
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, a.githubAPI+"/user/codespaces/"+codespaceName, bytes.NewBuffer(requestBody))
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	a.setHeaders(req)
+	resp, err := a.do(ctx, req, "/user/codespaces")
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		// 422 (unprocessable entity) is likely caused by the codespace having a
+		// pending op, so we'll fetch the codespace to see if that's the case
+		// and return a more understandable error message.
+		if resp.StatusCode == http.StatusUnprocessableEntity {
+			pendingOp, reason, err := a.checkForPendingOperation(ctx, codespaceName)
+			// If there's an error or there's not a pending op, we want to let
+			// this fall through to the normal api.HandleHTTPError flow
+			if err == nil && pendingOp {
+				return nil, fmt.Errorf(
+					"codespace is disabled while it has a pending operation: %s",
+					reason,
+				)
+			}
+		}
+		return nil, api.HandleHTTPError(resp)
+	}
+
+	b, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	var response Codespace
+	if err := json.Unmarshal(b, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %w", err)
+	}
+
+	return &response, nil
+}
+
+func (a *API) checkForPendingOperation(ctx context.Context, codespaceName string) (bool, string, error) {
+	codespace, err := a.GetCodespace(ctx, codespaceName, false)
+	if err != nil {
+		return false, "", err
+	}
+	return codespace.PendingOperation, codespace.PendingOperationDisabledReason, nil
 }
 
 type getCodespaceRepositoryContentsResponse struct {

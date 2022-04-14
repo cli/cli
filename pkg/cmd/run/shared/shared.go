@@ -307,6 +307,18 @@ func GetJobs(client *api.Client, repo ghrepo.Interface, run Run) ([]Job, error) 
 	return result.Jobs, nil
 }
 
+func GetJob(client *api.Client, repo ghrepo.Interface, jobID string) (*Job, error) {
+	path := fmt.Sprintf("repos/%s/actions/jobs/%s", ghrepo.FullName(repo), jobID)
+
+	var result Job
+	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
 func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 	var selected int
 	now := time.Now()

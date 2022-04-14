@@ -19,7 +19,7 @@ import (
 const mockClientName = "liveshare-client"
 
 func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server, *Session, error) {
-	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
+	joinWorkspace := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 		return joinWorkspaceResult{1}, nil
 	}
 	const sessionToken = "session-token"
@@ -51,7 +51,8 @@ func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server,
 
 func TestServerStartSharing(t *testing.T) {
 	serverPort, serverProtocol := 2222, "sshd"
-	startSharing := func(req *jsonrpc2.Request) (interface{}, error) {
+	sendNotification := make(chan portUpdateNotification)
+	startSharing := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 		var args []interface{}
 		if err := json.Unmarshal(*req.Params, &args); err != nil {
 			return nil, fmt.Errorf("error unmarshaling request: %w", err)
@@ -59,9 +60,11 @@ func TestServerStartSharing(t *testing.T) {
 		if len(args) < 3 {
 			return nil, errors.New("not enough arguments to start sharing")
 		}
-		if port, ok := args[0].(float64); !ok {
+		port, ok := args[0].(float64)
+		if !ok {
 			return nil, errors.New("port argument is not an int")
-		} else if port != float64(serverPort) {
+		}
+		if port != float64(serverPort) {
 			return nil, errors.New("port does not match serverPort")
 		}
 		if protocol, ok := args[1].(string); !ok {
@@ -74,6 +77,13 @@ func TestServerStartSharing(t *testing.T) {
 		} else if browseURL != fmt.Sprintf("http://localhost:%d", serverPort) {
 			return nil, errors.New("browseURL does not match expected")
 		}
+		sendNotification <- portUpdateNotification{
+			PortNotification: PortNotification{
+				Port:       int(port),
+				ChangeKind: PortChangeKindStart,
+			},
+			conn: conn,
+		}
 		return Port{StreamName: "stream-name", StreamCondition: "stream-condition"}, nil
 	}
 	testServer, session, err := makeMockSession(
@@ -85,6 +95,11 @@ func TestServerStartSharing(t *testing.T) {
 		t.Errorf("error creating mock session: %v", err)
 	}
 	ctx := context.Background()
+
+	go func() {
+		notif := <-sendNotification
+		_, _ = notif.conn.DispatchCall(context.Background(), "serverSharing.sharingSucceeded", notif)
+	}()
 
 	done := make(chan error)
 	go func() {
@@ -114,7 +129,7 @@ func TestServerGetSharedServers(t *testing.T) {
 		StreamName:      "stream-name",
 		StreamCondition: "stream-condition",
 	}
-	getSharedServers := func(req *jsonrpc2.Request) (interface{}, error) {
+	getSharedServers := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 		return []*Port{&sharedServer}, nil
 	}
 	testServer, session, err := makeMockSession(
@@ -157,7 +172,7 @@ func TestServerGetSharedServers(t *testing.T) {
 }
 
 func TestServerUpdateSharedServerPrivacy(t *testing.T) {
-	updateSharedVisibility := func(rpcReq *jsonrpc2.Request) (interface{}, error) {
+	updateSharedVisibility := func(conn *jsonrpc2.Conn, rpcReq *jsonrpc2.Request) (interface{}, error) {
 		var req []interface{}
 		if err := json.Unmarshal(*rpcReq.Params, &req); err != nil {
 			return nil, fmt.Errorf("unmarshal req: %w", err)
@@ -204,7 +219,7 @@ func TestServerUpdateSharedServerPrivacy(t *testing.T) {
 }
 
 func TestInvalidHostKey(t *testing.T) {
-	joinWorkspace := func(req *jsonrpc2.Request) (interface{}, error) {
+	joinWorkspace := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 		return joinWorkspaceResult{1}, nil
 	}
 	const sessionToken = "session-token"
@@ -240,7 +255,7 @@ func TestKeepAliveNonBlocking(t *testing.T) {
 }
 
 func TestNotifyHostOfActivity(t *testing.T) {
-	notifyHostOfActivity := func(rpcReq *jsonrpc2.Request) (interface{}, error) {
+	notifyHostOfActivity := func(conn *jsonrpc2.Conn, rpcReq *jsonrpc2.Request) (interface{}, error) {
 		var req []interface{}
 		if err := json.Unmarshal(*rpcReq.Params, &req); err != nil {
 			return nil, fmt.Errorf("unmarshal req: %w", err)
@@ -299,7 +314,7 @@ func TestSessionHeartbeat(t *testing.T) {
 		wg         sync.WaitGroup
 	)
 	wg.Add(1)
-	notifyHostOfActivity := func(rpcReq *jsonrpc2.Request) (interface{}, error) {
+	notifyHostOfActivity := func(conn *jsonrpc2.Conn, rpcReq *jsonrpc2.Request) (interface{}, error) {
 		defer wg.Done()
 		requestsMu.Lock()
 		requests++

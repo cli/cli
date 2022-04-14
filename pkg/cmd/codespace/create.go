@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -17,6 +18,7 @@ import (
 type createOptions struct {
 	repo              string
 	branch            string
+	location          string
 	machine           string
 	showStatus        bool
 	permissionsOptOut bool
@@ -37,6 +39,7 @@ func newCreateCmd(app *App) *cobra.Command {
 
 	createCmd.Flags().StringVarP(&opts.repo, "repo", "r", "", "repository name with owner: user/repo")
 	createCmd.Flags().StringVarP(&opts.branch, "branch", "b", "", "repository branch")
+	createCmd.Flags().StringVarP(&opts.location, "location", "l", "", "location: {EastUs|SouthEastAsia|WestEurope|WestUs2} (determined automatically if not provided)")
 	createCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "hardware specifications for the VM")
 	createCmd.Flags().BoolVarP(&opts.permissionsOptOut, "default-permissions", "", false, "do not prompt to accept additional permissions requested by the codespace")
 	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
@@ -47,14 +50,19 @@ func newCreateCmd(app *App) *cobra.Command {
 
 // Create creates a new Codespace
 func (a *App) Create(ctx context.Context, opts createOptions) error {
-	locationCh := getLocation(ctx, a.apiClient)
+	// Overrides for Codespace developers to target test environments
+	vscsLocation := os.Getenv("VSCS_LOCATION")
+	vscsTarget := os.Getenv("VSCS_TARGET")
+	vscsTargetUrl := os.Getenv("VSCS_TARGET_URL")
 
 	userInputs := struct {
 		Repository string
 		Branch     string
+		Location   string
 	}{
 		Repository: opts.repo,
 		Branch:     opts.branch,
+		Location:   opts.location,
 	}
 
 	if userInputs.Repository == "" {
@@ -87,6 +95,10 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		}
 	}
 
+	if userInputs.Location == "" && vscsLocation != "" {
+		userInputs.Location = vscsLocation
+	}
+
 	a.StartProgressIndicatorWithLabel("Fetching repository")
 	repository, err := a.apiClient.GetRepository(ctx, userInputs.Repository)
 	a.StopProgressIndicator()
@@ -99,12 +111,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		branch = repository.DefaultBranch
 	}
 
-	locationResult := <-locationCh
-	if locationResult.Err != nil {
-		return fmt.Errorf("error getting codespace region location: %w", locationResult.Err)
-	}
-
-	machine, err := getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, locationResult.Location)
+	machine, err := getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, userInputs.Location)
 	if err != nil {
 		return fmt.Errorf("error getting machine type: %w", err)
 	}
@@ -116,7 +123,9 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		RepositoryID:       repository.ID,
 		Branch:             branch,
 		Machine:            machine,
-		Location:           locationResult.Location,
+		Location:           userInputs.Location,
+		VSCSTarget:         vscsTarget,
+		VSCSTargetURL:      vscsTargetUrl,
 		IdleTimeoutMinutes: int(opts.idleTimeout.Minutes()),
 		PermissionsOptOut:  opts.permissionsOptOut,
 	}
@@ -144,7 +153,14 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		}
 	}
 
+	cs := a.io.ColorScheme()
+
 	fmt.Fprintln(a.io.Out, codespace.Name)
+
+	if a.io.IsStderrTTY() && codespace.IdleTimeoutNotice != "" {
+		fmt.Fprintln(a.io.ErrOut, cs.Yellow("Notice:"), codespace.IdleTimeoutNotice)
+	}
+
 	return nil
 }
 
@@ -164,7 +180,7 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 	}
 
 	choices := []string{
-		"Continue in browser to review and authorize additional permissions",
+		"Continue in browser to review and authorize additional permissions (Recommended)",
 		"Continue without authorizing additional permissions",
 	}
 
@@ -190,6 +206,7 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 
 	// if the user chose to continue in the browser, open the URL
 	if answers.Accept == choices[0] {
+		fmt.Fprintln(a.io.ErrOut, "Please re-run the create request after accepting permissions in the browser.")
 		if err := a.browser.Browse(allowPermissionsURL); err != nil {
 			return nil, fmt.Errorf("error opening browser: %w", err)
 		}
@@ -275,21 +292,6 @@ func (a *App) showStatus(ctx context.Context, codespace *api.Codespace) error {
 	}
 
 	return nil
-}
-
-type locationResult struct {
-	Location string
-	Err      error
-}
-
-// getLocation fetches the closest Codespace datacenter region/location to the user.
-func getLocation(ctx context.Context, apiClient apiClient) <-chan locationResult {
-	ch := make(chan locationResult, 1)
-	go func() {
-		location, err := apiClient.GetCodespaceRegionLocation(ctx)
-		ch <- locationResult{location, err}
-	}()
-	return ch
 }
 
 // getMachineName prompts the user to select the machine type, or validates the machine if non-empty.

@@ -10,7 +10,7 @@ import (
 )
 
 func StateTitleWithColor(cs *iostreams.ColorScheme, pr api.PullRequest) string {
-	prStateColorFunc := cs.ColorFromString(ColorForPR(pr))
+	prStateColorFunc := cs.ColorFromString(ColorForPRState(pr))
 
 	if pr.State == "OPEN" && pr.IsDraft {
 		return prStateColorFunc(strings.Title(strings.ToLower("Draft")))
@@ -18,21 +18,27 @@ func StateTitleWithColor(cs *iostreams.ColorScheme, pr api.PullRequest) string {
 	return prStateColorFunc(strings.Title(strings.ToLower(pr.State)))
 }
 
-func ColorForPR(pr api.PullRequest) string {
-	if pr.State == "OPEN" && pr.IsDraft {
-		return "gray"
-	}
-	return ColorForState(pr.State)
-}
-
-// ColorForState returns a color constant for a PR/Issue state
-func ColorForState(state string) string {
-	switch state {
+func ColorForPRState(pr api.PullRequest) string {
+	switch pr.State {
 	case "OPEN":
+		if pr.IsDraft {
+			return "gray"
+		}
 		return "green"
 	case "CLOSED":
 		return "red"
 	case "MERGED":
+		return "magenta"
+	default:
+		return ""
+	}
+}
+
+func ColorForIssueState(issue api.Issue) string {
+	switch issue.State {
+	case "OPEN":
+		return "green"
+	case "CLOSED":
 		return "magenta"
 	default:
 		return ""

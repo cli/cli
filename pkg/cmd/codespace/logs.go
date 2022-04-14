@@ -38,7 +38,7 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
-		return fmt.Errorf("get or choose codespace: %w", err)
+		return err
 	}
 
 	session, closeSession, err := startSession(ctx, codespace, a, false, "")

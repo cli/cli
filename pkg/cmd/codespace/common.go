@@ -100,9 +100,9 @@ type apiClient interface {
 	StartCodespace(ctx context.Context, name string) error
 	StopCodespace(ctx context.Context, name string) error
 	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
+	EditCodespace(ctx context.Context, codespaceName string, params *api.EditCodespaceParams) (*api.Codespace, error)
 	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
 	AuthorizedKeys(ctx context.Context, user string) ([]byte, error)
-	GetCodespaceRegionLocation(ctx context.Context) (string, error)
 	GetCodespacesMachines(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error)
 	GetCodespaceRepositoryContents(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
 	GetCodespaceRepoSuggestions(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error)
@@ -212,6 +212,13 @@ func getOrChooseCodespace(ctx context.Context, apiClient apiClient, codespaceNam
 		if err != nil {
 			return nil, fmt.Errorf("getting full codespace details: %w", err)
 		}
+	}
+
+	if codespace.PendingOperation {
+		return nil, fmt.Errorf(
+			"codespace is disabled while it has a pending operation: %s",
+			codespace.PendingOperationDisabledReason,
+		)
 	}
 
 	return codespace, nil

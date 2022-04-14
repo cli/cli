@@ -73,7 +73,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			Merge a pull request on GitHub.
 
 			Without an argument, the pull request that belongs to the current branch
-			is selected.			
+			is selected.
     	`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -131,6 +131,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			); err != nil {
 				return err
 			}
+
 			if bodyProvided || bodyFileProvided {
 				opts.BodySet = true
 				if bodyFileProvided {
@@ -140,7 +141,6 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 					}
 					opts.Body = string(b)
 				}
-
 			}
 
 			opts.Editor = &userEditor{
@@ -212,6 +212,16 @@ func mergeRun(opts *MergeOptions) error {
 	if reason := blockedReason(pr.MergeStateStatus, opts.UseAdmin); !opts.AutoMergeEnable && !isPRAlreadyMerged && reason != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is not mergeable: %s.\n", cs.FailureIcon(), pr.Number, reason)
 		fmt.Fprintf(opts.IO.ErrOut, "To have the pull request merged after all the requirements have been met, add the `--auto` flag.\n")
+		if remote := remoteForMergeConflictResolution(baseRepo, pr, opts); remote != nil {
+			mergeOrRebase := "merge"
+			if opts.MergeMethod == PullRequestMergeMethodRebase {
+				mergeOrRebase = "rebase"
+			}
+			fetchBranch := fmt.Sprintf("%s %s", remote.Name, pr.BaseRefName)
+			mergeBranch := fmt.Sprintf("%s %s/%s", mergeOrRebase, remote.Name, pr.BaseRefName)
+			cmd := fmt.Sprintf("gh pr checkout %d && git fetch %s && git %s", pr.Number, fetchBranch, mergeBranch)
+			fmt.Fprintf(opts.IO.ErrOut, "Run the following to resolve the merge conflicts locally:\n  %s\n", cs.Bold(cmd))
+		}
 		if !opts.UseAdmin && allowsAdminOverride(pr.MergeStateStatus) {
 			// TODO: show this flag only to repo admins
 			fmt.Fprintf(opts.IO.ErrOut, "To use administrator privileges to immediately merge the pull request, add the `--admin` flag.\n")
@@ -304,7 +314,7 @@ func mergeRun(opts *MergeOptions) error {
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
-	} else if crossRepoPR {
+	} else {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d was already merged\n", cs.WarningIcon(), pr.Number)
 	}
 
@@ -322,18 +332,35 @@ func mergeRun(opts *MergeOptions) error {
 
 		var branchToSwitchTo string
 		if currentBranch == pr.HeadRefName {
-			branchToSwitchTo, err = api.RepoDefaultBranch(apiClient, baseRepo)
+			branchToSwitchTo = pr.BaseRefName
+			if branchToSwitchTo == "" {
+				branchToSwitchTo, err = api.RepoDefaultBranch(apiClient, baseRepo)
+				if err != nil {
+					return err
+				}
+			}
+
+			remotes, err := opts.Remotes()
 			if err != nil {
 				return err
 			}
 
-			err = git.CheckoutBranch(branchToSwitchTo)
+			baseRemote, err := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
 			if err != nil {
 				return err
 			}
 
-			err := pullLatestChanges(opts, baseRepo, branchToSwitchTo)
-			if err != nil {
+			if git.HasLocalBranch(branchToSwitchTo) {
+				if err := git.CheckoutBranch(branchToSwitchTo); err != nil {
+					return err
+				}
+			} else {
+				if err := git.CheckoutNewBranch(baseRemote.Name, branchToSwitchTo); err != nil {
+					return err
+				}
+			}
+
+			if err := git.Pull(baseRemote.Name, branchToSwitchTo); err != nil {
 				fmt.Fprintf(opts.IO.ErrOut, "%s warning: not possible to fast-forward to: %q\n", cs.WarningIcon(), branchToSwitchTo)
 			}
 		}
@@ -359,25 +386,6 @@ func mergeRun(opts *MergeOptions) error {
 
 	if isTerminal {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted branch %s%s\n", cs.SuccessIconWithColor(cs.Red), cs.Cyan(pr.HeadRefName), branchSwitchString)
-	}
-
-	return nil
-}
-
-func pullLatestChanges(opts *MergeOptions, repo ghrepo.Interface, branch string) error {
-	remotes, err := opts.Remotes()
-	if err != nil {
-		return err
-	}
-
-	baseRemote, err := remotes.FindByRepo(repo.RepoOwner(), repo.RepoName())
-	if err != nil {
-		return err
-	}
-
-	err = git.Pull(baseRemote.Name, branch)
-	if err != nil {
-		return err
 	}
 
 	return nil
@@ -563,6 +571,25 @@ func allowsAdminOverride(status string) bool {
 	default:
 		return false
 	}
+}
+
+func remoteForMergeConflictResolution(baseRepo ghrepo.Interface, pr *api.PullRequest, opts *MergeOptions) *context.Remote {
+	if !mergeConflictStatus(pr.MergeStateStatus) || !opts.CanDeleteLocalBranch {
+		return nil
+	}
+	remotes, err := opts.Remotes()
+	if err != nil {
+		return nil
+	}
+	remote, err := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
+	if err != nil {
+		return nil
+	}
+	return remote
+}
+
+func mergeConflictStatus(status string) bool {
+	return status == "DIRTY"
 }
 
 func isImmediatelyMergeable(status string) bool {

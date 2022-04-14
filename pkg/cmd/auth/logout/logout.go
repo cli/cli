@@ -151,7 +151,7 @@ func logoutRun(opts *LogoutOptions) error {
 	}
 
 	cfg.UnsetHost(hostname)
-	err = cfg.Write()
+	err = cfg.WriteHosts()
 	if err != nil {
 		return fmt.Errorf("failed to write config, authentication configuration not updated: %w", err)
 	}

@@ -216,7 +216,7 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
 
-		prStateColorFunc := cs.ColorFromString(shared.ColorForPR(pr))
+		prStateColorFunc := cs.ColorFromString(shared.ColorForPRState(pr))
 
 		fmt.Fprintf(w, "  %s  %s %s", prStateColorFunc(prNumber), text.Truncate(50, text.ReplaceExcessiveWhitespace(pr.Title)), cs.Cyan("["+pr.HeadLabel()+"]"))
 

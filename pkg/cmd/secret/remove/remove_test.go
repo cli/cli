@@ -2,7 +2,6 @@ package remove
 
 import (
 	"bytes"
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -57,6 +56,23 @@ func TestNewCmdRemove(t *testing.T) {
 				UserSecrets: true,
 			},
 		},
+		{
+			name: "Dependabot repo",
+			cli:  "cool --app Dependabot",
+			wants: RemoveOptions{
+				SecretName:  "cool",
+				Application: "Dependabot",
+			},
+		},
+		{
+			name: "Dependabot org",
+			cli:  "cool --app Dependabot --org UmbrellaCorporation",
+			wants: RemoveOptions{
+				SecretName:  "cool",
+				OrgName:     "UmbrellaCorporation",
+				Application: "Dependabot",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -95,32 +111,61 @@ func TestNewCmdRemove(t *testing.T) {
 }
 
 func Test_removeRun_repo(t *testing.T) {
-	reg := &httpmock.Registry{}
-
-	reg.Register(
-		httpmock.REST("DELETE", "repos/owner/repo/actions/secrets/cool_secret"),
-		httpmock.StatusStringResponse(204, "No Content"))
-
-	io, _, _, _ := iostreams.Test()
-
-	opts := &RemoveOptions{
-		IO: io,
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
+	tests := []struct {
+		name     string
+		opts     *RemoveOptions
+		wantPath string
+	}{
+		{
+			name: "Actions",
+			opts: &RemoveOptions{
+				Application: "actions",
+				SecretName:  "cool_secret",
+			},
+			wantPath: "repos/owner/repo/actions/secrets/cool_secret",
 		},
-		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
+		{
+			name: "Dependabot",
+			opts: &RemoveOptions{
+				Application: "dependabot",
+				SecretName:  "cool_dependabot_secret",
+			},
+			wantPath: "repos/owner/repo/dependabot/secrets/cool_dependabot_secret",
 		},
-		BaseRepo: func() (ghrepo.Interface, error) {
-			return ghrepo.FromFullName("owner/repo")
+		{
+			name: "defaults to Actions",
+			opts: &RemoveOptions{
+				SecretName: "cool_secret",
+			},
+			wantPath: "repos/owner/repo/actions/secrets/cool_secret",
 		},
-		SecretName: "cool_secret",
 	}
 
-	err := removeRun(opts)
-	assert.NoError(t, err)
+	for _, tt := range tests {
+		reg := &httpmock.Registry{}
 
-	reg.Verify(t)
+		reg.Register(
+			httpmock.REST("DELETE", tt.wantPath),
+			httpmock.StatusStringResponse(204, "No Content"))
+
+		io, _, _, _ := iostreams.Test()
+
+		tt.opts.IO = io
+		tt.opts.HttpClient = func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		}
+		tt.opts.Config = func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		}
+		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+			return ghrepo.FromFullName("owner/repo")
+		}
+
+		err := removeRun(tt.opts)
+		assert.NoError(t, err)
+
+		reg.Verify(t)
+	}
 }
 
 func Test_removeRun_env(t *testing.T) {
@@ -155,18 +200,24 @@ func Test_removeRun_env(t *testing.T) {
 
 func Test_removeRun_org(t *testing.T) {
 	tests := []struct {
-		name string
-		opts *RemoveOptions
+		name     string
+		opts     *RemoveOptions
+		wantPath string
 	}{
-		{
-			name: "repo",
-			opts: &RemoveOptions{},
-		},
 		{
 			name: "org",
 			opts: &RemoveOptions{
 				OrgName: "UmbrellaCorporation",
 			},
+			wantPath: "orgs/UmbrellaCorporation/actions/secrets/tVirus",
+		},
+		{
+			name: "Dependabot org",
+			opts: &RemoveOptions{
+				Application: "dependabot",
+				OrgName:     "UmbrellaCorporation",
+			},
+			wantPath: "orgs/UmbrellaCorporation/dependabot/secrets/tVirus",
 		},
 	}
 
@@ -174,17 +225,9 @@ func Test_removeRun_org(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
 
-			orgName := tt.opts.OrgName
-
-			if orgName == "" {
-				reg.Register(
-					httpmock.REST("DELETE", "repos/owner/repo/actions/secrets/tVirus"),
-					httpmock.StatusStringResponse(204, "No Content"))
-			} else {
-				reg.Register(
-					httpmock.REST("DELETE", fmt.Sprintf("orgs/%s/actions/secrets/tVirus", orgName)),
-					httpmock.StatusStringResponse(204, "No Content"))
-			}
+			reg.Register(
+				httpmock.REST("DELETE", tt.wantPath),
+				httpmock.StatusStringResponse(204, "No Content"))
 
 			io, _, _, _ := iostreams.Test()
 

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -18,6 +19,7 @@ type ReopenOptions struct {
 	Finder shared.PRFinder
 
 	SelectorArg string
+	Comment     string
 }
 
 func NewCmdReopen(f *cmdutil.Factory, runF func(*ReopenOptions) error) *cobra.Command {
@@ -43,6 +45,8 @@ func NewCmdReopen(f *cmdutil.Factory, runF func(*ReopenOptions) error) *cobra.Co
 			return reopenRun(opts)
 		},
 	}
+
+	cmd.Flags().StringVarP(&opts.Comment, "comment", "c", "", "Add a reopening comment")
 
 	return cmd
 }
@@ -72,6 +76,22 @@ func reopenRun(opts *ReopenOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
+	}
+
+	if opts.Comment != "" {
+		commentOpts := &shared.CommentableOptions{
+			Body:       opts.Comment,
+			HttpClient: opts.HttpClient,
+			InputType:  shared.InputTypeInline,
+			Quiet:      true,
+			RetrieveCommentable: func() (shared.Commentable, ghrepo.Interface, error) {
+				return pr, baseRepo, nil
+			},
+		}
+		err := shared.CommentableRun(commentOpts)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = api.PullRequestReopen(httpClient, baseRepo, pr.ID)

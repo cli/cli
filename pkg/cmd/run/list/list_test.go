@@ -108,24 +108,6 @@ func TestNewCmdList(t *testing.T) {
 }
 
 func TestListRun(t *testing.T) {
-	// helper to match mocked requests by their query params along with method and path
-	queryMatcher := func(method string, path string, query url.Values) httpmock.Matcher {
-		return func(req *http.Request) bool {
-			if !httpmock.REST(method, path)(req) {
-				return false
-			}
-
-			actualQuery := req.URL.Query()
-
-			for param := range query {
-				if !(actualQuery.Get(param) == query.Get(param)) {
-					return false
-				}
-			}
-
-			return true
-		}
-	}
 	tests := []struct {
 		name       string
 		opts       *ListOptions
@@ -244,7 +226,7 @@ func TestListRun(t *testing.T) {
 			},
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					queryMatcher("GET", "repos/OWNER/REPO/actions/runs", url.Values{
+					httpmock.QueryMatcher("GET", "repos/OWNER/REPO/actions/runs", url.Values{
 						"branch": []string{"the-branch"},
 					}),
 					httpmock.JSONResponse(shared.RunsPayload{}),
@@ -261,7 +243,7 @@ func TestListRun(t *testing.T) {
 			},
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					queryMatcher("GET", "repos/OWNER/REPO/actions/runs", url.Values{
+					httpmock.QueryMatcher("GET", "repos/OWNER/REPO/actions/runs", url.Values{
 						"actor": []string{"bak1an"},
 					}),
 					httpmock.JSONResponse(shared.RunsPayload{}),

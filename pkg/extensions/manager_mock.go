@@ -25,13 +25,16 @@ var _ ExtensionManager = &ExtensionManagerMock{}
 // 			DispatchFunc: func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (bool, error) {
 // 				panic("mock out the Dispatch method")
 // 			},
-// 			InstallFunc: func(interfaceMoqParam ghrepo.Interface) error {
+// 			EnableDryRunModeFunc: func()  {
+// 				panic("mock out the EnableDryRunMode method")
+// 			},
+// 			InstallFunc: func(interfaceMoqParam ghrepo.Interface, s string) error {
 // 				panic("mock out the Install method")
 // 			},
 // 			InstallLocalFunc: func(dir string) error {
 // 				panic("mock out the InstallLocal method")
 // 			},
-// 			ListFunc: func(includeMetadata bool) []Extension {
+// 			ListFunc: func() []Extension {
 // 				panic("mock out the List method")
 // 			},
 // 			RemoveFunc: func(name string) error {
@@ -53,14 +56,17 @@ type ExtensionManagerMock struct {
 	// DispatchFunc mocks the Dispatch method.
 	DispatchFunc func(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (bool, error)
 
+	// EnableDryRunModeFunc mocks the EnableDryRunMode method.
+	EnableDryRunModeFunc func()
+
 	// InstallFunc mocks the Install method.
-	InstallFunc func(interfaceMoqParam ghrepo.Interface) error
+	InstallFunc func(interfaceMoqParam ghrepo.Interface, s string) error
 
 	// InstallLocalFunc mocks the InstallLocal method.
 	InstallLocalFunc func(dir string) error
 
 	// ListFunc mocks the List method.
-	ListFunc func(includeMetadata bool) []Extension
+	ListFunc func() []Extension
 
 	// RemoveFunc mocks the Remove method.
 	RemoveFunc func(name string) error
@@ -88,10 +94,15 @@ type ExtensionManagerMock struct {
 			// Stderr is the stderr argument value.
 			Stderr io.Writer
 		}
+		// EnableDryRunMode holds details about calls to the EnableDryRunMode method.
+		EnableDryRunMode []struct {
+		}
 		// Install holds details about calls to the Install method.
 		Install []struct {
 			// InterfaceMoqParam is the interfaceMoqParam argument value.
 			InterfaceMoqParam ghrepo.Interface
+			// S is the s argument value.
+			S string
 		}
 		// InstallLocal holds details about calls to the InstallLocal method.
 		InstallLocal []struct {
@@ -100,8 +111,6 @@ type ExtensionManagerMock struct {
 		}
 		// List holds details about calls to the List method.
 		List []struct {
-			// IncludeMetadata is the includeMetadata argument value.
-			IncludeMetadata bool
 		}
 		// Remove holds details about calls to the Remove method.
 		Remove []struct {
@@ -116,13 +125,14 @@ type ExtensionManagerMock struct {
 			Force bool
 		}
 	}
-	lockCreate       sync.RWMutex
-	lockDispatch     sync.RWMutex
-	lockInstall      sync.RWMutex
-	lockInstallLocal sync.RWMutex
-	lockList         sync.RWMutex
-	lockRemove       sync.RWMutex
-	lockUpgrade      sync.RWMutex
+	lockCreate           sync.RWMutex
+	lockDispatch         sync.RWMutex
+	lockEnableDryRunMode sync.RWMutex
+	lockInstall          sync.RWMutex
+	lockInstallLocal     sync.RWMutex
+	lockList             sync.RWMutex
+	lockRemove           sync.RWMutex
+	lockUpgrade          sync.RWMutex
 }
 
 // Create calls CreateFunc.
@@ -203,20 +213,48 @@ func (mock *ExtensionManagerMock) DispatchCalls() []struct {
 	return calls
 }
 
+// EnableDryRunMode calls EnableDryRunModeFunc.
+func (mock *ExtensionManagerMock) EnableDryRunMode() {
+	if mock.EnableDryRunModeFunc == nil {
+		panic("ExtensionManagerMock.EnableDryRunModeFunc: method is nil but ExtensionManager.EnableDryRunMode was just called")
+	}
+	callInfo := struct {
+	}{}
+	mock.lockEnableDryRunMode.Lock()
+	mock.calls.EnableDryRunMode = append(mock.calls.EnableDryRunMode, callInfo)
+	mock.lockEnableDryRunMode.Unlock()
+	mock.EnableDryRunModeFunc()
+}
+
+// EnableDryRunModeCalls gets all the calls that were made to EnableDryRunMode.
+// Check the length with:
+//     len(mockedExtensionManager.EnableDryRunModeCalls())
+func (mock *ExtensionManagerMock) EnableDryRunModeCalls() []struct {
+} {
+	var calls []struct {
+	}
+	mock.lockEnableDryRunMode.RLock()
+	calls = mock.calls.EnableDryRunMode
+	mock.lockEnableDryRunMode.RUnlock()
+	return calls
+}
+
 // Install calls InstallFunc.
-func (mock *ExtensionManagerMock) Install(interfaceMoqParam ghrepo.Interface) error {
+func (mock *ExtensionManagerMock) Install(interfaceMoqParam ghrepo.Interface, s string) error {
 	if mock.InstallFunc == nil {
 		panic("ExtensionManagerMock.InstallFunc: method is nil but ExtensionManager.Install was just called")
 	}
 	callInfo := struct {
 		InterfaceMoqParam ghrepo.Interface
+		S                 string
 	}{
 		InterfaceMoqParam: interfaceMoqParam,
+		S:                 s,
 	}
 	mock.lockInstall.Lock()
 	mock.calls.Install = append(mock.calls.Install, callInfo)
 	mock.lockInstall.Unlock()
-	return mock.InstallFunc(interfaceMoqParam)
+	return mock.InstallFunc(interfaceMoqParam, s)
 }
 
 // InstallCalls gets all the calls that were made to Install.
@@ -224,9 +262,11 @@ func (mock *ExtensionManagerMock) Install(interfaceMoqParam ghrepo.Interface) er
 //     len(mockedExtensionManager.InstallCalls())
 func (mock *ExtensionManagerMock) InstallCalls() []struct {
 	InterfaceMoqParam ghrepo.Interface
+	S                 string
 } {
 	var calls []struct {
 		InterfaceMoqParam ghrepo.Interface
+		S                 string
 	}
 	mock.lockInstall.RLock()
 	calls = mock.calls.Install
@@ -266,29 +306,24 @@ func (mock *ExtensionManagerMock) InstallLocalCalls() []struct {
 }
 
 // List calls ListFunc.
-func (mock *ExtensionManagerMock) List(includeMetadata bool) []Extension {
+func (mock *ExtensionManagerMock) List() []Extension {
 	if mock.ListFunc == nil {
 		panic("ExtensionManagerMock.ListFunc: method is nil but ExtensionManager.List was just called")
 	}
 	callInfo := struct {
-		IncludeMetadata bool
-	}{
-		IncludeMetadata: includeMetadata,
-	}
+	}{}
 	mock.lockList.Lock()
 	mock.calls.List = append(mock.calls.List, callInfo)
 	mock.lockList.Unlock()
-	return mock.ListFunc(includeMetadata)
+	return mock.ListFunc()
 }
 
 // ListCalls gets all the calls that were made to List.
 // Check the length with:
 //     len(mockedExtensionManager.ListCalls())
 func (mock *ExtensionManagerMock) ListCalls() []struct {
-	IncludeMetadata bool
 } {
 	var calls []struct {
-		IncludeMetadata bool
 	}
 	mock.lockList.RLock()
 	calls = mock.calls.List
