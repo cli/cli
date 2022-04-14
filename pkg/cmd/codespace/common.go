@@ -73,7 +73,7 @@ func startSession(ctx context.Context, codespace *api.Codespace, a *App, debug b
 	if debug {
 		debugLogger, err := newFileLogger(debugFile)
 		if err != nil {
-			return nil, nil, fmt.Errorf("error creating debug logger: %w", err)
+			return nil, nil, err
 		}
 		defer safeClose(debugLogger, &err)
 
@@ -86,7 +86,7 @@ func startSession(ctx context.Context, codespace *api.Codespace, a *App, debug b
 		if authErr := <-authkeys; authErr != nil {
 			return nil, nil, authErr
 		}
-		return nil, nil, fmt.Errorf("error connecting to codespace: %w", err)
+		return nil, nil, err
 	}
 	return session, func(e *error) { safeClose(session, e) }, nil
 }
