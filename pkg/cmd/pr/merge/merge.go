@@ -72,7 +72,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			Merge a pull request on GitHub.
 
 			Without an argument, the pull request that belongs to the current branch
-			is selected.			
+			is selected.
     	`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -303,7 +303,7 @@ func mergeRun(opts *MergeOptions) error {
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
-	} else if crossRepoPR {
+	} else {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d was already merged\n", cs.WarningIcon(), pr.Number)
 	}
 
