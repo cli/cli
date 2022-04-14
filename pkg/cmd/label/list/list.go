@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/label/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
@@ -101,15 +102,9 @@ func printLabels(io *iostreams.IOStreams, labels []shared.Label) error {
 	table := utils.NewTablePrinter(io)
 
 	for _, label := range labels {
-		labelName := ""
-		if table.IsTTY() {
-			labelName = cs.HexToRGB(label.Color, label.Name)
-		} else {
-			labelName = label.Name
-		}
-
-		table.AddField(labelName, nil, nil)
-		table.AddField(label.Description, nil, nil)
+		table.AddField(label.Name, nil, cs.ColorFromRGB(label.Color))
+		table.AddField(label.Description, text.Truncate, nil)
+		table.AddField("#"+label.Color, nil, nil)
 
 		table.EndRow()
 	}
