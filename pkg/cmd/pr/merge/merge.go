@@ -314,7 +314,7 @@ func mergeRun(opts *MergeOptions) error {
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
-	} else if crossRepoPR {
+	} else {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d was already merged\n", cs.WarningIcon(), pr.Number)
 	}
 
