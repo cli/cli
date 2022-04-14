@@ -74,7 +74,7 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 	}
 
 	var exe string
-	extName := args[0]
+	extName := normalizeExtensionSelector(args[0])
 	forwardArgs := args[1:]
 
 	exts, _ := m.list(false)

@@ -29,7 +29,9 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 			The name of the extension repository must start with "gh-" and it must contain an
 			executable of the same name. All arguments passed to the %[1]sgh <extname>%[1]s invocation
-			will be forwarded to the %[1]sgh-<extname>%[1]s executable of the extension.
+			will be forwarded to the %[1]sgh-<extname>%[1]s executable of the extension. You can also
+			pass the extension repository's organization and name like "owner/gh-extension" to
+			disambiguate extensions with the same <extname>.
 
 			An extension cannot override any of the core gh commands.
 
@@ -214,6 +216,33 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					fmt.Fprintf(io.Out, "%s Removed extension %s\n", cs.SuccessIcon(), extName)
 				}
 				return nil
+			},
+		},
+		&cobra.Command{
+			Use:   "run <name> [args]",
+			Short: "Run an installed extension",
+			Long: heredoc.Doc(`
+			Run an extension using either the extension name, or the extension repository's
+			organization and name. For example, if the extension repository is
+			"owner/gh-extension", you can pass either "extension" or "owner/gh-extension".
+
+			Use the extension repository's organization and name to disambiguate extensions
+			that have the same name, or share a name with a built-in command.
+
+			All arguments after the extension name will be forwarded to the executable
+			of the extension.
+			`),
+			Example: heredoc.Doc(`
+			$ gh extension run extension
+			$ gh extension run owner/gh-extension
+			`),
+			Args: cobra.MinimumNArgs(1),
+			RunE: func(cmd *cobra.Command, args []string) error {
+				if found, err := m.Dispatch(args, os.Stdin, os.Stdout, os.Stderr); !found {
+					return fmt.Errorf("command %s not found", args[0])
+				} else {
+					return err
+				}
 			},
 		},
 		func() *cobra.Command {
