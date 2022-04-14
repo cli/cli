@@ -121,11 +121,11 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		return err
 	}
 
-	session, closeSession, err := startSession(ctx, codespace, a, opts.debug, opts.debugFile)
+	session, endSession, err := startLiveShareSession(ctx, codespace, a, opts.debug, opts.debugFile)
 	if err != nil {
 		return err
 	}
-	defer closeSession(&err)
+	defer endSession(&err)
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)

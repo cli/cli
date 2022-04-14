@@ -61,7 +61,8 @@ func (a *App) StopProgressIndicator() {
 	a.io.StopProgressIndicator()
 }
 
-func startSession(ctx context.Context, codespace *api.Codespace, a *App, debug bool, debugFile string) (*liveshare.Session, func(*error), error) {
+// Connects to a codespace using Live Share and returns that session along with a function to end it
+func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App, debug bool, debugFile string) (*liveshare.Session, func(*error), error) {
 	// While connecting, ensure in the background that the user has keys installed.
 	// That lets us report a more useful error message if they don't.
 	authkeys := make(chan error, 1)

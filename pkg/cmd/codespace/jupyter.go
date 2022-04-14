@@ -37,11 +37,11 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) error {
 		return err
 	}
 
-	session, closeSession, err := startSession(ctx, codespace, a, false, "")
+	session, endSession, err := startLiveShareSession(ctx, codespace, a, false, "")
 	if err != nil {
 		return err
 	}
-	defer closeSession(&err)
+	defer endSession(&err)
 
 	a.StartProgressIndicatorWithLabel("Starting JupyterLab on codespace")
 	serverPort, serverUrl, err := session.StartJupyterServer(ctx)
