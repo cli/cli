@@ -75,6 +75,8 @@ func (a *App) Jupyter(ctx context.Context, opts jupyterOptions) error {
 		return err
 	}
 
+	fmt.Println(targetUrl)
+
 	select {
 	case err := <-tunnelClosed:
 		return fmt.Errorf("tunnel closed: %w", err)
