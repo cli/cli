@@ -1,11 +1,10 @@
-package list
+package label
 
 import (
 	"fmt"
 	"net/http"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/pkg/cmd/label/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/text"
@@ -17,7 +16,7 @@ type browser interface {
 	Browse(string) error
 }
 
-type ListOptions struct {
+type listOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser
 	HttpClient func() (*http.Client, error)
@@ -27,8 +26,8 @@ type ListOptions struct {
 	WebMode bool
 }
 
-func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
-	opts := ListOptions{
+func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Command {
+	opts := listOptions{
 		Browser:    f.Browser,
 		HttpClient: f.HttpClient,
 		IO:         f.IOStreams,
@@ -61,7 +60,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	return cmd
 }
 
-func listRun(opts *ListOptions) error {
+func listRun(opts *listOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -101,7 +100,7 @@ func listRun(opts *ListOptions) error {
 	return printLabels(opts.IO, labels)
 }
 
-func printLabels(io *iostreams.IOStreams, labels []shared.Label) error {
+func printLabels(io *iostreams.IOStreams, labels []label) error {
 	cs := io.ColorScheme()
 	table := utils.NewTablePrinter(io)
 

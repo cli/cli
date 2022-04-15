@@ -1,14 +1,13 @@
-package list
+package label
 
 import (
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/pkg/cmd/label/shared"
 )
 
-func listLabels(client *http.Client, repo ghrepo.Interface, limit int) ([]shared.Label, int, error) {
+func listLabels(client *http.Client, repo ghrepo.Interface, limit int) ([]label, int, error) {
 	apiClient := api.NewClientFromHTTP(client)
 	query := `
 	query LabelList($owner: String!,$repo: String!, $limit: Int!, $endCursor: String) {
@@ -37,7 +36,7 @@ func listLabels(client *http.Client, repo ghrepo.Interface, limit int) ([]shared
 		Repository struct {
 			Labels struct {
 				TotalCount int
-				Nodes      []shared.Label
+				Nodes      []label
 				PageInfo   struct {
 					HasNextPage bool
 					EndCursor   string
@@ -47,7 +46,7 @@ func listLabels(client *http.Client, repo ghrepo.Interface, limit int) ([]shared
 		}
 	}
 
-	var labels []shared.Label
+	var labels []label
 	var totalCount int
 	pageLimit := min(limit, 100)
 
