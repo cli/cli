@@ -49,7 +49,7 @@ func TestListRun(t *testing.T) {
 			},
 			wantStdout: "",
 			wantStderr: "No GPG keys present in GitHub account.\n",
-			wantErr:    true,
+			wantErr:    false,
 		},
 	}
 

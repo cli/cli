@@ -101,7 +101,7 @@ func TestListRun(t *testing.T) {
 			},
 			wantStdout: "",
 			wantStderr: "No SSH keys present in GitHub account.\n",
-			wantErr:    true,
+			wantErr:    false,
 		},
 	}
 

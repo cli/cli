@@ -94,7 +94,7 @@ func TestListRun(t *testing.T) {
 			},
 			wantStdout: "",
 			wantStderr: "No deploy keys found in OWNER/REPO\n",
-			wantErr:    true,
+			wantErr:    false,
 		},
 	}
 
