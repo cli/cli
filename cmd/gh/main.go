@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,7 +15,6 @@ import (
 	surveyCore "github.com/AlecAivazis/survey/v2/core"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/build"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -173,19 +173,24 @@ func mainRun() exitCode {
 		if aliases, err := cfg.Aliases(); err == nil {
 			for aliasName, aliasValue := range aliases.All() {
 				if strings.HasPrefix(aliasName, toComplete) {
-					results = append(results, aliasName+"\tAlias for "+aliasValue)
+					s := fmt.Sprintf("%s\tAlias for %q", aliasName, aliasValue)
+					results = append(results, s)
 				}
 			}
 		}
 		for _, ext := range cmdFactory.ExtensionManager.List() {
 			if strings.HasPrefix(ext.Name(), toComplete) {
-				repo := ext.URL()
-				if u, err := git.ParseURL(ext.URL()); err == nil {
-					if r, err := ghrepo.FromURL(u); err == nil {
-						repo = ghrepo.FullName(r)
+				if ext.IsLocal() {
+					s := fmt.Sprintf("%s\tLocal extension gh-%s", ext.Name(), ext.Name())
+					results = append(results, s)
+				} else {
+					path := ext.URL()
+					if u, err := url.Parse(ext.URL()); err == nil {
+						path = u.Path[1:]
 					}
+					s := fmt.Sprintf("%s\tExtension %s", ext.Name(), path)
+					results = append(results, s)
 				}
-				results = append(results, ext.Name()+"\tExtension "+repo+", version "+ext.CurrentVersion())
 			}
 		}
 		return results, cobra.ShellCompDirectiveNoFileComp
