@@ -1,15 +1,21 @@
 package base
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
+	"sort"
+	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/spf13/cobra"
 )
 
@@ -18,10 +24,11 @@ type DefaultOptions struct {
 	Remotes    func() (context.Remotes, error)
 	HttpClient func() (*http.Client, error)
 
-	ViewFlag bool
+	Repo     ghrepo.Interface
+	ViewMode bool
 }
 
-func NewCmdDefault(f *cmdutil.Factory) *cobra.Command {
+func NewCmdDefault(f *cmdutil.Factory, runF func(*DefaultOptions) error) *cobra.Command {
 	opts := &DefaultOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
@@ -29,51 +36,60 @@ func NewCmdDefault(f *cmdutil.Factory) *cobra.Command {
 	}
 
 	cmd := &cobra.Command{
-		Use:   "default",
-		Short: "Configure the default repository used for various commands",
-		Long: heredoc.Doc(`
-		The default repository is used to determine which remote 
-		repository gh should automatically point to.
-		`),
-		Example: heredoc.Doc(`
-			$ gh repo default
-			#=> prompts remote options
+		Use:   "default [<repository>]",
+		Short: "Configure default repository",
+		Long: heredoc.Docf(`
+			Set default repository for current directory.
 
-			$ gh repo default -v
-			#=> cli/cli
-		`),
-		Annotations: map[string]string{
-			"help:environment": heredoc.Doc(`
-				To manually configure a remote for gh to use, modify your local repo's git config
-
-				; Ex: setting gh to use the upstream remote
-				[remote "upstream"]
- 					gh-resolved = base
-				...
-			`),
-		},
-		Args: cobra.NoArgs,
+			The default repository is used as the target
+			repository for various commands such as %[1]spr%[1]s, %[1]sissue%[1]s,
+			and %[1]srepo%[1]s.
+		`, "`"),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runDefault(opts)
+			if len(args) > 0 {
+				var err error
+				opts.Repo, err = ghrepo.FromFullName(args[0])
+				if err != nil {
+					return err
+				}
+			}
+
+			if !opts.IO.CanPrompt() && opts.Repo == nil {
+				return cmdutil.FlagErrorf("repository required when not running interactively")
+			}
+
+			if !git.IsGitDirectory() {
+				return errors.New("must be run from inside a git repository")
+			}
+
+			if runF != nil {
+				return runF(opts)
+			}
+
+			return defaultRun(opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.ViewFlag, "view", "v", false, "view the default repository used for various commands")
+	cmd.Flags().BoolVarP(&opts.ViewMode, "view", "v", false, "view the current default repository")
+
 	return cmd
 }
 
-func runDefault(opts *DefaultOptions) error {
+func defaultRun(opts *DefaultOptions) error {
 	remotes, err := opts.Remotes()
 	if err != nil {
 		return err
 	}
 
-	if opts.ViewFlag {
-		baseRepo, err := context.GetBaseRepo(remotes)
-		if err != nil {
-			return err
+	currentDefaultRepo, _ := remotes.ResolvedRemote()
+
+	if opts.ViewMode {
+		if currentDefaultRepo == nil {
+			fmt.Fprintln(opts.IO.Out, "no default repo has been set; use `gh repo default` to select one")
+		} else {
+			fmt.Fprintln(opts.IO.Out, displayRemoteRepoName(currentDefaultRepo))
 		}
-		fmt.Fprintln(opts.IO.Out, ghrepo.FullName(baseRepo))
 		return nil
 	}
 
@@ -82,12 +98,107 @@ func runDefault(opts *DefaultOptions) error {
 		return err
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
-	repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, "")
+
+	resolvedRemotes, err := context.ResolveRemotesToRepos(remotes, apiClient, "")
 	if err != nil {
 		return err
 	}
-	if err = context.RemoveBaseRepo(remotes); err != nil {
+
+	knownRepos, err := resolvedRemotes.NetworkRepos()
+	if err != nil {
 		return err
 	}
-	return repoContext.SetBaseRepo(opts.IO)
+	if len(knownRepos) == 0 {
+		return errors.New("none of the git remotes correspond to a valid remote repository")
+	}
+
+	var selectedRepo ghrepo.Interface
+
+	if opts.Repo != nil {
+		for _, knownRepo := range knownRepos {
+			if ghrepo.IsSame(opts.Repo, knownRepo) {
+				selectedRepo = opts.Repo
+				break
+			}
+		}
+		if selectedRepo == nil {
+			return fmt.Errorf("%s does not correspond to any git remotes", ghrepo.FullName(opts.Repo))
+		}
+	}
+
+	if selectedRepo == nil {
+		if len(knownRepos) == 1 {
+			selectedRepo = knownRepos[0]
+		} else {
+			var repoNames []string
+			var selectedName string
+			current := ""
+			if currentDefaultRepo != nil {
+				current = ghrepo.FullName(currentDefaultRepo)
+			}
+
+			for _, knownRepo := range knownRepos {
+				repoNames = append(repoNames, ghrepo.FullName(knownRepo))
+			}
+
+			err := prompt.SurveyAskOne(&survey.Select{
+				Message: "Which should be the default repository (used for e.g. querying issues) for this directory?",
+				Options: repoNames,
+				Default: current,
+			}, &selectedName)
+			if err != nil {
+				return err
+			}
+
+			owner, repo, _ := strings.Cut(selectedName, "/")
+			selectedRepo = ghrepo.New(owner, repo)
+		}
+	}
+
+	resolution := "base"
+	selectedRemote, _ := resolvedRemotes.RemoteForRepo(selectedRepo)
+	if selectedRemote == nil {
+		sort.Stable(remotes)
+		selectedRemote = remotes[0]
+		resolution = ghrepo.FullName(selectedRepo)
+	}
+
+	if currentDefaultRepo != nil {
+		if err := unsetDefaultRepo(currentDefaultRepo); err != nil {
+			return err
+		}
+	}
+
+	err = setDefaultRepo(selectedRemote, resolution)
+	if err != nil {
+		return err
+	}
+
+	if opts.IO.IsStdoutTTY() {
+		cs := opts.IO.ColorScheme()
+		fmt.Fprintf(opts.IO.Out, "%s Set %s as the default repository for the current directory\n", cs.SuccessIcon(), ghrepo.FullName(selectedRepo))
+	}
+
+	return nil
+}
+
+func displayRemoteRepoName(remote *context.Remote) string {
+	if remote.Resolved == "" || remote.Resolved == "base" {
+		return ghrepo.FullName(remote)
+	}
+
+	repo, err := ghrepo.FromFullName(remote.Resolved)
+	if err != nil {
+		return ghrepo.FullName(remote)
+	}
+
+	return ghrepo.FullName(repo)
+}
+
+func setDefaultRepo(remote *context.Remote, resolution string) error {
+	return git.SetRemoteResolution(remote.Name, resolution)
+}
+
+func unsetDefaultRepo(remote *context.Remote) error {
+	return git.UnsetRemoteResolution(remote.Name)
 }

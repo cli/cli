@@ -394,7 +394,6 @@ func ToplevelDir() (string, error) {
 	}
 	output, err := run.PrepareCmd(showCmd).Output()
 	return firstLine(output), err
-
 }
 
 // ToplevelDirFromPath returns the top-level given path of the current repository
@@ -438,4 +437,17 @@ func firstLine(output []byte) string {
 func getBranchShortName(output []byte) string {
 	branch := firstLine(output)
 	return strings.TrimPrefix(branch, "refs/heads/")
+}
+
+func IsGitDirectory() bool {
+	showCmd, err := GitCommand("rev-parse", "--is-inside-work-tree")
+	if err != nil {
+		return false
+	}
+	output, err := run.PrepareCmd(showCmd).Output()
+	if err != nil {
+		return false
+	}
+	out := firstLine(output)
+	return out == "true"
 }

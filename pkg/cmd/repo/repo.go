@@ -53,7 +53,7 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(repoRenameCmd.NewCmdRename(f, nil))
 	cmd.AddCommand(repoDeleteCmd.NewCmdDelete(f, nil))
 	cmd.AddCommand(repoArchiveCmd.NewCmdArchive(f, nil))
-	cmd.AddCommand(repoDefaultCmd.NewCmdDefault(f))
+	cmd.AddCommand(repoDefaultCmd.NewCmdDefault(f, nil))
 
 	return cmd
 }
