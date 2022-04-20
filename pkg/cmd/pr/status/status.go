@@ -67,7 +67,6 @@ func statusRun(opts *StatusOptions) error {
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
@@ -91,7 +90,7 @@ func statusRun(opts *StatusOptions) error {
 		}
 	}
 
-	options := api.StatusOptions{
+	options := requestOptions{
 		Username:  "@me",
 		CurrentPR: currentPRNumber,
 		HeadRef:   currentPRHeadRef,
@@ -99,7 +98,7 @@ func statusRun(opts *StatusOptions) error {
 	if opts.Exporter != nil {
 		options.Fields = opts.Exporter.Fields()
 	}
-	prPayload, err := api.PullRequestStatus(apiClient, baseRepo, options)
+	prPayload, err := pullRequestStatus(httpClient, baseRepo, options)
 	if err != nil {
 		return err
 	}
