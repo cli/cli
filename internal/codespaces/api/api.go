@@ -564,6 +564,7 @@ type CreateCodespaceParams struct {
 	Branch             string
 	Machine            string
 	Location           string
+	DevContainerPath   string
 	VSCSTarget         string
 	VSCSTargetURL      string
 	PermissionsOptOut  bool
@@ -612,6 +613,7 @@ type startCreateRequest struct {
 	Ref                string `json:"ref"`
 	Location           string `json:"location"`
 	Machine            string `json:"machine"`
+	DevContainerPath   string `json:"devcontainer_path,omitempty"`
 	VSCSTarget         string `json:"vscs_target,omitempty"`
 	VSCSTargetURL      string `json:"vscs_target_url,omitempty"`
 	PermissionsOptOut  bool   `json:"multi_repo_permissions_opt_out"`
@@ -643,6 +645,7 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 		Ref:                params.Branch,
 		Location:           params.Location,
 		Machine:            params.Machine,
+		DevContainerPath:   params.DevContainerPath,
 		VSCSTarget:         params.VSCSTarget,
 		VSCSTargetURL:      params.VSCSTargetURL,
 		PermissionsOptOut:  params.PermissionsOptOut,
@@ -725,6 +728,73 @@ func (a *API) DeleteCodespace(ctx context.Context, codespaceName string) error {
 	}
 
 	return nil
+}
+
+type DevContainerEntry struct {
+	Path string `json:"path"`
+	Name string `json:"name,omitempty"`
+}
+
+// ListDevContainers returns a list of valid devcontainer.json files for the repo. Pass a negative limit to request all pages from
+// the API until all devcontainer.json files have been fetched.
+func (a *API) ListDevContainers(ctx context.Context, repoID int, branch string, limit int) (devcontainers []DevContainerEntry, err error) {
+	perPage := 100
+	if limit > 0 && limit < 100 {
+		perPage = limit
+	}
+
+	v := url.Values{}
+	v.Set("per_page", strconv.Itoa(perPage))
+	if branch != "" {
+		v.Set("ref", branch)
+	}
+	listURL := fmt.Sprintf("%s/repositories/%d/codespaces/devcontainers?%s", a.githubAPI, repoID, v.Encode())
+
+	for {
+		req, err := http.NewRequest(http.MethodGet, listURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("error creating request: %w", err)
+		}
+		a.setHeaders(req)
+
+		resp, err := a.do(ctx, req, fmt.Sprintf("/repositories/%d/codespaces/devcontainers", repoID))
+		if err != nil {
+			return nil, fmt.Errorf("error making request: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, api.HandleHTTPError(resp)
+		}
+
+		var response struct {
+			Devcontainers []DevContainerEntry `json:"devcontainers"`
+		}
+
+		dec := json.NewDecoder(resp.Body)
+		if err := dec.Decode(&response); err != nil {
+			return nil, fmt.Errorf("error unmarshaling response: %w", err)
+		}
+
+		nextURL := findNextPage(resp.Header.Get("Link"))
+		devcontainers = append(devcontainers, response.Devcontainers...)
+
+		if nextURL == "" || (limit > 0 && len(devcontainers) >= limit) {
+			break
+		}
+
+		if newPerPage := limit - len(devcontainers); limit > 0 && newPerPage < 100 {
+			u, _ := url.Parse(nextURL)
+			q := u.Query()
+			q.Set("per_page", strconv.Itoa(newPerPage))
+			u.RawQuery = q.Encode()
+			listURL = u.String()
+		} else {
+			listURL = nextURL
+		}
+	}
+
+	return devcontainers, nil
 }
 
 type EditCodespaceParams struct {

@@ -85,6 +85,15 @@ func ValidURL(urlStr string) bool {
 	return len(urlStr) < 8192
 }
 
+func StringInSlice(a string, slice []string) bool {
+	for _, b := range slice {
+		if b == a {
+			return true
+		}
+	}
+	return false
+}
+
 func IsDebugEnabled() (bool, string) {
 	debugValue, isDebugSet := os.LookupEnv("GH_DEBUG")
 	legacyDebugValue := os.Getenv("DEBUG")

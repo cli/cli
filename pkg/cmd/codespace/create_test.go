@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestApp_Create(t *testing.T) {
@@ -34,6 +35,9 @@ func TestApp_Create(t *testing.T) {
 							FullName:      nwo,
 							DefaultBranch: "main",
 						}, nil
+					},
+					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+						return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
 					},
 					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
 						return []*api.Machine{
@@ -97,6 +101,60 @@ func TestApp_Create(t *testing.T) {
 						if params.IdleTimeoutMinutes != 30 {
 							return nil, fmt.Errorf("idle timeout minutes was %v", params.IdleTimeoutMinutes)
 						}
+						if params.DevContainerPath != ".devcontainer/foobar/devcontainer.json" {
+							return nil, fmt.Errorf("got dev container path %q, want %q", params.DevContainerPath, ".devcontainer/foobar/devcontainer.json")
+						}
+						return &api.Codespace{
+							Name: "monalisa-dotfiles-abcd1234",
+						}, nil
+					},
+				},
+			},
+			opts: createOptions{
+				repo:             "monalisa/dotfiles",
+				branch:           "",
+				machine:          "GIGA",
+				showStatus:       false,
+				idleTimeout:      30 * time.Minute,
+				devContainerPath: ".devcontainer/foobar/devcontainer.json",
+			},
+			wantStdout: "monalisa-dotfiles-abcd1234\n",
+		},
+		{
+			name: "create codespace with default branch with default devcontainer if no path provided and no devcontainer files exist in the repo",
+			fields: fields{
+				apiClient: &apiClientMock{
+					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
+						return "EUROPE", nil
+					},
+					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+						return &api.Repository{
+							ID:            1234,
+							FullName:      nwo,
+							DefaultBranch: "main",
+						}, nil
+					},
+					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+						return []api.DevContainerEntry{}, nil
+					},
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
+						return []*api.Machine{
+							{
+								Name:        "GIGA",
+								DisplayName: "Gigabits of a machine",
+							},
+						}, nil
+					},
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						if params.Branch != "main" {
+							return nil, fmt.Errorf("got branch %q, want %q", params.Branch, "main")
+						}
+						if params.IdleTimeoutMinutes != 30 {
+							return nil, fmt.Errorf("idle timeout minutes was %v", params.IdleTimeoutMinutes)
+						}
+						if params.DevContainerPath != "" {
+							return nil, fmt.Errorf("got dev container path %q, want %q", params.DevContainerPath, ".devcontainer/foobar/devcontainer.json")
+						}
 						return &api.Codespace{
 							Name:              "monalisa-dotfiles-abcd1234",
 							IdleTimeoutNotice: "Idle timeout for this codespace is set to 10 minutes in compliance with your organization's policy",
@@ -119,6 +177,34 @@ func TestApp_Create(t *testing.T) {
 			isTTY:      true,
 		},
 		{
+			name: "returns error when getting devcontainer paths fails",
+			fields: fields{
+				apiClient: &apiClientMock{
+					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
+						return "EUROPE", nil
+					},
+					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+						return &api.Repository{
+							ID:            1234,
+							FullName:      nwo,
+							DefaultBranch: "main",
+						}, nil
+					},
+					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+						return nil, fmt.Errorf("some error")
+					},
+				},
+			},
+			opts: createOptions{
+				repo:        "monalisa/dotfiles",
+				branch:      "",
+				machine:     "GIGA",
+				showStatus:  false,
+				idleTimeout: 30 * time.Minute,
+			},
+			wantErr: fmt.Errorf("error getting devcontainer.json paths: some error"),
+		},
+		{
 			name: "create codespace with default branch does not show idle timeout notice if not conntected to terminal",
 			fields: fields{
 				apiClient: &apiClientMock{
@@ -131,6 +217,9 @@ func TestApp_Create(t *testing.T) {
 							FullName:      nwo,
 							DefaultBranch: "main",
 						}, nil
+					},
+					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+						return []api.DevContainerEntry{}, nil
 					},
 					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
 						return []*api.Machine{
@@ -178,6 +267,9 @@ func TestApp_Create(t *testing.T) {
 							FullName:      nwo,
 							DefaultBranch: "main",
 						}, nil
+					},
+					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+						return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
 					},
 					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
 						return []*api.Machine{
@@ -228,8 +320,9 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 				io:        io,
 				apiClient: tt.fields.apiClient,
 			}
-			if err := a.Create(context.Background(), tt.opts); err != tt.wantErr {
-				t.Errorf("App.Create() error = %v, wantErr %v", err, tt.wantErr)
+
+			if err := a.Create(context.Background(), tt.opts); err != nil && tt.wantErr != nil {
+				assert.EqualError(t, err, tt.wantErr.Error())
 			}
 			if got := stdout.String(); got != tt.wantStdout {
 				t.Errorf("stdout = %v, want %v", got, tt.wantStdout)

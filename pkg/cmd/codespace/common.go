@@ -73,6 +73,7 @@ type apiClient interface {
 	AuthorizedKeys(ctx context.Context, user string) ([]byte, error)
 	GetCodespacesMachines(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error)
 	GetCodespaceRepositoryContents(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
+	ListDevContainers(ctx context.Context, repoID int, branch string, limit int) (devcontainers []api.DevContainerEntry, err error)
 	GetCodespaceRepoSuggestions(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error)
 }
 
