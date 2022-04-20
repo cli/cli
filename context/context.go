@@ -112,7 +112,7 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, e
 	}
 
 	// determine corresponding git remote
-	owner, repo, _ := strings.Cut(baseName, "/")
+	owner, repo, _ := cut(baseName, "/")
 	selectedRepo := ghrepo.New(owner, repo)
 	resolution := "base"
 	remote, _ := r.RemoteForRepo(selectedRepo)
@@ -183,4 +183,11 @@ func (r *ResolvedRemotes) RemoteForRepo(repo ghrepo.Interface) (*Remote, error) 
 		}
 	}
 	return nil, errors.New("not found")
+}
+
+func cut(s, sep string) (before, after string, found bool) {
+	if i := strings.Index(s, sep); i >= 0 {
+		return s[:i], s[i+len(sep):], true
+	}
+	return s, "", false
 }

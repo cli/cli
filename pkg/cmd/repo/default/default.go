@@ -150,7 +150,7 @@ func defaultRun(opts *DefaultOptions) error {
 				return err
 			}
 
-			owner, repo, _ := strings.Cut(selectedName, "/")
+			owner, repo, _ := cut(selectedName, "/")
 			selectedRepo = ghrepo.New(owner, repo)
 		}
 	}
@@ -201,4 +201,11 @@ func setDefaultRepo(remote *context.Remote, resolution string) error {
 
 func unsetDefaultRepo(remote *context.Remote) error {
 	return git.UnsetRemoteResolution(remote.Name)
+}
+
+func cut(s, sep string) (before, after string, found bool) {
+	if i := strings.Index(s, sep); i >= 0 {
+		return s[:i], s[i+len(sep):], true
+	}
+	return s, "", false
 }
