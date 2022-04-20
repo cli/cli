@@ -17,7 +17,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 	var appAuthor string
 	opts := &shared.IssuesOptions{
 		Browser: f.Browser,
-		Entity:  shared.Issues,
+		Entity:  shared.PullRequests,
 		IO:      f.IOStreams,
 		Query: search.Query{Kind: search.KindIssues,
 			Qualifiers: search.Qualifiers{Type: "pr"}},
