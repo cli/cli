@@ -215,6 +215,15 @@ func (r Repository) RepoHost() string {
 	return r.hostname
 }
 
+// String returns the [HOST/]OWNER/NAME of the repository
+func (r Repository) String() string {
+	if r.hostname != "" {
+		return fmt.Sprintf("%s/%s/%s", r.hostname, r.Owner.Login, r.Name)
+	}
+
+	return fmt.Sprintf("%s/%s", r.Owner.Login, r.Name)
+}
+
 // ViewerCanPush is true when the requesting user has push access
 func (r Repository) ViewerCanPush() bool {
 	switch r.ViewerPermission {

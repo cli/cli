@@ -12,6 +12,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const listLimit = 30
+
 type browser interface {
 	Browse(string) error
 }
@@ -55,7 +57,7 @@ func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "List labels in the web browser")
-	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 30, "Maximum number of items to fetch")
+	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", listLimit, "Maximum number of items to fetch")
 
 	return cmd
 }
