@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/githubtemplate"
@@ -109,55 +108,6 @@ func listPullRequestTemplates(httpClient *http.Client, repo ghrepo.Interface) ([
 	return templates, nil
 }
 
-func hasTemplateSupport(httpClient *http.Client, hostname string, isPR bool) (bool, error) {
-	if !ghinstance.IsEnterprise(hostname) {
-		return true, nil
-	}
-
-	var featureDetection struct {
-		Repository struct {
-			Fields []struct {
-				Name string
-			} `graphql:"fields(includeDeprecated: true)"`
-		} `graphql:"Repository: __type(name: \"Repository\")"`
-		CreateIssueInput struct {
-			InputFields []struct {
-				Name string
-			}
-		} `graphql:"CreateIssueInput: __type(name: \"CreateIssueInput\")"`
-	}
-
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), httpClient)
-	err := gql.QueryNamed(context.Background(), "IssueTemplates_fields", &featureDetection, nil)
-	if err != nil {
-		return false, err
-	}
-
-	var hasIssueQuerySupport bool
-	var hasIssueMutationSupport bool
-	var hasPullRequestQuerySupport bool
-
-	for _, field := range featureDetection.Repository.Fields {
-		if field.Name == "issueTemplates" {
-			hasIssueQuerySupport = true
-		}
-		if field.Name == "pullRequestTemplates" {
-			hasPullRequestQuerySupport = true
-		}
-	}
-	for _, field := range featureDetection.CreateIssueInput.InputFields {
-		if field.Name == "issueTemplate" {
-			hasIssueMutationSupport = true
-		}
-	}
-
-	if isPR {
-		return hasPullRequestQuerySupport, nil
-	} else {
-		return hasIssueQuerySupport && hasIssueMutationSupport, nil
-	}
-}
-
 type Template interface {
 	Name() string
 	NameForSubmit() string
@@ -170,8 +120,8 @@ type templateManager struct {
 	allowFS    bool
 	isPR       bool
 	httpClient *http.Client
+	detector   fd.Detector
 
-	cachedClient   *http.Client
 	templates      []Template
 	legacyTemplate Template
 
@@ -186,14 +136,21 @@ func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, dir stri
 		allowFS:    allowFS,
 		isPR:       isPR,
 		httpClient: httpClient,
+		detector:   fd.NewDetector(httpClient, repo.RepoHost()),
 	}
 }
 
 func (m *templateManager) hasAPI() (bool, error) {
-	if m.cachedClient == nil {
-		m.cachedClient = api.NewCachedClient(m.httpClient, time.Hour*24)
+	features, err := m.detector.RepositoryFeatures()
+	if err != nil {
+		return false, err
 	}
-	return hasTemplateSupport(m.cachedClient, m.repo.RepoHost(), m.isPR)
+
+	if m.isPR {
+		return features.PullRequestTemplateQuery, nil
+	} else {
+		return features.IssueTemplateMutation && features.IssueTemplateQuery, nil
+	}
 }
 
 func (m *templateManager) HasTemplates() (bool, error) {

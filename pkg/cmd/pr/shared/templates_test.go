@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/prompt"
@@ -24,22 +25,6 @@ func TestTemplateManager_hasAPI(t *testing.T) {
 	defer tr.Verify(t)
 
 	tr.Register(
-		httpmock.GraphQL(`query IssueTemplates_fields\b`),
-		httpmock.StringResponse(`{"data":{
-			"Repository": {
-				"fields": [
-					{"name": "foo"},
-					{"name": "issueTemplates"}
-				]
-			},
-			"CreateIssueInput": {
-				"inputFields": [
-					{"name": "foo"},
-					{"name": "issueTemplate"}
-				]
-			}
-		}}`))
-	tr.Register(
 		httpmock.GraphQL(`query IssueTemplates\b`),
 		httpmock.StringResponse(`{"data":{"repository":{
 			"issueTemplates": [
@@ -49,12 +34,12 @@ func TestTemplateManager_hasAPI(t *testing.T) {
 		}}}`))
 
 	m := templateManager{
-		repo:         ghrepo.NewWithHost("OWNER", "REPO", "example.com"),
-		rootDir:      rootDir,
-		allowFS:      true,
-		isPR:         false,
-		httpClient:   httpClient,
-		cachedClient: httpClient,
+		repo:       ghrepo.NewWithHost("OWNER", "REPO", "example.com"),
+		rootDir:    rootDir,
+		allowFS:    true,
+		isPR:       false,
+		httpClient: httpClient,
+		detector:   &fd.EnabledDetectorMock{},
 	}
 
 	hasTemplates, err := m.HasTemplates()
@@ -86,16 +71,6 @@ func TestTemplateManager_hasAPI_PullRequest(t *testing.T) {
 	defer tr.Verify(t)
 
 	tr.Register(
-		httpmock.GraphQL(`query IssueTemplates_fields\b`),
-		httpmock.StringResponse(`{"data":{
-			"Repository": {
-				"fields": [
-					{"name": "foo"},
-					{"name": "pullRequestTemplates"}
-				]
-			}
-		}}`))
-	tr.Register(
 		httpmock.GraphQL(`query PullRequestTemplates\b`),
 		httpmock.StringResponse(`{"data":{"repository":{
 			"pullRequestTemplates": [
@@ -105,12 +80,12 @@ func TestTemplateManager_hasAPI_PullRequest(t *testing.T) {
 		}}}`))
 
 	m := templateManager{
-		repo:         ghrepo.NewWithHost("OWNER", "REPO", "example.com"),
-		rootDir:      rootDir,
-		allowFS:      true,
-		isPR:         true,
-		httpClient:   httpClient,
-		cachedClient: httpClient,
+		repo:       ghrepo.NewWithHost("OWNER", "REPO", "example.com"),
+		rootDir:    rootDir,
+		allowFS:    true,
+		isPR:       true,
+		httpClient: httpClient,
+		detector:   &fd.EnabledDetectorMock{},
 	}
 
 	hasTemplates, err := m.HasTemplates()
