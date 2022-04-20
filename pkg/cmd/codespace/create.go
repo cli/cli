@@ -15,6 +15,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	DEVCONTAINER_PROMPT_DEFAULT = "Default Codespaces configuration"
+)
+
+var (
+	DEFAULT_DEVCONTAINER_DEFINITIONS = []string{".devcontainer.json", ".devcontainer/devcontainer.json"}
+)
+
 type createOptions struct {
 	repo              string
 	branch            string
@@ -56,8 +64,6 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	vscsLocation := os.Getenv("VSCS_LOCATION")
 	vscsTarget := os.Getenv("VSCS_TARGET")
 	vscsTargetUrl := os.Getenv("VSCS_TARGET_URL")
-
-	DEFAULT_DEVCONTAINER_DEFINITIONS := []string{".devcontainer.json", ".devcontainer/devcontainer.json"}
 
 	userInputs := struct {
 		Repository string
@@ -118,13 +124,13 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	devContainerPath := opts.devContainerPath
 
 	// now that we have repo+branch, we can list available devcontainer.json files (if any)
-	if len(opts.devContainerPath) < 1 {
+	if opts.devContainerPath == "" {
 		a.StartProgressIndicatorWithLabel("Fetching devcontainer.json files")
 		devcontainers, err := a.apiClient.ListDevContainers(ctx, repository.ID, branch, 100)
+		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error getting devcontainer.json paths: %w", err)
 		}
-		a.StopProgressIndicator()
 
 		if len(devcontainers) > 0 {
 
@@ -135,7 +141,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 				promptOptions := []string{}
 
 				if !utils.StringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
-					promptOptions = []string{"Default Codespaces configuration"}
+					promptOptions = []string{DEVCONTAINER_PROMPT_DEFAULT}
 				}
 
 				for _, devcontainer := range devcontainers {
@@ -156,7 +162,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 			}
 		}
 
-		if devContainerPath == "Default Codespaces configuration" {
+		if devContainerPath == DEVCONTAINER_PROMPT_DEFAULT {
 			// special arg allows users to opt out of devcontainer.json selection
 			devContainerPath = ""
 		}
@@ -184,7 +190,6 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 
 	a.StartProgressIndicatorWithLabel("Creating codespace")
 	codespace, err := a.apiClient.CreateCodespace(ctx, createParams)
-
 	a.StopProgressIndicator()
 
 	if err != nil {

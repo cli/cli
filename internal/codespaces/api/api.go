@@ -742,10 +742,13 @@ func (a *API) ListDevContainers(ctx context.Context, repoID int, branch string, 
 		perPage = limit
 	}
 
-	listURL := fmt.Sprintf("%s/repositories/%d/codespaces/devcontainers?per_page=%d", a.githubAPI, repoID, perPage)
+	v := url.Values{}
+	v.Set("per_page", strconv.Itoa(perPage))
 	if branch != "" {
-		listURL += "&ref=" + branch
+		v.Set("ref", branch)
 	}
+	listURL := fmt.Sprintf("%s/repositories/%d/codespaces/devcontainers?%s", a.githubAPI, repoID, v.Encode())
+
 	for {
 		req, err := http.NewRequest(http.MethodGet, listURL, nil)
 		if err != nil {
