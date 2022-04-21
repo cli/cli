@@ -68,7 +68,7 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) error {
 	targetUrl := strings.Replace(serverUrl, fmt.Sprintf("%d", serverPort), fmt.Sprintf("%d", destPort), 1)
 	err = a.browser.Browse(targetUrl)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open JupyterLab in browser: %w", err)
 	}
 
 	fmt.Fprintln(a.io.Out, targetUrl)

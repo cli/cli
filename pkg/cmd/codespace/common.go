@@ -74,7 +74,7 @@ func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App
 	if debug {
 		debugLogger, err := newFileLogger(debugFile)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("couldn't create file logger: %w", err)
 		}
 		defer safeClose(debugLogger, &err)
 
@@ -85,9 +85,9 @@ func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App
 	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
 	if err != nil {
 		if authErr := <-authkeys; authErr != nil {
-			return nil, authErr
+			return nil, fmt.Errorf("failed to connect to Live Share: %w", authErr)
 		}
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to Live Share: %w", err)
 	}
 	return session, nil
 }
