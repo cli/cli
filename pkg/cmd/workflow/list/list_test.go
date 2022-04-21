@@ -236,6 +236,7 @@ func TestListRun(t *testing.T) {
 
 			io, _, stdout, stderr := iostreams.Test()
 			io.SetStdoutTTY(tt.tty)
+			io.SetStdinTTY(tt.tty)
 			tt.opts.IO = io
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("OWNER/REPO")

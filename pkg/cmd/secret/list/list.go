@@ -139,6 +139,11 @@ func listRun(opts *ListOptions) error {
 		return fmt.Errorf("failed to get secrets: %w", err)
 	}
 
+	if len(secrets) == 0 {
+		utils.HandleNoResults(opts.IO, "No secrets found")
+		return nil
+	}
+
 	if err := opts.IO.StartPager(); err == nil {
 		defer opts.IO.StopPager()
 	} else {

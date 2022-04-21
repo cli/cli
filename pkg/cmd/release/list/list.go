@@ -64,6 +64,10 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
+	if len(releases) == 0 {
+		utils.HandleNoResults(opts.IO, "No releases found")
+	}
+
 	if err := opts.IO.StartPager(); err == nil {
 		defer opts.IO.StopPager()
 	} else {

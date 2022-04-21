@@ -54,7 +54,7 @@ func TestListRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
-			name:  "list non-tty",
+			name:  "list notty",
 			isTTY: false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				createdAt, _ := time.Parse(time.RFC3339, "2020-08-31T15:44:24+02:00")
@@ -85,8 +85,8 @@ func TestListRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
-			name:  "no keys",
-			isTTY: false,
+			name:  "no keys tty",
+			isTTY: true,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/keys"),
@@ -94,6 +94,18 @@ func TestListRun(t *testing.T) {
 			},
 			wantStdout: "",
 			wantStderr: "No deploy keys found in OWNER/REPO\n",
+			wantErr:    false,
+		},
+		{
+			name:  "no keys notty",
+			isTTY: false,
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/keys"),
+					httpmock.StringResponse(`[]`))
+			},
+			wantStdout: "",
+			wantStderr: "",
 			wantErr:    false,
 		},
 	}

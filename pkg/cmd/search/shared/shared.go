@@ -114,26 +114,29 @@ func displayIssueResults(io *iostreams.IOStreams, et EntityType, results search.
 		}
 		tp.EndRow()
 	}
+
+	if len(results.Items) == 0 {
+		var msg string
+		switch et {
+		case Both:
+			msg = "No issues or pull requests matched your search"
+		case Issues:
+			msg = "No issues matched your search"
+		case PullRequests:
+			msg = "No pull requests matched your search"
+		}
+		utils.HandleNoResults(io, msg)
+		return nil
+	}
 	if io.IsStdoutTTY() {
 		var header string
-		if len(results.Items) == 0 {
-			switch et {
-			case Both:
-				header = "No issues or pull requests matched your search\n"
-			case Issues:
-				header = "No issues matched your search\n"
-			case PullRequests:
-				header = "No pull requests matched your search\n"
-			}
-		} else {
-			switch et {
-			case Both:
-				header = fmt.Sprintf("Showing %d of %d issues and pull requests\n\n", len(results.Items), results.Total)
-			case Issues:
-				header = fmt.Sprintf("Showing %d of %d issues\n\n", len(results.Items), results.Total)
-			case PullRequests:
-				header = fmt.Sprintf("Showing %d of %d pull requests\n\n", len(results.Items), results.Total)
-			}
+		switch et {
+		case Both:
+			header = fmt.Sprintf("Showing %d of %d issues and pull requests\n\n", len(results.Items), results.Total)
+		case Issues:
+			header = fmt.Sprintf("Showing %d of %d issues\n\n", len(results.Items), results.Total)
+		case PullRequests:
+			header = fmt.Sprintf("Showing %d of %d pull requests\n\n", len(results.Items), results.Total)
 		}
 		fmt.Fprintf(io.Out, "\n%s", header)
 	}

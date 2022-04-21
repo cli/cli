@@ -43,6 +43,11 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}
 
+	if len(codespaces) == 0 {
+		utils.HandleNoResults(a.io, "No codespaces found")
+		return nil
+	}
+
 	hasNonProdVSCSTarget := false
 	for _, apiCodespace := range codespaces {
 		if apiCodespace.VSCSTarget != "" && apiCodespace.VSCSTarget != api.VSCSTargetProduction {

@@ -99,7 +99,23 @@ func TestSearchIssues(t *testing.T) {
 				},
 			},
 			tty:        true,
-			wantStdout: "\nNo issues matched your search\n",
+			wantStdout: "",
+			wantStderr: "No issues matched your search\n",
+		},
+		{
+			name: "displays no results notty",
+			opts: &IssuesOptions{
+				Entity: Issues,
+				Query:  query,
+				Searcher: &search.SearcherMock{
+					IssuesFunc: func(query search.Query) (search.IssuesResult, error) {
+						return search.IssuesResult{}, nil
+					},
+				},
+			},
+			tty:        false,
+			wantStdout: "",
+			wantStderr: "",
 		},
 		{
 			name: "displays results notty",

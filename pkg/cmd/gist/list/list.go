@@ -86,6 +86,11 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
+	if len(gists) == 0 {
+		utils.HandleNoResults(opts.IO, "No gists found")
+		return nil
+	}
+
 	if err := opts.IO.StartPager(); err == nil {
 		defer opts.IO.StopPager()
 	} else {

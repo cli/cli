@@ -172,7 +172,23 @@ func TestListRun(t *testing.T) {
 					),
 				)
 			},
-			wantStdout: "\nThere are no labels in OWNER/REPO\n\n",
+			wantStdout: "",
+			wantStderr: "There are no labels in OWNER/REPO\n",
+		},
+		{
+			name: "empty label list notty",
+			tty:  false,
+			opts: &ListOptions{},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query LabelList\b`),
+					httpmock.StringResponse(`
+						{"data":{"repository":{"labels":{"totalCount":0,"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}`,
+					),
+				)
+			},
+			wantStdout: "",
+			wantStderr: "",
 		},
 		{
 			name:       "web mode",

@@ -174,6 +174,11 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
+	if len(listResult.PullRequests) == 0 {
+		shared.ListNoResults(opts.IO, ghrepo.FullName(baseRepo), "pull request", !filters.IsDefault())
+		return nil
+	}
+
 	err = opts.IO.StartPager()
 	if err != nil {
 		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)

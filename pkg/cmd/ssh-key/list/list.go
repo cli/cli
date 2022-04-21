@@ -1,7 +1,6 @@
 package list
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -63,7 +62,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(sshKeys) == 0 {
-		fmt.Fprintln(opts.IO.ErrOut, "No SSH keys present in GitHub account.")
+		utils.HandleNoResults(opts.IO, "No SSH keys present in GitHub account.")
 		return nil
 	}
 

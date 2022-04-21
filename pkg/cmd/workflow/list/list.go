@@ -83,9 +83,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(workflows) == 0 {
-		if !opts.PlainOutput {
-			fmt.Fprintln(opts.IO.ErrOut, "No workflows found")
-		}
+		utils.HandleNoResults(opts.IO, "No workflows found")
 		return nil
 	}
 

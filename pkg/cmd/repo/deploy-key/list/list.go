@@ -1,7 +1,6 @@
 package list
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -60,7 +59,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(deployKeys) == 0 {
-		fmt.Fprintf(opts.IO.ErrOut, "No deploy keys found in %s\n", ghrepo.FullName(repo))
+		utils.HandleNoResults(opts.IO, "No deploy keys found in "+ghrepo.FullName(repo))
 		return nil
 	}
 

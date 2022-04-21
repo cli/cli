@@ -39,13 +39,13 @@ func TestNewCmdCreate(t *testing.T) {
 		wantsOpts CreateOptions
 	}{
 		{
-			name:     "empty non-tty",
+			name:     "empty notty",
 			tty:      false,
 			cli:      "",
 			wantsErr: true,
 		},
 		{
-			name:     "only title non-tty",
+			name:     "only title notty",
 			tty:      false,
 			cli:      "-t mytitle",
 			wantsErr: true,

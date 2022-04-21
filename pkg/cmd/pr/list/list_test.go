@@ -116,11 +116,8 @@ func TestPRList_filtering(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, "", output.Stderr())
-	assert.Equal(t, `
-No pull requests match your search in OWNER/REPO
-
-`, output.String())
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "No pull requests match your search in OWNER/REPO\n", output.Stderr())
 }
 
 func TestPRList_filteringRemoveDuplicate(t *testing.T) {
