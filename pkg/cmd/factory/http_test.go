@@ -190,8 +190,8 @@ func TestNewHTTPClient(t *testing.T) {
 				os.Setenv("GH_DEBUG", oldGhDebug)
 			})
 
-			io, _, _, stderr := iostreams.Test()
-			client, err := NewHTTPClient(io, tt.args.config, tt.args.appVersion, tt.args.setAccept)
+			ios, _, _, stderr := iostreams.Test()
+			client, err := NewHTTPClient(ios, tt.args.config, tt.args.appVersion, tt.args.setAccept)
 			require.NoError(t, err)
 
 			req, err := http.NewRequest("GET", ts.URL, nil)

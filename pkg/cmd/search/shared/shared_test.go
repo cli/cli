@@ -188,11 +188,11 @@ func TestSearchIssues(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		io, _, stdout, stderr := iostreams.Test()
-		io.SetStdinTTY(tt.tty)
-		io.SetStdoutTTY(tt.tty)
-		io.SetStderrTTY(tt.tty)
-		tt.opts.IO = io
+		ios, _, stdout, stderr := iostreams.Test()
+		ios.SetStdinTTY(tt.tty)
+		ios.SetStdoutTTY(tt.tty)
+		ios.SetStderrTTY(tt.tty)
+		tt.opts.IO = ios
 		t.Run(tt.name, func(t *testing.T) {
 			err := SearchIssues(tt.opts)
 			if tt.wantErr {

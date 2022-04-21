@@ -3,8 +3,9 @@ package edit
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -110,7 +111,7 @@ func TestNewCmdEdit(t *testing.T) {
 
 func Test_editRun(t *testing.T) {
 	fileToAdd := filepath.Join(t.TempDir(), "gist-test.txt")
-	err := ioutil.WriteFile(fileToAdd, []byte("hello"), 0600)
+	err := os.WriteFile(fileToAdd, []byte("hello"), 0600)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -473,11 +474,11 @@ func Test_editRun(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
-		io, stdin, stdout, stderr := iostreams.Test()
+		ios, stdin, stdout, stderr := iostreams.Test()
 		stdin.WriteString(tt.stdin)
-		io.SetStdoutTTY(!tt.nontty)
-		io.SetStdinTTY(!tt.nontty)
-		tt.opts.IO = io
+		ios.SetStdoutTTY(!tt.nontty)
+		ios.SetStdinTTY(!tt.nontty)
+		tt.opts.IO = ios
 		tt.opts.Selector = "1234"
 
 		tt.opts.Config = func() (config.Config, error) {
@@ -499,7 +500,7 @@ func Test_editRun(t *testing.T) {
 			assert.NoError(t, err)
 
 			if tt.wantParams != nil {
-				bodyBytes, _ := ioutil.ReadAll(reg.Requests[2].Body)
+				bodyBytes, _ := io.ReadAll(reg.Requests[2].Body)
 				reqBody := make(map[string]interface{})
 				err = json.Unmarshal(bodyBytes, &reqBody)
 				if err != nil {

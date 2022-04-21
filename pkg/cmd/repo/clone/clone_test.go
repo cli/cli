@@ -60,8 +60,8 @@ func TestNewCmdClone(t *testing.T) {
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, stdout, stderr := iostreams.Test()
-			fac := &cmdutil.Factory{IOStreams: io}
+			ios, stdin, stdout, stderr := iostreams.Test()
+			fac := &cmdutil.Factory{IOStreams: ios}
 
 			var opts *CloneOptions
 			cmd := NewCmdClone(fac, func(co *CloneOptions) error {
@@ -95,9 +95,9 @@ func TestNewCmdClone(t *testing.T) {
 }
 
 func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) {
-	io, stdin, stdout, stderr := iostreams.Test()
+	ios, stdin, stdout, stderr := iostreams.Test()
 	fac := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		HttpClient: func() (*http.Client, error) {
 			return httpClient, nil
 		},

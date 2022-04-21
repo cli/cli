@@ -46,16 +46,16 @@ func TestNewCmdStatus(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		io, _, _, _ := iostreams.Test()
-		io.SetStdinTTY(true)
-		io.SetStdoutTTY(true)
+		ios, _, _, _ := iostreams.Test()
+		ios.SetStdinTTY(true)
+		ios.SetStdoutTTY(true)
 
 		if tt.wants.Exclude == nil {
 			tt.wants.Exclude = []string{}
 		}
 
 		f := &cmdutil.Factory{
-			IOStreams: io,
+			IOStreams: ios,
 			Config: func() (config.Config, error) {
 				return config.NewBlankConfig(), nil
 			},
@@ -283,9 +283,9 @@ func TestStatusRun(t *testing.T) {
 			return c
 		}
 		tt.opts.HostConfig = testHostConfig("github.com")
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdoutTTY(true)
-		tt.opts.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdoutTTY(true)
+		tt.opts.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := statusRun(tt.opts)

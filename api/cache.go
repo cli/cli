@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -73,7 +72,7 @@ func CacheResponse(ttl time.Duration, dir string) ClientOption {
 func copyStream(r io.ReadCloser) (io.ReadCloser, io.ReadCloser) {
 	b := &bytes.Buffer{}
 	nr := io.TeeReader(r, b)
-	return ioutil.NopCloser(b), &readCloser{
+	return io.NopCloser(b), &readCloser{
 		Reader: nr,
 		Closer: r,
 	}

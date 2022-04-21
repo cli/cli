@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -493,7 +492,7 @@ func setTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interfa
 	}
 
 	if res.Body != nil {
-		_, _ = io.Copy(ioutil.Discard, res.Body)
+		_, _ = io.Copy(io.Discard, res.Body)
 	}
 
 	return nil

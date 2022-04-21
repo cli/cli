@@ -2,7 +2,7 @@ package download
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"path/filepath"
 	"testing"
@@ -72,13 +72,13 @@ func Test_NewCmdDownload(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 				HttpClient: func() (*http.Client, error) {
 					return nil, nil
 				},
@@ -99,8 +99,8 @@ func Test_NewCmdDownload(t *testing.T) {
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {
@@ -247,8 +247,8 @@ func Test_runDownload(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			opts := &tt.opts
-			io, _, stdout, stderr := iostreams.Test()
-			opts.IO = io
+			ios, _, stdout, stderr := iostreams.Test()
+			opts.IO = ios
 			opts.Platform = newMockPlatform(t, tt.mockAPI)
 			opts.Prompter = newMockPrompter(t, tt.mockPrompt)
 

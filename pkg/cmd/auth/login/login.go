@@ -3,7 +3,7 @@ package login
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 
@@ -82,7 +82,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 
 			if tokenStdin {
 				defer opts.IO.In.Close()
-				token, err := ioutil.ReadAll(opts.IO.In)
+				token, err := io.ReadAll(opts.IO.In)
 				if err != nil {
 					return fmt.Errorf("failed to read token from standard input: %w", err)
 				}

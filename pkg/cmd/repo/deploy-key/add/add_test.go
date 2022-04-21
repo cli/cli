@@ -52,11 +52,11 @@ func Test_addRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, stdout, stderr := iostreams.Test()
+			ios, stdin, stdout, stderr := iostreams.Test()
 			stdin.WriteString(tt.stdin)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			reg := &httpmock.Registry{}
 			if tt.httpStubs != nil {
@@ -64,7 +64,7 @@ func Test_addRun(t *testing.T) {
 			}
 
 			opts := tt.opts
-			opts.IO = io
+			opts.IO = ios
 			opts.BaseRepo = func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
 			opts.HTTPClient = func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
 

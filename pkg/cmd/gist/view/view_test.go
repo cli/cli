@@ -78,11 +78,11 @@ func TestNewCmdView(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdoutTTY(tt.tty)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.tty)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			argv, err := shlex.Split(tt.cli)
@@ -371,9 +371,9 @@ func Test_viewRun(t *testing.T) {
 			return config.NewBlankConfig(), nil
 		}
 
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdoutTTY(true)
-		tt.opts.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdoutTTY(true)
+		tt.opts.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := viewRun(tt.opts)
@@ -451,7 +451,7 @@ func Test_promptGists(t *testing.T) {
 		},
 	}
 
-	io, _, _, _ := iostreams.Test()
+	ios, _, _, _ := iostreams.Test()
 
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}
@@ -474,7 +474,7 @@ func Test_promptGists(t *testing.T) {
 				tt.askStubs(as)
 			}
 
-			gistID, err := promptGists(client, "github.com", io.ColorScheme())
+			gistID, err := promptGists(client, "github.com", ios.ColorScheme())
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantOut, gistID)
 			reg.Verify(t)

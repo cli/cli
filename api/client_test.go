@@ -3,7 +3,7 @@ package api
 import (
 	"bytes"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -35,7 +35,7 @@ func TestGraphQL(t *testing.T) {
 	assert.Equal(t, "hubot", response.Viewer.Login)
 
 	req := http.Requests[0]
-	reqBody, _ := ioutil.ReadAll(req.Body)
+	reqBody, _ := io.ReadAll(req.Body)
 	assert.Equal(t, `{"query":"QUERY","variables":{"name":"Mona"}}`, string(reqBody))
 	assert.Equal(t, "token OTOKEN", req.Header.Get("Authorization"))
 }
@@ -116,7 +116,7 @@ func TestRESTError(t *testing.T) {
 		return &http.Response{
 			Request:    req,
 			StatusCode: 422,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(`{"message": "OH NO"}`)),
+			Body:       io.NopCloser(bytes.NewBufferString(`{"message": "OH NO"}`)),
 			Header: map[string][]string{
 				"Content-Type": {"application/json; charset=utf-8"},
 			},
@@ -146,7 +146,7 @@ func TestHandleHTTPError_GraphQL502(t *testing.T) {
 	resp := &http.Response{
 		Request:    req,
 		StatusCode: 502,
-		Body:       ioutil.NopCloser(bytes.NewBufferString(`{ "data": null, "errors": [{ "message": "Something went wrong" }] }`)),
+		Body:       io.NopCloser(bytes.NewBufferString(`{ "data": null, "errors": [{ "message": "Something went wrong" }] }`)),
 		Header:     map[string][]string{"Content-Type": {"application/json"}},
 	}
 	err = HandleHTTPError(resp)
@@ -164,7 +164,7 @@ func TestHTTPError_ScopesSuggestion(t *testing.T) {
 		return &http.Response{
 			Request:    req,
 			StatusCode: s,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(`{}`)),
+			Body:       io.NopCloser(bytes.NewBufferString(`{}`)),
 			Header: map[string][]string{
 				"Content-Type":            {"application/json"},
 				"X-Oauth-Scopes":          {haveScopes},

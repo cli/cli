@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -30,7 +31,7 @@ import (
 
 func Test_NewCmdMerge(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "my-body.md")
-	err := ioutil.WriteFile(tmpFile, []byte("a body from file"), 0600)
+	err := os.WriteFile(tmpFile, []byte("a body from file"), 0600)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -150,17 +151,17 @@ func Test_NewCmdMerge(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, _, _ := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, stdin, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			if tt.stdin != "" {
 				_, _ = stdin.WriteString(tt.stdin)
 			}
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			var opts *MergeOptions
@@ -175,8 +176,8 @@ func Test_NewCmdMerge(t *testing.T) {
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {
@@ -212,13 +213,13 @@ func stubCommit(pr *api.PullRequest, oid string) {
 }
 
 func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(isTTY)
-	io.SetStdinTTY(isTTY)
-	io.SetStderrTTY(isTTY)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(isTTY)
+	ios.SetStdinTTY(isTTY)
+	ios.SetStderrTTY(isTTY)
 
 	factory := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
@@ -248,8 +249,8 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
@@ -1069,9 +1070,9 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 }
 
 func TestPRMerge_interactiveSquashEditCommitMsgAndSubject(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(true)
-	io.SetStderrTTY(true)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStderrTTY(true)
 
 	tr := initFakeHTTP()
 	defer tr.Verify(t)
@@ -1125,7 +1126,7 @@ func TestPRMerge_interactiveSquashEditCommitMsgAndSubject(t *testing.T) {
 	as.StubOne("Submit") // Confirm submit survey
 
 	err := mergeRun(&MergeOptions{
-		IO:     io,
+		IO:     ios,
 		Editor: testEditor{},
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: tr}, nil
@@ -1204,9 +1205,9 @@ func Test_mergeMethodSurvey(t *testing.T) {
 }
 
 func TestMergeRun_autoMerge(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(true)
-	io.SetStderrTTY(true)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStderrTTY(true)
 
 	tr := initFakeHTTP()
 	defer tr.Verify(t)
@@ -1221,7 +1222,7 @@ func TestMergeRun_autoMerge(t *testing.T) {
 	defer cmdTeardown(t)
 
 	err := mergeRun(&MergeOptions{
-		IO: io,
+		IO: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: tr}, nil
 		},
@@ -1241,9 +1242,9 @@ func TestMergeRun_autoMerge(t *testing.T) {
 }
 
 func TestMergeRun_autoMerge_directMerge(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(true)
-	io.SetStderrTTY(true)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStderrTTY(true)
 
 	tr := initFakeHTTP()
 	defer tr.Verify(t)
@@ -1259,7 +1260,7 @@ func TestMergeRun_autoMerge_directMerge(t *testing.T) {
 	defer cmdTeardown(t)
 
 	err := mergeRun(&MergeOptions{
-		IO: io,
+		IO: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: tr}, nil
 		},
@@ -1279,9 +1280,9 @@ func TestMergeRun_autoMerge_directMerge(t *testing.T) {
 }
 
 func TestMergeRun_disableAutoMerge(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(true)
-	io.SetStderrTTY(true)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStderrTTY(true)
 
 	tr := initFakeHTTP()
 	defer tr.Verify(t)
@@ -1295,7 +1296,7 @@ func TestMergeRun_disableAutoMerge(t *testing.T) {
 	defer cmdTeardown(t)
 
 	err := mergeRun(&MergeOptions{
-		IO: io,
+		IO: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: tr}, nil
 		},

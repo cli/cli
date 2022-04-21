@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -343,7 +342,7 @@ func (c Client) RESTWithNext(hostname string, method string, p string, body io.R
 		return "", nil
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -379,7 +378,7 @@ func handleResponse(resp *http.Response, data interface{}) error {
 		return HandleHTTPError(resp)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -408,7 +407,7 @@ func HandleHTTPError(resp *http.Response) error {
 		return httpError
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		httpError.Message = err.Error()
 		return httpError

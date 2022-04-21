@@ -2,7 +2,7 @@ package shared
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -58,7 +58,7 @@ func Test_HasMinimumScopes(t *testing.T) {
 				return &http.Response{
 					Request:    req,
 					StatusCode: 200,
-					Body:       ioutil.NopCloser(&bytes.Buffer{}),
+					Body:       io.NopCloser(&bytes.Buffer{}),
 					Header: map[string][]string{
 						"X-Oauth-Scopes": {tt.header},
 					},

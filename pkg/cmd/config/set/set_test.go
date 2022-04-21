@@ -132,8 +132,8 @@ func Test_setRun(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		io, _, stdout, stderr := iostreams.Test()
-		tt.input.IO = io
+		ios, _, stdout, stderr := iostreams.Test()
+		tt.input.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := setRun(tt.input)

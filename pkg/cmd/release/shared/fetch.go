@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"strings"
@@ -141,7 +141,7 @@ func FetchRelease(httpClient *http.Client, baseRepo ghrepo.Interface, tagName st
 		return nil, api.HandleHTTPError(resp)
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func FetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*Re
 		return nil, api.HandleHTTPError(resp)
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func FindDraftRelease(httpClient *http.Client, baseRepo ghrepo.Interface, tagNam
 			return nil, api.HandleHTTPError(resp)
 		}
 
-		b, err := ioutil.ReadAll(resp.Body)
+		b, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, err
 		}

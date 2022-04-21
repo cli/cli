@@ -1,7 +1,6 @@
 package shared
 
 import (
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,7 +16,7 @@ func TestTemplateManager_hasAPI(t *testing.T) {
 	rootDir := t.TempDir()
 	legacyTemplateFile := filepath.Join(rootDir, ".github", "ISSUE_TEMPLATE.md")
 	_ = os.MkdirAll(filepath.Dir(legacyTemplateFile), 0755)
-	_ = ioutil.WriteFile(legacyTemplateFile, []byte("LEGACY"), 0644)
+	_ = os.WriteFile(legacyTemplateFile, []byte("LEGACY"), 0644)
 
 	tr := httpmock.Registry{}
 	httpClient := &http.Client{Transport: &tr}
@@ -79,7 +78,7 @@ func TestTemplateManager_hasAPI_PullRequest(t *testing.T) {
 	rootDir := t.TempDir()
 	legacyTemplateFile := filepath.Join(rootDir, ".github", "PULL_REQUEST_TEMPLATE.md")
 	_ = os.MkdirAll(filepath.Dir(legacyTemplateFile), 0755)
-	_ = ioutil.WriteFile(legacyTemplateFile, []byte("LEGACY"), 0644)
+	_ = os.WriteFile(legacyTemplateFile, []byte("LEGACY"), 0644)
 
 	tr := httpmock.Registry{}
 	httpClient := &http.Client{Transport: &tr}

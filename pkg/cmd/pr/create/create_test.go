@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -30,7 +31,7 @@ import (
 
 func TestNewCmdCreate(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "my-body.md")
-	err := ioutil.WriteFile(tmpFile, []byte("a body from file"), 0600)
+	err := os.WriteFile(tmpFile, []byte("a body from file"), 0600)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -108,16 +109,16 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, stdout, stderr := iostreams.Test()
+			ios, stdin, stdout, stderr := iostreams.Test()
 			if tt.stdin != "" {
 				_, _ = stdin.WriteString(tt.stdin)
 			} else if tt.tty {
-				io.SetStdinTTY(true)
-				io.SetStdoutTTY(true)
+				ios.SetStdinTTY(true)
+				ios.SetStdoutTTY(true)
 			}
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			var opts *CreateOptions
@@ -160,14 +161,14 @@ func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, is
 }
 
 func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes context.Remotes, branch string, isTTY bool, cli string, rootDir string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(isTTY)
-	io.SetStdinTTY(isTTY)
-	io.SetStderrTTY(isTTY)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(isTTY)
+	ios.SetStdinTTY(isTTY)
+	ios.SetStderrTTY(isTTY)
 
 	browser := &cmdutil.TestBrowser{}
 	factory := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		Browser:   browser,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
@@ -207,8 +208,8 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes context.Remot
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
@@ -291,7 +292,7 @@ func TestPRCreate_recover(t *testing.T) {
 	as.StubPrompt("Body").AnswerDefault()
 	as.StubPrompt("What's next?").AnswerDefault()
 
-	tmpfile, err := ioutil.TempFile(t.TempDir(), "testrecover*")
+	tmpfile, err := os.CreateTemp(t.TempDir(), "testrecover*")
 	assert.NoError(t, err)
 	defer tmpfile.Close()
 
@@ -790,7 +791,7 @@ func TestPRCreate_web(t *testing.T) {
 
 func TestPRCreate_webLongURL(t *testing.T) {
 	longBodyFile := filepath.Join(t.TempDir(), "long-body.txt")
-	err := ioutil.WriteFile(longBodyFile, make([]byte, 9216), 0600)
+	err := os.WriteFile(longBodyFile, make([]byte, 9216), 0600)
 	require.NoError(t, err)
 
 	http := initFakeHTTP()

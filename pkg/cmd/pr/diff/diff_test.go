@@ -3,7 +3,7 @@ package diff
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -88,14 +88,14 @@ func Test_NewCmdDiff(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
-			io.SetColorEnabled(tt.isTTY)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
+			ios.SetColorEnabled(tt.isTTY)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			var opts *DiffOptions
@@ -110,8 +110,8 @@ func Test_NewCmdDiff(t *testing.T) {
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {
@@ -184,7 +184,7 @@ func Test_diffRun(t *testing.T) {
 					return &http.Response{
 						StatusCode: 200,
 						Request:    req,
-						Body:       ioutil.NopCloser(strings.NewReader(tt.rawDiff)),
+						Body:       io.NopCloser(strings.NewReader(tt.rawDiff)),
 					}, nil
 				})
 
@@ -193,9 +193,8 @@ func Test_diffRun(t *testing.T) {
 				return &http.Client{Transport: httpReg}, nil
 			}
 
-			io, _, stdout, stderr := iostreams.Test()
-			opts.IO = io
-
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdinTTY(true)
 			finder := shared.NewMockFinder("123", pr, ghrepo.New("OWNER", "REPO"))
 			finder.ExpectFields([]string{"number"})
 			opts.Finder = finder
@@ -239,12 +238,12 @@ const testDiff = `%[2]sdiff --git a/.github/workflows/releases.yml b/.github/wor
 @@ -22,8 +22,8 @@ test:
  	go test ./...
  .PHONY: test
- 
+
 %[4]s-site:%[1]s
 %[4]s-	git clone https://github.com/github/cli.github.com.git "$@"%[1]s
 %[3]s+site: bin/gh%[1]s
 %[3]s+	bin/gh repo clone github/cli.github.com "$@"%[1]s
- 
+
  site-docs: site
  	git -C site pull
 `

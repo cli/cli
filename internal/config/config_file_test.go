@@ -3,7 +3,6 @@ package config
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -257,13 +256,13 @@ func Test_configFile_Write_toDisk(t *testing.T) {
 	}
 
 	expectedConfig := "pager: less\n"
-	if configBytes, err := ioutil.ReadFile(filepath.Join(configDir, "config.yml")); err != nil {
+	if configBytes, err := os.ReadFile(filepath.Join(configDir, "config.yml")); err != nil {
 		t.Error(err)
 	} else if string(configBytes) != expectedConfig {
 		t.Errorf("expected config.yml %q, got %q", expectedConfig, string(configBytes))
 	}
 
-	if configBytes, err := ioutil.ReadFile(filepath.Join(configDir, "hosts.yml")); err != nil {
+	if configBytes, err := os.ReadFile(filepath.Join(configDir, "hosts.yml")); err != nil {
 		t.Error(err)
 	} else if string(configBytes) != "" {
 		t.Errorf("unexpected hosts.yml: %q", string(configBytes))
@@ -288,7 +287,7 @@ func Test_configFile_WriteHosts_toDisk(t *testing.T) {
 	}
 
 	expectedConfig := "github.com:\n    user: monalisa\n    oauth_token: TOKEN\n"
-	actualConfig, err := ioutil.ReadFile(filepath.Join(configDir, "hosts.yml"))
+	actualConfig, err := os.ReadFile(filepath.Join(configDir, "hosts.yml"))
 	assert.NoError(t, err)
 	assert.Equal(t, expectedConfig, string(actualConfig))
 	_, nonExistErr := os.Stat(filepath.Join(configDir, "config.yml"))
@@ -310,7 +309,7 @@ func Test_autoMigrateConfigDir_noMigration_notExist(t *testing.T) {
 	err := autoMigrateConfigDir(migrateDir)
 	assert.Equal(t, errNotExist, err)
 
-	files, err := ioutil.ReadDir(migrateDir)
+	files, err := os.ReadDir(migrateDir)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(files))
 }
@@ -332,7 +331,7 @@ func Test_autoMigrateConfigDir_noMigration_samePath(t *testing.T) {
 	err = autoMigrateConfigDir(migrateDir)
 	assert.Equal(t, errSamePath, err)
 
-	files, err := ioutil.ReadDir(migrateDir)
+	files, err := os.ReadDir(migrateDir)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(files))
 }
@@ -353,17 +352,17 @@ func Test_autoMigrateConfigDir_migration(t *testing.T) {
 
 	err := os.MkdirAll(homeConfigDir, 0755)
 	assert.NoError(t, err)
-	f, err := ioutil.TempFile(homeConfigDir, "")
+	f, err := os.CreateTemp(homeConfigDir, "")
 	assert.NoError(t, err)
 	f.Close()
 
 	err = autoMigrateConfigDir(migrateConfigDir)
 	assert.NoError(t, err)
 
-	_, err = ioutil.ReadDir(homeConfigDir)
+	_, err = os.ReadDir(homeConfigDir)
 	assert.True(t, os.IsNotExist(err))
 
-	files, err := ioutil.ReadDir(migrateConfigDir)
+	files, err := os.ReadDir(migrateConfigDir)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(files))
 }
@@ -452,7 +451,7 @@ func Test_autoMigrateStateDir_noMigration_notExist(t *testing.T) {
 	err := autoMigrateStateDir(migrateDir)
 	assert.Equal(t, errNotExist, err)
 
-	files, err := ioutil.ReadDir(migrateDir)
+	files, err := os.ReadDir(migrateDir)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(files))
 }
@@ -474,7 +473,7 @@ func Test_autoMigrateStateDir_noMigration_samePath(t *testing.T) {
 	err = autoMigrateStateDir(migrateDir)
 	assert.Equal(t, errSamePath, err)
 
-	files, err := ioutil.ReadDir(migrateDir)
+	files, err := os.ReadDir(migrateDir)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(files))
 }
@@ -495,17 +494,17 @@ func Test_autoMigrateStateDir_migration(t *testing.T) {
 
 	err := os.MkdirAll(homeConfigDir, 0755)
 	assert.NoError(t, err)
-	err = ioutil.WriteFile(filepath.Join(homeConfigDir, "state.yml"), nil, 0755)
+	err = os.WriteFile(filepath.Join(homeConfigDir, "state.yml"), nil, 0755)
 	assert.NoError(t, err)
 
 	err = autoMigrateStateDir(migrateStateDir)
 	assert.NoError(t, err)
 
-	files, err := ioutil.ReadDir(homeConfigDir)
+	files, err := os.ReadDir(homeConfigDir)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, len(files))
 
-	files, err = ioutil.ReadDir(migrateStateDir)
+	files, err = os.ReadDir(migrateStateDir)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(files))
 	assert.Equal(t, "state.yml", files[0].Name())

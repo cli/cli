@@ -3,8 +3,9 @@ package edit
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -18,7 +19,7 @@ import (
 
 func Test_NewCmdEdit(t *testing.T) {
 	tempDir := t.TempDir()
-	tf, err := ioutil.TempFile(tempDir, "release-create")
+	tf, err := os.CreateTemp(tempDir, "release-create")
 	require.NoError(t, err)
 	fmt.Fprint(tf, "MY NOTES")
 	tf.Close()
@@ -124,18 +125,18 @@ func Test_NewCmdEdit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, _, _ := iostreams.Test()
+			ios, stdin, _, _ := iostreams.Test()
 			if tt.stdin == "" {
-				io.SetStdinTTY(tt.isTTY)
+				ios.SetStdinTTY(tt.isTTY)
 			} else {
-				io.SetStdinTTY(false)
+				ios.SetStdinTTY(false)
 				fmt.Fprint(stdin, tt.stdin)
 			}
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			var opts *EditOptions
@@ -150,8 +151,8 @@ func Test_NewCmdEdit(t *testing.T) {
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {
@@ -372,10 +373,10 @@ func Test_editRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			fakeHTTP := &httpmock.Registry{}
 			fakeHTTP.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.JSONResponse(map[string]interface{}{
@@ -387,7 +388,7 @@ func Test_editRun(t *testing.T) {
 			}
 			defer fakeHTTP.Verify(t)
 
-			tt.opts.IO = io
+			tt.opts.IO = ios
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}

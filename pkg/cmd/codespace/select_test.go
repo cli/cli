@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -45,14 +44,14 @@ func TestApp_Select(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdinTTY(true)
-			io.SetStdoutTTY(true)
-			a := NewApp(io, nil, testSelectApiMock(), nil)
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdinTTY(true)
+			ios.SetStdoutTTY(true)
+			a := NewApp(ios, nil, testSelectApiMock(), nil)
 
 			opts := selectOptions{}
 			if tt.outputToFile {
-				file, err := ioutil.TempFile("", "codespace-selection-test")
+				file, err := os.CreateTemp("", "codespace-selection-test")
 				if err != nil {
 					t.Fatal(err)
 				}

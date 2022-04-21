@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
@@ -14,7 +13,7 @@ import (
 func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, title string) error {
 	url := ghinstance.RESTPrefix(hostname) + "user/keys"
 
-	keyBytes, err := ioutil.ReadAll(keyFile)
+	keyBytes, err := io.ReadAll(keyFile)
 	if err != nil {
 		return err
 	}
@@ -44,7 +43,7 @@ func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 		return api.HandleHTTPError(resp)
 	}
 
-	_, err = io.Copy(ioutil.Discard, resp.Body)
+	_, err = io.Copy(io.Discard, resp.Body)
 	if err != nil {
 		return err
 	}

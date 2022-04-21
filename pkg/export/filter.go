@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"github.com/itchyny/gojq"
 )
@@ -15,7 +14,7 @@ func FilterJSON(w io.Writer, input io.Reader, queryStr string) error {
 		return err
 	}
 
-	jsonData, err := ioutil.ReadAll(input)
+	jsonData, err := io.ReadAll(input)
 	if err != nil {
 		return err
 	}

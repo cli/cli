@@ -3,7 +3,7 @@ package list
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -73,9 +73,9 @@ func Test_NewCmdList(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			ios, _, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			argv, err := shlex.Split(tt.cli)
@@ -351,11 +351,11 @@ func Test_listRun(t *testing.T) {
 
 			reg.Register(httpmock.REST("GET", path), httpmock.JSONResponse(payload))
 
-			io, _, stdout, _ := iostreams.Test()
+			ios, _, stdout, _ := iostreams.Test()
 
-			io.SetStdoutTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 
-			tt.opts.IO = io
+			tt.opts.IO = ios
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("owner/repo")
 			}
@@ -387,7 +387,7 @@ func Test_getSecrets_pagination(t *testing.T) {
 		requests = append(requests, req)
 		return &http.Response{
 			Request: req,
-			Body:    ioutil.NopCloser(strings.NewReader(`{"secrets":[{},{}]}`)),
+			Body:    io.NopCloser(strings.NewReader(`{"secrets":[{},{}]}`)),
 			Header:  header,
 		}, nil
 	}

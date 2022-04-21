@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"strings"
@@ -39,7 +39,7 @@ type PostCreateState struct {
 // and calls the supplied poller for each batch of state changes.
 // It runs until it encounters an error, including cancellation of the context.
 func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiClient apiClient, codespace *api.Codespace, poller func([]PostCreateState)) (err error) {
-	noopLogger := log.New(ioutil.Discard, "", 0)
+	noopLogger := log.New(io.Discard, "", 0)
 
 	session, err := ConnectToLiveshare(ctx, progress, noopLogger, apiClient, codespace)
 	if err != nil {

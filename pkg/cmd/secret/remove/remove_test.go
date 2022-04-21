@@ -77,9 +77,9 @@ func TestNewCmdRemove(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			ios, _, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			argv, err := shlex.Split(tt.cli)
@@ -148,9 +148,9 @@ func Test_removeRun_repo(t *testing.T) {
 			httpmock.REST("DELETE", tt.wantPath),
 			httpmock.StatusStringResponse(204, "No Content"))
 
-		io, _, _, _ := iostreams.Test()
+		ios, _, _, _ := iostreams.Test()
 
-		tt.opts.IO = io
+		tt.opts.IO = ios
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
@@ -175,10 +175,10 @@ func Test_removeRun_env(t *testing.T) {
 		httpmock.REST("DELETE", "repos/owner/repo/environments/development/secrets/cool_secret"),
 		httpmock.StatusStringResponse(204, "No Content"))
 
-	io, _, _, _ := iostreams.Test()
+	ios, _, _, _ := iostreams.Test()
 
 	opts := &RemoveOptions{
-		IO: io,
+		IO: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},
@@ -229,7 +229,7 @@ func Test_removeRun_org(t *testing.T) {
 				httpmock.REST("DELETE", tt.wantPath),
 				httpmock.StatusStringResponse(204, "No Content"))
 
-			io, _, _, _ := iostreams.Test()
+			ios, _, _, _ := iostreams.Test()
 
 			tt.opts.Config = func() (config.Config, error) {
 				return config.NewBlankConfig(), nil
@@ -240,7 +240,7 @@ func Test_removeRun_org(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
-			tt.opts.IO = io
+			tt.opts.IO = ios
 			tt.opts.SecretName = "tVirus"
 
 			err := removeRun(tt.opts)
@@ -260,10 +260,10 @@ func Test_removeRun_user(t *testing.T) {
 		httpmock.REST("DELETE", "user/codespaces/secrets/cool_secret"),
 		httpmock.StatusStringResponse(204, "No Content"))
 
-	io, _, _, _ := iostreams.Test()
+	ios, _, _, _ := iostreams.Test()
 
 	opts := &RemoveOptions{
-		IO: io,
+		IO: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		},

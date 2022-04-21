@@ -2,7 +2,6 @@ package update
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"testing"
@@ -117,7 +116,7 @@ func TestCheckForUpdate(t *testing.T) {
 }
 
 func tempFilePath() string {
-	file, err := ioutil.TempFile("", "")
+	file, err := os.CreateTemp("", "")
 	if err != nil {
 		log.Fatal(err)
 	}

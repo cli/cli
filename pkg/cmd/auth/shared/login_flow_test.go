@@ -2,8 +2,8 @@ package shared
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -36,7 +36,7 @@ func (c tinyConfig) WriteHosts() error {
 
 func TestLogin_ssh(t *testing.T) {
 	dir := t.TempDir()
-	io, _, stdout, stderr := iostreams.Test()
+	ios, _, stdout, stderr := iostreams.Test()
 
 	tr := httpmock.Registry{}
 	defer tr.Verify(t)
@@ -72,13 +72,13 @@ func TestLogin_ssh(t *testing.T) {
 		}
 		assert.Equal(t, expected, args)
 		// simulate that the public key file has been generated
-		_ = ioutil.WriteFile(keyFile+".pub", []byte("PUBKEY"), 0600)
+		_ = os.WriteFile(keyFile+".pub", []byte("PUBKEY"), 0600)
 	})
 
 	cfg := tinyConfig{}
 
 	err := Login(&LoginOptions{
-		IO:          io,
+		IO:          ios,
 		Config:      &cfg,
 		HTTPClient:  &http.Client{Transport: &tr},
 		Hostname:    "example.com",

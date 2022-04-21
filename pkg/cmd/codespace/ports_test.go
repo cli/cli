@@ -191,10 +191,10 @@ func runUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, ev
 		},
 	}
 
-	io, _, _, _ := iostreams.Test()
+	ios, _, _, _ := iostreams.Test()
 
 	a := &App{
-		io:        io,
+		io:        ios,
 		apiClient: mockApi,
 	}
 
@@ -264,7 +264,7 @@ func testingPortsApp() *App {
 		},
 	}
 
-	io, _, _, _ := iostreams.Test()
+	ios, _, _, _ := iostreams.Test()
 
-	return NewApp(io, nil, apiMock, nil)
+	return NewApp(ios, nil, apiMock, nil)
 }

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -40,7 +39,7 @@ type Manager struct {
 	dryRunMode bool
 }
 
-func NewManager(io *iostreams.IOStreams) *Manager {
+func NewManager(ios *iostreams.IOStreams) *Manager {
 	return &Manager{
 		dataDir:    config.DataDir,
 		lookPath:   safeexec.LookPath,
@@ -53,7 +52,7 @@ func NewManager(io *iostreams.IOStreams) *Manager {
 			}
 			return fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH), ext
 		},
-		io: io,
+		io: ios,
 	}
 }
 
@@ -126,7 +125,7 @@ func (m *Manager) List() []extensions.Extension {
 
 func (m *Manager) list(includeMetadata bool) ([]Extension, error) {
 	dir := m.installDir()
-	entries, err := ioutil.ReadDir(dir)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -160,11 +159,11 @@ func (m *Manager) list(includeMetadata bool) ([]Extension, error) {
 	return results, nil
 }
 
-func (m *Manager) parseExtensionFile(fi fs.FileInfo) (Extension, error) {
+func (m *Manager) parseExtensionFile(fi fs.DirEntry) (Extension, error) {
 	ext := Extension{isLocal: true}
 	id := m.installDir()
 	exePath := filepath.Join(id, fi.Name(), fi.Name())
-	if !isSymlink(fi.Mode()) {
+	if !isSymlink(fi.Type()) {
 		// if this is a regular file, its contents is the local directory of the extension
 		p, err := readPathFromFile(filepath.Join(id, fi.Name()))
 		if err != nil {
@@ -176,7 +175,7 @@ func (m *Manager) parseExtensionFile(fi fs.FileInfo) (Extension, error) {
 	return ext, nil
 }
 
-func (m *Manager) parseExtensionDir(fi fs.FileInfo) (Extension, error) {
+func (m *Manager) parseExtensionDir(fi fs.DirEntry) (Extension, error) {
 	id := m.installDir()
 	if _, err := os.Stat(filepath.Join(id, fi.Name(), manifestName)); err == nil {
 		return m.parseBinaryExtensionDir(fi)
@@ -185,7 +184,7 @@ func (m *Manager) parseExtensionDir(fi fs.FileInfo) (Extension, error) {
 	return m.parseGitExtensionDir(fi)
 }
 
-func (m *Manager) parseBinaryExtensionDir(fi fs.FileInfo) (Extension, error) {
+func (m *Manager) parseBinaryExtensionDir(fi fs.DirEntry) (Extension, error) {
 	id := m.installDir()
 	exePath := filepath.Join(id, fi.Name(), fi.Name())
 	ext := Extension{path: exePath, kind: BinaryKind}
@@ -207,7 +206,7 @@ func (m *Manager) parseBinaryExtensionDir(fi fs.FileInfo) (Extension, error) {
 	return ext, nil
 }
 
-func (m *Manager) parseGitExtensionDir(fi fs.FileInfo) (Extension, error) {
+func (m *Manager) parseGitExtensionDir(fi fs.DirEntry) (Extension, error) {
 	id := m.installDir()
 	exePath := filepath.Join(id, fi.Name(), fi.Name())
 	remoteUrl := m.getRemoteUrl(fi.Name())

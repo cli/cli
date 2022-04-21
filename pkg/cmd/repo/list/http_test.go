@@ -2,7 +2,7 @@ package list
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"testing"
@@ -23,7 +23,7 @@ func Test_listReposWithLanguage(t *testing.T) {
 	reg.Register(
 		httpmock.GraphQL(`query RepositoryListSearch\b`),
 		func(req *http.Request) (*http.Response, error) {
-			jsonData, err := ioutil.ReadAll(req.Body)
+			jsonData, err := io.ReadAll(req.Body)
 			if err != nil {
 				return nil, err
 			}

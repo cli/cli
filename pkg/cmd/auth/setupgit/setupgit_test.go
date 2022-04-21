@@ -102,12 +102,12 @@ func Test_setupGitRun(t *testing.T) {
 				}
 			}
 
-			io, _, _, stderr := iostreams.Test()
+			ios, _, _, stderr := iostreams.Test()
 
-			io.SetStdinTTY(true)
-			io.SetStderrTTY(true)
-			io.SetStdoutTTY(true)
-			tt.opts.IO = io
+			ios.SetStdinTTY(true)
+			ios.SetStderrTTY(true)
+			ios.SetStdoutTTY(true)
+			tt.opts.IO = ios
 
 			err := setupGitRun(tt.opts)
 			if tt.expectedErr != "" {
