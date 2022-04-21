@@ -41,11 +41,11 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 		return err
 	}
 
-	session, endSession, err := startLiveShareSession(ctx, codespace, a, false, "")
+	session, err := startLiveShareSession(ctx, codespace, a, false, "")
 	if err != nil {
 		return err
 	}
-	defer endSession(&err)
+	defer session.Close()
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
 	listen, err := net.Listen("tcp", "127.0.0.1:0") // arbitrary port

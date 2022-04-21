@@ -55,11 +55,11 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, exporter cmdu
 
 	devContainerCh := getDevContainer(ctx, a.apiClient, codespace)
 
-	session, endSession, err := startLiveShareSession(ctx, codespace, a, false, "")
+	session, err := startLiveShareSession(ctx, codespace, a, false, "")
 	if err != nil {
 		return err
 	}
-	defer endSession(&err)
+	defer session.Close()
 
 	a.StartProgressIndicatorWithLabel("Fetching ports")
 	ports, err := session.GetSharedServers(ctx)

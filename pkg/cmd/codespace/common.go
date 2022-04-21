@@ -62,7 +62,7 @@ func (a *App) StopProgressIndicator() {
 }
 
 // Connects to a codespace using Live Share and returns that session along with a function to end it
-func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App, debug bool, debugFile string) (*liveshare.Session, func(*error), error) {
+func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App, debug bool, debugFile string) (*liveshare.Session, error) {
 	// While connecting, ensure in the background that the user has keys installed.
 	// That lets us report a more useful error message if they don't.
 	authkeys := make(chan error, 1)
@@ -74,7 +74,7 @@ func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App
 	if debug {
 		debugLogger, err := newFileLogger(debugFile)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		defer safeClose(debugLogger, &err)
 
@@ -85,11 +85,11 @@ func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App
 	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
 	if err != nil {
 		if authErr := <-authkeys; authErr != nil {
-			return nil, nil, authErr
+			return nil, authErr
 		}
-		return nil, nil, err
+		return nil, err
 	}
-	return session, func(e *error) { safeClose(session, e) }, nil
+	return session, nil
 }
 
 //go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
