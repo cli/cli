@@ -29,25 +29,29 @@ func newCmdClone(f *cmdutil.Factory, runF func(*cloneOptions) error) *cobra.Comm
 	}
 
 	cmd := &cobra.Command{
-		Use:   "clone <source [HOST/]OWNER/REPO>",
-		Short: "Clones labels from another repo",
+		Use:   "clone <source-repository>",
+		Short: "Clones labels from one repo to another",
 		Long: heredoc.Doc(`
-			Clones labels from another repo into the current repo on GitHub.
+			Clones labels from a source repo to a destination repo on GitHub.
+			By default, the destination repo is the current repo.
 
-			All labels from the source repo will be copied to the current repo.
-			Any labels in the current repo that are not in the source repo will
+			All labels from the source repo will be copied to the destination repo.
+			Any labels in the destination repo that are not in the source repo will
 			not be deleted or modified.
 
-			If any labels from the source repo already exist in the current repo
+			If any labels from the source repo already exist in the destination repo
 			the command will fail. You can overwrite existing labels in the
-			current repo using the --force flag.
+			destination repo using the --force flag.
 
 		`),
 		Example: heredoc.Doc(`
 			# clone and overwrite labels from the cli/cli repo into the current repo
 			$ gh label clone cli/cli --force
+
+			# clone labels into a different destination repo, or with no current repo
+			$ gh label clone cli/cli -R octocat/cli
 		`),
-		Args: cmdutil.ExactArgs(1, "cannot clone labels: source repo argument required"),
+		Args: cmdutil.ExactArgs(1, "cannot clone labels: source-repository argument required"),
 		RunE: func(c *cobra.Command, args []string) error {
 			var err error
 			opts.BaseRepo = f.BaseRepo
@@ -62,7 +66,7 @@ func newCmdClone(f *cmdutil.Factory, runF func(*cloneOptions) error) *cobra.Comm
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Overwrite labels in the current repo from the source repo.")
+	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Overwrite labels in the destination repository")
 
 	return cmd
 }
@@ -87,10 +91,8 @@ func cloneRun(opts *cloneOptions) error {
 		switch {
 		case successCount == totalCount:
 			fmt.Fprintf(opts.IO.Out, "%s Cloned %s from %s to %s\n", cs.SuccessIcon(), pluralize(successCount), opts.SourceRepo, baseRepo)
-		case successCount != 0:
-			fmt.Fprintf(opts.IO.Out, "%s Cloned %s of %d from %s to %s\n", cs.WarningIcon(), pluralize(successCount), totalCount, opts.SourceRepo, baseRepo)
 		default:
-			fmt.Fprintf(opts.IO.Out, "%s Failed to clone %s from %s to %s\n", cs.FailureIcon(), pluralize(totalCount), opts.SourceRepo, baseRepo)
+			fmt.Fprintf(opts.IO.Out, "%s Cloned %s of %d from %s to %s\n", cs.WarningIcon(), pluralize(successCount), totalCount, opts.SourceRepo, baseRepo)
 		}
 	}
 

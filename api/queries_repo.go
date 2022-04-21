@@ -217,10 +217,6 @@ func (r Repository) RepoHost() string {
 
 // String returns the [HOST/]OWNER/NAME of the repository
 func (r Repository) String() string {
-	if r.hostname != "" {
-		return fmt.Sprintf("%s/%s/%s", r.hostname, r.Owner.Login, r.Name)
-	}
-
 	return fmt.Sprintf("%s/%s", r.Owner.Login, r.Name)
 }
 

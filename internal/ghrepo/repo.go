@@ -147,9 +147,5 @@ func (r ghRepo) RepoHost() string {
 }
 
 func (r ghRepo) String() string {
-	if r.hostname != "" {
-		return fmt.Sprintf("%s/%s/%s", r.hostname, r.owner, r.name)
-	}
-
 	return fmt.Sprintf("%s/%s", r.owner, r.name)
 }
