@@ -114,7 +114,7 @@ func cloneLabels(opts *cloneOptions) (successCount, totalCount int, err error) {
 	defer opts.IO.StopProgressIndicator()
 
 	successCount = 0
-	labels, totalCount, err := listLabels(httpClient, opts.SourceRepo, listLimit)
+	labels, totalCount, err := listLabels(httpClient, opts.SourceRepo, 0)
 	if err != nil {
 		return
 	}

@@ -7,6 +7,21 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
+type listLabelsResponseData struct {
+	Repository struct {
+		Labels struct {
+			TotalCount int
+			Nodes      []label
+			PageInfo   struct {
+				HasNextPage bool
+				EndCursor   string
+			}
+		}
+	}
+}
+
+// listLabels lists the labels in the given repo. Pass 0 for limit to list all labels;
+// otherwise, only that number of labels is returned for any number of pages.
 func listLabels(client *http.Client, repo ghrepo.Interface, limit int) ([]label, int, error) {
 	apiClient := api.NewClientFromHTTP(client)
 	query := `
@@ -32,27 +47,13 @@ func listLabels(client *http.Client, repo ghrepo.Interface, limit int) ([]label,
 		"repo":  repo.RepoName(),
 	}
 
-	type responseData struct {
-		Repository struct {
-			Labels struct {
-				TotalCount int
-				Nodes      []label
-				PageInfo   struct {
-					HasNextPage bool
-					EndCursor   string
-				}
-			}
-			HasIssuesEnabled bool
-		}
-	}
-
 	var labels []label
 	var totalCount int
 	pageLimit := min(limit, 100)
 
 loop:
 	for {
-		var response responseData
+		var response listLabelsResponseData
 		variables["limit"] = pageLimit
 		err := apiClient.GraphQL(repo.RepoHost(), query, variables, &response)
 		if err != nil {
@@ -63,14 +64,13 @@ loop:
 
 		for _, label := range response.Repository.Labels.Nodes {
 			labels = append(labels, label)
-			if len(labels) == limit {
+			if limit >= 0 && len(labels) == limit {
 				break loop
 			}
 		}
 
 		if response.Repository.Labels.PageInfo.HasNextPage {
 			variables["endCursor"] = response.Repository.Labels.PageInfo.EndCursor
-			pageLimit = min(pageLimit, limit-len(labels))
 		} else {
 			break
 		}

@@ -2,6 +2,7 @@ package label
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -79,6 +80,7 @@ func TestNewCmdClone(t *testing.T) {
 }
 
 func TestCloneRun(t *testing.T) {
+	const pages = 3
 	tests := []struct {
 		name       string
 		tty        bool
@@ -391,6 +393,52 @@ func TestCloneRun(t *testing.T) {
 				)
 			},
 			wantErr: true,
+		},
+		{
+			name: "clones pages of labels",
+			tty:  true,
+			opts: &cloneOptions{SourceRepo: ghrepo.New("cli", "cli"), Force: true},
+			httpStubs: func(reg *httpmock.Registry) {
+				for i := 0; i < pages; i++ {
+					labels := make([]label, listLimit)
+					for j := range labels {
+						labels[i] = label{
+							Name:  fmt.Sprintf("label%d", i*listLimit+j),
+							Color: "00ff00",
+						}
+					}
+
+					var responseData listLabelsResponseData
+					responseData.Repository.Labels.TotalCount = pages * listLimit
+					responseData.Repository.Labels.Nodes = labels
+					responseData.Repository.Labels.PageInfo.HasNextPage = (i + 1) < pages
+					responseData.Repository.Labels.PageInfo.EndCursor = fmt.Sprintf("page%d", i+1)
+
+					page := i
+					reg.Register(
+						httpmock.GraphQL(`query LabelList\b`),
+						httpmock.GraphQLQueryJSONResponse(responseData, func(s string, m map[string]interface{}) {
+							assert.Equal(t, "cli", m["owner"])
+							assert.Equal(t, "cli", m["repo"])
+							assert.Equal(t, float64(0), m["limit"].(float64))
+							if page > 0 {
+								assert.Equal(t, fmt.Sprintf("page%d", page), m["endCursor"])
+							}
+						}),
+					)
+				}
+				for i := 0; i < pages*listLimit; i++ {
+					reg.Register(
+						httpmock.REST("POST", "repos/OWNER/REPO/labels"),
+						httpmock.StatusStringResponse(201, fmt.Sprintf(`
+						{
+							"name": "label%d",
+							"color": "00ff00"
+						}`, i)),
+					)
+				}
+			},
+			wantStdout: fmt.Sprintf("✓ Cloned %d labels from cli/cli to OWNER/REPO\n", pages*listLimit),
 		},
 	}
 
