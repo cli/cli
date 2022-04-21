@@ -47,7 +47,7 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) error {
 	serverPort, serverUrl, err := session.StartJupyterServer(ctx)
 	a.StopProgressIndicator()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to start JupyterLab server: %w", err)
 	}
 
 	// Pass 0 to pick a random port
@@ -71,7 +71,7 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) error {
 		return err
 	}
 
-	fmt.Println(targetUrl)
+	fmt.Fprintln(a.io.Out, targetUrl)
 
 	select {
 	case err := <-tunnelClosed:

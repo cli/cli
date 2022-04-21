@@ -73,7 +73,7 @@ func (s *Session) StartJupyterServer(ctx context.Context) (int, string, error) {
 	}
 
 	if err := s.rpc.do(ctx, "IJupyterServerHostService.getRunningServer", []string{}, &response); err != nil {
-		return 0, "", err
+		return 0, "", fmt.Errorf("failed to invoke JupyterLab RPC: %w", err)
 	}
 
 	if !response.Result {
@@ -82,7 +82,7 @@ func (s *Session) StartJupyterServer(ctx context.Context) (int, string, error) {
 
 	port, err := strconv.Atoi(response.Port)
 	if err != nil {
-		return 0, "", err
+		return 0, "", fmt.Errorf("failed to parse JupyterLab port: %w", err)
 	}
 
 	return port, response.ServerUrl, nil
