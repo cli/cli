@@ -90,8 +90,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(labels) == 0 {
-		utils.HandleNoResults(opts.IO, fmt.Sprintf("There are no %ss in %s", "label", ghrepo.FullName(baseRepo)))
-		return nil
+		return utils.HandleNoResults(opts.IO, fmt.Sprintf("There are no %ss in %s", "label", ghrepo.FullName(baseRepo)))
 	}
 
 	if opts.IO.IsStdoutTTY() {

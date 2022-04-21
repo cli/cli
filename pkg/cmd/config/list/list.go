@@ -61,8 +61,7 @@ func listRun(opts *ListOptions) error {
 	configOptions := config.ConfigOptions()
 
 	if len(configOptions) == 0 {
-		utils.HandleNoResults(opts.IO, "No configuration options found")
-		return nil
+		return utils.HandleNoResults(opts.IO, "No configuration options found")
 	}
 
 	for _, key := range configOptions {

@@ -109,8 +109,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(runs) == 0 {
-		utils.HandleNoResults(opts.IO, "No runs found")
-		return nil
+		return utils.HandleNoResults(opts.IO, "No runs found")
 	}
 
 	if err := opts.IO.StartPager(); err == nil {

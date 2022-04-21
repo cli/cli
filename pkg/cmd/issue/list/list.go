@@ -175,8 +175,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(listResult.Issues) == 0 {
-		prShared.ListNoResults(opts.IO, ghrepo.FullName(baseRepo), "issue", !filterOptions.IsDefault())
-		return nil
+		return prShared.ListNoResults(opts.IO, ghrepo.FullName(baseRepo), "issue", !filterOptions.IsDefault())
 	}
 
 	if err := opts.IO.StartPager(); err == nil {

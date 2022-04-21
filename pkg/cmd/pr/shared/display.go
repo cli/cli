@@ -53,12 +53,11 @@ func PrintMessage(io *iostreams.IOStreams, s string) {
 	fmt.Fprintln(io.Out, io.ColorScheme().Gray(s))
 }
 
-func ListNoResults(io *iostreams.IOStreams, repoName string, itemName string, hasFilters bool) {
+func ListNoResults(io *iostreams.IOStreams, repoName string, itemName string, hasFilters bool) error {
 	if hasFilters {
-		utils.HandleNoResults(io, fmt.Sprintf("No %ss match your search in %s", itemName, repoName))
-	} else {
-		utils.HandleNoResults(io, fmt.Sprintf("There are no open %ss in %s", itemName, repoName))
+		return utils.HandleNoResults(io, fmt.Sprintf("No %ss match your search in %s", itemName, repoName))
 	}
+	return utils.HandleNoResults(io, fmt.Sprintf("There are no open %ss in %s", itemName, repoName))
 }
 
 func ListHeader(repoName string, itemName string, matchCount int, totalMatchCount int, hasFilters bool) string {

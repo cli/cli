@@ -83,8 +83,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(workflows) == 0 {
-		utils.HandleNoResults(opts.IO, "No workflows found")
-		return nil
+		return utils.HandleNoResults(opts.IO, "No workflows found")
 	}
 
 	if err := opts.IO.StartPager(); err == nil {

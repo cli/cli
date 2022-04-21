@@ -70,8 +70,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(gpgKeys) == 0 {
-		utils.HandleNoResults(opts.IO, "No GPG keys present in GitHub account.")
-		return nil
+		return utils.HandleNoResults(opts.IO, "No GPG keys present in GitHub account.")
 	}
 
 	t := utils.NewTablePrinter(opts.IO)
