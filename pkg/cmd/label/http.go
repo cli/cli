@@ -24,17 +24,18 @@ type listLabelsResponseData struct {
 
 // listLabels lists the labels in the given repo. Pass -1 for limit to list all labels;
 // otherwise, only that number of labels is returned for any number of pages.
-func listLabels(client *http.Client, repo ghrepo.Interface, limit int) ([]label, int, error) {
+func listLabels(client *http.Client, repo ghrepo.Interface, opts listQueryOptions) ([]label, int, error) {
 	apiClient := api.NewClientFromHTTP(client)
 	query := `
-	query LabelList($owner: String!,$repo: String!, $limit: Int!, $endCursor: String) {
+	query LabelList($owner: String!, $repo: String!, $limit: Int!, $endCursor: String, $query: String, $orderBy: LabelOrder) {
 		repository(owner: $owner, name: $repo) {
-			labels(first: $limit, after: $endCursor) {
+			labels(first: $limit, after: $endCursor, query: $query, orderBy: $orderBy) {
 				totalCount,
 				nodes {
 					name,
+					color,
 					description,
-					color
+					createdAt,
 				}
 				pageInfo {
 					hasNextPage
@@ -45,8 +46,13 @@ func listLabels(client *http.Client, repo ghrepo.Interface, limit int) ([]label,
 	}`
 
 	variables := map[string]interface{}{
-		"owner": repo.RepoOwner(),
-		"repo":  repo.RepoName(),
+		"owner":   repo.RepoOwner(),
+		"repo":    repo.RepoName(),
+		"orderBy": opts.OrderBy(),
+	}
+
+	if opts.Query != "" {
+		variables["query"] = opts.Query
 	}
 
 	var labels []label
@@ -55,7 +61,7 @@ func listLabels(client *http.Client, repo ghrepo.Interface, limit int) ([]label,
 loop:
 	for {
 		var response listLabelsResponseData
-		variables["limit"] = determinePageSize(limit - len(labels))
+		variables["limit"] = determinePageSize(opts.Limit - len(labels))
 		err := apiClient.GraphQL(repo.RepoHost(), query, variables, &response)
 		if err != nil {
 			return nil, 0, err
@@ -65,7 +71,7 @@ loop:
 
 		for _, label := range response.Repository.Labels.Nodes {
 			labels = append(labels, label)
-			if len(labels) == limit {
+			if len(labels) == opts.Limit {
 				break loop
 			}
 		}
@@ -75,6 +81,11 @@ loop:
 		} else {
 			break
 		}
+	}
+
+	if opts.Query != "" {
+		// Work around that `orderBy` has no effect when `query` is specified.
+		sortLabels(labels, opts.Sort, opts.Order == "asc")
 	}
 
 	return labels, totalCount, nil

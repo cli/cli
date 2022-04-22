@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -24,12 +25,12 @@ func TestNewCmdList(t *testing.T) {
 		{
 			name:   "no argument",
 			input:  "",
-			output: listOptions{Limit: 30},
+			output: listOptions{Query: listQueryOptions{Limit: 30}},
 		},
 		{
 			name:   "limit flag",
 			input:  "--limit 10",
-			output: listOptions{Limit: 10},
+			output: listOptions{Query: listQueryOptions{Limit: 10}},
 		},
 		{
 			name:    "invalid limit flag",
@@ -40,7 +41,44 @@ func TestNewCmdList(t *testing.T) {
 		{
 			name:   "web flag",
 			input:  "--web",
-			output: listOptions{Limit: 30, WebMode: true},
+			output: listOptions{Query: listQueryOptions{Limit: 30}, WebMode: true},
+		},
+		{
+			name:   "search flag",
+			input:  "--search core",
+			output: listOptions{Query: listQueryOptions{Limit: 30, Query: "core"}},
+		},
+		{
+			name:   "sort name flag",
+			input:  "--sort name",
+			output: listOptions{Query: listQueryOptions{Limit: 30, Sort: "name"}},
+		},
+		{
+			name:   "sort created flag",
+			input:  "--sort created",
+			output: listOptions{Query: listQueryOptions{Limit: 30, Sort: "created"}},
+		},
+		{
+			name:    "sort invalid flag",
+			input:   "--sort invalid",
+			wantErr: true,
+			errMsg:  `invalid argument "invalid" for "--sort" flag: valid values are {created|name}`,
+		},
+		{
+			name:   "order asc flag",
+			input:  "--order asc",
+			output: listOptions{Query: listQueryOptions{Limit: 30, Order: "asc"}},
+		},
+		{
+			name:   "order desc flag",
+			input:  "--order desc",
+			output: listOptions{Query: listQueryOptions{Limit: 30, Order: "desc"}},
+		},
+		{
+			name:    "order invalid flag",
+			input:   "--order invalid",
+			wantErr: true,
+			errMsg:  `invalid argument "invalid" for "--order" flag: valid values are {asc|desc}`,
 		},
 	}
 
@@ -69,7 +107,7 @@ func TestNewCmdList(t *testing.T) {
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, tt.output.Limit, gotOpts.Limit)
+			assert.Equal(t, tt.output.Query.Limit, gotOpts.Query.Limit)
 			assert.Equal(t, tt.output.WebMode, gotOpts.WebMode)
 		})
 	}
@@ -180,6 +218,120 @@ func TestListRun(t *testing.T) {
 			tty:        true,
 			opts:       &listOptions{WebMode: true},
 			wantStderr: "Opening github.com/OWNER/REPO/labels in your browser.\n",
+		},
+		{
+			name: "order by name ascending",
+			tty:  true,
+			opts: &listOptions{
+				Query: listQueryOptions{
+					Limit: 30,
+					Order: "asc",
+					Sort:  "name",
+				},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query LabelList\b`),
+					httpmock.GraphQLQuery(`
+					{
+						"data": {
+							"repository": {
+								"labels": {
+									"totalCount": 2,
+									"nodes": [
+										{
+											"name": "bug",
+											"color": "d73a4a",
+											"description": "This is a bug label",
+											"createdAt": "2022-04-20T06:17:50Z"
+										},
+										{
+											"name": "docs",
+											"color": "ffa8da",
+											"description": "This is a docs label",
+											"createdAt": "2022-04-20T06:17:49Z"
+										}
+									],
+									"pageInfo": {
+										"hasNextPage": false,
+										"endCursor": "Y3Vyc29yOnYyOpK5MjAxOS0xMC0xMVQwMTozODowMyswODowMM5f3HZq"
+									}
+								}
+							}
+						}
+					}`, func(s string, m map[string]interface{}) {
+						assert.Equal(t, "OWNER", m["owner"])
+						assert.Equal(t, "REPO", m["repo"])
+						assert.Equal(t, float64(30), m["limit"].(float64))
+						assert.Equal(t, map[string]interface{}{"direction": "ASC", "field": "NAME"}, m["orderBy"])
+					}),
+				)
+			},
+			wantStdout: heredoc.Doc(`
+
+			Showing 2 of 2 labels in OWNER/REPO
+
+			bug   This is a bug label   #d73a4a
+			docs  This is a docs label  #ffa8da
+			`),
+		},
+		{
+			name: "order by createdAt descending with query",
+			tty:  true,
+			opts: &listOptions{
+				Query: listQueryOptions{
+					Limit: 30,
+					Query: "label",
+					Order: "desc",
+					Sort:  "created",
+				},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query LabelList\b`),
+					httpmock.GraphQLQuery(`
+					{
+						"data": {
+							"repository": {
+								"labels": {
+									"totalCount": 2,
+									"nodes": [
+										{
+											"name": "docs",
+											"color": "ffa8da",
+											"description": "This is a docs label",
+											"createdAt": "2022-04-20T06:17:49Z"
+										},
+										{
+											"name": "bug",
+											"color": "d73a4a",
+											"description": "This is a bug label",
+											"createdAt": "2022-04-20T06:17:50Z"
+										}
+									],
+									"pageInfo": {
+										"hasNextPage": false,
+										"endCursor": "Y3Vyc29yOnYyOpK5MjAxOS0xMC0xMVQwMTozODowMyswODowMM5f3HZq"
+									}
+								}
+							}
+						}
+					}`, func(s string, m map[string]interface{}) {
+						assert.Equal(t, "OWNER", m["owner"])
+						assert.Equal(t, "REPO", m["repo"])
+						assert.Equal(t, float64(30), m["limit"].(float64))
+						assert.Equal(t, "label", m["query"])
+						assert.Equal(t, map[string]interface{}{"direction": "DESC", "field": "CREATED_AT"}, m["orderBy"])
+					}),
+				)
+			},
+			wantStdout: heredoc.Doc(`
+
+			Showing 2 of 2 labels in OWNER/REPO
+
+			bug   This is a bug label   #d73a4a
+			docs  This is a docs label  #ffa8da
+			`),
 		},
 	}
 

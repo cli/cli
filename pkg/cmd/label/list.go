@@ -3,6 +3,7 @@ package label
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -24,8 +25,15 @@ type listOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 
-	Limit   int
+	Query   listQueryOptions
 	WebMode bool
+}
+
+type listQueryOptions struct {
+	Limit int
+	Query string
+	Order string
+	Sort  string
 }
 
 func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Command {
@@ -45,8 +53,8 @@ func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			if opts.Limit < 1 {
-				return cmdutil.FlagErrorf("invalid limit: %v", opts.Limit)
+			if opts.Query.Limit < 1 {
+				return cmdutil.FlagErrorf("invalid limit: %v", opts.Query.Limit)
 			}
 
 			if runF != nil {
@@ -57,7 +65,12 @@ func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "List labels in the web browser")
-	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", listLimit, "Maximum number of items to fetch")
+	cmd.Flags().IntVarP(&opts.Query.Limit, "limit", "L", listLimit, "Maximum number of items to fetch")
+	cmd.Flags().StringVarP(&opts.Query.Query, "search", "S", "", "Search label names and descriptions")
+
+	// These defaults match the service behavior and, therefore, the initially release of `label list` behavior.
+	cmdutil.StringEnumFlag(cmd, &opts.Query.Order, "order", "", "asc", []string{"asc", "desc"}, "Order of labels returned")
+	cmdutil.StringEnumFlag(cmd, &opts.Query.Sort, "sort", "", "created", []string{"created", "name"}, "Sort fetched labels")
 
 	return cmd
 }
@@ -84,7 +97,7 @@ func listRun(opts *listOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
-	labels, totalCount, err := listLabels(httpClient, baseRepo, opts.Limit)
+	labels, totalCount, err := listLabels(httpClient, baseRepo, opts.Query)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -119,4 +132,15 @@ func printLabels(io *iostreams.IOStreams, labels []label) error {
 
 func listHeader(repoName string, count int, totalCount int) string {
 	return fmt.Sprintf("Showing %d of %s in %s", count, utils.Pluralize(totalCount, "label"), repoName)
+}
+
+func (opts listQueryOptions) OrderBy() map[string]interface{} {
+	field := strings.ToUpper(opts.Sort)
+	if opts.Sort == "created" {
+		field = "CREATED_AT"
+	}
+	return map[string]interface{}{
+		"direction": strings.ToUpper(opts.Order),
+		"field":     field,
+	}
 }
