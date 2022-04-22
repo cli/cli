@@ -30,18 +30,18 @@ func newCmdClone(f *cmdutil.Factory, runF func(*cloneOptions) error) *cobra.Comm
 
 	cmd := &cobra.Command{
 		Use:   "clone <source-repository>",
-		Short: "Clones labels from one repo to another",
+		Short: "Clones labels from one repository to another",
 		Long: heredoc.Doc(`
-			Clones labels from a source repo to a destination repo on GitHub.
-			By default, the destination repo is the current repo.
+			Clones labels from a source repository to a destination repository on GitHub.
+			By default, the destination repository is the current repository.
 
-			All labels from the source repo will be copied to the destination repo.
-			Any labels in the destination repo that are not in the source repo will
-			not be deleted or modified.
+			All labels from the source repository will be copied to the destination
+			repository. Any labels in the destination repository that are not in the source
+			repository will not be deleted or modified.
 
-			If any labels from the source repo already exist in the destination repo
-			the command will fail. You can overwrite existing labels in the
-			destination repo using the --force flag.
+			If any labels from the source repository already exist in the destination
+			repository the command will fail. You can overwrite existing labels in the
+			destination repository using the --force flag.
 
 		`),
 		Example: heredoc.Doc(`
