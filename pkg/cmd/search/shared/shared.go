@@ -125,7 +125,7 @@ func displayIssueResults(io *iostreams.IOStreams, et EntityType, results search.
 		case PullRequests:
 			msg = "No pull requests matched your search"
 		}
-		return utils.HandleNoResults(io, msg)
+		return cmdutil.NoResultsError(io, msg)
 	}
 	if io.IsStdoutTTY() {
 		var header string

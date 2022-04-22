@@ -59,7 +59,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(deployKeys) == 0 {
-		return utils.HandleNoResults(opts.IO, "No deploy keys found in "+ghrepo.FullName(repo))
+		return cmdutil.NoResultsError(opts.IO, "No deploy keys found in "+ghrepo.FullName(repo))
 	}
 
 	t := utils.NewTablePrinter(opts.IO)

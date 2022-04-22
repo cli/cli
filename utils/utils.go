@@ -6,8 +6,6 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 func Pluralize(num int, thing string) string {
@@ -115,11 +113,4 @@ func IsDebugEnabled() (bool, string) {
 	default:
 		return true, debugValue
 	}
-}
-
-func HandleNoResults(ios *iostreams.IOStreams, msg string) error {
-	if ios.CanPrompt() {
-		fmt.Fprintf(ios.ErrOut, "%s\n", msg)
-	}
-	return nil
 }

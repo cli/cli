@@ -536,7 +536,6 @@ func TestNewCmdExtension(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, stdout, stderr := iostreams.Test()
 			ios.SetStdoutTTY(tt.isTTY)
-			ios.SetStdinTTY(tt.isTTY)
 			ios.SetStderrTTY(tt.isTTY)
 
 			var assertFunc func(*testing.T)

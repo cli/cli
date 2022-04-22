@@ -199,7 +199,22 @@ func TestReposRun(t *testing.T) {
 				},
 			},
 			tty:        true,
-			wantStdout: "\nNo repositories matched your search\n",
+			wantStdout: "",
+			wantStderr: "No repositories matched your search\n",
+		},
+		{
+			name: "displays no results notty",
+			opts: &ReposOptions{
+				Query: query,
+				Searcher: &search.SearcherMock{
+					RepositoriesFunc: func(query search.Query) (search.RepositoriesResult, error) {
+						return search.RepositoriesResult{}, nil
+					},
+				},
+			},
+			tty:        false,
+			wantStdout: "",
+			wantStderr: "",
 		},
 		{
 			name: "displays results notty",

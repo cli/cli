@@ -142,7 +142,7 @@ func Test_NewCmdMerge(t *testing.T) {
 			wantErr: "only one of --merge, --rebase, or --squash can be enabled",
 		},
 		{
-			name:    "multiple merge methods, notty",
+			name:    "multiple merge methods, non-tty",
 			args:    "123 --merge --rebase",
 			isTTY:   false,
 			wantErr: "only one of --merge, --rebase, or --squash can be enabled",

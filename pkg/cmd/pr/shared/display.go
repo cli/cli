@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
 )
@@ -55,9 +56,9 @@ func PrintMessage(io *iostreams.IOStreams, s string) {
 
 func ListNoResults(io *iostreams.IOStreams, repoName string, itemName string, hasFilters bool) error {
 	if hasFilters {
-		return utils.HandleNoResults(io, fmt.Sprintf("No %ss match your search in %s", itemName, repoName))
+		return cmdutil.NoResultsError(io, fmt.Sprintf("No %ss match your search in %s", itemName, repoName))
 	}
-	return utils.HandleNoResults(io, fmt.Sprintf("There are no open %ss in %s", itemName, repoName))
+	return cmdutil.NoResultsError(io, fmt.Sprintf("There are no open %ss in %s", itemName, repoName))
 }
 
 func ListHeader(repoName string, itemName string, matchCount int, totalMatchCount int, hasFilters bool) string {

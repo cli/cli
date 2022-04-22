@@ -55,7 +55,7 @@ func TestListRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
-			name: "list notty",
+			name: "list non-tty",
 			opts: ListOptions{
 				HTTPClient: func() (*http.Client, error) {
 					createdAt, _ := time.Parse(time.RFC3339, "2020-08-31T15:44:24+02:00")
@@ -105,7 +105,7 @@ func TestListRun(t *testing.T) {
 			isTTY:      true,
 		},
 		{
-			name: "no keys notty",
+			name: "no keys non-tty",
 			opts: ListOptions{
 				HTTPClient: func() (*http.Client, error) {
 					reg := &httpmock.Registry{}

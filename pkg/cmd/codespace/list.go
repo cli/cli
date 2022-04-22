@@ -44,7 +44,7 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 	}
 
 	if len(codespaces) == 0 {
-		return utils.HandleNoResults(a.io, "No codespaces found")
+		return cmdutil.NoResultsError(a.io, "No codespaces found")
 	}
 
 	hasNonProdVSCSTarget := false

@@ -54,7 +54,7 @@ func TestListRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
-			name:  "list notty",
+			name:  "list non-tty",
 			isTTY: false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				createdAt, _ := time.Parse(time.RFC3339, "2020-08-31T15:44:24+02:00")
@@ -97,7 +97,7 @@ func TestListRun(t *testing.T) {
 			wantErr:    false,
 		},
 		{
-			name:  "no keys notty",
+			name:  "no keys non-tty",
 			isTTY: false,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(

@@ -6,7 +6,6 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -59,10 +58,6 @@ func listRun(opts *ListOptions) error {
 	}
 
 	configOptions := config.ConfigOptions()
-
-	if len(configOptions) == 0 {
-		return utils.HandleNoResults(opts.IO, "No configuration options found")
-	}
 
 	for _, key := range configOptions {
 		val, err := cfg.GetOrDefault(host, key.Key)

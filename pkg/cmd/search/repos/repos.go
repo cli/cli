@@ -171,11 +171,13 @@ func displayResults(io *iostreams.IOStreams, results search.RepositoriesResult) 
 		}
 		tp.EndRow()
 	}
+
+	if len(results.Items) == 0 {
+		return cmdutil.NoResultsError(io, "No repositories matched your search")
+	}
+
 	if io.IsStdoutTTY() {
-		header := "No repositories matched your search\n"
-		if len(results.Items) > 0 {
-			header = fmt.Sprintf("Showing %d of %d repositories\n\n", len(results.Items), results.Total)
-		}
+		header := fmt.Sprintf("Showing %d of %d repositories\n\n", len(results.Items), results.Total)
 		fmt.Fprintf(io.Out, "\n%s", header)
 	}
 	return tp.Render()

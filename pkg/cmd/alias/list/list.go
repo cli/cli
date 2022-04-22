@@ -54,7 +54,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if aliasCfg.Empty() {
-		return utils.HandleNoResults(opts.IO, "No aliases configured")
+		return cmdutil.NoResultsError(opts.IO, "No aliases configured")
 	}
 
 	tp := utils.NewTablePrinter(opts.IO)

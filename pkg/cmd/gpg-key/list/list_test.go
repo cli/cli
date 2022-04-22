@@ -29,7 +29,7 @@ func TestListRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
-			name:       "list notty",
+			name:       "list non-tty",
 			opts:       ListOptions{HTTPClient: mockGPGResponse},
 			isTTY:      false,
 			wantStdout: "johnny@test.com\tABCDEF1234567890\txJMEWfoofoofoo\t2020-06-11T15:44:24+01:00\t2099-01-01T15:44:24+01:00\nmonalisa@github.com\t1234567890ABCDEF\txJMEWbarbarbar\t2021-01-11T15:44:24+01:00\t0001-01-01T00:00:00Z\n",

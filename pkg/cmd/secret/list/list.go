@@ -140,7 +140,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(secrets) == 0 {
-		return utils.HandleNoResults(opts.IO, "No secrets found")
+		return cmdutil.NoResultsError(opts.IO, "No secrets found")
 	}
 
 	if err := opts.IO.StartPager(); err == nil {

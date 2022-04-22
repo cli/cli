@@ -109,7 +109,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(runs) == 0 {
-		return utils.HandleNoResults(opts.IO, "No runs found")
+		return cmdutil.NoResultsError(opts.IO, "No runs found")
 	}
 
 	if err := opts.IO.StartPager(); err == nil {
@@ -125,13 +125,6 @@ func listRun(opts *ListOptions) error {
 	tp := utils.NewTablePrinter(opts.IO)
 
 	cs := opts.IO.ColorScheme()
-
-	if len(runs) == 0 {
-		if !opts.PlainOutput {
-			fmt.Fprintln(opts.IO.ErrOut, "No runs found")
-		}
-		return nil
-	}
 
 	out := opts.IO.Out
 
