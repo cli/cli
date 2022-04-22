@@ -17,6 +17,7 @@ func NewCmdLabel(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(newCmdCreate(f, nil))
 	cmd.AddCommand(newCmdClone(f, nil))
 	cmd.AddCommand(newCmdEdit(f, nil))
+	cmd.AddCommand(newCmdRemove(f, nil))
 
 	return cmd
 }
