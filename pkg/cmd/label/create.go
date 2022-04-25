@@ -1,4 +1,4 @@
-package create
+package label
 
 import (
 	"bytes"
@@ -13,7 +13,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/pkg/cmd/label/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -38,7 +37,7 @@ var randomColors = []string{
 	"D4C5F9",
 }
 
-type CreateOptions struct {
+type createOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
@@ -49,8 +48,8 @@ type CreateOptions struct {
 	Force       bool
 }
 
-func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
-	opts := CreateOptions{
+func newCmdCreate(f *cmdutil.Factory, runF func(*createOptions) error) *cobra.Command {
+	opts := createOptions{
 		HttpClient: f.HttpClient,
 		IO:         f.IOStreams,
 	}
@@ -58,7 +57,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "create <name>",
 		Short: "Create a new label",
-		Long: heredoc.Docf(`
+		Long: heredoc.Doc(`
 			Create a new label on GitHub.
 
 			Must specify name for the label, the description and color are optional.
@@ -90,7 +89,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 var errLabelAlreadyExists = errors.New("label already exists")
 
-func createRun(opts *CreateOptions) error {
+func createRun(opts *createOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -125,7 +124,7 @@ func createRun(opts *CreateOptions) error {
 	return nil
 }
 
-func createLabel(client *http.Client, repo ghrepo.Interface, opts *CreateOptions) error {
+func createLabel(client *http.Client, repo ghrepo.Interface, opts *createOptions) error {
 	apiClient := api.NewClientFromHTTP(client)
 	path := fmt.Sprintf("repos/%s/%s/labels", repo.RepoOwner(), repo.RepoName())
 	requestByte, err := json.Marshal(map[string]string{
@@ -137,7 +136,7 @@ func createLabel(client *http.Client, repo ghrepo.Interface, opts *CreateOptions
 		return err
 	}
 	requestBody := bytes.NewReader(requestByte)
-	result := shared.Label{}
+	result := label{}
 	err = apiClient.REST(repo.RepoHost(), "POST", path, requestBody, &result)
 
 	if httpError, ok := err.(api.HTTPError); ok && isLabelAlreadyExistsError(httpError) {
@@ -151,7 +150,7 @@ func createLabel(client *http.Client, repo ghrepo.Interface, opts *CreateOptions
 	return err
 }
 
-func updateLabel(apiClient *api.Client, repo ghrepo.Interface, opts *CreateOptions) error {
+func updateLabel(apiClient *api.Client, repo ghrepo.Interface, opts *createOptions) error {
 	path := fmt.Sprintf("repos/%s/%s/labels/%s", repo.RepoOwner(), repo.RepoName(), opts.Name)
 	requestByte, err := json.Marshal(map[string]string{
 		"description": opts.Description,
@@ -161,7 +160,7 @@ func updateLabel(apiClient *api.Client, repo ghrepo.Interface, opts *CreateOptio
 		return err
 	}
 	requestBody := bytes.NewReader(requestByte)
-	result := shared.Label{}
+	result := label{}
 	return apiClient.REST(repo.RepoHost(), "PATCH", path, requestBody, &result)
 }
 

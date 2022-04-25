@@ -1,4 +1,4 @@
-package list
+package label
 
 import (
 	"net/http"

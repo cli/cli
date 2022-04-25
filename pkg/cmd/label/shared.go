@@ -1,6 +1,6 @@
-package shared
+package label
 
-type Label struct {
+type label struct {
 	Name        string
 	Color       string
 	Description string

@@ -1,14 +1,30 @@
-package list
+package label
 
 import (
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/pkg/cmd/label/shared"
 )
 
-func listLabels(client *http.Client, repo ghrepo.Interface, limit int) ([]shared.Label, int, error) {
+const maxPageSize = 100
+
+type listLabelsResponseData struct {
+	Repository struct {
+		Labels struct {
+			TotalCount int
+			Nodes      []label
+			PageInfo   struct {
+				HasNextPage bool
+				EndCursor   string
+			}
+		}
+	}
+}
+
+// listLabels lists the labels in the given repo. Pass -1 for limit to list all labels;
+// otherwise, only that number of labels is returned for any number of pages.
+func listLabels(client *http.Client, repo ghrepo.Interface, limit int) ([]label, int, error) {
 	apiClient := api.NewClientFromHTTP(client)
 	query := `
 	query LabelList($owner: String!,$repo: String!, $limit: Int!, $endCursor: String) {
@@ -33,28 +49,13 @@ func listLabels(client *http.Client, repo ghrepo.Interface, limit int) ([]shared
 		"repo":  repo.RepoName(),
 	}
 
-	type responseData struct {
-		Repository struct {
-			Labels struct {
-				TotalCount int
-				Nodes      []shared.Label
-				PageInfo   struct {
-					HasNextPage bool
-					EndCursor   string
-				}
-			}
-			HasIssuesEnabled bool
-		}
-	}
-
-	var labels []shared.Label
+	var labels []label
 	var totalCount int
-	pageLimit := min(limit, 100)
 
 loop:
 	for {
-		var response responseData
-		variables["limit"] = pageLimit
+		var response listLabelsResponseData
+		variables["limit"] = determinePageSize(limit - len(labels))
 		err := apiClient.GraphQL(repo.RepoHost(), query, variables, &response)
 		if err != nil {
 			return nil, 0, err
@@ -71,7 +72,6 @@ loop:
 
 		if response.Repository.Labels.PageInfo.HasNextPage {
 			variables["endCursor"] = response.Repository.Labels.PageInfo.EndCursor
-			pageLimit = min(pageLimit, limit-len(labels))
 		} else {
 			break
 		}
@@ -80,9 +80,10 @@ loop:
 	return labels, totalCount, nil
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
+func determinePageSize(numRequestedItems int) int {
+	// If numRequestedItems is -1 then retrieve maxPageSize
+	if numRequestedItems < 0 || numRequestedItems > maxPageSize {
+		return maxPageSize
 	}
-	return b
+	return numRequestedItems
 }
