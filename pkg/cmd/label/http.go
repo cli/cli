@@ -7,7 +7,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
-const defaultPageLimit = 100
+const maxPageSize = 100
 
 type listLabelsResponseData struct {
 	Repository struct {
@@ -55,7 +55,7 @@ func listLabels(client *http.Client, repo ghrepo.Interface, limit int) ([]label,
 loop:
 	for {
 		var response listLabelsResponseData
-		variables["limit"] = determinePageLimit(limit - len(labels))
+		variables["limit"] = determinePageSize(limit - len(labels))
 		err := apiClient.GraphQL(repo.RepoHost(), query, variables, &response)
 		if err != nil {
 			return nil, 0, err
@@ -80,10 +80,10 @@ loop:
 	return labels, totalCount, nil
 }
 
-func determinePageLimit(limit int) int {
-	// If limit is -1 we want to retrieve all labels
-	if limit < 0 || limit > defaultPageLimit {
-		return defaultPageLimit
+func determinePageSize(numRequestedItems int) int {
+	// If numRequestedItems is -1 then retrieve maxPageSize
+	if numRequestedItems < 0 || numRequestedItems > maxPageSize {
+		return maxPageSize
 	}
-	return limit
+	return numRequestedItems
 }
