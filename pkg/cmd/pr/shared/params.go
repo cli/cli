@@ -208,6 +208,13 @@ func ListURLWithQuery(listURL string, options FilterOptions) (string, error) {
 }
 
 func SearchQueryBuild(options FilterOptions) string {
+	var is, state string
+	switch options.State {
+	case "open", "closed":
+		state = options.State
+	case "merged":
+		is = "merged"
+	}
 	q := search.Query{
 		Qualifiers: search.Qualifiers{
 			Assignee:  options.Assignee,
@@ -219,7 +226,8 @@ func SearchQueryBuild(options FilterOptions) string {
 			Mentions:  options.Mention,
 			Milestone: options.Milestone,
 			Repo:      []string{options.Repo},
-			State:     options.State,
+			State:     state,
+			Is:        []string{is},
 			Type:      options.Entity,
 		},
 	}
