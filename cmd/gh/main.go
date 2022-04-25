@@ -218,7 +218,7 @@ func mainRun() exitCode {
 			// ignore the error raised when piping to a closed pager
 			return exitOK
 		} else if errors.As(err, &noResultsError) {
-			if cmdFactory.IOStreams.IsStdoutTTY() && cmdFactory.IOStreams.IsStderrTTY() {
+			if cmdFactory.IOStreams.IsStdoutTTY() {
 				fmt.Fprintln(stderr, noResultsError.Error())
 			}
 			// no results is not a command failure
