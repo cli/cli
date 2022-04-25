@@ -108,10 +108,6 @@ func listRun(opts *ListOptions) error {
 		return fmt.Errorf("failed to get runs: %w", err)
 	}
 
-	if len(runs) == 0 {
-		return cmdutil.NewNoResultsError("no runs found")
-	}
-
 	if err := opts.IO.StartPager(); err == nil {
 		defer opts.IO.StopPager()
 	} else {
@@ -120,6 +116,10 @@ func listRun(opts *ListOptions) error {
 
 	if opts.Exporter != nil {
 		return opts.Exporter.Write(opts.IO, runs)
+	}
+
+	if len(runs) == 0 {
+		return cmdutil.NewNoResultsError("no runs found")
 	}
 
 	tp := utils.NewTablePrinter(opts.IO)

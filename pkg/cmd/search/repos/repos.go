@@ -141,6 +141,9 @@ func reposRun(opts *ReposOptions) error {
 	if opts.Exporter != nil {
 		return opts.Exporter.Write(io, result.Items)
 	}
+	if len(result.Items) == 0 {
+		return cmdutil.NewNoResultsError("no repositories matched your search")
+	}
 	return displayResults(io, result)
 }
 
@@ -170,10 +173,6 @@ func displayResults(io *iostreams.IOStreams, results search.RepositoriesResult) 
 			tp.AddField(repo.UpdatedAt.Format(time.RFC3339), nil, nil)
 		}
 		tp.EndRow()
-	}
-
-	if len(results.Items) == 0 {
-		return cmdutil.NewNoResultsError("no repositories matched your search")
 	}
 
 	if io.IsStdoutTTY() {
