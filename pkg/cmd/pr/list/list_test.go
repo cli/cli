@@ -112,12 +112,10 @@ func TestPRList_filtering(t *testing.T) {
 		}))
 
 	output, err := runCommand(http, true, `-s all`)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Error(t, err)
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "No pull requests match your search in OWNER/REPO\n", output.Stderr())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestPRList_filteringRemoveDuplicate(t *testing.T) {
@@ -152,9 +150,7 @@ func TestPRList_filteringClosed(t *testing.T) {
 		}))
 
 	_, err := runCommand(http, true, `-s closed`)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Error(t, err)
 }
 
 func TestPRList_filteringHeadBranch(t *testing.T) {
@@ -168,9 +164,7 @@ func TestPRList_filteringHeadBranch(t *testing.T) {
 		}))
 
 	_, err := runCommand(http, true, `-H bug-fix`)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Error(t, err)
 }
 
 func TestPRList_filteringAssignee(t *testing.T) {
@@ -184,9 +178,7 @@ func TestPRList_filteringAssignee(t *testing.T) {
 		}))
 
 	_, err := runCommand(http, true, `-s merged -l "needs tests" -a hubot -B develop`)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Error(t, err)
 }
 
 func TestPRList_filteringDraft(t *testing.T) {
@@ -219,9 +211,7 @@ func TestPRList_filteringDraft(t *testing.T) {
 				}))
 
 			_, err := runCommand(http, true, test.cli)
-			if err != nil {
-				t.Fatal(err)
-			}
+			assert.Error(t, err)
 		})
 	}
 }
@@ -266,9 +256,7 @@ func TestPRList_filteringAuthor(t *testing.T) {
 				}))
 
 			_, err := runCommand(http, true, test.cli)
-			if err != nil {
-				t.Fatal(err)
-			}
+			assert.Error(t, err)
 		})
 	}
 }

@@ -18,6 +18,7 @@ func TestAliasList(t *testing.T) {
 		name       string
 		config     string
 		isTTY      bool
+		wantErr    bool
 		wantStdout string
 		wantStderr string
 	}{
@@ -25,8 +26,9 @@ func TestAliasList(t *testing.T) {
 			name:       "empty",
 			config:     "",
 			isTTY:      true,
+			wantErr:    true,
 			wantStdout: "",
-			wantStderr: "No aliases configured\n",
+			wantStderr: "",
 		},
 		{
 			name: "some",
@@ -68,7 +70,11 @@ func TestAliasList(t *testing.T) {
 			cmd.SetErr(ioutil.Discard)
 
 			_, err := cmd.ExecuteC()
-			require.NoError(t, err)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 
 			assert.Equal(t, tt.wantStdout, stdout.String())
 			assert.Equal(t, tt.wantStderr, stderr.String())

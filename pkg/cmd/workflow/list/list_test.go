@@ -120,6 +120,7 @@ func TestListRun(t *testing.T) {
 	tests := []struct {
 		name       string
 		opts       *ListOptions
+		wantErr    bool
 		wantOut    string
 		wantErrOut string
 		stubs      func(*httpmock.Registry)
@@ -170,7 +171,7 @@ func TestListRun(t *testing.T) {
 			wantOut: longOutput,
 		},
 		{
-			name: "no results nontty",
+			name: "no results",
 			opts: &ListOptions{
 				Limit:       defaultLimit,
 				PlainOutput: true,
@@ -181,22 +182,7 @@ func TestListRun(t *testing.T) {
 					httpmock.JSONResponse(shared.WorkflowsPayload{}),
 				)
 			},
-			wantOut: "",
-		},
-		{
-			name: "no results tty",
-			opts: &ListOptions{
-				Limit: defaultLimit,
-			},
-			tty: true,
-			stubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
-					httpmock.JSONResponse(shared.WorkflowsPayload{}),
-				)
-			},
-			wantOut:    "",
-			wantErrOut: "No workflows found\n",
+			wantErr: true,
 		},
 		{
 			name: "show all workflows",
@@ -221,6 +207,7 @@ func TestListRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
 			if tt.stubs == nil {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
@@ -242,11 +229,14 @@ func TestListRun(t *testing.T) {
 			}
 
 			err := listRun(tt.opts)
-			assert.NoError(t, err)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 
 			assert.Equal(t, tt.wantOut, stdout.String())
 			assert.Equal(t, tt.wantErrOut, stderr.String())
-			reg.Verify(t)
 		})
 	}
 }

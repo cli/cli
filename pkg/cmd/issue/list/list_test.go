@@ -125,12 +125,10 @@ func TestIssueList_tty_withFlags(t *testing.T) {
 		}))
 
 	output, err := runCommand(http, true, "-a probablyCher -s open -A foo --mention me")
-	if err != nil {
-		t.Errorf("error running command `issue list`: %v", err)
-	}
+	assert.EqualError(t, err, "no issues match your search in OWNER/REPO")
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "No issues match your search in OWNER/REPO\n", output.Stderr())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestIssueList_tty_withAppFlag(t *testing.T) {
@@ -148,12 +146,10 @@ func TestIssueList_tty_withAppFlag(t *testing.T) {
 		}))
 
 	output, err := runCommand(http, true, "--app dependabot")
-	if err != nil {
-		t.Errorf("error running command `issue list`: %v", err)
-	}
+	assert.EqualError(t, err, "no issues match your search in OWNER/REPO")
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "No issues match your search in OWNER/REPO\n", output.Stderr())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestIssueList_withInvalidLimitFlag(t *testing.T) {

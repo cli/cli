@@ -85,7 +85,7 @@ func TestListRun(t *testing.T) {
 			wantStderr: "",
 		},
 		{
-			name:  "no keys tty",
+			name:  "no keys",
 			isTTY: true,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
@@ -93,20 +93,8 @@ func TestListRun(t *testing.T) {
 					httpmock.StringResponse(`[]`))
 			},
 			wantStdout: "",
-			wantStderr: "No deploy keys found in OWNER/REPO\n",
-			wantErr:    false,
-		},
-		{
-			name:  "no keys non-tty",
-			isTTY: false,
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/keys"),
-					httpmock.StringResponse(`[]`))
-			},
-			wantStdout: "",
 			wantStderr: "",
-			wantErr:    false,
+			wantErr:    true,
 		},
 	}
 

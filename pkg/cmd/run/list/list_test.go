@@ -111,6 +111,7 @@ func TestListRun(t *testing.T) {
 	tests := []struct {
 		name       string
 		opts       *ListOptions
+		wantErr    bool
 		wantOut    string
 		wantErrOut string
 		stubs      func(*httpmock.Registry)
@@ -172,7 +173,7 @@ func TestListRun(t *testing.T) {
 			wantOut: longRunOutput,
 		},
 		{
-			name: "no results nontty",
+			name: "no results",
 			opts: &ListOptions{
 				Limit:       defaultLimit,
 				PlainOutput: true,
@@ -183,22 +184,7 @@ func TestListRun(t *testing.T) {
 					httpmock.JSONResponse(shared.RunsPayload{}),
 				)
 			},
-			nontty:  true,
-			wantOut: "",
-		},
-		{
-			name: "no results tty",
-			opts: &ListOptions{
-				Limit: defaultLimit,
-			},
-			stubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
-					httpmock.JSONResponse(shared.RunsPayload{}),
-				)
-			},
-			wantOut:    "",
-			wantErrOut: "No runs found\n",
+			wantErr: true,
 		},
 		{
 			name: "workflow selector",
@@ -232,8 +218,7 @@ func TestListRun(t *testing.T) {
 					httpmock.JSONResponse(shared.RunsPayload{}),
 				)
 			},
-			wantOut:    "",
-			wantErrOut: "No runs found\n",
+			wantErr: true,
 		},
 		{
 			name: "actor filter applied",
@@ -249,14 +234,14 @@ func TestListRun(t *testing.T) {
 					httpmock.JSONResponse(shared.RunsPayload{}),
 				)
 			},
-			wantOut:    "",
-			wantErrOut: "No runs found\n",
+			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
 			tt.stubs(reg)
 
 			tt.opts.HttpClient = func() (*http.Client, error) {
@@ -271,11 +256,14 @@ func TestListRun(t *testing.T) {
 			}
 
 			err := listRun(tt.opts)
-			assert.NoError(t, err)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 
 			assert.Equal(t, tt.wantOut, stdout.String())
 			assert.Equal(t, tt.wantErrOut, stderr.String())
-			reg.Verify(t)
 		})
 	}
 }
