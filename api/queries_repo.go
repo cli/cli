@@ -215,7 +215,7 @@ func (r Repository) RepoHost() string {
 	return r.hostname
 }
 
-// String returns the [HOST/]OWNER/NAME of the repository
+// String returns the OWNER/NAME of the repository
 func (r Repository) String() string {
 	return fmt.Sprintf("%s/%s", r.Owner.Login, r.Name)
 }

@@ -2,7 +2,6 @@ package label
 
 import (
 	"bytes"
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -80,7 +79,6 @@ func TestNewCmdClone(t *testing.T) {
 }
 
 func TestCloneRun(t *testing.T) {
-	const pages = 3
 	tests := []struct {
 		name       string
 		tty        bool
@@ -88,6 +86,7 @@ func TestCloneRun(t *testing.T) {
 		httpStubs  func(*httpmock.Registry)
 		wantStdout string
 		wantErr    bool
+		wantErrMsg string
 	}{
 		{
 			name: "clones all labels",
@@ -348,7 +347,8 @@ func TestCloneRun(t *testing.T) {
 					),
 				)
 			},
-			wantErr: true,
+			wantErr:    true,
+			wantErrMsg: "GraphQL: Could not resolve to a Repository with the name 'cli/invalid'. (repository)",
 		},
 		{
 			name: "create error",
@@ -392,59 +392,87 @@ func TestCloneRun(t *testing.T) {
 					),
 				)
 			},
-			wantErr: true,
+			wantErr:    true,
+			wantErrMsg: "HTTP 422: Validation Failed (https://api.github.com/repos/OWNER/REPO/labels)\nLabel.color is invalid",
 		},
 		{
 			name: "clones pages of labels",
 			tty:  true,
 			opts: &cloneOptions{SourceRepo: ghrepo.New("cli", "cli"), Force: true},
 			httpStubs: func(reg *httpmock.Registry) {
-				for i := 0; i < pages; i++ {
-					labels := make([]label, listLimit)
-					for j := range labels {
-						labels[i] = label{
-							Name:  fmt.Sprintf("label%d", i*listLimit+j),
-							Color: "00ff00",
-						}
-					}
-
-					var responseData listLabelsResponseData
-					responseData.Repository.Labels.TotalCount = pages * listLimit
-					responseData.Repository.Labels.Nodes = labels
-					responseData.Repository.Labels.PageInfo.HasNextPage = (i + 1) < pages
-					responseData.Repository.Labels.PageInfo.EndCursor = fmt.Sprintf("page%d", i+1)
-
-					page := i
-					reg.Register(
-						httpmock.GraphQL(`query LabelList\b`),
-						httpmock.GraphQLQueryJSONResponse(responseData, func(s string, m map[string]interface{}) {
-							assert.Equal(t, "cli", m["owner"])
-							assert.Equal(t, "cli", m["repo"])
-							assert.Equal(t, float64(0), m["limit"].(float64))
-							if page > 0 {
-								assert.Equal(t, fmt.Sprintf("page%d", page), m["endCursor"])
+				reg.Register(
+					httpmock.GraphQL(`query LabelList\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"repository": {
+								"labels": {
+									"totalCount": 2,
+									"nodes": [
+										{
+											"name": "bug",
+											"color": "d73a4a",
+											"description": "Something isn't working"
+										}
+									],
+									"pageInfo": {
+										"hasNextPage": true,
+										"endCursor": "abcd1234"
+									}
+								}
 							}
-						}),
-					)
-				}
-				for i := 0; i < pages*listLimit; i++ {
-					reg.Register(
-						httpmock.REST("POST", "repos/OWNER/REPO/labels"),
-						httpmock.StatusStringResponse(201, fmt.Sprintf(`
-						{
-							"name": "label%d",
-							"color": "00ff00"
-						}`, i)),
-					)
-				}
+						}
+					}`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query LabelList\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"repository": {
+								"labels": {
+									"totalCount": 2,
+									"nodes": [
+										{
+											"name": "docs",
+											"color": "6cafc9"
+										}
+									],
+									"pageInfo": {
+										"hasNextPage": false,
+										"endCursor": "abcd1234"
+									}
+								}
+							}
+						}
+					}`),
+				)
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/labels"),
+					httpmock.StatusStringResponse(201, `
+					{
+						"name": "bug",
+						"color": "d73a4a",
+						"description": "Someting isn't working"
+					}`),
+				)
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/labels"),
+					httpmock.StatusStringResponse(201, `
+					{
+						"name": "docs",
+						"color": "6cafc9"
+					}`),
+				)
 			},
-			wantStdout: fmt.Sprintf("✓ Cloned %d labels from cli/cli to OWNER/REPO\n", pages*listLimit),
+			wantStdout: "✓ Cloned 2 labels from cli/cli to OWNER/REPO\n",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			}
@@ -459,11 +487,11 @@ func TestCloneRun(t *testing.T) {
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			}
-			defer reg.Verify(t)
+
 			err := cloneRun(tt.opts)
 
 			if tt.wantErr {
-				assert.NotEqual(t, nil, err)
+				assert.EqualError(t, err, tt.wantErrMsg)
 			} else {
 				assert.NoError(t, err)
 			}

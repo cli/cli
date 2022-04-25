@@ -171,27 +171,6 @@ func GraphQLQuery(body string, cb func(string, map[string]interface{})) Responde
 	}
 }
 
-func GraphQLQueryJSONResponse(body interface{}, cb func(string, map[string]interface{})) Responder {
-	return func(req *http.Request) (*http.Response, error) {
-		var bodyData struct {
-			Query     string
-			Variables map[string]interface{}
-		}
-		err := decodeJSONBody(req, &bodyData)
-		if err != nil {
-			return nil, err
-		}
-		cb(bodyData.Query, bodyData.Variables)
-
-		responseData := struct {
-			Data interface{}
-		}{Data: body}
-		b, err := json.Marshal(responseData)
-
-		return httpResponse(200, req, bytes.NewBuffer(b)), err
-	}
-}
-
 func ScopesResponder(scopes string) func(*http.Request) (*http.Response, error) {
 	return func(req *http.Request) (*http.Response, error) {
 		return &http.Response{
