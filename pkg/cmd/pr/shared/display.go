@@ -56,9 +56,9 @@ func PrintMessage(io *iostreams.IOStreams, s string) {
 
 func ListNoResults(io *iostreams.IOStreams, repoName string, itemName string, hasFilters bool) error {
 	if hasFilters {
-		return cmdutil.NoResultsError(io, fmt.Sprintf("No %ss match your search in %s", itemName, repoName))
+		return cmdutil.NewNoResultsError(fmt.Sprintf("No %ss match your search in %s", itemName, repoName))
 	}
-	return cmdutil.NoResultsError(io, fmt.Sprintf("There are no open %ss in %s", itemName, repoName))
+	return cmdutil.NewNoResultsError(fmt.Sprintf("There are no open %ss in %s", itemName, repoName))
 }
 
 func ListHeader(repoName string, itemName string, matchCount int, totalMatchCount int, hasFilters bool) string {

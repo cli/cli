@@ -90,7 +90,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(labels) == 0 {
-		return cmdutil.NoResultsError(opts.IO, fmt.Sprintf("There are no %ss in %s", "label", ghrepo.FullName(baseRepo)))
+		return cmdutil.NewNoResultsError(fmt.Sprintf("there are no labels in %s", ghrepo.FullName(baseRepo)))
 	}
 
 	if opts.IO.IsStdoutTTY() {

@@ -83,7 +83,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(workflows) == 0 {
-		return cmdutil.NoResultsError(opts.IO, "No workflows found")
+		return cmdutil.NewNoResultsError("no workflows found")
 	}
 
 	if err := opts.IO.StartPager(); err == nil {

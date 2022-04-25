@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/AlecAivazis/survey/v2/terminal"
-	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 // FlagErrorf returns a new FlagError that wraps an error produced by
@@ -55,12 +54,14 @@ func MutuallyExclusive(message string, conditions ...bool) error {
 	return nil
 }
 
-// NoResultsError is an "error" that indicates that no results were found.
-// Its values is nil because no results being found should not be considered
-// a failing app exit.
-func NoResultsError(io *iostreams.IOStreams, msg string) error {
-	if io.IsStdoutTTY() {
-		fmt.Fprintf(io.ErrOut, "%s\n", msg)
-	}
-	return nil
+type NoResultsError struct {
+	message string
+}
+
+func (e NoResultsError) Error() string {
+	return e.message
+}
+
+func NewNoResultsError(message string) NoResultsError {
+	return NoResultsError{message: message}
 }

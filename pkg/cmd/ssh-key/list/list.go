@@ -62,7 +62,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(sshKeys) == 0 {
-		return cmdutil.NoResultsError(opts.IO, "No SSH keys present in GitHub account.")
+		return cmdutil.NewNoResultsError("no SSH keys present in the GitHub account")
 	}
 
 	t := utils.NewTablePrinter(opts.IO)

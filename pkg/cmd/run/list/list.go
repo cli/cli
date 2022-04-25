@@ -109,7 +109,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(runs) == 0 {
-		return cmdutil.NoResultsError(opts.IO, "No runs found")
+		return cmdutil.NewNoResultsError("no runs found")
 	}
 
 	if err := opts.IO.StartPager(); err == nil {

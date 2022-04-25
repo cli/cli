@@ -173,7 +173,7 @@ func displayResults(io *iostreams.IOStreams, results search.RepositoriesResult) 
 	}
 
 	if len(results.Items) == 0 {
-		return cmdutil.NoResultsError(io, "No repositories matched your search")
+		return cmdutil.NewNoResultsError("no repositories matched your search")
 	}
 
 	if io.IsStdoutTTY() {

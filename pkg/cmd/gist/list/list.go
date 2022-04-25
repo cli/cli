@@ -87,7 +87,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(gists) == 0 {
-		return cmdutil.NoResultsError(opts.IO, "No gists found")
+		return cmdutil.NewNoResultsError("no gists found")
 	}
 
 	if err := opts.IO.StartPager(); err == nil {

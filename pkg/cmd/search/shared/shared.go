@@ -66,14 +66,30 @@ func SearchIssues(opts *IssuesOptions) error {
 	if err != nil {
 		return err
 	}
+
 	if err := io.StartPager(); err == nil {
 		defer io.StopPager()
 	} else {
 		fmt.Fprintf(io.ErrOut, "failed to start pager: %v\n", err)
 	}
+
 	if opts.Exporter != nil {
 		return opts.Exporter.Write(io, result.Items)
 	}
+
+	if len(result.Items) == 0 {
+		var msg string
+		switch opts.Entity {
+		case Both:
+			msg = "no issues or pull requests matched your search"
+		case Issues:
+			msg = "no issues matched your search"
+		case PullRequests:
+			msg = "no pull requests matched your search"
+		}
+		return cmdutil.NewNoResultsError(msg)
+	}
+
 	return displayIssueResults(io, opts.Entity, result)
 }
 
@@ -115,18 +131,6 @@ func displayIssueResults(io *iostreams.IOStreams, et EntityType, results search.
 		tp.EndRow()
 	}
 
-	if len(results.Items) == 0 {
-		var msg string
-		switch et {
-		case Both:
-			msg = "No issues or pull requests matched your search"
-		case Issues:
-			msg = "No issues matched your search"
-		case PullRequests:
-			msg = "No pull requests matched your search"
-		}
-		return cmdutil.NoResultsError(io, msg)
-	}
 	if io.IsStdoutTTY() {
 		var header string
 		switch et {
