@@ -19,6 +19,16 @@ const (
 	PullRequestMergeMethodSquash
 )
 
+const (
+	MergeStateStatusBehind   = "BEHIND"
+	MergeStateStatusBlocked  = "BLOCKED"
+	MergeStateStatusClean    = "CLEAN"
+	MergeStateStatusDirty    = "DIRTY"
+	MergeStateStatusHasHooks = "HAS_HOOKS"
+	MergeStateStatusMerged   = "MERGED"
+	MergeStateStatusUnstable = "UNSTABLE"
+)
+
 type mergePayload struct {
 	repo          ghrepo.Interface
 	pullRequestID string
