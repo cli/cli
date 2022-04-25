@@ -189,19 +189,6 @@ func TestReposRun(t *testing.T) {
 			wantStdout: "\nShowing 3 of 300 repositories\n\ntest/cli     of course  private, archived  Feb 28, 2021\ntest/cliing  wow        public, fork       Feb 28, 2021\ncli/cli      so much    internal           Feb 28, 2021\n",
 		},
 		{
-			name: "displays no results tty",
-			opts: &ReposOptions{
-				Query: query,
-				Searcher: &search.SearcherMock{
-					RepositoriesFunc: func(query search.Query) (search.RepositoriesResult, error) {
-						return search.RepositoriesResult{}, nil
-					},
-				},
-			},
-			tty:        true,
-			wantStdout: "\nNo repositories matched your search\n",
-		},
-		{
 			name: "displays results notty",
 			opts: &ReposOptions{
 				Query: query,
@@ -222,7 +209,7 @@ func TestReposRun(t *testing.T) {
 			wantStdout: "test/cli\tof course\tprivate, archived\t2021-02-28T12:30:00Z\ntest/cliing\twow\tpublic, fork\t2021-02-28T12:30:00Z\ncli/cli\tso much\tinternal\t2021-02-28T12:30:00Z\n",
 		},
 		{
-			name: "displays no results notty",
+			name: "displays no results",
 			opts: &ReposOptions{
 				Query: query,
 				Searcher: &search.SearcherMock{
@@ -231,6 +218,8 @@ func TestReposRun(t *testing.T) {
 					},
 				},
 			},
+			wantErr: true,
+			errMsg:  "no repositories matched your search",
 		},
 		{
 			name: "displays search error",

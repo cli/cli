@@ -88,20 +88,6 @@ func TestSearchIssues(t *testing.T) {
 			wantStdout: "\nShowing 2 of 300 issues and pull requests\n\nissue  test/cli   #123  bug      bug, p1  about 1 year ago\npr     what/what  #456  fix bug  fix      about 1 year ago\n",
 		},
 		{
-			name: "displays no results tty",
-			opts: &IssuesOptions{
-				Entity: Issues,
-				Query:  query,
-				Searcher: &search.SearcherMock{
-					IssuesFunc: func(query search.Query) (search.IssuesResult, error) {
-						return search.IssuesResult{}, nil
-					},
-				},
-			},
-			tty:        true,
-			wantStdout: "\nNo issues matched your search\n",
-		},
-		{
 			name: "displays results notty",
 			opts: &IssuesOptions{
 				Entity: Issues,
@@ -143,7 +129,7 @@ func TestSearchIssues(t *testing.T) {
 			wantStdout: "issue\ttest/cli\t123\topen\tbug\tbug, p1\t2021-02-28 12:30:00 +0000 UTC\npr\twhat/what\t456\topen\tfix bug\tfix\t2021-02-28 12:30:00 +0000 UTC\n",
 		},
 		{
-			name: "displays no results notty",
+			name: "displays no results",
 			opts: &IssuesOptions{
 				Entity: Issues,
 				Query:  query,
@@ -153,6 +139,8 @@ func TestSearchIssues(t *testing.T) {
 					},
 				},
 			},
+			wantErr: true,
+			errMsg:  "no issues matched your search",
 		},
 		{
 			name: "displays search error",

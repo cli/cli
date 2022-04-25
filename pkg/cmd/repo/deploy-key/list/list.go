@@ -60,8 +60,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(deployKeys) == 0 {
-		fmt.Fprintf(opts.IO.ErrOut, "No deploy keys found in %s\n", ghrepo.FullName(repo))
-		return cmdutil.SilentError
+		return cmdutil.NewNoResultsError(fmt.Sprintf("no deploy keys found in %s", ghrepo.FullName(repo)))
 	}
 
 	t := utils.NewTablePrinter(opts.IO)

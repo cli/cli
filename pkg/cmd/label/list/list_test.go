@@ -81,6 +81,7 @@ func TestListRun(t *testing.T) {
 		tty        bool
 		opts       *ListOptions
 		httpStubs  func(*httpmock.Registry)
+		wantErr    bool
 		wantStdout string
 		wantStderr string
 	}{
@@ -172,7 +173,7 @@ func TestListRun(t *testing.T) {
 					),
 				)
 			},
-			wantStdout: "\nThere are no labels in OWNER/REPO\n\n",
+			wantErr: true,
 		},
 		{
 			name:       "web mode",
@@ -202,7 +203,11 @@ func TestListRun(t *testing.T) {
 			}
 			defer reg.Verify(t)
 			err := listRun(tt.opts)
-			assert.NoError(t, err)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 			assert.Equal(t, tt.wantStdout, stdout.String())
 			assert.Equal(t, tt.wantStderr, stderr.String())
 		})

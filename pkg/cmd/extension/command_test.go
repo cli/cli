@@ -273,8 +273,9 @@ func TestNewCmdExtension(t *testing.T) {
 					assert.Equal(t, "", calls[0].Name)
 				}
 			},
-			isTTY:      true,
-			wantStderr: "! No installed extensions found\n",
+			isTTY:   true,
+			wantErr: true,
+			errMsg:  "no installed extensions found",
 		},
 		{
 			name: "upgrade all notty",

@@ -86,14 +86,14 @@ func TestListRun(t *testing.T) {
 		},
 		{
 			name:  "no keys",
-			isTTY: false,
+			isTTY: true,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/keys"),
 					httpmock.StringResponse(`[]`))
 			},
 			wantStdout: "",
-			wantStderr: "No deploy keys found in OWNER/REPO\n",
+			wantStderr: "",
 			wantErr:    true,
 		},
 	}

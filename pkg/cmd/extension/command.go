@@ -47,9 +47,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			RunE: func(cmd *cobra.Command, args []string) error {
 				cmds := m.List()
 				if len(cmds) == 0 {
-					cs := io.ColorScheme()
-					fmt.Fprintf(io.ErrOut, "%s No installed extensions found\n", cs.WarningIcon())
-					return nil
+					return cmdutil.NewNoResultsError("no installed extensions found")
 				}
 				cs := io.ColorScheme()
 				t := utils.NewTablePrinter(io)
@@ -175,8 +173,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						if name != "" {
 							fmt.Fprintf(io.ErrOut, "%s Failed upgrading extension %s: %s\n", cs.FailureIcon(), name, err)
 						} else if errors.Is(err, noExtensionsInstalledError) {
-							fmt.Fprintf(io.ErrOut, "%s No installed extensions found\n", cs.WarningIcon())
-							return nil
+							return cmdutil.NewNoResultsError("no installed extensions found")
 						} else {
 							fmt.Fprintf(io.ErrOut, "%s Failed upgrading extensions\n", cs.FailureIcon())
 						}

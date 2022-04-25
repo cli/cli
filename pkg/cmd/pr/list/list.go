@@ -187,6 +187,9 @@ func listRun(opts *ListOptions) error {
 	if listResult.SearchCapped {
 		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
 	}
+	if len(listResult.PullRequests) == 0 {
+		return shared.ListNoResults(ghrepo.FullName(baseRepo), "pull request", !filters.IsDefault())
+	}
 	if opts.IO.IsStdoutTTY() {
 		title := shared.ListHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, !filters.IsDefault())
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
