@@ -183,7 +183,7 @@ func TestPRList_filteringAssignee(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`query PullRequestSearch\b`),
 		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
-			assert.Equal(t, `assignee:hubot base:develop label:"needs tests" repo:OWNER/REPO state:merged type:pr`, params["q"].(string))
+			assert.Equal(t, `assignee:hubot base:develop is:merged label:"needs tests" repo:OWNER/REPO type:pr`, params["q"].(string))
 		}))
 
 	_, err := runCommand(http, true, `-s merged -l "needs tests" -a hubot -B develop`)
@@ -292,7 +292,7 @@ func TestPRList_web(t *testing.T) {
 		{
 			name:               "filters",
 			cli:                "-a peter -l bug -l docs -L 10 -s merged -B trunk",
-			expectedBrowserURL: "https://github.com/OWNER/REPO/pulls?q=assignee%3Apeter+base%3Atrunk+label%3Abug+label%3Adocs+state%3Amerged+type%3Apr",
+			expectedBrowserURL: "https://github.com/OWNER/REPO/pulls?q=assignee%3Apeter+base%3Atrunk+is%3Amerged+label%3Abug+label%3Adocs+type%3Apr",
 		},
 		{
 			name:               "draft",
