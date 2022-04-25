@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -57,71 +56,44 @@ func TestNewCmdDelete(t *testing.T) {
 func Test_deleteRun(t *testing.T) {
 	tests := []struct {
 		name       string
-		opts       *DeleteOptions
-		gist       *shared.Gist
+		opts       DeleteOptions
 		httpStubs  func(*httpmock.Registry)
-		nontty     bool
 		wantErr    bool
+		wantStdout string
 		wantStderr string
-		wantParams map[string]interface{}
 	}{
 		{
-			name:    "no such gist",
-			wantErr: true,
-		}, {
-			name: "another user's gist",
-			gist: &shared.Gist{
-				ID: "1234",
-				Files: map[string]*shared.GistFile{
-					"cicada.txt": {
-						Filename: "cicada.txt",
-						Content:  "bwhiizzzbwhuiiizzzz",
-						Type:     "text/plain",
-					},
-				},
-				Owner: &shared.GistOwner{Login: "octocat2"},
-			},
-			wantErr:    true,
-			wantStderr: "you do not own this gist",
-		}, {
 			name: "successfully delete",
-			gist: &shared.Gist{
-				ID: "1234",
-				Files: map[string]*shared.GistFile{
-					"cicada.txt": {
-						Filename: "cicada.txt",
-						Content:  "bwhiizzzbwhuiiizzzz",
-						Type:     "text/plain",
-					},
-				},
-				Owner: &shared.GistOwner{Login: "octocat"},
+			opts: DeleteOptions{
+				Selector: "1234",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("DELETE", "gists/1234"),
-					httpmock.StringResponse("{}"))
+					httpmock.StatusStringResponse(200, "{}"))
 			},
-			wantErr: false,
+			wantErr:    false,
+			wantStdout: "",
+			wantStderr: "",
+		},
+		{
+			name: "not found",
+			opts: DeleteOptions{
+				Selector: "1234",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("DELETE", "gists/1234"),
+					httpmock.StatusStringResponse(404, "{}"))
+			},
+			wantErr:    true,
+			wantStdout: "",
+			wantStderr: "",
 		},
 	}
 
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}
-		if tt.gist == nil {
-			reg.Register(httpmock.REST("GET", "gists/1234"),
-				httpmock.StatusStringResponse(404, "Not Found"))
-		} else {
-			reg.Register(httpmock.REST("GET", "gists/1234"),
-				httpmock.JSONResponse(tt.gist))
-			reg.Register(httpmock.GraphQL(`query UserCurrent\b`),
-				httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`))
-		}
-
 		if tt.httpStubs != nil {
 			tt.httpStubs(reg)
-		}
-
-		if tt.opts == nil {
-			tt.opts = &DeleteOptions{}
 		}
 
 		tt.opts.HttpClient = func() (*http.Client, error) {
@@ -130,14 +102,13 @@ func Test_deleteRun(t *testing.T) {
 		tt.opts.Config = func() (config.Config, error) {
 			return config.NewBlankConfig(), nil
 		}
-		io, _, _, _ := iostreams.Test()
-		io.SetStdoutTTY(!tt.nontty)
-		io.SetStdinTTY(!tt.nontty)
-		tt.opts.IO = io
-		tt.opts.Selector = "1234"
+		ios, _, _, _ := iostreams.Test()
+		ios.SetStdoutTTY(false)
+		ios.SetStdinTTY(false)
+		tt.opts.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
-			err := deleteRun(tt.opts)
+			err := deleteRun(&tt.opts)
 			reg.Verify(t)
 			if tt.wantErr {
 				assert.Error(t, err)
