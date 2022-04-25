@@ -212,8 +212,6 @@ func SearchQueryBuild(options FilterOptions) string {
 	switch options.State {
 	case "open", "closed":
 		state = options.State
-	case "all":
-		// do nothing
 	case "merged":
 		is = "merged"
 	}
