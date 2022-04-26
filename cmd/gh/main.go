@@ -14,6 +14,7 @@ import (
 	surveyCore "github.com/AlecAivazis/survey/v2/core"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/build"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -25,6 +26,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/root"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 	"github.com/cli/safeexec"
 	"github.com/mattn/go-colorable"
@@ -170,15 +172,34 @@ func mainRun() exitCode {
 	rootCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var results []string
 		if aliases, err := cfg.Aliases(); err == nil {
-			for aliasName := range aliases.All() {
+			for aliasName, aliasValue := range aliases.All() {
 				if strings.HasPrefix(aliasName, toComplete) {
-					results = append(results, aliasName)
+					var s string
+					if strings.HasPrefix(aliasValue, "!") {
+						s = fmt.Sprintf("%s\tShell alias", aliasName)
+					} else {
+						aliasValue = text.Truncate(80, aliasValue)
+						s = fmt.Sprintf("%s\tAlias for %s", aliasName, aliasValue)
+					}
+					results = append(results, s)
 				}
 			}
 		}
 		for _, ext := range cmdFactory.ExtensionManager.List() {
 			if strings.HasPrefix(ext.Name(), toComplete) {
-				results = append(results, ext.Name())
+				var s string
+				if ext.IsLocal() {
+					s = fmt.Sprintf("%s\tLocal extension gh-%s", ext.Name(), ext.Name())
+				} else {
+					path := ext.URL()
+					if u, err := git.ParseURL(ext.URL()); err == nil {
+						if r, err := ghrepo.FromURL(u); err == nil {
+							path = ghrepo.FullName(r)
+						}
+					}
+					s = fmt.Sprintf("%s\tExtension %s", ext.Name(), path)
+				}
+				results = append(results, s)
 			}
 		}
 		return results, cobra.ShellCompDirectiveNoFileComp
