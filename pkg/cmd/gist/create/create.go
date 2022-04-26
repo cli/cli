@@ -148,7 +148,9 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
+	opts.IO.StartProgressIndicatorWithLabel("Creating gist")
 	gist, err := createGist(httpClient, host, opts.Description, opts.Public, files)
+	opts.IO.StopProgressIndicator()
 	if err != nil {
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) {
