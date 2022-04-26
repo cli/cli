@@ -60,12 +60,13 @@ func newCmdCreate(f *cmdutil.Factory, runF func(*createOptions) error) *cobra.Co
 		Long: heredoc.Doc(`
 			Create a new label on GitHub.
 
-			Must specify name for the label, the description and color are optional.
+			Must specify name for the label. The description and color are optional.
 			If a color isn't provided, a random one will be chosen.
 
-			Color needs to be 6 character hex value.
+			The label color needs to be 6 character hex value.
 		`),
 		Example: heredoc.Doc(`
+			# create new bug label
 			$ gh label create bug --description "Something isn't working" --color E99695
 	  `),
 		Args: cmdutil.ExactArgs(1, "cannot create label: name argument required"),
@@ -81,8 +82,8 @@ func newCmdCreate(f *cmdutil.Factory, runF func(*createOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "Description of the label")
-	cmd.Flags().StringVarP(&opts.Color, "color", "c", "", "Color of the label, if not specified one will be selected at random")
-	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Set the label color and description even if the name already exists.")
+	cmd.Flags().StringVarP(&opts.Color, "color", "c", "", "Color of the label")
+	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Update the label color and description if label already exists")
 
 	return cmd
 }
@@ -144,24 +145,42 @@ func createLabel(client *http.Client, repo ghrepo.Interface, opts *createOptions
 	}
 
 	if opts.Force && errors.Is(err, errLabelAlreadyExists) {
-		return updateLabel(apiClient, repo, opts)
+		editOpts := editOptions{
+			Description: opts.Description,
+			Color:       opts.Color,
+			Name:        opts.Name,
+		}
+		return updateLabel(apiClient, repo, &editOpts)
 	}
 
 	return err
 }
 
-func updateLabel(apiClient *api.Client, repo ghrepo.Interface, opts *createOptions) error {
+func updateLabel(apiClient *api.Client, repo ghrepo.Interface, opts *editOptions) error {
 	path := fmt.Sprintf("repos/%s/%s/labels/%s", repo.RepoOwner(), repo.RepoName(), opts.Name)
-	requestByte, err := json.Marshal(map[string]string{
-		"description": opts.Description,
-		"color":       opts.Color,
-	})
+	properties := map[string]string{}
+	if opts.Description != "" {
+		properties["description"] = opts.Description
+	}
+	if opts.Color != "" {
+		properties["color"] = opts.Color
+	}
+	if opts.NewName != "" {
+		properties["new_name"] = opts.NewName
+	}
+	requestByte, err := json.Marshal(properties)
 	if err != nil {
 		return err
 	}
 	requestBody := bytes.NewReader(requestByte)
 	result := label{}
-	return apiClient.REST(repo.RepoHost(), "PATCH", path, requestBody, &result)
+	err = apiClient.REST(repo.RepoHost(), "PATCH", path, requestBody, &result)
+
+	if httpError, ok := err.(api.HTTPError); ok && isLabelAlreadyExistsError(httpError) {
+		err = errLabelAlreadyExists
+	}
+
+	return err
 }
 
 func isLabelAlreadyExistsError(err api.HTTPError) bool {
