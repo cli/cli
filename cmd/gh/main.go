@@ -187,9 +187,9 @@ func mainRun() exitCode {
 		}
 		for _, ext := range cmdFactory.ExtensionManager.List() {
 			if strings.HasPrefix(ext.Name(), toComplete) {
+				var s string
 				if ext.IsLocal() {
-					s := fmt.Sprintf("%s\tLocal extension gh-%s", ext.Name(), ext.Name())
-					results = append(results, s)
+					s = fmt.Sprintf("%s\tLocal extension gh-%s", ext.Name(), ext.Name())
 				} else {
 					path := ext.URL()
 					if u, err := git.ParseURL(ext.URL()); err == nil {
@@ -197,9 +197,9 @@ func mainRun() exitCode {
 							path = ghrepo.FullName(r)
 						}
 					}
-					s := fmt.Sprintf("%s\tExtension %s", ext.Name(), path)
-					results = append(results, s)
+					s = fmt.Sprintf("%s\tExtension %s", ext.Name(), path)
 				}
+				results = append(results, s)
 			}
 		}
 		return results, cobra.ShellCompDirectiveNoFileComp
