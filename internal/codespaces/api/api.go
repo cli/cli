@@ -33,7 +33,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -115,7 +114,7 @@ func (a *API) GetUser(ctx context.Context) (*User, error) {
 		return nil, api.HandleHTTPError(resp)
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
@@ -153,7 +152,7 @@ func (a *API) GetRepository(ctx context.Context, nwo string) (*Repository, error
 		return nil, api.HandleHTTPError(resp)
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
@@ -366,7 +365,7 @@ func (a *API) GetCodespace(ctx context.Context, codespaceName string, includeCon
 		return nil, api.HandleHTTPError(resp)
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
@@ -464,7 +463,7 @@ func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, loc
 		return nil, api.HandleHTTPError(resp)
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
@@ -676,7 +675,7 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 			r        = io.TeeReader(resp.Body, bodyCopy)
 		)
 
-		b, err := ioutil.ReadAll(r)
+		b, err := io.ReadAll(r)
 		if err != nil {
 			return nil, fmt.Errorf("error reading response body: %w", err)
 		}
@@ -688,7 +687,7 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 			return nil, ue
 		}
 
-		resp.Body = ioutil.NopCloser(bodyCopy)
+		resp.Body = io.NopCloser(bodyCopy)
 
 		return nil, api.HandleHTTPError(resp)
 
@@ -696,7 +695,7 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 		return nil, api.HandleHTTPError(resp)
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
@@ -840,7 +839,7 @@ func (a *API) EditCodespace(ctx context.Context, codespaceName string, params *E
 		return nil, api.HandleHTTPError(resp)
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
@@ -888,7 +887,7 @@ func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Cod
 		return nil, api.HandleHTTPError(resp)
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
@@ -924,7 +923,7 @@ func (a *API) AuthorizedKeys(ctx context.Context, user string) ([]byte, error) {
 		return nil, fmt.Errorf("server returned %s", resp.Status)
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}

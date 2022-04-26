@@ -168,13 +168,13 @@ func Test_NewCmdLogin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, _, _ := iostreams.Test()
+			ios, stdin, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
-			io.SetStdoutTTY(true)
-			io.SetStdinTTY(tt.stdinTTY)
+			ios.SetStdoutTTY(true)
+			ios.SetStdinTTY(tt.stdinTTY)
 			if tt.stdin != "" {
 				stdin.WriteString(tt.stdin)
 			}
@@ -309,17 +309,17 @@ func Test_loginRun_nontty(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		io, _, stdout, stderr := iostreams.Test()
+		ios, _, stdout, stderr := iostreams.Test()
 
-		io.SetStdinTTY(false)
-		io.SetStdoutTTY(false)
+		ios.SetStdinTTY(false)
+		ios.SetStdoutTTY(false)
 
 		tt.opts.Config = func() (config.Config, error) {
 			cfg := config.NewBlankConfig()
 			return config.InheritEnv(cfg), nil
 		}
 
-		tt.opts.IO = io
+		tt.opts.IO = ios
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
 			tt.opts.HttpClient = func() (*http.Client, error) {
@@ -513,13 +513,13 @@ func Test_loginRun_Survey(t *testing.T) {
 		if tt.opts == nil {
 			tt.opts = &LoginOptions{}
 		}
-		io, _, _, stderr := iostreams.Test()
+		ios, _, _, stderr := iostreams.Test()
 
-		io.SetStdinTTY(true)
-		io.SetStderrTTY(true)
-		io.SetStdoutTTY(true)
+		ios.SetStdinTTY(true)
+		ios.SetStderrTTY(true)
+		ios.SetStdoutTTY(true)
 
-		tt.opts.IO = io
+		tt.opts.IO = ios
 
 		cfg := config.NewBlankConfig()
 

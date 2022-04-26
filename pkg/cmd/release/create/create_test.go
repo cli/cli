@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -26,7 +25,7 @@ import (
 
 func Test_NewCmdCreate(t *testing.T) {
 	tempDir := t.TempDir()
-	tf, err := ioutil.TempFile(tempDir, "release-create")
+	tf, err := os.CreateTemp(tempDir, "release-create")
 	require.NoError(t, err)
 	fmt.Fprint(tf, "MY NOTES")
 	tf.Close()
@@ -225,18 +224,18 @@ func Test_NewCmdCreate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, _, _ := iostreams.Test()
+			ios, stdin, _, _ := iostreams.Test()
 			if tt.stdin == "" {
-				io.SetStdinTTY(tt.isTTY)
+				ios.SetStdinTTY(tt.isTTY)
 			} else {
-				io.SetStdinTTY(false)
+				ios.SetStdinTTY(false)
 				fmt.Fprint(stdin, tt.stdin)
 			}
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			var opts *CreateOptions
@@ -251,8 +250,8 @@ func Test_NewCmdCreate(t *testing.T) {
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {
@@ -446,7 +445,7 @@ func Test_createRun(t *testing.T) {
 					{
 						Name: "ball.tgz",
 						Open: func() (io.ReadCloser, error) {
-							return ioutil.NopCloser(bytes.NewBufferString(`TARBALL`)), nil
+							return io.NopCloser(bytes.NewBufferString(`TARBALL`)), nil
 						},
 					},
 				},
@@ -471,7 +470,7 @@ func Test_createRun(t *testing.T) {
 					return &http.Response{
 						StatusCode: 201,
 						Request:    req,
-						Body:       ioutil.NopCloser(bytes.NewBufferString(`{}`)),
+						Body:       io.NopCloser(bytes.NewBufferString(`{}`)),
 						Header: map[string][]string{
 							"Content-Type": {"application/json"},
 						},
@@ -502,7 +501,7 @@ func Test_createRun(t *testing.T) {
 					{
 						Name: "ball.tgz",
 						Open: func() (io.ReadCloser, error) {
-							return ioutil.NopCloser(bytes.NewBufferString(`TARBALL`)), nil
+							return io.NopCloser(bytes.NewBufferString(`TARBALL`)), nil
 						},
 					},
 				},
@@ -529,7 +528,7 @@ func Test_createRun(t *testing.T) {
 					return &http.Response{
 						StatusCode: 201,
 						Request:    req,
-						Body:       ioutil.NopCloser(bytes.NewBufferString(`{}`)),
+						Body:       io.NopCloser(bytes.NewBufferString(`{}`)),
 						Header: map[string][]string{
 							"Content-Type": {"application/json"},
 						},
@@ -550,10 +549,10 @@ func Test_createRun(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			fakeHTTP := &httpmock.Registry{}
 			if tt.httpStubs != nil {
@@ -561,7 +560,7 @@ func Test_createRun(t *testing.T) {
 			}
 			defer fakeHTTP.Verify(t)
 
-			tt.opts.IO = io
+			tt.opts.IO = ios
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}
@@ -883,7 +882,7 @@ func Test_createRun_interactive(t *testing.T) {
 				if r == nil {
 					t.Fatalf("no http requests for creating a release found")
 				}
-				bb, err := ioutil.ReadAll(r.Body)
+				bb, err := io.ReadAll(r.Body)
 				assert.NoError(t, err)
 				var params map[string]interface{}
 				err = json.Unmarshal(bb, &params)

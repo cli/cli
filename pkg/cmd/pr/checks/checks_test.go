@@ -67,9 +67,9 @@ func TestNewCmdChecks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			ios, _, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			argv, err := shlex.Split(tt.cli)
@@ -249,16 +249,16 @@ func TestChecksRun_web(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			browser := &cmdutil.TestBrowser{}
 
-			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdoutTTY(tc.isTTY)
-			io.SetStdinTTY(tc.isTTY)
-			io.SetStderrTTY(tc.isTTY)
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tc.isTTY)
+			ios.SetStdinTTY(tc.isTTY)
+			ios.SetStderrTTY(tc.isTTY)
 
 			_, teardown := run.Stub()
 			defer teardown(t)
 
 			err := checksRunWebMode(&ChecksOptions{
-				IO:          io,
+				IO:          ios,
 				Browser:     browser,
 				WebMode:     true,
 				SelectorArg: "123",

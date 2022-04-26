@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
@@ -17,7 +16,7 @@ var scopesError = errors.New("insufficient OAuth scopes")
 func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader) error {
 	url := ghinstance.RESTPrefix(hostname) + "user/gpg_keys"
 
-	keyBytes, err := ioutil.ReadAll(keyFile)
+	keyBytes, err := io.ReadAll(keyFile)
 	if err != nil {
 		return err
 	}
@@ -53,7 +52,7 @@ func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader) e
 		return err
 	}
 
-	_, err = io.Copy(ioutil.Discard, resp.Body)
+	_, err = io.Copy(io.Discard, resp.Body)
 	if err != nil {
 		return err
 	}

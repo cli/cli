@@ -2,7 +2,7 @@ package api
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -281,7 +281,7 @@ func Test_httpRequest(t *testing.T) {
 			}
 
 			if tt.want.body != "" {
-				bb, err := ioutil.ReadAll(req.Body)
+				bb, err := io.ReadAll(req.Body)
 				if err != nil {
 					t.Errorf("Request.Body ReadAll error = %v", err)
 					return

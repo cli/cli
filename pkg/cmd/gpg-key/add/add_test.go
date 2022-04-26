@@ -11,10 +11,10 @@ import (
 )
 
 func Test_runAdd(t *testing.T) {
-	io, stdin, stdout, stderr := iostreams.Test()
-	io.SetStdinTTY(false)
-	io.SetStdoutTTY(true)
-	io.SetStderrTTY(true)
+	ios, stdin, stdout, stderr := iostreams.Test()
+	ios.SetStdinTTY(false)
+	ios.SetStdoutTTY(true)
+	ios.SetStderrTTY(true)
 
 	stdin.WriteString("PUBKEY")
 
@@ -26,7 +26,7 @@ func Test_runAdd(t *testing.T) {
 		httpmock.StringResponse(`{}`))
 
 	err := runAdd(&AddOptions{
-		IO: io,
+		IO: ios,
 		Config: func() (config.Config, error) {
 			return config.NewBlankConfig(), nil
 		},

@@ -2,7 +2,7 @@ package sync
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -66,11 +66,11 @@ func TestNewCmdSync(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 			argv, err := shlex.Split(tt.input)
 			assert.NoError(t, err)
@@ -417,7 +417,7 @@ func Test_SyncRun(t *testing.T) {
 							StatusCode: 422,
 							Request:    req,
 							Header:     map[string][]string{"Content-Type": {"application/json"}},
-							Body:       ioutil.NopCloser(bytes.NewBufferString(`{"message":"Update is not a fast forward"}`)),
+							Body:       io.NopCloser(bytes.NewBufferString(`{"message":"Update is not a fast forward"}`)),
 						}, nil
 					})
 			},
@@ -434,10 +434,10 @@ func Test_SyncRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdinTTY(tt.tty)
-		io.SetStdoutTTY(tt.tty)
-		tt.opts.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdinTTY(tt.tty)
+		ios.SetStdoutTTY(tt.tty)
+		tt.opts.IO = ios
 
 		repo1, _ := ghrepo.FromFullName("OWNER/REPO")
 		repo2, _ := ghrepo.FromFullName("OWNER2/REPO2")

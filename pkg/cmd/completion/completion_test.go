@@ -44,8 +44,8 @@ func TestNewCmdCompletion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, stdout, stderr := iostreams.Test()
-			completeCmd := NewCmdCompletion(io)
+			ios, _, stdout, stderr := iostreams.Test()
+			completeCmd := NewCmdCompletion(ios)
 			rootCmd := &cobra.Command{Use: "gh"}
 			rootCmd.AddCommand(completeCmd)
 

@@ -54,12 +54,12 @@ func Test_NewCmdLogout(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			ios, _, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 
 			argv, err := shlex.Split(tt.cli)
 			assert.NoError(t, err)
@@ -141,12 +141,12 @@ func Test_logoutRun_tty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, stderr := iostreams.Test()
+			ios, _, _, stderr := iostreams.Test()
 
-			io.SetStdinTTY(true)
-			io.SetStdoutTTY(true)
+			ios.SetStdinTTY(true)
+			ios.SetStdoutTTY(true)
 
-			tt.opts.IO = io
+			tt.opts.IO = ios
 			cfg := config.NewBlankConfig()
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil
@@ -229,12 +229,12 @@ func Test_logoutRun_nontty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, stderr := iostreams.Test()
+			ios, _, _, stderr := iostreams.Test()
 
-			io.SetStdinTTY(false)
-			io.SetStdoutTTY(false)
+			ios.SetStdinTTY(false)
+			ios.SetStdoutTTY(false)
 
-			tt.opts.IO = io
+			tt.opts.IO = ios
 			cfg := config.NewBlankConfig()
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil

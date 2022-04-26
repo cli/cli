@@ -365,9 +365,9 @@ func Test_listRun(t *testing.T) {
 			return config.NewBlankConfig(), nil
 		}
 
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdoutTTY(!tt.nontty)
-		tt.opts.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdoutTTY(!tt.nontty)
+		tt.opts.IO = ios
 
 		if tt.opts.Limit == 0 {
 			tt.opts.Limit = 10

@@ -3,7 +3,7 @@ package label
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -53,9 +53,9 @@ func TestNewCmdCreate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			ios, _, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 			argv, err := shlex.Split(tt.input)
 			assert.NoError(t, err)
@@ -144,11 +144,11 @@ func TestCreateRun(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
-			io, _, stdout, _ := iostreams.Test()
-			io.SetStdoutTTY(tt.tty)
-			io.SetStdinTTY(tt.tty)
-			io.SetStderrTTY(tt.tty)
-			tt.opts.IO = io
+			ios, _, stdout, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStderrTTY(tt.tty)
+			tt.opts.IO = ios
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			}
@@ -157,7 +157,7 @@ func TestCreateRun(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantStdout, stdout.String())
 
-			bodyBytes, _ := ioutil.ReadAll(reg.Requests[0].Body)
+			bodyBytes, _ := io.ReadAll(reg.Requests[0].Body)
 			reqBody := map[string]string{}
 			err = json.Unmarshal(bodyBytes, &reqBody)
 			assert.NoError(t, err)

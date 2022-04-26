@@ -42,6 +42,6 @@ func testingLogsApp() *App {
 		},
 	}
 
-	io, _, _, _ := iostreams.Test()
-	return NewApp(io, nil, apiMock, nil)
+	ios, _, _, _ := iostreams.Test()
+	return NewApp(ios, nil, apiMock, nil)
 }

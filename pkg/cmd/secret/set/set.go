@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -388,7 +387,7 @@ func getBody(opts *SetOptions) ([]byte, error) {
 		return []byte(bodyInput), nil
 	}
 
-	body, err := ioutil.ReadAll(opts.IO.In)
+	body, err := io.ReadAll(opts.IO.In)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from standard input: %w", err)
 	}

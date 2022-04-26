@@ -187,10 +187,10 @@ func TestDelete(t *testing.T) {
 				},
 			}
 
-			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdinTTY(true)
-			io.SetStdoutTTY(true)
-			app := NewApp(io, nil, apiMock, nil)
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdinTTY(true)
+			ios.SetStdoutTTY(true)
+			app := NewApp(ios, nil, apiMock, nil)
 			err := app.Delete(context.Background(), opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("delete() error = %v, wantErr %v", err, tt.wantErr)

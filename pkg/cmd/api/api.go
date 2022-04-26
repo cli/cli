@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"regexp"
@@ -80,7 +79,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			The default HTTP request method is "GET" normally and "POST" if any parameters
 			were added. Override the method with %[1]s--method%[1]s.
 
-			Pass one or more %[1]s-f/--raw-field%[1]s values in "key=value" format to add static string 
+			Pass one or more %[1]s-f/--raw-field%[1]s values in "key=value" format to add static string
 			parameters to the request payload. To add non-string or otherwise dynamic values, see
 			%[1]s--field%[1]s below. Note that adding request parameters will automatically switch the
 			request method to POST. To send the parameters as a GET query string instead, use
@@ -275,7 +274,7 @@ func apiRun(opts *ApiOptions) error {
 
 	headersOutputStream := opts.IO.Out
 	if opts.Silent {
-		opts.IO.Out = ioutil.Discard
+		opts.IO.Out = io.Discard
 	} else {
 		if err := opts.IO.StartPager(); err == nil {
 			defer opts.IO.StopPager()
@@ -536,7 +535,7 @@ func openUserFile(fn string, stdin io.ReadCloser) (io.ReadCloser, int64, error) 
 
 func parseErrorResponse(r io.Reader, statusCode int) (io.Reader, string, error) {
 	bodyCopy := &bytes.Buffer{}
-	b, err := ioutil.ReadAll(io.TeeReader(r, bodyCopy))
+	b, err := io.ReadAll(io.TeeReader(r, bodyCopy))
 	if err != nil {
 		return r, "", err
 	}

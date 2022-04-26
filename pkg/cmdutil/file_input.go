@@ -2,15 +2,15 @@ package cmdutil
 
 import (
 	"io"
-	"io/ioutil"
+	"os"
 )
 
 func ReadFile(filename string, stdin io.ReadCloser) ([]byte, error) {
 	if filename == "-" {
-		b, err := ioutil.ReadAll(stdin)
+		b, err := io.ReadAll(stdin)
 		_ = stdin.Close()
 		return b, err
 	}
 
-	return ioutil.ReadFile(filename)
+	return os.ReadFile(filename)
 }

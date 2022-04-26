@@ -217,10 +217,10 @@ func Test_helperRun(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, stdout, stderr := iostreams.Test()
+			ios, stdin, stdout, stderr := iostreams.Test()
 			fmt.Fprint(stdin, tt.input)
 			opts := &tt.opts
-			opts.IO = io
+			opts.IO = ios
 			if err := helperRun(opts); (err != nil) != tt.wantErr {
 				t.Fatalf("helperRun() error = %v, wantErr %v", err, tt.wantErr)
 			}

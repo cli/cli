@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"path/filepath"
 	"testing"
@@ -26,7 +25,7 @@ func Test_CacheResponse(t *testing.T) {
 			}
 			return &http.Response{
 				StatusCode: status,
-				Body:       ioutil.NopCloser(bytes.NewBufferString(body)),
+				Body:       io.NopCloser(bytes.NewBufferString(body)),
 			}, nil
 		},
 	}
@@ -44,7 +43,7 @@ func Test_CacheResponse(t *testing.T) {
 			return "", err
 		}
 		defer res.Body.Close()
-		resBody, err := ioutil.ReadAll(res.Body)
+		resBody, err := io.ReadAll(res.Body)
 		if err != nil {
 			err = fmt.Errorf("ReadAll: %w", err)
 		}

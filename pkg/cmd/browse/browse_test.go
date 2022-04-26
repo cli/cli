@@ -2,7 +2,7 @@ package browse
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -126,8 +126,8 @@ func TestNewCmdBrowse(t *testing.T) {
 			argv, err := shlex.Split(tt.cli)
 			assert.NoError(t, err)
 			cmd.SetArgs(argv)
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 			_, err = cmd.ExecuteC()
 
 			if tt.wantsErr {
@@ -418,7 +418,7 @@ func Test_runBrowse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, stdout, stderr := iostreams.Test()
+			ios, _, stdout, stderr := iostreams.Test()
 			browser := cmdutil.TestBrowser{}
 
 			reg := httpmock.Registry{}
@@ -428,7 +428,7 @@ func Test_runBrowse(t *testing.T) {
 			}
 
 			opts := tt.opts
-			opts.IO = io
+			opts.IO = ios
 			opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return tt.baseRepo, nil
 			}

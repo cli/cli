@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"strconv"
 	"strings"
@@ -81,7 +80,7 @@ func (t *Template) Execute(input io.Reader) error {
 		t.template = template
 	}
 
-	jsonData, err := ioutil.ReadAll(input)
+	jsonData, err := io.ReadAll(input)
 	if err != nil {
 		return err
 	}

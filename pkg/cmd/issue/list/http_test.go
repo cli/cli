@@ -2,7 +2,7 @@ package list
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
@@ -65,7 +65,7 @@ func TestIssueList(t *testing.T) {
 		Variables map[string]interface{}
 	}
 
-	bodyBytes, _ := ioutil.ReadAll(http.Requests[0].Body)
+	bodyBytes, _ := io.ReadAll(http.Requests[0].Body)
 	_ = json.Unmarshal(bodyBytes, &reqBody)
 	if reqLimit := reqBody.Variables["limit"].(float64); reqLimit != 100 {
 		t.Errorf("expected 100, got %v", reqLimit)
@@ -74,7 +74,7 @@ func TestIssueList(t *testing.T) {
 		t.Error("did not expect first request to pass 'endCursor'")
 	}
 
-	bodyBytes, _ = ioutil.ReadAll(http.Requests[1].Body)
+	bodyBytes, _ = io.ReadAll(http.Requests[1].Body)
 	_ = json.Unmarshal(bodyBytes, &reqBody)
 	if endCursor := reqBody.Variables["endCursor"].(string); endCursor != "ENDCURSOR" {
 		t.Errorf("expected %q, got %q", "ENDCURSOR", endCursor)

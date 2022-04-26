@@ -2,7 +2,7 @@ package set
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -162,7 +162,7 @@ func setRun(opts *SetOptions) error {
 
 func getExpansion(opts *SetOptions) (string, error) {
 	if opts.Expansion == "-" {
-		stdin, err := ioutil.ReadAll(opts.IO.In)
+		stdin, err := io.ReadAll(opts.IO.In)
 		if err != nil {
 			return "", fmt.Errorf("failed to read from STDIN: %w", err)
 		}

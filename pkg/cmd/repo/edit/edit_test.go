@@ -3,7 +3,7 @@ package edit
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -39,13 +39,13 @@ func TestNewCmdEdit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdoutTTY(true)
-			io.SetStdinTTY(true)
-			io.SetStderrTTY(true)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			ios.SetStdinTTY(true)
+			ios.SetStderrTTY(true)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.New("OWNER", "REPO"), nil
 				},
@@ -66,8 +66,8 @@ func TestNewCmdEdit(t *testing.T) {
 
 			cmd.SetArgs(argv)
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {
@@ -132,10 +132,10 @@ func Test_editRun(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdoutTTY(true)
-			io.SetStdinTTY(true)
-			io.SetStderrTTY(true)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			ios.SetStdinTTY(true)
+			ios.SetStderrTTY(true)
 
 			httpReg := &httpmock.Registry{}
 			defer httpReg.Verify(t)
@@ -145,8 +145,7 @@ func Test_editRun(t *testing.T) {
 
 			opts := &tt.opts
 			opts.HTTPClient = &http.Client{Transport: httpReg}
-			opts.IO = io
-
+			opts.IO = ios
 			err := editRun(context.Background(), opts)
 			if tt.wantsErr == "" {
 				require.NoError(t, err)
@@ -306,10 +305,10 @@ func Test_editRun_interactive(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdoutTTY(true)
-			io.SetStdinTTY(true)
-			io.SetStderrTTY(true)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			ios.SetStdinTTY(true)
+			ios.SetStderrTTY(true)
 
 			httpReg := &httpmock.Registry{}
 			defer httpReg.Verify(t)
@@ -319,8 +318,7 @@ func Test_editRun_interactive(t *testing.T) {
 
 			opts := &tt.opts
 			opts.HTTPClient = &http.Client{Transport: httpReg}
-			opts.IO = io
-
+			opts.IO = ios
 			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
 				tt.askStubs(as)

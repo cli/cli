@@ -97,8 +97,8 @@ browser=brave
 	}
 
 	for _, tt := range tests {
-		io, _, stdout, _ := iostreams.Test()
-		tt.input.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		tt.input.IO = ios
 		tt.input.Config = func() (config.Config, error) {
 			return tt.config, nil
 		}

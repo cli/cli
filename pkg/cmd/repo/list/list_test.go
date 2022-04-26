@@ -2,7 +2,7 @@ package list
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -254,13 +254,13 @@ func TestNewCmdList(t *testing.T) {
 }
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(isTTY)
-	io.SetStdinTTY(isTTY)
-	io.SetStderrTTY(isTTY)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(isTTY)
+	ios.SetStdinTTY(isTTY)
+	ios.SetStderrTTY(isTTY)
 
 	factory := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
@@ -278,8 +278,8 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
@@ -289,10 +289,10 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 }
 
 func TestRepoList_nontty(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(false)
-	io.SetStdinTTY(false)
-	io.SetStderrTTY(false)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(false)
+	ios.SetStdinTTY(false)
+	ios.SetStderrTTY(false)
 
 	httpReg := &httpmock.Registry{}
 	defer httpReg.Verify(t)
@@ -303,7 +303,7 @@ func TestRepoList_nontty(t *testing.T) {
 	)
 
 	opts := ListOptions{
-		IO: io,
+		IO: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: httpReg}, nil
 		},
@@ -330,10 +330,10 @@ func TestRepoList_nontty(t *testing.T) {
 }
 
 func TestRepoList_tty(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(true)
-	io.SetStdinTTY(true)
-	io.SetStderrTTY(true)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStdinTTY(true)
+	ios.SetStderrTTY(true)
 
 	httpReg := &httpmock.Registry{}
 	defer httpReg.Verify(t)
@@ -344,7 +344,7 @@ func TestRepoList_tty(t *testing.T) {
 	)
 
 	opts := ListOptions{
-		IO: io,
+		IO: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: httpReg}, nil
 		},
