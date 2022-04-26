@@ -163,7 +163,7 @@ func Test_checkoutRun(t *testing.T) {
 			opts := tt.opts
 
 			ios, _, stdout, stderr := iostreams.Test()
-			ios.SetStdinTTY(true)
+			opts.IO = ios
 			httpReg := &httpmock.Registry{}
 			defer httpReg.Verify(t)
 			if tt.httpStubs != nil {

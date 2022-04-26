@@ -145,7 +145,7 @@ func Test_editRun(t *testing.T) {
 
 			opts := &tt.opts
 			opts.HTTPClient = &http.Client{Transport: httpReg}
-			ios.SetStdinTTY(true)
+			opts.IO = ios
 			err := editRun(context.Background(), opts)
 			if tt.wantsErr == "" {
 				require.NoError(t, err)
@@ -318,7 +318,7 @@ func Test_editRun_interactive(t *testing.T) {
 
 			opts := &tt.opts
 			opts.HTTPClient = &http.Client{Transport: httpReg}
-			ios.SetStdinTTY(true)
+			opts.IO = ios
 			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
 				tt.askStubs(as)

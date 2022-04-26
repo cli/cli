@@ -194,7 +194,7 @@ func Test_diffRun(t *testing.T) {
 			}
 
 			ios, _, stdout, stderr := iostreams.Test()
-			ios.SetStdinTTY(true)
+			opts.IO = ios
 			finder := shared.NewMockFinder("123", pr, ghrepo.New("OWNER", "REPO"))
 			finder.ExpectFields([]string{"number"})
 			opts.Finder = finder
