@@ -1,6 +1,6 @@
 # Installation from source
 
-1. Verify that you have Go 1.16+ installed
+1. Verify that you have Go 1.18+ installed
 
    ```sh
    $ go version
@@ -21,12 +21,12 @@
    ```sh
    # installs to '/usr/local' by default; sudo may be required
    $ make install
-   
+
    # or, install to a different location
    $ make install prefix=/path/to/gh
    ```
 
-   #### Windows 
+   #### Windows
    ```pwsh
    # build the `bin\gh.exe` binary
    > go run script\build.go
