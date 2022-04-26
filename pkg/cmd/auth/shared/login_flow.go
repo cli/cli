@@ -94,7 +94,20 @@ func Login(opts *LoginOptions) error {
 			}
 		}
 	}
+
+	var keyTitle string
 	if keyToUpload != "" {
+		if opts.Interactive {
+			err := prompt.SurveyAskOne(&survey.Input{
+				Message: "SSH key title:",
+				Default: "GitHub CLI",
+			}, &keyTitle)
+			if err != nil {
+				return fmt.Errorf("could not prompt: %w", err)
+			}
+		} else {
+			keyTitle = "GitHub CLI"
+		}
 		additionalScopes = append(additionalScopes, "admin:public_key")
 	}
 
@@ -187,7 +200,7 @@ func Login(opts *LoginOptions) error {
 	}
 
 	if keyToUpload != "" {
-		err := sshKeyUpload(httpClient, hostname, keyToUpload)
+		err := sshKeyUpload(httpClient, hostname, keyToUpload, keyTitle)
 		if err != nil {
 			return err
 		}
