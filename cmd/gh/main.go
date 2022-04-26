@@ -179,7 +179,7 @@ func mainRun() exitCode {
 						s = fmt.Sprintf("%s\tShell alias", aliasName)
 					} else {
 						aliasValue = text.Truncate(80, aliasValue)
-						s = fmt.Sprintf("%s\tAlias for `%s`", aliasName, aliasValue)
+						s = fmt.Sprintf("%s\tAlias for %s", aliasName, aliasValue)
 					}
 					results = append(results, s)
 				}
