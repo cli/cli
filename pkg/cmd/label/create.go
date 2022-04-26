@@ -63,9 +63,10 @@ func newCmdCreate(f *cmdutil.Factory, runF func(*createOptions) error) *cobra.Co
 			Must specify name for the label. The description and color are optional.
 			If a color isn't provided, a random one will be chosen.
 
-			Color needs to be 6 character hex value.
+			The label color needs to be 6 character hex value.
 		`),
 		Example: heredoc.Doc(`
+			# create new bug label
 			$ gh label create bug --description "Something isn't working" --color E99695
 	  `),
 		Args: cmdutil.ExactArgs(1, "cannot create label: name argument required"),
@@ -80,9 +81,9 @@ func newCmdCreate(f *cmdutil.Factory, runF func(*createOptions) error) *cobra.Co
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "Description of the label.")
-	cmd.Flags().StringVarP(&opts.Color, "color", "c", "", "Color of the label. If not specified one will be selected at random.")
-	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Set the label color and description even if the name already exists.")
+	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "Description of the label")
+	cmd.Flags().StringVarP(&opts.Color, "color", "c", "", "Color of the label")
+	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Update the label color and description if label already exists")
 
 	return cmd
 }
@@ -173,7 +174,13 @@ func updateLabel(apiClient *api.Client, repo ghrepo.Interface, opts *editOptions
 	}
 	requestBody := bytes.NewReader(requestByte)
 	result := label{}
-	return apiClient.REST(repo.RepoHost(), "PATCH", path, requestBody, &result)
+	err = apiClient.REST(repo.RepoHost(), "PATCH", path, requestBody, &result)
+
+	if httpError, ok := err.(api.HTTPError); ok && isLabelAlreadyExistsError(httpError) {
+		err = errLabelAlreadyExists
+	}
+
+	return err
 }
 
 func isLabelAlreadyExistsError(err api.HTTPError) bool {

@@ -28,9 +28,10 @@ func TestNewCmdEdit(t *testing.T) {
 			errMsg:  "cannot update label: name argument required",
 		},
 		{
-			name:   "name argument",
-			input:  "test",
-			output: editOptions{Name: "test"},
+			name:    "name argument",
+			input:   "test",
+			wantErr: true,
+			errMsg:  "specify at least one of `--color`, `--description`, or `--name`",
 		},
 		{
 			name:   "description flag",
@@ -48,8 +49,8 @@ func TestNewCmdEdit(t *testing.T) {
 			output: editOptions{Name: "test", Color: "AAAAAA"},
 		},
 		{
-			name:   "rename flag",
-			input:  "test --rename test1",
+			name:   "name flag",
+			input:  "test --name test1",
 			output: editOptions{Name: "test", NewName: "test1"},
 		},
 	}
