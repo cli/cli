@@ -23,6 +23,7 @@ type repoCreateInput struct {
 	HasWikiEnabled       bool
 	GitIgnoreTemplate    string
 	LicenseTemplate      string
+	IncludeAllBranches   bool
 }
 
 // createRepositoryInputV3 is the payload for the repo create REST API
@@ -53,11 +54,12 @@ type createRepositoryInput struct {
 
 // cloneTemplateRepositoryInput is the payload for creating a repo from a template using GraphQL
 type cloneTemplateRepositoryInput struct {
-	Name         string `json:"name"`
-	Visibility   string `json:"visibility"`
-	Description  string `json:"description,omitempty"`
-	OwnerID      string `json:"ownerId"`
-	RepositoryID string `json:"repositoryId"`
+	Name               string `json:"name"`
+	Visibility         string `json:"visibility"`
+	Description        string `json:"description,omitempty"`
+	OwnerID            string `json:"ownerId"`
+	RepositoryID       string `json:"repositoryId"`
+	IncludeAllBranches bool   `json:"includeAllBranches"`
 }
 
 // repoCreate creates a new GitHub repository
@@ -104,11 +106,12 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 
 		variables := map[string]interface{}{
 			"input": cloneTemplateRepositoryInput{
-				Name:         input.Name,
-				Description:  input.Description,
-				Visibility:   strings.ToUpper(input.Visibility),
-				OwnerID:      ownerID,
-				RepositoryID: input.TemplateRepositoryID,
+				Name:               input.Name,
+				Description:        input.Description,
+				Visibility:         strings.ToUpper(input.Visibility),
+				OwnerID:            ownerID,
+				RepositoryID:       input.TemplateRepositoryID,
+				IncludeAllBranches: input.IncludeAllBranches,
 			},
 		}
 
