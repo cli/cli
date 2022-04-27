@@ -96,9 +96,9 @@ func cloneRun(opts *cloneOptions) error {
 
 		switch {
 		case successCount == totalCount:
-			fmt.Fprintf(opts.IO.Out, "%s Cloned %s from %s to %s\n", cs.SuccessIcon(), pluralize(successCount), opts.SourceRepo, ghrepo.FullName(baseRepo))
+			fmt.Fprintf(opts.IO.Out, "%s Cloned %s from %s to %s\n", cs.SuccessIcon(), pluralize(successCount), ghrepo.FullName(opts.SourceRepo), ghrepo.FullName(baseRepo))
 		default:
-			fmt.Fprintf(opts.IO.Out, "%s Cloned %s of %d from %s to %s\n", cs.WarningIcon(), pluralize(successCount), totalCount, opts.SourceRepo, ghrepo.FullName(baseRepo))
+			fmt.Fprintf(opts.IO.Out, "%s Cloned %s of %d from %s to %s\n", cs.WarningIcon(), pluralize(successCount), totalCount, ghrepo.FullName(opts.SourceRepo), ghrepo.FullName(baseRepo))
 		}
 	}
 
