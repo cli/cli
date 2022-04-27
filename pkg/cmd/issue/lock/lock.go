@@ -203,24 +203,27 @@ func padlock(state string, opts *LockOptions) error {
 	successMsg := fmt.Sprintf("%s %s\n",
 		cs.SuccessIconWithColor(cs.Green), status(state, issuePr, opts))
 
-	switch {
-	case state == Lock && !issuePr.Locked:
-		err = lockLockable(httpClient, baseRepo, issuePr, opts)
+	switch state {
+	case Lock:
+		if !issuePr.Locked {
+			err = lockLockable(httpClient, baseRepo, issuePr, opts)
+		} else {
+			var relocked bool
+			relocked, err = relockLockable(httpClient, baseRepo, issuePr, opts)
 
-	case state == Lock && issuePr.Locked:
-		relocked, errRelock := relockLockable(httpClient, baseRepo, issuePr, opts)
-		err = errRelock
-		if !relocked {
-			successMsg = fmt.Sprintf("%s #%d already locked%s.  Nothing changed.\n",
-				parent.FullName, issuePr.Number, reason(issuePr.ActiveLockReason))
+			if !relocked {
+				successMsg = fmt.Sprintf("%s #%d already locked%s.  Nothing changed.\n",
+					parent.FullName, issuePr.Number, reason(issuePr.ActiveLockReason))
+			}
 		}
 
-	case state == Unlock && issuePr.Locked:
-		err = unlockLockable(httpClient, baseRepo, issuePr, opts)
-
-	case state == Unlock && !issuePr.Locked:
-		successMsg = fmt.Sprintf("%s #%d already unlocked.  Nothing changed.\n",
-			parent.FullName, issuePr.Number)
+	case Unlock:
+		if issuePr.Locked {
+			err = unlockLockable(httpClient, baseRepo, issuePr, opts)
+		} else {
+			successMsg = fmt.Sprintf("%s #%d already unlocked.  Nothing changed.\n",
+				parent.FullName, issuePr.Number)
+		}
 	}
 
 	if err != nil {
