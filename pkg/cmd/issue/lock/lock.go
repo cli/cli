@@ -188,11 +188,9 @@ func padlock(state string, opts *LockOptions) error {
 
 	parent := alias[opts.ParentCmd]
 
-	switch {
-	case err != nil:
+	if err != nil {
 		return err
-
-	case parent.Typename != issuePr.Typename:
+	} else if parent.Typename != issuePr.Typename {
 		return fmt.Errorf("%s #%d not found, but found %s #%d",
 			alias[parent.Typename].FullName, issuePr.Number,
 			strings.ToLower(alias[issuePr.Typename].FullName), issuePr.Number)
