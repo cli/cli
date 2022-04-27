@@ -67,7 +67,7 @@ func newCmdEdit(f *cmdutil.Factory, runF func(*editOptions) error) *cobra.Comman
 
 	cmd.Flags().StringVarP(&opts.Description, "description", "d", "", "Description of the label")
 	cmd.Flags().StringVarP(&opts.Color, "color", "c", "", "Color of the label")
-	cmd.Flags().StringVarP(&opts.NewName, "name", "n", "", "Name of the label")
+	cmd.Flags().StringVarP(&opts.NewName, "name", "n", "", "New name of the label")
 
 	return cmd
 }
