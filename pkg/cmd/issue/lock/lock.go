@@ -191,9 +191,13 @@ func padlock(state string, opts *LockOptions) error {
 	if err != nil {
 		return err
 	} else if parent.Typename != issuePr.Typename {
-		return fmt.Errorf("%s #%d not found, but found %s #%d",
-			alias[parent.Typename].FullName, issuePr.Number,
-			strings.ToLower(alias[issuePr.Typename].FullName), issuePr.Number)
+		currentType := alias[parent.Typename]
+		correctType := alias[issuePr.Typename]
+
+		return fmt.Errorf("%s #%d not found, but found %s #%d.  Use `gh %s %s %d` instead",
+			currentType.FullName, issuePr.Number,
+			correctType.FullName, issuePr.Number,
+			correctType.Name, strings.ToLower(state), issuePr.Number)
 	}
 
 	successMsg := fmt.Sprintf("%s %s\n",
