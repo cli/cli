@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -12,8 +13,6 @@ import (
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
-
-const listLimit = 30
 
 type browser interface {
 	Browse(string) error
@@ -44,9 +43,20 @@ func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:     "list",
-		Short:   "List labels in a repository",
-		Long:    "Display labels in a GitHub repository.",
+		Use:   "list",
+		Short: "List labels in a repository",
+		Long: heredoc.Docf(`
+		Display labels in a GitHub repository.
+
+		You cannot use %[1]s--search%[1]s with either %[1]s--order%[1]s or %[1]s--sort%[1]s.
+		`, "`"),
+		Example: heredoc.Doc(`
+		# sort labels by name
+		$ gh label list --sort name
+
+		# find labels with "bug" in the name or description
+		$ gh label list --search bug
+		`),
 		Args:    cobra.NoArgs,
 		Aliases: []string{"ls"},
 		RunE: func(c *cobra.Command, args []string) error {
@@ -57,6 +67,11 @@ func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("invalid limit: %v", opts.Query.Limit)
 			}
 
+			if opts.Query.Query != "" &&
+				(c.Flags().Changed("order") || c.Flags().Changed("sort")) {
+				return cmdutil.FlagErrorf("cannot specify `--order` or `--sort` with `--search`")
+			}
+
 			if runF != nil {
 				return runF(&opts)
 			}
@@ -65,7 +80,7 @@ func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "List labels in the web browser")
-	cmd.Flags().IntVarP(&opts.Query.Limit, "limit", "L", listLimit, "Maximum number of items to fetch")
+	cmd.Flags().IntVarP(&opts.Query.Limit, "limit", "L", 30, "Maximum number of items to fetch")
 	cmd.Flags().StringVarP(&opts.Query.Query, "search", "S", "", "Search label names and descriptions")
 
 	// These defaults match the service behavior and, therefore, the initially release of `label list` behavior.

@@ -83,11 +83,6 @@ loop:
 		}
 	}
 
-	if opts.Query != "" {
-		// Work around that `orderBy` has no effect when `query` is specified.
-		sortLabels(labels, opts.Sort, opts.Order == "asc")
-	}
-
 	return labels, totalCount, nil
 }
 
