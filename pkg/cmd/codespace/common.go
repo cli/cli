@@ -85,7 +85,7 @@ func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App
 	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
 	if err != nil {
 		if authErr := <-authkeys; authErr != nil {
-			return nil, fmt.Errorf("failed to connect to Live Share: %w", authErr)
+			return nil, fmt.Errorf("failed to fetch authorization keys: %w", authErr)
 		}
 		return nil, fmt.Errorf("failed to connect to Live Share: %w", err)
 	}
