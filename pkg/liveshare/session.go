@@ -62,6 +62,32 @@ func (s *Session) StartSSHServer(ctx context.Context) (int, string, error) {
 	return port, response.User, nil
 }
 
+// StartJupyterServer starts a Juypyter server in the container and returns
+// the port on which it listens and the server URL.
+func (s *Session) StartJupyterServer(ctx context.Context) (int, string, error) {
+	var response struct {
+		Result    bool   `json:"result"`
+		Message   string `json:"message"`
+		Port      string `json:"port"`
+		ServerUrl string `json:"serverUrl"`
+	}
+
+	if err := s.rpc.do(ctx, "IJupyterServerHostService.getRunningServer", []string{}, &response); err != nil {
+		return 0, "", fmt.Errorf("failed to invoke JupyterLab RPC: %w", err)
+	}
+
+	if !response.Result {
+		return 0, "", fmt.Errorf("failed to start JupyterLab: %s", response.Message)
+	}
+
+	port, err := strconv.Atoi(response.Port)
+	if err != nil {
+		return 0, "", fmt.Errorf("failed to parse JupyterLab port: %w", err)
+	}
+
+	return port, response.ServerUrl, nil
+}
+
 // heartbeat runs until context cancellation, periodically checking whether there is a
 // reason to keep the connection alive, and if so, notifying the Live Share host to do so.
 // Heartbeat ensures it does not send more than one request every "interval" to ratelimit
