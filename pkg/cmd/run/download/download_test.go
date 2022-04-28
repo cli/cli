@@ -69,6 +69,29 @@ func Test_NewCmdDownload(t *testing.T) {
 				DestinationDir: ".",
 			},
 		},
+		{
+			name:  "repo level with patterns",
+			args:  "-p o*e -p tw*",
+			isTTY: true,
+			want: DownloadOptions{
+				RunID:          "",
+				DoPrompt:       false,
+				FilePatterns:   []string{"o*e", "tw*"},
+				DestinationDir: ".",
+			},
+		},
+		{
+			name:  "repo level with names and patterns",
+			args:  "-p o*e -p tw* -n three -n four",
+			isTTY: true,
+			want: DownloadOptions{
+				RunID:          "",
+				DoPrompt:       false,
+				Names:          []string{"three", "four"},
+				FilePatterns:   []string{"o*e", "tw*"},
+				DestinationDir: ".",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -112,6 +135,7 @@ func Test_NewCmdDownload(t *testing.T) {
 
 			assert.Equal(t, tt.want.RunID, opts.RunID)
 			assert.Equal(t, tt.want.Names, opts.Names)
+			assert.Equal(t, tt.want.FilePatterns, opts.FilePatterns)
 			assert.Equal(t, tt.want.DestinationDir, opts.DestinationDir)
 			assert.Equal(t, tt.want.DoPrompt, opts.DoPrompt)
 		})
