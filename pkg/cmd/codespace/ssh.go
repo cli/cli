@@ -125,7 +125,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	if err != nil {
 		return err
 	}
-	defer session.Close()
+	defer safeClose(session, &err)
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
@@ -187,11 +187,10 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 }
 
-func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) error {
+func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	var err error
 	var csList []*api.Codespace
 	if opts.codespace == "" {
 		a.StartProgressIndicatorWithLabel("Fetching codespaces")
@@ -232,7 +231,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) error {
 			if err != nil {
 				result.err = fmt.Errorf("error connecting to codespace: %w", err)
 			} else {
-				defer session.Close()
+				defer safeClose(session, &err)
 
 				_, result.user, err = session.StartSSHServer(ctx)
 				if err != nil {

@@ -27,7 +27,7 @@ func newJupyterCmd(app *App) *cobra.Command {
 	return jupyterCmd
 }
 
-func (a *App) Jupyter(ctx context.Context, codespaceName string) error {
+func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -41,7 +41,7 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) error {
 	if err != nil {
 		return err
 	}
-	defer session.Close()
+	defer safeClose(session, &err)
 
 	a.StartProgressIndicatorWithLabel("Starting JupyterLab on codespace")
 	serverPort, serverUrl, err := session.StartJupyterServer(ctx)

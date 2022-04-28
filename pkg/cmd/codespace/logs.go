@@ -45,7 +45,7 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 	if err != nil {
 		return err
 	}
-	defer session.Close()
+	defer safeClose(session, &err)
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
 	listen, err := net.Listen("tcp", "127.0.0.1:0") // arbitrary port

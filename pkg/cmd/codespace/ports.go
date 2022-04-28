@@ -59,7 +59,7 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, exporter cmdu
 	if err != nil {
 		return err
 	}
-	defer session.Close()
+	defer safeClose(session, &err)
 
 	a.StartProgressIndicatorWithLabel("Fetching ports")
 	ports, err := session.GetSharedServers(ctx)
