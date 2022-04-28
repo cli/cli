@@ -11,7 +11,6 @@ import (
 
 // Interface describes an object that represents a GitHub repository
 type Interface interface {
-	fmt.Stringer
 	RepoName() string
 	RepoOwner() string
 	RepoHost() string
@@ -144,8 +143,4 @@ func (r ghRepo) RepoName() string {
 
 func (r ghRepo) RepoHost() string {
 	return r.hostname
-}
-
-func (r ghRepo) String() string {
-	return fmt.Sprintf("%s/%s", r.owner, r.name)
 }
