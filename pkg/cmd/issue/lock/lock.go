@@ -75,11 +75,10 @@ type LockOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	Fields       []string
-	PadlockState string
-	ParentCmd    string
-	Reason       string
-	SelectorArg  string
+	Fields      []string
+	ParentCmd   string
+	Reason      string
+	SelectorArg string
 }
 
 func (opts *LockOptions) setCommonOptions(f *cmdutil.Factory, cmd *cobra.Command, args []string) {
@@ -100,10 +99,7 @@ func (opts *LockOptions) setCommonOptions(f *cmdutil.Factory, cmd *cobra.Command
 
 func NewCmdLock(f *cmdutil.Factory, parentName string) *cobra.Command {
 
-	opts := &LockOptions{
-		ParentCmd:    parentName,
-		PadlockState: Lock,
-	}
+	opts := &LockOptions{ParentCmd: parentName}
 
 	c := cmds[opts.ParentCmd]
 	short := fmt.Sprintf("Lock %s conversation", strings.ToLower(c.FullName))
@@ -127,7 +123,7 @@ func NewCmdLock(f *cmdutil.Factory, parentName string) *cobra.Command {
 				}
 			}
 
-			return padlock(opts)
+			return padlock(Lock, opts)
 		},
 	}
 
@@ -139,10 +135,7 @@ func NewCmdLock(f *cmdutil.Factory, parentName string) *cobra.Command {
 
 func NewCmdUnlock(f *cmdutil.Factory, parentName string) *cobra.Command {
 
-	opts := &LockOptions{
-		ParentCmd:    parentName,
-		PadlockState: Unlock,
-	}
+	opts := &LockOptions{ParentCmd: parentName}
 
 	c := cmds[opts.ParentCmd]
 	short := fmt.Sprintf("Unlock %s conversation", strings.ToLower(c.FullName))
@@ -155,15 +148,29 @@ func NewCmdUnlock(f *cmdutil.Factory, parentName string) *cobra.Command {
 
 			opts.setCommonOptions(f, cmd, args)
 
-			return padlock(opts)
+			return padlock(Unlock, opts)
 		},
 	}
 
 	return cmd
 }
 
+func reason(reason string) string {
+	result := ""
+	if reason != "" {
+		result = fmt.Sprintf(" as %s", reason)
+	}
+	return result
+}
+
+func status(state string, lockable *api.Issue, opts *LockOptions) string {
+
+	return fmt.Sprintf("%sed%s: %s #%d (%s)",
+		state, reason(opts.Reason), cmds[opts.ParentCmd].FullName, lockable.Number, lockable.Title)
+}
+
 // padlock will lock or unlock a conversation.
-func padlock(opts *LockOptions) error {
+func padlock(state string, opts *LockOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	httpClient, err := opts.HttpClient()
@@ -180,42 +187,29 @@ func padlock(opts *LockOptions) error {
 		return err
 	case parent.Typename != issuePr.Typename:
 		return fmt.Errorf("%s #%d not found, but found %s #%d",
-			parent.Typename, issuePr.Number,
-			issuePr.Typename, issuePr.Number)
-	case opts.PadlockState == Lock && issuePr.Locked:
-		opts.PadlockState = Relock
+			parent.Typename, issuePr.Number, issuePr.Typename, issuePr.Number)
 	}
 
-	var confirm bool
-	reason := " "
-	if opts.Reason != "" {
-		reason = fmt.Sprintf(" (%s) ", opts.Reason)
+	// If trying to lock an already locked conversation, mark as relock.
+	if state == Lock && issuePr.Locked {
+		state = Relock
 	}
-	successMsg := fmt.Sprintf("%s %sed%s%s #%d (%s)\n",
-		cs.SuccessIconWithColor(cs.Green), opts.PadlockState, reason,
-		parent.FullName, issuePr.Number, issuePr.Title)
 
-	switch opts.PadlockState {
+	successMsg := fmt.Sprintf("%s %s\n",
+		cs.SuccessIconWithColor(cs.Green), status(state, issuePr, opts))
+
+	switch state {
 	case Lock:
 		err = lockLockable(httpClient, baseRepo, issuePr, opts)
-	case Relock:
-		shouldRelock := &survey.Confirm{
-			Message: fmt.Sprintf("%s #%d already locked.  Unlock and lock again?", parent.FullName, issuePr.Number),
-			Default: true,
-		}
-		err = survey.AskOne(shouldRelock, &confirm)
-		if err != nil {
-			return err
-		}
-
-		if confirm {
-			err = relockLockable(httpClient, baseRepo, issuePr, opts)
-		} else {
-			successMsg = fmt.Sprintf("%s %s #%d (%s) unchanged\n",
-				cs.SuccessIconWithColor(cs.Green), parent.FullName, issuePr.Number, issuePr.Title)
-		}
 	case Unlock:
 		err = unlockLockable(httpClient, baseRepo, issuePr, opts)
+	case Relock:
+		relocked, errRelock := relockLockable(httpClient, baseRepo, issuePr, opts)
+		err = errRelock
+		if !relocked {
+			successMsg = fmt.Sprintf("%s Unchanged: %s #%d (%s)\n",
+				cs.SuccessIconWithColor(cs.Green), parent.FullName, issuePr.Number, issuePr.Title)
+		}
 	}
 
 	if err != nil {
@@ -272,19 +266,33 @@ func unlockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *ap
 	return gql.MutateNamed(context.Background(), "UnlockLockable", &mutation, variables)
 }
 
-func relockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *api.Issue, opts *LockOptions) error {
-	opts.PadlockState = Unlock
-	err := unlockLockable(httpClient, repo, lockable, opts)
-	if err != nil {
-		return err
+// relockLockable will unlock then lock an issue or pull request.  A common use
+// case would be to change the reason for locking.
+func relockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *api.Issue, opts *LockOptions) (bool, error) {
+
+	var relocked bool
+	shouldRelock := &survey.Confirm{
+		Message: fmt.Sprintf("%s #%d locked%s.  Unlock and lock again?",
+			cmds[opts.ParentCmd].FullName, lockable.Number, reason(strings.ToLower(lockable.ActiveLockReason))),
+		Default: true,
 	}
 
-	opts.PadlockState = Lock
+	err := survey.AskOne(shouldRelock, &relocked)
+	if err != nil {
+		return relocked, err
+	} else if !relocked {
+		return relocked, nil
+	}
+
+	err = unlockLockable(httpClient, repo, lockable, opts)
+	if err != nil {
+		return relocked, err
+	}
+
 	err = lockLockable(httpClient, repo, lockable, opts)
 	if err != nil {
-		return err
+		return relocked, err
 	}
 
-	opts.PadlockState = Relock
-	return nil
+	return relocked, nil
 }
