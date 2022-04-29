@@ -31,7 +31,7 @@ import (
 
 // the reason for not just declaring a map is so that I can put the keys in
 // alphabetical order
-var reasons = []string{"off-topic", "resolved", "spam", "too-heated"}
+var reasons = []string{"off_topic", "resolved", "spam", "too_heated"}
 var reasonsString = strings.Join(reasons, ", ")
 
 var reasonsApi = []githubv4.LockReason{
@@ -122,7 +122,7 @@ func NewCmdLock(f *cmdutil.Factory, parentName string) *cobra.Command {
 				if !ok {
 					cs := opts.IO.ColorScheme()
 
-					return cmdutil.FlagErrorf("%s Invalid reason: %v.\nSee help for options.\nAborting lock.",
+					return cmdutil.FlagErrorf("%s Invalid reason: %v.\n Aborting lock.  See help for options.",
 						cs.FailureIconWithColor(cs.Red), opts.Reason)
 				}
 			}
