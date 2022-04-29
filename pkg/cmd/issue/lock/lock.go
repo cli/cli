@@ -71,8 +71,8 @@ var alias map[string]*command = map[string]*command{
 // Acceptable lock states for conversations.  These are used in print
 // statements, hence the use of strings instead of booleans.
 const (
-	Unlock string = "Unlock"
-	Lock   string = "Lock"
+	Lock   = "Lock"
+	Unlock = "Unlock"
 )
 
 type LockOptions struct {
@@ -124,7 +124,7 @@ func NewCmdLock(f *cmdutil.Factory, parentName string) *cobra.Command {
 				if !ok {
 					cs := opts.IO.ColorScheme()
 
-					return cmdutil.FlagErrorf("%s Invalid reason: %v.\n Aborting lock.  See help for options.",
+					return cmdutil.FlagErrorf("%s Invalid reason: %v\nAborting lock.  See help for options.",
 						cs.FailureIconWithColor(cs.Red), opts.Reason)
 				}
 			}
@@ -196,7 +196,7 @@ func padlock(state string, opts *LockOptions) error {
 
 		return fmt.Errorf("%s #%d not found, but found %s #%d.  Use `gh %s %s %d` instead",
 			currentType.FullName, issuePr.Number,
-			correctType.FullName, issuePr.Number,
+			strings.ToLower(correctType.FullName), issuePr.Number,
 			correctType.Name, strings.ToLower(state), issuePr.Number)
 	}
 
@@ -283,7 +283,7 @@ func relockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *ap
 
 	var relocked bool
 	shouldRelock := &survey.Confirm{
-		Message: fmt.Sprintf("%s #%d locked%s.  Unlock and lock again%s?",
+		Message: fmt.Sprintf("%s #%d already locked%s.  Unlock and lock again%s?",
 			alias[opts.ParentCmd].FullName, lockable.Number, reason(lockable.ActiveLockReason), reason(opts.Reason)),
 		Default: true,
 	}
