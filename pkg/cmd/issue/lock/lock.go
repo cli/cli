@@ -194,7 +194,8 @@ func padlock(state string, opts *LockOptions) error {
 		currentType := alias[parent.Typename]
 		correctType := alias[issuePr.Typename]
 
-		return fmt.Errorf("%s #%d not found, but found %s #%d.  Use `gh %s %s %d` instead",
+		return fmt.Errorf("%s %s #%d not found, but found %s #%d.  Use `gh %s %s %d` instead",
+			cs.FailureIconWithColor(cs.Red),
 			currentType.FullName, issuePr.Number,
 			strings.ToLower(correctType.FullName), issuePr.Number,
 			correctType.Name, strings.ToLower(state), issuePr.Number)
