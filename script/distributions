@@ -176,12 +176,3 @@ Components: main
 Description: The GitHub CLI - ubuntu impish repo
 SignWith: C99B11DEB97541F0
 DebOverride: override.ubuntu
-
-Origin: gh
-Label: gh
-Codename: jammy
-Architectures: i386 amd64 armhf arm64
-Components: main
-Description: The GitHub CLI - ubuntu jammy repo
-SignWith: C99B11DEB97541F0
-DebOverride: override.ubuntu
