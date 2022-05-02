@@ -58,13 +58,13 @@ type Qualifiers struct {
 	Repo                []string
 	Review              string
 	ReviewRequested     string
-	TeamReviewRequested string
 	ReviewedBy          string
 	Size                string
 	Stars               string
 	State               string
 	Status              string
 	Team                string
+	TeamReviewRequested string
 	Topic               []string
 	Topics              string
 	Type                string
