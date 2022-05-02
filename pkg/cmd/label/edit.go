@@ -47,7 +47,7 @@ func newCmdEdit(f *cmdutil.Factory, runF func(*editOptions) error) *cobra.Comman
 
 			# rename and edit the description of the bug label
 			$ gh label edit bug --name big-bug --description "Bigger than normal bug"
-	  `),
+		`),
 		Args: cmdutil.ExactArgs(1, "cannot update label: name argument required"),
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo

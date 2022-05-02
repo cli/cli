@@ -68,7 +68,7 @@ func newCmdCreate(f *cmdutil.Factory, runF func(*createOptions) error) *cobra.Co
 		Example: heredoc.Doc(`
 			# create new bug label
 			$ gh label create bug --description "Something isn't working" --color E99695
-	  `),
+		`),
 		Args: cmdutil.ExactArgs(1, "cannot create label: name argument required"),
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo

@@ -3,7 +3,6 @@ package label
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -28,13 +27,6 @@ type listOptions struct {
 	WebMode bool
 }
 
-type listQueryOptions struct {
-	Limit int
-	Query string
-	Order string
-	Sort  string
-}
-
 func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Command {
 	opts := listOptions{
 		Browser:    f.Browser,
@@ -46,16 +38,16 @@ func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 		Use:   "list",
 		Short: "List labels in a repository",
 		Long: heredoc.Docf(`
-		Display labels in a GitHub repository.
+			Display labels in a GitHub repository.
 
-		You cannot use %[1]s--search%[1]s with either %[1]s--order%[1]s or %[1]s--sort%[1]s.
-		`, "`"),
+			You cannot use %[1]s--search%[1]s with either %[1]s--order%[1]s or %[1]s--sort%[1]s.
+			`, "`"),
 		Example: heredoc.Doc(`
-		# sort labels by name
-		$ gh label list --sort name
+			# sort labels by name
+			$ gh label list --sort name
 
-		# find labels with "bug" in the name or description
-		$ gh label list --search bug
+			# find labels with "bug" in the name or description
+			$ gh label list --search bug
 		`),
 		Args:    cobra.NoArgs,
 		Aliases: []string{"ls"},
@@ -80,7 +72,7 @@ func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "List labels in the web browser")
-	cmd.Flags().IntVarP(&opts.Query.Limit, "limit", "L", 30, "Maximum number of items to fetch")
+	cmd.Flags().IntVarP(&opts.Query.Limit, "limit", "L", 30, "Maximum number of labels to fetch")
 	cmd.Flags().StringVarP(&opts.Query.Query, "search", "S", "", "Search label names and descriptions")
 
 	// These defaults match the service behavior and, therefore, the initially release of `label list` behavior.
@@ -119,7 +111,10 @@ func listRun(opts *listOptions) error {
 	}
 
 	if len(labels) == 0 {
-		return cmdutil.NewNoResultsError(fmt.Sprintf("there are no labels in %s", ghrepo.FullName(baseRepo)))
+		if opts.Query.Query != "" {
+			return cmdutil.NewNoResultsError(fmt.Sprintf("no labels in %s matched your search", ghrepo.FullName(baseRepo)))
+		}
+		return cmdutil.NewNoResultsError(fmt.Sprintf("no labels found in %s", ghrepo.FullName(baseRepo)))
 	}
 
 	if opts.IO.IsStdoutTTY() {
@@ -147,15 +142,4 @@ func printLabels(io *iostreams.IOStreams, labels []label) error {
 
 func listHeader(repoName string, count int, totalCount int) string {
 	return fmt.Sprintf("Showing %d of %s in %s", count, utils.Pluralize(totalCount, "label"), repoName)
-}
-
-func (opts listQueryOptions) OrderBy() map[string]interface{} {
-	field := strings.ToUpper(opts.Sort)
-	if opts.Sort == "created" {
-		field = "CREATED_AT"
-	}
-	return map[string]interface{}{
-		"direction": strings.ToUpper(opts.Order),
-		"field":     field,
-	}
 }

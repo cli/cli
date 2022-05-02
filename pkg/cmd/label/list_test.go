@@ -141,6 +141,7 @@ func TestListRun(t *testing.T) {
 		opts       *listOptions
 		httpStubs  func(*httpmock.Registry)
 		wantErr    bool
+		wantErrMsg string
 		wantStdout string
 		wantStderr string
 	}{
@@ -232,7 +233,23 @@ func TestListRun(t *testing.T) {
 					),
 				)
 			},
-			wantErr: true,
+			wantErr:    true,
+			wantErrMsg: "no labels found in OWNER/REPO",
+		},
+		{
+			name: "empty label list search",
+			tty:  true,
+			opts: &listOptions{Query: listQueryOptions{Query: "test"}},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query LabelList\b`),
+					httpmock.StringResponse(`
+						{"data":{"repository":{"labels":{"totalCount":0,"nodes":[],"pageInfo":{"hasNextPage":false,"endCursor":null}}}}}`,
+					),
+				)
+			},
+			wantErr:    true,
+			wantErrMsg: "no labels in OWNER/REPO matched your search",
 		},
 		{
 			name:       "web mode",
@@ -319,7 +336,11 @@ func TestListRun(t *testing.T) {
 			defer reg.Verify(t)
 			err := listRun(tt.opts)
 			if tt.wantErr {
-				assert.Error(t, err)
+				if tt.wantErrMsg != "" {
+					assert.EqualError(t, err, tt.wantErrMsg)
+				} else {
+					assert.Error(t, err)
+				}
 			} else {
 				assert.NoError(t, err)
 			}

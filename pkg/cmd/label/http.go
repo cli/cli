@@ -2,6 +2,7 @@ package label
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -19,6 +20,24 @@ type listLabelsResponseData struct {
 				EndCursor   string
 			}
 		}
+	}
+}
+
+type listQueryOptions struct {
+	Limit int
+	Query string
+	Order string
+	Sort  string
+}
+
+func (opts listQueryOptions) OrderBy() map[string]string {
+	field := strings.ToUpper(opts.Sort)
+	if opts.Sort == "created" {
+		field = "CREATED_AT"
+	}
+	return map[string]string{
+		"direction": strings.ToUpper(opts.Order),
+		"field":     field,
 	}
 }
 
@@ -49,10 +68,7 @@ func listLabels(client *http.Client, repo ghrepo.Interface, opts listQueryOption
 		"owner":   repo.RepoOwner(),
 		"repo":    repo.RepoName(),
 		"orderBy": opts.OrderBy(),
-	}
-
-	if opts.Query != "" {
-		variables["query"] = opts.Query
+		"query":   opts.Query,
 	}
 
 	var labels []label

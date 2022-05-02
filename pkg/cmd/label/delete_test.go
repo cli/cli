@@ -9,28 +9,42 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewCmdRemove(t *testing.T) {
+func TestNewCmdDelete(t *testing.T) {
 	tests := []struct {
-		name    string
-		input   string
-		output  removeOptions
-		wantErr bool
-		errMsg  string
+		name       string
+		tty        bool
+		input      string
+		output     deleteOptions
+		wantErr    bool
+		wantErrMsg string
 	}{
 		{
-			name:    "no argument",
-			input:   "",
-			wantErr: true,
-			errMsg:  "cannot remove label: name argument required",
+			name:       "no argument",
+			input:      "",
+			wantErr:    true,
+			wantErrMsg: "cannot delete label: name argument required",
 		},
 		{
 			name:   "name argument",
+			tty:    true,
 			input:  "test",
-			output: removeOptions{Name: "test"},
+			output: deleteOptions{Name: "test"},
+		},
+		{
+			name:   "confirm argument",
+			input:  "test --confirm",
+			output: deleteOptions{Name: "test", Confirmed: true},
+		},
+		{
+			name:       "confirm no tty",
+			input:      "test",
+			wantErr:    true,
+			wantErrMsg: "--confirm required when not running interactively",
 		},
 	}
 
@@ -40,10 +54,13 @@ func TestNewCmdRemove(t *testing.T) {
 			f := &cmdutil.Factory{
 				IOStreams: io,
 			}
+			io.SetStdinTTY(tt.tty)
+			io.SetStdoutTTY(tt.tty)
+
 			argv, err := shlex.Split(tt.input)
 			assert.NoError(t, err)
-			var gotOpts *removeOptions
-			cmd := newCmdRemove(f, func(opts *removeOptions) error {
+			var gotOpts *deleteOptions
+			cmd := newCmdDelete(f, func(opts *deleteOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -54,7 +71,7 @@ func TestNewCmdRemove(t *testing.T) {
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr {
-				assert.EqualError(t, err, tt.errMsg)
+				assert.EqualError(t, err, tt.wantErrMsg)
 				return
 			}
 
@@ -64,32 +81,39 @@ func TestNewCmdRemove(t *testing.T) {
 	}
 }
 
-func TestRemoveRun(t *testing.T) {
+func TestDeleteRun(t *testing.T) {
 	tests := []struct {
 		name       string
 		tty        bool
-		opts       *removeOptions
+		opts       *deleteOptions
 		httpStubs  func(*httpmock.Registry)
+		askStubs   func(*prompt.AskStubber)
 		wantStdout string
 		wantErr    bool
 		errMsg     string
 	}{
 		{
-			name: "removes label",
+			name: "deletes label",
 			tty:  true,
-			opts: &removeOptions{Name: "test"},
+			opts: &deleteOptions{Name: "test"},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("DELETE", "repos/OWNER/REPO/labels/test"),
 					httpmock.StatusStringResponse(204, "{}"),
 				)
 			},
-			wantStdout: "✓ Label \"test\" removed from OWNER/REPO\n",
+			askStubs: func(q *prompt.AskStubber) {
+				// TODO: survey stubber doesn't have WithValidator support
+				// so this always passes regardless of prompt input
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
+				q.StubOne("OWNER/REPO")
+			},
+			wantStdout: "✓ Label \"test\" deleted from OWNER/REPO\n",
 		},
 		{
-			name: "removes label notty",
+			name: "deletes label notty",
 			tty:  false,
-			opts: &removeOptions{Name: "test"},
+			opts: &deleteOptions{Name: "test", Confirmed: true},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("DELETE", "repos/OWNER/REPO/labels/test"),
@@ -101,7 +125,7 @@ func TestRemoveRun(t *testing.T) {
 		{
 			name: "missing label",
 			tty:  false,
-			opts: &removeOptions{Name: "missing"},
+			opts: &deleteOptions{Name: "missing", Confirmed: true},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("DELETE", "repos/OWNER/REPO/labels/missing"),
@@ -129,6 +153,14 @@ func TestRemoveRun(t *testing.T) {
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
+
+			//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
+			q, teardown := prompt.InitAskStubber()
+			defer teardown()
+			if tt.askStubs != nil {
+				tt.askStubs(q)
+			}
+
 			io, _, stdout, _ := iostreams.Test()
 			io.SetStdoutTTY(tt.tty)
 			io.SetStdinTTY(tt.tty)
@@ -138,7 +170,7 @@ func TestRemoveRun(t *testing.T) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			}
 			defer reg.Verify(t)
-			err := removeRun(tt.opts)
+			err := deleteRun(tt.opts)
 
 			if tt.wantErr {
 				assert.EqualError(t, err, tt.errMsg)
