@@ -279,8 +279,8 @@ func mainRun() exitCode {
 		}
 		fmt.Fprintf(stderr, "\n\n%s %s → %s\n",
 			ansi.Color("A new release of gh is available:", "yellow"),
-			ansi.Color(buildVersion, "cyan"),
-			ansi.Color(newRelease.Version, "cyan"))
+			ansi.Color(strings.TrimPrefix(buildVersion, "v"), "cyan"),
+			ansi.Color(strings.TrimPrefix(newRelease.Version, "v"), "cyan"))
 		if isHomebrew {
 			fmt.Fprintf(stderr, "To upgrade, run: %s\n", "brew update && brew upgrade gh")
 		}
