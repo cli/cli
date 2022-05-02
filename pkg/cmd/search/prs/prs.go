@@ -2,6 +2,7 @@ package prs
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/pkg/cmd/search/shared"
@@ -15,6 +16,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 	var noAssignee, noLabel, noMilestone, noProject bool
 	var order, sort string
 	var appAuthor string
+	var requestedReviewer string
 	opts := &shared.IssuesOptions{
 		Browser: f.Browser,
 		Entity:  shared.PullRequests,
@@ -96,6 +98,13 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 			if c.Flags().Changed("no-project") && noProject {
 				opts.Query.Qualifiers.No = append(opts.Query.Qualifiers.No, "project")
 			}
+			if c.Flags().Changed("review-requested") {
+				if strings.Contains(requestedReviewer, "/") {
+					opts.Query.Qualifiers.TeamReviewRequested = requestedReviewer
+				} else {
+					opts.Query.Qualifiers.ReviewRequested = requestedReviewer
+				}
+			}
 			opts.Query.Keywords = args
 			if runF != nil {
 				return runF(opts)
@@ -168,7 +177,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Merged, "merged-at", "", "Filter on merged at `date`")
 	cmd.Flags().BoolVar(&merged, "merged", false, "Filter based on merged state")
 	cmdutil.StringEnumFlag(cmd, &opts.Query.Qualifiers.Review, "review", "", "", []string{"none", "required", "approved", "changes_requested"}, "Filter based on review status")
-	cmd.Flags().StringVar(&opts.Query.Qualifiers.ReviewRequested, "review-requested", "", "Filter on `user` requested to review")
+	cmd.Flags().StringVar(&requestedReviewer, "review-requested", "", "Filter on `user` or team requested to review")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.ReviewedBy, "reviewed-by", "", "Filter on `user` who reviewed")
 	cmdutil.StringEnumFlag(cmd, &opts.Query.Qualifiers.Status, "checks", "", "", []string{"pending", "success", "failure"}, "Filter based on status of the checks")
 
