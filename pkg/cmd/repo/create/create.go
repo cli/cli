@@ -535,10 +535,10 @@ func createFromLocal(opts *CreateOptions) error {
 		return err
 	}
 
-	// don't prompt for push if there's no commits
+	// don't prompt for push if there are no commits
 	if opts.Interactive && committed {
 		pushQuestion := &survey.Confirm{
-			Message: fmt.Sprintf(`Would you like to push commits from the current branch to the %q?`, baseRemote),
+			Message: fmt.Sprintf(`Would you like to push commits from the current branch to %q?`, baseRemote),
 			Default: true,
 		}
 		err = prompt.SurveyAskOne(pushQuestion, &opts.Push)
