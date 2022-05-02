@@ -52,6 +52,9 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 
 			# search pull requests with numerous reactions
 			$ gh search prs --reactions=">100"
+
+			# search pull requests with excluded labels
+			$ gh search prs -- --label: labels to exclude
     `),
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) == 0 && c.Flags().NFlag() == 0 {
