@@ -8,14 +8,15 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/google/shlex"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/test"
-	"github.com/google/shlex"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdList(t *testing.T) {
@@ -72,7 +73,7 @@ func TestNewCmdList(t *testing.T) {
 		},
 		{
 			name: "only public",
-			cli:  "--public",
+			cli:  "--visibility=public",
 			wants: ListOptions{
 				Limit:       30,
 				Owner:       "",
@@ -87,7 +88,7 @@ func TestNewCmdList(t *testing.T) {
 		},
 		{
 			name: "only private",
-			cli:  "--private",
+			cli:  "--visibility=private",
 			wants: ListOptions{
 				Limit:       30,
 				Owner:       "",
@@ -191,9 +192,9 @@ func TestNewCmdList(t *testing.T) {
 			},
 		},
 		{
-			name:     "no public and private",
-			cli:      "--public --private",
-			wantsErr: "specify only one of `--public` or `--private`",
+			name:     "invalid visibility",
+			cli:      "--visibility=bad",
+			wantsErr: "`--visibility` only supports `public`, `private`, or `internal`",
 		},
 		{
 			name:     "no forks with sources",
@@ -385,7 +386,7 @@ func TestRepoList_filtering(t *testing.T) {
 		}),
 	)
 
-	output, err := runCommand(http, true, `--private --limit 2 `)
+	output, err := runCommand(http, true, `--visibility=private --limit 2 `)
 	if err != nil {
 		t.Fatal(err)
 	}
