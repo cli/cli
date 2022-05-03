@@ -1,7 +1,7 @@
 package label
 
 type label struct {
-	Name        string
-	Color       string
-	Description string
+	Name        string `json:"name"`
+	Color       string `json:"color"`
+	Description string `json:"description,omitempty"`
 }

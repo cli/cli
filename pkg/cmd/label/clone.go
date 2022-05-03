@@ -107,7 +107,7 @@ func cloneRun(opts *cloneOptions) error {
 
 func cloneLabels(client *http.Client, source, destination ghrepo.Interface, force bool) (successCount, totalCount int, err error) {
 	successCount = 0
-	labels, totalCount, err := listLabels(client, source, -1)
+	labels, totalCount, err := listLabels(client, source, listQueryOptions{Limit: -1})
 	if err != nil {
 		return
 	}

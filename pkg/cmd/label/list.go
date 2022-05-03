@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -11,8 +12,6 @@ import (
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
-
-const listLimit = 30
 
 type browser interface {
 	Browse(string) error
@@ -24,7 +23,7 @@ type listOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 
-	Limit   int
+	Query   listQueryOptions
 	WebMode bool
 }
 
@@ -36,17 +35,34 @@ func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:     "list",
-		Short:   "List labels in a repository",
-		Long:    "Display labels in a GitHub repository.",
+		Use:   "list",
+		Short: "List labels in a repository",
+		Long: heredoc.Docf(`
+			Display labels in a GitHub repository.
+
+			When using the %[1]s--search%[1]s flag results are sorted by best match of the query.
+			This behavior cannot be configured with the %[1]s--order%[1]s or %[1]s--sort%[1]s flags.
+		`, "`"),
+		Example: heredoc.Doc(`
+			# sort labels by name
+			$ gh label list --sort name
+
+			# find labels with "bug" in the name or description
+			$ gh label list --search bug
+		`),
 		Args:    cobra.NoArgs,
 		Aliases: []string{"ls"},
 		RunE: func(c *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			if opts.Limit < 1 {
-				return cmdutil.FlagErrorf("invalid limit: %v", opts.Limit)
+			if opts.Query.Limit < 1 {
+				return cmdutil.FlagErrorf("invalid limit: %v", opts.Query.Limit)
+			}
+
+			if opts.Query.Query != "" &&
+				(c.Flags().Changed("order") || c.Flags().Changed("sort")) {
+				return cmdutil.FlagErrorf("cannot specify `--order` or `--sort` with `--search`")
 			}
 
 			if runF != nil {
@@ -57,7 +73,12 @@ func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "List labels in the web browser")
-	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", listLimit, "Maximum number of items to fetch")
+	cmd.Flags().IntVarP(&opts.Query.Limit, "limit", "L", 30, "Maximum number of labels to fetch")
+	cmd.Flags().StringVarP(&opts.Query.Query, "search", "S", "", "Search label names and descriptions")
+
+	// These defaults match the service behavior and, therefore, the initially release of `label list` behavior.
+	cmdutil.StringEnumFlag(cmd, &opts.Query.Order, "order", "", "asc", []string{"asc", "desc"}, "Order of labels returned")
+	cmdutil.StringEnumFlag(cmd, &opts.Query.Sort, "sort", "", "created", []string{"created", "name"}, "Sort fetched labels")
 
 	return cmd
 }
@@ -84,14 +105,17 @@ func listRun(opts *listOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
-	labels, totalCount, err := listLabels(httpClient, baseRepo, opts.Limit)
+	labels, totalCount, err := listLabels(httpClient, baseRepo, opts.Query)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
 
 	if len(labels) == 0 {
-		return cmdutil.NewNoResultsError(fmt.Sprintf("there are no labels in %s", ghrepo.FullName(baseRepo)))
+		if opts.Query.Query != "" {
+			return cmdutil.NewNoResultsError(fmt.Sprintf("no labels in %s matched your search", ghrepo.FullName(baseRepo)))
+		}
+		return cmdutil.NewNoResultsError(fmt.Sprintf("no labels found in %s", ghrepo.FullName(baseRepo)))
 	}
 
 	if opts.IO.IsStdoutTTY() {
