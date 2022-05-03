@@ -43,7 +43,7 @@ func TestNewHTTPClient(t *testing.T) {
 			wantHeader: map[string]string{
 				"authorization": "token MYTOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
-				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
+				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview, application/vnd.github.antiope-preview, application/vnd.github.shadow-cat-preview",
 			},
 			wantStderr: "",
 		},
@@ -73,7 +73,7 @@ func TestNewHTTPClient(t *testing.T) {
 			wantHeader: map[string]string{
 				"authorization": "",
 				"user-agent":    "GitHub CLI v1.2.3",
-				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
+				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview, application/vnd.github.antiope-preview, application/vnd.github.shadow-cat-preview",
 			},
 			wantStderr: "",
 		},
@@ -90,15 +90,17 @@ func TestNewHTTPClient(t *testing.T) {
 			wantHeader: map[string]string{
 				"authorization": "token MYTOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
-				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
+				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview, application/vnd.github.antiope-preview, application/vnd.github.shadow-cat-preview",
 			},
 			wantStderr: heredoc.Doc(`
 				* Request at <time>
 				* Request to http://<host>:<port>
 				> GET / HTTP/1.1
 				> Host: github.com
-				> Accept: application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview
+				> Accept: application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview, application/vnd.github.antiope-preview, application/vnd.github.shadow-cat-preview
 				> Authorization: token ████████████████████
+				> Content-Type: application/json; charset=utf-8
+				> Time-Zone: <timezone>
 				> User-Agent: GitHub CLI v1.2.3
 
 				< HTTP/1.1 204 No Content
@@ -120,15 +122,17 @@ func TestNewHTTPClient(t *testing.T) {
 			wantHeader: map[string]string{
 				"authorization": "token MYTOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
-				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
+				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview, application/vnd.github.antiope-preview, application/vnd.github.shadow-cat-preview",
 			},
 			wantStderr: heredoc.Doc(`
 				* Request at <time>
 				* Request to http://<host>:<port>
 				> GET / HTTP/1.1
 				> Host: github.com
-				> Accept: application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview
+				> Accept: application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview, application/vnd.github.antiope-preview, application/vnd.github.shadow-cat-preview
 				> Authorization: token ████████████████████
+				> Content-Type: application/json; charset=utf-8
+				> Time-Zone: <timezone>
 				> User-Agent: GitHub CLI v1.2.3
 
 				< HTTP/1.1 204 No Content
@@ -191,7 +195,12 @@ func TestNewHTTPClient(t *testing.T) {
 			})
 
 			ios, _, _, stderr := iostreams.Test()
-			client, err := NewHTTPClient(ios, tt.args.config, tt.args.appVersion, tt.args.setAccept)
+			client, err := NewHTTPClient(HTTPClientOptions{
+				AppVersion:        tt.args.appVersion,
+				Config:            tt.args.config,
+				Log:               ios.ErrOut,
+				SkipAcceptHeaders: !tt.args.setAccept,
+			})
 			require.NoError(t, err)
 
 			req, err := http.NewRequest("GET", ts.URL, nil)
@@ -227,11 +236,13 @@ var requestAtRE = regexp.MustCompile(`(?m)^\* Request at .+`)
 var dateRE = regexp.MustCompile(`(?m)^< Date: .+`)
 var hostWithPortRE = regexp.MustCompile(`127\.0\.0\.1:\d+`)
 var durationRE = regexp.MustCompile(`(?m)^\* Request took .+`)
+var timezoneRE = regexp.MustCompile(`(?m)^> Time-Zone: .+`)
 
 func normalizeVerboseLog(t string) string {
 	t = requestAtRE.ReplaceAllString(t, "* Request at <time>")
 	t = hostWithPortRE.ReplaceAllString(t, "<host>:<port>")
 	t = dateRE.ReplaceAllString(t, "< Date: <time>")
 	t = durationRE.ReplaceAllString(t, "* Request took <duration>")
+	t = timezoneRE.ReplaceAllString(t, "> Time-Zone: <timezone>")
 	return t
 }

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
@@ -14,7 +14,10 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
+	"github.com/cli/go-gh"
+	ghAPI "github.com/cli/go-gh/pkg/api"
 	"github.com/cli/oauth"
+	"github.com/henvic/httpretty"
 )
 
 var (
@@ -22,10 +25,11 @@ var (
 	oauthClientID = "178c6fc778ccc68e1d6a"
 	// This value is safe to be embedded in version control
 	oauthClientSecret = "34ddeff2b558a23d38fba8a6de74f086ede1cc0b"
+
+	jsonTypeRE = regexp.MustCompile(`[/+]json($|;)`)
 )
 
 type iconfig interface {
-	Get(string, string) (string, error)
 	Set(string, string, string) error
 	Write() error
 	WriteHosts() error
@@ -35,16 +39,7 @@ func AuthFlowWithConfig(cfg iconfig, IO *iostreams.IOStreams, hostname, notice s
 	// TODO this probably shouldn't live in this package. It should probably be in a new package that
 	// depends on both iostreams and config.
 
-	// FIXME: this duplicates `factory.browserLauncher()`
-	browserLauncher := os.Getenv("GH_BROWSER")
-	if browserLauncher == "" {
-		browserLauncher, _ = cfg.Get("", "browser")
-	}
-	if browserLauncher == "" {
-		browserLauncher = os.Getenv("BROWSER")
-	}
-
-	token, userLogin, err := authFlow(hostname, IO, notice, additionalScopes, isInteractive, browserLauncher)
+	token, userLogin, err := authFlow(hostname, IO, notice, additionalScopes, isInteractive)
 	if err != nil {
 		return "", err
 	}
@@ -61,7 +56,7 @@ func AuthFlowWithConfig(cfg iconfig, IO *iostreams.IOStreams, hostname, notice s
 	return token, cfg.WriteHosts()
 }
 
-func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string, isInteractive bool, browserLauncher string) (string, string, error) {
+func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string, isInteractive bool) (string, string, error) {
 	w := IO.ErrOut
 	cs := IO.ColorScheme()
 
@@ -69,7 +64,7 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 	debugEnabled, debugValue := utils.IsDebugEnabled()
 	if debugEnabled {
 		logTraffic := strings.Contains(debugValue, "api")
-		httpClient.Transport = api.VerboseLog(IO.ErrOut, logTraffic, IO.ColorEnabled())(httpClient.Transport)
+		httpClient.Transport = verboseLog(IO.ErrOut, logTraffic, IO.ColorEnabled())(httpClient.Transport)
 	}
 
 	minimumScopes := []string{"repo", "read:org", "gist"}
@@ -92,26 +87,19 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 			fmt.Fprintf(w, "%s First copy your one-time code: %s\n", cs.Yellow("!"), cs.Bold(code))
 			return nil
 		},
-		BrowseURL: func(authURL string) error {
-			if u, err := url.Parse(authURL); err == nil {
-				if u.Scheme != "http" && u.Scheme != "https" {
-					return fmt.Errorf("invalid URL: %s", authURL)
-				}
-			} else {
-				return err
-			}
-
+		BrowseURL: func(url string) error {
 			if !isInteractive {
-				fmt.Fprintf(w, "%s to continue in your web browser: %s\n", cs.Bold("Open this URL"), authURL)
+				fmt.Fprintf(w, "%s to continue in your web browser: %s\n", cs.Bold("Open this URL"), url)
 				return nil
 			}
 
 			fmt.Fprintf(w, "%s to open %s in your browser... ", cs.Bold("Press Enter"), oauthHost)
 			_ = waitForEnter(IO.In)
 
-			browser := cmdutil.NewBrowser(browserLauncher, IO.Out, IO.ErrOut)
-			if err := browser.Browse(authURL); err != nil {
-				fmt.Fprintf(w, "%s Failed opening a web browser at %s\n", cs.Red("!"), authURL)
+			// FIXME: read the browser from cmd Factory rather than recreating it
+			browser := cmdutil.NewBrowser(os.Getenv("BROWSER"), IO.Out, IO.ErrOut)
+			if err := browser.Browse(url); err != nil {
+				fmt.Fprintf(w, "%s Failed opening a web browser at %s\n", cs.Red("!"), url)
 				fmt.Fprintf(w, "  %s\n", err)
 				fmt.Fprint(w, "  Please try entering the URL in your browser manually\n")
 			}
@@ -141,12 +129,39 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 }
 
 func getViewer(hostname, token string) (string, error) {
-	http := api.NewClient(api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
-	return api.CurrentLoginName(http, hostname)
+	opts := ghAPI.ClientOptions{Host: hostname, AuthToken: token}
+	client, err := gh.HTTPClient(&opts)
+	if err != nil {
+		return "", err
+	}
+	return api.CurrentLoginName(api.NewClientFromHTTP(client), hostname)
 }
 
 func waitForEnter(r io.Reader) error {
 	scanner := bufio.NewScanner(r)
 	scanner.Scan()
 	return scanner.Err()
+}
+
+func verboseLog(out io.Writer, logTraffic bool, colorize bool) func(http.RoundTripper) http.RoundTripper {
+	logger := &httpretty.Logger{
+		Time:            true,
+		TLS:             false,
+		Colors:          colorize,
+		RequestHeader:   logTraffic,
+		RequestBody:     logTraffic,
+		ResponseHeader:  logTraffic,
+		ResponseBody:    logTraffic,
+		Formatters:      []httpretty.Formatter{&httpretty.JSONFormatter{}},
+		MaxResponseBody: 10000,
+	}
+	logger.SetOutput(out)
+	logger.SetBodyFilter(func(h http.Header) (skip bool, err error) {
+		return !inspectableMIMEType(h.Get("Content-Type")), nil
+	})
+	return logger.RoundTripper
+}
+
+func inspectableMIMEType(t string) bool {
+	return strings.HasPrefix(t, "text/") || jsonTypeRE.MatchString(t)
 }

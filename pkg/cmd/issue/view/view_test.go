@@ -276,7 +276,7 @@ func TestIssueView_web_notFound(t *testing.T) {
 	defer cmdTeardown(t)
 
 	_, err := runCommand(http, true, "-w 9999")
-	if err == nil || err.Error() != "GraphQL: Could not resolve to an Issue with the number of 9999." {
+	if err == nil || err.Error() != "GQL: Could not resolve to an Issue with the number of 9999." {
 		t.Errorf("error running command `issue view`: %v", err)
 	}
 }

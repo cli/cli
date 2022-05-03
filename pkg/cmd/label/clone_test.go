@@ -427,7 +427,7 @@ func TestCloneRun(t *testing.T) {
 				)
 			},
 			wantErr:    true,
-			wantErrMsg: "GraphQL: Could not resolve to a Repository with the name 'cli/invalid'. (repository)",
+			wantErrMsg: "GQL: Could not resolve to a Repository with the name 'cli/invalid'. (repository)",
 		},
 		{
 			name: "create error",

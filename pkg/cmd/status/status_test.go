@@ -371,7 +371,7 @@ func TestStatusRun(t *testing.T) {
 					httpmock.StringResponse(`[]`))
 			},
 			opts:       &StatusOptions{},
-			wantErrMsg: "failed to search: could not search for assignments: GraphQL: Not found. (assignments.nodes.0)",
+			wantErrMsg: "failed to search: could not search for assignments: GQL: Not found. (assignments.nodes.0)",
 		},
 	}
 
@@ -381,8 +381,8 @@ func TestStatusRun(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
-		tt.opts.CachedClient = func(c *http.Client, _ time.Duration) *http.Client {
-			return c
+		tt.opts.CachedClient = func(_ time.Duration) *http.Client {
+			return &http.Client{Transport: reg}
 		}
 		tt.opts.HostConfig = testHostConfig("github.com")
 		ios, _, stdout, _ := iostreams.Test()

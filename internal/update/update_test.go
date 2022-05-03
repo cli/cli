@@ -3,6 +3,7 @@ package update
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"testing"
 
@@ -71,10 +72,12 @@ func TestCheckForUpdate(t *testing.T) {
 
 	for _, s := range scenarios {
 		t.Run(s.Name, func(t *testing.T) {
-			http := &httpmock.Registry{}
-			client := api.NewClient(api.ReplaceTripper(http))
+			reg := &httpmock.Registry{}
+			httpClient := http.DefaultClient
+			httpmock.ReplaceTripper(httpClient, reg)
+			client := api.NewClientFromHTTP(httpClient)
 
-			http.Register(
+			reg.Register(
 				httpmock.REST("GET", "repos/OWNER/REPO/releases/latest"),
 				httpmock.StringResponse(fmt.Sprintf(`{
 					"tag_name": "%s",
@@ -87,10 +90,10 @@ func TestCheckForUpdate(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if len(http.Requests) != 1 {
-				t.Fatalf("expected 1 HTTP request, got %d", len(http.Requests))
+			if len(reg.Requests) != 1 {
+				t.Fatalf("expected 1 HTTP request, got %d", len(reg.Requests))
 			}
-			requestPath := http.Requests[0].URL.Path
+			requestPath := reg.Requests[0].URL.Path
 			if requestPath != "/repos/OWNER/REPO/releases/latest" {
 				t.Errorf("HTTP path: %q", requestPath)
 			}

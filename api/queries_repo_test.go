@@ -18,12 +18,12 @@ func TestGitHubRepo_notFound(t *testing.T) {
 		httpmock.GraphQL(`query RepositoryInfo\b`),
 		httpmock.StringResponse(`{ "data": { "repository": null } }`))
 
-	client := NewClient(ReplaceTripper(httpReg))
+	client := NewTestClient(httpReg)
 	repo, err := GitHubRepo(client, ghrepo.New("OWNER", "REPO"))
 	if err == nil {
 		t.Fatal("GitHubRepo did not return an error")
 	}
-	if wants := "GraphQL: Could not resolve to a Repository with the name 'OWNER/REPO'."; err.Error() != wants {
+	if wants := "GQL: Could not resolve to a Repository with the name 'OWNER/REPO'."; err.Error() != wants {
 		t.Errorf("GitHubRepo error: want %q, got %q", wants, err.Error())
 	}
 	if repo != nil {
@@ -33,7 +33,7 @@ func TestGitHubRepo_notFound(t *testing.T) {
 
 func Test_RepoMetadata(t *testing.T) {
 	http := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(http))
+	client := NewTestClient(http)
 
 	repo, _ := ghrepo.FromFullName("OWNER/REPO")
 	input := RepoMetadataInput{
@@ -182,7 +182,7 @@ func Test_ProjectsToPaths(t *testing.T) {
 
 func Test_ProjectNamesToPaths(t *testing.T) {
 	http := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(http))
+	client := NewTestClient(http)
 
 	repo, _ := ghrepo.FromFullName("OWNER/REPO")
 
@@ -221,7 +221,7 @@ func Test_ProjectNamesToPaths(t *testing.T) {
 
 func Test_RepoResolveMetadataIDs(t *testing.T) {
 	http := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(http))
+	client := NewTestClient(http)
 
 	repo, _ := ghrepo.FromFullName("OWNER/REPO")
 	input := RepoResolveInput{
@@ -350,7 +350,7 @@ func Test_RepoMilestones(t *testing.T) {
 			query = buf.String()
 			return httpmock.StringResponse("{}")(req)
 		})
-		client := NewClient(ReplaceTripper(reg))
+		client := NewTestClient(reg)
 
 		_, err := RepoMilestones(client, ghrepo.New("OWNER", "REPO"), tt.state)
 		if (err != nil) != tt.wantErr {

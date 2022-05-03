@@ -24,12 +24,13 @@ func New(appVersion string) *cmdutil.Factory {
 		ExecutableName: "gh",
 	}
 
-	f.IOStreams = ioStreams(f)                   // Depends on Config
-	f.HttpClient = httpClientFunc(f, appVersion) // Depends on Config, IOStreams, and appVersion
-	f.Remotes = remotesFunc(f)                   // Depends on Config
-	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
-	f.Browser = browser(f)                       // Depends on Config, and IOStreams
-	f.ExtensionManager = extensionManager(f)     // Depends on Config, HttpClient, and IOStreams
+	f.IOStreams = ioStreams(f)                               // Depends on Config
+	f.HttpClient = httpClientFunc(f, appVersion)             // Depends on Config, IOStreams, and appVersion
+	f.CachedHttpClient = cachedHttpClientFunc(f, appVersion) // Depends on Config, IOStreams, and appVersion
+	f.Remotes = remotesFunc(f)                               // Depends on Config
+	f.BaseRepo = BaseRepoFunc(f)                             // Depends on Remotes
+	f.Browser = browser(f)                                   // Depends on Config, and IOStreams
+	f.ExtensionManager = extensionManager(f)                 // Depends on Config, HttpClient, and IOStreams
 
 	return f
 }
@@ -85,7 +86,28 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 		if err != nil {
 			return nil, err
 		}
-		return NewHTTPClient(io, cfg, appVersion, true)
+		return NewHTTPClient(HTTPClientOptions{
+			Config:     cfg,
+			Log:        io.ErrOut,
+			AppVersion: appVersion,
+		})
+	}
+}
+
+func cachedHttpClientFunc(f *cmdutil.Factory, appVersion string) func(time.Duration) (*http.Client, error) {
+	return func(t time.Duration) (*http.Client, error) {
+		io := f.IOStreams
+		cfg, err := f.Config()
+		if err != nil {
+			return nil, err
+		}
+		return NewHTTPClient(HTTPClientOptions{
+			EnableCache: true,
+			CacheTTL:    t,
+			Config:      cfg,
+			Log:         io.ErrOut,
+			AppVersion:  appVersion,
+		})
 	}
 }
 
@@ -149,12 +171,12 @@ func extensionManager(f *cmdutil.Factory) *extension.Manager {
 	}
 	em.SetConfig(cfg)
 
-	client, err := f.HttpClient()
+	client, err := f.CachedHttpClient(time.Second * 30)
 	if err != nil {
 		return em
 	}
 
-	em.SetClient(api.NewCachedClient(client, time.Second*30))
+	em.SetClient(client)
 
 	return em
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/internal/config"
@@ -21,11 +22,12 @@ type Factory struct {
 	IOStreams *iostreams.IOStreams
 	Browser   Browser
 
-	HttpClient func() (*http.Client, error)
-	BaseRepo   func() (ghrepo.Interface, error)
-	Remotes    func() (context.Remotes, error)
-	Config     func() (config.Config, error)
-	Branch     func() (string, error)
+	HttpClient       func() (*http.Client, error)
+	CachedHttpClient func(time.Duration) (*http.Client, error)
+	BaseRepo         func() (ghrepo.Interface, error)
+	Remotes          func() (context.Remotes, error)
+	Config           func() (config.Config, error)
+	Branch           func() (string, error)
 
 	ExtensionManager extensions.ExtensionManager
 	ExecutableName   string

@@ -884,7 +884,7 @@ func Test_apiRun_cache(t *testing.T) {
 	requestCount := 0
 	options := ApiOptions{
 		IO: ios,
-		HttpClient: func() (*http.Client, error) {
+		CachedHttpClient: func(_ time.Duration) (*http.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				requestCount++
 				return &http.Response{
@@ -912,7 +912,7 @@ func Test_apiRun_cache(t *testing.T) {
 	err = apiRun(&options)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 1, requestCount)
+	assert.Equal(t, 2, requestCount)
 	assert.Equal(t, "", stdout.String(), "stdout")
 	assert.Equal(t, "", stderr.String(), "stderr")
 }

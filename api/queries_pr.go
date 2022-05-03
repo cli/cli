@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -362,8 +361,7 @@ func UpdatePullRequestReviews(client *Client, repo ghrepo.Interface, params gith
 		} `graphql:"requestReviews(input: $input)"`
 	}
 	variables := map[string]interface{}{"input": params}
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "PullRequestUpdateRequestReviews", &mutation, variables)
+	err := client.Mutate(repo.RepoHost(), "PullRequestUpdateRequestReviews", &mutation, variables)
 	return err
 }
 
@@ -393,8 +391,8 @@ func PullRequestClose(httpClient *http.Client, repo ghrepo.Interface, prID strin
 		},
 	}
 
-	gql := graphQLClient(httpClient, repo.RepoHost())
-	return gql.MutateNamed(context.Background(), "PullRequestClose", &mutation, variables)
+	client := NewClientFromHTTP(httpClient)
+	return client.Mutate(repo.RepoHost(), "PullRequestClose", &mutation, variables)
 }
 
 func PullRequestReopen(httpClient *http.Client, repo ghrepo.Interface, prID string) error {
@@ -412,8 +410,8 @@ func PullRequestReopen(httpClient *http.Client, repo ghrepo.Interface, prID stri
 		},
 	}
 
-	gql := graphQLClient(httpClient, repo.RepoHost())
-	return gql.MutateNamed(context.Background(), "PullRequestReopen", &mutation, variables)
+	client := NewClientFromHTTP(httpClient)
+	return client.Mutate(repo.RepoHost(), "PullRequestReopen", &mutation, variables)
 }
 
 func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
@@ -431,8 +429,7 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 		},
 	}
 
-	gql := graphQLClient(client.http, repo.RepoHost())
-	return gql.MutateNamed(context.Background(), "PullRequestReadyForReview", &mutation, variables)
+	return client.Mutate(repo.RepoHost(), "PullRequestReadyForReview", &mutation, variables)
 }
 
 func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) error {

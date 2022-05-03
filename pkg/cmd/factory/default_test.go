@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"net/http"
 	"net/url"
 	"os"
 	"testing"
@@ -182,6 +183,7 @@ func Test_SmartBaseRepo(t *testing.T) {
 					return tt.config, nil
 				},
 			}
+			f.HttpClient = func() (*http.Client, error) { return nil, nil }
 			f.Remotes = rr.Resolver()
 			f.BaseRepo = SmartBaseRepoFunc(f)
 			repo, err := f.BaseRepo()

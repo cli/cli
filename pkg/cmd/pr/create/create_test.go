@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -198,6 +199,9 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes context.Remot
 		IOStreams: ios,
 		Browser:   browser,
 		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: rt}, nil
+		},
+		CachedHttpClient: func(time.Duration) (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
 		Config: func() (config.Config, error) {

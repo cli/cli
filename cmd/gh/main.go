@@ -29,8 +29,9 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
+	"github.com/cli/go-gh"
+	ghAPI "github.com/cli/go-gh/pkg/api"
 	"github.com/cli/safeexec"
-	"github.com/mattn/go-colorable"
 	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
 )
@@ -372,24 +373,22 @@ func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
 // BasicClient returns an API client for github.com only that borrows from but
 // does not depend on user configuration
 func basicClient(currentVersion string) (*api.Client, error) {
-	var opts []api.ClientOption
-	if isVerbose, debugValue := utils.IsDebugEnabled(); isVerbose {
-		colorize := utils.IsTerminal(os.Stderr)
-		logTraffic := strings.Contains(debugValue, "api")
-		opts = append(opts, api.VerboseLog(colorable.NewColorable(os.Stderr), logTraffic, colorize))
+	var log io.Writer
+	if debugEnabled, _ := utils.IsDebugEnabled(); debugEnabled {
+		log = os.Stderr
 	}
-	opts = append(opts, api.AddHeader("User-Agent", fmt.Sprintf("GitHub CLI %s", currentVersion)))
 
-	token, _ := config.AuthTokenFromEnv(ghinstance.Default())
-	if token == "" {
-		if c, err := config.ParseDefaultConfig(); err == nil {
-			token, _ = c.Get(ghinstance.Default(), "oauth_token")
-		}
+	headers := map[string]string{
+		"User-Agent": fmt.Sprintf("GitHub CLI %s", currentVersion),
 	}
-	if token != "" {
-		opts = append(opts, api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
+
+	opts := ghAPI.ClientOptions{Host: ghinstance.Default(), Headers: headers, Log: log}
+	client, err := gh.HTTPClient(&opts)
+	if err != nil {
+		return nil, err
 	}
-	return api.NewClient(opts...), nil
+
+	return api.NewClientFromHTTP(client), nil
 }
 
 func isRecentRelease(publishedAt time.Time) bool {
