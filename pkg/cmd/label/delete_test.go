@@ -102,11 +102,10 @@ func TestDeleteRun(t *testing.T) {
 					httpmock.StatusStringResponse(204, "{}"),
 				)
 			},
-			askStubs: func(q *prompt.AskStubber) {
+			askStubs: func(as *prompt.AskStubber) {
 				// TODO: survey stubber doesn't have WithValidator support
 				// so this always passes regardless of prompt input
-				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
-				q.StubOne("OWNER/REPO")
+				as.StubPrompt("Type test to confirm deletion:").AnswerWith("test")
 			},
 			wantStdout: "✓ Label \"test\" deleted from OWNER/REPO\n",
 		},
@@ -154,11 +153,9 @@ func TestDeleteRun(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 
-			//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-			q, teardown := prompt.InitAskStubber()
-			defer teardown()
+			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
-				tt.askStubs(q)
+				tt.askStubs(as)
 			}
 
 			io, _, stdout, _ := iostreams.Test()
