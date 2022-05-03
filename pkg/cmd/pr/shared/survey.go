@@ -23,19 +23,32 @@ const (
 	MetadataAction
 	EditCommitMessageAction
 	EditCommitSubjectAction
+	SubmitDraftAction
 
 	noMilestone = "(none)"
 )
 
-func ConfirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
+func ConfirmIssueSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
+	return confirmSubmission(allowPreview, allowMetadata, false)
+}
+
+func ConfirmPRSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
+	return confirmSubmission(allowPreview, allowMetadata, true)
+}
+
+func confirmSubmission(allowPreview, allowMetadata, allowDraft bool) (Action, error) {
 	const (
-		submitLabel   = "Submit"
-		previewLabel  = "Continue in browser"
-		metadataLabel = "Add metadata"
-		cancelLabel   = "Cancel"
+		submitLabel      = "Submit"
+		submitDraftLabel = "Submit as draft"
+		previewLabel     = "Continue in browser"
+		metadataLabel    = "Add metadata"
+		cancelLabel      = "Cancel"
 	)
 
 	options := []string{submitLabel}
+	if allowDraft {
+		options = append(options, submitDraftLabel)
+	}
 	if allowPreview {
 		options = append(options, previewLabel)
 	}
@@ -65,6 +78,8 @@ func ConfirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
 	switch options[confirmAnswers.Confirmation] {
 	case submitLabel:
 		return SubmitAction, nil
+	case submitDraftLabel:
+		return SubmitDraftAction, nil
 	case previewLabel:
 		return PreviewAction, nil
 	case metadataLabel:
