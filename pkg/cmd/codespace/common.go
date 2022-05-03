@@ -88,7 +88,8 @@ func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App
 		}
 		return nil, fmt.Errorf("failed to connect to Live Share: %w", err)
 	}
-	return
+
+	return session, nil
 }
 
 //go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
