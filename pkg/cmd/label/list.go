@@ -40,8 +40,9 @@ func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 		Long: heredoc.Docf(`
 			Display labels in a GitHub repository.
 
-			You cannot use %[1]s--search%[1]s with either %[1]s--order%[1]s or %[1]s--sort%[1]s.
-			`, "`"),
+			When using the %[1]s--search%[1]s flag results are sorted by best match of the query.
+			This behavior cannot be configured with the %[1]s--order%[1]s or %[1]s--sort%[1]s flags.
+		`, "`"),
 		Example: heredoc.Doc(`
 			# sort labels by name
 			$ gh label list --sort name
