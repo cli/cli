@@ -41,7 +41,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 			# search pull requests matching set of keywords "fix" and "bug"
 			$ gh search prs fix bug
 
-			# search draft pull requests in cli repository 
+			# search draft pull requests in cli repository
 			$ gh search prs --repo=cli/cli --draft
 
 			# search open pull requests requesting your review
@@ -53,8 +53,8 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 			# search pull requests with numerous reactions
 			$ gh search prs --reactions=">100"
 
-			# search pull requests with excluded labels
-			$ gh search prs -- --label: labels to exclude
+			# search pull requests without label "bug"
+			$ gh search prs -- -label:bug
     `),
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) == 0 && c.Flags().NFlag() == 0 {
