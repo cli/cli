@@ -60,6 +60,9 @@ func NewCmdRepos(f *cmdutil.Factory, runF func(*ReposOptions) error) *cobra.Comm
 
 			# search repositories by coding language and number of good first issues
 			$ gh search repos --language=go --good-first-issues=">=10"
+
+			# search repositories without topic "linux"
+			$ gh search repos -- -topic:linux
     `),
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) == 0 && c.Flags().NFlag() == 0 {

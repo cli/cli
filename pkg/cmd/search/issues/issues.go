@@ -50,6 +50,9 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 
 			# search issues with numerous comments
 			$ gh search issues --comments=">100"
+
+			# search issues without label "bug"
+			$ gh search issues -- -label:bug
     `),
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) == 0 && c.Flags().NFlag() == 0 {
