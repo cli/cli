@@ -125,6 +125,7 @@ func TestNewCmdList(t *testing.T) {
 				  color
 				  createdAt
 				  description
+				  id
 				  isDefault
 				  name
 				  updatedAt

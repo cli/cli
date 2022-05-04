@@ -7,12 +7,13 @@ import (
 )
 
 var labelFields = []string{
-	"name",
 	"color",
-	"description",
 	"createdAt",
-	"updatedAt",
+	"description",
+	"id",
 	"isDefault",
+	"name",
+	"updatedAt",
 	"url",
 }
 
@@ -22,6 +23,7 @@ type label struct {
 	Color       string `json:"color"`
 	Description string `json:"description,omitempty"`
 
+	ID        string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	IsDefault bool
