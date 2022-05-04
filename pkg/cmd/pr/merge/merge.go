@@ -181,7 +181,7 @@ type mergeContext struct {
 	autoMerge         bool
 	crossRepoPR       bool
 	deleteBranch      bool
-	currentBranch     string
+	switchedToBranch  string
 }
 
 // Attempt to disable auto merge on the pull request.
@@ -348,10 +348,10 @@ func (m *mergeContext) deleteLocalBranch() error {
 	if currentBranch == m.pr.HeadRefName {
 		// if the target branch of the PR is not known, set the current branch to the
 		// default branch of the repository
-		m.currentBranch = m.pr.BaseRefName
-		if m.currentBranch == "" {
+		targetBranch := m.pr.BaseRefName
+		if targetBranch == "" {
 			apiClient := api.NewClientFromHTTP(m.httpClient)
-			m.currentBranch, err = api.RepoDefaultBranch(apiClient, m.baseRepo)
+			targetBranch, err = api.RepoDefaultBranch(apiClient, m.baseRepo)
 			if err != nil {
 				return err
 			}
@@ -367,19 +367,21 @@ func (m *mergeContext) deleteLocalBranch() error {
 			return err
 		}
 
-		if git.HasLocalBranch(m.currentBranch) {
-			if err := git.CheckoutBranch(m.currentBranch); err != nil {
+		if git.HasLocalBranch(targetBranch) {
+			if err := git.CheckoutBranch(targetBranch); err != nil {
 				return err
 			}
 		} else {
-			if err := git.CheckoutNewBranch(baseRemote.Name, m.currentBranch); err != nil {
+			if err := git.CheckoutNewBranch(baseRemote.Name, targetBranch); err != nil {
 				return err
 			}
 		}
 
-		if err := git.Pull(baseRemote.Name, m.currentBranch); err != nil {
-			_ = m.warnf(fmt.Sprintf("%s warning: not possible to fast-forward to: %q\n", m.cs.WarningIcon(), m.currentBranch))
+		if err := git.Pull(baseRemote.Name, targetBranch); err != nil {
+			_ = m.warnf(fmt.Sprintf("%s warning: not possible to fast-forward to: %q\n", m.cs.WarningIcon(), targetBranch))
 		}
+
+		m.switchedToBranch = targetBranch
 	}
 
 	if err := git.DeleteLocalBranch(m.pr.HeadRefName); err != nil {
@@ -407,8 +409,8 @@ func (m *mergeContext) deleteRemoteBranch() error {
 	}
 
 	branch := ""
-	if m.currentBranch != "" {
-		branch = fmt.Sprintf(" and switched to branch %s", m.cs.Cyan(m.currentBranch))
+	if m.switchedToBranch != "" {
+		branch = fmt.Sprintf(" and switched to branch %s", m.cs.Cyan(m.switchedToBranch))
 	}
 	return m.infof("%s Deleted branch %s%s\n", m.cs.SuccessIconWithColor(m.cs.Red), m.cs.Cyan(m.pr.HeadRefName), branch)
 }
