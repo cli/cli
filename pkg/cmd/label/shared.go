@@ -17,17 +17,15 @@ var labelFields = []string{
 	"url",
 }
 
-// TODO: Should this be moved the api package like other exportables?
 type label struct {
-	Name        string `json:"name"`
-	Color       string `json:"color"`
-	Description string `json:"description,omitempty"`
-
-	ID        string
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	IsDefault bool
-	URL       string
+	Color       string    `json:"color"`
+	CreatedAt   time.Time `json:"createdAt"`
+	Description string    `json:"description"`
+	ID          string    `json:"id"`
+	IsDefault   bool      `json:"isDefault"`
+	Name        string    `json:"name"`
+	URL         string    `json:"url"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 // ExportData implements cmdutil.exportable

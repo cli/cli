@@ -12,9 +12,9 @@ import (
 const maxPageSize = 100
 
 var defaultFields = []string{
-	"name",
 	"color",
 	"description",
+	"name",
 }
 
 type listLabelsResponseData struct {
@@ -58,7 +58,7 @@ func listLabels(client *http.Client, repo ghrepo.Interface, opts listQueryOption
 	}
 
 	apiClient := api.NewClientFromHTTP(client)
-	fragment := fmt.Sprintf("fragment label on Label {%s}", strings.Join(opts.fields, ","))
+	fragment := fmt.Sprintf("fragment label on Label{%s}", strings.Join(opts.fields, ","))
 	query := fragment + `
 	query LabelList($owner: String!, $repo: String!, $limit: Int!, $endCursor: String, $query: String, $orderBy: LabelOrder) {
 		repository(owner: $owner, name: $repo) {
