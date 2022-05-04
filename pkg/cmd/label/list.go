@@ -23,8 +23,9 @@ type listOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 
-	Query   listQueryOptions
-	WebMode bool
+	Exporter cmdutil.Exporter
+	Query    listQueryOptions
+	WebMode  bool
 }
 
 func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Command {
@@ -75,10 +76,10 @@ func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "List labels in the web browser")
 	cmd.Flags().IntVarP(&opts.Query.Limit, "limit", "L", 30, "Maximum number of labels to fetch")
 	cmd.Flags().StringVarP(&opts.Query.Query, "search", "S", "", "Search label names and descriptions")
-
-	// These defaults match the service behavior and, therefore, the initially release of `label list` behavior.
 	cmdutil.StringEnumFlag(cmd, &opts.Query.Order, "order", "", "asc", []string{"asc", "desc"}, "Order of labels returned")
 	cmdutil.StringEnumFlag(cmd, &opts.Query.Sort, "sort", "", "created", []string{"created", "name"}, "Sort fetched labels")
+
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, labelFields)
 
 	return cmd
 }
@@ -104,6 +105,10 @@ func listRun(opts *listOptions) error {
 		return opts.Browser.Browse(labelListURL)
 	}
 
+	if opts.Exporter != nil {
+		opts.Query.fields = opts.Exporter.Fields()
+	}
+
 	opts.IO.StartProgressIndicator()
 	labels, totalCount, err := listLabels(httpClient, baseRepo, opts.Query)
 	opts.IO.StopProgressIndicator()
@@ -116,6 +121,10 @@ func listRun(opts *listOptions) error {
 			return cmdutil.NewNoResultsError(fmt.Sprintf("no labels in %s matched your search", ghrepo.FullName(baseRepo)))
 		}
 		return cmdutil.NewNoResultsError(fmt.Sprintf("no labels found in %s", ghrepo.FullName(baseRepo)))
+	}
+
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, labels)
 	}
 
 	if opts.IO.IsStdoutTTY() {

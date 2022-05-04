@@ -1,6 +1,7 @@
 package label
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -9,6 +10,12 @@ import (
 )
 
 const maxPageSize = 100
+
+var defaultFields = []string{
+	"color",
+	"description",
+	"name",
+}
 
 type listLabelsResponseData struct {
 	Repository struct {
@@ -28,6 +35,8 @@ type listQueryOptions struct {
 	Query string
 	Order string
 	Sort  string
+
+	fields []string
 }
 
 func (opts listQueryOptions) OrderBy() map[string]string {
@@ -44,17 +53,19 @@ func (opts listQueryOptions) OrderBy() map[string]string {
 // listLabels lists the labels in the given repo. Pass -1 for limit to list all labels;
 // otherwise, only that number of labels is returned for any number of pages.
 func listLabels(client *http.Client, repo ghrepo.Interface, opts listQueryOptions) ([]label, int, error) {
+	if len(opts.fields) == 0 {
+		opts.fields = defaultFields
+	}
+
 	apiClient := api.NewClientFromHTTP(client)
-	query := `
+	fragment := fmt.Sprintf("fragment label on Label{%s}", strings.Join(opts.fields, ","))
+	query := fragment + `
 	query LabelList($owner: String!, $repo: String!, $limit: Int!, $endCursor: String, $query: String, $orderBy: LabelOrder) {
 		repository(owner: $owner, name: $repo) {
 			labels(first: $limit, after: $endCursor, query: $query, orderBy: $orderBy) {
 				totalCount,
 				nodes {
-					name,
-					color,
-					description,
-					createdAt,
+					...label
 				}
 				pageInfo {
 					hasNextPage

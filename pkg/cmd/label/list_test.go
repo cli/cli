@@ -98,6 +98,39 @@ func TestNewCmdList(t *testing.T) {
 			wantErr: true,
 			errMsg:  "cannot specify `--order` or `--sort` with `--search`",
 		},
+		{
+			name:  "json flag",
+			input: "--json name,color,description,createdAt",
+			output: listOptions{
+				Query: listQueryOptions{
+					Limit: 30,
+					Order: "asc",
+					Sort:  "created",
+					fields: []string{
+						"name",
+						"color",
+						"description",
+						"createdAt",
+					},
+				},
+			},
+		},
+		{
+			name:    "invalid json flag",
+			input:   "--json invalid",
+			wantErr: true,
+			errMsg: heredoc.Doc(`
+				Unknown JSON field: "invalid"
+				Available fields:
+				  color
+				  createdAt
+				  description
+				  id
+				  isDefault
+				  name
+				  updatedAt
+				  url`),
+		},
 	}
 
 	for _, tt := range tests {
