@@ -139,6 +139,7 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 	namesWithConflict := make(map[string]bool)
 	codespacesByName := make(map[string]codespaceWithIndex)
 	codespacesNames := make([]string, 0, len(codespaces))
+	codespacesDirty := make(map[string]bool)
 	for _, apiCodespace := range codespaces {
 		cs := codespace{apiCodespace}
 		csName := cs.displayName(false, false)
@@ -155,7 +156,14 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 
 				codespacesByName[fullDisplayName] = codespaceWithIndex{seenCodespace.cs, seenCodespace.idx}
 				codespacesNames[seenCodespace.idx] = fullDisplayNameWithGitStatus
-				delete(codespacesByName, csName) // delete the existing map entry with old name
+
+				// Update the git status dirty map to reflect the new name.
+				if cs.hasUnsavedChanges() {
+					codespacesDirty[fullDisplayNameWithGitStatus] = true
+				}
+
+				// delete the existing map entry with old name
+				delete(codespacesByName, csName)
 
 				// All other codespaces with the same name should update
 				// to their specific name, this tracks conflicting names going forward
@@ -169,6 +177,10 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 
 		codespacesByName[csName] = codespaceWithIndex{cs, len(codespacesNames)}
 		codespacesNames = append(codespacesNames, displayNameWithGitStatus)
+
+		if cs.hasUnsavedChanges() {
+			codespacesDirty[displayNameWithGitStatus] = true
+		}
 	}
 
 	csSurvey := []*survey.Question{
@@ -193,8 +205,26 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 	// Codespaces are indexed without the git status included as compared
 	// to how it is displayed in the prompt, so the git status symbol needs
 	// cleaning up in case it is included.
-	selectedCodespace := strings.Replace(answers.Codespace, gitStatusDirty, "", -1)
+	isDirty := codespacesDirty[answers.Codespace]
+	selectedCodespace := answers.Codespace
+	if isDirty {
+		selectedCodespace = withoutGitStatus(answers.Codespace)
+	}
 	return codespacesByName[selectedCodespace].cs.Codespace, nil
+}
+
+// withoutGitStatus returns the string without the git status symbol.
+func withoutGitStatus(cname string) string {
+	return replaceLastOccurence(cname, gitStatusDirty, "")
+}
+
+// replaceLastOccurence replaces the last occurence of a string with another string.
+func replaceLastOccurence(str, old, replace string) string {
+	i := strings.LastIndex(str, old)
+	if i == -1 {
+		return str
+	}
+	return str[:i] + replace + str[i+len(old):]
 }
 
 // getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
