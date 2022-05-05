@@ -205,8 +205,8 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 	// Codespaces are indexed without the git status included as compared
 	// to how it is displayed in the prompt, so the git status symbol needs
 	// cleaning up in case it is included.
-	isDirty := codespacesDirty[answers.Codespace]
 	selectedCodespace := answers.Codespace
+	isDirty := codespacesDirty[selectedCodespace]
 	if isDirty {
 		selectedCodespace = withoutGitStatus(answers.Codespace)
 	}
