@@ -302,70 +302,61 @@ func (s *StatusGetter) LoadNotifications() error {
 	return nil
 }
 
-func (s *StatusGetter) buildSearchQuery() string {
-	q := `
-	query AssignedSearch {
-	  assignments: search(first: 25, type: ISSUE, query:"%s") {
-		  edges {
-		  node {
-			...on Issue {
-			  __typename
-			  updatedAt
-			  title
-			  number
-			  repository {
-				nameWithOwner
-			  }
-			}
-			...on PullRequest {
-			  updatedAt
-			  __typename
-			  title
-			  number
-			  repository {
-				nameWithOwner
-			  }
-			}
-		  }
-		}
-	  }
-	  reviewRequested: search(first: 25, type: ISSUE, query:"%s") {
-		  edges {
-			  node {
-				...on PullRequest {
-				  updatedAt
-				  __typename
-				  title
-				  number
-				  repository {
-					nameWithOwner
-				  }
-				}
-			  }
-		  }
-	  }
-	}`
-	assignmentsQ := `assignee:@me state:open%s%s`
-	requestedQ := `state:open review-requested:@me%s%s`
-
-	orgFilter := ""
-	if s.Org != "" {
-		orgFilter = " org:" + s.Org
+const searchQuery = `
+fragment issue on Issue {
+	__typename
+	updatedAt
+	title
+	number
+	repository {
+		nameWithOwner
 	}
-	excludeFilter := ""
-	for _, repo := range s.Exclude {
-		excludeFilter += " -repo:" + repo
-	}
-	assignmentsQ = fmt.Sprintf(assignmentsQ, orgFilter, excludeFilter)
-	requestedQ = fmt.Sprintf(requestedQ, orgFilter, excludeFilter)
-
-	return fmt.Sprintf(q, assignmentsQ, requestedQ)
 }
+fragment pr on PullRequest {
+	__typename
+	updatedAt
+	title
+	number
+	repository {
+		nameWithOwner
+	}
+}
+query AssignedSearch($searchAssigns: String!, $searchReviews: String!, $limit: Int = 25) {
+	assignments: search(first: $limit, type: ISSUE, query: $searchAssigns) {
+		edges {
+			node {
+				...issue
+				...pr
+			}
+		}
+	}
+	reviewRequested: search(first: $limit, type: ISSUE, query: $searchReviews) {
+		edges {
+			node {
+				...pr
+			}
+		}
+	}
+}`
 
 // Populate .AssignedPRs, .AssignedIssues, .ReviewRequests
 func (s *StatusGetter) LoadSearchResults() error {
-	q := s.buildSearchQuery()
 	c := api.NewClientFromHTTP(s.Client)
+
+	searchAssigns := `assignee:@me state:open archived:false`
+	searchReviews := `review-requested:@me state:open archived:false`
+	if s.Org != "" {
+		searchAssigns += " org:" + s.Org
+		searchReviews += " org:" + s.Org
+	}
+	for _, repo := range s.Exclude {
+		searchAssigns += " -repo:" + repo
+		searchReviews += " -repo:" + repo
+	}
+	variables := map[string]interface{}{
+		"searchAssigns": searchAssigns,
+		"searchReviews": searchReviews,
+	}
 
 	var resp struct {
 		Assignments struct {
@@ -379,7 +370,7 @@ func (s *StatusGetter) LoadSearchResults() error {
 			}
 		}
 	}
-	err := c.GraphQL(s.hostname(), q, nil, &resp)
+	err := c.GraphQL(s.hostname(), searchQuery, variables, &resp)
 	if err != nil {
 		return fmt.Errorf("could not search for assignments: %w", err)
 	}
