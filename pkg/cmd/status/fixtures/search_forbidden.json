@@ -1,0 +1,104 @@
+{
+    "data": {
+        "assignments": {
+            "edges": [
+                {
+                    "node": {
+                        "updatedAt": "2022-03-15T17:10:25Z",
+                        "__typename": "PullRequest",
+                        "title": "Pin extensions",
+                        "number": 5272,
+                        "repository": {
+                            "nameWithOwner": "cli/cli"
+                        }
+                    }
+                },
+                null,
+                {
+                    "node": {
+                        "__typename": "Issue",
+                        "updatedAt": "2022-03-10T21:33:57Z",
+                        "title": "yolo",
+                        "number": 157,
+                        "repository": {
+                            "nameWithOwner": "vilmibm/testing"
+                        }
+                    }
+                },
+                null
+            ]
+        },
+        "reviewRequested": {
+            "edges": [
+                {
+                    "node": {
+                        "updatedAt": "2022-03-15T17:10:25Z",
+                        "__typename": "PullRequest",
+                        "title": "Pin extensions",
+                        "number": 5272,
+                        "repository": {
+                            "nameWithOwner": "cli/cli"
+                        }
+                    }
+                },
+                null
+            ]
+        }
+    },
+    "errors": [
+        {
+            "type": "FORBIDDEN",
+            "path": [
+                "assignments",
+                "edges",
+                0
+            ],
+            "extensions": {
+                "saml_failure": true
+            },
+            "locations": [
+                {
+                    "line": 4,
+                    "column": 5
+                }
+            ],
+            "message": "Resource protected by organization SAML enforcement. You must grant your OAuth token access to this organization."
+        },
+        {
+            "type": "FORBIDDEN",
+            "path": [
+                "assignments",
+                "edges",
+                0
+            ],
+            "extensions": {
+                "saml_failure": true
+            },
+            "locations": [
+                {
+                    "line": 4,
+                    "column": 5
+                }
+            ],
+            "message": "Resource protected by organization SAML enforcement. You must grant your OAuth token access to this organization."
+        },
+        {
+            "type": "FORBIDDEN",
+            "path": [
+                "reviewRequested",
+                "edges",
+                0
+            ],
+            "extensions": {
+                "saml_failure": true
+            },
+            "locations": [
+                {
+                    "line": 4,
+                    "column": 5
+                }
+            ],
+            "message": "Resource protected by organization SAML enforcement. You must grant your OAuth token access to this organization."
+        }
+    ]
+}

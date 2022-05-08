@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -44,7 +45,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Print information about relevant issues, pull requests, and notifications across repositories",
-		Long: heredoc.Doc(`
+		Long: heredoc.Docf(`
 			The status command prints information about your work on GitHub across all the repositories you're subscribed to, including:
 
 			- Assigned Issues
@@ -52,7 +53,9 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 			- Review Requests
 			- Mentions
 			- Repository Activity (new issues/pull requests, comments)
-		`),
+
+			Some status may be unavailable due to organization SAML enforcement. Run %[1]sgh auth refresh%[1]s to authorization access to organizations.
+		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh status -e cli/cli -e cli/go-gh # Exclude multiple repositories
 			$ gh status -o cli # Limit results to a single organization
@@ -166,6 +169,8 @@ type StatusGetter struct {
 	Mentions       []StatusItem
 	ReviewRequests []StatusItem
 	RepoActivity   []StatusItem
+	hasAuthErrors  bool
+	authErrorsMu   sync.Mutex
 }
 
 func NewStatusGetter(client *http.Client, hostname string, opts *StatusOptions) *StatusGetter {
@@ -295,7 +300,14 @@ func (s *StatusGetter) LoadNotifications() error {
 				preview:    actual,
 			})
 		} else if err != nil {
-			return fmt.Errorf("could not fetch comment: %w", err)
+			var httpErr api.HTTPError
+			if !errors.As(err, &httpErr) || httpErr.StatusCode != 403 {
+				return fmt.Errorf("could not fetch comment: %w", err)
+			} else if httpErr.StatusCode == 403 {
+				s.authErrorsMu.Lock()
+				s.hasAuthErrors = true
+				s.authErrorsMu.Unlock()
+			}
 		}
 	}
 
@@ -372,7 +384,18 @@ func (s *StatusGetter) LoadSearchResults() error {
 	}
 	err := c.GraphQL(s.hostname(), searchQuery, variables, &resp)
 	if err != nil {
-		return fmt.Errorf("could not search for assignments: %w", err)
+		// Exclude any FORBIDDEN errors and show status for what we can.
+		if gqlErrResponse, ok := err.(*api.GraphQLErrorResponse); ok {
+			err = filterGraphQLErrors(gqlErrResponse)
+			if err == nil {
+				s.authErrorsMu.Lock()
+				s.hasAuthErrors = true
+				s.authErrorsMu.Unlock()
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("could not search for assignments: %w", err)
+		}
 	}
 
 	prs := []SearchResult{}
@@ -384,13 +407,16 @@ func (s *StatusGetter) LoadSearchResults() error {
 			issues = append(issues, e.Node)
 		} else if e.Node.Type == "PullRequest" {
 			prs = append(prs, e.Node)
-		} else {
+		} else if e.Node.Type != "" {
+			// FORBIDDEN nodes are null in response, so Type == "" here.
 			panic("you shouldn't be here")
 		}
 	}
 
 	for _, e := range resp.ReviewRequested.Edges {
-		reviewRequested = append(reviewRequested, e.Node)
+		if e.Node.Type != "" {
+			reviewRequested = append(reviewRequested, e.Node)
+		}
 	}
 
 	sort.Sort(Results(issues))
@@ -425,6 +451,19 @@ func (s *StatusGetter) LoadSearchResults() error {
 		})
 	}
 
+	return nil
+}
+
+func filterGraphQLErrors(gqlErrResponse *api.GraphQLErrorResponse) error {
+	gqlErrors := make([]api.GraphQLError, 0, len(gqlErrResponse.Errors))
+	for _, gqlErr := range gqlErrResponse.Errors {
+		if gqlErr.Type != "FORBIDDEN" {
+			gqlErrors = append(gqlErrors, gqlErr)
+		}
+	}
+	if len(gqlErrors) > 0 {
+		return &api.GraphQLErrorResponse{Errors: gqlErrors}
+	}
 	return nil
 }
 
@@ -506,6 +545,13 @@ func (s *StatusGetter) LoadEvents() error {
 	return nil
 }
 
+func (s *StatusGetter) HasAuthErrors() bool {
+	s.authErrorsMu.Lock()
+	defer s.authErrorsMu.Unlock()
+
+	return s.hasAuthErrors
+}
+
 func statusRun(opts *StatusOptions) error {
 	client, err := opts.HttpClient()
 	if err != nil {
@@ -548,10 +594,10 @@ func statusRun(opts *StatusOptions) error {
 	})
 
 	err = g.Wait()
+	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
-	opts.IO.StopProgressIndicator()
 
 	cs := opts.IO.ColorScheme()
 	out := opts.IO.Out
@@ -627,6 +673,10 @@ func statusRun(opts *StatusOptions) error {
 	fmt.Fprintln(out, lipgloss.JoinHorizontal(lipgloss.Top, issueSection, prSection))
 	fmt.Fprintln(out, lipgloss.JoinHorizontal(lipgloss.Top, rrSection, mSection))
 	fmt.Fprintln(out, raSection)
+
+	if sg.HasAuthErrors() {
+		fmt.Fprintln(out, cs.Gray("Some status unavailable due to organization SAML enforcement. Run `gh auth refresh` to authorization access to organizations."))
+	}
 
 	return nil
 }
