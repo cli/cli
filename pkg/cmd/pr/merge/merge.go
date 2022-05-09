@@ -270,10 +270,7 @@ func (m *mergeContext) merge() error {
 		setCommitBody: m.opts.BodySet,
 	}
 
-	// merge queue is required and the user has provided a merge strategy
 	if m.addToMergeQueue() && !m.opts.InteractiveMode {
-		// TODO: should this continue if the strategy the user set is the same as the one for the merge queue?
-		// if repo.MergeQueue.MergeMethod != opts.MergeMethod
 		_ = m.warnf("%s a merge strategy cannot be set when adding a pull request to the merge queue\n", m.cs.FailureIconWithColor(m.cs.Red))
 		return cmdutil.SilentError
 	}
