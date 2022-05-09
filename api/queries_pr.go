@@ -17,24 +17,26 @@ type PullRequestAndTotalCount struct {
 }
 
 type PullRequest struct {
-	ID               string
-	Number           int
-	Title            string
-	State            string
-	Closed           bool
-	URL              string
-	BaseRefName      string
-	HeadRefName      string
-	Body             string
-	Mergeable        string
-	Additions        int
-	Deletions        int
-	ChangedFiles     int
-	MergeStateStatus string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	ClosedAt         *time.Time
-	MergedAt         *time.Time
+	ID                  string
+	Number              int
+	Title               string
+	State               string
+	Closed              bool
+	URL                 string
+	BaseRefName         string
+	HeadRefName         string
+	Body                string
+	Mergeable           string
+	Additions           int
+	Deletions           int
+	ChangedFiles        int
+	MergeStateStatus    string
+	IsInMergeQueue      bool
+	IsMergeQueueEnabled bool // Indicates whether the pull request's base ref has a merge queue enabled.
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	ClosedAt            *time.Time
+	MergedAt            *time.Time
 
 	MergeCommit          *Commit
 	PotentialMergeCommit *Commit
