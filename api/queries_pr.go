@@ -42,6 +42,7 @@ type PullRequest struct {
 	Deletions        int
 	ChangedFiles     int
 	MergeStateStatus string
+	IsInMergeQueue   bool
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	ClosedAt         *time.Time

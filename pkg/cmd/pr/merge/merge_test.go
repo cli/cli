@@ -280,16 +280,27 @@ func TestPrMerge(t *testing.T) {
 	)
 
 	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
+		} } }`),
+	)
+
+	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.NotContains(t, input, "commitHeadline")
-		}))
+		}),
+	)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
-
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "master", true, "pr merge 1 --merge")
@@ -320,6 +331,17 @@ func TestPrMerge_blocked(t *testing.T) {
 		baseRepo("OWNER", "REPO", "master"),
 	)
 
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
+		} } }`),
+	)
+
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
@@ -338,6 +360,24 @@ func TestPrMerge_blocked(t *testing.T) {
 func TestPrMerge_dirty(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {
+				"login": "OWNER"
+			},
+			"defaultBranchRef":{
+				"name": "master"
+			},
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
+		} } }`),
+	)
 
 	shared.RunCommandFinder(
 		"1",
@@ -393,6 +433,17 @@ func TestPrMerge_nontty(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"mergeQueue": {
+					"mergeMethod": ""
+				}
+			} } }`),
+	)
+
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
@@ -421,6 +472,16 @@ func TestPrMerge_editMessage_nontty(t *testing.T) {
 			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
+	)
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
+		} } }`),
 	)
 
 	http.Register(
@@ -463,6 +524,17 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 	)
 
 	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
+		} } }`),
+	)
+
+	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
@@ -497,6 +569,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 			State:            "OPEN",
 			Title:            "Blueberries are a good fruit",
 			HeadRefName:      "blueberries",
+			BaseRefName:      "master",
 			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
@@ -512,6 +585,24 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	http.Register(
 		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
 		httpmock.StringResponse(`{}`))
+
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"name": "REPO",
+				"owner": {
+					"login": "OWNER"
+				},
+				"defaultBranchRef":{
+					"name": "master"
+				},
+				"mergeQueue": {
+					"mergeMethod": ""
+				}
+			} } }`),
+	)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
@@ -550,6 +641,24 @@ func TestPrMerge_deleteBranch_nonDefault(t *testing.T) {
 			BaseRefName:      "fruit",
 		},
 		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {
+				"login": "OWNER"
+			},
+			"defaultBranchRef":{
+				"name": "master"
+			},
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
+		} } }`),
 	)
 
 	http.Register(
@@ -603,6 +712,24 @@ func TestPrMerge_deleteBranch_checkoutNewBranch(t *testing.T) {
 	)
 
 	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {
+				"login": "OWNER"
+			},
+			"defaultBranchRef":{
+				"name": "master"
+			},
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
+		} } }`),
+	)
+
+	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
@@ -652,6 +779,24 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 	)
 
 	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {
+				"login": "OWNER"
+			},
+			"defaultBranchRef":{
+				"name": "master"
+			},
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
+		} } }`),
+	)
+
+	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
@@ -690,11 +835,22 @@ func Test_nonDivergingPullRequest(t *testing.T) {
 		Title:            "Blueberries are a good fruit",
 		State:            "OPEN",
 		MergeStateStatus: "CLEAN",
+		BaseRefName:      "master",
 	}
 	stubCommit(pr, "COMMITSHA1")
 
-	prFinder := shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "master"))
-	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName"})
+	shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "master"))
+
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
+		} } }`),
+	)
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
@@ -730,11 +886,22 @@ func Test_divergingPullRequestWarning(t *testing.T) {
 		Title:            "Blueberries are a good fruit",
 		State:            "OPEN",
 		MergeStateStatus: "CLEAN",
+		BaseRefName:      "master",
 	}
 	stubCommit(pr, "COMMITSHA1")
 
-	prFinder := shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "master"))
-	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName"})
+	shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "master"))
+
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
+		} } }`),
+	)
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
@@ -778,6 +945,17 @@ func Test_pullRequestWithoutCommits(t *testing.T) {
 	)
 
 	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
+		} } }`),
+	)
+
+	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
@@ -814,6 +992,17 @@ func TestPrMerge_rebase(t *testing.T) {
 			MergeStateStatus: "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
+		} } }`),
 	)
 
 	http.Register(
@@ -858,6 +1047,17 @@ func TestPrMerge_squash(t *testing.T) {
 	)
 
 	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
+		} } }`),
+	)
+
+	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
@@ -884,6 +1084,24 @@ func TestPrMerge_squash(t *testing.T) {
 func TestPrMerge_alreadyMerged(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"name": "REPO",
+			"owner": {
+				"login": "OWNER"
+			},
+			"defaultBranchRef":{
+				"name": "master"
+			},
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
+		} } }`),
+	)
 
 	shared.RunCommandFinder(
 		"4",
@@ -923,6 +1141,17 @@ func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
+		} } }`),
+	)
+
 	shared.RunCommandFinder(
 		"4",
 		&api.PullRequest{
@@ -952,6 +1181,17 @@ func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
 func TestPrMerge_alreadyMerged_nonInteractive_crossRepo(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": {
+			"id": "REPOID",
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
+		} } }`),
+	)
 
 	shared.RunCommandFinder(
 		"4",
@@ -1000,8 +1240,13 @@ func TestPRMerge_interactive(t *testing.T) {
 		{ "data": { "repository": {
 			"mergeCommitAllowed": true,
 			"rebaseMergeAllowed": true,
-			"squashMergeAllowed": true
+			"squashMergeAllowed": true,
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
+
 		} } }`))
+
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
@@ -1047,6 +1292,7 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 			Title:            "It was the best of times",
 			HeadRefName:      "blueberries",
 			MergeStateStatus: "CLEAN",
+			BaseRefName:      "master",
 		},
 		baseRepo("OWNER", "REPO", "master"),
 	)
@@ -1057,7 +1303,17 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 		{ "data": { "repository": {
 			"mergeCommitAllowed": true,
 			"rebaseMergeAllowed": true,
-			"squashMergeAllowed": true
+			"squashMergeAllowed": true,
+			"name": "REPO",
+			"owner": {
+				"login": "OWNER"
+			},
+			"defaultBranchRef":{
+				"name": "master"
+			},
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
 		} } }`))
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
@@ -1113,7 +1369,10 @@ func TestPRMerge_interactiveSquashEditCommitMsgAndSubject(t *testing.T) {
 		{ "data": { "repository": {
 			"mergeCommitAllowed": true,
 			"rebaseMergeAllowed": true,
-			"squashMergeAllowed": true
+			"squashMergeAllowed": true,
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
 		} } }`))
 	tr.Register(
 		httpmock.GraphQL(`query PullRequestMergeText\b`),
@@ -1192,7 +1451,10 @@ func TestPRMerge_interactiveCancelled(t *testing.T) {
 		{ "data": { "repository": {
 			"mergeCommitAllowed": true,
 			"rebaseMergeAllowed": true,
-			"squashMergeAllowed": true
+			"squashMergeAllowed": true,
+			"mergeQueue": {
+				"mergeMethod": ""
+			}
 		} } }`))
 
 	cs, cmdTeardown := run.Stub()
@@ -1249,6 +1511,16 @@ func TestMergeRun_autoMerge(t *testing.T) {
 			assert.Equal(t, "SQUASH", input["mergeMethod"].(string))
 		}))
 
+	tr.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"mergeQueue": {
+					"mergeMethod": ""
+				}
+			} } }`),
+	)
 	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
@@ -1287,6 +1559,16 @@ func TestMergeRun_autoMerge_directMerge(t *testing.T) {
 			assert.NotContains(t, input, "commitHeadline")
 		}))
 
+	tr.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"mergeQueue": {
+					"mergeMethod": ""
+				}
+			} } }`),
+	)
 	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
@@ -1322,6 +1604,17 @@ func TestMergeRun_disableAutoMerge(t *testing.T) {
 		httpmock.GraphQLQuery(`{}`, func(s string, m map[string]interface{}) {
 			assert.Equal(t, map[string]interface{}{"prID": "THE-ID"}, m)
 		}))
+
+	tr.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"mergeQueue": {
+					"mergeMethod": ""
+				}
+			} } }`),
+	)
 
 	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
