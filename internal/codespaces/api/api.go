@@ -561,7 +561,7 @@ func (a *API) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch str
 type CreateCodespaceParams struct {
 	RepositoryID           int
 	IdleTimeoutMinutes     int
-	RetentionPeriodMinutes int
+	RetentionPeriodMinutes *int
 	Branch                 string
 	Machine                string
 	Location               string
@@ -611,7 +611,7 @@ func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams
 type startCreateRequest struct {
 	RepositoryID           int    `json:"repository_id"`
 	IdleTimeoutMinutes     int    `json:"idle_timeout_minutes,omitempty"`
-	RetentionPeriodMinutes int    `json:"retention_period_minutes,omitempty"`
+	RetentionPeriodMinutes *int   `json:"retention_period_minutes,omitempty"`
 	Ref                    string `json:"ref"`
 	Location               string `json:"location"`
 	Machine                string `json:"machine"`

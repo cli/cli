@@ -54,7 +54,7 @@ func TestApp_Create(t *testing.T) {
 						if params.IdleTimeoutMinutes != 30 {
 							return nil, fmt.Errorf("idle timeout minutes was %v", params.IdleTimeoutMinutes)
 						}
-						if params.RetentionPeriodMinutes != 2880 {
+						if *params.RetentionPeriodMinutes != 2880 {
 							return nil, fmt.Errorf("retention period minutes was %v", params.RetentionPeriodMinutes)
 						}
 						return &api.Codespace{

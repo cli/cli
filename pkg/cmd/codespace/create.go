@@ -178,6 +178,8 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return errors.New("there are no available machine types for this repository")
 	}
 
+	retentionPeriod := int(opts.retentionPeriod.Minutes())
+
 	createParams := &api.CreateCodespaceParams{
 		RepositoryID:           repository.ID,
 		Branch:                 branch,
@@ -186,7 +188,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		VSCSTarget:             vscsTarget,
 		VSCSTargetURL:          vscsTargetUrl,
 		IdleTimeoutMinutes:     int(opts.idleTimeout.Minutes()),
-		RetentionPeriodMinutes: int(opts.retentionPeriod.Minutes()),
+		RetentionPeriodMinutes: &retentionPeriod,
 		DevContainerPath:       devContainerPath,
 		PermissionsOptOut:      opts.permissionsOptOut,
 	}
