@@ -320,8 +320,9 @@ func TestPrMerge_blocked(t *testing.T) {
 		baseRepo("OWNER", "REPO", "master"),
 	)
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "master", true, "pr merge 1 --merge")
 	assert.EqualError(t, err, "SilentError")
@@ -352,8 +353,9 @@ func TestPrMerge_dirty(t *testing.T) {
 		baseRepo("OWNER", "REPO", "master"),
 	)
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "master", true, "pr merge 1 --merge")
 	assert.EqualError(t, err, "SilentError")
@@ -927,7 +929,7 @@ func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
 			ID:                  "THE-ID",
 			Number:              4,
 			State:               "MERGED",
-			HeadRepositoryOwner: api.Owner{Login: "monalisa"},
+			HeadRepositoryOwner: api.Owner{Login: "OWNER"},
 			MergeStateStatus:    "CLEAN",
 		},
 		baseRepo("OWNER", "REPO", "master"),
@@ -947,6 +949,35 @@ func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
 	assert.Equal(t, "! Pull request #4 was already merged\n", output.Stderr())
 }
 
+func TestPrMerge_alreadyMerged_nonInteractive_crossRepo(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"4",
+		&api.PullRequest{
+			ID:                  "THE-ID",
+			Number:              4,
+			State:               "MERGED",
+			HeadRepositoryOwner: api.Owner{Login: "monalisa"},
+			MergeStateStatus:    "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+
+	output, err := runCommand(http, "blueberries", true, "pr merge 4 --merge")
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
+}
 func TestPRMerge_interactive(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)

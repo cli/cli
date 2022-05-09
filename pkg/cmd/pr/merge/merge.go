@@ -168,224 +168,325 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	return cmd
 }
 
-func mergeRun(opts *MergeOptions) error {
-	cs := opts.IO.ColorScheme()
+// mergeContext contains state and dependencies to merge a pull request.
+type mergeContext struct {
+	pr                *api.PullRequest
+	baseRepo          ghrepo.Interface
+	httpClient        *http.Client
+	opts              *MergeOptions
+	cs                *iostreams.ColorScheme
+	isTerminal        bool
+	merged            bool
+	localBranchExists bool
+	autoMerge         bool
+	crossRepoPR       bool
+	deleteBranch      bool
+	switchedToBranch  string
+}
 
+// Attempt to disable auto merge on the pull request.
+func (m *mergeContext) disableAutoMerge() error {
+	if err := disableAutoMerge(m.httpClient, m.baseRepo, m.pr.ID); err != nil {
+		return err
+	}
+	return m.infof("%s Auto-merge disabled for pull request #%d\n", m.cs.SuccessIconWithColor(m.cs.Green), m.pr.Number)
+}
+
+// Warn if the pull request and the remote branch have diverged.
+func (m *mergeContext) warnIfDiverged() {
+	if m.opts.SelectorArg != "" || len(m.pr.Commits.Nodes) == 0 {
+		return
+	}
+
+	localBranchLastCommit, err := git.LastCommit()
+	if err != nil {
+		return
+	}
+
+	if localBranchLastCommit.Sha == m.pr.Commits.Nodes[len(m.pr.Commits.Nodes)-1].Commit.OID {
+		return
+	}
+
+	_ = m.warnf("%s Pull request #%d (%s) has diverged from local branch\n", m.cs.Yellow("!"), m.pr.Number, m.pr.Title)
+}
+
+// Check if the current state of the pull request allows for merging
+func (m *mergeContext) canMerge() error {
+	reason := blockedReason(m.pr.MergeStateStatus, m.opts.UseAdmin)
+
+	if reason == "" || m.autoMerge || m.merged {
+		return nil
+	}
+
+	_ = m.warnf("%s Pull request #%d is not mergeable: %s.\n", m.cs.FailureIcon(), m.pr.Number, reason)
+	_ = m.warnf("To have the pull request merged after all the requirements have been met, add the `--auto` flag.\n")
+	if remote := remoteForMergeConflictResolution(m.baseRepo, m.pr, m.opts); remote != nil {
+		mergeOrRebase := "merge"
+		if m.opts.MergeMethod == PullRequestMergeMethodRebase {
+			mergeOrRebase = "rebase"
+		}
+		fetchBranch := fmt.Sprintf("%s %s", remote.Name, m.pr.BaseRefName)
+		mergeBranch := fmt.Sprintf("%s %s/%s", mergeOrRebase, remote.Name, m.pr.BaseRefName)
+		cmd := fmt.Sprintf("gh pr checkout %d && git fetch %s && git %s", m.pr.Number, fetchBranch, mergeBranch)
+		_ = m.warnf("Run the following to resolve the merge conflicts locally:\n  %s\n", m.cs.Bold(cmd))
+	}
+	if !m.opts.UseAdmin && allowsAdminOverride(m.pr.MergeStateStatus) {
+		// TODO: show this flag only to repo admins
+		_ = m.warnf("To use administrator privileges to immediately merge the pull request, add the `--admin` flag.\n")
+	}
+	return cmdutil.SilentError
+}
+
+// Merge the pull request. May prompt the user for input parameters for the merge.
+func (m *mergeContext) merge() error {
+	if m.merged {
+		return nil
+	}
+
+	payload := mergePayload{
+		repo:          m.baseRepo,
+		pullRequestID: m.pr.ID,
+		method:        m.opts.MergeMethod,
+		auto:          m.autoMerge,
+		commitSubject: m.opts.Subject,
+		commitBody:    m.opts.Body,
+		setCommitBody: m.opts.BodySet,
+	}
+
+	// get user input if not already given
+	if m.opts.InteractiveMode {
+		apiClient := api.NewClientFromHTTP(m.httpClient)
+		r, err := api.GitHubRepo(apiClient, m.baseRepo)
+		if err != nil {
+			return err
+		}
+
+		payload.method, err = mergeMethodSurvey(r)
+		if err != nil {
+			return err
+		}
+
+		m.deleteBranch, err = deleteBranchSurvey(m.opts, m.crossRepoPR, m.localBranchExists)
+		if err != nil {
+			return err
+		}
+
+		allowEditMsg := payload.method != PullRequestMergeMethodRebase
+		for {
+			action, err := confirmSurvey(allowEditMsg)
+			if err != nil {
+				return fmt.Errorf("unable to confirm: %w", err)
+			}
+
+			submit, err := confirmSubmission(m.httpClient, m.opts, action, &payload)
+			if err != nil {
+				return err
+			}
+			if submit {
+				break
+			}
+		}
+	}
+
+	err := mergePullRequest(m.httpClient, payload)
+	if err != nil {
+		return err
+	}
+
+	if payload.auto {
+		method := ""
+		switch payload.method {
+		case PullRequestMergeMethodRebase:
+			method = " via rebase"
+		case PullRequestMergeMethodSquash:
+			method = " via squash"
+		}
+		return m.infof("%s Pull request #%d will be automatically merged%s when all requirements are met\n", m.cs.SuccessIconWithColor(m.cs.Green), m.pr.Number, method)
+	}
+
+	action := "Merged"
+	switch payload.method {
+	case PullRequestMergeMethodRebase:
+		action = "Rebased and merged"
+	case PullRequestMergeMethodSquash:
+		action = "Squashed and merged"
+	}
+	return m.infof("%s %s pull request #%d (%s)\n", m.cs.SuccessIconWithColor(m.cs.Magenta), action, m.pr.Number, m.pr.Title)
+}
+
+// Delete local branch if requested and if allowed.
+func (m *mergeContext) deleteLocalBranch() error {
+	if m.crossRepoPR || m.autoMerge {
+		return nil
+	}
+
+	if m.merged {
+		// prompt for delete
+		if m.opts.InteractiveMode && !m.opts.IsDeleteBranchIndicated {
+			err := prompt.SurveyAskOne(&survey.Confirm{
+				Message: fmt.Sprintf("Pull request #%d was already merged. Delete the branch locally?", m.pr.Number),
+				Default: false,
+			}, &m.deleteBranch)
+			if err != nil {
+				return fmt.Errorf("could not prompt: %w", err)
+			}
+		} else {
+			_ = m.warnf(fmt.Sprintf("%s Pull request #%d was already merged\n", m.cs.WarningIcon(), m.pr.Number))
+		}
+	}
+
+	if !m.deleteBranch || !m.opts.CanDeleteLocalBranch || !m.localBranchExists {
+		return nil
+	}
+
+	currentBranch, err := m.opts.Branch()
+	if err != nil {
+		return err
+	}
+
+	// branch the command was run on is the same as the pull request branch
+	if currentBranch == m.pr.HeadRefName {
+		// if the target branch of the PR is not known, set the current branch to the
+		// default branch of the repository
+		targetBranch := m.pr.BaseRefName
+		if targetBranch == "" {
+			apiClient := api.NewClientFromHTTP(m.httpClient)
+			targetBranch, err = api.RepoDefaultBranch(apiClient, m.baseRepo)
+			if err != nil {
+				return err
+			}
+		}
+
+		remotes, err := m.opts.Remotes()
+		if err != nil {
+			return err
+		}
+
+		baseRemote, err := remotes.FindByRepo(m.baseRepo.RepoOwner(), m.baseRepo.RepoName())
+		if err != nil {
+			return err
+		}
+
+		if git.HasLocalBranch(targetBranch) {
+			if err := git.CheckoutBranch(targetBranch); err != nil {
+				return err
+			}
+		} else {
+			if err := git.CheckoutNewBranch(baseRemote.Name, targetBranch); err != nil {
+				return err
+			}
+		}
+
+		if err := git.Pull(baseRemote.Name, targetBranch); err != nil {
+			_ = m.warnf(fmt.Sprintf("%s warning: not possible to fast-forward to: %q\n", m.cs.WarningIcon(), targetBranch))
+		}
+
+		m.switchedToBranch = targetBranch
+	}
+
+	if err := git.DeleteLocalBranch(m.pr.HeadRefName); err != nil {
+		return fmt.Errorf("failed to delete local branch %s: %w", m.cs.Cyan(m.pr.HeadRefName), err)
+	}
+
+	return nil
+}
+
+// Delete the remote branch if requested and if allowed.
+func (m *mergeContext) deleteRemoteBranch() error {
+	// the user was already asked if they want to delete the branch if they didn't provide the flag
+	if !m.deleteBranch || m.crossRepoPR || m.autoMerge {
+		return nil
+	}
+
+	if !m.merged {
+		apiClient := api.NewClientFromHTTP(m.httpClient)
+		err := api.BranchDeleteRemote(apiClient, m.baseRepo, m.pr.HeadRefName)
+		var httpErr api.HTTPError
+		// The ref might have already been deleted by GitHub
+		if err != nil && (!errors.As(err, &httpErr) || httpErr.StatusCode != 422) {
+			return fmt.Errorf("failed to delete remote branch %s: %w", m.cs.Cyan(m.pr.HeadRefName), err)
+		}
+	}
+
+	branch := ""
+	if m.switchedToBranch != "" {
+		branch = fmt.Sprintf(" and switched to branch %s", m.cs.Cyan(m.switchedToBranch))
+	}
+	return m.infof("%s Deleted branch %s%s\n", m.cs.SuccessIconWithColor(m.cs.Red), m.cs.Cyan(m.pr.HeadRefName), branch)
+}
+
+func (m *mergeContext) warnf(format string, args ...interface{}) error {
+	_, err := fmt.Fprintf(m.opts.IO.ErrOut, format, args...)
+	return err
+}
+
+func (m *mergeContext) infof(format string, args ...interface{}) error {
+	if !m.isTerminal {
+		return nil
+	}
+	_, err := fmt.Fprintf(m.opts.IO.ErrOut, format, args...)
+	return err
+}
+
+// Creates a new MergeConext from MergeOptions.
+func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
 		Fields:   []string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName"},
 	}
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	isTerminal := opts.IO.IsStdoutTTY()
 
 	httpClient, err := opts.HttpClient()
 	if err != nil {
+		return nil, err
+	}
+
+	return &mergeContext{
+		opts:              opts,
+		pr:                pr,
+		cs:                opts.IO.ColorScheme(),
+		baseRepo:          baseRepo,
+		isTerminal:        opts.IO.IsStdoutTTY(),
+		httpClient:        httpClient,
+		merged:            pr.State == MergeStateStatusMerged,
+		deleteBranch:      opts.DeleteBranch,
+		crossRepoPR:       pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner(),
+		autoMerge:         opts.AutoMergeEnable && !isImmediatelyMergeable(pr.MergeStateStatus),
+		localBranchExists: opts.CanDeleteLocalBranch && git.HasLocalBranch(pr.HeadRefName),
+	}, nil
+}
+
+// Run the merge command.
+func mergeRun(opts *MergeOptions) error {
+	ctx, err := NewMergeContext(opts)
+	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
+	// no further action is possible when disabling auto merge
 	if opts.AutoMergeDisable {
-		err := disableAutoMerge(httpClient, baseRepo, pr.ID)
-		if err != nil {
-			return err
-		}
-		if isTerminal {
-			fmt.Fprintf(opts.IO.ErrOut, "%s Auto-merge disabled for pull request #%d\n", cs.SuccessIconWithColor(cs.Green), pr.Number)
-		}
-		return nil
+		return ctx.disableAutoMerge()
 	}
 
-	if opts.SelectorArg == "" && len(pr.Commits.Nodes) > 0 {
-		if localBranchLastCommit, err := git.LastCommit(); err == nil {
-			if localBranchLastCommit.Sha != pr.Commits.Nodes[len(pr.Commits.Nodes)-1].Commit.OID {
-				fmt.Fprintf(opts.IO.ErrOut,
-					"%s Pull request #%d (%s) has diverged from local branch\n", cs.Yellow("!"), pr.Number, pr.Title)
-			}
-		}
+	ctx.warnIfDiverged()
+
+	if err := ctx.canMerge(); err != nil {
+		return err
 	}
 
-	isPRAlreadyMerged := pr.State == "MERGED"
-	if reason := blockedReason(pr.MergeStateStatus, opts.UseAdmin); !opts.AutoMergeEnable && !isPRAlreadyMerged && reason != "" {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is not mergeable: %s.\n", cs.FailureIcon(), pr.Number, reason)
-		fmt.Fprintf(opts.IO.ErrOut, "To have the pull request merged after all the requirements have been met, add the `--auto` flag.\n")
-		if remote := remoteForMergeConflictResolution(baseRepo, pr, opts); remote != nil {
-			mergeOrRebase := "merge"
-			if opts.MergeMethod == PullRequestMergeMethodRebase {
-				mergeOrRebase = "rebase"
-			}
-			fetchBranch := fmt.Sprintf("%s %s", remote.Name, pr.BaseRefName)
-			mergeBranch := fmt.Sprintf("%s %s/%s", mergeOrRebase, remote.Name, pr.BaseRefName)
-			cmd := fmt.Sprintf("gh pr checkout %d && git fetch %s && git %s", pr.Number, fetchBranch, mergeBranch)
-			fmt.Fprintf(opts.IO.ErrOut, "Run the following to resolve the merge conflicts locally:\n  %s\n", cs.Bold(cmd))
-		}
-		if !opts.UseAdmin && allowsAdminOverride(pr.MergeStateStatus) {
-			// TODO: show this flag only to repo admins
-			fmt.Fprintf(opts.IO.ErrOut, "To use administrator privileges to immediately merge the pull request, add the `--admin` flag.\n")
-		}
-		return cmdutil.SilentError
+	if err := ctx.merge(); err != nil {
+		return err
 	}
 
-	deleteBranch := opts.DeleteBranch
-	crossRepoPR := pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner()
-	autoMerge := opts.AutoMergeEnable && !isImmediatelyMergeable(pr.MergeStateStatus)
-	localBranchExists := false
-	if opts.CanDeleteLocalBranch {
-		localBranchExists = git.HasLocalBranch(pr.HeadRefName)
+	if err := ctx.deleteLocalBranch(); err != nil {
+		return err
 	}
 
-	if !isPRAlreadyMerged {
-		payload := mergePayload{
-			repo:          baseRepo,
-			pullRequestID: pr.ID,
-			method:        opts.MergeMethod,
-			auto:          autoMerge,
-			commitSubject: opts.Subject,
-			commitBody:    opts.Body,
-			setCommitBody: opts.BodySet,
-		}
-
-		if opts.InteractiveMode {
-			r, err := api.GitHubRepo(apiClient, baseRepo)
-			if err != nil {
-				return err
-			}
-			payload.method, err = mergeMethodSurvey(r)
-			if err != nil {
-				return err
-			}
-			deleteBranch, err = deleteBranchSurvey(opts, crossRepoPR, localBranchExists)
-			if err != nil {
-				return err
-			}
-
-			allowEditMsg := payload.method != PullRequestMergeMethodRebase
-
-			for {
-				action, err := confirmSurvey(allowEditMsg)
-				if err != nil {
-					return fmt.Errorf("unable to confirm: %w", err)
-				}
-
-				submit, err := confirmSubmission(httpClient, opts, action, &payload)
-				if err != nil {
-					return err
-				}
-				if submit {
-					break
-				}
-			}
-		}
-
-		err = mergePullRequest(httpClient, payload)
-		if err != nil {
-			return err
-		}
-
-		if isTerminal {
-			if payload.auto {
-				method := ""
-				switch payload.method {
-				case PullRequestMergeMethodRebase:
-					method = " via rebase"
-				case PullRequestMergeMethodSquash:
-					method = " via squash"
-				}
-				fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d will be automatically merged%s when all requirements are met\n", cs.SuccessIconWithColor(cs.Green), pr.Number, method)
-			} else {
-				action := "Merged"
-				switch payload.method {
-				case PullRequestMergeMethodRebase:
-					action = "Rebased and merged"
-				case PullRequestMergeMethodSquash:
-					action = "Squashed and merged"
-				}
-				fmt.Fprintf(opts.IO.ErrOut, "%s %s pull request #%d (%s)\n", cs.SuccessIconWithColor(cs.Magenta), action, pr.Number, pr.Title)
-			}
-		}
-	} else if !opts.IsDeleteBranchIndicated && opts.InteractiveMode && !crossRepoPR && !opts.AutoMergeEnable {
-		err := prompt.SurveyAskOne(&survey.Confirm{
-			Message: fmt.Sprintf("Pull request #%d was already merged. Delete the branch locally?", pr.Number),
-			Default: false,
-		}, &deleteBranch)
-		if err != nil {
-			return fmt.Errorf("could not prompt: %w", err)
-		}
-	} else {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d was already merged\n", cs.WarningIcon(), pr.Number)
-	}
-
-	if !deleteBranch || crossRepoPR || autoMerge {
-		return nil
-	}
-
-	branchSwitchString := ""
-
-	if opts.CanDeleteLocalBranch && localBranchExists {
-		currentBranch, err := opts.Branch()
-		if err != nil {
-			return err
-		}
-
-		var branchToSwitchTo string
-		if currentBranch == pr.HeadRefName {
-			branchToSwitchTo = pr.BaseRefName
-			if branchToSwitchTo == "" {
-				branchToSwitchTo, err = api.RepoDefaultBranch(apiClient, baseRepo)
-				if err != nil {
-					return err
-				}
-			}
-
-			remotes, err := opts.Remotes()
-			if err != nil {
-				return err
-			}
-
-			baseRemote, err := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
-			if err != nil {
-				return err
-			}
-
-			if git.HasLocalBranch(branchToSwitchTo) {
-				if err := git.CheckoutBranch(branchToSwitchTo); err != nil {
-					return err
-				}
-			} else {
-				if err := git.CheckoutNewBranch(baseRemote.Name, branchToSwitchTo); err != nil {
-					return err
-				}
-			}
-
-			if err := git.Pull(baseRemote.Name, branchToSwitchTo); err != nil {
-				fmt.Fprintf(opts.IO.ErrOut, "%s warning: not possible to fast-forward to: %q\n", cs.WarningIcon(), branchToSwitchTo)
-			}
-		}
-
-		if err := git.DeleteLocalBranch(pr.HeadRefName); err != nil {
-			err = fmt.Errorf("failed to delete local branch %s: %w", cs.Cyan(pr.HeadRefName), err)
-			return err
-		}
-
-		if branchToSwitchTo != "" {
-			branchSwitchString = fmt.Sprintf(" and switched to branch %s", cs.Cyan(branchToSwitchTo))
-		}
-	}
-	if !isPRAlreadyMerged {
-		err = api.BranchDeleteRemote(apiClient, baseRepo, pr.HeadRefName)
-		var httpErr api.HTTPError
-		// The ref might have already been deleted by GitHub
-		if err != nil && (!errors.As(err, &httpErr) || httpErr.StatusCode != 422) {
-			err = fmt.Errorf("failed to delete remote branch %s: %w", cs.Cyan(pr.HeadRefName), err)
-			return err
-		}
-	}
-
-	if isTerminal {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Deleted branch %s%s\n", cs.SuccessIconWithColor(cs.Red), cs.Cyan(pr.HeadRefName), branchSwitchString)
+	if err := ctx.deleteRemoteBranch(); err != nil {
+		return err
 	}
 
 	return nil
@@ -547,17 +648,17 @@ func (e *userEditor) Edit(filename, startingText string) (string, error) {
 // blockedReason translates various MergeStateStatus GraphQL values into human-readable reason
 func blockedReason(status string, useAdmin bool) string {
 	switch status {
-	case "BLOCKED":
+	case MergeStateStatusBlocked:
 		if useAdmin {
 			return ""
 		}
 		return "the base branch policy prohibits the merge"
-	case "BEHIND":
+	case MergeStateStatusBehind:
 		if useAdmin {
 			return ""
 		}
 		return "the head branch is not up to date with the base branch"
-	case "DIRTY":
+	case MergeStateStatusDirty:
 		return "the merge commit cannot be cleanly created"
 	default:
 		return ""
@@ -566,7 +667,7 @@ func blockedReason(status string, useAdmin bool) string {
 
 func allowsAdminOverride(status string) bool {
 	switch status {
-	case "BLOCKED", "BEHIND":
+	case MergeStateStatusBlocked, MergeStateStatusBehind:
 		return true
 	default:
 		return false
@@ -589,12 +690,12 @@ func remoteForMergeConflictResolution(baseRepo ghrepo.Interface, pr *api.PullReq
 }
 
 func mergeConflictStatus(status string) bool {
-	return status == "DIRTY"
+	return status == MergeStateStatusDirty
 }
 
 func isImmediatelyMergeable(status string) bool {
 	switch status {
-	case "CLEAN", "HAS_HOOKS", "UNSTABLE":
+	case MergeStateStatusClean, MergeStateStatusHasHooks, MergeStateStatusUnstable:
 		return true
 	default:
 		return false
