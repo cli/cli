@@ -224,8 +224,7 @@ func (m *mergeContext) warnIfDiverged() {
 // Check if the current state of the pull request allows for merging
 func (m *mergeContext) canMerge() error {
 	if m.mergeQueueRequired {
-		// the pull request state is ignored if a merge queue is required
-		// as it cannot be merged directly except by an admin with override
+		// a pull request can always be added to the merge queue
 		return nil
 	}
 
