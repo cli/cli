@@ -271,7 +271,7 @@ func (m *mergeContext) merge() error {
 	}
 
 	// merge queue is required and the user has provided a merge strategy
-	if m.mergeQueueRequired && !m.opts.InteractiveMode && !m.opts.UseAdmin {
+	if m.addToMergeQueue() && !m.opts.InteractiveMode {
 		// TODO: should this continue if the strategy the user set is the same as the one for the merge queue?
 		// if repo.MergeQueue.MergeMethod != opts.MergeMethod
 		_ = m.warnf("%s a merge strategy cannot be set when adding a pull request to the merge queue\n", m.cs.FailureIconWithColor(m.cs.Red))
@@ -282,10 +282,8 @@ func (m *mergeContext) merge() error {
 
 	// get user input if not already given
 	if m.opts.InteractiveMode {
-		// if merge queue is required:
-		// 	if opts.UseAdmin is false, enqueue using auto merge
-		// 	if opts.UseAdmin is true, attempt to merge directly and bypass the queue
-		if m.mergeQueueRequired && !m.opts.UseAdmin {
+		if m.addToMergeQueue() {
+			// auto merge will either enable auto merge or add to the merge queue
 			payload.auto = true
 		} else {
 			payload.method, err = mergeMethodSurvey(m.baseRepo)
@@ -324,7 +322,7 @@ func (m *mergeContext) merge() error {
 		return err
 	}
 
-	if m.mergeQueueRequired && !m.opts.UseAdmin {
+	if m.addToMergeQueue() {
 		_ = m.infof("Pull Request will be added to the merge queue for %s and %s when ready\n", m.pr.BaseRefName, m.baseRepo.MergeQueue.MergeMethod)
 		return nil
 	}
@@ -438,6 +436,10 @@ func (m *mergeContext) deleteRemoteBranch() error {
 		branch = fmt.Sprintf(" and switched to branch %s", m.cs.Cyan(m.switchedToBranch))
 	}
 	return m.infof("%s Deleted branch %s%s\n", m.cs.SuccessIconWithColor(m.cs.Red), m.cs.Cyan(m.pr.HeadRefName), branch)
+}
+
+func (m *mergeContext) addToMergeQueue() bool {
+	return m.mergeQueueRequired && !m.opts.UseAdmin
 }
 
 func (m *mergeContext) warnf(format string, args ...interface{}) error {
