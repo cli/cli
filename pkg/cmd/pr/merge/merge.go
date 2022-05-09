@@ -274,7 +274,7 @@ func (m *mergeContext) merge() error {
 	if m.mergeQueueRequired && !m.opts.InteractiveMode {
 		// TODO: should this continue if the strategy the user set is the same as the one for the merge queue?
 		// if repo.MergeQueue.MergeMethod != opts.MergeMethod
-		m.warnf("%s a merge strategy cannot be set when adding a pull request to the merge queue\n", m.cs.FailureIconWithColor(m.cs.Red))
+		_ = m.warnf("%s a merge strategy cannot be set when adding a pull request to the merge queue\n", m.cs.FailureIconWithColor(m.cs.Red))
 		return cmdutil.SilentError
 	}
 
@@ -287,7 +287,7 @@ func (m *mergeContext) merge() error {
 		// 	if opts.UseAdmin is true, attempt to merge directly and bypass the queue
 		if m.mergeQueueRequired && !m.opts.UseAdmin {
 			payload.auto = true
-			m.infof("Pull Request will be added to the merge queue for %s and %s when ready\n", m.pr.BaseRefName, m.baseRepo.MergeQueue.MergeMethod)
+			_ = m.infof("Pull Request will be added to the merge queue for %s and %s when ready\n", m.pr.BaseRefName, m.baseRepo.MergeQueue.MergeMethod)
 		} else {
 			payload.method, err = mergeMethodSurvey(m.baseRepo)
 			if err != nil {
