@@ -371,6 +371,7 @@ func TestPRCreate(t *testing.T) {
 			assert.Equal(t, "my body", input["body"].(string))
 			assert.Equal(t, "master", input["baseRefName"].(string))
 			assert.Equal(t, "feature", input["headRefName"].(string))
+			assert.Equal(t, false, input["draft"].(bool))
 		}))
 
 	cs, cmdTeardown := run.Stub()
@@ -633,7 +634,7 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 		AnswerWith("template1")
 	as.StubPrompt("Body").AnswerDefault()
 	as.StubPrompt("What's next?").
-		AssertOptions([]string{"Submit", "Continue in browser", "Add metadata", "Cancel"}).
+		AssertOptions([]string{"Submit", "Submit as draft", "Continue in browser", "Add metadata", "Cancel"}).
 		AnswerDefault()
 
 	output, err := runCommandWithRootDirOverridden(http, nil, "feature", true, `-t "my title" -H feature`, "./fixtures/repoWithNonLegacyPRTemplates")
@@ -860,6 +861,46 @@ func TestPRCreate_webProject(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
 	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1&projects=ORG%2F1", output.BrowsedURL)
+}
+
+func TestPRCreate_draft(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.StubRepoInfoResponse("OWNER", "REPO", "master")
+	shared.RunCommandFinder("feature", nil, nil)
+	http.Register(
+		httpmock.GraphQL(`query PullRequestTemplates\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "pullRequestTemplates": [
+				{ "filename": "template1",
+				  "body": "this is a bug" },
+				{ "filename": "template2",
+				  "body": "this is a enhancement" }
+			] } } }`),
+	)
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestCreate\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+		`, func(input map[string]interface{}) {
+			assert.Equal(t, true, input["draft"].(bool))
+		}))
+
+	as := prompt.NewAskStubber(t)
+
+	as.StubPrompt("Choose a template").AnswerDefault()
+	as.StubPrompt("Body").AnswerDefault()
+	as.StubPrompt("What's next?").
+		AssertOptions([]string{"Submit", "Submit as draft", "Continue in browser", "Add metadata", "Cancel"}).
+		AnswerWith("Submit as draft")
+
+	output, err := runCommand(http, nil, "feature", true, `-t "my title" -H feature`)
+	require.NoError(t, err)
+
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
 }
 
 func Test_determineTrackingBranch_empty(t *testing.T) {

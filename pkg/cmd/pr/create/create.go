@@ -312,7 +312,7 @@ func createRun(opts *CreateOptions) (err error) {
 
 	allowPreview := !state.HasMetadata() && utils.ValidURL(openURL)
 	allowMetadata := ctx.BaseRepo.ViewerCanTriage()
-	action, err := shared.ConfirmSubmission(allowPreview, allowMetadata)
+	action, err := shared.ConfirmPRSubmission(allowPreview, allowMetadata, state.Draft)
 	if err != nil {
 		return fmt.Errorf("unable to confirm: %w", err)
 	}
@@ -329,7 +329,7 @@ func createRun(opts *CreateOptions) (err error) {
 			return
 		}
 
-		action, err = shared.ConfirmSubmission(!state.HasMetadata(), false)
+		action, err = shared.ConfirmPRSubmission(!state.HasMetadata(), false, state.Draft)
 		if err != nil {
 			return
 		}
@@ -348,6 +348,11 @@ func createRun(opts *CreateOptions) (err error) {
 
 	if action == shared.PreviewAction {
 		return previewPR(*opts, openURL)
+	}
+
+	if action == shared.SubmitDraftAction {
+		state.Draft = true
+		return submitPR(*opts, *ctx, *state)
 	}
 
 	if action == shared.SubmitAction {

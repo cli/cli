@@ -473,7 +473,9 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 
 	as.StubPrompt("Choose a template").AnswerWith("Submit a request")
 	as.StubPrompt("Body").AnswerDefault()
-	as.StubPrompt("What's next?").AnswerWith("Submit")
+	as.StubPrompt("What's next?").
+		AssertOptions([]string{"Submit", "Continue in browser", "Cancel"}).
+		AnswerWith("Submit")
 
 	output, err := runCommandWithRootDirOverridden(http, true, `-t hello`, "./fixtures/repoWithNonLegacyIssueTemplates")
 	if err != nil {
