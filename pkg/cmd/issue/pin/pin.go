@@ -46,7 +46,7 @@ func NewCmdPin(f *cmdutil.Factory, runF func(*PinOptions) error) *cobra.Command 
 		`),
 
 		Example: heredoc.Doc(`
-			# Pin and Unpin issues to your current repository
+			# Pin and Unpin issues to the current repository
 			$ gh issue pin 23
 			$ gh issue pin 23 --remove
 
