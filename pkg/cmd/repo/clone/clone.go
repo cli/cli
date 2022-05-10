@@ -38,14 +38,16 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 		Use:   "clone <repository> [<directory>] [-- <gitflags>...]",
 		Args:  cmdutil.MinimumArgs(1, "cannot clone: repository argument required"),
 		Short: "Clone a repository locally",
-		Long: heredoc.Doc(`
-			Clone a GitHub repository locally.
+		Long: heredoc.Docf(`
+			Clone a GitHub repository locally. Pass additional %[1]sgit clone%[1]s flags by listing
+			them after "--".
 
 			If the "OWNER/" portion of the "OWNER/REPO" repository argument is omitted, it
 			defaults to the name of the authenticating user.
 
-			Pass additional 'git clone' flags by listing them after '--'.
-		`),
+			If the repository is a fork, its parent repository will be added as an additional
+			git remote called "upstream".
+		`, "`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Repository = args[0]
 			opts.GitArgs = args[1:]
