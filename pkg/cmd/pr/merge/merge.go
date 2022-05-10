@@ -434,6 +434,8 @@ func (m *mergeContext) deleteRemoteBranch() error {
 	return m.infof("%s Deleted branch %s%s\n", m.cs.SuccessIconWithColor(m.cs.Red), m.cs.Cyan(m.pr.HeadRefName), branch)
 }
 
+// Add the Pull Request to a merge queue
+// Admins can bypass the queue and merge directly
 func (m *mergeContext) addToMergeQueue() bool {
 	return m.mergeQueueRequired && !m.opts.UseAdmin
 }
