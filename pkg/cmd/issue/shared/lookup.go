@@ -72,6 +72,15 @@ func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 		}
 	}
 
+	// isPinned is an invalid field for PullRequest
+	prFields := make([]string, len(fields))
+	for i, f := range fields {
+		if f == "isPinned" {
+			prFields = append(fields[:i], fields[i+1:]...)
+			break
+		}
+	}
+
 	query := fmt.Sprintf(`
 	query IssueByNumber($owner: String!, $repo: String!, $number: Int!) {
 		repository(owner: $owner, name: $repo) {
@@ -79,10 +88,10 @@ func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 			issue: issueOrPullRequest(number: $number) {
 				__typename
 				...on Issue{%[1]s}
-				...on PullRequest{%[1]s}
+				...on PullRequest{%[2]s}
 			}
 		}
-	}`, api.PullRequestGraphQL(fields))
+	}`, api.PullRequestGraphQL(fields), api.PullRequestGraphQL(prFields))
 
 	variables := map[string]interface{}{
 		"owner":  repo.RepoOwner(),
