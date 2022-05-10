@@ -594,9 +594,10 @@ func (s *StatusGetter) addAuthError(msg, ssoURL string) {
 		s.authErrors = set.NewStringSet()
 	}
 
-	s.authErrors.Add(msg)
 	if ssoURL != "" {
-		s.authErrors.Add(fmt.Sprintf("Authorize in your web browser:  %s", ssoURL))
+		s.authErrors.Add(fmt.Sprintf("%s\nAuthorize in your web browser:  %s", msg, ssoURL))
+	} else {
+		s.authErrors.Add(msg)
 	}
 }
 
@@ -725,7 +726,9 @@ func statusRun(opts *StatusOptions) error {
 	fmt.Fprintln(out, raSection)
 
 	if sg.HasAuthErrors() {
-		for _, msg := range sg.authErrors.ToSlice() {
+		errs := sg.authErrors.ToSlice()
+		sort.Strings(errs)
+		for _, msg := range errs {
 			fmt.Fprintln(out, cs.Gray(fmt.Sprintf("warning: %s", msg)))
 		}
 	}
