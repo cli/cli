@@ -158,7 +158,7 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 				codespacesNames[seenCodespace.idx] = fullDisplayNameWithGitStatus
 
 				// Update the git status dirty map to reflect the new name.
-				if cs.hasUnsavedChanges() {
+				if seenCodespace.cs.hasUnsavedChanges() {
 					codespacesDirty[fullDisplayNameWithGitStatus] = true
 				}
 
