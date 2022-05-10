@@ -18,7 +18,8 @@ type ListOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	LimitResults int
+	LimitResults  int
+	ExcludeDrafts bool
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -44,6 +45,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of items to fetch")
+	cmd.Flags().BoolVar(&opts.ExcludeDrafts, "exclude-drafts", false, "Exclude draft releases")
 
 	return cmd
 }
@@ -59,7 +61,7 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	releases, err := fetchReleases(httpClient, baseRepo, opts.LimitResults)
+	releases, err := fetchReleases(httpClient, baseRepo, opts.LimitResults, opts.ExcludeDrafts)
 	if err != nil {
 		return err
 	}
