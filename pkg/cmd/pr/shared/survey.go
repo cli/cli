@@ -26,26 +26,27 @@ const (
 	SubmitDraftAction
 
 	noMilestone = "(none)"
+
+	submitLabel      = "Submit"
+	submitDraftLabel = "Submit as draft"
+	previewLabel     = "Continue in browser"
+	metadataLabel    = "Add metadata"
+	cancelLabel      = "Cancel"
 )
 
 func ConfirmIssueSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
-	return confirmSubmission(allowPreview, allowMetadata, false)
+	return confirmSubmission(allowPreview, allowMetadata, false, false)
 }
 
-func ConfirmPRSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
-	return confirmSubmission(allowPreview, allowMetadata, true)
+func ConfirmPRSubmission(allowPreview, allowMetadata, isDraft bool) (Action, error) {
+	return confirmSubmission(allowPreview, allowMetadata, true, isDraft)
 }
 
-func confirmSubmission(allowPreview, allowMetadata, allowDraft bool) (Action, error) {
-	const (
-		submitLabel      = "Submit"
-		submitDraftLabel = "Submit as draft"
-		previewLabel     = "Continue in browser"
-		metadataLabel    = "Add metadata"
-		cancelLabel      = "Cancel"
-	)
-
-	options := []string{submitLabel}
+func confirmSubmission(allowPreview, allowMetadata, allowDraft, isDraft bool) (Action, error) {
+	var options []string
+	if !isDraft {
+		options = append(options, submitLabel)
+	}
 	if allowDraft {
 		options = append(options, submitDraftLabel)
 	}
