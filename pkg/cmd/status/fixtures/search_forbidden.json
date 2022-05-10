@@ -1,44 +1,38 @@
 {
     "data": {
         "assignments": {
-            "edges": [
+            "nodes": [
                 {
-                    "node": {
-                        "updatedAt": "2022-03-15T17:10:25Z",
-                        "__typename": "PullRequest",
-                        "title": "Pin extensions",
-                        "number": 5272,
-                        "repository": {
-                            "nameWithOwner": "cli/cli"
-                        }
+                    "updatedAt": "2022-03-15T17:10:25Z",
+                    "__typename": "PullRequest",
+                    "title": "Pin extensions",
+                    "number": 5272,
+                    "repository": {
+                        "nameWithOwner": "cli/cli"
                     }
                 },
                 null,
                 {
-                    "node": {
-                        "__typename": "Issue",
-                        "updatedAt": "2022-03-10T21:33:57Z",
-                        "title": "yolo",
-                        "number": 157,
-                        "repository": {
-                            "nameWithOwner": "vilmibm/testing"
-                        }
+                    "__typename": "Issue",
+                    "updatedAt": "2022-03-10T21:33:57Z",
+                    "title": "yolo",
+                    "number": 157,
+                    "repository": {
+                        "nameWithOwner": "vilmibm/testing"
                     }
                 },
                 null
             ]
         },
         "reviewRequested": {
-            "edges": [
+            "nodes": [
                 {
-                    "node": {
-                        "updatedAt": "2022-03-15T17:10:25Z",
-                        "__typename": "PullRequest",
-                        "title": "Pin extensions",
-                        "number": 5272,
-                        "repository": {
-                            "nameWithOwner": "cli/cli"
-                        }
+                    "updatedAt": "2022-03-15T17:10:25Z",
+                    "__typename": "PullRequest",
+                    "title": "Pin extensions",
+                    "number": 5272,
+                    "repository": {
+                        "nameWithOwner": "cli/cli"
                     }
                 },
                 null
@@ -50,8 +44,8 @@
             "type": "FORBIDDEN",
             "path": [
                 "assignments",
-                "edges",
-                0
+                "nodes",
+                1
             ],
             "extensions": {
                 "saml_failure": true
@@ -68,8 +62,8 @@
             "type": "FORBIDDEN",
             "path": [
                 "assignments",
-                "edges",
-                0
+                "nodes",
+                3
             ],
             "extensions": {
                 "saml_failure": true
@@ -86,8 +80,8 @@
             "type": "FORBIDDEN",
             "path": [
                 "reviewRequested",
-                "edges",
-                0
+                "nodes",
+                1
             ],
             "extensions": {
                 "saml_failure": true

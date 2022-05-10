@@ -2,10 +2,13 @@ package status
 
 import (
 	"bytes"
+	"io/ioutil"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -96,7 +99,7 @@ func TestStatusRun(t *testing.T) {
 					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
 				reg.Register(
 					httpmock.GraphQL("AssignedSearch"),
-					httpmock.StringResponse(`{"data": { "assignments": {"edges": [] }, "reviewRequested": {"edges": []}}}`))
+					httpmock.StringResponse(`{"data": { "assignments": {"nodes": [] }, "reviewRequested": {"nodes": []}}}`))
 				reg.Register(
 					httpmock.REST("GET", "notifications"),
 					httpmock.StringResponse(`[]`))
@@ -110,18 +113,6 @@ func TestStatusRun(t *testing.T) {
 		{
 			name: "something",
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
-				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
-				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
-				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
 				reg.Register(
 					httpmock.GraphQL("UserCurrent"),
 					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
@@ -140,9 +131,6 @@ func TestStatusRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/vilmibm/gh-screensaver/issues/comments/10"),
 					httpmock.StringResponse(`{"body":"a message for @jillvalentine"}`))
-				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
 				reg.Register(
 					httpmock.GraphQL("AssignedSearch"),
 					httpmock.FileResponse("./fixtures/search.json"))
@@ -163,15 +151,6 @@ func TestStatusRun(t *testing.T) {
 					httpmock.GraphQL("UserCurrent"),
 					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
 				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
-				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
-				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
-				reg.Register(
 					httpmock.REST("GET", "repos/rpd/todo/issues/110"),
 					httpmock.StringResponse(`{"body":"hello @jillvalentine how are you"}`))
 				reg.Register(
@@ -183,9 +162,6 @@ func TestStatusRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/vilmibm/gh-screensaver/issues/comments/10"),
 					httpmock.StringResponse(`{"body":"a message for @jillvalentine"}`))
-				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
 				reg.Register(
 					httpmock.GraphQL("AssignedSearch"),
 					httpmock.FileResponse("./fixtures/search.json"))
@@ -213,9 +189,6 @@ func TestStatusRun(t *testing.T) {
 					httpmock.REST("GET", "repos/vilmibm/gh-screensaver/issues/comments/10"),
 					httpmock.StringResponse(`{"body":"a message for @jillvalentine"}`))
 				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
-				reg.Register(
 					httpmock.GraphQL("AssignedSearch"),
 					httpmock.FileResponse("./fixtures/search.json"))
 				reg.Register(
@@ -239,12 +212,6 @@ func TestStatusRun(t *testing.T) {
 					httpmock.GraphQL("UserCurrent"),
 					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
 				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
-				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
-				reg.Register(
 					httpmock.REST("GET", "repos/rpd/todo/issues/110"),
 					httpmock.StringResponse(`{"body":"hello @jillvalentine how are you"}`))
 				reg.Register(
@@ -253,9 +220,6 @@ func TestStatusRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/rpd/todo/issues/comments/1065"),
 					httpmock.StringResponse(`{"body":"not a real mention"}`))
-				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
 				reg.Register(
 					httpmock.GraphQL("AssignedSearch"),
 					httpmock.FileResponse("./fixtures/search.json"))
@@ -278,22 +242,18 @@ func TestStatusRun(t *testing.T) {
 					httpmock.GraphQL("UserCurrent"),
 					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
 				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
-				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
-				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
-				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
-				reg.Register(
 					httpmock.REST("GET", "repos/rpd/todo/issues/110"),
-					httpmock.StatusStringResponse(403, `{
-						"message": "Resource protected by organization SAML enforcement. You must grant your OAuth token access to this organization."
-					}`))
+					func(req *http.Request) (*http.Response, error) {
+						return &http.Response{
+							Request:    req,
+							StatusCode: 403,
+							Body:       ioutil.NopCloser(strings.NewReader(`{"message": "You don't have permission to access this resource."}`)),
+							Header: http.Header{
+								"Content-Type": []string{"application/json"},
+								"X-Github-Sso": []string{"required; url=http://click.me/auth"},
+							},
+						}, nil
+					})
 				reg.Register(
 					httpmock.REST("GET", "repos/rpd/todo/issues/4113"),
 					httpmock.StringResponse(`{"body":"this is a comment"}`))
@@ -307,9 +267,6 @@ func TestStatusRun(t *testing.T) {
 					httpmock.REST("GET", "repos/vilmibm/gh-screensaver/issues/comments/10"),
 					httpmock.StringResponse(`{"body":"a message for @jillvalentine"}`))
 				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
-				reg.Register(
 					httpmock.GraphQL("AssignedSearch"),
 					httpmock.FileResponse("./fixtures/search_forbidden.json"))
 				reg.Register(
@@ -319,15 +276,28 @@ func TestStatusRun(t *testing.T) {
 					httpmock.REST("GET", "users/jillvalentine/received_events"),
 					httpmock.FileResponse("./fixtures/events.json"))
 			},
-			opts:    &StatusOptions{},
-			wantOut: "Assigned Issues                       │ Assigned Pull Requests                \nvilmibm/testing#157  yolo             │ cli/cli#5272  Pin extensions          \n                                      │                                       \nReview Requests                       │ Mentions                              \ncli/cli#5272  Pin extensions          │ cli/cli#1096               @jillval...\n                                      │ vilmibm/gh-screensaver#15  a messag...\n                                                                              \nRepository Activity\nrpd/todo#5326         new PR                        Only write UTF-8 BOM on W...\nvilmibm/testing#5325  comment on Ability to sea...  We are working on dedicat...\ncli/cli#5319          comment on [Codespaces] D...  Wondering if we shouldn't...\ncli/cli#5300          new issue                     Terminal bell when a runn...\n\nSome status unavailable due to organization SAML enforcement. Run `gh auth refresh` to authorization access to organizations.\n",
+			opts: &StatusOptions{},
+			wantOut: heredoc.Doc(`
+				Assigned Issues                       │ Assigned Pull Requests                
+				vilmibm/testing#157  yolo             │ cli/cli#5272  Pin extensions          
+				                                      │                                       
+				Review Requests                       │ Mentions                              
+				cli/cli#5272  Pin extensions          │ cli/cli#1096               @jillval...
+				                                      │ vilmibm/gh-screensaver#15  a messag...
+				                                                                              
+				Repository Activity
+				rpd/todo#5326         new PR                        Only write UTF-8 BOM on W...
+				vilmibm/testing#5325  comment on Ability to sea...  We are working on dedicat...
+				cli/cli#5319          comment on [Codespaces] D...  Wondering if we shouldn't...
+				cli/cli#5300          new issue                     Terminal bell when a runn...
+				
+				warning: Resource protected by organization SAML enforcement. You must grant your OAuth token access to this organization.
+				warning: You don't have permission to access this resource.
+			`),
 		},
 		{
 			name: "notification errors",
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL("UserCurrent"),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
 				reg.Register(
 					httpmock.GraphQL("UserCurrent"),
 					httpmock.StringResponse(`{"data": {"viewer": {"login": "jillvalentine"}}}`))
@@ -338,7 +308,7 @@ func TestStatusRun(t *testing.T) {
 					}`))
 				reg.Register(
 					httpmock.GraphQL("AssignedSearch"),
-					httpmock.StringResponse(`{"data": { "assignments": {"edges": [] }, "reviewRequested": {"edges": []}}}`))
+					httpmock.StringResponse(`{"data": { "assignments": {"nodes": [] }, "reviewRequested": {"nodes": []}}}`))
 				reg.Register(
 					httpmock.REST("GET", "notifications"),
 					httpmock.StringResponse(`[
@@ -376,7 +346,7 @@ func TestStatusRun(t *testing.T) {
 					httpmock.StringResponse(`{
 						"data": {
 							"assignments": {
-								"edges": [
+								"nodes": [
 									null
 								]
 							}
@@ -386,7 +356,7 @@ func TestStatusRun(t *testing.T) {
 								"type": "NOT FOUND",
 								"path": [
 									"assignments",
-									"edges",
+									"nodes",
 									0
 								],
 								"message": "Not found."
@@ -401,7 +371,7 @@ func TestStatusRun(t *testing.T) {
 					httpmock.StringResponse(`[]`))
 			},
 			opts:       &StatusOptions{},
-			wantErrMsg: "failed to search: could not search for assignments: GraphQL: Not found. (assignments.edges.0)",
+			wantErrMsg: "failed to search: could not search for assignments: GraphQL: Not found. (assignments.nodes.0)",
 		},
 	}
 
