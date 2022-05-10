@@ -5,9 +5,10 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/shurcooL/githubv4"
+
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/pkg/search"
-	"github.com/shurcooL/githubv4"
 )
 
 type RepositoryList struct {
@@ -18,7 +19,7 @@ type RepositoryList struct {
 }
 
 type FilterOptions struct {
-	Visibility  string // private, public
+	Visibility  string // private, public, internal
 	Fork        bool
 	Source      bool
 	Language    string
@@ -29,7 +30,7 @@ type FilterOptions struct {
 }
 
 func listRepos(client *http.Client, hostname string, limit int, owner string, filter FilterOptions) (*RepositoryList, error) {
-	if filter.Language != "" || filter.Archived || filter.NonArchived || filter.Topic != "" {
+	if filter.Language != "" || filter.Archived || filter.NonArchived || filter.Topic != "" || filter.Visibility == "internal" {
 		return searchRepos(client, hostname, limit, owner, filter)
 	}
 
