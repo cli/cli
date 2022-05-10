@@ -276,7 +276,7 @@ func TestPrMerge(t *testing.T) {
 			Title:            "The title of the PR",
 			MergeStateStatus: "CLEAN",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
@@ -303,7 +303,7 @@ func TestPrMerge(t *testing.T) {
 	defer cmdTeardown(t)
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "master", true, "pr merge 1 --merge")
+	output, err := runCommand(http, "main", true, "pr merge 1 --merge")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -328,7 +328,7 @@ func TestPrMerge_blocked(t *testing.T) {
 			Title:            "The title of the PR",
 			MergeStateStatus: "BLOCKED",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
@@ -346,7 +346,7 @@ func TestPrMerge_blocked(t *testing.T) {
 	defer cmdTeardown(t)
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "master", true, "pr merge 1 --merge")
+	output, err := runCommand(http, "main", true, "pr merge 1 --merge")
 	assert.EqualError(t, err, "SilentError")
 
 	assert.Equal(t, "", output.String())
@@ -371,7 +371,7 @@ func TestPrMerge_dirty(t *testing.T) {
 				"login": "OWNER"
 			},
 			"defaultBranchRef":{
-				"name": "master"
+				"name": "main"
 			},
 			"mergeQueue": {
 				"mergeMethod": ""
@@ -390,14 +390,14 @@ func TestPrMerge_dirty(t *testing.T) {
 			BaseRefName:      "trunk",
 			HeadRefName:      "feature",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "master", true, "pr merge 1 --merge")
+	output, err := runCommand(http, "main", true, "pr merge 1 --merge")
 	assert.EqualError(t, err, "SilentError")
 
 	assert.Equal(t, "", output.String())
@@ -422,7 +422,7 @@ func TestPrMerge_nontty(t *testing.T) {
 			Title:            "The title of the PR",
 			MergeStateStatus: "CLEAN",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
@@ -449,7 +449,7 @@ func TestPrMerge_nontty(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "master", false, "pr merge 1 --merge")
+	output, err := runCommand(http, "main", false, "pr merge 1 --merge")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -471,7 +471,7 @@ func TestPrMerge_editMessage_nontty(t *testing.T) {
 			Title:            "The title of the PR",
 			MergeStateStatus: "CLEAN",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 	http.Register(
 		httpmock.GraphQL(`query RepositoryInfo\b`),
@@ -498,7 +498,7 @@ func TestPrMerge_editMessage_nontty(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "master", false, "pr merge 1 --merge -t mytitle -b mybody")
+	output, err := runCommand(http, "main", false, "pr merge 1 --merge -t mytitle -b mybody")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -520,7 +520,7 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 			Title:            "The title of the PR",
 			MergeStateStatus: "CLEAN",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
@@ -545,7 +545,7 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	output, err := runCommand(http, "master", true, "pr merge 1 --merge -R OWNER/REPO")
+	output, err := runCommand(http, "main", true, "pr merge 1 --merge -R OWNER/REPO")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -569,10 +569,10 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 			State:            "OPEN",
 			Title:            "Blueberries are a good fruit",
 			HeadRefName:      "blueberries",
-			BaseRefName:      "master",
+			BaseRefName:      "main",
 			MergeStateStatus: "CLEAN",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
@@ -596,7 +596,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 					"login": "OWNER"
 				},
 				"defaultBranchRef":{
-					"name": "master"
+					"name": "main"
 				},
 				"mergeQueue": {
 					"mergeMethod": ""
@@ -607,8 +607,8 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git rev-parse --verify refs/heads/master`, 0, "")
-	cs.Register(`git checkout master`, 0, "")
+	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
+	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
@@ -621,7 +621,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
 		✓ Merged pull request #10 (Blueberries are a good fruit)
-		✓ Deleted branch blueberries and switched to branch master
+		✓ Deleted branch blueberries and switched to branch main
 	`), output.Stderr())
 }
 
@@ -640,7 +640,7 @@ func TestPrMerge_deleteBranch_nonDefault(t *testing.T) {
 			MergeStateStatus: "CLEAN",
 			BaseRefName:      "fruit",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
@@ -653,7 +653,7 @@ func TestPrMerge_deleteBranch_nonDefault(t *testing.T) {
 				"login": "OWNER"
 			},
 			"defaultBranchRef":{
-				"name": "master"
+				"name": "main"
 			},
 			"mergeQueue": {
 				"mergeMethod": ""
@@ -708,7 +708,7 @@ func TestPrMerge_deleteBranch_checkoutNewBranch(t *testing.T) {
 			MergeStateStatus: "CLEAN",
 			BaseRefName:      "fruit",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
@@ -721,7 +721,7 @@ func TestPrMerge_deleteBranch_checkoutNewBranch(t *testing.T) {
 				"login": "OWNER"
 			},
 			"defaultBranchRef":{
-				"name": "master"
+				"name": "main"
 			},
 			"mergeQueue": {
 				"mergeMethod": ""
@@ -775,7 +775,7 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 			HeadRefName:      "blueberries",
 			MergeStateStatus: "CLEAN",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
@@ -788,7 +788,7 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 				"login": "OWNER"
 			},
 			"defaultBranchRef":{
-				"name": "master"
+				"name": "main"
 			},
 			"mergeQueue": {
 				"mergeMethod": ""
@@ -813,7 +813,7 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
 
-	output, err := runCommand(http, "master", true, `pr merge --merge --delete-branch blueberries`)
+	output, err := runCommand(http, "main", true, `pr merge --merge --delete-branch blueberries`)
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
@@ -835,11 +835,11 @@ func Test_nonDivergingPullRequest(t *testing.T) {
 		Title:            "Blueberries are a good fruit",
 		State:            "OPEN",
 		MergeStateStatus: "CLEAN",
-		BaseRefName:      "master",
+		BaseRefName:      "main",
 	}
 	stubCommit(pr, "COMMITSHA1")
 
-	shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "master"))
+	shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "main"))
 
 	http.Register(
 		httpmock.GraphQL(`query RepositoryInfo\b`),
@@ -886,11 +886,11 @@ func Test_divergingPullRequestWarning(t *testing.T) {
 		Title:            "Blueberries are a good fruit",
 		State:            "OPEN",
 		MergeStateStatus: "CLEAN",
-		BaseRefName:      "master",
+		BaseRefName:      "main",
 	}
 	stubCommit(pr, "COMMITSHA1")
 
-	shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "master"))
+	shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "main"))
 
 	http.Register(
 		httpmock.GraphQL(`query RepositoryInfo\b`),
@@ -941,7 +941,7 @@ func Test_pullRequestWithoutCommits(t *testing.T) {
 			State:            "OPEN",
 			MergeStateStatus: "CLEAN",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
@@ -991,7 +991,7 @@ func TestPrMerge_rebase(t *testing.T) {
 			State:            "OPEN",
 			MergeStateStatus: "CLEAN",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
@@ -1018,7 +1018,7 @@ func TestPrMerge_rebase(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "master", true, "pr merge 2 --rebase")
+	output, err := runCommand(http, "main", true, "pr merge 2 --rebase")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -1043,7 +1043,7 @@ func TestPrMerge_squash(t *testing.T) {
 			State:            "OPEN",
 			MergeStateStatus: "CLEAN",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
@@ -1070,7 +1070,7 @@ func TestPrMerge_squash(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "master", true, "pr merge 3 --squash")
+	output, err := runCommand(http, "main", true, "pr merge 3 --squash")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -1095,7 +1095,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 				"login": "OWNER"
 			},
 			"defaultBranchRef":{
-				"name": "master"
+				"name": "main"
 			},
 			"mergeQueue": {
 				"mergeMethod": ""
@@ -1110,17 +1110,17 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 			Number:           4,
 			State:            "MERGED",
 			HeadRefName:      "blueberries",
-			BaseRefName:      "master",
+			BaseRefName:      "main",
 			MergeStateStatus: "CLEAN",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git rev-parse --verify refs/heads/master`, 0, "")
-	cs.Register(`git checkout master`, 0, "")
+	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
+	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
@@ -1134,7 +1134,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	output, err := runCommand(http, "blueberries", true, "pr merge 4")
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "✓ Deleted branch blueberries and switched to branch master\n", output.Stderr())
+	assert.Equal(t, "✓ Deleted branch blueberries and switched to branch main\n", output.Stderr())
 }
 
 func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
@@ -1161,7 +1161,7 @@ func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
 			HeadRepositoryOwner: api.Owner{Login: "OWNER"},
 			MergeStateStatus:    "CLEAN",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	cs, cmdTeardown := run.Stub()
@@ -1202,7 +1202,7 @@ func TestPrMerge_alreadyMerged_nonInteractive_crossRepo(t *testing.T) {
 			HeadRepositoryOwner: api.Owner{Login: "monalisa"},
 			MergeStateStatus:    "CLEAN",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	cs, cmdTeardown := run.Stub()
@@ -1231,7 +1231,7 @@ func TestPRMerge_interactive(t *testing.T) {
 			HeadRefName:      "blueberries",
 			MergeStateStatus: "CLEAN",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
@@ -1292,9 +1292,9 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 			Title:            "It was the best of times",
 			HeadRefName:      "blueberries",
 			MergeStateStatus: "CLEAN",
-			BaseRefName:      "master",
+			BaseRefName:      "main",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
@@ -1309,7 +1309,7 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 				"login": "OWNER"
 			},
 			"defaultBranchRef":{
-				"name": "master"
+				"name": "main"
 			},
 			"mergeQueue": {
 				"mergeMethod": ""
@@ -1329,8 +1329,8 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git rev-parse --verify refs/heads/master`, 0, "")
-	cs.Register(`git checkout master`, 0, "")
+	cs.Register(`git rev-parse --verify refs/heads/main`, 0, "")
+	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
@@ -1352,7 +1352,7 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, heredoc.Doc(`
 		✓ Merged pull request #3 (It was the best of times)
-		✓ Deleted branch blueberries and switched to branch master
+		✓ Deleted branch blueberries and switched to branch main
 	`), output.Stderr())
 }
 
@@ -1652,7 +1652,7 @@ func TestPrInMergeQueue(t *testing.T) {
 			MergeStateStatus: "CLEAN",
 			IsInMergeQueue:   true,
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
@@ -1673,7 +1673,7 @@ func TestPrInMergeQueue(t *testing.T) {
 	output, err := runCommand(http, "blueberries", true, "pr merge 1")
 	assert.EqualError(t, err, "SilentError")
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "X Pull Request #1 is queued to merge\n", output.Stderr())
+	assert.Equal(t, "X Pull request #1 is queued to merge\n", output.Stderr())
 }
 
 func TestPrAddToMergeQueueWithMergeMethod(t *testing.T) {
@@ -1690,7 +1690,7 @@ func TestPrAddToMergeQueueWithMergeMethod(t *testing.T) {
 			MergeStateStatus: "CLEAN",
 			IsInMergeQueue:   false,
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
@@ -1729,7 +1729,7 @@ func TestPrAddToMergeQueueClean(t *testing.T) {
 			IsInMergeQueue:   false,
 			BaseRefName:      "main",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
@@ -1761,7 +1761,7 @@ func TestPrAddToMergeQueueClean(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Pull Request will be added to the merge queue for main and MERGE when ready\n", output.Stderr())
+	assert.Equal(t, "Pull request will be added to the merge queue for main and MERGE when ready\n", output.Stderr())
 }
 
 func TestPrAddToMergeQueueBlocked(t *testing.T) {
@@ -1779,7 +1779,7 @@ func TestPrAddToMergeQueueBlocked(t *testing.T) {
 			IsInMergeQueue:   false,
 			BaseRefName:      "main",
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
@@ -1811,7 +1811,7 @@ func TestPrAddToMergeQueueBlocked(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Pull Request will be added to the merge queue for main and MERGE when ready\n", output.Stderr())
+	assert.Equal(t, "Pull request will be added to the merge queue for main and MERGE when ready\n", output.Stderr())
 }
 
 func TestPrAddToMergeQueueAdmin(t *testing.T) {
@@ -1828,7 +1828,7 @@ func TestPrAddToMergeQueueAdmin(t *testing.T) {
 			MergeStateStatus: "CLEAN",
 			IsInMergeQueue:   false,
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
@@ -1884,7 +1884,7 @@ func TestPrAddToMergeQueueAdminWithMergeStrategy(t *testing.T) {
 			MergeStateStatus: "CLEAN",
 			IsInMergeQueue:   false,
 		},
-		baseRepo("OWNER", "REPO", "master"),
+		baseRepo("OWNER", "REPO", "main"),
 	)
 
 	http.Register(
