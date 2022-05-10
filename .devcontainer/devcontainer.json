@@ -5,8 +5,7 @@
 	"build": {
 		"dockerfile": "Dockerfile",
 		"args": {
-			"VARIANT": "1.18",
-			"NODE_VERSION": "none"
+			"VARIANT": "1.18"
 		}
 	},
 	"settings": {
