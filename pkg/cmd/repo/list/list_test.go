@@ -194,7 +194,7 @@ func TestNewCmdList(t *testing.T) {
 		{
 			name:     "invalid visibility",
 			cli:      "--visibility=bad",
-			wantsErr: "`--visibility` only supports `public`, `private`, or `internal`",
+			wantsErr: "invalid argument \"bad\" for \"--visibility\" flag: valid values are {public|private|internal}",
 		},
 		{
 			name:     "no forks with sources",

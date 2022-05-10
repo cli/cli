@@ -386,8 +386,6 @@ func RepositoryGraphQL(fields []string) string {
 			q = append(q, "pullRequests(states:OPEN){totalCount}")
 		case "defaultBranchRef":
 			q = append(q, "defaultBranchRef{name}")
-		case "visibility":
-			q = append(q, "visibility")
 		default:
 			q = append(q, field)
 		}

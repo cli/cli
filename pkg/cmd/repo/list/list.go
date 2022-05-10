@@ -44,6 +44,11 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Now:        time.Now,
 	}
 
+	var (
+		flagPublic  bool
+		flagPrivate bool
+	)
+
 	cmd := &cobra.Command{
 		Use:     "list [<owner>]",
 		Args:    cobra.MaximumNArgs(1),
@@ -54,6 +59,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("invalid limit: %v", opts.Limit)
 			}
 
+			if err := cmdutil.MutuallyExclusive("specify only one of `--public`, `--private`, or `--visibility`", flagPublic, flagPrivate, opts.Visibility != ""); err != nil {
+				return err
+			}
 			if opts.Source && opts.Fork {
 				return cmdutil.FlagErrorf("specify only one of `--source` or `--fork`")
 			}
@@ -61,9 +69,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("specify only one of `--archived` or `--no-archived`")
 			}
 
-			visibility := strings.ToUpper(opts.Visibility)
-			if visibility != "" && (visibility != "PUBLIC" && visibility != "PRIVATE" && visibility != "INTERNAL") {
-				return cmdutil.FlagErrorf("`--visibility` only supports `public`, `private`, or `internal`")
+			if flagPrivate {
+				opts.Visibility = "private"
+			} else if flagPublic {
+				opts.Visibility = "public"
 			}
 
 			if len(args) > 0 {
@@ -82,10 +91,15 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.Fork, "fork", false, "Show only forks")
 	cmd.Flags().StringVarP(&opts.Language, "language", "l", "", "Filter by primary coding language")
 	cmd.Flags().StringVar(&opts.Topic, "topic", "", "Filter by topic")
-	cmd.Flags().StringVar(&opts.Visibility, "visibility", "", "Filter by visibility")
+	cmdutil.StringEnumFlag(cmd, &opts.Visibility, "visibility", "", "", []string{"public", "private", "internal"}, "Filter by repository visibility")
 	cmd.Flags().BoolVar(&opts.Archived, "archived", false, "Show only archived repositories")
 	cmd.Flags().BoolVar(&opts.NonArchived, "no-archived", false, "Omit archived repositories")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.RepositoryFields)
+
+	cmd.Flags().BoolVar(&flagPrivate, "private", false, "Show only private repositories")
+	cmd.Flags().BoolVar(&flagPublic, "public", false, "Show only public repositories")
+	_ = cmd.Flags().MarkDeprecated("public", "use `--visibility=public` instead")
+	_ = cmd.Flags().MarkDeprecated("private", "use `--visibility=private` instead")
 
 	return cmd
 }

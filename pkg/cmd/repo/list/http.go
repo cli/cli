@@ -30,7 +30,7 @@ type FilterOptions struct {
 }
 
 func listRepos(client *http.Client, hostname string, limit int, owner string, filter FilterOptions) (*RepositoryList, error) {
-	if filter.Language != "" || filter.Archived || filter.NonArchived || filter.Topic != "" {
+	if filter.Language != "" || filter.Archived || filter.NonArchived || filter.Topic != "" || filter.Visibility == "internal" {
 		return searchRepos(client, hostname, limit, owner, filter)
 	}
 
