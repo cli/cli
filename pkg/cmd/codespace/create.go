@@ -32,6 +32,7 @@ type createOptions struct {
 	permissionsOptOut bool
 	devContainerPath  string
 	idleTimeout       time.Duration
+	retentionPeriod   time.Duration
 }
 
 func newCreateCmd(app *App) *cobra.Command {
@@ -53,6 +54,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().BoolVarP(&opts.permissionsOptOut, "default-permissions", "", false, "do not prompt to accept additional permissions requested by the codespace")
 	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
 	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 0, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
+	createCmd.Flags().DurationVar(&opts.retentionPeriod, "retention-period", 0, "allowed time after going idle before codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
 	createCmd.Flags().StringVar(&opts.devContainerPath, "devcontainer-path", "", "path to the devcontainer.json file to use when creating codespace")
 
 	return createCmd
@@ -176,16 +178,19 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return errors.New("there are no available machine types for this repository")
 	}
 
+	retentionPeriod := int(opts.retentionPeriod.Minutes())
+
 	createParams := &api.CreateCodespaceParams{
-		RepositoryID:       repository.ID,
-		Branch:             branch,
-		Machine:            machine,
-		Location:           userInputs.Location,
-		VSCSTarget:         vscsTarget,
-		VSCSTargetURL:      vscsTargetUrl,
-		IdleTimeoutMinutes: int(opts.idleTimeout.Minutes()),
-		DevContainerPath:   devContainerPath,
-		PermissionsOptOut:  opts.permissionsOptOut,
+		RepositoryID:           repository.ID,
+		Branch:                 branch,
+		Machine:                machine,
+		Location:               userInputs.Location,
+		VSCSTarget:             vscsTarget,
+		VSCSTargetURL:          vscsTargetUrl,
+		IdleTimeoutMinutes:     int(opts.idleTimeout.Minutes()),
+		RetentionPeriodMinutes: &retentionPeriod,
+		DevContainerPath:       devContainerPath,
+		PermissionsOptOut:      opts.permissionsOptOut,
 	}
 
 	a.StartProgressIndicatorWithLabel("Creating codespace")

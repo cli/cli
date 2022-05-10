@@ -66,6 +66,71 @@ func createFakeListEndpointServer(t *testing.T, initalTotal int, finalTotal int)
 	}))
 }
 
+func createFakeCreateEndpointServer(t *testing.T, initalTotal int, finalTotal int) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/user/codespaces" {
+			t.Fatal("Incorrect path")
+		}
+
+		body := r.Body
+		if body == nil {
+			t.Fatal("No body")
+		}
+		defer body.Close()
+
+		var params startCreateRequest
+		err := json.NewDecoder(body).Decode(&params)
+		if err != nil {
+			t.Fatal("error:", err)
+		}
+
+		if params.RepositoryID != 1 {
+			t.Fatal("Expected RepositoryID to be 1. Got: ", params.RepositoryID)
+		}
+
+		if params.IdleTimeoutMinutes != 10 {
+			t.Fatal("Expected IdleTimeoutMinutes to be 10. Got: ", params.IdleTimeoutMinutes)
+		}
+
+		if *params.RetentionPeriodMinutes != 0 {
+			t.Fatal("Expected RetentionPeriodMinutes to be 0. Got: ", *params.RetentionPeriodMinutes)
+		}
+
+		response := Codespace{
+			Name: "codespace-1",
+		}
+
+		data, _ := json.Marshal(response)
+		fmt.Fprint(w, string(data))
+	}))
+}
+
+func TestCreateCodespaces(t *testing.T) {
+	svr := createFakeCreateEndpointServer(t, 200, 200)
+	defer svr.Close()
+
+	api := API{
+		githubAPI: svr.URL,
+		client:    &http.Client{},
+	}
+
+	ctx := context.TODO()
+	retentionPeriod := 0
+	params := &CreateCodespaceParams{
+		RepositoryID:           1,
+		IdleTimeoutMinutes:     10,
+		RetentionPeriodMinutes: &retentionPeriod,
+	}
+	codespace, err := api.CreateCodespace(ctx, params)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if codespace.Name != "codespace-1" {
+		t.Fatalf("expected codespace-1, got %s", codespace.Name)
+	}
+}
+
 func TestListCodespaces_limited(t *testing.T) {
 	svr := createFakeListEndpointServer(t, 200, 200)
 	defer svr.Close()

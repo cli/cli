@@ -558,15 +558,16 @@ func (a *API) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch str
 
 // CreateCodespaceParams are the required parameters for provisioning a Codespace.
 type CreateCodespaceParams struct {
-	RepositoryID       int
-	IdleTimeoutMinutes int
-	Branch             string
-	Machine            string
-	Location           string
-	DevContainerPath   string
-	VSCSTarget         string
-	VSCSTargetURL      string
-	PermissionsOptOut  bool
+	RepositoryID           int
+	IdleTimeoutMinutes     int
+	RetentionPeriodMinutes *int
+	Branch                 string
+	Machine                string
+	Location               string
+	DevContainerPath       string
+	VSCSTarget             string
+	VSCSTargetURL          string
+	PermissionsOptOut      bool
 }
 
 // CreateCodespace creates a codespace with the given parameters and returns a non-nil error if it
@@ -607,15 +608,16 @@ func (a *API) CreateCodespace(ctx context.Context, params *CreateCodespaceParams
 }
 
 type startCreateRequest struct {
-	RepositoryID       int    `json:"repository_id"`
-	IdleTimeoutMinutes int    `json:"idle_timeout_minutes,omitempty"`
-	Ref                string `json:"ref"`
-	Location           string `json:"location"`
-	Machine            string `json:"machine"`
-	DevContainerPath   string `json:"devcontainer_path,omitempty"`
-	VSCSTarget         string `json:"vscs_target,omitempty"`
-	VSCSTargetURL      string `json:"vscs_target_url,omitempty"`
-	PermissionsOptOut  bool   `json:"multi_repo_permissions_opt_out"`
+	RepositoryID           int    `json:"repository_id"`
+	IdleTimeoutMinutes     int    `json:"idle_timeout_minutes,omitempty"`
+	RetentionPeriodMinutes *int   `json:"retention_period_minutes,omitempty"`
+	Ref                    string `json:"ref"`
+	Location               string `json:"location"`
+	Machine                string `json:"machine"`
+	DevContainerPath       string `json:"devcontainer_path,omitempty"`
+	VSCSTarget             string `json:"vscs_target,omitempty"`
+	VSCSTargetURL          string `json:"vscs_target_url,omitempty"`
+	PermissionsOptOut      bool   `json:"multi_repo_permissions_opt_out"`
 }
 
 var errProvisioningInProgress = errors.New("provisioning in progress")
@@ -639,15 +641,16 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 	}
 
 	requestBody, err := json.Marshal(startCreateRequest{
-		RepositoryID:       params.RepositoryID,
-		IdleTimeoutMinutes: params.IdleTimeoutMinutes,
-		Ref:                params.Branch,
-		Location:           params.Location,
-		Machine:            params.Machine,
-		DevContainerPath:   params.DevContainerPath,
-		VSCSTarget:         params.VSCSTarget,
-		VSCSTargetURL:      params.VSCSTargetURL,
-		PermissionsOptOut:  params.PermissionsOptOut,
+		RepositoryID:           params.RepositoryID,
+		IdleTimeoutMinutes:     params.IdleTimeoutMinutes,
+		RetentionPeriodMinutes: params.RetentionPeriodMinutes,
+		Ref:                    params.Branch,
+		Location:               params.Location,
+		Machine:                params.Machine,
+		DevContainerPath:       params.DevContainerPath,
+		VSCSTarget:             params.VSCSTarget,
+		VSCSTargetURL:          params.VSCSTargetURL,
+		PermissionsOptOut:      params.PermissionsOptOut,
 	})
 
 	if err != nil {

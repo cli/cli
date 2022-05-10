@@ -54,6 +54,9 @@ func TestApp_Create(t *testing.T) {
 						if params.IdleTimeoutMinutes != 30 {
 							return nil, fmt.Errorf("idle timeout minutes was %v", params.IdleTimeoutMinutes)
 						}
+						if *params.RetentionPeriodMinutes != 2880 {
+							return nil, fmt.Errorf("retention period minutes was %v", params.RetentionPeriodMinutes)
+						}
 						return &api.Codespace{
 							Name: "monalisa-dotfiles-abcd1234",
 						}, nil
@@ -64,11 +67,12 @@ func TestApp_Create(t *testing.T) {
 				},
 			},
 			opts: createOptions{
-				repo:        "monalisa/dotfiles",
-				branch:      "",
-				machine:     "GIGA",
-				showStatus:  false,
-				idleTimeout: 30 * time.Minute,
+				repo:            "monalisa/dotfiles",
+				branch:          "",
+				machine:         "GIGA",
+				showStatus:      false,
+				idleTimeout:     30 * time.Minute,
+				retentionPeriod: 48 * time.Hour,
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
 		},
