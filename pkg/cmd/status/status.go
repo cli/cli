@@ -2,19 +2,23 @@ package status
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/set"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -93,6 +97,7 @@ type Notification struct {
 		}
 		FullName string `json:"full_name"`
 	}
+	index int
 }
 
 type StatusItem struct {
@@ -100,6 +105,7 @@ type StatusItem struct {
 	Identifier string // eg cli/cli#1234 or just 1234
 	preview    string // eg This is the truncated body of something...
 	Reason     string // only used in repo activity
+	index      int
 }
 
 func (s StatusItem) Preview() string {
@@ -155,6 +161,12 @@ func (rs Results) Swap(i, j int) {
 	rs[i], rs[j] = rs[j], rs[i]
 }
 
+type stringSet interface {
+	Len() int
+	Add(string)
+	ToSlice() []string
+}
+
 type StatusGetter struct {
 	Client         *http.Client
 	cachedClient   func(*http.Client, time.Duration) *http.Client
@@ -166,6 +178,12 @@ type StatusGetter struct {
 	Mentions       []StatusItem
 	ReviewRequests []StatusItem
 	RepoActivity   []StatusItem
+
+	authErrors   stringSet
+	authErrorsMu sync.Mutex
+
+	currentUsername string
+	usernameMu      sync.Mutex
 }
 
 func NewStatusGetter(client *http.Client, hostname string, opts *StatusOptions) *StatusGetter {
@@ -196,6 +214,13 @@ func (s *StatusGetter) ShouldExclude(repo string) bool {
 }
 
 func (s *StatusGetter) CurrentUsername() (string, error) {
+	s.usernameMu.Lock()
+	defer s.usernameMu.Unlock()
+
+	if s.currentUsername != "" {
+		return s.currentUsername, nil
+	}
+
 	cachedClient := s.CachedClient(time.Hour * 48)
 	cachingAPIClient := api.NewClientFromHTTP(cachedClient)
 	currentUsername, err := api.CurrentLoginName(cachingAPIClient, s.hostname())
@@ -203,10 +228,11 @@ func (s *StatusGetter) CurrentUsername() (string, error) {
 		return "", fmt.Errorf("failed to get current username: %w", err)
 	}
 
+	s.currentUsername = currentUsername
 	return currentUsername, nil
 }
 
-func (s *StatusGetter) ActualMention(n Notification) (string, error) {
+func (s *StatusGetter) ActualMention(commentURL string) (string, error) {
 	currentUsername, err := s.CurrentUsername()
 	if err != nil {
 		return "", err
@@ -219,17 +245,15 @@ func (s *StatusGetter) ActualMention(n Notification) (string, error) {
 	resp := struct {
 		Body string
 	}{}
-	if err := c.REST(s.hostname(), "GET", n.Subject.LatestCommentURL, nil, &resp); err != nil {
+	if err := c.REST(s.hostname(), "GET", commentURL, nil, &resp); err != nil {
 		return "", err
 	}
 
-	var ret string
-
 	if strings.Contains(resp.Body, "@"+currentUsername) {
-		ret = resp.Body
+		return resp.Body, nil
 	}
 
-	return ret, nil
+	return "", nil
 }
 
 // These are split up by endpoint since it is along that boundary we parallelize
@@ -244,16 +268,63 @@ func (s *StatusGetter) LoadNotifications() error {
 	query.Add("participating", "true")
 	query.Add("all", "true")
 
+	fetchWorkers := 10
+	ctx, abortFetching := context.WithCancel(context.Background())
+	defer abortFetching()
+	toFetch := make(chan Notification)
+	fetched := make(chan StatusItem)
+
+	wg := new(errgroup.Group)
+	for i := 0; i < fetchWorkers; i++ {
+		wg.Go(func() error {
+			for {
+				select {
+				case <-ctx.Done():
+					return nil
+				case n, ok := <-toFetch:
+					if !ok {
+						return nil
+					}
+					if actual, err := s.ActualMention(n.Subject.LatestCommentURL); actual != "" && err == nil {
+						// I'm so sorry
+						split := strings.Split(n.Subject.URL, "/")
+						fetched <- StatusItem{
+							Repository: n.Repository.FullName,
+							Identifier: fmt.Sprintf("%s#%s", n.Repository.FullName, split[len(split)-1]),
+							preview:    actual,
+							index:      n.index,
+						}
+					} else if err != nil {
+						var httpErr api.HTTPError
+						if errors.As(err, &httpErr) && httpErr.StatusCode == 403 {
+							s.addAuthError(httpErr.Message, factory.SSOURL())
+						} else {
+							abortFetching()
+							return fmt.Errorf("could not fetch comment: %w", err)
+						}
+					}
+				}
+			}
+		})
+	}
+
+	doneCh := make(chan struct{})
+	go func() {
+		for item := range fetched {
+			s.Mentions = append(s.Mentions, item)
+		}
+		close(doneCh)
+	}()
+
 	// this sucks, having to fetch so much :/ but it was the only way in my
 	// testing to really get enough mentions. I would love to be able to just
 	// filter for mentions but it does not seem like the notifications API can
 	// do that. I'd switch to the GraphQL version, but to my knowledge that does
 	// not work with PATs right now.
-	var ns []Notification
-	var resp []Notification
-	pages := 0
+	nIndex := 0
 	p := fmt.Sprintf("notifications?%s", query.Encode())
-	for pages < 3 {
+	for pages := 0; pages < 3; pages++ {
+		var resp []Notification
 		next, err := c.RESTWithNext(s.hostname(), "GET", p, nil, &resp)
 		if err != nil {
 			var httpErr api.HTTPError
@@ -261,45 +332,36 @@ func (s *StatusGetter) LoadNotifications() error {
 				return fmt.Errorf("could not get notifications: %w", err)
 			}
 		}
-		ns = append(ns, resp...)
+
+		for _, n := range resp {
+			if n.Reason != "mention" {
+				continue
+			}
+			if s.Org != "" && n.Repository.Owner.Login != s.Org {
+				continue
+			}
+			if s.ShouldExclude(n.Repository.FullName) {
+				continue
+			}
+			n.index = nIndex
+			nIndex++
+			toFetch <- n
+		}
 
 		if next == "" || len(resp) < perPage {
 			break
 		}
-
-		pages++
 		p = next
 	}
 
-	s.Mentions = []StatusItem{}
-
-	for _, n := range ns {
-		if n.Reason != "mention" {
-			continue
-		}
-
-		if s.Org != "" && n.Repository.Owner.Login != s.Org {
-			continue
-		}
-
-		if s.ShouldExclude(n.Repository.FullName) {
-			continue
-		}
-
-		if actual, err := s.ActualMention(n); actual != "" && err == nil {
-			// I'm so sorry
-			split := strings.Split(n.Subject.URL, "/")
-			s.Mentions = append(s.Mentions, StatusItem{
-				Repository: n.Repository.FullName,
-				Identifier: fmt.Sprintf("%s#%s", n.Repository.FullName, split[len(split)-1]),
-				preview:    actual,
-			})
-		} else if err != nil {
-			return fmt.Errorf("could not fetch comment: %w", err)
-		}
-	}
-
-	return nil
+	close(toFetch)
+	err := wg.Wait()
+	close(fetched)
+	<-doneCh
+	sort.Slice(s.Mentions, func(i, j int) bool {
+		return s.Mentions[i].index < s.Mentions[j].index
+	})
+	return err
 }
 
 const searchQuery = `
@@ -323,18 +385,14 @@ fragment pr on PullRequest {
 }
 query AssignedSearch($searchAssigns: String!, $searchReviews: String!, $limit: Int = 25) {
 	assignments: search(first: $limit, type: ISSUE, query: $searchAssigns) {
-		edges {
-			node {
-				...issue
-				...pr
-			}
+		nodes {
+			...issue
+			...pr
 		}
 	}
 	reviewRequested: search(first: $limit, type: ISSUE, query: $searchReviews) {
-		edges {
-			node {
-				...pr
-			}
+		nodes {
+			...pr
 		}
 	}
 }`
@@ -360,37 +418,59 @@ func (s *StatusGetter) LoadSearchResults() error {
 
 	var resp struct {
 		Assignments struct {
-			Edges []struct {
-				Node SearchResult
-			}
+			Nodes []*SearchResult
 		}
 		ReviewRequested struct {
-			Edges []struct {
-				Node SearchResult
-			}
+			Nodes []*SearchResult
 		}
 	}
 	err := c.GraphQL(s.hostname(), searchQuery, variables, &resp)
 	if err != nil {
-		return fmt.Errorf("could not search for assignments: %w", err)
+		var gqlErrResponse *api.GraphQLErrorResponse
+		if errors.As(err, &gqlErrResponse) {
+			gqlErrors := make([]api.GraphQLError, 0, len(gqlErrResponse.Errors))
+			// Exclude any FORBIDDEN errors and show status for what we can.
+			for _, gqlErr := range gqlErrResponse.Errors {
+				if gqlErr.Type == "FORBIDDEN" {
+					s.addAuthError(gqlErr.Message, factory.SSOURL())
+				} else {
+					gqlErrors = append(gqlErrors, gqlErr)
+				}
+			}
+			if len(gqlErrors) == 0 {
+				err = nil
+			} else {
+				err = &api.GraphQLErrorResponse{Errors: gqlErrors}
+			}
+		}
+		if err != nil {
+			return fmt.Errorf("could not search for assignments: %w", err)
+		}
 	}
 
 	prs := []SearchResult{}
 	issues := []SearchResult{}
 	reviewRequested := []SearchResult{}
 
-	for _, e := range resp.Assignments.Edges {
-		if e.Node.Type == "Issue" {
-			issues = append(issues, e.Node)
-		} else if e.Node.Type == "PullRequest" {
-			prs = append(prs, e.Node)
-		} else {
-			panic("you shouldn't be here")
+	for _, node := range resp.Assignments.Nodes {
+		if node == nil {
+			continue // likely due to FORBIDDEN results
+		}
+		switch node.Type {
+		case "Issue":
+			issues = append(issues, *node)
+		case "PullRequest":
+			prs = append(prs, *node)
+		default:
+			return fmt.Errorf("unkown Assignments type: %q", node.Type)
 		}
 	}
 
-	for _, e := range resp.ReviewRequested.Edges {
-		reviewRequested = append(reviewRequested, e.Node)
+	for _, node := range resp.ReviewRequested.Nodes {
+		if node == nil {
+			continue // likely due to FORBIDDEN results
+		}
+		reviewRequested = append(reviewRequested, *node)
 	}
 
 	sort.Sort(Results(issues))
@@ -506,6 +586,28 @@ func (s *StatusGetter) LoadEvents() error {
 	return nil
 }
 
+func (s *StatusGetter) addAuthError(msg, ssoURL string) {
+	s.authErrorsMu.Lock()
+	defer s.authErrorsMu.Unlock()
+
+	if s.authErrors == nil {
+		s.authErrors = set.NewStringSet()
+	}
+
+	if ssoURL != "" {
+		s.authErrors.Add(fmt.Sprintf("%s\nAuthorize in your web browser:  %s", msg, ssoURL))
+	} else {
+		s.authErrors.Add(msg)
+	}
+}
+
+func (s *StatusGetter) HasAuthErrors() bool {
+	s.authErrorsMu.Lock()
+	defer s.authErrorsMu.Unlock()
+
+	return s.authErrors != nil && s.authErrors.Len() > 0
+}
+
 func statusRun(opts *StatusOptions) error {
 	client, err := opts.HttpClient()
 	if err != nil {
@@ -522,36 +624,31 @@ func statusRun(opts *StatusOptions) error {
 	// TODO break out sections into individual subcommands
 
 	g := new(errgroup.Group)
+	g.Go(func() error {
+		if err := sg.LoadNotifications(); err != nil {
+			return fmt.Errorf("could not load notifications: %w", err)
+		}
+		return nil
+	})
+	g.Go(func() error {
+		if err := sg.LoadEvents(); err != nil {
+			return fmt.Errorf("could not load events: %w", err)
+		}
+		return nil
+	})
+	g.Go(func() error {
+		if err := sg.LoadSearchResults(); err != nil {
+			return fmt.Errorf("failed to search: %w", err)
+		}
+		return nil
+	})
+
 	opts.IO.StartProgressIndicator()
-	g.Go(func() error {
-		err := sg.LoadNotifications()
-		if err != nil {
-			err = fmt.Errorf("could not load notifications: %w", err)
-		}
-		return err
-	})
-
-	g.Go(func() error {
-		err := sg.LoadEvents()
-		if err != nil {
-			err = fmt.Errorf("could not load events: %w", err)
-		}
-		return err
-	})
-
-	g.Go(func() error {
-		err := sg.LoadSearchResults()
-		if err != nil {
-			err = fmt.Errorf("failed to search: %w", err)
-		}
-		return err
-	})
-
 	err = g.Wait()
+	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
-	opts.IO.StopProgressIndicator()
 
 	cs := opts.IO.ColorScheme()
 	out := opts.IO.Out
@@ -627,6 +724,14 @@ func statusRun(opts *StatusOptions) error {
 	fmt.Fprintln(out, lipgloss.JoinHorizontal(lipgloss.Top, issueSection, prSection))
 	fmt.Fprintln(out, lipgloss.JoinHorizontal(lipgloss.Top, rrSection, mSection))
 	fmt.Fprintln(out, raSection)
+
+	if sg.HasAuthErrors() {
+		errs := sg.authErrors.ToSlice()
+		sort.Strings(errs)
+		for _, msg := range errs {
+			fmt.Fprintln(out, cs.Gray(fmt.Sprintf("warning: %s", msg)))
+		}
+	}
 
 	return nil
 }
