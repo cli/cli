@@ -20,9 +20,12 @@ type CloneOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
+	Exporter   cmdutil.Exporter
 
-	GitArgs    []string
-	Repository string
+	GitArgs      []string
+	MagicFields  []string
+	Repository   string
+	UpstreamName string
 }
 
 func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Command {
@@ -60,6 +63,8 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 		},
 	}
 
+	cmd.Flags().StringVarP(&opts.UpstreamName, "upstream-remote-name", "u", "", "Change Upstream remote name")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.RepositoryFields)
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		if err == pflag.ErrHelp {
 			return err
@@ -164,11 +169,26 @@ func cloneRun(opts *CloneOptions) error {
 		}
 		upstreamURL := ghrepo.FormatRemoteURL(canonicalRepo.Parent, protocol)
 
-		err = git.AddUpstreamRemote(upstreamURL, cloneDir, []string{canonicalRepo.Parent.DefaultBranchRef.Name})
-		if err != nil {
-			return err
+		if opts.UpstreamName != "" {
+			upstreamName := ""
+
+			if opts.UpstreamName == "@owner" {
+				upstreamName = canonicalRepo.Parent.RepoOwner()
+			} else {
+				upstreamName = opts.UpstreamName
+			}
+
+			err = git.AddCustomUpstreamRemote(upstreamURL, upstreamName, cloneDir, []string{canonicalRepo.Parent.DefaultBranchRef.Name})
+			if err != nil {
+				return err
+			}
+
+		} else {
+			err = git.AddUpstreamRemote(upstreamURL, cloneDir, []string{canonicalRepo.Parent.DefaultBranchRef.Name})
+			if err != nil {
+				return err
+			}
 		}
 	}
-
 	return nil
 }

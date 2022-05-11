@@ -382,6 +382,21 @@ func AddUpstreamRemote(upstreamURL, cloneDir string, branches []string) error {
 	return run.PrepareCmd(cloneCmd).Run()
 }
 
+func AddCustomUpstreamRemote(upstreamURL, upstreamName, cloneDir string, branches []string) error {
+	args := []string{"-C", cloneDir, "remote", "add"}
+	for _, branch := range branches {
+		args = append(args, "-t", branch)
+	}
+	args = append(args, "-f", upstreamName, upstreamURL)
+	cloneCmd, err := GitCommand(args...)
+	if err != nil {
+		return err
+	}
+	cloneCmd.Stdout = os.Stdout
+	cloneCmd.Stderr = os.Stderr
+	return run.PrepareCmd(cloneCmd).Run()
+}
+
 func isFilesystemPath(p string) bool {
 	return p == "." || strings.HasPrefix(p, "./") || strings.HasPrefix(p, "/")
 }
