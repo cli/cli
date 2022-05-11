@@ -171,7 +171,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 // mergeContext contains state and dependencies to merge a pull request.
 type mergeContext struct {
 	pr                 *api.PullRequest
-	baseRepo           *api.Repository
+	baseRepo           ghrepo.Interface
 	httpClient         *http.Client
 	opts               *MergeOptions
 	cs                 *iostreams.ColorScheme
@@ -274,15 +274,19 @@ func (m *mergeContext) merge() error {
 		return cmdutil.SilentError
 	}
 
-	var err error
-
 	// get user input if not already given
 	if m.opts.InteractiveMode {
 		if m.addToMergeQueue() {
 			// auto merge will either enable auto merge or add to the merge queue
 			payload.auto = true
 		} else {
-			payload.method, err = mergeMethodSurvey(m.baseRepo)
+			apiClient := api.NewClientFromHTTP(m.httpClient)
+			r, err := api.GitHubRepo(apiClient, m.baseRepo)
+			if err != nil {
+				return err
+			}
+
+			payload.method, err = mergeMethodSurvey(r)
 			if err != nil {
 				return err
 			}
@@ -313,13 +317,13 @@ func (m *mergeContext) merge() error {
 		}
 	}
 
-	err = mergePullRequest(m.httpClient, payload)
+	err := mergePullRequest(m.httpClient, payload)
 	if err != nil {
 		return err
 	}
 
 	if m.addToMergeQueue() {
-		_ = m.infof("Pull request will be added to the merge queue for %s and %s when ready\n", m.pr.BaseRefName, m.baseRepo.MergeQueue.MergeMethod)
+		_ = m.infof("Pull request will be added to the merge queue for %s when ready\n", m.pr.BaseRefName)
 		return nil
 	}
 
@@ -457,7 +461,7 @@ func (m *mergeContext) infof(format string, args ...interface{}) error {
 func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
-		Fields:   []string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName", "baseRefName", "isInMergeQueue"},
+		Fields:   []string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName", "baseRefName", "isInMergeQueue", "isMergeQueueEnabled"},
 	}
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
@@ -469,17 +473,11 @@ func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 		return nil, err
 	}
 
-	apiClient := api.NewClientFromHTTP(httpClient)
-	repo, err := api.GitHubRepoWithMergeQueue(apiClient, baseRepo, pr.BaseRefName)
-	if err != nil {
-		return nil, err
-	}
-
 	return &mergeContext{
 		opts:               opts,
 		pr:                 pr,
 		cs:                 opts.IO.ColorScheme(),
-		baseRepo:           repo,
+		baseRepo:           baseRepo,
 		isTerminal:         opts.IO.IsStdoutTTY(),
 		httpClient:         httpClient,
 		merged:             pr.State == MergeStateStatusMerged,
@@ -487,7 +485,7 @@ func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 		crossRepoPR:        pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner(),
 		autoMerge:          opts.AutoMergeEnable && !isImmediatelyMergeable(pr.MergeStateStatus),
 		localBranchExists:  opts.CanDeleteLocalBranch && git.HasLocalBranch(pr.HeadRefName),
-		mergeQueueRequired: repo.MergeQueueRequired(),
+		mergeQueueRequired: pr.IsMergeQueueEnabled,
 	}, nil
 }
 
