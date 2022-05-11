@@ -270,7 +270,7 @@ func (m *mergeContext) merge() error {
 	}
 
 	if m.addToMergeQueue() && !m.opts.InteractiveMode {
-		_ = m.warnf("%s a merge strategy cannot be set when adding a pull request to the merge queue\n", m.cs.FailureIconWithColor(m.cs.Red))
+		_ = m.warnf("%s A merge strategy cannot be set when adding a pull request to the merge queue\n", m.cs.FailureIconWithColor(m.cs.Red))
 		return cmdutil.SilentError
 	}
 
@@ -323,7 +323,7 @@ func (m *mergeContext) merge() error {
 	}
 
 	if m.addToMergeQueue() {
-		_ = m.infof("Pull request will be added to the merge queue for %s when ready\n", m.pr.BaseRefName)
+		_ = m.infof("Pull request #%d will be added to the merge queue for %s when ready\n", m.pr.Number, m.pr.BaseRefName)
 		return nil
 	}
 
