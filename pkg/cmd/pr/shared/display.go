@@ -2,23 +2,20 @@ package shared
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 )
 
 func StateTitleWithColor(cs *iostreams.ColorScheme, pr api.PullRequest) string {
 	prStateColorFunc := cs.ColorFromString(ColorForPRState(pr))
-	c := cases.Title(language.English)
 	if pr.State == "OPEN" && pr.IsDraft {
-		return prStateColorFunc(c.String(strings.ToLower("Draft")))
+		return prStateColorFunc("Draft")
 	}
-	return prStateColorFunc(c.String(strings.ToLower(pr.State)))
+	return prStateColorFunc(text.Title(pr.State))
 }
 
 func ColorForPRState(pr api.PullRequest) string {
