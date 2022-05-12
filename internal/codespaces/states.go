@@ -8,18 +8,20 @@ import (
 	"io"
 	"log"
 	"net"
-	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/liveshare"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // PostCreateStateStatus is a string value representing the different statuses a state can have.
 type PostCreateStateStatus string
 
 func (p PostCreateStateStatus) String() string {
-	return strings.Title(string(p))
+	c := cases.Title(language.English)
+	return c.String(string(p))
 }
 
 const (

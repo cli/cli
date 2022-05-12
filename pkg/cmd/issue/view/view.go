@@ -19,6 +19,8 @@ import (
 	"github.com/cli/cli/v2/pkg/set"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 type browser interface {
@@ -256,7 +258,8 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 
 func issueStateTitleWithColor(cs *iostreams.ColorScheme, issue *api.Issue) string {
 	colorFunc := cs.ColorFromString(prShared.ColorForIssueState(*issue))
-	return colorFunc(strings.Title(strings.ToLower(issue.State)))
+	c := cases.Title(language.English)
+	return colorFunc(c.String(strings.ToLower(issue.State)))
 }
 
 func issueAssigneeList(issue api.Issue) string {

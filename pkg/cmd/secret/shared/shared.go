@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 type Visibility string
@@ -28,7 +31,8 @@ func (app App) String() string {
 }
 
 func (app App) Title() string {
-	return strings.Title(app.String())
+	c := cases.Title(language.English)
+	return c.String(app.String())
 }
 
 type SecretEntity string

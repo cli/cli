@@ -14,6 +14,8 @@ import (
 	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 type browser interface {
@@ -272,7 +274,8 @@ func formattedReviewerState(cs *iostreams.ColorScheme, reviewer *reviewerState) 
 		colorFunc = func(str string) string { return str } // Do nothing
 	}
 
-	return fmt.Sprintf("%s (%s)", reviewer.Name, colorFunc(strings.ReplaceAll(strings.Title(strings.ToLower(state)), "_", " ")))
+	c := cases.Title(language.English)
+	return fmt.Sprintf("%s (%s)", reviewer.Name, colorFunc(strings.ReplaceAll(c.String(strings.ToLower(state)), "_", " ")))
 }
 
 // prReviewerList generates a reviewer list with their last state
