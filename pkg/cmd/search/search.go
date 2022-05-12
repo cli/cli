@@ -12,7 +12,7 @@ import (
 func NewCmdSearch(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "search <command>",
-		Short: "Search for repositories, issues, pull requests and users",
+		Short: "Search for repositories, issues, and pull requests",
 		Long:  "Search across all of GitHub.",
 	}
 
