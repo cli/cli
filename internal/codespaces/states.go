@@ -8,18 +8,18 @@ import (
 	"io"
 	"log"
 	"net"
-	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/liveshare"
+	"github.com/cli/cli/v2/pkg/text"
 )
 
 // PostCreateStateStatus is a string value representing the different statuses a state can have.
 type PostCreateStateStatus string
 
 func (p PostCreateStateStatus) String() string {
-	return strings.Title(string(p))
+	return text.Title(string(p))
 }
 
 const (

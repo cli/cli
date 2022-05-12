@@ -2,21 +2,20 @@ package shared
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 )
 
 func StateTitleWithColor(cs *iostreams.ColorScheme, pr api.PullRequest) string {
 	prStateColorFunc := cs.ColorFromString(ColorForPRState(pr))
-
 	if pr.State == "OPEN" && pr.IsDraft {
-		return prStateColorFunc(strings.Title(strings.ToLower("Draft")))
+		return prStateColorFunc("Draft")
 	}
-	return prStateColorFunc(strings.Title(strings.ToLower(pr.State)))
+	return prStateColorFunc(text.Title(pr.State))
 }
 
 func ColorForPRState(pr api.PullRequest) string {

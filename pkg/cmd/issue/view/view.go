@@ -256,7 +256,11 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 
 func issueStateTitleWithColor(cs *iostreams.ColorScheme, issue *api.Issue) string {
 	colorFunc := cs.ColorFromString(prShared.ColorForIssueState(*issue))
-	return colorFunc(strings.Title(strings.ToLower(issue.State)))
+	state := "Open"
+	if issue.State == "CLOSED" {
+		state = "Closed"
+	}
+	return colorFunc(state)
 }
 
 func issueAssigneeList(issue api.Issue) string {
