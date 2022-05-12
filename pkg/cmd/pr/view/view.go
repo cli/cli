@@ -254,23 +254,20 @@ type reviewerState struct {
 
 // formattedReviewerState formats a reviewerState with state color
 func formattedReviewerState(cs *iostreams.ColorScheme, reviewer *reviewerState) string {
-	state := reviewer.State
-	if state == dismissedReviewState {
-		// Show "DISMISSED" review as "COMMENTED", since "dismissed" only makes
-		// sense when displayed in an events timeline but not in the final tally.
-		state = commentedReviewState
-	}
-
 	var displayState string
-	switch state {
+	switch reviewer.State {
 	case requestedReviewState:
 		displayState = cs.Yellow("Requested")
 	case approvedReviewState:
 		displayState = cs.Green("Approved")
 	case changesRequestedReviewState:
 		displayState = cs.Red("Changes requested")
+	case commentedReviewState, dismissedReviewState:
+		// Show "DISMISSED" review as "COMMENTED", since "dismissed" only makes
+		// sense when displayed in an events timeline but not in the final tally.
+		displayState = "Commented"
 	default:
-		displayState = text.Title(state)
+		displayState = text.Title(reviewer.State)
 	}
 
 	return fmt.Sprintf("%s (%s)", reviewer.Name, displayState)
