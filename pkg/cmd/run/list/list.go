@@ -171,8 +171,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if !opts.PlainOutput {
-		fmt.Fprintln(out)
-		fmt.Fprintln(out, "For details on a run, try: gh run view <run-id>")
+		fmt.Fprint(out)
 	}
 
 	return nil
