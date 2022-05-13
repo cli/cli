@@ -3,7 +3,7 @@ package secret
 import (
 	"github.com/MakeNowJust/heredoc"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/secret/list"
-	cmdRemove "github.com/cli/cli/v2/pkg/cmd/secret/remove"
+	cmdDelete "github.com/cli/cli/v2/pkg/cmd/secret/delete"
 	cmdSet "github.com/cli/cli/v2/pkg/cmd/secret/set"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -25,7 +25,7 @@ func NewCmdSecret(f *cmdutil.Factory) *cobra.Command {
 
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
 	cmd.AddCommand(cmdSet.NewCmdSet(f, nil))
-	cmd.AddCommand(cmdRemove.NewCmdRemove(f, nil))
+	cmd.AddCommand(cmdDelete.NewCmdDelete(f, nil))
 
 	return cmd
 }

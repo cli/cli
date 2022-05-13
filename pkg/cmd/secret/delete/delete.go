@@ -1,4 +1,4 @@
-package remove
+package delete
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type RemoveOptions struct {
+type DeleteOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
@@ -27,8 +27,8 @@ type RemoveOptions struct {
 	Application string
 }
 
-func NewCmdRemove(f *cmdutil.Factory, runF func(*RemoveOptions) error) *cobra.Command {
-	opts := &RemoveOptions{
+func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
+	opts := &DeleteOptions{
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
@@ -73,7 +73,7 @@ func NewCmdRemove(f *cmdutil.Factory, runF func(*RemoveOptions) error) *cobra.Co
 	return cmd
 }
 
-func removeRun(opts *RemoveOptions) error {
+func removeRun(opts *DeleteOptions) error {
 	c, err := opts.HttpClient()
 	if err != nil {
 		return fmt.Errorf("could not create http client: %w", err)
