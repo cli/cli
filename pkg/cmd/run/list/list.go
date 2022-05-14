@@ -126,8 +126,6 @@ func listRun(opts *ListOptions) error {
 
 	cs := opts.IO.ColorScheme()
 
-	out := opts.IO.Out
-
 	if !opts.PlainOutput {
 		tp.AddField("STATUS", nil, nil)
 		tp.AddField("NAME", nil, nil)
@@ -168,10 +166,6 @@ func listRun(opts *ListOptions) error {
 	err = tp.Render()
 	if err != nil {
 		return err
-	}
-
-	if !opts.PlainOutput {
-		fmt.Fprint(out)
 	}
 
 	return nil
