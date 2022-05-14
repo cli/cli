@@ -2,6 +2,7 @@ package extension
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -514,6 +515,38 @@ func TestNewCmdExtension(t *testing.T) {
 			},
 			isTTY:      false,
 			wantStdout: "",
+		},
+		{
+			name: "exec extension missing",
+			args: []string{"exec", "invalid"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.DispatchFunc = func(args []string, stdin io.Reader, stdout, stderr io.Writer) (bool, error) {
+					return false, nil
+				}
+				return func(t *testing.T) {
+					calls := em.DispatchCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.EqualValues(t, []string{"invalid"}, calls[0].Args)
+				}
+			},
+			wantErr: true,
+			errMsg:  `extension "invalid" not found`,
+		},
+		{
+			name: "exec extension with arguments",
+			args: []string{"exec", "test", "arg1", "arg2", "--flag1"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.DispatchFunc = func(args []string, stdin io.Reader, stdout, stderr io.Writer) (bool, error) {
+					fmt.Fprintf(stdout, "test output")
+					return true, nil
+				}
+				return func(t *testing.T) {
+					calls := em.DispatchCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.EqualValues(t, []string{"test", "arg1", "arg2", "--flag1"}, calls[0].Args)
+				}
+			},
+			wantStdout: "test output",
 		},
 	}
 

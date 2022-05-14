@@ -153,27 +153,6 @@ func TestManager_Dispatch(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 }
 
-func TestManager_Dispatch_repo(t *testing.T) {
-	tempDir := t.TempDir()
-	extPath := filepath.Join(tempDir, "extensions", "gh-hello", "gh-hello")
-	assert.NoError(t, stubExtension(extPath))
-
-	m := newTestManager(tempDir, nil, nil)
-
-	stdout := &bytes.Buffer{}
-	stderr := &bytes.Buffer{}
-	found, err := m.Dispatch([]string{"owner/gh-hello", "one", "two"}, nil, stdout, stderr)
-	assert.NoError(t, err)
-	assert.True(t, found)
-
-	if runtime.GOOS == "windows" {
-		assert.Equal(t, fmt.Sprintf("[sh -c command \"$@\" -- %s one two]\n", extPath), stdout.String())
-	} else {
-		assert.Equal(t, fmt.Sprintf("[%s one two]\n", extPath), stdout.String())
-	}
-	assert.Equal(t, "", stderr.String())
-}
-
 func TestManager_Dispatch_binary(t *testing.T) {
 	tempDir := t.TempDir()
 	extPath := filepath.Join(tempDir, "extensions", "gh-hello")

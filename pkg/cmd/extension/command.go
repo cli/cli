@@ -29,11 +29,10 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 			The name of the extension repository must start with "gh-" and it must contain an
 			executable of the same name. All arguments passed to the %[1]sgh <extname>%[1]s invocation
-			will be forwarded to the %[1]sgh-<extname>%[1]s executable of the extension. You can also
-			pass the extension repository's organization and name like "owner/gh-extension" to
-			disambiguate extensions with the same <extname>.
+			will be forwarded to the %[1]sgh-<extname>%[1]s executable of the extension.
 
-			An extension cannot override any of the core gh commands.
+			An extension cannot override any of the core gh commands. If an extension name conflicts
+			with a core gh command you can use %[1]sgh extension exec <extname>%[1]s.
 
 			See the list of available extensions at <https://github.com/topics/gh-extension>.
 		`, "`"),
@@ -81,21 +80,21 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				Use:   "install <repository>",
 				Short: "Install a gh extension from a repository",
 				Long: heredoc.Doc(`
-				Install a GitHub repository locally as a GitHub CLI extension.
+					Install a GitHub repository locally as a GitHub CLI extension.
 
-				The repository argument can be specified in "owner/repo" format as well as a full URL.
-				The URL format is useful when the repository is not hosted on github.com.
+					The repository argument can be specified in "owner/repo" format as well as a full URL.
+					The URL format is useful when the repository is not hosted on github.com.
 
-				To install an extension in development from the current directory, use "." as the
-				value of the repository argument.
+					To install an extension in development from the current directory, use "." as the
+					value of the repository argument.
 
-				See the list of available extensions at <https://github.com/topics/gh-extension>.
-			`),
+					See the list of available extensions at <https://github.com/topics/gh-extension>.
+				`),
 				Example: heredoc.Doc(`
-				$ gh extension install owner/gh-extension
-				$ gh extension install https://git.example.com/owner/gh-extension
-				$ gh extension install .
-			`),
+					$ gh extension install owner/gh-extension
+					$ gh extension install https://git.example.com/owner/gh-extension
+					$ gh extension install .
+				`),
 				Args: cmdutil.MinimumArgs(1, "must specify a repository to install from"),
 				RunE: func(cmd *cobra.Command, args []string) error {
 					if args[0] == "." {
@@ -219,27 +218,25 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			},
 		},
 		&cobra.Command{
-			Use:   "run <name> [args]",
-			Short: "Run an installed extension",
+			Use:   "exec <name> [args]",
+			Short: "Execute an installed extension",
 			Long: heredoc.Doc(`
-			Run an extension using either the extension name, or the extension repository's
-			organization and name. For example, if the extension repository is
-			"owner/gh-extension", you can pass either "extension" or "owner/gh-extension".
+				Execute an extension using the short name. For example, if the extension repository is
+				"owner/gh-extension", you should pass "extension". You can use this command when
+				the short name conflicts with a core gh command.
 
-			Use the extension repository's organization and name to disambiguate extensions
-			that have the same name, or share a name with a built-in command.
-
-			All arguments after the extension name will be forwarded to the executable
-			of the extension.
+				All arguments after the extension name will be forwarded to the executable
+				of the extension.
 			`),
 			Example: heredoc.Doc(`
-			$ gh extension run extension
-			$ gh extension run owner/gh-extension
+				# execute a label extension instead of the core gh label command
+				$ gh extension exec label
 			`),
-			Args: cobra.MinimumNArgs(1),
+			Args:               cobra.MinimumNArgs(1),
+			DisableFlagParsing: true,
 			RunE: func(cmd *cobra.Command, args []string) error {
-				if found, err := m.Dispatch(args, os.Stdin, os.Stdout, os.Stderr); !found {
-					return fmt.Errorf("command %s not found", args[0])
+				if found, err := m.Dispatch(args, io.In, io.Out, io.ErrOut); !found {
+					return fmt.Errorf("extension %q not found", args[0])
 				} else {
 					return err
 				}
@@ -270,17 +267,17 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				Use:   "create [<name>]",
 				Short: "Create a new extension",
 				Example: heredoc.Doc(`
-				# Use interactively
-				gh extension create
+					# Use interactively
+					gh extension create
 
-				# Create a script-based extension
-				gh extension create foobar
+					# Create a script-based extension
+					gh extension create foobar
 
-				# Create a Go extension
-				gh extension create --precompiled=go foobar
+					# Create a Go extension
+					gh extension create --precompiled=go foobar
 
-				# Create a non-Go precompiled extension
-				gh extension create --precompiled=other foobar
+					# Create a non-Go precompiled extension
+					gh extension create --precompiled=other foobar
 				`),
 				Args: cobra.MaximumNArgs(1),
 				RunE: func(cmd *cobra.Command, args []string) error {
@@ -346,19 +343,19 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					}
 					link := "https://docs.github.com/github-cli/github-cli/creating-github-cli-extensions"
 					out := heredoc.Docf(`
-					%[1]s Created directory %[2]s
-					%[1]s Initialized git repository
-					%[1]s Set up extension scaffolding
-					%[6]s
-					%[2]s is ready for development!
+						%[1]s Created directory %[2]s
+						%[1]s Initialized git repository
+						%[1]s Set up extension scaffolding
+						%[6]s
+						%[2]s is ready for development!
 
-					%[4]s
-					%[5]s
-					- commit and use 'gh repo create' to share your extension with others
+						%[4]s
+						%[5]s
+						- commit and use 'gh repo create' to share your extension with others
 
-					For more information on writing extensions:
-					%[3]s
-				`, cs.SuccessIcon(), fullName, link, cs.Bold("Next Steps"), steps, goBinChecks)
+						For more information on writing extensions:
+						%[3]s
+					`, cs.SuccessIcon(), fullName, link, cs.Bold("Next Steps"), steps, goBinChecks)
 					fmt.Fprint(io.Out, out)
 					return nil
 				},
