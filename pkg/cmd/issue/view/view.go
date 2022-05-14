@@ -147,7 +147,8 @@ func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error),
 	fieldSet.AddValues(fields)
 	fieldSet.Add("id")
 
-	issue, repo, err := issueShared.IssueFromArgWithFields(client, baseRepoFn, selector, fieldSet.ToSlice())
+	issue, repo, err := issueShared.NewFinder(client, baseRepoFn, progressIndicator).IssueFromArgWithFields(selector, fieldSet.ToSlice())
+
 	if err != nil {
 		return issue, err
 	}
