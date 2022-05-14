@@ -13,9 +13,12 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
-// IssueFromArgWithFields loads an issue or pull request with the specified fields. If some of the fields
-// could not be fetched by GraphQL, this returns a non-nil issue and a *PartialLoadError.
-func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.Interface, error), arg string, fields []string) (*api.Issue, ghrepo.Interface, error) {
+type issueFinder struct {
+	httpClient *http.Client
+	baseRepoFn func() (ghrepo.Interface, error)
+}
+
+func (f issueFinder) IssueFromArgWithFields(arg string, fields []string) (*api.Issue, ghrepo.Interface, error) {
 	issueNumber, baseRepo := issueMetadataFromURL(arg)
 
 	if issueNumber == 0 {
@@ -28,14 +31,25 @@ func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.I
 
 	if baseRepo == nil {
 		var err error
-		baseRepo, err = baseRepoFn()
+		baseRepo, err = f.baseRepoFn()
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not determine base repo: %w", err)
 		}
 	}
 
-	issue, err := findIssueOrPR(httpClient, baseRepo, issueNumber, fields)
+	issue, err := findIssueOrPR(f.httpClient, baseRepo, issueNumber, fields)
 	return issue, baseRepo, err
+}
+
+// IssueFromArgWithFields loads an issue or pull request with the specified fields. If some of the fields
+// could not be fetched by GraphQL, this returns a non-nil issue and a *PartialLoadError.
+func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.Interface, error), arg string, fields []string) (*api.Issue, ghrepo.Interface, error) {
+	i := issueFinder{
+		httpClient: httpClient,
+		baseRepoFn: baseRepoFn,
+	}
+
+	return i.IssueFromArgWithFields(arg, fields)
 }
 
 var issueURLRE = regexp.MustCompile(`^/([^/]+)/([^/]+)/issues/(\d+)`)
