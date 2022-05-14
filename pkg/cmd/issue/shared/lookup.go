@@ -18,13 +18,22 @@ type progressIndicator interface {
 	StopProgressIndicator()
 }
 
-type issueFinder struct {
+type IssueFinder struct {
 	httpClient *http.Client
 	baseRepoFn func() (ghrepo.Interface, error)
 	progress   progressIndicator
 }
 
-func (f issueFinder) IssueFromArgWithFields(arg string, fields []string) (*api.Issue, ghrepo.Interface, error) {
+func NewFinder(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), progress progressIndicator) IssueFinder {
+
+	return IssueFinder{
+		httpClient: client,
+		baseRepoFn: baseRepoFn,
+		progress:   progress,
+	}
+}
+
+func (f IssueFinder) IssueFromArgWithFields(arg string, fields []string) (*api.Issue, ghrepo.Interface, error) {
 	issueNumber, baseRepo := issueMetadataFromURL(arg)
 
 	if issueNumber == 0 {
@@ -55,11 +64,11 @@ func (f issueFinder) IssueFromArgWithFields(arg string, fields []string) (*api.I
 // IssueFromArgWithFields loads an issue or pull request with the specified fields. If some of the fields
 // could not be fetched by GraphQL, this returns a non-nil issue and a *PartialLoadError.
 func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.Interface, error), arg string, fields []string) (*api.Issue, ghrepo.Interface, error) {
-	i := issueFinder{
-		httpClient: httpClient,
-		baseRepoFn: baseRepoFn,
-		progress:   nil,
-	}
+	i := NewFinder(
+		httpClient,
+		baseRepoFn,
+		nil,
+	)
 
 	return i.IssueFromArgWithFields(arg, fields)
 }
