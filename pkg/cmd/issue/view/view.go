@@ -102,9 +102,7 @@ func viewRun(opts *ViewOptions) error {
 		lookupFields.Remove("lastComment")
 	}
 
-	opts.IO.StartProgressIndicator()
-	issue, err := findIssue(httpClient, opts.BaseRepo, opts.SelectorArg, lookupFields.ToSlice())
-	opts.IO.StopProgressIndicator()
+	issue, err := findIssue(httpClient, opts.BaseRepo, opts.IO, opts.SelectorArg, lookupFields.ToSlice())
 	if err != nil {
 		var loadErr *issueShared.PartialLoadError
 		if opts.Exporter == nil && errors.As(err, &loadErr) {
@@ -144,7 +142,7 @@ func viewRun(opts *ViewOptions) error {
 	return printRawIssuePreview(opts.IO.Out, issue)
 }
 
-func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, fields []string) (*api.Issue, error) {
+func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), progressIndicator *iostreams.IOStreams, selector string, fields []string) (*api.Issue, error) {
 	fieldSet := set.NewStringSet()
 	fieldSet.AddValues(fields)
 	fieldSet.Add("id")
