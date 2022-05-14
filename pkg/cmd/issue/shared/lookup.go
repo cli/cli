@@ -13,9 +13,15 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
+type progressIndicator interface {
+	StartProgressIndicator()
+	StopProgressIndicator()
+}
+
 type issueFinder struct {
 	httpClient *http.Client
 	baseRepoFn func() (ghrepo.Interface, error)
+	progress   progressIndicator
 }
 
 func (f issueFinder) IssueFromArgWithFields(arg string, fields []string) (*api.Issue, ghrepo.Interface, error) {
@@ -37,6 +43,11 @@ func (f issueFinder) IssueFromArgWithFields(arg string, fields []string) (*api.I
 		}
 	}
 
+	if f.progress != nil {
+		f.progress.StartProgressIndicator()
+		defer f.progress.StopProgressIndicator()
+	}
+
 	issue, err := findIssueOrPR(f.httpClient, baseRepo, issueNumber, fields)
 	return issue, baseRepo, err
 }
@@ -47,6 +58,7 @@ func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.I
 	i := issueFinder{
 		httpClient: httpClient,
 		baseRepoFn: baseRepoFn,
+		progress:   nil,
 	}
 
 	return i.IssueFromArgWithFields(arg, fields)
