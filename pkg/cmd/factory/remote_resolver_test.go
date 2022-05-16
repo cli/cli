@@ -11,6 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type identityTranslator struct{}
+
+func (it identityTranslator) Translate(u *url.URL) *url.URL {
+	return u
+}
+
 func Test_remoteResolver(t *testing.T) {
 	orig_GH_HOST := os.Getenv("GH_HOST")
 	t.Cleanup(func() {
@@ -240,11 +246,9 @@ func Test_remoteResolver(t *testing.T) {
 				os.Setenv("GH_HOST", tt.override)
 			}
 			rr := &remoteResolver{
-				readRemotes: tt.remotes,
-				getConfig:   tt.config,
-				urlTranslator: func(u *url.URL) *url.URL {
-					return u
-				},
+				readRemotes:   tt.remotes,
+				getConfig:     tt.config,
+				urlTranslator: identityTranslator{},
 			}
 			resolver := rr.Resolver()
 			remotes, err := resolver()
