@@ -390,21 +390,22 @@ func (m *mergeContext) deleteLocalBranch() error {
 			return err
 		}
 
-		if git.HasLocalBranch(m.pr.BaseRefName) {
-			if err := git.CheckoutBranch(m.pr.BaseRefName); err != nil {
+		targetBranch := m.pr.BaseRefName
+		if git.HasLocalBranch(targetBranch) {
+			if err := git.CheckoutBranch(targetBranch); err != nil {
 				return err
 			}
 		} else {
-			if err := git.CheckoutNewBranch(baseRemote.Name, m.pr.BaseRefName); err != nil {
+			if err := git.CheckoutNewBranch(baseRemote.Name, targetBranch); err != nil {
 				return err
 			}
 		}
 
-		if err := git.Pull(baseRemote.Name, m.pr.BaseRefName); err != nil {
-			_ = m.warnf(fmt.Sprintf("%s warning: not possible to fast-forward to: %q\n", m.cs.WarningIcon(), m.pr.BaseRefName))
+		if err := git.Pull(baseRemote.Name, targetBranch); err != nil {
+			_ = m.warnf(fmt.Sprintf("%s warning: not possible to fast-forward to: %q\n", m.cs.WarningIcon(), targetBranch))
 		}
 
-		m.switchedToBranch = m.pr.BaseRefName
+		m.switchedToBranch = targetBranch
 	}
 
 	if err := git.DeleteLocalBranch(m.pr.HeadRefName); err != nil {
