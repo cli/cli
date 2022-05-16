@@ -145,14 +145,16 @@ func TestPullRequest_ExportData(t *testing.T) {
 							"conclusion": "SUCCESS",
 							"startedAt": "2020-08-31T15:44:24+02:00",
 							"completedAt": "2020-08-31T15:45:24+02:00",
-							"detailsUrl": "http://example.com/details"
+							"detailsUrl": "http://example.com/details",
+							"isRequired": false
 						},
 						{
 							"__typename": "StatusContext",
 							"context": "mycontext",
 							"state": "SUCCESS",
 							"createdAt": "2020-08-31T15:44:24+02:00",
-							"targetUrl": "http://example.com/details"
+							"targetUrl": "http://example.com/details",
+							"isRequired": false
 						}
 					] } } } }
 				] } }
@@ -168,14 +170,16 @@ func TestPullRequest_ExportData(t *testing.T) {
 							"conclusion": "SUCCESS",
 							"startedAt": "2020-08-31T15:44:24+02:00",
 							"completedAt": "2020-08-31T15:45:24+02:00",
-							"detailsUrl": "http://example.com/details"
+							"detailsUrl": "http://example.com/details",
+							"isRequired": false
 						},
 						{
 							"__typename": "StatusContext",
 							"context": "mycontext",
 							"state": "SUCCESS",
 							"startedAt": "2020-08-31T15:44:24+02:00",
-							"targetUrl": "http://example.com/details"
+							"targetUrl": "http://example.com/details",
+							"isRequired": false
 						}
 					]
 				}

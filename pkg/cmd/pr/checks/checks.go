@@ -27,6 +27,7 @@ type ChecksOptions struct {
 	WebMode     bool
 	Interval    time.Duration
 	Watch       bool
+	Required    bool
 }
 
 func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Command {
@@ -82,6 +83,7 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to show details about checks")
 	cmd.Flags().BoolVarP(&opts.Watch, "watch", "", false, "Watch checks until they finish")
 	cmd.Flags().IntVarP(&interval, "interval", "i", 10, "Refresh interval in seconds when using `--watch` flag")
+	cmd.Flags().BoolVar(&opts.Required, "required", false, "Only show checks that are required")
 
 	return cmd
 }
@@ -139,7 +141,7 @@ func checksRun(opts *ChecksOptions) error {
 			break
 		}
 
-		checks, counts, err = aggregateChecks(pr)
+		checks, counts, err = aggregateChecks(pr, opts.Required)
 		if err != nil {
 			break
 		}

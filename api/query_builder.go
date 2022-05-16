@@ -144,7 +144,8 @@ func StatusCheckRollupGraphQL(after string) string {
 								context,
 								state,
 								targetUrl,
-								createdAt
+								createdAt,
+								isRequired(pullRequestNumber: $pr_number)
 							},
 							...on CheckRun {
 								name,
@@ -153,7 +154,8 @@ func StatusCheckRollupGraphQL(after string) string {
 								conclusion,
 								startedAt,
 								completedAt,
-								detailsUrl
+								detailsUrl,
+								isRequired(pullRequestNumber: $pr_number)
 							}
 						},
 						pageInfo{hasNextPage,endCursor}

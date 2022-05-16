@@ -64,6 +64,14 @@ func TestNewCmdChecks(t *testing.T) {
 			cli:        "--interval 5",
 			wantsError: "cannot use `--interval` flag without `--watch` flag",
 		},
+		{
+			name: "required flag",
+			cli:  "--required",
+			wants: ChecksOptions{
+				Required: true,
+				Interval: time.Duration(10000000000),
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -95,19 +103,21 @@ func TestNewCmdChecks(t *testing.T) {
 			assert.Equal(t, tt.wants.SelectorArg, gotOpts.SelectorArg)
 			assert.Equal(t, tt.wants.Watch, gotOpts.Watch)
 			assert.Equal(t, tt.wants.Interval, gotOpts.Interval)
+			assert.Equal(t, tt.wants.Required, gotOpts.Required)
 		})
 	}
 }
 
 func Test_checksRun(t *testing.T) {
 	tests := []struct {
-		name    string
-		fixture string
-		prJSON  string
-		tty     bool
-		watch   bool
-		wantOut string
-		wantErr string
+		name     string
+		fixture  string
+		prJSON   string
+		tty      bool
+		watch    bool
+		required bool
+		wantOut  string
+		wantErr  string
 	}{
 		{
 			name:    "no commits",
@@ -196,6 +206,21 @@ func Test_checksRun(t *testing.T) {
 			wantOut: "All checks were successful\n0 failing, 1 successful, 2 skipped, and 0 pending checks\n\n✓  cool tests  1m26s  sweet link\n-  rad tests   1m26s  sweet link\n-  skip tests  1m26s  sweet link\n",
 			wantErr: "",
 		},
+		{
+			name:     "only required",
+			fixture:  "./fixtures/onlyRequired.json",
+			tty:      true,
+			wantOut:  "All checks were successful\n0 failing, 1 successful, 0 skipped, and 0 pending checks\n\n✓  cool tests  1m26s  sweet link\n",
+			wantErr:  "",
+			required: true,
+		},
+		{
+			name:     "no required checks",
+			fixture:  "./fixtures/someSkipping.json",
+			wantOut:  "",
+			wantErr:  "no required checks reported on the 'master' branch",
+			required: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -222,6 +247,7 @@ func Test_checksRun(t *testing.T) {
 				SelectorArg: "123",
 				Finder:      shared.NewMockFinder("123", response, ghrepo.New("OWNER", "REPO")),
 				Watch:       tt.watch,
+				Required:    tt.required,
 			}
 
 			err := checksRun(opts)

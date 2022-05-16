@@ -96,6 +96,7 @@ type PullRequest struct {
 type CheckContext struct {
 	TypeName   string `json:"__typename"`
 	Name       string `json:"name"`
+	IsRequired bool   `json:"isRequired"`
 	CheckSuite struct {
 		WorkflowRun struct {
 			Workflow struct {

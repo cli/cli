@@ -50,6 +50,7 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 							"startedAt":    c.StartedAt,
 							"completedAt":  c.CompletedAt,
 							"detailsUrl":   c.DetailsURL,
+							"isRequired":   c.IsRequired,
 						})
 					} else {
 						checks = append(checks, map[string]interface{}{
@@ -58,6 +59,7 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 							"state":      c.State,
 							"targetUrl":  c.TargetURL,
 							"startedAt":  c.CreatedAt,
+							"isRequired": c.IsRequired,
 						})
 					}
 				}
