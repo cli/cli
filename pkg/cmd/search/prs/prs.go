@@ -45,7 +45,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 			$ gh search prs --repo=cli/cli --draft
 
 			# search open pull requests requesting your review
-      $ gh search prs --review-requested=@me --state=open
+			$ gh search prs --review-requested=@me --state=open
 
 			# search merged pull requests assigned to yourself
 			$ gh search prs --assignee=@me --merged
