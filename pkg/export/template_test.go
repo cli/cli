@@ -263,6 +263,38 @@ func Test_executeTemplate(t *testing.T) {
 			},
 			wantW: "This is a ...",
 		},
+		{
+			name: "truncate with JSON null",
+			args: args{
+				json:     strings.NewReader(`{}`),
+				template: `{{ truncate 13 .title }}`,
+			},
+			wantW: "",
+		},
+		{
+			name: "truncate with piped JSON null",
+			args: args{
+				json:     strings.NewReader(`{}`),
+				template: `{{ .title | truncate 13 }}`,
+			},
+			wantW: "",
+		},
+		{
+			name: "truncate with piped JSON null in parenthetical",
+			args: args{
+				json:     strings.NewReader(`{}`),
+				template: `{{ (.title | truncate 13) }}`,
+			},
+			wantW: "",
+		},
+		{
+			name: "truncate invalid type",
+			args: args{
+				json:     strings.NewReader(`{"title": 42}`),
+				template: `{{ (.title | truncate 13) }}`,
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
