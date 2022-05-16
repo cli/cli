@@ -2,6 +2,7 @@ package rerun
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 	"testing"
@@ -92,6 +93,31 @@ func TestNewCmdRerun(t *testing.T) {
 			cli:      "--job",
 			wantsErr: true,
 		},
+		{
+			name: "debug nontty",
+			cli:  "4321 --debug",
+			wants: RerunOptions{
+				RunID: "4321",
+				Debug: true,
+			},
+		},
+		{
+			name: "debug tty",
+			tty:  true,
+			cli:  "--debug",
+			wants: RerunOptions{
+				Prompt: true,
+				Debug:  true,
+			},
+		},
+		{
+			name: "debug off",
+			cli:  "4321 --debug=false",
+			wants: RerunOptions{
+				RunID: "4321",
+				Debug: false,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -142,6 +168,7 @@ func TestRerun(t *testing.T) {
 		wantErr   bool
 		errOut    string
 		wantOut   string
+		wantDebug bool
 	}{
 		{
 			name: "arg",
@@ -191,6 +218,61 @@ func TestRerun(t *testing.T) {
 					httpmock.StringResponse("{}"))
 			},
 			wantOut: "✓ Requested rerun of job 20 on run 1234\n",
+		},
+		{
+			name: "arg including debug",
+			tty:  true,
+			opts: &RerunOptions{
+				RunID: "1234",
+				Debug: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/1234/rerun"),
+					httpmock.StringResponse("{}"))
+			},
+			wantOut:   "✓ Requested rerun of run 1234 with debug logging enabled\n",
+			wantDebug: true,
+		},
+		{
+			name: "arg including onlyFailed and debug",
+			tty:  true,
+			opts: &RerunOptions{
+				RunID:      "1234",
+				OnlyFailed: true,
+				Debug:      true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
+					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/1234/rerun-failed-jobs"),
+					httpmock.StringResponse("{}"))
+			},
+			wantOut:   "✓ Requested rerun (failed jobs) of run 1234 with debug logging enabled\n",
+			wantDebug: true,
+		},
+		{
+			name: "arg including a specific job and debug",
+			tty:  true,
+			opts: &RerunOptions{
+				JobID: "20", // 20 is shared.FailedJob.ID
+				Debug: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/jobs/20"),
+					httpmock.JSONResponse(shared.FailedJob))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/jobs/20/rerun"),
+					httpmock.StringResponse("{}"))
+			},
+			wantOut:   "✓ Requested rerun of job 20 on run 1234 with debug logging enabled\n",
+			wantDebug: true,
 		},
 		{
 			name: "prompt",
@@ -286,6 +368,24 @@ func TestRerun(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantOut, stdout.String())
 			reg.Verify(t)
+
+			for _, d := range reg.Requests {
+				if d.Method != "POST" {
+					continue
+				}
+
+				if !tt.wantDebug {
+					assert.Nil(t, d.Body)
+					continue
+				}
+
+				data, err := io.ReadAll(d.Body)
+				assert.NoError(t, err)
+				var payload RerunPayload
+				err = json.Unmarshal(data, &payload)
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantDebug, payload.Debug)
+			}
 		})
 	}
 }
