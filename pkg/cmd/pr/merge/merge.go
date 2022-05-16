@@ -269,14 +269,14 @@ func (m *mergeContext) merge() error {
 		setCommitBody: m.opts.BodySet,
 	}
 
-	if m.addToMergeQueue() && !m.opts.InteractiveMode {
+	if m.shouldAddToMergeQueue() && !m.opts.InteractiveMode {
 		_ = m.warnf("%s A merge strategy cannot be set when adding a pull request to the merge queue\n", m.cs.FailureIconWithColor(m.cs.Red))
 		return cmdutil.SilentError
 	}
 
 	// get user input if not already given
 	if m.opts.InteractiveMode {
-		if m.addToMergeQueue() {
+		if m.shouldAddToMergeQueue() {
 			// auto merge will either enable auto merge or add to the merge queue
 			payload.auto = true
 		} else {
@@ -322,7 +322,7 @@ func (m *mergeContext) merge() error {
 		return err
 	}
 
-	if m.addToMergeQueue() {
+	if m.shouldAddToMergeQueue() {
 		_ = m.infof("%s Pull request #%d will be added to the merge queue for %s when ready\n", m.cs.SuccessIconWithColor(m.cs.Green), m.pr.Number, m.pr.BaseRefName)
 		return nil
 	}
@@ -441,7 +441,7 @@ func (m *mergeContext) deleteRemoteBranch() error {
 
 // Add the Pull Request to a merge queue
 // Admins can bypass the queue and merge directly
-func (m *mergeContext) addToMergeQueue() bool {
+func (m *mergeContext) shouldAddToMergeQueue() bool {
 	return m.mergeQueueRequired && !m.opts.UseAdmin
 }
 
