@@ -21,7 +21,7 @@ type label struct {
 	Color       string    `json:"color"`
 	CreatedAt   time.Time `json:"createdAt"`
 	Description string    `json:"description"`
-	ID          string    `json:"id"`
+	ID          string    `json:"node_id"`
 	IsDefault   bool      `json:"isDefault"`
 	Name        string    `json:"name"`
 	URL         string    `json:"url"`
