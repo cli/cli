@@ -1377,7 +1377,7 @@ func TestPrInMergeQueue(t *testing.T) {
 	output, err := runCommand(http, "blueberries", true, "pr merge 1")
 	assert.EqualError(t, err, "SilentError")
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "X Pull request #1 is queued to merge\n", output.Stderr())
+	assert.Equal(t, "! Pull request #1 is already queued to merge\n", output.Stderr())
 }
 
 func TestPrAddToMergeQueueWithMergeMethod(t *testing.T) {
@@ -1445,7 +1445,7 @@ func TestPrAddToMergeQueueClean(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Pull request #1 will be added to the merge queue for main when ready\n", output.Stderr())
+	assert.Equal(t, "✓ Pull request #1 will be added to the merge queue for main when ready\n", output.Stderr())
 }
 
 func TestPrAddToMergeQueueBlocked(t *testing.T) {
@@ -1485,7 +1485,7 @@ func TestPrAddToMergeQueueBlocked(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Pull request #1 will be added to the merge queue for main when ready\n", output.Stderr())
+	assert.Equal(t, "✓ Pull request #1 will be added to the merge queue for main when ready\n", output.Stderr())
 }
 
 func TestPrAddToMergeQueueAdmin(t *testing.T) {
