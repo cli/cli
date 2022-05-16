@@ -9,6 +9,7 @@ require (
 	github.com/charmbracelet/glamour v0.4.0
 	github.com/charmbracelet/lipgloss v0.5.0
 	github.com/cli/browser v1.1.0
+	github.com/cli/go-gh v0.0.4-0.20220517195232-b7131b0759cc
 	github.com/cli/oauth v0.9.0
 	github.com/cli/safeexec v1.0.0
 	github.com/cli/shurcooL-graphql v0.0.1
@@ -67,7 +68,6 @@ require (
 	github.com/yuin/goldmark-emoji v1.0.1 // indirect
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
 	golang.org/x/oauth2 v0.0.0-20220309155454-6242fa91716a // indirect
-	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 )
 
 replace golang.org/x/crypto => github.com/cli/crypto v0.0.0-20210929142629-6be313f59b03
