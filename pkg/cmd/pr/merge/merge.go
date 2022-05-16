@@ -197,7 +197,7 @@ func (m *mergeContext) disableAutoMerge() error {
 func (m *mergeContext) inMergeQueue() error {
 	// if the pull request is in a merge queue no further action is possible
 	if m.pr.IsInMergeQueue {
-		_ = m.warnf("%s Pull request #%d is queued to merge\n", m.cs.FailureIconWithColor(m.cs.Red), m.pr.Number)
+		_ = m.warnf("%s Pull request #%d is already queued to merge\n", m.cs.WarningIcon(), m.pr.Number)
 		return cmdutil.SilentError
 	}
 	return nil
@@ -323,7 +323,7 @@ func (m *mergeContext) merge() error {
 	}
 
 	if m.addToMergeQueue() {
-		_ = m.infof("Pull request #%d will be added to the merge queue for %s when ready\n", m.pr.Number, m.pr.BaseRefName)
+		_ = m.infof("%s Pull request #%d will be added to the merge queue for %s when ready\n", m.cs.SuccessIconWithColor(m.cs.Green), m.pr.Number, m.pr.BaseRefName)
 		return nil
 	}
 
