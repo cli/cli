@@ -1,4 +1,4 @@
-package remove
+package delete
 
 import (
 	"bytes"
@@ -14,11 +14,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewCmdRemove(t *testing.T) {
+func TestNewCmdDelete(t *testing.T) {
 	tests := []struct {
 		name     string
 		cli      string
-		wants    RemoveOptions
+		wants    DeleteOptions
 		wantsErr bool
 	}{
 		{
@@ -28,14 +28,14 @@ func TestNewCmdRemove(t *testing.T) {
 		{
 			name: "repo",
 			cli:  "cool",
-			wants: RemoveOptions{
+			wants: DeleteOptions{
 				SecretName: "cool",
 			},
 		},
 		{
 			name: "org",
 			cli:  "cool --org anOrg",
-			wants: RemoveOptions{
+			wants: DeleteOptions{
 				SecretName: "cool",
 				OrgName:    "anOrg",
 			},
@@ -43,7 +43,7 @@ func TestNewCmdRemove(t *testing.T) {
 		{
 			name: "env",
 			cli:  "cool --env anEnv",
-			wants: RemoveOptions{
+			wants: DeleteOptions{
 				SecretName: "cool",
 				EnvName:    "anEnv",
 			},
@@ -51,7 +51,7 @@ func TestNewCmdRemove(t *testing.T) {
 		{
 			name: "user",
 			cli:  "cool -u",
-			wants: RemoveOptions{
+			wants: DeleteOptions{
 				SecretName:  "cool",
 				UserSecrets: true,
 			},
@@ -59,7 +59,7 @@ func TestNewCmdRemove(t *testing.T) {
 		{
 			name: "Dependabot repo",
 			cli:  "cool --app Dependabot",
-			wants: RemoveOptions{
+			wants: DeleteOptions{
 				SecretName:  "cool",
 				Application: "Dependabot",
 			},
@@ -67,7 +67,7 @@ func TestNewCmdRemove(t *testing.T) {
 		{
 			name: "Dependabot org",
 			cli:  "cool --app Dependabot --org UmbrellaCorporation",
-			wants: RemoveOptions{
+			wants: DeleteOptions{
 				SecretName:  "cool",
 				OrgName:     "UmbrellaCorporation",
 				Application: "Dependabot",
@@ -85,8 +85,8 @@ func TestNewCmdRemove(t *testing.T) {
 			argv, err := shlex.Split(tt.cli)
 			assert.NoError(t, err)
 
-			var gotOpts *RemoveOptions
-			cmd := NewCmdRemove(f, func(opts *RemoveOptions) error {
+			var gotOpts *DeleteOptions
+			cmd := NewCmdDelete(f, func(opts *DeleteOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -113,12 +113,12 @@ func TestNewCmdRemove(t *testing.T) {
 func Test_removeRun_repo(t *testing.T) {
 	tests := []struct {
 		name     string
-		opts     *RemoveOptions
+		opts     *DeleteOptions
 		wantPath string
 	}{
 		{
 			name: "Actions",
-			opts: &RemoveOptions{
+			opts: &DeleteOptions{
 				Application: "actions",
 				SecretName:  "cool_secret",
 			},
@@ -126,7 +126,7 @@ func Test_removeRun_repo(t *testing.T) {
 		},
 		{
 			name: "Dependabot",
-			opts: &RemoveOptions{
+			opts: &DeleteOptions{
 				Application: "dependabot",
 				SecretName:  "cool_dependabot_secret",
 			},
@@ -134,7 +134,7 @@ func Test_removeRun_repo(t *testing.T) {
 		},
 		{
 			name: "defaults to Actions",
-			opts: &RemoveOptions{
+			opts: &DeleteOptions{
 				SecretName: "cool_secret",
 			},
 			wantPath: "repos/owner/repo/actions/secrets/cool_secret",
@@ -177,7 +177,7 @@ func Test_removeRun_env(t *testing.T) {
 
 	ios, _, _, _ := iostreams.Test()
 
-	opts := &RemoveOptions{
+	opts := &DeleteOptions{
 		IO: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
@@ -201,19 +201,19 @@ func Test_removeRun_env(t *testing.T) {
 func Test_removeRun_org(t *testing.T) {
 	tests := []struct {
 		name     string
-		opts     *RemoveOptions
+		opts     *DeleteOptions
 		wantPath string
 	}{
 		{
 			name: "org",
-			opts: &RemoveOptions{
+			opts: &DeleteOptions{
 				OrgName: "UmbrellaCorporation",
 			},
 			wantPath: "orgs/UmbrellaCorporation/actions/secrets/tVirus",
 		},
 		{
 			name: "Dependabot org",
-			opts: &RemoveOptions{
+			opts: &DeleteOptions{
 				Application: "dependabot",
 				OrgName:     "UmbrellaCorporation",
 			},
@@ -262,7 +262,7 @@ func Test_removeRun_user(t *testing.T) {
 
 	ios, _, _, _ := iostreams.Test()
 
-	opts := &RemoveOptions{
+	opts := &DeleteOptions{
 		IO: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil

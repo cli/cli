@@ -1,4 +1,4 @@
-package remove
+package delete
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type RemoveOptions struct {
+type DeleteOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
@@ -27,18 +27,18 @@ type RemoveOptions struct {
 	Application string
 }
 
-func NewCmdRemove(f *cmdutil.Factory, runF func(*RemoveOptions) error) *cobra.Command {
-	opts := &RemoveOptions{
+func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
+	opts := &DeleteOptions{
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
 	}
 
 	cmd := &cobra.Command{
-		Use:   "remove <secret-name>",
-		Short: "Remove secrets",
+		Use:   "delete <secret-name>",
+		Short: "Delete secrets",
 		Long: heredoc.Doc(`
-			Remove a secret on one of the following levels:
+			Delete a secret on one of the following levels:
 			- repository (default): available to Actions runs or Dependabot in a repository
 			- environment: available to Actions runs for a deployment environment in a repository
 			- organization: available to Actions runs or Dependabot within an organization
@@ -61,16 +61,19 @@ func NewCmdRemove(f *cmdutil.Factory, runF func(*RemoveOptions) error) *cobra.Co
 
 			return removeRun(opts)
 		},
+		Aliases: []string{
+			"remove",
+		},
 	}
-	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Remove a secret for an organization")
-	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Remove a secret for an environment")
-	cmd.Flags().BoolVarP(&opts.UserSecrets, "user", "u", false, "Remove a secret for your user")
-	cmdutil.StringEnumFlag(cmd, &opts.Application, "app", "a", "", []string{shared.Actions, shared.Codespaces, shared.Dependabot}, "Remove a secret for a specific application")
+	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Delete a secret for an organization")
+	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Delete a secret for an environment")
+	cmd.Flags().BoolVarP(&opts.UserSecrets, "user", "u", false, "Delete a secret for your user")
+	cmdutil.StringEnumFlag(cmd, &opts.Application, "app", "a", "", []string{shared.Actions, shared.Codespaces, shared.Dependabot}, "Delete a secret for a specific application")
 
 	return cmd
 }
 
-func removeRun(opts *RemoveOptions) error {
+func removeRun(opts *DeleteOptions) error {
 	c, err := opts.HttpClient()
 	if err != nil {
 		return fmt.Errorf("could not create http client: %w", err)
@@ -142,9 +145,9 @@ func removeRun(opts *RemoveOptions) error {
 
 		cs := opts.IO.ColorScheme()
 		if envName != "" {
-			fmt.Fprintf(opts.IO.Out, "%s Removed secret %s from %s environment on %s\n", cs.SuccessIconWithColor(cs.Red), opts.SecretName, envName, target)
+			fmt.Fprintf(opts.IO.Out, "%s Deleted secret %s from %s environment on %s\n", cs.SuccessIconWithColor(cs.Red), opts.SecretName, envName, target)
 		} else {
-			fmt.Fprintf(opts.IO.Out, "%s Removed %s secret %s from %s\n", cs.SuccessIconWithColor(cs.Red), secretApp.Title(), opts.SecretName, target)
+			fmt.Fprintf(opts.IO.Out, "%s Deleted %s secret %s from %s\n", cs.SuccessIconWithColor(cs.Red), secretApp.Title(), opts.SecretName, target)
 		}
 	}
 
