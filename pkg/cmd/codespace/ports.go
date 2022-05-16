@@ -22,6 +22,11 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const (
+	vscodeServerPortName       = "VSCodeServerInternal"
+	codespacesInternalPortName = "CodespacesInternal"
+)
+
 // newPortsCmd returns a Cobra "ports" command that displays a table of available ports,
 // according to the specified flags.
 func newPortsCmd(app *App) *cobra.Command {
@@ -74,13 +79,19 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, exporter cmdu
 		a.errLogger.Printf("Failed to get port names: %v", devContainerResult.err.Error())
 	}
 
-	portInfos := make([]*portInfo, len(ports))
-	for i, p := range ports {
-		portInfos[i] = &portInfo{
+	var portInfos []*portInfo
+
+	for _, p := range ports {
+		p := p
+		// filter out internal ports from list
+		if strings.HasPrefix(p.SessionName, vscodeServerPortName) || strings.HasPrefix(p.SessionName, codespacesInternalPortName) {
+			continue
+		}
+		portInfos = append(portInfos, &portInfo{
 			Port:         p,
 			codespace:    codespace,
 			devContainer: devContainerResult.devContainer,
-		}
+		})
 	}
 
 	if err := a.io.StartPager(); err != nil {
