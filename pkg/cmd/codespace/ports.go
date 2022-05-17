@@ -82,7 +82,6 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, exporter cmdu
 	var portInfos []*portInfo
 
 	for _, p := range ports {
-		p := p
 		// filter out internal ports from list
 		if strings.HasPrefix(p.SessionName, vscodeServerPortName) || strings.HasPrefix(p.SessionName, codespacesInternalPortName) {
 			continue
