@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,6 +9,8 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+
+	"github.com/imdario/mergo"
 )
 
 var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
@@ -21,8 +24,13 @@ func findNextPage(resp *http.Response) (string, bool) {
 	return "", false
 }
 
-func findEndCursor(r io.Reader) string {
-	dec := json.NewDecoder(r)
+func findEndCursor(responseBody io.ReadSeeker) string {
+	_, err := responseBody.Seek(0, io.SeekStart)
+	if err != nil {
+		return ""
+	}
+
+	dec := json.NewDecoder(responseBody)
 
 	var idx int
 	var stack []json.Delim
@@ -105,4 +113,36 @@ func addPerPage(p string, perPage int, params map[string]interface{}) string {
 	}
 
 	return fmt.Sprintf("%s%sper_page=%d", p, sep, perPage)
+}
+
+func mergeJSON(v *interface{}, responseBody io.ReadSeeker) error {
+	_, err := responseBody.Seek(0, io.SeekStart)
+	if err != nil {
+		return err
+	}
+
+	b, err := io.ReadAll(responseBody)
+	if err != nil {
+		return err
+	}
+
+	var m interface{}
+	if bytes.HasPrefix(b, []byte("{")) {
+		if *v == nil {
+			*v = new(map[string]interface{})
+		}
+		m = new(map[string]interface{})
+	} else if bytes.HasPrefix(b, []byte("[")) {
+		if *v == nil {
+			*v = new([]interface{})
+		}
+		m = new([]interface{})
+	}
+
+	err = json.Unmarshal(b, &m)
+	if err != nil {
+		return err
+	}
+
+	return mergo.Merge(*v, m, mergo.WithAppendSlice, mergo.WithOverride)
 }

@@ -304,15 +304,46 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
+	var resp *http.Response
+	var responseBody io.ReadSeeker
+	var pages interface{}
+	var serverError string
+
+	isJSONRegexp := regexp.MustCompile(`[/+]json(;|$)`)
+	isJSON := false
 	hasNextPage := true
+
 	for hasNextPage {
-		resp, err := httpRequest(httpClient, host, method, requestPath, requestBody, requestHeaders)
+		resp, err = httpRequest(httpClient, host, method, requestPath, requestBody, requestHeaders)
 		if err != nil {
 			return err
 		}
 
-		endCursor, err := processResponse(resp, opts, bodyWriter, headersWriter, &tmpl)
+		if resp.StatusCode == 204 {
+			return nil
+		}
+
+		b, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
 		if err != nil {
+			return err
+		}
+
+		responseBody = bytes.NewReader(b)
+
+		isJSON = isJSONRegexp.MatchString(resp.Header.Get("Content-Type"))
+		if isJSON && (opts.RequestPath == "graphql" || resp.StatusCode >= 400) {
+			serverError, err = parseErrorResponse(responseBody, resp.StatusCode)
+			if err != nil {
+				return err
+			}
+		}
+
+		err = processServerError(serverError, resp, opts)
+		if err != nil {
+			// Print the server error message before exiting
+			_ = printResponse(responseBody, opts, isJSON, serverError, bodyWriter, &tmpl)
 			return err
 		}
 
@@ -320,7 +351,15 @@ func apiRun(opts *ApiOptions) error {
 			break
 		}
 
+		if isJSON {
+			err = mergeJSON(&pages, responseBody)
+			if err != nil {
+				return err
+			}
+		}
+
 		if isGraphQL {
+			endCursor := findEndCursor(responseBody)
 			hasNextPage = endCursor != ""
 			if hasNextPage {
 				params["endCursor"] = endCursor
@@ -329,43 +368,55 @@ func apiRun(opts *ApiOptions) error {
 			requestPath, hasNextPage = findNextPage(resp)
 			requestBody = nil // prevent repeating GET parameters
 		}
-
-		if hasNextPage && opts.ShowResponseHeaders {
-			fmt.Fprint(opts.IO.Out, "\n")
-		}
 	}
 
-	return tmpl.Flush()
-}
+	if opts.Paginate && isJSON {
+		var buf []byte
+		buf, err = json.Marshal(pages)
+		if err != nil {
+			return err
+		}
 
-func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersWriter io.Writer, template *template.Template) (endCursor string, err error) {
+		responseBody = bytes.NewReader(buf)
+	}
+
 	if opts.ShowResponseHeaders {
 		fmt.Fprintln(headersWriter, resp.Proto, resp.Status)
 		printHeaders(headersWriter, resp.Header, opts.IO.ColorEnabled())
 		fmt.Fprint(headersWriter, "\r\n")
 	}
 
-	if resp.StatusCode == 204 {
-		return
+	err = printResponse(responseBody, opts, isJSON, serverError, bodyWriter, &tmpl)
+	if err != nil {
+		return err
 	}
-	var responseBody io.Reader = resp.Body
-	defer resp.Body.Close()
 
-	isJSON, _ := regexp.MatchString(`[/+]json(;|$)`, resp.Header.Get("Content-Type"))
+	return tmpl.Flush()
+}
 
-	var serverError string
-	if isJSON && (opts.RequestPath == "graphql" || resp.StatusCode >= 400) {
-		responseBody, serverError, err = parseErrorResponse(responseBody, resp.StatusCode)
-		if err != nil {
-			return
+func processServerError(serverError string, resp *http.Response, opts *ApiOptions) error {
+	if serverError == "" && resp.StatusCode > 299 {
+		serverError = fmt.Sprintf("HTTP %d", resp.StatusCode)
+	}
+
+	if serverError != "" {
+		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
+		if msg := api.ScopesSuggestion(resp); msg != "" {
+			fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", msg)
 		}
+		if u := factory.SSOURL(); u != "" {
+			fmt.Fprintf(opts.IO.ErrOut, "Authorize in your web browser: %s\n", u)
+		}
+		return cmdutil.SilentError
 	}
 
-	var bodyCopy *bytes.Buffer
-	isGraphQLPaginate := isJSON && resp.StatusCode == 200 && opts.Paginate && opts.RequestPath == "graphql"
-	if isGraphQLPaginate {
-		bodyCopy = &bytes.Buffer{}
-		responseBody = io.TeeReader(responseBody, bodyCopy)
+	return nil
+}
+
+func printResponse(responseBody io.ReadSeeker, opts *ApiOptions, isJSON bool, serverError string, bodyWriter io.Writer, template *template.Template) (err error) {
+	_, err = responseBody.Seek(0, io.SeekStart)
+	if err != nil {
+		return
 	}
 
 	if opts.FilterOutput != "" && serverError == "" {
@@ -384,29 +435,6 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 	} else {
 		_, err = io.Copy(bodyWriter, responseBody)
 	}
-	if err != nil {
-		return
-	}
-
-	if serverError == "" && resp.StatusCode > 299 {
-		serverError = fmt.Sprintf("HTTP %d", resp.StatusCode)
-	}
-	if serverError != "" {
-		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
-		if msg := api.ScopesSuggestion(resp); msg != "" {
-			fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", msg)
-		}
-		if u := factory.SSOURL(); u != "" {
-			fmt.Fprintf(opts.IO.ErrOut, "Authorize in your web browser: %s\n", u)
-		}
-		err = cmdutil.SilentError
-		return
-	}
-
-	if isGraphQLPaginate {
-		endCursor = findEndCursor(bodyCopy)
-	}
-
 	return
 }
 
@@ -537,46 +565,51 @@ func openUserFile(fn string, stdin io.ReadCloser) (io.ReadCloser, int64, error) 
 	return r, s.Size(), nil
 }
 
-func parseErrorResponse(r io.Reader, statusCode int) (io.Reader, string, error) {
-	bodyCopy := &bytes.Buffer{}
-	b, err := io.ReadAll(io.TeeReader(r, bodyCopy))
+func parseErrorResponse(responseBody io.ReadSeeker, statusCode int) (string, error) {
+	_, err := responseBody.Seek(0, io.SeekStart)
 	if err != nil {
-		return r, "", err
+		return "", err
 	}
 
 	var parsedBody struct {
 		Message string
 		Errors  json.RawMessage
 	}
+
+	b, err := io.ReadAll(responseBody)
+	if err != nil {
+		return "", err
+	}
+
 	err = json.Unmarshal(b, &parsedBody)
 	if err != nil {
-		return bodyCopy, "", err
+		return "", err
 	}
 
 	if len(parsedBody.Errors) > 0 && parsedBody.Errors[0] == '"' {
 		var stringError string
 		if err := json.Unmarshal(parsedBody.Errors, &stringError); err != nil {
-			return bodyCopy, "", err
+			return "", err
 		}
 		if stringError != "" {
 			if parsedBody.Message != "" {
-				return bodyCopy, fmt.Sprintf("%s (%s)", stringError, parsedBody.Message), nil
+				return fmt.Sprintf("%s (%s)", stringError, parsedBody.Message), nil
 			}
-			return bodyCopy, stringError, nil
+			return stringError, nil
 		}
 	}
 
 	if parsedBody.Message != "" {
-		return bodyCopy, fmt.Sprintf("%s (HTTP %d)", parsedBody.Message, statusCode), nil
+		return fmt.Sprintf("%s (HTTP %d)", parsedBody.Message, statusCode), nil
 	}
 
 	if len(parsedBody.Errors) == 0 || parsedBody.Errors[0] != '[' {
-		return bodyCopy, "", nil
+		return "", nil
 	}
 
 	var errorObjects []json.RawMessage
 	if err := json.Unmarshal(parsedBody.Errors, &errorObjects); err != nil {
-		return bodyCopy, "", err
+		return "", err
 	}
 
 	var objectError struct {
@@ -590,24 +623,24 @@ func parseErrorResponse(r io.Reader, statusCode int) (io.Reader, string, error) 
 		if rawErr[0] == '{' {
 			err := json.Unmarshal(rawErr, &objectError)
 			if err != nil {
-				return bodyCopy, "", err
+				return "", err
 			}
 			errors = append(errors, objectError.Message)
 		} else if rawErr[0] == '"' {
 			var stringError string
 			err := json.Unmarshal(rawErr, &stringError)
 			if err != nil {
-				return bodyCopy, "", err
+				return "", err
 			}
 			errors = append(errors, stringError)
 		}
 	}
 
 	if len(errors) > 0 {
-		return bodyCopy, strings.Join(errors, "\n"), nil
+		return strings.Join(errors, "\n"), nil
 	}
 
-	return bodyCopy, "", nil
+	return "", nil
 }
 
 func previewNamesToMIMETypes(names []string) string {

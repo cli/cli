@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -18,7 +17,6 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/go-gh/pkg/template"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -491,6 +489,34 @@ func Test_apiRun(t *testing.T) {
 			stderr: ``,
 		},
 		{
+			name: "output template with range",
+			options: ApiOptions{
+				Template: `{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " }}){{"\n"}}{{end}}`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 200,
+				Body: io.NopCloser(bytes.NewBufferString(`[
+					{
+						"title": "First title",
+						"labels": [{"name":"bug"}, {"name":"help wanted"}]
+					},
+					{
+						"title": "Second but not last"
+					},
+					{
+						"title": "Alas, tis' the end",
+						"labels": [{}, {"name":"feature"}]
+					}
+				]`)),
+				Header: http.Header{"Content-Type": []string{"application/json"}},
+			},
+			stdout: heredoc.Doc(`
+			First title (bug, help wanted)
+			Second but not last ()
+			Alas, tis' the end (, feature)
+		`),
+		},
+		{
 			name: "output template when REST error",
 			options: ApiOptions{
 				Template: `{{.status}}`,
@@ -571,22 +597,26 @@ func Test_apiRun_paginationREST(t *testing.T) {
 	responses := []*http.Response{
 		{
 			StatusCode: 200,
-			Body:       io.NopCloser(bytes.NewBufferString(`{"page":1}`)),
+			Body:       io.NopCloser(bytes.NewBufferString(`[{"page":1}]`)),
 			Header: http.Header{
-				"Link": []string{`<https://api.github.com/repositories/1227/issues?page=2>; rel="next", <https://api.github.com/repositories/1227/issues?page=3>; rel="last"`},
+				"Content-Type": []string{"application/json"},
+				"Link":         []string{`<https://api.github.com/repositories/1227/issues?page=2>; rel="next", <https://api.github.com/repositories/1227/issues?page=3>; rel="last"`},
 			},
 		},
 		{
 			StatusCode: 200,
-			Body:       io.NopCloser(bytes.NewBufferString(`{"page":2}`)),
+			Body:       io.NopCloser(bytes.NewBufferString(`[{"page":2}]`)),
 			Header: http.Header{
-				"Link": []string{`<https://api.github.com/repositories/1227/issues?page=3>; rel="next", <https://api.github.com/repositories/1227/issues?page=3>; rel="last"`},
+				"Content-Type": []string{"application/json"},
+				"Link":         []string{`<https://api.github.com/repositories/1227/issues?page=3>; rel="next", <https://api.github.com/repositories/1227/issues?page=3>; rel="last"`},
 			},
 		},
 		{
 			StatusCode: 200,
-			Body:       io.NopCloser(bytes.NewBufferString(`{"page":3}`)),
-			Header:     http.Header{},
+			Body:       io.NopCloser(bytes.NewBufferString(`[{"page":3}]`)),
+			Header: http.Header{
+				"Content-Type": []string{"application/json"},
+			},
 		},
 	}
 
@@ -615,7 +645,80 @@ func Test_apiRun_paginationREST(t *testing.T) {
 	err := apiRun(&options)
 	assert.NoError(t, err)
 
-	assert.Equal(t, `{"page":1}{"page":2}{"page":3}`, stdout.String(), "stdout")
+	assert.Equal(t, `[{"page":1},{"page":2},{"page":3}]`, stdout.String(), "stdout")
+	assert.Equal(t, "", stderr.String(), "stderr")
+
+	assert.Equal(t, "https://api.github.com/issues?page=1&per_page=50", responses[0].Request.URL.String())
+	assert.Equal(t, "https://api.github.com/repositories/1227/issues?page=2", responses[1].Request.URL.String())
+	assert.Equal(t, "https://api.github.com/repositories/1227/issues?page=3", responses[2].Request.URL.String())
+}
+
+func Test_apiRun_paginationREST_with_headers(t *testing.T) {
+	ios, _, stdout, stderr := iostreams.Test()
+
+	requestCount := 0
+	responses := []*http.Response{
+		{
+			Proto:      "HTTP/1.1",
+			Status:     "200 OK",
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBufferString(`[{"page":1}]`)),
+			Header: http.Header{
+				"Content-Type":        []string{"application/json"},
+				"Link":                []string{`<https://api.github.com/repositories/1227/issues?page=2>; rel="next", <https://api.github.com/repositories/1227/issues?page=3>; rel="last"`},
+				"X-Github-Request-Id": []string{"1"},
+			},
+		},
+		{
+			Proto:      "HTTP/1.1",
+			Status:     "200 OK",
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBufferString(`[{"page":2}]`)),
+			Header: http.Header{
+				"Content-Type":        []string{"application/json"},
+				"Link":                []string{`<https://api.github.com/repositories/1227/issues?page=3>; rel="next", <https://api.github.com/repositories/1227/issues?page=3>; rel="last"`},
+				"X-Github-Request-Id": []string{"2"},
+			},
+		},
+		{
+			Proto:      "HTTP/1.1",
+			Status:     "200 OK",
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBufferString(`[{"page":3}]`)),
+			Header: http.Header{
+				"Content-Type":        []string{"application/json"},
+				"X-Github-Request-Id": []string{"3"},
+			},
+		},
+	}
+
+	options := ApiOptions{
+		IO: ios,
+		HttpClient: func() (*http.Client, error) {
+			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+				resp := responses[requestCount]
+				resp.Request = req
+				requestCount++
+				return resp, nil
+			}
+			return &http.Client{Transport: tr}, nil
+		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+
+		RequestMethod:       "GET",
+		RequestMethodPassed: true,
+		RequestPath:         "issues",
+		Paginate:            true,
+		RawFields:           []string{"per_page=50", "page=1"},
+		ShowResponseHeaders: true,
+	}
+
+	err := apiRun(&options)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "HTTP/1.1 200 OK\nContent-Type: application/json\r\nX-Github-Request-Id: 3\r\n\r\n[{\"page\":1},{\"page\":2},{\"page\":3}]", stdout.String(), "stdout")
 	assert.Equal(t, "", stderr.String(), "stderr")
 
 	assert.Equal(t, "https://api.github.com/issues?page=1&per_page=50", responses[0].Request.URL.String())
@@ -766,7 +869,8 @@ func Test_apiRun_paginated_template(t *testing.T) {
 		RequestPath:   "graphql",
 		Paginate:      true,
 		// test that templates executed per page properly render a table.
-		Template: `{{range .data.nodes}}{{tablerow .page .caption}}{{end}}`,
+		// use explicit {{tablerender}} to assert all pages are rendered together when paginating.
+		Template: `{{range .data.nodes}}{{tablerow .page .caption}}{{end}}{{tablerender}}`,
 	}
 
 	err := apiRun(&options)
@@ -1271,50 +1375,6 @@ func Test_previewNamesToMIMETypes(t *testing.T) {
 	}
 }
 
-func Test_processResponse_template(t *testing.T) {
-	ios, _, stdout, stderr := iostreams.Test()
-
-	resp := http.Response{
-		StatusCode: 200,
-		Header: map[string][]string{
-			"Content-Type": {"application/json"},
-		},
-		Body: io.NopCloser(strings.NewReader(`[
-			{
-				"title": "First title",
-				"labels": [{"name":"bug"}, {"name":"help wanted"}]
-			},
-			{
-				"title": "Second but not last"
-			},
-			{
-				"title": "Alas, tis' the end",
-				"labels": [{}, {"name":"feature"}]
-			}
-		]`)),
-	}
-
-	opts := ApiOptions{
-		IO:       ios,
-		Template: `{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " }}){{"\n"}}{{end}}`,
-	}
-
-	tmpl := template.New(ios.Out, ios.TerminalWidth(), ios.ColorEnabled())
-	err := tmpl.Parse(opts.Template)
-	require.NoError(t, err)
-	_, err = processResponse(&resp, &opts, ios.Out, io.Discard, &tmpl)
-	require.NoError(t, err)
-	err = tmpl.Flush()
-	require.NoError(t, err)
-
-	assert.Equal(t, heredoc.Doc(`
-		First title (bug, help wanted)
-		Second but not last ()
-		Alas, tis' the end (, feature)
-	`), stdout.String())
-	assert.Equal(t, "", stderr.String())
-}
-
 func Test_parseErrorResponse(t *testing.T) {
 	type args struct {
 		input      string
@@ -1383,15 +1443,13 @@ func Test_parseErrorResponse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1, err := parseErrorResponse(strings.NewReader(tt.args.input), tt.args.statusCode)
+			responseBody := bytes.NewReader([]byte(tt.args.input))
+			got, err := parseErrorResponse(responseBody, tt.args.statusCode)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseErrorResponse() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if gotString, _ := io.ReadAll(got); tt.args.input != string(gotString) {
-				t.Errorf("parseErrorResponse() got = %q, want %q", string(gotString), tt.args.input)
-			}
-			if got1 != tt.wantErrMsg {
-				t.Errorf("parseErrorResponse() got1 = %q, want %q", got1, tt.wantErrMsg)
+			if got != tt.wantErrMsg {
+				t.Errorf("parseErrorResponse() got1 = %q, want %q", got, tt.wantErrMsg)
 			}
 		})
 	}
