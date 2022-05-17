@@ -13,27 +13,9 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
-type progressIndicator interface {
-	StartProgressIndicator()
-	StopProgressIndicator()
-}
-
-type IssueFinder struct {
-	httpClient *http.Client
-	baseRepoFn func() (ghrepo.Interface, error)
-	progress   progressIndicator
-}
-
-func NewFinder(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), progress progressIndicator) IssueFinder {
-
-	return IssueFinder{
-		httpClient: client,
-		baseRepoFn: baseRepoFn,
-		progress:   progress,
-	}
-}
-
-func (f IssueFinder) IssueFromArgWithFields(arg string, fields []string) (*api.Issue, ghrepo.Interface, error) {
+// IssueFromArgWithFields loads an issue or pull request with the specified fields. If some of the fields
+// could not be fetched by GraphQL, this returns a non-nil issue and a *PartialLoadError.
+func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.Interface, error), arg string, fields []string) (*api.Issue, ghrepo.Interface, error) {
 	issueNumber, baseRepo := issueMetadataFromURL(arg)
 
 	if issueNumber == 0 {
@@ -46,31 +28,14 @@ func (f IssueFinder) IssueFromArgWithFields(arg string, fields []string) (*api.I
 
 	if baseRepo == nil {
 		var err error
-		baseRepo, err = f.baseRepoFn()
+		baseRepo, err = baseRepoFn()
 		if err != nil {
 			return nil, nil, fmt.Errorf("could not determine base repo: %w", err)
 		}
 	}
 
-	if f.progress != nil {
-		f.progress.StartProgressIndicator()
-		defer f.progress.StopProgressIndicator()
-	}
-
-	issue, err := findIssueOrPR(f.httpClient, baseRepo, issueNumber, fields)
+	issue, err := findIssueOrPR(httpClient, baseRepo, issueNumber, fields)
 	return issue, baseRepo, err
-}
-
-// IssueFromArgWithFields loads an issue or pull request with the specified fields. If some of the fields
-// could not be fetched by GraphQL, this returns a non-nil issue and a *PartialLoadError.
-func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.Interface, error), arg string, fields []string) (*api.Issue, ghrepo.Interface, error) {
-	i := NewFinder(
-		httpClient,
-		baseRepoFn,
-		nil,
-	)
-
-	return i.IssueFromArgWithFields(arg, fields)
 }
 
 var issueURLRE = regexp.MustCompile(`^/([^/]+)/([^/]+)/issues/(\d+)`)

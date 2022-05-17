@@ -102,7 +102,9 @@ func viewRun(opts *ViewOptions) error {
 		lookupFields.Remove("lastComment")
 	}
 
-	issue, err := findIssue(httpClient, opts.BaseRepo, opts.IO, opts.SelectorArg, lookupFields.ToSlice())
+	opts.IO.StartProgressIndicator()
+	issue, err := findIssue(httpClient, opts.BaseRepo, opts.SelectorArg, lookupFields.ToSlice())
+	opts.IO.StopProgressIndicator()
 	if err != nil {
 		var loadErr *issueShared.PartialLoadError
 		if opts.Exporter == nil && errors.As(err, &loadErr) {
@@ -142,13 +144,12 @@ func viewRun(opts *ViewOptions) error {
 	return printRawIssuePreview(opts.IO.Out, issue)
 }
 
-func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), progressIndicator *iostreams.IOStreams, selector string, fields []string) (*api.Issue, error) {
+func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error), selector string, fields []string) (*api.Issue, error) {
 	fieldSet := set.NewStringSet()
 	fieldSet.AddValues(fields)
 	fieldSet.Add("id")
 
-	issue, repo, err := issueShared.NewFinder(client, baseRepoFn, progressIndicator).IssueFromArgWithFields(selector, fieldSet.ToSlice())
-
+	issue, repo, err := issueShared.IssueFromArgWithFields(client, baseRepoFn, selector, fieldSet.ToSlice())
 	if err != nil {
 		return issue, err
 	}
