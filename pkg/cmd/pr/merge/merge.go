@@ -101,9 +101,6 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 				methodFlags++
 			}
 			if methodFlags == 0 {
-				if !opts.IO.CanPrompt() {
-					return cmdutil.FlagErrorf("--merge, --rebase, or --squash required when not running interactively")
-				}
 				opts.MergeStrategyEmpty = true
 			} else if methodFlags > 1 {
 				return cmdutil.FlagErrorf("only one of --merge, --rebase, or --squash can be enabled")
@@ -279,6 +276,10 @@ func (m *mergeContext) merge() error {
 	} else {
 		// get user input if not already given
 		if m.opts.MergeStrategyEmpty {
+			if !m.opts.IO.CanPrompt() {
+				return cmdutil.FlagErrorf("--merge, --rebase, or --squash required when not running interactively")
+			}
+
 			apiClient := api.NewClientFromHTTP(m.httpClient)
 			r, err := api.GitHubRepo(apiClient, m.baseRepo)
 			if err != nil {

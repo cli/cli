@@ -131,12 +131,6 @@ func Test_NewCmdMerge(t *testing.T) {
 			wantErr: "argument required when using the --repo flag",
 		},
 		{
-			name:    "insufficient flags in non-interactive mode",
-			args:    "123",
-			isTTY:   false,
-			wantErr: "--merge, --rebase, or --squash required when not running interactively",
-		},
-		{
 			name:    "multiple merge methods",
 			args:    "123 --merge --rebase",
 			isTTY:   true,
@@ -1108,6 +1102,7 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 
 func TestPRMerge_interactiveSquashEditCommitMsgAndSubject(t *testing.T) {
 	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdinTTY(true)
 	ios.SetStdoutTTY(true)
 	ios.SetStderrTTY(true)
 
@@ -1181,6 +1176,33 @@ func TestPRMerge_interactiveSquashEditCommitMsgAndSubject(t *testing.T) {
 
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "✓ Squashed and merged pull request #123 (title)\n", stderr.String())
+}
+
+func TestPRMergeEmptyStrategyNonTTY(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "CLEAN",
+			BaseRefName:      "main",
+		},
+		baseRepo("OWNER", "REPO", "main"),
+	)
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+
+	output, err := runCommand(http, "blueberries", false, "pr merge 1")
+	assert.EqualError(t, err, "--merge, --rebase, or --squash required when not running interactively")
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestPRMerge_interactiveCancelled(t *testing.T) {
