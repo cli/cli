@@ -28,67 +28,11 @@ func TestPullRequestFeatures(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:     "GHE empty response",
+			name:     "GHE",
 			hostname: "git.my.org",
-			queryResponse: map[string]string{
-				`query PullRequest_fields\b`:  `{"data": {}}`,
-				`query PullRequest_fields2\b`: `{"data": {}}`,
-			},
-			wantFeatures: PullRequestFeatures{
-				ReviewDecision:       false,
-				StatusCheckRollup:    false,
-				BranchProtectionRule: false}, wantErr: false,
-		},
-		{
-			name:     "GHE has reviewDecision",
-			hostname: "git.my.org",
-			queryResponse: map[string]string{
-				`query PullRequest_fields\b`: heredoc.Doc(`
-					{ "data": { "PullRequest": { "fields": [
-						{"name": "reviewDecision"}
-					] } } }
-				`),
-				`query PullRequest_fields2\b`: `{"data": {}}`,
-			},
 			wantFeatures: PullRequestFeatures{
 				ReviewDecision:       true,
-				StatusCheckRollup:    false,
-				BranchProtectionRule: false,
-			},
-			wantErr: false,
-		},
-		{
-			name:     "GHE has statusCheckRollup",
-			hostname: "git.my.org",
-			queryResponse: map[string]string{
-				`query PullRequest_fields\b`: heredoc.Doc(`
-					{ "data": { "Commit": { "fields": [
-						{"name": "statusCheckRollup"}
-					] } } }
-				`),
-				`query PullRequest_fields2\b`: `{"data": {}}`,
-			},
-			wantFeatures: PullRequestFeatures{
-				ReviewDecision:       false,
 				StatusCheckRollup:    true,
-				BranchProtectionRule: false,
-			},
-			wantErr: false,
-		},
-		{
-			name:     "GHE has branchProtectionRule",
-			hostname: "git.my.org",
-			queryResponse: map[string]string{
-				`query PullRequest_fields\b`: `{"data": {}}`,
-				`query PullRequest_fields2\b`: heredoc.Doc(`
-					{ "data": { "Ref": { "fields": [
-						{"name": "branchProtectionRule"}
-					] } } }
-				`),
-			},
-			wantFeatures: PullRequestFeatures{
-				ReviewDecision:       false,
-				StatusCheckRollup:    false,
 				BranchProtectionRule: true,
 			},
 			wantErr: false,
@@ -138,25 +82,7 @@ func TestRepositoryFeatures(t *testing.T) {
 				`query Repository_fields\b`: `{"data": {}}`,
 			},
 			wantFeatures: RepositoryFeatures{
-				IssueTemplateMutation:    false,
-				IssueTemplateQuery:       false,
-				PullRequestTemplateQuery: false,
-			},
-			wantErr: false,
-		},
-		{
-			name:     "GHE has issue template query",
-			hostname: "git.my.org",
-			queryResponse: map[string]string{
-				`query Repository_fields\b`: heredoc.Doc(`
-					{ "data": { "Repository": { "fields": [
-						{"name": "issueTemplates"}
-					] } } }
-				`),
-				`query PullRequest_fields2\b`: `{"data": {}}`,
-			},
-			wantFeatures: RepositoryFeatures{
-				IssueTemplateMutation:    false,
+				IssueTemplateMutation:    true,
 				IssueTemplateQuery:       true,
 				PullRequestTemplateQuery: false,
 			},
@@ -171,29 +97,11 @@ func TestRepositoryFeatures(t *testing.T) {
 						{"name": "pullRequestTemplates"}
 					] } } }
 				`),
-				`query PullRequest_fields2\b`: `{"data": {}}`,
-			},
-			wantFeatures: RepositoryFeatures{
-				IssueTemplateMutation:    false,
-				IssueTemplateQuery:       false,
-				PullRequestTemplateQuery: true,
-			},
-			wantErr: false,
-		},
-		{
-			name:     "GHE has issue template mutation",
-			hostname: "git.my.org",
-			queryResponse: map[string]string{
-				`query Repository_fields\b`: heredoc.Doc(`
-					{ "data": { "CreateIssueInput": { "inputFields": [
-						{"name": "issueTemplate"}
-					] } } }
-				`),
 			},
 			wantFeatures: RepositoryFeatures{
 				IssueTemplateMutation:    true,
-				IssueTemplateQuery:       false,
-				PullRequestTemplateQuery: false,
+				IssueTemplateQuery:       true,
+				PullRequestTemplateQuery: true,
 			},
 			wantErr: false,
 		},

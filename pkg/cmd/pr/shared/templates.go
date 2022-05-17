@@ -141,16 +141,16 @@ func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, dir stri
 }
 
 func (m *templateManager) hasAPI() (bool, error) {
+	if !m.isPR {
+		return true, nil
+	}
+
 	features, err := m.detector.RepositoryFeatures()
 	if err != nil {
 		return false, err
 	}
 
-	if m.isPR {
-		return features.PullRequestTemplateQuery, nil
-	} else {
-		return features.IssueTemplateMutation && features.IssueTemplateQuery, nil
-	}
+	return features.PullRequestTemplateQuery, nil
 }
 
 func (m *templateManager) HasTemplates() (bool, error) {

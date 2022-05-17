@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/set"
@@ -188,28 +187,12 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 }
 
 func pullRequestFragment(httpClient *http.Client, hostname string) (string, error) {
-	detector := fd.NewDetector(httpClient, hostname)
-	features, err := detector.PullRequestFeatures()
-	if err != nil {
-		return "", err
-	}
-
 	fields := []string{
 		"number", "title", "state", "url", "isDraft", "isCrossRepository",
 		"headRefName", "headRepositoryOwner", "mergeStateStatus",
+		"statusCheckRollup", "requiresStrictStatusChecks",
 	}
-	if features.StatusCheckRollup {
-		fields = append(fields, "statusCheckRollup")
-	}
-	if features.BranchProtectionRule {
-		fields = append(fields, "requiresStrictStatusChecks")
-	}
-
-	var reviewFields []string
-	if features.ReviewDecision {
-		reviewFields = append(reviewFields, "reviewDecision", "latestReviews")
-	}
-
+	reviewFields := []string{"reviewDecision", "latestReviews"}
 	fragments := fmt.Sprintf(`
 	fragment pr on PullRequest {%s}
 	fragment prWithReviews on PullRequest {...pr,%s}
