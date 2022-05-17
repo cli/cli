@@ -198,8 +198,8 @@ type CodespaceMachine struct {
 	Name            string `json:"name"`
 	DisplayName     string `json:"display_name"`
 	OperatingSystem string `json:"operating_system"`
-	StorageInBytes  int64  `json:"storage_in_bytes"`
-	MemoryInBytes   int64  `json:"memory_in_bytes"`
+	StorageInBytes  uint64 `json:"storage_in_bytes"`
+	MemoryInBytes   uint64 `json:"memory_in_bytes"`
 	CPUCount        int    `json:"cpus"`
 }
 
