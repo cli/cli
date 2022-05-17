@@ -973,7 +973,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_crossRepo(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
 }
-func TestPRMerge_interactive(t *testing.T) {
+func TestPRMergeTTY(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
@@ -1031,7 +1031,7 @@ func TestPRMerge_interactive(t *testing.T) {
 	test.ExpectLines(t, output.Stderr(), "Merged pull request #3")
 }
 
-func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
+func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
@@ -1100,7 +1100,7 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 	`), output.Stderr())
 }
 
-func TestPRMerge_interactiveSquashEditCommitMsgAndSubject(t *testing.T) {
+func TestPRMergeTTY_squashEditCommitMsgAndSubject(t *testing.T) {
 	ios, _, stdout, stderr := iostreams.Test()
 	ios.SetStdinTTY(true)
 	ios.SetStdoutTTY(true)
@@ -1205,7 +1205,7 @@ func TestPRMergeEmptyStrategyNonTTY(t *testing.T) {
 	assert.Equal(t, "", output.Stderr())
 }
 
-func TestPRMerge_interactiveCancelled(t *testing.T) {
+func TestPRTTY_cancelled(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
