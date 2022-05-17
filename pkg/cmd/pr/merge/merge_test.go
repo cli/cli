@@ -902,11 +902,8 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-	as, surveyTeardown := prompt.InitAskStubber()
-	defer surveyTeardown()
-	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-	as.StubOne(true)
+	as := prompt.NewAskStubber(t)
+	as.StubPrompt("Pull request #4 was already merged. Delete the branch locally?").AnswerWith(true)
 
 	output, err := runCommand(http, "blueberries", true, "pr merge 4")
 	assert.NoError(t, err)
@@ -1011,24 +1008,17 @@ func TestPRMergeTTY(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-	as, surveyTeardown := prompt.InitAskStubber()
-	defer surveyTeardown()
-
-	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-	as.StubOne(0) // Merge method survey
-	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-	as.StubOne(false) // Delete branch survey
-	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-	as.StubOne("Submit") // Confirm submit survey
+	as := prompt.NewAskStubber(t)
+	as.StubPrompt("What merge method would you like to use?").AnswerDefault()
+	as.StubPrompt("Delete the branch locally and on GitHub?").AnswerDefault()
+	as.StubPrompt("What's next?").AnswerWith("Submit")
 
 	output, err := runCommand(http, "blueberries", true, "")
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
 
-	//nolint:staticcheck // prefer exact matchers over ExpectLines
-	test.ExpectLines(t, output.Stderr(), "Merged pull request #3")
+	assert.Equal(t, "✓ Merged pull request #3 (It was the best of times)\n", output.Stderr())
 }
 
 func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
@@ -1079,14 +1069,9 @@ func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-	as, surveyTeardown := prompt.InitAskStubber()
-	defer surveyTeardown()
-
-	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-	as.StubOne(0) // Merge method survey
-	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-	as.StubOne("Submit") // Confirm submit survey
+	as := prompt.NewAskStubber(t)
+	as.StubPrompt("What merge method would you like to use?").AnswerDefault()
+	as.StubPrompt("What's next?").AnswerWith("Submit")
 
 	output, err := runCommand(http, "blueberries", true, "-d")
 	if err != nil {
@@ -1143,20 +1128,12 @@ func TestPRMergeTTY_squashEditCommitMsgAndSubject(t *testing.T) {
 	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-	as, surveyTeardown := prompt.InitAskStubber()
-	defer surveyTeardown()
-
-	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-	as.StubOne(2) // Merge method survey
-	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-	as.StubOne(false) // Delete branch survey
-	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-	as.StubOne("Edit commit subject") // Confirm submit survey
-	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-	as.StubOne("Edit commit message") // Confirm submit survey
-	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-	as.StubOne("Submit") // Confirm submit survey
+	as := prompt.NewAskStubber(t)
+	as.StubPrompt("What merge method would you like to use?").AnswerWith("Squash and merge")
+	as.StubPrompt("Delete the branch on GitHub?").AnswerDefault()
+	as.StubPrompt("What's next?").AnswerWith("Edit commit message")
+	as.StubPrompt("What's next?").AnswerWith("Edit commit subject")
+	as.StubPrompt("What's next?").AnswerWith("Submit")
 
 	err := mergeRun(&MergeOptions{
 		IO:     ios,
@@ -1229,16 +1206,10 @@ func TestPRTTY_cancelled(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-	as, surveyTeardown := prompt.InitAskStubber()
-	defer surveyTeardown()
-
-	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-	as.StubOne(0) // Merge method survey
-	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-	as.StubOne(true) // Delete branch survey
-	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-	as.StubOne("Cancel") // Confirm submit survey
+	as := prompt.NewAskStubber(t)
+	as.StubPrompt("What merge method would you like to use?").AnswerDefault()
+	as.StubPrompt("Delete the branch locally and on GitHub?").AnswerDefault()
+	as.StubPrompt("What's next?").AnswerWith("Cancel")
 
 	output, err := runCommand(http, "blueberries", true, "")
 	if !errors.Is(err, cmdutil.CancelError) {
@@ -1254,11 +1225,9 @@ func Test_mergeMethodSurvey(t *testing.T) {
 		RebaseMergeAllowed: true,
 		SquashMergeAllowed: true,
 	}
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-	as, surveyTeardown := prompt.InitAskStubber()
-	defer surveyTeardown()
-	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-	as.StubOne(0) // Select first option which is rebase merge
+	as := prompt.NewAskStubber(t)
+	as.StubPrompt("What merge method would you like to use?").AnswerWith("Rebase and merge")
+
 	method, err := mergeMethodSurvey(repo)
 	assert.Nil(t, err)
 	assert.Equal(t, PullRequestMergeMethodRebase, method)
