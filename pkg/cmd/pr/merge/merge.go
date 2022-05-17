@@ -296,10 +296,7 @@ func (m *mergeContext) merge() error {
 				return err
 			}
 
-			allowEditMsg := (payload.method != PullRequestMergeMethodRebase) &&
-				// merging as admin ignores the merge queue if it is required
-				(!m.mergeQueueRequired || m.opts.UseAdmin)
-
+			allowEditMsg := !m.shouldAddToMergeQueue() && payload.method != PullRequestMergeMethodRebase
 			for {
 				action, err := confirmSurvey(allowEditMsg)
 				if err != nil {
