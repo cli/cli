@@ -47,7 +47,7 @@ type MergeOptions struct {
 	UseAdmin                bool
 	IsDeleteBranchIndicated bool
 	CanDeleteLocalBranch    bool
-	InteractiveMode         bool
+	MergeStrategyEmpty      bool
 }
 
 func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Command {
@@ -104,7 +104,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 				if !opts.IO.CanPrompt() {
 					return cmdutil.FlagErrorf("--merge, --rebase, or --squash required when not running interactively")
 				}
-				opts.InteractiveMode = true
+				opts.MergeStrategyEmpty = true
 			} else if methodFlags > 1 {
 				return cmdutil.FlagErrorf("only one of --merge, --rebase, or --squash can be enabled")
 			}
@@ -269,13 +269,13 @@ func (m *mergeContext) merge() error {
 		setCommitBody: m.opts.BodySet,
 	}
 
-	if m.shouldAddToMergeQueue() && !m.opts.InteractiveMode {
-		_ = m.warnf("%s A merge strategy cannot be set when adding a pull request to the merge queue\n", m.cs.FailureIconWithColor(m.cs.Red))
+	if m.shouldAddToMergeQueue() && !m.opts.MergeStrategyEmpty {
+		_ = m.warnf("%s The merge strategy for %s is set by the merge queue\n", m.cs.Yellow("!"), m.pr.BaseRefName)
 		return cmdutil.SilentError
 	}
 
 	// get user input if not already given
-	if m.opts.InteractiveMode {
+	if m.opts.MergeStrategyEmpty {
 		if m.shouldAddToMergeQueue() {
 			// auto merge will either enable auto merge or add to the merge queue
 			payload.auto = true
@@ -356,7 +356,7 @@ func (m *mergeContext) deleteLocalBranch() error {
 
 	if m.merged {
 		// prompt for delete
-		if m.opts.InteractiveMode && !m.opts.IsDeleteBranchIndicated {
+		if m.opts.MergeStrategyEmpty && !m.opts.IsDeleteBranchIndicated {
 			err := prompt.SurveyAskOne(&survey.Confirm{
 				Message: fmt.Sprintf("Pull request #%d was already merged. Delete the branch locally?", m.pr.Number),
 				Default: false,

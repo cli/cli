@@ -52,7 +52,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				IsDeleteBranchIndicated: false,
 				CanDeleteLocalBranch:    true,
 				MergeMethod:             PullRequestMergeMethodMerge,
-				InteractiveMode:         true,
+				MergeStrategyEmpty:      true,
 				Body:                    "",
 				BodySet:                 false,
 			},
@@ -67,7 +67,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				IsDeleteBranchIndicated: true,
 				CanDeleteLocalBranch:    true,
 				MergeMethod:             PullRequestMergeMethodMerge,
-				InteractiveMode:         true,
+				MergeStrategyEmpty:      true,
 				Body:                    "",
 				BodySet:                 false,
 			},
@@ -82,7 +82,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				IsDeleteBranchIndicated: false,
 				CanDeleteLocalBranch:    true,
 				MergeMethod:             PullRequestMergeMethodMerge,
-				InteractiveMode:         true,
+				MergeStrategyEmpty:      true,
 				Body:                    "a body from file",
 				BodySet:                 true,
 			},
@@ -98,7 +98,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				IsDeleteBranchIndicated: false,
 				CanDeleteLocalBranch:    true,
 				MergeMethod:             PullRequestMergeMethodMerge,
-				InteractiveMode:         true,
+				MergeStrategyEmpty:      true,
 				Body:                    "this is on standard input",
 				BodySet:                 true,
 			},
@@ -113,7 +113,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				IsDeleteBranchIndicated: false,
 				CanDeleteLocalBranch:    true,
 				MergeMethod:             PullRequestMergeMethodMerge,
-				InteractiveMode:         true,
+				MergeStrategyEmpty:      true,
 				Body:                    "cool",
 				BodySet:                 true,
 			},
@@ -191,7 +191,7 @@ func Test_NewCmdMerge(t *testing.T) {
 			assert.Equal(t, tt.want.DeleteBranch, opts.DeleteBranch)
 			assert.Equal(t, tt.want.CanDeleteLocalBranch, opts.CanDeleteLocalBranch)
 			assert.Equal(t, tt.want.MergeMethod, opts.MergeMethod)
-			assert.Equal(t, tt.want.InteractiveMode, opts.InteractiveMode)
+			assert.Equal(t, tt.want.MergeStrategyEmpty, opts.MergeStrategyEmpty)
 			assert.Equal(t, tt.want.Body, opts.Body)
 			assert.Equal(t, tt.want.BodySet, opts.BodySet)
 		})
@@ -920,7 +920,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	assert.Equal(t, "✓ Deleted branch blueberries and switched to branch main\n", output.Stderr())
 }
 
-func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
+func TestPrMerge_alreadyMerged_withMergeStrategy(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
@@ -950,7 +950,7 @@ func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
 	assert.Equal(t, "! Pull request #4 was already merged\n", output.Stderr())
 }
 
-func TestPrMerge_alreadyMerged_nonInteractive_crossRepo(t *testing.T) {
+func TestPrMerge_alreadyMerged_withMergeStrategy_crossRepo(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
@@ -1169,8 +1169,8 @@ func TestPRMerge_interactiveSquashEditCommitMsgAndSubject(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: tr}, nil
 		},
-		SelectorArg:     "https://github.com/OWNER/REPO/pull/123",
-		InteractiveMode: true,
+		SelectorArg:        "https://github.com/OWNER/REPO/pull/123",
+		MergeStrategyEmpty: true,
 		Finder: shared.NewMockFinder(
 			"https://github.com/OWNER/REPO/pull/123",
 			&api.PullRequest{ID: "THE-ID", Number: 123, Title: "title", MergeStateStatus: "CLEAN"},
@@ -1394,6 +1394,7 @@ func TestPrAddToMergeQueueWithMergeMethod(t *testing.T) {
 			MergeStateStatus:    "CLEAN",
 			IsInMergeQueue:      false,
 			IsMergeQueueEnabled: true,
+			BaseRefName:         "main",
 		},
 		baseRepo("OWNER", "REPO", "main"),
 	)
@@ -1405,7 +1406,7 @@ func TestPrAddToMergeQueueWithMergeMethod(t *testing.T) {
 	output, err := runCommand(http, "blueberries", true, "pr merge 1 --merge")
 	assert.EqualError(t, err, "SilentError")
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "X A merge strategy cannot be set when adding a pull request to the merge queue\n", output.Stderr())
+	assert.Equal(t, "! The merge strategy for main is set by the merge queue\n", output.Stderr())
 }
 
 func TestPrAddToMergeQueueClean(t *testing.T) {
