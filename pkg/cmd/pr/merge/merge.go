@@ -269,17 +269,16 @@ func (m *mergeContext) merge() error {
 		setCommitBody: m.opts.BodySet,
 	}
 
-	if m.shouldAddToMergeQueue() && !m.opts.MergeStrategyEmpty {
-		_ = m.warnf("%s The merge strategy for %s is set by the merge queue\n", m.cs.Yellow("!"), m.pr.BaseRefName)
-		return cmdutil.SilentError
-	}
-
-	// get user input if not already given
-	if m.opts.MergeStrategyEmpty {
-		if m.shouldAddToMergeQueue() {
-			// auto merge will either enable auto merge or add to the merge queue
-			payload.auto = true
-		} else {
+	if m.shouldAddToMergeQueue() {
+		if !m.opts.MergeStrategyEmpty {
+			// only warn for now
+			_ = m.warnf("%s The merge strategy for %s is set by the merge queue\n", m.cs.Yellow("!"), m.pr.BaseRefName)
+		}
+		// auto merge will either enable auto merge or add to the merge queue
+		payload.auto = true
+	} else {
+		// get user input if not already given
+		if m.opts.MergeStrategyEmpty {
 			apiClient := api.NewClientFromHTTP(m.httpClient)
 			r, err := api.GitHubRepo(apiClient, m.baseRepo)
 			if err != nil {

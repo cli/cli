@@ -1398,15 +1398,24 @@ func TestPrAddToMergeQueueWithMergeMethod(t *testing.T) {
 		},
 		baseRepo("OWNER", "REPO", "main"),
 	)
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestAutoMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+		}),
+	)
 
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, "pr merge 1 --merge")
-	assert.EqualError(t, err, "SilentError")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "! The merge strategy for main is set by the merge queue\n", output.Stderr())
+	assert.Equal(t, "! The merge strategy for main is set by the merge queue\n✓ Pull request #1 will be added to the merge queue for main when ready\n", output.Stderr())
 }
 
 func TestPrAddToMergeQueueClean(t *testing.T) {
