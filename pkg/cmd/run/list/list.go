@@ -126,8 +126,6 @@ func listRun(opts *ListOptions) error {
 
 	cs := opts.IO.ColorScheme()
 
-	out := opts.IO.Out
-
 	if !opts.PlainOutput {
 		tp.AddField("STATUS", nil, nil)
 		tp.AddField("NAME", nil, nil)
@@ -168,11 +166,6 @@ func listRun(opts *ListOptions) error {
 	err = tp.Render()
 	if err != nil {
 		return err
-	}
-
-	if !opts.PlainOutput {
-		fmt.Fprintln(out)
-		fmt.Fprintln(out, "For details on a run, try: gh run view <run-id>")
 	}
 
 	return nil
