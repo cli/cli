@@ -49,6 +49,31 @@ func TestNewCmdCreate(t *testing.T) {
 			wantsErr: true,
 		},
 		{
+			name:     "only title non-tty",
+			tty:      false,
+			cli:      "--title mytitle",
+			wantsErr: true,
+		},
+		{
+			name:     "minimum non-tty",
+			tty:      false,
+			cli:      "--title mytitle --body ''",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:               "mytitle",
+				TitleProvided:       true,
+				Body:                "",
+				BodyProvided:        true,
+				Autofill:            false,
+				RecoverFile:         "",
+				WebMode:             false,
+				IsDraft:             false,
+				BaseBranch:          "",
+				HeadBranch:          "",
+				MaintainerCanModify: true,
+			},
+		},
+		{
 			name:     "empty tty",
 			tty:      true,
 			cli:      "",
@@ -130,6 +155,8 @@ func TestNewCmdCreate(t *testing.T) {
 			args, err := shlex.Split(tt.cli)
 			require.NoError(t, err)
 			cmd.SetArgs(args)
+			cmd.SetOut(stdout)
+			cmd.SetErr(stderr)
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
 				assert.Error(t, err)
