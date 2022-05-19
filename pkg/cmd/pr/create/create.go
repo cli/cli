@@ -130,10 +130,6 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("`--recover` only supported when running interactively")
 			}
 
-			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.TitleProvided && !opts.Autofill {
-				return cmdutil.FlagErrorf("`--title` or `--fill` required when not running interactively")
-			}
-
 			if opts.IsDraft && opts.WebMode {
 				return errors.New("the `--draft` flag is not supported with `--web`")
 			}
@@ -152,6 +148,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				}
 				opts.Body = string(b)
 				opts.BodyProvided = true
+			}
+
+			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.Autofill && (!opts.TitleProvided || !opts.BodyProvided) {
+				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--fill`) when not running interactively")
 			}
 
 			if runF != nil {
