@@ -1366,7 +1366,10 @@ func TestPrInMergeQueue(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, "pr merge 1")
-	assert.EqualError(t, err, "SilentError")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "! Pull request #1 is already queued to merge\n", output.Stderr())
 }

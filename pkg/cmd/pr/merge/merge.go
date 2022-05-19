@@ -50,6 +50,9 @@ type MergeOptions struct {
 	MergeStrategyEmpty      bool
 }
 
+// ErrAlreadyInMergeQueue indicates that the pull request is already in a merge queue
+var ErrAlreadyInMergeQueue = errors.New("already in merge queue")
+
 func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Command {
 	opts := &MergeOptions{
 		IO:         f.IOStreams,
@@ -153,7 +156,12 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			if runF != nil {
 				return runF(opts)
 			}
-			return mergeRun(opts)
+
+			err := mergeRun(opts)
+			if errors.Is(err, ErrAlreadyInMergeQueue) {
+				return nil
+			}
+			return err
 		},
 	}
 
@@ -200,7 +208,7 @@ func (m *mergeContext) inMergeQueue() error {
 	// if the pull request is in a merge queue no further action is possible
 	if m.pr.IsInMergeQueue {
 		_ = m.warnf("%s Pull request #%d is already queued to merge\n", m.cs.WarningIcon(), m.pr.Number)
-		return cmdutil.SilentError
+		return ErrAlreadyInMergeQueue
 	}
 	return nil
 }
