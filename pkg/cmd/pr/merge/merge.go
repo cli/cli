@@ -301,7 +301,7 @@ func (m *mergeContext) merge() error {
 				return err
 			}
 
-			allowEditMsg := !m.shouldAddToMergeQueue() && payload.method != PullRequestMergeMethodRebase
+			allowEditMsg := payload.method != PullRequestMergeMethodRebase
 			for {
 				action, err := confirmSurvey(allowEditMsg)
 				if err != nil {
