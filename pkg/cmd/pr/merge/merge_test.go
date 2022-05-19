@@ -932,7 +932,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "blueberries", true, "pr merge 4 --merge")
+	output, err := runCommand(http, "blueberries", false, "pr merge 4 --merge")
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}

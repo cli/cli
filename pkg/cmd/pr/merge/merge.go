@@ -358,7 +358,7 @@ func (m *mergeContext) deleteLocalBranch() error {
 
 	if m.merged {
 		// prompt for delete
-		if m.opts.MergeStrategyEmpty && !m.opts.IsDeleteBranchIndicated {
+		if m.opts.IO.CanPrompt() && !m.opts.IsDeleteBranchIndicated {
 			err := prompt.SurveyAskOne(&survey.Confirm{
 				Message: fmt.Sprintf("Pull request #%d was already merged. Delete the branch locally?", m.pr.Number),
 				Default: false,
