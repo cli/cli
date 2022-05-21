@@ -441,16 +441,12 @@ func TestCloneRun(t *testing.T) {
 						"data": {
 							"repository": {
 								"labels": {
-									"totalCount": 2,
+									"totalCount": 1,
 									"nodes": [
 										{
 											"name": "bug",
 											"color": "d73a4a",
 											"description": "Something isn't working"
-										},
-										{
-											"name": "docs",
-											"color": "6cafc9"
 										}
 									],
 									"pageInfo": {
