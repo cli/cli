@@ -1,6 +1,7 @@
 package label
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 type cloneOptions struct {
@@ -82,7 +84,7 @@ func cloneRun(opts *cloneOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
-	successCount, totalCount, err := cloneLabels(httpClient, opts.SourceRepo, baseRepo, opts.Force)
+	successCount, totalCount, err := cloneLabels(httpClient, baseRepo, opts)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -105,32 +107,67 @@ func cloneRun(opts *cloneOptions) error {
 	return nil
 }
 
-func cloneLabels(client *http.Client, source, destination ghrepo.Interface, force bool) (successCount, totalCount int, err error) {
+func cloneLabels(client *http.Client, destination ghrepo.Interface, opts *cloneOptions) (successCount, totalCount int, err error) {
 	successCount = 0
-	labels, totalCount, err := listLabels(client, source, listQueryOptions{Limit: -1})
+	labels, totalCount, err := listLabels(client, opts.SourceRepo, listQueryOptions{Limit: -1})
 	if err != nil {
 		return
 	}
 
-	createOpts := createOptions{
-		Force: force,
+	workers := 10
+	ctx, abortCreate := context.WithCancel(context.Background())
+	defer abortCreate()
+	toCreate := make(chan createOptions)
+	created := make(chan interface{})
+
+	wg := new(errgroup.Group)
+	for i := 0; i < workers; i++ {
+		wg.Go(func() error {
+			for {
+				select {
+				case <-ctx.Done():
+					return nil
+				case l, ok := <-toCreate:
+					if !ok {
+						return nil
+					}
+					createErr := createLabel(client, destination, &l)
+					if createErr != nil {
+						if !errors.Is(createErr, errLabelAlreadyExists) {
+							abortCreate()
+							err := createErr
+							return err
+						}
+					} else {
+						created <- nil
+					}
+				}
+			}
+		})
 	}
 
-	for _, label := range labels {
-		createOpts.Name = label.Name
-		createOpts.Description = label.Description
-		createOpts.Color = label.Color
-
-		createErr := createLabel(client, destination, &createOpts)
-		if createErr != nil {
-			if !errors.Is(createErr, errLabelAlreadyExists) {
-				err = createErr
-				return
-			}
-		} else {
+	doneCh := make(chan struct{})
+	go func() {
+		for range created {
 			successCount++
 		}
+		close(doneCh)
+	}()
+
+	for _, label := range labels {
+		createOpts := createOptions{
+			Name:        label.Name,
+			Description: label.Description,
+			Color:       label.Color,
+			Force:       opts.Force,
+		}
+		toCreate <- createOpts
 	}
+
+	close(toCreate)
+	err = wg.Wait()
+	close(created)
+	<-doneCh
 
 	return
 }
