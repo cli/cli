@@ -115,12 +115,10 @@ func cloneLabels(client *http.Client, destination ghrepo.Interface, opts *cloneO
 	}
 
 	workers := 10
-	ctx, abortCreate := context.WithCancel(context.Background())
-	defer abortCreate()
 	toCreate := make(chan createOptions)
-	created := make(chan interface{})
+	created := make(chan uint8)
 
-	wg := new(errgroup.Group)
+	wg, ctx := errgroup.WithContext(context.Background())
 	for i := 0; i < workers; i++ {
 		wg.Go(func() error {
 			for {
@@ -134,12 +132,11 @@ func cloneLabels(client *http.Client, destination ghrepo.Interface, opts *cloneO
 					createErr := createLabel(client, destination, &l)
 					if createErr != nil {
 						if !errors.Is(createErr, errLabelAlreadyExists) {
-							abortCreate()
 							err := createErr
 							return err
 						}
 					} else {
-						created <- nil
+						created <- 1
 					}
 				}
 			}
@@ -148,8 +145,17 @@ func cloneLabels(client *http.Client, destination ghrepo.Interface, opts *cloneO
 
 	doneCh := make(chan struct{})
 	go func() {
-		for range created {
-			successCount++
+	loop:
+		for {
+			select {
+			case <-ctx.Done():
+				break loop
+			case _, ok := <-created:
+				if !ok {
+					break loop
+				}
+				successCount++
+			}
 		}
 		close(doneCh)
 	}()
