@@ -203,7 +203,7 @@ func Test_runDownload(t *testing.T) {
 			wantErr: "no valid artifacts found to download",
 		},
 		{
-			name: "no matches",
+			name: "no name matches",
 			opts: DownloadOptions{
 				RunID:          "2345",
 				DestinationDir: ".",
@@ -223,7 +223,30 @@ func Test_runDownload(t *testing.T) {
 					},
 				}, nil)
 			},
-			wantErr: "no artifact matches any of the names provided",
+			wantErr: "no artifact matches any of the names or patterns provided",
+		},
+		{
+			name: "no pattern matches",
+			opts: DownloadOptions{
+				RunID:          "2345",
+				DestinationDir: ".",
+				FilePatterns:   []string{"artifiction-*"},
+			},
+			mockAPI: func(p *mockPlatform) {
+				p.On("List", "2345").Return([]shared.Artifact{
+					{
+						Name:        "artifact-1",
+						DownloadURL: "http://download.com/artifact1.zip",
+						Expired:     false,
+					},
+					{
+						Name:        "artifact-2",
+						DownloadURL: "http://download.com/artifact2.zip",
+						Expired:     false,
+					},
+				}, nil)
+			},
+			wantErr: "no artifact matches any of the names or patterns provided",
 		},
 		{
 			name: "prompt to select artifact",
