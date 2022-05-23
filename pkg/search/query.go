@@ -51,7 +51,6 @@ type Qualifiers struct {
 	Merged              string
 	Milestone           string
 	No                  []string
-	Org                 string
 	Project             string
 	Pushed              string
 	Reactions           string

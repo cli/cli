@@ -79,7 +79,7 @@ func Test_searchQuery(t *testing.T) {
 			args: args{
 				owner: "cli",
 			},
-			want: "sort:updated-desc fork:true org:cli",
+			want: "sort:updated-desc fork:true user:cli",
 		},
 		{
 			name: "only public",

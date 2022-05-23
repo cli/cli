@@ -180,6 +180,10 @@ pagination:
 }
 
 func searchQuery(owner string, filter FilterOptions) string {
+	if owner == "" {
+		owner = "@me"
+	}
+
 	fork := "true"
 	if filter.Fork {
 		fork = "only"
@@ -205,13 +209,8 @@ func searchQuery(owner string, filter FilterOptions) string {
 			Is:       []string{filter.Visibility},
 			Language: filter.Language,
 			Topic:    []string{filter.Topic},
+			User:     owner,
 		},
-	}
-
-	if owner == "" {
-		q.Qualifiers.User = "@me"
-	} else {
-		q.Qualifiers.Org = owner
 	}
 
 	return q.String()
