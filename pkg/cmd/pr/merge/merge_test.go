@@ -119,6 +119,22 @@ func Test_NewCmdMerge(t *testing.T) {
 			},
 		},
 		{
+			name:  "sha specified",
+			args:  "123 --sha 555",
+			isTTY: true,
+			want: MergeOptions{
+				SelectorArg:             "123",
+				DeleteBranch:            false,
+				IsDeleteBranchIndicated: false,
+				CanDeleteLocalBranch:    true,
+				MergeMethod:             PullRequestMergeMethodMerge,
+				InteractiveMode:         true,
+				Body:                    "",
+				BodySet:                 false,
+				Sha:                     "555",
+			},
+		},
+		{
 			name:    "body and body-file flags",
 			args:    "123 --body 'test' --body-file 'test-file.txt'",
 			isTTY:   true,
@@ -194,6 +210,7 @@ func Test_NewCmdMerge(t *testing.T) {
 			assert.Equal(t, tt.want.InteractiveMode, opts.InteractiveMode)
 			assert.Equal(t, tt.want.Body, opts.Body)
 			assert.Equal(t, tt.want.BodySet, opts.BodySet)
+			assert.Equal(t, tt.want.Sha, opts.Sha)
 		})
 	}
 }
@@ -694,7 +711,7 @@ func Test_nonDivergingPullRequest(t *testing.T) {
 	stubCommit(pr, "COMMITSHA1")
 
 	prFinder := shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "master"))
-	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName"})
+	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName", "headRefOid"})
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
@@ -734,7 +751,7 @@ func Test_divergingPullRequestWarning(t *testing.T) {
 	stubCommit(pr, "COMMITSHA1")
 
 	prFinder := shared.RunCommandFinder("", pr, baseRepo("OWNER", "REPO", "master"))
-	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName"})
+	prFinder.ExpectFields([]string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName", "headRefOid"})
 
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),

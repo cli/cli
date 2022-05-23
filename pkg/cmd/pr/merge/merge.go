@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
@@ -48,6 +49,8 @@ type MergeOptions struct {
 	IsDeleteBranchIndicated bool
 	CanDeleteLocalBranch    bool
 	InteractiveMode         bool
+
+	Sha string
 }
 
 func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Command {
@@ -165,6 +168,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	cmd.Flags().BoolVarP(&flagSquash, "squash", "s", false, "Squash the commits into one commit and merge it into the base branch")
 	cmd.Flags().BoolVar(&opts.AutoMergeEnable, "auto", false, "Automatically merge only after necessary requirements are met")
 	cmd.Flags().BoolVar(&opts.AutoMergeDisable, "disable-auto", false, "Disable auto-merge for this pull request")
+	cmd.Flags().StringVar(&opts.Sha, "sha", "", "`SHA` that pull request head must match to allow merge")
 	return cmd
 }
 
@@ -244,13 +248,14 @@ func (m *mergeContext) merge() error {
 	}
 
 	payload := mergePayload{
-		repo:          m.baseRepo,
-		pullRequestID: m.pr.ID,
-		method:        m.opts.MergeMethod,
-		auto:          m.autoMerge,
-		commitSubject: m.opts.Subject,
-		commitBody:    m.opts.Body,
-		setCommitBody: m.opts.BodySet,
+		repo:            m.baseRepo,
+		pullRequestID:   m.pr.ID,
+		method:          m.opts.MergeMethod,
+		auto:            m.autoMerge,
+		commitSubject:   m.opts.Subject,
+		commitBody:      m.opts.Body,
+		setCommitBody:   m.opts.BodySet,
+		expectedHeadOid: m.opts.Sha,
 	}
 
 	// get user input if not already given
@@ -290,6 +295,13 @@ func (m *mergeContext) merge() error {
 
 	err := mergePullRequest(m.httpClient, payload)
 	if err != nil {
+		// gql returns vague errors when passing sha that may be confusing
+		if strings.Contains(err.Error(), "Head branch was modified. Review and try the merge again.") {
+			return fmt.Errorf("%s the provided sha does not match head sha: %s", m.cs.FailureIconWithColor(m.cs.Red), m.pr.HeadRefOid)
+		}
+		if strings.Contains(err.Error(), "Variable $input of type MergePullRequestInput! was provided invalid value for expectedHeadOid") {
+			return fmt.Errorf("%s the provided sha: %s is in an invalid format", m.cs.FailureIconWithColor(m.cs.Red), payload.expectedHeadOid)
+		}
 		return err
 	}
 
@@ -432,7 +444,7 @@ func (m *mergeContext) infof(format string, args ...interface{}) error {
 func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
-		Fields:   []string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName"},
+		Fields:   []string{"id", "number", "state", "title", "lastCommit", "mergeStateStatus", "headRepositoryOwner", "headRefName", "headRefOid"},
 	}
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
@@ -553,6 +565,7 @@ func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 		submitLabel            = "Submit"
 		editCommitSubjectLabel = "Edit commit subject"
 		editCommitMsgLabel     = "Edit commit message"
+		shaCheckLabel          = "Check SHA before merge"
 		cancelLabel            = "Cancel"
 	)
 
@@ -560,6 +573,7 @@ func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 	if allowEditMsg {
 		options = append(options, editCommitSubjectLabel, editCommitMsgLabel)
 	}
+	options = append(options, shaCheckLabel)
 	options = append(options, cancelLabel)
 
 	var result string
@@ -579,6 +593,8 @@ func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 		return shared.EditCommitSubjectAction, nil
 	case editCommitMsgLabel:
 		return shared.EditCommitMessageAction, nil
+	case shaCheckLabel:
+		return shared.ShaCheckAction, nil
 	default:
 		return shared.CancelAction, nil
 	}
@@ -618,6 +634,12 @@ func confirmSubmission(client *http.Client, opts *MergeOptions, action shared.Ac
 		}
 
 		return false, nil
+
+	case shared.ShaCheckAction:
+		prompt := &survey.Input{Message: "Sha to check:"}
+		err = survey.AskOne(prompt, &payload.expectedHeadOid)
+
+		return false, err
 
 	case shared.CancelAction:
 		fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")
