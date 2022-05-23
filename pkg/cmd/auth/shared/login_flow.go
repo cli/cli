@@ -14,6 +14,8 @@ import (
 	"github.com/cli/cli/v2/pkg/prompt"
 )
 
+const defaultSSHKeyTitle = "GitHub CLI"
+
 type iconfig interface {
 	Get(string, string) (string, error)
 	Set(string, string, string) error
@@ -68,6 +70,7 @@ func Login(opts *LoginOptions) error {
 	}
 
 	var keyToUpload string
+	keyTitle := defaultSSHKeyTitle
 	if opts.Interactive && gitProtocol == "ssh" {
 		pubKeys, err := opts.sshContext.localPublicKeys()
 		if err != nil {
@@ -93,22 +96,18 @@ func Login(opts *LoginOptions) error {
 				return err
 			}
 		}
-	}
 
-	var keyTitle string
-	if keyToUpload != "" {
-		if opts.Interactive {
+		if keyToUpload != "" {
 			err := prompt.SurveyAskOne(&survey.Input{
-				Message: "SSH key title:",
-				Default: "GitHub CLI",
+				Message: "Title for your SSH key:",
+				Default: defaultSSHKeyTitle,
 			}, &keyTitle)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
-		} else {
-			keyTitle = "GitHub CLI"
+
+			additionalScopes = append(additionalScopes, "admin:public_key")
 		}
-		additionalScopes = append(additionalScopes, "admin:public_key")
 	}
 
 	var authMode int
