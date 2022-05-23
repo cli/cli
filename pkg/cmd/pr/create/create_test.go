@@ -155,7 +155,7 @@ func TestNewCmdCreate(t *testing.T) {
 			args, err := shlex.Split(tt.cli)
 			require.NoError(t, err)
 			cmd.SetArgs(args)
-			cmd.SetOut(stdout)
+			cmd.SetOut(stderr)
 			cmd.SetErr(stderr)
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {

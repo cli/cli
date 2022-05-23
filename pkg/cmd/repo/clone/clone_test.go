@@ -74,7 +74,7 @@ func TestNewCmdClone(t *testing.T) {
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(stdin)
-			cmd.SetOut(stdout)
+			cmd.SetOut(stderr)
 			cmd.SetErr(stderr)
 
 			_, err = cmd.ExecuteC()
@@ -112,7 +112,7 @@ func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) 
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(stdin)
-	cmd.SetOut(stdout)
+	cmd.SetOut(stderr)
 	cmd.SetErr(stderr)
 
 	if err != nil {
