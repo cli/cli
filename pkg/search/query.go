@@ -69,6 +69,7 @@ type Qualifiers struct {
 	Topics              string
 	Type                string
 	Updated             string
+	User                string
 }
 
 func (q Query) String() string {
