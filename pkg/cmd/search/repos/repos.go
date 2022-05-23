@@ -108,15 +108,15 @@ func NewCmdRepos(f *cmdutil.Factory, runF func(*ReposOptions) error) *cobra.Comm
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.GoodFirstIssues, "good-first-issues", "", "Filter on `number` of issues with the 'good first issue' label")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.HelpWantedIssues, "help-wanted-issues", "", "Filter on `number` of issues with the 'help wanted' label")
 	cmdutil.StringSliceEnumFlag(cmd, &opts.Query.Qualifiers.In, "match", "", nil, []string{"name", "description", "readme"}, "Restrict search to specific field of repository")
+	cmdutil.StringSliceEnumFlag(cmd, &opts.Query.Qualifiers.Is, "visibility", "", nil, []string{"public", "private", "internal"}, "Filter based on visibility")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Language, "language", "", "Filter based on the coding language")
 	cmd.Flags().StringSliceVar(&opts.Query.Qualifiers.License, "license", nil, "Filter based on license type")
-	cmd.Flags().StringVar(&opts.Query.Qualifiers.Org, "owner", "", "Filter on owner")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Pushed, "updated", "", "Filter on last updated at `date`")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Size, "size", "", "Filter on a size range, in kilobytes")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Stars, "stars", "", "Filter on `number` of stars")
 	cmd.Flags().StringSliceVar(&opts.Query.Qualifiers.Topic, "topic", nil, "Filter on topic")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Topics, "number-topics", "", "Filter on `number` of topics")
-	cmdutil.StringSliceEnumFlag(cmd, &opts.Query.Qualifiers.Is, "visibility", "", nil, []string{"public", "private", "internal"}, "Filter based on visibility")
+	cmd.Flags().StringVar(&opts.Query.Qualifiers.User, "owner", "", "Filter on owner")
 
 	return cmd
 }
