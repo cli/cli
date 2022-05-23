@@ -27,24 +27,25 @@ type CreateOptions struct {
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 
-	Name              string
-	Description       string
-	Homepage          string
-	Team              string
-	Template          string
-	Public            bool
-	Private           bool
-	Internal          bool
-	Visibility        string
-	Push              bool
-	Clone             bool
-	Source            string
-	Remote            string
-	GitIgnoreTemplate string
-	LicenseTemplate   string
-	DisableIssues     bool
-	DisableWiki       bool
-	Interactive       bool
+	Name               string
+	Description        string
+	Homepage           string
+	Team               string
+	Template           string
+	Public             bool
+	Private            bool
+	Internal           bool
+	Visibility         string
+	Push               bool
+	Clone              bool
+	Source             string
+	Remote             string
+	GitIgnoreTemplate  string
+	LicenseTemplate    string
+	DisableIssues      bool
+	DisableWiki        bool
+	Interactive        bool
+	IncludeAllBranches bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -144,6 +145,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("the `--template` option is not supported with `--homepage`, `--team`, `--disable-issues`, or `--disable-wiki`")
 			}
 
+			if opts.Template == "" && opts.IncludeAllBranches {
+				return cmdutil.FlagErrorf("the `--include-all-branches` option is only supported when using `--template`")
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -166,6 +171,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.Clone, "clone", "c", false, "Clone the new repository to the current directory")
 	cmd.Flags().BoolVar(&opts.DisableIssues, "disable-issues", false, "Disable issues in the new repository")
 	cmd.Flags().BoolVar(&opts.DisableWiki, "disable-wiki", false, "Disable wiki in the new repository")
+	cmd.Flags().BoolVar(&opts.IncludeAllBranches, "include-all-branches", false, "Include all branches from template repository")
 
 	// deprecated flags
 	cmd.Flags().BoolP("confirm", "y", false, "Skip the confirmation prompt")
@@ -295,16 +301,17 @@ func createFromScratch(opts *CreateOptions) error {
 	}
 
 	input := repoCreateInput{
-		Name:              repoToCreate.RepoName(),
-		Visibility:        opts.Visibility,
-		OwnerLogin:        repoToCreate.RepoOwner(),
-		TeamSlug:          opts.Team,
-		Description:       opts.Description,
-		HomepageURL:       opts.Homepage,
-		HasIssuesEnabled:  !opts.DisableIssues,
-		HasWikiEnabled:    !opts.DisableWiki,
-		GitIgnoreTemplate: opts.GitIgnoreTemplate,
-		LicenseTemplate:   opts.LicenseTemplate,
+		Name:               repoToCreate.RepoName(),
+		Visibility:         opts.Visibility,
+		OwnerLogin:         repoToCreate.RepoOwner(),
+		TeamSlug:           opts.Team,
+		Description:        opts.Description,
+		HomepageURL:        opts.Homepage,
+		HasIssuesEnabled:   !opts.DisableIssues,
+		HasWikiEnabled:     !opts.DisableWiki,
+		GitIgnoreTemplate:  opts.GitIgnoreTemplate,
+		LicenseTemplate:    opts.LicenseTemplate,
+		IncludeAllBranches: opts.IncludeAllBranches,
 	}
 
 	var templateRepoMainBranch string
