@@ -56,6 +56,7 @@ func TestLogin_ssh(t *testing.T) {
 	ask.StubPrompt("What is your preferred protocol for Git operations?").AnswerWith("SSH")
 	ask.StubPrompt("Generate a new SSH key to add to your GitHub account?").AnswerWith(true)
 	ask.StubPrompt("Enter a passphrase for your new SSH key (Optional)").AnswerWith("monkey")
+	ask.StubPrompt("Title for your SSH key:").AnswerWith("Test Key")
 	ask.StubPrompt("How would you like to authenticate GitHub CLI?").AnswerWith("Paste an authentication token")
 	ask.StubPrompt("Paste your authentication token:").AnswerWith("ATOKEN")
 

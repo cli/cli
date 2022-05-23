@@ -108,12 +108,12 @@ func (c *sshContext) generateSSHKey() (string, error) {
 	return keyFile + ".pub", run.PrepareCmd(keygenCmd).Run()
 }
 
-func sshKeyUpload(httpClient *http.Client, hostname, keyFile string) error {
+func sshKeyUpload(httpClient *http.Client, hostname, keyFile string, title string) error {
 	f, err := os.Open(keyFile)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	return add.SSHKeyUpload(httpClient, hostname, f, "GitHub CLI")
+	return add.SSHKeyUpload(httpClient, hostname, f, title)
 }
