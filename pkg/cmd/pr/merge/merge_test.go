@@ -941,6 +941,40 @@ func TestPrMerge_alreadyMerged_withMergeStrategy(t *testing.T) {
 	assert.Equal(t, "! Pull request #4 was already merged\n", output.Stderr())
 }
 
+func TestPrMerge_alreadyMerged_withMergeStrategy_TTY(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"4",
+		&api.PullRequest{
+			ID:                  "THE-ID",
+			Number:              4,
+			State:               "MERGED",
+			HeadRepositoryOwner: api.Owner{Login: "OWNER"},
+			MergeStateStatus:    "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "main"),
+	)
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+	cs.Register(`git branch -D `, 0, "")
+
+	as := prompt.NewAskStubber(t)
+	as.StubPrompt("Pull request #4 was already merged. Delete the branch locally?").AnswerWith(true)
+
+	output, err := runCommand(http, "blueberries", true, "pr merge 4 --merge")
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "✓ Deleted branch \n", output.Stderr())
+}
+
 func TestPrMerge_alreadyMerged_withMergeStrategy_crossRepo(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
