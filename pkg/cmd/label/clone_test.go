@@ -95,7 +95,7 @@ func TestCloneRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query LabelList\b`),
-					httpmock.StringResponse(`
+					httpmock.GraphQLQuery(`
 					{
 						"data": {
 							"repository": {
@@ -119,7 +119,19 @@ func TestCloneRun(t *testing.T) {
 								}
 							}
 						}
-					}`),
+					}`, func(s string, m map[string]interface{}) {
+						expected := map[string]interface{}{
+							"owner": "cli",
+							"repo":  "cli",
+							"orderBy": map[string]interface{}{
+								"direction": "ASC",
+								"field":     "CREATED_AT",
+							},
+							"query": "",
+							"limit": float64(100),
+						}
+						assert.Equal(t, expected, m)
+					}),
 				)
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/labels"),
