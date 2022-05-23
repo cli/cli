@@ -251,6 +251,42 @@ func Test_RepoClone_hasParent(t *testing.T) {
 	}
 }
 
+func Test_RepoClone_hasParent_upstreamRemoteName(t *testing.T) {
+	reg := &httpmock.Registry{}
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+				{ "data": { "repository": {
+					"name": "REPO",
+					"owner": {
+						"login": "OWNER"
+					},
+					"parent": {
+						"name": "ORIG",
+						"owner": {
+							"login": "hubot"
+						},
+						"defaultBranchRef": {
+							"name": "trunk"
+						}
+					}
+				} } }
+				`))
+
+	httpClient := &http.Client{Transport: reg}
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
+	cs.Register(`git -C REPO remote add -t trunk -f test https://github.com/hubot/ORIG.git`, 0, "")
+
+	_, err := runCloneCommand(httpClient, "OWNER/REPO --upstream-remote-name test")
+	if err != nil {
+		t.Fatalf("error running command `repo clone`: %v", err)
+	}
+}
+
 func Test_RepoClone_withoutUsername(t *testing.T) {
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)

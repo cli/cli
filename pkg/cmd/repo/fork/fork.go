@@ -317,7 +317,7 @@ func forkRun(opts *ForkOptions) error {
 			}
 
 			upstreamURL := ghrepo.FormatRemoteURL(repoToFork, protocol)
-			err = git.AddUpstreamRemote(upstreamURL, cloneDir, []string{})
+			err = git.AddNamedRemote(upstreamURL, "upstream", cloneDir, []string{})
 			if err != nil {
 				return err
 			}
