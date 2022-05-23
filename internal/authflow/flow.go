@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -30,6 +31,7 @@ var (
 )
 
 type iconfig interface {
+	Get(string, string) (string, error)
 	Set(string, string, string) error
 	Write() error
 	WriteHosts() error
@@ -39,7 +41,16 @@ func AuthFlowWithConfig(cfg iconfig, IO *iostreams.IOStreams, hostname, notice s
 	// TODO this probably shouldn't live in this package. It should probably be in a new package that
 	// depends on both iostreams and config.
 
-	token, userLogin, err := authFlow(hostname, IO, notice, additionalScopes, isInteractive)
+	// FIXME: this duplicates `factory.browserLauncher()`
+	browserLauncher := os.Getenv("GH_BROWSER")
+	if browserLauncher == "" {
+		browserLauncher, _ = cfg.Get("", "browser")
+	}
+	if browserLauncher == "" {
+		browserLauncher = os.Getenv("BROWSER")
+	}
+
+	token, userLogin, err := authFlow(hostname, IO, notice, additionalScopes, isInteractive, browserLauncher)
 	if err != nil {
 		return "", err
 	}
@@ -56,7 +67,7 @@ func AuthFlowWithConfig(cfg iconfig, IO *iostreams.IOStreams, hostname, notice s
 	return token, cfg.WriteHosts()
 }
 
-func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string, isInteractive bool) (string, string, error) {
+func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string, isInteractive bool, browserLauncher string) (string, string, error) {
 	w := IO.ErrOut
 	cs := IO.ColorScheme()
 
@@ -87,19 +98,26 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 			fmt.Fprintf(w, "%s First copy your one-time code: %s\n", cs.Yellow("!"), cs.Bold(code))
 			return nil
 		},
-		BrowseURL: func(url string) error {
+		BrowseURL: func(authURL string) error {
+			if u, err := url.Parse(authURL); err == nil {
+				if u.Scheme != "http" && u.Scheme != "https" {
+					return fmt.Errorf("invalid URL: %s", authURL)
+				}
+			} else {
+				return err
+			}
+
 			if !isInteractive {
-				fmt.Fprintf(w, "%s to continue in your web browser: %s\n", cs.Bold("Open this URL"), url)
+				fmt.Fprintf(w, "%s to continue in your web browser: %s\n", cs.Bold("Open this URL"), authURL)
 				return nil
 			}
 
 			fmt.Fprintf(w, "%s to open %s in your browser... ", cs.Bold("Press Enter"), oauthHost)
 			_ = waitForEnter(IO.In)
 
-			// FIXME: read the browser from cmd Factory rather than recreating it
-			browser := cmdutil.NewBrowser(os.Getenv("BROWSER"), IO.Out, IO.ErrOut)
-			if err := browser.Browse(url); err != nil {
-				fmt.Fprintf(w, "%s Failed opening a web browser at %s\n", cs.Red("!"), url)
+			browser := cmdutil.NewBrowser(browserLauncher, IO.Out, IO.ErrOut)
+			if err := browser.Browse(authURL); err != nil {
+				fmt.Fprintf(w, "%s Failed opening a web browser at %s\n", cs.Red("!"), authURL)
 				fmt.Fprintf(w, "  %s\n", err)
 				fmt.Fprint(w, "  Please try entering the URL in your browser manually\n")
 			}

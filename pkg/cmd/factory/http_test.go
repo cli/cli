@@ -181,6 +181,7 @@ func TestNewHTTPClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+
 			oldDebug := os.Getenv("DEBUG")
 			oldGhDebug := os.Getenv("GH_DEBUG")
 			os.Setenv("DEBUG", tt.envDebug)
@@ -213,6 +214,7 @@ func TestNewHTTPClient(t *testing.T) {
 			require.NoError(t, err)
 
 			res, err := client.Do(req)
+
 			require.NoError(t, err)
 
 			for name, value := range tt.wantHeader {

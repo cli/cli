@@ -132,13 +132,13 @@ func (c Client) RESTWithNext(hostname string, method string, p string, body io.R
 	return next, nil
 }
 
+// HandleHTTPError parses a http.Response into a HTTPError.
 func HandleHTTPError(resp *http.Response) error {
-	err := ghAPI.HandleHTTPError(resp)
-	return handleResponse(err)
+	return handleResponse(ghAPI.HandleHTTPError(resp))
 }
 
-//TODO: Rename this awful name
-// Maybe wrapAPIError?
+// handleResponse takes a ghAPI.HTTPError or ghAPI.GQLError and converts it into an
+// HTTPError or GraphQLError respectively.
 func handleResponse(err error) error {
 	if err == nil {
 		return nil
@@ -149,8 +149,8 @@ func handleResponse(err error) error {
 		return HTTPError{
 			HTTPError: restErr,
 			scopesSuggestion: generateScopesSuggestion(restErr.StatusCode,
-				restErr.AcceptedOAuthScopes,
-				restErr.OAuthScopes,
+				restErr.Headers.Get("X-Accepted-Oauth-Scopes"),
+				restErr.Headers.Get("X-Oauth-Scopes"),
 				restErr.RequestURL.Hostname()),
 		}
 	}

@@ -287,14 +287,14 @@ func createRun(opts *CreateOptions) (err error) {
 	if !opts.BodyProvided {
 		templateContent := ""
 		if opts.RecoverFile == "" {
-			// var cachedClient *http.Client
-			// cachedClient, err = opts.CachedHttpClient(time.Hour * 24)
-			// if err != nil {
-			// return
-			// }
+			var cachedClient *http.Client
+			cachedClient, err = opts.CachedHttpClient(time.Hour * 24)
+			if err != nil {
+				return
+			}
 
-			tpl := shared.NewTemplateManager(client.HTTP(), ctx.BaseRepo, opts.RootDirOverride, opts.RepoOverride == "", true)
-			// tpl.SetCachedClient(cachedClient)
+			tpl := shared.NewTemplateManager(client.HTTP(), cachedClient, ctx.BaseRepo, opts.RootDirOverride, opts.RepoOverride == "", true)
+
 			var template shared.Template
 			template, err = tpl.Choose()
 			if err != nil {

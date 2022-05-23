@@ -129,14 +129,14 @@ type templateManager struct {
 	fetchError error
 }
 
-func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, dir string, allowFS bool, isPR bool) *templateManager {
+func NewTemplateManager(httpClient *http.Client, cachedClient *http.Client, repo ghrepo.Interface, dir string, allowFS bool, isPR bool) *templateManager {
 	return &templateManager{
 		repo:       repo,
 		rootDir:    dir,
 		allowFS:    allowFS,
 		isPR:       isPR,
 		httpClient: httpClient,
-		detector:   fd.NewDetector(httpClient, repo.RepoHost()),
+		detector:   fd.NewDetector(cachedClient, repo.RepoHost()),
 	}
 }
 

@@ -155,7 +155,7 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 	}
 
-	tpl := shared.NewTemplateManager(httpClient, baseRepo, opts.RootDirOverride, !opts.HasRepoOverride, false)
+	tpl := shared.NewTemplateManager(httpClient, nil, baseRepo, opts.RootDirOverride, !opts.HasRepoOverride, false)
 
 	if opts.WebMode {
 		var openURL string
