@@ -20,10 +20,8 @@ type CloneOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
-	Exporter   cmdutil.Exporter
 
 	GitArgs      []string
-	MagicFields  []string
 	Repository   string
 	UpstreamName string
 }
@@ -66,7 +64,6 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().StringVarP(&opts.UpstreamName, "upstream-remote-name", "u", "upstream", "Upstream remote name when cloning a fork")
-	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.RepositoryFields)
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		if err == pflag.ErrHelp {
 			return err
