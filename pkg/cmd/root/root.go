@@ -56,14 +56,16 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 		},
 	}
 
-	cmd.SetOut(f.IOStreams.Out)
-	cmd.SetErr(f.IOStreams.ErrOut)
+	cmd.SetOut(f.IOStreams.ErrOut) // command usage summary and deprecation warnings
+	cmd.SetErr(f.IOStreams.ErrOut) // error messages
 
 	cmd.PersistentFlags().Bool("help", false, "Show help for command")
-	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		rootHelpFunc(f, cmd, args)
+	cmd.SetHelpFunc(func(c *cobra.Command, args []string) {
+		rootHelpFunc(f, c, args)
 	})
-	cmd.SetUsageFunc(rootUsageFunc)
+	cmd.SetUsageFunc(func(c *cobra.Command) error {
+		return rootUsageFunc(f.IOStreams.ErrOut, c)
+	})
 	cmd.SetFlagErrorFunc(rootFlagErrorFunc)
 
 	formattedVersion := versionCmd.Format(version, buildDate)
@@ -108,10 +110,10 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(labelCmd.NewCmdLabel(&repoResolvingCmdFactory))
 
 	// Help topics
-	cmd.AddCommand(NewHelpTopic("environment"))
-	cmd.AddCommand(NewHelpTopic("formatting"))
-	cmd.AddCommand(NewHelpTopic("mintty"))
-	referenceCmd := NewHelpTopic("reference")
+	cmd.AddCommand(NewHelpTopic(f.IOStreams, "environment"))
+	cmd.AddCommand(NewHelpTopic(f.IOStreams, "formatting"))
+	cmd.AddCommand(NewHelpTopic(f.IOStreams, "mintty"))
+	referenceCmd := NewHelpTopic(f.IOStreams, "reference")
 	referenceCmd.SetHelpFunc(referenceHelpFn(f.IOStreams))
 	cmd.AddCommand(referenceCmd)
 
