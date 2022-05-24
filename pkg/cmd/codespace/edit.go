@@ -44,6 +44,27 @@ func (a *App) Edit(ctx context.Context, opts editOptions) error {
 		DisplayName:   opts.displayName,
 		SKU:           opts.machine,
 	}
+
+	if userInputs.DisplayName == "" && userInputs.SKU == "" {
+		return fmt.Errorf("please pass in at least one valid argument to be edited")
+	}
+
+	if userInputs.CodespaceName == "" {
+		a.StartProgressIndicatorWithLabel("Fetching codespaces")
+		codespaces, err := a.apiClient.ListCodespaces(ctx, -1)
+		a.StopProgressIndicator()
+		if err != nil {
+			return fmt.Errorf("error getting codespaces to select from: %w", err)
+		}
+
+		selectedCodespace, err := chooseCodespaceFromList(ctx, codespaces)
+		if err != nil {
+			return fmt.Errorf("error choosing codespace: %w", err)
+		}
+
+		opts.codespaceName = selectedCodespace.Name
+	}
+
 	a.StartProgressIndicatorWithLabel("Editing codespace")
 	_, err := a.apiClient.EditCodespace(ctx, userInputs.CodespaceName, &api.EditCodespaceParams{
 		DisplayName: userInputs.DisplayName,
