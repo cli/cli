@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -96,6 +97,7 @@ func cloneRun(opts *cloneOptions) error {
 			return utils.Pluralize(num, "label")
 		}
 
+		successCount := int(successCount)
 		switch {
 		case successCount == totalCount:
 			fmt.Fprintf(opts.IO.Out, "%s Cloned %s from %s to %s\n", cs.SuccessIcon(), pluralize(successCount), ghrepo.FullName(opts.SourceRepo), ghrepo.FullName(baseRepo))
@@ -107,7 +109,7 @@ func cloneRun(opts *cloneOptions) error {
 	return nil
 }
 
-func cloneLabels(client *http.Client, destination ghrepo.Interface, opts *cloneOptions) (successCount, totalCount int, err error) {
+func cloneLabels(client *http.Client, destination ghrepo.Interface, opts *cloneOptions) (successCount uint32, totalCount int, err error) {
 	successCount = 0
 	labels, totalCount, err := listLabels(client, opts.SourceRepo, listQueryOptions{Limit: -1})
 	if err != nil {
@@ -116,7 +118,6 @@ func cloneLabels(client *http.Client, destination ghrepo.Interface, opts *cloneO
 
 	workers := 10
 	toCreate := make(chan createOptions)
-	created := make(chan uint8)
 
 	wg, ctx := errgroup.WithContext(context.Background())
 	for i := 0; i < workers; i++ {
@@ -129,36 +130,18 @@ func cloneLabels(client *http.Client, destination ghrepo.Interface, opts *cloneO
 					if !ok {
 						return nil
 					}
-					createErr := createLabel(client, destination, &l)
-					if createErr != nil {
-						if !errors.Is(createErr, errLabelAlreadyExists) {
-							err := createErr
+					err := createLabel(client, destination, &l)
+					if err != nil {
+						if !errors.Is(err, errLabelAlreadyExists) {
 							return err
 						}
 					} else {
-						created <- 1
+						atomic.AddUint32(&successCount, 1)
 					}
 				}
 			}
 		})
 	}
-
-	doneCh := make(chan struct{})
-	go func() {
-	loop:
-		for {
-			select {
-			case <-ctx.Done():
-				break loop
-			case _, ok := <-created:
-				if !ok {
-					break loop
-				}
-				successCount++
-			}
-		}
-		close(doneCh)
-	}()
 
 	for _, label := range labels {
 		createOpts := createOptions{
@@ -172,8 +155,6 @@ func cloneLabels(client *http.Client, destination ghrepo.Interface, opts *cloneO
 
 	close(toCreate)
 	err = wg.Wait()
-	close(created)
-	<-doneCh
 
 	return
 }
