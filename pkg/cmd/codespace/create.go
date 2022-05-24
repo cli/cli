@@ -32,7 +32,7 @@ type createOptions struct {
 	permissionsOptOut bool
 	devContainerPath  string
 	idleTimeout       time.Duration
-	retentionPeriod   time.Duration
+	retentionPeriod   string
 }
 
 func newCreateCmd(app *App) *cobra.Command {
@@ -54,7 +54,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().BoolVarP(&opts.permissionsOptOut, "default-permissions", "", false, "do not prompt to accept additional permissions requested by the codespace")
 	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
 	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 0, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
-	// createCmd.Flags().DurationVar(&opts.retentionPeriod, "retention-period", 0, "allowed time after going idle before codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
+	// createCmd.Flags().StringVar(&opts.retentionPeriod, "retention-period", "", "allowed time after going idle before codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
 	createCmd.Flags().StringVar(&opts.devContainerPath, "devcontainer-path", "", "path to the devcontainer.json file to use when creating codespace")
 
 	return createCmd
@@ -178,7 +178,15 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return errors.New("there are no available machine types for this repository")
 	}
 
-	retentionPeriod := int(opts.retentionPeriod.Minutes())
+	var retentionPeriod *int
+	if opts.retentionPeriod != "" {
+		retentionMinutesf, err := time.ParseDuration(opts.retentionPeriod)
+		if err != nil {
+			return fmt.Errorf("error parsing retention period: %w", err)
+		}
+		retentionMinutei := int(retentionMinutesf.Minutes())
+		retentionPeriod = &retentionMinutei
+	}
 
 	createParams := &api.CreateCodespaceParams{
 		RepositoryID:           repository.ID,
@@ -188,7 +196,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		VSCSTarget:             vscsTarget,
 		VSCSTargetURL:          vscsTargetUrl,
 		IdleTimeoutMinutes:     int(opts.idleTimeout.Minutes()),
-		RetentionPeriodMinutes: &retentionPeriod,
+		RetentionPeriodMinutes: retentionPeriod,
 		DevContainerPath:       devContainerPath,
 		PermissionsOptOut:      opts.permissionsOptOut,
 	}

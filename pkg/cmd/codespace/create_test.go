@@ -72,7 +72,7 @@ func TestApp_Create(t *testing.T) {
 				machine:         "GIGA",
 				showStatus:      false,
 				idleTimeout:     30 * time.Minute,
-				retentionPeriod: 48 * time.Hour,
+				retentionPeriod: "48h",
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
 		},
