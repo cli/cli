@@ -23,6 +23,31 @@ var (
 	DEFAULT_DEVCONTAINER_DEFINITIONS = []string{".devcontainer.json", ".devcontainer/devcontainer.json"}
 )
 
+type NullableDuration struct {
+	*time.Duration
+}
+
+func (d *NullableDuration) String() string {
+	if d.Duration != nil {
+		return d.Duration.String()
+	}
+
+	return ""
+}
+
+func (d *NullableDuration) Set(str string) error {
+	duration, err := time.ParseDuration(str)
+	if err != nil {
+		return fmt.Errorf("error duration: %w", err)
+	}
+	d.Duration = &duration
+	return nil
+}
+
+func (d *NullableDuration) Type() string {
+	return "duration"
+}
+
 type createOptions struct {
 	repo              string
 	branch            string
@@ -32,7 +57,7 @@ type createOptions struct {
 	permissionsOptOut bool
 	devContainerPath  string
 	idleTimeout       time.Duration
-	retentionPeriod   string
+	retentionPeriod   NullableDuration
 }
 
 func newCreateCmd(app *App) *cobra.Command {
@@ -54,7 +79,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().BoolVarP(&opts.permissionsOptOut, "default-permissions", "", false, "do not prompt to accept additional permissions requested by the codespace")
 	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
 	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 0, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
-	// createCmd.Flags().StringVar(&opts.retentionPeriod, "retention-period", "", "allowed time after going idle before codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
+	// createCmd.Flags().Var(&opts.retentionPeriod, "retention-period", "allowed time after going idle before codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
 	createCmd.Flags().StringVar(&opts.devContainerPath, "devcontainer-path", "", "path to the devcontainer.json file to use when creating codespace")
 
 	return createCmd
@@ -178,27 +203,20 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return errors.New("there are no available machine types for this repository")
 	}
 
-	var retentionPeriod *int
-	if opts.retentionPeriod != "" {
-		retentionMinutesf, err := time.ParseDuration(opts.retentionPeriod)
-		if err != nil {
-			return fmt.Errorf("error parsing retention period: %w", err)
-		}
-		retentionMinutei := int(retentionMinutesf.Minutes())
-		retentionPeriod = &retentionMinutei
-	}
-
 	createParams := &api.CreateCodespaceParams{
-		RepositoryID:           repository.ID,
-		Branch:                 branch,
-		Machine:                machine,
-		Location:               userInputs.Location,
-		VSCSTarget:             vscsTarget,
-		VSCSTargetURL:          vscsTargetUrl,
-		IdleTimeoutMinutes:     int(opts.idleTimeout.Minutes()),
-		RetentionPeriodMinutes: retentionPeriod,
-		DevContainerPath:       devContainerPath,
-		PermissionsOptOut:      opts.permissionsOptOut,
+		RepositoryID:       repository.ID,
+		Branch:             branch,
+		Machine:            machine,
+		Location:           userInputs.Location,
+		VSCSTarget:         vscsTarget,
+		VSCSTargetURL:      vscsTargetUrl,
+		IdleTimeoutMinutes: int(opts.idleTimeout.Minutes()),
+		DevContainerPath:   devContainerPath,
+		PermissionsOptOut:  opts.permissionsOptOut,
+	}
+	if opts.retentionPeriod.Duration != nil {
+		retentionMinutes := int(opts.retentionPeriod.Duration.Minutes())
+		createParams.RetentionPeriodMinutes = &retentionMinutes
 	}
 
 	a.StartProgressIndicatorWithLabel("Creating codespace")

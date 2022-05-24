@@ -72,7 +72,7 @@ func TestApp_Create(t *testing.T) {
 				machine:         "GIGA",
 				showStatus:      false,
 				idleTimeout:     30 * time.Minute,
-				retentionPeriod: "48h",
+				retentionPeriod: NullableDuration{durationPtr(48 * time.Hour)},
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
 		},
@@ -383,4 +383,8 @@ func TestBuildDisplayName(t *testing.T) {
 			}
 		})
 	}
+}
+
+func durationPtr(d time.Duration) *time.Duration {
+	return &d
 }
