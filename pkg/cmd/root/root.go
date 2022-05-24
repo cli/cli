@@ -53,12 +53,14 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 			"help:feedback": heredoc.Doc(`
 				Open an issue using 'gh issue create -R github.com/cli/cli'
 			`),
+			"versionInfo": versionCmd.Format(version, buildDate),
 		},
 	}
 
 	cmd.SetOut(f.IOStreams.ErrOut) // command usage summary and deprecation warnings
 	cmd.SetErr(f.IOStreams.ErrOut) // error messages
 
+	cmd.Flags().Bool("version", false, "Show gh version")
 	cmd.PersistentFlags().Bool("help", false, "Show help for command")
 	cmd.SetHelpFunc(func(c *cobra.Command, args []string) {
 		rootHelpFunc(f, c, args)
@@ -67,11 +69,6 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 		return rootUsageFunc(f.IOStreams.ErrOut, c)
 	})
 	cmd.SetFlagErrorFunc(rootFlagErrorFunc)
-
-	formattedVersion := versionCmd.Format(version, buildDate)
-	cmd.SetVersionTemplate(formattedVersion)
-	cmd.Version = formattedVersion
-	cmd.Flags().Bool("version", false, "Show gh version")
 
 	// Child commands
 	cmd.AddCommand(versionCmd.NewCmdVersion(f, version, buildDate))

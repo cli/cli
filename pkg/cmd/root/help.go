@@ -82,6 +82,17 @@ func isRootCmd(command *cobra.Command) bool {
 }
 
 func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
+	if isRootCmd(command) {
+		if versionVal, err := command.Flags().GetBool("version"); err == nil && versionVal {
+			fmt.Fprint(f.IOStreams.Out, command.Annotations["versionInfo"])
+			return
+		} else if err != nil {
+			fmt.Fprintln(f.IOStreams.ErrOut, err)
+			hasFailed = true
+			return
+		}
+	}
+
 	cs := f.IOStreams.ColorScheme()
 
 	if isRootCmd(command.Parent()) && len(args) >= 2 && args[1] != "--help" && args[1] != "-h" {
