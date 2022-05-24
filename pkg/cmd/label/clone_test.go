@@ -154,6 +154,73 @@ func TestCloneRun(t *testing.T) {
 			wantStdout: "✓ Cloned 2 labels from cli/cli to OWNER/REPO\n",
 		},
 		{
+			name: "clones one label",
+			tty:  true,
+			opts: &cloneOptions{SourceRepo: ghrepo.New("cli", "cli")},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query LabelList\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"repository": {
+								"labels": {
+									"totalCount": 1,
+									"nodes": [
+										{
+											"name": "bug",
+											"color": "d73a4a",
+											"description": "Something isn't working"
+										}
+									],
+									"pageInfo": {
+										"hasNextPage": false,
+										"endCursor": "abcd1234"
+									}
+								}
+							}
+						}
+					}`),
+				)
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/labels"),
+					httpmock.StatusStringResponse(201, `
+					{
+						"name": "bug",
+						"color": "d73a4a",
+						"description": "Someting isn't working"
+					}`),
+				)
+			},
+			wantStdout: "✓ Cloned 1 label from cli/cli to OWNER/REPO\n",
+		},
+		{
+			name: "has no labels",
+			tty:  true,
+			opts: &cloneOptions{SourceRepo: ghrepo.New("cli", "cli")},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query LabelList\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"repository": {
+								"labels": {
+									"totalCount": 0,
+									"nodes": [],
+									"pageInfo": {
+										"hasNextPage": false,
+										"endCursor": "abcd1234"
+									}
+								}
+							}
+						}
+					}`),
+				)
+			},
+			wantStdout: "✓ Cloned 0 labels from cli/cli to OWNER/REPO\n",
+		},
+		{
 			name: "clones some labels",
 			tty:  true,
 			opts: &cloneOptions{SourceRepo: ghrepo.New("cli", "cli")},
@@ -374,16 +441,12 @@ func TestCloneRun(t *testing.T) {
 						"data": {
 							"repository": {
 								"labels": {
-									"totalCount": 2,
+									"totalCount": 1,
 									"nodes": [
 										{
 											"name": "bug",
 											"color": "d73a4a",
 											"description": "Something isn't working"
-										},
-										{
-											"name": "docs",
-											"color": "6cafc9"
 										}
 									],
 									"pageInfo": {
