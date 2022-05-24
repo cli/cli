@@ -62,7 +62,7 @@ func (a *App) Edit(ctx context.Context, opts editOptions) error {
 			return fmt.Errorf("error choosing codespace: %w", err)
 		}
 
-		opts.codespaceName = selectedCodespace.Name
+		userInputs.CodespaceName = selectedCodespace.Name
 	}
 
 	a.StartProgressIndicatorWithLabel("Editing codespace")
