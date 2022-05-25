@@ -860,6 +860,7 @@ func possibleDists() []string {
 		"windows-386",
 		"windows-amd64",
 		"windows-arm",
+		"windows-arm64",
 	}
 }
 
