@@ -2,6 +2,7 @@ package codespace
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
@@ -18,7 +19,6 @@ func TestEdit(t *testing.T) {
 		editErr       error
 		wantErr       bool
 		wantStdout    string
-		wantStderr    string
 	}{
 		{
 			name: "edit codespace display name",
@@ -57,8 +57,8 @@ func TestEdit(t *testing.T) {
 				displayName:   "",
 				machine:       "",
 			},
-			wantStderr: "at least one property has to be edited",
-			wantErr:    true,
+			editErr: fmt.Errorf("at least one property has to be edited"),
+			wantErr: true,
 		},
 		{
 			name: "select codespace to edit when no codespace input is given",
@@ -112,7 +112,7 @@ func TestEdit(t *testing.T) {
 
 			opts := tt.opts
 
-			ios, _, stdout, stderr := iostreams.Test()
+			ios, _, stdout, _ := iostreams.Test()
 			ios.SetStdinTTY(true)
 			ios.SetStdoutTTY(true)
 			ios.SetStderrTTY(true)
@@ -128,8 +128,8 @@ func TestEdit(t *testing.T) {
 				t.Errorf("stdout = %q, want %q", out, tt.wantStdout)
 			}
 
-			if out := stderr.String(); out != tt.wantStderr {
-				t.Errorf("stderr = %q, want %q", out, tt.wantStderr)
+			if tt.wantErr && err.Error() != tt.editErr.Error() {
+				t.Errorf("stderr = %v, expected error %v", err, tt.editErr)
 			}
 
 		})
