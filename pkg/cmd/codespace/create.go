@@ -48,6 +48,15 @@ func (d *NullableDuration) Type() string {
 	return "duration"
 }
 
+func (d *NullableDuration) Minutes() *int {
+	if d.Duration != nil {
+		retentionMinutes := int(d.Duration.Minutes())
+		return &retentionMinutes
+	}
+
+	return nil
+}
+
 type createOptions struct {
 	repo              string
 	branch            string
@@ -204,19 +213,16 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	}
 
 	createParams := &api.CreateCodespaceParams{
-		RepositoryID:       repository.ID,
-		Branch:             branch,
-		Machine:            machine,
-		Location:           userInputs.Location,
-		VSCSTarget:         vscsTarget,
-		VSCSTargetURL:      vscsTargetUrl,
-		IdleTimeoutMinutes: int(opts.idleTimeout.Minutes()),
-		DevContainerPath:   devContainerPath,
-		PermissionsOptOut:  opts.permissionsOptOut,
-	}
-	if opts.retentionPeriod.Duration != nil {
-		retentionMinutes := int(opts.retentionPeriod.Duration.Minutes())
-		createParams.RetentionPeriodMinutes = &retentionMinutes
+		RepositoryID:           repository.ID,
+		Branch:                 branch,
+		Machine:                machine,
+		Location:               userInputs.Location,
+		VSCSTarget:             vscsTarget,
+		VSCSTargetURL:          vscsTargetUrl,
+		IdleTimeoutMinutes:     int(opts.idleTimeout.Minutes()),
+		RetentionPeriodMinutes: opts.retentionPeriod.Minutes(),
+		DevContainerPath:       devContainerPath,
+		PermissionsOptOut:      opts.permissionsOptOut,
 	}
 
 	a.StartProgressIndicatorWithLabel("Creating codespace")
