@@ -38,7 +38,7 @@ func (d *NullableDuration) String() string {
 func (d *NullableDuration) Set(str string) error {
 	duration, err := time.ParseDuration(str)
 	if err != nil {
-		return fmt.Errorf("error duration: %w", err)
+		return fmt.Errorf("error parsing duration: %w", err)
 	}
 	d.Duration = &duration
 	return nil
