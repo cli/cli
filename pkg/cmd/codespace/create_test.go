@@ -55,7 +55,7 @@ func TestApp_Create(t *testing.T) {
 							return nil, fmt.Errorf("idle timeout minutes was %v", params.IdleTimeoutMinutes)
 						}
 						if *params.RetentionPeriodMinutes != 2880 {
-							return nil, fmt.Errorf("retention period minutes was %v", params.RetentionPeriodMinutes)
+							return nil, fmt.Errorf("retention period minutes expected 2880, was %v", params.RetentionPeriodMinutes)
 						}
 						return &api.Codespace{
 							Name: "monalisa-dotfiles-abcd1234",
@@ -72,7 +72,7 @@ func TestApp_Create(t *testing.T) {
 				machine:         "GIGA",
 				showStatus:      false,
 				idleTimeout:     30 * time.Minute,
-				retentionPeriod: 48 * time.Hour,
+				retentionPeriod: NullableDuration{durationPtr(48 * time.Hour)},
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
 		},
@@ -104,6 +104,9 @@ func TestApp_Create(t *testing.T) {
 						}
 						if params.IdleTimeoutMinutes != 30 {
 							return nil, fmt.Errorf("idle timeout minutes was %v", params.IdleTimeoutMinutes)
+						}
+						if params.RetentionPeriodMinutes != nil {
+							return nil, fmt.Errorf("retention period minutes expected nil, was %v", params.RetentionPeriodMinutes)
 						}
 						if params.DevContainerPath != ".devcontainer/foobar/devcontainer.json" {
 							return nil, fmt.Errorf("got dev container path %q, want %q", params.DevContainerPath, ".devcontainer/foobar/devcontainer.json")
@@ -325,14 +328,20 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 				apiClient: tt.fields.apiClient,
 			}
 
-			if err := a.Create(context.Background(), tt.opts); err != nil && tt.wantErr != nil {
+			err := a.Create(context.Background(), tt.opts)
+			if err != nil && tt.wantErr != nil {
 				assert.EqualError(t, err, tt.wantErr.Error())
 			}
+			if err != nil && tt.wantErr == nil {
+				t.Logf(err.Error())
+			}
 			if got := stdout.String(); got != tt.wantStdout {
-				t.Errorf("stdout = %v, want %v", got, tt.wantStdout)
+				t.Logf(t.Name())
+				t.Errorf("  stdout = %v, want %v", got, tt.wantStdout)
 			}
 			if got := stderr.String(); got != tt.wantStderr {
-				t.Errorf("stderr = %v, want %v", got, tt.wantStderr)
+				t.Logf(t.Name())
+				t.Errorf("  stderr = %v, want %v", got, tt.wantStderr)
 			}
 		})
 	}
@@ -374,4 +383,8 @@ func TestBuildDisplayName(t *testing.T) {
 			}
 		})
 	}
+}
+
+func durationPtr(d time.Duration) *time.Duration {
+	return &d
 }
