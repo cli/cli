@@ -17,7 +17,6 @@ func TestEdit(t *testing.T) {
 		mockCodespace *api.Codespace
 		editErr       error
 		wantErr       bool
-		wantCodespace string
 		wantStdout    string
 		wantStderr    string
 	}{
@@ -58,7 +57,7 @@ func TestEdit(t *testing.T) {
 				displayName:   "",
 				machine:       "",
 			},
-			wantStderr: "please pass in at least one valid argument to be edited",
+			wantStderr: "at least one property has to be edited",
 			wantErr:    true,
 		},
 		{
@@ -82,9 +81,15 @@ func TestEdit(t *testing.T) {
 					DisplayName: "c4f3",
 				},
 			},
-			wantCodespace: "monalisa-123",
-			wantStdout:    "",
-			wantErr:       false,
+			mockCodespace: &api.Codespace{
+				Name: "hubot",
+				Machine: api.CodespaceMachine{
+					Name:        "monalisa-123",
+					DisplayName: "monalisa-new",
+				},
+			},
+			wantStdout: "",
+			wantErr:    false,
 		},
 	}
 	for _, tt := range tests {
@@ -110,18 +115,23 @@ func TestEdit(t *testing.T) {
 			ios, _, stdout, stderr := iostreams.Test()
 			ios.SetStdinTTY(true)
 			ios.SetStdoutTTY(true)
+			ios.SetStderrTTY(true)
 			a := NewApp(ios, nil, apiMock, nil)
 
-			if err := a.Edit(context.Background(), opts); (err != nil) != tt.wantErr {
+			err := a.Edit(context.Background(), opts)
+
+			if (err != nil) != tt.wantErr {
 				t.Errorf("App.Edit() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
 			if out := stdout.String(); out != tt.wantStdout {
 				t.Errorf("stdout = %q, want %q", out, tt.wantStdout)
 			}
+
 			if out := stderr.String(); out != tt.wantStderr {
 				t.Errorf("stderr = %q, want %q", out, tt.wantStderr)
 			}
+
 		})
 	}
 }
