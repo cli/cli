@@ -57,8 +57,8 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 		},
 	}
 
-	cmd.SetOut(f.IOStreams.ErrOut) // command usage summary and deprecation warnings
-	cmd.SetErr(f.IOStreams.ErrOut) // error messages
+	// cmd.SetOut(f.IOStreams.Out)    // can't use due to https://github.com/spf13/cobra/issues/1708
+	// cmd.SetErr(f.IOStreams.ErrOut) // just let it default to os.Stderr instead
 
 	cmd.Flags().Bool("version", false, "Show gh version")
 	cmd.PersistentFlags().Bool("help", false, "Show help for command")
