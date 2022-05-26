@@ -115,6 +115,11 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// Make sure we have SSH keys available
+	// If not, generate them to ~/.ssh/codespace
+	// If that doesn't work, fail before connecting
+	userPublicKey := "hello"
+
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
 	if err != nil {
 		return err
@@ -127,7 +132,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	defer safeClose(session, &err)
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
+	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx, userPublicKey)
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
@@ -232,7 +237,8 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 			} else {
 				defer safeClose(session, &err)
 
-				_, result.user, err = session.StartSSHServer(ctx)
+				// Pass empty key here because it doesn't actually connect to SSH
+				_, result.user, err = session.StartSSHServer(ctx, "")
 				if err != nil {
 					result.err = fmt.Errorf("error getting ssh server details: %w", err)
 				} else {

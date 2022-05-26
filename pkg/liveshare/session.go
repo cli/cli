@@ -38,7 +38,7 @@ func (s *Session) registerRequestHandler(requestType string, h handler) func() {
 
 // StartsSSHServer starts an SSH server in the container, installing sshd if necessary,
 // and returns the port on which it listens and the user name clients should provide.
-func (s *Session) StartSSHServer(ctx context.Context) (int, string, error) {
+func (s *Session) StartSSHServer(ctx context.Context, userPublicKey string) (int, string, error) {
 	var response struct {
 		Result     bool   `json:"result"`
 		ServerPort string `json:"serverPort"`
@@ -46,7 +46,9 @@ func (s *Session) StartSSHServer(ctx context.Context) (int, string, error) {
 		Message    string `json:"message"`
 	}
 
-	if err := s.rpc.do(ctx, "ISshServerHostService.startRemoteServer", []string{}, &response); err != nil {
+	// Add param with key here, update corresponding on C# side
+	params := []string{userPublicKey}
+	if err := s.rpc.do(ctx, "ISshServerHostService.startRemoteServer", &params, &response); err != nil {
 		return 0, "", err
 	}
 
