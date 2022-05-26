@@ -385,6 +385,78 @@ func TestBuildDisplayName(t *testing.T) {
 	}
 }
 
+func TestCreateAndSsh(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	user := &api.User{Login: "monalisa"}
+	apiMock := &apiClientMock{
+		ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+			return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
+		},
+		GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
+			return []*api.Machine{
+				{
+					Name:        "GIGA",
+					DisplayName: "Gigabits of a machine",
+				},
+			}, nil
+		},
+		CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+			return &api.Codespace{
+				Name: "monalisa-dotfiles-abcd1234",
+			}, nil
+		},
+		GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+			return &api.Repository{
+				ID:            1234,
+				FullName:      "monalisa/dotfiles",
+				DefaultBranch: "main",
+			}, nil
+		},
+		GetUserFunc: func(_ context.Context) (*api.User, error) {
+			return user, nil
+		},
+		AuthorizedKeysFunc: func(_ context.Context, _ string) ([]byte, error) {
+			return []byte{}, nil
+		},
+		StartCodespaceFunc: func(ctx context.Context, name string) error {
+			fmt.Println("Starting codespace")
+			return nil
+		},
+		GetCodespaceFunc: func(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error) {
+			return &api.Codespace{
+				Name:  "monalisa-dotfiles-abcd1234",
+				State: api.CodespaceStateAvailable,
+				Connection: api.CodespaceConnection{
+					SessionID:     "something",
+					SessionToken:  "something",
+					RelayEndpoint: "something",
+					RelaySAS:      "something",
+				},
+			}, nil
+		},
+	}
+
+	a := &App{
+		io:        ios,
+		apiClient: apiMock,
+	}
+
+	opts := createOptions{
+		repo:             "monalisa/dotfiles",
+		branch:           "",
+		machine:          "GIGA",
+		ssh:              true,
+		showStatus:       false,
+		idleTimeout:      30 * time.Minute,
+		devContainerPath: ".devcontainer/foobar/devcontainer.json",
+	}
+
+	_, err := a.Create(context.Background(), opts)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func durationPtr(d time.Duration) *time.Duration {
 	return &d
 }
