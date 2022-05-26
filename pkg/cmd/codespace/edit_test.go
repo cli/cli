@@ -1,0 +1,106 @@
+package codespace
+
+import (
+	"context"
+	"fmt"
+	"testing"
+
+	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/pkg/iostreams"
+)
+
+func TestEdit(t *testing.T) {
+
+	tests := []struct {
+		name          string
+		opts          editOptions
+		codespaces    []*api.Codespace
+		mockCodespace *api.Codespace
+		editErr       error
+		wantErr       bool
+		wantStdout    string
+	}{
+		{
+			name: "edit codespace display name",
+			opts: editOptions{
+				codespaceName: "hubot",
+				displayName:   "hubot-changed",
+				machine:       "",
+			},
+			mockCodespace: &api.Codespace{
+				Name:        "hubot",
+				DisplayName: "hubot-changed",
+			},
+			wantStdout: "",
+			wantErr:    false,
+		},
+		{
+			name: "edit codespace machine",
+			opts: editOptions{
+				codespaceName: "hubot",
+				displayName:   "",
+				machine:       "machine",
+			},
+			mockCodespace: &api.Codespace{
+				Name: "hubot",
+				Machine: api.CodespaceMachine{
+					Name: "machine",
+				},
+			},
+			wantStdout: "",
+			wantErr:    false,
+		},
+		{
+			name: "trying to edit a codespace without anything to edit should return an error",
+			opts: editOptions{
+				codespaceName: "hubot",
+				displayName:   "",
+				machine:       "",
+			},
+			editErr: fmt.Errorf("at least one property has to be edited"),
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			apiMock := &apiClientMock{
+				EditCodespaceFunc: func(_ context.Context, codespaceName string, params *api.EditCodespaceParams) (*api.Codespace, error) {
+					if tt.editErr != nil {
+						return tt.mockCodespace, tt.editErr
+					}
+					return tt.mockCodespace, nil
+				},
+			}
+
+			if tt.opts.codespaceName == "" {
+				apiMock.ListCodespacesFunc = func(_ context.Context, num int) ([]*api.Codespace, error) {
+					return tt.codespaces, nil
+				}
+			}
+
+			opts := tt.opts
+
+			ios, _, stdout, _ := iostreams.Test()
+			ios.SetStdinTTY(true)
+			ios.SetStdoutTTY(true)
+			ios.SetStderrTTY(true)
+			a := NewApp(ios, nil, apiMock, nil)
+
+			err := a.Edit(context.Background(), opts)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("App.Edit() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if out := stdout.String(); out != tt.wantStdout {
+				t.Errorf("stdout = %q, want %q", out, tt.wantStdout)
+			}
+
+			if tt.wantErr && err.Error() != tt.editErr.Error() {
+				t.Errorf("stderr = %v, expected error %v", err, tt.editErr)
+			}
+
+		})
+	}
+}

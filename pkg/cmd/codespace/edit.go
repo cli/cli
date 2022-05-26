@@ -46,23 +46,19 @@ func (a *App) Edit(ctx context.Context, opts editOptions) error {
 	}
 
 	if userInputs.DisplayName == "" && userInputs.SKU == "" {
-		return fmt.Errorf("please pass in at least one valid argument to be edited")
+		return fmt.Errorf("at least one property has to be edited")
 	}
 
 	if userInputs.CodespaceName == "" {
-		a.StartProgressIndicatorWithLabel("Fetching codespaces")
-		codespaces, err := a.apiClient.ListCodespaces(ctx, -1)
-		a.StopProgressIndicator()
+		selectedCodespace, err := chooseCodespace(ctx, a.apiClient)
 		if err != nil {
-			return fmt.Errorf("error getting codespaces to select from: %w", err)
-		}
-
-		selectedCodespace, err := chooseCodespaceFromList(ctx, codespaces)
-		if err != nil {
+			if err == errNoCodespaces {
+				return err
+			}
 			return fmt.Errorf("error choosing codespace: %w", err)
 		}
 
-		opts.codespaceName = selectedCodespace.Name
+		userInputs.CodespaceName = selectedCodespace.Name
 	}
 
 	a.StartProgressIndicatorWithLabel("Editing codespace")
