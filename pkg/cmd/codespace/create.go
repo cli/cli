@@ -63,6 +63,7 @@ type createOptions struct {
 	location          string
 	machine           string
 	showStatus        bool
+	ssh               bool
 	permissionsOptOut bool
 	devContainerPath  string
 	idleTimeout       time.Duration
@@ -77,7 +78,23 @@ func newCreateCmd(app *App) *cobra.Command {
 		Short: "Create a codespace",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.Create(cmd.Context(), opts)
+			codespace, err := app.Create(cmd.Context(), opts)
+
+			if err != nil {
+				return err
+			}
+
+			if opts.ssh {
+				sshOpts := sshOptions{
+					codespace: codespace.Name,
+				}
+				var sshArgs []string
+				if err := app.SSH(cmd.Context(), sshArgs, sshOpts); err != nil {
+					return fmt.Errorf("ssh error: %w", err)
+				}
+			}
+
+			return nil
 		},
 	}
 
@@ -87,6 +104,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "hardware specifications for the VM")
 	createCmd.Flags().BoolVarP(&opts.permissionsOptOut, "default-permissions", "", false, "do not prompt to accept additional permissions requested by the codespace")
 	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
+	createCmd.Flags().BoolVar(&opts.ssh, "ssh", false, "SSH immediately into the codespace once ready. Implies --status")
 	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 0, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
 	// createCmd.Flags().Var(&opts.retentionPeriod, "retention-period", "allowed time after shutting down before the codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
 	createCmd.Flags().StringVar(&opts.devContainerPath, "devcontainer-path", "", "path to the devcontainer.json file to use when creating codespace")
@@ -95,7 +113,7 @@ func newCreateCmd(app *App) *cobra.Command {
 }
 
 // Create creates a new Codespace
-func (a *App) Create(ctx context.Context, opts createOptions) error {
+func (a *App) Create(ctx context.Context, opts createOptions) (*api.Codespace, error) {
 	// Overrides for Codespace developers to target test environments
 	vscsLocation := os.Getenv("VSCS_LOCATION")
 	vscsTarget := os.Getenv("VSCS_TARGET")
@@ -137,7 +155,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 			},
 		}
 		if err := ask(questions, &userInputs); err != nil {
-			return fmt.Errorf("failed to prompt: %w", err)
+			return nil, fmt.Errorf("failed to prompt: %w", err)
 		}
 	}
 
@@ -149,7 +167,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	repository, err := a.apiClient.GetRepository(ctx, userInputs.Repository)
 	a.StopProgressIndicator()
 	if err != nil {
-		return fmt.Errorf("error getting repository: %w", err)
+		return nil, fmt.Errorf("error getting repository: %w", err)
 	}
 
 	branch := userInputs.Branch
@@ -165,7 +183,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		devcontainers, err := a.apiClient.ListDevContainers(ctx, repository.ID, branch, 100)
 		a.StopProgressIndicator()
 		if err != nil {
-			return fmt.Errorf("error getting devcontainer.json paths: %w", err)
+			return nil, fmt.Errorf("error getting devcontainer.json paths: %w", err)
 		}
 
 		if len(devcontainers) > 0 {
@@ -193,7 +211,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 				}
 
 				if err := ask([]*survey.Question{devContainerPathQuestion}, &devContainerPath); err != nil {
-					return fmt.Errorf("failed to prompt: %w", err)
+					return nil, fmt.Errorf("failed to prompt: %w", err)
 				}
 			}
 		}
@@ -206,10 +224,10 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 
 	machine, err := getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, userInputs.Location)
 	if err != nil {
-		return fmt.Errorf("error getting machine type: %w", err)
+		return nil, fmt.Errorf("error getting machine type: %w", err)
 	}
 	if machine == "" {
-		return errors.New("there are no available machine types for this repository")
+		return nil, errors.New("there are no available machine types for this repository")
 	}
 
 	createParams := &api.CreateCodespaceParams{
@@ -232,19 +250,23 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	if err != nil {
 		var aerr api.AcceptPermissionsRequiredError
 		if !errors.As(err, &aerr) || aerr.AllowPermissionsURL == "" {
-			return fmt.Errorf("error creating codespace: %w", err)
+			return nil, fmt.Errorf("error creating codespace: %w", err)
 		}
 
 		codespace, err = a.handleAdditionalPermissions(ctx, createParams, aerr.AllowPermissionsURL)
 		if err != nil {
 			// this error could be a cmdutil.SilentError (in the case that the user opened the browser) so we don't want to wrap it
-			return err
+			return nil, err
 		}
+	}
+
+	if opts.ssh {
+		opts.showStatus = true
 	}
 
 	if opts.showStatus {
 		if err := a.showStatus(ctx, codespace); err != nil {
-			return fmt.Errorf("show status: %w", err)
+			return nil, fmt.Errorf("show status: %w", err)
 		}
 	}
 
@@ -256,7 +278,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		fmt.Fprintln(a.io.ErrOut, cs.Yellow("Notice:"), codespace.IdleTimeoutNotice)
 	}
 
-	return nil
+	return codespace, nil
 }
 
 func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api.CreateCodespaceParams, allowPermissionsURL string) (*api.Codespace, error) {

@@ -328,7 +328,7 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 				apiClient: tt.fields.apiClient,
 			}
 
-			err := a.Create(context.Background(), tt.opts)
+			_, err := a.Create(context.Background(), tt.opts)
 			if err != nil && tt.wantErr != nil {
 				assert.EqualError(t, err, tt.wantErr.Error())
 			}
