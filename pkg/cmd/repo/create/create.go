@@ -443,7 +443,7 @@ func createFromLocal(opts *CreateOptions) error {
 		if repoPath == "." {
 			return fmt.Errorf("current directory is not a git repository. Run `git init` to initalize it")
 		}
-		return fmt.Errorf("%s is not a git repository. Run `git -C %s init` to initialize it", absPath, repoPath)
+		return fmt.Errorf("%s is not a git repository. Run `git -C \"%s\" init` to initialize it", absPath, repoPath)
 	}
 
 	committed, err := hasCommits(repoPath)
