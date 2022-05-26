@@ -56,7 +56,8 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 	localPort := listen.Addr().(*net.TCPAddr).Port
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
+	// TODO: This shouldn't care about the key
+	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx, "")
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
