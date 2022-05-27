@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -439,6 +440,10 @@ func TestCreateAndSsh(t *testing.T) {
 	a := &App{
 		io:        ios,
 		apiClient: apiMock,
+	}
+
+	PollStates = func(ctx context.Context, progress codespaces.ProgressIndicator, apiClient codespaces.ApiClient, codespace *api.Codespace, poller func([]codespaces.PostCreateState)) (err error) {
+		return nil
 	}
 
 	opts := createOptions{
