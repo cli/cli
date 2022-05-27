@@ -442,6 +442,13 @@ func TestCreateAndSsh(t *testing.T) {
 		apiClient: apiMock,
 	}
 
+	ssh = func(a *App) func(ctx context.Context, sshArgs []string, opts sshOptions) (err error) {
+		return func(ctx context.Context, sshArgs []string, opts sshOptions) (err error) {
+			fmt.Println("I GUESS :SHRUG:")
+			return nil
+		}
+	}
+
 	PollStates = func(ctx context.Context, progress codespaces.ProgressIndicator, apiClient codespaces.ApiClient, codespace *api.Codespace, poller func([]codespaces.PostCreateState)) (err error) {
 
 		if codespace.Name != "monalisa-dotfiles-abcd1234" {

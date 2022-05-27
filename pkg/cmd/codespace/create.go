@@ -268,13 +268,19 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 			codespace: codespace.Name,
 		}
 		var sshArgs []string
-		if err := a.SSH(ctx, sshArgs, sshOpts); err != nil {
+		if err := ssh(a)(ctx, sshArgs, sshOpts); err != nil {
 			return fmt.Errorf("ssh error: %w", err)
 		}
 	}
 
 	return nil
 }
+
+var (
+	ssh = func(a *App) func(ctx context.Context, sshArgs []string, opts sshOptions) (err error) {
+		return a.SSH
+	}
+)
 
 func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api.CreateCodespaceParams, allowPermissionsURL string) (*api.Codespace, error) {
 	var (
