@@ -46,7 +46,9 @@ func makeMockSession(opts ...livesharetest.ServerOption) (*livesharetest.Server,
 	if err != nil {
 		return nil, nil, fmt.Errorf("error connecting to Live Share: %w", err)
 	}
-	return testServer, session, nil
+
+	testSession, _ := session.(*Session)
+	return testServer, testSession, nil
 }
 
 func TestServerStartSharing(t *testing.T) {

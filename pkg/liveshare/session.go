@@ -5,7 +5,30 @@ import (
 	"fmt"
 	"strconv"
 	"time"
+
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/opentracing/opentracing-go"
 )
+
+// A channelID is an identifier for an exposed port on a remote
+// container that may be used to open an SSH channel to it.
+type channelID struct {
+	name, condition string
+}
+
+type LiveshareSession interface {
+	StartSSHServer(context.Context) (int, string, error)
+	StartJupyterServer(context.Context) (int, string, error)
+	GetSharedServers(context.Context) ([]*Port, error)
+	UpdateSharedServerPrivacy(context.Context, int, string) error
+	startSharing(context.Context, string, int) (channelID, error)
+	keepAlive(string)
+	heartbeat(context.Context, time.Duration)
+	openStreamingChannel(context.Context, channelID) (ssh.Channel, error)
+	notifyHostOfActivity(context.Context, string) error
+}
 
 // A Session represents the session between a connected Live Share client and server.
 type Session struct {
@@ -127,4 +150,84 @@ func (s *Session) keepAlive(reason string) {
 		// there is already an active keep alive reason
 		// so we can ignore this one
 	}
+}
+
+// startSharing tells the Live Share host to start sharing the specified port from the container.
+// The sessionName describes the purpose of the remote port or service.
+// It returns an identifier that can be used to open an SSH channel to the remote port.
+func (s *Session) startSharing(ctx context.Context, sessionName string, port int) (channelID, error) {
+	args := []interface{}{port, sessionName, fmt.Sprintf("http://localhost:%d", port)}
+	g, ctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		startNotification, err := s.WaitForPortNotification(ctx, port, PortChangeKindStart)
+		if err != nil {
+			return fmt.Errorf("error while waiting for port notification: %w", err)
+
+		}
+		if !startNotification.Success {
+			return fmt.Errorf("error while starting port sharing: %s", startNotification.ErrorDetail)
+		}
+		return nil // success
+	})
+
+	var response Port
+	g.Go(func() error {
+		return s.rpc.do(ctx, "serverSharing.startSharing", args, &response)
+	})
+
+	if err := g.Wait(); err != nil {
+		return channelID{}, err
+	}
+
+	return channelID{response.StreamName, response.StreamCondition}, nil
+}
+
+// GetSharedServers returns a description of each container port
+// shared by a prior call to startSharing by some client.
+func (s *Session) GetSharedServers(ctx context.Context) ([]*Port, error) {
+	var response []*Port
+	if err := s.rpc.do(ctx, "serverSharing.getSharedServers", []string{}, &response); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// UpdateSharedServerPrivacy controls port permissions and visibility scopes for who can access its URLs
+// in the browser.
+func (s *Session) UpdateSharedServerPrivacy(ctx context.Context, port int, visibility string) error {
+	return s.rpc.do(ctx, "serverSharing.updateSharedServerPrivacy", []interface{}{port, visibility}, nil)
+}
+
+func (s *Session) openStreamingChannel(ctx context.Context, id channelID) (ssh.Channel, error) {
+	type getStreamArgs struct {
+		StreamName string `json:"streamName"`
+		Condition  string `json:"condition"`
+	}
+	args := getStreamArgs{
+		StreamName: id.name,
+		Condition:  id.condition,
+	}
+	var streamID string
+	if err := s.rpc.do(ctx, "streamManager.getStream", args, &streamID); err != nil {
+		return nil, fmt.Errorf("error getting stream id: %w", err)
+	}
+
+	span, ctx := opentracing.StartSpanFromContext(ctx, "Session.OpenChannel+SendRequest")
+	defer span.Finish()
+	_ = ctx // ctx is not currently used
+
+	channel, reqs, err := s.ssh.conn.OpenChannel("session", nil)
+	if err != nil {
+		return nil, fmt.Errorf("error opening ssh channel for transport: %w", err)
+	}
+	go ssh.DiscardRequests(reqs)
+
+	requestType := fmt.Sprintf("stream-transport-%s", streamID)
+	if _, err = channel.SendRequest(requestType, true, nil); err != nil {
+		return nil, fmt.Errorf("error sending channel request: %w", err)
+	}
+
+	return channel, nil
 }
