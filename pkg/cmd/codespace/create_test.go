@@ -329,7 +329,7 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 				apiClient: tt.fields.apiClient,
 			}
 
-			_, err := a.Create(context.Background(), tt.opts)
+			err := a.Create(context.Background(), tt.opts)
 			if err != nil && tt.wantErr != nil {
 				assert.EqualError(t, err, tt.wantErr.Error())
 			}
@@ -443,6 +443,11 @@ func TestCreateAndSsh(t *testing.T) {
 	}
 
 	PollStates = func(ctx context.Context, progress codespaces.ProgressIndicator, apiClient codespaces.ApiClient, codespace *api.Codespace, poller func([]codespaces.PostCreateState)) (err error) {
+
+		if codespace.Name != "monalisa-dotfiles-abcd1234" {
+			t.Errorf("Expected codespace name to be 'monalisa-dotfiles-abcd1234'. Got %q", codespace.Name)
+		}
+
 		return nil
 	}
 
@@ -456,7 +461,7 @@ func TestCreateAndSsh(t *testing.T) {
 		devContainerPath: ".devcontainer/foobar/devcontainer.json",
 	}
 
-	_, err := a.Create(context.Background(), opts)
+	err := a.Create(context.Background(), opts)
 	if err != nil {
 		t.Error(err)
 	}
