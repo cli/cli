@@ -30,23 +30,29 @@ type executable interface {
 	Executable() string
 }
 
+type liveshareClient interface {
+	startLiveShareSession(context.Context, *api.Codespace, *App, bool, string) (session *liveshare.Session, err error)
+}
+
 type App struct {
-	io         *iostreams.IOStreams
-	apiClient  apiClient
-	errLogger  *log.Logger
-	executable executable
-	browser    browser
+	io              *iostreams.IOStreams
+	apiClient       apiClient
+	errLogger       *log.Logger
+	executable      executable
+	browser         browser
+	liveshareClient liveshareClient
 }
 
 func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browser browser) *App {
 	errLogger := log.New(io.ErrOut, "", 0)
 
 	return &App{
-		io:         io,
-		apiClient:  apiClient,
-		errLogger:  errLogger,
-		executable: exe,
-		browser:    browser,
+		io:              io,
+		apiClient:       apiClient,
+		errLogger:       errLogger,
+		executable:      exe,
+		browser:         browser,
+		liveshareClient: liveshareClientImp{},
 	}
 }
 
@@ -60,8 +66,10 @@ func (a *App) StopProgressIndicator() {
 	a.io.StopProgressIndicator()
 }
 
+type liveshareClientImp struct{}
+
 // Connects to a codespace using Live Share and returns that session
-func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App, debug bool, debugFile string) (session *liveshare.Session, err error) {
+func (client liveshareClientImp) startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App, debug bool, debugFile string) (session *liveshare.Session, err error) {
 	// While connecting, ensure in the background that the user has keys installed.
 	// That lets us report a more useful error message if they don't.
 	authkeys := make(chan error, 1)

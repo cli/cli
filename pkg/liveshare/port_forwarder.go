@@ -12,7 +12,7 @@ import (
 // A PortForwarder forwards TCP traffic over a Live Share session from a port on a remote
 // container to a local destination such as a network port or Go reader/writer.
 type PortForwarder struct {
-	session    *Session
+	session    LiveshareSession
 	name       string
 	remotePort int
 	keepAlive  bool
@@ -22,7 +22,7 @@ type PortForwarder struct {
 // remote port and Live Share session. The name describes the purpose
 // of the remote port or service. The keepAlive flag indicates whether
 // the session should be kept alive with port forwarding traffic.
-func NewPortForwarder(session *Session, name string, remotePort int, keepAlive bool) *PortForwarder {
+func NewPortForwarder(session LiveshareSession, name string, remotePort int, keepAlive bool) *PortForwarder {
 	return &PortForwarder{
 		session:    session,
 		name:       name,
@@ -42,7 +42,7 @@ func NewPortForwarder(session *Session, name string, remotePort int, keepAlive b
 // cancellation. Its error result is always non-nil. The caller is
 // responsible for closing the listening port.
 func (fwd *PortForwarder) ForwardToListener(ctx context.Context, listen net.Listener) (err error) {
-	id, err := fwd.shareRemotePort(ctx)
+	id, err := fwd.session.ShareRemotePort(ctx, fwd.name, fwd.remotePort)
 	if err != nil {
 		return err
 	}

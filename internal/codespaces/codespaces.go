@@ -35,7 +35,7 @@ type logger interface {
 
 // ConnectToLiveshare waits for a Codespace to become running,
 // and connects to it using a Live Share session.
-func ConnectToLiveshare(ctx context.Context, progress ProgressIndicator, sessionLogger logger, apiClient ApiClient, codespace *api.Codespace) (sess *liveshare.Session, err error) {
+func ConnectToLiveshare(ctx context.Context, progress ProgressIndicator, sessionLogger logger, apiClient ApiClient, codespace *api.Codespace) (liveshare.LiveshareSession, error) {
 	if codespace.State != api.CodespaceStateAvailable {
 		progress.StartProgressIndicatorWithLabel("Starting codespace")
 		if err := apiClient.StartCodespace(ctx, codespace.Name); err != nil {

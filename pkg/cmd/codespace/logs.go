@@ -41,7 +41,7 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 		return err
 	}
 
-	session, err := startLiveShareSession(ctx, codespace, a, false, "")
+	session, err := a.liveshareClient.startLiveShareSession(ctx, codespace, a, false, "")
 	if err != nil {
 		return err
 	}

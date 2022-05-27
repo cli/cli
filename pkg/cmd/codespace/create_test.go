@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -438,15 +439,9 @@ func TestCreateAndSsh(t *testing.T) {
 	}
 
 	a := &App{
-		io:        ios,
-		apiClient: apiMock,
-	}
-
-	ssh = func(a *App) func(ctx context.Context, sshArgs []string, opts sshOptions) (err error) {
-		return func(ctx context.Context, sshArgs []string, opts sshOptions) (err error) {
-			fmt.Println("I GUESS :SHRUG:")
-			return nil
-		}
+		io:              ios,
+		apiClient:       apiMock,
+		liveshareClient: mockLiveshareClient{},
 	}
 
 	PollStates = func(ctx context.Context, progress codespaces.ProgressIndicator, apiClient codespaces.ApiClient, codespace *api.Codespace, poller func([]codespaces.PostCreateState)) (err error) {
@@ -476,4 +471,25 @@ func TestCreateAndSsh(t *testing.T) {
 
 func durationPtr(d time.Duration) *time.Duration {
 	return &d
+}
+
+type mockLiveshareSession struct{}
+
+func (s mockLiveshareSession) Close() error {
+	return nil
+}
+
+func (s mockLiveshareSession) StartSSHServer(ctx context.Context) (int, string, error) {
+	return 0, "", nil
+}
+
+func (s mockLiveshareSession) StartJupyterServer(ctx context.Context) (int, string, error) {
+	return 0, "", nil
+}
+
+type mockLiveshareClient struct{}
+
+func (client mockLiveshareClient) startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App, debug bool, debugFile string) (liveshare.LiveshareSession, error) {
+	fmt.Println("WORKSSSSSS")
+	return mockLiveshareSession{}, nil
 }

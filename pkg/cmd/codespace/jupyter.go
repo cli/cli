@@ -37,7 +37,7 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 		return err
 	}
 
-	session, err := startLiveShareSession(ctx, codespace, a, false, "")
+	session, err := a.liveshareClient.startLiveShareSession(ctx, codespace, a, false, "")
 	if err != nil {
 		return err
 	}

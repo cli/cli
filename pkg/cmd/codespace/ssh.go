@@ -120,7 +120,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		return err
 	}
 
-	session, err := startLiveShareSession(ctx, codespace, a, opts.debug, opts.debugFile)
+	session, err := a.liveshareClient.startLiveShareSession(ctx, codespace, a, opts.debug, opts.debugFile)
 	if err != nil {
 		return err
 	}
