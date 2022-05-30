@@ -52,7 +52,6 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/itchyny/gojq v0.12.8 // indirect
 	github.com/itchyny/timefmt-go v0.1.3 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
@@ -74,3 +73,5 @@ require (
 )
 
 replace golang.org/x/crypto => github.com/cli/crypto v0.0.0-20210929142629-6be313f59b03
+
+replace github.com/spf13/cobra => ./internal/cobra
