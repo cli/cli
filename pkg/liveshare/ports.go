@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/sourcegraph/jsonrpc2"
+	"golang.org/x/sync/errgroup"
 )
 
 // Port describes a port exposed by the container.
@@ -28,6 +29,37 @@ const (
 	PortChangeKindStart  PortChangeKind = "start"
 	PortChangeKindUpdate PortChangeKind = "update"
 )
+
+// startSharing tells the Live Share host to start sharing the specified port from the container.
+// The sessionName describes the purpose of the remote port or service.
+// It returns an identifier that can be used to open an SSH channel to the remote port.
+func (s *Session) startSharing(ctx context.Context, sessionName string, port int) (channelID, error) {
+	args := []interface{}{port, sessionName, fmt.Sprintf("http://localhost:%d", port)}
+	g, ctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		startNotification, err := s.WaitForPortNotification(ctx, port, PortChangeKindStart)
+		if err != nil {
+			return fmt.Errorf("error while waiting for port notification: %w", err)
+
+		}
+		if !startNotification.Success {
+			return fmt.Errorf("error while starting port sharing: %s", startNotification.ErrorDetail)
+		}
+		return nil // success
+	})
+
+	var response Port
+	g.Go(func() error {
+		return s.rpc.do(ctx, "serverSharing.startSharing", args, &response)
+	})
+
+	if err := g.Wait(); err != nil {
+		return channelID{}, err
+	}
+
+	return channelID{response.StreamName, response.StreamCondition}, nil
+}
 
 type PortNotification struct {
 	Success bool // Helps us disambiguate between the SharingSucceeded/SharingFailed events
@@ -81,4 +113,21 @@ func (s *Session) WaitForPortNotification(ctx context.Context, port int, notifTy
 			return notification, nil
 		}
 	}
+}
+
+// GetSharedServers returns a description of each container port
+// shared by a prior call to StartSharing by some client.
+func (s *Session) GetSharedServers(ctx context.Context) ([]*Port, error) {
+	var response []*Port
+	if err := s.rpc.do(ctx, "serverSharing.getSharedServers", []string{}, &response); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// UpdateSharedServerPrivacy controls port permissions and visibility scopes for who can access its URLs
+// in the browser.
+func (s *Session) UpdateSharedServerPrivacy(ctx context.Context, port int, visibility string) error {
+	return s.rpc.do(ctx, "serverSharing.updateSharedServerPrivacy", []interface{}{port, visibility}, nil)
 }

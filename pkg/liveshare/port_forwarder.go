@@ -12,7 +12,7 @@ import (
 // A PortForwarder forwards TCP traffic over a Live Share session from a port on a remote
 // container to a local destination such as a network port or Go reader/writer.
 type PortForwarder struct {
-	session    LiveshareSession
+	session    *Session
 	name       string
 	remotePort int
 	keepAlive  bool
@@ -22,7 +22,7 @@ type PortForwarder struct {
 // remote port and Live Share session. The name describes the purpose
 // of the remote port or service. The keepAlive flag indicates whether
 // the session should be kept alive with port forwarding traffic.
-func NewPortForwarder(session LiveshareSession, name string, remotePort int, keepAlive bool) *PortForwarder {
+func NewPortForwarder(session *Session, name string, remotePort int, keepAlive bool) *PortForwarder {
 	return &PortForwarder{
 		session:    session,
 		name:       name,
@@ -115,14 +115,14 @@ func awaitError(ctx context.Context, errc <-chan error) error {
 type trafficMonitor struct {
 	reader io.Reader
 
-	session     LiveshareSession
+	session     *Session
 	trafficType string
 }
 
 // newTrafficMonitor returns a new trafficMonitor for the specified
 // session and traffic type. It wraps the provided io.Reader with its own
 // Read method.
-func newTrafficMonitor(reader io.Reader, session LiveshareSession, trafficType string) *trafficMonitor {
+func newTrafficMonitor(reader io.Reader, session *Session, trafficType string) *trafficMonitor {
 	return &trafficMonitor{reader, session, trafficType}
 }
 
