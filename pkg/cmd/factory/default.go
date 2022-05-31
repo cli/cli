@@ -1,7 +1,6 @@
 package factory
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -134,12 +133,7 @@ func configFunc() func() (config.Config, error) {
 		if cachedConfig != nil || configError != nil {
 			return cachedConfig, configError
 		}
-		cachedConfig, configError = config.ParseDefaultConfig()
-		if errors.Is(configError, os.ErrNotExist) {
-			cachedConfig = config.NewBlankConfig()
-			configError = nil
-		}
-		cachedConfig = config.InheritEnv(cachedConfig)
+		cachedConfig, configError = config.NewConfig()
 		return cachedConfig, configError
 	}
 }

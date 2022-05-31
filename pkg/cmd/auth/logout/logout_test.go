@@ -114,6 +114,7 @@ func Test_logoutRun_tty(t *testing.T) {
 			name:       "no arguments, one host",
 			opts:       &LogoutOptions{},
 			cfgHosts:   []string{"github.com"},
+			wantHosts:  "{}\n",
 			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'cybilb'`),
 		},
 		{
@@ -134,33 +135,28 @@ func Test_logoutRun_tty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ios, _, _, stderr := iostreams.Test()
-
-			ios.SetStdinTTY(true)
-			ios.SetStdoutTTY(true)
-
-			tt.opts.IO = ios
-			cfg := config.NewBlankConfig()
+			readConfigs := config.StubWriteConfig(t)
+			cfg := config.NewFromString("")
+			for _, hostname := range tt.cfgHosts {
+				cfg.Set(hostname, "oauth_token", "abc123")
+			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil
 			}
 
-			for _, hostname := range tt.cfgHosts {
-				_ = cfg.Set(hostname, "oauth_token", "abc123")
-			}
+			ios, _, _, stderr := iostreams.Test()
+			ios.SetStdinTTY(true)
+			ios.SetStdoutTTY(true)
+			tt.opts.IO = ios
 
 			reg := &httpmock.Registry{}
 			reg.Register(
 				httpmock.GraphQL(`query UserCurrent\b`),
-				httpmock.StringResponse(`{"data":{"viewer":{"login":"cybilb"}}}`))
-
+				httpmock.StringResponse(`{"data":{"viewer":{"login":"cybilb"}}}`),
+			)
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
-
-			mainBuf := bytes.Buffer{}
-			hostsBuf := bytes.Buffer{}
-			defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
 			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
@@ -180,6 +176,10 @@ func Test_logoutRun_tty(t *testing.T) {
 			} else {
 				assert.True(t, tt.wantErrOut.MatchString(stderr.String()))
 			}
+
+			mainBuf := bytes.Buffer{}
+			hostsBuf := bytes.Buffer{}
+			readConfigs(&mainBuf, &hostsBuf)
 
 			assert.Equal(t, tt.wantHosts, hostsBuf.String())
 			reg.Verify(t)
@@ -201,7 +201,8 @@ func Test_logoutRun_nontty(t *testing.T) {
 			opts: &LogoutOptions{
 				Hostname: "harry.mason",
 			},
-			cfgHosts: []string{"harry.mason"},
+			cfgHosts:  []string{"harry.mason"},
+			wantHosts: "{}\n",
 		},
 		{
 			name: "hostname, multiple hosts",
@@ -222,29 +223,24 @@ func Test_logoutRun_nontty(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ios, _, _, stderr := iostreams.Test()
-
-			ios.SetStdinTTY(false)
-			ios.SetStdoutTTY(false)
-
-			tt.opts.IO = ios
-			cfg := config.NewBlankConfig()
+			readConfigs := config.StubWriteConfig(t)
+			cfg := config.NewFromString("")
+			for _, hostname := range tt.cfgHosts {
+				cfg.Set(hostname, "oauth_token", "abc123")
+			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil
 			}
 
-			for _, hostname := range tt.cfgHosts {
-				_ = cfg.Set(hostname, "oauth_token", "abc123")
-			}
+			ios, _, _, stderr := iostreams.Test()
+			ios.SetStdinTTY(false)
+			ios.SetStdoutTTY(false)
+			tt.opts.IO = ios
 
 			reg := &httpmock.Registry{}
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
-
-			mainBuf := bytes.Buffer{}
-			hostsBuf := bytes.Buffer{}
-			defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
 			err := logoutRun(tt.opts)
 			if tt.wantErr != "" {
@@ -254,6 +250,10 @@ func Test_logoutRun_nontty(t *testing.T) {
 			}
 
 			assert.Equal(t, "", stderr.String())
+
+			mainBuf := bytes.Buffer{}
+			hostsBuf := bytes.Buffer{}
+			readConfigs(&mainBuf, &hostsBuf)
 
 			assert.Equal(t, tt.wantHosts, hostsBuf.String())
 			reg.Verify(t)

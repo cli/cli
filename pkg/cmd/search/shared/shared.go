@@ -40,10 +40,7 @@ func Searcher(f *cmdutil.Factory) (search.Searcher, error) {
 	if err != nil {
 		return nil, err
 	}
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return nil, err
-	}
+	host, _ := cfg.DefaultHost()
 	client, err := f.HttpClient()
 	if err != nil {
 		return nil, err

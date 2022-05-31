@@ -1,80 +1,113 @@
 package config
 
 import (
-	"errors"
+	"io"
+	"os"
+	"path/filepath"
+	"testing"
+
+	ghConfig "github.com/cli/go-gh/pkg/config"
 )
 
-type ConfigStub map[string]string
+func NewBlankConfig() *ConfigMock {
+	defaultStr := `
+# What protocol to use when performing git operations. Supported values: ssh, https
+git_protocol: https
+# What editor gh should run when creating issues, pull requests, etc. If blank, will refer to environment.
+editor:
+# When to interactively prompt. This is a global config that cannot be overridden by hostname. Supported values: enabled, disabled
+prompt: enabled
+# A pager program to send command output to, e.g. "less". Set the value to "cat" to disable the pager.
+pager:
+# Aliases allow you to create nicknames for gh commands
+aliases:
+  co: pr checkout
+# The path to a unix socket through which send HTTP connections. If blank, HTTP traffic will be handled by net/http.DefaultTransport.
+http_unix_socket:
+# What web browser gh should use when opening URLs. If blank, will refer to environment.
+browser:
+`
+	return NewFromString(defaultStr)
+}
 
-func genKey(host, key string) string {
-	if host != "" {
-		return host + ":" + key
+func NewFromString(cfgStr string) *ConfigMock {
+	c := ghConfig.ReadFromString(cfgStr)
+	cfg := cfg{c}
+	mock := &ConfigMock{}
+	mock.AuthTokenFunc = func(host string) (string, string) {
+		token, _ := c.Get([]string{"hosts", host, "oauth_token"})
+		return token, "oauth_token"
 	}
-	return key
-}
-
-func (c ConfigStub) Get(host, key string) (string, error) {
-	val, _, err := c.GetWithSource(host, key)
-	return val, err
-}
-
-func (c ConfigStub) GetWithSource(host, key string) (string, string, error) {
-	if v, found := c[genKey(host, key)]; found {
-		return v, "(memory)", nil
+	mock.GetFunc = func(host, key string) (string, error) {
+		return cfg.Get(host, key)
 	}
-	return "", "", errors.New("not found")
-}
-
-func (c ConfigStub) GetOrDefault(hostname, key string) (val string, err error) {
-	val, _, err = c.GetOrDefaultWithSource(hostname, key)
-	return
-}
-
-func (c ConfigStub) GetOrDefaultWithSource(hostname, key string) (val string, src string, err error) {
-	val, src, err = c.GetWithSource(hostname, key)
-	if err == nil && val == "" {
-		val = c.Default(key)
+	mock.GetOrDefaultFunc = func(host, key string) (string, error) {
+		return cfg.GetOrDefault(host, key)
 	}
-	return
+	mock.SetFunc = func(host, key, value string) {
+		cfg.Set(host, key, value)
+	}
+	mock.UnsetHostFunc = func(host string) {
+		cfg.UnsetHost(host)
+	}
+	mock.HostsFunc = func() []string {
+		keys, _ := c.Keys([]string{"hosts"})
+		if host, ok := os.LookupEnv("GH_HOST"); ok && host != "" {
+			keys = append(keys, host)
+		}
+		return keys
+	}
+	mock.DefaultHostFunc = func() (string, string) {
+		if host, ok := os.LookupEnv("GH_HOST"); ok && host != "" {
+			return host, "GH_HOST"
+		}
+		return "github.com", "default"
+	}
+	mock.AliasesFunc = func() *AliasConfig {
+		return &AliasConfig{cfg: c}
+	}
+	mock.WriteFunc = func() error {
+		return cfg.Write()
+	}
+	return mock
 }
 
-func (c ConfigStub) Default(key string) string {
-	return defaultFor(key)
-}
+// StubWriteConfig stubs out the filesystem where config file are written.
+// It then returns a function that will read in the config files into io.Writers.
+// It automatically cleans up environment variables and written files.
+func StubWriteConfig(t *testing.T) func(io.Writer, io.Writer) {
+	t.Helper()
+	tempDir := t.TempDir()
+	old := os.Getenv("GH_CONFIG_DIR")
+	os.Setenv("GH_CONFIG_DIR", tempDir)
+	t.Cleanup(func() { os.Setenv("GH_CONFIG_DIR", old) })
+	return func(wc io.Writer, wh io.Writer) {
+		config, err := os.Open(filepath.Join(tempDir, "config.yml"))
+		if err != nil {
+			return
+		}
+		defer config.Close()
+		configData, err := io.ReadAll(config)
+		if err != nil {
+			return
+		}
+		_, err = wc.Write(configData)
+		if err != nil {
+			return
+		}
 
-func (c ConfigStub) Set(host, key, value string) error {
-	c[genKey(host, key)] = value
-	return nil
-}
-
-func (c ConfigStub) Aliases() (*AliasConfig, error) {
-	return nil, nil
-}
-
-func (c ConfigStub) Hosts() ([]string, error) {
-	return nil, nil
-}
-
-func (c ConfigStub) UnsetHost(hostname string) {
-}
-
-func (c ConfigStub) CheckWriteable(host, key string) error {
-	return nil
-}
-
-func (c ConfigStub) Write() error {
-	c["_written"] = "true"
-	return nil
-}
-
-func (c ConfigStub) WriteHosts() error {
-	return nil
-}
-
-func (c ConfigStub) DefaultHost() (string, error) {
-	return "", nil
-}
-
-func (c ConfigStub) DefaultHostWithSource() (string, string, error) {
-	return "", "", nil
+		hosts, err := os.Open(filepath.Join(tempDir, "hosts.yml"))
+		if err != nil {
+			return
+		}
+		defer hosts.Close()
+		hostsData, err := io.ReadAll(hosts)
+		if err != nil {
+			return
+		}
+		_, err = wh.Write(hostsData)
+		if err != nil {
+			return
+		}
+	}
 }

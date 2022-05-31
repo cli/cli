@@ -238,19 +238,19 @@ func Test_refreshRun(t *testing.T) {
 				return nil
 			}
 
-			ios, _, _, _ := iostreams.Test()
-
-			ios.SetStdinTTY(!tt.nontty)
-			ios.SetStdoutTTY(!tt.nontty)
-
-			tt.opts.IO = ios
-			cfg := config.NewBlankConfig()
+			_ = config.StubWriteConfig(t)
+			cfg := config.NewFromString("")
+			for _, hostname := range tt.cfgHosts {
+				cfg.Set(hostname, "oauth_token", "abc123")
+			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil
 			}
-			for _, hostname := range tt.cfgHosts {
-				_ = cfg.Set(hostname, "oauth_token", "abc123")
-			}
+
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(!tt.nontty)
+			ios.SetStdoutTTY(!tt.nontty)
+			tt.opts.IO = ios
 
 			httpReg := &httpmock.Registry{}
 			httpReg.Register(
@@ -271,10 +271,6 @@ func Test_refreshRun(t *testing.T) {
 				},
 			)
 			tt.opts.httpClient = &http.Client{Transport: httpReg}
-
-			mainBuf := bytes.Buffer{}
-			hostsBuf := bytes.Buffer{}
-			defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
 			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {

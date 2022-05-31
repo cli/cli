@@ -42,7 +42,7 @@ func TestNewCmdConfigGet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &cmdutil.Factory{
 				Config: func() (config.Config, error) {
-					return config.ConfigStub{}, nil
+					return config.NewBlankConfig(), nil
 				},
 			}
 
@@ -86,9 +86,11 @@ func Test_getRun(t *testing.T) {
 			name: "get key",
 			input: &GetOptions{
 				Key: "editor",
-				Config: config.ConfigStub{
-					"editor": "ed",
-				},
+				Config: func() config.Config {
+					cfg := config.NewBlankConfig()
+					cfg.Set("", "editor", "ed")
+					return cfg
+				}(),
 			},
 			stdout: "ed\n",
 		},
@@ -97,10 +99,12 @@ func Test_getRun(t *testing.T) {
 			input: &GetOptions{
 				Hostname: "github.com",
 				Key:      "editor",
-				Config: config.ConfigStub{
-					"editor":            "ed",
-					"github.com:editor": "vim",
-				},
+				Config: func() config.Config {
+					cfg := config.NewBlankConfig()
+					cfg.Set("", "editor", "ed")
+					cfg.Set("github.com", "editor", "vim")
+					return cfg
+				}(),
 			},
 			stdout: "vim\n",
 		},
@@ -115,10 +119,6 @@ func Test_getRun(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, tt.stdout, stdout.String())
 			assert.Equal(t, tt.stderr, stderr.String())
-			_, err = tt.input.Config.GetOrDefault("", "_written")
-			assert.Error(t, err)
-			_, err = tt.input.Config.Get("", "_written")
-			assert.Error(t, err)
 		})
 	}
 }

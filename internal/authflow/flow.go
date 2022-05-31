@@ -32,9 +32,8 @@ var (
 
 type iconfig interface {
 	Get(string, string) (string, error)
-	Set(string, string, string) error
+	Set(string, string, string)
 	Write() error
-	WriteHosts() error
 }
 
 func AuthFlowWithConfig(cfg iconfig, IO *iostreams.IOStreams, hostname, notice string, additionalScopes []string, isInteractive bool) (string, error) {
@@ -55,16 +54,10 @@ func AuthFlowWithConfig(cfg iconfig, IO *iostreams.IOStreams, hostname, notice s
 		return "", err
 	}
 
-	err = cfg.Set(hostname, "user", userLogin)
-	if err != nil {
-		return "", err
-	}
-	err = cfg.Set(hostname, "oauth_token", token)
-	if err != nil {
-		return "", err
-	}
+	cfg.Set(hostname, "user", userLogin)
+	cfg.Set(hostname, "oauth_token", token)
 
-	return token, cfg.WriteHosts()
+	return token, cfg.Write()
 }
 
 func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string, isInteractive bool, browserLauncher string) (string, string, error) {

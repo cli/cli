@@ -191,10 +191,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
-		hostname, err := cfg.DefaultHost()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveError
-		}
+		hostname, _ := cfg.DefaultHost()
 		results, err := listGitIgnoreTemplates(httpClient, hostname)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
@@ -211,10 +208,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
-		hostname, err := cfg.DefaultHost()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveError
-		}
+		hostname, _ := cfg.DefaultHost()
 		licenses, err := listLicenseTemplates(httpClient, hostname)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
@@ -266,10 +260,7 @@ func createFromScratch(opts *CreateOptions) error {
 		return err
 	}
 
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
 	if opts.Interactive {
 		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo("")
@@ -409,10 +400,7 @@ func createFromLocal(opts *CreateOptions) error {
 	if err != nil {
 		return err
 	}
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
 	if opts.Interactive {
 		opts.Source, err = interactiveSource()

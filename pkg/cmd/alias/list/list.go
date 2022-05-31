@@ -1,7 +1,6 @@
 package list
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/MakeNowJust/heredoc"
@@ -48,18 +47,14 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	aliasCfg, err := cfg.Aliases()
-	if err != nil {
-		return fmt.Errorf("couldn't read aliases config: %w", err)
-	}
+	aliasCfg := cfg.Aliases()
 
-	if aliasCfg.Empty() {
+	aliasMap := aliasCfg.All()
+	if len(aliasMap) == 0 {
 		return cmdutil.NewNoResultsError("no aliases configured")
 	}
 
 	tp := utils.NewTablePrinter(opts.IO)
-
-	aliasMap := aliasCfg.All()
 	keys := []string{}
 	for alias := range aliasMap {
 		keys = append(keys, alias)

@@ -13,6 +13,10 @@ import (
 	"github.com/cli/go-gh/pkg/ssh"
 )
 
+const (
+	GH_HOST = "GH_HOST"
+)
+
 type remoteResolver struct {
 	readRemotes   func() (git.RemoteSet, error)
 	getConfig     func() (config.Config, error)
@@ -49,14 +53,12 @@ func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
 			return nil, err
 		}
 
-		authedHosts, err := cfg.Hosts()
-		if err != nil {
-			return nil, err
+		authedHosts := cfg.Hosts()
+		if len(authedHosts) == 0 {
+			return nil, errors.New("could not find any host configurations")
 		}
-		defaultHost, src, err := cfg.DefaultHostWithSource()
-		if err != nil {
-			return nil, err
-		}
+		defaultHost, src := cfg.DefaultHost()
+
 		// Use set to dedupe list of hosts
 		hostsSet := set.NewStringSet()
 		hostsSet.AddValues(authedHosts)
@@ -72,18 +74,19 @@ func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
 		// Filter again by default host if one is set
 		// For config file default host fallback to cachedRemotes if none match
 		// For enviornment default host (GH_HOST) do not fallback to cachedRemotes if none match
-		if src != "" {
+		if src != "default" {
 			filteredRemotes := cachedRemotes.FilterByHosts([]string{defaultHost})
-			if config.IsHostEnv(src) || len(filteredRemotes) > 0 {
+			if isHostEnv(src) || len(filteredRemotes) > 0 {
 				cachedRemotes = filteredRemotes
 			}
 		}
 
 		if len(cachedRemotes) == 0 {
-			dummyHostname := "example.com" // any non-github.com hostname is fine here
-			if config.IsHostEnv(src) {
+			// Any non-github.com hostname is fine here
+			dummyHostname := "example.com"
+			if isHostEnv(src) {
 				return nil, fmt.Errorf("none of the git remotes configured for this repository correspond to the %s environment variable. Try adding a matching remote or unsetting the variable.", src)
-			} else if v, src, _ := cfg.GetWithSource(dummyHostname, "oauth_token"); v != "" && config.IsEnterpriseEnv(src) {
+			} else if v, _ := cfg.AuthToken(dummyHostname); v != "" {
 				return nil, errors.New("set the GH_HOST environment variable to specify which GitHub host to use")
 			}
 			return nil, errors.New("none of the git remotes configured for this repository point to a known GitHub host. To tell gh about a new GitHub host, please use `gh auth login`")
@@ -91,4 +94,8 @@ func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
 
 		return cachedRemotes, nil
 	}
+}
+
+func isHostEnv(src string) bool {
+	return src == GH_HOST
 }

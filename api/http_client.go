@@ -14,6 +14,7 @@ import (
 
 type configGetter interface {
 	Get(string, string) (string, error)
+	AuthToken(string) (string, string)
 }
 
 type HTTPClientOptions struct {
@@ -52,7 +53,9 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		return nil, err
 	}
 
-	client.Transport = AddAuthTokenHeader(client.Transport, opts.Config)
+	if opts.Config != nil {
+		client.Transport = AddAuthTokenHeader(client.Transport, opts.Config)
+	}
 
 	return client, nil
 }
@@ -75,7 +78,7 @@ func AddCacheTTLHeader(rt http.RoundTripper, ttl time.Duration) http.RoundTrippe
 func AddAuthTokenHeader(rt http.RoundTripper, cfg configGetter) http.RoundTripper {
 	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 		hostname := ghinstance.NormalizeHostname(getHost(req))
-		if token, err := cfg.Get(hostname, "oauth_token"); err == nil && token != "" {
+		if token, _ := cfg.AuthToken(hostname); token != "" {
 			req.Header.Set("Authorization", fmt.Sprintf("token %s", token))
 		}
 		return rt.RoundTrip(req)

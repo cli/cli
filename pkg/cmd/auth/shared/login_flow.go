@@ -21,9 +21,8 @@ const defaultSSHKeyTitle = "GitHub CLI"
 
 type iconfig interface {
 	Get(string, string) (string, error)
-	Set(string, string, string) error
+	Set(string, string, string)
 	Write() error
-	WriteHosts() error
 }
 
 type LoginOptions struct {
@@ -175,9 +174,7 @@ func Login(opts *LoginOptions) error {
 			return fmt.Errorf("error validating token: %w", err)
 		}
 
-		if err := cfg.Set(hostname, "oauth_token", authToken); err != nil {
-			return err
-		}
+		cfg.Set(hostname, "oauth_token", authToken)
 	}
 
 	var username string
@@ -191,22 +188,16 @@ func Login(opts *LoginOptions) error {
 			return fmt.Errorf("error using api: %w", err)
 		}
 
-		err = cfg.Set(hostname, "user", username)
-		if err != nil {
-			return err
-		}
+		cfg.Set(hostname, "user", username)
 	}
 
 	if gitProtocol != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "- gh config set -h %s git_protocol %s\n", hostname, gitProtocol)
-		err := cfg.Set(hostname, "git_protocol", gitProtocol)
-		if err != nil {
-			return err
-		}
+		cfg.Set(hostname, "git_protocol", gitProtocol)
 		fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", cs.SuccessIcon())
 	}
 
-	err := cfg.WriteHosts()
+	err := cfg.Write()
 	if err != nil {
 		return err
 	}

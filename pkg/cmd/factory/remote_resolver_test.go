@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/stretchr/testify/assert"
@@ -26,8 +25,7 @@ func Test_remoteResolver(t *testing.T) {
 	tests := []struct {
 		name     string
 		remotes  func() (git.RemoteSet, error)
-		config   func() (config.Config, error)
-		override string
+		config   config.Config
 		output   []string
 		wantsErr bool
 	}{
@@ -38,9 +36,16 @@ func Test_remoteResolver(t *testing.T) {
 					git.NewRemote("origin", "https://github.com/owner/repo.git"),
 				}, nil
 			},
-			config: func() (config.Config, error) {
-				return config.NewFromString(heredoc.Doc(`hosts:`)), nil
-			},
+			config: func() config.Config {
+				cfg := &config.ConfigMock{}
+				cfg.HostsFunc = func() []string {
+					return []string{}
+				}
+				cfg.DefaultHostFunc = func() (string, string) {
+					return "github.com", "default"
+				}
+				return cfg
+			}(),
 			wantsErr: true,
 		},
 		{
@@ -48,13 +53,16 @@ func Test_remoteResolver(t *testing.T) {
 			remotes: func() (git.RemoteSet, error) {
 				return git.RemoteSet{}, nil
 			},
-			config: func() (config.Config, error) {
-				return config.NewFromString(heredoc.Doc(`
-				  hosts:
-				    example.com:
-				      oauth_token: GHETOKEN
-				`)), nil
-			},
+			config: func() config.Config {
+				cfg := &config.ConfigMock{}
+				cfg.HostsFunc = func() []string {
+					return []string{"example.com"}
+				}
+				cfg.DefaultHostFunc = func() (string, string) {
+					return "example.com", "hosts"
+				}
+				return cfg
+			}(),
 			wantsErr: true,
 		},
 		{
@@ -64,13 +72,19 @@ func Test_remoteResolver(t *testing.T) {
 					git.NewRemote("origin", "https://test.com/owner/repo.git"),
 				}, nil
 			},
-			config: func() (config.Config, error) {
-				return config.NewFromString(heredoc.Doc(`
-				  hosts:
-				    example.com:
-				      oauth_token: GHETOKEN
-				`)), nil
-			},
+			config: func() config.Config {
+				cfg := &config.ConfigMock{}
+				cfg.HostsFunc = func() []string {
+					return []string{"example.com"}
+				}
+				cfg.DefaultHostFunc = func() (string, string) {
+					return "example.com", "hosts"
+				}
+				cfg.AuthTokenFunc = func(string) (string, string) {
+					return "", ""
+				}
+				return cfg
+			}(),
 			wantsErr: true,
 		},
 		{
@@ -80,30 +94,35 @@ func Test_remoteResolver(t *testing.T) {
 					git.NewRemote("origin", "https://github.com/owner/repo.git"),
 				}, nil
 			},
-			config: func() (config.Config, error) {
-				return config.NewFromString(heredoc.Doc(`
-				  hosts:
-				    example.com:
-				      oauth_token: GHETOKEN
-				`)), nil
-			},
+			config: func() config.Config {
+				cfg := &config.ConfigMock{}
+				cfg.HostsFunc = func() []string {
+					return []string{"example.com"}
+				}
+				cfg.DefaultHostFunc = func() (string, string) {
+					return "example.com", "hosts"
+				}
+				return cfg
+			}(),
 			output: []string{"origin"},
 		},
 		{
 			name: "one authenticated host with matching git remote",
 			remotes: func() (git.RemoteSet, error) {
 				return git.RemoteSet{
-					git.NewRemote("upstream", "https://github.com/owner/repo.git"),
 					git.NewRemote("origin", "https://example.com/owner/repo.git"),
 				}, nil
 			},
-			config: func() (config.Config, error) {
-				return config.NewFromString(heredoc.Doc(`
-				  hosts:
-				    example.com:
-				      oauth_token: GHETOKEN
-				`)), nil
-			},
+			config: func() config.Config {
+				cfg := &config.ConfigMock{}
+				cfg.HostsFunc = func() []string {
+					return []string{"example.com"}
+				}
+				cfg.DefaultHostFunc = func() (string, string) {
+					return "example.com", "default"
+				}
+				return cfg
+			}(),
 			output: []string{"origin"},
 		},
 		{
@@ -116,13 +135,16 @@ func Test_remoteResolver(t *testing.T) {
 					git.NewRemote("fork", "https://example.com/owner/repo.git"),
 				}, nil
 			},
-			config: func() (config.Config, error) {
-				return config.NewFromString(heredoc.Doc(`
-				  hosts:
-				    example.com:
-				      oauth_token: GHETOKEN
-				`)), nil
-			},
+			config: func() config.Config {
+				cfg := &config.ConfigMock{}
+				cfg.HostsFunc = func() []string {
+					return []string{"example.com"}
+				}
+				cfg.DefaultHostFunc = func() (string, string) {
+					return "example.com", "default"
+				}
+				return cfg
+			}(),
 			output: []string{"upstream", "github", "origin", "fork"},
 		},
 		{
@@ -132,15 +154,19 @@ func Test_remoteResolver(t *testing.T) {
 					git.NewRemote("origin", "https://test.com/owner/repo.git"),
 				}, nil
 			},
-			config: func() (config.Config, error) {
-				return config.NewFromString(heredoc.Doc(`
-				  hosts:
-				    example.com:
-				      oauth_token: GHETOKEN
-				    github.com:
-				      oauth_token: GHTOKEN
-				`)), nil
-			},
+			config: func() config.Config {
+				cfg := &config.ConfigMock{}
+				cfg.HostsFunc = func() []string {
+					return []string{"example.com", "github.com"}
+				}
+				cfg.DefaultHostFunc = func() (string, string) {
+					return "github.com", "default"
+				}
+				cfg.AuthTokenFunc = func(string) (string, string) {
+					return "", ""
+				}
+				return cfg
+			}(),
 			wantsErr: true,
 		},
 		{
@@ -151,15 +177,16 @@ func Test_remoteResolver(t *testing.T) {
 					git.NewRemote("origin", "https://example.com/owner/repo.git"),
 				}, nil
 			},
-			config: func() (config.Config, error) {
-				return config.NewFromString(heredoc.Doc(`
-				  hosts:
-				    example.com:
-				      oauth_token: GHETOKEN
-				    github.com:
-				      oauth_token: GHTOKEN
-				`)), nil
-			},
+			config: func() config.Config {
+				cfg := &config.ConfigMock{}
+				cfg.HostsFunc = func() []string {
+					return []string{"example.com", "github.com"}
+				}
+				cfg.DefaultHostFunc = func() (string, string) {
+					return "github.com", "default"
+				}
+				return cfg
+			}(),
 			output: []string{"origin"},
 		},
 		{
@@ -173,15 +200,16 @@ func Test_remoteResolver(t *testing.T) {
 					git.NewRemote("test", "https://test.com/owner/repo.git"),
 				}, nil
 			},
-			config: func() (config.Config, error) {
-				return config.NewFromString(heredoc.Doc(`
-				  hosts:
-				    example.com:
-				      oauth_token: GHETOKEN
-				    github.com:
-				      oauth_token: GHTOKEN
-				`)), nil
-			},
+			config: func() config.Config {
+				cfg := &config.ConfigMock{}
+				cfg.HostsFunc = func() []string {
+					return []string{"example.com", "github.com"}
+				}
+				cfg.DefaultHostFunc = func() (string, string) {
+					return "github.com", "default"
+				}
+				return cfg
+			}(),
 			output: []string{"upstream", "github", "origin", "fork"},
 		},
 		{
@@ -191,14 +219,16 @@ func Test_remoteResolver(t *testing.T) {
 					git.NewRemote("origin", "https://example.com/owner/repo.git"),
 				}, nil
 			},
-			config: func() (config.Config, error) {
-				return config.InheritEnv(config.NewFromString(heredoc.Doc(`
-				  hosts:
-				    example.com:
-				      oauth_token: GHETOKEN
-				`))), nil
-			},
-			override: "test.com",
+			config: func() config.Config {
+				cfg := &config.ConfigMock{}
+				cfg.HostsFunc = func() []string {
+					return []string{"example.com"}
+				}
+				cfg.DefaultHostFunc = func() (string, string) {
+					return "test.com", "GH_HOST"
+				}
+				return cfg
+			}(),
 			wantsErr: true,
 		},
 		{
@@ -209,15 +239,17 @@ func Test_remoteResolver(t *testing.T) {
 					git.NewRemote("origin", "https://test.com/owner/repo.git"),
 				}, nil
 			},
-			config: func() (config.Config, error) {
-				return config.InheritEnv(config.NewFromString(heredoc.Doc(`
-				  hosts:
-				    example.com:
-				      oauth_token: GHETOKEN
-				`))), nil
-			},
-			override: "test.com",
-			output:   []string{"origin"},
+			config: func() config.Config {
+				cfg := &config.ConfigMock{}
+				cfg.HostsFunc = func() []string {
+					return []string{"example.com"}
+				}
+				cfg.DefaultHostFunc = func() (string, string) {
+					return "test.com", "GH_HOST"
+				}
+				return cfg
+			}(),
+			output: []string{"origin"},
 		},
 		{
 			name: "override host with multiple matching git remotes",
@@ -228,26 +260,25 @@ func Test_remoteResolver(t *testing.T) {
 					git.NewRemote("origin", "https://test.com/owner/repo.git"),
 				}, nil
 			},
-			config: func() (config.Config, error) {
-				return config.InheritEnv(config.NewFromString(heredoc.Doc(`
-				  hosts:
-				    example.com:
-				      oauth_token: GHETOKEN
-				`))), nil
-			},
-			override: "test.com",
-			output:   []string{"upstream", "origin"},
+			config: func() config.Config {
+				cfg := &config.ConfigMock{}
+				cfg.HostsFunc = func() []string {
+					return []string{"example.com", "test.com"}
+				}
+				cfg.DefaultHostFunc = func() (string, string) {
+					return "test.com", "GH_HOST"
+				}
+				return cfg
+			}(),
+			output: []string{"upstream", "origin"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.override != "" {
-				os.Setenv("GH_HOST", tt.override)
-			}
 			rr := &remoteResolver{
 				readRemotes:   tt.remotes,
-				getConfig:     tt.config,
+				getConfig:     func() (config.Config, error) { return tt.config, nil },
 				urlTranslator: identityTranslator{},
 			}
 			resolver := rr.Resolver()

@@ -1,7 +1,6 @@
 package refresh
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -85,10 +84,7 @@ func refreshRun(opts *RefreshOptions) error {
 		return err
 	}
 
-	candidates, err := cfg.Hosts()
-	if err != nil {
-		return err
-	}
+	candidates := cfg.Hosts()
 	if len(candidates) == 0 {
 		return fmt.Errorf("not logged in to any hosts. Use 'gh auth login' to authenticate with a host")
 	}
@@ -121,18 +117,14 @@ func refreshRun(opts *RefreshOptions) error {
 		}
 	}
 
-	if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
-		var roErr *config.ReadOnlyEnvError
-		if errors.As(err, &roErr) {
-			fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", roErr.Variable)
-			fmt.Fprint(opts.IO.ErrOut, "To refresh credentials stored in GitHub CLI, first clear the value from the environment.\n")
-			return cmdutil.SilentError
-		}
-		return err
+	if src, writeable := shared.AuthTokenWriteable(cfg, hostname); !writeable {
+		fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", src)
+		fmt.Fprint(opts.IO.ErrOut, "To refresh credentials stored in GitHub CLI, first clear the value from the environment.\n")
+		return cmdutil.SilentError
 	}
 
 	var additionalScopes []string
-	if oldToken, _ := cfg.Get(hostname, "oauth_token"); oldToken != "" {
+	if oldToken, _ := cfg.AuthToken(hostname); oldToken != "" {
 		if oldScopes, err := shared.GetScopes(opts.httpClient, hostname, oldToken); err == nil {
 			for _, s := range strings.Split(oldScopes, ",") {
 				s = strings.TrimSpace(s)
@@ -163,7 +155,7 @@ func refreshRun(opts *RefreshOptions) error {
 
 	if credentialFlow.ShouldSetup() {
 		username, _ := cfg.Get(hostname, "user")
-		password, _ := cfg.Get(hostname, "oauth_token")
+		password, _ := cfg.AuthToken(hostname)
 		if err := credentialFlow.Setup(hostname, username, password); err != nil {
 			return err
 		}
