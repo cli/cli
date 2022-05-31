@@ -132,7 +132,9 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	defer safeClose(session, &err)
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx, userPublicKey)
+	remoteSSHServerPort, sshUser, err := session.StartSSHServerWithOptions(ctx, liveshare.StartSSHServerOptions{
+		UserPublicKey: userPublicKey,
+	})
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
@@ -238,7 +240,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 				defer safeClose(session, &err)
 
 				// Pass empty key here because it doesn't actually connect to SSH
-				_, result.user, err = session.StartSSHServer(ctx, "")
+				_, result.user, err = session.StartSSHServer(ctx)
 				if err != nil {
 					result.err = fmt.Errorf("error getting ssh server details: %w", err)
 				} else {

@@ -17,6 +17,10 @@ type Session struct {
 	logger          logger
 }
 
+type StartSSHServerOptions struct {
+	UserPublicKey string `json:"userPublicKey"`
+}
+
 // Close should be called by users to clean up RPC and SSH resources whenever the session
 // is no longer active.
 func (s *Session) Close() error {
@@ -38,7 +42,14 @@ func (s *Session) registerRequestHandler(requestType string, h handler) func() {
 
 // StartsSSHServer starts an SSH server in the container, installing sshd if necessary,
 // and returns the port on which it listens and the user name clients should provide.
-func (s *Session) StartSSHServer(ctx context.Context, userPublicKey string) (int, string, error) {
+func (s *Session) StartSSHServer(ctx context.Context) (int, string, error) {
+	return s.StartSSHServerWithOptions(ctx, StartSSHServerOptions{})
+}
+
+// StartSSHServerWithOptions starts an SSH server in the container, installing sshd if
+// necessary, applies specified options, and returns the port on which it listens and
+// the user name clients should provide.
+func (s *Session) StartSSHServerWithOptions(ctx context.Context, opts StartSSHServerOptions) (int, string, error) {
 	var response struct {
 		Result     bool   `json:"result"`
 		ServerPort string `json:"serverPort"`
@@ -47,8 +58,8 @@ func (s *Session) StartSSHServer(ctx context.Context, userPublicKey string) (int
 	}
 
 	// Add param with key here, update corresponding on C# side
-	params := []string{userPublicKey}
-	if err := s.rpc.do(ctx, "ISshServerHostService.startRemoteServer", &params, &response); err != nil {
+	params := []interface{}{opts}
+	if err := s.rpc.do(ctx, "ISshServerHostService.startRemoteServerWithOptions", &params, &response); err != nil {
 		return 0, "", err
 	}
 
