@@ -373,6 +373,16 @@ func TestBuildDisplayName(t *testing.T) {
 			prebuildAvailability: "",
 			expectedDisplayName:  "4 cores, 8 GB RAM, 32 GB storage",
 		},
+		{
+			name:                 "prebuild availability is ready",
+			prebuildAvailability: "ready",
+			expectedDisplayName:  "4 cores, 8 GB RAM, 32 GB storage (Prebuild ready)",
+		},
+		{
+			name:                 "prebuild availability is in_progress",
+			prebuildAvailability: "in_progress",
+			expectedDisplayName:  "4 cores, 8 GB RAM, 32 GB storage (Prebuild in progress)",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
