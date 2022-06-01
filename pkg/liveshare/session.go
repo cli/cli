@@ -58,7 +58,9 @@ func (s *Session) StartSSHServerWithOptions(ctx context.Context, opts StartSSHSe
 	}
 
 	// Add param with key here, update corresponding on C# side
-	params := []interface{}{opts}
+	// TODO: Use this object once we update the service
+	// params := []interface{}{opts}
+	params := []string{opts.UserPublicKey}
 	if err := s.rpc.do(ctx, "ISshServerHostService.startRemoteServerWithOptions", &params, &response); err != nil {
 		return 0, "", err
 	}

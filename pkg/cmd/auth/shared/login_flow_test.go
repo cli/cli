@@ -84,7 +84,7 @@ func TestLogin_ssh(t *testing.T) {
 		HTTPClient:  &http.Client{Transport: &tr},
 		Hostname:    "example.com",
 		Interactive: true,
-		sshContext: sshContext{
+		sshContext: SshContext{
 			configDir: dir,
 			keygenExe: "ssh-keygen",
 		},

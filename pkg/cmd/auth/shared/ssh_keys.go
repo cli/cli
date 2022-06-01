@@ -16,12 +16,12 @@ import (
 	"github.com/cli/safeexec"
 )
 
-type sshContext struct {
+type SshContext struct {
 	configDir string
 	keygenExe string
 }
 
-func (c *sshContext) sshDir() (string, error) {
+func (c *SshContext) sshDir() (string, error) {
 	if c.configDir != "" {
 		return c.configDir, nil
 	}
@@ -32,7 +32,7 @@ func (c *sshContext) sshDir() (string, error) {
 	return dir, err
 }
 
-func (c *sshContext) localPublicKeys() ([]string, error) {
+func (c *SshContext) localPublicKeys() ([]string, error) {
 	sshDir, err := c.sshDir()
 	if err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func (c *sshContext) localPublicKeys() ([]string, error) {
 	return filepath.Glob(filepath.Join(sshDir, "*.pub"))
 }
 
-func (c *sshContext) findKeygen() (string, error) {
+func (c *SshContext) findKeygen() (string, error) {
 	if c.keygenExe != "" {
 		return c.keygenExe, nil
 	}
@@ -63,15 +63,21 @@ func (c *sshContext) findKeygen() (string, error) {
 	return keygenExe, err
 }
 
-func (c *sshContext) generateSSHKey() (string, error) {
+func (c *SshContext) GenerateSSHKey() (string, error) {
+	return c.GenerateSSHKeyWithOptions("id_ed25519", true)
+}
+
+func (c *SshContext) GenerateSSHKeyWithOptions(keyName string, errorOnExists bool) (string, error) {
 	keygenExe, err := c.findKeygen()
 	if err != nil {
 		// give up silently if `ssh-keygen` is not available
 		return "", nil
 	}
 
+	// TODO: Prompt after searching for existing key
 	var sshChoice bool
 	err = prompt.SurveyAskOne(&survey.Confirm{
+		// TODO: Change this message if we're not uploading
 		Message: "Generate a new SSH key to add to your GitHub account?",
 		Default: true,
 	}, &sshChoice)
@@ -86,9 +92,13 @@ func (c *sshContext) generateSSHKey() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	keyFile := filepath.Join(sshDir, "id_ed25519")
+	keyFile := filepath.Join(sshDir, keyName)
 	if _, err := os.Stat(keyFile); err == nil {
-		return "", fmt.Errorf("refusing to overwrite file %s", keyFile)
+		if errorOnExists {
+			return "", fmt.Errorf("refusing to overwrite file %s", keyFile)
+		} else {
+			return keyFile + ".pub", nil
+		}
 	}
 
 	if err := os.MkdirAll(filepath.Dir(keyFile), 0711); err != nil {

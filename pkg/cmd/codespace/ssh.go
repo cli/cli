@@ -18,6 +18,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
@@ -115,10 +116,21 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Make sure we have SSH keys available
-	// If not, generate them to ~/.ssh/codespace
-	// If that doesn't work, fail before connecting
-	userPublicKey := "hello"
+	sshContext := shared.SshContext{}
+	keyFile, err := sshContext.GenerateSSHKeyWithOptions("codespaces", false)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(keyFile)
+
+	// TODO: Fix bug that we read the entire file versus only the first line (where the SSH key is)
+	userPublicKey, err := os.ReadFile(keyFile)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(userPublicKey)
 
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
 	if err != nil {
@@ -133,7 +145,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServerWithOptions(ctx, liveshare.StartSSHServerOptions{
-		UserPublicKey: userPublicKey,
+		UserPublicKey: string(userPublicKey),
 	})
 	a.StopProgressIndicator()
 	if err != nil {

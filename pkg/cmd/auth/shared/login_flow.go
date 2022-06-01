@@ -34,7 +34,7 @@ type LoginOptions struct {
 	Executable  string
 	GitProtocol string
 
-	sshContext sshContext
+	sshContext SshContext
 }
 
 func Login(opts *LoginOptions) error {
@@ -91,7 +91,7 @@ func Login(opts *LoginOptions) error {
 			}
 		} else {
 			var err error
-			keyToUpload, err = opts.sshContext.generateSSHKey()
+			keyToUpload, err = opts.sshContext.GenerateSSHKey()
 			if err != nil {
 				return err
 			}
