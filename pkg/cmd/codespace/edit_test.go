@@ -2,7 +2,6 @@ package codespace
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
@@ -10,15 +9,16 @@ import (
 )
 
 func TestEdit(t *testing.T) {
-
 	tests := []struct {
 		name          string
 		opts          editOptions
-		codespaces    []*api.Codespace
+		cliArgs       []string // alternative to opts; will test command dispatcher
+		wantEdits     *api.EditCodespaceParams
 		mockCodespace *api.Codespace
-		editErr       error
-		wantErr       bool
 		wantStdout    string
+		wantStderr    string
+		wantErr       bool
+		errMsg        string
 	}{
 		{
 			name: "edit codespace display name",
@@ -26,6 +26,9 @@ func TestEdit(t *testing.T) {
 				codespaceName: "hubot",
 				displayName:   "hubot-changed",
 				machine:       "",
+			},
+			wantEdits: &api.EditCodespaceParams{
+				DisplayName: "hubot-changed",
 			},
 			mockCodespace: &api.Codespace{
 				Name:        "hubot",
@@ -35,11 +38,28 @@ func TestEdit(t *testing.T) {
 			wantErr:    false,
 		},
 		{
+			name:    "CLI legacy --displayName",
+			cliArgs: []string{"--codespace", "hubot", "--displayName", "hubot-changed"},
+			wantEdits: &api.EditCodespaceParams{
+				DisplayName: "hubot-changed",
+			},
+			mockCodespace: &api.Codespace{
+				Name:        "hubot",
+				DisplayName: "hubot-changed",
+			},
+			wantStdout: "",
+			wantStderr: "Flag --displayName has been deprecated, use `--display-name` instead\n",
+			wantErr:    false,
+		},
+		{
 			name: "edit codespace machine",
 			opts: editOptions{
 				codespaceName: "hubot",
 				displayName:   "",
 				machine:       "machine",
+			},
+			wantEdits: &api.EditCodespaceParams{
+				Machine: "machine",
 			},
 			mockCodespace: &api.Codespace{
 				Name: "hubot",
@@ -51,56 +71,69 @@ func TestEdit(t *testing.T) {
 			wantErr:    false,
 		},
 		{
-			name: "trying to edit a codespace without anything to edit should return an error",
-			opts: editOptions{
-				codespaceName: "hubot",
-				displayName:   "",
-				machine:       "",
-			},
-			editErr: fmt.Errorf("at least one property has to be edited"),
+			name:    "no CLI arguments",
+			cliArgs: []string{},
 			wantErr: true,
+			errMsg:  "must provide `--display-name` or `--machine`",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
+			var gotEdits *api.EditCodespaceParams
 			apiMock := &apiClientMock{
 				EditCodespaceFunc: func(_ context.Context, codespaceName string, params *api.EditCodespaceParams) (*api.Codespace, error) {
-					if tt.editErr != nil {
-						return tt.mockCodespace, tt.editErr
-					}
+					gotEdits = params
 					return tt.mockCodespace, nil
 				},
 			}
 
-			if tt.opts.codespaceName == "" {
-				apiMock.ListCodespacesFunc = func(_ context.Context, num int) ([]*api.Codespace, error) {
-					return tt.codespaces, nil
-				}
-			}
-
-			opts := tt.opts
-
-			ios, _, stdout, _ := iostreams.Test()
-			ios.SetStdinTTY(true)
-			ios.SetStdoutTTY(true)
-			ios.SetStderrTTY(true)
+			ios, _, stdout, stderr := iostreams.Test()
 			a := NewApp(ios, nil, apiMock, nil)
 
-			err := a.Edit(context.Background(), opts)
+			var err error
+			if tt.cliArgs == nil {
+				err = a.Edit(context.Background(), tt.opts)
+			} else {
+				cmd := newEditCmd(a)
+				cmd.SilenceUsage = true
+				cmd.SilenceErrors = true
+				cmd.SetOut(ios.ErrOut)
+				cmd.SetErr(ios.ErrOut)
+				cmd.SetArgs(tt.cliArgs)
+				_, err = cmd.ExecuteC()
+			}
 
-			if (err != nil) != tt.wantErr {
-				t.Errorf("App.Edit() error = %v, wantErr %v", err, tt.wantErr)
+			if tt.wantErr {
+				if err == nil {
+					t.Error("Edit() expected error, got nil")
+				} else if err.Error() != tt.errMsg {
+					t.Errorf("Edit() error = %q, want %q", err, tt.errMsg)
+				}
+			} else if err != nil {
+				t.Errorf("Edit() expected no error, got %v", err)
 			}
 
 			if out := stdout.String(); out != tt.wantStdout {
 				t.Errorf("stdout = %q, want %q", out, tt.wantStdout)
 			}
-
-			if tt.wantErr && err.Error() != tt.editErr.Error() {
-				t.Errorf("stderr = %v, expected error %v", err, tt.editErr)
+			if out := stderr.String(); out != tt.wantStderr {
+				t.Errorf("stderr = %q, want %q", out, tt.wantStderr)
 			}
 
+			if tt.wantEdits != nil {
+				if gotEdits == nil {
+					t.Fatalf("EditCodespace() never called")
+				}
+				if tt.wantEdits.DisplayName != gotEdits.DisplayName {
+					t.Errorf("edited display name %q, want %q", gotEdits.DisplayName, tt.wantEdits.DisplayName)
+				}
+				if tt.wantEdits.Machine != gotEdits.Machine {
+					t.Errorf("edited machine type %q, want %q", gotEdits.Machine, tt.wantEdits.Machine)
+				}
+				if tt.wantEdits.IdleTimeoutMinutes != gotEdits.IdleTimeoutMinutes {
+					t.Errorf("edited idle timeout minutes %d, want %d", gotEdits.IdleTimeoutMinutes, tt.wantEdits.IdleTimeoutMinutes)
+				}
+			}
 		})
 	}
 }
