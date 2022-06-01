@@ -474,6 +474,7 @@ func buildDisplayName(displayName string, prebuildAvailability string) string {
 			return displayName + " (Prebuild ready)" 
 		case "in_progress": 
 			return displayName + " (Prebuild in progress)" 
-		default: return displayName 
+		default: 
+			return displayName 
 	}
 }
