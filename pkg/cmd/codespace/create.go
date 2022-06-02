@@ -469,12 +469,12 @@ func getRepoSuggestions(ctx context.Context, apiClient apiClient, partialSearch 
 // prebuildAvailability will be migrated to use enum values: "none", "ready", "in_progress" before Prebuild GA
 // Enum values "blob" and "pool" will be deprecated soon.
 func buildDisplayName(displayName string, prebuildAvailability string) string {
-	switch prebuildAvailability { 
-		case "blob", "pool", "ready": 
-			return displayName + " (Prebuild ready)" 
-		case "in_progress": 
-			return displayName + " (Prebuild in progress)" 
-		default: 
-			return displayName 
+	switch prebuildAvailability {
+	case "blob", "pool", "ready":
+		return displayName + " (Prebuild ready)"
+	case "in_progress":
+		return displayName + " (Prebuild in progress)"
+	default:
+		return displayName
 	}
 }
