@@ -31,23 +31,33 @@ type executable interface {
 	Executable() string
 }
 
+type sshClient interface {
+	SSH(*App, context.Context, []string, sshOptions) error
+}
+
 type App struct {
-	io         *iostreams.IOStreams
-	apiClient  apiClient
-	errLogger  *log.Logger
-	executable executable
-	browser    browser
+	io                     *iostreams.IOStreams
+	apiClient              apiClient
+	errLogger              *log.Logger
+	executable             executable
+	browser                browser
+	sshClient              sshClient
+	codespaceStatusChecker codespaceStatusChecker
 }
 
 func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browser browser) *App {
 	errLogger := log.New(io.ErrOut, "", 0)
+	sshClient := codespaceSSHClient{}
+	statusChecker := codespaceStatusCheck{}
 
 	return &App{
-		io:         io,
-		apiClient:  apiClient,
-		errLogger:  errLogger,
-		executable: exe,
-		browser:    browser,
+		io:                     io,
+		apiClient:              apiClient,
+		errLogger:              errLogger,
+		executable:             exe,
+		browser:                browser,
+		sshClient:              &sshClient,
+		codespaceStatusChecker: &statusChecker,
 	}
 }
 

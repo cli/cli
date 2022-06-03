@@ -63,6 +63,7 @@ type createOptions struct {
 	location          string
 	machine           string
 	showStatus        bool
+	ssh               bool
 	permissionsOptOut bool
 	devContainerPath  string
 	idleTimeout       time.Duration
@@ -89,6 +90,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
 	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 0, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
 	// createCmd.Flags().Var(&opts.retentionPeriod, "retention-period", "allowed time after shutting down before the codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
+	createCmd.Flags().BoolVar(&opts.ssh, "ssh", false, "SSH immediately into the codespace once ready. Implies --status")
 	createCmd.Flags().StringVar(&opts.devContainerPath, "devcontainer-path", "", "path to the devcontainer.json file to use when creating codespace")
 
 	return createCmd
@@ -242,9 +244,23 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		}
 	}
 
+	if opts.ssh {
+		opts.showStatus = true
+	}
+
 	if opts.showStatus {
-		if err := a.showStatus(ctx, codespace); err != nil {
+		if err := a.codespaceStatusChecker.ShowStatus(a, ctx, codespace); err != nil {
 			return fmt.Errorf("show status: %w", err)
+		}
+	}
+
+	if opts.ssh {
+		sshOpts := sshOptions{
+			codespace: codespace.Name,
+		}
+		var sshArgs []string
+		if err := a.sshClient.SSH(a, ctx, sshArgs, sshOpts); err != nil {
+			return fmt.Errorf("ssh error: %w", err)
 		}
 	}
 
@@ -325,10 +341,14 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 	return codespace, nil
 }
 
-// showStatus polls the codespace for a list of post create states and their status. It will keep polling
-// until all states have finished. Once all states have finished, we poll once more to check if any new
+type codespaceStatusCheck struct{}
+
+type codespaceStatusChecker interface {
+	ShowStatus(*App, context.Context, *api.Codespace) error
+}
+
 // states have been introduced and stop polling otherwise.
-func (a *App) showStatus(ctx context.Context, codespace *api.Codespace) error {
+func (_ *codespaceStatusCheck) ShowStatus(a *App, ctx context.Context, codespace *api.Codespace) error {
 	var (
 		lastState      codespaces.PostCreateState
 		breakNextState bool

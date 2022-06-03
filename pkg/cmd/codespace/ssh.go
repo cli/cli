@@ -89,7 +89,7 @@ func newSSHCmd(app *App) *cobra.Command {
 			if opts.config {
 				return app.printOpenSSHConfig(cmd.Context(), opts)
 			} else {
-				return app.SSH(cmd.Context(), args, opts)
+				return app.sshClient.SSH(app, cmd.Context(), args, opts)
 			}
 		},
 		DisableFlagsInUseLine: true,
@@ -109,26 +109,29 @@ func newSSHCmd(app *App) *cobra.Command {
 	return sshCmd
 }
 
+type codespaceSSHClient struct{}
+
 // SSH opens an ssh session or runs an ssh command in a codespace.
-func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err error) {
+// func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err error) {
+func (c *codespaceSSHClient) SSH(app *App, ctx context.Context, sshArgs []string, opts sshOptions) (err error) {
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
+	codespace, err := getOrChooseCodespace(ctx, app.apiClient, opts.codespace)
 	if err != nil {
 		return err
 	}
 
-	session, err := startLiveShareSession(ctx, codespace, a, opts.debug, opts.debugFile)
+	session, err := startLiveShareSession(ctx, codespace, app, opts.debug, opts.debugFile)
 	if err != nil {
 		return err
 	}
 	defer safeClose(session, &err)
 
-	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
+	app.StartProgressIndicatorWithLabel("Fetching SSH Details")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
-	a.StopProgressIndicator()
+	app.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}
@@ -170,7 +173,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		if opts.scpArgs != nil {
 			err = codespaces.Copy(ctx, opts.scpArgs, localSSHServerPort, connectDestination)
 		} else {
-			err = codespaces.Shell(ctx, a.errLogger, sshArgs, localSSHServerPort, connectDestination, usingCustomPort)
+			err = codespaces.Shell(ctx, app.errLogger, sshArgs, localSSHServerPort, connectDestination, usingCustomPort)
 		}
 		shellClosed <- err
 	}()
@@ -399,7 +402,7 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) error {
 	if !hasRemote {
 		return cmdutil.FlagErrorf("at least one argument must have a 'remote:' prefix")
 	}
-	return a.SSH(ctx, nil, opts.sshOptions)
+	return a.sshClient.SSH(a, ctx, nil, opts.sshOptions)
 }
 
 // fileLogger is a wrapper around an log.Logger configured to write

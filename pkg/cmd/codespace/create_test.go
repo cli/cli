@@ -398,3 +398,69 @@ func TestBuildDisplayName(t *testing.T) {
 func durationPtr(d time.Duration) *time.Duration {
 	return &d
 }
+
+func TestCreateAndSsh(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+	apiMock := &apiClientMock{
+		ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+			return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
+		},
+		GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
+			return []*api.Machine{
+				{
+					Name:        "GIGA",
+					DisplayName: "Gigabits of a machine",
+				},
+			}, nil
+		},
+		CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+			return &api.Codespace{
+				Name: "monalisa-dotfiles-abcd1234",
+			}, nil
+		},
+		GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+			return &api.Repository{
+				ID:            1234,
+				FullName:      "monalisa/dotfiles",
+				DefaultBranch: "main",
+			}, nil
+		},
+	}
+
+	sshClient := mockSSHClient{}
+	statusCheck := mockStatusCheck{}
+
+	a := &App{
+		io:                     ios,
+		apiClient:              apiMock,
+		sshClient:              &sshClient,
+		codespaceStatusChecker: &statusCheck,
+	}
+
+	opts := createOptions{
+		repo:             "monalisa/dotfiles",
+		branch:           "",
+		machine:          "GIGA",
+		ssh:              true,
+		showStatus:       false,
+		idleTimeout:      30 * time.Minute,
+		devContainerPath: ".devcontainer/foobar/devcontainer.json",
+	}
+
+	err := a.Create(context.Background(), opts)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+type mockSSHClient struct{}
+
+func (c *mockSSHClient) SSH(*App, context.Context, []string, sshOptions) error {
+	return nil
+}
+
+type mockStatusCheck struct{}
+
+func (c *mockStatusCheck) ShowStatus(*App, context.Context, *api.Codespace) error {
+	return nil
+}
