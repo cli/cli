@@ -68,6 +68,9 @@ func (c *SshContext) GenerateSSHKey(keyName string, errorOnExists bool, promptPa
 	var sshPassphrase string
 	if promptPassphrase != nil {
 		sshPassphrase, err = promptPassphrase()
+		if err != nil {
+			return SshKeyPair{}, err
+		}
 	}
 
 	// TOOD: sshLabel was never set, so should -C just be removed?
