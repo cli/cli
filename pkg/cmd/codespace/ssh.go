@@ -130,7 +130,8 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		}
 
 		liveshareSSHOptions.UserPublicKeyFile = keyPair.PublicKeyPath
-		args = append(args, "-i", keyPair.PrivateKeyPath)
+		// For cp any flags need to come first, so prepend this one
+		args = append([]string{"-i", keyPair.PrivateKeyPath}, args...)
 	}
 
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
