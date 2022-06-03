@@ -94,9 +94,7 @@ func Login(opts *LoginOptions) error {
 			}
 		} else if opts.sshContext.HasKeygen() {
 			var sshChoice bool
-			var err error
-
-			err = prompt.SurveyAskOne(&survey.Confirm{
+			err := prompt.SurveyAskOne(&survey.Confirm{
 				Message: "Generate a new SSH key to add to your GitHub account?",
 				Default: true,
 			}, &sshChoice)
