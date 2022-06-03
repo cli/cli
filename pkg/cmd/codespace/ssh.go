@@ -89,7 +89,7 @@ func newSSHCmd(app *App) *cobra.Command {
 			if opts.config {
 				return app.printOpenSSHConfig(cmd.Context(), opts)
 			} else {
-				return app.sshClient.SSH(app, cmd.Context(), args, opts)
+				return app.SSH(cmd.Context(), args, opts)
 			}
 		},
 		DisableFlagsInUseLine: true,
@@ -402,7 +402,11 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) error {
 	if !hasRemote {
 		return cmdutil.FlagErrorf("at least one argument must have a 'remote:' prefix")
 	}
-	return a.sshClient.SSH(a, ctx, nil, opts.sshOptions)
+	return a.SSH(ctx, nil, opts.sshOptions)
+}
+
+func (a *App) SSH(ctx context.Context, args []string, opts sshOptions) error {
+	return a.sshClient.SSH(a, ctx, args, opts)
 }
 
 // fileLogger is a wrapper around an log.Logger configured to write

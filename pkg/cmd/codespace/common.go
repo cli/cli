@@ -71,6 +71,10 @@ func (a *App) StopProgressIndicator() {
 	a.io.StopProgressIndicator()
 }
 
+func (a *App) showStatus(ctx context.Context, codespace *api.Codespace) error {
+	return a.codespaceStatusChecker.ShowStatus(a, ctx, codespace)
+}
+
 type liveshareSession interface {
 	Close() error
 	GetSharedServers(context.Context) ([]*liveshare.Port, error)
