@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/cli/cli/v2/pkg/ssh"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -84,9 +85,9 @@ func TestLogin_ssh(t *testing.T) {
 		HTTPClient:  &http.Client{Transport: &tr},
 		Hostname:    "example.com",
 		Interactive: true,
-		sshContext: SshContext{
-			configDir: dir,
-			keygenExe: "ssh-keygen",
+		sshContext: ssh.SshContext{
+			ConfigDir: dir,
+			KeygenExe: "ssh-keygen",
 		},
 	})
 	assert.NoError(t, err)

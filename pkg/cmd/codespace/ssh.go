@@ -18,9 +18,9 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/liveshare"
+	"github.com/cli/cli/v2/pkg/ssh"
 	"github.com/spf13/cobra"
 )
 
@@ -116,21 +116,22 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	sshContext := shared.SshContext{}
-	keyFile, err := sshContext.GenerateSSHKeyWithOptions("codespaces", false)
-	if err != nil {
-		return err
+	liveshareSSHOptions := liveshare.StartSSHServerOptions{}
+	args := sshArgs
+	if opts.scpArgs != nil {
+		args = opts.scpArgs
 	}
 
-	fmt.Println(keyFile)
+	sshContext := ssh.SshContext{}
+	if shouldGenerateSSHKeys(args, opts) && sshContext.HasKeygen() {
+		keyPair, err := sshContext.GenerateSSHKey("codespaces", false, nil)
+		if err != nil {
+			return fmt.Errorf("failed to generate ssh keys: %s", err)
+		}
 
-	// TODO: Fix bug that we read the entire file versus only the first line (where the SSH key is)
-	userPublicKey, err := os.ReadFile(keyFile)
-	if err != nil {
-		return err
+		liveshareSSHOptions.UserPublicKeyFile = keyPair.PublicKeyPath
+		args = append(args, "-i", keyPair.PrivateKeyPath)
 	}
-
-	fmt.Println(userPublicKey)
 
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
 	if err != nil {
@@ -144,9 +145,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	defer safeClose(session, &err)
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	remoteSSHServerPort, sshUser, err := session.StartSSHServerWithOptions(ctx, liveshare.StartSSHServerOptions{
-		UserPublicKey: string(userPublicKey),
-	})
+	remoteSSHServerPort, sshUser, err := session.StartSSHServerWithOptions(ctx, liveshareSSHOptions)
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
@@ -187,9 +186,10 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	go func() {
 		var err error
 		if opts.scpArgs != nil {
-			err = codespaces.Copy(ctx, opts.scpArgs, localSSHServerPort, connectDestination)
+			// args is the correct variable to use here, we just use scpArgs as the check for which command to run
+			err = codespaces.Copy(ctx, args, localSSHServerPort, connectDestination)
 		} else {
-			err = codespaces.Shell(ctx, a.errLogger, sshArgs, localSSHServerPort, connectDestination, usingCustomPort)
+			err = codespaces.Shell(ctx, a.errLogger, args, localSSHServerPort, connectDestination, usingCustomPort)
 		}
 		shellClosed <- err
 	}()
@@ -203,6 +203,24 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		}
 		return nil // success
 	}
+}
+
+func shouldGenerateSSHKeys(args []string, opts sshOptions) bool {
+	if opts.profile != "" {
+		// The profile may specify the identity file so cautiously don't override that option
+		return false
+	}
+
+	for _, arg := range args {
+		if arg == "-i" {
+			// User specified the identity file so it should exist
+			return false
+		}
+
+		// TODO: should -F have similar behavior?
+	}
+
+	return true
 }
 
 func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err error) {

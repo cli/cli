@@ -3,6 +3,7 @@ package shared
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -10,8 +11,10 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/pkg/cmd/ssh-key/add"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/cli/cli/v2/pkg/ssh"
 )
 
 const defaultSSHKeyTitle = "GitHub CLI"
@@ -34,7 +37,7 @@ type LoginOptions struct {
 	Executable  string
 	GitProtocol string
 
-	sshContext SshContext
+	sshContext ssh.SshContext
 }
 
 func Login(opts *LoginOptions) error {
@@ -72,7 +75,7 @@ func Login(opts *LoginOptions) error {
 	var keyToUpload string
 	keyTitle := defaultSSHKeyTitle
 	if opts.Interactive && gitProtocol == "ssh" {
-		pubKeys, err := opts.sshContext.localPublicKeys()
+		pubKeys, err := opts.sshContext.LocalPublicKeys()
 		if err != nil {
 			return err
 		}
@@ -89,11 +92,25 @@ func Login(opts *LoginOptions) error {
 			if keyChoice < len(pubKeys) {
 				keyToUpload = pubKeys[keyChoice]
 			}
-		} else {
+		} else if opts.sshContext.HasKeygen() {
+			var sshChoice bool
 			var err error
-			keyToUpload, err = opts.sshContext.GenerateSSHKey()
+
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: "Generate a new SSH key to add to your GitHub account?",
+				Default: true,
+			}, &sshChoice)
+
 			if err != nil {
-				return err
+				return fmt.Errorf("could not prompt: %w", err)
+			}
+
+			if sshChoice {
+				keyPair, err := opts.sshContext.GenerateSSHKey("id_ed25519", true, promptForSshKeyPassphrase)
+				if err != nil {
+					return err
+				}
+				keyToUpload = keyPair.PublicKeyPath
 			}
 		}
 
@@ -210,6 +227,18 @@ func Login(opts *LoginOptions) error {
 	return nil
 }
 
+func promptForSshKeyPassphrase() (string, error) {
+	var sshPassphrase string
+	err := prompt.SurveyAskOne(&survey.Password{
+		Message: "Enter a passphrase for your new SSH key (Optional)",
+	}, &sshPassphrase)
+	if err != nil {
+		return "", fmt.Errorf("could not prompt: %w", err)
+	}
+
+	return sshPassphrase, nil
+}
+
 func scopesSentence(scopes []string, isEnterprise bool) string {
 	quoted := make([]string, len(scopes))
 	for i, s := range scopes {
@@ -220,4 +249,14 @@ func scopesSentence(scopes []string, isEnterprise bool) string {
 		}
 	}
 	return strings.Join(quoted, ", ")
+}
+
+func sshKeyUpload(httpClient *http.Client, hostname, keyFile string, title string) error {
+	f, err := os.Open(keyFile)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	return add.SSHKeyUpload(httpClient, hostname, f, title)
 }

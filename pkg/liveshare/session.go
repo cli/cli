@@ -3,7 +3,9 @@ package liveshare
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -18,7 +20,7 @@ type Session struct {
 }
 
 type StartSSHServerOptions struct {
-	UserPublicKey string `json:"userPublicKey"`
+	UserPublicKeyFile string
 }
 
 // Close should be called by users to clean up RPC and SSH resources whenever the session
@@ -50,6 +52,10 @@ func (s *Session) StartSSHServer(ctx context.Context) (int, string, error) {
 // necessary, applies specified options, and returns the port on which it listens and
 // the user name clients should provide.
 func (s *Session) StartSSHServerWithOptions(ctx context.Context, opts StartSSHServerOptions) (int, string, error) {
+	var params struct {
+		UserPublicKey string `json:"userPublicKey"`
+	}
+
 	var response struct {
 		Result     bool   `json:"result"`
 		ServerPort string `json:"serverPort"`
@@ -57,11 +63,19 @@ func (s *Session) StartSSHServerWithOptions(ctx context.Context, opts StartSSHSe
 		Message    string `json:"message"`
 	}
 
+	if opts.UserPublicKeyFile != "" {
+		publicKeyBytes, err := os.ReadFile(opts.UserPublicKeyFile)
+		if err != nil {
+			return 0, "", fmt.Errorf("failed to read public key file: %s", err)
+		}
+
+		params.UserPublicKey = strings.TrimSpace(string(publicKeyBytes))
+	}
+
 	// Add param with key here, update corresponding on C# side
 	// TODO: Use this object once we update the service
 	// params := []interface{}{opts}
-	params := []string{opts.UserPublicKey}
-	if err := s.rpc.do(ctx, "ISshServerHostService.startRemoteServerWithOptions", &params, &response); err != nil {
+	if err := s.rpc.do(ctx, "ISshServerHostService.startRemoteServerWithOptions", params, &response); err != nil {
 		return 0, "", err
 	}
 
