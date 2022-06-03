@@ -60,7 +60,6 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 
 	progress.StartProgressIndicatorWithLabel("Fetching SSH Details")
 	defer progress.StopProgressIndicator()
-	// TODO: This shouldn't care about the key
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)

@@ -56,7 +56,6 @@ func NewRemoteCommand(ctx context.Context, tunnelPort int, destination string, s
 // newSSHCommand populates an exec.Cmd to run a command (or if blank,
 // an interactive shell) over ssh.
 func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string) (*exec.Cmd, []string, error) {
-	// TODO: Read SSH key from ~/.ssh/codespace and pass as argument with -i
 	connArgs := []string{"-p", strconv.Itoa(port), "-o", "NoHostAuthenticationForLocalhost=yes"}
 
 	// The ssh command syntax is: ssh [flags] user@host command [args...]
