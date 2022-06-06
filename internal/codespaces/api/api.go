@@ -807,7 +807,6 @@ type EditCodespaceParams struct {
 
 func (a *API) EditCodespace(ctx context.Context, codespaceName string, params *EditCodespaceParams) (*Codespace, error) {
 	requestBody, err := json.Marshal(params)
-
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
@@ -818,7 +817,7 @@ func (a *API) EditCodespace(ctx context.Context, codespaceName string, params *E
 	}
 
 	a.setHeaders(req)
-	resp, err := a.do(ctx, req, "/user/codespaces")
+	resp, err := a.do(ctx, req, "/user/codespaces/*")
 	if err != nil {
 		return nil, fmt.Errorf("error making request: %w", err)
 	}
