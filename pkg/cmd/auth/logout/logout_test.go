@@ -27,7 +27,6 @@ func Test_NewCmdLogout(t *testing.T) {
 		{
 			name:     "nontty no arguments",
 			cli:      "",
-			errMsg:   "--confirm required when not running interactively",
 			wantsErr: true,
 		},
 		{
@@ -48,10 +47,9 @@ func Test_NewCmdLogout(t *testing.T) {
 		},
 		{
 			name: "nontty with hostname",
-			cli:  "--hostname harry.mason --confirm",
+			cli:  "--hostname harry.mason",
 			wants: LogoutOptions{
-				Hostname:  "harry.mason",
-				Confirmed: true,
+				Hostname: "harry.mason",
 			},
 		},
 	}
@@ -88,7 +86,6 @@ func Test_NewCmdLogout(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.wants.Hostname, gotOpts.Hostname)
-			assert.Equal(t, tt.wants.Confirmed, gotOpts.Confirmed)
 		})
 
 	}
@@ -111,33 +108,13 @@ func Test_logoutRun_tty(t *testing.T) {
 			wantHosts: "cheryl.mason:\n    oauth_token: abc123\n",
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubPrompt("What account do you want to log out of?").AnswerWith("github.com")
-				as.StubPrompt("Are you sure you want to log out of github.com account 'cybilb'?").AnswerWith(true)
 			},
 			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'cybilb'`),
-		},
-		{
-			name: "no arguments, multiple hosts, with confirm",
-			opts: &LogoutOptions{
-				Confirmed: true,
-			},
-			cfgHosts: []string{"cheryl.mason", "github.com"},
-			wantErr:  `--hostname required when multiple credentials found`,
 		},
 		{
 			name:     "no arguments, one host",
 			opts:     &LogoutOptions{},
 			cfgHosts: []string{"github.com"},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Are you sure you want to log out of github.com account 'cybilb'?").AnswerWith(true)
-			},
-			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'cybilb'`),
-		},
-		{
-			name: "no hostname, one host, with confirm",
-			opts: &LogoutOptions{
-				Confirmed: true,
-			},
-			cfgHosts:   []string{"github.com"},
 			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'cybilb'`),
 		},
 		{
@@ -149,19 +126,6 @@ func Test_logoutRun_tty(t *testing.T) {
 			name: "hostname",
 			opts: &LogoutOptions{
 				Hostname: "cheryl.mason",
-			},
-			cfgHosts:  []string{"cheryl.mason", "github.com"},
-			wantHosts: "github.com:\n    oauth_token: abc123\n",
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Are you sure you want to log out of cheryl.mason account 'cybilb'?").AnswerWith(true)
-			},
-			wantErrOut: regexp.MustCompile(`Logged out of cheryl.mason account 'cybilb'`),
-		},
-		{
-			name: "hostname, with confirm",
-			opts: &LogoutOptions{
-				Hostname:  "cheryl.mason",
-				Confirmed: true,
 			},
 			cfgHosts:  []string{"cheryl.mason", "github.com"},
 			wantHosts: "github.com:\n    oauth_token: abc123\n",

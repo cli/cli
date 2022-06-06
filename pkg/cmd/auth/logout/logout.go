@@ -20,7 +20,6 @@ type LogoutOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	Hostname   string
-	Confirmed  bool
 }
 
 func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Command {
@@ -50,9 +49,6 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 			if opts.Hostname == "" && !opts.IO.CanPrompt() {
 				return cmdutil.FlagErrorf("--hostname required when not running interactively")
 			}
-			if !opts.Confirmed && !opts.IO.CanPrompt() {
-				return cmdutil.FlagErrorf("--confirm required when not running interactively")
-			}
 			if runF != nil {
 				return runF(opts)
 			}
@@ -62,8 +58,7 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to log out of")
-	cmd.Flags().BoolVarP(&opts.Confirmed, "confirm", "y", false, "Skip the confirmation prompt")
-
+	
 	return cmd
 }
 
@@ -87,10 +82,6 @@ func logoutRun(opts *LogoutOptions) error {
 		if len(candidates) == 1 {
 			hostname = candidates[0]
 		} else {
-
-			if opts.Confirmed {
-				return fmt.Errorf("--hostname required when multiple credentials found")
-			}
 
 			err = prompt.SurveyAskOne(&survey.Select{
 				Message: "What account do you want to log out of?",
@@ -141,21 +132,6 @@ func logoutRun(opts *LogoutOptions) error {
 	usernameStr := ""
 	if username != "" {
 		usernameStr = fmt.Sprintf(" account '%s'", username)
-	}
-
-	if !opts.Confirmed && opts.IO.CanPrompt() {
-		var keepGoing bool
-		err := prompt.SurveyAskOne(&survey.Confirm{
-			Message: fmt.Sprintf("Are you sure you want to log out of %s%s?", hostname, usernameStr),
-			Default: true,
-		}, &keepGoing)
-		if err != nil {
-			return fmt.Errorf("could not prompt: %w", err)
-		}
-
-		if !keepGoing {
-			return nil
-		}
 	}
 
 	cfg.UnsetHost(hostname)
