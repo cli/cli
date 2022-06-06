@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"time"
@@ -104,21 +105,23 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 func getPostCreateOutput(ctx context.Context, tunnelPort int, user string) ([]PostCreateState, error) {
 	cmd, err := NewRemoteCommand(
 		ctx, tunnelPort, fmt.Sprintf("%s@localhost", user),
-		"cat /workspaces/.codespaces/shared/postCreateOutput.json",
+		"cat /workspaces/.codespaces/shared/postCreateOutput.json >&2",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("remote command: %w", err)
 	}
 
-	stdout := new(bytes.Buffer)
-	cmd.Stdout = stdout
+	stderr := new(bytes.Buffer)
+	cmd.Stdout = ioutil.Discard
+	cmd.Stderr = stderr
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("run command: %w", err)
 	}
+
 	var output struct {
 		Steps []PostCreateState `json:"steps"`
 	}
-	if err := json.Unmarshal(stdout.Bytes(), &output); err != nil {
+	if err := json.Unmarshal(stderr.Bytes(), &output); err != nil {
 		return nil, fmt.Errorf("unmarshal output: %w", err)
 	}
 

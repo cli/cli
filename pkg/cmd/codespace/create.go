@@ -15,13 +15,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	DEVCONTAINER_PROMPT_DEFAULT = "Default Codespaces configuration"
-)
+const devcontainerPromptDefault = "Default Codespaces configuration"
 
-var (
-	DEFAULT_DEVCONTAINER_DEFINITIONS = []string{".devcontainer.json", ".devcontainer/devcontainer.json"}
-)
+var defaultDevcontainerDefinitions = []string{".devcontainer.json", ".devcontainer/devcontainer.json"}
 
 type NullableDuration struct {
 	*time.Duration
@@ -171,13 +167,13 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		if len(devcontainers) > 0 {
 
 			// if there is only one devcontainer.json file and it is one of the default paths we can auto-select it
-			if len(devcontainers) == 1 && utils.StringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
+			if len(devcontainers) == 1 && utils.StringInSlice(devcontainers[0].Path, defaultDevcontainerDefinitions) {
 				devContainerPath = devcontainers[0].Path
 			} else {
 				promptOptions := []string{}
 
-				if !utils.StringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
-					promptOptions = []string{DEVCONTAINER_PROMPT_DEFAULT}
+				if !utils.StringInSlice(devcontainers[0].Path, defaultDevcontainerDefinitions) {
+					promptOptions = []string{devcontainerPromptDefault}
 				}
 
 				for _, devcontainer := range devcontainers {
@@ -198,7 +194,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 			}
 		}
 
-		if devContainerPath == DEVCONTAINER_PROMPT_DEFAULT {
+		if devContainerPath == devcontainerPromptDefault {
 			// special arg allows users to opt out of devcontainer.json selection
 			devContainerPath = ""
 		}
