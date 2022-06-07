@@ -24,16 +24,26 @@ func TestPullRequestFeatures(t *testing.T) {
 				ReviewDecision:       true,
 				StatusCheckRollup:    true,
 				BranchProtectionRule: true,
+				MergeQueue:           true,
 			},
 			wantErr: false,
 		},
 		{
 			name:     "GHE",
 			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`: heredoc.Doc(`
+					{ "data": { "PullRequest": { "fields": [
+						{"name": "isInMergeQueue"},
+						{"name": "isMergeQueueEnabled"}
+					] } } }
+				`),
+			},
 			wantFeatures: PullRequestFeatures{
 				ReviewDecision:       true,
 				StatusCheckRollup:    true,
 				BranchProtectionRule: true,
+				MergeQueue:           true,
 			},
 			wantErr: false,
 		},
