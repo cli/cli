@@ -1,4 +1,14 @@
-* @cli/code-reviewers
+* // Octokit.js
+// https://github.com/octokit/core.js#readme
+const octokit = new Octokit({
+  auth: 'personal-access-token123'
+})
+
+await octokit.request('GET /repos/{owner}/{repo}/check-suites/{check_suite_id}', {
+  owner: 'OWNER',
+  repo: 'REPO',
+  check_suite_id: 'CHECK_SUITE_ID'
+})@cli/code-reviewers
 
 pkg/cmd/codespace/ @cli/codespaces
 pkg/liveshare/ @cli/codespaces
