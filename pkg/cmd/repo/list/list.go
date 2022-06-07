@@ -225,16 +225,7 @@ func listHeader(owner string, matchCount, totalMatchCount int, hasFilters bool) 
 }
 
 func repoInfo(r api.Repository) string {
-	tags := []string{}
-	if r.Visibility != "" {
-		tags = append(tags, strings.ToLower(r.Visibility))
-	} else {
-		if r.IsPrivate {
-			tags = append(tags, "private")
-		} else {
-			tags = append(tags, "public")
-		}
-	}
+	tags := []string{visibilityLabel(r)}
 
 	if r.IsFork {
 		tags = append(tags, "fork")
@@ -244,4 +235,13 @@ func repoInfo(r api.Repository) string {
 	}
 
 	return strings.Join(tags, ", ")
+}
+
+func visibilityLabel(repo api.Repository) string {
+	if repo.Visibility != "" {
+		return strings.ToLower(repo.Visibility)
+	} else if repo.IsPrivate {
+		return "private"
+	}
+	return "public"
 }

@@ -154,7 +154,7 @@ func displayResults(io *iostreams.IOStreams, results search.RepositoriesResult) 
 	cs := io.ColorScheme()
 	tp := utils.NewTablePrinter(io)
 	for _, repo := range results.Items {
-		tags := []string{repo.Visibility}
+		tags := []string{visibilityLabel(repo)}
 		if repo.IsFork {
 			tags = append(tags, "fork")
 		}
@@ -183,4 +183,13 @@ func displayResults(io *iostreams.IOStreams, results search.RepositoriesResult) 
 		fmt.Fprintf(io.Out, "\n%s", header)
 	}
 	return tp.Render()
+}
+
+func visibilityLabel(repo search.Repository) string {
+	if repo.Visibility != "" {
+		return repo.Visibility
+	} else if repo.IsPrivate {
+		return "private"
+	}
+	return "public"
 }
