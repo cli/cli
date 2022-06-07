@@ -37,6 +37,7 @@ type RepositoryFeatures struct {
 	IssueTemplateQuery       bool
 	PullRequestTemplateQuery bool
 	VisibilityField          bool
+	AutoMerge                bool
 }
 
 var allRepositoryFeatures = RepositoryFeatures{
@@ -44,6 +45,7 @@ var allRepositoryFeatures = RepositoryFeatures{
 	IssueTemplateQuery:       true,
 	PullRequestTemplateQuery: true,
 	VisibilityField:          true,
+	AutoMerge:                true,
 }
 
 type detector struct {
@@ -106,6 +108,9 @@ func (d *detector) RepositoryFeatures() (RepositoryFeatures, error) {
 		}
 		if field.Name == "visibility" {
 			features.VisibilityField = true
+		}
+		if field.Name == "autoMergeAllowed" {
+			features.AutoMerge = true
 		}
 	}
 

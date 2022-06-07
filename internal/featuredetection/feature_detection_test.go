@@ -73,6 +73,7 @@ func TestRepositoryFeatures(t *testing.T) {
 				IssueTemplateQuery:       true,
 				PullRequestTemplateQuery: true,
 				VisibilityField:          true,
+				AutoMerge:                true,
 			},
 			wantErr: false,
 		},
@@ -120,6 +121,23 @@ func TestRepositoryFeatures(t *testing.T) {
 				IssueTemplateMutation: true,
 				IssueTemplateQuery:    true,
 				VisibilityField:       true,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "GHE has automerge field",
+			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query Repository_fields\b`: heredoc.Doc(`
+					{ "data": { "Repository": { "fields": [
+						{"name": "autoMergeAllowed"}
+					] } } }
+				`),
+			},
+			wantFeatures: RepositoryFeatures{
+				IssueTemplateMutation: true,
+				IssueTemplateQuery:    true,
+				AutoMerge:             true,
 			},
 			wantErr: false,
 		},
