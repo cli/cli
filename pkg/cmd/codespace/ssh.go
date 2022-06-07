@@ -116,21 +116,22 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	liveshareSSHOptions := liveshare.StartSSHServerOptions{}
 	args := sshArgs
 	if opts.scpArgs != nil {
 		args = opts.scpArgs
 	}
 
 	sshContext := ssh.SshContext{}
+	startSshServerOpts := []func(*liveshare.StartSSHServerOptions){}
+
 	if shouldGenerateSSHKeys(args, opts) && sshContext.HasKeygen() {
 		keyPair, err := sshContext.GenerateSSHKey("codespaces", ssh.WithNoErrorOnExitingKey())
 		if err != nil {
 			return fmt.Errorf("failed to generate ssh keys: %s", err)
 		}
 
-		liveshareSSHOptions.UserPublicKeyFile = keyPair.PublicKeyPath
-		// For cp any flags need to come first, so prepend this one
+		startSshServerOpts = append(startSshServerOpts, liveshare.WithUserPublicKeyFile(keyPair.PublicKeyPath))
+		// For cp, any flags need to come before the file paths, so we need to prepend here
 		args = append([]string{"-i", keyPair.PrivateKeyPath}, args...)
 	}
 
@@ -146,7 +147,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	defer safeClose(session, &err)
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	remoteSSHServerPort, sshUser, err := session.StartSSHServerWithOptions(ctx, liveshareSSHOptions)
+	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx, startSshServerOpts...)
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
