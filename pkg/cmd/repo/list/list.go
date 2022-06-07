@@ -173,9 +173,7 @@ func listRun(opts *ListOptions) error {
 		info := repoInfo(repo)
 		infoColor := cs.Gray
 
-		if (repo.Visibility != "" &&
-			repo.Visibility != "PUBLIC") ||
-			repo.IsPrivate {
+		if repo.IsPrivate {
 			infoColor = cs.Yellow
 		}
 
