@@ -94,7 +94,7 @@ func (c *SshContext) GenerateSSHKey(keyName string, configureOptions ...func(*Ge
 		}
 	}
 
-	keygenCmd := exec.Command(keygenExe, "-t", "ed25519", "-N", sshPassphrase, "-f", keyFile)
+	keygenCmd := exec.Command(keygenExe, "-t", "ed25519", "-C", "", "-N", sshPassphrase, "-f", keyFile)
 	err = run.PrepareCmd(keygenCmd).Run()
 	if err != nil {
 		return nil, err
