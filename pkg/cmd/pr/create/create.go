@@ -588,9 +588,6 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 			return nil, cmdutil.CancelError
 		} else {
 			// "Create a fork of ..."
-			if baseRepo.IsPrivate {
-				return nil, fmt.Errorf("cannot fork private repository %s", ghrepo.FullName(baseRepo))
-			}
 			headBranchLabel = fmt.Sprintf("%s:%s", currentLogin, headBranch)
 		}
 	}
