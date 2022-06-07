@@ -22,7 +22,6 @@ func Test_NewCmdLogout(t *testing.T) {
 		wants    LogoutOptions
 		wantsErr bool
 		tty      bool
-		errMsg   string
 	}{
 		{
 			name:     "nontty no arguments",
@@ -112,9 +111,9 @@ func Test_logoutRun_tty(t *testing.T) {
 			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'cybilb'`),
 		},
 		{
-			name:     "no arguments, one host",
-			opts:     &LogoutOptions{},
-			cfgHosts: []string{"github.com"},
+			name:       "no arguments, one host",
+			opts:       &LogoutOptions{},
+			cfgHosts:   []string{"github.com"},
 			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'cybilb'`),
 		},
 		{
@@ -127,8 +126,8 @@ func Test_logoutRun_tty(t *testing.T) {
 			opts: &LogoutOptions{
 				Hostname: "cheryl.mason",
 			},
-			cfgHosts:  []string{"cheryl.mason", "github.com"},
-			wantHosts: "github.com:\n    oauth_token: abc123\n",
+			cfgHosts:   []string{"cheryl.mason", "github.com"},
+			wantHosts:  "github.com:\n    oauth_token: abc123\n",
 			wantErrOut: regexp.MustCompile(`Logged out of cheryl.mason account 'cybilb'`),
 		},
 	}

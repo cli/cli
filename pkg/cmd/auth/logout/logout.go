@@ -58,7 +58,7 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance to log out of")
-	
+
 	return cmd
 }
 
@@ -82,7 +82,6 @@ func logoutRun(opts *LogoutOptions) error {
 		if len(candidates) == 1 {
 			hostname = candidates[0]
 		} else {
-
 			err = prompt.SurveyAskOne(&survey.Select{
 				Message: "What account do you want to log out of?",
 				Options: candidates,
