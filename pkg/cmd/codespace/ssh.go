@@ -124,7 +124,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 
 	sshContext := ssh.SshContext{}
 	if shouldGenerateSSHKeys(args, opts) && sshContext.HasKeygen() {
-		keyPair, err := sshContext.GenerateSSHKey("codespaces", false, nil)
+		keyPair, err := sshContext.GenerateSSHKey("codespaces", ssh.WithNoErrorOnExitingKey())
 		if err != nil {
 			return fmt.Errorf("failed to generate ssh keys: %s", err)
 		}
