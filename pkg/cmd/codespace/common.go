@@ -19,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
 )
 
@@ -60,8 +61,18 @@ func (a *App) StopProgressIndicator() {
 	a.io.StopProgressIndicator()
 }
 
+type liveshareSession interface {
+	Close() error
+	GetSharedServers(context.Context) ([]*liveshare.Port, error)
+	KeepAlive(string)
+	OpenStreamingChannel(context.Context, liveshare.ChannelID) (ssh.Channel, error)
+	StartJupyterServer(context.Context) (int, string, error)
+	StartSharing(context.Context, string, int) (liveshare.ChannelID, error)
+	StartSSHServer(context.Context) (int, string, error)
+}
+
 // Connects to a codespace using Live Share and returns that session
-func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App, debug bool, debugFile string) (session *liveshare.Session, err error) {
+func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App, debug bool, debugFile string) (session liveshareSession, err error) {
 	// While connecting, ensure in the background that the user has keys installed.
 	// That lets us report a more useful error message if they don't.
 	authkeys := make(chan error, 1)

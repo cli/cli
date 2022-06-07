@@ -19,8 +19,7 @@ type LogoutOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
-
-	Hostname string
+	Hostname   string
 }
 
 func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Command {
@@ -50,7 +49,6 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 			if opts.Hostname == "" && !opts.IO.CanPrompt() {
 				return cmdutil.FlagErrorf("--hostname required when not running interactively")
 			}
-
 			if runF != nil {
 				return runF(opts)
 			}
@@ -133,21 +131,6 @@ func logoutRun(opts *LogoutOptions) error {
 	usernameStr := ""
 	if username != "" {
 		usernameStr = fmt.Sprintf(" account '%s'", username)
-	}
-
-	if opts.IO.CanPrompt() {
-		var keepGoing bool
-		err := prompt.SurveyAskOne(&survey.Confirm{
-			Message: fmt.Sprintf("Are you sure you want to log out of %s%s?", hostname, usernameStr),
-			Default: true,
-		}, &keepGoing)
-		if err != nil {
-			return fmt.Errorf("could not prompt: %w", err)
-		}
-
-		if !keepGoing {
-			return nil
-		}
 	}
 
 	cfg.UnsetHost(hostname)

@@ -466,12 +466,15 @@ func getRepoSuggestions(ctx context.Context, apiClient apiClient, partialSearch 
 }
 
 // buildDisplayName returns display name to be used in the machine survey prompt.
+// prebuildAvailability will be migrated to use enum values: "none", "ready", "in_progress" before Prebuild GA
+// Enum values "blob" and "pool" will be deprecated soon.
 func buildDisplayName(displayName string, prebuildAvailability string) string {
-	prebuildText := ""
-
-	if prebuildAvailability == "blob" || prebuildAvailability == "pool" {
-		prebuildText = " (Prebuild ready)"
+	switch prebuildAvailability {
+	case "blob", "pool", "ready":
+		return displayName + " (Prebuild ready)"
+	case "in_progress":
+		return displayName + " (Prebuild in progress)"
+	default:
+		return displayName
 	}
-
-	return fmt.Sprintf("%s%s", displayName, prebuildText)
 }
