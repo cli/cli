@@ -341,14 +341,8 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 	return codespace, nil
 }
 
-type codespaceStatusCheck struct{}
-
-type codespaceStatusChecker interface {
-	ShowStatus(*App, context.Context, *api.Codespace) error
-}
-
 // states have been introduced and stop polling otherwise.
-func (_ *codespaceStatusCheck) ShowStatus(a *App, ctx context.Context, codespace *api.Codespace) error {
+func ShowStatus(a *App, ctx context.Context, codespace *api.Codespace) error {
 	var (
 		lastState      codespaces.PostCreateState
 		breakNextState bool

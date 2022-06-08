@@ -428,13 +428,14 @@ func TestCreateAndSsh(t *testing.T) {
 	}
 
 	sshClient := mockSSHClient{}
-	statusCheck := mockStatusCheck{}
 
 	a := &App{
-		io:                     ios,
-		apiClient:              apiMock,
-		sshClient:              &sshClient,
-		codespaceStatusChecker: &statusCheck,
+		io:        ios,
+		apiClient: apiMock,
+		sshClient: &sshClient,
+		codespaceStatusChecker: func(*App, context.Context, *api.Codespace) error {
+			return nil
+		},
 	}
 
 	opts := createOptions{
@@ -456,11 +457,5 @@ func TestCreateAndSsh(t *testing.T) {
 type mockSSHClient struct{}
 
 func (c *mockSSHClient) SSH(*App, context.Context, []string, sshOptions) error {
-	return nil
-}
-
-type mockStatusCheck struct{}
-
-func (c *mockStatusCheck) ShowStatus(*App, context.Context, *api.Codespace) error {
 	return nil
 }
