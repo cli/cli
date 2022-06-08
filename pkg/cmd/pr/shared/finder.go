@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	remotes "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -138,6 +139,18 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 	fields.AddValues(opts.Fields)
 	numberFieldOnly := fields.Len() == 1 && fields.Contains("number")
 	fields.Add("id") // for additional preload queries below
+
+	if fields.Contains("isInMergeQueue") || fields.Contains("isMergeQueueEnabled") {
+		detector := fd.NewDetector(httpClient, f.repo.RepoHost())
+		prFeatures, err := detector.PullRequestFeatures()
+		if err != nil {
+			return nil, nil, err
+		}
+		if !prFeatures.MergeQueue {
+			fields.Remove("isInMergeQueue")
+			fields.Remove("isMergeQueueEnabled")
+		}
+	}
 
 	var pr *api.PullRequest
 	if f.prNumber > 0 {
