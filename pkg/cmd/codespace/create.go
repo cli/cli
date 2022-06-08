@@ -259,7 +259,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 			codespace: codespace.Name,
 		}
 		var sshArgs []string
-		if err := a.SSH(ctx, sshArgs, sshOpts); err != nil {
+		if err := a.sshClient(a, ctx, sshArgs, sshOpts); err != nil {
 			return fmt.Errorf("ssh error: %w", err)
 		}
 	}

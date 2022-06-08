@@ -89,7 +89,7 @@ func newSSHCmd(app *App) *cobra.Command {
 			if opts.config {
 				return app.printOpenSSHConfig(cmd.Context(), opts)
 			} else {
-				return app.SSH(cmd.Context(), args, opts)
+				return app.sshClient(app, cmd.Context(), args, opts)
 			}
 		},
 		DisableFlagsInUseLine: true,
@@ -109,11 +109,9 @@ func newSSHCmd(app *App) *cobra.Command {
 	return sshCmd
 }
 
-type codespaceSSHClient struct{}
-
 // SSH opens an ssh session or runs an ssh command in a codespace.
 // func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err error) {
-func (c *codespaceSSHClient) SSH(app *App, ctx context.Context, sshArgs []string, opts sshOptions) (err error) {
+func SSH(app *App, ctx context.Context, sshArgs []string, opts sshOptions) (err error) {
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -402,11 +400,7 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) error {
 	if !hasRemote {
 		return cmdutil.FlagErrorf("at least one argument must have a 'remote:' prefix")
 	}
-	return a.SSH(ctx, nil, opts.sshOptions)
-}
-
-func (a *App) SSH(ctx context.Context, args []string, opts sshOptions) error {
-	return a.sshClient.SSH(a, ctx, args, opts)
+	return a.sshClient(a, ctx, nil, opts.sshOptions)
 }
 
 // fileLogger is a wrapper around an log.Logger configured to write

@@ -31,11 +31,8 @@ type executable interface {
 	Executable() string
 }
 
-type sshClient interface {
-	SSH(*App, context.Context, []string, sshOptions) error
-}
-
 type statusChecker func(a *App, ctx context.Context, codespace *api.Codespace) error
+type sshClient func(app *App, ctx context.Context, sshArgs []string, opts sshOptions) (err error)
 
 type App struct {
 	io            *iostreams.IOStreams
@@ -49,7 +46,6 @@ type App struct {
 
 func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browser browser) *App {
 	errLogger := log.New(io.ErrOut, "", 0)
-	sshClient := codespaceSSHClient{}
 
 	return &App{
 		io:            io,
@@ -57,8 +53,8 @@ func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browse
 		errLogger:     errLogger,
 		executable:    exe,
 		browser:       browser,
-		sshClient:     &sshClient,
 		statusChecker: ShowStatus,
+		sshClient:     SSH,
 	}
 }
 

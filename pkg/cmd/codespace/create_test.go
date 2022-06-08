@@ -427,12 +427,12 @@ func TestCreateAndSsh(t *testing.T) {
 		},
 	}
 
-	sshClient := mockSSHClient{}
-
 	a := &App{
 		io:        ios,
 		apiClient: apiMock,
-		sshClient: &sshClient,
+		sshClient: func(*App, context.Context, []string, sshOptions) error {
+			return nil
+		},
 		statusChecker: func(*App, context.Context, *api.Codespace) error {
 			return nil
 		},
@@ -452,10 +452,4 @@ func TestCreateAndSsh(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-}
-
-type mockSSHClient struct{}
-
-func (c *mockSSHClient) SSH(*App, context.Context, []string, sshOptions) error {
-	return nil
 }
