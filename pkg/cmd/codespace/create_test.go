@@ -433,7 +433,7 @@ func TestCreateAndSsh(t *testing.T) {
 		io:        ios,
 		apiClient: apiMock,
 		sshClient: &sshClient,
-		codespaceStatusChecker: func(*App, context.Context, *api.Codespace) error {
+		statusChecker: func(*App, context.Context, *api.Codespace) error {
 			return nil
 		},
 	}

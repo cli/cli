@@ -35,16 +35,16 @@ type sshClient interface {
 	SSH(*App, context.Context, []string, sshOptions) error
 }
 
-type codespaceStatusChecker func(a *App, ctx context.Context, codespace *api.Codespace) error
+type statusChecker func(a *App, ctx context.Context, codespace *api.Codespace) error
 
 type App struct {
-	io                     *iostreams.IOStreams
-	apiClient              apiClient
-	errLogger              *log.Logger
-	executable             executable
-	browser                browser
-	sshClient              sshClient
-	codespaceStatusChecker codespaceStatusChecker
+	io            *iostreams.IOStreams
+	apiClient     apiClient
+	errLogger     *log.Logger
+	executable    executable
+	browser       browser
+	sshClient     sshClient
+	statusChecker statusChecker
 }
 
 func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browser browser) *App {
@@ -52,13 +52,13 @@ func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browse
 	sshClient := codespaceSSHClient{}
 
 	return &App{
-		io:                     io,
-		apiClient:              apiClient,
-		errLogger:              errLogger,
-		executable:             exe,
-		browser:                browser,
-		sshClient:              &sshClient,
-		codespaceStatusChecker: ShowStatus,
+		io:            io,
+		apiClient:     apiClient,
+		errLogger:     errLogger,
+		executable:    exe,
+		browser:       browser,
+		sshClient:     &sshClient,
+		statusChecker: ShowStatus,
 	}
 }
 
@@ -73,7 +73,7 @@ func (a *App) StopProgressIndicator() {
 }
 
 func (a *App) showStatus(ctx context.Context, codespace *api.Codespace) error {
-	return a.codespaceStatusChecker(a, ctx, codespace)
+	return a.statusChecker(a, ctx, codespace)
 }
 
 type liveshareSession interface {
