@@ -3,7 +3,6 @@ package factory
 import (
 	"errors"
 	"fmt"
-	"net/url"
 	"sort"
 
 	"github.com/cli/cli/v2/context"
@@ -11,12 +10,13 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/set"
+	"github.com/cli/go-gh/pkg/ssh"
 )
 
 type remoteResolver struct {
 	readRemotes   func() (git.RemoteSet, error)
 	getConfig     func() (config.Config, error)
-	urlTranslator func(*url.URL) *url.URL
+	urlTranslator context.Translator
 }
 
 func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
@@ -40,7 +40,7 @@ func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
 
 		sshTranslate := rr.urlTranslator
 		if sshTranslate == nil {
-			sshTranslate = git.ParseSSHConfig().Translator()
+			sshTranslate = ssh.NewTranslator()
 		}
 		resolvedRemotes := context.TranslateRemotes(gitRemotes, sshTranslate)
 
