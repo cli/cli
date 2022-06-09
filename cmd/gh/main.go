@@ -13,6 +13,7 @@ import (
 
 	surveyCore "github.com/AlecAivazis/survey/v2/core"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/build"
@@ -211,9 +212,7 @@ func mainRun() exitCode {
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		// require that the user is authenticated before running most commands
 		if cmdutil.IsAuthCheckEnabled(cmd) && !cmdutil.CheckAuth(cfg) {
-			fmt.Fprintln(stderr, cs.Bold("Welcome to GitHub CLI!"))
-			fmt.Fprintln(stderr)
-			fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")
+			printNoAuthHelp(stderr, cs)
 			return authError
 		}
 
@@ -317,6 +316,39 @@ func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
 		}
 		fmt.Fprintln(out, cmd.UsageString())
 	}
+}
+
+// printNoAuthHelp will print a help message when authentication is required,
+// which is either a welcome message in interactive environments or help on how
+// to set up the non-interactive environment.
+func printNoAuthHelp(out io.Writer, cs *iostreams.ColorScheme) {
+	var helpMessage string
+	if os.Getenv("CI") == "true" {
+		helpMessage = "Either `GH_TOKEN` or `GITHUB_TOKEN` must be set to use `gh`"
+		if _, ok := os.LookupEnv("GITHUB_ACTION"); ok {
+			helpMessage += heredoc.Doc(`
+				 in a GitHub Action.
+
+				Example:
+
+				env:
+				  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+			`)
+		} else {
+			helpMessage += heredoc.Doc(`
+				 in this CI environment.
+
+				Please consult the relevant documentation for setting these environment variables.
+			`)
+		}
+	} else {
+		helpMessage = heredoc.Docf(`
+			%s
+
+			To authenticate, please run %s.
+		`, cs.Bold("Welcome to GitHub CLI!"), "`gh auth login`")
+	}
+	fmt.Fprintf(out, helpMessage)
 }
 
 func shouldCheckForUpdate() bool {
