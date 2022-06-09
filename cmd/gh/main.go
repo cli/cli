@@ -348,7 +348,7 @@ func printNoAuthHelp(out io.Writer, cs *iostreams.ColorScheme) {
 			To authenticate, please run %s.
 		`, cs.Bold("Welcome to GitHub CLI!"), "`gh auth login`")
 	}
-	fmt.Fprintf(out, helpMessage)
+	fmt.Fprint(out, helpMessage)
 }
 
 func shouldCheckForUpdate() bool {
