@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -433,7 +434,7 @@ func TestCreateAndSsh(t *testing.T) {
 		sshClient: func(*App, context.Context, []string, sshOptions) error {
 			return nil
 		},
-		statusChecker: func(*App, context.Context, *api.Codespace) error {
+		statusChecker: func(progressIndicator, codespaces.LiveshareApiClient, context.Context, *api.Codespace) error {
 			return nil
 		},
 	}

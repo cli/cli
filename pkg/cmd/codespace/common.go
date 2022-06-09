@@ -31,7 +31,12 @@ type executable interface {
 	Executable() string
 }
 
-type statusChecker func(a *App, ctx context.Context, codespace *api.Codespace) error
+type progressIndicator interface {
+	StartProgressIndicatorWithLabel(s string)
+	StopProgressIndicator()
+}
+
+type statusChecker func(progressIndicator, codespaces.LiveshareApiClient, context.Context, *api.Codespace) error
 type sshClient func(app *App, ctx context.Context, sshArgs []string, opts sshOptions) (err error)
 
 type App struct {
@@ -69,7 +74,7 @@ func (a *App) StopProgressIndicator() {
 }
 
 func (a *App) showStatus(ctx context.Context, codespace *api.Codespace) error {
-	return a.statusChecker(a, ctx, codespace)
+	return a.statusChecker(a.io, a.apiClient, ctx, codespace)
 }
 
 type liveshareSession interface {

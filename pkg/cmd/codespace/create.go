@@ -344,7 +344,7 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 // ShowStatus polls the codespace for a list of post create states and their status. It will keep polling
 // until all states have finished. Once all states have finished, we poll once more to check if any new
 // states have been introduced and stop polling otherwise.
-func ShowStatus(a *App, ctx context.Context, codespace *api.Codespace) error {
+func ShowStatus(io progressIndicator, apiClient codespaces.LiveshareApiClient, ctx context.Context, codespace *api.Codespace) error {
 	var (
 		lastState      codespaces.PostCreateState
 		breakNextState bool
@@ -362,7 +362,7 @@ func ShowStatus(a *App, ctx context.Context, codespace *api.Codespace) error {
 			}
 
 			if state.Name != lastState.Name {
-				a.StartProgressIndicatorWithLabel(state.Name)
+				io.StartProgressIndicatorWithLabel(state.Name)
 
 				if state.Status == codespaces.PostCreateStateRunning {
 					inProgress = true
@@ -371,7 +371,7 @@ func ShowStatus(a *App, ctx context.Context, codespace *api.Codespace) error {
 				}
 
 				finishedStates[state.Name] = true
-				a.StopProgressIndicator()
+				io.StopProgressIndicator()
 			} else {
 				if state.Status == codespaces.PostCreateStateRunning {
 					inProgress = true
@@ -379,7 +379,7 @@ func ShowStatus(a *App, ctx context.Context, codespace *api.Codespace) error {
 				}
 
 				finishedStates[state.Name] = true
-				a.StopProgressIndicator()
+				io.StopProgressIndicator()
 				lastState = codespaces.PostCreateState{} // reset the value
 			}
 		}
@@ -393,7 +393,7 @@ func ShowStatus(a *App, ctx context.Context, codespace *api.Codespace) error {
 		}
 	}
 
-	err := codespaces.PollPostCreateStates(ctx, a, a.apiClient, codespace, poller)
+	err := codespaces.PollPostCreateStates(ctx, io, apiClient, codespace, poller)
 	if err != nil {
 		if errors.Is(err, context.Canceled) && breakNextState {
 			return nil // we cancelled the context to stop polling, we can ignore the error
