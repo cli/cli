@@ -20,11 +20,36 @@ func TestPullRequestFeatures(t *testing.T) {
 		{
 			name:     "github.com",
 			hostname: "github.com",
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`: heredoc.Doc(`
+					{ "data": { "PullRequest": { "fields": [
+						{"name": "isInMergeQueue"},
+						{"name": "isMergeQueueEnabled"}
+					] } } }
+				`),
+			},
 			wantFeatures: PullRequestFeatures{
 				ReviewDecision:       true,
 				StatusCheckRollup:    true,
 				BranchProtectionRule: true,
 				MergeQueue:           true,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "github.com with no merge queue",
+			hostname: "github.com",
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`: heredoc.Doc(`
+					{ "data": { "PullRequest": { "fields": [
+					] } } }
+				`),
+			},
+			wantFeatures: PullRequestFeatures{
+				ReviewDecision:       true,
+				StatusCheckRollup:    true,
+				BranchProtectionRule: true,
+				MergeQueue:           false,
 			},
 			wantErr: false,
 		},
