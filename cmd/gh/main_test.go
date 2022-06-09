@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
@@ -72,6 +74,64 @@ check your internet connection or https://githubstatus.com
 			printError(out, tt.args.err, tt.args.cmd, tt.args.debug)
 			if gotOut := out.String(); gotOut != tt.wantOut {
 				t.Errorf("printError() = %q, want %q", gotOut, tt.wantOut)
+			}
+		})
+	}
+}
+
+func Test_printNoAuthHelp(t *testing.T) {
+	orig_CI := os.Getenv("CI")
+	orig_GITHUB_ACTION := os.Getenv("GITHUB_ACTION")
+	t.Cleanup(func() {
+		os.Setenv("CI", orig_CI)
+		os.Setenv("GITHUB_ACTION", orig_GITHUB_ACTION)
+	})
+	tests := []struct {
+		name          string
+		CI            string
+		GITHUB_ACTION string
+		wantOut       string
+	}{
+		{
+			name:          "Interactive",
+			CI:            "",
+			GITHUB_ACTION: "",
+			wantOut: `Welcome to GitHub CLI!
+
+To authenticate, please run ` + "`gh auth login`.\n",
+		},
+		{
+			name:          "Non-Interactive, not a GitHub Action",
+			CI:            "true",
+			GITHUB_ACTION: "",
+			wantOut: "Either `GH_TOKEN` or `GITHUB_TOKEN` must be set to use `gh` in this CI environment." + `
+
+Please consult the relevant documentation for setting these environment variables.
+`,
+		},
+		{
+			name:          "GitHub Action",
+			CI:            "true",
+			GITHUB_ACTION: "__run",
+			wantOut: "Either `GH_TOKEN` or `GITHUB_TOKEN` must be set to use `gh` in a GitHub Action." + `
+
+Example:
+
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			out := &bytes.Buffer{}
+			cs := &iostreams.ColorScheme{}
+			os.Setenv("CI", tt.CI)
+			os.Setenv("GITHUB_ACTION", tt.GITHUB_ACTION)
+			printNoAuthHelp(out, cs)
+			if gotOut := out.String(); gotOut != tt.wantOut {
+				t.Errorf("printNoAuthHelp() = %q, want %q", gotOut, tt.wantOut)
 			}
 		})
 	}
