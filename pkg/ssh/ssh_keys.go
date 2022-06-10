@@ -43,7 +43,7 @@ type GenerateSSHKeyOptions struct {
 
 func WithNoErrorOnExitingKey() func(*GenerateSSHKeyOptions) {
 	return func(o *GenerateSSHKeyOptions) {
-		o.noErrorOnExists = false
+		o.noErrorOnExists = true
 	}
 }
 
