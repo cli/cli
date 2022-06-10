@@ -41,7 +41,7 @@ type GenerateSSHKeyOptions struct {
 	promptPassphrase func() (string, error)
 }
 
-func WithNoErrorOnExitingKey() func(*GenerateSSHKeyOptions) {
+func WithNoErrorOnExistingKey() func(*GenerateSSHKeyOptions) {
 	return func(o *GenerateSSHKeyOptions) {
 		o.noErrorOnExists = true
 	}

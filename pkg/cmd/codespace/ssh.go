@@ -125,7 +125,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	startSshServerOpts := []func(*liveshare.StartSSHServerOptions){}
 
 	if shouldGenerateSSHKeys(args, opts) && sshContext.HasKeygen() {
-		keyPair, err := sshContext.GenerateSSHKey("codespaces", ssh.WithNoErrorOnExitingKey())
+		keyPair, err := sshContext.GenerateSSHKey("codespaces", ssh.WithNoErrorOnExistingKey())
 		if err != nil {
 			return fmt.Errorf("failed to generate ssh keys: %s", err)
 		}
