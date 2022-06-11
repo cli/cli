@@ -9,7 +9,12 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
-const maxPageSize = 100
+const (
+	maxPageSize = 100
+
+	defaultOrder = "asc"
+	defaultSort  = "created"
+)
 
 var defaultFields = []string{
 	"color",
@@ -40,6 +45,14 @@ type listQueryOptions struct {
 }
 
 func (opts listQueryOptions) OrderBy() map[string]string {
+	// Set on copy to keep original intact.
+	if opts.Order == "" {
+		opts.Order = defaultOrder
+	}
+	if opts.Sort == "" {
+		opts.Sort = defaultSort
+	}
+
 	field := strings.ToUpper(opts.Sort)
 	if opts.Sort == "created" {
 		field = "CREATED_AT"

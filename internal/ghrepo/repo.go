@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/go-gh/pkg/repository"
 )
 
 // Interface describes an object that represents a GitHub repository
@@ -59,28 +59,11 @@ func FromFullName(nwo string) (Interface, error) {
 // FromFullNameWithHost is like FromFullName that defaults to a specific host for values that don't
 // explicitly include a hostname.
 func FromFullNameWithHost(nwo, fallbackHost string) (Interface, error) {
-	if git.IsURL(nwo) {
-		u, err := git.ParseURL(nwo)
-		if err != nil {
-			return nil, err
-		}
-		return FromURL(u)
+	repo, err := repository.ParseWithHost(nwo, defaultHost())
+	if err != nil {
+		return nil, err
 	}
-
-	parts := strings.SplitN(nwo, "/", 4)
-	for _, p := range parts {
-		if len(p) == 0 {
-			return nil, fmt.Errorf(`expected the "[HOST/]OWNER/REPO" format, got %q`, nwo)
-		}
-	}
-	switch len(parts) {
-	case 3:
-		return NewWithHost(parts[1], parts[2], parts[0]), nil
-	case 2:
-		return NewWithHost(parts[0], parts[1], fallbackHost), nil
-	default:
-		return nil, fmt.Errorf(`expected the "[HOST/]OWNER/REPO" format, got %q`, nwo)
-	}
+	return NewWithHost(repo.Owner(), repo.Name(), repo.Host()), nil
 }
 
 // FromURL extracts the GitHub repository information from a git remote URL

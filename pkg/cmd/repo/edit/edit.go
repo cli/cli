@@ -12,6 +12,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -48,6 +49,7 @@ type EditOptions struct {
 	AddTopics       []string
 	RemoveTopics    []string
 	InteractiveMode bool
+	Detector        fd.Detector
 	// Cache of current repo topics to avoid retrieving them
 	// in multiple flows.
 	topicsCache []string
@@ -158,9 +160,17 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 	repo := opts.Repository
 
 	if opts.InteractiveMode {
+		detector := opts.Detector
+		if detector == nil {
+			detector = fd.NewDetector(opts.HTTPClient, repo.RepoHost())
+		}
+		repoFeatures, err := detector.RepositoryFeatures()
+		if err != nil {
+			return err
+		}
+
 		apiClient := api.NewClientFromHTTP(opts.HTTPClient)
 		fieldsToRetrieve := []string{
-			"autoMergeAllowed",
 			"defaultBranchRef",
 			"deleteBranchOnMerge",
 			"description",
@@ -174,8 +184,14 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 			"rebaseMergeAllowed",
 			"repositoryTopics",
 			"squashMergeAllowed",
-			"visibility",
 		}
+		if repoFeatures.VisibilityField {
+			fieldsToRetrieve = append(fieldsToRetrieve, "visibility")
+		}
+		if repoFeatures.AutoMerge {
+			fieldsToRetrieve = append(fieldsToRetrieve, "autoMergeAllowed")
+		}
+
 		opts.IO.StartProgressIndicator()
 		fetchedRepo, err := api.FetchRepository(apiClient, opts.Repository, fieldsToRetrieve)
 		opts.IO.StopProgressIndicator()

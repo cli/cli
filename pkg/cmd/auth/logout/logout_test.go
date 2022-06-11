@@ -24,12 +24,9 @@ func Test_NewCmdLogout(t *testing.T) {
 		tty      bool
 	}{
 		{
-			name: "tty with hostname",
-			tty:  true,
-			cli:  "--hostname harry.mason",
-			wants: LogoutOptions{
-				Hostname: "harry.mason",
-			},
+			name:     "nontty no arguments",
+			cli:      "",
+			wantsErr: true,
 		},
 		{
 			name: "tty no arguments",
@@ -40,16 +37,19 @@ func Test_NewCmdLogout(t *testing.T) {
 			},
 		},
 		{
-			name: "nontty with hostname",
+			name: "tty with hostname",
+			tty:  true,
 			cli:  "--hostname harry.mason",
 			wants: LogoutOptions{
 				Hostname: "harry.mason",
 			},
 		},
 		{
-			name:     "nontty no arguments",
-			cli:      "",
-			wantsErr: true,
+			name: "nontty with hostname",
+			cli:  "--hostname harry.mason",
+			wants: LogoutOptions{
+				Hostname: "harry.mason",
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -107,17 +107,13 @@ func Test_logoutRun_tty(t *testing.T) {
 			wantHosts: "cheryl.mason:\n    oauth_token: abc123\n",
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubPrompt("What account do you want to log out of?").AnswerWith("github.com")
-				as.StubPrompt("Are you sure you want to log out of github.com account 'cybilb'?").AnswerWith(true)
 			},
 			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'cybilb'`),
 		},
 		{
-			name:     "no arguments, one host",
-			opts:     &LogoutOptions{},
-			cfgHosts: []string{"github.com"},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Are you sure you want to log out of github.com account 'cybilb'?").AnswerWith(true)
-			},
+			name:       "no arguments, one host",
+			opts:       &LogoutOptions{},
+			cfgHosts:   []string{"github.com"},
 			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'cybilb'`),
 		},
 		{
@@ -130,11 +126,8 @@ func Test_logoutRun_tty(t *testing.T) {
 			opts: &LogoutOptions{
 				Hostname: "cheryl.mason",
 			},
-			cfgHosts:  []string{"cheryl.mason", "github.com"},
-			wantHosts: "github.com:\n    oauth_token: abc123\n",
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Are you sure you want to log out of cheryl.mason account 'cybilb'?").AnswerWith(true)
-			},
+			cfgHosts:   []string{"cheryl.mason", "github.com"},
+			wantHosts:  "github.com:\n    oauth_token: abc123\n",
 			wantErrOut: regexp.MustCompile(`Logged out of cheryl.mason account 'cybilb'`),
 		},
 	}

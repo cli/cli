@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/cli/cli/v2/internal/config"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -393,4 +395,45 @@ func TestRepoList_filtering(t *testing.T) {
 
 	assert.Equal(t, "", output.Stderr())
 	assert.Equal(t, "\nNo results match your search\n\n", output.String())
+}
+
+func TestRepoList_noVisibilityField(t *testing.T) {
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(false)
+	ios.SetStdinTTY(false)
+	ios.SetStderrTTY(false)
+
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryList\b`),
+		httpmock.GraphQLQuery(`{"data":{"repositoryOwner":{"login":"octocat","repositories":{"totalCount":0}}}}`,
+			func(query string, params map[string]interface{}) {
+				assert.False(t, strings.Contains(query, "visibility"))
+			},
+		),
+	)
+
+	opts := ListOptions{
+		IO: ios,
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		Config: func() (config.Config, error) {
+			return config.InheritEnv(config.NewBlankConfig()), nil
+		},
+		Now: func() time.Time {
+			t, _ := time.Parse(time.RFC822, "19 Feb 21 15:00 UTC")
+			return t
+		},
+		Limit:    30,
+		Detector: &fd.DisabledDetectorMock{},
+	}
+
+	err := listRun(&opts)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "", stderr.String())
+	assert.Equal(t, "", stdout.String())
 }

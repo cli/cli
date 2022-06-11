@@ -146,10 +146,12 @@ func checksRun(opts *ChecksOptions) error {
 			return err
 		}
 
-		if counts.Pending != 0 && opts.Watch {
+		if opts.Watch {
 			refreshScreen(opts.IO.Out)
-			cs := opts.IO.ColorScheme()
-			fmt.Fprintln(opts.IO.Out, cs.Boldf("Refreshing checks status every %v seconds. Press Ctrl+C to quit.\n", opts.Interval.Seconds()))
+			if counts.Pending != 0 {
+				cs := opts.IO.ColorScheme()
+				fmt.Fprintln(opts.IO.Out, cs.Boldf("Refreshing checks status every %v seconds. Press Ctrl+C to quit.\n", opts.Interval.Seconds()))
+			}
 		}
 
 		printSummary(opts.IO, counts)

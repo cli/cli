@@ -51,7 +51,6 @@ type Qualifiers struct {
 	Merged              string
 	Milestone           string
 	No                  []string
-	Org                 string
 	Project             string
 	Pushed              string
 	Reactions           string
@@ -69,6 +68,7 @@ type Qualifiers struct {
 	Topics              string
 	Type                string
 	Updated             string
+	User                string
 }
 
 func (q Query) String() string {

@@ -208,8 +208,8 @@ func searchQuery(owner string, filter FilterOptions) string {
 			Fork:     fork,
 			Is:       []string{filter.Visibility},
 			Language: filter.Language,
-			Org:      owner,
 			Topic:    []string{filter.Topic},
+			User:     owner,
 		},
 	}
 

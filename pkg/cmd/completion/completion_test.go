@@ -54,7 +54,7 @@ func TestNewCmdCompletion(t *testing.T) {
 				t.Fatalf("argument splitting error: %v", err)
 			}
 			rootCmd.SetArgs(argv)
-			rootCmd.SetOut(stdout)
+			rootCmd.SetOut(stderr)
 			rootCmd.SetErr(stderr)
 
 			_, err = rootCmd.ExecuteC()

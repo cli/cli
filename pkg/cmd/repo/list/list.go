@@ -10,6 +10,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/text"
@@ -21,6 +22,7 @@ type ListOptions struct {
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	Exporter   cmdutil.Exporter
+	Detector   fd.Detector
 
 	Limit int
 	Owner string
@@ -104,26 +106,12 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	return cmd
 }
 
-var defaultFields = []string{"nameWithOwner", "description", "isPrivate", "isFork", "isArchived", "createdAt", "pushedAt", "visibility"}
+var defaultFields = []string{"nameWithOwner", "description", "isPrivate", "isFork", "isArchived", "createdAt", "pushedAt"}
 
 func listRun(opts *ListOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
-	}
-
-	filter := FilterOptions{
-		Visibility:  opts.Visibility,
-		Fork:        opts.Fork,
-		Source:      opts.Source,
-		Language:    opts.Language,
-		Topic:       opts.Topic,
-		Archived:    opts.Archived,
-		NonArchived: opts.NonArchived,
-		Fields:      defaultFields,
-	}
-	if opts.Exporter != nil {
-		filter.Fields = opts.Exporter.Fields()
 	}
 
 	cfg, err := opts.Config()
@@ -134,6 +122,33 @@ func listRun(opts *ListOptions) error {
 	host, err := cfg.DefaultHost()
 	if err != nil {
 		return err
+	}
+
+	if opts.Detector == nil {
+		opts.Detector = fd.NewDetector(httpClient, host)
+	}
+	features, err := opts.Detector.RepositoryFeatures()
+	if err != nil {
+		return err
+	}
+
+	fields := defaultFields
+	if features.VisibilityField {
+		fields = append(defaultFields, "visibility")
+	}
+
+	filter := FilterOptions{
+		Visibility:  opts.Visibility,
+		Fork:        opts.Fork,
+		Source:      opts.Source,
+		Language:    opts.Language,
+		Topic:       opts.Topic,
+		Archived:    opts.Archived,
+		NonArchived: opts.NonArchived,
+		Fields:      fields,
+	}
+	if opts.Exporter != nil {
+		filter.Fields = opts.Exporter.Fields()
 	}
 
 	listResult, err := listRepos(httpClient, host, opts.Limit, opts.Owner, filter)
@@ -158,7 +173,7 @@ func listRun(opts *ListOptions) error {
 		info := repoInfo(repo)
 		infoColor := cs.Gray
 
-		if repo.Visibility != "PUBLIC" {
+		if repo.IsPrivate {
 			infoColor = cs.Yellow
 		}
 
@@ -208,9 +223,7 @@ func listHeader(owner string, matchCount, totalMatchCount int, hasFilters bool) 
 }
 
 func repoInfo(r api.Repository) string {
-	tags := []string{
-		strings.ToLower(r.Visibility),
-	}
+	tags := []string{visibilityLabel(r)}
 
 	if r.IsFork {
 		tags = append(tags, "fork")
@@ -220,4 +233,13 @@ func repoInfo(r api.Repository) string {
 	}
 
 	return strings.Join(tags, ", ")
+}
+
+func visibilityLabel(repo api.Repository) string {
+	if repo.Visibility != "" {
+		return strings.ToLower(repo.Visibility)
+	} else if repo.IsPrivate {
+		return "private"
+	}
+	return "public"
 }

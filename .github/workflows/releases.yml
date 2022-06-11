@@ -39,7 +39,7 @@ jobs:
         env:
           CERT_CONTENTS: ${{ secrets.WINDOWS_CERT_PFX }}
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
+        uses: goreleaser/goreleaser-action@v3
         with:
           version: v0.174.1
           args: release --release-notes=CHANGELOG.md
@@ -218,18 +218,3 @@ jobs:
           GIT_AUTHOR_NAME: cli automation
           GIT_COMMITTER_EMAIL: noreply@github.com
           GIT_AUTHOR_EMAIL: noreply@github.com
-      - name: Bump Winget manifest
-        shell: pwsh
-        env:
-          WINGETCREATE_VERSION: v1.0.3.0
-          GITHUB_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
-        run: |
-          $tagname = $env:GITHUB_REF.Replace("refs/tags/", "")
-          $version = $tagname.Replace("v", "")
-          $url = "https://github.com/cli/cli/releases/download/${tagname}/gh_${version}_windows_amd64.msi"
-          iwr https://github.com/microsoft/winget-create/releases/download/${env:WINGETCREATE_VERSION}/wingetcreate.exe -OutFile wingetcreate.exe
-
-          .\wingetcreate.exe update GitHub.cli --url $url --version $version
-          if ($version -notmatch "-") {
-            .\wingetcreate.exe submit .\manifests\g\GitHub\cli\${version}\ --token $env:GITHUB_TOKEN
-          }

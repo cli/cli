@@ -20,20 +20,55 @@ func TestPullRequestFeatures(t *testing.T) {
 		{
 			name:     "github.com",
 			hostname: "github.com",
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`: heredoc.Doc(`
+					{ "data": { "PullRequest": { "fields": [
+						{"name": "isInMergeQueue"},
+						{"name": "isMergeQueueEnabled"}
+					] } } }
+				`),
+			},
 			wantFeatures: PullRequestFeatures{
 				ReviewDecision:       true,
 				StatusCheckRollup:    true,
 				BranchProtectionRule: true,
+				MergeQueue:           true,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "github.com with no merge queue",
+			hostname: "github.com",
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`: heredoc.Doc(`
+					{ "data": { "PullRequest": { "fields": [
+					] } } }
+				`),
+			},
+			wantFeatures: PullRequestFeatures{
+				ReviewDecision:       true,
+				StatusCheckRollup:    true,
+				BranchProtectionRule: true,
+				MergeQueue:           false,
 			},
 			wantErr: false,
 		},
 		{
 			name:     "GHE",
 			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`: heredoc.Doc(`
+					{ "data": { "PullRequest": { "fields": [
+						{"name": "isInMergeQueue"},
+						{"name": "isMergeQueueEnabled"}
+					] } } }
+				`),
+			},
 			wantFeatures: PullRequestFeatures{
 				ReviewDecision:       true,
 				StatusCheckRollup:    true,
 				BranchProtectionRule: true,
+				MergeQueue:           true,
 			},
 			wantErr: false,
 		},
@@ -72,6 +107,8 @@ func TestRepositoryFeatures(t *testing.T) {
 				IssueTemplateMutation:    true,
 				IssueTemplateQuery:       true,
 				PullRequestTemplateQuery: true,
+				VisibilityField:          true,
+				AutoMerge:                true,
 			},
 			wantErr: false,
 		},
@@ -102,6 +139,40 @@ func TestRepositoryFeatures(t *testing.T) {
 				IssueTemplateMutation:    true,
 				IssueTemplateQuery:       true,
 				PullRequestTemplateQuery: true,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "GHE has visibility field",
+			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query Repository_fields\b`: heredoc.Doc(`
+					{ "data": { "Repository": { "fields": [
+						{"name": "visibility"}
+					] } } }
+				`),
+			},
+			wantFeatures: RepositoryFeatures{
+				IssueTemplateMutation: true,
+				IssueTemplateQuery:    true,
+				VisibilityField:       true,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "GHE has automerge field",
+			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query Repository_fields\b`: heredoc.Doc(`
+					{ "data": { "Repository": { "fields": [
+						{"name": "autoMergeAllowed"}
+					] } } }
+				`),
+			},
+			wantFeatures: RepositoryFeatures{
+				IssueTemplateMutation: true,
+				IssueTemplateQuery:    true,
+				AutoMerge:             true,
 			},
 			wantErr: false,
 		},

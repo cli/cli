@@ -101,6 +101,22 @@ func TestNewCmdCreate(t *testing.T) {
 			wantsErr: true,
 			errMsg:   "the `--source` option is not supported with `--clone`, `--template`, `--license`, or `--gitignore`",
 		},
+		{
+			name:     "include all branches without template",
+			cli:      "--source=/path/to/repo --private --include-all-branches",
+			wantsErr: true,
+			errMsg:   "the `--include-all-branches` option is only supported when using `--template`",
+		},
+		{
+			name: "new remote from template with include all branches",
+			cli:  "template-repo --template https://github.com/OWNER/REPO --public --include-all-branches",
+			wantsOpts: CreateOptions{
+				Name:               "template-repo",
+				Public:             true,
+				Template:           "https://github.com/OWNER/REPO",
+				IncludeAllBranches: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
