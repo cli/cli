@@ -48,9 +48,8 @@ type MergeOptions struct {
 	UseAdmin                bool
 	IsDeleteBranchIndicated bool
 	CanDeleteLocalBranch    bool
-
-	Sha                string
-	MergeStrategyEmpty bool
+	MergeStrategyEmpty      bool
+	Sha                     string
 }
 
 // ErrAlreadyInMergeQueue indicates that the pull request is already in a merge queue
