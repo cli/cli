@@ -185,6 +185,13 @@ func forkRun(opts *ForkOptions) error {
 		return fmt.Errorf("failed to fork: %w", err)
 	}
 
+	// If the existing owner attempts to fork a repo that they own no error is returned
+	// from the API.  This explicit check provides better feedback in the form of an error and
+	// stops proceeding to renaming if specified using --fork-name
+	if ghrepo.FullName(repoToFork) == ghrepo.FullName(forkedRepo) {
+		return fmt.Errorf("%s can't be forked by the current owner", ghrepo.FullName(repoToFork))
+	}
+
 	// This is weird. There is not an efficient way to determine via the GitHub API whether or not a
 	// given user has forked a given repo. We noticed, also, that the create fork API endpoint just
 	// returns the fork repo data even if it already exists -- with no change in status code or
@@ -192,6 +199,7 @@ func forkRun(opts *ForkOptions) error {
 	// we assume the fork already existed and report an error.
 	createdAgo := opts.Since(forkedRepo.CreatedAt)
 	if createdAgo > time.Minute {
+
 		if connectedToTerminal {
 			fmt.Fprintf(stderr, "%s %s %s\n",
 				cs.Yellow("!"),

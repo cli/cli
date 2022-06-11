@@ -187,20 +187,22 @@ func TestNewCmdFork(t *testing.T) {
 }
 
 func TestRepoFork(t *testing.T) {
+	forkResult := `{
+		"node_id": "123",
+		"name": "REPO",
+		"clone_url": "https://github.com/someone/repo.git",
+		"created_at": "2011-01-26T19:01:12Z",
+		"owner": {
+			"login": "someone"
+		}
+	}`
+
 	forkPost := func(reg *httpmock.Registry) {
-		forkResult := `{
-			"node_id": "123",
-			"name": "REPO",
-			"clone_url": "https://github.com/someone/repo.git",
-			"created_at": "2011-01-26T19:01:12Z",
-			"owner": {
-				"login": "someone"
-			}
-		}`
 		reg.Register(
 			httpmock.REST("POST", "repos/OWNER/REPO/forks"),
 			httpmock.StringResponse(forkResult))
 	}
+
 	tests := []struct {
 		name       string
 		opts       *ForkOptions
@@ -326,6 +328,20 @@ func TestRepoFork(t *testing.T) {
 			httpStubs: forkPost,
 			wantErr:   true,
 			errMsg:    "a git remote named 'origin' already exists",
+		},
+		{
+			name: "implicit tty current owner forked",
+			tty:  true,
+			opts: &ForkOptions{
+				Repository: "someone/REPO",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("POST", "repos/someone/REPO/forks"),
+					httpmock.StringResponse(forkResult))
+			},
+			wantErr: true,
+			errMsg:  "someone/REPO can't be forked by the current owner",
 		},
 		{
 			name: "implicit tty already forked",
