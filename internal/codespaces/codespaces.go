@@ -38,6 +38,7 @@ type logger interface {
 func ConnectToLiveshare(ctx context.Context, progress progressIndicator, sessionLogger logger, apiClient apiClient, codespace *api.Codespace) (sess *liveshare.Session, err error) {
 	if codespace.State != api.CodespaceStateAvailable {
 		progress.StartProgressIndicatorWithLabel("Starting codespace")
+		defer progress.StopProgressIndicator()
 		if err := apiClient.StartCodespace(ctx, codespace.Name); err != nil {
 			return nil, fmt.Errorf("error starting codespace: %w", err)
 		}
