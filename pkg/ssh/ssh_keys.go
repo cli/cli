@@ -17,10 +17,16 @@ type SshContext struct {
 	KeygenExe string
 }
 
-type SshKeyPair struct {
+type KeyPair struct {
 	PublicKeyPath  string
 	PrivateKeyPath string
 }
+
+type KeyAlreadyExistsError struct {
+	keyPath string
+}
+
+func (err *KeyAlreadyExistsError) Error() string { return "SSH key already exists: " + err.keyPath }
 
 func (c *SshContext) LocalPublicKeys() ([]string, error) {
 	sshDir, err := c.sshDir()
@@ -36,24 +42,7 @@ func (c *SshContext) HasKeygen() bool {
 	return err == nil
 }
 
-type GenerateSSHKeyOptions struct {
-	noErrorOnExists  bool
-	promptPassphrase func() (string, error)
-}
-
-func WithNoErrorOnExistingKey() func(*GenerateSSHKeyOptions) {
-	return func(o *GenerateSSHKeyOptions) {
-		o.noErrorOnExists = true
-	}
-}
-
-func WithPassphrasePrompt(prompt func() (string, error)) func(*GenerateSSHKeyOptions) {
-	return func(o *GenerateSSHKeyOptions) {
-		o.promptPassphrase = prompt
-	}
-}
-
-func (c *SshContext) GenerateSSHKey(keyName string, configureOptions ...func(*GenerateSSHKeyOptions)) (*SshKeyPair, error) {
+func (c *SshContext) GenerateSSHKey(keyName string, passphrase string) (*KeyPair, error) {
 	keygenExe, err := c.findKeygen()
 	if err != nil {
 		return nil, fmt.Errorf("could not find keygen executable")
@@ -64,37 +53,21 @@ func (c *SshContext) GenerateSSHKey(keyName string, configureOptions ...func(*Ge
 		return nil, err
 	}
 	keyFile := filepath.Join(sshDir, keyName)
-	keyPair := SshKeyPair{
+	keyPair := KeyPair{
 		PublicKeyPath:  keyFile + ".pub",
 		PrivateKeyPath: keyFile,
 	}
 
-	opts := GenerateSSHKeyOptions{}
-	for _, configure := range configureOptions {
-		configure(&opts)
-	}
-
 	if _, err := os.Stat(keyFile); err == nil {
-		if opts.noErrorOnExists {
-			return &keyPair, nil
-		} else {
-			return nil, fmt.Errorf("refusing to overwrite file %s", keyFile)
-		}
+		// Still return keyPair because the caller might be OK with they - they can check the error with
+		return &keyPair, &KeyAlreadyExistsError{keyFile}
 	}
 
 	if err := os.MkdirAll(filepath.Dir(keyFile), 0711); err != nil {
 		return nil, err
 	}
 
-	var sshPassphrase string
-	if opts.promptPassphrase != nil {
-		sshPassphrase, err = opts.promptPassphrase()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	keygenCmd := exec.Command(keygenExe, "-t", "ed25519", "-C", "", "-N", sshPassphrase, "-f", keyFile)
+	keygenCmd := exec.Command(keygenExe, "-t", "ed25519", "-C", "", "-N", passphrase, "-f", keyFile)
 	err = run.PrepareCmd(keygenCmd).Run()
 	if err != nil {
 		return nil, err

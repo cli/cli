@@ -122,16 +122,16 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 
 	sshContext := ssh.SshContext{}
-	startSshServerOpts := []func(*liveshare.StartSSHServerOptions){}
+	startSSHOptions := liveshare.StartSSHServerOptions{}
 
 	if shouldGenerateSSHKeys(args, opts) && sshContext.HasKeygen() {
-		keyPair, err := sshContext.GenerateSSHKey("codespaces", ssh.WithNoErrorOnExistingKey())
+		keyPair, err := sshContext.GenerateSSHKey("codespaces", "")
 		if err != nil {
 			return fmt.Errorf("failed to generate ssh keys: %s", err)
 		}
 
-		startSshServerOpts = append(startSshServerOpts, liveshare.WithUserPublicKeyFile(keyPair.PublicKeyPath))
-		// For cp, any flags need to come before the file paths, so we need to prepend here
+		startSSHOptions.UserPublicKeyFile = keyPair.PublicKeyPath
+		// For both cp and ssh, flags need to come first in the args (before a command in ssh and files in cp), so prepend this flag
 		args = append([]string{"-i", keyPair.PrivateKeyPath}, args...)
 	}
 
@@ -147,7 +147,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	defer safeClose(session, &err)
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx, startSshServerOpts...)
+	remoteSSHServerPort, sshUser, err := session.StartSSHServerWithOptions(ctx, startSSHOptions)
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
@@ -209,7 +209,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 
 func shouldGenerateSSHKeys(args []string, opts sshOptions) bool {
 	if opts.profile != "" {
-		// The profile may specify the identity file so cautiously don't override that option
+		// The profile may specify the identity file so cautiously don't override anything with that option
 		return false
 	}
 
@@ -219,7 +219,10 @@ func shouldGenerateSSHKeys(args []string, opts sshOptions) bool {
 			return false
 		}
 
-		// TODO: should -F have similar behavior?
+		if arg == "-F" {
+			// User specified a config file so, similar to profile, cautiously don't override settings
+			return false
+		}
 	}
 
 	return true
@@ -271,7 +274,6 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 			} else {
 				defer safeClose(session, &err)
 
-				// Pass empty key here because it doesn't actually connect to SSH
 				_, result.user, err = session.StartSSHServer(ctx)
 				if err != nil {
 					result.err = fmt.Errorf("error getting ssh server details: %w", err)

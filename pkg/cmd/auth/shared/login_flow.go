@@ -104,7 +104,12 @@ func Login(opts *LoginOptions) error {
 			}
 
 			if sshChoice {
-				keyPair, err := opts.sshContext.GenerateSSHKey("id_ed25519", ssh.WithPassphrasePrompt(promptForSshKeyPassphrase))
+				passphrase, err := promptForSshKeyPassphrase()
+				if err != nil {
+					return err
+				}
+
+				keyPair, err := opts.sshContext.GenerateSSHKey("id_ed25519", passphrase)
 				if err != nil {
 					return err
 				}

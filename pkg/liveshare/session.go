@@ -30,7 +30,7 @@ type Session struct {
 }
 
 type StartSSHServerOptions struct {
-	userPublicKeyFile string
+	UserPublicKeyFile string
 }
 
 // Close should be called by users to clean up RPC and SSH resources whenever the session
@@ -52,15 +52,15 @@ func (s *Session) registerRequestHandler(requestType string, h handler) func() {
 	return s.rpc.register(requestType, h)
 }
 
-func WithUserPublicKeyFile(path string) func(opts *StartSSHServerOptions) {
-	return func(opts *StartSSHServerOptions) {
-		opts.userPublicKeyFile = path
-	}
-}
-
 // StartSSHServer starts an SSH server in the container, installing sshd if necessary, applies specified
 // options, and returns the port on which it listens and the user name clients should provide.
-func (s *Session) StartSSHServer(ctx context.Context, configureOptions ...func(*StartSSHServerOptions)) (int, string, error) {
+func (s *Session) StartSSHServer(ctx context.Context) (int, string, error) {
+	return s.StartSSHServerWithOptions(ctx, StartSSHServerOptions{})
+}
+
+// StartSSHServerWithOptions starts an SSH server in the container, installing sshd if necessary, applies specified
+// options, and returns the port on which it listens and the user name clients should provide.
+func (s *Session) StartSSHServerWithOptions(ctx context.Context, options StartSSHServerOptions) (int, string, error) {
 	var params struct {
 		UserPublicKey string `json:"userPublicKey"`
 	}
@@ -72,13 +72,8 @@ func (s *Session) StartSSHServer(ctx context.Context, configureOptions ...func(*
 		Message    string `json:"message"`
 	}
 
-	opts := StartSSHServerOptions{}
-	for _, configure := range configureOptions {
-		configure(&opts)
-	}
-
-	if opts.userPublicKeyFile != "" {
-		publicKeyBytes, err := os.ReadFile(opts.userPublicKeyFile)
+	if options.UserPublicKeyFile != "" {
+		publicKeyBytes, err := os.ReadFile(options.UserPublicKeyFile)
 		if err != nil {
 			return 0, "", fmt.Errorf("failed to read public key file: %s", err)
 		}

@@ -68,7 +68,8 @@ type liveshareSession interface {
 	OpenStreamingChannel(context.Context, liveshare.ChannelID) (ssh.Channel, error)
 	StartJupyterServer(context.Context) (int, string, error)
 	StartSharing(context.Context, string, int) (liveshare.ChannelID, error)
-	StartSSHServer(context.Context, ...func(*liveshare.StartSSHServerOptions)) (int, string, error)
+	StartSSHServer(context.Context) (int, string, error)
+	StartSSHServerWithOptions(context.Context, liveshare.StartSSHServerOptions) (int, string, error)
 }
 
 // Connects to a codespace using Live Share and returns that session
