@@ -127,7 +127,9 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	if shouldGenerateSSHKeys(args, opts) && sshContext.HasKeygen() {
 		keyPair, err := sshContext.GenerateSSHKey("codespaces", "")
 		if err != nil {
-			return fmt.Errorf("failed to generate ssh keys: %s", err)
+			if _, ok := err.(*ssh.KeyAlreadyExistsError); !ok {
+				return fmt.Errorf("failed to generate ssh keys: %s", err)
+			}
 		}
 
 		startSSHOptions.UserPublicKeyFile = keyPair.PublicKeyPath
