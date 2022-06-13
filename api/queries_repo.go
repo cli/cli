@@ -517,6 +517,13 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, e
 		return nil, err
 	}
 
+	// If the existing owner attempts to fork a repo that they own no error is returned
+	// from the API.  This explicit check provides better feedback in the form of an error and
+	// stops proceeding to renaming if specified using --fork-name
+	if strings.EqualFold(ghrepo.FullName(repo), fmt.Sprintf("%s/%s", result.Owner.Login, result.Name)) {
+		return nil, fmt.Errorf("%s can't be forked by the current owner", ghrepo.FullName(repo))
+	}
+
 	return &Repository{
 		ID:        result.NodeID,
 		Name:      result.Name,

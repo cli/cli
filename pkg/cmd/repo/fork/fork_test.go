@@ -341,7 +341,7 @@ func TestRepoFork(t *testing.T) {
 					httpmock.StringResponse(forkResult))
 			},
 			wantErr: true,
-			errMsg:  "someone/REPO can't be forked by the current owner",
+			errMsg:  "failed to fork: someone/REPO can't be forked by the current owner",
 		},
 		{
 			name: "implicit tty already forked",
