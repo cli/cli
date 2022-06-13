@@ -36,7 +36,12 @@ type progressIndicator interface {
 	StopProgressIndicator()
 }
 
-type statusChecker func(progressIndicator, codespaces.LiveshareApiClient, context.Context, *api.Codespace) error
+type liveshareApiClient interface {
+	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
+	StartCodespace(ctx context.Context, name string) error
+}
+
+type statusChecker func(progressIndicator, liveshareApiClient, context.Context, *api.Codespace) error
 type sshClient func(app *App, ctx context.Context, sshArgs []string, opts sshOptions) (err error)
 
 type App struct {
