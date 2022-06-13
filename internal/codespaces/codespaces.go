@@ -18,7 +18,7 @@ func connectionReady(codespace *api.Codespace) bool {
 		codespace.State == api.CodespaceStateAvailable
 }
 
-type liveshareApiClient interface {
+type apiClient interface {
 	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
 	StartCodespace(ctx context.Context, name string) error
 }
@@ -35,7 +35,7 @@ type logger interface {
 
 // ConnectToLiveshare waits for a Codespace to become running,
 // and connects to it using a Live Share session.
-func ConnectToLiveshare(ctx context.Context, progress progressIndicator, sessionLogger logger, apiClient liveshareApiClient, codespace *api.Codespace) (sess *liveshare.Session, err error) {
+func ConnectToLiveshare(ctx context.Context, progress progressIndicator, sessionLogger logger, apiClient apiClient, codespace *api.Codespace) (sess *liveshare.Session, err error) {
 	if codespace.State != api.CodespaceStateAvailable {
 		progress.StartProgressIndicatorWithLabel("Starting codespace")
 		defer progress.StopProgressIndicator()
