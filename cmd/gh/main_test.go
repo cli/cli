@@ -81,38 +81,38 @@ check your internet connection or https://githubstatus.com
 
 func Test_printNoAuthHelp(t *testing.T) {
 	orig_CI := os.Getenv("CI")
-	orig_GITHUB_ACTION := os.Getenv("GITHUB_ACTION")
+	orig_GITHUB_ACTIONS := os.Getenv("GITHUB_ACTIONS")
 	t.Cleanup(func() {
 		os.Setenv("CI", orig_CI)
-		os.Setenv("GITHUB_ACTION", orig_GITHUB_ACTION)
+		os.Setenv("GITHUB_ACTIONS", orig_GITHUB_ACTIONS)
 	})
 	tests := []struct {
-		name          string
-		CI            string
-		GITHUB_ACTION string
-		wantOut       string
+		name           string
+		CI             string
+		GITHUB_ACTIONS string
+		wantOut        string
 	}{
 		{
-			name:          "Interactive",
-			CI:            "",
-			GITHUB_ACTION: "",
+			name:           "Interactive",
+			CI:             "",
+			GITHUB_ACTIONS: "",
 			wantOut: `Welcome to GitHub CLI!
 
 To authenticate, please run ` + "`gh auth login`.\n",
 		},
 		{
-			name:          "Non-Interactive, not a GitHub Action",
-			CI:            "true",
-			GITHUB_ACTION: "",
+			name:           "Non-Interactive, not a GitHub Action",
+			CI:             "true",
+			GITHUB_ACTIONS: "",
 			wantOut: "Either `GH_TOKEN` or `GITHUB_TOKEN` must be set to use `gh` in this CI environment." + `
 
 Please consult the relevant documentation for setting these environment variables.
 `,
 		},
 		{
-			name:          "GitHub Action",
-			CI:            "true",
-			GITHUB_ACTION: "__run",
+			name:           "GitHub Action",
+			CI:             "true",
+			GITHUB_ACTIONS: "true",
 			wantOut: "Either `GH_TOKEN` or `GITHUB_TOKEN` must be set to use `gh` in a GitHub Action." + `
 
 Example:
@@ -128,7 +128,7 @@ env:
 			out := &bytes.Buffer{}
 			cs := &iostreams.ColorScheme{}
 			os.Setenv("CI", tt.CI)
-			os.Setenv("GITHUB_ACTION", tt.GITHUB_ACTION)
+			os.Setenv("GITHUB_ACTIONS", tt.GITHUB_ACTIONS)
 			printNoAuthHelp(out, cs)
 			if gotOut := out.String(); gotOut != tt.wantOut {
 				t.Errorf("printNoAuthHelp() = %q, want %q", gotOut, tt.wantOut)

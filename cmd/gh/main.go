@@ -325,7 +325,7 @@ func printNoAuthHelp(out io.Writer, cs *iostreams.ColorScheme) {
 	var helpMessage string
 	if os.Getenv("CI") == "true" {
 		helpMessage = "Either `GH_TOKEN` or `GITHUB_TOKEN` must be set to use `gh`"
-		if os.Getenv("GITHUB_ACTION") != "" {
+		if os.Getenv("GITHUB_ACTIONS") == "true" {
 			helpMessage += heredoc.Doc(`
 				 in a GitHub Action.
 
