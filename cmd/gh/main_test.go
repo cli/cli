@@ -104,7 +104,7 @@ To authenticate, please run ` + "`gh auth login`.\n",
 			name:           "Non-Interactive, not a GitHub Action",
 			CI:             "true",
 			GITHUB_ACTIONS: "",
-			wantOut: "Either `GH_TOKEN` or `GITHUB_TOKEN` must be set to use `gh` in this CI environment." + `
+			wantOut: "`GH_TOKEN` must be set to use `gh` in this CI environment." + `
 
 Please consult the relevant documentation for setting these environment variables.
 `,
@@ -113,7 +113,7 @@ Please consult the relevant documentation for setting these environment variable
 			name:           "GitHub Action",
 			CI:             "true",
 			GITHUB_ACTIONS: "true",
-			wantOut: "Either `GH_TOKEN` or `GITHUB_TOKEN` must be set to use `gh` in a GitHub Action." + `
+			wantOut: "`GH_TOKEN` must be set to use `gh` in a GitHub Action." + `
 
 Example:
 
