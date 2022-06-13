@@ -37,7 +37,7 @@ type LoginOptions struct {
 	Executable  string
 	GitProtocol string
 
-	sshContext ssh.SshContext
+	sshContext ssh.Context
 }
 
 func Login(opts *LoginOptions) error {

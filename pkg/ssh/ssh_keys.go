@@ -12,7 +12,7 @@ import (
 	"github.com/cli/safeexec"
 )
 
-type SshContext struct {
+type Context struct {
 	ConfigDir string
 	KeygenExe string
 }
@@ -28,7 +28,7 @@ type KeyAlreadyExistsError struct {
 
 func (err *KeyAlreadyExistsError) Error() string { return "SSH key already exists: " + err.keyPath }
 
-func (c *SshContext) LocalPublicKeys() ([]string, error) {
+func (c *Context) LocalPublicKeys() ([]string, error) {
 	sshDir, err := c.sshDir()
 	if err != nil {
 		return nil, err
@@ -37,12 +37,12 @@ func (c *SshContext) LocalPublicKeys() ([]string, error) {
 	return filepath.Glob(filepath.Join(sshDir, "*.pub"))
 }
 
-func (c *SshContext) HasKeygen() bool {
+func (c *Context) HasKeygen() bool {
 	_, err := c.findKeygen()
 	return err == nil
 }
 
-func (c *SshContext) GenerateSSHKey(keyName string, passphrase string) (*KeyPair, error) {
+func (c *Context) GenerateSSHKey(keyName string, passphrase string) (*KeyPair, error) {
 	keygenExe, err := c.findKeygen()
 	if err != nil {
 		return nil, fmt.Errorf("could not find keygen executable")
@@ -76,7 +76,7 @@ func (c *SshContext) GenerateSSHKey(keyName string, passphrase string) (*KeyPair
 	return &keyPair, nil
 }
 
-func (c *SshContext) sshDir() (string, error) {
+func (c *Context) sshDir() (string, error) {
 	if c.ConfigDir != "" {
 		return c.ConfigDir, nil
 	}
@@ -87,7 +87,7 @@ func (c *SshContext) sshDir() (string, error) {
 	return dir, err
 }
 
-func (c *SshContext) findKeygen() (string, error) {
+func (c *Context) findKeygen() (string, error) {
 	if c.KeygenExe != "" {
 		return c.KeygenExe, nil
 	}

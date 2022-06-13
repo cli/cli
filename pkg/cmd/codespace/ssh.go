@@ -121,7 +121,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		args = opts.scpArgs
 	}
 
-	sshContext := ssh.SshContext{}
+	sshContext := ssh.Context{}
 	startSSHOptions := liveshare.StartSSHServerOptions{}
 
 	if shouldGenerateSSHKeys(args, opts) && sshContext.HasKeygen() {
