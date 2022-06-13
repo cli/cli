@@ -324,22 +324,21 @@ func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
 func printNoAuthHelp(out io.Writer, cs *iostreams.ColorScheme) {
 	var helpMessage string
 	if os.Getenv("CI") == "true" {
-		helpMessage = "`GH_TOKEN` must be set to use `gh`"
 		if os.Getenv("GITHUB_ACTIONS") == "true" {
-			helpMessage += heredoc.Doc(`
-				 in a GitHub Action.
+			helpMessage = heredoc.Docf(`
+				%s must be set to use %s in a GitHub Action.
 
 				Example:
 
 				env:
 				  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-			`)
+			`, "`GH_TOKEN`", "`gh`")
 		} else {
-			helpMessage += heredoc.Doc(`
-				 in this CI environment.
+			helpMessage = heredoc.Docf(`
+				%s must be set to use %s in this CI environment.
 
 				Please consult the relevant documentation for setting these environment variables.
-			`)
+			`, "`GH_TOKEN`", "`gh`")
 		}
 	} else {
 		helpMessage = heredoc.Docf(`
