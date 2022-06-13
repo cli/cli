@@ -433,7 +433,7 @@ func TestCreateAndSsh(t *testing.T) {
 		sshClient: func(*App, context.Context, []string, sshOptions) error {
 			return nil
 		},
-		statusChecker: func(progressIndicator, liveshareApiClient, context.Context, *api.Codespace) error {
+		statusChecker: func(context.Context, progressIndicator, liveshareApiClient, *api.Codespace) error {
 			return nil
 		},
 	}

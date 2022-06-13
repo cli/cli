@@ -41,7 +41,7 @@ type liveshareApiClient interface {
 	StartCodespace(ctx context.Context, name string) error
 }
 
-type statusChecker func(progressIndicator, liveshareApiClient, context.Context, *api.Codespace) error
+type statusChecker func(context.Context, progressIndicator, liveshareApiClient, *api.Codespace) error
 type sshClient func(app *App, ctx context.Context, sshArgs []string, opts sshOptions) (err error)
 
 type App struct {
@@ -79,7 +79,7 @@ func (a *App) StopProgressIndicator() {
 }
 
 func (a *App) showStatus(ctx context.Context, codespace *api.Codespace) error {
-	return a.statusChecker(a.io, a.apiClient, ctx, codespace)
+	return a.statusChecker(ctx, a.io, a.apiClient, codespace)
 }
 
 type liveshareSession interface {
