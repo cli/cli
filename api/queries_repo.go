@@ -517,14 +517,7 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, e
 		return nil, err
 	}
 
-	// If the existing owner attempts to fork a repo that they own no error is returned
-	// from the API.  This explicit check provides better feedback in the form of an error and
-	// stops proceeding to renaming if specified using --fork-name
-	if strings.EqualFold(ghrepo.FullName(repo), fmt.Sprintf("%s/%s", result.Owner.Login, result.Name)) {
-		return nil, fmt.Errorf("%s can't be forked by the current owner", ghrepo.FullName(repo))
-	}
-
-	return &Repository{
+	newRepo := &Repository{
 		ID:        result.NodeID,
 		Name:      result.Name,
 		CreatedAt: result.CreatedAt,
@@ -533,7 +526,15 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, e
 		},
 		ViewerPermission: "WRITE",
 		hostname:         repo.RepoHost(),
-	}, nil
+	}
+
+	// The GitHub API will happily return a HTTP 200 when attempting to fork own repo even though no forking
+	// actually took place. Ensure that we raise an error instead.
+	if ghrepo.IsSame(repo, newRepo) {
+		return newRepo, fmt.Errorf("%s cannot be forked", ghrepo.FullName(repo))
+	}
+
+	return newRepo, nil
 }
 
 // RenameRepo renames the repository on GitHub and returns the renamed repository
