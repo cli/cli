@@ -601,7 +601,6 @@ func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 		submitLabel            = "Submit"
 		editCommitSubjectLabel = "Edit commit subject"
 		editCommitMsgLabel     = "Edit commit message"
-		shaCheckLabel          = "Check SHA before merge"
 		cancelLabel            = "Cancel"
 	)
 
@@ -609,7 +608,6 @@ func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 	if allowEditMsg {
 		options = append(options, editCommitSubjectLabel, editCommitMsgLabel)
 	}
-	options = append(options, shaCheckLabel)
 	options = append(options, cancelLabel)
 
 	var result string
@@ -629,8 +627,6 @@ func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 		return shared.EditCommitSubjectAction, nil
 	case editCommitMsgLabel:
 		return shared.EditCommitMessageAction, nil
-	case shaCheckLabel:
-		return shared.ShaCheckAction, nil
 	default:
 		return shared.CancelAction, nil
 	}
@@ -670,12 +666,6 @@ func confirmSubmission(client *http.Client, opts *MergeOptions, action shared.Ac
 		}
 
 		return false, nil
-
-	case shared.ShaCheckAction:
-		prompt := &survey.Input{Message: "Sha to check:"}
-		err = survey.AskOne(prompt, &payload.expectedHeadOid)
-
-		return false, err
 
 	case shared.CancelAction:
 		fmt.Fprintln(opts.IO.ErrOut, "Cancelled.")

@@ -24,7 +24,6 @@ const (
 	EditCommitMessageAction
 	EditCommitSubjectAction
 	SubmitDraftAction
-	ShaCheckAction
 
 	noMilestone = "(none)"
 
