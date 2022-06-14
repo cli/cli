@@ -11,12 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func newTestHTTPClient(reg *httpmock.Registry) *http.Client {
-	client := &http.Client{}
-	httpmock.ReplaceTripper(client, reg)
-	return client
-}
-
 func newTestClient(reg *httpmock.Registry) *Client {
 	client := &http.Client{}
 	httpmock.ReplaceTripper(client, reg)
