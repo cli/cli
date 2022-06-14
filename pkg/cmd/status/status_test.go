@@ -371,7 +371,7 @@ func TestStatusRun(t *testing.T) {
 					httpmock.StringResponse(`[]`))
 			},
 			opts:       &StatusOptions{},
-			wantErrMsg: "failed to search: could not search for assignments: GQL: Not found. (assignments.nodes.0)",
+			wantErrMsg: "failed to search: could not search for assignments: GraphQL: Not found. (assignments.nodes.0)",
 		},
 	}
 

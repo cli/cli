@@ -43,7 +43,7 @@ func TestNewHTTPClient(t *testing.T) {
 			wantHeader: map[string]string{
 				"authorization": "token MYTOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
-				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview, application/vnd.github.antiope-preview, application/vnd.github.shadow-cat-preview",
+				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
 			},
 			wantStderr: "",
 		},
@@ -73,7 +73,7 @@ func TestNewHTTPClient(t *testing.T) {
 			wantHeader: map[string]string{
 				"authorization": "",
 				"user-agent":    "GitHub CLI v1.2.3",
-				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview, application/vnd.github.antiope-preview, application/vnd.github.shadow-cat-preview",
+				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
 			},
 			wantStderr: "",
 		},
@@ -90,14 +90,14 @@ func TestNewHTTPClient(t *testing.T) {
 			wantHeader: map[string]string{
 				"authorization": "token MYTOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
-				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview, application/vnd.github.antiope-preview, application/vnd.github.shadow-cat-preview",
+				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
 			},
 			wantStderr: heredoc.Doc(`
 				* Request at <time>
 				* Request to http://<host>:<port>
 				> GET / HTTP/1.1
 				> Host: github.com
-				> Accept: application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview, application/vnd.github.antiope-preview, application/vnd.github.shadow-cat-preview
+				> Accept: application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview
 				> Authorization: token ████████████████████
 				> Content-Type: application/json; charset=utf-8
 				> Time-Zone: <timezone>
@@ -122,14 +122,14 @@ func TestNewHTTPClient(t *testing.T) {
 			wantHeader: map[string]string{
 				"authorization": "token MYTOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
-				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview, application/vnd.github.antiope-preview, application/vnd.github.shadow-cat-preview",
+				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
 			},
 			wantStderr: heredoc.Doc(`
 				* Request at <time>
 				* Request to http://<host>:<port>
 				> GET / HTTP/1.1
 				> Host: github.com
-				> Accept: application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview, application/vnd.github.antiope-preview, application/vnd.github.shadow-cat-preview
+				> Accept: application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview
 				> Authorization: token ████████████████████
 				> Content-Type: application/json; charset=utf-8
 				> Time-Zone: <timezone>
@@ -152,7 +152,7 @@ func TestNewHTTPClient(t *testing.T) {
 			wantHeader: map[string]string{
 				"authorization": "token GHETOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
-				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview, application/vnd.github.antiope-preview, application/vnd.github.shadow-cat-preview",
+				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
 			},
 			wantStderr: "",
 		},

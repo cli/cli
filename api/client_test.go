@@ -11,21 +11,21 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func NewTestHTTPClient(reg *httpmock.Registry) *http.Client {
-	client := http.DefaultClient
+func newTestHTTPClient(reg *httpmock.Registry) *http.Client {
+	client := &http.Client{}
 	httpmock.ReplaceTripper(client, reg)
 	return client
 }
 
-func NewTestClient(reg *httpmock.Registry) *Client {
-	client := http.DefaultClient
+func newTestClient(reg *httpmock.Registry) *Client {
+	client := &http.Client{}
 	httpmock.ReplaceTripper(client, reg)
 	return NewClientFromHTTP(client)
 }
 
 func TestGraphQL(t *testing.T) {
 	http := &httpmock.Registry{}
-	client := NewTestClient(http)
+	client := newTestClient(http)
 
 	vars := map[string]interface{}{"name": "Mona"}
 	response := struct {
@@ -50,7 +50,7 @@ func TestGraphQL(t *testing.T) {
 
 func TestGraphQLError(t *testing.T) {
 	reg := &httpmock.Registry{}
-	client := NewTestClient(reg)
+	client := newTestClient(reg)
 
 	response := struct{}{}
 
@@ -74,14 +74,14 @@ func TestGraphQLError(t *testing.T) {
 	)
 
 	err := client.GraphQL("github.com", "", nil, &response)
-	if err == nil || err.Error() != "GQL: OH NO (repository.issue), this is fine (repository.issues.0.comments)" {
+	if err == nil || err.Error() != "GraphQL: OH NO (repository.issue), this is fine (repository.issues.0.comments)" {
 		t.Fatalf("got %q", err.Error())
 	}
 }
 
 func TestRESTGetDelete(t *testing.T) {
 	http := &httpmock.Registry{}
-	client := NewTestClient(http)
+	client := newTestClient(http)
 
 	http.Register(
 		httpmock.REST("DELETE", "applications/CLIENTID/grant"),
@@ -95,7 +95,7 @@ func TestRESTGetDelete(t *testing.T) {
 
 func TestRESTWithFullURL(t *testing.T) {
 	http := &httpmock.Registry{}
-	client := NewTestClient(http)
+	client := newTestClient(http)
 
 	http.Register(
 		httpmock.REST("GET", "api/v3/user/repos"),
@@ -115,7 +115,7 @@ func TestRESTWithFullURL(t *testing.T) {
 
 func TestRESTError(t *testing.T) {
 	fakehttp := &httpmock.Registry{}
-	client := NewTestClient(fakehttp)
+	client := newTestClient(fakehttp)
 
 	fakehttp.Register(httpmock.MatchAny, func(req *http.Request) (*http.Response, error) {
 		return &http.Response{

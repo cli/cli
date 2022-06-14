@@ -76,7 +76,7 @@ func TestPullRequestFeatures(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
-			httpClient := http.DefaultClient
+			httpClient := &http.Client{}
 			httpmock.ReplaceTripper(httpClient, reg)
 			for query, resp := range tt.queryResponse {
 				reg.Register(httpmock.GraphQL(query), httpmock.StringResponse(resp))
@@ -182,7 +182,7 @@ func TestRepositoryFeatures(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
-			httpClient := http.DefaultClient
+			httpClient := &http.Client{}
 			httpmock.ReplaceTripper(httpClient, reg)
 			for query, resp := range tt.queryResponse {
 				reg.Register(httpmock.GraphQL(query), httpmock.StringResponse(resp))

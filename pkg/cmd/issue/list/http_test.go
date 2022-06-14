@@ -15,7 +15,7 @@ import (
 
 func TestIssueList(t *testing.T) {
 	reg := &httpmock.Registry{}
-	httpClient := http.DefaultClient
+	httpClient := &http.Client{}
 	httpmock.ReplaceTripper(httpClient, reg)
 	client := api.NewClientFromHTTP(httpClient)
 
@@ -86,7 +86,7 @@ func TestIssueList(t *testing.T) {
 
 func TestIssueList_pagination(t *testing.T) {
 	reg := &httpmock.Registry{}
-	httpClient := http.DefaultClient
+	httpClient := &http.Client{}
 	httpmock.ReplaceTripper(httpClient, reg)
 	client := api.NewClientFromHTTP(httpClient)
 

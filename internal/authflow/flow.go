@@ -71,7 +71,7 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 	w := IO.ErrOut
 	cs := IO.ColorScheme()
 
-	httpClient := http.DefaultClient
+	httpClient := &http.Client{}
 	debugEnabled, debugValue := utils.IsDebugEnabled()
 	if debugEnabled {
 		logTraffic := strings.Contains(debugValue, "api")

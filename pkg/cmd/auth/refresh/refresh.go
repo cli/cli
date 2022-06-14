@@ -39,7 +39,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			_, err := authflow.AuthFlowWithConfig(cfg, io, hostname, "", scopes, interactive)
 			return err
 		},
-		httpClient: http.DefaultClient,
+		httpClient: &http.Client{},
 	}
 
 	cmd := &cobra.Command{

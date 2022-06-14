@@ -165,7 +165,7 @@ func TestIssueDelete_doesNotExist(t *testing.T) {
 	)
 
 	_, err := runCommand(httpRegistry, true, "13")
-	if err == nil || err.Error() != "GQL: Could not resolve to an Issue with the number of 13." {
+	if err == nil || err.Error() != "GraphQL: Could not resolve to an Issue with the number of 13." {
 		t.Errorf("error running command `issue delete`: %v", err)
 	}
 }

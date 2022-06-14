@@ -73,7 +73,7 @@ func TestCheckForUpdate(t *testing.T) {
 	for _, s := range scenarios {
 		t.Run(s.Name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
-			httpClient := http.DefaultClient
+			httpClient := &http.Client{}
 			httpmock.ReplaceTripper(httpClient, reg)
 			client := api.NewClientFromHTTP(httpClient)
 
