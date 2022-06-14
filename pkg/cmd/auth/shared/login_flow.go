@@ -106,7 +106,7 @@ func Login(opts *LoginOptions) error {
 			if sshChoice {
 				passphrase, err := promptForSshKeyPassphrase()
 				if err != nil {
-					return err
+					return fmt.Errorf("could not prompt for key passphrase: %w", err)
 				}
 
 				keyPair, err := opts.sshContext.GenerateSSHKey("id_ed25519", passphrase)
@@ -235,8 +235,9 @@ func promptForSshKeyPassphrase() (string, error) {
 	err := prompt.SurveyAskOne(&survey.Password{
 		Message: "Enter a passphrase for your new SSH key (Optional)",
 	}, &sshPassphrase)
+
 	if err != nil {
-		return "", fmt.Errorf("could not prompt: %w", err)
+		return "", err
 	}
 
 	return sshPassphrase, nil

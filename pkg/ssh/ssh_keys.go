@@ -1,7 +1,7 @@
 package ssh
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,11 +22,7 @@ type KeyPair struct {
 	PrivateKeyPath string
 }
 
-type KeyAlreadyExistsError struct {
-	keyPath string
-}
-
-func (err *KeyAlreadyExistsError) Error() string { return "SSH key already exists: " + err.keyPath }
+var ErrKeyAlreadyExists = errors.New("SSH key already exists")
 
 func (c *Context) LocalPublicKeys() ([]string, error) {
 	sshDir, err := c.sshDir()
@@ -45,7 +41,7 @@ func (c *Context) HasKeygen() bool {
 func (c *Context) GenerateSSHKey(keyName string, passphrase string) (*KeyPair, error) {
 	keygenExe, err := c.findKeygen()
 	if err != nil {
-		return nil, fmt.Errorf("could not find keygen executable")
+		return nil, err
 	}
 
 	sshDir, err := c.sshDir()
@@ -59,8 +55,8 @@ func (c *Context) GenerateSSHKey(keyName string, passphrase string) (*KeyPair, e
 	}
 
 	if _, err := os.Stat(keyFile); err == nil {
-		// Still return keyPair because the caller might be OK with they - they can check the error with
-		return &keyPair, &KeyAlreadyExistsError{keyFile}
+		// Still return keyPair because the caller might be OK with this - they can check the error with errors.Is(err, ErrKeyAlreadyExists)
+		return &keyPair, ErrKeyAlreadyExists
 	}
 
 	if err := os.MkdirAll(filepath.Dir(keyFile), 0711); err != nil {

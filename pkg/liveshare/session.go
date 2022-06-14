@@ -75,7 +75,7 @@ func (s *Session) StartSSHServerWithOptions(ctx context.Context, options StartSS
 	if options.UserPublicKeyFile != "" {
 		publicKeyBytes, err := os.ReadFile(options.UserPublicKeyFile)
 		if err != nil {
-			return 0, "", fmt.Errorf("failed to read public key file: %s", err)
+			return 0, "", fmt.Errorf("failed to read public key file: %w", err)
 		}
 
 		params.UserPublicKey = strings.TrimSpace(string(publicKeyBytes))
