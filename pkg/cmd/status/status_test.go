@@ -381,8 +381,8 @@ func TestStatusRun(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
-		tt.opts.CachedClient = func(_ time.Duration) *http.Client {
-			return &http.Client{Transport: reg}
+		tt.opts.CachedClient = func(c *http.Client, _ time.Duration) *http.Client {
+			return c
 		}
 		tt.opts.HostConfig = testHostConfig("github.com")
 		ios, _, stdout, _ := iostreams.Test()

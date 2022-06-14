@@ -30,14 +30,13 @@ type browser interface {
 
 type CreateOptions struct {
 	// This struct stores user input and factory functions
-	HttpClient       func() (*http.Client, error)
-	CachedHttpClient func(time.Duration) (*http.Client, error)
-	Config           func() (config.Config, error)
-	IO               *iostreams.IOStreams
-	Remotes          func() (context.Remotes, error)
-	Branch           func() (string, error)
-	Browser          browser
-	Finder           shared.PRFinder
+	HttpClient func() (*http.Client, error)
+	Config     func() (config.Config, error)
+	IO         *iostreams.IOStreams
+	Remotes    func() (context.Remotes, error)
+	Branch     func() (string, error)
+	Browser    browser
+	Finder     shared.PRFinder
 
 	TitleProvided bool
 	BodyProvided  bool
@@ -81,13 +80,12 @@ type CreateContext struct {
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
-		IO:               f.IOStreams,
-		HttpClient:       f.HttpClient,
-		CachedHttpClient: f.CachedHttpClient,
-		Config:           f.Config,
-		Remotes:          f.Remotes,
-		Branch:           f.Branch,
-		Browser:          f.Browser,
+		IO:         f.IOStreams,
+		HttpClient: f.HttpClient,
+		Config:     f.Config,
+		Remotes:    f.Remotes,
+		Branch:     f.Branch,
+		Browser:    f.Browser,
 	}
 
 	var bodyFile string
@@ -287,13 +285,7 @@ func createRun(opts *CreateOptions) (err error) {
 	if !opts.BodyProvided {
 		templateContent := ""
 		if opts.RecoverFile == "" {
-			var cachedClient *http.Client
-			cachedClient, err = opts.CachedHttpClient(time.Hour * 24)
-			if err != nil {
-				return
-			}
-
-			tpl := shared.NewTemplateManager(client.HTTP(), cachedClient, ctx.BaseRepo, opts.RootDirOverride, opts.RepoOverride == "", true)
+			tpl := shared.NewTemplateManager(client.HTTP(), ctx.BaseRepo, opts.RootDirOverride, opts.RepoOverride == "", true)
 
 			var template shared.Template
 			template, err = tpl.Choose()

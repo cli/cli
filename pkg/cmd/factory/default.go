@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/cli/cli/v2/api"
@@ -17,6 +18,9 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
+var ssoHeader string
+var ssoURLRE = regexp.MustCompile(`\burl=([^;]+)`)
+
 func New(appVersion string) *cmdutil.Factory {
 	f := &cmdutil.Factory{
 		Config:         configFunc(), // No factory dependencies
@@ -24,13 +28,12 @@ func New(appVersion string) *cmdutil.Factory {
 		ExecutableName: "gh",
 	}
 
-	f.IOStreams = ioStreams(f)                               // Depends on Config
-	f.HttpClient = httpClientFunc(f, appVersion)             // Depends on Config, IOStreams, and appVersion
-	f.CachedHttpClient = cachedHttpClientFunc(f, appVersion) // Depends on Config, IOStreams, and appVersion
-	f.Remotes = remotesFunc(f)                               // Depends on Config
-	f.BaseRepo = BaseRepoFunc(f)                             // Depends on Remotes
-	f.Browser = browser(f)                                   // Depends on Config, and IOStreams
-	f.ExtensionManager = extensionManager(f)                 // Depends on Config, HttpClient, and IOStreams
+	f.IOStreams = ioStreams(f)                   // Depends on Config
+	f.HttpClient = httpClientFunc(f, appVersion) // Depends on Config, IOStreams, and appVersion
+	f.Remotes = remotesFunc(f)                   // Depends on Config
+	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
+	f.Browser = browser(f)                       // Depends on Config, and IOStreams
+	f.ExtensionManager = extensionManager(f)     // Depends on Config, HttpClient, and IOStreams
 
 	return f
 }
@@ -86,28 +89,17 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 		if err != nil {
 			return nil, err
 		}
-		return NewHTTPClient(HTTPClientOptions{
+		opts := api.HTTPClientOptions{
 			Config:     cfg,
 			Log:        io.ErrOut,
 			AppVersion: appVersion,
-		})
-	}
-}
-
-func cachedHttpClientFunc(f *cmdutil.Factory, appVersion string) func(time.Duration) (*http.Client, error) {
-	return func(t time.Duration) (*http.Client, error) {
-		io := f.IOStreams
-		cfg, err := f.Config()
+		}
+		client, err := api.NewHTTPClient(opts)
 		if err != nil {
 			return nil, err
 		}
-		return NewHTTPClient(HTTPClientOptions{
-			EnableCache: true,
-			CacheTTL:    t,
-			Config:      cfg,
-			Log:         io.ErrOut,
-			AppVersion:  appVersion,
-		})
+		client.Transport = api.ExtractHeader("X-GitHub-SSO", &ssoHeader)(client.Transport)
+		return client, nil
 	}
 }
 
@@ -171,12 +163,12 @@ func extensionManager(f *cmdutil.Factory) *extension.Manager {
 	}
 	em.SetConfig(cfg)
 
-	client, err := f.CachedHttpClient(time.Second * 30)
+	client, err := f.HttpClient()
 	if err != nil {
 		return em
 	}
 
-	em.SetClient(client)
+	em.SetClient(api.NewCachedHTTPClient(client, time.Second*30))
 
 	return em
 }
@@ -203,4 +195,17 @@ func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 	}
 
 	return io
+}
+
+// SSOURL returns the URL of a SAML SSO challenge received by the server for clients that use ExtractHeader
+// to extract the value of the "X-GitHub-SSO" response header.
+func SSOURL() string {
+	if ssoHeader == "" {
+		return ""
+	}
+	m := ssoURLRE.FindStringSubmatch(ssoHeader)
+	if m == nil {
+		return ""
+	}
+	return m[1]
 }

@@ -9,7 +9,7 @@ require (
 	github.com/charmbracelet/glamour v0.4.0
 	github.com/charmbracelet/lipgloss v0.5.0
 	github.com/cli/browser v1.1.0
-	github.com/cli/go-gh v0.0.4-0.20220523141704-14561a42d6e2
+	github.com/cli/go-gh v0.0.4-0.20220614183308-ef2bca923638
 	github.com/cli/oauth v0.9.0
 	github.com/cli/safeexec v1.0.0
 	github.com/cli/shurcooL-graphql v0.0.1
@@ -42,7 +42,7 @@ require (
 	golang.org/x/sys v0.0.0-20220227234510-4e6760a101f9
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	golang.org/x/text v0.3.7
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

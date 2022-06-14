@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -129,7 +131,8 @@ type templateManager struct {
 	fetchError error
 }
 
-func NewTemplateManager(httpClient *http.Client, cachedClient *http.Client, repo ghrepo.Interface, dir string, allowFS bool, isPR bool) *templateManager {
+func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, dir string, allowFS bool, isPR bool) *templateManager {
+	cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
 	return &templateManager{
 		repo:       repo,
 		rootDir:    dir,

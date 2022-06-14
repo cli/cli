@@ -1,10 +1,9 @@
-package factory
+package api
 
 import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -53,14 +52,27 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		return nil, err
 	}
 
-	client.Transport = AddAuthTokenHeader(opts.Config, client.Transport)
-	client.Transport = ExtractHeader("X-GitHub-SSO", &ssoHeader)(client.Transport)
+	client.Transport = AddAuthTokenHeader(client.Transport, opts.Config)
 
 	return client, nil
 }
 
+func NewCachedHTTPClient(httpClient *http.Client, ttl time.Duration) *http.Client {
+	httpClient.Transport = AddCacheTTLHeader(httpClient.Transport, ttl)
+	return httpClient
+}
+
+// AddCacheTTLHeader adds an header to the request telling the cache that the request
+// should be cached for a specified amount of time.
+func AddCacheTTLHeader(rt http.RoundTripper, ttl time.Duration) http.RoundTripper {
+	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+		req.Header.Set("X-GH-CACHE-TTL", fmt.Sprintf("%s", ttl))
+		return rt.RoundTrip(req)
+	}}
+}
+
 // AddAuthToken adds an authentication token header for the host specified by the request.
-func AddAuthTokenHeader(cfg configGetter, rt http.RoundTripper) http.RoundTripper {
+func AddAuthTokenHeader(rt http.RoundTripper, cfg configGetter) http.RoundTripper {
 	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 		hostname := ghinstance.NormalizeHostname(getHost(req))
 		if token, err := cfg.Get(hostname, "oauth_token"); err == nil && token != "" {
@@ -92,22 +104,6 @@ type funcTripper struct {
 
 func (tr funcTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return tr.roundTrip(req)
-}
-
-var ssoHeader string
-var ssoURLRE = regexp.MustCompile(`\burl=([^;]+)`)
-
-// SSOURL returns the URL of a SAML SSO challenge received by the server for clients that use ExtractHeader
-// to extract the value of the "X-GitHub-SSO" response header.
-func SSOURL() string {
-	if ssoHeader == "" {
-		return ""
-	}
-	m := ssoURLRE.FindStringSubmatch(ssoHeader)
-	if m == nil {
-		return ""
-	}
-	return m[1]
 }
 
 func getHost(r *http.Request) string {

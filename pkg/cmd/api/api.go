@@ -45,21 +45,19 @@ type ApiOptions struct {
 	CacheTTL            time.Duration
 	FilterOutput        string
 
-	Config           func() (config.Config, error)
-	HttpClient       func() (*http.Client, error)
-	CachedHttpClient func(time.Duration) (*http.Client, error)
-	BaseRepo         func() (ghrepo.Interface, error)
-	Branch           func() (string, error)
+	Config     func() (config.Config, error)
+	HttpClient func() (*http.Client, error)
+	BaseRepo   func() (ghrepo.Interface, error)
+	Branch     func() (string, error)
 }
 
 func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command {
 	opts := ApiOptions{
-		IO:               f.IOStreams,
-		Config:           f.Config,
-		HttpClient:       f.HttpClient,
-		CachedHttpClient: f.CachedHttpClient,
-		BaseRepo:         f.BaseRepo,
-		Branch:           f.Branch,
+		IO:         f.IOStreams,
+		Config:     f.Config,
+		HttpClient: f.HttpClient,
+		BaseRepo:   f.BaseRepo,
+		Branch:     f.Branch,
 	}
 
 	cmd := &cobra.Command{
@@ -266,14 +264,12 @@ func apiRun(opts *ApiOptions) error {
 		requestHeaders = append(requestHeaders, "Accept: "+previewNamesToMIMETypes(opts.Previews))
 	}
 
-	var httpClient *http.Client
-	if opts.CacheTTL > 0 {
-		httpClient, err = opts.CachedHttpClient(opts.CacheTTL)
-	} else {
-		httpClient, err = opts.HttpClient()
-	}
+	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
+	}
+	if opts.CacheTTL > 0 {
+		httpClient = api.NewCachedHTTPClient(httpClient, opts.CacheTTL)
 	}
 
 	headersOutputStream := opts.IO.Out

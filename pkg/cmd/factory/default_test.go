@@ -2,6 +2,7 @@ package factory
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"testing"
@@ -10,7 +11,9 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_BaseRepo(t *testing.T) {
@@ -450,6 +453,60 @@ func Test_browserLauncher(t *testing.T) {
 			}
 			browser := browserLauncher(f)
 			assert.Equal(t, tt.wantBrowser, browser)
+		})
+	}
+}
+
+func TestSSOURL(t *testing.T) {
+	tests := []struct {
+		name       string
+		host       string
+		sso        string
+		wantStderr string
+		wantSSO    string
+	}{
+		{
+			name:       "SSO challenge in response header",
+			host:       "github.com",
+			sso:        "required; url=https://github.com/login/sso?return_to=xyz&param=123abc; another",
+			wantStderr: "",
+			wantSSO:    "https://github.com/login/sso?return_to=xyz&param=123abc",
+		},
+	}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if sso := r.URL.Query().Get("sso"); sso != "" {
+			w.Header().Set("X-GitHub-SSO", sso)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := New("1")
+			f.Config = func() (config.Config, error) {
+				return config.NewBlankConfig(), nil
+			}
+			ios, _, _, stderr := iostreams.Test()
+			f.IOStreams = ios
+			client, err := httpClientFunc(f, "v1.2.3")()
+			require.NoError(t, err)
+			req, err := http.NewRequest("GET", ts.URL, nil)
+			if tt.sso != "" {
+				q := req.URL.Query()
+				q.Set("sso", tt.sso)
+				req.URL.RawQuery = q.Encode()
+			}
+			req.Host = tt.host
+			require.NoError(t, err)
+
+			res, err := client.Do(req)
+			require.NoError(t, err)
+
+			assert.Equal(t, 204, res.StatusCode)
+			assert.Equal(t, tt.wantStderr, stderr.String())
+			assert.Equal(t, tt.wantSSO, SSOURL())
 		})
 	}
 }

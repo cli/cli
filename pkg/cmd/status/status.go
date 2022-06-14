@@ -32,7 +32,7 @@ type hostConfig interface {
 type StatusOptions struct {
 	HttpClient   func() (*http.Client, error)
 	HostConfig   hostConfig
-	CachedClient func(time.Duration) *http.Client
+	CachedClient func(*http.Client, time.Duration) *http.Client
 	IO           *iostreams.IOStreams
 	Org          string
 	Exclude      []string
@@ -40,9 +40,8 @@ type StatusOptions struct {
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
 	opts := &StatusOptions{
-		CachedClient: func(ttl time.Duration) *http.Client {
-			client, _ := f.CachedHttpClient(ttl)
-			return client
+		CachedClient: func(c *http.Client, ttl time.Duration) *http.Client {
+			return api.NewCachedHTTPClient(c, ttl)
 		},
 	}
 	opts.HttpClient = f.HttpClient
@@ -171,7 +170,7 @@ type stringSet interface {
 
 type StatusGetter struct {
 	Client         *http.Client
-	cachedClient   func(time.Duration) *http.Client
+	cachedClient   func(*http.Client, time.Duration) *http.Client
 	host           string
 	Org            string
 	Exclude        []string
@@ -203,7 +202,7 @@ func (s *StatusGetter) hostname() string {
 }
 
 func (s *StatusGetter) CachedClient(ttl time.Duration) *http.Client {
-	return s.cachedClient(ttl)
+	return s.cachedClient(s.Client, ttl)
 }
 
 func (s *StatusGetter) ShouldExclude(repo string) bool {

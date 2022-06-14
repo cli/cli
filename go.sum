@@ -60,6 +60,8 @@ github.com/cli/crypto v0.0.0-20210929142629-6be313f59b03 h1:3f4uHLfWx4/WlnMPXGai
 github.com/cli/crypto v0.0.0-20210929142629-6be313f59b03/go.mod h1:GvvjBRRGRdwPK5ydBHafDWAxML/pGHZbMvKqRZ5+Abc=
 github.com/cli/go-gh v0.0.4-0.20220523141704-14561a42d6e2 h1:O2OMzlSH69b/rDg8cu/E2lp0YuNFRAV/ey3/d87m9ww=
 github.com/cli/go-gh v0.0.4-0.20220523141704-14561a42d6e2/go.mod h1:R/GsVfMGy+dmMjW4XIHFRhw8qAr2bF7bx2RtD93QZZE=
+github.com/cli/go-gh v0.0.4-0.20220614183308-ef2bca923638 h1:7MXhocX2RDlWrjKZ1pZsy8eMNGa3xkZzPrGC1IPBfx4=
+github.com/cli/go-gh v0.0.4-0.20220614183308-ef2bca923638/go.mod h1:Y/QFb/VxnXQH0W4VlP+507HVxMzQ430x8kdjUuVcono=
 github.com/cli/oauth v0.9.0 h1:nxBC0Df4tUzMkqffAB+uZvisOwT3/N9FpkfdTDtafxc=
 github.com/cli/oauth v0.9.0/go.mod h1:qd/FX8ZBD6n1sVNQO3aIdRxeu5LGw9WhKnYhIIoC2A4=
 github.com/cli/safeexec v1.0.0 h1:0VngyaIyqACHdcMNWfo6+KdUYnqEr2Sg+bSP1pdF+dI=
@@ -509,6 +511,8 @@ gopkg.in/yaml.v2 v2.4.0/go.mod h1:RDklbk79AGWmwhnvt/jBztapEOGDOx6ZbXqjP6csGnQ=
 gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b h1:h8qDotaEPuJATrMmW04NCwg7v22aHH28wwpauUhK9Oo=
 gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
+gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
+gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 honnef.co/go/tools v0.0.0-20190102054323-c2f93a96b099/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 honnef.co/go/tools v0.0.0-20190106161140-3f1c8253044a/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 honnef.co/go/tools v0.0.0-20190418001031-e561f6794a2a/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
