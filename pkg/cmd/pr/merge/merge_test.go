@@ -119,8 +119,8 @@ func Test_NewCmdMerge(t *testing.T) {
 			},
 		},
 		{
-			name:  "sha specified",
-			args:  "123 --sha 555",
+			name:  "match-head-commit specified",
+			args:  "123 --match-head-commit 555",
 			isTTY: true,
 			want: MergeOptions{
 				SelectorArg:             "123",
@@ -494,6 +494,43 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 	if !r.MatchString(output.Stderr()) {
 		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
 	}
+}
+
+func TestPrMerge_withMatchCommitHeadFlag(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "main"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.Equal(t, "285ed5ab740f53ff6b0b4b629c59a9df23b9c6db", input["expectedHeadOid"].(string))
+			assert.NotContains(t, input, "commitHeadline")
+		}))
+
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	output, err := runCommand(http, "main", false, "pr merge 1 --merge -R OWNER/REPO --match-head-commit 285ed5ab740f53ff6b0b4b629c59a9df23b9c6db")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestPrMerge_deleteBranch(t *testing.T) {
