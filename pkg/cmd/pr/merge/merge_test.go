@@ -131,7 +131,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				MergeStrategyEmpty:      true,
 				Body:                    "",
 				BodySet:                 false,
-				Sha:                     "555",
+				MatchHeadCommit:         "555",
 			},
 		},
 		{
@@ -204,7 +204,7 @@ func Test_NewCmdMerge(t *testing.T) {
 			assert.Equal(t, tt.want.MergeStrategyEmpty, opts.MergeStrategyEmpty)
 			assert.Equal(t, tt.want.Body, opts.Body)
 			assert.Equal(t, tt.want.BodySet, opts.BodySet)
-			assert.Equal(t, tt.want.Sha, opts.Sha)
+			assert.Equal(t, tt.want.MatchHeadCommit, opts.MatchHeadCommit)
 		})
 	}
 }
