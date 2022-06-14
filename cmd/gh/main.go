@@ -206,13 +206,11 @@ func mainRun() exitCode {
 		return results, cobra.ShellCompDirectiveNoFileComp
 	}
 
-	cs := cmdFactory.IOStreams.ColorScheme()
-
 	authError := errors.New("authError")
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		// require that the user is authenticated before running most commands
 		if cmdutil.IsAuthCheckEnabled(cmd) && !cmdutil.CheckAuth(cfg) {
-			printNoAuthHelp(stderr, cs)
+			fmt.Fprint(stderr, authHelp())
 			return authError
 		}
 
@@ -318,36 +316,25 @@ func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
 	}
 }
 
-// printNoAuthHelp will print a help message when authentication is required,
-// which is either a welcome message in interactive environments or help on how
-// to set up the non-interactive environment.
-func printNoAuthHelp(out io.Writer, cs *iostreams.ColorScheme) {
-	var helpMessage string
-	if os.Getenv("CI") == "true" {
-		if os.Getenv("GITHUB_ACTIONS") == "true" {
-			helpMessage = heredoc.Docf(`
-				%s must be set to use %s in a GitHub Action.
-
-				Example:
-
-				env:
-				  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-			`, "`GH_TOKEN`", "`gh`")
-		} else {
-			helpMessage = heredoc.Docf(`
-				%s must be set to use %s in this CI environment.
-
-				Please consult the relevant documentation for setting these environment variables.
-			`, "`GH_TOKEN`", "`gh`")
-		}
-	} else {
-		helpMessage = heredoc.Docf(`
-			%s
-
-			To authenticate, please run %s.
-		`, cs.Bold("Welcome to GitHub CLI!"), "`gh auth login`")
+func authHelp() string {
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		return heredoc.Doc(`
+			gh: To use GitHub CLI in a GitHub Actions workflow, set the GH_TOKEN environment variable. Example:
+			  env:
+			    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+		`)
 	}
-	fmt.Fprint(out, helpMessage)
+
+	if os.Getenv("CI") != "" {
+		return heredoc.Doc(`
+			gh: To use GitHub CLI in automation, set the GH_TOKEN environment variable.
+		`)
+	}
+
+	return heredoc.Doc(`
+		To get started with GitHub CLI, please run:  gh auth login
+		Alternatively, populate the GH_TOKEN environment variable with a GitHub API authentication token.
+	`)
 }
 
 func shouldCheckForUpdate() bool {
