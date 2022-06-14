@@ -66,7 +66,7 @@ func NewCachedHTTPClient(httpClient *http.Client, ttl time.Duration) *http.Clien
 // should be cached for a specified amount of time.
 func AddCacheTTLHeader(rt http.RoundTripper, ttl time.Duration) http.RoundTripper {
 	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
-		req.Header.Set("X-GH-CACHE-TTL", fmt.Sprintf("%s", ttl))
+		req.Header.Set("X-GH-CACHE-TTL", ttl.String())
 		return rt.RoundTrip(req)
 	}}
 }

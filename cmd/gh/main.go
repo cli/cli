@@ -18,7 +18,6 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/build"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/internal/update"
@@ -29,8 +28,6 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
-	"github.com/cli/go-gh"
-	ghAPI "github.com/cli/go-gh/pkg/api"
 	"github.com/cli/safeexec"
 	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
@@ -359,36 +356,17 @@ func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
 	if !shouldCheckForUpdate() {
 		return nil, nil
 	}
-
-	client, err := basicClient(currentVersion)
+	httpClient, err := api.NewHTTPClient(api.HTTPClientOptions{
+		AppVersion: currentVersion,
+		Log:        os.Stderr,
+	})
 	if err != nil {
 		return nil, err
 	}
-
+	client := api.NewClientFromHTTP(httpClient)
 	repo := updaterEnabled
 	stateFilePath := filepath.Join(config.StateDir(), "state.yml")
 	return update.CheckForUpdate(client, stateFilePath, repo, currentVersion)
-}
-
-// BasicClient returns an API client for github.com only that borrows from but
-// does not depend on user configuration
-func basicClient(currentVersion string) (*api.Client, error) {
-	var log io.Writer
-	if debugEnabled, _ := utils.IsDebugEnabled(); debugEnabled {
-		log = os.Stderr
-	}
-
-	headers := map[string]string{
-		"User-Agent": fmt.Sprintf("GitHub CLI %s", currentVersion),
-	}
-
-	opts := ghAPI.ClientOptions{Host: ghinstance.Default(), Headers: headers, Log: log}
-	client, err := gh.HTTPClient(&opts)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.NewClientFromHTTP(client), nil
 }
 
 func isRecentRelease(publishedAt time.Time) bool {
