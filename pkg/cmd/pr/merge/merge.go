@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
@@ -333,13 +332,6 @@ func (m *mergeContext) merge() error {
 
 	err := mergePullRequest(m.httpClient, payload)
 	if err != nil {
-		// gql returns vague errors when passing sha that may be confusing
-		if strings.Contains(err.Error(), "Head branch was modified. Review and try the merge again.") {
-			return fmt.Errorf("%s the provided sha does not match head sha: %s", m.cs.FailureIconWithColor(m.cs.Red), m.pr.HeadRefOid)
-		}
-		if strings.Contains(err.Error(), "Variable $input of type MergePullRequestInput! was provided invalid value for expectedHeadOid") {
-			return fmt.Errorf("%s the provided sha: %s is in an invalid format", m.cs.FailureIconWithColor(m.cs.Red), payload.expectedHeadOid)
-		}
 		return err
 	}
 
