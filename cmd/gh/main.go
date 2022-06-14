@@ -13,6 +13,7 @@ import (
 
 	surveyCore "github.com/AlecAivazis/survey/v2/core"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/build"
@@ -205,15 +206,11 @@ func mainRun() exitCode {
 		return results, cobra.ShellCompDirectiveNoFileComp
 	}
 
-	cs := cmdFactory.IOStreams.ColorScheme()
-
 	authError := errors.New("authError")
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		// require that the user is authenticated before running most commands
 		if cmdutil.IsAuthCheckEnabled(cmd) && !cmdutil.CheckAuth(cfg) {
-			fmt.Fprintln(stderr, cs.Bold("Welcome to GitHub CLI!"))
-			fmt.Fprintln(stderr)
-			fmt.Fprintln(stderr, "To authenticate, please run `gh auth login`.")
+			fmt.Fprint(stderr, authHelp())
 			return authError
 		}
 
@@ -317,6 +314,27 @@ func printError(out io.Writer, err error, cmd *cobra.Command, debug bool) {
 		}
 		fmt.Fprintln(out, cmd.UsageString())
 	}
+}
+
+func authHelp() string {
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		return heredoc.Doc(`
+			gh: To use GitHub CLI in a GitHub Actions workflow, set the GH_TOKEN environment variable. Example:
+			  env:
+			    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+		`)
+	}
+
+	if os.Getenv("CI") != "" {
+		return heredoc.Doc(`
+			gh: To use GitHub CLI in automation, set the GH_TOKEN environment variable.
+		`)
+	}
+
+	return heredoc.Doc(`
+		To get started with GitHub CLI, please run:  gh auth login
+		Alternatively, populate the GH_TOKEN environment variable with a GitHub API authentication token.
+	`)
 }
 
 func shouldCheckForUpdate() bool {
