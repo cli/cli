@@ -26,9 +26,9 @@ type HTTPClientOptions struct {
 }
 
 func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
-	// Provide default invalid token so gh.HTTPClient will not automatically resolve it.
-	// The real token is inserted at request time with AddAuthTokenHeader.
-	clientOpts := &ghAPI.ClientOptions{AuthToken: "none"}
+	// Provide invalid host, and token values so gh.HTTPClient will not automatically resolve them.
+	// The real host and token are inserted at request time.
+	clientOpts := ghAPI.ClientOptions{Host: "none", AuthToken: "none"}
 
 	if debugEnabled, _ := utils.IsDebugEnabled(); debugEnabled {
 		clientOpts.Log = opts.Log
@@ -47,7 +47,7 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		clientOpts.CacheTTL = opts.CacheTTL
 	}
 
-	client, err := gh.HTTPClient(clientOpts)
+	client, err := gh.HTTPClient(&clientOpts)
 	if err != nil {
 		return nil, err
 	}
