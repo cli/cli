@@ -517,7 +517,7 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, e
 		return nil, err
 	}
 
-	return &Repository{
+	newRepo := &Repository{
 		ID:        result.NodeID,
 		Name:      result.Name,
 		CreatedAt: result.CreatedAt,
@@ -526,7 +526,15 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, e
 		},
 		ViewerPermission: "WRITE",
 		hostname:         repo.RepoHost(),
-	}, nil
+	}
+
+	// The GitHub API will happily return a HTTP 200 when attempting to fork own repo even though no forking
+	// actually took place. Ensure that we raise an error instead.
+	if ghrepo.IsSame(repo, newRepo) {
+		return newRepo, fmt.Errorf("%s cannot be forked", ghrepo.FullName(repo))
+	}
+
+	return newRepo, nil
 }
 
 // RenameRepo renames the repository on GitHub and returns the renamed repository
