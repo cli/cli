@@ -3,7 +3,9 @@ package liveshare
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -27,6 +29,10 @@ type Session struct {
 	logger          logger
 }
 
+type StartSSHServerOptions struct {
+	UserPublicKeyFile string
+}
+
 // Close should be called by users to clean up RPC and SSH resources whenever the session
 // is no longer active.
 func (s *Session) Close() error {
@@ -46,9 +52,19 @@ func (s *Session) registerRequestHandler(requestType string, h handler) func() {
 	return s.rpc.register(requestType, h)
 }
 
-// StartsSSHServer starts an SSH server in the container, installing sshd if necessary,
-// and returns the port on which it listens and the user name clients should provide.
+// StartSSHServer starts an SSH server in the container, installing sshd if necessary, applies specified
+// options, and returns the port on which it listens and the user name clients should provide.
 func (s *Session) StartSSHServer(ctx context.Context) (int, string, error) {
+	return s.StartSSHServerWithOptions(ctx, StartSSHServerOptions{})
+}
+
+// StartSSHServerWithOptions starts an SSH server in the container, installing sshd if necessary, applies specified
+// options, and returns the port on which it listens and the user name clients should provide.
+func (s *Session) StartSSHServerWithOptions(ctx context.Context, options StartSSHServerOptions) (int, string, error) {
+	var params struct {
+		UserPublicKey string `json:"userPublicKey"`
+	}
+
 	var response struct {
 		Result     bool   `json:"result"`
 		ServerPort string `json:"serverPort"`
@@ -56,7 +72,16 @@ func (s *Session) StartSSHServer(ctx context.Context) (int, string, error) {
 		Message    string `json:"message"`
 	}
 
-	if err := s.rpc.do(ctx, "ISshServerHostService.startRemoteServer", []string{}, &response); err != nil {
+	if options.UserPublicKeyFile != "" {
+		publicKeyBytes, err := os.ReadFile(options.UserPublicKeyFile)
+		if err != nil {
+			return 0, "", fmt.Errorf("failed to read public key file: %w", err)
+		}
+
+		params.UserPublicKey = strings.TrimSpace(string(publicKeyBytes))
+	}
+
+	if err := s.rpc.do(ctx, "ISshServerHostService.startRemoteServerWithOptions", params, &response); err != nil {
 		return 0, "", err
 	}
 
