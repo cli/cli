@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -48,6 +49,12 @@ func (c *Context) GenerateSSHKey(keyName string, passphrase string) (*KeyPair, e
 	if err != nil {
 		return nil, err
 	}
+
+	err = os.MkdirAll(sshDir, 0700)
+	if err != nil {
+		return nil, fmt.Errorf("could not create .ssh directory: %w", err)
+	}
+
 	keyFile := filepath.Join(sshDir, keyName)
 	keyPair := KeyPair{
 		PublicKeyPath:  keyFile + ".pub",
