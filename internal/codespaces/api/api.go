@@ -556,6 +556,50 @@ func (a *API) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch str
 	return repoNames, nil
 }
 
+// GetCodespacePreFlight returns the billable owner and expected default values for
+// codespaces created by the user for a given repository.
+func (a *API) GetCodespacePreFlight(ctx context.Context, nwo string) (*User, error) {
+	req, err := http.NewRequest(http.MethodGet, a.githubAPI+"/repos/"+nwo+"/codespaces/new", nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	a.setHeaders(req)
+	resp, err := a.do(ctx, req, "/repos/*/codespaces/new")
+	if err != nil {
+		return nil, fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	} else if resp.StatusCode != http.StatusForbidden {
+		return nil, fmt.Errorf("codespaces cannot be created from that repository")
+	} else if resp.StatusCode != http.StatusOK {
+		return nil, api.HandleHTTPError(resp)
+	}
+
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
+	}
+
+	var response struct {
+		BillableOwner User `json:"billableOwner"`
+		Defaults      struct {
+			DevcontainerPath string `json:"devcontainerPath"`
+			Location         string `json:"location"`
+		}
+	}
+	if err := json.Unmarshal(b, &response); err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %w", err)
+	}
+
+	// While this response contains further helpful information ahead of codespace creation,
+	// we're only referencing the billable owner today.
+	return &response.BillableOwner, nil
+}
+
 // CreateCodespaceParams are the required parameters for provisioning a Codespace.
 type CreateCodespaceParams struct {
 	RepositoryID           int
