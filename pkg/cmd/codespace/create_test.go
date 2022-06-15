@@ -440,7 +440,7 @@ func TestCreateAndSsh(t *testing.T) {
 	a := &App{
 		io:        ios,
 		apiClient: apiMock,
-		statusChecker: func(context.Context, progressIndicator, liveshareApiClient, *api.Codespace) error {
+		statusChecker: func(context.Context, progressIndicator, githubApiClient, *api.Codespace) error {
 			return nil
 		},
 	}

@@ -344,7 +344,7 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 // ShowStatus polls the codespace for a list of post create states and their status. It will keep polling
 // until all states have finished. Once all states have finished, we poll once more to check if any new
 // states have been introduced and stop polling otherwise.
-func ShowStatus(ctx context.Context, io progressIndicator, apiClient liveshareApiClient, codespace *api.Codespace) error {
+func ShowStatus(ctx context.Context, io progressIndicator, apiClient githubApiClient, codespace *api.Codespace) error {
 	var (
 		lastState      codespaces.PostCreateState
 		breakNextState bool

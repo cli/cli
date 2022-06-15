@@ -36,14 +36,14 @@ type progressIndicator interface {
 	StopProgressIndicator()
 }
 
-type liveshareApiClient interface {
+type githubApiClient interface {
 	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
 	StartCodespace(ctx context.Context, name string) error
 }
 
 type liveshareConnector func(context.Context, *api.Codespace, *App, bool, string) (liveshareSession, error)
 
-type statusChecker func(context.Context, progressIndicator, liveshareApiClient, *api.Codespace) error
+type statusChecker func(context.Context, progressIndicator, githubApiClient, *api.Codespace) error
 
 type App struct {
 	io            *iostreams.IOStreams
