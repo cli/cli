@@ -24,7 +24,7 @@ type JSONFlagError struct {
 
 func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 	f := cmd.Flags()
-	f.StringSlice("json", nil, "Output JSON with the specified `fields`")
+	f.StringSlice("json", nil, "Output JSON with the specified `fields`, or `*` for all fields")
 	f.StringP("jq", "q", "", "Filter JSON output using a jq `expression`")
 	f.StringP("template", "t", "", "Format JSON output using a Go template")
 
@@ -58,13 +58,21 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 			} else {
 				allowedFields := set.NewStringSet()
 				allowedFields.AddValues(fields)
-				for _, f := range export.fields {
-					if !allowedFields.Contains(f) {
-						sort.Strings(fields)
-						return JSONFlagError{fmt.Errorf("Unknown JSON field: %q\nAvailable fields:\n  %s", f, strings.Join(fields, "\n  "))}
+				if len(export.fields) == 1 && export.fields[0] == "*" {
+					*exportTarget = &exportFormat{
+						fields:   allowedFields.ToSlice(),
+						filter:   export.filter,
+						template: export.template,
 					}
+				} else {
+					for _, f := range export.fields {
+						if !allowedFields.Contains(f) {
+							sort.Strings(fields)
+							return JSONFlagError{fmt.Errorf("Unknown JSON field: %q\nAvailable fields:\n  %s", f, strings.Join(fields, "\n  "))}
+						}
+					}
+					*exportTarget = export
 				}
-				*exportTarget = export
 			}
 		} else {
 			return err

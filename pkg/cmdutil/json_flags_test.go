@@ -72,6 +72,16 @@ func TestAddJSONFlags(t *testing.T) {
 			},
 		},
 		{
+			name:   "with all JSON",
+			fields: []string{"id", "number", "title"},
+			args:   []string{"--json", "*"},
+			wantsExport: &exportFormat{
+				fields:   []string{"id", "number", "title"},
+				filter:   "",
+				template: "",
+			},
+		},
+		{
 			name:   "with jq filter",
 			fields: []string{"id", "number", "title"},
 			args:   []string{"--json", "number", "-q.number"},
