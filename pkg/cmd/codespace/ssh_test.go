@@ -11,7 +11,7 @@ import (
 func TestPendingOperationDisallowsSSH(t *testing.T) {
 	app := testingSSHApp()
 
-	if err := SSH(app, context.Background(), []string{}, sshOptions{codespace: "disabledCodespace"}); err != nil {
+	if err := app.SSH(context.Background(), []string{}, sshOptions{codespace: "disabledCodespace"}, startLiveShareSession); err != nil {
 		if err.Error() != "codespace is disabled while it has a pending operation: Some pending operation" {
 			t.Errorf("expected pending operation error, but got: %v", err)
 		}

@@ -78,7 +78,7 @@ func newCreateCmd(app *App) *cobra.Command {
 		Short: "Create a codespace",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.Create(cmd.Context(), opts)
+			return app.Create(cmd.Context(), opts, startLiveShareSession)
 		},
 	}
 
@@ -97,7 +97,7 @@ func newCreateCmd(app *App) *cobra.Command {
 }
 
 // Create creates a new Codespace
-func (a *App) Create(ctx context.Context, opts createOptions) error {
+func (a *App) Create(ctx context.Context, opts createOptions, liveshareConnect liveshareConnector) error {
 	// Overrides for Codespace developers to target test environments
 	vscsLocation := os.Getenv("VSCS_LOCATION")
 	vscsTarget := os.Getenv("VSCS_TARGET")
@@ -259,7 +259,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 			codespace: codespace.Name,
 		}
 		var sshArgs []string
-		if err := a.sshClient(a, ctx, sshArgs, sshOpts); err != nil {
+		if err := a.SSH(ctx, sshArgs, sshOpts, liveshareConnect); err != nil {
 			return fmt.Errorf("ssh error: %w", err)
 		}
 	}

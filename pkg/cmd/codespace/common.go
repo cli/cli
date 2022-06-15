@@ -41,8 +41,9 @@ type liveshareApiClient interface {
 	StartCodespace(ctx context.Context, name string) error
 }
 
+type liveshareConnector func(context.Context, *api.Codespace, *App, bool, string) (liveshareSession, error)
+
 type statusChecker func(context.Context, progressIndicator, liveshareApiClient, *api.Codespace) error
-type sshClient func(app *App, ctx context.Context, sshArgs []string, opts sshOptions) (err error)
 
 type App struct {
 	io            *iostreams.IOStreams
@@ -50,7 +51,6 @@ type App struct {
 	errLogger     *log.Logger
 	executable    executable
 	browser       browser
-	sshClient     sshClient
 	statusChecker statusChecker
 }
 
@@ -64,7 +64,6 @@ func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browse
 		executable:    exe,
 		browser:       browser,
 		statusChecker: ShowStatus,
-		sshClient:     SSH,
 	}
 }
 

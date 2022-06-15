@@ -9,7 +9,9 @@ import (
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/crypto/ssh"
 )
 
 func TestApp_Create(t *testing.T) {
@@ -328,7 +330,10 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 				apiClient: tt.fields.apiClient,
 			}
 
-			err := a.Create(context.Background(), tt.opts)
+			mockLiveshareConnector := func(context.Context, *api.Codespace, *App, bool, string) (liveshareSession, error) {
+				return nil, nil
+			}
+			err := a.Create(context.Background(), tt.opts, mockLiveshareConnector)
 			if err != nil && tt.wantErr != nil {
 				assert.EqualError(t, err, tt.wantErr.Error())
 			}
@@ -425,14 +430,16 @@ func TestCreateAndSsh(t *testing.T) {
 				DefaultBranch: "main",
 			}, nil
 		},
+		GetCodespaceFunc: func(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error) {
+			return &api.Codespace{
+				Name: "monalisa-dotfiles-abcd1234",
+			}, nil
+		},
 	}
 
 	a := &App{
 		io:        ios,
 		apiClient: apiMock,
-		sshClient: func(*App, context.Context, []string, sshOptions) error {
-			return nil
-		},
 		statusChecker: func(context.Context, progressIndicator, liveshareApiClient, *api.Codespace) error {
 			return nil
 		},
@@ -448,8 +455,38 @@ func TestCreateAndSsh(t *testing.T) {
 		devContainerPath: ".devcontainer/foobar/devcontainer.json",
 	}
 
-	err := a.Create(context.Background(), opts)
+	mockLiveshareConnector := func(context.Context, *api.Codespace, *App, bool, string) (liveshareSession, error) {
+		session := &mockLiveShare{}
+		return session, nil
+	}
+
+	err := a.Create(context.Background(), opts, mockLiveshareConnector)
 	if err != nil {
 		t.Error(err)
 	}
+}
+
+type mockLiveShare struct{}
+
+func (l *mockLiveShare) StartSSHServer(ctx context.Context) (int, string, error) {
+	return 0, "", nil
+}
+
+func (l *mockLiveShare) Close() error {
+	return nil
+}
+func (l *mockLiveShare) GetSharedServers(context.Context) ([]*liveshare.Port, error) {
+	return nil, nil
+}
+func (l *mockLiveShare) KeepAlive(string) {
+}
+func (l *mockLiveShare) OpenStreamingChannel(context.Context, liveshare.ChannelID) (ssh.Channel, error) {
+	return nil, nil
+}
+
+func (l *mockLiveShare) StartJupyterServer(context.Context) (int, string, error) {
+	return 0, "", nil
+}
+func (l *mockLiveShare) StartSharing(context.Context, string, int) (liveshare.ChannelID, error) {
+	return liveshare.ChannelID{}, nil
 }
