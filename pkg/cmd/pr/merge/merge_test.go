@@ -515,22 +515,26 @@ func TestPrMerge_withMatchCommitHeadFlag(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`mutation PullRequestMerge\b`),
 		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, 3, len(input))
 			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
 			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
 			assert.Equal(t, "285ed5ab740f53ff6b0b4b629c59a9df23b9c6db", input["expectedHeadOid"].(string))
-			assert.NotContains(t, input, "commitHeadline")
 		}))
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "main", false, "pr merge 1 --merge -R OWNER/REPO --match-head-commit 285ed5ab740f53ff6b0b4b629c59a9df23b9c6db")
+	output, err := runCommand(http, "main", true, "pr merge 1 --merge --match-head-commit 285ed5ab740f53ff6b0b4b629c59a9df23b9c6db")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
 
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "", output.Stderr())
+	r := regexp.MustCompile(`Merged pull request #1 \(The title of the PR\)`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
 }
 
 func TestPrMerge_deleteBranch(t *testing.T) {
