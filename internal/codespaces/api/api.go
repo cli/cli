@@ -94,6 +94,7 @@ func New(serverURL, apiURL, vscsURL string, httpClient httpClient) *API {
 // User represents a GitHub user.
 type User struct {
 	Login string `json:"login"`
+	Type  string `json:"type"`
 }
 
 // GetUser returns the user associated with the given token.

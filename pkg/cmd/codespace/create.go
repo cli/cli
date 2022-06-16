@@ -112,11 +112,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	}
 
 	if userInputs.Repository == "" {
-		branchPrompt := "Branch (leave blank for default branch):"
-		if userInputs.Branch != "" {
-			branchPrompt = "Branch:"
-		}
-		questions := []*survey.Question{
+		repoQuestions := []*survey.Question{
 			{
 				Name: "repository",
 				Prompt: &survey.Input{
@@ -128,6 +124,27 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 				},
 				Validate: survey.Required,
 			},
+		}
+		if err := ask(repoQuestions, &userInputs); err != nil {
+			return fmt.Errorf("failed to prompt: %w", err)
+		}
+
+		a.StartProgressIndicatorWithLabel("Validating repository for codespaces")
+		billableOwner, err := a.apiClient.GetCodespacePreFlight(ctx, userInputs.Repository)
+		a.StopProgressIndicator()
+
+		if billableOwner.Type == "Organization" {
+			cs := a.io.ColorScheme()
+			fmt.Fprintln(a.io.Out, cs.Blue("✓ Usage covered by "+billableOwner.Login))
+		} else if err != nil {
+			return fmt.Errorf("error checking codespace ownership: %w", err)
+		}
+
+		branchPrompt := "Branch (leave blank for default branch):"
+		if userInputs.Branch != "" {
+			branchPrompt = "Branch:"
+		}
+		branchQuestions := []*survey.Question{
 			{
 				Name: "branch",
 				Prompt: &survey.Input{
@@ -136,7 +153,8 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 				},
 			},
 		}
-		if err := ask(questions, &userInputs); err != nil {
+
+		if err := ask(branchQuestions, &userInputs); err != nil {
 			return fmt.Errorf("failed to prompt: %w", err)
 		}
 	}
