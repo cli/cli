@@ -9,24 +9,28 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type stopOptions struct {
+	codespaceName string
+}
+
 func newStopCmd(app *App) *cobra.Command {
-	var codespace string
+	opts := &stopOptions{}
 
 	stopCmd := &cobra.Command{
 		Use:   "stop",
 		Short: "Stop a running codespace",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.StopCodespace(cmd.Context(), codespace)
+			return app.StopCodespace(cmd.Context(), opts)
 		},
 	}
-	stopCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
+	stopCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "Name of the codespace")
 
 	return stopCmd
 }
 
-func (a *App) StopCodespace(ctx context.Context, codespaceName string) error {
-	if codespaceName == "" {
+func (a *App) StopCodespace(ctx context.Context, opts *stopOptions) error {
+	if opts.codespaceName == "" {
 		a.StartProgressIndicatorWithLabel("Fetching codespaces")
 		codespaces, err := a.apiClient.ListCodespaces(ctx, -1, "")
 		a.StopProgressIndicator()
@@ -49,23 +53,23 @@ func (a *App) StopCodespace(ctx context.Context, codespaceName string) error {
 		if err != nil {
 			return fmt.Errorf("failed to choose codespace: %w", err)
 		}
-		codespaceName = codespace.Name
+		opts.codespaceName = codespace.Name
 	} else {
 		a.StartProgressIndicatorWithLabel("Fetching codespace")
-		c, err := a.apiClient.GetCodespace(ctx, codespaceName, false)
+		c, err := a.apiClient.GetCodespace(ctx, opts.codespaceName, false)
 		a.StopProgressIndicator()
 		if err != nil {
-			return fmt.Errorf("failed to get codespace: %q: %w", codespaceName, err)
+			return fmt.Errorf("failed to get codespace: %q: %w", opts.codespaceName, err)
 		}
 		cs := codespace{c}
 		if !cs.running() {
-			return fmt.Errorf("codespace %q is not running", codespaceName)
+			return fmt.Errorf("codespace %q is not running", opts.codespaceName)
 		}
 	}
 
 	a.StartProgressIndicatorWithLabel("Stopping codespace")
 	defer a.StopProgressIndicator()
-	if err := a.apiClient.StopCodespace(ctx, codespaceName); err != nil {
+	if err := a.apiClient.StopCodespace(ctx, opts.codespaceName); err != nil {
 		return fmt.Errorf("failed to stop codespace: %w", err)
 	}
 
