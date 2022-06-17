@@ -132,6 +132,11 @@ func chooseCodespace(ctx context.Context, apiClient apiClient) (*api.Codespace, 
 	return chooseCodespaceFromList(ctx, codespaces)
 }
 
+type codespaceWithIndex struct {
+	cs  codespace
+	idx int
+}
+
 // chooseCodespaceFromList returns the selected codespace from the list,
 // or an error if there are no codespaces.
 func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (*api.Codespace, error) {
@@ -139,19 +144,48 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 		return nil, errNoCodespaces
 	}
 
+	codespacesNames, codespacesDirty, codespacesByName := formatCodespacesForSelect(codespaces)
+
+	csSurvey := []*survey.Question{
+		{
+			Name: "codespace",
+			Prompt: &survey.Select{
+				Message: "Choose codespace:",
+				Options: codespacesNames,
+				Default: codespacesNames[0],
+			},
+			Validate: survey.Required,
+		},
+	}
+
+	var answers struct {
+		Codespace string
+	}
+	if err := ask(csSurvey, &answers); err != nil {
+		return nil, fmt.Errorf("error getting answers: %w", err)
+	}
+
+	// Codespaces are indexed without the git status included as compared
+	// to how it is displayed in the prompt, so the git status symbol needs
+	// cleaning up in case it is included.
+	selectedCodespace := answers.Codespace
+	isDirty := codespacesDirty[selectedCodespace]
+	if isDirty {
+		selectedCodespace = withoutGitStatus(answers.Codespace)
+	}
+	return codespacesByName[selectedCodespace].cs.Codespace, nil
+}
+
+func formatCodespacesForSelect(codespaces []*api.Codespace) ([]string, map[string]bool, map[string]codespaceWithIndex) {
 	sort.Slice(codespaces, func(i, j int) bool {
 		return codespaces[i].CreatedAt > codespaces[j].CreatedAt
 	})
-
-	type codespaceWithIndex struct {
-		cs  codespace
-		idx int
-	}
 
 	namesWithConflict := make(map[string]bool)
 	codespacesByName := make(map[string]codespaceWithIndex)
 	codespacesNames := make([]string, 0, len(codespaces))
 	codespacesDirty := make(map[string]bool)
+
 	for _, apiCodespace := range codespaces {
 		cs := codespace{apiCodespace}
 		csName := cs.displayName(false, false)
@@ -195,34 +229,7 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 		}
 	}
 
-	csSurvey := []*survey.Question{
-		{
-			Name: "codespace",
-			Prompt: &survey.Select{
-				Message: "Choose codespace:",
-				Options: codespacesNames,
-				Default: codespacesNames[0],
-			},
-			Validate: survey.Required,
-		},
-	}
-
-	var answers struct {
-		Codespace string
-	}
-	if err := ask(csSurvey, &answers); err != nil {
-		return nil, fmt.Errorf("error getting answers: %w", err)
-	}
-
-	// Codespaces are indexed without the git status included as compared
-	// to how it is displayed in the prompt, so the git status symbol needs
-	// cleaning up in case it is included.
-	selectedCodespace := answers.Codespace
-	isDirty := codespacesDirty[selectedCodespace]
-	if isDirty {
-		selectedCodespace = withoutGitStatus(answers.Codespace)
-	}
-	return codespacesByName[selectedCodespace].cs.Codespace, nil
+	return codespacesNames, codespacesDirty, codespacesByName
 }
 
 // withoutGitStatus returns the string without the git status symbol.
