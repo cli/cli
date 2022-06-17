@@ -31,8 +31,8 @@ import (
 // 			GetCodespaceFunc: func(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error) {
 // 				panic("mock out the GetCodespace method")
 // 			},
-// 			GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
-// 				panic("mock out the GetCodespaceRegionLocation method")
+// 			GetCodespacePreFlightFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+// 				panic("mock out the GetCodespacePreFlight method")
 // 			},
 // 			GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
 // 				panic("mock out the GetCodespaceRepoSuggestions method")
@@ -83,8 +83,8 @@ type apiClientMock struct {
 	// GetCodespaceFunc mocks the GetCodespace method.
 	GetCodespaceFunc func(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
 
-	// GetCodespaceRegionLocationFunc mocks the GetCodespaceRegionLocation method.
-	GetCodespaceRegionLocationFunc func(ctx context.Context) (string, error)
+	// GetCodespacePreFlightFunc mocks the GetCodespacePreFlight method.
+	GetCodespacePreFlightFunc func(ctx context.Context, nwo string) (*api.User, error)
 
 	// GetCodespaceRepoSuggestionsFunc mocks the GetCodespaceRepoSuggestions method.
 	GetCodespaceRepoSuggestionsFunc func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error)
@@ -154,10 +154,12 @@ type apiClientMock struct {
 			// IncludeConnection is the includeConnection argument value.
 			IncludeConnection bool
 		}
-		// GetCodespaceRegionLocation holds details about calls to the GetCodespaceRegionLocation method.
-		GetCodespaceRegionLocation []struct {
+		// GetCodespacePreFlight holds details about calls to the GetCodespacePreFlight method.
+		GetCodespacePreFlight []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+			// Nwo is the nwo argument value.
+			Nwo string
 		}
 		// GetCodespaceRepoSuggestions holds details about calls to the GetCodespaceRepoSuggestions method.
 		GetCodespaceRepoSuggestions []struct {
@@ -238,7 +240,7 @@ type apiClientMock struct {
 	lockDeleteCodespace                sync.RWMutex
 	lockEditCodespace                  sync.RWMutex
 	lockGetCodespace                   sync.RWMutex
-	lockGetCodespaceRegionLocation     sync.RWMutex
+	lockGetCodespacePreFlight          sync.RWMutex
 	lockGetCodespaceRepoSuggestions    sync.RWMutex
 	lockGetCodespaceRepositoryContents sync.RWMutex
 	lockGetCodespacesMachines          sync.RWMutex
@@ -433,34 +435,38 @@ func (mock *apiClientMock) GetCodespaceCalls() []struct {
 	return calls
 }
 
-// GetCodespaceRegionLocation calls GetCodespaceRegionLocationFunc.
-func (mock *apiClientMock) GetCodespaceRegionLocation(ctx context.Context) (string, error) {
-	if mock.GetCodespaceRegionLocationFunc == nil {
-		panic("apiClientMock.GetCodespaceRegionLocationFunc: method is nil but apiClient.GetCodespaceRegionLocation was just called")
+// GetCodespacePreFlight calls GetCodespacePreFlightFunc.
+func (mock *apiClientMock) GetCodespacePreFlight(ctx context.Context, nwo string) (*api.User, error) {
+	if mock.GetCodespacePreFlightFunc == nil {
+		panic("apiClientMock.GetCodespacePreFlightFunc: method is nil but apiClient.GetCodespacePreFlight was just called")
 	}
 	callInfo := struct {
 		Ctx context.Context
+		Nwo string
 	}{
 		Ctx: ctx,
+		Nwo: nwo,
 	}
-	mock.lockGetCodespaceRegionLocation.Lock()
-	mock.calls.GetCodespaceRegionLocation = append(mock.calls.GetCodespaceRegionLocation, callInfo)
-	mock.lockGetCodespaceRegionLocation.Unlock()
-	return mock.GetCodespaceRegionLocationFunc(ctx)
+	mock.lockGetCodespacePreFlight.Lock()
+	mock.calls.GetCodespacePreFlight = append(mock.calls.GetCodespacePreFlight, callInfo)
+	mock.lockGetCodespacePreFlight.Unlock()
+	return mock.GetCodespacePreFlightFunc(ctx, nwo)
 }
 
-// GetCodespaceRegionLocationCalls gets all the calls that were made to GetCodespaceRegionLocation.
+// GetCodespacePreFlightCalls gets all the calls that were made to GetCodespacePreFlight.
 // Check the length with:
-//     len(mockedapiClient.GetCodespaceRegionLocationCalls())
-func (mock *apiClientMock) GetCodespaceRegionLocationCalls() []struct {
+//     len(mockedapiClient.GetCodespacePreFlightCalls())
+func (mock *apiClientMock) GetCodespacePreFlightCalls() []struct {
 	Ctx context.Context
+	Nwo string
 } {
 	var calls []struct {
 		Ctx context.Context
+		Nwo string
 	}
-	mock.lockGetCodespaceRegionLocation.RLock()
-	calls = mock.calls.GetCodespaceRegionLocation
-	mock.lockGetCodespaceRegionLocation.RUnlock()
+	mock.lockGetCodespacePreFlight.RLock()
+	calls = mock.calls.GetCodespacePreFlight
+	mock.lockGetCodespacePreFlight.RUnlock()
 	return calls
 }
 
