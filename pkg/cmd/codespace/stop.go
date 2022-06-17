@@ -53,11 +53,14 @@ func (a *App) StopCodespace(ctx context.Context, opts *stopOptions) error {
 			return errors.New("no running codespaces")
 		}
 
-		codespace, err := chooseCodespaceFromList(ctx, runningCodespaces)
+		includeUsername := opts.orgName != ""
+		codespace, err := chooseCodespaceFromList(ctx, runningCodespaces, includeUsername)
+
 		if err != nil {
 			return fmt.Errorf("failed to choose codespace: %w", err)
 		}
 		opts.codespaceName = codespace.Name
+		opts.userName = codespace.Owner.Login
 	} else {
 		a.StartProgressIndicatorWithLabel("Fetching codespace")
 		c, err := a.apiClient.GetCodespace(ctx, opts.codespaceName, false)
