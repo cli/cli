@@ -22,6 +22,18 @@ func newStopCmd(app *App) *cobra.Command {
 		Use:   "stop",
 		Short: "Stop a running codespace",
 		Args:  noArgsConstraint,
+		PreRunE: func(c *cobra.Command, args []string) error {
+			if opts.orgName != "" {
+				if opts.codespaceName != "" && opts.userName == "" {
+					return errors.New("`--org` with `--codespace` requires `--username`")
+				}
+				if opts.codespaceName == "" && opts.userName != "" {
+					return errors.New("`--org` with `--username` requires `--codespace`")
+				}
+				return nil
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.StopCodespace(cmd.Context(), opts)
 		},
