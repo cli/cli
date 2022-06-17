@@ -29,6 +29,12 @@ func TestApp_Create(t *testing.T) {
 			name: "create codespace with default branch and 30m idle timeout",
 			fields: fields{
 				apiClient: &apiClientMock{
+					GetCodespacePreFlightFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Login: "monalisa",
+							Type:  "User",
+						}, nil
+					},
 					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
 						return &api.Repository{
 							ID:            1234,
@@ -83,6 +89,12 @@ func TestApp_Create(t *testing.T) {
 					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
 						return "EUROPE", nil
 					},
+					GetCodespacePreFlightFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Login: "monalisa",
+							Type:  "User",
+						}, nil
+					},
 					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
 						return &api.Repository{
 							ID:            1234,
@@ -133,6 +145,12 @@ func TestApp_Create(t *testing.T) {
 				apiClient: &apiClientMock{
 					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
 						return "EUROPE", nil
+					},
+					GetCodespacePreFlightFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Login: "monalisa",
+							Type:  "User",
+						}, nil
 					},
 					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
 						return &api.Repository{
@@ -190,6 +208,12 @@ func TestApp_Create(t *testing.T) {
 					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
 						return "EUROPE", nil
 					},
+					GetCodespacePreFlightFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Login: "monalisa",
+							Type:  "User",
+						}, nil
+					},
 					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
 						return &api.Repository{
 							ID:            1234,
@@ -217,6 +241,12 @@ func TestApp_Create(t *testing.T) {
 				apiClient: &apiClientMock{
 					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
 						return "EUROPE", nil
+					},
+					GetCodespacePreFlightFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Login: "monalisa",
+							Type:  "User",
+						}, nil
 					},
 					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
 						return &api.Repository{
@@ -268,6 +298,12 @@ func TestApp_Create(t *testing.T) {
 			name: "create codespace that requires accepting additional permissions",
 			fields: fields{
 				apiClient: &apiClientMock{
+					GetCodespacePreFlightFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Login: "monalisa",
+							Type:  "User",
+						}, nil
+					},
 					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
 						return &api.Repository{
 							ID:            1234,
