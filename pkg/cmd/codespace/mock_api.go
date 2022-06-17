@@ -40,6 +40,9 @@ import (
 // 			GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch string, location string) ([]*api.Machine, error) {
 // 				panic("mock out the GetCodespacesMachines method")
 // 			},
+// 			GetOrgMemberCodespaceFunc: func(ctx context.Context, orgName string, userName string, codespaceName string) (*api.Codespace, error) {
+// 				panic("mock out the GetOrgMemberCodespace method")
+// 			},
 // 			GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
 // 				panic("mock out the GetRepository method")
 // 			},
@@ -88,6 +91,9 @@ type apiClientMock struct {
 
 	// GetCodespacesMachinesFunc mocks the GetCodespacesMachines method.
 	GetCodespacesMachinesFunc func(ctx context.Context, repoID int, branch string, location string) ([]*api.Machine, error)
+
+	// GetOrgMemberCodespaceFunc mocks the GetOrgMemberCodespace method.
+	GetOrgMemberCodespaceFunc func(ctx context.Context, orgName string, userName string, codespaceName string) (*api.Codespace, error)
 
 	// GetRepositoryFunc mocks the GetRepository method.
 	GetRepositoryFunc func(ctx context.Context, nwo string) (*api.Repository, error)
@@ -177,6 +183,17 @@ type apiClientMock struct {
 			// Location is the location argument value.
 			Location string
 		}
+		// GetOrgMemberCodespace holds details about calls to the GetOrgMemberCodespace method.
+		GetOrgMemberCodespace []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// OrgName is the orgName argument value.
+			OrgName string
+			// UserName is the userName argument value.
+			UserName string
+			// CodespaceName is the codespaceName argument value.
+			CodespaceName string
+		}
 		// GetRepository holds details about calls to the GetRepository method.
 		GetRepository []struct {
 			// Ctx is the ctx argument value.
@@ -236,6 +253,7 @@ type apiClientMock struct {
 	lockGetCodespaceRepoSuggestions    sync.RWMutex
 	lockGetCodespaceRepositoryContents sync.RWMutex
 	lockGetCodespacesMachines          sync.RWMutex
+	lockGetOrgMemberCodespace          sync.RWMutex
 	lockGetRepository                  sync.RWMutex
 	lockGetUser                        sync.RWMutex
 	lockListCodespaces                 sync.RWMutex
@@ -545,6 +563,49 @@ func (mock *apiClientMock) GetCodespacesMachinesCalls() []struct {
 	mock.lockGetCodespacesMachines.RLock()
 	calls = mock.calls.GetCodespacesMachines
 	mock.lockGetCodespacesMachines.RUnlock()
+	return calls
+}
+
+// GetOrgMemberCodespace calls GetOrgMemberCodespaceFunc.
+func (mock *apiClientMock) GetOrgMemberCodespace(ctx context.Context, orgName string, userName string, codespaceName string) (*api.Codespace, error) {
+	if mock.GetOrgMemberCodespaceFunc == nil {
+		panic("apiClientMock.GetOrgMemberCodespaceFunc: method is nil but apiClient.GetOrgMemberCodespace was just called")
+	}
+	callInfo := struct {
+		Ctx           context.Context
+		OrgName       string
+		UserName      string
+		CodespaceName string
+	}{
+		Ctx:           ctx,
+		OrgName:       orgName,
+		UserName:      userName,
+		CodespaceName: codespaceName,
+	}
+	mock.lockGetOrgMemberCodespace.Lock()
+	mock.calls.GetOrgMemberCodespace = append(mock.calls.GetOrgMemberCodespace, callInfo)
+	mock.lockGetOrgMemberCodespace.Unlock()
+	return mock.GetOrgMemberCodespaceFunc(ctx, orgName, userName, codespaceName)
+}
+
+// GetOrgMemberCodespaceCalls gets all the calls that were made to GetOrgMemberCodespace.
+// Check the length with:
+//     len(mockedapiClient.GetOrgMemberCodespaceCalls())
+func (mock *apiClientMock) GetOrgMemberCodespaceCalls() []struct {
+	Ctx           context.Context
+	OrgName       string
+	UserName      string
+	CodespaceName string
+} {
+	var calls []struct {
+		Ctx           context.Context
+		OrgName       string
+		UserName      string
+		CodespaceName string
+	}
+	mock.lockGetOrgMemberCodespace.RLock()
+	calls = mock.calls.GetOrgMemberCodespace
+	mock.lockGetOrgMemberCodespace.RUnlock()
 	return calls
 }
 

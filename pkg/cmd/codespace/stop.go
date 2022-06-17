@@ -63,7 +63,15 @@ func (a *App) StopCodespace(ctx context.Context, opts *stopOptions) error {
 		opts.userName = codespace.Owner.Login
 	} else {
 		a.StartProgressIndicatorWithLabel("Fetching codespace")
-		c, err := a.apiClient.GetCodespace(ctx, opts.codespaceName, false)
+
+		var c *api.Codespace
+		var err error
+
+		if opts.orgName == "" {
+			c, err = a.apiClient.GetCodespace(ctx, opts.codespaceName, false)
+		} else {
+			c, err = a.apiClient.GetOrgMemberCodespace(ctx, opts.orgName, opts.userName, opts.codespaceName)
+		}
 		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get codespace: %q: %w", opts.codespaceName, err)

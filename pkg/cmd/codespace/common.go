@@ -108,6 +108,7 @@ func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App
 type apiClient interface {
 	GetUser(ctx context.Context) (*api.User, error)
 	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
+	GetOrgMemberCodespace(ctx context.Context, orgName string, userName string, codespaceName string) (*api.Codespace, error)
 	ListCodespaces(ctx context.Context, limit int, orgName string) ([]*api.Codespace, error)
 	DeleteCodespace(ctx context.Context, name string) error
 	StartCodespace(ctx context.Context, name string) error

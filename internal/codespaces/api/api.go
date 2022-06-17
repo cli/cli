@@ -344,6 +344,56 @@ func findNextPage(linkValue string) string {
 	return ""
 }
 
+func (a *API) GetOrgMemberCodespace(ctx context.Context, orgName string, userName string, codespaceName string) (*Codespace, error) {
+	perPage := 100
+	listURL := fmt.Sprintf("%s/orgs/%s/codespaces?per_page=%d", a.githubAPI, orgName, perPage)
+	var codespaces []*Codespace
+
+	for {
+		req, err := http.NewRequest(http.MethodGet, listURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("error creating request: %w", err)
+		}
+		a.setHeaders(req)
+
+		resp, err := a.do(ctx, req, "/orgs/*/members/*/codespaces")
+		if err != nil {
+			return nil, fmt.Errorf("error making request: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, api.HandleHTTPError(resp)
+		}
+
+		var response struct {
+			Codespaces []*Codespace `json:"codespaces"`
+		}
+
+		dec := json.NewDecoder(resp.Body)
+		if err := dec.Decode(&response); err != nil {
+			return nil, fmt.Errorf("error unmarshaling response: %w", err)
+		}
+
+		nextURL := findNextPage(resp.Header.Get("Link"))
+		codespaces = append(codespaces, response.Codespaces...)
+
+		if nextURL == "" {
+			break
+		}
+
+		listURL = nextURL
+	}
+
+	for _, cs := range codespaces {
+		if cs.Name == codespaceName {
+			return cs, nil
+		}
+	}
+
+	return nil, fmt.Errorf("codespace not found for user %s with name %s", userName, codespaceName)
+}
+
 // GetCodespace returns the user codespace based on the provided name.
 // If the codespace is not found, an error is returned.
 // If includeConnection is true, it will return the connection information for the codespace.
