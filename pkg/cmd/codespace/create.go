@@ -111,7 +111,8 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		Location:   opts.location,
 	}
 
-	if userInputs.Repository == "" {
+	promptForRepoAndBranch := userInputs.Repository == ""
+	if promptForRepoAndBranch {
 		repoQuestions := []*survey.Question{
 			{
 				Name: "repository",
@@ -128,18 +129,31 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		if err := ask(repoQuestions, &userInputs); err != nil {
 			return fmt.Errorf("failed to prompt: %w", err)
 		}
+	}
 
-		a.StartProgressIndicatorWithLabel("Validating repository for codespaces")
-		billableOwner, err := a.apiClient.GetCodespacePreFlight(ctx, userInputs.Repository)
-		a.StopProgressIndicator()
+	if userInputs.Location == "" && vscsLocation != "" {
+		userInputs.Location = vscsLocation
+	}
 
-		if billableOwner != nil && billableOwner.Type == "Organization" {
-			cs := a.io.ColorScheme()
-			fmt.Fprintln(a.io.Out, cs.Blue("✓ Codespaces usage for this repository is paid for by "+billableOwner.Login))
-		} else if err != nil {
-			return fmt.Errorf("error checking codespace ownership: %w", err)
-		}
+	a.StartProgressIndicatorWithLabel("Fetching repository")
+	repository, err := a.apiClient.GetRepository(ctx, userInputs.Repository)
+	a.StopProgressIndicator()
+	if err != nil {
+		return fmt.Errorf("error getting repository: %w", err)
+	}
 
+	a.StartProgressIndicatorWithLabel("Validating repository for codespaces")
+	billableOwner, err := a.apiClient.GetCodespacePreFlight(ctx, userInputs.Repository)
+	a.StopProgressIndicator()
+
+	if billableOwner != nil && billableOwner.Type == "Organization" {
+		cs := a.io.ColorScheme()
+		fmt.Fprintln(a.io.Out, cs.Blue("✓ Codespaces usage for this repository is paid for by "+billableOwner.Login))
+	} else if err != nil {
+		return fmt.Errorf("error checking codespace ownership: %w", err)
+	}
+
+	if promptForRepoAndBranch {
 		branchPrompt := "Branch (leave blank for default branch):"
 		if userInputs.Branch != "" {
 			branchPrompt = "Branch:"
@@ -157,17 +171,6 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		if err := ask(branchQuestions, &userInputs); err != nil {
 			return fmt.Errorf("failed to prompt: %w", err)
 		}
-	}
-
-	if userInputs.Location == "" && vscsLocation != "" {
-		userInputs.Location = vscsLocation
-	}
-
-	a.StartProgressIndicatorWithLabel("Fetching repository")
-	repository, err := a.apiClient.GetRepository(ctx, userInputs.Repository)
-	a.StopProgressIndicator()
-	if err != nil {
-		return fmt.Errorf("error getting repository: %w", err)
 	}
 
 	branch := userInputs.Branch
