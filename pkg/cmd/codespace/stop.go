@@ -11,6 +11,8 @@ import (
 
 type stopOptions struct {
 	codespaceName string
+	orgName       string
+	userName      string
 }
 
 func newStopCmd(app *App) *cobra.Command {
@@ -25,6 +27,8 @@ func newStopCmd(app *App) *cobra.Command {
 		},
 	}
 	stopCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "Name of the codespace")
+	stopCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "Stop codespace for an organization member (admin-only)")
+	stopCmd.Flags().StringVarP(&opts.userName, "username", "u", "", "Owner of the codespace. Required when using both -c and -o flags.")
 
 	return stopCmd
 }
@@ -32,7 +36,7 @@ func newStopCmd(app *App) *cobra.Command {
 func (a *App) StopCodespace(ctx context.Context, opts *stopOptions) error {
 	if opts.codespaceName == "" {
 		a.StartProgressIndicatorWithLabel("Fetching codespaces")
-		codespaces, err := a.apiClient.ListCodespaces(ctx, -1, "")
+		codespaces, err := a.apiClient.ListCodespaces(ctx, -1, opts.orgName)
 		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to list codespaces: %w", err)
@@ -69,7 +73,7 @@ func (a *App) StopCodespace(ctx context.Context, opts *stopOptions) error {
 
 	a.StartProgressIndicatorWithLabel("Stopping codespace")
 	defer a.StopProgressIndicator()
-	if err := a.apiClient.StopCodespace(ctx, opts.codespaceName); err != nil {
+	if err := a.apiClient.StopCodespace(ctx, opts.codespaceName, opts.orgName, opts.userName); err != nil {
 		return fmt.Errorf("failed to stop codespace: %w", err)
 	}
 

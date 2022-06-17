@@ -111,7 +111,7 @@ type apiClient interface {
 	ListCodespaces(ctx context.Context, limit int, orgName string) ([]*api.Codespace, error)
 	DeleteCodespace(ctx context.Context, name string) error
 	StartCodespace(ctx context.Context, name string) error
-	StopCodespace(ctx context.Context, name string) error
+	StopCodespace(ctx context.Context, name string, orgName string, userName string) error
 	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
 	EditCodespace(ctx context.Context, codespaceName string, params *api.EditCodespaceParams) (*api.Codespace, error)
 	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)

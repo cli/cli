@@ -419,18 +419,25 @@ func (a *API) StartCodespace(ctx context.Context, codespaceName string) error {
 	return nil
 }
 
-func (a *API) StopCodespace(ctx context.Context, codespaceName string) error {
-	req, err := http.NewRequest(
-		http.MethodPost,
-		a.githubAPI+"/user/codespaces/"+codespaceName+"/stop",
-		nil,
-	)
+func (a *API) StopCodespace(ctx context.Context, codespaceName string, orgName string, userName string) error {
+	var stopURL string
+	var spanName string
+
+	if orgName != "" {
+		stopURL = fmt.Sprintf("%s/orgs/%s/members/%s/codespaces/%s/stop", a.githubAPI, orgName, userName, codespaceName)
+		spanName = "/orgs/*/members/*/codespaces/*/stop"
+	} else {
+		stopURL = fmt.Sprintf("%s/user/codespaces/%s/stop", a.githubAPI, codespaceName)
+		spanName = "/user/codespaces/*/stop"
+	}
+
+	req, err := http.NewRequest(http.MethodPost, stopURL, nil)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
 
 	a.setHeaders(req)
-	resp, err := a.do(ctx, req, "/user/codespaces/*/stop")
+	resp, err := a.do(ctx, req, spanName)
 	if err != nil {
 		return fmt.Errorf("error making request: %w", err)
 	}

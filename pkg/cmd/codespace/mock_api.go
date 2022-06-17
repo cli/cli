@@ -111,7 +111,7 @@ type apiClientMock struct {
 	StartCodespaceFunc func(ctx context.Context, name string) error
 
 	// StopCodespaceFunc mocks the StopCodespace method.
-	StopCodespaceFunc func(ctx context.Context, name string) error
+	StopCodespaceFunc func(ctx context.Context, name string, orgName string, userName string) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -771,7 +771,7 @@ func (mock *apiClientMock) StartCodespaceCalls() []struct {
 }
 
 // StopCodespace calls StopCodespaceFunc.
-func (mock *apiClientMock) StopCodespace(ctx context.Context, name string) error {
+func (mock *apiClientMock) StopCodespace(ctx context.Context, name string, orgName string, userName string) error {
 	if mock.StopCodespaceFunc == nil {
 		panic("apiClientMock.StopCodespaceFunc: method is nil but apiClient.StopCodespace was just called")
 	}
@@ -785,7 +785,7 @@ func (mock *apiClientMock) StopCodespace(ctx context.Context, name string) error
 	mock.lockStopCodespace.Lock()
 	mock.calls.StopCodespace = append(mock.calls.StopCodespace, callInfo)
 	mock.lockStopCodespace.Unlock()
-	return mock.StopCodespaceFunc(ctx, name)
+	return mock.StopCodespaceFunc(ctx, name, orgName, userName)
 }
 
 // StopCodespaceCalls gets all the calls that were made to StopCodespace.
