@@ -11,7 +11,6 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/stretchr/testify/assert"
-	"golang.org/x/crypto/ssh"
 )
 
 func TestApp_Create(t *testing.T) {
@@ -82,9 +81,6 @@ func TestApp_Create(t *testing.T) {
 			name: "create codespace with default branch shows idle timeout notice if present",
 			fields: fields{
 				apiClient: &apiClientMock{
-					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
-						return "EUROPE", nil
-					},
 					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
 						return &api.Repository{
 							ID:            1234,
@@ -133,9 +129,6 @@ func TestApp_Create(t *testing.T) {
 			name: "create codespace with default branch with default devcontainer if no path provided and no devcontainer files exist in the repo",
 			fields: fields{
 				apiClient: &apiClientMock{
-					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
-						return "EUROPE", nil
-					},
 					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
 						return &api.Repository{
 							ID:            1234,
@@ -189,9 +182,6 @@ func TestApp_Create(t *testing.T) {
 			name: "returns error when getting devcontainer paths fails",
 			fields: fields{
 				apiClient: &apiClientMock{
-					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
-						return "EUROPE", nil
-					},
 					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
 						return &api.Repository{
 							ID:            1234,
@@ -217,9 +207,6 @@ func TestApp_Create(t *testing.T) {
 			name: "create codespace with default branch does not show idle timeout notice if not conntected to terminal",
 			fields: fields{
 				apiClient: &apiClientMock{
-					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
-						return "EUROPE", nil
-					},
 					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
 						return &api.Repository{
 							ID:            1234,
@@ -456,37 +443,23 @@ func TestCreateAndSsh(t *testing.T) {
 	}
 
 	mockLiveshareConnector := func(context.Context, *api.Codespace, *App, bool, string) (liveshareSession, error) {
-		session := &mockLiveShare{}
+		session := &liveshareSessionMock{
+			StartSSHServerFunc: func(ctx context.Context) (int, string, error) {
+				return 1, "", nil
+			},
+			StartSharingFunc: func(context.Context, string, int) (liveshare.ChannelID, error) {
+				return liveshare.ChannelID{}, nil
+			},
+			CloseFunc: func() error {
+				return nil
+			},
+		}
 		return session, nil
 	}
 
 	err := a.Create(context.Background(), opts, mockLiveshareConnector)
+
 	if err != nil {
 		t.Error(err)
 	}
-}
-
-type mockLiveShare struct{}
-
-func (l *mockLiveShare) StartSSHServer(ctx context.Context) (int, string, error) {
-	return 0, "", nil
-}
-
-func (l *mockLiveShare) Close() error {
-	return nil
-}
-func (l *mockLiveShare) GetSharedServers(context.Context) ([]*liveshare.Port, error) {
-	return nil, nil
-}
-func (l *mockLiveShare) KeepAlive(string) {
-}
-func (l *mockLiveShare) OpenStreamingChannel(context.Context, liveshare.ChannelID) (ssh.Channel, error) {
-	return nil, nil
-}
-
-func (l *mockLiveShare) StartJupyterServer(context.Context) (int, string, error) {
-	return 0, "", nil
-}
-func (l *mockLiveShare) StartSharing(context.Context, string, int) (liveshare.ChannelID, error) {
-	return liveshare.ChannelID{}, nil
 }

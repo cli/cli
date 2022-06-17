@@ -81,6 +81,7 @@ func (a *App) showStatus(ctx context.Context, codespace *api.Codespace) error {
 	return a.statusChecker(ctx, a.io, a.apiClient, codespace)
 }
 
+//go:generate moq -fmt goimports -rm -skip-ensure -out liveshare_session_mock.go . liveshareSession
 type liveshareSession interface {
 	Close() error
 	GetSharedServers(context.Context) ([]*liveshare.Port, error)
@@ -123,7 +124,7 @@ func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App
 	return session, nil
 }
 
-//go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
+//go:generate moq -fmt goimports -rm -skip-ensure -out api_client_mock.go . apiClient
 type apiClient interface {
 	GetUser(ctx context.Context) (*api.User, error)
 	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
