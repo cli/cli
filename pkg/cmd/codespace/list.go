@@ -35,7 +35,7 @@ func newListCmd(app *App) *cobra.Command {
 	}
 
 	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", 30, "Maximum number of codespaces to list")
-	listCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "List codespaces for an organization")
+	listCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "List codespaces for members of an organization (admin-only)")
 	cmdutil.AddJSONFlags(listCmd, &exporter, api.CodespaceFields)
 
 	return listCmd
