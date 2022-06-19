@@ -408,6 +408,50 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 			},
 			wantStdout: "✓ Codespaces usage for this repository is paid for by megacorp\nmegacorp-private-abcd1234\n",
 		},
+		{
+			name: "doesn't mention billable owner when it's the individual",
+			fields: fields{
+				apiClient: &apiClientMock{
+					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+						return &api.Repository{
+							ID:            1234,
+							FullName:      nwo,
+							DefaultBranch: "main",
+						}, nil
+					},
+					GetCodespacePreFlightFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Type:  "User",
+							Login: "monalisa",
+						}, nil
+					},
+					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+						return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
+					},
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
+						return []*api.Machine{
+							{
+								Name:        "GIGA",
+								DisplayName: "Gigabits of a machine",
+							},
+						}, nil
+					},
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						return &api.Codespace{
+							Name: "megacorp-private-abcd1234",
+						}, nil
+					},
+				},
+			},
+			opts: createOptions{
+				repo:        "megacorp/private",
+				branch:      "",
+				machine:     "GIGA",
+				showStatus:  false,
+				idleTimeout: 30 * time.Minute,
+			},
+			wantStdout: "megacorp-private-abcd1234\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
