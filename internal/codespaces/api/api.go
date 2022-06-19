@@ -574,8 +574,8 @@ func (a *API) GetCodespacePreFlight(ctx context.Context, nwo string) (*User, err
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, nil
-	} else if resp.StatusCode != http.StatusForbidden {
-		return nil, fmt.Errorf("codespaces cannot be created from that repository")
+	} else if resp.StatusCode == http.StatusForbidden {
+		return nil, fmt.Errorf("you cannot create codespaces with that repository")
 	} else if resp.StatusCode != http.StatusOK {
 		return nil, api.HandleHTTPError(resp)
 	}
@@ -586,9 +586,9 @@ func (a *API) GetCodespacePreFlight(ctx context.Context, nwo string) (*User, err
 	}
 
 	var response struct {
-		BillableOwner User `json:"billableOwner"`
+		BillableOwner User `json:"billable_owner"`
 		Defaults      struct {
-			DevcontainerPath string `json:"devcontainerPath"`
+			DevcontainerPath string `json:"devcontainer_path"`
 			Location         string `json:"location"`
 		}
 	}
