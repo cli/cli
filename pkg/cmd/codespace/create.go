@@ -111,12 +111,9 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		Location:   opts.location,
 	}
 
-	if userInputs.Repository == "" {
-		branchPrompt := "Branch (leave blank for default branch):"
-		if userInputs.Branch != "" {
-			branchPrompt = "Branch:"
-		}
-		questions := []*survey.Question{
+	promptForRepoAndBranch := userInputs.Repository == ""
+	if promptForRepoAndBranch {
+		repoQuestions := []*survey.Question{
 			{
 				Name: "repository",
 				Prompt: &survey.Input{
@@ -128,15 +125,8 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 				},
 				Validate: survey.Required,
 			},
-			{
-				Name: "branch",
-				Prompt: &survey.Input{
-					Message: branchPrompt,
-					Default: userInputs.Branch,
-				},
-			},
 		}
-		if err := ask(questions, &userInputs); err != nil {
+		if err := ask(repoQuestions, &userInputs); err != nil {
 			return fmt.Errorf("failed to prompt: %w", err)
 		}
 	}
@@ -150,6 +140,37 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting repository: %w", err)
+	}
+
+	a.StartProgressIndicatorWithLabel("Validating repository for codespaces")
+	billableOwner, err := a.apiClient.GetCodespaceBillableOwner(ctx, userInputs.Repository)
+	a.StopProgressIndicator()
+
+	if err != nil {
+		return fmt.Errorf("error checking codespace ownership: %w", err)
+	} else if billableOwner != nil && billableOwner.Type == "Organization" {
+		cs := a.io.ColorScheme()
+		fmt.Fprintln(a.io.Out, cs.Blue("✓ Codespaces usage for this repository is paid for by "+billableOwner.Login))
+	}
+
+	if promptForRepoAndBranch {
+		branchPrompt := "Branch (leave blank for default branch):"
+		if userInputs.Branch != "" {
+			branchPrompt = "Branch:"
+		}
+		branchQuestions := []*survey.Question{
+			{
+				Name: "branch",
+				Prompt: &survey.Input{
+					Message: branchPrompt,
+					Default: userInputs.Branch,
+				},
+			},
+		}
+
+		if err := ask(branchQuestions, &userInputs); err != nil {
+			return fmt.Errorf("failed to prompt: %w", err)
+		}
 	}
 
 	branch := userInputs.Branch
