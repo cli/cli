@@ -35,4 +35,4 @@
         <Message Importance="high" Text="::set-output name=msi::$(TargetPath)"/>
     </Target>
     <Import Project="$(WixTargetsPath)"/>
-</Project>
+</Project> <https://ghcr.io/home/runner/work/shibainu/shibainu>
