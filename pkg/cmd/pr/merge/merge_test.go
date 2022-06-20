@@ -119,6 +119,22 @@ func Test_NewCmdMerge(t *testing.T) {
 			},
 		},
 		{
+			name:  "match-head-commit specified",
+			args:  "123 --match-head-commit 555",
+			isTTY: true,
+			want: MergeOptions{
+				SelectorArg:             "123",
+				DeleteBranch:            false,
+				IsDeleteBranchIndicated: false,
+				CanDeleteLocalBranch:    true,
+				MergeMethod:             PullRequestMergeMethodMerge,
+				MergeStrategyEmpty:      true,
+				Body:                    "",
+				BodySet:                 false,
+				MatchHeadCommit:         "555",
+			},
+		},
+		{
 			name:    "body and body-file flags",
 			args:    "123 --body 'test' --body-file 'test-file.txt'",
 			isTTY:   true,
@@ -188,6 +204,7 @@ func Test_NewCmdMerge(t *testing.T) {
 			assert.Equal(t, tt.want.MergeStrategyEmpty, opts.MergeStrategyEmpty)
 			assert.Equal(t, tt.want.Body, opts.Body)
 			assert.Equal(t, tt.want.BodySet, opts.BodySet)
+			assert.Equal(t, tt.want.MatchHeadCommit, opts.MatchHeadCommit)
 		})
 	}
 }
@@ -468,6 +485,47 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 	defer cmdTeardown(t)
 
 	output, err := runCommand(http, "main", true, "pr merge 1 --merge -R OWNER/REPO")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Merged pull request #1 \(The title of the PR\)`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPrMerge_withMatchCommitHeadFlag(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "main"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, 3, len(input))
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.Equal(t, "285ed5ab740f53ff6b0b4b629c59a9df23b9c6db", input["expectedHeadOid"].(string))
+		}))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+
+	output, err := runCommand(http, "main", true, "pr merge 1 --merge --match-head-commit 285ed5ab740f53ff6b0b4b629c59a9df23b9c6db")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
