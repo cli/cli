@@ -152,6 +152,24 @@ func TestDelete(t *testing.T) {
 			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-c4f3"},
 			wantStdout:  "",
 		},
+		{
+			name: "deletion for org codespace by admin succeeds",
+			opts: deleteOptions{
+				deleteAll: true,
+				orgName:   "bookish",
+				userName:  "monalisa",
+			},
+			codespaces: []*api.Codespace{
+				{
+					Name: "monalisa-spoonknife-123",
+				},
+				{
+					Name: "hubot-robawt-abc",
+				},
+			},
+			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-123"},
+			wantStdout:  "",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -159,7 +177,7 @@ func TestDelete(t *testing.T) {
 				GetUserFunc: func(_ context.Context) (*api.User, error) {
 					return user, nil
 				},
-				DeleteCodespaceFunc: func(_ context.Context, name string) error {
+				DeleteCodespaceFunc: func(_ context.Context, name string, orgName string, userName string) error {
 					if tt.deleteErr != nil {
 						return tt.deleteErr
 					}
@@ -167,12 +185,18 @@ func TestDelete(t *testing.T) {
 				},
 			}
 			if tt.opts.codespaceName == "" {
-				apiMock.ListCodespacesFunc = func(_ context.Context, num int) ([]*api.Codespace, error) {
+				apiMock.ListCodespacesFunc = func(_ context.Context, num int, orgName string) ([]*api.Codespace, error) {
 					return tt.codespaces, nil
 				}
 			} else {
-				apiMock.GetCodespaceFunc = func(_ context.Context, name string, includeConnection bool) (*api.Codespace, error) {
-					return tt.codespaces[0], nil
+				if tt.opts.orgName != "" {
+					apiMock.GetOrgMemberCodespaceFunc = func(_ context.Context, orgName string, userName string, name string) (*api.Codespace, error) {
+						return tt.codespaces[0], nil
+					}
+				} else {
+					apiMock.GetCodespaceFunc = func(_ context.Context, name string, includeConnection bool) (*api.Codespace, error) {
+						return tt.codespaces[0], nil
+					}
 				}
 			}
 			opts := tt.opts

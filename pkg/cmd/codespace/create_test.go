@@ -80,9 +80,6 @@ func TestApp_Create(t *testing.T) {
 			name: "create codespace with default branch shows idle timeout notice if present",
 			fields: fields{
 				apiClient: &apiClientMock{
-					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
-						return "EUROPE", nil
-					},
 					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
 						return &api.Repository{
 							ID:            1234,
@@ -131,9 +128,6 @@ func TestApp_Create(t *testing.T) {
 			name: "create codespace with default branch with default devcontainer if no path provided and no devcontainer files exist in the repo",
 			fields: fields{
 				apiClient: &apiClientMock{
-					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
-						return "EUROPE", nil
-					},
 					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
 						return &api.Repository{
 							ID:            1234,
@@ -187,9 +181,6 @@ func TestApp_Create(t *testing.T) {
 			name: "returns error when getting devcontainer paths fails",
 			fields: fields{
 				apiClient: &apiClientMock{
-					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
-						return "EUROPE", nil
-					},
 					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
 						return &api.Repository{
 							ID:            1234,
@@ -215,9 +206,6 @@ func TestApp_Create(t *testing.T) {
 			name: "create codespace with default branch does not show idle timeout notice if not conntected to terminal",
 			fields: fields{
 				apiClient: &apiClientMock{
-					GetCodespaceRegionLocationFunc: func(ctx context.Context) (string, error) {
-						return "EUROPE", nil
-					},
 					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
 						return &api.Repository{
 							ID:            1234,

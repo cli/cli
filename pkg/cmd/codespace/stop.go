@@ -28,7 +28,7 @@ func newStopCmd(app *App) *cobra.Command {
 func (a *App) StopCodespace(ctx context.Context, codespaceName string) error {
 	if codespaceName == "" {
 		a.StartProgressIndicatorWithLabel("Fetching codespaces")
-		codespaces, err := a.apiClient.ListCodespaces(ctx, -1)
+		codespaces, err := a.apiClient.ListCodespaces(ctx, -1, "")
 		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to list codespaces: %w", err)

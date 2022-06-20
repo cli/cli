@@ -37,7 +37,7 @@ func newListCmd(app *App) *cobra.Command {
 
 func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) error {
 	a.StartProgressIndicatorWithLabel("Fetching codespaces")
-	codespaces, err := a.apiClient.ListCodespaces(ctx, limit)
+	codespaces, err := a.apiClient.ListCodespaces(ctx, limit, "")
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting codespaces: %w", err)
