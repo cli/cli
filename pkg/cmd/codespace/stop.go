@@ -45,7 +45,7 @@ func (a *App) StopCodespace(ctx context.Context, codespaceName string) error {
 			return errors.New("no running codespaces")
 		}
 
-		codespace, err := chooseCodespaceFromList(ctx, runningCodespaces)
+		codespace, err := chooseCodespaceFromList(ctx, runningCodespaces, false)
 		if err != nil {
 			return fmt.Errorf("failed to choose codespace: %w", err)
 		}

@@ -130,12 +130,12 @@ func chooseCodespace(ctx context.Context, apiClient apiClient) (*api.Codespace, 
 	if err != nil {
 		return nil, fmt.Errorf("error getting codespaces: %w", err)
 	}
-	return chooseCodespaceFromList(ctx, codespaces)
+	return chooseCodespaceFromList(ctx, codespaces, false)
 }
 
 // chooseCodespaceFromList returns the selected codespace from the list,
 // or an error if there are no codespaces.
-func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (*api.Codespace, error) {
+func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace, includeOwner bool) (*api.Codespace, error) {
 	if len(codespaces) == 0 {
 		return nil, errNoCodespaces
 	}
@@ -149,41 +149,17 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (
 		idx int
 	}
 
-	namesWithConflict := make(map[string]bool)
 	codespacesByName := make(map[string]codespaceWithIndex)
 	codespacesNames := make([]string, 0, len(codespaces))
 	codespacesDirty := make(map[string]bool)
 	for _, apiCodespace := range codespaces {
 		cs := codespace{apiCodespace}
-		csName := cs.displayName(false, false)
-		displayNameWithGitStatus := cs.displayName(false, true)
+		var csName, displayNameWithGitStatus string
 
-		_, hasExistingConflict := namesWithConflict[csName]
-		if seenCodespace, ok := codespacesByName[csName]; ok || hasExistingConflict {
-			// There is an existing codespace on the repo and branch.
-			// We need to disambiguate by adding the codespace name
-			// to the existing entry and the one we are processing now.
-			if !hasExistingConflict {
-				fullDisplayName := seenCodespace.cs.displayName(true, false)
-				fullDisplayNameWithGitStatus := seenCodespace.cs.displayName(true, true)
-
-				codespacesByName[fullDisplayName] = codespaceWithIndex{seenCodespace.cs, seenCodespace.idx}
-				codespacesNames[seenCodespace.idx] = fullDisplayNameWithGitStatus
-
-				// Update the git status dirty map to reflect the new name.
-				if seenCodespace.cs.hasUnsavedChanges() {
-					codespacesDirty[fullDisplayNameWithGitStatus] = true
-				}
-
-				// delete the existing map entry with old name
-				delete(codespacesByName, csName)
-
-				// All other codespaces with the same name should update
-				// to their specific name, this tracks conflicting names going forward
-				namesWithConflict[csName] = true
-			}
-
-			// update this codespace names to include the name to disambiguate
+		if includeOwner {
+			csName = cs.displayNameWithOwner()
+			displayNameWithGitStatus = cs.displayNameWithOwner()
+		} else {
 			csName = cs.displayName(true, false)
 			displayNameWithGitStatus = cs.displayName(true, true)
 		}
@@ -362,6 +338,12 @@ func (c codespace) displayName(includeName, includeGitStatus bool) string {
 		"%s: %s", c.Repository.FullName, branch,
 	)
 
+}
+
+func (c codespace) displayNameWithOwner() string {
+	return fmt.Sprintf(
+		"%-15s %s", c.Owner.Login, c.displayName(true, true),
+	)
 }
 
 // gitStatusDirty represents an unsaved changes status.

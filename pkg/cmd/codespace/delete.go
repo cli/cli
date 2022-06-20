@@ -74,11 +74,14 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 		}
 
 		if !opts.deleteAll && opts.repoFilter == "" {
-			c, err := chooseCodespaceFromList(ctx, codespaces)
+			includeUsername := opts.orgName != ""
+			c, err := chooseCodespaceFromList(ctx, codespaces, includeUsername)
 			if err != nil {
 				return fmt.Errorf("error choosing codespace: %w", err)
 			}
 			nameFilter = c.Name
+			opts.codespaceName = c.Name
+			opts.userName = c.Owner.Login
 		}
 	} else {
 		a.StartProgressIndicatorWithLabel("Fetching codespace")
