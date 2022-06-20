@@ -146,11 +146,11 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	billableOwner, err := a.apiClient.GetCodespaceBillableOwner(ctx, userInputs.Repository)
 	a.StopProgressIndicator()
 
-	if billableOwner != nil && billableOwner.Type == "Organization" {
+	if err != nil {
+		return fmt.Errorf("error checking codespace ownership: %w", err)
+	} else if billableOwner != nil && billableOwner.Type == "Organization" {
 		cs := a.io.ColorScheme()
 		fmt.Fprintln(a.io.Out, cs.Blue("✓ Codespaces usage for this repository is paid for by "+billableOwner.Login))
-	} else if err != nil {
-		return fmt.Errorf("error checking codespace ownership: %w", err)
 	}
 
 	if promptForRepoAndBranch {
