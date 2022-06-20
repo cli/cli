@@ -36,7 +36,7 @@ func TestApp_Create(t *testing.T) {
 							DefaultBranch: "main",
 						}, nil
 					},
-					GetCodespacePreFlightFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
 						return &api.User{
 							Login: "monalisa",
 							Type:  "User",
@@ -93,7 +93,7 @@ func TestApp_Create(t *testing.T) {
 							DefaultBranch: "main",
 						}, nil
 					},
-					GetCodespacePreFlightFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
 						return &api.User{
 							Login: "monalisa",
 							Type:  "User",
@@ -147,7 +147,7 @@ func TestApp_Create(t *testing.T) {
 							DefaultBranch: "main",
 						}, nil
 					},
-					GetCodespacePreFlightFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
 						return &api.User{
 							Login: "monalisa",
 							Type:  "User",
@@ -206,7 +206,7 @@ func TestApp_Create(t *testing.T) {
 							DefaultBranch: "main",
 						}, nil
 					},
-					GetCodespacePreFlightFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
 						return &api.User{
 							Login: "monalisa",
 							Type:  "User",
@@ -237,7 +237,7 @@ func TestApp_Create(t *testing.T) {
 							DefaultBranch: "main",
 						}, nil
 					},
-					GetCodespacePreFlightFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
 						return &api.User{
 							Login: "monalisa",
 							Type:  "User",
@@ -286,7 +286,7 @@ func TestApp_Create(t *testing.T) {
 			name: "create codespace that requires accepting additional permissions",
 			fields: fields{
 				apiClient: &apiClientMock{
-					GetCodespacePreFlightFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
 						return &api.User{
 							Login: "monalisa",
 							Type:  "User",
@@ -350,7 +350,7 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 							DefaultBranch: "main",
 						}, nil
 					},
-					GetCodespacePreFlightFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
 						return nil, fmt.Errorf("some error")
 					},
 				},
@@ -375,7 +375,7 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 							DefaultBranch: "main",
 						}, nil
 					},
-					GetCodespacePreFlightFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
 						return &api.User{
 							Type:  "Organization",
 							Login: "megacorp",
@@ -419,7 +419,7 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 							DefaultBranch: "main",
 						}, nil
 					},
-					GetCodespacePreFlightFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
 						return &api.User{
 							Type:  "User",
 							Login: "monalisa",

@@ -143,7 +143,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	}
 
 	a.StartProgressIndicatorWithLabel("Validating repository for codespaces")
-	billableOwner, err := a.apiClient.GetCodespacePreFlight(ctx, userInputs.Repository)
+	billableOwner, err := a.apiClient.GetCodespaceBillableOwner(ctx, userInputs.Repository)
 	a.StopProgressIndicator()
 
 	if billableOwner != nil && billableOwner.Type == "Organization" {

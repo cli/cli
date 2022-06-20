@@ -557,9 +557,9 @@ func (a *API) GetCodespaceRepoSuggestions(ctx context.Context, partialSearch str
 	return repoNames, nil
 }
 
-// GetCodespacePreFlight returns the billable owner and expected default values for
+// GetCodespaceBillableOwner returns the billable owner and expected default values for
 // codespaces created by the user for a given repository.
-func (a *API) GetCodespacePreFlight(ctx context.Context, nwo string) (*User, error) {
+func (a *API) GetCodespaceBillableOwner(ctx context.Context, nwo string) (*User, error) {
 	req, err := http.NewRequest(http.MethodGet, a.githubAPI+"/repos/"+nwo+"/codespaces/new", nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)

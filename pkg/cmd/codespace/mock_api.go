@@ -31,8 +31,8 @@ import (
 // 			GetCodespaceFunc: func(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error) {
 // 				panic("mock out the GetCodespace method")
 // 			},
-// 			GetCodespacePreFlightFunc: func(ctx context.Context, nwo string) (*api.User, error) {
-// 				panic("mock out the GetCodespacePreFlight method")
+// 			GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+// 				panic("mock out the GetCodespaceBillableOwner method")
 // 			},
 // 			GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
 // 				panic("mock out the GetCodespaceRepoSuggestions method")
@@ -83,8 +83,8 @@ type apiClientMock struct {
 	// GetCodespaceFunc mocks the GetCodespace method.
 	GetCodespaceFunc func(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
 
-	// GetCodespacePreFlightFunc mocks the GetCodespacePreFlight method.
-	GetCodespacePreFlightFunc func(ctx context.Context, nwo string) (*api.User, error)
+	// GetCodespaceBillableOwnerFunc mocks the GetCodespaceBillableOwner method.
+	GetCodespaceBillableOwnerFunc func(ctx context.Context, nwo string) (*api.User, error)
 
 	// GetCodespaceRepoSuggestionsFunc mocks the GetCodespaceRepoSuggestions method.
 	GetCodespaceRepoSuggestionsFunc func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error)
@@ -154,8 +154,8 @@ type apiClientMock struct {
 			// IncludeConnection is the includeConnection argument value.
 			IncludeConnection bool
 		}
-		// GetCodespacePreFlight holds details about calls to the GetCodespacePreFlight method.
-		GetCodespacePreFlight []struct {
+		// GetCodespaceBillableOwner holds details about calls to the GetCodespaceBillableOwner method.
+		GetCodespaceBillableOwner []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// Nwo is the nwo argument value.
@@ -240,7 +240,7 @@ type apiClientMock struct {
 	lockDeleteCodespace                sync.RWMutex
 	lockEditCodespace                  sync.RWMutex
 	lockGetCodespace                   sync.RWMutex
-	lockGetCodespacePreFlight          sync.RWMutex
+	lockGetCodespaceBillableOwner      sync.RWMutex
 	lockGetCodespaceRepoSuggestions    sync.RWMutex
 	lockGetCodespaceRepositoryContents sync.RWMutex
 	lockGetCodespacesMachines          sync.RWMutex
@@ -435,10 +435,10 @@ func (mock *apiClientMock) GetCodespaceCalls() []struct {
 	return calls
 }
 
-// GetCodespacePreFlight calls GetCodespacePreFlightFunc.
-func (mock *apiClientMock) GetCodespacePreFlight(ctx context.Context, nwo string) (*api.User, error) {
-	if mock.GetCodespacePreFlightFunc == nil {
-		panic("apiClientMock.GetCodespacePreFlightFunc: method is nil but apiClient.GetCodespacePreFlight was just called")
+// GetCodespaceBillableOwner calls GetCodespaceBillableOwnerFunc.
+func (mock *apiClientMock) GetCodespaceBillableOwner(ctx context.Context, nwo string) (*api.User, error) {
+	if mock.GetCodespaceBillableOwnerFunc == nil {
+		panic("apiClientMock.GetCodespaceBillableOwnerFunc: method is nil but apiClient.GetCodespaceBillableOwner was just called")
 	}
 	callInfo := struct {
 		Ctx context.Context
@@ -447,16 +447,16 @@ func (mock *apiClientMock) GetCodespacePreFlight(ctx context.Context, nwo string
 		Ctx: ctx,
 		Nwo: nwo,
 	}
-	mock.lockGetCodespacePreFlight.Lock()
-	mock.calls.GetCodespacePreFlight = append(mock.calls.GetCodespacePreFlight, callInfo)
-	mock.lockGetCodespacePreFlight.Unlock()
-	return mock.GetCodespacePreFlightFunc(ctx, nwo)
+	mock.lockGetCodespaceBillableOwner.Lock()
+	mock.calls.GetCodespaceBillableOwner = append(mock.calls.GetCodespaceBillableOwner, callInfo)
+	mock.lockGetCodespaceBillableOwner.Unlock()
+	return mock.GetCodespaceBillableOwnerFunc(ctx, nwo)
 }
 
-// GetCodespacePreFlightCalls gets all the calls that were made to GetCodespacePreFlight.
+// GetCodespaceBillableOwnerCalls gets all the calls that were made to GetCodespaceBillableOwner.
 // Check the length with:
-//     len(mockedapiClient.GetCodespacePreFlightCalls())
-func (mock *apiClientMock) GetCodespacePreFlightCalls() []struct {
+//     len(mockedapiClient.GetCodespaceBillableOwnerCalls())
+func (mock *apiClientMock) GetCodespaceBillableOwnerCalls() []struct {
 	Ctx context.Context
 	Nwo string
 } {
@@ -464,9 +464,9 @@ func (mock *apiClientMock) GetCodespacePreFlightCalls() []struct {
 		Ctx context.Context
 		Nwo string
 	}
-	mock.lockGetCodespacePreFlight.RLock()
-	calls = mock.calls.GetCodespacePreFlight
-	mock.lockGetCodespacePreFlight.RUnlock()
+	mock.lockGetCodespaceBillableOwner.RLock()
+	calls = mock.calls.GetCodespaceBillableOwner
+	mock.lockGetCodespaceBillableOwner.RUnlock()
 	return calls
 }
 
