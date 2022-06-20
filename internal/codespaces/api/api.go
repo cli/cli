@@ -280,7 +280,7 @@ func (a *API) ListCodespaces(ctx context.Context, limit int, orgName string) (co
 
 	if orgName != "" {
 		listURL = fmt.Sprintf("%s/orgs/%s/codespaces?per_page=%d", a.githubAPI, orgName, perPage)
-		spanName = fmt.Sprintf("/orgs/%s/codespaces", orgName)
+		spanName = "/orgs/*/codespaces"
 	} else {
 		listURL = fmt.Sprintf("%s/user/codespaces?per_page=%d", a.githubAPI, perPage)
 		spanName = "/user/codespaces"
