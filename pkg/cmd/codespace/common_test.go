@@ -35,10 +35,9 @@ func Test_codespace_displayName(t *testing.T) {
 				},
 			},
 			args: args{
-				includeName:      false,
 				includeGitStatus: false,
 			},
-			want: "cli/cli: trunk",
+			want: "cli/cli (trunk): scuba steve",
 		},
 		{
 			name: "No included name - included gitstatus - no unsaved changes",
@@ -54,10 +53,9 @@ func Test_codespace_displayName(t *testing.T) {
 				},
 			},
 			args: args{
-				includeName:      false,
 				includeGitStatus: true,
 			},
-			want: "cli/cli: trunk",
+			want: "cli/cli (trunk): scuba steve",
 		},
 		{
 			name: "No included name - included gitstatus - unsaved changes",
@@ -74,10 +72,9 @@ func Test_codespace_displayName(t *testing.T) {
 				},
 			},
 			args: args{
-				includeName:      false,
 				includeGitStatus: true,
 			},
-			want: "cli/cli: trunk*",
+			want: "cli/cli (trunk*): scuba steve",
 		},
 		{
 			name: "Included name - included gitstatus - unsaved changes",
@@ -94,10 +91,9 @@ func Test_codespace_displayName(t *testing.T) {
 				},
 			},
 			args: args{
-				includeName:      true,
 				includeGitStatus: true,
 			},
-			want: "cli/cli: scuba steve (trunk*)",
+			want: "cli/cli (trunk*): scuba steve",
 		},
 		{
 			name: "Included name - included gitstatus - no unsaved changes",
@@ -114,10 +110,9 @@ func Test_codespace_displayName(t *testing.T) {
 				},
 			},
 			args: args{
-				includeName:      true,
 				includeGitStatus: true,
 			},
-			want: "cli/cli: scuba steve (trunk)",
+			want: "cli/cli (trunk): scuba steve",
 		},
 	}
 	for _, tt := range tests {
@@ -125,7 +120,7 @@ func Test_codespace_displayName(t *testing.T) {
 			c := codespace{
 				Codespace: tt.fields.Codespace,
 			}
-			if got := c.displayName(tt.args.includeName, tt.args.includeGitStatus); got != tt.want {
+			if got := c.displayName(tt.args.includeGitStatus); got != tt.want {
 				t.Errorf("codespace.displayName() = %v, want %v", got, tt.want)
 			}
 		})
@@ -140,7 +135,6 @@ func Test_formatCodespacesForSelect(t *testing.T) {
 		name                string
 		args                args
 		wantCodespacesNames []string
-		wantCodespacesDirty map[string]bool
 	}{
 		{
 			name: "One codespace: Shows only repo and branch name",
@@ -158,9 +152,8 @@ func Test_formatCodespacesForSelect(t *testing.T) {
 				},
 			},
 			wantCodespacesNames: []string{
-				"cli/cli: trunk",
+				"cli/cli (trunk): scuba steve",
 			},
-			wantCodespacesDirty: map[string]bool{},
 		},
 		{
 			name: "Two codespaces on the same repo/branch: Adds the codespace's display name",
@@ -187,10 +180,9 @@ func Test_formatCodespacesForSelect(t *testing.T) {
 				},
 			},
 			wantCodespacesNames: []string{
-				"cli/cli: scuba steve (trunk)",
-				"cli/cli: flappy bird (trunk)",
+				"cli/cli (trunk): scuba steve",
+				"cli/cli (trunk): flappy bird",
 			},
-			wantCodespacesDirty: map[string]bool{},
 		},
 		{
 			name: "Two codespaces on the different branches: Shows only repo and branch name",
@@ -217,10 +209,9 @@ func Test_formatCodespacesForSelect(t *testing.T) {
 				},
 			},
 			wantCodespacesNames: []string{
-				"cli/cli: trunk",
-				"cli/cli: feature",
+				"cli/cli (trunk): scuba steve",
+				"cli/cli (feature): flappy bird",
 			},
-			wantCodespacesDirty: map[string]bool{},
 		},
 		{
 			name: "Two codespaces on the different repos: Shows only repo and branch name",
@@ -247,10 +238,9 @@ func Test_formatCodespacesForSelect(t *testing.T) {
 				},
 			},
 			wantCodespacesNames: []string{
-				"github/cli: trunk",
-				"cli/cli: trunk",
+				"github/cli (trunk): scuba steve",
+				"cli/cli (trunk): flappy bird",
 			},
-			wantCodespacesDirty: map[string]bool{},
 		},
 		{
 			name: "Two codespaces on the same repo/branch, one dirty: Adds the codespace's display name and *",
@@ -278,23 +268,17 @@ func Test_formatCodespacesForSelect(t *testing.T) {
 				},
 			},
 			wantCodespacesNames: []string{
-				"cli/cli: scuba steve (trunk)",
-				"cli/cli: flappy bird (trunk*)",
-			},
-			wantCodespacesDirty: map[string]bool{
-				"cli/cli: flappy bird (trunk*)": true,
+				"cli/cli (trunk): scuba steve",
+				"cli/cli (trunk*): flappy bird",
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotCodespacesNames, gotCodespacesDirty, _ := formatCodespacesForSelect(tt.args.codespaces)
+			gotCodespacesNames, _ := formatCodespacesForSelect(tt.args.codespaces)
 
 			if !reflect.DeepEqual(gotCodespacesNames, tt.wantCodespacesNames) {
 				t.Errorf("codespacesNames: got %v, want %v", gotCodespacesNames, tt.wantCodespacesNames)
-			}
-			if !reflect.DeepEqual(gotCodespacesDirty, tt.wantCodespacesDirty) {
-				t.Errorf("codespacesDirty: got %v, want %v", gotCodespacesDirty, tt.wantCodespacesDirty)
 			}
 		})
 	}
