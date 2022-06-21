@@ -27,9 +27,6 @@ func newStopCmd(app *App) *cobra.Command {
 				if opts.codespaceName != "" && opts.userName == "" {
 					return errors.New("`--org` with `--codespace` requires `--username`")
 				}
-				if opts.codespaceName == "" && opts.userName != "" {
-					return errors.New("`--org` with `--username` requires `--codespace`")
-				}
 				return nil
 			}
 			return nil
@@ -46,9 +43,12 @@ func newStopCmd(app *App) *cobra.Command {
 }
 
 func (a *App) StopCodespace(ctx context.Context, opts *stopOptions) error {
-	if opts.codespaceName == "" {
+	codespaceName := opts.codespaceName
+	ownerName := opts.userName
+
+	if codespaceName == "" {
 		a.StartProgressIndicatorWithLabel("Fetching codespaces")
-		codespaces, err := a.apiClient.ListCodespaces(ctx, -1, opts.orgName, "")
+		codespaces, err := a.apiClient.ListCodespaces(ctx, -1, opts.orgName, ownerName)
 		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to list codespaces: %w", err)
@@ -70,32 +70,32 @@ func (a *App) StopCodespace(ctx context.Context, opts *stopOptions) error {
 		if err != nil {
 			return fmt.Errorf("failed to choose codespace: %w", err)
 		}
-		opts.codespaceName = codespace.Name
-		opts.userName = codespace.Owner.Login
+		codespaceName = codespace.Name
+		ownerName = codespace.Owner.Login
 	} else {
 		a.StartProgressIndicatorWithLabel("Fetching codespace")
 
 		var c *api.Codespace
 		var err error
 
-		if opts.orgName == "" || opts.userName == "" {
-			c, err = a.apiClient.GetCodespace(ctx, opts.codespaceName, false)
+		if opts.orgName == "" {
+			c, err = a.apiClient.GetCodespace(ctx, codespaceName, false)
 		} else {
-			c, err = a.apiClient.GetOrgMemberCodespace(ctx, opts.orgName, opts.userName, opts.codespaceName)
+			c, err = a.apiClient.GetOrgMemberCodespace(ctx, opts.orgName, ownerName, codespaceName)
 		}
 		a.StopProgressIndicator()
 		if err != nil {
-			return fmt.Errorf("failed to get codespace: %q: %w", opts.codespaceName, err)
+			return fmt.Errorf("failed to get codespace: %q: %w", codespaceName, err)
 		}
 		cs := codespace{c}
 		if !cs.running() {
-			return fmt.Errorf("codespace %q is not running", opts.codespaceName)
+			return fmt.Errorf("codespace %q is not running", codespaceName)
 		}
 	}
 
 	a.StartProgressIndicatorWithLabel("Stopping codespace")
 	defer a.StopProgressIndicator()
-	if err := a.apiClient.StopCodespace(ctx, opts.codespaceName, opts.orgName, opts.userName); err != nil {
+	if err := a.apiClient.StopCodespace(ctx, codespaceName, opts.orgName, ownerName); err != nil {
 		return fmt.Errorf("failed to stop codespace: %w", err)
 	}
 
