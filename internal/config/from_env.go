@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -67,10 +68,17 @@ func (c *envConfig) DefaultHost() (string, error) {
 }
 
 func (c *envConfig) DefaultHostWithSource() (string, string, error) {
-	if host := os.Getenv(GH_HOST); host != "" {
+	var err error
+
+	if _, err = ReadConfigFile(HostsConfigFile()); err == nil {
+		return c.Config.DefaultHostWithSource()
+	}
+
+	if host := os.Getenv(GH_HOST); host != "" && errors.Is(err, os.ErrNotExist) {
 		return host, GH_HOST, nil
 	}
-	return c.Config.DefaultHostWithSource()
+
+	return "", "", err
 }
 
 func (c *envConfig) Get(hostname, key string) (string, error) {
@@ -79,13 +87,19 @@ func (c *envConfig) Get(hostname, key string) (string, error) {
 }
 
 func (c *envConfig) GetWithSource(hostname, key string) (string, string, error) {
-	if hostname != "" && key == "oauth_token" {
+	var err error
+
+	if _, err = ReadConfigFile(HostsConfigFile()); err == nil {
+		return c.Config.GetWithSource(hostname, key)
+	}
+
+	if hostname != "" && key == "oauth_token" && errors.Is(err, os.ErrNotExist) {
 		if token, env := AuthTokenFromEnv(hostname); token != "" {
 			return token, env, nil
 		}
 	}
 
-	return c.Config.GetWithSource(hostname, key)
+	return "", "", err
 }
 
 func (c *envConfig) GetOrDefault(hostname, key string) (val string, err error) {
@@ -107,13 +121,19 @@ func (c *envConfig) Default(key string) string {
 }
 
 func (c *envConfig) CheckWriteable(hostname, key string) error {
-	if hostname != "" && key == "oauth_token" {
+	var err error
+
+	if _, err = ReadConfigFile(HostsConfigFile()); err == nil {
+		return c.Config.CheckWriteable(hostname, key)
+	}
+
+	if hostname != "" && key == "oauth_token" && errors.Is(err, os.ErrNotExist) {
 		if token, env := AuthTokenFromEnv(hostname); token != "" {
 			return &ReadOnlyEnvError{Variable: env}
 		}
 	}
 
-	return c.Config.CheckWriteable(hostname, key)
+	return err
 }
 
 func AuthTokenFromEnv(hostname string) (string, string) {

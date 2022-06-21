@@ -32,6 +32,7 @@ type LoginOptions struct {
 	Token       string
 	Web         bool
 	GitProtocol string
+	ForceAuth   bool
 }
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
@@ -116,6 +117,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes to request")
 	cmd.Flags().BoolVar(&tokenStdin, "with-token", false, "Read token from standard input")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a browser to authenticate")
+	cmd.Flags().BoolVarP(&opts.ForceAuth, "force-auth", "f", false, "Bypasses existing `GH_TOKEN` and `GITHUB_TOKEN`")
 	cmdutil.StringEnumFlag(cmd, &opts.GitProtocol, "git-protocol", "p", "", []string{"ssh", "https"}, "The protocol to use for git operations")
 
 	return cmd
@@ -136,14 +138,16 @@ func loginRun(opts *LoginOptions) error {
 		}
 	}
 
-	if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
-		var roErr *config.ReadOnlyEnvError
-		if errors.As(err, &roErr) {
-			fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", roErr.Variable)
-			fmt.Fprint(opts.IO.ErrOut, "To have GitHub CLI store credentials instead, first clear the value from the environment.\n")
-			return cmdutil.SilentError
+	if !opts.ForceAuth {
+		if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
+			var roErr *config.ReadOnlyEnvError
+			if errors.As(err, &roErr) {
+				fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", roErr.Variable)
+				fmt.Fprint(opts.IO.ErrOut, "To have GitHub CLI store credentials instead, first clear the value from the environment, or rerun the command with the `--force-auth` or `-f` flags.\n")
+				return cmdutil.SilentError
+			}
+			return err
 		}
-		return err
 	}
 
 	httpClient, err := opts.HttpClient()
