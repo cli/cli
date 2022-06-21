@@ -131,63 +131,48 @@ func chooseCodespace(ctx context.Context, apiClient apiClient) (*api.Codespace, 
 	return chooseCodespaceFromList(ctx, codespaces)
 }
 
-type codespaceWithIndex struct {
-	cs  codespace
-	idx int
-}
-
-// chooseCodespaceFromList returns the selected codespace from the list,
-// or an error if there are no codespaces.
+// chooseCodespaceFromList returns the codespace that the user has interactively selected from the list, or
+// an error if there are no codespaces.
 func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (*api.Codespace, error) {
 	if len(codespaces) == 0 {
 		return nil, errNoCodespaces
 	}
 
-	codespacesNames, codespacesByName := formatCodespacesForSelect(codespaces)
+	sortedCodespaces := codespaces
+	sort.Slice(sortedCodespaces, func(i, j int) bool {
+		return sortedCodespaces[i].CreatedAt > sortedCodespaces[j].CreatedAt
+	})
 
 	csSurvey := []*survey.Question{
 		{
 			Name: "codespace",
 			Prompt: &survey.Select{
 				Message: "Choose codespace:",
-				Options: codespacesNames,
-				Default: codespacesNames[0],
+				Options: formatCodespacesForSelect(sortedCodespaces),
 			},
 			Validate: survey.Required,
 		},
 	}
 
 	var answers struct {
-		Codespace string
+		Codespace int
 	}
 	if err := ask(csSurvey, &answers); err != nil {
 		return nil, fmt.Errorf("error getting answers: %w", err)
 	}
 
-	// Codespaces are indexed without the git status included as compared
-	// to how it is displayed in the prompt, so the git status symbol needs
-	// cleaning up in case it is included.
-	selectedCodespace := answers.Codespace
-	return codespacesByName[selectedCodespace].cs.Codespace, nil
+	return sortedCodespaces[answers.Codespace], nil
 }
 
-func formatCodespacesForSelect(codespaces []*api.Codespace) ([]string, map[string]codespaceWithIndex) {
-	sort.Slice(codespaces, func(i, j int) bool {
-		return codespaces[i].CreatedAt > codespaces[j].CreatedAt
-	})
+func formatCodespacesForSelect(codespaces []*api.Codespace) []string {
+	names := make([]string, len(codespaces))
 
-	codespacesByName := make(map[string]codespaceWithIndex)
-	codespacesNames := make([]string, 0, len(codespaces))
-
-	for _, apiCodespace := range codespaces {
+	for i, apiCodespace := range codespaces {
 		cs := codespace{apiCodespace}
-		// csName := cs.displayName(false)
-		displayNameWithGitStatus := cs.displayName(true)
-		codespacesByName[displayNameWithGitStatus] = codespaceWithIndex{cs, len(codespacesNames)}
-		codespacesNames = append(codespacesNames, displayNameWithGitStatus)
+		names[i] = cs.displayName()
 	}
 
-	return codespacesNames, codespacesByName
+	return names
 }
 
 // getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
@@ -289,23 +274,14 @@ type codespace struct {
 	*api.Codespace
 }
 
-// displayName returns the repository nwo and branch.
-// If includeGitStatus is true, the branch will include a star if
-// the codespace has unsaved changes.
-func (c codespace) displayName(includeGitStatus bool) string {
-	branch := c.GitStatus.Ref
-	if includeGitStatus {
-		branch = c.branchWithGitStatus()
+// displayName formats the codespace name for the interactive selector prompt.
+func (c codespace) displayName() string {
+	branch := c.branchWithGitStatus()
+	displayName := c.DisplayName
+	if displayName == "" {
+		displayName = c.Name
 	}
-
-	var displayName = c.Name
-	if c.DisplayName != "" {
-		displayName = c.DisplayName
-	}
-
-	return fmt.Sprintf(
-		"%s (%s): %s", c.Repository.FullName, branch, displayName,
-	)
+	return fmt.Sprintf("%s (%s): %s", c.Repository.FullName, branch, displayName)
 }
 
 // gitStatusDirty represents an unsaved changes status.
