@@ -396,8 +396,7 @@ func (a *API) GetCodespace(ctx context.Context, codespaceName string, includeCon
 
 func (a *API) GetOrgMemberCodespace(ctx context.Context, orgName string, userName string, codespaceName string) (*Codespace, error) {
 	perPage := 100
-	listURL := fmt.Sprintf("%s/orgs/%s/codespaces?per_page=%d", a.githubAPI, orgName, perPage)
-	var codespaces []*Codespace
+	listURL := fmt.Sprintf("%s/orgs/%s/members/%s/codespaces?per_page=%d", a.githubAPI, orgName, userName, perPage)
 
 	for {
 		req, err := http.NewRequest(http.MethodGet, listURL, nil)
@@ -426,19 +425,18 @@ func (a *API) GetOrgMemberCodespace(ctx context.Context, orgName string, userNam
 		}
 
 		nextURL := findNextPage(resp.Header.Get("Link"))
-		codespaces = append(codespaces, response.Codespaces...)
+
+		for _, cs := range response.Codespaces {
+			if cs.Name == codespaceName {
+				return cs, nil
+			}
+		}
 
 		if nextURL == "" {
 			break
 		}
 
 		listURL = nextURL
-	}
-
-	for _, cs := range codespaces {
-		if cs.Name == codespaceName {
-			return cs, nil
-		}
 	}
 
 	return nil, fmt.Errorf("codespace not found for user %s with name %s", userName, codespaceName)

@@ -67,7 +67,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 	nameFilter := opts.codespaceName
 	if nameFilter == "" {
 		a.StartProgressIndicatorWithLabel("Fetching codespaces")
-		codespaces, err = a.apiClient.ListCodespaces(ctx, -1, opts.orgName, "")
+		codespaces, err = a.apiClient.ListCodespaces(ctx, -1, opts.orgName, opts.userName)
 		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error getting codespaces: %w", err)
@@ -80,8 +80,6 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 				return fmt.Errorf("error choosing codespace: %w", err)
 			}
 			nameFilter = c.Name
-			opts.codespaceName = c.Name
-			opts.userName = c.Owner.Login
 		}
 	} else {
 		a.StartProgressIndicatorWithLabel("Fetching codespace")
