@@ -11,8 +11,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type listOptions struct {
+	limit    int
+	orgName  string
+	userName string
+}
+
 func newListCmd(app *App) *cobra.Command {
-	var limit int
+	opts := &listOptions{}
 	var exporter cmdutil.Exporter
 
 	listCmd := &cobra.Command{
@@ -21,23 +27,25 @@ func newListCmd(app *App) *cobra.Command {
 		Aliases: []string{"ls"},
 		Args:    noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if limit < 1 {
-				return cmdutil.FlagErrorf("invalid limit: %v", limit)
+			if opts.limit < 1 {
+				return cmdutil.FlagErrorf("invalid limit: %v", opts.limit)
 			}
 
-			return app.List(cmd.Context(), limit, exporter)
+			return app.List(cmd.Context(), opts, exporter)
 		},
 	}
 
-	listCmd.Flags().IntVarP(&limit, "limit", "L", 30, "Maximum number of codespaces to list")
+	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", 30, "Maximum number of codespaces to list")
+	listCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "List codespaces for an organization")
+	listCmd.Flags().StringVarP(&opts.userName, "user", "u", "", "Used with --org to filter to a specific user")
 	cmdutil.AddJSONFlags(listCmd, &exporter, api.CodespaceFields)
 
 	return listCmd
 }
 
-func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) error {
+func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Exporter) error {
 	a.StartProgressIndicatorWithLabel("Fetching codespaces")
-	codespaces, err := a.apiClient.ListCodespaces(ctx, limit)
+	codespaces, err := a.apiClient.ListCodespaces(ctx, opts.limit, opts.orgName, opts.userName)
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting codespaces: %w", err)
@@ -68,6 +76,9 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 	if tp.IsTTY() {
 		tp.AddField("NAME", nil, nil)
 		tp.AddField("DISPLAY NAME", nil, nil)
+		if opts.orgName != "" {
+			tp.AddField("OWNER", nil, nil)
+		}
 		tp.AddField("REPOSITORY", nil, nil)
 		tp.AddField("BRANCH", nil, nil)
 		tp.AddField("STATE", nil, nil)
@@ -104,6 +115,9 @@ func (a *App) List(ctx context.Context, limit int, exporter cmdutil.Exporter) er
 
 		tp.AddField(formattedName, nil, nameColor)
 		tp.AddField(c.DisplayName, nil, nil)
+		if opts.orgName != "" {
+			tp.AddField(c.Owner.Login, nil, nil)
+		}
 		tp.AddField(c.Repository.FullName, nil, nil)
 		tp.AddField(c.branchWithGitStatus(), nil, cs.Cyan)
 		if c.PendingOperation {
