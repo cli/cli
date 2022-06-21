@@ -78,7 +78,7 @@ func (a *App) StopCodespace(ctx context.Context, opts *stopOptions) error {
 		var c *api.Codespace
 		var err error
 
-		if opts.orgName == "" {
+		if opts.orgName == "" || opts.userName == "" {
 			c, err = a.apiClient.GetCodespace(ctx, opts.codespaceName, false)
 		} else {
 			c, err = a.apiClient.GetOrgMemberCodespace(ctx, opts.orgName, opts.userName, opts.codespaceName)
