@@ -12,8 +12,8 @@ import (
 )
 
 type listOptions struct {
-	limit   int
-	orgName string
+	limit    int
+	orgName  string
 	userName string
 }
 

@@ -80,7 +80,7 @@ func TestApp_List(t *testing.T) {
 				},
 			},
 			opts: &listOptions{
-				orgName: "TestOrg",
+				orgName:  "TestOrg",
 				userName: "jimmy",
 			},
 		},
