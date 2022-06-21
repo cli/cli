@@ -255,7 +255,7 @@ func Test_formatCodespacesForSelect(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotCodespacesNames := formatCodespacesForSelect(tt.args.codespaces)
+			gotCodespacesNames := formatCodespacesForSelect(tt.args.codespaces, false)
 
 			if !reflect.DeepEqual(gotCodespacesNames, tt.wantCodespacesNames) {
 				t.Errorf("codespacesNames: got %v, want %v", gotCodespacesNames, tt.wantCodespacesNames)

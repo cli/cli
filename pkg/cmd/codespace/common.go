@@ -133,8 +133,8 @@ func chooseCodespace(ctx context.Context, apiClient apiClient) (*api.Codespace, 
 	return chooseCodespaceFromList(ctx, codespaces, false)
 }
 
-// chooseCodespaceFromList returns the selected codespace from the list,
-// or an error if there are no codespaces.
+// chooseCodespaceFromList returns the codespace that the user has interactively selected from the list, or
+// an error if there are no codespaces.
 func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace, includeOwner bool) (*api.Codespace, error) {
 	if len(codespaces) == 0 {
 		return nil, errNoCodespaces
