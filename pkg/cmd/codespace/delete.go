@@ -43,6 +43,12 @@ func newDeleteCmd(app *App) *cobra.Command {
 		Use:   "delete",
 		Short: "Delete a codespace",
 		Args:  noArgsConstraint,
+		PreRunE: func(c *cobra.Command, args []string) error {
+			if opts.orgName != "" && opts.codespaceName != "" && opts.userName == "" {
+				return errors.New("`--org` with `--codespace` requires `--username`")
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.deleteAll && opts.repoFilter != "" {
 				return errors.New("both --all and --repo is not supported")
@@ -56,8 +62,8 @@ func newDeleteCmd(app *App) *cobra.Command {
 	deleteCmd.Flags().StringVarP(&opts.repoFilter, "repo", "r", "", "Delete codespaces for a `repository`")
 	deleteCmd.Flags().BoolVarP(&opts.skipConfirm, "force", "f", false, "Skip confirmation for codespaces that contain unsaved changes")
 	deleteCmd.Flags().Uint16Var(&opts.keepDays, "days", 0, "Delete codespaces older than `N` days")
-	deleteCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "Select organization to delete codespace from")
-	deleteCmd.Flags().StringVarP(&opts.userName, "username", "u", "", "Username of user in organization to delete codespace from")
+	deleteCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "Select organization to delete codespace from (admin-only)")
+	deleteCmd.Flags().StringVarP(&opts.userName, "username", "u", "", "Used with --org to filter to a specific user")
 
 	return deleteCmd
 }
