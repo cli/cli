@@ -75,7 +75,7 @@ func (c *envConfig) DefaultHostWithSource() (string, string, error) {
 		return host, GH_HOST, nil
 	}
 
-	return "", "", nil
+	return c.Config.DefaultHostWithSource()
 }
 
 func (c *envConfig) Get(hostname, key string) (string, error) {
@@ -94,7 +94,7 @@ func (c *envConfig) GetWithSource(hostname, key string) (string, string, error) 
 		}
 	}
 
-	return "", "", nil
+	return c.Config.GetWithSource(hostname, key)
 }
 
 func (c *envConfig) GetOrDefault(hostname, key string) (val string, err error) {
@@ -126,7 +126,7 @@ func (c *envConfig) CheckWriteable(hostname, key string) error {
 		}
 	}
 
-	return nil
+	return c.Config.CheckWriteable(hostname, key)
 }
 
 func AuthTokenFromEnv(hostname string) (string, string) {
