@@ -150,7 +150,7 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace, i
 			Name: "codespace",
 			Prompt: &survey.Select{
 				Message: "Choose codespace:",
-				Options: formatCodespacesForSelect(sortedCodespaces),
+				Options: formatCodespacesForSelect(sortedCodespaces, includeOwner),
 			},
 			Validate: survey.Required,
 		},
@@ -166,12 +166,12 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace, i
 	return sortedCodespaces[answers.Codespace], nil
 }
 
-func formatCodespacesForSelect(codespaces []*api.Codespace) []string {
+func formatCodespacesForSelect(codespaces []*api.Codespace, includeOwner bool) []string {
 	names := make([]string, len(codespaces))
 
 	for i, apiCodespace := range codespaces {
 		cs := codespace{apiCodespace}
-		names[i] = cs.displayName()
+		names[i] = cs.displayName(includeOwner)
 	}
 
 	return names
@@ -277,13 +277,21 @@ type codespace struct {
 }
 
 // displayName formats the codespace name for the interactive selector prompt.
-func (c codespace) displayName() string {
+func (c codespace) displayName(includeOwner bool) string {
 	branch := c.branchWithGitStatus()
 	displayName := c.DisplayName
+
 	if displayName == "" {
 		displayName = c.Name
 	}
-	return fmt.Sprintf("%s (%s): %s", c.Repository.FullName, branch, displayName)
+
+	description := fmt.Sprintf("%s (%s): %s", c.Repository.FullName, branch, displayName)
+
+	if includeOwner {
+		description = fmt.Sprintf("%-15s %s", c.Owner.Login, description)
+	}
+
+	return description
 }
 
 // gitStatusDirty represents an unsaved changes status.
