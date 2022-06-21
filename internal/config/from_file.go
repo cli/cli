@@ -114,6 +114,16 @@ func (c *fileConfig) UnsetHost(hostname string) {
 	cm.RemoveEntry(hostname)
 }
 
+func (c *fileConfig) OverrideEnv() bool {
+	ent, _ := c.FindEntry("override_env")
+
+	if ent.ValueNode.Value == "true" {
+		return true
+	}
+
+	return false
+}
+
 func (c *fileConfig) configForHost(hostname string) (*HostConfig, error) {
 	hosts, err := c.hostEntries()
 	if err != nil {
