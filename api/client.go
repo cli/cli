@@ -47,6 +47,7 @@ func (err HTTPError) ScopesSuggestion() string {
 func (c Client) GraphQL(hostname string, query string, variables map[string]interface{}, data interface{}) error {
 	// AuthToken is being handled by Transport, so let go-gh know that it does not need to resolve it.
 	opts := ghAPI.ClientOptions{Host: hostname, AuthToken: "none", Transport: c.http.Transport}
+	opts.Headers = map[string]string{"GraphQL-Features": "merge_queue"}
 	gqlClient, err := gh.GQLClient(&opts)
 	if err != nil {
 		return err

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
@@ -162,7 +163,8 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 	if opts.InteractiveMode {
 		detector := opts.Detector
 		if detector == nil {
-			detector = fd.NewDetector(opts.HTTPClient, repo.RepoHost())
+			cachedClient := api.NewCachedHTTPClient(opts.HTTPClient, time.Hour*24)
+			detector = fd.NewDetector(cachedClient, repo.RepoHost())
 		}
 		repoFeatures, err := detector.RepositoryFeatures()
 		if err != nil {
