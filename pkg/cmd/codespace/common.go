@@ -10,7 +10,6 @@ import (
 	"log"
 	"os"
 	"sort"
-	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
@@ -109,7 +108,7 @@ type apiClient interface {
 	GetUser(ctx context.Context) (*api.User, error)
 	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
 	GetOrgMemberCodespace(ctx context.Context, orgName string, userName string, codespaceName string) (*api.Codespace, error)
-	ListCodespaces(ctx context.Context, limit int, orgName string) ([]*api.Codespace, error)
+	ListCodespaces(ctx context.Context, limit int, orgName string, userName string) ([]*api.Codespace, error)
 	DeleteCodespace(ctx context.Context, name string, orgName string, userName string) error
 	StartCodespace(ctx context.Context, name string) error
 	StopCodespace(ctx context.Context, name string) error
@@ -121,12 +120,13 @@ type apiClient interface {
 	GetCodespaceRepositoryContents(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
 	ListDevContainers(ctx context.Context, repoID int, branch string, limit int) (devcontainers []api.DevContainerEntry, err error)
 	GetCodespaceRepoSuggestions(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error)
+	GetCodespaceBillableOwner(ctx context.Context, nwo string) (*api.User, error)
 }
 
 var errNoCodespaces = errors.New("you have no codespaces")
 
 func chooseCodespace(ctx context.Context, apiClient apiClient) (*api.Codespace, error) {
-	codespaces, err := apiClient.ListCodespaces(ctx, -1, "")
+	codespaces, err := apiClient.ListCodespaces(ctx, -1, "", "")
 	if err != nil {
 		return nil, fmt.Errorf("error getting codespaces: %w", err)
 	}
@@ -140,80 +140,45 @@ func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace, i
 		return nil, errNoCodespaces
 	}
 
-	sort.Slice(codespaces, func(i, j int) bool {
-		return codespaces[i].CreatedAt > codespaces[j].CreatedAt
+	sortedCodespaces := codespaces
+	sort.Slice(sortedCodespaces, func(i, j int) bool {
+		return sortedCodespaces[i].CreatedAt > sortedCodespaces[j].CreatedAt
 	})
-
-	type codespaceWithIndex struct {
-		cs  codespace
-		idx int
-	}
-
-	codespacesByName := make(map[string]codespaceWithIndex)
-	codespacesNames := make([]string, 0, len(codespaces))
-	codespacesDirty := make(map[string]bool)
-	for _, apiCodespace := range codespaces {
-		cs := codespace{apiCodespace}
-		var csName, displayNameWithGitStatus string
-
-		if includeOwner {
-			csName = cs.displayNameWithOwner()
-			displayNameWithGitStatus = cs.displayNameWithOwner()
-		} else {
-			csName = cs.displayName(true, false)
-			displayNameWithGitStatus = cs.displayName(true, true)
-		}
-
-		codespacesByName[csName] = codespaceWithIndex{cs, len(codespacesNames)}
-		codespacesNames = append(codespacesNames, displayNameWithGitStatus)
-
-		if cs.hasUnsavedChanges() {
-			codespacesDirty[displayNameWithGitStatus] = true
-		}
-	}
 
 	csSurvey := []*survey.Question{
 		{
 			Name: "codespace",
 			Prompt: &survey.Select{
 				Message: "Choose codespace:",
-				Options: codespacesNames,
-				Default: codespacesNames[0],
+				Options: formatCodespacesForSelect(sortedCodespaces, includeOwner),
 			},
 			Validate: survey.Required,
 		},
 	}
 
 	var answers struct {
-		Codespace string
+		Codespace int
 	}
 	if err := ask(csSurvey, &answers); err != nil {
 		return nil, fmt.Errorf("error getting answers: %w", err)
 	}
 
-	// Codespaces are indexed without the git status included as compared
-	// to how it is displayed in the prompt, so the git status symbol needs
-	// cleaning up in case it is included.
-	selectedCodespace := answers.Codespace
-	isDirty := codespacesDirty[selectedCodespace]
-	if isDirty {
-		selectedCodespace = withoutGitStatus(answers.Codespace)
-	}
-	return codespacesByName[selectedCodespace].cs.Codespace, nil
+	return sortedCodespaces[answers.Codespace], nil
 }
 
-// withoutGitStatus returns the string without the git status symbol.
-func withoutGitStatus(cname string) string {
-	return replaceLastOccurence(cname, gitStatusDirty, "")
-}
+func formatCodespacesForSelect(codespaces []*api.Codespace, includeOwner bool) []string {
+	names := make([]string, len(codespaces))
 
-// replaceLastOccurence replaces the last occurence of a string with another string.
-func replaceLastOccurence(str, old, replace string) string {
-	i := strings.LastIndex(str, old)
-	if i == -1 {
-		return str
+	for i, apiCodespace := range codespaces {
+		cs := codespace{apiCodespace}
+		if includeOwner {
+			names[i] = cs.displayNameWithOwner()
+		} else {
+			names[i] = cs.displayName()
+		}
 	}
-	return str[:i] + replace + str[i+len(old):]
+
+	return names
 }
 
 // getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
@@ -315,34 +280,19 @@ type codespace struct {
 	*api.Codespace
 }
 
-// displayName returns the repository nwo and branch.
-// If includeName is true, the name of the codespace (including displayName) is included.
-// If includeGitStatus is true, the branch will include a star if
-// the codespace has unsaved changes.
-func (c codespace) displayName(includeName, includeGitStatus bool) string {
-	branch := c.GitStatus.Ref
-	if includeGitStatus {
-		branch = c.branchWithGitStatus()
+// displayName formats the codespace name for the interactive selector prompt.
+func (c codespace) displayName() string {
+	branch := c.branchWithGitStatus()
+	displayName := c.DisplayName
+	if displayName == "" {
+		displayName = c.Name
 	}
-
-	if includeName {
-		var displayName = c.Name
-		if c.DisplayName != "" {
-			displayName = c.DisplayName
-		}
-		return fmt.Sprintf(
-			"%s: %s (%s)", c.Repository.FullName, displayName, branch,
-		)
-	}
-	return fmt.Sprintf(
-		"%s: %s", c.Repository.FullName, branch,
-	)
-
+	return fmt.Sprintf("%s (%s): %s", c.Repository.FullName, branch, displayName)
 }
 
 func (c codespace) displayNameWithOwner() string {
 	return fmt.Sprintf(
-		"%-15s %s", c.Owner.Login, c.displayName(true, true),
+		"%-15s %s", c.Owner.Login, c.displayName(),
 	)
 }
 
