@@ -155,20 +155,53 @@ func TestDelete(t *testing.T) {
 		{
 			name: "deletion for org codespace by admin succeeds",
 			opts: deleteOptions{
-				deleteAll: true,
-				orgName:   "bookish",
-				userName:  "monalisa",
+				deleteAll:     true,
+				orgName:       "bookish",
+				userName:      "monalisa",
+				codespaceName: "monalisa-spoonknife-123",
 			},
 			codespaces: []*api.Codespace{
 				{
-					Name: "monalisa-spoonknife-123",
+					Name:  "monalisa-spoonknife-123",
+					Owner: api.User{Login: "monalisa"},
 				},
 				{
-					Name: "hubot-robawt-abc",
+					Name:  "monalisa-spoonknife-123",
+					Owner: api.User{Login: "monalisa2"},
+				},
+				{
+					Name:  "dont-delete-abc",
+					Owner: api.User{Login: "monalisa"},
 				},
 			},
-			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-123"},
+			wantDeleted: []string{"monalisa-spoonknife-123"},
 			wantStdout:  "",
+		},
+		{
+			name: "deletion for org codespace by admin fails for codespace not found",
+			opts: deleteOptions{
+				deleteAll:     true,
+				orgName:       "bookish",
+				userName:      "johnDoe",
+				codespaceName: "monalisa-spoonknife-123",
+			},
+			codespaces: []*api.Codespace{
+				{
+					Name:  "monalisa-spoonknife-123",
+					Owner: api.User{Login: "monalisa"},
+				},
+				{
+					Name:  "monalisa-spoonknife-123",
+					Owner: api.User{Login: "monalisa2"},
+				},
+				{
+					Name:  "dont-delete-abc",
+					Owner: api.User{Login: "monalisa"},
+				},
+			},
+			wantDeleted: []string{},
+			wantStdout:  "",
+			wantErr:     true,
 		},
 	}
 	for _, tt := range tests {
@@ -191,7 +224,12 @@ func TestDelete(t *testing.T) {
 			} else {
 				if tt.opts.orgName != "" {
 					apiMock.GetOrgMemberCodespaceFunc = func(_ context.Context, orgName string, userName string, name string) (*api.Codespace, error) {
-						return tt.codespaces[0], nil
+						for _, codespace := range tt.codespaces {
+							if codespace.Name == name && codespace.Owner.Login == userName {
+								return codespace, nil
+							}
+						}
+						return nil, fmt.Errorf("codespace not found for user %s with name %s", userName, name)
 					}
 				} else {
 					apiMock.GetCodespaceFunc = func(_ context.Context, name string, includeConnection bool) (*api.Codespace, error) {
