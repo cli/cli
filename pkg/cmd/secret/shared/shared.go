@@ -85,7 +85,7 @@ func IsSupportedSecretEntity(app App, entity SecretEntity) bool {
 	case Actions:
 		return entity == Repository || entity == Organization || entity == Environment
 	case Codespaces:
-		return entity == User
+		return entity == User || entity == Repository
 	case Dependabot:
 		return entity == Repository || entity == Organization
 	default:

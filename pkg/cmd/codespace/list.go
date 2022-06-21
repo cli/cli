@@ -12,8 +12,9 @@ import (
 )
 
 type listOptions struct {
-	limit   int
-	orgName string
+	limit    int
+	orgName  string
+	userName string
 }
 
 func newListCmd(app *App) *cobra.Command {
@@ -36,6 +37,7 @@ func newListCmd(app *App) *cobra.Command {
 
 	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", 30, "Maximum number of codespaces to list")
 	listCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "List codespaces for members of an organization (admin-only)")
+	listCmd.Flags().StringVarP(&opts.userName, "user", "u", "", "Used with --org to filter to a specific user")
 	cmdutil.AddJSONFlags(listCmd, &exporter, api.CodespaceFields)
 
 	return listCmd
@@ -43,7 +45,7 @@ func newListCmd(app *App) *cobra.Command {
 
 func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Exporter) error {
 	a.StartProgressIndicatorWithLabel("Fetching codespaces")
-	codespaces, err := a.apiClient.ListCodespaces(ctx, opts.limit, opts.orgName)
+	codespaces, err := a.apiClient.ListCodespaces(ctx, opts.limit, opts.orgName, opts.userName)
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting codespaces: %w", err)

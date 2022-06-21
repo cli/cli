@@ -31,6 +31,9 @@ import (
 // 			GetCodespaceFunc: func(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error) {
 // 				panic("mock out the GetCodespace method")
 // 			},
+// 			GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+// 				panic("mock out the GetCodespaceBillableOwner method")
+// 			},
 // 			GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
 // 				panic("mock out the GetCodespaceRepoSuggestions method")
 // 			},
@@ -49,7 +52,7 @@ import (
 // 			GetUserFunc: func(ctx context.Context) (*api.User, error) {
 // 				panic("mock out the GetUser method")
 // 			},
-// 			ListCodespacesFunc: func(ctx context.Context, limit int, orgName string) ([]*api.Codespace, error) {
+// 			ListCodespacesFunc: func(ctx context.Context, limit int, orgName string, userName string) ([]*api.Codespace, error) {
 // 				panic("mock out the ListCodespaces method")
 // 			},
 // 			ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
@@ -83,6 +86,9 @@ type apiClientMock struct {
 	// GetCodespaceFunc mocks the GetCodespace method.
 	GetCodespaceFunc func(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
 
+	// GetCodespaceBillableOwnerFunc mocks the GetCodespaceBillableOwner method.
+	GetCodespaceBillableOwnerFunc func(ctx context.Context, nwo string) (*api.User, error)
+
 	// GetCodespaceRepoSuggestionsFunc mocks the GetCodespaceRepoSuggestions method.
 	GetCodespaceRepoSuggestionsFunc func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error)
 
@@ -102,7 +108,7 @@ type apiClientMock struct {
 	GetUserFunc func(ctx context.Context) (*api.User, error)
 
 	// ListCodespacesFunc mocks the ListCodespaces method.
-	ListCodespacesFunc func(ctx context.Context, limit int, orgName string) ([]*api.Codespace, error)
+	ListCodespacesFunc func(ctx context.Context, limit int, orgName string, userName string) ([]*api.Codespace, error)
 
 	// ListDevContainersFunc mocks the ListDevContainers method.
 	ListDevContainersFunc func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error)
@@ -153,6 +159,13 @@ type apiClientMock struct {
 			Name string
 			// IncludeConnection is the includeConnection argument value.
 			IncludeConnection bool
+		}
+		// GetCodespaceBillableOwner holds details about calls to the GetCodespaceBillableOwner method.
+		GetCodespaceBillableOwner []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Nwo is the nwo argument value.
+			Nwo string
 		}
 		// GetCodespaceRepoSuggestions holds details about calls to the GetCodespaceRepoSuggestions method.
 		GetCodespaceRepoSuggestions []struct {
@@ -214,6 +227,8 @@ type apiClientMock struct {
 			Limit int
 			// OrgName is the orgName argument value.
 			OrgName string
+			// UserName is the userName argument value.
+			UserName string
 		}
 		// ListDevContainers holds details about calls to the ListDevContainers method.
 		ListDevContainers []struct {
@@ -250,6 +265,7 @@ type apiClientMock struct {
 	lockDeleteCodespace                sync.RWMutex
 	lockEditCodespace                  sync.RWMutex
 	lockGetCodespace                   sync.RWMutex
+	lockGetCodespaceBillableOwner      sync.RWMutex
 	lockGetCodespaceRepoSuggestions    sync.RWMutex
 	lockGetCodespaceRepositoryContents sync.RWMutex
 	lockGetCodespacesMachines          sync.RWMutex
@@ -442,6 +458,41 @@ func (mock *apiClientMock) GetCodespaceCalls() []struct {
 	mock.lockGetCodespace.RLock()
 	calls = mock.calls.GetCodespace
 	mock.lockGetCodespace.RUnlock()
+	return calls
+}
+
+// GetCodespaceBillableOwner calls GetCodespaceBillableOwnerFunc.
+func (mock *apiClientMock) GetCodespaceBillableOwner(ctx context.Context, nwo string) (*api.User, error) {
+	if mock.GetCodespaceBillableOwnerFunc == nil {
+		panic("apiClientMock.GetCodespaceBillableOwnerFunc: method is nil but apiClient.GetCodespaceBillableOwner was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+		Nwo string
+	}{
+		Ctx: ctx,
+		Nwo: nwo,
+	}
+	mock.lockGetCodespaceBillableOwner.Lock()
+	mock.calls.GetCodespaceBillableOwner = append(mock.calls.GetCodespaceBillableOwner, callInfo)
+	mock.lockGetCodespaceBillableOwner.Unlock()
+	return mock.GetCodespaceBillableOwnerFunc(ctx, nwo)
+}
+
+// GetCodespaceBillableOwnerCalls gets all the calls that were made to GetCodespaceBillableOwner.
+// Check the length with:
+//     len(mockedapiClient.GetCodespaceBillableOwnerCalls())
+func (mock *apiClientMock) GetCodespaceBillableOwnerCalls() []struct {
+	Ctx context.Context
+	Nwo string
+} {
+	var calls []struct {
+		Ctx context.Context
+		Nwo string
+	}
+	mock.lockGetCodespaceBillableOwner.RLock()
+	calls = mock.calls.GetCodespaceBillableOwner
+	mock.lockGetCodespaceBillableOwner.RUnlock()
 	return calls
 }
 
@@ -676,37 +727,41 @@ func (mock *apiClientMock) GetUserCalls() []struct {
 }
 
 // ListCodespaces calls ListCodespacesFunc.
-func (mock *apiClientMock) ListCodespaces(ctx context.Context, limit int, orgName string) ([]*api.Codespace, error) {
+func (mock *apiClientMock) ListCodespaces(ctx context.Context, limit int, orgName string, userName string) ([]*api.Codespace, error) {
 	if mock.ListCodespacesFunc == nil {
 		panic("apiClientMock.ListCodespacesFunc: method is nil but apiClient.ListCodespaces was just called")
 	}
 	callInfo := struct {
-		Ctx     context.Context
-		Limit   int
-		OrgName string
+		Ctx      context.Context
+		Limit    int
+		OrgName  string
+		UserName string
 	}{
-		Ctx:     ctx,
-		Limit:   limit,
-		OrgName: orgName,
+		Ctx:      ctx,
+		Limit:    limit,
+		OrgName:  orgName,
+		UserName: userName,
 	}
 	mock.lockListCodespaces.Lock()
 	mock.calls.ListCodespaces = append(mock.calls.ListCodespaces, callInfo)
 	mock.lockListCodespaces.Unlock()
-	return mock.ListCodespacesFunc(ctx, limit, orgName)
+	return mock.ListCodespacesFunc(ctx, limit, orgName, userName)
 }
 
 // ListCodespacesCalls gets all the calls that were made to ListCodespaces.
 // Check the length with:
 //     len(mockedapiClient.ListCodespacesCalls())
 func (mock *apiClientMock) ListCodespacesCalls() []struct {
-	Ctx     context.Context
-	Limit   int
-	OrgName string
+	Ctx      context.Context
+	Limit    int
+	OrgName  string
+	UserName string
 } {
 	var calls []struct {
-		Ctx     context.Context
-		Limit   int
-		OrgName string
+		Ctx      context.Context
+		Limit    int
+		OrgName  string
+		UserName string
 	}
 	mock.lockListCodespaces.RLock()
 	calls = mock.calls.ListCodespaces

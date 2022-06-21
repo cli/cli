@@ -23,7 +23,7 @@ func TestApp_List(t *testing.T) {
 			name: "list codespaces, no flags",
 			fields: fields{
 				apiClient: &apiClientMock{
-					ListCodespacesFunc: func(ctx context.Context, limit int, orgName string) ([]*api.Codespace, error) {
+					ListCodespacesFunc: func(ctx context.Context, limit int, orgName string, userName string) ([]*api.Codespace, error) {
 						if orgName != "" {
 							return nil, fmt.Errorf("should not be called with an orgName")
 						}
@@ -41,9 +41,12 @@ func TestApp_List(t *testing.T) {
 			name: "list codespaces, --org flag",
 			fields: fields{
 				apiClient: &apiClientMock{
-					ListCodespacesFunc: func(ctx context.Context, limit int, orgName string) ([]*api.Codespace, error) {
+					ListCodespacesFunc: func(ctx context.Context, limit int, orgName string, userName string) ([]*api.Codespace, error) {
 						if orgName != "TestOrg" {
 							return nil, fmt.Errorf("Expected orgName to be TestOrg. Got %s", orgName)
+						}
+						if userName != "" {
+							return nil, fmt.Errorf("Expected userName to be blank. Got %s", userName)
 						}
 						return []*api.Codespace{
 							{
@@ -55,6 +58,30 @@ func TestApp_List(t *testing.T) {
 			},
 			opts: &listOptions{
 				orgName: "TestOrg",
+			},
+		},
+		{
+			name: "list codespaces, --org and --user flag",
+			fields: fields{
+				apiClient: &apiClientMock{
+					ListCodespacesFunc: func(ctx context.Context, limit int, orgName string, userName string) ([]*api.Codespace, error) {
+						if orgName != "TestOrg" {
+							return nil, fmt.Errorf("Expected orgName to be TestOrg. Got %s", orgName)
+						}
+						if userName != "jimmy" {
+							return nil, fmt.Errorf("Expected userName to be jimmy. Got %s", userName)
+						}
+						return []*api.Codespace{
+							{
+								DisplayName: "CS1",
+							},
+						}, nil
+					},
+				},
+			},
+			opts: &listOptions{
+				orgName:  "TestOrg",
+				userName: "jimmy",
 			},
 		},
 	}
