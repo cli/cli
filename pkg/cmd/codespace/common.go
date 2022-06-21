@@ -10,7 +10,6 @@ import (
 	"log"
 	"os"
 	"sort"
-	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
@@ -133,111 +132,48 @@ func chooseCodespace(ctx context.Context, apiClient apiClient) (*api.Codespace, 
 	return chooseCodespaceFromList(ctx, codespaces)
 }
 
-// chooseCodespaceFromList returns the selected codespace from the list,
-// or an error if there are no codespaces.
+// chooseCodespaceFromList returns the codespace that the user has interactively selected from the list, or
+// an error if there are no codespaces.
 func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (*api.Codespace, error) {
 	if len(codespaces) == 0 {
 		return nil, errNoCodespaces
 	}
 
-	sort.Slice(codespaces, func(i, j int) bool {
-		return codespaces[i].CreatedAt > codespaces[j].CreatedAt
+	sortedCodespaces := codespaces
+	sort.Slice(sortedCodespaces, func(i, j int) bool {
+		return sortedCodespaces[i].CreatedAt > sortedCodespaces[j].CreatedAt
 	})
-
-	type codespaceWithIndex struct {
-		cs  codespace
-		idx int
-	}
-
-	namesWithConflict := make(map[string]bool)
-	codespacesByName := make(map[string]codespaceWithIndex)
-	codespacesNames := make([]string, 0, len(codespaces))
-	codespacesDirty := make(map[string]bool)
-	for _, apiCodespace := range codespaces {
-		cs := codespace{apiCodespace}
-		csName := cs.displayName(false, false)
-		displayNameWithGitStatus := cs.displayName(false, true)
-
-		_, hasExistingConflict := namesWithConflict[csName]
-		if seenCodespace, ok := codespacesByName[csName]; ok || hasExistingConflict {
-			// There is an existing codespace on the repo and branch.
-			// We need to disambiguate by adding the codespace name
-			// to the existing entry and the one we are processing now.
-			if !hasExistingConflict {
-				fullDisplayName := seenCodespace.cs.displayName(true, false)
-				fullDisplayNameWithGitStatus := seenCodespace.cs.displayName(true, true)
-
-				codespacesByName[fullDisplayName] = codespaceWithIndex{seenCodespace.cs, seenCodespace.idx}
-				codespacesNames[seenCodespace.idx] = fullDisplayNameWithGitStatus
-
-				// Update the git status dirty map to reflect the new name.
-				if seenCodespace.cs.hasUnsavedChanges() {
-					codespacesDirty[fullDisplayNameWithGitStatus] = true
-				}
-
-				// delete the existing map entry with old name
-				delete(codespacesByName, csName)
-
-				// All other codespaces with the same name should update
-				// to their specific name, this tracks conflicting names going forward
-				namesWithConflict[csName] = true
-			}
-
-			// update this codespace names to include the name to disambiguate
-			csName = cs.displayName(true, false)
-			displayNameWithGitStatus = cs.displayName(true, true)
-		}
-
-		codespacesByName[csName] = codespaceWithIndex{cs, len(codespacesNames)}
-		codespacesNames = append(codespacesNames, displayNameWithGitStatus)
-
-		if cs.hasUnsavedChanges() {
-			codespacesDirty[displayNameWithGitStatus] = true
-		}
-	}
 
 	csSurvey := []*survey.Question{
 		{
 			Name: "codespace",
 			Prompt: &survey.Select{
 				Message: "Choose codespace:",
-				Options: codespacesNames,
-				Default: codespacesNames[0],
+				Options: formatCodespacesForSelect(sortedCodespaces),
 			},
 			Validate: survey.Required,
 		},
 	}
 
 	var answers struct {
-		Codespace string
+		Codespace int
 	}
 	if err := ask(csSurvey, &answers); err != nil {
 		return nil, fmt.Errorf("error getting answers: %w", err)
 	}
 
-	// Codespaces are indexed without the git status included as compared
-	// to how it is displayed in the prompt, so the git status symbol needs
-	// cleaning up in case it is included.
-	selectedCodespace := answers.Codespace
-	isDirty := codespacesDirty[selectedCodespace]
-	if isDirty {
-		selectedCodespace = withoutGitStatus(answers.Codespace)
-	}
-	return codespacesByName[selectedCodespace].cs.Codespace, nil
+	return sortedCodespaces[answers.Codespace], nil
 }
 
-// withoutGitStatus returns the string without the git status symbol.
-func withoutGitStatus(cname string) string {
-	return replaceLastOccurence(cname, gitStatusDirty, "")
-}
+func formatCodespacesForSelect(codespaces []*api.Codespace) []string {
+	names := make([]string, len(codespaces))
 
-// replaceLastOccurence replaces the last occurence of a string with another string.
-func replaceLastOccurence(str, old, replace string) string {
-	i := strings.LastIndex(str, old)
-	if i == -1 {
-		return str
+	for i, apiCodespace := range codespaces {
+		cs := codespace{apiCodespace}
+		names[i] = cs.displayName()
 	}
-	return str[:i] + replace + str[i+len(old):]
+
+	return names
 }
 
 // getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
@@ -339,29 +275,14 @@ type codespace struct {
 	*api.Codespace
 }
 
-// displayName returns the repository nwo and branch.
-// If includeName is true, the name of the codespace (including displayName) is included.
-// If includeGitStatus is true, the branch will include a star if
-// the codespace has unsaved changes.
-func (c codespace) displayName(includeName, includeGitStatus bool) string {
-	branch := c.GitStatus.Ref
-	if includeGitStatus {
-		branch = c.branchWithGitStatus()
+// displayName formats the codespace name for the interactive selector prompt.
+func (c codespace) displayName() string {
+	branch := c.branchWithGitStatus()
+	displayName := c.DisplayName
+	if displayName == "" {
+		displayName = c.Name
 	}
-
-	if includeName {
-		var displayName = c.Name
-		if c.DisplayName != "" {
-			displayName = c.DisplayName
-		}
-		return fmt.Sprintf(
-			"%s: %s (%s)", c.Repository.FullName, displayName, branch,
-		)
-	}
-	return fmt.Sprintf(
-		"%s: %s", c.Repository.FullName, branch,
-	)
-
+	return fmt.Sprintf("%s (%s): %s", c.Repository.FullName, branch, displayName)
 }
 
 // gitStatusDirty represents an unsaved changes status.
