@@ -36,6 +36,12 @@ func TestApp_Create(t *testing.T) {
 							DefaultBranch: "main",
 						}, nil
 					},
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Login: "monalisa",
+							Type:  "User",
+						}, nil
+					},
 					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
 						return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
 					},
@@ -87,6 +93,12 @@ func TestApp_Create(t *testing.T) {
 							DefaultBranch: "main",
 						}, nil
 					},
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Login: "monalisa",
+							Type:  "User",
+						}, nil
+					},
 					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
 						return []*api.Machine{
 							{
@@ -133,6 +145,12 @@ func TestApp_Create(t *testing.T) {
 							ID:            1234,
 							FullName:      nwo,
 							DefaultBranch: "main",
+						}, nil
+					},
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Login: "monalisa",
+							Type:  "User",
 						}, nil
 					},
 					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
@@ -188,6 +206,12 @@ func TestApp_Create(t *testing.T) {
 							DefaultBranch: "main",
 						}, nil
 					},
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Login: "monalisa",
+							Type:  "User",
+						}, nil
+					},
 					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
 						return nil, fmt.Errorf("some error")
 					},
@@ -211,6 +235,12 @@ func TestApp_Create(t *testing.T) {
 							ID:            1234,
 							FullName:      nwo,
 							DefaultBranch: "main",
+						}, nil
+					},
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Login: "monalisa",
+							Type:  "User",
 						}, nil
 					},
 					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
@@ -256,6 +286,12 @@ func TestApp_Create(t *testing.T) {
 			name: "create codespace that requires accepting additional permissions",
 			fields: fields{
 				apiClient: &apiClientMock{
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Login: "monalisa",
+							Type:  "User",
+						}, nil
+					},
 					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
 						return &api.Repository{
 							ID:            1234,
@@ -302,6 +338,119 @@ func TestApp_Create(t *testing.T) {
 Open this URL in your browser to review and authorize additional permissions: example.com/permissions
 Alternatively, you can run "create" with the "--default-permissions" option to continue without authorizing additional permissions.
 `,
+		},
+		{
+			name: "returns error when user can't create codepaces for a repository",
+			fields: fields{
+				apiClient: &apiClientMock{
+					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+						return &api.Repository{
+							ID:            1234,
+							FullName:      nwo,
+							DefaultBranch: "main",
+						}, nil
+					},
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return nil, fmt.Errorf("some error")
+					},
+				},
+			},
+			opts: createOptions{
+				repo:        "megacorp/private",
+				branch:      "",
+				machine:     "GIGA",
+				showStatus:  false,
+				idleTimeout: 30 * time.Minute,
+			},
+			wantErr: fmt.Errorf("error checking codespace ownership: some error"),
+		},
+		{
+			name: "mentions billable owner when org covers codepaces for a repository",
+			fields: fields{
+				apiClient: &apiClientMock{
+					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+						return &api.Repository{
+							ID:            1234,
+							FullName:      nwo,
+							DefaultBranch: "main",
+						}, nil
+					},
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Type:  "Organization",
+							Login: "megacorp",
+						}, nil
+					},
+					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+						return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
+					},
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
+						return []*api.Machine{
+							{
+								Name:        "GIGA",
+								DisplayName: "Gigabits of a machine",
+							},
+						}, nil
+					},
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						return &api.Codespace{
+							Name: "megacorp-private-abcd1234",
+						}, nil
+					},
+				},
+			},
+			opts: createOptions{
+				repo:        "megacorp/private",
+				branch:      "",
+				machine:     "GIGA",
+				showStatus:  false,
+				idleTimeout: 30 * time.Minute,
+			},
+			wantStdout: "✓ Codespaces usage for this repository is paid for by megacorp\nmegacorp-private-abcd1234\n",
+		},
+		{
+			name: "doesn't mention billable owner when it's the individual",
+			fields: fields{
+				apiClient: &apiClientMock{
+					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+						return &api.Repository{
+							ID:            1234,
+							FullName:      nwo,
+							DefaultBranch: "main",
+						}, nil
+					},
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Type:  "User",
+							Login: "monalisa",
+						}, nil
+					},
+					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+						return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
+					},
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
+						return []*api.Machine{
+							{
+								Name:        "GIGA",
+								DisplayName: "Gigabits of a machine",
+							},
+						}, nil
+					},
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						return &api.Codespace{
+							Name: "megacorp-private-abcd1234",
+						}, nil
+					},
+				},
+			},
+			opts: createOptions{
+				repo:        "megacorp/private",
+				branch:      "",
+				machine:     "GIGA",
+				showStatus:  false,
+				idleTimeout: 30 * time.Minute,
+			},
+			wantStdout: "megacorp-private-abcd1234\n",
 		},
 	}
 	for _, tt := range tests {
