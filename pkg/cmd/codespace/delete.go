@@ -70,7 +70,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 		}
 
 		if !opts.deleteAll && opts.repoFilter == "" {
-			c, err := chooseCodespaceFromList(ctx, codespaces)
+			c, err := chooseCodespaceFromList(ctx, codespaces, false)
 			if err != nil {
 				return fmt.Errorf("error choosing codespace: %w", err)
 			}

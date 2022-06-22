@@ -9,26 +9,46 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type stopOptions struct {
+	codespaceName string
+	orgName       string
+	userName      string
+}
+
 func newStopCmd(app *App) *cobra.Command {
-	var codespace string
+	opts := &stopOptions{}
 
 	stopCmd := &cobra.Command{
 		Use:   "stop",
 		Short: "Stop a running codespace",
 		Args:  noArgsConstraint,
+		PreRunE: func(c *cobra.Command, args []string) error {
+			if opts.orgName != "" {
+				if opts.codespaceName != "" && opts.userName == "" {
+					return errors.New("`--org` with `--codespace` requires `--username`")
+				}
+				return nil
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.StopCodespace(cmd.Context(), codespace)
+			return app.StopCodespace(cmd.Context(), opts)
 		},
 	}
-	stopCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
+	stopCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "Name of the codespace")
+	stopCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "Stop codespace for an organization member (admin-only)")
+	stopCmd.Flags().StringVarP(&opts.userName, "username", "u", "", "Owner of the codespace. Required when using both -c and -o flags.")
 
 	return stopCmd
 }
 
-func (a *App) StopCodespace(ctx context.Context, codespaceName string) error {
+func (a *App) StopCodespace(ctx context.Context, opts *stopOptions) error {
+	codespaceName := opts.codespaceName
+	ownerName := opts.userName
+
 	if codespaceName == "" {
 		a.StartProgressIndicatorWithLabel("Fetching codespaces")
-		codespaces, err := a.apiClient.ListCodespaces(ctx, -1, "", "")
+		codespaces, err := a.apiClient.ListCodespaces(ctx, -1, opts.orgName, ownerName)
 		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to list codespaces: %w", err)
@@ -45,14 +65,24 @@ func (a *App) StopCodespace(ctx context.Context, codespaceName string) error {
 			return errors.New("no running codespaces")
 		}
 
-		codespace, err := chooseCodespaceFromList(ctx, runningCodespaces)
+		includeOwner := opts.orgName != ""
+		codespace, err := chooseCodespaceFromList(ctx, runningCodespaces, includeOwner)
 		if err != nil {
 			return fmt.Errorf("failed to choose codespace: %w", err)
 		}
 		codespaceName = codespace.Name
+		ownerName = codespace.Owner.Login
 	} else {
 		a.StartProgressIndicatorWithLabel("Fetching codespace")
-		c, err := a.apiClient.GetCodespace(ctx, codespaceName, false)
+
+		var c *api.Codespace
+		var err error
+
+		if opts.orgName == "" {
+			c, err = a.apiClient.GetCodespace(ctx, codespaceName, false)
+		} else {
+			c, err = a.apiClient.GetOrgMemberCodespace(ctx, opts.orgName, ownerName, codespaceName)
+		}
 		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get codespace: %q: %w", codespaceName, err)
@@ -65,7 +95,7 @@ func (a *App) StopCodespace(ctx context.Context, codespaceName string) error {
 
 	a.StartProgressIndicatorWithLabel("Stopping codespace")
 	defer a.StopProgressIndicator()
-	if err := a.apiClient.StopCodespace(ctx, codespaceName); err != nil {
+	if err := a.apiClient.StopCodespace(ctx, codespaceName, opts.orgName, ownerName); err != nil {
 		return fmt.Errorf("failed to stop codespace: %w", err)
 	}
 

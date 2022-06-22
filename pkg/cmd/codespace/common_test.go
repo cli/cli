@@ -11,13 +11,18 @@ func Test_codespace_displayName(t *testing.T) {
 	type fields struct {
 		Codespace *api.Codespace
 	}
+	type args struct {
+		includeOwner bool
+	}
 	tests := []struct {
 		name   string
+		args   args
 		fields fields
 		want   string
 	}{
 		{
 			name: "No included name or gitstatus",
+			args: args{},
 			fields: fields{
 				Codespace: &api.Codespace{
 					GitStatus: api.CodespaceGitStatus{
@@ -33,6 +38,7 @@ func Test_codespace_displayName(t *testing.T) {
 		},
 		{
 			name: "No included name - included gitstatus - no unsaved changes",
+			args: args{},
 			fields: fields{
 				Codespace: &api.Codespace{
 					GitStatus: api.CodespaceGitStatus{
@@ -48,6 +54,7 @@ func Test_codespace_displayName(t *testing.T) {
 		},
 		{
 			name: "No included name - included gitstatus - unsaved changes",
+			args: args{},
 			fields: fields{
 				Codespace: &api.Codespace{
 					GitStatus: api.CodespaceGitStatus{
@@ -64,6 +71,7 @@ func Test_codespace_displayName(t *testing.T) {
 		},
 		{
 			name: "Included name - included gitstatus - unsaved changes",
+			args: args{},
 			fields: fields{
 				Codespace: &api.Codespace{
 					GitStatus: api.CodespaceGitStatus{
@@ -80,6 +88,7 @@ func Test_codespace_displayName(t *testing.T) {
 		},
 		{
 			name: "Included name - included gitstatus - no unsaved changes",
+			args: args{},
 			fields: fields{
 				Codespace: &api.Codespace{
 					GitStatus: api.CodespaceGitStatus{
@@ -94,14 +103,36 @@ func Test_codespace_displayName(t *testing.T) {
 			},
 			want: "cli/cli (trunk): scuba steve",
 		},
+		{
+			name: "with includeOwner true, prefixes the codespace owner",
+			args: args{
+				includeOwner: true,
+			},
+			fields: fields{
+				Codespace: &api.Codespace{
+					Owner: api.User{
+						Login: "jimmy",
+					},
+					GitStatus: api.CodespaceGitStatus{
+						Ref:                  "trunk",
+						HasUncommitedChanges: false,
+					},
+					Repository: api.Repository{
+						FullName: "cli/cli",
+					},
+					DisplayName: "scuba steve",
+				},
+			},
+			want: "jimmy           cli/cli (trunk): scuba steve",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := codespace{
 				Codespace: tt.fields.Codespace,
 			}
-			if got := c.displayName(); got != tt.want {
-				t.Errorf("codespace.displayName() = %v, want %v", got, tt.want)
+			if got := c.displayName(tt.args.includeOwner); got != tt.want {
+				t.Errorf("codespace.displayName(includeOwnewr) = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -255,7 +286,7 @@ func Test_formatCodespacesForSelect(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotCodespacesNames := formatCodespacesForSelect(tt.args.codespaces)
+			gotCodespacesNames := formatCodespacesForSelect(tt.args.codespaces, false)
 
 			if !reflect.DeepEqual(gotCodespacesNames, tt.wantCodespacesNames) {
 				t.Errorf("codespacesNames: got %v, want %v", gotCodespacesNames, tt.wantCodespacesNames)
