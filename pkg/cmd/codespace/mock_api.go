@@ -61,7 +61,7 @@ import (
 // 			StartCodespaceFunc: func(ctx context.Context, name string) error {
 // 				panic("mock out the StartCodespace method")
 // 			},
-// 			StopCodespaceFunc: func(ctx context.Context, name string) error {
+// 			StopCodespaceFunc: func(ctx context.Context, name string, orgName string, userName string) error {
 // 				panic("mock out the StopCodespace method")
 // 			},
 // 		}
@@ -117,7 +117,7 @@ type apiClientMock struct {
 	StartCodespaceFunc func(ctx context.Context, name string) error
 
 	// StopCodespaceFunc mocks the StopCodespace method.
-	StopCodespaceFunc func(ctx context.Context, name string) error
+	StopCodespaceFunc func(ctx context.Context, name string, orgName string, userName string) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -258,6 +258,10 @@ type apiClientMock struct {
 			Ctx context.Context
 			// Name is the name argument value.
 			Name string
+			// OrgName is the orgName argument value.
+			OrgName string
+			// UserName is the userName argument value.
+			UserName string
 		}
 	}
 	lockAuthorizedKeys                 sync.RWMutex
@@ -856,33 +860,41 @@ func (mock *apiClientMock) StartCodespaceCalls() []struct {
 }
 
 // StopCodespace calls StopCodespaceFunc.
-func (mock *apiClientMock) StopCodespace(ctx context.Context, name string) error {
+func (mock *apiClientMock) StopCodespace(ctx context.Context, name string, orgName string, userName string) error {
 	if mock.StopCodespaceFunc == nil {
 		panic("apiClientMock.StopCodespaceFunc: method is nil but apiClient.StopCodespace was just called")
 	}
 	callInfo := struct {
-		Ctx  context.Context
-		Name string
+		Ctx      context.Context
+		Name     string
+		OrgName  string
+		UserName string
 	}{
-		Ctx:  ctx,
-		Name: name,
+		Ctx:      ctx,
+		Name:     name,
+		OrgName:  orgName,
+		UserName: userName,
 	}
 	mock.lockStopCodespace.Lock()
 	mock.calls.StopCodespace = append(mock.calls.StopCodespace, callInfo)
 	mock.lockStopCodespace.Unlock()
-	return mock.StopCodespaceFunc(ctx, name)
+	return mock.StopCodespaceFunc(ctx, name, orgName, userName)
 }
 
 // StopCodespaceCalls gets all the calls that were made to StopCodespace.
 // Check the length with:
 //     len(mockedapiClient.StopCodespaceCalls())
 func (mock *apiClientMock) StopCodespaceCalls() []struct {
-	Ctx  context.Context
-	Name string
+	Ctx      context.Context
+	Name     string
+	OrgName  string
+	UserName string
 } {
 	var calls []struct {
-		Ctx  context.Context
-		Name string
+		Ctx      context.Context
+		Name     string
+		OrgName  string
+		UserName string
 	}
 	mock.lockStopCodespace.RLock()
 	calls = mock.calls.StopCodespace

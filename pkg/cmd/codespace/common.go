@@ -111,7 +111,7 @@ type apiClient interface {
 	ListCodespaces(ctx context.Context, limit int, orgName string, userName string) ([]*api.Codespace, error)
 	DeleteCodespace(ctx context.Context, name string, orgName string, userName string) error
 	StartCodespace(ctx context.Context, name string) error
-	StopCodespace(ctx context.Context, name string) error
+	StopCodespace(ctx context.Context, name string, orgName string, userName string) error
 	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
 	EditCodespace(ctx context.Context, codespaceName string, params *api.EditCodespaceParams) (*api.Codespace, error)
 	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
@@ -171,11 +171,7 @@ func formatCodespacesForSelect(codespaces []*api.Codespace, includeOwner bool) [
 
 	for i, apiCodespace := range codespaces {
 		cs := codespace{apiCodespace}
-		if includeOwner {
-			names[i] = cs.displayNameWithOwner()
-		} else {
-			names[i] = cs.displayName()
-		}
+		names[i] = cs.displayName(includeOwner)
 	}
 
 	return names
@@ -281,13 +277,21 @@ type codespace struct {
 }
 
 // displayName formats the codespace name for the interactive selector prompt.
-func (c codespace) displayName() string {
+func (c codespace) displayName(includeOwner bool) string {
 	branch := c.branchWithGitStatus()
 	displayName := c.DisplayName
+
 	if displayName == "" {
 		displayName = c.Name
 	}
-	return fmt.Sprintf("%s (%s): %s", c.Repository.FullName, branch, displayName)
+
+	description := fmt.Sprintf("%s (%s): %s", c.Repository.FullName, branch, displayName)
+
+	if includeOwner {
+		description = fmt.Sprintf("%-15s %s", c.Owner.Login, description)
+	}
+
+	return description
 }
 
 func (c codespace) displayNameWithOwner() string {
