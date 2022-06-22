@@ -22,7 +22,7 @@ type Config interface {
 	CheckWriteable(string, string) error
 	Write() error
 	WriteHosts() error
-	OverrideEnv() bool
+	OverrideEnv(string) bool
 }
 
 type ConfigOption struct {

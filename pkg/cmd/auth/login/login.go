@@ -138,7 +138,14 @@ func loginRun(opts *LoginOptions) error {
 		}
 	}
 
-	if !opts.ForceAuth {
+	if opts.ForceAuth {
+		err := cfg.Set(hostname, "override_env", "true")
+		if err != nil {
+			fmt.Printf("got error: %+v when attempting to set override_env", err)
+		}
+	}
+
+	if !opts.ForceAuth && !cfg.OverrideEnv(hostname) {
 		if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
 			var roErr *config.ReadOnlyEnvError
 			if errors.As(err, &roErr) {

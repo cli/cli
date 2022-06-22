@@ -67,10 +67,6 @@ func (c *envConfig) DefaultHost() (string, error) {
 }
 
 func (c *envConfig) DefaultHostWithSource() (string, string, error) {
-	if c.Config.OverrideEnv() {
-		return c.Config.DefaultHostWithSource()
-	}
-
 	if host := os.Getenv(GH_HOST); host != "" {
 		return host, GH_HOST, nil
 	}
@@ -84,7 +80,7 @@ func (c *envConfig) Get(hostname, key string) (string, error) {
 }
 
 func (c *envConfig) GetWithSource(hostname, key string) (string, string, error) {
-	if c.Config.OverrideEnv() {
+	if c.Config.OverrideEnv(hostname) {
 		return c.Config.GetWithSource(hostname, key)
 	}
 
@@ -116,7 +112,7 @@ func (c *envConfig) Default(key string) string {
 }
 
 func (c *envConfig) CheckWriteable(hostname, key string) error {
-	if c.Config.OverrideEnv() {
+	if c.Config.OverrideEnv(hostname) {
 		return c.Config.CheckWriteable(hostname, key)
 	}
 
