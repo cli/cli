@@ -77,7 +77,8 @@ jobs:
           GIT_AUTHOR_NAME: cli automation
           GIT_COMMITTER_EMAIL: noreply@github.com
           GIT_AUTHOR_EMAIL: noreply@github.com
-        run: make site-bump
+          TAGNAME: ${{steps.normalize.outputs.tagname}}
+        run: GITHUB_REF="refs/tags/$TAGNAME" make site-bump
       - name: Move project cards
         continue-on-error: true
         env:
