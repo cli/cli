@@ -109,7 +109,7 @@ type apiClient interface {
 	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
 	GetOrgMemberCodespace(ctx context.Context, orgName string, userName string, codespaceName string) (*api.Codespace, error)
 	ListCodespaces(ctx context.Context, limit int, orgName string, userName string) ([]*api.Codespace, error)
-	DeleteCodespace(ctx context.Context, name string) error
+	DeleteCodespace(ctx context.Context, name string, orgName string, userName string) error
 	StartCodespace(ctx context.Context, name string) error
 	StopCodespace(ctx context.Context, name string, orgName string, userName string) error
 	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
@@ -133,8 +133,8 @@ func chooseCodespace(ctx context.Context, apiClient apiClient) (*api.Codespace, 
 	return chooseCodespaceFromList(ctx, codespaces, false)
 }
 
-// chooseCodespaceFromList returns the selected codespace from the list,
-// or an error if there are no codespaces.
+// chooseCodespaceFromList returns the codespace that the user has interactively selected from the list, or
+// an error if there are no codespaces.
 func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace, includeOwner bool) (*api.Codespace, error) {
 	if len(codespaces) == 0 {
 		return nil, errNoCodespaces

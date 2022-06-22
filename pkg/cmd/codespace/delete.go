@@ -19,6 +19,8 @@ type deleteOptions struct {
 	codespaceName string
 	repoFilter    string
 	keepDays      uint16
+	orgName       string
+	userName      string
 
 	isInteractive bool
 	now           func() time.Time
@@ -41,6 +43,12 @@ func newDeleteCmd(app *App) *cobra.Command {
 		Use:   "delete",
 		Short: "Delete a codespace",
 		Args:  noArgsConstraint,
+		PreRunE: func(c *cobra.Command, args []string) error {
+			if opts.orgName != "" && opts.codespaceName != "" && opts.userName == "" {
+				return errors.New("`--org` with `--codespace` requires `--username`")
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.deleteAll && opts.repoFilter != "" {
 				return errors.New("both --all and --repo is not supported")
@@ -54,6 +62,8 @@ func newDeleteCmd(app *App) *cobra.Command {
 	deleteCmd.Flags().StringVarP(&opts.repoFilter, "repo", "r", "", "Delete codespaces for a `repository`")
 	deleteCmd.Flags().BoolVarP(&opts.skipConfirm, "force", "f", false, "Skip confirmation for codespaces that contain unsaved changes")
 	deleteCmd.Flags().Uint16Var(&opts.keepDays, "days", 0, "Delete codespaces older than `N` days")
+	deleteCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "Select organization to delete codespace from (admin-only)")
+	deleteCmd.Flags().StringVarP(&opts.userName, "username", "u", "", "Used with --org to filter to a specific user")
 
 	return deleteCmd
 }
@@ -63,14 +73,15 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 	nameFilter := opts.codespaceName
 	if nameFilter == "" {
 		a.StartProgressIndicatorWithLabel("Fetching codespaces")
-		codespaces, err = a.apiClient.ListCodespaces(ctx, -1, "", "")
+		codespaces, err = a.apiClient.ListCodespaces(ctx, -1, opts.orgName, opts.userName)
 		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error getting codespaces: %w", err)
 		}
 
 		if !opts.deleteAll && opts.repoFilter == "" {
-			c, err := chooseCodespaceFromList(ctx, codespaces, false)
+			includeUsername := opts.orgName != ""
+			c, err := chooseCodespaceFromList(ctx, codespaces, includeUsername)
 			if err != nil {
 				return fmt.Errorf("error choosing codespace: %w", err)
 			}
@@ -78,7 +89,15 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 		}
 	} else {
 		a.StartProgressIndicatorWithLabel("Fetching codespace")
-		codespace, err := a.apiClient.GetCodespace(ctx, nameFilter, false)
+
+		var codespace *api.Codespace
+		var err error
+
+		if opts.orgName == "" || opts.userName == "" {
+			codespace, err = a.apiClient.GetCodespace(ctx, nameFilter, false)
+		} else {
+			codespace, err = a.apiClient.GetOrgMemberCodespace(ctx, opts.orgName, opts.userName, opts.codespaceName)
+		}
 		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error fetching codespace information: %w", err)
@@ -132,7 +151,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 	for _, c := range codespacesToDelete {
 		codespaceName := c.Name
 		g.Go(func() error {
-			if err := a.apiClient.DeleteCodespace(ctx, codespaceName); err != nil {
+			if err := a.apiClient.DeleteCodespace(ctx, codespaceName, opts.orgName, opts.userName); err != nil {
 				a.errLogger.Printf("error deleting codespace %q: %v\n", codespaceName, err)
 				return err
 			}

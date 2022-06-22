@@ -827,14 +827,25 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 }
 
 // DeleteCodespace deletes the given codespace.
-func (a *API) DeleteCodespace(ctx context.Context, codespaceName string) error {
-	req, err := http.NewRequest(http.MethodDelete, a.githubAPI+"/user/codespaces/"+codespaceName, nil)
+func (a *API) DeleteCodespace(ctx context.Context, codespaceName string, orgName string, userName string) error {
+	var deleteURL string
+	var spanName string
+
+	if orgName != "" && userName != "" {
+		deleteURL = fmt.Sprintf("%s/orgs/%s/members/%s/codespaces/%s", a.githubAPI, orgName, userName, codespaceName)
+		spanName = "/orgs/*/members/*/codespaces/*"
+	} else {
+		deleteURL = a.githubAPI + "/user/codespaces/" + codespaceName
+		spanName = "/user/codespaces/*"
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, deleteURL, nil)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
 
 	a.setHeaders(req)
-	resp, err := a.do(ctx, req, "/user/codespaces/*")
+	resp, err := a.do(ctx, req, spanName)
 	if err != nil {
 		return fmt.Errorf("error making request: %w", err)
 	}
