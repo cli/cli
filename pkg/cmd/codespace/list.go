@@ -28,8 +28,7 @@ func newListCmd(app *App) *cobra.Command {
 		Long: heredoc.Doc(`
 			List codespaces of the authenticated user.
 
-			Alternatively, organization administrators may list codespaces belonging to members of
-			their organization.
+			Alternatively, organization administrators may list all codespaces billed to the organization.
 		`),
 		Aliases: []string{"ls"},
 		Args:    noArgsConstraint,

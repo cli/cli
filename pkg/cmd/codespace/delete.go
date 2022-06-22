@@ -50,7 +50,7 @@ func newDeleteCmd(app *App) *cobra.Command {
 			All codespaces for the authenticated user can be deleted, as well as codespaces for a
 			specific repository. Alternatively, only codespaces older than N days can be deleted.
 
-			Organization administrators may delete codespaces belonging to members of their organization.
+			Organization administrators may delete any codespace billed to the organization.
 		`),
 		Args: noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
