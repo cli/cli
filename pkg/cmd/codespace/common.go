@@ -294,12 +294,6 @@ func (c codespace) displayName(includeOwner bool) string {
 	return description
 }
 
-func (c codespace) displayNameWithOwner() string {
-	return fmt.Sprintf(
-		"%-15s %s", c.Owner.Login, c.displayName(),
-	)
-}
-
 // gitStatusDirty represents an unsaved changes status.
 const gitStatusDirty = "*"
 
