@@ -70,6 +70,7 @@ func (c *envConfig) DefaultHostWithSource() (string, string, error) {
 	if host := os.Getenv(GH_HOST); host != "" {
 		return host, GH_HOST, nil
 	}
+
 	return c.Config.DefaultHostWithSource()
 }
 
@@ -79,6 +80,10 @@ func (c *envConfig) Get(hostname, key string) (string, error) {
 }
 
 func (c *envConfig) GetWithSource(hostname, key string) (string, string, error) {
+	if c.Config.OverrideEnv(hostname) {
+		return c.Config.GetWithSource(hostname, key)
+	}
+
 	if hostname != "" && key == "oauth_token" {
 		if token, env := AuthTokenFromEnv(hostname); token != "" {
 			return token, env, nil
@@ -107,6 +112,10 @@ func (c *envConfig) Default(key string) string {
 }
 
 func (c *envConfig) CheckWriteable(hostname, key string) error {
+	if c.Config.OverrideEnv(hostname) {
+		return c.Config.CheckWriteable(hostname, key)
+	}
+
 	if hostname != "" && key == "oauth_token" {
 		if token, env := AuthTokenFromEnv(hostname); token != "" {
 			return &ReadOnlyEnvError{Variable: env}

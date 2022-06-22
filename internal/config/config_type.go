@@ -22,6 +22,7 @@ type Config interface {
 	CheckWriteable(string, string) error
 	Write() error
 	WriteHosts() error
+	OverrideEnv(string) bool
 }
 
 type ConfigOption struct {
@@ -210,6 +211,15 @@ func NewBlankRoot() *yaml.Node {
 					{
 						Kind:  yaml.ScalarNode,
 						Value: "",
+					},
+					{
+						HeadComment: "If ENV should be overriden for hosts.yml.",
+						Kind:        yaml.ScalarNode,
+						Value:       "override_env",
+					},
+					{
+						Kind:  yaml.ScalarNode,
+						Value: "false",
 					},
 				},
 			},
