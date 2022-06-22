@@ -31,7 +31,8 @@ jobs:
           TAGNAME_INPUT: ${{inputs.tagname}}
       - name: Checkout
         uses: actions/checkout@v3
-        ref: refs/tags/${{steps.normalize.outputs.tagname}}
+        with:
+          ref: refs/tags/${{steps.normalize.outputs.tagname}}
       - name: Set up Go 1.18
         uses: actions/setup-go@v3
         with:
@@ -61,7 +62,7 @@ jobs:
           args: release --release-notes=CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-          GORELEASER_CURRENT_TAG: ${{steps.changelog.outputs.tag-name}}
+          GORELEASER_CURRENT_TAG: ${{steps.normalize.outputs.tagname}}
           CERT_PASSWORD: ${{secrets.WINDOWS_CERT_PASSWORD}}
       - name: Checkout documentation site
         uses: actions/checkout@v3
@@ -167,7 +168,8 @@ jobs:
           TAGNAME_INPUT: ${{inputs.tagname}}
       - name: Checkout
         uses: actions/checkout@v3
-        ref: refs/tags/${{steps.normalize.outputs.tagname}}
+        with:
+          ref: refs/tags/${{steps.normalize.outputs.tagname}}
       - name: Download gh.exe
         id: download_exe
         shell: bash
