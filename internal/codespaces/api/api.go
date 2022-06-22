@@ -380,18 +380,16 @@ func (a *API) GetOrgMemberCodespace(ctx context.Context, orgName string, userNam
 			return nil, fmt.Errorf("error unmarshaling response: %w", err)
 		}
 
-		nextURL := findNextPage(resp.Header.Get("Link"))
-
 		for _, cs := range response.Codespaces {
 			if cs.Name == codespaceName {
 				return cs, nil
 			}
 		}
 
+		nextURL := findNextPage(resp.Header.Get("Link"))
 		if nextURL == "" {
 			break
 		}
-
 		listURL = nextURL
 	}
 
