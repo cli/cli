@@ -141,7 +141,7 @@ func loginRun(opts *LoginOptions) error {
 	if opts.ForceAuth {
 		err := cfg.Set(hostname, "override_env", "true")
 		if err != nil {
-			fmt.Printf("got error: %+v when attempting to set override_env", err)
+			fmt.Fprintf(opts.IO.ErrOut, "Failed to set `override_env` for host %s in %s, please set it your self.", hostname, config.ConfigFile())
 		}
 	}
 
