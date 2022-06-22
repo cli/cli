@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
 
@@ -22,22 +23,16 @@ func newStopCmd(app *App) *cobra.Command {
 		Use:   "stop",
 		Short: "Stop a running codespace",
 		Args:  noArgsConstraint,
-		PreRunE: func(c *cobra.Command, args []string) error {
-			if opts.orgName != "" {
-				if opts.codespaceName != "" && opts.userName == "" {
-					return errors.New("`--org` with `--codespace` requires `--username`")
-				}
-				return nil
-			}
-			return nil
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if opts.orgName != "" && opts.codespaceName != "" && opts.userName == "" {
+				return cmdutil.FlagErrorf("using `--org` with `--codespace` requires `--user`")
+			}
 			return app.StopCodespace(cmd.Context(), opts)
 		},
 	}
 	stopCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "Name of the codespace")
-	stopCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "Stop codespace for an organization member (admin-only)")
-	stopCmd.Flags().StringVarP(&opts.userName, "username", "u", "", "Owner of the codespace. Required when using both -c and -o flags.")
+	stopCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "The `login` handle of the organization (admin-only)")
+	stopCmd.Flags().StringVarP(&opts.userName, "user", "u", "", "The `username` to stop codespace for (used with --org)")
 
 	return stopCmd
 }

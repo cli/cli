@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/utils"
@@ -22,8 +23,14 @@ func newListCmd(app *App) *cobra.Command {
 	var exporter cmdutil.Exporter
 
 	listCmd := &cobra.Command{
-		Use:     "list",
-		Short:   "List your codespaces",
+		Use:   "list",
+		Short: "List codespaces",
+		Long: heredoc.Doc(`
+			List codespaces of the authenticated user.
+
+			Alternatively, organization administrators may list codespaces belonging to members of
+			their organization.
+		`),
 		Aliases: []string{"ls"},
 		Args:    noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -36,8 +43,8 @@ func newListCmd(app *App) *cobra.Command {
 	}
 
 	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", 30, "Maximum number of codespaces to list")
-	listCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "List codespaces for members of an organization (admin-only)")
-	listCmd.Flags().StringVarP(&opts.userName, "user", "u", "", "Used with --org to filter to a specific user")
+	listCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "The `login` handle of the organization to list codespaces for (admin-only)")
+	listCmd.Flags().StringVarP(&opts.userName, "user", "u", "", "The `username` to list codespaces for (used with --org)")
 	cmdutil.AddJSONFlags(listCmd, &exporter, api.CodespaceFields)
 
 	return listCmd

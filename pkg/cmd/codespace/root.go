@@ -7,7 +7,7 @@ import (
 func NewRootCmd(app *App) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "codespace",
-		Short: "Connect to and manage your codespaces",
+		Short: "Connect to and manage codespaces",
 	}
 
 	root.AddCommand(newCodeCmd(app))

@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
@@ -41,17 +43,22 @@ func newDeleteCmd(app *App) *cobra.Command {
 
 	deleteCmd := &cobra.Command{
 		Use:   "delete",
-		Short: "Delete a codespace",
-		Args:  noArgsConstraint,
-		PreRunE: func(c *cobra.Command, args []string) error {
-			if opts.orgName != "" && opts.codespaceName != "" && opts.userName == "" {
-				return errors.New("`--org` with `--codespace` requires `--username`")
-			}
-			return nil
-		},
+		Short: "Delete codespaces",
+		Long: heredoc.Doc(`
+			Delete codespaces based on selection criteria.
+
+			All codespaces for the authenticated user can be deleted, as well as codespaces for a
+			specific repository. Alternatively, only codespaces older than N days can be deleted.
+
+			Organization administrators may delete codespaces belonging to members of their organization.
+		`),
+		Args: noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.deleteAll && opts.repoFilter != "" {
-				return errors.New("both --all and --repo is not supported")
+				return cmdutil.FlagErrorf("both `--all` and `--repo` is not supported")
+			}
+			if opts.orgName != "" && opts.codespaceName != "" && opts.userName == "" {
+				return cmdutil.FlagErrorf("using `--org` with `--codespace` requires `--user`")
 			}
 			return app.Delete(cmd.Context(), opts)
 		},
@@ -62,8 +69,8 @@ func newDeleteCmd(app *App) *cobra.Command {
 	deleteCmd.Flags().StringVarP(&opts.repoFilter, "repo", "r", "", "Delete codespaces for a `repository`")
 	deleteCmd.Flags().BoolVarP(&opts.skipConfirm, "force", "f", false, "Skip confirmation for codespaces that contain unsaved changes")
 	deleteCmd.Flags().Uint16Var(&opts.keepDays, "days", 0, "Delete codespaces older than `N` days")
-	deleteCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "Select organization to delete codespace from (admin-only)")
-	deleteCmd.Flags().StringVarP(&opts.userName, "username", "u", "", "Used with --org to filter to a specific user")
+	deleteCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "The `login` handle of the organization (admin-only)")
+	deleteCmd.Flags().StringVarP(&opts.userName, "user", "u", "", "The `username` to delete codespaces for (used with --org)")
 
 	return deleteCmd
 }
