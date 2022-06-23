@@ -702,10 +702,7 @@ func (m *Manager) goBinScaffolding(gitExe, name string) error {
 		return err
 	}
 
-	host, err := m.config.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := m.config.DefaultHost()
 
 	currentUser, err := api.CurrentLoginName(api.NewClientFromHTTP(m.client), host)
 	if err != nil {

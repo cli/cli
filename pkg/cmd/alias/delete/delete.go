@@ -45,13 +45,10 @@ func deleteRun(opts *DeleteOptions) error {
 		return err
 	}
 
-	aliasCfg, err := cfg.Aliases()
-	if err != nil {
-		return fmt.Errorf("couldn't read aliases config: %w", err)
-	}
+	aliasCfg := cfg.Aliases()
 
-	expansion, ok := aliasCfg.Get(opts.Name)
-	if !ok {
+	expansion, err := aliasCfg.Get(opts.Name)
+	if err != nil {
 		return fmt.Errorf("no such alias %s", opts.Name)
 
 	}
@@ -59,6 +56,11 @@ func deleteRun(opts *DeleteOptions) error {
 	err = aliasCfg.Delete(opts.Name)
 	if err != nil {
 		return fmt.Errorf("failed to delete alias %s: %w", opts.Name, err)
+	}
+
+	err = cfg.Write()
+	if err != nil {
+		return err
 	}
 
 	if opts.IO.IsStdoutTTY() {

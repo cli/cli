@@ -421,7 +421,7 @@ func TestRepoList_noVisibilityField(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		},
 		Config: func() (config.Config, error) {
-			return config.InheritEnv(config.NewBlankConfig()), nil
+			return config.NewBlankConfig(), nil
 		},
 		Now: func() time.Time {
 			t, _ := time.Parse(time.RFC822, "19 Feb 21 15:00 UTC")

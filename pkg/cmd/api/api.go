@@ -288,10 +288,7 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
 	if opts.Hostname != "" {
 		host = opts.Hostname

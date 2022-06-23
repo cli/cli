@@ -98,10 +98,8 @@ func mainRun() exitCode {
 		return exitError
 	}
 
-	// TODO: remove after FromFullName has been revisited
-	if host, err := cfg.DefaultHost(); err == nil {
-		ghrepo.SetDefaultHost(host)
-	}
+	host, _ := cfg.DefaultHost()
+	ghrepo.SetDefaultHost(host)
 
 	expandedArgs := []string{}
 	if len(os.Args) > 0 {
@@ -170,18 +168,17 @@ func mainRun() exitCode {
 	// provide completions for aliases and extensions
 	rootCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var results []string
-		if aliases, err := cfg.Aliases(); err == nil {
-			for aliasName, aliasValue := range aliases.All() {
-				if strings.HasPrefix(aliasName, toComplete) {
-					var s string
-					if strings.HasPrefix(aliasValue, "!") {
-						s = fmt.Sprintf("%s\tShell alias", aliasName)
-					} else {
-						aliasValue = text.Truncate(80, aliasValue)
-						s = fmt.Sprintf("%s\tAlias for %s", aliasName, aliasValue)
-					}
-					results = append(results, s)
+		aliases := cfg.Aliases()
+		for aliasName, aliasValue := range aliases.All() {
+			if strings.HasPrefix(aliasName, toComplete) {
+				var s string
+				if strings.HasPrefix(aliasValue, "!") {
+					s = fmt.Sprintf("%s\tShell alias", aliasName)
+				} else {
+					aliasValue = text.Truncate(80, aliasValue)
+					s = fmt.Sprintf("%s\tAlias for %s", aliasName, aliasValue)
 				}
+				results = append(results, s)
 			}
 		}
 		for _, ext := range cmdFactory.ExtensionManager.List() {

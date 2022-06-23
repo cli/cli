@@ -122,10 +122,7 @@ func removeRun(opts *DeleteOptions) error {
 		return err
 	}
 
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
 	err = client.REST(host, "DELETE", path, nil, nil)
 	if err != nil {

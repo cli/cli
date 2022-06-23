@@ -186,11 +186,7 @@ func setRun(opts *SetOptions) error {
 		if err != nil {
 			return err
 		}
-
-		host, err = cfg.DefaultHost()
-		if err != nil {
-			return err
-		}
+		host, _ = cfg.DefaultHost()
 	}
 
 	secretEntity, err := shared.GetSecretEntity(orgName, envName, opts.UserSecrets)

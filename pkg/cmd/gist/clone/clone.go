@@ -75,10 +75,7 @@ func cloneRun(opts *CloneOptions) error {
 		if err != nil {
 			return err
 		}
-		hostname, err := cfg.DefaultHost()
-		if err != nil {
-			return err
-		}
+		hostname, _ := cfg.DefaultHost()
 		protocol, err := cfg.GetOrDefault(hostname, "git_protocol")
 		if err != nil {
 			return err

@@ -11,8 +11,12 @@ import (
 // why not just use the config stub argh
 type tinyConfig map[string]string
 
-func (c tinyConfig) GetWithSource(host, key string) (string, string, error) {
-	return c[fmt.Sprintf("%s:%s", host, key)], c["_source"], nil
+func (c tinyConfig) AuthToken(host string) (string, string) {
+	return c[fmt.Sprintf("%s:%s", host, "oauth_token")], c["_source"]
+}
+
+func (c tinyConfig) Get(host, key string) (string, error) {
+	return c[fmt.Sprintf("%s:%s", host, key)], nil
 }
 
 func Test_helperRun(t *testing.T) {

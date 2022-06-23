@@ -1,7 +1,6 @@
 package login
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -136,14 +135,10 @@ func loginRun(opts *LoginOptions) error {
 		}
 	}
 
-	if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
-		var roErr *config.ReadOnlyEnvError
-		if errors.As(err, &roErr) {
-			fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", roErr.Variable)
-			fmt.Fprint(opts.IO.ErrOut, "To have GitHub CLI store credentials instead, first clear the value from the environment.\n")
-			return cmdutil.SilentError
-		}
-		return err
+	if src, writeable := shared.AuthTokenWriteable(cfg, hostname); !writeable {
+		fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", src)
+		fmt.Fprint(opts.IO.ErrOut, "To have GitHub CLI store credentials instead, first clear the value from the environment.\n")
+		return cmdutil.SilentError
 	}
 
 	httpClient, err := opts.HttpClient()
@@ -152,19 +147,16 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	if opts.Token != "" {
-		err := cfg.Set(hostname, "oauth_token", opts.Token)
-		if err != nil {
-			return err
-		}
+		cfg.Set(hostname, "oauth_token", opts.Token)
 
 		if err := shared.HasMinimumScopes(httpClient, hostname, opts.Token); err != nil {
 			return fmt.Errorf("error validating token: %w", err)
 		}
 
-		return cfg.WriteHosts()
+		return cfg.Write()
 	}
 
-	existingToken, _ := cfg.Get(hostname, "oauth_token")
+	existingToken, _ := cfg.AuthToken(hostname)
 	if existingToken != "" && opts.Interactive {
 		if err := shared.HasMinimumScopes(httpClient, hostname, existingToken); err == nil {
 			var keepGoing bool

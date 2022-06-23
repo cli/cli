@@ -1,7 +1,6 @@
 package logout
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
@@ -70,10 +70,7 @@ func logoutRun(opts *LogoutOptions) error {
 		return err
 	}
 
-	candidates, err := cfg.Hosts()
-	if err != nil {
-		return err
-	}
+	candidates := cfg.Hosts()
 	if len(candidates) == 0 {
 		return fmt.Errorf("not logged in to any hosts")
 	}
@@ -105,14 +102,10 @@ func logoutRun(opts *LogoutOptions) error {
 		}
 	}
 
-	if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
-		var roErr *config.ReadOnlyEnvError
-		if errors.As(err, &roErr) {
-			fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", roErr.Variable)
-			fmt.Fprint(opts.IO.ErrOut, "To erase credentials stored in GitHub CLI, first clear the value from the environment.\n")
-			return cmdutil.SilentError
-		}
-		return err
+	if src, writeable := shared.AuthTokenWriteable(cfg, hostname); !writeable {
+		fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", src)
+		fmt.Fprint(opts.IO.ErrOut, "To erase credentials stored in GitHub CLI, first clear the value from the environment.\n")
+		return cmdutil.SilentError
 	}
 
 	httpClient, err := opts.HttpClient()
@@ -134,7 +127,7 @@ func logoutRun(opts *LogoutOptions) error {
 	}
 
 	cfg.UnsetHost(hostname)
-	err = cfg.WriteHosts()
+	err = cfg.Write()
 	if err != nil {
 		return fmt.Errorf("failed to write config, authentication configuration not updated: %w", err)
 	}

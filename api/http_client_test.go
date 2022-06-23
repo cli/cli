@@ -211,6 +211,10 @@ func (c tinyConfig) Get(host, key string) (string, error) {
 	return c[fmt.Sprintf("%s:%s", host, key)], nil
 }
 
+func (c tinyConfig) AuthToken(host string) (string, string) {
+	return c[fmt.Sprintf("%s:%s", host, "oauth_token")], "oauth_token"
+}
+
 var requestAtRE = regexp.MustCompile(`(?m)^\* Request at .+`)
 var dateRE = regexp.MustCompile(`(?m)^< Date: .+`)
 var hostWithPortRE = regexp.MustCompile(`127\.0\.0\.1:\d+`)
