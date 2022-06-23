@@ -292,6 +292,7 @@ func (s *IOStreams) StartAlternateScreenBuffer() {
 func (s *IOStreams) StopAlternateScreenBuffer() {
 	if s.alternateScreenBufferActive {
 		fmt.Fprint(s.Out, "\x1b[?1049l")
+		s.alternateScreenBufferActive = false
 	}
 }
 
@@ -403,10 +404,10 @@ func System() *IOStreams {
 	stdoutIsTTY := isTerminal(os.Stdout)
 	stderrIsTTY := isTerminal(os.Stderr)
 
-	assumeTrueColor := false
+	isVirtualTerminal := false
 	if stdoutIsTTY {
 		if err := enableVirtualTerminalProcessing(os.Stdout); err == nil {
-			assumeTrueColor = true
+			isVirtualTerminal = true
 		}
 	}
 
@@ -416,8 +417,8 @@ func System() *IOStreams {
 		Out:          colorable.NewColorable(os.Stdout),
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		colorEnabled: EnvColorForced() || (!EnvColorDisabled() && stdoutIsTTY),
-		is256enabled: assumeTrueColor || Is256ColorSupported(),
-		hasTrueColor: assumeTrueColor || IsTrueColorSupported(),
+		is256enabled: isVirtualTerminal || Is256ColorSupported(),
+		hasTrueColor: isVirtualTerminal || IsTrueColorSupported(),
 		pagerCommand: os.Getenv("PAGER"),
 		ttySize:      ttySize,
 	}
@@ -426,7 +427,7 @@ func System() *IOStreams {
 		io.progressIndicatorEnabled = true
 	}
 
-	if stdoutIsTTY && assumeTrueColor {
+	if stdoutIsTTY && isVirtualTerminal {
 		io.alternateScreenBufferEnabled = true
 	}
 
