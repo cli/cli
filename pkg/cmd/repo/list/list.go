@@ -125,7 +125,8 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if opts.Detector == nil {
-		opts.Detector = fd.NewDetector(httpClient, host)
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, host)
 	}
 	features, err := opts.Detector.RepositoryFeatures()
 	if err != nil {

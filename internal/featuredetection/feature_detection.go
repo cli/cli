@@ -3,9 +3,7 @@ package featuredetection
 import (
 	"context"
 	"net/http"
-	"time"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	graphql "github.com/cli/shurcooL-graphql"
 )
@@ -56,9 +54,8 @@ type detector struct {
 }
 
 func NewDetector(httpClient *http.Client, host string) Detector {
-	cachedClient := api.NewCachedClient(httpClient, time.Hour*48)
 	return &detector{
-		httpClient: cachedClient,
+		httpClient: httpClient,
 		host:       host,
 	}
 }

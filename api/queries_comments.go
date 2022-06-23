@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"time"
 
 	graphql "github.com/cli/shurcooL-graphql"
@@ -51,8 +50,7 @@ func CommentCreate(client *Client, repoHost string, params CommentCreateInput) (
 		},
 	}
 
-	gql := graphQLClient(client.http, repoHost)
-	err := gql.MutateNamed(context.Background(), "CommentCreate", &mutation, variables)
+	err := client.Mutate(repoHost, "CommentCreate", &mutation, variables)
 	if err != nil {
 		return "", err
 	}

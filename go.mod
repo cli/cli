@@ -9,7 +9,7 @@ require (
 	github.com/charmbracelet/glamour v0.4.0
 	github.com/charmbracelet/lipgloss v0.5.0
 	github.com/cli/browser v1.1.0
-	github.com/cli/go-gh v0.0.4-0.20220601161125-9dbbfe25d943
+	github.com/cli/go-gh v0.0.4-0.20220614183308-ef2bca923638
 	github.com/cli/oauth v0.9.0
 	github.com/cli/safeexec v1.0.0
 	github.com/cli/shurcooL-graphql v0.0.1

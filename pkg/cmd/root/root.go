@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	codespacesAPI "github.com/cli/cli/v2/internal/codespaces/api"
 	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
 	aliasCmd "github.com/cli/cli/v2/pkg/cmd/alias"
@@ -127,7 +128,13 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 		if err != nil {
 			return nil, err
 		}
-		return factory.NewHTTPClient(f.IOStreams, cfg, version, false)
+		opts := api.HTTPClientOptions{
+			AppVersion:        version,
+			Config:            cfg,
+			Log:               f.IOStreams.ErrOut,
+			SkipAcceptHeaders: true,
+		}
+		return api.NewHTTPClient(opts)
 	}
 }
 

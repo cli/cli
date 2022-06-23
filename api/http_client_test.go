@@ -1,4 +1,4 @@
-package factory
+package api
 
 import (
 	"fmt"
@@ -27,10 +27,8 @@ func TestNewHTTPClient(t *testing.T) {
 		setGhDebug bool
 		envGhDebug string
 		host       string
-		sso        string
 		wantHeader map[string]string
 		wantStderr string
-		wantSSO    string
 	}{
 		{
 			name: "github.com with Accept header",
@@ -99,6 +97,8 @@ func TestNewHTTPClient(t *testing.T) {
 				> Host: github.com
 				> Accept: application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview
 				> Authorization: token ████████████████████
+				> Content-Type: application/json; charset=utf-8
+				> Time-Zone: <timezone>
 				> User-Agent: GitHub CLI v1.2.3
 
 				< HTTP/1.1 204 No Content
@@ -129,6 +129,8 @@ func TestNewHTTPClient(t *testing.T) {
 				> Host: github.com
 				> Accept: application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview
 				> Authorization: token ████████████████████
+				> Content-Type: application/json; charset=utf-8
+				> Time-Zone: <timezone>
 				> User-Agent: GitHub CLI v1.2.3
 
 				< HTTP/1.1 204 No Content
@@ -148,29 +150,15 @@ func TestNewHTTPClient(t *testing.T) {
 			wantHeader: map[string]string{
 				"authorization": "token GHETOKEN",
 				"user-agent":    "GitHub CLI v1.2.3",
-				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview, application/vnd.github.antiope-preview, application/vnd.github.shadow-cat-preview",
+				"accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
 			},
 			wantStderr: "",
-		},
-		{
-			name: "SSO challenge in response header",
-			args: args{
-				config:     tinyConfig{},
-				appVersion: "v1.2.3",
-			},
-			host:       "github.com",
-			sso:        "required; url=https://github.com/login/sso?return_to=xyz&param=123abc; another",
-			wantStderr: "",
-			wantSSO:    "https://github.com/login/sso?return_to=xyz&param=123abc",
 		},
 	}
 
 	var gotReq *http.Request
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotReq = r
-		if sso := r.URL.Query().Get("sso"); sso != "" {
-			w.Header().Set("X-GitHub-SSO", sso)
-		}
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer ts.Close()
@@ -191,19 +179,20 @@ func TestNewHTTPClient(t *testing.T) {
 			})
 
 			ios, _, _, stderr := iostreams.Test()
-			client, err := NewHTTPClient(ios, tt.args.config, tt.args.appVersion, tt.args.setAccept)
+			client, err := NewHTTPClient(HTTPClientOptions{
+				AppVersion:        tt.args.appVersion,
+				Config:            tt.args.config,
+				Log:               ios.ErrOut,
+				SkipAcceptHeaders: !tt.args.setAccept,
+			})
 			require.NoError(t, err)
 
 			req, err := http.NewRequest("GET", ts.URL, nil)
-			if tt.sso != "" {
-				q := req.URL.Query()
-				q.Set("sso", tt.sso)
-				req.URL.RawQuery = q.Encode()
-			}
 			req.Host = tt.host
 			require.NoError(t, err)
 
 			res, err := client.Do(req)
+
 			require.NoError(t, err)
 
 			for name, value := range tt.wantHeader {
@@ -212,7 +201,6 @@ func TestNewHTTPClient(t *testing.T) {
 
 			assert.Equal(t, 204, res.StatusCode)
 			assert.Equal(t, tt.wantStderr, normalizeVerboseLog(stderr.String()))
-			assert.Equal(t, tt.wantSSO, SSOURL())
 		})
 	}
 }
@@ -227,11 +215,13 @@ var requestAtRE = regexp.MustCompile(`(?m)^\* Request at .+`)
 var dateRE = regexp.MustCompile(`(?m)^< Date: .+`)
 var hostWithPortRE = regexp.MustCompile(`127\.0\.0\.1:\d+`)
 var durationRE = regexp.MustCompile(`(?m)^\* Request took .+`)
+var timezoneRE = regexp.MustCompile(`(?m)^> Time-Zone: .+`)
 
 func normalizeVerboseLog(t string) string {
 	t = requestAtRE.ReplaceAllString(t, "* Request at <time>")
 	t = hostWithPortRE.ReplaceAllString(t, "<host>:<port>")
 	t = dateRE.ReplaceAllString(t, "< Date: <time>")
 	t = durationRE.ReplaceAllString(t, "* Request took <duration>")
+	t = timezoneRE.ReplaceAllString(t, "> Time-Zone: <timezone>")
 	return t
 }

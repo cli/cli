@@ -1,10 +1,10 @@
 package featuredetection
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 )
@@ -75,10 +75,11 @@ func TestPullRequestFeatures(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fakeHTTP := &httpmock.Registry{}
-			httpClient := api.NewHTTPClient(api.ReplaceTripper(fakeHTTP))
+			reg := &httpmock.Registry{}
+			httpClient := &http.Client{}
+			httpmock.ReplaceTripper(httpClient, reg)
 			for query, resp := range tt.queryResponse {
-				fakeHTTP.Register(httpmock.GraphQL(query), httpmock.StringResponse(resp))
+				reg.Register(httpmock.GraphQL(query), httpmock.StringResponse(resp))
 			}
 			detector := detector{host: tt.hostname, httpClient: httpClient}
 			gotPrFeatures, err := detector.PullRequestFeatures()
@@ -180,10 +181,11 @@ func TestRepositoryFeatures(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fakeHTTP := &httpmock.Registry{}
-			httpClient := api.NewHTTPClient(api.ReplaceTripper(fakeHTTP))
+			reg := &httpmock.Registry{}
+			httpClient := &http.Client{}
+			httpmock.ReplaceTripper(httpClient, reg)
 			for query, resp := range tt.queryResponse {
-				fakeHTTP.Register(httpmock.GraphQL(query), httpmock.StringResponse(resp))
+				reg.Register(httpmock.GraphQL(query), httpmock.StringResponse(resp))
 			}
 			detector := detector{host: tt.hostname, httpClient: httpClient}
 			gotPrFeatures, err := detector.RepositoryFeatures()

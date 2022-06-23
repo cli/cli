@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
@@ -14,7 +15,10 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
+	"github.com/cli/go-gh"
+	ghAPI "github.com/cli/go-gh/pkg/api"
 	"github.com/cli/oauth"
+	"github.com/henvic/httpretty"
 )
 
 var (
@@ -22,6 +26,8 @@ var (
 	oauthClientID = "178c6fc778ccc68e1d6a"
 	// This value is safe to be embedded in version control
 	oauthClientSecret = "34ddeff2b558a23d38fba8a6de74f086ede1cc0b"
+
+	jsonTypeRE = regexp.MustCompile(`[/+]json($|;)`)
 )
 
 type iconfig interface {
@@ -65,11 +71,11 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 	w := IO.ErrOut
 	cs := IO.ColorScheme()
 
-	httpClient := http.DefaultClient
+	httpClient := &http.Client{}
 	debugEnabled, debugValue := utils.IsDebugEnabled()
 	if debugEnabled {
 		logTraffic := strings.Contains(debugValue, "api")
-		httpClient.Transport = api.VerboseLog(IO.ErrOut, logTraffic, IO.ColorEnabled())(httpClient.Transport)
+		httpClient.Transport = verboseLog(IO.ErrOut, logTraffic, IO.ColorEnabled())(httpClient.Transport)
 	}
 
 	minimumScopes := []string{"repo", "read:org", "gist"}
@@ -141,12 +147,39 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 }
 
 func getViewer(hostname, token string) (string, error) {
-	http := api.NewClient(api.AddHeader("Authorization", fmt.Sprintf("token %s", token)))
-	return api.CurrentLoginName(http, hostname)
+	opts := ghAPI.ClientOptions{Host: hostname, AuthToken: token}
+	client, err := gh.HTTPClient(&opts)
+	if err != nil {
+		return "", err
+	}
+	return api.CurrentLoginName(api.NewClientFromHTTP(client), hostname)
 }
 
 func waitForEnter(r io.Reader) error {
 	scanner := bufio.NewScanner(r)
 	scanner.Scan()
 	return scanner.Err()
+}
+
+func verboseLog(out io.Writer, logTraffic bool, colorize bool) func(http.RoundTripper) http.RoundTripper {
+	logger := &httpretty.Logger{
+		Time:            true,
+		TLS:             false,
+		Colors:          colorize,
+		RequestHeader:   logTraffic,
+		RequestBody:     logTraffic,
+		ResponseHeader:  logTraffic,
+		ResponseBody:    logTraffic,
+		Formatters:      []httpretty.Formatter{&httpretty.JSONFormatter{}},
+		MaxResponseBody: 10000,
+	}
+	logger.SetOutput(out)
+	logger.SetBodyFilter(func(h http.Header) (skip bool, err error) {
+		return !inspectableMIMEType(h.Get("Content-Type")), nil
+	})
+	return logger.RoundTripper
+}
+
+func inspectableMIMEType(t string) bool {
+	return strings.HasPrefix(t, "text/") || jsonTypeRE.MatchString(t)
 }

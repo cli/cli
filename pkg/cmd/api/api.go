@@ -269,7 +269,7 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 	if opts.CacheTTL > 0 {
-		httpClient = api.NewCachedClient(httpClient, opts.CacheTTL)
+		httpClient = api.NewCachedHTTPClient(httpClient, opts.CacheTTL)
 	}
 
 	headersOutputStream := opts.IO.Out

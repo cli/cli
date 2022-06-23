@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/v2/api"
 	remotes "github.com/cli/cli/v2/context"
@@ -141,7 +142,8 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 	fields.Add("id") // for additional preload queries below
 
 	if fields.Contains("isInMergeQueue") || fields.Contains("isMergeQueueEnabled") {
-		detector := fd.NewDetector(httpClient, f.repo.RepoHost())
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		detector := fd.NewDetector(cachedClient, f.repo.RepoHost())
 		prFeatures, err := detector.PullRequestFeatures()
 		if err != nil {
 			return nil, nil, err
