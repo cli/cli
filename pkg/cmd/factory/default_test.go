@@ -63,18 +63,30 @@ func Test_BaseRepo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.override != "" {
-				old := os.Getenv("GH_HOST")
-				os.Setenv("GH_HOST", tt.override)
-				defer os.Setenv("GH_HOST", old)
-			}
 			f := New("1")
 			rr := &remoteResolver{
 				readRemotes: func() (git.RemoteSet, error) {
 					return tt.remotes, nil
 				},
 				getConfig: func() (config.Config, error) {
-					return defaultConfig(), nil
+					cfg := &config.ConfigMock{}
+					cfg.HostsFunc = func() []string {
+						hosts := []string{"nonsense.com"}
+						if tt.override != "" {
+							hosts = append([]string{tt.override}, hosts...)
+						}
+						return hosts
+					}
+					cfg.DefaultHostFunc = func() (string, string) {
+						if tt.override != "" {
+							return tt.override, "GH_HOST"
+						}
+						return "nonsense.com", "hosts"
+					}
+					cfg.AuthTokenFunc = func(string) (string, string) {
+						return "", ""
+					}
+					return cfg, nil
 				},
 			}
 			f.Remotes = rr.Resolver()
@@ -152,18 +164,27 @@ func Test_SmartBaseRepo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.override != "" {
-				old := os.Getenv("GH_HOST")
-				os.Setenv("GH_HOST", tt.override)
-				defer os.Setenv("GH_HOST", old)
-			}
 			f := New("1")
 			rr := &remoteResolver{
 				readRemotes: func() (git.RemoteSet, error) {
 					return tt.remotes, nil
 				},
 				getConfig: func() (config.Config, error) {
-					return defaultConfig(), nil
+					cfg := &config.ConfigMock{}
+					cfg.HostsFunc = func() []string {
+						hosts := []string{"nonsense.com"}
+						if tt.override != "" {
+							hosts = append([]string{tt.override}, hosts...)
+						}
+						return hosts
+					}
+					cfg.DefaultHostFunc = func() (string, string) {
+						if tt.override != "" {
+							return tt.override, "GH_HOST"
+						}
+						return "nonsense.com", "hosts"
+					}
+					return cfg, nil
 				},
 			}
 			f.HttpClient = func() (*http.Client, error) { return nil, nil }

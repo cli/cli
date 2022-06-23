@@ -52,15 +52,9 @@ func NewFromString(cfgStr string) *ConfigMock {
 	}
 	mock.HostsFunc = func() []string {
 		keys, _ := c.Keys([]string{"hosts"})
-		if host, ok := os.LookupEnv("GH_HOST"); ok && host != "" {
-			keys = append(keys, host)
-		}
 		return keys
 	}
 	mock.DefaultHostFunc = func() (string, string) {
-		if host, ok := os.LookupEnv("GH_HOST"); ok && host != "" {
-			return host, "GH_HOST"
-		}
 		return "github.com", "default"
 	}
 	mock.AliasesFunc = func() *AliasConfig {
