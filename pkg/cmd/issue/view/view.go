@@ -136,6 +136,7 @@ func viewRun(opts *ViewOptions) error {
 		return printHumanIssuePreview(opts, issue)
 	}
 
+
 	if opts.Comments {
 		fmt.Fprint(opts.IO.Out, prShared.RawCommentList(issue.Comments, api.PullRequestReviews{}))
 		return nil
