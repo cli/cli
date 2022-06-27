@@ -295,7 +295,7 @@ func (a *API) ListCodespaces(ctx context.Context, opts ListCodespacesOptions) (c
 		listURL = fmt.Sprintf("%s/repos/%s/codespaces?per_page=%d", a.githubAPI, opts.Repository.FullName, perPage)
 		spanName = "/repos/*/codespaces"
 	} else if opts.OrgName != "" {
-		// admin only
+		// the endpoints below can only be called by the organization admins
 		orgName := opts.OrgName
 		if opts.UserName != "" {
 			userName := opts.UserName

@@ -140,7 +140,7 @@ func TestListCodespaces_limited(t *testing.T) {
 		client:    &http.Client{},
 	}
 	ctx := context.TODO()
-	codespaces, err := api.ListCodespaces(ctx, ListCodespacesOptions{Limit: 200, OrgName: "", UserName: ""})
+	codespaces, err := api.ListCodespaces(ctx, ListCodespacesOptions{Limit: 200})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +165,7 @@ func TestListCodespaces_unlimited(t *testing.T) {
 		client:    &http.Client{},
 	}
 	ctx := context.TODO()
-	codespaces, err := api.ListCodespaces(ctx, ListCodespacesOptions{OrgName: "", UserName: ""})
+	codespaces, err := api.ListCodespaces(ctx, ListCodespacesOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
