@@ -15,9 +15,10 @@ func TestApp_List(t *testing.T) {
 		apiClient apiClient
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		opts   *listOptions
+		name      string
+		fields    fields
+		opts      *listOptions
+		wantError error
 	}{
 		{
 			name: "list codespaces, no flags",
@@ -84,6 +85,52 @@ func TestApp_List(t *testing.T) {
 				userName: "jimmy",
 			},
 		},
+		{
+			name: "list codespaces, --repo",
+			fields: fields{
+				apiClient: &apiClientMock{
+					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+						if nwo != "cli/cli" {
+							return nil, fmt.Errorf("Expected nwo to be cli/cli. Got %s", nwo)
+						}
+						return &api.Repository{
+							FullName: "cli/cli",
+						}, nil
+					},
+					ListCodespacesFunc: func(ctx context.Context, opts api.ListCodespacesOptions) ([]*api.Codespace, error) {
+						if opts.Repository == nil {
+							return nil, fmt.Errorf("Expected repository to not be nil")
+						}
+						if opts.Repository.FullName != "cli/cli" {
+							return nil, fmt.Errorf("Expected repository name to be cli/cli. Got %s", opts.Repository.FullName)
+						}
+						if opts.OrgName != "" {
+							return nil, fmt.Errorf("Expected orgName to be blank. Got %s", opts.OrgName)
+						}
+						if opts.UserName != "" {
+							return nil, fmt.Errorf("Expected userName to be blank. Got %s", opts.UserName)
+						}
+						return []*api.Codespace{
+							{
+								DisplayName: "CS1",
+							},
+						}, nil
+					},
+				},
+			},
+			opts: &listOptions{
+				repo: "cli/cli",
+			},
+		},
+		{
+			name: "list codespaces,--repo, --org and --user flag",
+			opts: &listOptions{
+				repo:     "cli/cli",
+				orgName:  "TestOrg",
+				userName: "jimmy",
+			},
+			wantError: fmt.Errorf("using `--org` or `--user` with `--repo` is not allowed"),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -95,8 +142,13 @@ func TestApp_List(t *testing.T) {
 			var exporter cmdutil.Exporter
 
 			err := a.List(context.Background(), tt.opts, exporter)
-			if err != nil {
-				t.Error(err)
+			if (err != nil) != (tt.wantError != nil) {
+				t.Errorf("error = %v, wantErr %v", err, tt.wantError)
+				return
+			}
+
+			if err != nil && err.Error() != tt.wantError.Error() {
+				t.Errorf("error = %v, wantErr %v", err, tt.wantError)
 			}
 		})
 	}
