@@ -23,8 +23,8 @@ func TestApp_List(t *testing.T) {
 			name: "list codespaces, no flags",
 			fields: fields{
 				apiClient: &apiClientMock{
-					ListCodespacesFunc: func(ctx context.Context, limit int, orgName string, userName string) ([]*api.Codespace, error) {
-						if orgName != "" {
+					ListCodespacesFunc: func(ctx context.Context, opts api.ListCodespacesOptions) ([]*api.Codespace, error) {
+						if opts.OrgName != "" {
 							return nil, fmt.Errorf("should not be called with an orgName")
 						}
 						return []*api.Codespace{
@@ -41,12 +41,12 @@ func TestApp_List(t *testing.T) {
 			name: "list codespaces, --org flag",
 			fields: fields{
 				apiClient: &apiClientMock{
-					ListCodespacesFunc: func(ctx context.Context, limit int, orgName string, userName string) ([]*api.Codespace, error) {
-						if orgName != "TestOrg" {
-							return nil, fmt.Errorf("Expected orgName to be TestOrg. Got %s", orgName)
+					ListCodespacesFunc: func(ctx context.Context, opts api.ListCodespacesOptions) ([]*api.Codespace, error) {
+						if opts.OrgName != "TestOrg" {
+							return nil, fmt.Errorf("Expected orgName to be TestOrg. Got %s", opts.OrgName)
 						}
-						if userName != "" {
-							return nil, fmt.Errorf("Expected userName to be blank. Got %s", userName)
+						if opts.UserName != "" {
+							return nil, fmt.Errorf("Expected userName to be blank. Got %s", opts.UserName)
 						}
 						return []*api.Codespace{
 							{
@@ -64,12 +64,12 @@ func TestApp_List(t *testing.T) {
 			name: "list codespaces, --org and --user flag",
 			fields: fields{
 				apiClient: &apiClientMock{
-					ListCodespacesFunc: func(ctx context.Context, limit int, orgName string, userName string) ([]*api.Codespace, error) {
-						if orgName != "TestOrg" {
-							return nil, fmt.Errorf("Expected orgName to be TestOrg. Got %s", orgName)
+					ListCodespacesFunc: func(ctx context.Context, opts api.ListCodespacesOptions) ([]*api.Codespace, error) {
+						if opts.OrgName != "TestOrg" {
+							return nil, fmt.Errorf("Expected orgName to be TestOrg. Got %s", opts.OrgName)
 						}
-						if userName != "jimmy" {
-							return nil, fmt.Errorf("Expected userName to be jimmy. Got %s", userName)
+						if opts.UserName != "jimmy" {
+							return nil, fmt.Errorf("Expected userName to be jimmy. Got %s", opts.UserName)
 						}
 						return []*api.Codespace{
 							{

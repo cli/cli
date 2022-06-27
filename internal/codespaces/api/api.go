@@ -268,19 +268,32 @@ func (c *Codespace) ExportData(fields []string) map[string]interface{} {
 	return data
 }
 
-// ListCodespaces returns a list of codespaces for the user. Pass a negative limit to request all pages from
+type ListCodespacesOptions struct {
+	OrgName        string
+	UserName       string
+	RepositoryName string
+	Limit          int
+}
+
+// ListCodespaces returns a list of codespaces for the user. Pass a negative limit (default) to request all pages from
 // the API until all codespaces have been fetched.
-func (a *API) ListCodespaces(ctx context.Context, limit int, orgName string, userName string) (codespaces []*Codespace, err error) {
+func (a *API) ListCodespaces(ctx context.Context, opts ListCodespacesOptions) (codespaces []*Codespace, err error) {
 	perPage := 100
-	if limit > 0 && limit < 100 {
+	limit := opts.Limit
+
+	if limit == 0 {
+		limit = -1
+	} else if limit > 0 && limit < 100 {
 		perPage = limit
 	}
 
 	var listURL string
 	var spanName string
 
-	if orgName != "" {
-		if userName != "" {
+	if opts.OrgName != "" {
+		orgName := opts.OrgName
+		if opts.UserName != "" {
+			userName := opts.UserName
 			listURL = fmt.Sprintf("%s/orgs/%s/members/%s/codespaces?per_page=%d", a.githubAPI, orgName, userName, perPage)
 			spanName = "/orgs/*/members/*/codespaces"
 		} else {
