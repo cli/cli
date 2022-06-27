@@ -275,15 +275,16 @@ type ListCodespacesOptions struct {
 	Limit      int
 }
 
-// ListCodespaces returns a list of codespaces for the user. Pass a negative limit (default) to request all pages from
+// ListCodespaces returns a list of codespaces for the user. Pass a negative limit to request all pages from
 // the API until all codespaces have been fetched.
 func (a *API) ListCodespaces(ctx context.Context, opts ListCodespacesOptions) (codespaces []*Codespace, err error) {
-	perPage := 100
-	limit := opts.Limit
 
-	if limit == 0 {
-		limit = -1
-	} else if limit > 0 && limit < 100 {
+	var (
+		perPage = 100
+		limit   = opts.Limit
+	)
+
+	if limit > 0 && limit < 100 {
 		perPage = limit
 	}
 
