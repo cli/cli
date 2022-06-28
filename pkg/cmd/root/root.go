@@ -16,6 +16,7 @@ import (
 	codespaceCmd "github.com/cli/cli/v2/pkg/cmd/codespace"
 	completionCmd "github.com/cli/cli/v2/pkg/cmd/completion"
 	configCmd "github.com/cli/cli/v2/pkg/cmd/config"
+	dependabotCmd "github.com/cli/cli/v2/pkg/cmd/dependabot"
 	extensionCmd "github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	gistCmd "github.com/cli/cli/v2/pkg/cmd/gist"
@@ -78,6 +79,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(authCmd.NewCmdAuth(f))
 	cmd.AddCommand(configCmd.NewCmdConfig(f))
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
+	cmd.AddCommand(dependabotCmd.NewCmdDependabot(f))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
 	cmd.AddCommand(gpgKeyCmd.NewCmdGPGKey(f))
 	cmd.AddCommand(completionCmd.NewCmdCompletion(f.IOStreams))
