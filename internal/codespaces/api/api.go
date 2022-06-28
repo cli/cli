@@ -269,16 +269,15 @@ func (c *Codespace) ExportData(fields []string) map[string]interface{} {
 }
 
 type ListCodespacesOptions struct {
-	OrgName    string
-	UserName   string
-	Repository *Repository
-	Limit      int
+	OrgName  string
+	UserName string
+	RepoName string
+	Limit    int
 }
 
 // ListCodespaces returns a list of codespaces for the user. Pass a negative limit to request all pages from
 // the API until all codespaces have been fetched.
 func (a *API) ListCodespaces(ctx context.Context, opts ListCodespacesOptions) (codespaces []*Codespace, err error) {
-
 	var (
 		perPage = 100
 		limit   = opts.Limit
@@ -288,11 +287,13 @@ func (a *API) ListCodespaces(ctx context.Context, opts ListCodespacesOptions) (c
 		perPage = limit
 	}
 
-	var listURL string
-	var spanName string
+	var (
+		listURL  string
+		spanName string
+	)
 
-	if opts.Repository != nil {
-		listURL = fmt.Sprintf("%s/repos/%s/codespaces?per_page=%d", a.githubAPI, opts.Repository.FullName, perPage)
+	if opts.RepoName != "" {
+		listURL = fmt.Sprintf("%s/repos/%s/codespaces?per_page=%d", a.githubAPI, opts.RepoName, perPage)
 		spanName = "/repos/*/codespaces"
 	} else if opts.OrgName != "" {
 		// the endpoints below can only be called by the organization admins

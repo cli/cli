@@ -89,20 +89,12 @@ func TestApp_List(t *testing.T) {
 			name: "list codespaces, --repo",
 			fields: fields{
 				apiClient: &apiClientMock{
-					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
-						if nwo != "cli/cli" {
-							return nil, fmt.Errorf("Expected nwo to be cli/cli. Got %s", nwo)
-						}
-						return &api.Repository{
-							FullName: "cli/cli",
-						}, nil
-					},
 					ListCodespacesFunc: func(ctx context.Context, opts api.ListCodespacesOptions) ([]*api.Codespace, error) {
-						if opts.Repository == nil {
+						if opts.RepoName == "" {
 							return nil, fmt.Errorf("Expected repository to not be nil")
 						}
-						if opts.Repository.FullName != "cli/cli" {
-							return nil, fmt.Errorf("Expected repository name to be cli/cli. Got %s", opts.Repository.FullName)
+						if opts.RepoName != "cli/cli" {
+							return nil, fmt.Errorf("Expected repository name to be cli/cli. Got %s", opts.RepoName)
 						}
 						if opts.OrgName != "" {
 							return nil, fmt.Errorf("Expected orgName to be blank. Got %s", opts.OrgName)

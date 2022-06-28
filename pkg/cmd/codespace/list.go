@@ -52,26 +52,13 @@ func newListCmd(app *App) *cobra.Command {
 }
 
 func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Exporter) error {
-	if (opts.orgName != "" || opts.userName != "") && opts.repo != "" {
+	// if repo is provided, we don't accept orgName or userName
+	if opts.repo != "" && (opts.orgName != "" || opts.userName != "") {
 		return cmdutil.FlagErrorf("using `--org` or `--user` with `--repo` is not allowed")
 	}
 
-	var (
-		repository *api.Repository
-		err        error
-	)
-
-	if opts.repo != "" {
-		a.StartProgressIndicatorWithLabel("Fetching repository")
-		repository, err = a.apiClient.GetRepository(ctx, opts.repo)
-		a.StopProgressIndicator()
-		if err != nil {
-			return fmt.Errorf("error getting repository: %w", err)
-		}
-	}
-
 	a.StartProgressIndicatorWithLabel("Fetching codespaces")
-	codespaces, err := a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{Limit: opts.limit, Repository: repository, OrgName: opts.orgName, UserName: opts.userName})
+	codespaces, err := a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{Limit: opts.limit, RepoName: opts.repo, OrgName: opts.orgName, UserName: opts.userName})
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting codespaces: %w", err)
