@@ -108,7 +108,7 @@ type apiClient interface {
 	GetUser(ctx context.Context) (*api.User, error)
 	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
 	GetOrgMemberCodespace(ctx context.Context, orgName string, userName string, codespaceName string) (*api.Codespace, error)
-	ListCodespaces(ctx context.Context, limit int, orgName string, userName string) ([]*api.Codespace, error)
+	ListCodespaces(ctx context.Context, opts api.ListCodespacesOptions) ([]*api.Codespace, error)
 	DeleteCodespace(ctx context.Context, name string, orgName string, userName string) error
 	StartCodespace(ctx context.Context, name string) error
 	StopCodespace(ctx context.Context, name string, orgName string, userName string) error
@@ -126,7 +126,7 @@ type apiClient interface {
 var errNoCodespaces = errors.New("you have no codespaces")
 
 func chooseCodespace(ctx context.Context, apiClient apiClient) (*api.Codespace, error) {
-	codespaces, err := apiClient.ListCodespaces(ctx, -1, "", "")
+	codespaces, err := apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting codespaces: %w", err)
 	}

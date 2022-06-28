@@ -14,6 +14,7 @@ import (
 
 type listOptions struct {
 	limit    int
+	repo     string
 	orgName  string
 	userName string
 }
@@ -42,6 +43,7 @@ func newListCmd(app *App) *cobra.Command {
 	}
 
 	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", 30, "Maximum number of codespaces to list")
+	listCmd.Flags().StringVarP(&opts.repo, "repo", "r", "", "Repository name with owner: user/repo")
 	listCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "The `login` handle of the organization to list codespaces for (admin-only)")
 	listCmd.Flags().StringVarP(&opts.userName, "user", "u", "", "The `username` to list codespaces for (used with --org)")
 	cmdutil.AddJSONFlags(listCmd, &exporter, api.CodespaceFields)
@@ -50,8 +52,13 @@ func newListCmd(app *App) *cobra.Command {
 }
 
 func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Exporter) error {
+	// if repo is provided, we don't accept orgName or userName
+	if opts.repo != "" && (opts.orgName != "" || opts.userName != "") {
+		return cmdutil.FlagErrorf("using `--org` or `--user` with `--repo` is not allowed")
+	}
+
 	a.StartProgressIndicatorWithLabel("Fetching codespaces")
-	codespaces, err := a.apiClient.ListCodespaces(ctx, opts.limit, opts.orgName, opts.userName)
+	codespaces, err := a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{Limit: opts.limit, RepoName: opts.repo, OrgName: opts.orgName, UserName: opts.userName})
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting codespaces: %w", err)
