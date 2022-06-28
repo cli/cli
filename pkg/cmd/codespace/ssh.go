@@ -24,6 +24,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const automaticPrivateKeyName = "codespaces.auto"
+
 type sshOptions struct {
 	codespace  string
 	profile    string
@@ -44,6 +46,11 @@ func newSSHCmd(app *App) *cobra.Command {
 		Long: heredoc.Doc(`
 			The 'ssh' command is used to SSH into a codespace. In its simplest form, you can
 			run 'gh cs ssh', select a codespace interactively, and connect.
+			
+			By default, the 'ssh' command will create a public/private ssh key pair to  
+			authenticate with the codespace (if they haven't already been created) inside the 
+			~/.ssh directory. Any private keys for which the public key has been uploaded to 
+			your GitHub profile may also be used instead, if desired.
 
 			The 'ssh' command also supports deeper integration with OpenSSH using a
 			'--config' option that generates per-codespace ssh configuration in OpenSSH
@@ -125,7 +132,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	startSSHOptions := liveshare.StartSSHServerOptions{}
 
 	if shouldGenerateSSHKeys(args, opts) && sshContext.HasKeygen() {
-		keyPair, err := sshContext.GenerateSSHKey("codespaces", "")
+		keyPair, err := sshContext.GenerateSSHKey(automaticPrivateKeyName, "")
 		if err != nil && !errors.Is(err, ssh.ErrKeyAlreadyExists) {
 			return fmt.Errorf("failed to generate ssh keys: %w", err)
 		}
@@ -381,6 +388,11 @@ func newCpCmd(app *App) *cobra.Command {
 			be evaluated on the remote machine, subject to expansion of tildes, braces, globs,
 			environment variables, and backticks. For security, do not use this flag with arguments
 			provided by untrusted users; see <https://lwn.net/Articles/835962/> for discussion.
+			
+			By default, the 'cp' command will create a public/private ssh key pair to authenticate with 
+			the codespace (if they haven't already been created) inside the ~/.ssh directory. Any private 
+			keys for which the public key has been uploaded to your GitHub profile may also be used
+			instead, if desired.
 		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh codespace cp -e README.md 'remote:/workspaces/$RepositoryName/'
