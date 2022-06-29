@@ -273,14 +273,14 @@ func checkAndUpdateOldKeyPair(sshContext ssh.Context) *ssh.KeyPair {
 
 		// Both old public and private keys exist, rename them to the new name
 
-		privateKeyNew := strings.Replace(privateKey, automaticPrivateKeyNameOld, automaticPrivateKeyName, -1)
-		err = os.Rename(privateKey, privateKeyNew)
+		publicKeyNew := strings.Replace(publicKey, automaticPrivateKeyNameOld, automaticPrivateKeyName, -1)
+		err = os.Rename(publicKey, publicKeyNew)
 		if err != nil {
 			return nil
 		}
 
-		publicKeyNew := strings.Replace(publicKey, automaticPrivateKeyNameOld, automaticPrivateKeyName, -1)
-		err = os.Rename(publicKey, publicKeyNew)
+		privateKeyNew := strings.Replace(privateKey, automaticPrivateKeyNameOld, automaticPrivateKeyName, -1)
+		err = os.Rename(privateKey, privateKeyNew)
 		if err != nil {
 			return nil
 		}
