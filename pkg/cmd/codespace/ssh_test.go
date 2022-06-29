@@ -71,12 +71,13 @@ func TestAutomaticSSHKeyPairs(t *testing.T) {
 			ConfigDir: dir,
 		}
 
-		defer os.RemoveAll(dir)
-
 		for _, file := range tt.existingFiles {
-			if _, err := os.Create(filepath.Join(dir, file)); err != nil {
+			f, err := os.Create(filepath.Join(dir, file))
+			if err != nil {
 				t.Errorf("Failed to setup test files: %v", err)
 			}
+			// If the file isn't closed here windows will have errors about file already in use
+			f.Close()
 		}
 
 		keyPair, err := setupAutomaticSSHKeys(sshContext)
