@@ -24,6 +24,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// In 2.13.0 these commands started automatically generating key pairs named 'codespaces' and 'codespaces.pub'
+// which could collide with suggested the ssh config also named 'codespaces'. We now use 'codespaces.auto'
+// and 'codespaces.auto.pub' in order to avoid that collision.
+const automaticPrivateKeyNameOld = "codespaces"
+const automaticPrivateKeyName = "codespaces.auto"
+
 type sshOptions struct {
 	codespace  string
 	profile    string
@@ -44,6 +50,9 @@ func newSSHCmd(app *App) *cobra.Command {
 		Long: heredoc.Doc(`
 			The 'ssh' command is used to SSH into a codespace. In its simplest form, you can
 			run 'gh cs ssh', select a codespace interactively, and connect.
+			
+			By default, the 'ssh' command will create a public/private ssh key pair to  
+			authenticate with the codespace inside the ~/.ssh directory.
 
 			The 'ssh' command also supports deeper integration with OpenSSH using a
 			'--config' option that generates per-codespace ssh configuration in OpenSSH
@@ -124,9 +133,9 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	sshContext := ssh.Context{}
 	startSSHOptions := liveshare.StartSSHServerOptions{}
 
-	if shouldGenerateSSHKeys(args, opts) && sshContext.HasKeygen() {
-		keyPair, err := sshContext.GenerateSSHKey("codespaces", "")
-		if err != nil && !errors.Is(err, ssh.ErrKeyAlreadyExists) {
+	if shouldUseAutomaticSSHKeys(args, opts) {
+		keyPair, err := setupAutomaticSSHKeys(sshContext)
+		if err != nil {
 			return fmt.Errorf("failed to generate ssh keys: %w", err)
 		}
 
@@ -207,7 +216,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 }
 
-func shouldGenerateSSHKeys(args []string, opts sshOptions) bool {
+func shouldUseAutomaticSSHKeys(args []string, opts sshOptions) bool {
 	if opts.profile != "" {
 		// The profile may specify the identity file so cautiously don't override anything with that option
 		return false
@@ -226,6 +235,67 @@ func shouldGenerateSSHKeys(args []string, opts sshOptions) bool {
 	}
 
 	return true
+}
+
+func setupAutomaticSSHKeys(sshContext ssh.Context) (*ssh.KeyPair, error) {
+	keyPair := checkAndUpdateOldKeyPair(sshContext)
+	if keyPair != nil {
+		return keyPair, nil
+	}
+
+	keyPair, err := sshContext.GenerateSSHKey(automaticPrivateKeyName, "")
+	if err != nil && !errors.Is(err, ssh.ErrKeyAlreadyExists) {
+		return nil, err
+	}
+
+	return keyPair, nil
+}
+
+// checkAndUpdateOldKeyPair handles backward compatibility with the old keypair names.
+// If the old public and private keys both exist they are renamed to the new name.
+// The return value is non-nil only if the rename happens.
+func checkAndUpdateOldKeyPair(sshContext ssh.Context) *ssh.KeyPair {
+	publicKeys, err := sshContext.LocalPublicKeys()
+	if err != nil {
+		return nil
+	}
+
+	for _, publicKey := range publicKeys {
+		if filepath.Base(publicKey) != automaticPrivateKeyNameOld+".pub" {
+			continue
+		}
+
+		privateKey := strings.TrimSuffix(publicKey, ".pub")
+		_, err := os.Stat(privateKey)
+		if err != nil {
+			continue
+		}
+
+		// Both old public and private keys exist, rename them to the new name
+
+		sshDir := filepath.Dir(publicKey)
+
+		publicKeyNew := filepath.Join(sshDir, automaticPrivateKeyName+".pub")
+		err = os.Rename(publicKey, publicKeyNew)
+		if err != nil {
+			return nil
+		}
+
+		privateKeyNew := filepath.Join(sshDir, automaticPrivateKeyName)
+		err = os.Rename(privateKey, privateKeyNew)
+		if err != nil {
+			return nil
+		}
+
+		keyPair := &ssh.KeyPair{
+			PublicKeyPath:  publicKeyNew,
+			PrivateKeyPath: privateKeyNew,
+		}
+
+		return keyPair
+	}
+
+	return nil
 }
 
 func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err error) {
@@ -381,6 +451,9 @@ func newCpCmd(app *App) *cobra.Command {
 			be evaluated on the remote machine, subject to expansion of tildes, braces, globs,
 			environment variables, and backticks. For security, do not use this flag with arguments
 			provided by untrusted users; see <https://lwn.net/Articles/835962/> for discussion.
+			
+			By default, the 'cp' command will create a public/private ssh key pair to authenticate with 
+			the codespace inside the ~/.ssh directory.
 		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh codespace cp -e README.md 'remote:/workspaces/$RepositoryName/'
