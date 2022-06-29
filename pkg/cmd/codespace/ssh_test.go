@@ -63,6 +63,11 @@ func TestAutomaticSSHKeyPairs(t *testing.T) {
 			[]string{automaticPrivateKeyNameOld + ".pub"},
 			[]string{automaticPrivateKeyNameOld + ".pub", automaticPrivateKeyName, automaticPrivateKeyName + ".pub"},
 		},
+		// Backward compatibility (edge case): files exist which contains old key name as a substring, the new keys should be created
+		{
+			[]string{"foo" + automaticPrivateKeyNameOld + ".pub", "foo" + automaticPrivateKeyNameOld},
+			[]string{"foo" + automaticPrivateKeyNameOld + ".pub", "foo" + automaticPrivateKeyNameOld, automaticPrivateKeyName, automaticPrivateKeyName + ".pub"},
+		},
 	}
 
 	for _, tt := range tests {

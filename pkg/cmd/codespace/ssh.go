@@ -261,7 +261,7 @@ func checkAndUpdateOldKeyPair(sshContext ssh.Context) *ssh.KeyPair {
 	}
 
 	for _, publicKey := range publicKeys {
-		if !strings.HasSuffix(publicKey, automaticPrivateKeyNameOld+".pub") {
+		if filepath.Base(publicKey) != automaticPrivateKeyNameOld+".pub" {
 			continue
 		}
 
