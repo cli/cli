@@ -26,12 +26,6 @@ func TestPendingOperationDisallowsSSH(t *testing.T) {
 }
 
 func TestAutomaticSSHKeyPairs(t *testing.T) {
-	dir := t.TempDir()
-
-	sshContext := ssh.Context{
-		ConfigDir: dir,
-	}
-
 	tests := []struct {
 		// These files exist when calling setupAutomaticSSHKeys
 		existingFiles []string
@@ -71,14 +65,13 @@ func TestAutomaticSSHKeyPairs(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		err := os.RemoveAll(dir)
-		if err != nil {
-			t.Errorf("Failed to clean test directory: %v", err)
+		dir := t.TempDir()
+
+		sshContext := ssh.Context{
+			ConfigDir: dir,
 		}
-		err = os.MkdirAll(dir, 0711)
-		if err != nil {
-			t.Errorf("Failed to set up test directory: %v", err)
-		}
+
+		defer os.RemoveAll(dir)
 
 		for _, file := range tt.existingFiles {
 			if _, err := os.Create(filepath.Join(dir, file)); err != nil {
