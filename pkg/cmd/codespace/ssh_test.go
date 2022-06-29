@@ -70,7 +70,7 @@ func TestAutomaticSSHKeyPairs(t *testing.T) {
 		if err != nil {
 			t.Errorf("Failed to clean test directory: %v", err)
 		}
-		os.MkdirAll(dir, 0711)
+		err = os.MkdirAll(dir, 0711)
 		if err != nil {
 			t.Errorf("Failed to set up test directory: %v", err)
 		}
