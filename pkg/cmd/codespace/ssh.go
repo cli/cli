@@ -251,6 +251,9 @@ func setupAutomaticSSHKeys(sshContext ssh.Context) (*ssh.KeyPair, error) {
 	return keyPair, nil
 }
 
+// checkAndUpdateOldKeyPair handles backward compatibility with the old keypair names.
+// If the old public and private keys both exist they are renamed to the new name.
+// The return value is non-nil only if the rename happens.
 func checkAndUpdateOldKeyPair(sshContext ssh.Context) *ssh.KeyPair {
 	publicKeys, err := sshContext.LocalPublicKeys()
 	if err != nil {
