@@ -86,7 +86,7 @@ func TestAutomaticSSHKeyPairs(t *testing.T) {
 			t.Errorf("Unexpected error from setupAutomaticSSHKeys: %v", err)
 		}
 		if keyPair == nil {
-			t.Error("Unexpected nil KeyPair from setupAutomaticSSHKeys")
+			t.Fatal("Unexpected nil KeyPair from setupAutomaticSSHKeys")
 		}
 		if !strings.HasSuffix(keyPair.PrivateKeyPath, automaticPrivateKeyName) {
 			t.Errorf("Expected private key path %v, got %v", automaticPrivateKeyName, keyPair.PrivateKeyPath)
