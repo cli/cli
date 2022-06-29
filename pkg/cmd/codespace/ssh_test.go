@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
@@ -86,6 +87,12 @@ func TestAutomaticSSHKeyPairs(t *testing.T) {
 		}
 		if keyPair == nil {
 			t.Error("Unexpected nil KeyPair from setupAutomaticSSHKeys")
+		}
+		if !strings.HasSuffix(keyPair.PrivateKeyPath, automaticPrivateKeyName) {
+			t.Errorf("Expected private key path %v, got %v", automaticPrivateKeyName, keyPair.PrivateKeyPath)
+		}
+		if !strings.HasSuffix(keyPair.PublicKeyPath, automaticPrivateKeyName+".pub") {
+			t.Errorf("Expected public key path %v, got %v", automaticPrivateKeyName+".pub", keyPair.PublicKeyPath)
 		}
 
 		// Check that all the expected files are present
