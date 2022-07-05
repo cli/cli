@@ -93,6 +93,15 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 	}, err
 }
 
+func TestNoArgs(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	_, err := runCommand(http, true, "")
+
+	assert.ErrorContains(t, err, "cannot close: branch, url, or number of the pr required")
+}
+
 func TestPrClose(t *testing.T) {
 	http := &httpmock.Registry{}
 	defer http.Verify(t)
