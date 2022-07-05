@@ -10,6 +10,10 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
+type artifactsPayload struct {
+	Artifacts []Artifact
+}
+
 type Artifact struct {
 	Name        string `json:"name"`
 	Size        uint64 `json:"size_in_bytes"`
