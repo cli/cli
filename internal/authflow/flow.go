@@ -88,7 +88,7 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 		CallbackURI:  callbackURI,
 		Scopes:       scopes,
 		DisplayCode: func(code, verificationURL string) error {
-			fmt.Fprintf(w, "%s First copy your one-time code: %s\n", cs.Yellow("!"), cs.Bold(code))
+			fmt.Fprintf(w, "%s Your one-time code: %s\n", cs.Yellow("!"), cs.Bold(code))
 			return nil
 		},
 		BrowseURL: func(authURL string) error {
