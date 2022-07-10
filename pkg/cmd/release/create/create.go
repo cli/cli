@@ -222,7 +222,7 @@ func createRun(opts *CreateOptions) error {
 		// If there is a local tag with the same name as specified
 		// the user may not want to create a new tag on the remote
 		// as the local one might be annotated or signed.
-		// If the user specifies the target take that as explict instruction
+		// If the user specifies the target take that as explicit instruction
 		// to create the tag on the remote pointing to the target regardless
 		// of local tag status.
 		// If a remote tag with the same name as specified exists already
