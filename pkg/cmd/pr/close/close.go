@@ -36,7 +36,7 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:   "close {<number> | <url> | <branch>}",
 		Short: "Close a pull request",
-		Args:  cobra.ExactArgs(1),
+		Args:  cmdutil.ExactArgs(1, "cannot close pull request: number, url, or branch required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
 
