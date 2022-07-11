@@ -139,7 +139,7 @@ func TestCloneRun(t *testing.T) {
 					{
 						"name": "bug",
 						"color": "d73a4a",
-						"description": "Someting isn't working"
+						"description": "Something isn't working"
 					}`),
 				)
 				reg.Register(
@@ -188,7 +188,7 @@ func TestCloneRun(t *testing.T) {
 					{
 						"name": "bug",
 						"color": "d73a4a",
-						"description": "Someting isn't working"
+						"description": "Something isn't working"
 					}`),
 				)
 			},
@@ -259,7 +259,7 @@ func TestCloneRun(t *testing.T) {
 					{
 						"name": "bug",
 						"color": "d73a4a",
-						"description": "Someting isn't working"
+						"description": "Something isn't working"
 					}`),
 				)
 				reg.Register(
@@ -371,7 +371,7 @@ func TestCloneRun(t *testing.T) {
 					httpmock.StatusStringResponse(201, `
 					{
 						"color": "d73a4a",
-						"description": "Someting isn't working"
+						"description": "Something isn't working"
 					}`),
 				)
 				reg.Register(
@@ -536,7 +536,7 @@ func TestCloneRun(t *testing.T) {
 					{
 						"name": "bug",
 						"color": "d73a4a",
-						"description": "Someting isn't working"
+						"description": "Something isn't working"
 					}`),
 				)
 				reg.Register(

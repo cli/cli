@@ -429,7 +429,7 @@ func createFromLocal(opts *CreateOptions) error {
 	}
 	if !isRepo {
 		if repoPath == "." {
-			return fmt.Errorf("current directory is not a git repository. Run `git init` to initalize it")
+			return fmt.Errorf("current directory is not a git repository. Run `git init` to initialize it")
 		}
 		return fmt.Errorf("%s is not a git repository. Run `git -C \"%s\" init` to initialize it", absPath, repoPath)
 	}
@@ -579,7 +579,7 @@ func sourceInit(io *iostreams.IOStreams, remoteURL, baseRemote, repoPath string)
 	return nil
 }
 
-// check if local repository has commited changes
+// check if local repository has committed changes
 func hasCommits(repoPath string) (bool, error) {
 	hasCommitsCmd, err := git.GitCommand("-C", repoPath, "rev-parse", "HEAD")
 	if err != nil {

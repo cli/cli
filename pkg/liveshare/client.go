@@ -1,5 +1,5 @@
 // Package liveshare is a Go client library for the Visual Studio Live Share
-// service, which provides collaborative, distibuted editing and debugging.
+// service, which provides collaborative, distributed editing and debugging.
 // See https://docs.microsoft.com/en-us/visualstudio/liveshare for an overview.
 //
 // It provides the ability for a Go program to connect to a Live Share
