@@ -9,6 +9,8 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	diff "github.com/yudai/gojsondiff"
+	"github.com/yudai/gojsondiff/formatter"
 )
 
 func TestIssue_ExportData(t *testing.T) {
@@ -140,11 +142,19 @@ func TestPullRequest_ExportData(t *testing.T) {
 						{
 							"__typename": "CheckRun",
 							"name": "mycheck",
+							"checkSuite": {"workflowRun": {"workflow": {"name": "myworkflow"}}},
 							"status": "COMPLETED",
 							"conclusion": "SUCCESS",
 							"startedAt": "2020-08-31T15:44:24+02:00",
 							"completedAt": "2020-08-31T15:45:24+02:00",
 							"detailsUrl": "http://example.com/details"
+						},
+						{
+							"__typename": "StatusContext",
+							"context": "mycontext",
+							"state": "SUCCESS",
+							"createdAt": "2020-08-31T15:44:24+02:00",
+							"targetUrl": "http://example.com/details"
 						}
 					] } } } }
 				] } }
@@ -155,11 +165,19 @@ func TestPullRequest_ExportData(t *testing.T) {
 						{
 							"__typename": "CheckRun",
 							"name": "mycheck",
+							"workflowName": "myworkflow",
 							"status": "COMPLETED",
 							"conclusion": "SUCCESS",
 							"startedAt": "2020-08-31T15:44:24+02:00",
 							"completedAt": "2020-08-31T15:45:24+02:00",
 							"detailsUrl": "http://example.com/details"
+						},
+						{
+							"__typename": "StatusContext",
+							"context": "mycontext",
+							"state": "SUCCESS",
+							"startedAt": "2020-08-31T15:44:24+02:00",
+							"targetUrl": "http://example.com/details"
 						}
 					]
 				}
@@ -178,7 +196,22 @@ func TestPullRequest_ExportData(t *testing.T) {
 			enc := json.NewEncoder(&buf)
 			enc.SetIndent("", "\t")
 			require.NoError(t, enc.Encode(exported))
-			assert.Equal(t, tt.outputJSON, buf.String())
+
+			differ := diff.New()
+			d, err := differ.Compare([]byte(tt.outputJSON), buf.Bytes())
+			require.NoError(t, err)
+
+			if d.Modified() {
+				var aJson map[string]interface{}
+				require.NoError(t, json.Unmarshal([]byte(tt.outputJSON), &aJson))
+				f := formatter.NewAsciiFormatter(aJson, formatter.AsciiFormatterConfig{
+					ShowArrayIndex: true,
+					Coloring:       false,
+				})
+				diffString, err := f.Format(d)
+				require.NoError(t, err)
+				t.Errorf("output JSON did not match:\n%s", diffString)
+			}
 		})
 	}
 }
