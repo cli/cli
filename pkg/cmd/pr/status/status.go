@@ -191,7 +191,7 @@ func prSelectorForCurrentBranch(baseRepo ghrepo.Interface, prHeadRef string, rem
 		}
 		// prepend `OWNER:` if this branch is pushed to a fork
 		if !strings.EqualFold(branchOwner, baseRepo.RepoOwner()) {
-			selector = fmt.Sprintf("%s:%s", branchOwner, prHeadRef)
+			selector = fmt.Sprintf("%s:%s", branchOwner, selector)
 		}
 	}
 
