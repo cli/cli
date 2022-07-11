@@ -99,7 +99,7 @@ func TestNoArgs(t *testing.T) {
 
 	_, err := runCommand(http, true, "")
 
-	assert.ErrorContains(t, err, "cannot close: branch, url, or number of the pr required")
+	assert.EqualError(t, err, "cannot close pull request: number, url, or branch required")
 }
 
 func TestPrClose(t *testing.T) {
