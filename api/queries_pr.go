@@ -94,8 +94,15 @@ type PullRequest struct {
 }
 
 type CheckContext struct {
-	TypeName    string    `json:"__typename"`
-	Name        string    `json:"name"`
+	TypeName   string `json:"__typename"`
+	Name       string `json:"name"`
+	CheckSuite struct {
+		WorkflowRun struct {
+			Workflow struct {
+				Name string `json:"name"`
+			} `json:"workflow"`
+		} `json:"workflowRun"`
+	} `json:"checkSuite"`
 	Context     string    `json:"context,omitempty"`
 	State       string    `json:"state,omitempty"`
 	Status      string    `json:"status"`

@@ -145,6 +145,7 @@ func StatusCheckRollupGraphQL(after string) string {
 							},
 							...on CheckRun {
 								name,
+								checkSuite{workflowRun{workflow{name}}},
 								status,
 								conclusion,
 								startedAt,
