@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -16,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
@@ -816,9 +816,9 @@ func interactiveSource() (string, error) {
 }
 
 func confirmSubmission(repoWithOwner, visibility string) error {
-	targetRepo := normalizeRepoName(repoWithOwner)
+	targetRepo := shared.NormalizeRepoName(repoWithOwner)
 	if idx := strings.IndexRune(repoWithOwner, '/'); idx > 0 {
-		targetRepo = repoWithOwner[0:idx+1] + normalizeRepoName(repoWithOwner[idx+1:])
+		targetRepo = repoWithOwner[0:idx+1] + shared.NormalizeRepoName(repoWithOwner[idx+1:])
 	}
 	var answer struct {
 		ConfirmSubmit bool
@@ -837,9 +837,4 @@ func confirmSubmission(repoWithOwner, visibility string) error {
 		return cmdutil.CancelError
 	}
 	return nil
-}
-
-// normalizeRepoName takes in the repo name the user inputted and normalizes it using the same logic as GitHub (GitHub.com/new)
-func normalizeRepoName(repoName string) string {
-	return strings.TrimSuffix(regexp.MustCompile(`[^\w._-]+`).ReplaceAllString(repoName, "-"), ".git")
 }
