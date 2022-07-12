@@ -80,6 +80,7 @@ func (c *cfg) GetOrDefault(hostname, key string) (string, error) {
 func (c *cfg) Set(hostname, key, value string) {
 	if hostname == "" {
 		c.cfg.Set([]string{key}, value)
+		return
 	}
 	c.cfg.Set([]string{hosts, hostname, key}, value)
 }
