@@ -12,15 +12,14 @@ import (
 	ghAPI "github.com/cli/go-gh/pkg/api"
 )
 
-type configGetter interface {
-	Get(string, string) (string, error)
+type tokenGetter interface {
 	AuthToken(string) (string, string)
 }
 
 type HTTPClientOptions struct {
 	AppVersion        string
 	CacheTTL          time.Duration
-	Config            configGetter
+	Config            tokenGetter
 	EnableCache       bool
 	Log               io.Writer
 	SkipAcceptHeaders bool
@@ -75,7 +74,7 @@ func AddCacheTTLHeader(rt http.RoundTripper, ttl time.Duration) http.RoundTrippe
 }
 
 // AddAuthToken adds an authentication token header for the host specified by the request.
-func AddAuthTokenHeader(rt http.RoundTripper, cfg configGetter) http.RoundTripper {
+func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper {
 	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 		hostname := ghinstance.NormalizeHostname(getHost(req))
 		if token, _ := cfg.AuthToken(hostname); token != "" {
