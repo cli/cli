@@ -1,10 +1,10 @@
 package factory
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/cli/cli/v2/api"
@@ -16,6 +16,9 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
+
+var ssoHeader string
+var ssoURLRE = regexp.MustCompile(`\burl=([^;]+)`)
 
 func New(appVersion string) *cmdutil.Factory {
 	f := &cmdutil.Factory{
@@ -85,7 +88,17 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 		if err != nil {
 			return nil, err
 		}
-		return NewHTTPClient(io, cfg, appVersion, true)
+		opts := api.HTTPClientOptions{
+			Config:     cfg,
+			Log:        io.ErrOut,
+			AppVersion: appVersion,
+		}
+		client, err := api.NewHTTPClient(opts)
+		if err != nil {
+			return nil, err
+		}
+		client.Transport = api.ExtractHeader("X-GitHub-SSO", &ssoHeader)(client.Transport)
+		return client, nil
 	}
 }
 
@@ -120,12 +133,7 @@ func configFunc() func() (config.Config, error) {
 		if cachedConfig != nil || configError != nil {
 			return cachedConfig, configError
 		}
-		cachedConfig, configError = config.ParseDefaultConfig()
-		if errors.Is(configError, os.ErrNotExist) {
-			cachedConfig = config.NewBlankConfig()
-			configError = nil
-		}
-		cachedConfig = config.InheritEnv(cachedConfig)
+		cachedConfig, configError = config.NewConfig()
 		return cachedConfig, configError
 	}
 }
@@ -154,7 +162,7 @@ func extensionManager(f *cmdutil.Factory) *extension.Manager {
 		return em
 	}
 
-	em.SetClient(api.NewCachedClient(client, time.Second*30))
+	em.SetClient(api.NewCachedHTTPClient(client, time.Second*30))
 
 	return em
 }
@@ -181,4 +189,17 @@ func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 	}
 
 	return io
+}
+
+// SSOURL returns the URL of a SAML SSO challenge received by the server for clients that use ExtractHeader
+// to extract the value of the "X-GitHub-SSO" response header.
+func SSOURL() string {
+	if ssoHeader == "" {
+		return ""
+	}
+	m := ssoURLRE.FindStringSubmatch(ssoHeader)
+	if m == nil {
+		return ""
+	}
+	return m[1]
 }

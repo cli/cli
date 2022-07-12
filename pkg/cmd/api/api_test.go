@@ -912,7 +912,7 @@ func Test_apiRun_cache(t *testing.T) {
 	err = apiRun(&options)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 1, requestCount)
+	assert.Equal(t, 2, requestCount)
 	assert.Equal(t, "", stdout.String(), "stdout")
 	assert.Equal(t, "", stderr.String(), "stderr")
 }

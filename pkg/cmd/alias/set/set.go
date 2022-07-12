@@ -109,10 +109,7 @@ func setRun(opts *SetOptions) error {
 		return err
 	}
 
-	aliasCfg, err := cfg.Aliases()
-	if err != nil {
-		return err
-	}
+	aliasCfg := cfg.Aliases()
 
 	expansion, err := getExpansion(opts)
 	if err != nil {
@@ -139,7 +136,7 @@ func setRun(opts *SetOptions) error {
 	}
 
 	successMsg := fmt.Sprintf("%s Added alias.", cs.SuccessIcon())
-	if oldExpansion, ok := aliasCfg.Get(opts.Name); ok {
+	if oldExpansion, err := aliasCfg.Get(opts.Name); err == nil {
 		successMsg = fmt.Sprintf("%s Changed alias %s from %s to %s",
 			cs.SuccessIcon(),
 			cs.Bold(opts.Name),
@@ -148,9 +145,11 @@ func setRun(opts *SetOptions) error {
 		)
 	}
 
-	err = aliasCfg.Add(opts.Name, expansion)
+	aliasCfg.Add(opts.Name, expansion)
+
+	err = cfg.Write()
 	if err != nil {
-		return fmt.Errorf("could not create alias: %s", err)
+		return err
 	}
 
 	if isTerminal {

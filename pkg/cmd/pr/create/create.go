@@ -588,9 +588,6 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 			return nil, cmdutil.CancelError
 		} else {
 			// "Create a fork of ..."
-			if baseRepo.IsPrivate {
-				return nil, fmt.Errorf("cannot fork private repository %s", ghrepo.FullName(baseRepo))
-			}
 			headBranchLabel = fmt.Sprintf("%s:%s", currentLogin, headBranch)
 		}
 	}
@@ -683,7 +680,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	// one by forking the base repository
 	if headRepo == nil && ctx.IsPushEnabled {
 		opts.IO.StartProgressIndicator()
-		headRepo, err = api.ForkRepo(client, ctx.BaseRepo, "")
+		headRepo, err = api.ForkRepo(client, ctx.BaseRepo, "", "")
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error forking repo: %w", err)

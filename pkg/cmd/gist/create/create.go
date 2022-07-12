@@ -143,10 +143,7 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
 	opts.IO.StartProgressIndicator()
 	gist, err := createGist(httpClient, host, opts.Description, opts.Public, files)

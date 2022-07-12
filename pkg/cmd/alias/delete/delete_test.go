@@ -15,6 +15,8 @@ import (
 )
 
 func TestAliasDelete(t *testing.T) {
+	_ = config.StubWriteConfig(t)
+
 	tests := []struct {
 		name       string
 		config     string
@@ -48,8 +50,6 @@ func TestAliasDelete(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer config.StubWriteConfig(io.Discard, io.Discard)()
-
 			cfg := config.NewFromString(tt.config)
 
 			ios, _, stdout, stderr := iostreams.Test()

@@ -1,7 +1,11 @@
 package root
 
 import (
+	"fmt"
+	"io"
+
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/text"
 	"github.com/spf13/cobra"
 )
@@ -127,7 +131,7 @@ var HelpTopics = map[string]map[string]string{
 	},
 }
 
-func NewHelpTopic(topic string) *cobra.Command {
+func NewHelpTopic(ios *iostreams.IOStreams, topic string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     topic,
 		Short:   HelpTopics[topic]["short"],
@@ -140,21 +144,25 @@ func NewHelpTopic(topic string) *cobra.Command {
 		},
 	}
 
-	cmd.SetHelpFunc(helpTopicHelpFunc)
-	cmd.SetUsageFunc(helpTopicUsageFunc)
+	cmd.SetHelpFunc(func(c *cobra.Command, args []string) {
+		helpTopicHelpFunc(ios.Out, c, args)
+	})
+	cmd.SetUsageFunc(func(c *cobra.Command) error {
+		return helpTopicUsageFunc(ios.ErrOut, c)
+	})
 
 	return cmd
 }
 
-func helpTopicHelpFunc(command *cobra.Command, args []string) {
-	command.Print(command.Long)
+func helpTopicHelpFunc(w io.Writer, command *cobra.Command, args []string) {
+	fmt.Fprint(w, command.Long)
 	if command.Example != "" {
-		command.Printf("\n\nEXAMPLES\n")
-		command.Print(text.Indent(command.Example, "  "))
+		fmt.Fprintf(w, "\n\nEXAMPLES\n")
+		fmt.Fprint(w, text.Indent(command.Example, "  "))
 	}
 }
 
-func helpTopicUsageFunc(command *cobra.Command) error {
-	command.Printf("Usage: gh help %s", command.Use)
+func helpTopicUsageFunc(w io.Writer, command *cobra.Command) error {
+	fmt.Fprintf(w, "Usage: gh help %s", command.Use)
 	return nil
 }

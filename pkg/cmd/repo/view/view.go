@@ -97,11 +97,7 @@ func viewRun(opts *ViewOptions) error {
 			if err != nil {
 				return err
 			}
-			hostname, err := cfg.DefaultHost()
-			if err != nil {
-				return err
-			}
-
+			hostname, _ := cfg.DefaultHost()
 			currentUser, err := api.CurrentLoginName(apiClient, hostname)
 			if err != nil {
 				return err

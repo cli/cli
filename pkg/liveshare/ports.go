@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/sourcegraph/jsonrpc2"
-	"golang.org/x/sync/errgroup"
 )
 
 // Port describes a port exposed by the container.
@@ -29,37 +28,6 @@ const (
 	PortChangeKindStart  PortChangeKind = "start"
 	PortChangeKindUpdate PortChangeKind = "update"
 )
-
-// startSharing tells the Live Share host to start sharing the specified port from the container.
-// The sessionName describes the purpose of the remote port or service.
-// It returns an identifier that can be used to open an SSH channel to the remote port.
-func (s *Session) startSharing(ctx context.Context, sessionName string, port int) (channelID, error) {
-	args := []interface{}{port, sessionName, fmt.Sprintf("http://localhost:%d", port)}
-	g, ctx := errgroup.WithContext(ctx)
-
-	g.Go(func() error {
-		startNotification, err := s.WaitForPortNotification(ctx, port, PortChangeKindStart)
-		if err != nil {
-			return fmt.Errorf("error while waiting for port notification: %w", err)
-
-		}
-		if !startNotification.Success {
-			return fmt.Errorf("error while starting port sharing: %s", startNotification.ErrorDetail)
-		}
-		return nil // success
-	})
-
-	var response Port
-	g.Go(func() error {
-		return s.rpc.do(ctx, "serverSharing.startSharing", args, &response)
-	})
-
-	if err := g.Wait(); err != nil {
-		return channelID{}, err
-	}
-
-	return channelID{response.StreamName, response.StreamCondition}, nil
-}
 
 type PortNotification struct {
 	Success bool // Helps us disambiguate between the SharingSucceeded/SharingFailed events

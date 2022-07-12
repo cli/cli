@@ -8,10 +8,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -306,5 +308,33 @@ Requesting a code review from you
 `
 	if output.String() != expected {
 		t.Errorf("expected %q, got %q", expected, output.String())
+	}
+}
+
+func Test_prSelectorForCurrentBranch(t *testing.T) {
+	rs, cleanup := run.Stub()
+	defer cleanup(t)
+
+	rs.Register(`git config --get-regexp \^branch\\.`, 0, heredoc.Doc(`
+		branch.Frederick888/main.remote git@github.com:Frederick888/playground.git
+		branch.Frederick888/main.merge refs/heads/main
+	`))
+
+	repo := ghrepo.NewWithHost("octocat", "playground", "github.com")
+	rem := context.Remotes{
+		&context.Remote{
+			Remote: &git.Remote{Name: "origin"},
+			Repo:   repo,
+		},
+	}
+	prNum, headRef, err := prSelectorForCurrentBranch(repo, "Frederick888/main", rem)
+	if err != nil {
+		t.Fatalf("prSelectorForCurrentBranch error: %v", err)
+	}
+	if prNum != 0 {
+		t.Errorf("expected prNum to be 0, got %q", prNum)
+	}
+	if headRef != "Frederick888:main" {
+		t.Errorf("expected headRef to be \"Frederick888:main\", got %q", headRef)
 	}
 }

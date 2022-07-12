@@ -20,12 +20,13 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/set"
 	"github.com/cli/cli/v2/utils"
+	ghAPI "github.com/cli/go-gh/pkg/api"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
 
 type hostConfig interface {
-	DefaultHost() (string, error)
+	DefaultHost() (string, string)
 }
 
 type StatusOptions struct {
@@ -40,7 +41,7 @@ type StatusOptions struct {
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
 	opts := &StatusOptions{
 		CachedClient: func(c *http.Client, ttl time.Duration) *http.Client {
-			return api.NewCachedClient(c, ttl)
+			return api.NewCachedHTTPClient(c, ttl)
 		},
 	}
 	opts.HttpClient = f.HttpClient
@@ -426,9 +427,9 @@ func (s *StatusGetter) LoadSearchResults() error {
 	}
 	err := c.GraphQL(s.hostname(), searchQuery, variables, &resp)
 	if err != nil {
-		var gqlErrResponse *api.GraphQLErrorResponse
+		var gqlErrResponse api.GraphQLError
 		if errors.As(err, &gqlErrResponse) {
-			gqlErrors := make([]api.GraphQLError, 0, len(gqlErrResponse.Errors))
+			gqlErrors := make([]ghAPI.GQLErrorItem, 0, len(gqlErrResponse.Errors))
 			// Exclude any FORBIDDEN errors and show status for what we can.
 			for _, gqlErr := range gqlErrResponse.Errors {
 				if gqlErr.Type == "FORBIDDEN" {
@@ -440,7 +441,11 @@ func (s *StatusGetter) LoadSearchResults() error {
 			if len(gqlErrors) == 0 {
 				err = nil
 			} else {
-				err = &api.GraphQLErrorResponse{Errors: gqlErrors}
+				err = &api.GraphQLError{
+					GQLError: ghAPI.GQLError{
+						Errors: gqlErrors,
+					},
+				}
 			}
 		}
 		if err != nil {
@@ -614,10 +619,7 @@ func statusRun(opts *StatusOptions) error {
 		return fmt.Errorf("could not create client: %w", err)
 	}
 
-	hostname, err := opts.HostConfig.DefaultHost()
-	if err != nil {
-		return err
-	}
+	hostname, _ := opts.HostConfig.DefaultHost()
 
 	sg := NewStatusGetter(client, hostname, opts)
 

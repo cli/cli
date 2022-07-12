@@ -187,20 +187,22 @@ func TestNewCmdFork(t *testing.T) {
 }
 
 func TestRepoFork(t *testing.T) {
+	forkResult := `{
+		"node_id": "123",
+		"name": "REPO",
+		"clone_url": "https://github.com/someone/repo.git",
+		"created_at": "2011-01-26T19:01:12Z",
+		"owner": {
+			"login": "someone"
+		}
+	}`
+
 	forkPost := func(reg *httpmock.Registry) {
-		forkResult := `{
-			"node_id": "123",
-			"name": "REPO",
-			"clone_url": "https://github.com/someone/repo.git",
-			"created_at": "2011-01-26T19:01:12Z",
-			"owner": {
-				"login": "someone"
-			}
-		}`
 		reg.Register(
 			httpmock.REST("POST", "repos/OWNER/REPO/forks"),
 			httpmock.StringResponse(forkResult))
 	}
+
 	tests := []struct {
 		name       string
 		opts       *ForkOptions
@@ -208,7 +210,7 @@ func TestRepoFork(t *testing.T) {
 		httpStubs  func(*httpmock.Registry)
 		execStubs  func(*run.CommandStubber)
 		askStubs   func(*prompt.AskStubber)
-		cfg        func(config.Config) config.Config
+		cfgStubs   func(*config.ConfigMock)
 		remotes    []*context.Remote
 		wantOut    string
 		wantErrOut string
@@ -251,9 +253,8 @@ func TestRepoFork(t *testing.T) {
 					Repo: ghrepo.New("OWNER", "REPO"),
 				},
 			},
-			cfg: func(c config.Config) config.Config {
-				_ = c.Set("", "git_protocol", "")
-				return c
+			cfgStubs: func(c *config.ConfigMock) {
+				c.Set("", "git_protocol", "")
 			},
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
@@ -326,6 +327,20 @@ func TestRepoFork(t *testing.T) {
 			httpStubs: forkPost,
 			wantErr:   true,
 			errMsg:    "a git remote named 'origin' already exists",
+		},
+		{
+			name: "implicit tty current owner forked",
+			tty:  true,
+			opts: &ForkOptions{
+				Repository: "someone/REPO",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("POST", "repos/someone/REPO/forks"),
+					httpmock.StringResponse(forkResult))
+			},
+			wantErr: true,
+			errMsg:  "failed to fork: someone/REPO cannot be forked",
 		},
 		{
 			name: "implicit tty already forked",
@@ -663,8 +678,8 @@ func TestRepoFork(t *testing.T) {
 		}
 
 		cfg := config.NewBlankConfig()
-		if tt.cfg != nil {
-			cfg = tt.cfg(cfg)
+		if tt.cfgStubs != nil {
+			tt.cfgStubs(cfg)
 		}
 		tt.opts.Config = func() (config.Config, error) {
 			return cfg, nil

@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/cli/cli/v2/pkg/ssh"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,16 +22,11 @@ func (c tinyConfig) Get(host, key string) (string, error) {
 	return c[fmt.Sprintf("%s:%s", host, key)], nil
 }
 
-func (c tinyConfig) Set(host string, key string, value string) error {
+func (c tinyConfig) Set(host string, key string, value string) {
 	c[fmt.Sprintf("%s:%s", host, key)] = value
-	return nil
 }
 
 func (c tinyConfig) Write() error {
-	return nil
-}
-
-func (c tinyConfig) WriteHosts() error {
 	return nil
 }
 
@@ -84,9 +80,9 @@ func TestLogin_ssh(t *testing.T) {
 		HTTPClient:  &http.Client{Transport: &tr},
 		Hostname:    "example.com",
 		Interactive: true,
-		sshContext: sshContext{
-			configDir: dir,
-			keygenExe: "ssh-keygen",
+		sshContext: ssh.Context{
+			ConfigDir: dir,
+			KeygenExe: "ssh-keygen",
 		},
 	})
 	assert.NoError(t, err)

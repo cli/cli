@@ -11,12 +11,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func newTestClient(reg *httpmock.Registry) *Client {
+	client := &http.Client{}
+	httpmock.ReplaceTripper(client, reg)
+	return NewClientFromHTTP(client)
+}
+
 func TestGraphQL(t *testing.T) {
 	http := &httpmock.Registry{}
-	client := NewClient(
-		ReplaceTripper(http),
-		AddHeader("Authorization", "token OTOKEN"),
-	)
+	client := newTestClient(http)
 
 	vars := map[string]interface{}{"name": "Mona"}
 	response := struct {
@@ -37,16 +40,15 @@ func TestGraphQL(t *testing.T) {
 	req := http.Requests[0]
 	reqBody, _ := io.ReadAll(req.Body)
 	assert.Equal(t, `{"query":"QUERY","variables":{"name":"Mona"}}`, string(reqBody))
-	assert.Equal(t, "token OTOKEN", req.Header.Get("Authorization"))
 }
 
 func TestGraphQLError(t *testing.T) {
-	http := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(http))
+	reg := &httpmock.Registry{}
+	client := newTestClient(reg)
 
 	response := struct{}{}
 
-	http.Register(
+	reg.Register(
 		httpmock.GraphQL(""),
 		httpmock.StringResponse(`
 			{ "errors": [
@@ -73,10 +75,7 @@ func TestGraphQLError(t *testing.T) {
 
 func TestRESTGetDelete(t *testing.T) {
 	http := &httpmock.Registry{}
-
-	client := NewClient(
-		ReplaceTripper(http),
-	)
+	client := newTestClient(http)
 
 	http.Register(
 		httpmock.REST("DELETE", "applications/CLIENTID/grant"),
@@ -90,7 +89,7 @@ func TestRESTGetDelete(t *testing.T) {
 
 func TestRESTWithFullURL(t *testing.T) {
 	http := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(http))
+	client := newTestClient(http)
 
 	http.Register(
 		httpmock.REST("GET", "api/v3/user/repos"),
@@ -110,7 +109,7 @@ func TestRESTWithFullURL(t *testing.T) {
 
 func TestRESTError(t *testing.T) {
 	fakehttp := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(fakehttp))
+	client := newTestClient(fakehttp)
 
 	fakehttp.Register(httpmock.MatchAny, func(req *http.Request) (*http.Response, error) {
 		return &http.Response{
@@ -134,7 +133,6 @@ func TestRESTError(t *testing.T) {
 	}
 	if httpErr.Error() != "HTTP 422: OH NO (https://api.github.com/repos/branch)" {
 		t.Errorf("got %q", httpErr.Error())
-
 	}
 }
 

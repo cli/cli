@@ -509,7 +509,7 @@ var noExtensionsInstalledError = errors.New("no extensions installed")
 func (m *Manager) Upgrade(name string, force bool) error {
 	// Fetch metadata during list only when upgrading all extensions.
 	// This is a performance improvement so that we don't make a
-	// bunch of unecessary network requests when trying to upgrade a single extension.
+	// bunch of unnecessary network requests when trying to upgrade a single extension.
 	fetchMetadata := name == ""
 	exts, _ := m.list(fetchMetadata)
 	if len(exts) == 0 {
@@ -702,10 +702,7 @@ func (m *Manager) goBinScaffolding(gitExe, name string) error {
 		return err
 	}
 
-	host, err := m.config.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := m.config.DefaultHost()
 
 	currentUser, err := api.CurrentLoginName(api.NewClientFromHTTP(m.client), host)
 	if err != nil {
@@ -860,6 +857,7 @@ func possibleDists() []string {
 		"windows-386",
 		"windows-amd64",
 		"windows-arm",
+		"windows-arm64",
 	}
 }
 

@@ -21,8 +21,9 @@ type CloneOptions struct {
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 
-	GitArgs    []string
-	Repository string
+	GitArgs      []string
+	Repository   string
+	UpstreamName string
 }
 
 func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Command {
@@ -46,7 +47,9 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 			defaults to the name of the authenticating user.
 
 			If the repository is a fork, its parent repository will be added as an additional
-			git remote called "upstream".
+			git remote called "upstream". The remote name can be configured using %[1]s--upstream-remote-name%[1]s.
+			The %[1]s--upstream-remote-name%[1]s option supports an "@owner" value which will name
+			the remote after the owner of the parent repository.
 		`, "`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Repository = args[0]
@@ -60,6 +63,7 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 		},
 	}
 
+	cmd.Flags().StringVarP(&opts.UpstreamName, "upstream-remote-name", "u", "upstream", "Upstream remote name when cloning a fork")
 	cmd.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
 		if err == pflag.ErrHelp {
 			return err
@@ -107,10 +111,7 @@ func cloneRun(opts *CloneOptions) error {
 		if repositoryIsFullName {
 			fullName = opts.Repository
 		} else {
-			host, err := cfg.DefaultHost()
-			if err != nil {
-				return err
-			}
+			host, _ := cfg.DefaultHost()
 			currentUser, err := api.CurrentLoginName(apiClient, host)
 			if err != nil {
 				return err
@@ -164,11 +165,15 @@ func cloneRun(opts *CloneOptions) error {
 		}
 		upstreamURL := ghrepo.FormatRemoteURL(canonicalRepo.Parent, protocol)
 
-		err = git.AddUpstreamRemote(upstreamURL, cloneDir, []string{canonicalRepo.Parent.DefaultBranchRef.Name})
+		upstreamName := opts.UpstreamName
+		if opts.UpstreamName == "@owner" {
+			upstreamName = canonicalRepo.Parent.RepoOwner()
+		}
+
+		err = git.AddNamedRemote(upstreamURL, upstreamName, cloneDir, []string{canonicalRepo.Parent.DefaultBranchRef.Name})
 		if err != nil {
 			return err
 		}
 	}
-
 	return nil
 }

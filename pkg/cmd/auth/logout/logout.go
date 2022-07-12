@@ -1,7 +1,6 @@
 package logout
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
@@ -19,8 +19,7 @@ type LogoutOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
-
-	Hostname string
+	Hostname   string
 }
 
 func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Command {
@@ -50,7 +49,6 @@ func NewCmdLogout(f *cmdutil.Factory, runF func(*LogoutOptions) error) *cobra.Co
 			if opts.Hostname == "" && !opts.IO.CanPrompt() {
 				return cmdutil.FlagErrorf("--hostname required when not running interactively")
 			}
-
 			if runF != nil {
 				return runF(opts)
 			}
@@ -72,10 +70,7 @@ func logoutRun(opts *LogoutOptions) error {
 		return err
 	}
 
-	candidates, err := cfg.Hosts()
-	if err != nil {
-		return err
-	}
+	candidates := cfg.Hosts()
 	if len(candidates) == 0 {
 		return fmt.Errorf("not logged in to any hosts")
 	}
@@ -107,14 +102,10 @@ func logoutRun(opts *LogoutOptions) error {
 		}
 	}
 
-	if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
-		var roErr *config.ReadOnlyEnvError
-		if errors.As(err, &roErr) {
-			fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", roErr.Variable)
-			fmt.Fprint(opts.IO.ErrOut, "To erase credentials stored in GitHub CLI, first clear the value from the environment.\n")
-			return cmdutil.SilentError
-		}
-		return err
+	if src, writeable := shared.AuthTokenWriteable(cfg, hostname); !writeable {
+		fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", src)
+		fmt.Fprint(opts.IO.ErrOut, "To erase credentials stored in GitHub CLI, first clear the value from the environment.\n")
+		return cmdutil.SilentError
 	}
 
 	httpClient, err := opts.HttpClient()
@@ -135,23 +126,8 @@ func logoutRun(opts *LogoutOptions) error {
 		usernameStr = fmt.Sprintf(" account '%s'", username)
 	}
 
-	if opts.IO.CanPrompt() {
-		var keepGoing bool
-		err := prompt.SurveyAskOne(&survey.Confirm{
-			Message: fmt.Sprintf("Are you sure you want to log out of %s%s?", hostname, usernameStr),
-			Default: true,
-		}, &keepGoing)
-		if err != nil {
-			return fmt.Errorf("could not prompt: %w", err)
-		}
-
-		if !keepGoing {
-			return nil
-		}
-	}
-
 	cfg.UnsetHost(hostname)
-	err = cfg.WriteHosts()
+	err = cfg.Write()
 	if err != nil {
 		return fmt.Errorf("failed to write config, authentication configuration not updated: %w", err)
 	}

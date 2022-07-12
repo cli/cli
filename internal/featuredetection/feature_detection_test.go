@@ -1,10 +1,10 @@
 package featuredetection
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,30 +20,66 @@ func TestPullRequestFeatures(t *testing.T) {
 		{
 			name:     "github.com",
 			hostname: "github.com",
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`: heredoc.Doc(`
+					{ "data": { "PullRequest": { "fields": [
+						{"name": "isInMergeQueue"},
+						{"name": "isMergeQueueEnabled"}
+					] } } }
+				`),
+			},
 			wantFeatures: PullRequestFeatures{
 				ReviewDecision:       true,
 				StatusCheckRollup:    true,
 				BranchProtectionRule: true,
+				MergeQueue:           true,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "github.com with no merge queue",
+			hostname: "github.com",
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`: heredoc.Doc(`
+					{ "data": { "PullRequest": { "fields": [
+					] } } }
+				`),
+			},
+			wantFeatures: PullRequestFeatures{
+				ReviewDecision:       true,
+				StatusCheckRollup:    true,
+				BranchProtectionRule: true,
+				MergeQueue:           false,
 			},
 			wantErr: false,
 		},
 		{
 			name:     "GHE",
 			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query PullRequest_fields\b`: heredoc.Doc(`
+					{ "data": { "PullRequest": { "fields": [
+						{"name": "isInMergeQueue"},
+						{"name": "isMergeQueueEnabled"}
+					] } } }
+				`),
+			},
 			wantFeatures: PullRequestFeatures{
 				ReviewDecision:       true,
 				StatusCheckRollup:    true,
 				BranchProtectionRule: true,
+				MergeQueue:           true,
 			},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fakeHTTP := &httpmock.Registry{}
-			httpClient := api.NewHTTPClient(api.ReplaceTripper(fakeHTTP))
+			reg := &httpmock.Registry{}
+			httpClient := &http.Client{}
+			httpmock.ReplaceTripper(httpClient, reg)
 			for query, resp := range tt.queryResponse {
-				fakeHTTP.Register(httpmock.GraphQL(query), httpmock.StringResponse(resp))
+				reg.Register(httpmock.GraphQL(query), httpmock.StringResponse(resp))
 			}
 			detector := detector{host: tt.hostname, httpClient: httpClient}
 			gotPrFeatures, err := detector.PullRequestFeatures()
@@ -72,6 +108,8 @@ func TestRepositoryFeatures(t *testing.T) {
 				IssueTemplateMutation:    true,
 				IssueTemplateQuery:       true,
 				PullRequestTemplateQuery: true,
+				VisibilityField:          true,
+				AutoMerge:                true,
 			},
 			wantErr: false,
 		},
@@ -105,14 +143,49 @@ func TestRepositoryFeatures(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name:     "GHE has visibility field",
+			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query Repository_fields\b`: heredoc.Doc(`
+					{ "data": { "Repository": { "fields": [
+						{"name": "visibility"}
+					] } } }
+				`),
+			},
+			wantFeatures: RepositoryFeatures{
+				IssueTemplateMutation: true,
+				IssueTemplateQuery:    true,
+				VisibilityField:       true,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "GHE has automerge field",
+			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query Repository_fields\b`: heredoc.Doc(`
+					{ "data": { "Repository": { "fields": [
+						{"name": "autoMergeAllowed"}
+					] } } }
+				`),
+			},
+			wantFeatures: RepositoryFeatures{
+				IssueTemplateMutation: true,
+				IssueTemplateQuery:    true,
+				AutoMerge:             true,
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fakeHTTP := &httpmock.Registry{}
-			httpClient := api.NewHTTPClient(api.ReplaceTripper(fakeHTTP))
+			reg := &httpmock.Registry{}
+			httpClient := &http.Client{}
+			httpmock.ReplaceTripper(httpClient, reg)
 			for query, resp := range tt.queryResponse {
-				fakeHTTP.Register(httpmock.GraphQL(query), httpmock.StringResponse(resp))
+				reg.Register(httpmock.GraphQL(query), httpmock.StringResponse(resp))
 			}
 			detector := detector{host: tt.hostname, httpClient: httpClient}
 			gotPrFeatures, err := detector.RepositoryFeatures()

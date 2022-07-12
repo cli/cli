@@ -141,10 +141,12 @@ func StatusCheckRollupGraphQL(after string) string {
 							...on StatusContext {
 								context,
 								state,
-								targetUrl
+								targetUrl,
+								createdAt
 							},
 							...on CheckRun {
 								name,
+								checkSuite{workflowRun{workflow{name}}},
 								status,
 								conclusion,
 								startedAt,

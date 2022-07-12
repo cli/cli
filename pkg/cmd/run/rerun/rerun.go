@@ -104,7 +104,7 @@ func runRerun(opts *RerunOptions) error {
 			if run.Status != shared.Completed {
 				return false
 			}
-			// TODO StartupFailure indiciates a bad yaml file; such runs can never be
+			// TODO StartupFailure indicates a bad yaml file; such runs can never be
 			// rerun. But hiding them from the prompt might confuse people?
 			return run.Conclusion != shared.Success && run.Conclusion != shared.StartupFailure
 		})

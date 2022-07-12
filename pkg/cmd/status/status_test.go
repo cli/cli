@@ -19,8 +19,8 @@ import (
 
 type testHostConfig string
 
-func (c testHostConfig) DefaultHost() (string, error) {
-	return string(c), nil
+func (c testHostConfig) DefaultHost() (string, string) {
+	return string(c), ""
 }
 
 func TestNewCmdStatus(t *testing.T) {

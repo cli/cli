@@ -23,6 +23,40 @@ var (
 	DEFAULT_DEVCONTAINER_DEFINITIONS = []string{".devcontainer.json", ".devcontainer/devcontainer.json"}
 )
 
+type NullableDuration struct {
+	*time.Duration
+}
+
+func (d *NullableDuration) String() string {
+	if d.Duration != nil {
+		return d.Duration.String()
+	}
+
+	return ""
+}
+
+func (d *NullableDuration) Set(str string) error {
+	duration, err := time.ParseDuration(str)
+	if err != nil {
+		return fmt.Errorf("error parsing duration: %w", err)
+	}
+	d.Duration = &duration
+	return nil
+}
+
+func (d *NullableDuration) Type() string {
+	return "duration"
+}
+
+func (d *NullableDuration) Minutes() *int {
+	if d.Duration != nil {
+		retentionMinutes := int(d.Duration.Minutes())
+		return &retentionMinutes
+	}
+
+	return nil
+}
+
 type createOptions struct {
 	repo              string
 	branch            string
@@ -32,7 +66,7 @@ type createOptions struct {
 	permissionsOptOut bool
 	devContainerPath  string
 	idleTimeout       time.Duration
-	retentionPeriod   time.Duration
+	retentionPeriod   NullableDuration
 }
 
 func newCreateCmd(app *App) *cobra.Command {
@@ -54,7 +88,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().BoolVarP(&opts.permissionsOptOut, "default-permissions", "", false, "do not prompt to accept additional permissions requested by the codespace")
 	createCmd.Flags().BoolVarP(&opts.showStatus, "status", "s", false, "show status of post-create command and dotfiles")
 	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 0, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
-	// createCmd.Flags().DurationVar(&opts.retentionPeriod, "retention-period", 0, "allowed time after going idle before codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
+	createCmd.Flags().Var(&opts.retentionPeriod, "retention-period", "allowed time after shutting down before the codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
 	createCmd.Flags().StringVar(&opts.devContainerPath, "devcontainer-path", "", "path to the devcontainer.json file to use when creating codespace")
 
 	return createCmd
@@ -77,12 +111,9 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		Location:   opts.location,
 	}
 
-	if userInputs.Repository == "" {
-		branchPrompt := "Branch (leave blank for default branch):"
-		if userInputs.Branch != "" {
-			branchPrompt = "Branch:"
-		}
-		questions := []*survey.Question{
+	promptForRepoAndBranch := userInputs.Repository == ""
+	if promptForRepoAndBranch {
+		repoQuestions := []*survey.Question{
 			{
 				Name: "repository",
 				Prompt: &survey.Input{
@@ -94,15 +125,8 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 				},
 				Validate: survey.Required,
 			},
-			{
-				Name: "branch",
-				Prompt: &survey.Input{
-					Message: branchPrompt,
-					Default: userInputs.Branch,
-				},
-			},
 		}
-		if err := ask(questions, &userInputs); err != nil {
+		if err := ask(repoQuestions, &userInputs); err != nil {
 			return fmt.Errorf("failed to prompt: %w", err)
 		}
 	}
@@ -116,6 +140,37 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting repository: %w", err)
+	}
+
+	a.StartProgressIndicatorWithLabel("Validating repository for codespaces")
+	billableOwner, err := a.apiClient.GetCodespaceBillableOwner(ctx, userInputs.Repository)
+	a.StopProgressIndicator()
+
+	if err != nil {
+		return fmt.Errorf("error checking codespace ownership: %w", err)
+	} else if billableOwner != nil && billableOwner.Type == "Organization" {
+		cs := a.io.ColorScheme()
+		fmt.Fprintln(a.io.Out, cs.Blue("  ✓ Codespaces usage for this repository is paid for by "+billableOwner.Login))
+	}
+
+	if promptForRepoAndBranch {
+		branchPrompt := "Branch (leave blank for default branch):"
+		if userInputs.Branch != "" {
+			branchPrompt = "Branch:"
+		}
+		branchQuestions := []*survey.Question{
+			{
+				Name: "branch",
+				Prompt: &survey.Input{
+					Message: branchPrompt,
+					Default: userInputs.Branch,
+				},
+			},
+		}
+
+		if err := ask(branchQuestions, &userInputs); err != nil {
+			return fmt.Errorf("failed to prompt: %w", err)
+		}
 	}
 
 	branch := userInputs.Branch
@@ -178,8 +233,6 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return errors.New("there are no available machine types for this repository")
 	}
 
-	retentionPeriod := int(opts.retentionPeriod.Minutes())
-
 	createParams := &api.CreateCodespaceParams{
 		RepositoryID:           repository.ID,
 		Branch:                 branch,
@@ -188,7 +241,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		VSCSTarget:             vscsTarget,
 		VSCSTargetURL:          vscsTargetUrl,
 		IdleTimeoutMinutes:     int(opts.idleTimeout.Minutes()),
-		RetentionPeriodMinutes: &retentionPeriod,
+		RetentionPeriodMinutes: opts.retentionPeriod.Minutes(),
 		DevContainerPath:       devContainerPath,
 		PermissionsOptOut:      opts.permissionsOptOut,
 	}
@@ -434,12 +487,15 @@ func getRepoSuggestions(ctx context.Context, apiClient apiClient, partialSearch 
 }
 
 // buildDisplayName returns display name to be used in the machine survey prompt.
+// prebuildAvailability will be migrated to use enum values: "none", "ready", "in_progress" before Prebuild GA
+// Enum values "blob" and "pool" will be deprecated soon.
 func buildDisplayName(displayName string, prebuildAvailability string) string {
-	prebuildText := ""
-
-	if prebuildAvailability == "blob" || prebuildAvailability == "pool" {
-		prebuildText = " (Prebuild ready)"
+	switch prebuildAvailability {
+	case "blob", "pool", "ready":
+		return displayName + " (Prebuild ready)"
+	case "in_progress":
+		return displayName + " (Prebuild in progress)"
+	default:
+		return displayName
 	}
-
-	return fmt.Sprintf("%s%s", displayName, prebuildText)
 }

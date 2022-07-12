@@ -327,7 +327,7 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 		Milestone string
 	}{}
 
-	err = prompt.SurveyAsk(mqs, &values, survey.WithKeepFilter(true))
+	err = prompt.SurveyAsk(mqs, &values)
 	if err != nil {
 		return fmt.Errorf("could not prompt: %w", err)
 	}
