@@ -3,11 +3,12 @@ package shared
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"regexp"
+
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"net/http"
-	"regexp"
 )
 
 type Artifact struct {
