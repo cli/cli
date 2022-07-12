@@ -140,11 +140,19 @@ func TestPullRequest_ExportData(t *testing.T) {
 						{
 							"__typename": "CheckRun",
 							"name": "mycheck",
+							"checkSuite": {"workflowRun": {"workflow": {"name": "myworkflow"}}},
 							"status": "COMPLETED",
 							"conclusion": "SUCCESS",
 							"startedAt": "2020-08-31T15:44:24+02:00",
 							"completedAt": "2020-08-31T15:45:24+02:00",
 							"detailsUrl": "http://example.com/details"
+						},
+						{
+							"__typename": "StatusContext",
+							"context": "mycontext",
+							"state": "SUCCESS",
+							"createdAt": "2020-08-31T15:44:24+02:00",
+							"targetUrl": "http://example.com/details"
 						}
 					] } } } }
 				] } }
@@ -155,11 +163,19 @@ func TestPullRequest_ExportData(t *testing.T) {
 						{
 							"__typename": "CheckRun",
 							"name": "mycheck",
+							"workflowName": "myworkflow",
 							"status": "COMPLETED",
 							"conclusion": "SUCCESS",
 							"startedAt": "2020-08-31T15:44:24+02:00",
 							"completedAt": "2020-08-31T15:45:24+02:00",
 							"detailsUrl": "http://example.com/details"
+						},
+						{
+							"__typename": "StatusContext",
+							"context": "mycontext",
+							"state": "SUCCESS",
+							"startedAt": "2020-08-31T15:44:24+02:00",
+							"targetUrl": "http://example.com/details"
 						}
 					]
 				}
@@ -178,7 +194,14 @@ func TestPullRequest_ExportData(t *testing.T) {
 			enc := json.NewEncoder(&buf)
 			enc.SetIndent("", "\t")
 			require.NoError(t, enc.Encode(exported))
-			assert.Equal(t, tt.outputJSON, buf.String())
+
+			var gotData interface{}
+			dec = json.NewDecoder(&buf)
+			require.NoError(t, dec.Decode(&gotData))
+			var expectData interface{}
+			require.NoError(t, json.Unmarshal([]byte(tt.outputJSON), &expectData))
+
+			assert.Equal(t, expectData, gotData)
 		})
 	}
 }

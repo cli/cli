@@ -38,7 +38,30 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 			data[f] = pr.HeadRepository
 		case "statusCheckRollup":
 			if n := pr.StatusCheckRollup.Nodes; len(n) > 0 {
-				data[f] = n[0].Commit.StatusCheckRollup.Contexts.Nodes
+				checks := make([]interface{}, 0, len(n[0].Commit.StatusCheckRollup.Contexts.Nodes))
+				for _, c := range n[0].Commit.StatusCheckRollup.Contexts.Nodes {
+					if c.TypeName == "CheckRun" {
+						checks = append(checks, map[string]interface{}{
+							"__typename":   c.TypeName,
+							"name":         c.Name,
+							"workflowName": c.CheckSuite.WorkflowRun.Workflow.Name,
+							"status":       c.Status,
+							"conclusion":   c.Conclusion,
+							"startedAt":    c.StartedAt,
+							"completedAt":  c.CompletedAt,
+							"detailsUrl":   c.DetailsURL,
+						})
+					} else {
+						checks = append(checks, map[string]interface{}{
+							"__typename": c.TypeName,
+							"context":    c.Context,
+							"state":      c.State,
+							"targetUrl":  c.TargetURL,
+							"startedAt":  c.CreatedAt,
+						})
+					}
+				}
+				data[f] = checks
 			} else {
 				data[f] = nil
 			}
