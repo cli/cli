@@ -141,12 +141,8 @@ type cfg struct {
 	authToken string
 }
 
-func (c cfg) Get(_, _ string) (string, error) {
-	return "", nil
-}
-
-func (c cfg) AuthToken(_ string) (string, string) {
-	return c.authToken, ""
+func (c cfg) AuthToken(hostname string) (string, string) {
+	return c.authToken, "oauth_token"
 }
 
 func getViewer(hostname, token string) (string, error) {

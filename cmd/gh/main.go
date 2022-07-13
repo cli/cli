@@ -98,9 +98,6 @@ func mainRun() exitCode {
 		return exitError
 	}
 
-	host, _ := cfg.DefaultHost()
-	ghrepo.SetDefaultHost(host)
-
 	expandedArgs := []string{}
 	if len(os.Args) > 0 {
 		expandedArgs = os.Args[1:]

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/internal/ghinstance"
+	ghAuth "github.com/cli/go-gh/pkg/auth"
 	"github.com/cli/go-gh/pkg/repository"
 )
 
@@ -35,19 +36,9 @@ func FullName(r Interface) string {
 	return fmt.Sprintf("%s/%s", r.RepoOwner(), r.RepoName())
 }
 
-var defaultHostOverride string
-
 func defaultHost() string {
-	if defaultHostOverride != "" {
-		return defaultHostOverride
-	}
-	return ghinstance.Default()
-}
-
-// SetDefaultHost overrides the default GitHub hostname for FromFullName.
-// TODO: remove after FromFullName approach is revisited
-func SetDefaultHost(host string) {
-	defaultHostOverride = host
+	host, _ := ghAuth.DefaultHost()
+	return host
 }
 
 // FromFullName extracts the GitHub repository information from the following
