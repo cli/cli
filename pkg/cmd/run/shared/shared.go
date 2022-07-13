@@ -61,11 +61,13 @@ type Run struct {
 	Name           string
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+	StartedAt      time.Time `json:"run_started_at"`
 	Status         Status
 	Conclusion     Conclusion
 	Event          string
 	ID             int64
 	WorkflowID     int64  `json:"workflow_id"`
+	Attempts       uint8  `json:"run_attempt"`
 	HeadBranch     string `json:"head_branch"`
 	JobsURL        string `json:"jobs_url"`
 	HeadCommit     Commit `json:"head_commit"`
@@ -329,7 +331,7 @@ func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 		symbol, _ := Symbol(cs, run.Status, run.Conclusion)
 		candidates = append(candidates,
 			// TODO truncate commit message, long ones look terrible
-			fmt.Sprintf("%s %s, %s (%s) %s", symbol, run.CommitMsg(), run.Name, run.HeadBranch, preciseAgo(now, run.CreatedAt)))
+			fmt.Sprintf("%s %s, %s (%s) %s", symbol, run.CommitMsg(), run.Name, run.HeadBranch, preciseAgo(now, run.StartedAt)))
 	}
 
 	// TODO consider custom filter so it's fuzzier. right now matches start anywhere in string but

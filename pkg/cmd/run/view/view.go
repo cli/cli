@@ -319,7 +319,7 @@ func runView(opts *ViewOptions) error {
 
 	out := opts.IO.Out
 
-	ago := opts.Now().Sub(run.CreatedAt)
+	ago := opts.Now().Sub(run.StartedAt)
 
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, utils.FuzzyAgo(ago), prNumber))

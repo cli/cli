@@ -154,12 +154,12 @@ func listRun(opts *ListOptions) error {
 		tp.AddField(string(run.Event), nil, nil)
 		tp.AddField(fmt.Sprintf("%d", run.ID), nil, cs.Cyan)
 
-		elapsed := run.UpdatedAt.Sub(run.CreatedAt)
+		elapsed := run.UpdatedAt.Sub(run.StartedAt)
 		if elapsed < 0 {
 			elapsed = 0
 		}
 		tp.AddField(elapsed.String(), nil, nil)
-		tp.AddField(utils.FuzzyAgoAbbr(time.Now(), run.CreatedAt), nil, nil)
+		tp.AddField(utils.FuzzyAgoAbbr(time.Now(), run.StartedAt), nil, nil)
 		tp.EndRow()
 	}
 
