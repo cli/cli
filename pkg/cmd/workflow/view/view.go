@@ -223,11 +223,7 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interfa
 		tp.AddField(string(run.Event), nil, nil)
 
 		if opts.Raw {
-			elapsed := run.UpdatedAt.Sub(run.CreatedAt)
-			if elapsed < 0 {
-				elapsed = 0
-			}
-			tp.AddField(elapsed.String(), nil, nil)
+			tp.AddField(run.Duration().String(), nil, nil)
 		}
 
 		tp.AddField(fmt.Sprintf("%d", run.ID), nil, cs.Cyan)

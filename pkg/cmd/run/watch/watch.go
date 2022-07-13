@@ -180,7 +180,7 @@ func renderRun(opts WatchOptions, client *api.Client, repo ghrepo.Interface, run
 		return nil, fmt.Errorf("failed to get run: %w", err)
 	}
 
-	ago := opts.Now().Sub(run.CreatedAt)
+	ago := opts.Now().Sub(run.StartedTime())
 
 	jobs, err := shared.GetJobs(client, repo, *run)
 	if err != nil {

@@ -49,6 +49,7 @@ var RunFields = []string{
 	"headSha",
 	"createdAt",
 	"updatedAt",
+	"startedAt",
 	"status",
 	"conclusion",
 	"event",
@@ -74,6 +75,21 @@ type Run struct {
 	HeadSha        string `json:"head_sha"`
 	URL            string `json:"html_url"`
 	HeadRepository Repo   `json:"head_repository"`
+}
+
+func (r *Run) StartedTime() time.Time {
+	if r.StartedAt.IsZero() {
+		return r.CreatedAt
+	}
+	return r.StartedAt
+}
+
+func (r *Run) Duration() time.Duration {
+	d := r.UpdatedAt.Sub(r.StartedTime())
+	if d < 0 {
+		return 0
+	}
+	return d
 }
 
 type Repo struct {
@@ -331,7 +347,7 @@ func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 		symbol, _ := Symbol(cs, run.Status, run.Conclusion)
 		candidates = append(candidates,
 			// TODO truncate commit message, long ones look terrible
-			fmt.Sprintf("%s %s, %s (%s) %s", symbol, run.CommitMsg(), run.Name, run.HeadBranch, preciseAgo(now, run.StartedAt)))
+			fmt.Sprintf("%s %s, %s (%s) %s", symbol, run.CommitMsg(), run.Name, run.HeadBranch, preciseAgo(now, run.StartedTime())))
 	}
 
 	// TODO consider custom filter so it's fuzzier. right now matches start anywhere in string but
