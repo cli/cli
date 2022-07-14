@@ -60,8 +60,9 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 }
 
 func NewCachedHTTPClient(httpClient *http.Client, ttl time.Duration) *http.Client {
-	httpClient.Transport = AddCacheTTLHeader(httpClient.Transport, ttl)
-	return httpClient
+	newClient := *httpClient
+	newClient.Transport = AddCacheTTLHeader(httpClient.Transport, ttl)
+	return &newClient
 }
 
 // AddCacheTTLHeader adds an header to the request telling the cache that the request
