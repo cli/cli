@@ -5,9 +5,11 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -220,4 +222,37 @@ func TestHTTPError_ScopesSuggestion(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHTTPHeaders(t *testing.T) {
+	var gotReq *http.Request
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotReq = r
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	ios, _, _, stderr := iostreams.Test()
+	httpClient, err := NewHTTPClient(HTTPClientOptions{
+		AppVersion:        "v1.2.3",
+		Config:            tinyConfig{ts.URL[7:] + ":oauth_token": "MYTOKEN"},
+		Log:               ios.ErrOut,
+		SkipAcceptHeaders: false,
+	})
+	assert.NoError(t, err)
+	client := NewClientFromHTTP(httpClient)
+
+	err = client.REST(ts.URL, "GET", ts.URL+"/user/repos", nil, nil)
+	assert.NoError(t, err)
+
+	wantHeader := map[string]string{
+		"Accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
+		"Authorization": "token MYTOKEN",
+		"Content-Type":  "application/json; charset=utf-8",
+		"User-Agent":    "GitHub CLI v1.2.3",
+	}
+	for name, value := range wantHeader {
+		assert.Equal(t, value, gotReq.Header.Get(name), name)
+	}
+	assert.Equal(t, "", stderr.String())
 }

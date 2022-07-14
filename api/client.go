@@ -14,6 +14,17 @@ import (
 	ghAPI "github.com/cli/go-gh/pkg/api"
 )
 
+const (
+	accept          = "Accept"
+	authorization   = "Authorization"
+	cacheTTL        = "X-GH-CACHE-TTL"
+	contentType     = "Content-Type"
+	graphqlFeatures = "GraphQL-Features"
+	mergeQueue      = "merge_queue"
+	timeZone        = "Time-Zone"
+	userAgent       = "User-Agent"
+)
+
 var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
 
 func NewClientFromHTTP(httpClient *http.Client) *Client {
@@ -45,9 +56,8 @@ func (err HTTPError) ScopesSuggestion() string {
 // GraphQL performs a GraphQL request and parses the response. If there are errors in the response,
 // GraphQLError will be returned, but the data will also be parsed into the receiver.
 func (c Client) GraphQL(hostname string, query string, variables map[string]interface{}, data interface{}) error {
-	// AuthToken is being handled by Transport, so let go-gh know that it does not need to resolve it.
-	opts := ghAPI.ClientOptions{Host: hostname, AuthToken: "none", Transport: c.http.Transport}
-	opts.Headers = map[string]string{"GraphQL-Features": "merge_queue"}
+	opts := clientOptions(hostname, c.http.Transport)
+	opts.Headers[graphqlFeatures] = mergeQueue
 	gqlClient, err := gh.GQLClient(&opts)
 	if err != nil {
 		return err
@@ -58,8 +68,7 @@ func (c Client) GraphQL(hostname string, query string, variables map[string]inte
 // GraphQL performs a GraphQL mutation and parses the response. If there are errors in the response,
 // GraphQLError will be returned, but the data will also be parsed into the receiver.
 func (c Client) Mutate(hostname, name string, mutation interface{}, variables map[string]interface{}) error {
-	// AuthToken is being handled by Transport, so let go-gh know that it does not need to resolve it.
-	opts := ghAPI.ClientOptions{Host: hostname, AuthToken: "none", Transport: c.http.Transport}
+	opts := clientOptions(hostname, c.http.Transport)
 	gqlClient, err := gh.GQLClient(&opts)
 	if err != nil {
 		return err
@@ -70,8 +79,7 @@ func (c Client) Mutate(hostname, name string, mutation interface{}, variables ma
 // GraphQL performs a GraphQL query and parses the response. If there are errors in the response,
 // GraphQLError will be returned, but the data will also be parsed into the receiver.
 func (c Client) Query(hostname, name string, query interface{}, variables map[string]interface{}) error {
-	// AuthToken is being handled by Transport, so let go-gh know that it does not need to resolve it.
-	opts := ghAPI.ClientOptions{Host: hostname, AuthToken: "none", Transport: c.http.Transport}
+	opts := clientOptions(hostname, c.http.Transport)
 	gqlClient, err := gh.GQLClient(&opts)
 	if err != nil {
 		return err
@@ -81,8 +89,7 @@ func (c Client) Query(hostname, name string, query interface{}, variables map[st
 
 // REST performs a REST request and parses the response.
 func (c Client) REST(hostname string, method string, p string, body io.Reader, data interface{}) error {
-	// AuthToken is being handled by Transport, so let go-gh know that it does not need to resolve it.
-	opts := ghAPI.ClientOptions{Host: hostname, AuthToken: "none", Transport: c.http.Transport}
+	opts := clientOptions(hostname, c.http.Transport)
 	restClient, err := gh.RESTClient(&opts)
 	if err != nil {
 		return err
@@ -91,8 +98,7 @@ func (c Client) REST(hostname string, method string, p string, body io.Reader, d
 }
 
 func (c Client) RESTWithNext(hostname string, method string, p string, body io.Reader, data interface{}) (string, error) {
-	// AuthToken is being handled by Transport, so let go-gh know that it does not need to resolve it.
-	opts := ghAPI.ClientOptions{Host: hostname, AuthToken: "none", Transport: c.http.Transport}
+	opts := clientOptions(hostname, c.http.Transport)
 	restClient, err := gh.RESTClient(&opts)
 	if err != nil {
 		return "", err
@@ -236,4 +242,23 @@ func generateScopesSuggestion(statusCode int, endpointNeedsScopes, tokenHasScope
 	}
 
 	return ""
+}
+
+func clientOptions(hostname string, transport http.RoundTripper) ghAPI.ClientOptions {
+	// AuthToken, and Headers are being handled by transport,
+	// so let go-gh know that it does not need to resolve them.
+	opts := ghAPI.ClientOptions{
+		AuthToken: "none",
+		// Blank values for Accept, Authorization, Content-Type, Time-Zone, and User-Agent headers.
+		Headers: map[string]string{
+			accept:        "",
+			authorization: "",
+			contentType:   "",
+			timeZone:      "",
+			userAgent:     "",
+		},
+		Host:      hostname,
+		Transport: transport,
+	}
+	return opts
 }
