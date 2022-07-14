@@ -215,7 +215,7 @@ func Test_editRun_interactive(t *testing.T) {
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubPrompt("What do you want to edit?").AnswerWith([]string{"Description", "Topics"})
 				as.StubPrompt("Description of the repository").AnswerWith("awesome repo description")
-				as.StubPrompt("Add topics?(csv format)").AnswerWith("a,b,c,d")
+				as.StubPrompt("Add topics?(csv format)").AnswerWith("a, b,c,d ")
 				as.StubPrompt("Remove Topics").AnswerWith([]string{"x"})
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {

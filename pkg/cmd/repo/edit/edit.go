@@ -326,7 +326,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 				return err
 			}
 			if len(strings.TrimSpace(addTopics)) > 0 {
-				opts.AddTopics = strings.Split(addTopics, ",")
+				opts.AddTopics = parseTopics(addTopics)
 			}
 
 			if len(opts.topicsCache) > 0 {
@@ -452,6 +452,14 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 		}
 	}
 	return nil
+}
+
+func parseTopics(s string) []string {
+	topics := strings.Split(s, ",")
+	for i, topic := range topics {
+		topics[i] = strings.TrimSpace(topic)
+	}
+	return topics
 }
 
 func getTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface) ([]string, error) {
