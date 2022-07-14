@@ -17,6 +17,7 @@ import (
 const (
 	accept          = "Accept"
 	authorization   = "Authorization"
+	cacheTTL        = "X-GH-CACHE-TTL"
 	contentType     = "Content-Type"
 	graphqlFeatures = "GraphQL-Features"
 	mergeQueue      = "merge_queue"
