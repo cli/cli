@@ -103,77 +103,87 @@ func Test_checksRun(t *testing.T) {
 		name    string
 		fixture string
 		prJSON  string
-		nontty  bool
+		tty     bool
+		watch   bool
 		wantOut string
 		wantErr string
 	}{
 		{
 			name:    "no commits",
 			prJSON:  `{ "number": 123 }`,
+			tty:     true,
 			wantOut: "",
 			wantErr: "no commit found on the pull request",
 		},
 		{
 			name:    "no checks",
 			prJSON:  `{ "number": 123, "statusCheckRollup": { "nodes": [{"commit": {"oid": "abc"}}]}, "headRefName": "master" }`,
+			tty:     true,
 			wantOut: "",
 			wantErr: "no checks reported on the 'master' branch",
 		},
 		{
 			name:    "some failing",
 			fixture: "./fixtures/someFailing.json",
+			tty:     true,
 			wantOut: "Some checks were not successful\n1 failing, 1 successful, 0 skipped, and 1 pending checks\n\nX  sad tests   1m26s  sweet link\n✓  cool tests  1m26s  sweet link\n*  slow tests  1m26s  sweet link\n",
 			wantErr: "SilentError",
 		},
 		{
 			name:    "some pending",
 			fixture: "./fixtures/somePending.json",
+			tty:     true,
 			wantOut: "Some checks are still pending\n0 failing, 2 successful, 0 skipped, and 1 pending checks\n\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n*  slow tests  1m26s  sweet link\n",
 			wantErr: "SilentError",
 		},
 		{
 			name:    "all passing",
 			fixture: "./fixtures/allPassing.json",
+			tty:     true,
 			wantOut: "All checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link\n✓  cool tests     1m26s  sweet link\n✓  rad tests      1m26s  sweet link\n",
+			wantErr: "",
+		},
+		{
+			name:    "watch all passing",
+			fixture: "./fixtures/allPassing.json",
+			tty:     true,
+			watch:   true,
+			wantOut: "\x1b[?1049hAll checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link\n✓  cool tests     1m26s  sweet link\n✓  rad tests      1m26s  sweet link\n\x1b[?1049lAll checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link\n✓  cool tests     1m26s  sweet link\n✓  rad tests      1m26s  sweet link\n",
 			wantErr: "",
 		},
 		{
 			name:    "with statuses",
 			fixture: "./fixtures/withStatuses.json",
+			tty:     true,
 			wantOut: "Some checks were not successful\n1 failing, 2 successful, 0 skipped, and 0 pending checks\n\nX  a status           sweet link\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n",
 			wantErr: "SilentError",
 		},
 		{
 			name:    "no checks",
-			nontty:  true,
 			prJSON:  `{ "number": 123, "statusCheckRollup": { "nodes": [{"commit": {"oid": "abc"}}]}, "headRefName": "master" }`,
 			wantOut: "",
 			wantErr: "no checks reported on the 'master' branch",
 		},
 		{
 			name:    "some failing",
-			nontty:  true,
 			fixture: "./fixtures/someFailing.json",
 			wantOut: "sad tests\tfail\t1m26s\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nslow tests\tpending\t1m26s\tsweet link\n",
 			wantErr: "SilentError",
 		},
 		{
 			name:    "some pending",
-			nontty:  true,
 			fixture: "./fixtures/somePending.json",
 			wantOut: "cool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\nslow tests\tpending\t1m26s\tsweet link\n",
 			wantErr: "SilentError",
 		},
 		{
 			name:    "all passing",
-			nontty:  true,
 			fixture: "./fixtures/allPassing.json",
 			wantOut: "awesome tests\tpass\t1m26s\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\n",
 			wantErr: "",
 		},
 		{
 			name:    "with statuses",
-			nontty:  true,
 			fixture: "./fixtures/withStatuses.json",
 			wantOut: "a status\tfail\t0\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\n",
 			wantErr: "SilentError",
@@ -181,6 +191,7 @@ func Test_checksRun(t *testing.T) {
 		{
 			name:    "some skipped",
 			fixture: "./fixtures/someSkipping.json",
+			tty:     true,
 			wantOut: "All checks were successful\n0 failing, 1 successful, 2 skipped, and 0 pending checks\n\n✓  cool tests  1m26s  sweet link\n-  rad tests   1m26s  sweet link\n-  skip tests  1m26s  sweet link\n",
 			wantErr: "",
 		},
@@ -189,7 +200,8 @@ func Test_checksRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, stdout, _ := iostreams.Test()
-			ios.SetStdoutTTY(!tt.nontty)
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetAlternateScreenBufferEnabled(tt.tty)
 
 			var response *api.PullRequest
 			var jsonReader io.Reader
@@ -208,6 +220,7 @@ func Test_checksRun(t *testing.T) {
 				IO:          ios,
 				SelectorArg: "123",
 				Finder:      shared.NewMockFinder("123", response, ghrepo.New("OWNER", "REPO")),
+				Watch:       tt.watch,
 			}
 
 			err := checksRun(opts)
