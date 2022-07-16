@@ -3,10 +3,12 @@ package ssh
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/run"
@@ -32,6 +34,64 @@ func (c *Context) LocalPublicKeys() ([]string, error) {
 	}
 
 	return filepath.Glob(filepath.Join(sshDir, "*.pub"))
+}
+
+func (c *Context) HasPrivateKey(keyName string) bool {
+	sshDir, err := c.sshDir()
+	if err != nil {
+		return false
+	}
+
+	keyFile := filepath.Join(sshDir, keyName)
+	_, err = os.Stat(keyFile)
+
+	return err == nil
+}
+
+func (c *Context) HasAnyMatchingPrivateKey(publicKeys []string) (bool, error) {
+	keygenExe, err := c.findKeygen()
+	if err != nil {
+		return false, fmt.Errorf("could not find ssh-keygen: %w", err)
+	}
+
+	sshDir, err := c.sshDir()
+	if err != nil {
+		// If .ssh doesn't exist it's not an error, there are just no keys to match
+		return false, nil
+	}
+
+	files, err := ioutil.ReadDir(sshDir)
+	if err != nil {
+		return false, fmt.Errorf("could not read .ssh directory: %w", err)
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
+		fullPath := filepath.Join(sshDir, file.Name())
+		keygenCmd := exec.Command(keygenExe, "-y", "-f", fullPath)
+
+		keygenRunnable := run.PrepareCmd(keygenCmd)
+		outputBytes, err := keygenRunnable.Output()
+		if err != nil {
+			// Just move on, it probably wasn't a key file
+			continue
+		}
+
+		fullPublicKey := string(outputBytes)
+		typeAndKey := strings.SplitN(fullPublicKey, " ", 3)[:2]
+		publicKeyWithoutComment := strings.Join(typeAndKey, " ")
+
+		for _, publicKey := range publicKeys {
+			if publicKeyWithoutComment == publicKey {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
 }
 
 func (c *Context) HasKeygen() bool {

@@ -279,7 +279,7 @@ type apiClientMock struct {
 }
 
 // AuthorizedKeys calls AuthorizedKeysFunc.
-func (mock *apiClientMock) AuthorizedKeys(ctx context.Context, user string) ([]byte, error) {
+func (mock *apiClientMock) AuthorizedKeys(ctx context.Context, user string) ([]string, error) {
 	if mock.AuthorizedKeysFunc == nil {
 		panic("apiClientMock.AuthorizedKeysFunc: method is nil but apiClient.AuthorizedKeys was just called")
 	}

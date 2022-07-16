@@ -133,12 +133,12 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	sshContext := ssh.Context{}
 	startSSHOptions := liveshare.StartSSHServerOptions{}
 
-	if shouldUseAutomaticSSHKeys(args, opts) {
-		keyPair, err := setupAutomaticSSHKeys(sshContext)
-		if err != nil {
-			return fmt.Errorf("failed to generate ssh keys: %w", err)
-		}
+	keyPair, err := setupAutomaticSSHKeys(ctx, sshContext, a.apiClient, args, opts)
+	if err != nil {
+		return fmt.Errorf("failed to generate ssh keys: %w", err)
+	}
 
+	if keyPair != nil {
 		startSSHOptions.UserPublicKeyFile = keyPair.PublicKeyPath
 		// For both cp and ssh, flags need to come first in the args (before a command in ssh and files in cp), so prepend this flag
 		args = append([]string{"-i", keyPair.PrivateKeyPath}, args...)
@@ -216,7 +216,37 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 }
 
-func shouldUseAutomaticSSHKeys(args []string, opts sshOptions) bool {
+func setupAutomaticSSHKeys(
+	ctx context.Context,
+	sshContext ssh.Context,
+	apiClient apiClient,
+	args []string,
+	opts sshOptions,
+) (*ssh.KeyPair, error) {
+	if isUsingCustomIdentityOrProfile(args, opts) {
+		return nil, nil
+	}
+
+	keyPair := checkAndUpdateOldKeyPair(sshContext)
+	if keyPair != nil {
+		return keyPair, nil
+	}
+
+	if !sshContext.HasPrivateKey(automaticPrivateKeyName) {
+		if hasAnyPrivateKeyForUploadedPublicKeys(ctx, sshContext, apiClient) {
+			return nil, nil
+		}
+	}
+
+	keyPair, err := sshContext.GenerateSSHKey(automaticPrivateKeyName, "")
+	if err != nil && !errors.Is(err, ssh.ErrKeyAlreadyExists) {
+		return nil, err
+	}
+
+	return keyPair, nil
+}
+
+func isUsingCustomIdentityOrProfile(args []string, opts sshOptions) bool {
 	if opts.profile != "" {
 		// The profile may specify the identity file so cautiously don't override anything with that option
 		return false
@@ -235,20 +265,6 @@ func shouldUseAutomaticSSHKeys(args []string, opts sshOptions) bool {
 	}
 
 	return true
-}
-
-func setupAutomaticSSHKeys(sshContext ssh.Context) (*ssh.KeyPair, error) {
-	keyPair := checkAndUpdateOldKeyPair(sshContext)
-	if keyPair != nil {
-		return keyPair, nil
-	}
-
-	keyPair, err := sshContext.GenerateSSHKey(automaticPrivateKeyName, "")
-	if err != nil && !errors.Is(err, ssh.ErrKeyAlreadyExists) {
-		return nil, err
-	}
-
-	return keyPair, nil
 }
 
 // checkAndUpdateOldKeyPair handles backward compatibility with the old keypair names.
@@ -296,6 +312,25 @@ func checkAndUpdateOldKeyPair(sshContext ssh.Context) *ssh.KeyPair {
 	}
 
 	return nil
+}
+
+func hasAnyPrivateKeyForUploadedPublicKeys(
+	ctx context.Context,
+	sshContext ssh.Context,
+	apiClient apiClient,
+) bool {
+	user, err := apiClient.GetUser(ctx)
+	if err != nil {
+		return false
+	}
+
+	publicKeys, err := apiClient.AuthorizedKeys(ctx, user.Login)
+	if err != nil {
+		return false
+	}
+
+	hasKey, _ := sshContext.HasAnyMatchingPrivateKey(publicKeys)
+	return hasKey
 }
 
 func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err error) {
