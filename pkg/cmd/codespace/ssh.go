@@ -141,11 +141,9 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 			return fmt.Errorf("failed to generate ssh keys: %w", err)
 		}
 
-		if keyPair != nil {
-			startSSHOptions.UserPublicKeyFile = keyPair.PublicKeyPath
-			// For both cp and ssh, flags need to come first in the args (before a command in ssh and files in cp), so prepend this flag
-			args = append([]string{"-i", keyPair.PrivateKeyPath}, args...)
-		}
+		startSSHOptions.UserPublicKeyFile = keyPair.PublicKeyPath
+		// For both cp and ssh, flags need to come first in the args (before a command in ssh and files in cp), so prepend this flag
+		args = append([]string{"-i", keyPair.PrivateKeyPath}, args...)
 	}
 
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
