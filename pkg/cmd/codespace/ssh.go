@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -21,6 +22,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/cli/cli/v2/pkg/ssh"
+	"github.com/cli/safeexec"
 	"github.com/spf13/cobra"
 )
 
@@ -133,15 +135,17 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	sshContext := ssh.Context{}
 	startSSHOptions := liveshare.StartSSHServerOptions{}
 
-	keyPair, err := setupAutomaticSSHKeys(ctx, sshContext, a.apiClient, args, opts)
-	if err != nil {
-		return fmt.Errorf("failed to generate ssh keys: %w", err)
-	}
+	if shouldUseAutomaticSSHKeys(ctx, sshContext, a.apiClient, args, opts) {
+		keyPair, err := setupAutomaticSSHKeys(sshContext)
+		if err != nil {
+			return fmt.Errorf("failed to generate ssh keys: %w", err)
+		}
 
-	if keyPair != nil {
-		startSSHOptions.UserPublicKeyFile = keyPair.PublicKeyPath
-		// For both cp and ssh, flags need to come first in the args (before a command in ssh and files in cp), so prepend this flag
-		args = append([]string{"-i", keyPair.PrivateKeyPath}, args...)
+		if keyPair != nil {
+			startSSHOptions.UserPublicKeyFile = keyPair.PublicKeyPath
+			// For both cp and ssh, flags need to come first in the args (before a command in ssh and files in cp), so prepend this flag
+			args = append([]string{"-i", keyPair.PrivateKeyPath}, args...)
+		}
 	}
 
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
@@ -216,37 +220,13 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 }
 
-func setupAutomaticSSHKeys(
+func shouldUseAutomaticSSHKeys(
 	ctx context.Context,
 	sshContext ssh.Context,
 	apiClient apiClient,
 	args []string,
 	opts sshOptions,
-) (*ssh.KeyPair, error) {
-	if isUsingCustomIdentityOrProfile(args, opts) {
-		return nil, nil
-	}
-
-	keyPair := checkAndUpdateOldKeyPair(sshContext)
-	if keyPair != nil {
-		return keyPair, nil
-	}
-
-	if !sshContext.HasPrivateKey(automaticPrivateKeyName) {
-		if hasAnyPrivateKeyForUploadedPublicKeys(ctx, sshContext, apiClient) {
-			return nil, nil
-		}
-	}
-
-	keyPair, err := sshContext.GenerateSSHKey(automaticPrivateKeyName, "")
-	if err != nil && !errors.Is(err, ssh.ErrKeyAlreadyExists) {
-		return nil, err
-	}
-
-	return keyPair, nil
-}
-
-func isUsingCustomIdentityOrProfile(args []string, opts sshOptions) bool {
+) bool {
 	if opts.profile != "" {
 		// The profile may specify the identity file so cautiously don't override anything with that option
 		return false
@@ -264,7 +244,23 @@ func isUsingCustomIdentityOrProfile(args []string, opts sshOptions) bool {
 		}
 	}
 
-	return true
+	// If there is a public key uploaded which matches a configured
+	// private key, there is no need for automatic key generation
+	return hasUploadedPublicKeyForConfig(ctx, sshContext, apiClient)
+}
+
+func setupAutomaticSSHKeys(sshContext ssh.Context) (*ssh.KeyPair, error) {
+	keyPair := checkAndUpdateOldKeyPair(sshContext)
+	if keyPair != nil {
+		return keyPair, nil
+	}
+
+	keyPair, err := sshContext.GenerateSSHKey(automaticPrivateKeyName, "")
+	if err != nil && !errors.Is(err, ssh.ErrKeyAlreadyExists) {
+		return nil, err
+	}
+
+	return keyPair, nil
 }
 
 // checkAndUpdateOldKeyPair handles backward compatibility with the old keypair names.
@@ -314,23 +310,101 @@ func checkAndUpdateOldKeyPair(sshContext ssh.Context) *ssh.KeyPair {
 	return nil
 }
 
-func hasAnyPrivateKeyForUploadedPublicKeys(
+// hasUploadedValidCustomKey checks which private keys are used in ssh configration and
+// compares them to uploaded public keys to see if there is a match
+func hasUploadedPublicKeyForConfig(
 	ctx context.Context,
 	sshContext ssh.Context,
 	apiClient apiClient,
 ) bool {
+	configuredPrivateKeyPaths, err := getConfiguredPrivateKeys(ctx)
+	if err != nil {
+		return false
+	}
+
+	configuredPublicKeys := []string{}
+	for _, privateKeyPath := range configuredPrivateKeyPaths {
+		if _, err := os.Stat(privateKeyPath); err != nil {
+			// The default configuration includes standard keys like id_rsa,
+			// id_ed25519, etc, but these may not actually exist
+			continue
+		}
+
+		configuredPublicKey, err := sshContext.GetPublicKeyFromPrivateKey(privateKeyPath)
+		if err != nil {
+			continue
+		}
+
+		configuredPublicKeys = append(configuredPublicKeys, configuredPublicKey)
+	}
+
+	if len(configuredPublicKeys) == 0 {
+		// There are no local private keys which ssh would use
+		return false
+	}
+
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
 		return false
 	}
 
-	publicKeys, err := apiClient.AuthorizedKeys(ctx, user.Login)
+	uploadedPublicKeys, err := apiClient.AuthorizedKeys(ctx, user.Login)
 	if err != nil {
 		return false
 	}
 
-	hasKey, _ := sshContext.HasAnyMatchingPrivateKey(publicKeys)
-	return hasKey
+	if len(uploadedPublicKeys) == 0 {
+		return false
+	}
+
+	for _, configuredPublicKey := range configuredPublicKeys {
+		for _, uploadedPublicKey := range uploadedPublicKeys {
+			if configuredPublicKey == uploadedPublicKey {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// getConfiguredPrivateKeys reads the effective configuration for a localhost
+// connection and returns all private keys which would be tried for authentication
+func getConfiguredPrivateKeys(ctx context.Context) ([]string, error) {
+	sshExe, err := safeexec.LookPath("ssh")
+	if err != nil {
+		return nil, fmt.Errorf("could not find ssh executable: %w", err)
+	}
+
+	// The -G option tells ssh to output the effective config for the given host, but not connect
+	// The target host is always localhost because we skip this check if --profile was set.
+	sshGCmd := exec.CommandContext(ctx, sshExe, "-G", "localhost")
+	configBytes, err := sshGCmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("could not load ssh configuration: %w", err)
+	}
+
+	privateKeyPaths := []string{}
+
+	userHomeDir, _ := os.UserHomeDir()
+
+	configLines := strings.Split(string(configBytes), "\n")
+	for _, line := range configLines {
+		line = strings.TrimSpace(line)
+
+		if strings.HasPrefix(line, "identityfile ") {
+			path := strings.SplitN(line, " ", 2)[1]
+
+			if strings.HasPrefix(path, "~") {
+				// os.Stat can't handle ~, so convert it to the real path
+				path = strings.Replace(path, "~", userHomeDir, 1)
+			}
+
+			privateKeyPaths = append(privateKeyPaths, path)
+		}
+	}
+
+	return privateKeyPaths, nil
 }
 
 func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err error) {

@@ -16,7 +16,7 @@ import (
 //
 // 		// make and configure a mocked apiClient
 // 		mockedapiClient := &apiClientMock{
-// 			AuthorizedKeysFunc: func(ctx context.Context, user string) ([]byte, error) {
+// 			AuthorizedKeysFunc: func(ctx context.Context, user string) ([]string, error) {
 // 				panic("mock out the AuthorizedKeys method")
 // 			},
 // 			CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
@@ -72,7 +72,7 @@ import (
 // 	}
 type apiClientMock struct {
 	// AuthorizedKeysFunc mocks the AuthorizedKeys method.
-	AuthorizedKeysFunc func(ctx context.Context, user string) ([]byte, error)
+	AuthorizedKeysFunc func(ctx context.Context, user string) ([]string, error)
 
 	// CreateCodespaceFunc mocks the CreateCodespace method.
 	CreateCodespaceFunc func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
