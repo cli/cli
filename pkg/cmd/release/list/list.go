@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -17,6 +18,8 @@ type ListOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+
+	Exporter cmdutil.Exporter
 
 	LimitResults  int
 	ExcludeDrafts bool
@@ -46,6 +49,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of items to fetch")
 	cmd.Flags().BoolVar(&opts.ExcludeDrafts, "exclude-drafts", false, "Exclude draft releases")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.ReleaseFields)
 
 	return cmd
 }
@@ -64,6 +68,10 @@ func listRun(opts *ListOptions) error {
 	releases, err := fetchReleases(httpClient, baseRepo, opts.LimitResults, opts.ExcludeDrafts)
 	if err != nil {
 		return err
+	}
+
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, releases)
 	}
 
 	if len(releases) == 0 {
