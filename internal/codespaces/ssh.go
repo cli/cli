@@ -56,7 +56,11 @@ func NewRemoteCommand(ctx context.Context, tunnelPort int, destination string, s
 // newSSHCommand populates an exec.Cmd to run a command (or if blank,
 // an interactive shell) over ssh.
 func newSSHCommand(ctx context.Context, port int, dst string, cmdArgs []string) (*exec.Cmd, []string, error) {
-	connArgs := []string{"-p", strconv.Itoa(port), "-o", "NoHostAuthenticationForLocalhost=yes"}
+	connArgs := []string{
+		"-p", strconv.Itoa(port),
+		"-o", "NoHostAuthenticationForLocalhost=yes",
+		"-o", "PasswordAuthentication=no",
+	}
 
 	// The ssh command syntax is: ssh [flags] user@host command [args...]
 	// There is no way to specify the user@host destination as a flag.
@@ -101,6 +105,7 @@ func newSCPCommand(ctx context.Context, port int, dst string, cmdArgs []string) 
 	connArgs := []string{
 		"-P", strconv.Itoa(port),
 		"-o", "NoHostAuthenticationForLocalhost=yes",
+		"-o", "PasswordAuthentication=no",
 		"-C", // compression
 	}
 
