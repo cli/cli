@@ -1,10 +1,12 @@
 package shared
 
 import (
+	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -51,4 +53,52 @@ func TestGetAnnotations404(t *testing.T) {
 	result, err := GetAnnotations(apiClient, repo, Job{ID: 123456, Name: "a job"})
 	assert.NoError(t, err)
 	assert.Equal(t, result, []Annotation{})
+}
+
+func TestRun_Duration(t *testing.T) {
+	tests := []struct {
+		name  string
+		json  string
+		wants string
+	}{
+		{
+			name: "no run_started_at",
+			json: heredoc.Doc(`
+				{
+					"created_at": "2022-07-20T11:20:13Z",
+					"updated_at": "2022-07-20T11:21:16Z",
+					"status": "completed"
+				}`),
+			wants: "1m3s",
+		},
+		{
+			name: "with run_started_at",
+			json: heredoc.Doc(`
+				{
+					"created_at": "2022-07-20T11:20:13Z",
+					"run_started_at": "2022-07-20T11:20:55Z",
+					"updated_at": "2022-07-20T11:21:16Z",
+					"status": "completed"
+				}`),
+			wants: "21s",
+		},
+		{
+			name: "in_progress",
+			json: heredoc.Docf(`
+				{
+					"created_at": "2022-07-20T11:20:13Z",
+					"run_started_at": "%s",
+					"updated_at": "2022-07-20T11:21:16Z",
+					"status": "in_progress"
+				}`, time.Now().Add(-time.Second*123).Format(time.RFC3339)),
+			wants: "2m3s",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var r Run
+			assert.NoError(t, json.Unmarshal([]byte(tt.json), &r))
+			assert.Equal(t, tt.wants, r.Duration().String())
+		})
+	}
 }

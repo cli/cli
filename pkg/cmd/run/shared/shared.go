@@ -85,11 +85,15 @@ func (r *Run) StartedTime() time.Time {
 }
 
 func (r *Run) Duration() time.Duration {
-	d := r.UpdatedAt.Sub(r.StartedTime())
+	endTime := r.UpdatedAt
+	if r.Status != Completed {
+		endTime = time.Now()
+	}
+	d := endTime.Sub(r.StartedTime())
 	if d < 0 {
 		return 0
 	}
-	return d
+	return d.Round(time.Second)
 }
 
 type Repo struct {
