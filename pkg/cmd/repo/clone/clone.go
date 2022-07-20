@@ -159,16 +159,18 @@ func cloneRun(opts *CloneOptions) error {
 
 	// If the repo is a fork, add the parent as an upstream
 	if canonicalRepo.Parent != nil {
-		protocol, err := cfg.GetOrDefault(canonicalRepo.Parent.RepoHost(), "git_protocol")
-		if err != nil {
-			return err
-		}
-		upstreamURL := ghrepo.FormatRemoteURL(canonicalRepo.Parent, protocol)
-
 		upstreamName := opts.UpstreamName
 		if opts.UpstreamName == "@owner" {
 			upstreamName = canonicalRepo.Parent.RepoOwner()
 		}
+		protocol, err = cfg.GetOrDefault(canonicalRepo.Parent.RepoHost(), "git_protocol")
+		if err != nil {
+			return err
+		}
+		if upstreamName == "upstream" {
+			protocol = "https"
+		}
+		upstreamURL := ghrepo.FormatRemoteURL(canonicalRepo.Parent, protocol)
 
 		err = git.AddNamedRemote(upstreamURL, upstreamName, cloneDir, []string{canonicalRepo.Parent.DefaultBranchRef.Name})
 		if err != nil {

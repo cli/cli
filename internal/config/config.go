@@ -19,7 +19,7 @@ type Config interface {
 	AuthToken(string) (string, string)
 	Get(string, string) (string, error)
 	GetOrDefault(string, string) (string, error)
-	Set(string, string, string)
+	Set(hostname, key, value string)
 	UnsetHost(string)
 	Hosts() []string
 	DefaultHost() (string, string)

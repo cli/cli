@@ -94,7 +94,9 @@ func TestNewCmdClone(t *testing.T) {
 	}
 }
 
-func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) {
+type configOpt func(config.Config)
+
+func runCloneCommand(httpClient *http.Client, cli string, opts ...configOpt) (*test.CmdOut, error) {
 	ios, stdin, stdout, stderr := iostreams.Test()
 	fac := &cmdutil.Factory{
 		IOStreams: ios,
@@ -102,7 +104,11 @@ func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) 
 			return httpClient, nil
 		},
 		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
+			cfg := config.Config(config.NewBlankConfig())
+			for _, opt := range opts {
+				opt(cfg)
+			}
+			return cfg, nil
 		},
 	}
 
@@ -242,10 +248,13 @@ func Test_RepoClone_hasParent(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
+	cs.Register(`git clone git@github.com:OWNER/REPO.git`, 0, "")
 	cs.Register(`git -C REPO remote add -t trunk -f upstream https://github.com/hubot/ORIG.git`, 0, "")
 
-	_, err := runCloneCommand(httpClient, "OWNER/REPO")
+	cfg := func(c config.Config) {
+		c.Set("github.com", "git_protocol", "ssh")
+	}
+	_, err := runCloneCommand(httpClient, "OWNER/REPO", cfg)
 	if err != nil {
 		t.Fatalf("error running command `repo clone`: %v", err)
 	}
