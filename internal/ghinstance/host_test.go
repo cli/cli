@@ -95,7 +95,7 @@ func TestNormalizeHostname(t *testing.T) {
 func TestHostnameValidator(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    interface{}
+		input    string
 		wantsErr bool
 	}{
 		{
@@ -116,11 +116,6 @@ func TestHostnameValidator(t *testing.T) {
 		{
 			name:     "hostname with colon",
 			input:    "internal.instance:2205",
-			wantsErr: true,
-		},
-		{
-			name:     "non-string hostname",
-			input:    62,
 			wantsErr: true,
 		},
 	}

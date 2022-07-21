@@ -16,7 +16,6 @@ import (
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
@@ -28,15 +27,15 @@ func TestNewCmdExtension(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chdir(oldWd) })
 
 	tests := []struct {
-		name         string
-		args         []string
-		managerStubs func(em *extensions.ExtensionManagerMock) func(*testing.T)
-		askStubs     func(as *prompt.AskStubber)
-		isTTY        bool
-		wantErr      bool
-		errMsg       string
-		wantStdout   string
-		wantStderr   string
+		name          string
+		args          []string
+		managerStubs  func(em *extensions.ExtensionManagerMock) func(*testing.T)
+		prompterStubs func(pm *cmdutil.PrompterMock)
+		isTTY         bool
+		wantErr       bool
+		errMsg        string
+		wantStdout    string
+		wantStderr    string
 	}{
 		{
 			name: "install an extension",
@@ -387,11 +386,16 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY: true,
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Extension name:").AnswerWith("test")
-				as.StubPrompt("What kind of extension?").
-					AssertOptions([]string{"Script (Bash, Ruby, Python, etc)", "Go", "Other Precompiled (C++, Rust, etc)"}).
-					AnswerDefault()
+			prompterStubs: func(pm *cmdutil.PrompterMock) {
+				pm.InputFunc = func(prompt, defVal string) (string, error) {
+					if prompt == "Extension name:" {
+						return "test", nil
+					}
+					return "", nil
+				}
+				pm.SelectFunc = func(prompt, defVal string, opts []string) (int, error) {
+					return 0, nil
+				}
 			},
 			wantStdout: heredoc.Doc(`
 				✓ Created directory gh-test
@@ -562,9 +566,9 @@ func TestNewCmdExtension(t *testing.T) {
 				assertFunc = tt.managerStubs(em)
 			}
 
-			as := prompt.NewAskStubber(t)
-			if tt.askStubs != nil {
-				tt.askStubs(as)
+			pm := &cmdutil.PrompterMock{}
+			if tt.prompterStubs != nil {
+				tt.prompterStubs(pm)
 			}
 
 			reg := httpmock.Registry{}
@@ -577,6 +581,7 @@ func TestNewCmdExtension(t *testing.T) {
 				},
 				IOStreams:        ios,
 				ExtensionManager: em,
+				Prompter:         pm,
 				HttpClient: func() (*http.Client, error) {
 					return &client, nil
 				},

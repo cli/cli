@@ -31,6 +31,7 @@ func New(appVersion string) *cmdutil.Factory {
 	f.HttpClient = httpClientFunc(f, appVersion) // Depends on Config, IOStreams, and appVersion
 	f.Remotes = remotesFunc(f)                   // Depends on Config
 	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
+	f.Prompter = prompter(f)                     // Depends on Config and IOStreams
 	f.Browser = browser(f)                       // Depends on Config, and IOStreams
 	f.ExtensionManager = extensionManager(f)     // Depends on Config, HttpClient, and IOStreams
 
@@ -105,6 +106,12 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 func browser(f *cmdutil.Factory) cmdutil.Browser {
 	io := f.IOStreams
 	return cmdutil.NewBrowser(browserLauncher(f), io.Out, io.ErrOut)
+}
+
+func prompter(f *cmdutil.Factory) cmdutil.Prompter {
+	editor, _ := cmdutil.DetermineEditor(f.Config)
+	io := f.IOStreams
+	return cmdutil.NewPrompter(editor, io.In, io.Out, io.ErrOut)
 }
 
 // Browser precedence

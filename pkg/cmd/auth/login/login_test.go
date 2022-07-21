@@ -14,7 +14,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -362,14 +361,14 @@ func Test_loginRun_Survey(t *testing.T) {
 	stubHomeDir(t, t.TempDir())
 
 	tests := []struct {
-		name       string
-		opts       *LoginOptions
-		httpStubs  func(*httpmock.Registry)
-		askStubs   func(*prompt.AskStubber)
-		runStubs   func(*run.CommandStubber)
-		wantHosts  string
-		wantErrOut *regexp.Regexp
-		cfgStubs   func(*config.ConfigMock)
+		name          string
+		opts          *LoginOptions
+		httpStubs     func(*httpmock.Registry)
+		prompterStubs func(*cmdutil.PrompterMock)
+		runStubs      func(*run.CommandStubber)
+		wantHosts     string
+		wantErrOut    *regexp.Regexp
+		cfgStubs      func(*config.ConfigMock)
 	}{
 		{
 			name: "already authenticated",
@@ -384,9 +383,10 @@ func Test_loginRun_Survey(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("What account do you want to log into?").AnswerWith("GitHub.com")
-				as.StubPrompt("You're already logged into github.com. Do you want to re-authenticate?").AnswerWith(false)
+			prompterStubs: func(pm *cmdutil.PrompterMock) {
+				pm.SelectFunc = func(_, _ string, _ []string) (int, error) {
+					return 0, nil
+				}
 			},
 			wantHosts:  "",
 			wantErrOut: nil,
@@ -403,11 +403,16 @@ func Test_loginRun_Survey(t *testing.T) {
 				    user: jillv
 				    git_protocol: https
 			`),
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("What is your preferred protocol for Git operations?").AnswerWith("HTTPS")
-				as.StubPrompt("Authenticate Git with your GitHub credentials?").AnswerWith(false)
-				as.StubPrompt("How would you like to authenticate GitHub CLI?").AnswerWith("Paste an authentication token")
-				as.StubPrompt("Paste your authentication token:").AnswerWith("def456")
+			prompterStubs: func(pm *cmdutil.PrompterMock) {
+				pm.SelectFunc = func(prompt, _ string, _ []string) (int, error) {
+					switch prompt {
+					case "What is your preferred protocol for Git operations?":
+						return 0, nil
+					case "How would you like to authenticate GitHub CLI?":
+						return 1, nil
+					}
+					return -1, nil
+				}
 			},
 			runStubs: func(rs *run.CommandStubber) {
 				rs.Register(`git config credential\.https:/`, 1, "")
@@ -432,13 +437,21 @@ func Test_loginRun_Survey(t *testing.T) {
 			opts: &LoginOptions{
 				Interactive: true,
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("What account do you want to log into?").AnswerWith("GitHub Enterprise Server")
-				as.StubPrompt("GHE hostname:").AnswerWith("brad.vickers")
-				as.StubPrompt("What is your preferred protocol for Git operations?").AnswerWith("HTTPS")
-				as.StubPrompt("Authenticate Git with your GitHub credentials?").AnswerWith(false)
-				as.StubPrompt("How would you like to authenticate GitHub CLI?").AnswerWith("Paste an authentication token")
-				as.StubPrompt("Paste your authentication token:").AnswerWith("def456")
+			prompterStubs: func(pm *cmdutil.PrompterMock) {
+				pm.SelectFunc = func(prompt, _ string, _ []string) (int, error) {
+					switch prompt {
+					case "What account do you want to log into?":
+						return 1, nil
+					case "What is your preferred protocol for Git operations?":
+						return 0, nil
+					case "How would you like to authenticate GitHub CLI?":
+						return 1, nil
+					}
+					return -1, nil
+				}
+				pm.InputHostnameFunc = func() (string, error) {
+					return "brad.vickers", nil
+				}
 			},
 			runStubs: func(rs *run.CommandStubber) {
 				rs.Register(`git config credential\.https:/`, 1, "")
@@ -463,12 +476,18 @@ func Test_loginRun_Survey(t *testing.T) {
 			opts: &LoginOptions{
 				Interactive: true,
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("What account do you want to log into?").AnswerWith("GitHub.com")
-				as.StubPrompt("What is your preferred protocol for Git operations?").AnswerWith("HTTPS")
-				as.StubPrompt("Authenticate Git with your GitHub credentials?").AnswerWith(false)
-				as.StubPrompt("How would you like to authenticate GitHub CLI?").AnswerWith("Paste an authentication token")
-				as.StubPrompt("Paste your authentication token:").AnswerWith("def456")
+			prompterStubs: func(pm *cmdutil.PrompterMock) {
+				pm.SelectFunc = func(prompt, _ string, _ []string) (int, error) {
+					switch prompt {
+					case "What account do you want to log into?":
+						return 0, nil
+					case "What is your preferred protocol for Git operations?":
+						return 0, nil
+					case "How would you like to authenticate GitHub CLI?":
+						return 1, nil
+					}
+					return -1, nil
+				}
 			},
 			runStubs: func(rs *run.CommandStubber) {
 				rs.Register(`git config credential\.https:/`, 1, "")
@@ -487,12 +506,18 @@ func Test_loginRun_Survey(t *testing.T) {
 			opts: &LoginOptions{
 				Interactive: true,
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("What account do you want to log into?").AnswerWith("GitHub.com")
-				as.StubPrompt("What is your preferred protocol for Git operations?").AnswerWith("SSH")
-				as.StubPrompt("Generate a new SSH key to add to your GitHub account?").AnswerWith(false)
-				as.StubPrompt("How would you like to authenticate GitHub CLI?").AnswerWith("Paste an authentication token")
-				as.StubPrompt("Paste your authentication token:").AnswerWith("def456")
+			prompterStubs: func(pm *cmdutil.PrompterMock) {
+				pm.SelectFunc = func(prompt, _ string, _ []string) (int, error) {
+					switch prompt {
+					case "What account do you want to log into?":
+						return 0, nil
+					case "What is your preferred protocol for Git operations?":
+						return 1, nil
+					case "How would you like to authenticate GitHub CLI?":
+						return 1, nil
+					}
+					return -1, nil
+				}
 			},
 			wantErrOut: regexp.MustCompile("Tip: you can generate a Personal Access Token here https://github.com/settings/tokens"),
 		},
@@ -535,10 +560,17 @@ func Test_loginRun_Survey(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
 			}
 
-			as := prompt.NewAskStubber(t)
-			if tt.askStubs != nil {
-				tt.askStubs(as)
+			pm := &cmdutil.PrompterMock{}
+			pm.ConfirmFunc = func(_ string, _ bool) (bool, error) {
+				return false, nil
 			}
+			pm.AuthTokenFunc = func() (string, error) {
+				return "def456", nil
+			}
+			if tt.prompterStubs != nil {
+				tt.prompterStubs(pm)
+			}
+			tt.opts.Prompter = pm
 
 			rs, restoreRun := run.Stub()
 			defer restoreRun(t)
