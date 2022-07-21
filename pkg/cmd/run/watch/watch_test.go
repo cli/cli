@@ -288,7 +288,10 @@ func TestWatchRun(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-			assert.Equal(t, tt.wantOut, stdout.String())
+			// avoiding using `assert.Equal` here because it would print raw escape sequences to stdout
+			if got := stdout.String(); got != tt.wantOut {
+				t.Errorf("got stdout:\n%q\nwant:\n%q", got, tt.wantOut)
+			}
 			reg.Verify(t)
 		})
 	}

@@ -49,6 +49,7 @@ var RunFields = []string{
 	"headSha",
 	"createdAt",
 	"updatedAt",
+	"startedAt",
 	"status",
 	"conclusion",
 	"event",
@@ -61,17 +62,38 @@ type Run struct {
 	Name           string
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+	StartedAt      time.Time `json:"run_started_at"`
 	Status         Status
 	Conclusion     Conclusion
 	Event          string
 	ID             int64
 	WorkflowID     int64  `json:"workflow_id"`
+	Attempts       uint8  `json:"run_attempt"`
 	HeadBranch     string `json:"head_branch"`
 	JobsURL        string `json:"jobs_url"`
 	HeadCommit     Commit `json:"head_commit"`
 	HeadSha        string `json:"head_sha"`
 	URL            string `json:"html_url"`
 	HeadRepository Repo   `json:"head_repository"`
+}
+
+func (r *Run) StartedTime() time.Time {
+	if r.StartedAt.IsZero() {
+		return r.CreatedAt
+	}
+	return r.StartedAt
+}
+
+func (r *Run) Duration(now time.Time) time.Duration {
+	endTime := r.UpdatedAt
+	if r.Status != Completed {
+		endTime = now
+	}
+	d := endTime.Sub(r.StartedTime())
+	if d < 0 {
+		return 0
+	}
+	return d.Round(time.Second)
 }
 
 type Repo struct {
@@ -329,7 +351,7 @@ func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 		symbol, _ := Symbol(cs, run.Status, run.Conclusion)
 		candidates = append(candidates,
 			// TODO truncate commit message, long ones look terrible
-			fmt.Sprintf("%s %s, %s (%s) %s", symbol, run.CommitMsg(), run.Name, run.HeadBranch, preciseAgo(now, run.CreatedAt)))
+			fmt.Sprintf("%s %s, %s (%s) %s", symbol, run.CommitMsg(), run.Name, run.HeadBranch, preciseAgo(now, run.StartedTime())))
 	}
 
 	// TODO consider custom filter so it's fuzzier. right now matches start anywhere in string but
