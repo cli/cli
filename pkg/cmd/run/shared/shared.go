@@ -84,10 +84,10 @@ func (r *Run) StartedTime() time.Time {
 	return r.StartedAt
 }
 
-func (r *Run) Duration() time.Duration {
+func (r *Run) Duration(now time.Time) time.Duration {
 	endTime := r.UpdatedAt
 	if r.Status != Completed {
-		endTime = time.Now()
+		endTime = now
 	}
 	d := endTime.Sub(r.StartedTime())
 	if d < 0 {

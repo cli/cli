@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
@@ -115,13 +116,15 @@ func TestListRun(t *testing.T) {
 		wantOut    string
 		wantErrOut string
 		stubs      func(*httpmock.Registry)
-		nontty     bool
+		isTTY      bool
 	}{
 		{
-			name: "blank tty",
+			name: "default arguments",
 			opts: &ListOptions{
 				Limit: defaultLimit,
+				now:   shared.TestRunStartTime.Add(time.Minute*4 + time.Second*34),
 			},
+			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
@@ -132,12 +135,12 @@ func TestListRun(t *testing.T) {
 			wantOut: "STATUS  NAME         WORKFLOW     BRANCH  EVENT  ID    ELAPSED  AGE\nX       cool commit  timed out    trunk   push   1     4m34s    Feb 23, 2021\n*       cool commit  in progress  trunk   push   2     4m34s    Feb 23, 2021\n✓       cool commit  successful   trunk   push   3     4m34s    Feb 23, 2021\nX       cool commit  cancelled    trunk   push   4     4m34s    Feb 23, 2021\nX       cool commit  failed       trunk   push   1234  4m34s    Feb 23, 2021\n-       cool commit  neutral      trunk   push   6     4m34s    Feb 23, 2021\n-       cool commit  skipped      trunk   push   7     4m34s    Feb 23, 2021\n*       cool commit  requested    trunk   push   8     4m34s    Feb 23, 2021\n*       cool commit  queued       trunk   push   9     4m34s    Feb 23, 2021\nX       cool commit  stale        trunk   push   10    4m34s    Feb 23, 2021\n",
 		},
 		{
-			name: "blank nontty",
+			name: "default arguments nontty",
 			opts: &ListOptions{
-				Limit:       defaultLimit,
-				PlainOutput: true,
+				Limit: defaultLimit,
+				now:   shared.TestRunStartTime.Add(time.Minute*4 + time.Second*34),
 			},
-			nontty: true,
+			isTTY: false,
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
@@ -151,7 +154,9 @@ func TestListRun(t *testing.T) {
 			name: "pagination",
 			opts: &ListOptions{
 				Limit: 101,
+				now:   shared.TestRunStartTime.Add(time.Minute*4 + time.Second*34),
 			},
+			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {
 				var runID int64
 				runs := []shared.Run{}
@@ -175,8 +180,7 @@ func TestListRun(t *testing.T) {
 		{
 			name: "no results",
 			opts: &ListOptions{
-				Limit:       defaultLimit,
-				PlainOutput: true,
+				Limit: defaultLimit,
 			},
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -191,7 +195,9 @@ func TestListRun(t *testing.T) {
 			opts: &ListOptions{
 				Limit:            defaultLimit,
 				WorkflowSelector: "flow.yml",
+				now:              shared.TestRunStartTime.Add(time.Minute*4 + time.Second*34),
 			},
+			isTTY: true,
 			stubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/flow.yml"),
@@ -249,7 +255,7 @@ func TestListRun(t *testing.T) {
 			}
 
 			ios, _, stdout, stderr := iostreams.Test()
-			ios.SetStdoutTTY(!tt.nontty)
+			ios.SetStdoutTTY(tt.isTTY)
 			tt.opts.IO = ios
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("OWNER/REPO")

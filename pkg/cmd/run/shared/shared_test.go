@@ -56,6 +56,8 @@ func TestGetAnnotations404(t *testing.T) {
 }
 
 func TestRun_Duration(t *testing.T) {
+	now, _ := time.Parse(time.RFC3339, "2022-07-20T11:22:58Z")
+
 	tests := []struct {
 		name  string
 		json  string
@@ -84,13 +86,13 @@ func TestRun_Duration(t *testing.T) {
 		},
 		{
 			name: "in_progress",
-			json: heredoc.Docf(`
+			json: heredoc.Doc(`
 				{
 					"created_at": "2022-07-20T11:20:13Z",
-					"run_started_at": "%s",
+					"run_started_at": "2022-07-20T11:20:55Z",
 					"updated_at": "2022-07-20T11:21:16Z",
 					"status": "in_progress"
-				}`, time.Now().Add(-time.Second*123).Format(time.RFC3339)),
+				}`),
 			wants: "2m3s",
 		},
 	}
@@ -98,7 +100,7 @@ func TestRun_Duration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var r Run
 			assert.NoError(t, json.Unmarshal([]byte(tt.json), &r))
-			assert.Equal(t, tt.wants, r.Duration().String())
+			assert.Equal(t, tt.wants, r.Duration(now).String())
 		})
 	}
 }
