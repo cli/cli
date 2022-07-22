@@ -115,6 +115,7 @@ func createRun(opts *CreateOptions) error {
 		return fmt.Errorf("failed to collect files for posting: %w", err)
 	}
 
+	cs := opts.IO.ColorScheme()
 	gistName := guessGistName(files)
 
 	processMessage := "Creating gist..."
@@ -125,10 +126,12 @@ func createRun(opts *CreateOptions) error {
 		} else {
 			processMessage = fmt.Sprintf("Creating gist %s", gistName)
 		}
-		completionMessage = fmt.Sprintf("Created gist %s", gistName)
+		if opts.Public {
+			completionMessage = fmt.Sprintf("Created %s gist %s", cs.Red("public"), gistName)
+		} else {
+			completionMessage = fmt.Sprintf("Created %s gist %s", cs.Green("secret"), gistName)
+		}
 	}
-
-	cs := opts.IO.ColorScheme()
 
 	errOut := opts.IO.ErrOut
 	fmt.Fprintf(errOut, "%s %s\n", cs.Gray("-"), processMessage)
