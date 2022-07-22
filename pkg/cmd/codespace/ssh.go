@@ -244,7 +244,7 @@ func shouldUseAutomaticSSHKeys(
 
 	// If there is a public key uploaded which matches a configured
 	// private key, there is no need for automatic key generation
-	return hasUploadedPublicKeyForConfig(ctx, sshContext, apiClient, customConfigPath, opts.profile)
+	return !hasUploadedPublicKeyForConfig(ctx, sshContext, apiClient, customConfigPath, opts.profile)
 }
 
 func setupAutomaticSSHKeys(sshContext ssh.Context) (*ssh.KeyPair, error) {
