@@ -319,7 +319,7 @@ func runView(opts *ViewOptions) error {
 
 	out := opts.IO.Out
 
-	ago := opts.Now().Sub(run.CreatedAt)
+	ago := opts.Now().Sub(run.StartedTime())
 
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, utils.FuzzyAgo(ago), prNumber))
@@ -416,7 +416,7 @@ func getLog(httpClient *http.Client, logURL string) (io.ReadCloser, error) {
 }
 
 func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface, run *shared.Run) (*zip.ReadCloser, error) {
-	filename := fmt.Sprintf("run-log-%d-%d.zip", run.ID, run.CreatedAt.Unix())
+	filename := fmt.Sprintf("run-log-%d-%d.zip", run.ID, run.StartedTime().Unix())
 	filepath := filepath.Join(os.TempDir(), "gh-cli-cache", filename)
 	if !cache.Exists(filepath) {
 		// Run log does not exist in cache so retrieve and store it
