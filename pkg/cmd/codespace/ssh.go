@@ -227,26 +227,24 @@ func shouldUseAutomaticSSHKeys(
 	args []string,
 	opts sshOptions,
 ) bool {
-	if opts.profile != "" {
-		// The profile may specify the identity file so cautiously don't override anything with that option
-		return false
-	}
+	customConfigPath := ""
+	for i := 0; i < len(args); i += 1 {
+		arg := args[i]
 
-	for _, arg := range args {
 		if arg == "-i" {
-			// User specified the identity file so it should exist
+			// User specified the identity file so just trust it is correct
 			return false
 		}
 
-		if arg == "-F" {
-			// User specified a config file so, similar to profile, cautiously don't override settings
-			return false
+		if arg == "-F" && i < len(args)-1 {
+			// ssh only pays attention to that last specified -F value, so it's correct to overwrite here
+			customConfigPath = args[i+1]
 		}
 	}
 
 	// If there is a public key uploaded which matches a configured
 	// private key, there is no need for automatic key generation
-	return hasUploadedPublicKeyForConfig(ctx, sshContext, apiClient)
+	return hasUploadedPublicKeyForConfig(ctx, sshContext, apiClient, customConfigPath, opts.profile)
 }
 
 func setupAutomaticSSHKeys(sshContext ssh.Context) (*ssh.KeyPair, error) {
@@ -316,26 +314,26 @@ func hasUploadedPublicKeyForConfig(
 	ctx context.Context,
 	sshContext ssh.Context,
 	apiClient apiClient,
+	customConfigFile string,
+	customHost string,
 ) bool {
-	configuredPrivateKeyPaths, err := getConfiguredPrivateKeys(ctx)
+	configuredPrivateKeyPaths, err := getConfiguredPrivateKeys(ctx, customConfigFile, customHost)
 	if err != nil {
 		return false
 	}
 
 	configuredPublicKeys := []string{}
 	for _, privateKeyPath := range configuredPrivateKeyPaths {
-		if _, err := os.Stat(privateKeyPath); err != nil {
-			// The default configuration includes standard keys like id_rsa,
-			// id_ed25519, etc, but these may not actually exist
-			continue
-		}
+		publicKeyPath := privateKeyPath + ".pub"
 
-		configuredPublicKey, err := sshContext.GetPublicKeyFromPrivateKey(privateKeyPath)
+		publicKeyContent, err := os.ReadFile(publicKeyPath)
 		if err != nil {
+			// The default configuration includes standard keys like id_rsa,
+			// id_ed25519, etc, but these may not actually exist so just skip
 			continue
 		}
 
-		configuredPublicKeys = append(configuredPublicKeys, configuredPublicKey)
+		configuredPublicKeys = append(configuredPublicKeys, string(publicKeyContent))
 	}
 
 	if len(configuredPublicKeys) == 0 {
@@ -370,15 +368,30 @@ func hasUploadedPublicKeyForConfig(
 
 // getConfiguredPrivateKeys reads the effective configuration for a localhost
 // connection and returns all private keys which would be tried for authentication
-func getConfiguredPrivateKeys(ctx context.Context) ([]string, error) {
+func getConfiguredPrivateKeys(
+	ctx context.Context,
+	customConfigFile string,
+	customHost string,
+) ([]string, error) {
 	sshExe, err := safeexec.LookPath("ssh")
 	if err != nil {
 		return nil, fmt.Errorf("could not find ssh executable: %w", err)
 	}
 
 	// The -G option tells ssh to output the effective config for the given host, but not connect
-	// The target host is always localhost because we skip this check if --profile was set.
-	sshGCmd := exec.CommandContext(ctx, sshExe, "-G", "localhost")
+	sshGArgs := []string{"-G"}
+
+	if customConfigFile != "" {
+		sshGArgs = append(sshGArgs, "-F", customConfigFile)
+	}
+
+	if customHost != "" {
+		sshGArgs = append(sshGArgs, customHost)
+	} else {
+		sshGArgs = append(sshGArgs, "localhost")
+	}
+
+	sshGCmd := exec.CommandContext(ctx, sshExe, sshGArgs...)
 	configBytes, err := sshGCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("could not load ssh configuration: %w", err)
@@ -484,6 +497,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 			StrictHostKeyChecking no
 			LogLevel quiet
 			ControlMaster auto
+			IdentityFile ~/.ssh/{{.AutomaticIdentityFile}}
 
 	`))
 	if err != nil {
@@ -510,17 +524,19 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 		// flattened to '-' to prevent problems with tab completion or when the
 		// hostname appears in ControlMaster socket paths.
 		type codespaceSSHConfig struct {
-			Name       string // the codespace name, passed to `ssh -c`
-			EscapedRef string // the currently checked-out branch
-			SSHUser    string // the remote ssh username
-			GHExec     string // path used for invoking the current `gh` binary
+			Name                  string // the codespace name, passed to `ssh -c`
+			EscapedRef            string // the currently checked-out branch
+			SSHUser               string // the remote ssh username
+			GHExec                string // path used for invoking the current `gh` binary
+			AutomaticIdentityFile string
 		}
 
 		conf := codespaceSSHConfig{
-			Name:       result.codespace.Name,
-			EscapedRef: strings.ReplaceAll(result.codespace.GitStatus.Ref, "/", "-"),
-			SSHUser:    result.user,
-			GHExec:     ghExec,
+			Name:                  result.codespace.Name,
+			EscapedRef:            strings.ReplaceAll(result.codespace.GitStatus.Ref, "/", "-"),
+			SSHUser:               result.user,
+			GHExec:                ghExec,
+			AutomaticIdentityFile: automaticPrivateKeyName,
 		}
 		if err := t.Execute(a.io.Out, conf); err != nil {
 			return err

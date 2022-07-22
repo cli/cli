@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/run"
@@ -78,29 +77,6 @@ func (c *Context) GenerateSSHKey(keyName string, passphrase string) (*KeyPair, e
 	}
 
 	return &keyPair, nil
-}
-
-func (c *Context) GetPublicKeyFromPrivateKey(privateKeyPath string) (string, error) {
-	keygenExe, err := c.findKeygen()
-	if err != nil {
-		return "", err
-	}
-
-	keygenCmd := exec.Command(keygenExe, "-y", "-f", privateKeyPath)
-	keygenRunnable := run.PrepareCmd(keygenCmd)
-
-	fullPublicKeyBytes, err := keygenRunnable.Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to generate public key: %w", err)
-	}
-
-	fullPublicKey := string(fullPublicKeyBytes)
-
-	// The public key format is "<type> <key>[ <comment>]" - remove the comment if it exists
-	publicKeyParts := strings.SplitN(fullPublicKey, " ", 3)
-	publicKeyWithoutComment := strings.Join(publicKeyParts[:2], " ")
-
-	return publicKeyWithoutComment, nil
 }
 
 func (c *Context) sshDir() (string, error) {
