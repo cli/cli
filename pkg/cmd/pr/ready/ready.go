@@ -6,7 +6,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -37,6 +36,8 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 
 			Without an argument, the pull request that belongs to the current branch
 			is marked as ready.
+
+			If supported by your plan, convert to draft with --undo
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -57,7 +58,7 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.Undo, "undo", false, `Mark a pull request as "draft"`)
+	cmd.Flags().BoolVar(&opts.Undo, "undo", false, `Convert a pull request to "draft"`)
 	return cmd
 }
 
@@ -78,52 +79,36 @@ func readyRun(opts *ReadyOptions) error {
 		return cmdutil.SilentError
 	}
 
-	if opts.Undo {
-		return markAsDraft(pr, opts, cs, baseRepo)
-	}
-	return markAsReady(pr, opts, cs, baseRepo)
-}
-
-func markAsReady(pr *api.PullRequest, opts *ReadyOptions, cs *iostreams.ColorScheme, baseRepo ghrepo.Interface) error {
-	if !pr.IsDraft {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is already \"ready for review\"\n", cs.WarningIcon(), pr.Number)
-		return nil
-	}
-
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	err = api.PullRequestReady(apiClient, baseRepo, pr)
-	if err != nil {
-		return fmt.Errorf("API call failed: %w", err)
+	if opts.Undo { // convert to draft
+		if pr.IsDraft {
+			fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is already \"in draft\"\n", cs.WarningIcon(), pr.Number)
+			return nil
+		}
+		err = api.ConvertPullRequestToDraft(apiClient, baseRepo, pr)
+		if err != nil {
+			return fmt.Errorf("API call failed: %w", err)
+		}
+
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is converted to \"draft\"\n", cs.SuccessIconWithColor(cs.Green), pr.Number)
+	} else { // mark as ready for review
+		if !pr.IsDraft {
+			fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is already \"ready for review\"\n", cs.WarningIcon(), pr.Number)
+			return nil
+		}
+
+		err = api.PullRequestReady(apiClient, baseRepo, pr)
+		if err != nil {
+			return fmt.Errorf("API call failed: %w", err)
+		}
+
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is marked as \"ready for review\"\n", cs.SuccessIconWithColor(cs.Green), pr.Number)
 	}
-
-	fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is marked as \"ready for review\"\n", cs.SuccessIconWithColor(cs.Green), pr.Number)
-
-	return nil
-}
-
-func markAsDraft(pr *api.PullRequest, opts *ReadyOptions, cs *iostreams.ColorScheme, baseRepo ghrepo.Interface) error {
-	if pr.IsDraft {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is already \"in draft\"\n", cs.WarningIcon(), pr.Number)
-		return nil
-	}
-
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-	apiClient := api.NewClientFromHTTP(httpClient)
-
-	err = api.ConvertPullRequestToDraft(apiClient, baseRepo, pr)
-	if err != nil {
-		return fmt.Errorf("API call failed: %w", err)
-	}
-
-	fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is marked as \"in draft\"\n", cs.SuccessIconWithColor(cs.Green), pr.Number)
 
 	return nil
 }
