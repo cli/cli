@@ -20,6 +20,7 @@ type ReadyOptions struct {
 	Finder shared.PRFinder
 
 	SelectorArg string
+	Undo        bool
 }
 
 func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Command {
@@ -56,6 +57,7 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 		},
 	}
 
+	cmd.Flags().BoolVar(&opts.Undo, "undo", false, `Mark a pull request as "draft"`)
 	return cmd
 }
 
@@ -76,8 +78,10 @@ func readyRun(opts *ReadyOptions) error {
 		return cmdutil.SilentError
 	}
 
-	// return markAsReady(pr, opts, cs, baseRepo)
-	return markAsDraft(pr, opts, cs, baseRepo)
+	if opts.Undo {
+		return markAsDraft(pr, opts, cs, baseRepo)
+	}
+	return markAsReady(pr, opts, cs, baseRepo)
 }
 
 func markAsReady(pr *api.PullRequest, opts *ReadyOptions, cs *iostreams.ColorScheme, baseRepo ghrepo.Interface) error {
