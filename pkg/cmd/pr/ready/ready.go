@@ -6,6 +6,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -73,7 +74,14 @@ func readyRun(opts *ReadyOptions) error {
 	if !pr.IsOpen() {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is closed. Only draft pull requests can be marked as \"ready for review\"\n", cs.FailureIcon(), pr.Number)
 		return cmdutil.SilentError
-	} else if !pr.IsDraft {
+	}
+
+	// return markAsReady(pr, opts, cs, baseRepo)
+	return markAsDraft(pr, opts, cs, baseRepo)
+}
+
+func markAsReady(pr *api.PullRequest, opts *ReadyOptions, cs *iostreams.ColorScheme, baseRepo ghrepo.Interface) error {
+	if !pr.IsDraft {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is already \"ready for review\"\n", cs.WarningIcon(), pr.Number)
 		return nil
 	}
@@ -90,6 +98,28 @@ func readyRun(opts *ReadyOptions) error {
 	}
 
 	fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is marked as \"ready for review\"\n", cs.SuccessIconWithColor(cs.Green), pr.Number)
+
+	return nil
+}
+
+func markAsDraft(pr *api.PullRequest, opts *ReadyOptions, cs *iostreams.ColorScheme, baseRepo ghrepo.Interface) error {
+	if pr.IsDraft {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is already \"in draft\"\n", cs.WarningIcon(), pr.Number)
+		return nil
+	}
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+	apiClient := api.NewClientFromHTTP(httpClient)
+
+	err = api.ConvertPullRequestToDraft(apiClient, baseRepo, pr)
+	if err != nil {
+		return fmt.Errorf("API call failed: %w", err)
+	}
+
+	fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is marked as \"in draft\"\n", cs.SuccessIconWithColor(cs.Green), pr.Number)
 
 	return nil
 }
