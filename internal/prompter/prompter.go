@@ -1,4 +1,4 @@
-package cmdutil
+package prompter
 
 import (
 	"fmt"
@@ -9,6 +9,18 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/surveyext"
 )
+
+//go:generate moq -rm -out prompter_mock.go . Prompter
+type Prompter interface {
+	Select(string, string, []string) (int, error)
+	MultiSelect(string, string, []string) (int, error)
+	Input(string, string) (string, error)
+	InputHostname() (string, error)
+	Password(string) (string, error)
+	AuthToken() (string, error)
+	Confirm(string, bool) (bool, error)
+	MarkdownEditor(string, string, bool) (string, error)
+}
 
 func NewPrompter(editorCmd string, stdin io.Reader, stdout, stderr io.Writer) Prompter {
 	return &surveyPrompter{

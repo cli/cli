@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
@@ -17,25 +18,10 @@ type Browser interface {
 	Browse(string) error
 }
 
-// TODO fix current breaking tests
-// TODO linter warning for using the prompt package
-
-//go:generate moq -rm -out prompter_mock.go . Prompter
-type Prompter interface {
-	Select(string, string, []string) (int, error)
-	MultiSelect(string, string, []string) (int, error)
-	Input(string, string) (string, error)
-	InputHostname() (string, error)
-	Password(string) (string, error)
-	AuthToken() (string, error)
-	Confirm(string, bool) (bool, error)
-	MarkdownEditor(string, string, bool) (string, error)
-}
-
 type Factory struct {
 	IOStreams *iostreams.IOStreams
 	Browser   Browser
-	Prompter  Prompter
+	Prompter  prompter.Prompter
 
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)

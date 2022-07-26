@@ -8,6 +8,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -17,7 +18,7 @@ import (
 type DeleteOptions struct {
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
-	Prompter   cmdutil.Prompter
+	Prompter   prompter.Prompter
 	IO         *iostreams.IOStreams
 	RepoArg    string
 	Confirmed  bool

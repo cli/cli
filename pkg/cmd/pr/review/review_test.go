@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -165,7 +166,7 @@ func Test_NewCmdReview(t *testing.T) {
 	}
 }
 
-func runCommand(rt http.RoundTripper, prompter cmdutil.Prompter, remotes context.Remotes, isTTY bool, cli string) (*test.CmdOut, error) {
+func runCommand(rt http.RoundTripper, prompter prompter.Prompter, remotes context.Remotes, isTTY bool, cli string) (*test.CmdOut, error) {
 	ios, _, stdout, stderr := iostreams.Test()
 	ios.SetStdoutTTY(isTTY)
 	ios.SetStdinTTY(isTTY)
@@ -271,7 +272,7 @@ func TestPRReview_interactive(t *testing.T) {
 			}),
 	)
 
-	pm := &cmdutil.PrompterMock{
+	pm := &prompter.PrompterMock{
 		SelectFunc:         func(_, _ string, _ []string) (int, error) { return 1, nil },
 		MarkdownEditorFunc: func(_, _ string, _ bool) (string, error) { return "cool story", nil },
 		ConfirmFunc:        func(_ string, _ bool) (bool, error) { return true, nil },
@@ -294,7 +295,7 @@ func TestPRReview_interactive_no_body(t *testing.T) {
 
 	shared.RunCommandFinder("", &api.PullRequest{ID: "THE-ID", Number: 123}, ghrepo.New("OWNER", "REPO"))
 
-	pm := &cmdutil.PrompterMock{
+	pm := &prompter.PrompterMock{
 		SelectFunc:         func(_, _ string, _ []string) (int, error) { return 2, nil },
 		MarkdownEditorFunc: func(_, _ string, _ bool) (string, error) { return "", nil },
 	}
@@ -318,7 +319,7 @@ func TestPRReview_interactive_blank_approve(t *testing.T) {
 			}),
 	)
 
-	pm := &cmdutil.PrompterMock{
+	pm := &prompter.PrompterMock{
 		SelectFunc:         func(_, _ string, _ []string) (int, error) { return 1, nil },
 		MarkdownEditorFunc: func(_, defVal string, _ bool) (string, error) { return defVal, nil },
 		ConfirmFunc:        func(_ string, _ bool) (bool, error) { return true, nil },

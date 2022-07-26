@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
-	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/ssh"
@@ -47,7 +47,7 @@ func TestLogin_ssh(t *testing.T) {
 		httpmock.REST("POST", "api/v3/user/keys"),
 		httpmock.StringResponse(`{}`))
 
-	pm := &cmdutil.PrompterMock{}
+	pm := &prompter.PrompterMock{}
 	pm.SelectFunc = func(prompt, _ string, _ []string) (int, error) {
 		switch prompt {
 		case "What is your preferred protocol for Git operations?":

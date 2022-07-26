@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -80,7 +81,7 @@ func Test_deleteRun(t *testing.T) {
 		tty           bool
 		opts          *DeleteOptions
 		httpStubs     func(*httpmock.Registry)
-		prompterStubs func(*cmdutil.PrompterMock)
+		prompterStubs func(*prompter.PrompterMock)
 		wantStdout    string
 		wantErr       bool
 		errMsg        string
@@ -90,7 +91,7 @@ func Test_deleteRun(t *testing.T) {
 			tty:        true,
 			opts:       &DeleteOptions{RepoArg: "OWNER/REPO"},
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
-			prompterStubs: func(p *cmdutil.PrompterMock) {
+			prompterStubs: func(p *prompter.PrompterMock) {
 				p.InputFunc = func(_, _ string) (string, error) {
 					return "OWNER/REPO", nil
 				}
@@ -106,7 +107,7 @@ func Test_deleteRun(t *testing.T) {
 			tty:        true,
 			opts:       &DeleteOptions{},
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
-			prompterStubs: func(p *cmdutil.PrompterMock) {
+			prompterStubs: func(p *prompter.PrompterMock) {
 				p.InputFunc = func(_, _ string) (string, error) {
 					return "OWNER/REPO", nil
 				}
@@ -134,7 +135,7 @@ func Test_deleteRun(t *testing.T) {
 			opts:       &DeleteOptions{RepoArg: "REPO"},
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
 			tty:        true,
-			prompterStubs: func(p *cmdutil.PrompterMock) {
+			prompterStubs: func(p *prompter.PrompterMock) {
 				p.InputFunc = func(_, _ string) (string, error) {
 					return "OWNER/REPO", nil
 				}
@@ -150,7 +151,7 @@ func Test_deleteRun(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		pm := &cmdutil.PrompterMock{}
+		pm := &prompter.PrompterMock{}
 		if tt.prompterStubs != nil {
 			tt.prompterStubs(pm)
 		}

@@ -12,6 +12,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -30,7 +31,7 @@ func TestNewCmdExtension(t *testing.T) {
 		name          string
 		args          []string
 		managerStubs  func(em *extensions.ExtensionManagerMock) func(*testing.T)
-		prompterStubs func(pm *cmdutil.PrompterMock)
+		prompterStubs func(pm *prompter.PrompterMock)
 		isTTY         bool
 		wantErr       bool
 		errMsg        string
@@ -386,7 +387,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY: true,
-			prompterStubs: func(pm *cmdutil.PrompterMock) {
+			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.InputFunc = func(prompt, defVal string) (string, error) {
 					if prompt == "Extension name:" {
 						return "test", nil
@@ -566,7 +567,7 @@ func TestNewCmdExtension(t *testing.T) {
 				assertFunc = tt.managerStubs(em)
 			}
 
-			pm := &cmdutil.PrompterMock{}
+			pm := &prompter.PrompterMock{}
 			if tt.prompterStubs != nil {
 				tt.prompterStubs(pm)
 			}

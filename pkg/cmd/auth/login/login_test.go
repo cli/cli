@@ -10,6 +10,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -364,7 +365,7 @@ func Test_loginRun_Survey(t *testing.T) {
 		name          string
 		opts          *LoginOptions
 		httpStubs     func(*httpmock.Registry)
-		prompterStubs func(*cmdutil.PrompterMock)
+		prompterStubs func(*prompter.PrompterMock)
 		runStubs      func(*run.CommandStubber)
 		wantHosts     string
 		wantErrOut    *regexp.Regexp
@@ -383,7 +384,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
 			},
-			prompterStubs: func(pm *cmdutil.PrompterMock) {
+			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(_, _ string, _ []string) (int, error) {
 					return 0, nil
 				}
@@ -403,7 +404,7 @@ func Test_loginRun_Survey(t *testing.T) {
 				    user: jillv
 				    git_protocol: https
 			`),
-			prompterStubs: func(pm *cmdutil.PrompterMock) {
+			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(prompt, _ string, _ []string) (int, error) {
 					switch prompt {
 					case "What is your preferred protocol for Git operations?":
@@ -437,7 +438,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			opts: &LoginOptions{
 				Interactive: true,
 			},
-			prompterStubs: func(pm *cmdutil.PrompterMock) {
+			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(prompt, _ string, _ []string) (int, error) {
 					switch prompt {
 					case "What account do you want to log into?":
@@ -476,7 +477,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			opts: &LoginOptions{
 				Interactive: true,
 			},
-			prompterStubs: func(pm *cmdutil.PrompterMock) {
+			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(prompt, _ string, _ []string) (int, error) {
 					switch prompt {
 					case "What account do you want to log into?":
@@ -506,7 +507,7 @@ func Test_loginRun_Survey(t *testing.T) {
 			opts: &LoginOptions{
 				Interactive: true,
 			},
-			prompterStubs: func(pm *cmdutil.PrompterMock) {
+			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(prompt, _ string, _ []string) (int, error) {
 					switch prompt {
 					case "What account do you want to log into?":
@@ -560,7 +561,7 @@ func Test_loginRun_Survey(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
 			}
 
-			pm := &cmdutil.PrompterMock{}
+			pm := &prompter.PrompterMock{}
 			pm.ConfirmFunc = func(_ string, _ bool) (bool, error) {
 				return false, nil
 			}
