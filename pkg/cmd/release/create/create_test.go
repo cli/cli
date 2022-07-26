@@ -597,14 +597,19 @@ func Test_createRun_interactive(t *testing.T) {
 			name: "create a release from existing tag",
 			opts: &CreateOptions{},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Choose a tag").
 					AssertOptions([]string{"v1.2.3", "v1.2.2", "v1.0.0", "v0.1.2", "Create a new tag"}).
 					AnswerWith("v1.2.3")
+					//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Title (optional)").AnswerWith("")
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Release notes").
 					AssertOptions([]string{"Write my own", "Write using generated notes as template", "Leave blank"}).
 					AnswerWith("Leave blank")
+					//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Is this a prerelease?").AnswerWith(false)
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Submit?").
 					AssertOptions([]string{"Publish release", "Save as draft", "Cancel"}).AnswerWith("Publish release")
 			},
@@ -632,13 +637,19 @@ func Test_createRun_interactive(t *testing.T) {
 			name: "create a release from new tag",
 			opts: &CreateOptions{},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Choose a tag").AnswerWith("Create a new tag")
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Tag name").AnswerWith("v1.2.3")
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Title (optional)").AnswerWith("")
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Release notes").
 					AssertOptions([]string{"Write my own", "Write using generated notes as template", "Leave blank"}).
 					AnswerWith("Leave blank")
+					//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Is this a prerelease?").AnswerWith(false)
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Submit?").AnswerWith("Publish release")
 			},
 			runStubs: func(rs *run.CommandStubber) {
@@ -667,11 +678,15 @@ func Test_createRun_interactive(t *testing.T) {
 				TagName: "v1.2.3",
 			},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Title (optional)").AnswerDefault()
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Release notes").
 					AssertOptions([]string{"Write my own", "Write using generated notes as template", "Leave blank"}).
 					AnswerWith("Write using generated notes as template")
+					//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Is this a prerelease?").AnswerWith(false)
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Submit?").AnswerWith("Publish release")
 			},
 			runStubs: func(rs *run.CommandStubber) {
@@ -705,11 +720,15 @@ func Test_createRun_interactive(t *testing.T) {
 				TagName: "v1.2.3",
 			},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Title (optional)").AnswerDefault()
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Release notes").
 					AssertOptions([]string{"Write my own", "Write using commit log as template", "Leave blank"}).
 					AnswerWith("Write using commit log as template")
+					//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Is this a prerelease?").AnswerWith(false)
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Submit?").AnswerWith("Publish release")
 			},
 			runStubs: func(rs *run.CommandStubber) {
@@ -741,11 +760,15 @@ func Test_createRun_interactive(t *testing.T) {
 				TagName: "v1.2.3",
 			},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Title (optional)").AnswerDefault()
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Release notes").
 					AssertOptions([]string{"Write my own", "Write using git tag message as template", "Leave blank"}).
 					AnswerWith("Write using git tag message as template")
+					//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Is this a prerelease?").AnswerWith(false)
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Submit?").AnswerWith("Publish release")
 			},
 			runStubs: func(rs *run.CommandStubber) {
@@ -793,11 +816,15 @@ func Test_createRun_interactive(t *testing.T) {
 				Target:  "main",
 			},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Title (optional)").AnswerWith("")
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Release notes").
 					AssertOptions([]string{"Write my own", "Write using generated notes as template", "Write using git tag message as template", "Leave blank"}).
 					AnswerWith("Leave blank")
+					//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Is this a prerelease?").AnswerWith(false)
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Submit?").AnswerWith("Publish release")
 			},
 			runStubs: func(rs *run.CommandStubber) {

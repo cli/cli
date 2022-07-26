@@ -105,6 +105,7 @@ func TestDeleteRun(t *testing.T) {
 			askStubs: func(as *prompt.AskStubber) {
 				// TODO: survey stubber doesn't have WithValidator support
 				// so this always passes regardless of prompt input
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Type test to confirm deletion:").AnswerWith("test")
 			},
 			wantStdout: "✓ Label \"test\" deleted from OWNER/REPO\n",

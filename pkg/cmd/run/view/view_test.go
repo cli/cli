@@ -374,7 +374,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse([]shared.Annotation{}))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
 				as.StubOne(2)
 			},
 			opts: &ViewOptions{
@@ -411,9 +411,9 @@ func TestViewRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/run_log.zip"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
 				as.StubOne(2)
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
 				as.StubOne(1)
 			},
 			wantOut: coolJobRunLogOutput,
@@ -466,9 +466,9 @@ func TestViewRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/run_log.zip"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
 				as.StubOne(2)
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
 				as.StubOne(0)
 			},
 			wantOut: expectedRunLogOutput,
@@ -527,9 +527,9 @@ func TestViewRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/run_log.zip"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
 				as.StubOne(4)
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
 				as.StubOne(2)
 			},
 			wantOut: quuxTheBarfLogOutput,
@@ -582,9 +582,9 @@ func TestViewRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/run_log.zip"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
 				as.StubOne(4)
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
 				as.StubOne(0)
 			},
 			wantOut: quuxTheBarfLogOutput,
@@ -708,9 +708,9 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse(shared.FailedJobAnnotations))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
 				as.StubOne(2)
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
 				as.StubOne(0)
 			},
 			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nFor more information about a job, try: gh run view --job=<job-id>\nView this run on GitHub: https://github.com/runs/3\n",
@@ -743,9 +743,9 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse([]shared.Annotation{}))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
 				as.StubOne(2)
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
 				as.StubOne(1)
 			},
 			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\nTo see the full job log, try: gh run view --log --job=10\nView this run on GitHub: https://github.com/runs/3\n",
@@ -842,7 +842,7 @@ func TestViewRun(t *testing.T) {
 			return ghrepo.FromFullName("OWNER/REPO")
 		}
 
-		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
+		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use PrompterMock
 		as, teardown := prompt.InitAskStubber()
 		defer teardown()
 		if tt.askStubs != nil {

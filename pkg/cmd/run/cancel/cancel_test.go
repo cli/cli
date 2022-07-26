@@ -174,7 +174,7 @@ func TestRunCancel(t *testing.T) {
 					httpmock.StatusStringResponse(202, "{}"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
 				as.StubOne(0)
 			},
 			wantOut: "✓ Request to cancel workflow submitted.\n",
@@ -196,7 +196,7 @@ func TestRunCancel(t *testing.T) {
 			return ghrepo.FromFullName("OWNER/REPO")
 		}
 
-		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
+		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use PrompterMock
 		as, teardown := prompt.InitAskStubber()
 		defer teardown()
 		if tt.askStubs != nil {

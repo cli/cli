@@ -356,6 +356,7 @@ func Test_viewRun(t *testing.T) {
 			)
 
 			as := prompt.NewAskStubber(t)
+			//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 			as.StubPrompt("Select a gist").AnswerDefault()
 		}
 
@@ -401,6 +402,7 @@ func Test_promptGists(t *testing.T) {
 		{
 			name: "multiple files, select first gist",
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Select a gist").AnswerWith("cool.txt  about 6 hours ago")
 			},
 			response: `{ "data": { "viewer": { "gists": { "nodes": [
@@ -424,6 +426,7 @@ func Test_promptGists(t *testing.T) {
 		{
 			name: "multiple files, select second gist",
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Select a gist").AnswerWith("gistfile0.txt  about 6 hours ago")
 			},
 			response: `{ "data": { "viewer": { "gists": { "nodes": [

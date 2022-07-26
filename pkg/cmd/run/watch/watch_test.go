@@ -230,6 +230,7 @@ func TestWatchRun(t *testing.T) {
 			},
 			httpStubs: successfulRunStubs,
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Select a workflow run").
 					AssertOptions([]string{"* cool commit, run (trunk) Feb 23, 2021", "* cool commit, more runs (trunk) Feb 23, 2021"}).
 					AnswerWith("* cool commit, more runs (trunk) Feb 23, 2021")
@@ -246,6 +247,7 @@ func TestWatchRun(t *testing.T) {
 			},
 			httpStubs: failedRunStubs,
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Select a workflow run").
 					AssertOptions([]string{"* cool commit, run (trunk) Feb 23, 2021", "* cool commit, more runs (trunk) Feb 23, 2021"}).
 					AnswerWith("* cool commit, more runs (trunk) Feb 23, 2021")

@@ -404,8 +404,11 @@ func TestIssueCreate_recover(t *testing.T) {
 
 	as := prompt.NewAskStubber(t)
 
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Title").AnswerDefault()
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Body").AnswerDefault()
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What's next?").AnswerWith("Submit")
 
 	tmpfile, err := os.CreateTemp(t.TempDir(), "testrecover*")
@@ -471,8 +474,11 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 
 	as := prompt.NewAskStubber(t)
 
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Choose a template").AnswerWith("Submit a request")
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Body").AnswerDefault()
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What's next?").
 		AssertOptions([]string{"Submit", "Continue in browser", "Cancel"}).
 		AnswerWith("Submit")
@@ -501,7 +507,9 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 
 	as := prompt.NewAskStubber(t)
 
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Title").AnswerWith("hello")
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What's next?").AnswerWith("Continue in browser")
 
 	_, cmdTeardown := run.Stub()

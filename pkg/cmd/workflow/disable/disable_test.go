@@ -121,6 +121,7 @@ func TestDisableRun(t *testing.T) {
 					httpmock.StatusStringResponse(204, "{}"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Select a workflow").AnswerWith("another workflow (another.yml)")
 			},
 			wantOut: "✓ Disabled another workflow\n",
@@ -176,6 +177,7 @@ func TestDisableRun(t *testing.T) {
 					httpmock.StatusStringResponse(204, "{}"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Which workflow do you mean?").AnswerWith("another workflow (yetanother.yml)")
 			},
 			wantOut: "✓ Disabled another workflow\n",

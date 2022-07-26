@@ -77,6 +77,7 @@ func TestIssueDelete(t *testing.T) {
 	)
 
 	as := prompt.NewAskStubber(t)
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("You're going to delete issue #13. This action cannot be reversed. To confirm, type the issue number:").AnswerWith("13")
 
 	output, err := runCommand(httpRegistry, true, "13")
@@ -137,6 +138,7 @@ func TestIssueDelete_cancel(t *testing.T) {
 	)
 
 	as := prompt.NewAskStubber(t)
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("You're going to delete issue #13. This action cannot be reversed. To confirm, type the issue number:").AnswerWith("14")
 
 	output, err := runCommand(httpRegistry, true, "13")

@@ -961,6 +961,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	cs.Register(`git pull --ff-only`, 0, "")
 
 	as := prompt.NewAskStubber(t)
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Pull request #4 was already merged. Delete the branch locally?").AnswerWith(true)
 
 	output, err := runCommand(http, "blueberries", true, "pr merge 4")
@@ -1022,6 +1023,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_TTY(t *testing.T) {
 	cs.Register(`git branch -D `, 0, "")
 
 	as := prompt.NewAskStubber(t)
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Pull request #4 was already merged. Delete the branch locally?").AnswerWith(true)
 
 	output, err := runCommand(http, "blueberries", true, "pr merge 4 --merge")
@@ -1101,8 +1103,11 @@ func TestPRMergeTTY(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 
 	as := prompt.NewAskStubber(t)
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What merge method would you like to use?").AnswerDefault()
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Delete the branch locally and on GitHub?").AnswerDefault()
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What's next?").AnswerWith("Submit")
 
 	output, err := runCommand(http, "blueberries", true, "")
@@ -1162,7 +1167,9 @@ func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
 	cs.Register(`git pull --ff-only`, 0, "")
 
 	as := prompt.NewAskStubber(t)
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What merge method would you like to use?").AnswerDefault()
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What's next?").AnswerWith("Submit")
 
 	output, err := runCommand(http, "blueberries", true, "-d")
@@ -1221,10 +1228,15 @@ func TestPRMergeTTY_squashEditCommitMsgAndSubject(t *testing.T) {
 	defer cmdTeardown(t)
 
 	as := prompt.NewAskStubber(t)
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What merge method would you like to use?").AnswerWith("Squash and merge")
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Delete the branch on GitHub?").AnswerDefault()
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What's next?").AnswerWith("Edit commit message")
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What's next?").AnswerWith("Edit commit subject")
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What's next?").AnswerWith("Submit")
 
 	err := mergeRun(&MergeOptions{
@@ -1299,8 +1311,11 @@ func TestPRTTY_cancelled(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	as := prompt.NewAskStubber(t)
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What merge method would you like to use?").AnswerDefault()
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Delete the branch locally and on GitHub?").AnswerDefault()
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What's next?").AnswerWith("Cancel")
 
 	output, err := runCommand(http, "blueberries", true, "")
@@ -1318,6 +1333,7 @@ func Test_mergeMethodSurvey(t *testing.T) {
 		SquashMergeAllowed: true,
 	}
 	as := prompt.NewAskStubber(t)
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What merge method would you like to use?").AnswerWith("Rebase and merge")
 
 	method, err := mergeMethodSurvey(repo)
@@ -1625,8 +1641,11 @@ func TestPrAddToMergeQueueAdmin(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	as := prompt.NewAskStubber(t)
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What merge method would you like to use?").AnswerDefault()
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Delete the branch locally and on GitHub?").AnswerDefault()
+	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What's next?").AnswerDefault()
 
 	output, err := runCommand(http, "blueberries", true, "pr merge 1 --admin")

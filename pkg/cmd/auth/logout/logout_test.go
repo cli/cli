@@ -106,6 +106,7 @@ func Test_logoutRun_tty(t *testing.T) {
 			cfgHosts:  []string{"cheryl.mason", "github.com"},
 			wantHosts: "cheryl.mason:\n    oauth_token: abc123\n",
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("What account do you want to log out of?").AnswerWith("github.com")
 			},
 			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'cybilb'`),
