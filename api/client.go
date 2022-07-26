@@ -18,10 +18,8 @@ const (
 	accept          = "Accept"
 	authorization   = "Authorization"
 	cacheTTL        = "X-GH-CACHE-TTL"
-	contentType     = "Content-Type"
 	graphqlFeatures = "GraphQL-Features"
 	mergeQueue      = "merge_queue"
-	timeZone        = "Time-Zone"
 	userAgent       = "User-Agent"
 )
 
@@ -249,16 +247,12 @@ func clientOptions(hostname string, transport http.RoundTripper) ghAPI.ClientOpt
 	// so let go-gh know that it does not need to resolve them.
 	opts := ghAPI.ClientOptions{
 		AuthToken: "none",
-		// Blank values for Accept, Authorization, Content-Type, Time-Zone, and User-Agent headers.
 		Headers: map[string]string{
-			accept:        "",
 			authorization: "",
-			contentType:   "",
-			timeZone:      "",
-			userAgent:     "",
 		},
-		Host:      hostname,
-		Transport: transport,
+		Host:               hostname,
+		SkipDefaultHeaders: true,
+		Transport:          transport,
 	}
 	return opts
 }
