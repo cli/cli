@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -422,8 +423,8 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 		%s
 	}
 	`, strings.Join(queries, "")), nil, &graphqlResult)
-	graphqlError, isGraphQLError := err.(*GraphQLError)
-	if isGraphQLError {
+	var graphqlError GraphQLError
+	if errors.As(err, &graphqlError) {
 		// If the only errors are that certain repositories are not found,
 		// continue processing this response instead of returning an error
 		tolerated := true
