@@ -196,6 +196,7 @@ func Test_repoCreate(t *testing.T) {
 				TemplateRepositoryID: "TPLID",
 				HasIssuesEnabled:     true,
 				HasWikiEnabled:       true,
+				IncludeAllBranches:   false,
 			},
 			stubs: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
@@ -218,11 +219,12 @@ func Test_repoCreate(t *testing.T) {
 						}`,
 						func(inputs map[string]interface{}) {
 							assert.Equal(t, map[string]interface{}{
-								"name":         "gen-project",
-								"description":  "my generated project",
-								"visibility":   "PRIVATE",
-								"ownerId":      "USERID",
-								"repositoryId": "TPLID",
+								"name":               "gen-project",
+								"description":        "my generated project",
+								"visibility":         "PRIVATE",
+								"ownerId":            "USERID",
+								"repositoryId":       "TPLID",
+								"includeAllBranches": false,
 							}, inputs)
 						}),
 				)
@@ -240,6 +242,7 @@ func Test_repoCreate(t *testing.T) {
 				TemplateRepositoryID: "TPLID",
 				HasIssuesEnabled:     true,
 				HasWikiEnabled:       true,
+				IncludeAllBranches:   false,
 			},
 			stubs: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
@@ -262,11 +265,12 @@ func Test_repoCreate(t *testing.T) {
 						}`,
 						func(inputs map[string]interface{}) {
 							assert.Equal(t, map[string]interface{}{
-								"name":         "gen-project",
-								"description":  "my generated project",
-								"visibility":   "INTERNAL",
-								"ownerId":      "ORGID",
-								"repositoryId": "TPLID",
+								"name":               "gen-project",
+								"description":        "my generated project",
+								"visibility":         "INTERNAL",
+								"ownerId":            "ORGID",
+								"repositoryId":       "TPLID",
+								"includeAllBranches": false,
 							}, inputs)
 						}),
 				)

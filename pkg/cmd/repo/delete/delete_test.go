@@ -45,11 +45,11 @@ func TestNewCmdDelete(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 			argv, err := shlex.Split(tt.input)
 			assert.NoError(t, err)
@@ -169,10 +169,10 @@ func Test_deleteRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdinTTY(tt.tty)
-		io.SetStdoutTTY(tt.tty)
-		tt.opts.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdinTTY(tt.tty)
+		ios.SetStdoutTTY(tt.tty)
+		tt.opts.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)

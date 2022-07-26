@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -49,6 +50,7 @@ type EditOptions struct {
 	AddTopics       []string
 	RemoveTopics    []string
 	InteractiveMode bool
+	Detector        fd.Detector
 	// Cache of current repo topics to avoid retrieving them
 	// in multiple flows.
 	topicsCache []string
@@ -159,9 +161,18 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 	repo := opts.Repository
 
 	if opts.InteractiveMode {
+		detector := opts.Detector
+		if detector == nil {
+			cachedClient := api.NewCachedHTTPClient(opts.HTTPClient, time.Hour*24)
+			detector = fd.NewDetector(cachedClient, repo.RepoHost())
+		}
+		repoFeatures, err := detector.RepositoryFeatures()
+		if err != nil {
+			return err
+		}
+
 		apiClient := api.NewClientFromHTTP(opts.HTTPClient)
 		fieldsToRetrieve := []string{
-			"autoMergeAllowed",
 			"defaultBranchRef",
 			"deleteBranchOnMerge",
 			"description",
@@ -175,8 +186,14 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 			"rebaseMergeAllowed",
 			"repositoryTopics",
 			"squashMergeAllowed",
-			"visibility",
 		}
+		if repoFeatures.VisibilityField {
+			fieldsToRetrieve = append(fieldsToRetrieve, "visibility")
+		}
+		if repoFeatures.AutoMerge {
+			fieldsToRetrieve = append(fieldsToRetrieve, "autoMergeAllowed")
+		}
+
 		opts.IO.StartProgressIndicator()
 		fetchedRepo, err := api.FetchRepository(apiClient, opts.Repository, fieldsToRetrieve)
 		opts.IO.StopProgressIndicator()
@@ -309,7 +326,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 				return err
 			}
 			if len(strings.TrimSpace(addTopics)) > 0 {
-				opts.AddTopics = strings.Split(addTopics, ",")
+				opts.AddTopics = parseTopics(addTopics)
 			}
 
 			if len(opts.topicsCache) > 0 {
@@ -437,6 +454,14 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 	return nil
 }
 
+func parseTopics(s string) []string {
+	topics := strings.Split(s, ",")
+	for i, topic := range topics {
+		topics[i] = strings.TrimSpace(topic)
+	}
+	return topics
+}
+
 func getTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface) ([]string, error) {
 	apiPath := fmt.Sprintf("repos/%s/%s/topics", repo.RepoOwner(), repo.RepoName())
 	req, err := http.NewRequestWithContext(ctx, "GET", ghinstance.RESTPrefix(repo.RepoHost())+apiPath, nil)
@@ -493,7 +518,7 @@ func setTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interfa
 	}
 
 	if res.Body != nil {
-		_, _ = io.Copy(ioutil.Discard, res.Body)
+		_, _ = io.Copy(io.Discard, res.Body)
 	}
 
 	return nil

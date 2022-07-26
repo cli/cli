@@ -11,8 +11,12 @@ import (
 // why not just use the config stub argh
 type tinyConfig map[string]string
 
-func (c tinyConfig) GetWithSource(host, key string) (string, string, error) {
-	return c[fmt.Sprintf("%s:%s", host, key)], c["_source"], nil
+func (c tinyConfig) AuthToken(host string) (string, string) {
+	return c[fmt.Sprintf("%s:%s", host, "oauth_token")], c["_source"]
+}
+
+func (c tinyConfig) Get(host, key string) (string, error) {
+	return c[fmt.Sprintf("%s:%s", host, key)], nil
 }
 
 func Test_helperRun(t *testing.T) {
@@ -217,10 +221,10 @@ func Test_helperRun(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, stdout, stderr := iostreams.Test()
+			ios, stdin, stdout, stderr := iostreams.Test()
 			fmt.Fprint(stdin, tt.input)
 			opts := &tt.opts
-			opts.IO = io
+			opts.IO = ios
 			if err := helperRun(opts); (err != nil) != tt.wantErr {
 				t.Fatalf("helperRun() error = %v, wantErr %v", err, tt.wantErr)
 			}

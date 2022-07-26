@@ -36,10 +36,9 @@ type ListOptions struct {
 	HeadBranch string
 	Labels     []string
 	Author     string
-	AppAuthor  string
 	Assignee   string
 	Search     string
-	Draft      string
+	Draft      *bool
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -49,7 +48,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Browser:    f.Browser,
 	}
 
-	var draft bool
+	var appAuthor string
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -83,16 +82,12 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("invalid value for --limit: %v", opts.LimitResults)
 			}
 
-			if cmd.Flags().Changed("draft") {
-				opts.Draft = strconv.FormatBool(draft)
+			if cmd.Flags().Changed("author") && cmd.Flags().Changed("app") {
+				return cmdutil.FlagErrorf("specify only `--author` or `--app`")
 			}
 
-			if err := cmdutil.MutuallyExclusive(
-				"specify only `--author` or `--app`",
-				opts.Author != "",
-				opts.AppAuthor != "",
-			); err != nil {
-				return err
+			if cmd.Flags().Changed("app") {
+				opts.Author = fmt.Sprintf("app/%s", appAuthor)
 			}
 
 			if runF != nil {
@@ -109,10 +104,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.HeadBranch, "head", "H", "", "Filter by head branch")
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by label")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
-	cmd.Flags().StringVar(&opts.AppAuthor, "app", "", "Filter by GitHub App author")
+	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
-	cmd.Flags().BoolVarP(&draft, "draft", "d", false, "Filter by draft state")
+	cmdutil.NilBoolFlag(cmd, &opts.Draft, "draft", "d", "Filter by draft state")
 
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
@@ -174,10 +169,6 @@ func listRun(opts *ListOptions) error {
 		return opts.Browser.Browse(openURL)
 	}
 
-	if opts.AppAuthor != "" {
-		filters.Author = fmt.Sprintf("app/%s", opts.AppAuthor)
-	}
-
 	listResult, err := listPullRequests(httpClient, baseRepo, filters, opts.LimitResults)
 	if err != nil {
 		return err
@@ -196,6 +187,9 @@ func listRun(opts *ListOptions) error {
 	if listResult.SearchCapped {
 		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
 	}
+	if len(listResult.PullRequests) == 0 {
+		return shared.ListNoResults(ghrepo.FullName(baseRepo), "pull request", !filters.IsDefault())
+	}
 	if opts.IO.IsStdoutTTY() {
 		title := shared.ListHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, !filters.IsDefault())
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
@@ -208,7 +202,7 @@ func listRun(opts *ListOptions) error {
 		if table.IsTTY() {
 			prNum = "#" + prNum
 		}
-		table.AddField(prNum, nil, cs.ColorFromString(shared.ColorForPR(pr)))
+		table.AddField(prNum, nil, cs.ColorFromString(shared.ColorForPRState(pr)))
 		table.AddField(text.ReplaceExcessiveWhitespace(pr.Title), nil, nil)
 		table.AddField(pr.HeadLabel(), nil, cs.Cyan)
 		if !table.IsTTY() {

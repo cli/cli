@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -16,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
@@ -27,24 +27,25 @@ type CreateOptions struct {
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 
-	Name              string
-	Description       string
-	Homepage          string
-	Team              string
-	Template          string
-	Public            bool
-	Private           bool
-	Internal          bool
-	Visibility        string
-	Push              bool
-	Clone             bool
-	Source            string
-	Remote            string
-	GitIgnoreTemplate string
-	LicenseTemplate   string
-	DisableIssues     bool
-	DisableWiki       bool
-	Interactive       bool
+	Name               string
+	Description        string
+	Homepage           string
+	Team               string
+	Template           string
+	Public             bool
+	Private            bool
+	Internal           bool
+	Visibility         string
+	Push               bool
+	Clone              bool
+	Source             string
+	Remote             string
+	GitIgnoreTemplate  string
+	LicenseTemplate    string
+	DisableIssues      bool
+	DisableWiki        bool
+	Interactive        bool
+	IncludeAllBranches bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -82,7 +83,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			# create a remote repository from the current directory
 			gh repo create my-project --private --source=. --remote=upstream
 		`),
-		Args: cobra.MaximumNArgs(1),
+		Args:    cobra.MaximumNArgs(1),
+		Aliases: []string{"new"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				opts.Name = args[0]
@@ -143,6 +145,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("the `--template` option is not supported with `--homepage`, `--team`, `--disable-issues`, or `--disable-wiki`")
 			}
 
+			if opts.Template == "" && opts.IncludeAllBranches {
+				return cmdutil.FlagErrorf("the `--include-all-branches` option is only supported when using `--template`")
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -165,6 +171,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.Clone, "clone", "c", false, "Clone the new repository to the current directory")
 	cmd.Flags().BoolVar(&opts.DisableIssues, "disable-issues", false, "Disable issues in the new repository")
 	cmd.Flags().BoolVar(&opts.DisableWiki, "disable-wiki", false, "Disable wiki in the new repository")
+	cmd.Flags().BoolVar(&opts.IncludeAllBranches, "include-all-branches", false, "Include all branches from template repository")
 
 	// deprecated flags
 	cmd.Flags().BoolP("confirm", "y", false, "Skip the confirmation prompt")
@@ -184,10 +191,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
-		hostname, err := cfg.DefaultHost()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveError
-		}
+		hostname, _ := cfg.DefaultHost()
 		results, err := listGitIgnoreTemplates(httpClient, hostname)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
@@ -204,10 +208,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
-		hostname, err := cfg.DefaultHost()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveError
-		}
+		hostname, _ := cfg.DefaultHost()
 		licenses, err := listLicenseTemplates(httpClient, hostname)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
@@ -259,10 +260,7 @@ func createFromScratch(opts *CreateOptions) error {
 		return err
 	}
 
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
 	if opts.Interactive {
 		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo("")
@@ -294,16 +292,17 @@ func createFromScratch(opts *CreateOptions) error {
 	}
 
 	input := repoCreateInput{
-		Name:              repoToCreate.RepoName(),
-		Visibility:        opts.Visibility,
-		OwnerLogin:        repoToCreate.RepoOwner(),
-		TeamSlug:          opts.Team,
-		Description:       opts.Description,
-		HomepageURL:       opts.Homepage,
-		HasIssuesEnabled:  !opts.DisableIssues,
-		HasWikiEnabled:    !opts.DisableWiki,
-		GitIgnoreTemplate: opts.GitIgnoreTemplate,
-		LicenseTemplate:   opts.LicenseTemplate,
+		Name:               repoToCreate.RepoName(),
+		Visibility:         opts.Visibility,
+		OwnerLogin:         repoToCreate.RepoOwner(),
+		TeamSlug:           opts.Team,
+		Description:        opts.Description,
+		HomepageURL:        opts.Homepage,
+		HasIssuesEnabled:   !opts.DisableIssues,
+		HasWikiEnabled:     !opts.DisableWiki,
+		GitIgnoreTemplate:  opts.GitIgnoreTemplate,
+		LicenseTemplate:    opts.LicenseTemplate,
+		IncludeAllBranches: opts.IncludeAllBranches,
 	}
 
 	var templateRepoMainBranch string
@@ -401,10 +400,7 @@ func createFromLocal(opts *CreateOptions) error {
 	if err != nil {
 		return err
 	}
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
 	if opts.Interactive {
 		opts.Source, err = interactiveSource()
@@ -433,9 +429,9 @@ func createFromLocal(opts *CreateOptions) error {
 	}
 	if !isRepo {
 		if repoPath == "." {
-			return fmt.Errorf("current directory is not a git repository. Run `git init` to initalize it")
+			return fmt.Errorf("current directory is not a git repository. Run `git init` to initialize it")
 		}
-		return fmt.Errorf("%s is not a git repository. Run `git -C %s init` to initialize it", absPath, repoPath)
+		return fmt.Errorf("%s is not a git repository. Run `git -C \"%s\" init` to initialize it", absPath, repoPath)
 	}
 
 	committed, err := hasCommits(repoPath)
@@ -534,10 +530,10 @@ func createFromLocal(opts *CreateOptions) error {
 		return err
 	}
 
-	// don't prompt for push if there's no commits
+	// don't prompt for push if there are no commits
 	if opts.Interactive && committed {
 		pushQuestion := &survey.Confirm{
-			Message: fmt.Sprintf(`Would you like to push commits from the current branch to the %q?`, baseRemote),
+			Message: fmt.Sprintf(`Would you like to push commits from the current branch to %q?`, baseRemote),
 			Default: true,
 		}
 		err = prompt.SurveyAskOne(pushQuestion, &opts.Push)
@@ -583,7 +579,7 @@ func sourceInit(io *iostreams.IOStreams, remoteURL, baseRemote, repoPath string)
 	return nil
 }
 
-// check if local repository has commited changes
+// check if local repository has committed changes
 func hasCommits(repoPath string) (bool, error) {
 	hasCommitsCmd, err := git.GitCommand("-C", repoPath, "rev-parse", "HEAD")
 	if err != nil {
@@ -820,9 +816,9 @@ func interactiveSource() (string, error) {
 }
 
 func confirmSubmission(repoWithOwner, visibility string) error {
-	targetRepo := normalizeRepoName(repoWithOwner)
+	targetRepo := shared.NormalizeRepoName(repoWithOwner)
 	if idx := strings.IndexRune(repoWithOwner, '/'); idx > 0 {
-		targetRepo = repoWithOwner[0:idx+1] + normalizeRepoName(repoWithOwner[idx+1:])
+		targetRepo = repoWithOwner[0:idx+1] + shared.NormalizeRepoName(repoWithOwner[idx+1:])
 	}
 	var answer struct {
 		ConfirmSubmit bool
@@ -841,9 +837,4 @@ func confirmSubmission(repoWithOwner, visibility string) error {
 		return cmdutil.CancelError
 	}
 	return nil
-}
-
-// normalizeRepoName takes in the repo name the user inputted and normalizes it using the same logic as GitHub (GitHub.com/new)
-func normalizeRepoName(repoName string) string {
-	return strings.TrimSuffix(regexp.MustCompile(`[^\w._-]+`).ReplaceAllString(repoName, "-"), ".git")
 }

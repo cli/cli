@@ -1,8 +1,11 @@
 package rerun
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
@@ -21,6 +24,7 @@ type RerunOptions struct {
 	RunID      string
 	OnlyFailed bool
 	JobID      string
+	Debug      bool
 
 	Prompt bool
 }
@@ -62,6 +66,7 @@ func NewCmdRerun(f *cmdutil.Factory, runF func(*RerunOptions) error) *cobra.Comm
 
 	cmd.Flags().BoolVar(&opts.OnlyFailed, "failed", false, "Rerun only failed jobs, including dependencies")
 	cmd.Flags().StringVarP(&opts.JobID, "job", "j", "", "Rerun a specific job from a run, including dependencies")
+	cmd.Flags().BoolVarP(&opts.Debug, "debug", "d", false, "Rerun with debug logging")
 
 	return cmd
 }
@@ -99,7 +104,7 @@ func runRerun(opts *RerunOptions) error {
 			if run.Status != shared.Completed {
 				return false
 			}
-			// TODO StartupFailure indiciates a bad yaml file; such runs can never be
+			// TODO StartupFailure indicates a bad yaml file; such runs can never be
 			// rerun. But hiding them from the prompt might confuse people?
 			return run.Conclusion != shared.Success && run.Conclusion != shared.StartupFailure
 		})
@@ -115,16 +120,22 @@ func runRerun(opts *RerunOptions) error {
 		}
 	}
 
+	debugMsg := ""
+	if opts.Debug {
+		debugMsg = " with debug logging enabled"
+	}
+
 	if opts.JobID != "" {
-		err = rerunJob(client, repo, selectedJob)
+		err = rerunJob(client, repo, selectedJob, opts.Debug)
 		if err != nil {
 			return err
 		}
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "%s Requested rerun of job %s on run %s\n",
+			fmt.Fprintf(opts.IO.Out, "%s Requested rerun of job %s on run %s%s\n",
 				cs.SuccessIcon(),
 				cs.Cyanf("%d", selectedJob.ID),
-				cs.Cyanf("%d", selectedJob.RunID))
+				cs.Cyanf("%d", selectedJob.RunID),
+				debugMsg)
 		}
 	} else {
 		opts.IO.StartProgressIndicator()
@@ -134,7 +145,7 @@ func runRerun(opts *RerunOptions) error {
 			return fmt.Errorf("failed to get run: %w", err)
 		}
 
-		err = rerunRun(client, repo, run, opts.OnlyFailed)
+		err = rerunRun(client, repo, run, opts.OnlyFailed, opts.Debug)
 		if err != nil {
 			return err
 		}
@@ -143,25 +154,31 @@ func runRerun(opts *RerunOptions) error {
 			if opts.OnlyFailed {
 				onlyFailedMsg = "(failed jobs) "
 			}
-			fmt.Fprintf(opts.IO.Out, "%s Requested rerun %sof run %s\n",
+			fmt.Fprintf(opts.IO.Out, "%s Requested rerun %sof run %s%s\n",
 				cs.SuccessIcon(),
 				onlyFailedMsg,
-				cs.Cyanf("%d", run.ID))
+				cs.Cyanf("%d", run.ID),
+				debugMsg)
 		}
 	}
 
 	return nil
 }
 
-func rerunRun(client *api.Client, repo ghrepo.Interface, run *shared.Run, onlyFailed bool) error {
+func rerunRun(client *api.Client, repo ghrepo.Interface, run *shared.Run, onlyFailed, debug bool) error {
 	runVerb := "rerun"
 	if onlyFailed {
 		runVerb = "rerun-failed-jobs"
 	}
 
+	body, err := requestBody(debug)
+	if err != nil {
+		return fmt.Errorf("failed to create rerun body: %w", err)
+	}
+
 	path := fmt.Sprintf("repos/%s/actions/runs/%d/%s", ghrepo.FullName(repo), run.ID, runVerb)
 
-	err := client.REST(repo.RepoHost(), "POST", path, nil, nil)
+	err = client.REST(repo.RepoHost(), "POST", path, body, nil)
 	if err != nil {
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) && httpError.StatusCode == 403 {
@@ -172,10 +189,15 @@ func rerunRun(client *api.Client, repo ghrepo.Interface, run *shared.Run, onlyFa
 	return nil
 }
 
-func rerunJob(client *api.Client, repo ghrepo.Interface, job *shared.Job) error {
+func rerunJob(client *api.Client, repo ghrepo.Interface, job *shared.Job, debug bool) error {
+	body, err := requestBody(debug)
+	if err != nil {
+		return fmt.Errorf("failed to create rerun body: %w", err)
+	}
+
 	path := fmt.Sprintf("repos/%s/actions/jobs/%d/rerun", ghrepo.FullName(repo), job.ID)
 
-	err := client.REST(repo.RepoHost(), "POST", path, nil, nil)
+	err = client.REST(repo.RepoHost(), "POST", path, body, nil)
 	if err != nil {
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) && httpError.StatusCode == 403 {
@@ -184,4 +206,24 @@ func rerunJob(client *api.Client, repo ghrepo.Interface, job *shared.Job) error 
 		return fmt.Errorf("failed to rerun: %w", err)
 	}
 	return nil
+}
+
+type RerunPayload struct {
+	Debug bool `json:"enable_debug_logging"`
+}
+
+func requestBody(debug bool) (io.Reader, error) {
+	if !debug {
+		return nil, nil
+	}
+	params := &RerunPayload{
+		debug,
+	}
+
+	body := &bytes.Buffer{}
+	enc := json.NewEncoder(body)
+	if err := enc.Encode(params); err != nil {
+		return nil, err
+	}
+	return body, nil
 }

@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -30,7 +31,7 @@ import (
 
 func TestNewCmdCreate(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "my-body.md")
-	err := ioutil.WriteFile(tmpFile, []byte("a body from file"), 0600)
+	err := os.WriteFile(tmpFile, []byte("a body from file"), 0600)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -46,6 +47,31 @@ func TestNewCmdCreate(t *testing.T) {
 			tty:      false,
 			cli:      "",
 			wantsErr: true,
+		},
+		{
+			name:     "only title non-tty",
+			tty:      false,
+			cli:      "--title mytitle",
+			wantsErr: true,
+		},
+		{
+			name:     "minimum non-tty",
+			tty:      false,
+			cli:      "--title mytitle --body ''",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:               "mytitle",
+				TitleProvided:       true,
+				Body:                "",
+				BodyProvided:        true,
+				Autofill:            false,
+				RecoverFile:         "",
+				WebMode:             false,
+				IsDraft:             false,
+				BaseBranch:          "",
+				HeadBranch:          "",
+				MaintainerCanModify: true,
+			},
 		},
 		{
 			name:     "empty tty",
@@ -108,16 +134,16 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, stdout, stderr := iostreams.Test()
+			ios, stdin, stdout, stderr := iostreams.Test()
 			if tt.stdin != "" {
 				_, _ = stdin.WriteString(tt.stdin)
 			} else if tt.tty {
-				io.SetStdinTTY(true)
-				io.SetStdoutTTY(true)
+				ios.SetStdinTTY(true)
+				ios.SetStdoutTTY(true)
 			}
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			var opts *CreateOptions
@@ -129,6 +155,8 @@ func TestNewCmdCreate(t *testing.T) {
 			args, err := shlex.Split(tt.cli)
 			require.NoError(t, err)
 			cmd.SetArgs(args)
+			cmd.SetOut(stderr)
+			cmd.SetErr(stderr)
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
 				assert.Error(t, err)
@@ -160,14 +188,14 @@ func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, is
 }
 
 func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes context.Remotes, branch string, isTTY bool, cli string, rootDir string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(isTTY)
-	io.SetStdinTTY(isTTY)
-	io.SetStderrTTY(isTTY)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(isTTY)
+	ios.SetStdinTTY(isTTY)
+	ios.SetStderrTTY(isTTY)
 
 	browser := &cmdutil.TestBrowser{}
 	factory := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		Browser:   browser,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
@@ -207,8 +235,8 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes context.Remot
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
@@ -291,7 +319,7 @@ func TestPRCreate_recover(t *testing.T) {
 	as.StubPrompt("Body").AnswerDefault()
 	as.StubPrompt("What's next?").AnswerDefault()
 
-	tmpfile, err := ioutil.TempFile(t.TempDir(), "testrecover*")
+	tmpfile, err := os.CreateTemp(t.TempDir(), "testrecover*")
 	assert.NoError(t, err)
 	defer tmpfile.Close()
 
@@ -370,6 +398,7 @@ func TestPRCreate(t *testing.T) {
 			assert.Equal(t, "my body", input["body"].(string))
 			assert.Equal(t, "master", input["baseRefName"].(string))
 			assert.Equal(t, "feature", input["headRefName"].(string))
+			assert.Equal(t, false, input["draft"].(bool))
 		}))
 
 	cs, cmdTeardown := run.Stub()
@@ -632,7 +661,7 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 		AnswerWith("template1")
 	as.StubPrompt("Body").AnswerDefault()
 	as.StubPrompt("What's next?").
-		AssertOptions([]string{"Submit", "Continue in browser", "Add metadata", "Cancel"}).
+		AssertOptions([]string{"Submit", "Submit as draft", "Continue in browser", "Add metadata", "Cancel"}).
 		AnswerDefault()
 
 	output, err := runCommandWithRootDirOverridden(http, nil, "feature", true, `-t "my title" -H feature`, "./fixtures/repoWithNonLegacyPRTemplates")
@@ -790,7 +819,7 @@ func TestPRCreate_web(t *testing.T) {
 
 func TestPRCreate_webLongURL(t *testing.T) {
 	longBodyFile := filepath.Join(t.TempDir(), "long-body.txt")
-	err := ioutil.WriteFile(longBodyFile, make([]byte, 9216), 0600)
+	err := os.WriteFile(longBodyFile, make([]byte, 9216), 0600)
 	require.NoError(t, err)
 
 	http := initFakeHTTP()
@@ -859,6 +888,46 @@ func TestPRCreate_webProject(t *testing.T) {
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
 	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1&projects=ORG%2F1", output.BrowsedURL)
+}
+
+func TestPRCreate_draft(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.StubRepoInfoResponse("OWNER", "REPO", "master")
+	shared.RunCommandFinder("feature", nil, nil)
+	http.Register(
+		httpmock.GraphQL(`query PullRequestTemplates\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "pullRequestTemplates": [
+				{ "filename": "template1",
+				  "body": "this is a bug" },
+				{ "filename": "template2",
+				  "body": "this is a enhancement" }
+			] } } }`),
+	)
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestCreate\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+		`, func(input map[string]interface{}) {
+			assert.Equal(t, true, input["draft"].(bool))
+		}))
+
+	as := prompt.NewAskStubber(t)
+
+	as.StubPrompt("Choose a template").AnswerDefault()
+	as.StubPrompt("Body").AnswerDefault()
+	as.StubPrompt("What's next?").
+		AssertOptions([]string{"Submit", "Submit as draft", "Continue in browser", "Add metadata", "Cancel"}).
+		AnswerWith("Submit as draft")
+
+	output, err := runCommand(http, nil, "feature", true, `-t "my title" -H feature`)
+	require.NoError(t, err)
+
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
 }
 
 func Test_determineTrackingBranch_empty(t *testing.T) {
@@ -989,13 +1058,29 @@ func Test_generateCompareURL(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "complex branch names",
+			name: "'/'s in branch names/labels are percent-encoded",
 			ctx: CreateContext{
 				BaseRepo:        api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
 				BaseBranch:      "main/trunk",
 				HeadBranchLabel: "owner:feature",
 			},
-			want:    "https://github.com/OWNER/REPO/compare/main%2Ftrunk...owner%3Afeature?body=&expand=1",
+			want:    "https://github.com/OWNER/REPO/compare/main%2Ftrunk...owner:feature?body=&expand=1",
+			wantErr: false,
+		},
+		{
+			name: "Any of !'(),; but none of $&+=@ and : in branch names/labels are percent-encoded ",
+			/*
+					- Technically, per section 3.3 of RFC 3986, none of !$&'()*+,;= (sub-delims) and :[]@ (part of gen-delims) in path segments are optionally percent-encoded, but url.PathEscape percent-encodes !'(),; anyway
+					- !$&'()+,;=@ is a valid Git branch name—essentially RFC 3986 sub-delims without * and gen-delims without :/?#[]
+					- : is GitHub separator between a fork name and a branch name
+				    - See https://github.com/golang/go/issues/27559.
+			*/
+			ctx: CreateContext{
+				BaseRepo:        api.InitRepoHostname(&api.Repository{Name: "REPO", Owner: api.RepositoryOwner{Login: "OWNER"}}, "github.com"),
+				BaseBranch:      "main/trunk",
+				HeadBranchLabel: "owner:!$&'()+,;=@",
+			},
+			want:    "https://github.com/OWNER/REPO/compare/main%2Ftrunk...owner:%21$&%27%28%29+%2C%3B=@?body=&expand=1",
 			wantErr: false,
 		},
 	}

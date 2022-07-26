@@ -2,7 +2,7 @@ package list
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"testing"
@@ -21,13 +21,13 @@ import (
 )
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(isTTY)
-	io.SetStdinTTY(isTTY)
-	io.SetStderrTTY(isTTY)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(isTTY)
+	ios.SetStdinTTY(isTTY)
+	ios.SetStderrTTY(isTTY)
 
 	factory := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
@@ -48,8 +48,8 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
@@ -125,15 +125,31 @@ func TestIssueList_tty_withFlags(t *testing.T) {
 		}))
 
 	output, err := runCommand(http, true, "-a probablyCher -s open -A foo --mention me")
-	if err != nil {
-		t.Errorf("error running command `issue list`: %v", err)
-	}
+	assert.EqualError(t, err, "no issues match your search in OWNER/REPO")
 
+	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
-	assert.Equal(t, `
-No issues match your search in OWNER/REPO
+}
 
-`, output.String())
+func TestIssueList_tty_withAppFlag(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.GraphQLQuery(`
+		{ "data": {	"repository": {
+			"hasIssuesEnabled": true,
+			"issues": { "nodes": [] }
+		} } }`, func(_ string, params map[string]interface{}) {
+			assert.Equal(t, "app/dependabot", params["author"].(string))
+		}))
+
+	output, err := runCommand(http, true, "--app dependabot")
+	assert.EqualError(t, err, "no issues match your search in OWNER/REPO")
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestIssueList_withInvalidLimitFlag(t *testing.T) {
@@ -166,9 +182,9 @@ func TestIssueList_disabledIssues(t *testing.T) {
 }
 
 func TestIssueList_web(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(true)
-	io.SetStderrTTY(true)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStderrTTY(true)
 	browser := &cmdutil.TestBrowser{}
 
 	reg := &httpmock.Registry{}
@@ -178,7 +194,7 @@ func TestIssueList_web(t *testing.T) {
 	defer cmdTeardown(t)
 
 	err := listRun(&ListOptions{
-		IO:      io,
+		IO:      ios,
 		Browser: browser,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
@@ -201,7 +217,7 @@ func TestIssueList_web(t *testing.T) {
 
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/issues in your browser.\n", stderr.String())
-	browser.Verify(t, "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+mentions%3Afrank+milestone%3Av1.1")
+	browser.Verify(t, "https://github.com/OWNER/REPO/issues?q=assignee%3Apeter+author%3Ajohn+label%3Abug+label%3Adocs+mentions%3Afrank+milestone%3Av1.1+type%3Aissue")
 }
 
 func Test_issueList(t *testing.T) {
@@ -276,7 +292,7 @@ func Test_issueList(t *testing.T) {
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
-							"query": "repo:OWNER/REPO is:issue is:open milestone:1.x",
+							"query": "milestone:1.x repo:OWNER/REPO state:open type:issue",
 							"type":  "ISSUE",
 						}, params)
 					}))
@@ -308,7 +324,7 @@ func Test_issueList(t *testing.T) {
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
-							"query": "repo:OWNER/REPO is:issue is:open milestone:1.x",
+							"query": "milestone:1.x repo:OWNER/REPO state:open type:issue",
 							"type":  "ISSUE",
 						}, params)
 					}))
@@ -379,7 +395,7 @@ func Test_issueList(t *testing.T) {
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
-							"query": "repo:OWNER/REPO is:issue is:open assignee:@me author:@me mentions:@me auth bug",
+							"query": "auth bug assignee:@me author:@me mentions:@me repo:OWNER/REPO state:open type:issue",
 							"type":  "ISSUE",
 						}, params)
 					}))
@@ -411,7 +427,7 @@ func Test_issueList(t *testing.T) {
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
-							"query": `repo:OWNER/REPO is:issue is:open label:hello label:"one world"`,
+							"query": `label:"one world" label:hello repo:OWNER/REPO state:open type:issue`,
 							"type":  "ISSUE",
 						}, params)
 					}))

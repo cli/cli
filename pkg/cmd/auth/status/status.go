@@ -68,10 +68,7 @@ func statusRun(opts *StatusOptions) error {
 
 	statusInfo := map[string][]string{}
 
-	hostnames, err := cfg.Hosts()
-	if err != nil {
-		return err
-	}
+	hostnames := cfg.Hosts()
 	if len(hostnames) == 0 {
 		fmt.Fprintf(stderr,
 			"You are not logged into any GitHub hosts. Run %s to authenticate.\n", cs.Bold("gh auth login"))
@@ -92,8 +89,8 @@ func statusRun(opts *StatusOptions) error {
 		}
 		isHostnameFound = true
 
-		token, tokenSource, _ := cfg.GetWithSource(hostname, "oauth_token")
-		tokenIsWriteable := cfg.CheckWriteable(hostname, "oauth_token") == nil
+		token, tokenSource := cfg.AuthToken(hostname)
+		_, tokenIsWriteable := shared.AuthTokenWriteable(cfg, hostname)
 
 		statusInfo[hostname] = []string{}
 		addMsg := func(x string, ys ...interface{}) {

@@ -89,15 +89,18 @@ func (r Remote) RepoHost() string {
 	return r.Repo.RepoHost()
 }
 
-// TODO: accept an interface instead of git.RemoteSet
-func TranslateRemotes(gitRemotes git.RemoteSet, urlTranslate func(*url.URL) *url.URL) (remotes Remotes) {
+type Translator interface {
+	Translate(*url.URL) *url.URL
+}
+
+func TranslateRemotes(gitRemotes git.RemoteSet, translator Translator) (remotes Remotes) {
 	for _, r := range gitRemotes {
 		var repo ghrepo.Interface
 		if r.FetchURL != nil {
-			repo, _ = ghrepo.FromURL(urlTranslate(r.FetchURL))
+			repo, _ = ghrepo.FromURL(translator.Translate(r.FetchURL))
 		}
 		if r.PushURL != nil && repo == nil {
-			repo, _ = ghrepo.FromURL(urlTranslate(r.PushURL))
+			repo, _ = ghrepo.FromURL(translator.Translate(r.PushURL))
 		}
 		if repo == nil {
 			continue

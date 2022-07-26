@@ -68,7 +68,7 @@ func executable(fallbackName string) string {
 		if err != nil {
 			continue
 		}
-		f, err := os.Stat(p)
+		f, err := os.Lstat(p)
 		if err != nil {
 			continue
 		}

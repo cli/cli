@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"regexp"
@@ -80,7 +79,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			The default HTTP request method is "GET" normally and "POST" if any parameters
 			were added. Override the method with %[1]s--method%[1]s.
 
-			Pass one or more %[1]s-f/--raw-field%[1]s values in "key=value" format to add static string 
+			Pass one or more %[1]s-f/--raw-field%[1]s values in "key=value" format to add static string
 			parameters to the request payload. To add non-string or otherwise dynamic values, see
 			%[1]s--field%[1]s below. Note that adding request parameters will automatically switch the
 			request method to POST. To send the parameters as a GET query string instead, use
@@ -215,7 +214,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in `key=value` format")
 	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add a HTTP request header in `key:value` format")
 	cmd.Flags().StringSliceVarP(&opts.Previews, "preview", "p", nil, "GitHub API preview `names` to request (without the \"-preview\" suffix)")
-	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response headers in the output")
+	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response status line and headers in the output")
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request (use \"-\" to read from standard input)")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
@@ -270,12 +269,12 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 	if opts.CacheTTL > 0 {
-		httpClient = api.NewCachedClient(httpClient, opts.CacheTTL)
+		httpClient = api.NewCachedHTTPClient(httpClient, opts.CacheTTL)
 	}
 
 	headersOutputStream := opts.IO.Out
 	if opts.Silent {
-		opts.IO.Out = ioutil.Discard
+		opts.IO.Out = io.Discard
 	} else {
 		if err := opts.IO.StartPager(); err == nil {
 			defer opts.IO.StopPager()
@@ -289,10 +288,7 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
 	if opts.Hostname != "" {
 		host = opts.Hostname
@@ -536,7 +532,7 @@ func openUserFile(fn string, stdin io.ReadCloser) (io.ReadCloser, int64, error) 
 
 func parseErrorResponse(r io.Reader, statusCode int) (io.Reader, string, error) {
 	bodyCopy := &bytes.Buffer{}
-	b, err := ioutil.ReadAll(io.TeeReader(r, bodyCopy))
+	b, err := io.ReadAll(io.TeeReader(r, bodyCopy))
 	if err != nil {
 		return r, "", err
 	}

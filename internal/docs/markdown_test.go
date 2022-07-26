@@ -2,7 +2,6 @@ package docs
 
 import (
 	"bytes"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -67,7 +66,7 @@ func TestGenMdNoHiddenParents(t *testing.T) {
 
 func TestGenMdTree(t *testing.T) {
 	c := &cobra.Command{Use: "do [OPTIONS] arg1 arg2"}
-	tmpdir, err := ioutil.TempDir("", "test-gen-md-tree")
+	tmpdir, err := os.MkdirTemp("", "test-gen-md-tree")
 	if err != nil {
 		t.Fatalf("Failed to create tmpdir: %v", err)
 	}
@@ -83,7 +82,7 @@ func TestGenMdTree(t *testing.T) {
 }
 
 func BenchmarkGenMarkdownToFile(b *testing.B) {
-	file, err := ioutil.TempFile(b.TempDir(), "")
+	file, err := os.CreateTemp(b.TempDir(), "")
 	if err != nil {
 		b.Fatal(err)
 	}

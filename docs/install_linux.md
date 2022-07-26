@@ -15,6 +15,7 @@ Install:
 
 ```bash
 curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
 sudo apt update
 sudo apt install gh
@@ -32,6 +33,7 @@ sudo apt install gh
 Install from our package repository for immediate access to latest releases:
 
 ```bash
+sudo dnf install 'dnf-command(config-manager)'
 sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
 sudo dnf install gh
 ```
@@ -187,7 +189,7 @@ sudo zypper in gh
 
 ### Alpine Linux
 
-Alpine Linux users can install from the [stable releases' community packaage repository](https://pkgs.alpinelinux.org/packages?name=github-cli&branch=v3.15).
+Alpine Linux users can install from the [stable releases' community package repository](https://pkgs.alpinelinux.org/packages?name=github-cli&branch=v3.15).
 
 ```bash
 apk add github-cli

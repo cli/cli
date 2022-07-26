@@ -5,23 +5,14 @@ import (
 	"time"
 )
 
-// Test data for use in the various run and job tests
-func created() time.Time {
-	created, _ := time.Parse("2006-01-02 15:04:05", "2021-02-23 04:51:00")
-	return created
-}
-
-func updated() time.Time {
-	updated, _ := time.Parse("2006-01-02 15:04:05", "2021-02-23 04:55:34")
-	return updated
-}
+var TestRunStartTime, _ = time.Parse("2006-01-02 15:04:05", "2021-02-23 04:51:00")
 
 func TestRun(name string, id int64, s Status, c Conclusion) Run {
 	return Run{
 		Name:       name,
 		ID:         id,
-		CreatedAt:  created(),
-		UpdatedAt:  updated(),
+		CreatedAt:  TestRunStartTime,
+		UpdatedAt:  TestRunStartTime.Add(time.Minute*4 + time.Second*34),
 		Status:     s,
 		Conclusion: c,
 		Event:      "push",
@@ -66,8 +57,8 @@ var SuccessfulJob Job = Job{
 	Status:      Completed,
 	Conclusion:  Success,
 	Name:        "cool job",
-	StartedAt:   created(),
-	CompletedAt: updated(),
+	StartedAt:   TestRunStartTime,
+	CompletedAt: TestRunStartTime.Add(time.Minute*4 + time.Second*34),
 	URL:         "https://github.com/jobs/10",
 	RunID:       3,
 	Steps: []Step{
@@ -91,8 +82,8 @@ var FailedJob Job = Job{
 	Status:      Completed,
 	Conclusion:  Failure,
 	Name:        "sad job",
-	StartedAt:   created(),
-	CompletedAt: updated(),
+	StartedAt:   TestRunStartTime,
+	CompletedAt: TestRunStartTime.Add(time.Minute*4 + time.Second*34),
 	URL:         "https://github.com/jobs/20",
 	RunID:       1234,
 	Steps: []Step{

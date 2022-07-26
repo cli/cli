@@ -1,6 +1,11 @@
 package text
 
-import "unicode"
+import (
+	"unicode"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+)
 
 // Copied from: https://github.com/asaskevich/govalidator
 func CamelToKebab(str string) string {
@@ -26,4 +31,9 @@ func addSegment(inrune, segment []rune) []rune {
 	}
 	inrune = append(inrune, segment...)
 	return inrune
+}
+
+func Title(str string) string {
+	c := cases.Title(language.English)
+	return c.String(str)
 }

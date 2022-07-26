@@ -7,7 +7,6 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 type mockGitConfigurer struct {
@@ -35,8 +34,16 @@ func Test_setupGitRun(t *testing.T) {
 			expectedErr: "oops",
 		},
 		{
-			name:           "no authenticated hostnames",
-			opts:           &SetupGitOptions{},
+			name: "no authenticated hostnames",
+			opts: &SetupGitOptions{
+				Config: func() (config.Config, error) {
+					cfg := &config.ConfigMock{}
+					cfg.HostsFunc = func() []string {
+						return []string{}
+					}
+					return cfg, nil
+				},
+			},
 			expectedErr:    "SilentError",
 			expectedErrOut: "You are not logged into any GitHub hosts. Run gh auth login to authenticate.\n",
 		},
@@ -45,8 +52,10 @@ func Test_setupGitRun(t *testing.T) {
 			opts: &SetupGitOptions{
 				Hostname: "foo",
 				Config: func() (config.Config, error) {
-					cfg := config.NewBlankConfig()
-					require.NoError(t, cfg.Set("bar", "", ""))
+					cfg := &config.ConfigMock{}
+					cfg.HostsFunc = func() []string {
+						return []string{"bar"}
+					}
 					return cfg, nil
 				},
 			},
@@ -60,8 +69,10 @@ func Test_setupGitRun(t *testing.T) {
 					setupErr: fmt.Errorf("broken"),
 				},
 				Config: func() (config.Config, error) {
-					cfg := config.NewBlankConfig()
-					require.NoError(t, cfg.Set("bar", "", ""))
+					cfg := &config.ConfigMock{}
+					cfg.HostsFunc = func() []string {
+						return []string{"bar"}
+					}
 					return cfg, nil
 				},
 			},
@@ -73,8 +84,10 @@ func Test_setupGitRun(t *testing.T) {
 			opts: &SetupGitOptions{
 				gitConfigure: &mockGitConfigurer{},
 				Config: func() (config.Config, error) {
-					cfg := config.NewBlankConfig()
-					require.NoError(t, cfg.Set("bar", "", ""))
+					cfg := &config.ConfigMock{}
+					cfg.HostsFunc = func() []string {
+						return []string{"bar"}
+					}
 					return cfg, nil
 				},
 			},
@@ -85,9 +98,10 @@ func Test_setupGitRun(t *testing.T) {
 				Hostname:     "yes",
 				gitConfigure: &mockGitConfigurer{},
 				Config: func() (config.Config, error) {
-					cfg := config.NewBlankConfig()
-					require.NoError(t, cfg.Set("bar", "", ""))
-					require.NoError(t, cfg.Set("yes", "", ""))
+					cfg := &config.ConfigMock{}
+					cfg.HostsFunc = func() []string {
+						return []string{"bar", "yes"}
+					}
 					return cfg, nil
 				},
 			},
@@ -98,16 +112,16 @@ func Test_setupGitRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.opts.Config == nil {
 				tt.opts.Config = func() (config.Config, error) {
-					return config.NewBlankConfig(), nil
+					return &config.ConfigMock{}, nil
 				}
 			}
 
-			io, _, _, stderr := iostreams.Test()
+			ios, _, _, stderr := iostreams.Test()
 
-			io.SetStdinTTY(true)
-			io.SetStderrTTY(true)
-			io.SetStdoutTTY(true)
-			tt.opts.IO = io
+			ios.SetStdinTTY(true)
+			ios.SetStderrTTY(true)
+			ios.SetStdoutTTY(true)
+			tt.opts.IO = ios
 
 			err := setupGitRun(tt.opts)
 			if tt.expectedErr != "" {

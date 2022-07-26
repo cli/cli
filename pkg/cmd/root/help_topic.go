@@ -1,7 +1,11 @@
 package root
 
 import (
+	"fmt"
+	"io"
+
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/text"
 	"github.com/spf13/cobra"
 )
@@ -47,8 +51,11 @@ var HelpTopics = map[string]map[string]string{
 
 			GH_BROWSER, BROWSER (in order of precedence): the web browser to use for opening links.
 
-			DEBUG: set to any value to enable verbose output to standard error. Include values "api"
-			or "oauth" to print detailed information about HTTP requests or authentication flow.
+			GH_DEBUG: set to a truthy value to enable verbose output on standard error. Set to "api"
+			to additionally log details of HTTP traffic.
+
+			DEBUG (deprecated): set to "1", "true", or "yes" to enable verbose output on standard
+			error.
 
 			GH_PAGER, PAGER (in order of precedence): a terminal paging program to send standard output
 			to, e.g. "less".
@@ -124,7 +131,7 @@ var HelpTopics = map[string]map[string]string{
 	},
 }
 
-func NewHelpTopic(topic string) *cobra.Command {
+func NewHelpTopic(ios *iostreams.IOStreams, topic string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     topic,
 		Short:   HelpTopics[topic]["short"],
@@ -137,21 +144,25 @@ func NewHelpTopic(topic string) *cobra.Command {
 		},
 	}
 
-	cmd.SetHelpFunc(helpTopicHelpFunc)
-	cmd.SetUsageFunc(helpTopicUsageFunc)
+	cmd.SetHelpFunc(func(c *cobra.Command, args []string) {
+		helpTopicHelpFunc(ios.Out, c, args)
+	})
+	cmd.SetUsageFunc(func(c *cobra.Command) error {
+		return helpTopicUsageFunc(ios.ErrOut, c)
+	})
 
 	return cmd
 }
 
-func helpTopicHelpFunc(command *cobra.Command, args []string) {
-	command.Print(command.Long)
+func helpTopicHelpFunc(w io.Writer, command *cobra.Command, args []string) {
+	fmt.Fprint(w, command.Long)
 	if command.Example != "" {
-		command.Printf("\n\nEXAMPLES\n")
-		command.Print(text.Indent(command.Example, "  "))
+		fmt.Fprintf(w, "\n\nEXAMPLES\n")
+		fmt.Fprint(w, text.Indent(command.Example, "  "))
 	}
 }
 
-func helpTopicUsageFunc(command *cobra.Command) error {
-	command.Printf("Usage: gh help %s", command.Use)
+func helpTopicUsageFunc(w io.Writer, command *cobra.Command) error {
+	fmt.Fprintf(w, "Usage: gh help %s", command.Use)
 	return nil
 }

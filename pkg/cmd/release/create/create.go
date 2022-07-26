@@ -109,6 +109,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			Create a release and start a discussion
 			$ gh release create v1.2.3 --discussion-category "General"
 		`),
+		Aliases: []string{"new"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cmd.Flags().Changed("discussion-category") && opts.Draft {
 				return errors.New("discussions for draft releases not supported")
@@ -157,7 +158,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Name, "title", "t", "", "Release title")
 	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
-	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion of the specified category")
+	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion in the specified category")
 	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate title and notes for the release")
 
 	return cmd
@@ -221,7 +222,7 @@ func createRun(opts *CreateOptions) error {
 		// If there is a local tag with the same name as specified
 		// the user may not want to create a new tag on the remote
 		// as the local one might be annotated or signed.
-		// If the user specifies the target take that as explict instruction
+		// If the user specifies the target take that as explicit instruction
 		// to create the tag on the remote pointing to the target regardless
 		// of local tag status.
 		// If a remote tag with the same name as specified exists already

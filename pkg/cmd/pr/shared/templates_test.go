@@ -1,12 +1,12 @@
 package shared
 
 import (
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/prompt"
@@ -17,28 +17,12 @@ func TestTemplateManager_hasAPI(t *testing.T) {
 	rootDir := t.TempDir()
 	legacyTemplateFile := filepath.Join(rootDir, ".github", "ISSUE_TEMPLATE.md")
 	_ = os.MkdirAll(filepath.Dir(legacyTemplateFile), 0755)
-	_ = ioutil.WriteFile(legacyTemplateFile, []byte("LEGACY"), 0644)
+	_ = os.WriteFile(legacyTemplateFile, []byte("LEGACY"), 0644)
 
 	tr := httpmock.Registry{}
 	httpClient := &http.Client{Transport: &tr}
 	defer tr.Verify(t)
 
-	tr.Register(
-		httpmock.GraphQL(`query IssueTemplates_fields\b`),
-		httpmock.StringResponse(`{"data":{
-			"Repository": {
-				"fields": [
-					{"name": "foo"},
-					{"name": "issueTemplates"}
-				]
-			},
-			"CreateIssueInput": {
-				"inputFields": [
-					{"name": "foo"},
-					{"name": "issueTemplate"}
-				]
-			}
-		}}`))
 	tr.Register(
 		httpmock.GraphQL(`query IssueTemplates\b`),
 		httpmock.StringResponse(`{"data":{"repository":{
@@ -49,12 +33,12 @@ func TestTemplateManager_hasAPI(t *testing.T) {
 		}}}`))
 
 	m := templateManager{
-		repo:         ghrepo.NewWithHost("OWNER", "REPO", "example.com"),
-		rootDir:      rootDir,
-		allowFS:      true,
-		isPR:         false,
-		httpClient:   httpClient,
-		cachedClient: httpClient,
+		repo:       ghrepo.NewWithHost("OWNER", "REPO", "example.com"),
+		rootDir:    rootDir,
+		allowFS:    true,
+		isPR:       false,
+		httpClient: httpClient,
+		detector:   &fd.EnabledDetectorMock{},
 	}
 
 	hasTemplates, err := m.HasTemplates()
@@ -79,22 +63,12 @@ func TestTemplateManager_hasAPI_PullRequest(t *testing.T) {
 	rootDir := t.TempDir()
 	legacyTemplateFile := filepath.Join(rootDir, ".github", "PULL_REQUEST_TEMPLATE.md")
 	_ = os.MkdirAll(filepath.Dir(legacyTemplateFile), 0755)
-	_ = ioutil.WriteFile(legacyTemplateFile, []byte("LEGACY"), 0644)
+	_ = os.WriteFile(legacyTemplateFile, []byte("LEGACY"), 0644)
 
 	tr := httpmock.Registry{}
 	httpClient := &http.Client{Transport: &tr}
 	defer tr.Verify(t)
 
-	tr.Register(
-		httpmock.GraphQL(`query IssueTemplates_fields\b`),
-		httpmock.StringResponse(`{"data":{
-			"Repository": {
-				"fields": [
-					{"name": "foo"},
-					{"name": "pullRequestTemplates"}
-				]
-			}
-		}}`))
 	tr.Register(
 		httpmock.GraphQL(`query PullRequestTemplates\b`),
 		httpmock.StringResponse(`{"data":{"repository":{
@@ -105,12 +79,12 @@ func TestTemplateManager_hasAPI_PullRequest(t *testing.T) {
 		}}}`))
 
 	m := templateManager{
-		repo:         ghrepo.NewWithHost("OWNER", "REPO", "example.com"),
-		rootDir:      rootDir,
-		allowFS:      true,
-		isPR:         true,
-		httpClient:   httpClient,
-		cachedClient: httpClient,
+		repo:       ghrepo.NewWithHost("OWNER", "REPO", "example.com"),
+		rootDir:    rootDir,
+		allowFS:    true,
+		isPR:       true,
+		httpClient: httpClient,
+		detector:   &fd.EnabledDetectorMock{},
 	}
 
 	hasTemplates, err := m.HasTemplates()

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
@@ -44,6 +43,9 @@ type IOStreams struct {
 	progressIndicatorEnabled bool
 	progressIndicator        *spinner.Spinner
 	progressIndicatorMu      sync.Mutex
+
+	alternateScreenBufferEnabled bool
+	alternateScreenBufferActive  bool
 
 	stdinTTYOverride  bool
 	stdinIsTTY        bool
@@ -279,6 +281,34 @@ func (s *IOStreams) StopProgressIndicator() {
 	s.progressIndicator = nil
 }
 
+func (s *IOStreams) StartAlternateScreenBuffer() {
+	if s.alternateScreenBufferEnabled {
+		if _, err := fmt.Fprint(s.Out, "\x1b[?1049h"); err == nil {
+			s.alternateScreenBufferActive = true
+		}
+	}
+}
+
+func (s *IOStreams) StopAlternateScreenBuffer() {
+	if s.alternateScreenBufferActive {
+		fmt.Fprint(s.Out, "\x1b[?1049l")
+		s.alternateScreenBufferActive = false
+	}
+}
+
+func (s *IOStreams) SetAlternateScreenBufferEnabled(enabled bool) {
+	s.alternateScreenBufferEnabled = enabled
+}
+
+func (s *IOStreams) RefreshScreen() {
+	if s.stdoutIsTTY {
+		// Move cursor to 0,0
+		fmt.Fprint(s.Out, "\x1b[0;0H")
+		// Clear from cursor to bottom of screen
+		fmt.Fprint(s.Out, "\x1b[J")
+	}
+}
+
 // TerminalWidth returns the width of the terminal that stdout is attached to.
 // TODO: investigate whether ProcessTerminalWidth could replace all this.
 func (s *IOStreams) TerminalWidth() int {
@@ -360,24 +390,24 @@ func (s *IOStreams) ReadUserFile(fn string) ([]byte, error) {
 		}
 	}
 	defer r.Close()
-	return ioutil.ReadAll(r)
+	return io.ReadAll(r)
 }
 
 func (s *IOStreams) TempFile(dir, pattern string) (*os.File, error) {
 	if s.TempFileOverride != nil {
 		return s.TempFileOverride, nil
 	}
-	return ioutil.TempFile(dir, pattern)
+	return os.CreateTemp(dir, pattern)
 }
 
 func System() *IOStreams {
 	stdoutIsTTY := isTerminal(os.Stdout)
 	stderrIsTTY := isTerminal(os.Stderr)
 
-	assumeTrueColor := false
+	isVirtualTerminal := false
 	if stdoutIsTTY {
 		if err := enableVirtualTerminalProcessing(os.Stdout); err == nil {
-			assumeTrueColor = true
+			isVirtualTerminal = true
 		}
 	}
 
@@ -387,14 +417,18 @@ func System() *IOStreams {
 		Out:          colorable.NewColorable(os.Stdout),
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		colorEnabled: EnvColorForced() || (!EnvColorDisabled() && stdoutIsTTY),
-		is256enabled: assumeTrueColor || Is256ColorSupported(),
-		hasTrueColor: assumeTrueColor || IsTrueColorSupported(),
+		is256enabled: isVirtualTerminal || Is256ColorSupported(),
+		hasTrueColor: isVirtualTerminal || IsTrueColorSupported(),
 		pagerCommand: os.Getenv("PAGER"),
 		ttySize:      ttySize,
 	}
 
 	if stdoutIsTTY && stderrIsTTY {
 		io.progressIndicatorEnabled = true
+	}
+
+	if stdoutIsTTY && isVirtualTerminal {
+		io.alternateScreenBufferEnabled = true
 	}
 
 	// prevent duplicate isTerminal queries now that we know the answer
@@ -408,7 +442,7 @@ func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	return &IOStreams{
-		In:     ioutil.NopCloser(in),
+		In:     io.NopCloser(in),
 		Out:    out,
 		ErrOut: errOut,
 		ttySize: func() (int, int, error) {

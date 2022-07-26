@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"strconv"
 	"strings"
@@ -57,7 +56,15 @@ func (t *Template) parseTemplate(tpl string) (*template.Template, error) {
 		"join":        templateJoin,
 		"tablerow":    t.tableRow,
 		"tablerender": t.tableRender,
-		"truncate":    text.Truncate,
+		"truncate": func(maxWidth int, v interface{}) (string, error) {
+			if v == nil {
+				return "", nil
+			}
+			if s, ok := v.(string); ok {
+				return text.Truncate(maxWidth, s), nil
+			}
+			return "", fmt.Errorf("invalid value; expected string, got %T", v)
+		},
 	}
 
 	if !t.io.ColorEnabled() {
@@ -81,7 +88,7 @@ func (t *Template) Execute(input io.Reader) error {
 		t.template = template
 	}
 
-	jsonData, err := ioutil.ReadAll(input)
+	jsonData, err := io.ReadAll(input)
 	if err != nil {
 		return err
 	}

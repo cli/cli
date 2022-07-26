@@ -37,9 +37,9 @@ func TestNewCmdArchive(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			ios, _, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 			argv, err := shlex.Split(tt.input)
 			assert.NoError(t, err)
@@ -137,8 +137,8 @@ func Test_ArchiveRun(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
-		io, _, stdout, stderr := iostreams.Test()
-		tt.opts.IO = io
+		ios, _, stdout, stderr := iostreams.Test()
+		tt.opts.IO = ios
 
 		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 		q, teardown := prompt.InitAskStubber()
@@ -149,8 +149,8 @@ func Test_ArchiveRun(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			err := archiveRun(&tt.opts)
 			assert.NoError(t, err)

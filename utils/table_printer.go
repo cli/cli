@@ -18,7 +18,9 @@ type TablePrinter interface {
 }
 
 type TablePrinterOptions struct {
-	IsTTY bool
+	IsTTY    bool
+	MaxWidth int
+	Out      io.Writer
 }
 
 func NewTablePrinter(io *iostreams.IOStreams) TablePrinter {
@@ -27,21 +29,29 @@ func NewTablePrinter(io *iostreams.IOStreams) TablePrinter {
 	})
 }
 
-func NewTablePrinterWithOptions(io *iostreams.IOStreams, opts TablePrinterOptions) TablePrinter {
+func NewTablePrinterWithOptions(ios *iostreams.IOStreams, opts TablePrinterOptions) TablePrinter {
+	var out io.Writer
+	if opts.Out != nil {
+		out = opts.Out
+	} else {
+		out = ios.Out
+	}
 	if opts.IsTTY {
 		var maxWidth int
-		if io.IsStdoutTTY() {
-			maxWidth = io.TerminalWidth()
+		if opts.MaxWidth > 0 {
+			maxWidth = opts.MaxWidth
+		} else if ios.IsStdoutTTY() {
+			maxWidth = ios.TerminalWidth()
 		} else {
-			maxWidth = io.ProcessTerminalWidth()
+			maxWidth = ios.ProcessTerminalWidth()
 		}
 		return &ttyTablePrinter{
-			out:      io.Out,
+			out:      out,
 			maxWidth: maxWidth,
 		}
 	}
 	return &tsvTablePrinter{
-		out: io.Out,
+		out: out,
 	}
 }
 
@@ -194,7 +204,7 @@ func (t *ttyTablePrinter) calculateColumnWidths(delimSize int) []int {
 				}
 				if max := maxColWidths[col]; max < perColumn {
 					colWidths[col] = max
-				} else {
+				} else if perColumn > 0 {
 					colWidths[col] = perColumn
 				}
 			}

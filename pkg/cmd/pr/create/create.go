@@ -116,7 +116,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh pr create --project "Roadmap"
 			$ gh pr create --base develop --head monalisa:feature
 		`),
-		Args: cmdutil.NoArgsQuoteReminder,
+		Args:    cmdutil.NoArgsQuoteReminder,
+		Aliases: []string{"new"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
 
@@ -127,10 +128,6 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			if !opts.IO.CanPrompt() && opts.RecoverFile != "" {
 				return cmdutil.FlagErrorf("`--recover` only supported when running interactively")
-			}
-
-			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.TitleProvided && !opts.Autofill {
-				return cmdutil.FlagErrorf("`--title` or `--fill` required when not running interactively")
 			}
 
 			if opts.IsDraft && opts.WebMode {
@@ -153,6 +150,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				opts.BodyProvided = true
 			}
 
+			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.Autofill && (!opts.TitleProvided || !opts.BodyProvided) {
+				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--fill`) when not running interactively")
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -164,7 +165,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.BoolVarP(&opts.IsDraft, "draft", "d", false, "Mark pull request as a draft")
 	fl.StringVarP(&opts.Title, "title", "t", "", "Title for the pull request")
 	fl.StringVarP(&opts.Body, "body", "b", "", "Body for the pull request")
-	fl.StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
+	fl.StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	fl.StringVarP(&opts.BaseBranch, "base", "B", "", "The `branch` into which you want your code merged")
 	fl.StringVarP(&opts.HeadBranch, "head", "H", "", "The `branch` that contains commits for your pull request (default: current branch)")
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
@@ -311,7 +312,7 @@ func createRun(opts *CreateOptions) (err error) {
 
 	allowPreview := !state.HasMetadata() && utils.ValidURL(openURL)
 	allowMetadata := ctx.BaseRepo.ViewerCanTriage()
-	action, err := shared.ConfirmSubmission(allowPreview, allowMetadata)
+	action, err := shared.ConfirmPRSubmission(allowPreview, allowMetadata, state.Draft)
 	if err != nil {
 		return fmt.Errorf("unable to confirm: %w", err)
 	}
@@ -328,7 +329,7 @@ func createRun(opts *CreateOptions) (err error) {
 			return
 		}
 
-		action, err = shared.ConfirmSubmission(!state.HasMetadata(), false)
+		action, err = shared.ConfirmPRSubmission(!state.HasMetadata(), false, state.Draft)
 		if err != nil {
 			return
 		}
@@ -347,6 +348,11 @@ func createRun(opts *CreateOptions) (err error) {
 
 	if action == shared.PreviewAction {
 		return previewPR(*opts, openURL)
+	}
+
+	if action == shared.SubmitDraftAction {
+		state.Draft = true
+		return submitPR(*opts, *ctx, *state)
 	}
 
 	if action == shared.SubmitAction {
@@ -582,9 +588,6 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 			return nil, cmdutil.CancelError
 		} else {
 			// "Create a fork of ..."
-			if baseRepo.IsPrivate {
-				return nil, fmt.Errorf("cannot fork private repository %s", ghrepo.FullName(baseRepo))
-			}
 			headBranchLabel = fmt.Sprintf("%s:%s", currentLogin, headBranch)
 		}
 	}
@@ -677,7 +680,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	// one by forking the base repository
 	if headRepo == nil && ctx.IsPushEnabled {
 		opts.IO.StartProgressIndicator()
-		headRepo, err = api.ForkRepo(client, ctx.BaseRepo, "")
+		headRepo, err = api.ForkRepo(client, ctx.BaseRepo, "", "")
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error forking repo: %w", err)
@@ -755,7 +758,7 @@ func generateCompareURL(ctx CreateContext, state shared.IssueMetadataState) (str
 	u := ghrepo.GenerateRepoURL(
 		ctx.BaseRepo,
 		"compare/%s...%s?expand=1",
-		url.QueryEscape(ctx.BaseBranch), url.QueryEscape(ctx.HeadBranchLabel))
+		url.PathEscape(ctx.BaseBranch), url.PathEscape(ctx.HeadBranchLabel))
 	url, err := shared.WithPrAndIssueQueryParams(ctx.Client, ctx.BaseRepo, u, state)
 	if err != nil {
 		return "", err

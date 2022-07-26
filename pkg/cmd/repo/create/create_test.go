@@ -101,16 +101,32 @@ func TestNewCmdCreate(t *testing.T) {
 			wantsErr: true,
 			errMsg:   "the `--source` option is not supported with `--clone`, `--template`, `--license`, or `--gitignore`",
 		},
+		{
+			name:     "include all branches without template",
+			cli:      "--source=/path/to/repo --private --include-all-branches",
+			wantsErr: true,
+			errMsg:   "the `--include-all-branches` option is only supported when using `--template`",
+		},
+		{
+			name: "new remote from template with include all branches",
+			cli:  "template-repo --template https://github.com/OWNER/REPO --public --include-all-branches",
+			wantsOpts: CreateOptions{
+				Name:               "template-repo",
+				Public:             true,
+				Template:           "https://github.com/OWNER/REPO",
+				IncludeAllBranches: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			var opts *CreateOptions
@@ -460,10 +476,10 @@ func Test_createRun(t *testing.T) {
 			tt.execStubs(cs)
 		}
 
-		io, _, stdout, stderr := iostreams.Test()
-		io.SetStdinTTY(tt.tty)
-		io.SetStdoutTTY(tt.tty)
-		tt.opts.IO = io
+		ios, _, stdout, stderr := iostreams.Test()
+		ios.SetStdinTTY(tt.tty)
+		ios.SetStdoutTTY(tt.tty)
+		tt.opts.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)
@@ -477,46 +493,5 @@ func Test_createRun(t *testing.T) {
 			assert.Equal(t, tt.wantStdout, stdout.String())
 			assert.Equal(t, "", stderr.String())
 		})
-	}
-}
-
-func Test_getModifiedNormalizedName(t *testing.T) {
-	// confirmed using GitHub.com/new
-	tests := []struct {
-		LocalName      string
-		NormalizedName string
-	}{
-		{
-			LocalName:      "cli",
-			NormalizedName: "cli",
-		},
-		{
-			LocalName:      "cli.git",
-			NormalizedName: "cli",
-		},
-		{
-			LocalName:      "@-#$^",
-			NormalizedName: "---",
-		},
-		{
-			LocalName:      "[cli]",
-			NormalizedName: "-cli-",
-		},
-		{
-			LocalName:      "Hello World, I'm a new repo!",
-			NormalizedName: "Hello-World-I-m-a-new-repo-",
-		},
-		{
-			LocalName:      " @E3H*(#$#_$-ZVp,n.7lGq*_eMa-(-zAZSJYg!",
-			NormalizedName: "-E3H-_--ZVp-n.7lGq-_eMa---zAZSJYg-",
-		},
-		{
-			LocalName:      "I'm a crazy .git repo name .git.git .git",
-			NormalizedName: "I-m-a-crazy-.git-repo-name-.git.git-",
-		},
-	}
-	for _, tt := range tests {
-		output := normalizeRepoName(tt.LocalName)
-		assert.Equal(t, tt.NormalizedName, output)
 	}
 }

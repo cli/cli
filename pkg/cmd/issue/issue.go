@@ -25,7 +25,7 @@ func NewCmdIssue(f *cmdutil.Factory) *cobra.Command {
 		Example: heredoc.Doc(`
 			$ gh issue list
 			$ gh issue create --label bug
-			$ gh issue view --web
+			$ gh issue view 123 --web
 		`),
 		Annotations: map[string]string{
 			"IsCore": "true",

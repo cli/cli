@@ -3,7 +3,7 @@ package cmdutil
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -99,8 +99,8 @@ func TestAddJSONFlags(t *testing.T) {
 			var exporter Exporter
 			AddJSONFlags(cmd, &exporter, tt.fields)
 			cmd.SetArgs(tt.args)
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 			_, err := cmd.ExecuteC()
 			if tt.wantsError == "" {
 				require.NoError(t, err)

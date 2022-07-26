@@ -7,11 +7,10 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
-	"github.com/cli/cli/v2/pkg/githubsearch"
 )
 
 func shouldUseSearch(filters prShared.FilterOptions) bool {
-	return filters.Draft != "" || filters.Author != "" || filters.Assignee != "" || filters.Search != "" || len(filters.Labels) > 0
+	return filters.Draft != nil || filters.Author != "" || filters.Assignee != "" || filters.Search != "" || len(filters.Labels) > 0
 }
 
 func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.PullRequestAndTotalCount, error) {
@@ -159,41 +158,12 @@ func searchPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters 
 			}
 		}`
 
-	q := githubsearch.NewQuery()
-	q.SetType(githubsearch.PullRequest)
-	q.InRepository(ghrepo.FullName(repo))
-	q.AddQuery(filters.Search)
-
-	switch filters.State {
-	case "open":
-		q.SetState(githubsearch.Open)
-	case "closed":
-		q.SetState(githubsearch.Closed)
-	case "merged":
-		q.SetState(githubsearch.Merged)
-	}
-
-	if filters.Author != "" {
-		q.AuthoredBy(filters.Author)
-	}
-	if filters.Assignee != "" {
-		q.AssignedTo(filters.Assignee)
-	}
-	for _, label := range filters.Labels {
-		q.AddLabel(label)
-	}
-	if filters.BaseBranch != "" {
-		q.SetBaseBranch(filters.BaseBranch)
-	}
-
-	if filters.Draft != "" {
-		q.SetDraft(filters.Draft)
-	}
+	filters.Repo = ghrepo.FullName(repo)
+	filters.Entity = "pr"
+	q := prShared.SearchQueryBuild(filters)
 
 	pageLimit := min(limit, 100)
-	variables := map[string]interface{}{
-		"q": q.String(),
-	}
+	variables := map[string]interface{}{"q": q}
 
 	res := api.PullRequestAndTotalCount{SearchCapped: limit > 1000}
 	var check = make(map[int]struct{})

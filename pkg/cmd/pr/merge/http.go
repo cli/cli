@@ -19,14 +19,25 @@ const (
 	PullRequestMergeMethodSquash
 )
 
+const (
+	MergeStateStatusBehind   = "BEHIND"
+	MergeStateStatusBlocked  = "BLOCKED"
+	MergeStateStatusClean    = "CLEAN"
+	MergeStateStatusDirty    = "DIRTY"
+	MergeStateStatusHasHooks = "HAS_HOOKS"
+	MergeStateStatusMerged   = "MERGED"
+	MergeStateStatusUnstable = "UNSTABLE"
+)
+
 type mergePayload struct {
-	repo          ghrepo.Interface
-	pullRequestID string
-	method        PullRequestMergeMethod
-	auto          bool
-	commitSubject string
-	commitBody    string
-	setCommitBody bool
+	repo            ghrepo.Interface
+	pullRequestID   string
+	method          PullRequestMergeMethod
+	auto            bool
+	commitSubject   string
+	commitBody      string
+	setCommitBody   bool
+	expectedHeadOid string
 }
 
 // TODO: drop after githubv4 gets updated
@@ -58,6 +69,11 @@ func mergePullRequest(client *http.Client, payload mergePayload) error {
 	if payload.setCommitBody {
 		commitBody := githubv4.String(payload.commitBody)
 		input.CommitBody = &commitBody
+	}
+
+	if payload.expectedHeadOid != "" {
+		expectedHeadOid := githubv4.GitObjectID(payload.expectedHeadOid)
+		input.ExpectedHeadOid = &expectedHeadOid
 	}
 
 	variables := map[string]interface{}{

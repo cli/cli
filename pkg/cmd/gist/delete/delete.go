@@ -2,6 +2,7 @@ package delete
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -58,33 +59,18 @@ func deleteRun(opts *DeleteOptions) error {
 		return err
 	}
 
-	apiClient := api.NewClientFromHTTP(client)
-
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
 	}
 
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
-	gist, err := shared.GetGist(client, host, gistID)
-	if err != nil {
-		return err
-	}
-	username, err := api.CurrentLoginName(apiClient, host)
-	if err != nil {
-		return err
-	}
-
-	if username != gist.Owner.Login {
-		return errors.New("you do not own this gist")
-	}
-
-	err = deleteGist(apiClient, host, gistID)
-	if err != nil {
+	apiClient := api.NewClientFromHTTP(client)
+	if err := deleteGist(apiClient, host, gistID); err != nil {
+		if errors.Is(err, shared.NotFoundErr) {
+			return fmt.Errorf("unable to delete gist %s: either the gist is not found or it is not owned by you", gistID)
+		}
 		return err
 	}
 
@@ -95,6 +81,10 @@ func deleteGist(apiClient *api.Client, hostname string, gistID string) error {
 	path := "gists/" + gistID
 	err := apiClient.REST(hostname, "DELETE", path, nil, nil)
 	if err != nil {
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == 404 {
+			return shared.NotFoundErr
+		}
 		return err
 	}
 	return nil

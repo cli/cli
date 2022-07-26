@@ -1,7 +1,6 @@
 package list
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -52,10 +51,7 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
 	sshKeys, err := userKeys(apiClient, host, "")
 	if err != nil {
@@ -63,8 +59,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(sshKeys) == 0 {
-		fmt.Fprintln(opts.IO.ErrOut, "No SSH keys present in GitHub account.")
-		return cmdutil.SilentError
+		return cmdutil.NewNoResultsError("no SSH keys present in the GitHub account")
 	}
 
 	t := utils.NewTablePrinter(opts.IO)

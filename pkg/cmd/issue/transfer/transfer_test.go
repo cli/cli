@@ -2,7 +2,7 @@ package transfer
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -17,10 +17,10 @@ import (
 )
 
 func runCommand(rt http.RoundTripper, cli string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
+	ios, _, stdout, stderr := iostreams.Test()
 
 	factory := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
@@ -32,7 +32,7 @@ func runCommand(rt http.RoundTripper, cli string) (*test.CmdOut, error) {
 		},
 	}
 
-	io.SetStdoutTTY(true)
+	ios.SetStdoutTTY(true)
 
 	cmd := NewCmdTransfer(factory, nil)
 
@@ -43,8 +43,8 @@ func runCommand(rt http.RoundTripper, cli string) (*test.CmdOut, error) {
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
 
 	_, err = cmd.ExecuteC()
 
@@ -124,9 +124,9 @@ func Test_transferRunSuccessfulIssueTransfer(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`query RepositoryInfo\b`),
 		httpmock.StringResponse(`
-				{ "data": { "repository": { 
+				{ "data": { "repository": {
 						"id": "dest-id",
-						"name": "REPO1", 
+						"name": "REPO1",
 						"owner": { "login": "OWNER1" },
 						"viewerPermission": "WRITE",
 						"hasIssuesEnabled": true

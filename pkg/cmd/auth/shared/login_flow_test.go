@@ -2,8 +2,8 @@ package shared
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/cli/cli/v2/pkg/ssh"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,9 +22,8 @@ func (c tinyConfig) Get(host, key string) (string, error) {
 	return c[fmt.Sprintf("%s:%s", host, key)], nil
 }
 
-func (c tinyConfig) Set(host string, key string, value string) error {
+func (c tinyConfig) Set(host string, key string, value string) {
 	c[fmt.Sprintf("%s:%s", host, key)] = value
-	return nil
 }
 
 func (c tinyConfig) Write() error {
@@ -32,7 +32,7 @@ func (c tinyConfig) Write() error {
 
 func TestLogin_ssh(t *testing.T) {
 	dir := t.TempDir()
-	io, _, stdout, stderr := iostreams.Test()
+	ios, _, stdout, stderr := iostreams.Test()
 
 	tr := httpmock.Registry{}
 	defer tr.Verify(t)
@@ -52,6 +52,7 @@ func TestLogin_ssh(t *testing.T) {
 	ask.StubPrompt("What is your preferred protocol for Git operations?").AnswerWith("SSH")
 	ask.StubPrompt("Generate a new SSH key to add to your GitHub account?").AnswerWith(true)
 	ask.StubPrompt("Enter a passphrase for your new SSH key (Optional)").AnswerWith("monkey")
+	ask.StubPrompt("Title for your SSH key:").AnswerWith("Test Key")
 	ask.StubPrompt("How would you like to authenticate GitHub CLI?").AnswerWith("Paste an authentication token")
 	ask.StubPrompt("Paste your authentication token:").AnswerWith("ATOKEN")
 
@@ -68,20 +69,20 @@ func TestLogin_ssh(t *testing.T) {
 		}
 		assert.Equal(t, expected, args)
 		// simulate that the public key file has been generated
-		_ = ioutil.WriteFile(keyFile+".pub", []byte("PUBKEY"), 0600)
+		_ = os.WriteFile(keyFile+".pub", []byte("PUBKEY"), 0600)
 	})
 
 	cfg := tinyConfig{}
 
 	err := Login(&LoginOptions{
-		IO:          io,
+		IO:          ios,
 		Config:      &cfg,
 		HTTPClient:  &http.Client{Transport: &tr},
 		Hostname:    "example.com",
 		Interactive: true,
-		sshContext: sshContext{
-			configDir: dir,
-			keygenExe: "ssh-keygen",
+		sshContext: ssh.Context{
+			ConfigDir: dir,
+			KeygenExe: "ssh-keygen",
 		},
 	})
 	assert.NoError(t, err)

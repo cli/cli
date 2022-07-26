@@ -19,7 +19,7 @@ func (mf *metadataFetcher) RepoMetadataFetch(input api.RepoMetadataInput) (*api.
 }
 
 func TestMetadataSurvey_selectAll(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
+	ios, _, stdout, stderr := iostreams.Test()
 
 	repo := ghrepo.New("OWNER", "REPO")
 
@@ -81,7 +81,7 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 	state := &IssueMetadataState{
 		Assignees: []string{"hubot"},
 	}
-	err := MetadataSurvey(io, repo, fetcher, state)
+	err := MetadataSurvey(ios, repo, fetcher, state)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
@@ -95,7 +95,7 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 }
 
 func TestMetadataSurvey_keepExisting(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
+	ios, _, stdout, stderr := iostreams.Test()
 
 	repo := ghrepo.New("OWNER", "REPO")
 
@@ -138,7 +138,7 @@ func TestMetadataSurvey_keepExisting(t *testing.T) {
 	state := &IssueMetadataState{
 		Assignees: []string{"hubot"},
 	}
-	err := MetadataSurvey(io, repo, fetcher, state)
+	err := MetadataSurvey(ios, repo, fetcher, state)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())

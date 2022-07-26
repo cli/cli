@@ -15,10 +15,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Set up Go 1.16
-        uses: actions/setup-go@v2
+      - name: Set up Go 1.18
+        uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: 1.18
       - name: Generate changelog
         id: changelog
         run: |
@@ -39,7 +39,7 @@ jobs:
         env:
           CERT_CONTENTS: ${{ secrets.WINDOWS_CERT_PFX }}
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
+        uses: goreleaser/goreleaser-action@v3
         with:
           version: v0.174.1
           args: release --release-notes=CHANGELOG.md
@@ -99,6 +99,9 @@ jobs:
           popd
       - name: Run reprepro
         env:
+          # We are no longer adding to the distribution list.
+          # All apt distributions should use "stable" according to our install documentation.
+          # In the future we will remove legacy distributions listed here.
           RELEASES: "cosmic eoan disco groovy focal stable oldstable testing sid unstable buster bullseye stretch jessie bionic trusty precise xenial hirsute impish kali-rolling"
         run: |
           mkdir -p upload
@@ -215,18 +218,3 @@ jobs:
           GIT_AUTHOR_NAME: cli automation
           GIT_COMMITTER_EMAIL: noreply@github.com
           GIT_AUTHOR_EMAIL: noreply@github.com
-      - name: Bump Winget manifest
-        shell: pwsh
-        env:
-          WINGETCREATE_VERSION: v0.2.0.29-preview
-          GITHUB_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
-        run: |
-          $tagname = $env:GITHUB_REF.Replace("refs/tags/", "")
-          $version = $tagname.Replace("v", "")
-          $url = "https://github.com/cli/cli/releases/download/${tagname}/gh_${version}_windows_amd64.msi"
-          iwr https://github.com/microsoft/winget-create/releases/download/${env:WINGETCREATE_VERSION}/wingetcreate.exe -OutFile wingetcreate.exe
-
-          .\wingetcreate.exe update GitHub.cli --url $url --version $version
-          if ($version -notmatch "-") {
-            .\wingetcreate.exe submit .\manifests\g\GitHub\cli\${version}\ --token $env:GITHUB_TOKEN
-          }

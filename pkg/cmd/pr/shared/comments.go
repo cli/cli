@@ -9,6 +9,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/markdown"
+	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 )
 
@@ -99,7 +100,7 @@ func formatComment(io *iostreams.IOStreams, comment Comment, newest bool) (strin
 		fmt.Fprint(&b, formatCommentStatus(cs, comment.Status()))
 	}
 	if comment.Association() != "NONE" {
-		fmt.Fprint(&b, cs.Boldf(" (%s)", strings.Title(strings.ToLower(comment.Association()))))
+		fmt.Fprint(&b, cs.Boldf(" (%s)", text.Title(comment.Association())))
 	}
 	fmt.Fprint(&b, cs.Boldf(" • %s", utils.FuzzyAgoAbbr(time.Now(), comment.Created())))
 	if comment.IsEdited() {
@@ -195,7 +196,7 @@ func formatHiddenComment(comment Comment) string {
 	var b strings.Builder
 	fmt.Fprint(&b, comment.AuthorLogin())
 	if comment.Association() != "NONE" {
-		fmt.Fprintf(&b, " (%s)", strings.Title(strings.ToLower(comment.Association())))
+		fmt.Fprintf(&b, " (%s)", text.Title(comment.Association()))
 	}
 	fmt.Fprintf(&b, " • This comment has been marked as %s\n\n", comment.HiddenReason())
 	return b.String()

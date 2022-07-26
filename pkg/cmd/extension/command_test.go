@@ -2,7 +2,8 @@ package extension
 
 import (
 	"errors"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -41,10 +42,10 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "install an extension",
 			args: []string{"install", "owner/gh-some-ext"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.ListFunc = func(bool) []extensions.Extension {
+				em.ListFunc = func() []extensions.Extension {
 					return []extensions.Extension{}
 				}
-				em.InstallFunc = func(_ ghrepo.Interface) error {
+				em.InstallFunc = func(_ ghrepo.Interface, _ string) error {
 					return nil
 				}
 				return func(t *testing.T) {
@@ -60,7 +61,7 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "install an extension with same name as existing extension",
 			args: []string{"install", "owner/gh-existing-ext"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.ListFunc = func(bool) []extensions.Extension {
+				em.ListFunc = func() []extensions.Extension {
 					e := &Extension{path: "owner2/gh-existing-ext"}
 					return []extensions.Extension{e}
 				}
@@ -87,10 +88,23 @@ func TestNewCmdExtension(t *testing.T) {
 			},
 		},
 		{
+			name:    "install local extension with pin",
+			args:    []string{"install", ".", "--pin", "v1.0.0"},
+			wantErr: true,
+			errMsg:  "local extensions cannot be pinned",
+			isTTY:   true,
+		},
+		{
 			name:    "upgrade argument error",
 			args:    []string{"upgrade"},
 			wantErr: true,
 			errMsg:  "specify an extension to upgrade or `--all`",
+		},
+		{
+			name:    "upgrade --all with extension name error",
+			args:    []string{"upgrade", "test", "--all"},
+			wantErr: true,
+			errMsg:  "cannot use `--all` with extension name",
 		},
 		{
 			name: "upgrade an extension",
@@ -107,6 +121,26 @@ func TestNewCmdExtension(t *testing.T) {
 			},
 			isTTY:      true,
 			wantStdout: "✓ Successfully upgraded extension hello\n",
+		},
+		{
+			name: "upgrade an extension dry run",
+			args: []string{"upgrade", "hello", "--dry-run"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.EnableDryRunModeFunc = func() {}
+				em.UpgradeFunc = func(name string, force bool) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					dryRunCalls := em.EnableDryRunModeCalls()
+					assert.Equal(t, 1, len(dryRunCalls))
+					upgradeCalls := em.UpgradeCalls()
+					assert.Equal(t, 1, len(upgradeCalls))
+					assert.Equal(t, "hello", upgradeCalls[0].Name)
+					assert.False(t, upgradeCalls[0].Force)
+				}
+			},
+			isTTY:      true,
+			wantStdout: "✓ Would have upgraded extension hello\n",
 		},
 		{
 			name: "upgrade an extension notty",
@@ -208,6 +242,43 @@ func TestNewCmdExtension(t *testing.T) {
 			wantStdout: "✓ Successfully upgraded extensions\n",
 		},
 		{
+			name: "upgrade all dry run",
+			args: []string{"upgrade", "--all", "--dry-run"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.EnableDryRunModeFunc = func() {}
+				em.UpgradeFunc = func(name string, force bool) error {
+					return nil
+				}
+				return func(t *testing.T) {
+					dryRunCalls := em.EnableDryRunModeCalls()
+					assert.Equal(t, 1, len(dryRunCalls))
+					upgradeCalls := em.UpgradeCalls()
+					assert.Equal(t, 1, len(upgradeCalls))
+					assert.Equal(t, "", upgradeCalls[0].Name)
+					assert.False(t, upgradeCalls[0].Force)
+				}
+			},
+			isTTY:      true,
+			wantStdout: "✓ Would have upgraded extensions\n",
+		},
+		{
+			name: "upgrade all none installed",
+			args: []string{"upgrade", "--all"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.UpgradeFunc = func(name string, force bool) error {
+					return noExtensionsInstalledError
+				}
+				return func(t *testing.T) {
+					calls := em.UpgradeCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "", calls[0].Name)
+				}
+			},
+			isTTY:   true,
+			wantErr: true,
+			errMsg:  "no installed extensions found",
+		},
+		{
 			name: "upgrade all notty",
 			args: []string{"upgrade", "--all"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
@@ -290,16 +361,17 @@ func TestNewCmdExtension(t *testing.T) {
 			name: "list extensions",
 			args: []string{"list"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
-				em.ListFunc = func(bool) []extensions.Extension {
-					ex1 := &Extension{path: "cli/gh-test", url: "https://github.com/cli/gh-test", currentVersion: "1", latestVersion: "1"}
-					ex2 := &Extension{path: "cli/gh-test2", url: "https://github.com/cli/gh-test2", currentVersion: "1", latestVersion: "2"}
+				em.ListFunc = func() []extensions.Extension {
+					ex1 := &Extension{path: "cli/gh-test", url: "https://github.com/cli/gh-test", currentVersion: "1"}
+					ex2 := &Extension{path: "cli/gh-test2", url: "https://github.com/cli/gh-test2", currentVersion: "1"}
 					return []extensions.Extension{ex1, ex2}
 				}
 				return func(t *testing.T) {
-					assert.Equal(t, 1, len(em.ListCalls()))
+					calls := em.ListCalls()
+					assert.Equal(t, 1, len(calls))
 				}
 			},
-			wantStdout: "gh test\tcli/gh-test\t1\t\ngh test2\tcli/gh-test2\t1\tUpgrade available\n",
+			wantStdout: "gh test\tcli/gh-test\t1\ngh test2\tcli/gh-test2\t1\n",
 		},
 		{
 			name: "create extension interactive",
@@ -444,6 +516,38 @@ func TestNewCmdExtension(t *testing.T) {
 			isTTY:      false,
 			wantStdout: "",
 		},
+		{
+			name: "exec extension missing",
+			args: []string{"exec", "invalid"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.DispatchFunc = func(args []string, stdin io.Reader, stdout, stderr io.Writer) (bool, error) {
+					return false, nil
+				}
+				return func(t *testing.T) {
+					calls := em.DispatchCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.EqualValues(t, []string{"invalid"}, calls[0].Args)
+				}
+			},
+			wantErr: true,
+			errMsg:  `extension "invalid" not found`,
+		},
+		{
+			name: "exec extension with arguments",
+			args: []string{"exec", "test", "arg1", "arg2", "--flag1"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.DispatchFunc = func(args []string, stdin io.Reader, stdout, stderr io.Writer) (bool, error) {
+					fmt.Fprintf(stdout, "test output")
+					return true, nil
+				}
+				return func(t *testing.T) {
+					calls := em.DispatchCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.EqualValues(t, []string{"test", "arg1", "arg2", "--flag1"}, calls[0].Args)
+				}
+			},
+			wantStdout: "test output",
+		},
 	}
 
 	for _, tt := range tests {
@@ -480,8 +584,8 @@ func TestNewCmdExtension(t *testing.T) {
 
 			cmd := NewCmdExtension(&f)
 			cmd.SetArgs(tt.args)
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err := cmd.ExecuteC()
 			if tt.wantErr {
@@ -510,7 +614,7 @@ func Test_checkValidExtension(t *testing.T) {
 	rootCmd.AddCommand(&cobra.Command{Use: "auth"})
 
 	m := &extensions.ExtensionManagerMock{
-		ListFunc: func(bool) []extensions.Extension {
+		ListFunc: func() []extensions.Extension {
 			return []extensions.Extension{
 				&extensions.ExtensionMock{
 					NameFunc: func() string { return "screensaver" },

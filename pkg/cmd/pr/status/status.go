@@ -67,7 +67,6 @@ func statusRun(opts *StatusOptions) error {
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
@@ -91,7 +90,7 @@ func statusRun(opts *StatusOptions) error {
 		}
 	}
 
-	options := api.StatusOptions{
+	options := requestOptions{
 		Username:  "@me",
 		CurrentPR: currentPRNumber,
 		HeadRef:   currentPRHeadRef,
@@ -99,7 +98,7 @@ func statusRun(opts *StatusOptions) error {
 	if opts.Exporter != nil {
 		options.Fields = opts.Exporter.Fields()
 	}
-	prPayload, err := api.PullRequestStatus(apiClient, baseRepo, options)
+	prPayload, err := pullRequestStatus(httpClient, baseRepo, options)
 	if err != nil {
 		return err
 	}
@@ -192,7 +191,7 @@ func prSelectorForCurrentBranch(baseRepo ghrepo.Interface, prHeadRef string, rem
 		}
 		// prepend `OWNER:` if this branch is pushed to a fork
 		if !strings.EqualFold(branchOwner, baseRepo.RepoOwner()) {
-			selector = fmt.Sprintf("%s:%s", branchOwner, prHeadRef)
+			selector = fmt.Sprintf("%s:%s", branchOwner, selector)
 		}
 	}
 
@@ -216,7 +215,7 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
 
-		prStateColorFunc := cs.ColorFromString(shared.ColorForPR(pr))
+		prStateColorFunc := cs.ColorFromString(shared.ColorForPRState(pr))
 
 		fmt.Fprintf(w, "  %s  %s %s", prStateColorFunc(prNumber), text.Truncate(50, text.ReplaceExcessiveWhitespace(pr.Title)), cs.Cyan("["+pr.HeadLabel()+"]"))
 

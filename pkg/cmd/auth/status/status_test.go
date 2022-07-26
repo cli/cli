@@ -71,11 +71,13 @@ func Test_NewCmdStatus(t *testing.T) {
 }
 
 func Test_statusRun(t *testing.T) {
+	readConfigs := config.StubWriteConfig(t)
+
 	tests := []struct {
 		name       string
 		opts       *StatusOptions
 		httpStubs  func(*httpmock.Registry)
-		cfg        func(config.Config)
+		cfgStubs   func(*config.ConfigMock)
 		wantErr    string
 		wantErrOut *regexp.Regexp
 	}{
@@ -84,9 +86,9 @@ func Test_statusRun(t *testing.T) {
 			opts: &StatusOptions{
 				Hostname: "joel.miller",
 			},
-			cfg: func(c config.Config) {
-				_ = c.Set("joel.miller", "oauth_token", "abc123")
-				_ = c.Set("github.com", "oauth_token", "abc123")
+			cfgStubs: func(c *config.ConfigMock) {
+				c.Set("joel.miller", "oauth_token", "abc123")
+				c.Set("github.com", "oauth_token", "abc123")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
@@ -99,9 +101,9 @@ func Test_statusRun(t *testing.T) {
 		{
 			name: "missing scope",
 			opts: &StatusOptions{},
-			cfg: func(c config.Config) {
-				_ = c.Set("joel.miller", "oauth_token", "abc123")
-				_ = c.Set("github.com", "oauth_token", "abc123")
+			cfgStubs: func(c *config.ConfigMock) {
+				c.Set("joel.miller", "oauth_token", "abc123")
+				c.Set("github.com", "oauth_token", "abc123")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo"))
@@ -116,9 +118,9 @@ func Test_statusRun(t *testing.T) {
 		{
 			name: "bad token",
 			opts: &StatusOptions{},
-			cfg: func(c config.Config) {
-				_ = c.Set("joel.miller", "oauth_token", "abc123")
-				_ = c.Set("github.com", "oauth_token", "abc123")
+			cfgStubs: func(c *config.ConfigMock) {
+				c.Set("joel.miller", "oauth_token", "abc123")
+				c.Set("github.com", "oauth_token", "abc123")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(400, "no bueno"))
@@ -133,9 +135,9 @@ func Test_statusRun(t *testing.T) {
 		{
 			name: "all good",
 			opts: &StatusOptions{},
-			cfg: func(c config.Config) {
-				_ = c.Set("joel.miller", "oauth_token", "abc123")
-				_ = c.Set("github.com", "oauth_token", "abc123")
+			cfgStubs: func(c *config.ConfigMock) {
+				c.Set("github.com", "oauth_token", "abc123")
+				c.Set("joel.miller", "oauth_token", "abc123")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
@@ -152,9 +154,9 @@ func Test_statusRun(t *testing.T) {
 		{
 			name: "hide token",
 			opts: &StatusOptions{},
-			cfg: func(c config.Config) {
-				_ = c.Set("joel.miller", "oauth_token", "abc123")
-				_ = c.Set("github.com", "oauth_token", "xyz456")
+			cfgStubs: func(c *config.ConfigMock) {
+				c.Set("joel.miller", "oauth_token", "abc123")
+				c.Set("github.com", "oauth_token", "xyz456")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
@@ -173,9 +175,9 @@ func Test_statusRun(t *testing.T) {
 			opts: &StatusOptions{
 				ShowToken: true,
 			},
-			cfg: func(c config.Config) {
-				_ = c.Set("joel.miller", "oauth_token", "abc123")
-				_ = c.Set("github.com", "oauth_token", "xyz456")
+			cfgStubs: func(c *config.ConfigMock) {
+				c.Set("github.com", "oauth_token", "xyz456")
+				c.Set("joel.miller", "oauth_token", "abc123")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
@@ -188,13 +190,14 @@ func Test_statusRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
 			},
 			wantErrOut: regexp.MustCompile(`(?s)Token: xyz456.*Token: abc123`),
-		}, {
+		},
+		{
 			name: "missing hostname",
 			opts: &StatusOptions{
 				Hostname: "github.example.com",
 			},
-			cfg: func(c config.Config) {
-				_ = c.Set("github.com", "oauth_token", "abc123")
+			cfgStubs: func(c *config.ConfigMock) {
+				c.Set("github.com", "oauth_token", "abc123")
 			},
 			httpStubs:  func(reg *httpmock.Registry) {},
 			wantErrOut: regexp.MustCompile(`(?s)Hostname "github.example.com" not found among authenticated GitHub hosts`),
@@ -208,18 +211,16 @@ func Test_statusRun(t *testing.T) {
 				tt.opts = &StatusOptions{}
 			}
 
-			io, _, _, stderr := iostreams.Test()
+			ios, _, _, stderr := iostreams.Test()
 
-			io.SetStdinTTY(true)
-			io.SetStderrTTY(true)
-			io.SetStdoutTTY(true)
+			ios.SetStdinTTY(true)
+			ios.SetStderrTTY(true)
+			ios.SetStdoutTTY(true)
+			tt.opts.IO = ios
 
-			tt.opts.IO = io
-
-			cfg := config.NewBlankConfig()
-
-			if tt.cfg != nil {
-				tt.cfg(cfg)
+			cfg := config.NewFromString("")
+			if tt.cfgStubs != nil {
+				tt.cfgStubs(cfg)
 			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil
@@ -232,9 +233,6 @@ func Test_statusRun(t *testing.T) {
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			}
-			mainBuf := bytes.Buffer{}
-			hostsBuf := bytes.Buffer{}
-			defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
 			err := statusRun(tt.opts)
 			if tt.wantErr != "" {
@@ -249,6 +247,10 @@ func Test_statusRun(t *testing.T) {
 			} else {
 				assert.True(t, tt.wantErrOut.MatchString(stderr.String()))
 			}
+
+			mainBuf := bytes.Buffer{}
+			hostsBuf := bytes.Buffer{}
+			readConfigs(&mainBuf, &hostsBuf)
 
 			assert.Equal(t, "", mainBuf.String())
 			assert.Equal(t, "", hostsBuf.String())

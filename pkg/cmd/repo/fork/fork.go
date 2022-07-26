@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
@@ -179,7 +180,7 @@ func forkRun(opts *ForkOptions) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	opts.IO.StartProgressIndicator()
-	forkedRepo, err := api.ForkRepo(apiClient, repoToFork, opts.Organization)
+	forkedRepo, err := api.ForkRepo(apiClient, repoToFork, opts.Organization, opts.ForkName)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to fork: %w", err)
@@ -206,8 +207,8 @@ func forkRun(opts *ForkOptions) error {
 		}
 	}
 
-	// Rename the forked repo if ForkName is specified in opts.
-	if opts.ForkName != "" {
+	// Rename the new repo if necessary
+	if opts.ForkName != "" && !strings.EqualFold(forkedRepo.RepoName(), shared.NormalizeRepoName(opts.ForkName)) {
 		forkedRepo, err = api.RenameRepo(apiClient, forkedRepo, opts.ForkName)
 		if err != nil {
 			return fmt.Errorf("could not rename fork: %w", err)
@@ -225,10 +226,7 @@ func forkRun(opts *ForkOptions) error {
 	if err != nil {
 		return err
 	}
-	protocol, err := cfg.Get(repoToFork.RepoHost(), "git_protocol")
-	if err != nil {
-		return err
-	}
+	protocol, _ := cfg.Get(repoToFork.RepoHost(), "git_protocol")
 
 	if inParent {
 		remotes, err := opts.Remotes()
@@ -248,7 +246,7 @@ func forkRun(opts *ForkOptions) error {
 				if scheme != "" {
 					protocol = scheme
 				} else {
-					protocol = cfg.Default("git_protocol")
+					protocol = "https"
 				}
 			}
 		}
@@ -317,7 +315,7 @@ func forkRun(opts *ForkOptions) error {
 			}
 
 			upstreamURL := ghrepo.FormatRemoteURL(repoToFork, protocol)
-			err = git.AddUpstreamRemote(upstreamURL, cloneDir, []string{})
+			err = git.AddNamedRemote(upstreamURL, "upstream", cloneDir, []string{})
 			if err != nil {
 				return err
 			}

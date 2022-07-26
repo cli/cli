@@ -2,16 +2,18 @@ package status
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -20,13 +22,13 @@ import (
 )
 
 func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(isTTY)
-	io.SetStdinTTY(isTTY)
-	io.SetStderrTTY(isTTY)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(isTTY)
+	ios.SetStdinTTY(isTTY)
+	ios.SetStderrTTY(isTTY)
 
 	factory := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
@@ -62,8 +64,8 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
@@ -306,5 +308,33 @@ Requesting a code review from you
 `
 	if output.String() != expected {
 		t.Errorf("expected %q, got %q", expected, output.String())
+	}
+}
+
+func Test_prSelectorForCurrentBranch(t *testing.T) {
+	rs, cleanup := run.Stub()
+	defer cleanup(t)
+
+	rs.Register(`git config --get-regexp \^branch\\.`, 0, heredoc.Doc(`
+		branch.Frederick888/main.remote git@github.com:Frederick888/playground.git
+		branch.Frederick888/main.merge refs/heads/main
+	`))
+
+	repo := ghrepo.NewWithHost("octocat", "playground", "github.com")
+	rem := context.Remotes{
+		&context.Remote{
+			Remote: &git.Remote{Name: "origin"},
+			Repo:   repo,
+		},
+	}
+	prNum, headRef, err := prSelectorForCurrentBranch(repo, "Frederick888/main", rem)
+	if err != nil {
+		t.Fatalf("prSelectorForCurrentBranch error: %v", err)
+	}
+	if prNum != 0 {
+		t.Errorf("expected prNum to be 0, got %q", prNum)
+	}
+	if headRef != "Frederick888:main" {
+		t.Errorf("expected headRef to be \"Frederick888:main\", got %q", headRef)
 	}
 }

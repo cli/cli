@@ -3,7 +3,6 @@ package checks
 import (
 	"fmt"
 	"sort"
-	"time"
 
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
@@ -12,9 +11,8 @@ import (
 func addRow(tp utils.TablePrinter, io *iostreams.IOStreams, o check) {
 	cs := io.ColorScheme()
 	elapsed := ""
-	zeroTime := time.Time{}
 
-	if o.StartedAt != zeroTime && o.CompletedAt != zeroTime {
+	if !o.StartedAt.IsZero() && !o.CompletedAt.IsZero() {
 		e := o.CompletedAt.Sub(o.StartedAt)
 		if e > 0 {
 			elapsed = e.String()

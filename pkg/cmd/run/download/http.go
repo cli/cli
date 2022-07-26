@@ -4,7 +4,6 @@ import (
 	"archive/zip"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 
@@ -44,7 +43,7 @@ func downloadArtifact(httpClient *http.Client, url, destDir string) error {
 		return api.HandleHTTPError(resp)
 	}
 
-	tmpfile, err := ioutil.TempFile("", "gh-artifact.*.zip")
+	tmpfile, err := os.CreateTemp("", "gh-artifact.*.zip")
 	if err != nil {
 		return fmt.Errorf("error initializing temporary file: %w", err)
 	}

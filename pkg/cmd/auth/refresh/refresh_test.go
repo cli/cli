@@ -2,7 +2,7 @@ package refresh
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -89,13 +89,13 @@ func Test_NewCmdRefresh(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			ios, _, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
-			io.SetNeverPrompt(tt.neverPrompt)
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetNeverPrompt(tt.neverPrompt)
 
 			argv, err := shlex.Split(tt.cli)
 			assert.NoError(t, err)
@@ -238,19 +238,19 @@ func Test_refreshRun(t *testing.T) {
 				return nil
 			}
 
-			io, _, _, _ := iostreams.Test()
-
-			io.SetStdinTTY(!tt.nontty)
-			io.SetStdoutTTY(!tt.nontty)
-
-			tt.opts.IO = io
-			cfg := config.NewBlankConfig()
+			_ = config.StubWriteConfig(t)
+			cfg := config.NewFromString("")
+			for _, hostname := range tt.cfgHosts {
+				cfg.Set(hostname, "oauth_token", "abc123")
+			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil
 			}
-			for _, hostname := range tt.cfgHosts {
-				_ = cfg.Set(hostname, "oauth_token", "abc123")
-			}
+
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(!tt.nontty)
+			ios.SetStdoutTTY(!tt.nontty)
+			tt.opts.IO = ios
 
 			httpReg := &httpmock.Registry{}
 			httpReg.Register(
@@ -263,7 +263,7 @@ func Test_refreshRun(t *testing.T) {
 					return &http.Response{
 						Request:    req,
 						StatusCode: statusCode,
-						Body:       ioutil.NopCloser(strings.NewReader(``)),
+						Body:       io.NopCloser(strings.NewReader(``)),
 						Header: http.Header{
 							"X-Oauth-Scopes": {tt.oldScopes},
 						},
@@ -271,10 +271,6 @@ func Test_refreshRun(t *testing.T) {
 				},
 			)
 			tt.opts.httpClient = &http.Client{Transport: httpReg}
-
-			mainBuf := bytes.Buffer{}
-			hostsBuf := bytes.Buffer{}
-			defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
 			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {

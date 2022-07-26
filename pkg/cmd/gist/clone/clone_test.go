@@ -16,9 +16,9 @@ import (
 )
 
 func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) {
-	io, stdin, stdout, stderr := iostreams.Test()
+	ios, stdin, stdout, stderr := iostreams.Test()
 	fac := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		HttpClient: func() (*http.Client, error) {
 			return httpClient, nil
 		},
@@ -33,7 +33,7 @@ func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) 
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(stdin)
-	cmd.SetOut(stdout)
+	cmd.SetOut(stderr)
 	cmd.SetErr(stderr)
 
 	if err != nil {

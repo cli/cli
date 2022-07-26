@@ -60,8 +60,8 @@ func TestNewCmdClone(t *testing.T) {
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, stdout, stderr := iostreams.Test()
-			fac := &cmdutil.Factory{IOStreams: io}
+			ios, stdin, stdout, stderr := iostreams.Test()
+			fac := &cmdutil.Factory{IOStreams: ios}
 
 			var opts *CloneOptions
 			cmd := NewCmdClone(fac, func(co *CloneOptions) error {
@@ -74,7 +74,7 @@ func TestNewCmdClone(t *testing.T) {
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(stdin)
-			cmd.SetOut(stdout)
+			cmd.SetOut(stderr)
 			cmd.SetErr(stderr)
 
 			_, err = cmd.ExecuteC()
@@ -95,9 +95,9 @@ func TestNewCmdClone(t *testing.T) {
 }
 
 func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) {
-	io, stdin, stdout, stderr := iostreams.Test()
+	ios, stdin, stdout, stderr := iostreams.Test()
 	fac := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		HttpClient: func() (*http.Client, error) {
 			return httpClient, nil
 		},
@@ -112,7 +112,7 @@ func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) 
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(stdin)
-	cmd.SetOut(stdout)
+	cmd.SetOut(stderr)
 	cmd.SetErr(stderr)
 
 	if err != nil {
@@ -246,6 +246,42 @@ func Test_RepoClone_hasParent(t *testing.T) {
 	cs.Register(`git -C REPO remote add -t trunk -f upstream https://github.com/hubot/ORIG.git`, 0, "")
 
 	_, err := runCloneCommand(httpClient, "OWNER/REPO")
+	if err != nil {
+		t.Fatalf("error running command `repo clone`: %v", err)
+	}
+}
+
+func Test_RepoClone_hasParent_upstreamRemoteName(t *testing.T) {
+	reg := &httpmock.Registry{}
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`
+				{ "data": { "repository": {
+					"name": "REPO",
+					"owner": {
+						"login": "OWNER"
+					},
+					"parent": {
+						"name": "ORIG",
+						"owner": {
+							"login": "hubot"
+						},
+						"defaultBranchRef": {
+							"name": "trunk"
+						}
+					}
+				} } }
+				`))
+
+	httpClient := &http.Client{Transport: reg}
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
+	cs.Register(`git -C REPO remote add -t trunk -f test https://github.com/hubot/ORIG.git`, 0, "")
+
+	_, err := runCloneCommand(httpClient, "OWNER/REPO --upstream-remote-name test")
 	if err != nil {
 		t.Fatalf("error running command `repo clone`: %v", err)
 	}

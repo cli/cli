@@ -13,6 +13,7 @@ func TestApp_VSCode(t *testing.T) {
 	type args struct {
 		codespaceName string
 		useInsiders   bool
+		useWeb        bool
 	}
 	tests := []struct {
 		name    string
@@ -38,18 +39,46 @@ func TestApp_VSCode(t *testing.T) {
 			wantErr: false,
 			wantURL: "vscode-insiders://github.codespaces/connect?name=monalisa-cli-cli-abcdef",
 		},
+		{
+			name: "open VS Code web",
+			args: args{
+				codespaceName: "monalisa-cli-cli-abcdef",
+				useInsiders:   false,
+				useWeb:        true,
+			},
+			wantErr: false,
+			wantURL: "https://monalisa-cli-cli-abcdef.github.dev",
+		},
+		{
+			name: "open VS Code web with Insiders",
+			args: args{
+				codespaceName: "monalisa-cli-cli-abcdef",
+				useInsiders:   true,
+				useWeb:        true,
+			},
+			wantErr: false,
+			wantURL: "https://monalisa-cli-cli-abcdef.github.dev?vscodeChannel=insiders",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			b := &cmdutil.TestBrowser{}
+			ios, _, stdout, stderr := iostreams.Test()
 			a := &App{
 				browser:   b,
 				apiClient: testCodeApiMock(),
+				io:        ios,
 			}
-			if err := a.VSCode(context.Background(), tt.args.codespaceName, tt.args.useInsiders); (err != nil) != tt.wantErr {
+			if err := a.VSCode(context.Background(), tt.args.codespaceName, tt.args.useInsiders, tt.args.useWeb); (err != nil) != tt.wantErr {
 				t.Errorf("App.VSCode() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			b.Verify(t, tt.wantURL)
+			if got := stdout.String(); got != "" {
+				t.Errorf("stdout = %q, want %q", got, "")
+			}
+			if got := stderr.String(); got != "" {
+				t.Errorf("stderr = %q, want %q", got, "")
+			}
 		})
 	}
 }
@@ -57,7 +86,7 @@ func TestApp_VSCode(t *testing.T) {
 func TestPendingOperationDisallowsCode(t *testing.T) {
 	app := testingCodeApp()
 
-	if err := app.VSCode(context.Background(), "disabledCodespace", false); err != nil {
+	if err := app.VSCode(context.Background(), "disabledCodespace", false, false); err != nil {
 		if err.Error() != "codespace is disabled while it has a pending operation: Some pending operation" {
 			t.Errorf("expected pending operation error, but got: %v", err)
 		}
@@ -67,14 +96,15 @@ func TestPendingOperationDisallowsCode(t *testing.T) {
 }
 
 func testingCodeApp() *App {
-	io, _, _, _ := iostreams.Test()
-	return NewApp(io, nil, testCodeApiMock(), nil)
+	ios, _, _, _ := iostreams.Test()
+	return NewApp(ios, nil, testCodeApiMock(), nil)
 }
 
 func testCodeApiMock() *apiClientMock {
 	user := &api.User{Login: "monalisa"}
 	testingCodespace := &api.Codespace{
-		Name: "monalisa-cli-cli-abcdef",
+		Name:   "monalisa-cli-cli-abcdef",
+		WebURL: "https://monalisa-cli-cli-abcdef.github.dev",
 	}
 	disabledCodespace := &api.Codespace{
 		Name:                           "disabledCodespace",

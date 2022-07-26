@@ -24,7 +24,7 @@ func PrintIssues(io *iostreams.IOStreams, prefix string, totalCount int, issues 
 		issueNum = prefix + issueNum
 		now := time.Now()
 		ago := now.Sub(issue.UpdatedAt)
-		table.AddField(issueNum, nil, cs.ColorFromString(prShared.ColorForState(issue.State)))
+		table.AddField(issueNum, nil, cs.ColorFromString(prShared.ColorForIssueState(issue)))
 		if !table.IsTTY() {
 			table.AddField(issue.State, nil, nil)
 		}

@@ -123,10 +123,7 @@ func listRun(opts *ListOptions) error {
 			return err
 		}
 
-		host, err = cfg.DefaultHost()
-		if err != nil {
-			return err
-		}
+		host, _ = cfg.DefaultHost()
 
 		if secretEntity == shared.User {
 			secrets, err = getUserSecrets(client, host, showSelectedRepoInfo)
@@ -137,6 +134,10 @@ func listRun(opts *ListOptions) error {
 
 	if err != nil {
 		return fmt.Errorf("failed to get secrets: %w", err)
+	}
+
+	if len(secrets) == 0 {
+		return cmdutil.NewNoResultsError("no secrets found")
 	}
 
 	if err := opts.IO.StartPager(); err == nil {
