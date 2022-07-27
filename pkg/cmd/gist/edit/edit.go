@@ -189,6 +189,7 @@ func editRun(opts *EditOptions) error {
 				if !opts.IO.CanPrompt() {
 					return errors.New("unsure what file to edit; either specify --filename or run interactively")
 				}
+				//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 				err = prompt.SurveyAskOne(&survey.Select{
 					Message: "Edit which file?",
 					Options: candidates,
@@ -249,6 +250,7 @@ func editRun(opts *EditOptions) error {
 
 		choice := ""
 
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(&survey.Select{
 			Message: "What next?",
 			Options: []string{

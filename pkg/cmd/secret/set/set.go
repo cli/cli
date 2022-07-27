@@ -373,6 +373,7 @@ func getBody(opts *SetOptions) ([]byte, error) {
 
 	if opts.IO.CanPrompt() {
 		var bodyInput string
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err := prompt.SurveyAskOne(&survey.Password{
 			Message: "Paste your secret",
 		}, &bodyInput)

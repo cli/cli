@@ -119,6 +119,7 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, e
 		// hide the spinner in case a command started the progress indicator before base repo was fully
 		// resolved, e.g. in `gh issue view`
 		io.StopProgressIndicator()
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err := prompt.SurveyAskOne(&survey.Select{
 			Message: "Which should be the base repository (used for e.g. querying issues) for this directory?",
 			Options: repoNames,

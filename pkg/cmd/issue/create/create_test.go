@@ -402,6 +402,7 @@ func TestIssueCreate_recover(t *testing.T) {
 			assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
 		}))
 
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 	as := prompt.NewAskStubber(t)
 
 	as.StubPrompt("Title").AnswerDefault()
@@ -469,6 +470,7 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 			}),
 	)
 
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 	as := prompt.NewAskStubber(t)
 
 	as.StubPrompt("Choose a template").AnswerWith("Submit a request")
@@ -499,6 +501,7 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 			} } }`),
 	)
 
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 	as := prompt.NewAskStubber(t)
 
 	as.StubPrompt("Title").AnswerWith("hello")

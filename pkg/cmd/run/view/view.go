@@ -446,6 +446,7 @@ func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, er
 	}
 
 	var selected int
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err := prompt.SurveyAskOne(&survey.Select{
 		Message:  "View a specific job in this run?",
 		Options:  candidates,

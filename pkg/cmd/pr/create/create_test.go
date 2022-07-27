@@ -654,6 +654,7 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "1234567890,commit 0\n2345678901,commit 1")
 	cs.Register(`git status --porcelain`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 	as := prompt.NewAskStubber(t)
 
 	as.StubPrompt("Choose a template").
@@ -916,6 +917,7 @@ func TestPRCreate_draft(t *testing.T) {
 			assert.Equal(t, true, input["draft"].(bool))
 		}))
 
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 	as := prompt.NewAskStubber(t)
 
 	as.StubPrompt("Choose a template").AnswerDefault()

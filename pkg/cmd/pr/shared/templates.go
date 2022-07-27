@@ -189,6 +189,7 @@ func (m *templateManager) Choose() (Template, error) {
 	}
 
 	var selectedOption int
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err := prompt.SurveyAskOne(&survey.Select{
 		Message: "Choose a template",
 		Options: append(names, blankOption),

@@ -246,6 +246,7 @@ func promptGists(client *http.Client, host string, cs *iostreams.ColorScheme) (g
 		Options: opts,
 	}
 
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err = prompt.SurveyAskOne(questions, &result)
 
 	if err != nil {

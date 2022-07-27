@@ -560,6 +560,7 @@ func Test_getBodyPrompt(t *testing.T) {
 	ios.SetStdinTTY(true)
 	ios.SetStdoutTTY(true)
 
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 	as := prompt.NewAskStubber(t)
 	as.StubPrompt("Paste your secret").AnswerWith("cool secret")
 
