@@ -558,7 +558,6 @@ jobs:
 					httpmock.StatusStringResponse(204, "cool"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Select a workflow").AnswerDefault()
 			},
 			wantBody: map[string]interface{}{
@@ -596,11 +595,8 @@ jobs:
 					httpmock.StatusStringResponse(204, "cool"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Select a workflow").AnswerDefault()
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("greeting").AnswerWith("hi")
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("name").AnswerWith("scully")
 			},
 			wantBody: map[string]interface{}{

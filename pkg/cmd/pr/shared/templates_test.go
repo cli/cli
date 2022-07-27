@@ -48,7 +48,6 @@ func TestTemplateManager_hasAPI(t *testing.T) {
 	assert.Equal(t, "LEGACY", string(m.LegacyBody()))
 
 	as := prompt.NewAskStubber(t)
-	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Choose a template").
 		AssertOptions([]string{"Bug report", "Feature request", "Open a blank issue"}).
 		AnswerWith("Feature request")
@@ -95,7 +94,6 @@ func TestTemplateManager_hasAPI_PullRequest(t *testing.T) {
 	assert.Equal(t, "LEGACY", string(m.LegacyBody()))
 
 	as := prompt.NewAskStubber(t)
-	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Choose a template").
 		AssertOptions([]string{"bug_pr.md", "feature_pr.md", "Open a blank pull request"}).
 		AnswerWith("bug_pr.md")

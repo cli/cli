@@ -311,15 +311,12 @@ func TestPRCreate_recover(t *testing.T) {
 	cs.Register(`git status --porcelain`, 0, "")
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use PrompterMock
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, teardown := prompt.InitAskStubber()
 	defer teardown()
 
-	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Title").AnswerDefault()
-	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Body").AnswerDefault()
-	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What's next?").AnswerDefault()
 
 	tmpfile, err := os.CreateTemp(t.TempDir(), "testrecover*")
@@ -412,11 +409,10 @@ func TestPRCreate(t *testing.T) {
 	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use PrompterMock
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
 
-	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	ask.StubPrompt("Where should we push the 'feature' branch?").AnswerDefault()
 
 	output, err := runCommand(http, nil, "feature", true, `-t "my title" -b "my body"`)
@@ -460,11 +456,10 @@ func TestPRCreate_NoMaintainerModify(t *testing.T) {
 	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use PrompterMock
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
 
-	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	ask.StubPrompt("Where should we push the 'feature' branch?").AnswerDefault()
 
 	output, err := runCommand(http, nil, "feature", true, `-t "my title" -b "my body" --no-maintainer-edit`)
@@ -513,11 +508,10 @@ func TestPRCreate_createFork(t *testing.T) {
 	cs.Register(`git remote add -f fork https://github.com/monalisa/REPO.git`, 0, "")
 	cs.Register(`git push --set-upstream fork HEAD:feature`, 0, "")
 
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use PrompterMock
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
 
-	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	ask.StubPrompt("Where should we push the 'feature' branch?").
 		AssertOptions([]string{"OWNER/REPO", "Create a fork of OWNER/REPO", "Skip pushing the branch", "Cancel"}).
 		AnswerWith("Create a fork of OWNER/REPO")
@@ -574,7 +568,7 @@ func TestPRCreate_pushedToNonBaseRepo(t *testing.T) {
 		deadbeef refs/remotes/origin/feature
 	`)) // determineTrackingBranch
 
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use PrompterMock
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	_, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
 
@@ -616,7 +610,7 @@ func TestPRCreate_pushedToDifferentBranchName(t *testing.T) {
 		deadbeef refs/remotes/origin/my-feat2
 	`)) // determineTrackingBranch
 
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use PrompterMock
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	_, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
 
@@ -662,13 +656,10 @@ func TestPRCreate_nonLegacyTemplate(t *testing.T) {
 
 	as := prompt.NewAskStubber(t)
 
-	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Choose a template").
 		AssertOptions([]string{"template1", "template2", "Open a blank pull request"}).
 		AnswerWith("template1")
-	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Body").AnswerDefault()
-	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What's next?").
 		AssertOptions([]string{"Submit", "Submit as draft", "Continue in browser", "Add metadata", "Cancel"}).
 		AnswerDefault()
@@ -810,11 +801,10 @@ func TestPRCreate_web(t *testing.T) {
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use PrompterMock
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
 
-	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	ask.StubPrompt("Where should we push the 'feature' branch?").
 		AssertOptions([]string{"OWNER/REPO", "Skip pushing the branch", "Cancel"}).
 		AnswerDefault()
@@ -886,11 +876,10 @@ func TestPRCreate_webProject(t *testing.T) {
 	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use PrompterMock
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	ask, cleanupAsk := prompt.InitAskStubber()
 	defer cleanupAsk()
 
-	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	ask.StubPrompt("Where should we push the 'feature' branch?").AnswerDefault()
 
 	output, err := runCommand(http, nil, "feature", true, `--web -p Triage`)
@@ -929,11 +918,8 @@ func TestPRCreate_draft(t *testing.T) {
 
 	as := prompt.NewAskStubber(t)
 
-	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Choose a template").AnswerDefault()
-	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("Body").AnswerDefault()
-	//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 	as.StubPrompt("What's next?").
 		AssertOptions([]string{"Submit", "Submit as draft", "Continue in browser", "Add metadata", "Cancel"}).
 		AnswerWith("Submit as draft")

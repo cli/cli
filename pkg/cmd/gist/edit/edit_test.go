@@ -162,9 +162,7 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "multiple files, submit",
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Edit which file?").AnswerWith("unix.md")
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("What next?").AnswerWith("Submit")
 			},
 			gist: &shared.Gist{
@@ -209,9 +207,7 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "multiple files, cancel",
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Edit which file?").AnswerWith("unix.md")
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("What next?").AnswerWith("Cancel")
 			},
 			wantErr: "CancelError",

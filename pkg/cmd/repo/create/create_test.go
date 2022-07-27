@@ -187,30 +187,30 @@ func Test_createRun(t *testing.T) {
 			tty:        true,
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n",
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne("Create a new repository on GitHub from scratch")
-				//nolint:staticcheck // SA1019: as.Stub is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoName", Value: "REPO"},
 					{Name: "repoDescription", Value: "my new repo"},
 					{Name: "repoVisibility", Value: "Private"},
 				})
-				//nolint:staticcheck // SA1019: as.Stub is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "addGitIgnore", Value: true}})
-				//nolint:staticcheck // SA1019: as.Stub is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "chooseGitIgnore", Value: "Go"}})
-				//nolint:staticcheck // SA1019: as.Stub is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "addLicense", Value: true}})
-				//nolint:staticcheck // SA1019: as.Stub is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "chooseLicense", Value: "GNU Lesser General Public License v3.0"}})
-				//nolint:staticcheck // SA1019: as.Stub is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "confirmSubmit", Value: true}})
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(true) //clone locally?
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -234,21 +234,21 @@ func Test_createRun(t *testing.T) {
 			opts: &CreateOptions{Interactive: true},
 			tty:  true,
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne("Create a new repository on GitHub from scratch")
-				//nolint:staticcheck // SA1019: as.Stub is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoName", Value: "REPO"},
 					{Name: "repoDescription", Value: "my new repo"},
 					{Name: "repoVisibility", Value: "Private"},
 				})
-				//nolint:staticcheck // SA1019: as.Stub is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "addGitIgnore", Value: false}})
-				//nolint:staticcheck // SA1019: as.Stub is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "addLicense", Value: false}})
-				//nolint:staticcheck // SA1019: as.Stub is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "confirmSubmit", Value: false}})
 			},
@@ -261,17 +261,17 @@ func Test_createRun(t *testing.T) {
 			opts: &CreateOptions{Interactive: true},
 			tty:  true,
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne("Push an existing local repository to GitHub")
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(".")
-				//nolint:staticcheck // SA1019: as.Stub is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoName", Value: "REPO"},
 					{Name: "repoDescription", Value: "my new repo"},
 					{Name: "repoVisibility", Value: "Private"},
 				})
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(false)
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -302,21 +302,21 @@ func Test_createRun(t *testing.T) {
 			opts: &CreateOptions{Interactive: true},
 			tty:  true,
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne("Push an existing local repository to GitHub")
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(".")
-				//nolint:staticcheck // SA1019: as.Stub is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoName", Value: "REPO"},
 					{Name: "repoDescription", Value: "my new repo"},
 					{Name: "repoVisibility", Value: "Private"},
 				})
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(true) //ask for adding a remote
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne("origin") //ask for remote name
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(false) //ask to push to remote
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -348,21 +348,21 @@ func Test_createRun(t *testing.T) {
 			opts: &CreateOptions{Interactive: true},
 			tty:  true,
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne("Push an existing local repository to GitHub")
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(".")
-				//nolint:staticcheck // SA1019: as.Stub is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoName", Value: "REPO"},
 					{Name: "repoDescription", Value: "my new repo"},
 					{Name: "repoVisibility", Value: "Private"},
 				})
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(true) //ask for adding a remote
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne("origin") //ask for remote name
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated; use PrompterMock
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(true) //ask to push to remote
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -452,7 +452,7 @@ func Test_createRun(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use PrompterMock
+		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 		q, teardown := prompt.InitAskStubber()
 		defer teardown()
 		if tt.askStubs != nil {

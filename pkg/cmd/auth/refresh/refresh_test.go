@@ -194,7 +194,6 @@ func Test_refreshRun(t *testing.T) {
 				Hostname: "",
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("What account do you want to refresh auth for?").AnswerWith("github.com")
 			},
 			wantAuthArgs: authArgs{

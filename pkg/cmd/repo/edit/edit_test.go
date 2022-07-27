@@ -173,9 +173,7 @@ func Test_editRun_interactive(t *testing.T) {
 				InteractiveMode: true,
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("What do you want to edit?").AnswerWith([]string{"Description"})
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Description of the repository").AnswerWith("awesome repo description")
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -215,13 +213,9 @@ func Test_editRun_interactive(t *testing.T) {
 				InteractiveMode: true,
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("What do you want to edit?").AnswerWith([]string{"Description", "Topics"})
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Description of the repository").AnswerWith("awesome repo description")
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Add topics?(csv format)").AnswerWith("a, b,c,d ")
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Remove Topics").AnswerWith([]string{"x"})
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
@@ -266,13 +260,9 @@ func Test_editRun_interactive(t *testing.T) {
 				InteractiveMode: true,
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("What do you want to edit?").AnswerWith([]string{"Merge Options"})
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Allowed merge strategies").AnswerWith([]string{allowMergeCommits, allowRebaseMerge})
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Enable Auto Merge?").AnswerWith(false)
-				//nolint:staticcheck // SA1019: as.StubPrompt is deprecated: use PrompterMock
 				as.StubPrompt("Automatically delete head branches after merging?").AnswerWith(false)
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {

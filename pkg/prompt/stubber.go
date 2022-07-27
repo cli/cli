@@ -18,7 +18,6 @@ type testing interface {
 	Cleanup(func())
 }
 
-// Deprecated: use PrompterMock
 func NewAskStubber(t testing) *AskStubber {
 	as, teardown := InitAskStubber()
 	t.Cleanup(func() {
@@ -32,7 +31,7 @@ func NewAskStubber(t testing) *AskStubber {
 	return as
 }
 
-// Deprecated: use PrompterMock
+// Deprecated: use NewAskStubber
 func InitAskStubber() (*AskStubber, func()) {
 	origSurveyAsk := SurveyAsk
 	origSurveyAskOne := SurveyAskOne
@@ -158,38 +157,34 @@ type QuestionStub struct {
 }
 
 // AssertOptions asserts the options presented to the user in Selects and MultiSelects.
-// Deprecated: use PrompterMock
 func (s *QuestionStub) AssertOptions(opts []string) *QuestionStub {
 	s.options = opts
 	return s
 }
 
 // AnswerWith defines an answer for the given stub.
-// Deprecated: use PrompterMock
 func (s *QuestionStub) AnswerWith(v interface{}) *QuestionStub {
 	s.Value = v
 	return s
 }
 
 // AnswerDefault marks the current stub to be answered with the default value for the prompt question.
-// Deprecated: use PrompterMock
 func (s *QuestionStub) AnswerDefault() *QuestionStub {
 	s.Default = true
 	return s
 }
 
-// Deprecated: use PrompterMock
+// Deprecated: use StubPrompt
 func (as *AskStubber) StubOne(value interface{}) {
 	as.Stub([]*QuestionStub{{Value: value}})
 }
 
-// Deprecated: use PrompterMock
+// Deprecated: use StubPrompt
 func (as *AskStubber) Stub(stubbedQuestions []*QuestionStub) {
 	as.stubs = append(as.stubs, stubbedQuestions...)
 }
 
 // StubPrompt records a stub for an interactive prompt matched by its message.
-// Deprecated: use PrompterMock
 func (as *AskStubber) StubPrompt(msg string) *QuestionStub {
 	stub := &QuestionStub{message: msg}
 	as.stubs = append(as.stubs, stub)
