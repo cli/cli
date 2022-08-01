@@ -1,6 +1,7 @@
 package checkout
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -32,6 +33,7 @@ type CheckoutOptions struct {
 	SelectorArg       string
 	RecurseSubmodules bool
 	Force             bool
+	Fetch             bool
 	Detach            bool
 	BranchName        string
 }
@@ -65,6 +67,7 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 
 	cmd.Flags().BoolVarP(&opts.RecurseSubmodules, "recurse-submodules", "", false, "Update all submodules after checkout")
 	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Reset the existing local branch to the latest state of the pull request")
+	cmd.Flags().BoolVarP(&opts.Fetch, "fetch", "", false, "Only fetch the PR without checking it out")
 	cmd.Flags().BoolVarP(&opts.Detach, "detach", "", false, "Checkout PR with a detached HEAD")
 	cmd.Flags().StringVarP(&opts.BranchName, "branch", "b", "", "Local branch name to use (default: the name of the head branch)")
 
@@ -72,6 +75,10 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 }
 
 func checkoutRun(opts *CheckoutOptions) error {
+	if opts.Detach && opts.Fetch {
+		return errors.New("--detach and --fetch are exclusive and cannot be both supplied")
+	}
+
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
 		Fields:   []string{"number", "headRefName", "headRepository", "headRepositoryOwner", "isCrossRepository", "maintainerCanModify"},
@@ -156,6 +163,7 @@ func cmdsForExistingRemote(remote *context.Remote, pr *api.PullRequest, opts *Ch
 	}
 
 	switch {
+	case opts.Fetch:
 	case opts.Detach:
 		cmds = append(cmds, []string{"git", "checkout", "--detach", "FETCH_HEAD"})
 	case localBranchExists(localBranch):
@@ -209,7 +217,9 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 			cmds = append(cmds, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch)})
 		}
 
-		cmds = append(cmds, []string{"git", "checkout", localBranch})
+		if !opts.Fetch {
+			cmds = append(cmds, []string{"git", "checkout", localBranch})
+		}
 	}
 
 	remote := baseURLOrName
