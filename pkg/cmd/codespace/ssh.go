@@ -63,6 +63,14 @@ func newSSHCmd(app *App) *cobra.Command {
 
 			Once that is set up (see the second example below), you can ssh to codespaces as
 			if they were ordinary remote hosts (using 'ssh', not 'gh cs ssh').
+
+			Please note that you might need to explicitly install 'sshd' when using a
+			custom container image. You can install it by adding following snippet to the 
+			'devcontainer.json'
+			
+			"features": {
+				"sshd": "latest"
+			}
 		`),
 		Example: heredoc.Doc(`
 			$ gh codespace ssh
