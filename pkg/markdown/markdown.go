@@ -52,6 +52,10 @@ func Render(text string, opts ...glamour.TermRendererOption) (string, error) {
 	// we need to ensure that no such characters are present in the output.
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 
+	// Set default word wrap limit to 120. Glamour default is 80, which causes
+	// problems with hard-wrapped text and blockquoted text in issues and PRs
+	opts = append([]glamour.TermRendererOption{glamour.WithWordWrap(120)}, opts...)
+
 	opts = append(opts, glamour.WithEmoji(), glamour.WithPreservedNewLines())
 	tr, err := glamour.NewTermRenderer(opts...)
 	if err != nil {
