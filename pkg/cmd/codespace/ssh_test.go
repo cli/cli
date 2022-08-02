@@ -137,6 +137,7 @@ func TestHasUploadedPublicKeyForConfig(t *testing.T) {
 		localKeyPairs           []testLocalKeyPair
 		wantResult              bool
 	}{
+		// Failure tests
 		{
 			// No API keys and no local keys
 			wantResult: false,
@@ -158,10 +159,25 @@ func TestHasUploadedPublicKeyForConfig(t *testing.T) {
 			wantResult:              false,
 		},
 
+		// Successful tests
 		{
-			// API keys and local keys and matching
 			apiAuthorizedPublicKeys: []string{"test-key"},
 			localKeyPairs:           []testLocalKeyPair{{"keyfile", "test-key"}},
+			wantResult:              true,
+		},
+		{
+			apiAuthorizedPublicKeys: []string{"test-key-1", "test-key-2"},
+			localKeyPairs:           []testLocalKeyPair{{"keyfile1", "test-key-1"}},
+			wantResult:              true,
+		},
+		{
+			apiAuthorizedPublicKeys: []string{"test-key-1"},
+			localKeyPairs:           []testLocalKeyPair{{"keyfile1", "test-key-1"}, {"keyfile2", "test-key-2"}},
+			wantResult:              true,
+		},
+		{
+			apiAuthorizedPublicKeys: []string{"test-key-1", "test-key-2"},
+			localKeyPairs:           []testLocalKeyPair{{"keyfile3", "test-key-3"}, {"keyfile2", "test-key-2"}},
 			wantResult:              true,
 		},
 	}
