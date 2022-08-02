@@ -201,7 +201,10 @@ func TestHasUploadedPublicKeyForConfig(t *testing.T) {
 		for _, pair := range tt.localKeyPairs {
 			configContent += fmt.Sprintf("IdentityFile %s\n", path.Join(dir, pair.privateKeyFile))
 
-			os.WriteFile(path.Join(dir, pair.privateKeyFile+".pub"), []byte(pair.publicKeyContent), 0666)
+			err := os.WriteFile(path.Join(dir, pair.privateKeyFile+".pub"), []byte(pair.publicKeyContent), 0666)
+			if err != nil {
+				t.Fatalf("could not write test public key file %v", err)
+			}
 		}
 
 		err := os.WriteFile(configPath, []byte(configContent), 0666)
