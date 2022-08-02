@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -30,6 +31,8 @@ type ViewOptions struct {
 	Prompt   bool
 	Raw      bool
 	YAML     bool
+
+	now time.Time
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -37,6 +40,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
+		now:        time.Now(),
 	}
 
 	cmd := &cobra.Command{
@@ -223,11 +227,7 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interfa
 		tp.AddField(string(run.Event), nil, nil)
 
 		if opts.Raw {
-			elapsed := run.UpdatedAt.Sub(run.CreatedAt)
-			if elapsed < 0 {
-				elapsed = 0
-			}
-			tp.AddField(elapsed.String(), nil, nil)
+			tp.AddField(run.Duration(opts.now).String(), nil, nil)
 		}
 
 		tp.AddField(fmt.Sprintf("%d", run.ID), nil, cs.Cyan)
