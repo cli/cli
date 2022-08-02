@@ -2,8 +2,10 @@ package codespace
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -122,6 +124,83 @@ func TestAutomaticSSHKeyPairs(t *testing.T) {
 		}
 	}
 
+}
+
+func TestHasUploadedPublicKeyForConfig(t *testing.T) {
+	type testLocalKeyPair struct {
+		privateKeyFile   string
+		publicKeyContent string
+	}
+
+	tests := []struct {
+		apiAuthorizedPublicKeys []string
+		localKeyPairs           []testLocalKeyPair
+		wantResult              bool
+	}{
+		{
+			// No API keys and no local keys
+			wantResult: false,
+		},
+		{
+			// Has API keys, but no local keys
+			apiAuthorizedPublicKeys: []string{"test-key"},
+			wantResult:              false,
+		},
+		{
+			// No API keys, but has local keys
+			localKeyPairs: []testLocalKeyPair{{"keyfile", "test-key"}},
+			wantResult:    false,
+		},
+		{
+			// API keys and local keys, but not matching
+			apiAuthorizedPublicKeys: []string{"test-api-key"},
+			localKeyPairs:           []testLocalKeyPair{{"keyfile", "test-local-key"}},
+			wantResult:              false,
+		},
+
+		{
+			// API keys and local keys and matching
+			apiAuthorizedPublicKeys: []string{"test-key"},
+			localKeyPairs:           []testLocalKeyPair{{"keyfile", "test-key"}},
+			wantResult:              true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Logf("%+v", tt)
+
+		mockApi := &apiClientMock{
+			GetUserFunc: func(ctx context.Context) (*api.User, error) {
+				return &api.User{Login: "test"}, nil
+			},
+			AuthorizedKeysFunc: func(_ context.Context, _ string) ([]string, error) {
+				return tt.apiAuthorizedPublicKeys, nil
+			},
+		}
+
+		dir := t.TempDir()
+		configPath := path.Join(dir, "test-config")
+
+		configContent := ""
+		for _, pair := range tt.localKeyPairs {
+			configContent += fmt.Sprintf("IdentityFile %s\n", path.Join(dir, pair.privateKeyFile))
+
+			os.WriteFile(path.Join(dir, pair.privateKeyFile+".pub"), []byte(pair.publicKeyContent), 0666)
+		}
+
+		err := os.WriteFile(configPath, []byte(configContent), 0666)
+		if err != nil {
+			t.Fatalf("could not write test config %v", err)
+		}
+
+		sshContext := ssh.Context{}
+
+		result := hasUploadedPublicKeyForConfig(context.Background(), sshContext, mockApi, configPath, "")
+
+		if result != tt.wantResult {
+			t.Errorf("Want hasUploadedPublicKeyForConfig to be %v, got %v", tt.wantResult, result)
+		}
+	}
 }
 
 func testingSSHApp() *App {
