@@ -366,7 +366,7 @@ func hasUploadedPublicKeyForConfig(
 	}
 
 	for _, uploadedPublicKey := range uploadedPublicKeys {
-		if ok, _ := publicKeyMap[uploadedPublicKey]; ok {
+		if publicKeyMap[uploadedPublicKey] {
 			return true, nil
 		}
 	}
