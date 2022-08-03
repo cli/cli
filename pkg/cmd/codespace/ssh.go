@@ -65,8 +65,9 @@ func newSSHCmd(app *App) *cobra.Command {
 			if they were ordinary remote hosts (using 'ssh', not 'gh cs ssh').
 
 			Note that the codespace you are connecting to must have an SSH server pre-installed.
-			If the docker image being used for the codespace does not have an SSH server, you can
-			try adding the following snippet in your devcontainer.json:
+			If the docker image being used for the codespace does not have an SSH server,
+			install it in your Dockerfile or you can try adding the following snippet
+			in your devcontainer.json:
 			
 			"features": {
 				"sshd": "latest"
