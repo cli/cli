@@ -1087,11 +1087,12 @@ func (a *API) AuthorizedKeys(ctx context.Context, user string) ([]string, error)
 
 	splitKeys := []string{}
 	for _, key := range strings.Split(allKeys, "\n") {
+		key = strings.TrimSpace(key)
 		if key == "" {
 			continue
 		}
 
-		splitKeys = append(splitKeys, strings.TrimSpace(key))
+		splitKeys = append(splitKeys, key)
 	}
 
 	return splitKeys, nil

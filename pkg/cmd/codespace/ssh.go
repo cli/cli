@@ -135,7 +135,12 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	sshContext := ssh.Context{}
 	startSSHOptions := liveshare.StartSSHServerOptions{}
 
-	if shouldUseAutomaticSSHKeys(ctx, sshContext, a.apiClient, args, opts) {
+	useAutoKeys, err := useAutomaticSSHKeys(ctx, sshContext, a.apiClient, args, opts)
+	if err != nil {
+		return fmt.Errorf("checking ssh key configuration: %w", err)
+	}
+
+	if useAutoKeys {
 		keyPair, err := setupAutomaticSSHKeys(sshContext)
 		if err != nil {
 			return fmt.Errorf("failed to generate ssh keys: %w", err)
@@ -218,20 +223,20 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 }
 
-func shouldUseAutomaticSSHKeys(
+func useAutomaticSSHKeys(
 	ctx context.Context,
 	sshContext ssh.Context,
 	apiClient apiClient,
 	args []string,
 	opts sshOptions,
-) bool {
+) (bool, error) {
 	customConfigPath := ""
 	for i := 0; i < len(args); i += 1 {
 		arg := args[i]
 
 		if arg == "-i" {
 			// User specified the identity file so just trust it is correct
-			return false
+			return false, nil
 		}
 
 		if arg == "-F" && i < len(args)-1 {
@@ -242,7 +247,9 @@ func shouldUseAutomaticSSHKeys(
 
 	// If there is a public key uploaded which matches a configured
 	// private key, there is no need for automatic key generation
-	return !hasUploadedPublicKeyForConfig(ctx, sshContext, apiClient, customConfigPath, opts.profile)
+	hasPublicKey, err := hasUploadedPublicKeyForConfig(ctx, sshContext, apiClient, customConfigPath, opts.profile)
+
+	return !hasPublicKey, err
 }
 
 func setupAutomaticSSHKeys(sshContext ssh.Context) (*ssh.KeyPair, error) {
@@ -314,10 +321,10 @@ func hasUploadedPublicKeyForConfig(
 	apiClient apiClient,
 	customConfigFile string,
 	customHost string,
-) bool {
+) (bool, error) {
 	configuredPrivateKeyPaths, err := getConfiguredPrivateKeys(ctx, customConfigFile, customHost)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("getting local ssh keys: %w", err)
 	}
 
 	configuredPublicKeys := []string{}
@@ -326,8 +333,8 @@ func hasUploadedPublicKeyForConfig(
 
 		publicKeyContent, err := os.ReadFile(publicKeyPath)
 		if err != nil {
-			// The default configuration includes standard keys like id_rsa,
-			// id_ed25519, etc, but these may not actually exist so just skip
+			// The default configuration includes standard keys like id_rsa or id_ed25519,
+			// but these may not actually exist so just skip them
 			continue
 		}
 
@@ -336,32 +343,35 @@ func hasUploadedPublicKeyForConfig(
 
 	if len(configuredPublicKeys) == 0 {
 		// There are no local private keys which ssh would use
-		return false
+		return false, nil
+	}
+
+	publicKeyMap := make(map[string]bool)
+	for _, publicKey := range configuredPublicKeys {
+		publicKeyMap[publicKey] = true
 	}
 
 	user, err := apiClient.GetUser(ctx)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("fetching user account: %w", err)
 	}
 
 	uploadedPublicKeys, err := apiClient.AuthorizedKeys(ctx, user.Login)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("fetching known ssh keys: %w", err)
 	}
 
 	if len(uploadedPublicKeys) == 0 {
-		return false
+		return false, nil
 	}
 
-	for _, configuredPublicKey := range configuredPublicKeys {
-		for _, uploadedPublicKey := range uploadedPublicKeys {
-			if configuredPublicKey == uploadedPublicKey {
-				return true
-			}
+	for _, uploadedPublicKey := range uploadedPublicKeys {
+		if ok, _ := publicKeyMap[uploadedPublicKey]; ok {
+			return true, nil
 		}
 	}
 
-	return false
+	return false, nil
 }
 
 // getConfiguredPrivateKeys reads the effective configuration for a localhost

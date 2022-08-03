@@ -214,7 +214,10 @@ func TestHasUploadedPublicKeyForConfig(t *testing.T) {
 
 		sshContext := ssh.Context{}
 
-		result := hasUploadedPublicKeyForConfig(context.Background(), sshContext, mockApi, configPath, "")
+		result, err := hasUploadedPublicKeyForConfig(context.Background(), sshContext, mockApi, configPath, "")
+		if err != nil {
+			t.Errorf("Unexpected error from hasUploadedPublicKeyForConfig: %v", err)
+		}
 
 		if result != tt.wantResult {
 			t.Errorf("Want hasUploadedPublicKeyForConfig to be %v, got %v", tt.wantResult, result)
