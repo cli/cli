@@ -439,3 +439,15 @@ func getBranchShortName(output []byte) string {
 	branch := firstLine(output)
 	return strings.TrimPrefix(branch, "refs/heads/")
 }
+
+func GetRemoteBranches() []string {
+	cmd, err := GitCommand("branch", "-r", "--format", "%(refname:strip=3)")
+	if err != nil {
+		return []string{}
+	}
+	output, err := run.PrepareCmd(cmd).Output()
+	if err != nil {
+		return []string{}
+	}
+	return strings.Split(string(output), "\n")
+}
