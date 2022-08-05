@@ -67,6 +67,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Filter runs by branch")
 	cmd.Flags().StringVarP(&opts.Actor, "user", "u", "", "Filter runs by user who triggered the run")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.RunFields)
+	cmdutil.RegisterBranchCompletionFlags(cmd, "branch")
 
 	return cmd
 }

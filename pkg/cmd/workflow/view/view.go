@@ -82,6 +82,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open workflow in the browser")
 	cmd.Flags().BoolVarP(&opts.YAML, "yaml", "y", false, "View the workflow yaml file")
 	cmd.Flags().StringVarP(&opts.Ref, "ref", "r", "", "The branch or tag name which contains the version of the workflow file you'd like to view")
+	cmdutil.RegisterBranchCompletionFlags(cmd, "ref")
 
 	return cmd
 }

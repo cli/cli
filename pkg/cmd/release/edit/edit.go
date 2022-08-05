@@ -78,6 +78,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or full commit SHA (default: main branch)")
 	cmd.Flags().StringVar(&opts.TagName, "tag", "", "The name of the tag")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
+	cmdutil.RegisterBranchCompletionFlags(cmd, "target")
 
 	return cmd
 }
