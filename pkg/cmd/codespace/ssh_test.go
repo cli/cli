@@ -123,7 +123,48 @@ func TestAutomaticSSHKeyPairs(t *testing.T) {
 			}
 		}
 	}
+}
 
+func TestDontUseAutomaticSSHKeysWithCustomPrivateKey(t *testing.T) {
+	args := []string{"-i", "private-key"}
+	result, err := useAutomaticSSHKeys(context.Background(), ssh.Context{}, nil, args, sshOptions{})
+
+	if err != nil {
+		t.Errorf("Unexpected error from useAutomaticSSHKeys: %v", err)
+	}
+
+	if result != false {
+		t.Errorf("Want useAutomaticSSHKeys to be false, got true")
+	}
+}
+
+func TestUseAutomaticSSHKeysWithAutoKeysExist(t *testing.T) {
+	dir := t.TempDir()
+
+	f, err := os.Create(path.Join(dir, automaticPrivateKeyName))
+	if err != nil {
+		t.Errorf("Failed to create test private key: %v", err)
+	}
+	f.Close()
+
+	f, err = os.Create(path.Join(dir, automaticPrivateKeyName+".pub"))
+	if err != nil {
+		t.Errorf("Failed to create test public key: %v", err)
+	}
+	f.Close()
+
+	sshContext := ssh.Context{
+		ConfigDir: dir,
+	}
+	result, err := useAutomaticSSHKeys(context.Background(), sshContext, nil, nil, sshOptions{})
+
+	if err != nil {
+		t.Errorf("Unexpected error from useAutomaticSSHKeys: %v", err)
+	}
+
+	if result != true {
+		t.Errorf("Want useAutomaticSSHKeys to be true, got false")
+	}
 }
 
 func TestHasUploadedPublicKeyForConfig(t *testing.T) {

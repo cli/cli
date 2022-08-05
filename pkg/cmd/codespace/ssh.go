@@ -245,11 +245,36 @@ func useAutomaticSSHKeys(
 		}
 	}
 
+	if automaticKeySSHKeysExist(sshContext) {
+		// If the automatic keys already exist, just use them
+		return true, nil
+	}
+
 	// If there is a public key uploaded which matches a configured
 	// private key, there is no need for automatic key generation
 	hasPublicKey, err := hasUploadedPublicKeyForConfig(ctx, sshContext, apiClient, customConfigPath, opts.profile)
 
 	return !hasPublicKey, err
+}
+
+func automaticKeySSHKeysExist(sshContext ssh.Context) bool {
+	publicKeys, err := sshContext.LocalPublicKeys()
+	if err != nil {
+		return false
+	}
+
+	for _, publicKey := range publicKeys {
+		if filepath.Base(publicKey) != automaticPrivateKeyName+".pub" {
+			continue
+		}
+
+		privateKey := strings.TrimSuffix(publicKey, ".pub")
+
+		_, err := os.Stat(privateKey)
+		return err == nil
+	}
+
+	return false
 }
 
 func setupAutomaticSSHKeys(sshContext ssh.Context) (*ssh.KeyPair, error) {
