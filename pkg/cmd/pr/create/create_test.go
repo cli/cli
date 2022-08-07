@@ -576,9 +576,28 @@ func Test_createRun(t *testing.T) {
 				} } } }
 				`))
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+					httpmock.StringResponse(`
+				{ "data": { "repository": { "projectsV2": {
+					"nodes": [
+						{ "title": "CleanupV2", "id": "CLEANUPV2ID" },
+						{ "title": "RoadmapV2", "id": "ROADMAPV2ID" }
+					],
+					"pageInfo": { "hasNextPage": false }
+				} } } }			
+				`))
+				reg.Register(
 					httpmock.GraphQL(`query OrganizationProjectList\b`),
 					httpmock.StringResponse(`
 				{ "data": { "organization": { "projects": {
+					"nodes": [],
+					"pageInfo": { "hasNextPage": false }
+				} } } }
+				`))
+				reg.Register(
+					httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+					httpmock.StringResponse(`
+				{ "data": { "organization": { "projectsV2": {
 					"nodes": [],
 					"pageInfo": { "hasNextPage": false }
 				} } } }
@@ -698,11 +717,41 @@ func Test_createRun(t *testing.T) {
 			} } } }
 			`))
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryProjectList\b`),
+					httpmock.StringResponse(`
+			{ "data": { "repository": { "projects": {
+				"nodes": [
+					{ "name": "Cleanup", "id": "CLEANUPID", "resourcePath": "/OWNER/REPO/projects/1" }
+				],
+				"pageInfo": { "hasNextPage": false }
+			} } } }
+			`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+					httpmock.StringResponse(`
+			{ "data": { "repository": { "projectsV2": {
+				"nodes": [
+					{ "title": "CleanupV2", "id": "CLEANUPV2ID", "resourcePath": "/OWNER/REPO/projects/2" }
+				],
+				"pageInfo": { "hasNextPage": false }
+			} } } }
+			`))
+				reg.Register(
 					httpmock.GraphQL(`query OrganizationProjectList\b`),
 					httpmock.StringResponse(`
 			{ "data": { "organization": { "projects": {
 				"nodes": [
 					{ "name": "Triage", "id": "TRIAGEID", "resourcePath": "/orgs/ORG/projects/1"  }
+				],
+				"pageInfo": { "hasNextPage": false }
+			} } } }
+			`))
+				reg.Register(
+					httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+					httpmock.StringResponse(`
+			{ "data": { "organization": { "projectsV2": {
+				"nodes": [
+					{ "title": "TriageV2", "id": "TRIAGEV2ID", "resourcePath": "/orgs/ORG/projects/2"  }
 				],
 				"pageInfo": { "hasNextPage": false }
 			} } } }

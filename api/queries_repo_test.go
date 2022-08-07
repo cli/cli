@@ -90,11 +90,32 @@ func Test_RepoMetadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
+		httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projectsV2": {
+			"nodes": [
+				{ "title": "CleanupV2", "id": "CLEANUPV2ID" },
+				{ "title": "RoadmapV2", "id": "ROADMAPV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
 		httpmock.GraphQL(`query OrganizationProjectList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "organization": { "projects": {
 			"nodes": [
 				{ "name": "Triage", "id": "TRIAGEID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "organization": { "projectsV2": {
+			"nodes": [
+				{ "title": "TriageV2", "id": "TRIAGEV2ID" }
 			],
 			"pageInfo": { "hasNextPage": false }
 		} } } }
@@ -149,12 +170,16 @@ func Test_RepoMetadata(t *testing.T) {
 	}
 
 	expectedProjectIDs := []string{"TRIAGEID", "ROADMAPID"}
-	projectIDs, err := result.ProjectsToIDs([]string{"triage", "roadmap"})
+	expectedProjectV2IDs := []string{"TRIAGEV2ID", "ROADMAPV2ID"}
+	projectIDs, projectV2IDs, err := result.ProjectsToIDs([]string{"triage", "roadmap", "triagev2", "roadmapv2"})
 	if err != nil {
 		t.Errorf("error resolving projects: %v", err)
 	}
 	if !sliceEqual(projectIDs, expectedProjectIDs) {
 		t.Errorf("expected projects %v, got %v", expectedProjectIDs, projectIDs)
+	}
+	if !sliceEqual(projectV2IDs, expectedProjectV2IDs) {
+		t.Errorf("expected projectsV2 %v, got %v", expectedProjectV2IDs, projectV2IDs)
 	}
 
 	expectedMilestoneID := "BIGONEID"
@@ -210,13 +235,34 @@ func Test_ProjectNamesToPaths(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`query OrganizationProjectList\b`),
 		httpmock.StringResponse(`
-			{ "data": { "organization": { "projects": {
-				"nodes": [
-					{ "name": "Triage", "id": "TRIAGEID", "resourcePath": "/orgs/ORG/projects/1"  }
-				],
-				"pageInfo": { "hasNextPage": false }
-			} } } }
-			`))
+		{ "data": { "organization": { "projects": {
+			"nodes": [
+				{ "name": "Triage", "id": "TRIAGEID", "resourcePath": "/orgs/ORG/projects/1"  }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projectsV2": {
+			"nodes": [
+				{ "title": "CleanupV2", "id": "CLEANUPV2ID", "resourcePath": "/OWNER/REPO/projects/3" },
+				{ "title": "RoadmapV2", "id": "ROADMAPV2ID", "resourcePath": "/OWNER/REPO/projects/4" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "organization": { "projectsV2": {
+			"nodes": [
+				{ "title": "TriageV2", "id": "TRIAGEV2ID", "resourcePath": "/orgs/ORG/projects/2"  }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
 
 	projectPaths, err := ProjectNamesToPaths(client, repo, []string{"Triage", "Roadmap"})
 	if err != nil {

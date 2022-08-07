@@ -109,11 +109,12 @@ func AddMetadataToIssueParams(client *api.Client, baseRepo ghrepo.Interface, par
 	}
 	params["labelIds"] = labelIDs
 
-	projectIDs, err := tb.MetadataResult.ProjectsToIDs(tb.Projects)
+	projectIDs, projectV2IDs, err := tb.MetadataResult.ProjectsToIDs(tb.Projects)
 	if err != nil {
 		return fmt.Errorf("could not add to project: %w", err)
 	}
 	params["projectIds"] = projectIDs
+	params["projectV2Ids"] = projectV2IDs
 
 	if len(tb.Milestones) > 0 {
 		milestoneID, err := tb.MetadataResult.MilestoneToID(tb.Milestones[0])

@@ -217,6 +217,24 @@ func Test_createRun(t *testing.T) {
 						],
 						"pageInfo": { "hasNextPage": false }
 					} } } }`))
+				r.Register(
+					httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "projectsV2": {
+						"nodes": [
+							{ "title": "CleanupV2", "id": "CLEANUPV2ID", "resourcePath": "/OWNER/REPO/projects/2" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }`))
+				r.Register(
+					httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+					httpmock.StringResponse(`
+					{ "data": { "organization": { "projectsV2": {
+						"nodes": [
+							{ "title": "Triage", "id": "TRIAGEID", "resourcePath": "/orgs/ORG/projects/2"  }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }`))
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?body=&projects=OWNER%2FREPO%2F1",
 			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
@@ -613,6 +631,28 @@ func TestIssueCreate_metadata(t *testing.T) {
 		}
 		`))
 	http.Register(
+		httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projectsV2": {
+			"nodes": [
+				{ "title": "CleanupV2", "id": "CLEANUPV2ID" },
+				{ "title": "RoadmapV2", "id": "ROADMAPV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+		httpmock.StringResponse(`
+		{	"data": { "organization": null },
+			"errors": [{
+				"type": "NOT_FOUND",
+				"path": [ "organization" ],
+				"message": "Could not resolve to an Organization with the login of 'OWNER'."
+			}]
+		}
+		`))
+	http.Register(
 		httpmock.GraphQL(`mutation IssueCreate\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "createIssue": { "issue": {
@@ -631,6 +671,7 @@ func TestIssueCreate_metadata(t *testing.T) {
 			if v, ok := inputs["teamIds"]; ok {
 				t.Errorf("did not expect teamIds: %v", v)
 			}
+			assert.NotContains(t, inputs, "projectV2Ids")
 		}))
 
 	output, err := runCommand(http, true, `-t TITLE -b BODY -a monalisa -l bug -l todo -p roadmap -m 'big one.oh'`, nil)
