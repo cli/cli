@@ -1287,7 +1287,6 @@ func RepoMilestones(client *Client, repo ghrepo.Interface, state string) ([]Repo
 
 func ProjectNamesToPaths(client *Client, repo ghrepo.Interface, projectNames []string) ([]string, error) {
 	var paths []string
-	// projectsV2 are ignored for now
 	projects, projectsV2, err := RepoAndOrgProjects(client, repo)
 	if err != nil {
 		return paths, err
