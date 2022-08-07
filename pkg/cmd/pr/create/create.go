@@ -681,7 +681,9 @@ func addPullRequestToProjectsV2(client *api.Client, repo *api.Repository, pullRe
 		}
 
 		_, err := api.AddProjectV2ItemById(client, repo, addItemParams)
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
