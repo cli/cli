@@ -654,7 +654,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 		if ok {
 			err = addPullRequestToProjectsV2(client, ctx.BaseRepo, pr, projectV2Ids)
 			if err != nil {
-				fmt.Fprintln(opts.IO.ErrOut, "Failed to add pull request with ID %w to projectsV2: %w", pr.ID, err)
+				fmt.Fprintln(opts.IO.ErrOut, "Failed to add pull request with ID", pr.ID, "to projectsV2:", err)
 				return err
 			}
 		}
