@@ -122,6 +122,7 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 	mutation IssueCreate($input: CreateIssueInput!) {
 		createIssue(input: $input) {
 			issue {
+				id
 				url
 			}
 		}
