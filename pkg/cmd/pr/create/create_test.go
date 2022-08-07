@@ -422,6 +422,99 @@ func TestPRCreate(t *testing.T) {
 	assert.Equal(t, "\nCreating pull request for feature into master in OWNER/REPO\n\n", output.Stderr())
 }
 
+func TestPRCreate_projectV2(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.StubRepoInfoResponse("OWNER", "REPO", "master")
+	http.StubRepoResponse("OWNER", "REPO")
+	http.Register(
+		httpmock.GraphQL(`query UserCurrent\b`),
+		httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
+	shared.RunCommandFinder("feature", nil, nil)
+	http.Register(
+		httpmock.GraphQL(`query RepositoryProjectList\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projects": {
+			"nodes": [],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query OrganizationProjectList\b`),
+		httpmock.StringResponse(`
+		{ "data": { "organization": { "projects": {
+			"nodes": [],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projectsV2": {
+			"nodes": [],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "organization": { "projectsV2": {
+			"nodes": [
+				{ "title": "CleanupV2", "id": "CLEANUPV2ID" },
+				{ "title": "RoadmapV2", "id": "ROADMAPV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestCreate\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"id": "PullRequest#1",
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+		`, func(input map[string]interface{}) {
+			assert.Equal(t, "REPOID", input["repositoryId"].(string))
+			assert.Equal(t, "my title", input["title"].(string))
+			assert.Equal(t, "my body", input["body"].(string))
+			assert.Equal(t, "master", input["baseRefName"].(string))
+			assert.Equal(t, "feature", input["headRefName"].(string))
+			assert.Equal(t, false, input["draft"].(bool))
+		}))
+	http.Register(
+		httpmock.GraphQL(`mutation AddProjectV2ItemById\b`),
+		httpmock.GraphQLMutation(`
+				{ "data": { "addProjectV2ItemById": { "item": {
+					"id": "1"
+				} } } }
+		`, func(inputs map[string]interface{}) {
+			assert.Equal(t, "PullRequest#1", inputs["contentId"])
+			assert.Equal(t, "ROADMAPV2ID", inputs["projectId"])
+			assert.Equal(t, 2, len(inputs))
+		}))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git status --porcelain`, 0, "")
+	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
+	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
+	ask, cleanupAsk := prompt.InitAskStubber()
+	defer cleanupAsk()
+
+	ask.StubPrompt("Where should we push the 'feature' branch?").AnswerDefault()
+
+	output, err := runCommand(http, nil, "feature", true, `-t "my title" -b "my body" -p "roadmapv2"`)
+	require.NoError(t, err)
+
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
+	assert.Equal(t, "\nCreating pull request for feature into master in OWNER/REPO\n\n", output.Stderr())
+}
+
 func TestPRCreate_NoMaintainerModify(t *testing.T) {
 	// TODO update this copypasta
 	http := initFakeHTTP()
