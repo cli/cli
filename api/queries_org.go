@@ -42,6 +42,48 @@ func OrganizationProjects(client *Client, repo ghrepo.Interface) ([]RepoProject,
 	return projects, nil
 }
 
+// OrganizationProjectsV2 fetches all open projectsV2 for an organization
+func OrganizationProjectsV2(client *Client, repo ghrepo.Interface) ([]RepoProjectV2, error) {
+	type responseData struct {
+		Organization struct {
+			ProjectsV2 struct {
+				Nodes    []RepoProjectV2
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			} `graphql:"projectsV2(first: 100, orderBy: {field: TITLE, direction: ASC}, after: $endCursor)"`
+		} `graphql:"organization(login: $owner)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":     githubv4.String(repo.RepoOwner()),
+		"endCursor": (*githubv4.String)(nil),
+	}
+
+	var projectsV2 []RepoProjectV2
+	for {
+		var query responseData
+		err := client.Query(repo.RepoHost(), "OrganizationProjectV2List", &query, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, p := range query.Organization.ProjectsV2.Nodes {
+			if !p.Closed {
+				projectsV2 = append(projectsV2, p)
+			}
+		}
+
+		if !query.Organization.ProjectsV2.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Organization.ProjectsV2.PageInfo.EndCursor)
+	}
+
+	return projectsV2, nil
+}
+
 type OrgTeam struct {
 	ID   string
 	Slug string
