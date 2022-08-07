@@ -281,6 +281,76 @@ func Test_createRun(t *testing.T) {
 			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
 		},
 		{
+			name: "project v2",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.Projects = []string{"roadmap2"}
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
+				reg.StubRepoResponse("OWNER", "REPO")
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryProjectList\b`),
+					httpmock.StringResponse(`{ "data": { "repository": { "projects": { "nodes": [],	"pageInfo": { "hasNextPage": false } } } } }`))
+				reg.Register(
+					httpmock.GraphQL(`query OrganizationProjectList\b`),
+					httpmock.StringResponse(`{ "data": { "organization": { "projects": { "nodes": [], "pageInfo": { "hasNextPage": false } } } } }`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryProjectListV2\b`),
+					httpmock.StringResponse(`{ "data": { "repository": { "projectsV2": { "nodes": [],	"pageInfo": { "hasNextPage": false } } } } }`))
+				reg.Register(
+					httpmock.GraphQL(`query OrganizationProjectListV2\b`),
+					httpmock.StringResponse(`{ "data": { "organization": { "projectsV2": { "nodes": [], "pageInfo": { "hasNextPage": false } } } } }`))
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"id": "PullRequest#1",
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }
+						`, func(input map[string]interface{}) {
+						assert.Equal(t, "REPOID", input["repositoryId"].(string))
+						assert.Equal(t, "my title", input["title"].(string))
+						assert.Equal(t, "my body", input["body"].(string))
+						assert.Equal(t, "master", input["baseRefName"].(string))
+						assert.Equal(t, "feature", input["headRefName"].(string))
+						assert.Equal(t, false, input["draft"].(bool))
+					}))
+				reg.Register(
+					httpmock.GraphQL(`mutation AddProjectV2ItemById\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "addProjectV2ItemById": { "item": {
+							"id": "1"
+						} } } }
+						`, func(input map[string]interface{}) {
+						assert.Equal(t, "PullRequest#1", input["contentId"])
+						assert.Equal(t, "ROADMAPV2ID", input["projectId"])
+						assert.Equal(t, 2, len(input))
+					}))
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
+				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+			},
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+					if p == "Where should we push the 'feature' branch?" {
+						return 0, nil
+					} else {
+						return -1, prompter.NoSuchPromptErr(p)
+					}
+				}
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
+		},
+		{
 			name: "no maintainer modify",
 			tty:  true,
 			setup: func(opts *CreateOptions, t *testing.T) func() {

@@ -296,12 +296,35 @@ func createRun(opts *CreateOptions) (err error) {
 			return
 		}
 
+		projectV2Ids, ok := params["projectV2Ids"].([]string)
+		if ok {
+			err = addIssueToProjectsV2(apiClient, repo, newIssue, projectV2Ids)
+			if err != nil {
+				fmt.Fprintln(opts.IO.ErrOut, "Failed to add issue with ID %w to projectsV2: %w", newIssue.ID, err)
+				return
+			}
+		}
+
 		fmt.Fprintln(opts.IO.Out, newIssue.URL)
 	} else {
 		panic("Unreachable state")
 	}
 
 	return
+}
+
+func addIssueToProjectsV2(client *api.Client, repo *api.Repository, issue *api.Issue, projectV2Ids []string) error {
+	for _, projectId := range projectV2Ids {
+		addItemParams := map[string]interface{}{
+			"contentId": issue.ID,
+			"projectId": projectId,
+		}
+
+		_, err := api.AddProjectV2ItemById(client, repo, addItemParams)
+		return err
+	}
+
+	return nil
 }
 
 func generatePreviewURL(apiClient *api.Client, baseRepo ghrepo.Interface, tb shared.IssueMetadataState) (string, error) {
