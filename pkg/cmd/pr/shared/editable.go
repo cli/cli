@@ -131,7 +131,7 @@ func (e Editable) ProjectIds() (*[]string, error) {
 		s.RemoveValues(e.Projects.Remove)
 		e.Projects.Value = s.ToSlice()
 	}
-	p, err := e.Metadata.ProjectsToIDs(e.Projects.Value)
+	p, _, err := e.Metadata.ProjectsToIDs(e.Projects.Value)
 	return &p, err
 }
 

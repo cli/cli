@@ -530,6 +530,27 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry, skipReviewers bool) 
 			"pageInfo": { "hasNextPage": false }
 		} } } }
 		`))
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projectsV2": {
+			"nodes": [
+				{ "title": "CleanupV2", "id": "CLEANUPV2ID" },
+				{ "title": "RoadmapV2", "id": "ROADMAPV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	reg.Register(
+		httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "organization": { "projectsV2": {
+			"nodes": [
+				{ "title": "TriageV2", "id": "TRIAGEV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
 	if !skipReviewers {
 		reg.Register(
 			httpmock.GraphQL(`query OrganizationTeamList\b`),
