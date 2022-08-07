@@ -307,7 +307,7 @@ func createRun(opts *CreateOptions) (err error) {
 		if ok {
 			err = addIssueToProjectsV2(apiClient, repo, newIssue, projectV2Ids)
 			if err != nil {
-				fmt.Fprintln(opts.IO.ErrOut, "Failed to add issue with ID %w to projectsV2: %w", newIssue.ID, err)
+				fmt.Fprintln(opts.IO.ErrOut, "Failed to add issue with ID", newIssue.ID, "to projectsV2:", err)
 				return
 			}
 		}
