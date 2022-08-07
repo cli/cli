@@ -752,9 +752,14 @@ func (m *RepoMetadataResult) projectV2TitleToID(projectTitle string) (string, bo
 	return "", false
 }
 
-func ProjectsToPaths(projects []RepoProject, names []string) ([]string, error) {
+func ProjectsToPaths(projects []RepoProject, projectsV2 []RepoProjectV2, names []string) ([]string, error) {
 	var paths []string
 	for _, projectName := range names {
+		// do not include projectsV2 in query params as they are not supported
+		if isProjectV2(projectName, projectsV2) {
+			continue
+		}
+
 		found := false
 		for _, p := range projects {
 			if strings.EqualFold(projectName, p.Name) {
@@ -777,6 +782,16 @@ func ProjectsToPaths(projects []RepoProject, names []string) ([]string, error) {
 		}
 	}
 	return paths, nil
+}
+
+func isProjectV2(projectName string, projectsV2 []RepoProjectV2) bool {
+	for _, p := range projectsV2 {
+		if strings.EqualFold(projectName, p.Title) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (m *RepoMetadataResult) MilestoneToID(title string) (string, error) {
@@ -1285,11 +1300,11 @@ func RepoMilestones(client *Client, repo ghrepo.Interface, state string) ([]Repo
 func ProjectNamesToPaths(client *Client, repo ghrepo.Interface, projectNames []string) ([]string, error) {
 	var paths []string
 	// projectsV2 are ignored for now
-	projects, _, err := RepoAndOrgProjects(client, repo)
+	projects, projectsV2, err := RepoAndOrgProjects(client, repo)
 	if err != nil {
 		return paths, err
 	}
-	return ProjectsToPaths(projects, projectNames)
+	return ProjectsToPaths(projects, projectsV2, projectNames)
 }
 
 func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, path string, body io.Reader) (*Repository, error) {
