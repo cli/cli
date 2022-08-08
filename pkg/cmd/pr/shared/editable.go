@@ -120,6 +120,7 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 	return &a, err
 }
 
+// ProjectIds returns a slice containing IDs of old projects (v1) that the issue or a PR has to be linked tos
 func (e Editable) ProjectIds() (*[]string, error) {
 	if !e.Projects.Edited {
 		return nil, nil
@@ -131,9 +132,36 @@ func (e Editable) ProjectIds() (*[]string, error) {
 		s.RemoveValues(e.Projects.Remove)
 		e.Projects.Value = s.ToSlice()
 	}
-	// ignore projectV2 IDs for now
 	p, _, err := e.Metadata.ProjectsToIDs(e.Projects.Value)
 	return &p, err
+}
+
+// ProjectV2Ids returns a pair of slices, where the first contains IDs of projectV2 the issue or a PR should be added to,
+// and the second contains IDs of projectV2 from which the issue or a PR should be removed
+func (e Editable) ProjectV2Ids() (*[]string, *[]string, error) {
+	if !e.Projects.Edited {
+		return nil, nil, nil
+	}
+
+	var addedProjectsV2 []string
+	var removedProjectsV2 []string
+	var err error
+
+	if len(e.Projects.Add) > 0 {
+		_, addedProjectsV2, err = e.Metadata.ProjectsToIDs(e.Projects.Add)
+		if err != nil {
+			return &addedProjectsV2, &removedProjectsV2, err
+		}
+	}
+
+	if len(e.Projects.Remove) > 0 {
+		_, removedProjectsV2, err = e.Metadata.ProjectsToIDs(e.Projects.Remove)
+		if err != nil {
+			return &addedProjectsV2, &removedProjectsV2, err
+		}
+	}
+
+	return &addedProjectsV2, &removedProjectsV2, nil
 }
 
 func (e Editable) MilestoneId() (*string, error) {

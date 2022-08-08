@@ -85,6 +85,7 @@ type PullRequest struct {
 	Assignees      Assignees
 	Labels         Labels
 	ProjectCards   ProjectCards
+	ProjectItems   ProjectItems
 	Milestone      *Milestone
 	Comments       Comments
 	ReactionGroups ReactionGroups

@@ -279,8 +279,8 @@ func Test_editRun(t *testing.T) {
 						Edited: true,
 					},
 					Projects: prShared.EditableSlice{
-						Add:    []string{"Cleanup", "Roadmap"},
-						Remove: []string{"Features"},
+						Add:    []string{"Cleanup", "RoadmapV2"},
+						Remove: []string{"Roadmap", "CleanupV2"},
 						Edited: true,
 					},
 					Milestone: prShared.EditableString{
@@ -297,9 +297,11 @@ func Test_editRun(t *testing.T) {
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockIssueGet(t, reg)
+				reg.StubRepoInfoResponse("OWNER", "REPO", "main")
 				mockRepoMetadata(t, reg)
 				mockIssueUpdate(t, reg)
 				mockIssueUpdateLabels(t, reg)
+				mockProjectV2ItemUpdate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
 		},
@@ -322,7 +324,7 @@ func Test_editRun(t *testing.T) {
 					eo.Body.Value = "new body"
 					eo.Assignees.Value = []string{"monalisa", "hubot"}
 					eo.Labels.Value = []string{"feature", "TODO", "bug"}
-					eo.Projects.Value = []string{"Cleanup", "Roadmap"}
+					eo.Projects.Value = []string{"Cleanup", "RoadmapV2"}
 					eo.Milestone.Value = "GA"
 					return nil
 				},
@@ -369,7 +371,12 @@ func mockIssueGet(_ *testing.T, reg *httpmock.Registry) {
 		httpmock.StringResponse(`
 			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
 				"number": 123,
-				"url": "https://github.com/OWNER/REPO/issue/123"
+				"url": "https://github.com/OWNER/REPO/issue/123",
+				"projectItems": {
+					"nodes": [
+						{ "id": "1" }
+					]
+				}
 			} } } }`),
 	)
 }
@@ -474,6 +481,21 @@ func mockIssueUpdateLabels(t *testing.T, reg *httpmock.Registry) {
 		httpmock.GraphQL(`mutation LabelRemove\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "removeLabelsFromLabelable": { "__typename": "" } } }`,
+			func(inputs map[string]interface{}) {}),
+	)
+}
+
+func mockProjectV2ItemUpdate(t *testing.T, reg *httpmock.Registry) {
+	reg.Register(
+		httpmock.GraphQL(`mutation AddProjectV2ItemById\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "addProjectV2ItemById": { "__typename": "" } } }`,
+			func(inputs map[string]interface{}) {}),
+	)
+	reg.Register(
+		httpmock.GraphQL(`mutation DeleteProjectV2Item\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "deleteProjectV2Item": { "__typename": "" } } }`,
 			func(inputs map[string]interface{}) {}),
 	)
 }

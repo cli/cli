@@ -311,6 +311,11 @@ func Test_editRun(t *testing.T) {
 				SelectorArg: "123",
 				Finder: shared.NewMockFinder("123", &api.PullRequest{
 					URL: "https://github.com/OWNER/REPO/pull/123",
+					ProjectItems: api.ProjectItems{
+						Nodes: []*api.ProjectV2Item{
+							{ID: "1"},
+						},
+					},
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
 				Editable: shared.Editable{
@@ -342,8 +347,8 @@ func Test_editRun(t *testing.T) {
 						Edited: true,
 					},
 					Projects: shared.EditableSlice{
-						Add:    []string{"Cleanup", "Roadmap"},
-						Remove: []string{"Features"},
+						Add:    []string{"Cleanup", "RoadmapV2"},
+						Remove: []string{"Roadmap", "CleanupV2"},
 						Edited: true,
 					},
 					Milestone: shared.EditableString{
@@ -354,10 +359,12 @@ func Test_editRun(t *testing.T) {
 				Fetcher: testFetcher{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.StubRepoInfoResponse("OWNER", "REPO", "main")
 				mockRepoMetadata(t, reg, false)
 				mockPullRequestUpdate(t, reg)
 				mockPullRequestReviewersUpdate(t, reg)
 				mockPullRequestUpdateLabels(t, reg)
+				mockProjectV2ItemUpdate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -367,6 +374,11 @@ func Test_editRun(t *testing.T) {
 				SelectorArg: "123",
 				Finder: shared.NewMockFinder("123", &api.PullRequest{
 					URL: "https://github.com/OWNER/REPO/pull/123",
+					ProjectItems: api.ProjectItems{
+						Nodes: []*api.ProjectV2Item{
+							{ID: "1"},
+						},
+					},
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
 				Editable: shared.Editable{
@@ -393,8 +405,9 @@ func Test_editRun(t *testing.T) {
 						Edited: true,
 					},
 					Projects: shared.EditableSlice{
-						Value:  []string{"Cleanup", "Roadmap"},
-						Remove: []string{"Features"},
+						Value:  []string{"Cleanup", "RoadmapV2"},
+						Remove: []string{"RoadmapV2"},
+						Add:    []string{"CleanupV2"},
 						Edited: true,
 					},
 					Milestone: shared.EditableString{
@@ -405,9 +418,11 @@ func Test_editRun(t *testing.T) {
 				Fetcher: testFetcher{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.StubRepoInfoResponse("OWNER", "REPO", "main")
 				mockRepoMetadata(t, reg, true)
 				mockPullRequestUpdate(t, reg)
 				mockPullRequestUpdateLabels(t, reg)
+				mockProjectV2ItemUpdate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -589,6 +604,21 @@ func mockPullRequestUpdateLabels(t *testing.T, reg *httpmock.Registry) {
 		httpmock.GraphQL(`mutation LabelRemove\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "removeLabelsFromLabelable": { "__typename": "" } } }`,
+			func(inputs map[string]interface{}) {}),
+	)
+}
+
+func mockProjectV2ItemUpdate(t *testing.T, reg *httpmock.Registry) {
+	reg.Register(
+		httpmock.GraphQL(`mutation AddProjectV2ItemById\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "addProjectV2ItemById": { "__typename": "" } } }`,
+			func(inputs map[string]interface{}) {}),
+	)
+	reg.Register(
+		httpmock.GraphQL(`mutation DeleteProjectV2Item\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "deleteProjectV2Item": { "__typename": "" } } }`,
 			func(inputs map[string]interface{}) {}),
 	)
 }

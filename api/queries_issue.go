@@ -36,6 +36,7 @@ type Issue struct {
 	Assignees      Assignees
 	Labels         Labels
 	ProjectCards   ProjectCards
+	ProjectItems   ProjectItems
 	Milestone      *Milestone
 	ReactionGroups ReactionGroups
 }
@@ -75,6 +76,10 @@ type ProjectCards struct {
 	TotalCount int
 }
 
+type ProjectItems struct {
+	Nodes []*ProjectV2Item
+}
+
 type ProjectInfo struct {
 	Project struct {
 		Name string `json:"name"`
@@ -82,6 +87,10 @@ type ProjectInfo struct {
 	Column struct {
 		Name string `json:"name"`
 	} `json:"column"`
+}
+
+type ProjectV2Item struct {
+	ID string `json:"id"`
 }
 
 func (p ProjectCards) ProjectNames() []string {
