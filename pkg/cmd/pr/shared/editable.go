@@ -143,25 +143,41 @@ func (e Editable) ProjectV2Ids() (*[]string, *[]string, error) {
 		return nil, nil, nil
 	}
 
-	var addedProjectsV2 []string
-	var removedProjectsV2 []string
+	// we add projects which are present in current selection, but which the entity was not linked to
+	addedProjectsV2TitlesSet := set.NewStringSet()
+	addedProjectsV2TitlesSet.AddValues(e.Projects.Value)
+	addedProjectsV2TitlesSet.AddValues(e.Projects.Add)
+	addedProjectsV2TitlesSet.RemoveValues(e.Projects.Default)
+	addedProjectsV2TitlesSet.RemoveValues(e.Projects.Remove)
+	addedProjectsV2Titles := addedProjectsV2TitlesSet.ToSlice()
+
+	// we remove projects which the entity was linked to, but which are not present in the current seleciton
+	removedProjecsV2TitlesSet := set.NewStringSet()
+	removedProjecsV2TitlesSet.AddValues(e.Projects.Default)
+	removedProjecsV2TitlesSet.AddValues(e.Projects.Remove)
+	removedProjecsV2TitlesSet.RemoveValues(e.Projects.Value)
+	removedProjecsV2TitlesSet.RemoveValues(e.Projects.Add)
+	removedProjecsV2Titles := removedProjecsV2TitlesSet.ToSlice()
+
+	var addedProjectsV2Ids []string
+	var removedProjectsV2Ids []string
 	var err error
 
-	if len(e.Projects.Add) > 0 {
-		_, addedProjectsV2, err = e.Metadata.ProjectsToIDs(e.Projects.Add)
+	if len(addedProjectsV2Titles) > 0 {
+		_, addedProjectsV2Ids, err = e.Metadata.ProjectsToIDs(addedProjectsV2Titles)
 		if err != nil {
-			return &addedProjectsV2, &removedProjectsV2, err
+			return &addedProjectsV2Ids, &removedProjectsV2Ids, err
 		}
 	}
 
-	if len(e.Projects.Remove) > 0 {
-		_, removedProjectsV2, err = e.Metadata.ProjectsToIDs(e.Projects.Remove)
+	if len(removedProjecsV2Titles) > 0 {
+		_, removedProjectsV2Ids, err = e.Metadata.ProjectsToIDs(removedProjecsV2Titles)
 		if err != nil {
-			return &addedProjectsV2, &removedProjectsV2, err
+			return &addedProjectsV2Ids, &removedProjectsV2Ids, err
 		}
 	}
 
-	return &addedProjectsV2, &removedProjectsV2, nil
+	return &addedProjectsV2Ids, &removedProjectsV2Ids, nil
 }
 
 func (e Editable) MilestoneId() (*string, error) {
@@ -314,8 +330,11 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable)
 		labels = append(labels, l.Name)
 	}
 	var projects []string
-	for _, l := range metadata.Projects {
-		projects = append(projects, l.Name)
+	for _, p := range metadata.Projects {
+		projects = append(projects, p.Name)
+	}
+	for _, p := range metadata.ProjectsV2 {
+		projects = append(projects, p.Title)
 	}
 	milestones := []string{noMilestone}
 	for _, m := range metadata.Milestones {

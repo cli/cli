@@ -229,7 +229,7 @@ func PullRequestGraphQL(fields []string) string {
 		case "projectCards":
 			q = append(q, `projectCards(first:100){nodes{project{name}column{name}},totalCount}`)
 		case "projectItems":
-			q = append(q, `projectItems(first:100){nodes{id}}`)
+			q = append(q, `projectItems(first:100){nodes{id, project{title}}}`)
 		case "milestone":
 			q = append(q, `milestone{number,title,description,dueOn}`)
 		case "reactionGroups":

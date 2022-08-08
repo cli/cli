@@ -313,7 +313,14 @@ func Test_editRun(t *testing.T) {
 					URL: "https://github.com/OWNER/REPO/pull/123",
 					ProjectItems: api.ProjectItems{
 						Nodes: []*api.ProjectV2Item{
-							{ID: "1"},
+							{
+								ID: "1",
+								Project: struct {
+									Title string "json:\"title\""
+								}{
+									Title: "CleanupV2",
+								},
+							},
 						},
 					},
 				}, ghrepo.New("OWNER", "REPO")),
@@ -348,7 +355,7 @@ func Test_editRun(t *testing.T) {
 					},
 					Projects: shared.EditableSlice{
 						Add:    []string{"Cleanup", "RoadmapV2"},
-						Remove: []string{"Roadmap", "CleanupV2"},
+						Remove: []string{"Roadmap"},
 						Edited: true,
 					},
 					Milestone: shared.EditableString{
@@ -359,7 +366,6 @@ func Test_editRun(t *testing.T) {
 				Fetcher: testFetcher{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.StubRepoInfoResponse("OWNER", "REPO", "main")
 				mockRepoMetadata(t, reg, false)
 				mockPullRequestUpdate(t, reg)
 				mockPullRequestReviewersUpdate(t, reg)
@@ -376,7 +382,14 @@ func Test_editRun(t *testing.T) {
 					URL: "https://github.com/OWNER/REPO/pull/123",
 					ProjectItems: api.ProjectItems{
 						Nodes: []*api.ProjectV2Item{
-							{ID: "1"},
+							{
+								ID: "1",
+								Project: struct {
+									Title string "json:\"title\""
+								}{
+									Title: "TriageV2",
+								},
+							},
 						},
 					},
 				}, ghrepo.New("OWNER", "REPO")),
@@ -418,7 +431,6 @@ func Test_editRun(t *testing.T) {
 				Fetcher: testFetcher{},
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.StubRepoInfoResponse("OWNER", "REPO", "main")
 				mockRepoMetadata(t, reg, true)
 				mockPullRequestUpdate(t, reg)
 				mockPullRequestUpdateLabels(t, reg)
@@ -489,6 +501,7 @@ func Test_editRun(t *testing.T) {
 }
 
 func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry, skipReviewers bool) {
+	reg.StubRepoInfoResponse("OWNER", "REPO", "main")
 	reg.Register(
 		httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
 		httpmock.StringResponse(`

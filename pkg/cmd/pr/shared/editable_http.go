@@ -44,7 +44,7 @@ func UpdateIssue(httpClient *http.Client, repo ghrepo.Interface, id string, proj
 		})
 	}
 
-	if len(options.Projects.Add) > 0 || len(options.Projects.Remove) > 0 {
+	if options.Projects.Edited {
 		wg.Go(func() error {
 			return linkIssueToProjectsV2(httpClient, repo, id, projectV2Items, options)
 		})

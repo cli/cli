@@ -90,7 +90,10 @@ type ProjectInfo struct {
 }
 
 type ProjectV2Item struct {
-	ID string `json:"id"`
+	ID      string `json:"id"`
+	Project struct {
+		Title string `json:"title"`
+	}
 }
 
 func (p ProjectCards) ProjectNames() []string {
@@ -99,6 +102,14 @@ func (p ProjectCards) ProjectNames() []string {
 		names[i] = c.Project.Name
 	}
 	return names
+}
+
+func (p ProjectItems) ProjectTitles() []string {
+	titles := make([]string, len(p.Nodes))
+	for i, c := range p.Nodes {
+		titles[i] = c.Project.Title
+	}
+	return titles
 }
 
 type Milestone struct {
