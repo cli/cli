@@ -280,7 +280,7 @@ func Test_editRun(t *testing.T) {
 					},
 					Projects: prShared.EditableSlice{
 						Add:    []string{"Cleanup", "RoadmapV2"},
-						Remove: []string{"Roadmap", "CleanupV2"},
+						Remove: []string{"Roadmap"},
 						Edited: true,
 					},
 					Milestone: prShared.EditableString{
@@ -297,7 +297,6 @@ func Test_editRun(t *testing.T) {
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockIssueGet(t, reg)
-				reg.StubRepoInfoResponse("OWNER", "REPO", "main")
 				mockRepoMetadata(t, reg)
 				mockIssueUpdate(t, reg)
 				mockIssueUpdateLabels(t, reg)
@@ -335,6 +334,7 @@ func Test_editRun(t *testing.T) {
 				mockIssueGet(t, reg)
 				mockRepoMetadata(t, reg)
 				mockIssueUpdate(t, reg)
+				mockProjectV2ItemUpdate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
 		},
@@ -374,7 +374,7 @@ func mockIssueGet(_ *testing.T, reg *httpmock.Registry) {
 				"url": "https://github.com/OWNER/REPO/issue/123",
 				"projectItems": {
 					"nodes": [
-						{ "id": "1" }
+						{ "id": "1", "project": { "title": "CleanupV2" } }
 					]
 				}
 			} } } }`),
@@ -382,6 +382,7 @@ func mockIssueGet(_ *testing.T, reg *httpmock.Registry) {
 }
 
 func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
+	reg.StubRepoInfoResponse("OWNER", "REPO", "main")
 	reg.Register(
 		httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
 		httpmock.StringResponse(`

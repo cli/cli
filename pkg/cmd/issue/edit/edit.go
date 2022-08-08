@@ -160,7 +160,9 @@ func editRun(opts *EditOptions) error {
 	editable.Body.Default = issue.Body
 	editable.Assignees.Default = issue.Assignees.Logins()
 	editable.Labels.Default = issue.Labels.Names()
-	editable.Projects.Default = issue.ProjectCards.ProjectNames()
+	defaultProjectNames := issue.ProjectCards.ProjectNames()
+	defaultProjectNames = append(defaultProjectNames, issue.ProjectItems.ProjectTitles()...)
+	editable.Projects.Default = defaultProjectNames
 	if issue.Milestone != nil {
 		editable.Milestone.Default = issue.Milestone.Title
 	}

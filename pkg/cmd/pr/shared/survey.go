@@ -203,8 +203,11 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 		labels = append(labels, l.Name)
 	}
 	var projects []string
-	for _, l := range metadataResult.Projects {
-		projects = append(projects, l.Name)
+	for _, p := range metadataResult.Projects {
+		projects = append(projects, p.Name)
+	}
+	for _, p := range metadataResult.ProjectsV2 {
+		projects = append(projects, p.Title)
 	}
 	milestones := []string{noMilestone}
 	for _, m := range metadataResult.Milestones {
