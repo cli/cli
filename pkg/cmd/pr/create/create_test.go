@@ -930,99 +930,101 @@ func TestPRCreate_draft(t *testing.T) {
 	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
 }
 
-func Test_determineTrackingBranch_empty(t *testing.T) {
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-	cs.Register(`git show-ref --verify -- HEAD`, 0, "abc HEAD")
-
-	remotes := context.Remotes{}
-
-	ref := determineTrackingBranch(remotes, "feature")
-	if ref != nil {
-		t.Errorf("expected nil result, got %v", ref)
-	}
-}
-
-func Test_determineTrackingBranch_noMatch(t *testing.T) {
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-	cs.Register("git show-ref --verify -- HEAD refs/remotes/origin/feature refs/remotes/upstream/feature", 0, "abc HEAD\nbca refs/remotes/origin/feature")
-
-	remotes := context.Remotes{
-		&context.Remote{
-			Remote: &git.Remote{Name: "origin"},
-			Repo:   ghrepo.New("hubot", "Spoon-Knife"),
+func Test_determineTrackingBranch(t *testing.T) {
+	tests := []struct {
+		name     string
+		cmdStubs func(*run.CommandStubber)
+		remotes  context.Remotes
+		assert   func(ref *git.TrackingRef, t *testing.T)
+	}{
+		{
+			name: "empty",
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+				cs.Register(`git show-ref --verify -- HEAD`, 0, "abc HEAD")
+			},
+			assert: func(ref *git.TrackingRef, t *testing.T) {
+				assert.Nil(t, ref)
+			},
 		},
-		&context.Remote{
-			Remote: &git.Remote{Name: "upstream"},
-			Repo:   ghrepo.New("octocat", "Spoon-Knife"),
+		{
+			name: "no match",
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+				cs.Register("git show-ref --verify -- HEAD refs/remotes/origin/feature refs/remotes/upstream/feature", 0, "abc HEAD\nbca refs/remotes/origin/feature")
+			},
+			remotes: context.Remotes{
+				&context.Remote{
+					Remote: &git.Remote{Name: "origin"},
+					Repo:   ghrepo.New("hubot", "Spoon-Knife"),
+				},
+				&context.Remote{
+					Remote: &git.Remote{Name: "upstream"},
+					Repo:   ghrepo.New("octocat", "Spoon-Knife"),
+				},
+			},
+			assert: func(ref *git.TrackingRef, t *testing.T) {
+				assert.Nil(t, ref)
+			},
 		},
-	}
-
-	ref := determineTrackingBranch(remotes, "feature")
-	if ref != nil {
-		t.Errorf("expected nil result, got %v", ref)
-	}
-}
-
-func Test_determineTrackingBranch_hasMatch(t *testing.T) {
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature refs/remotes/upstream/feature$`, 0, heredoc.Doc(`
+		{
+			name: "match",
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature refs/remotes/upstream/feature$`, 0, heredoc.Doc(`
 		deadbeef HEAD
 		deadb00f refs/remotes/origin/feature
 		deadbeef refs/remotes/upstream/feature
 	`))
-
-	remotes := context.Remotes{
-		&context.Remote{
-			Remote: &git.Remote{Name: "origin"},
-			Repo:   ghrepo.New("hubot", "Spoon-Knife"),
+			},
+			remotes: context.Remotes{
+				&context.Remote{
+					Remote: &git.Remote{Name: "origin"},
+					Repo:   ghrepo.New("hubot", "Spoon-Knife"),
+				},
+				&context.Remote{
+					Remote: &git.Remote{Name: "upstream"},
+					Repo:   ghrepo.New("octocat", "Spoon-Knife"),
+				},
+			},
+			assert: func(ref *git.TrackingRef, t *testing.T) {
+				assert.Equal(t, "upstream", ref.RemoteName)
+				assert.Equal(t, "feature", ref.BranchName)
+			},
 		},
-		&context.Remote{
-			Remote: &git.Remote{Name: "upstream"},
-			Repo:   ghrepo.New("octocat", "Spoon-Knife"),
-		},
-	}
-
-	ref := determineTrackingBranch(remotes, "feature")
-	if ref == nil {
-		t.Fatal("expected result, got nil")
-	}
-
-	assert.Equal(t, "upstream", ref.RemoteName)
-	assert.Equal(t, "feature", ref.BranchName)
-}
-
-func Test_determineTrackingBranch_respectTrackingConfig(t *testing.T) {
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, heredoc.Doc(`
+		{
+			name: "respect tracking config",
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, heredoc.Doc(`
 		branch.feature.remote origin
 		branch.feature.merge refs/heads/great-feat
 	`))
-	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/great-feat refs/remotes/origin/feature$`, 0, heredoc.Doc(`
+				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/great-feat refs/remotes/origin/feature$`, 0, heredoc.Doc(`
 		deadbeef HEAD
 		deadb00f refs/remotes/origin/feature
 	`))
-
-	remotes := context.Remotes{
-		&context.Remote{
-			Remote: &git.Remote{Name: "origin"},
-			Repo:   ghrepo.New("hubot", "Spoon-Knife"),
+			},
+			remotes: context.Remotes{
+				&context.Remote{
+					Remote: &git.Remote{Name: "origin"},
+					Repo:   ghrepo.New("hubot", "Spoon-Knife"),
+				},
+			},
+			assert: func(ref *git.TrackingRef, t *testing.T) {
+				assert.Nil(t, ref)
+			},
 		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs, cmdTeardown := run.Stub()
+			defer cmdTeardown(t)
 
-	ref := determineTrackingBranch(remotes, "feature")
-	if ref != nil {
-		t.Errorf("expected nil result, got %v", ref)
+			tt.cmdStubs(cs)
+
+			ref := determineTrackingBranch(tt.remotes, "feature")
+			tt.assert(ref, t)
+		})
 	}
 }
 
