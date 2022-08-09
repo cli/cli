@@ -185,40 +185,47 @@ func TestHasUploadedPublicKeyForConfig(t *testing.T) {
 		},
 		{
 			// Has API keys, but no local keys
-			apiAuthorizedPublicKeys: []string{"test-key"},
+			apiAuthorizedPublicKeys: []string{"ssh-rsa test-key"},
 			wantResult:              false,
 		},
 		{
 			// No API keys, but has local keys
-			localKeyPairs: []testLocalKeyPair{{"keyfile", "test-key"}},
+			localKeyPairs: []testLocalKeyPair{{"keyfile", "ssh-rsa test-key"}},
 			wantResult:    false,
 		},
 		{
 			// API keys and local keys, but not matching
-			apiAuthorizedPublicKeys: []string{"test-api-key"},
-			localKeyPairs:           []testLocalKeyPair{{"keyfile", "test-local-key"}},
+			apiAuthorizedPublicKeys: []string{"ssh-rsa test-api-key"},
+			localKeyPairs:           []testLocalKeyPair{{"keyfile", "ssh-rsa test-local-key"}},
 			wantResult:              false,
 		},
 
 		// Successful tests
 		{
-			apiAuthorizedPublicKeys: []string{"test-key"},
-			localKeyPairs:           []testLocalKeyPair{{"keyfile", "test-key"}},
+			apiAuthorizedPublicKeys: []string{"ssh-rsa test-key"},
+			localKeyPairs:           []testLocalKeyPair{{"keyfile", "ssh-rsa test-key"}},
 			wantResult:              true,
 		},
 		{
-			apiAuthorizedPublicKeys: []string{"test-key-1", "test-key-2"},
-			localKeyPairs:           []testLocalKeyPair{{"keyfile1", "test-key-1"}},
+			apiAuthorizedPublicKeys: []string{"ssh-rsa test-key-1", "ssh-rsa test-key-2"},
+			localKeyPairs:           []testLocalKeyPair{{"keyfile1", "ssh-rsa test-key-1"}},
 			wantResult:              true,
 		},
 		{
-			apiAuthorizedPublicKeys: []string{"test-key-1"},
-			localKeyPairs:           []testLocalKeyPair{{"keyfile1", "test-key-1"}, {"keyfile2", "test-key-2"}},
+			apiAuthorizedPublicKeys: []string{"ssh-rsa test-key-1"},
+			localKeyPairs:           []testLocalKeyPair{{"keyfile1", "ssh-rsa test-key-1"}, {"keyfile2", "ssh-rsa test-key-2"}},
 			wantResult:              true,
 		},
 		{
-			apiAuthorizedPublicKeys: []string{"test-key-1", "test-key-2"},
-			localKeyPairs:           []testLocalKeyPair{{"keyfile3", "test-key-3"}, {"keyfile2", "test-key-2"}},
+			apiAuthorizedPublicKeys: []string{"ssh-rsa test-key-1", "ssh-rsa test-key-2"},
+			localKeyPairs:           []testLocalKeyPair{{"keyfile3", "ssh-rsa test-key-3"}, {"keyfile2", "ssh-rsa test-key-2"}},
+			wantResult:              true,
+		},
+
+		// Extra case - local key contain comments
+		{
+			apiAuthorizedPublicKeys: []string{"ssh-rsa test-key-1", "ssh-rsa test-key"},
+			localKeyPairs:           []testLocalKeyPair{{"keyfile3", "ssh-rsa test-key a comment on the key"}},
 			wantResult:              true,
 		},
 	}

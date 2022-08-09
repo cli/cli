@@ -360,7 +360,7 @@ func hasUploadedPublicKeyForConfig(
 		return false, fmt.Errorf("getting local ssh keys: %w", err)
 	}
 
-	var configuredPublicKeys []string
+	configuredPublicKeys := make(map[string]bool)
 	for _, privateKeyPath := range configuredPrivateKeyPaths {
 		publicKeyPath := privateKeyPath + ".pub"
 
@@ -371,17 +371,20 @@ func hasUploadedPublicKeyForConfig(
 			continue
 		}
 
-		configuredPublicKeys = append(configuredPublicKeys, string(publicKeyContent))
+		parts := strings.SplitN(string(publicKeyContent), " ", 3)
+		if len(parts) < 2 {
+			// Unexpected format, skip it
+			continue
+		}
+
+		publicKeyWithoutComment := strings.Join(parts[:2], " ")
+
+		configuredPublicKeys[publicKeyWithoutComment] = true
 	}
 
 	if len(configuredPublicKeys) == 0 {
 		// There are no local private keys which ssh would use
 		return false, nil
-	}
-
-	publicKeyMap := make(map[string]bool)
-	for _, publicKey := range configuredPublicKeys {
-		publicKeyMap[publicKey] = true
 	}
 
 	user, err := apiClient.GetUser(ctx)
@@ -399,7 +402,7 @@ func hasUploadedPublicKeyForConfig(
 	}
 
 	for _, uploadedPublicKey := range uploadedPublicKeys {
-		if publicKeyMap[uploadedPublicKey] {
+		if configuredPublicKeys[uploadedPublicKey] {
 			return true, nil
 		}
 	}
