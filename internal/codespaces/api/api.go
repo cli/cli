@@ -1085,7 +1085,7 @@ func (a *API) AuthorizedKeys(ctx context.Context, user string) ([]string, error)
 
 	allKeys := string(b)
 
-	splitKeys := []string{}
+	var splitKeys []string
 	for _, key := range strings.Split(allKeys, "\n") {
 		key = strings.TrimSpace(key)
 		if key == "" {

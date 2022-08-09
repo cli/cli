@@ -253,9 +253,7 @@ func TestHasUploadedPublicKeyForConfig(t *testing.T) {
 			t.Fatalf("could not write test config %v", err)
 		}
 
-		sshContext := ssh.Context{}
-
-		result, err := hasUploadedPublicKeyForConfig(context.Background(), sshContext, mockApi, configPath, "")
+		result, err := hasUploadedPublicKeyForConfig(context.Background(), mockApi, configPath, "")
 		if err != nil {
 			t.Errorf("Unexpected error from hasUploadedPublicKeyForConfig: %v", err)
 		}

@@ -261,7 +261,7 @@ func useAutomaticSSHKeys(
 
 	// If there is a public key uploaded which matches a configured
 	// private key, there is no need for automatic key generation
-	hasPublicKey, err := hasUploadedPublicKeyForConfig(ctx, sshContext, apiClient, customConfigPath, opts.profile)
+	hasPublicKey, err := hasUploadedPublicKeyForConfig(ctx, apiClient, customConfigPath, opts.profile)
 
 	return !hasPublicKey, err
 }
@@ -351,7 +351,6 @@ func checkAndUpdateOldKeyPair(sshContext ssh.Context) *ssh.KeyPair {
 // compares them to uploaded public keys to see if there is a match
 func hasUploadedPublicKeyForConfig(
 	ctx context.Context,
-	sshContext ssh.Context,
 	apiClient apiClient,
 	customConfigFile string,
 	customHost string,
@@ -361,7 +360,7 @@ func hasUploadedPublicKeyForConfig(
 		return false, fmt.Errorf("getting local ssh keys: %w", err)
 	}
 
-	configuredPublicKeys := []string{}
+	var configuredPublicKeys []string
 	for _, privateKeyPath := range configuredPrivateKeyPaths {
 		publicKeyPath := privateKeyPath + ".pub"
 
@@ -439,7 +438,7 @@ func getConfiguredPrivateKeys(
 		return nil, fmt.Errorf("could not load ssh configuration: %w", err)
 	}
 
-	privateKeyPaths := []string{}
+	var privateKeyPaths []string
 
 	userHomeDir, _ := os.UserHomeDir()
 
