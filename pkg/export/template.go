@@ -76,9 +76,7 @@ func (t *Template) parseTemplate(tpl string) (*template.Template, error) {
 	return template.New("").Funcs(templateFuncs).Parse(tpl)
 }
 
-func (t *Template) Execute(input io.Reader) error {
-	w := t.io.Out
-
+func (t *Template) Execute(w io.Writer, input io.Reader) error {
 	if t.template == nil {
 		template, err := t.parseTemplate(t.templateStr)
 		if err != nil {
@@ -103,7 +101,7 @@ func (t *Template) Execute(input io.Reader) error {
 
 func ExecuteTemplate(io *iostreams.IOStreams, input io.Reader, template string) error {
 	t := NewTemplate(io, template)
-	if err := t.Execute(input); err != nil {
+	if err := t.Execute(io.Out, input); err != nil {
 		return err
 	}
 	return t.End()
