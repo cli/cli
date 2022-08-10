@@ -59,7 +59,7 @@ func extractZipFile(zf *zip.File, dest string, force bool, skip bool) error {
 		}
 		if errExist {
 			return fmt.Errorf(
-				"%s already exists ((use `--clobber` to override or `--skip-existing` to skip))",
+				"%s already exists (use `--clobber` to override or `--skip-existing` to skip)",
 				dest,
 			)
 		}

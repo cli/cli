@@ -20,13 +20,14 @@ import (
 )
 
 type DownloadOptions struct {
-	HttpClient func() (*http.Client, error)
-	IO         *iostreams.IOStreams
-	BaseRepo   func() (ghrepo.Interface, error)
-
-	TagName      string
-	FilePatterns []string
-	Destination  string
+	HttpClient        func() (*http.Client, error)
+	IO                *iostreams.IOStreams
+	BaseRepo          func() (ghrepo.Interface, error)
+	OverwriteExisting bool
+	SkipExisting      bool
+	TagName           string
+	FilePatterns      []string
+	Destination       string
 
 	// maximum number of simultaneous downloads
 	Concurrency int
@@ -75,6 +76,10 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 				opts.TagName = args[0]
 			}
 
+			if opts.OverwriteExisting && opts.SkipExisting {
+				return errors.New("specify only one of --clobber or --skip-existing")
+			}
+
 			// check archive type option validity
 			if err := checkArchiveTypeOption(opts); err != nil {
 				return err
@@ -92,6 +97,8 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 	cmd.Flags().StringVarP(&opts.Destination, "dir", "D", ".", "The directory to download files into")
 	cmd.Flags().StringArrayVarP(&opts.FilePatterns, "pattern", "p", nil, "Download only assets that match a glob pattern")
 	cmd.Flags().StringVarP(&opts.ArchiveType, "archive", "A", "", "Download the source code archive in the specified `format` (zip or tar.gz)")
+	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Overwrite existing assets of the same name")
+	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", false, "Skip existing assets of the same name")
 
 	return cmd
 }
@@ -175,7 +182,7 @@ func downloadRun(opts *DownloadOptions) error {
 		}
 	}
 
-	return downloadAssets(httpClient, toDownload, opts.Destination, opts.Concurrency, isArchive)
+	return downloadAssets(httpClient, toDownload, opts.Destination, opts.Concurrency, isArchive, opts.OverwriteExisting, opts.SkipExisting)
 }
 
 func matchAny(patterns []string, name string) bool {
@@ -187,7 +194,7 @@ func matchAny(patterns []string, name string) bool {
 	return false
 }
 
-func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, destDir string, numWorkers int, isArchive bool) error {
+func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, destDir string, numWorkers int, isArchive, force, skip bool) error {
 	if numWorkers == 0 {
 		return errors.New("the number of concurrent workers needs to be greater than 0")
 	}
@@ -202,7 +209,7 @@ func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, d
 	for w := 1; w <= numWorkers; w++ {
 		go func() {
 			for a := range jobs {
-				results <- downloadAsset(httpClient, a.APIURL, destDir, a.Name, isArchive)
+				results <- downloadAsset(httpClient, a.APIURL, destDir, a.Name, isArchive, force, skip)
 			}
 		}()
 	}
@@ -222,7 +229,7 @@ func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, d
 	return downloadError
 }
 
-func downloadAsset(httpClient *http.Client, assetURL, destinationDir string, fileName string, isArchive bool) error {
+func downloadAsset(httpClient *http.Client, assetURL, destinationDir string, fileName string, isArchive, force, skip bool) error {
 	req, err := http.NewRequest("GET", assetURL, nil)
 	if err != nil {
 		return err
@@ -270,8 +277,22 @@ func downloadAsset(httpClient *http.Client, assetURL, destinationDir string, fil
 		}
 	}
 
-	f, err := os.OpenFile(destinationPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	flag := os.O_WRONLY | os.O_CREATE
+	if !force {
+		flag = flag | os.O_EXCL
+	}
+	f, err := os.OpenFile(destinationPath, flag, 0644)
 	if err != nil {
+		errExist := errors.Is(err, os.ErrExist)
+		if errExist && skip {
+			return nil
+		}
+		if errExist {
+			return fmt.Errorf(
+				"%s already exists (use `--clobber` to override or `--skip-existing` to skip)",
+				destinationPath,
+			)
+		}
 		return err
 	}
 	defer f.Close()

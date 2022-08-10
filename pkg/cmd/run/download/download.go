@@ -76,7 +76,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 				opts.DoPrompt = true
 			}
 			if opts.OverwriteExisting && opts.SkipExisting {
-				return errors.New("specify either --clobber or --skip-existing. you cannot use both of them simultaneously")
+				return errors.New("specify either --clobber or --skip-existing")
 			}
 			// support `-R, --repo` override
 			baseRepo, err := f.BaseRepo()

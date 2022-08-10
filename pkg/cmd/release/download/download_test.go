@@ -319,6 +319,92 @@ func Test_downloadRun(t *testing.T) {
 	}
 }
 
+func Test_downloadOption(t *testing.T) {
+	opts := DownloadOptions{
+
+		TagName:     "v1.2.3",
+		ArchiveType: "zip",
+		Destination: "tmp/packages",
+		Concurrency: 2,
+	}
+	tempDir := t.TempDir()
+	opts.Destination = filepath.Join(tempDir, opts.Destination)
+
+	fakeHTTP := &httpmock.Registry{}
+
+	register := func() {
+		fakeHTTP.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StringResponse(`{
+				"zipball_url": "https://api.github.com/repos/OWNER/REPO/zipball/v1.2.3"
+			}`))
+		fakeHTTP.Register(httpmock.REST("GET", "assets/1234"), httpmock.StringResponse(`1234`))
+
+		fakeHTTP.Register(
+			httpmock.REST(
+				"GET",
+				"repos/OWNER/REPO/zipball/v1.2.3",
+			),
+			httpmock.WithHeader(
+				httpmock.StringResponse("somedata"), "content-disposition", "attachment; filename=zipball.zip",
+			),
+		)
+	}
+
+	ios, _, _, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStdinTTY(true)
+	ios.SetStderrTTY(true)
+	opts.IO = ios
+	opts.HttpClient = func() (*http.Client, error) {
+		return &http.Client{Transport: fakeHTTP}, nil
+	}
+	opts.BaseRepo = func() (ghrepo.Interface, error) {
+		return ghrepo.FromFullName("OWNER/REPO")
+	}
+
+	readme := tempDir + string(filepath.Separator) + "tmp/packages/zipball.zip"
+
+	// First files are newly created
+	register()
+	err := downloadRun(&opts)
+	require.NoError(t, err)
+	stat, err := os.Stat(readme)
+	require.NoError(t, err)
+	mtimeFirst := stat.ModTime()
+
+	// test existing error
+	register()
+	err = downloadRun(&opts)
+	require.ErrorContains(t, err, "(use `--clobber` to override or `--skip-existing` to skip)")
+
+	stat, err = os.Stat(readme)
+	require.NoError(t, err)
+	mtimeError := stat.ModTime()
+	require.Equal(t, mtimeFirst, mtimeError)
+
+	// test --clobber
+	register()
+	opts.OverwriteExisting = true
+	err = downloadRun(&opts)
+	require.NoError(t, err)
+
+	stat, err = os.Stat(readme)
+	require.NoError(t, err)
+	mtimeClobber := stat.ModTime()
+	require.Less(t, mtimeFirst, mtimeClobber)
+
+	// test --skip-existing
+	register()
+	opts.OverwriteExisting = false
+	opts.SkipExisting = true
+	err = downloadRun(&opts)
+	require.NoError(t, err)
+
+	stat, err = os.Stat(readme)
+	require.NoError(t, err)
+	mtimeSkip := stat.ModTime()
+	require.Equal(t, mtimeClobber, mtimeSkip)
+}
+
 func listFiles(dir string) ([]string, error) {
 	var files []string
 	err := filepath.Walk(dir, func(p string, f os.FileInfo, err error) error {
