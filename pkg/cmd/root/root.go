@@ -132,6 +132,7 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 			AppVersion:        version,
 			Config:            cfg,
 			Log:               f.IOStreams.ErrOut,
+			LogColorize:       f.IOStreams.ColorEnabled(),
 			SkipAcceptHeaders: true,
 		}
 		return api.NewHTTPClient(opts)

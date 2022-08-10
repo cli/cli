@@ -89,9 +89,10 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 			return nil, err
 		}
 		opts := api.HTTPClientOptions{
-			Config:     cfg,
-			Log:        io.ErrOut,
-			AppVersion: appVersion,
+			Config:      cfg,
+			Log:         io.ErrOut,
+			LogColorize: io.ColorEnabled(),
+			AppVersion:  appVersion,
 		}
 		client, err := api.NewHTTPClient(opts)
 		if err != nil {

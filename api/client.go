@@ -253,6 +253,7 @@ func clientOptions(hostname string, transport http.RoundTripper) ghAPI.ClientOpt
 		Host:               hostname,
 		SkipDefaultHeaders: true,
 		Transport:          transport,
+		LogIgnoreEnv:       true,
 	}
 	return opts
 }
