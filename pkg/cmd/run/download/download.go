@@ -20,7 +20,10 @@ type DownloadOptions struct {
 	Platform platform
 	Prompter prompter
 
-	DoPrompt       bool
+	DoPrompt          bool
+	OverwriteExisting bool
+	SkipExisting      bool
+
 	RunID          string
 	DestinationDir string
 	Names          []string
@@ -29,7 +32,7 @@ type DownloadOptions struct {
 
 type platform interface {
 	List(runID string) ([]shared.Artifact, error)
-	Download(url string, dir string) error
+	Download(url string, dir string, force bool, skip bool) error
 }
 type prompter interface {
 	Prompt(message string, options []string, result interface{}) error
@@ -72,6 +75,9 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 				opts.IO.CanPrompt() {
 				opts.DoPrompt = true
 			}
+			if opts.OverwriteExisting && opts.SkipExisting {
+				return errors.New("specify either --clobber or --skip-existing. you cannot use both of them simultaneously")
+			}
 			// support `-R, --repo` override
 			baseRepo, err := f.BaseRepo()
 			if err != nil {
@@ -97,6 +103,8 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 	cmd.Flags().StringVarP(&opts.DestinationDir, "dir", "D", ".", "The directory to download artifacts into")
 	cmd.Flags().StringArrayVarP(&opts.Names, "name", "n", nil, "Download artifacts that match any of the given names")
 	cmd.Flags().StringArrayVarP(&opts.FilePatterns, "pattern", "p", nil, "Download artifacts that match a glob pattern")
+	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Overwrite existing assets of the same name")
+	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", false, "Skip existing assets of the same name")
 
 	return cmd
 }
@@ -163,7 +171,7 @@ func runDownload(opts *DownloadOptions) error {
 		if len(wantPatterns) != 0 || len(wantNames) != 1 {
 			destDir = filepath.Join(destDir, a.Name)
 		}
-		err := opts.Platform.Download(a.DownloadURL, destDir)
+		err := opts.Platform.Download(a.DownloadURL, destDir, opts.OverwriteExisting, opts.SkipExisting)
 		if err != nil {
 			return fmt.Errorf("error downloading %s: %w", a.Name, err)
 		}
