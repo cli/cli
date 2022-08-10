@@ -536,7 +536,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 	t, err := template.New("ssh_config").Parse(heredoc.Doc(`
 		Host cs.{{.Name}}.{{.EscapedRef}}
 			User {{.SSHUser}}
-			ProxyCommand {{.GHExec}} cs ssh -c {{.Name}} --stdio
+			ProxyCommand {{.GHExec}} cs ssh -c {{.Name}} --stdio -- -i ~/.ssh/{{.AutomaticIdentityFile}}
 			UserKnownHostsFile=/dev/null
 			StrictHostKeyChecking no
 			LogLevel quiet
