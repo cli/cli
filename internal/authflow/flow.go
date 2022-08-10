@@ -129,7 +129,7 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 		return "", "", err
 	}
 
-	userLogin, err := getViewer(oauthHost, token.Token)
+	userLogin, err := getViewer(oauthHost, token.Token, IO.ErrOut)
 	if err != nil {
 		return "", "", err
 	}
@@ -145,8 +145,11 @@ func (c cfg) AuthToken(hostname string) (string, string) {
 	return c.authToken, "oauth_token"
 }
 
-func getViewer(hostname, token string) (string, error) {
-	opts := api.HTTPClientOptions{Config: cfg{authToken: token}}
+func getViewer(hostname, token string, logWriter io.Writer) (string, error) {
+	opts := api.HTTPClientOptions{
+		Config: cfg{authToken: token},
+		Log:    logWriter,
+	}
 	client, err := api.NewHTTPClient(opts)
 	if err != nil {
 		return "", err
@@ -180,5 +183,7 @@ func verboseLog(out io.Writer, logTraffic bool, colorize bool) func(http.RoundTr
 }
 
 func inspectableMIMEType(t string) bool {
-	return strings.HasPrefix(t, "text/") || jsonTypeRE.MatchString(t)
+	return strings.HasPrefix(t, "text/") ||
+		strings.HasPrefix(t, "application/x-www-form-urlencoded") ||
+		jsonTypeRE.MatchString(t)
 }
