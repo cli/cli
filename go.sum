@@ -60,6 +60,8 @@ github.com/cli/crypto v0.0.0-20210929142629-6be313f59b03 h1:3f4uHLfWx4/WlnMPXGai
 github.com/cli/crypto v0.0.0-20210929142629-6be313f59b03/go.mod h1:GvvjBRRGRdwPK5ydBHafDWAxML/pGHZbMvKqRZ5+Abc=
 github.com/cli/go-gh v0.0.4-0.20220725193052-79f89db738dc h1:qHm0KQPwmr2gsov+Vqsb0bm5jwWykf8zfUS0Q0/xeR4=
 github.com/cli/go-gh v0.0.4-0.20220725193052-79f89db738dc/go.mod h1:YDzUlo0eCH9G0jY2CONIPYSuIMiQiSDnWaTB/YW6yfk=
+github.com/cli/go-gh v0.1.0 h1:kMqFmC3ECBrV2UKzlOHjNOTTchExVc5tjNHtCqk/zYk=
+github.com/cli/go-gh v0.1.0/go.mod h1:eTGWl99EMZ+3Iau5C6dHyGAJRRia65MtdBtuhWc+84o=
 github.com/cli/oauth v0.9.0 h1:nxBC0Df4tUzMkqffAB+uZvisOwT3/N9FpkfdTDtafxc=
 github.com/cli/oauth v0.9.0/go.mod h1:qd/FX8ZBD6n1sVNQO3aIdRxeu5LGw9WhKnYhIIoC2A4=
 github.com/cli/safeexec v1.0.0 h1:0VngyaIyqACHdcMNWfo6+KdUYnqEr2Sg+bSP1pdF+dI=
