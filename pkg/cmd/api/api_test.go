@@ -1299,7 +1299,7 @@ func Test_processResponse_template(t *testing.T) {
 		Template: `{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " }}){{"\n"}}{{end}}`,
 	}
 	template := export.NewTemplate(ios, opts.Template)
-	_, err := processResponse(&resp, &opts, io.Discard, &template)
+	_, err := processResponse(&resp, &opts, ios.Out, io.Discard, &template)
 	require.NoError(t, err)
 
 	err = template.End()
