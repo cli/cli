@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -19,6 +20,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/cli/cli/v2/pkg/ssh"
@@ -536,17 +538,24 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 	t, err := template.New("ssh_config").Parse(heredoc.Doc(`
 		Host cs.{{.Name}}.{{.EscapedRef}}
 			User {{.SSHUser}}
-			ProxyCommand {{.GHExec}} cs ssh -c {{.Name}} --stdio -- -i ~/.ssh/{{.AutomaticIdentityFile}}
+			ProxyCommand {{.GHExec}} cs ssh -c {{.Name}} --stdio -- -i {{.AutomaticIdentityFilePath}}
 			UserKnownHostsFile=/dev/null
 			StrictHostKeyChecking no
 			LogLevel quiet
 			ControlMaster auto
-			IdentityFile ~/.ssh/{{.AutomaticIdentityFile}}
+			IdentityFile {{.AutomaticIdentityFilePath}}
 
 	`))
 	if err != nil {
 		return fmt.Errorf("error formatting template: %w", err)
 	}
+
+	sshDir, err := config.HomeDirPath(".ssh")
+	if err != nil {
+		return fmt.Errorf("error finding .ssh directory: %w", err)
+	}
+
+	automaticIdentityFilePath := path.Join(sshDir, automaticPrivateKeyName)
 
 	ghExec := a.executable.Executable()
 	for result := range sshUsers {
@@ -568,19 +577,19 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 		// flattened to '-' to prevent problems with tab completion or when the
 		// hostname appears in ControlMaster socket paths.
 		type codespaceSSHConfig struct {
-			Name                  string // the codespace name, passed to `ssh -c`
-			EscapedRef            string // the currently checked-out branch
-			SSHUser               string // the remote ssh username
-			GHExec                string // path used for invoking the current `gh` binary
-			AutomaticIdentityFile string
+			Name                      string // the codespace name, passed to `ssh -c`
+			EscapedRef                string // the currently checked-out branch
+			SSHUser                   string // the remote ssh username
+			GHExec                    string // path used for invoking the current `gh` binary
+			AutomaticIdentityFilePath string // path used for automatic private key `gh cs ssh` would generate
 		}
 
 		conf := codespaceSSHConfig{
-			Name:                  result.codespace.Name,
-			EscapedRef:            strings.ReplaceAll(result.codespace.GitStatus.Ref, "/", "-"),
-			SSHUser:               result.user,
-			GHExec:                ghExec,
-			AutomaticIdentityFile: automaticPrivateKeyName,
+			Name:                      result.codespace.Name,
+			EscapedRef:                strings.ReplaceAll(result.codespace.GitStatus.Ref, "/", "-"),
+			SSHUser:                   result.user,
+			GHExec:                    ghExec,
+			AutomaticIdentityFilePath: automaticIdentityFilePath,
 		}
 		if err := t.Execute(a.io.Out, conf); err != nil {
 			return err
