@@ -226,6 +226,11 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 }
 
 func shouldUseAutomaticSSHKeys(args []string, opts sshOptions) bool {
+	if opts.stdio {
+		// The default or config-specified identity file should work.
+		return false
+	}
+
 	if opts.profile != "" {
 		// The profile may specify the identity file so cautiously don't override anything with that option
 		return false
