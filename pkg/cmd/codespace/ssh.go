@@ -68,7 +68,7 @@ func newSSHCmd(app *App) *cobra.Command {
 			If the docker image being used for the codespace does not have an SSH server,
 			install it in your Dockerfile or, for codespaces that use Debian-based images,
 			you can add the following to your devcontainer.json:
-						
+
 			"features": {
 				"ghcr.io/devcontainers/features/sshd:1": {
 					"version": "latest"
