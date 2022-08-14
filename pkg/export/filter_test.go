@@ -10,6 +10,8 @@ import (
 )
 
 func Test_filterJSON(t *testing.T) {
+	t.Setenv("CODE", "code_c")
+
 	type args struct {
 		json  io.Reader
 		query string
@@ -68,6 +70,27 @@ func Test_filterJSON(t *testing.T) {
 				Second but not last	
 				Alas, tis' the end	,feature
 			`),
+		},
+		{
+			name: "with env var",
+			args: args{
+				json: strings.NewReader(heredoc.Doc(`[
+					{
+						"title": "code_a",
+						"labels": [{"name":"bug"}, {"name":"help wanted"}]
+					},
+					{
+						"title": "code_b",
+						"labels": []
+					},
+					{
+						"title": "code_c",
+						"labels": [{}, {"name":"feature"}]
+					}
+				]`)),
+				query: `.[]| select(.title == env.CODE) | .labels`,
+			},
+			wantW: "[{},{\"name\":\"feature\"}]\n",
 		},
 	}
 	for _, tt := range tests {

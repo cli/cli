@@ -4,12 +4,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/itchyny/gojq"
 )
 
 func FilterJSON(w io.Writer, input io.Reader, queryStr string) error {
 	query, err := gojq.Parse(queryStr)
+	if err != nil {
+		return err
+	}
+
+	code, err := gojq.Compile(
+		query,
+		gojq.WithEnvironLoader(func() []string {
+			return os.Environ()
+		}))
+
 	if err != nil {
 		return err
 	}
@@ -25,7 +36,7 @@ func FilterJSON(w io.Writer, input io.Reader, queryStr string) error {
 		return err
 	}
 
-	iter := query.Run(responseData)
+	iter := code.Run(responseData)
 	for {
 		v, ok := iter.Next()
 		if !ok {
