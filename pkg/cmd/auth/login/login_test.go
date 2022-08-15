@@ -385,8 +385,11 @@ func Test_loginRun_Survey(t *testing.T) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
 			},
 			prompterStubs: func(pm *prompter.PrompterMock) {
-				pm.SelectFunc = func(_, _ string, _ []string) (int, error) {
-					return 0, nil
+				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
+					if prompt == "What account do you want to log into?" {
+						return prompter.IndexFor(opts, "GitHub.com")
+					}
+					return -1, prompter.NoSuchPromptErr(prompt)
 				}
 			},
 			wantHosts:  "",
@@ -405,14 +408,14 @@ func Test_loginRun_Survey(t *testing.T) {
 				    git_protocol: https
 			`),
 			prompterStubs: func(pm *prompter.PrompterMock) {
-				pm.SelectFunc = func(prompt, _ string, _ []string) (int, error) {
+				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
 					switch prompt {
 					case "What is your preferred protocol for Git operations?":
-						return 0, nil
+						return prompter.IndexFor(opts, "HTTPS")
 					case "How would you like to authenticate GitHub CLI?":
-						return 1, nil
+						return prompter.IndexFor(opts, "Paste an authentication token")
 					}
-					return -1, nil
+					return -1, prompter.NoSuchPromptErr(prompt)
 				}
 			},
 			runStubs: func(rs *run.CommandStubber) {
@@ -439,16 +442,16 @@ func Test_loginRun_Survey(t *testing.T) {
 				Interactive: true,
 			},
 			prompterStubs: func(pm *prompter.PrompterMock) {
-				pm.SelectFunc = func(prompt, _ string, _ []string) (int, error) {
+				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
 					switch prompt {
 					case "What account do you want to log into?":
-						return 1, nil
+						return prompter.IndexFor(opts, "GitHub Enterprise Server")
 					case "What is your preferred protocol for Git operations?":
-						return 0, nil
+						return prompter.IndexFor(opts, "HTTPS")
 					case "How would you like to authenticate GitHub CLI?":
-						return 1, nil
+						return prompter.IndexFor(opts, "Paste an authentication token")
 					}
-					return -1, nil
+					return -1, prompter.NoSuchPromptErr(prompt)
 				}
 				pm.InputHostnameFunc = func() (string, error) {
 					return "brad.vickers", nil
@@ -478,16 +481,16 @@ func Test_loginRun_Survey(t *testing.T) {
 				Interactive: true,
 			},
 			prompterStubs: func(pm *prompter.PrompterMock) {
-				pm.SelectFunc = func(prompt, _ string, _ []string) (int, error) {
+				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
 					switch prompt {
 					case "What account do you want to log into?":
-						return 0, nil
+						return prompter.IndexFor(opts, "GitHub.com")
 					case "What is your preferred protocol for Git operations?":
-						return 0, nil
+						return prompter.IndexFor(opts, "HTTPS")
 					case "How would you like to authenticate GitHub CLI?":
-						return 1, nil
+						return prompter.IndexFor(opts, "Paste an authentication token")
 					}
-					return -1, nil
+					return -1, prompter.NoSuchPromptErr(prompt)
 				}
 			},
 			runStubs: func(rs *run.CommandStubber) {
@@ -508,16 +511,16 @@ func Test_loginRun_Survey(t *testing.T) {
 				Interactive: true,
 			},
 			prompterStubs: func(pm *prompter.PrompterMock) {
-				pm.SelectFunc = func(prompt, _ string, _ []string) (int, error) {
+				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
 					switch prompt {
 					case "What account do you want to log into?":
-						return 0, nil
+						return prompter.IndexFor(opts, "GitHub.com")
 					case "What is your preferred protocol for Git operations?":
-						return 1, nil
+						return prompter.IndexFor(opts, "SSH")
 					case "How would you like to authenticate GitHub CLI?":
-						return 1, nil
+						return prompter.IndexFor(opts, "Paste an authentication token")
 					}
-					return -1, nil
+					return -1, prompter.NoSuchPromptErr(prompt)
 				}
 			},
 			wantErrOut: regexp.MustCompile("Tip: you can generate a Personal Access Token here https://github.com/settings/tokens"),

@@ -48,14 +48,14 @@ func TestLogin_ssh(t *testing.T) {
 		httpmock.StringResponse(`{}`))
 
 	pm := &prompter.PrompterMock{}
-	pm.SelectFunc = func(prompt, _ string, _ []string) (int, error) {
+	pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
 		switch prompt {
 		case "What is your preferred protocol for Git operations?":
-			return 1, nil
+			return prompter.IndexFor(opts, "SSH")
 		case "How would you like to authenticate GitHub CLI?":
-			return 1, nil
+			return prompter.IndexFor(opts, "Paste an authentication token")
 		}
-		return -1, nil
+		return -1, prompter.NoSuchPromptErr(prompt)
 	}
 	pm.PasswordFunc = func(_ string) (string, error) {
 		return "monkey", nil

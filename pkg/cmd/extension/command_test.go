@@ -395,7 +395,7 @@ func TestNewCmdExtension(t *testing.T) {
 					return "", nil
 				}
 				pm.SelectFunc = func(prompt, defVal string, opts []string) (int, error) {
-					return 0, nil
+					return prompter.IndexFor(opts, "Script (Bash, Ruby, Python, etc)")
 				}
 			},
 			wantStdout: heredoc.Doc(`
