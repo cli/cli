@@ -181,11 +181,11 @@ func Test_diffRun(t *testing.T) {
 			name: "name only",
 			opts: DiffOptions{
 				SelectorArg: "123",
-				UseColor: false,
-				Patch: false,
-				NameOnly: true,
+				UseColor:    false,
+				Patch:       false,
+				NameOnly:    true,
 			},
-			rawDiff: fmt.Sprintf(testDiff, "", "", "", ""),
+			rawDiff:    fmt.Sprintf(testDiff, "", "", "", ""),
 			wantAccept: "application/vnd.github.v3.diff",
 			wantStdout: fmt.Sprintf(".github/workflows/releases.yml\nMakefile\n"),
 		},
@@ -331,11 +331,11 @@ func Test_changedFileNames(t *testing.T) {
 			output: "cmd.go\n",
 		},
 		{
-			input: fmt.Sprintf("diff --git a/baz.go b/rename.go\n--- a/baz.go\n+++ b/rename.go\n+foo\n-b%sr", strings.Repeat("a", 2*lineBufferSize)),
+			input:  fmt.Sprintf("diff --git a/baz.go b/rename.go\n--- a/baz.go\n+++ b/rename.go\n+foo\n-b%sr", strings.Repeat("a", 2*lineBufferSize)),
 			output: "rename.go\n",
 		},
 		{
-			input: fmt.Sprintf("diff --git a/baz.go b/baz.go\n--- a/baz.go\n+++ b/baz.go\n+foo\n-b%sr", strings.Repeat("a", 2*lineBufferSize)),
+			input:  fmt.Sprintf("diff --git a/baz.go b/baz.go\n--- a/baz.go\n+++ b/baz.go\n+foo\n-b%sr", strings.Repeat("a", 2*lineBufferSize)),
 			output: "baz.go\n",
 		},
 	}
