@@ -152,7 +152,9 @@ func loginRun(opts *LoginOptions) error {
 		if err := shared.HasMinimumScopes(httpClient, hostname, opts.Token); err != nil {
 			return fmt.Errorf("error validating token: %w", err)
 		}
-
+		if opts.GitProtocol != "" {
+			cfg.Set(hostname, "git_protocol", opts.GitProtocol)
+		}
 		return cfg.Write()
 	}
 
