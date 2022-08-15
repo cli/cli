@@ -29,6 +29,13 @@ func Test_NewCmdDiff(t *testing.T) {
 		wantErr string
 	}{
 		{
+			name: "name only",
+			args: "--name-only",
+			want: DiffOptions{
+				NameOnly: true,
+			},
+		},
+		{
 			name:  "number argument",
 			args:  "123",
 			isTTY: true,
