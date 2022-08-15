@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
-	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
 	"github.com/cli/oauth"
@@ -106,8 +106,8 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 			fmt.Fprintf(w, "%s to open %s in your browser... ", cs.Bold("Press Enter"), oauthHost)
 			_ = waitForEnter(IO.In)
 
-			browser := cmdutil.NewBrowser(browserLauncher, IO.Out, IO.ErrOut)
-			if err := browser.Browse(authURL); err != nil {
+			b := browser.New(browserLauncher, IO.Out, IO.ErrOut)
+			if err := b.Browse(authURL); err != nil {
 				fmt.Fprintf(w, "%s Failed opening a web browser at %s\n", cs.Red("!"), authURL)
 				fmt.Fprintf(w, "  %s\n", err)
 				fmt.Fprint(w, "  Please try entering the URL in your browser manually\n")

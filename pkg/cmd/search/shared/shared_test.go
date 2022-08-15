@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
-	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/search"
 	"github.com/stretchr/testify/assert"
@@ -159,7 +159,7 @@ func TestSearchIssues(t *testing.T) {
 		{
 			name: "opens browser for web mode tty",
 			opts: &IssuesOptions{
-				Browser: &cmdutil.TestBrowser{},
+				Browser: &browser.Stub{},
 				Entity:  Issues,
 				Query:   query,
 				Searcher: &search.SearcherMock{
@@ -175,7 +175,7 @@ func TestSearchIssues(t *testing.T) {
 		{
 			name: "opens browser for web mode notty",
 			opts: &IssuesOptions{
-				Browser: &cmdutil.TestBrowser{},
+				Browser: &browser.Stub{},
 				Entity:  Issues,
 				Query:   query,
 				Searcher: &search.SearcherMock{

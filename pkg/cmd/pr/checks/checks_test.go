@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -260,7 +261,7 @@ func TestChecksRun_web(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			browser := &cmdutil.TestBrowser{}
+			browser := &browser.Stub{}
 
 			ios, _, stdout, stderr := iostreams.Test()
 			ios.SetStdoutTTY(tc.isTTY)

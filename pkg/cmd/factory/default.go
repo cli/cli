@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/extension"
@@ -31,7 +32,7 @@ func New(appVersion string) *cmdutil.Factory {
 	f.HttpClient = httpClientFunc(f, appVersion) // Depends on Config, IOStreams, and appVersion
 	f.Remotes = remotesFunc(f)                   // Depends on Config
 	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
-	f.Browser = browser(f)                       // Depends on Config, and IOStreams
+	f.Browser = newBrowser(f)                    // Depends on Config, and IOStreams
 	f.ExtensionManager = extensionManager(f)     // Depends on Config, HttpClient, and IOStreams
 
 	return f
@@ -103,9 +104,9 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 	}
 }
 
-func browser(f *cmdutil.Factory) cmdutil.Browser {
+func newBrowser(f *cmdutil.Factory) browser.Browser {
 	io := f.IOStreams
-	return cmdutil.NewBrowser(browserLauncher(f), io.Out, io.ErrOut)
+	return browser.New(browserLauncher(f), io.Out, io.ErrOut)
 }
 
 // Browser precedence

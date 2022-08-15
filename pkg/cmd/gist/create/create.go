@@ -15,6 +15,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
@@ -23,10 +24,6 @@ import (
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
-
-type browser interface {
-	Browse(string) error
-}
 
 type CreateOptions struct {
 	IO *iostreams.IOStreams
@@ -39,7 +36,7 @@ type CreateOptions struct {
 
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
-	Browser    browser
+	Browser    browser.Browser
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {

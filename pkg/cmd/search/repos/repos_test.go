@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/search"
@@ -237,7 +238,7 @@ func TestReposRun(t *testing.T) {
 		{
 			name: "opens browser for web mode tty",
 			opts: &ReposOptions{
-				Browser: &cmdutil.TestBrowser{},
+				Browser: &browser.Stub{},
 				Query:   query,
 				Searcher: &search.SearcherMock{
 					URLFunc: func(query search.Query) string {
@@ -252,7 +253,7 @@ func TestReposRun(t *testing.T) {
 		{
 			name: "opens browser for web mode notty",
 			opts: &ReposOptions{
-				Browser: &cmdutil.TestBrowser{},
+				Browser: &browser.Stub{},
 				Query:   query,
 				Searcher: &search.SearcherMock{
 					URLFunc: func(query search.Query) string {

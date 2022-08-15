@@ -7,19 +7,16 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
-type Browser interface {
-	Browse(string) error
-}
-
 type Factory struct {
 	IOStreams *iostreams.IOStreams
-	Browser   Browser
+	Browser   browser.Browser
 
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
