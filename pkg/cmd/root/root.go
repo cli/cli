@@ -111,6 +111,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(NewHelpTopic(f.IOStreams, "environment"))
 	cmd.AddCommand(NewHelpTopic(f.IOStreams, "formatting"))
 	cmd.AddCommand(NewHelpTopic(f.IOStreams, "mintty"))
+	cmd.AddCommand(NewHelpTopic(f.IOStreams, "exit-codes"))
 	referenceCmd := NewHelpTopic(f.IOStreams, "reference")
 	referenceCmd.SetHelpFunc(referenceHelpFn(f.IOStreams))
 	cmd.AddCommand(referenceCmd)

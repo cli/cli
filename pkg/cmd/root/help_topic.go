@@ -129,6 +129,20 @@ var HelpTopics = map[string]map[string]string{
 			  '
 		`),
 	},
+	"exit-codes": {
+		"short": "Exit codes used by gh",
+		"long": heredoc.Doc(`
+			gh follows normal conventions regarding exit codes.
+
+			- If a command completes successfully, the exit code will be 0
+			
+			- If a command fails for any reason, the exit code will be 1
+
+			NOTE: It is possible that a particular command may have more exit codes, so it is a good 
+			practice to check documentation for the command if you are relying on exit codes to 
+			control some behavior. 
+		`),
+	},
 }
 
 func NewHelpTopic(ios *iostreams.IOStreams, topic string) *cobra.Command {
