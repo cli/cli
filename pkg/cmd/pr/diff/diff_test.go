@@ -187,7 +187,7 @@ func Test_diffRun(t *testing.T) {
 			},
 			rawDiff:    fmt.Sprintf(testDiff, "", "", "", ""),
 			wantAccept: "application/vnd.github.v3.diff",
-			wantStdout: fmt.Sprintf(".github/workflows/releases.yml\nMakefile\n"),
+			wantStdout: ".github/workflows/releases.yml\nMakefile\n",
 		},
 	}
 	for _, tt := range tests {
