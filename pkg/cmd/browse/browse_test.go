@@ -414,6 +414,35 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/bchadwic/test/blob/branch/with%20spaces%3F/%3F=hello%20world/%20%2A?plain=1#L23-L44",
 			wantsErr:    false,
 		},
+		{
+			name: "commit hash in selector arg",
+			opts: BrowseOptions{
+				SelectorArg: "77507cd94ccafcf568f8560cfecde965fcfa63e7",
+			},
+			baseRepo:    ghrepo.New("bchadwic", "test"),
+			expectedURL: "https://github.com/bchadwic/test/commit/77507cd94ccafcf568f8560cfecde965fcfa63e7",
+			wantsErr:    false,
+		},
+		{
+			name: "short commit hash in selector arg",
+			opts: BrowseOptions{
+				SelectorArg: "6e3689d5",
+			},
+			baseRepo:    ghrepo.New("bchadwic", "test"),
+			expectedURL: "https://github.com/bchadwic/test/commit/6e3689d5",
+			wantsErr:    false,
+		},
+
+		{
+			name: "commit hash with extension",
+			opts: BrowseOptions{
+				SelectorArg: "77507cd94ccafcf568f8560cfecde965fcfa63e7.txt",
+				Branch:      "trunk",
+			},
+			baseRepo:    ghrepo.New("bchadwic", "test"),
+			expectedURL: "https://github.com/bchadwic/test/tree/trunk/77507cd94ccafcf568f8560cfecde965fcfa63e7.txt",
+			wantsErr:    false,
+		},
 	}
 
 	for _, tt := range tests {
