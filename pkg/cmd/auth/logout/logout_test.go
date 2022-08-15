@@ -158,6 +158,7 @@ func Test_logoutRun_tty(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 
+			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
 				tt.askStubs(as)

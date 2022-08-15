@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -77,25 +77,24 @@ func TestNewCmdDelete(t *testing.T) {
 
 func Test_deleteRun(t *testing.T) {
 	tests := []struct {
-		name       string
-		tty        bool
-		opts       *DeleteOptions
-		httpStubs  func(*httpmock.Registry)
-		askStubs   func(*prompt.AskStubber)
-		wantStdout string
-		wantErr    bool
-		errMsg     string
+		name          string
+		tty           bool
+		opts          *DeleteOptions
+		httpStubs     func(*httpmock.Registry)
+		prompterStubs func(*prompter.PrompterMock)
+		wantStdout    string
+		wantErr       bool
+		errMsg        string
 	}{
 		{
 			name:       "prompting confirmation tty",
 			tty:        true,
 			opts:       &DeleteOptions{RepoArg: "OWNER/REPO"},
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
-			askStubs: func(q *prompt.AskStubber) {
-				// TODO: survey stubber doesn't have WithValidator support
-				// so this always passes regardless of prompt input
-				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
-				q.StubOne("OWNER/REPO")
+			prompterStubs: func(p *prompter.PrompterMock) {
+				p.InputFunc = func(_, _ string) (string, error) {
+					return "OWNER/REPO", nil
+				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -108,9 +107,10 @@ func Test_deleteRun(t *testing.T) {
 			tty:        true,
 			opts:       &DeleteOptions{},
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
-			askStubs: func(q *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
-				q.StubOne("OWNER/REPO")
+			prompterStubs: func(p *prompter.PrompterMock) {
+				p.InputFunc = func(_, _ string) (string, error) {
+					return "OWNER/REPO", nil
+				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -135,9 +135,10 @@ func Test_deleteRun(t *testing.T) {
 			opts:       &DeleteOptions{RepoArg: "REPO"},
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
 			tty:        true,
-			askStubs: func(q *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
-				q.StubOne("OWNER/REPO")
+			prompterStubs: func(p *prompter.PrompterMock) {
+				p.InputFunc = func(_, _ string) (string, error) {
+					return "OWNER/REPO", nil
+				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -150,12 +151,11 @@ func Test_deleteRun(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-		q, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(q)
+		pm := &prompter.PrompterMock{}
+		if tt.prompterStubs != nil {
+			tt.prompterStubs(pm)
 		}
+		tt.opts.Prompter = pm
 
 		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil

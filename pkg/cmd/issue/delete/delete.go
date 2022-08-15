@@ -79,6 +79,7 @@ func deleteRun(opts *DeleteOptions) error {
 	// already provided. Otherwise skip confirmation.
 	if opts.IO.CanPrompt() && !opts.Confirmed {
 		answer := ""
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(
 			&survey.Input{
 				Message: fmt.Sprintf("You're going to delete issue #%d. This action cannot be reversed. To confirm, type the issue number:", issue.Number),

@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -31,6 +32,7 @@ func New(appVersion string) *cmdutil.Factory {
 	f.HttpClient = httpClientFunc(f, appVersion) // Depends on Config, IOStreams, and appVersion
 	f.Remotes = remotesFunc(f)                   // Depends on Config
 	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
+	f.Prompter = newPrompter(f)                  // Depends on Config and IOStreams
 	f.Browser = browser(f)                       // Depends on Config, and IOStreams
 	f.ExtensionManager = extensionManager(f)     // Depends on Config, HttpClient, and IOStreams
 
@@ -106,6 +108,12 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 func browser(f *cmdutil.Factory) cmdutil.Browser {
 	io := f.IOStreams
 	return cmdutil.NewBrowser(browserLauncher(f), io.Out, io.ErrOut)
+}
+
+func newPrompter(f *cmdutil.Factory) prompter.Prompter {
+	editor, _ := cmdutil.DetermineEditor(f.Config)
+	io := f.IOStreams
+	return prompter.New(editor, io.In, io.Out, io.ErrOut)
 }
 
 // Browser precedence

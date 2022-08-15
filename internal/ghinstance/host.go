@@ -36,12 +36,7 @@ func NormalizeHostname(h string) string {
 	return hostname
 }
 
-func HostnameValidator(v interface{}) error {
-	hostname, valid := v.(string)
-	if !valid {
-		return errors.New("hostname is not a string")
-	}
-
+func HostnameValidator(hostname string) error {
 	if len(strings.TrimSpace(hostname)) < 1 {
 		return errors.New("a value is required")
 	}

@@ -569,6 +569,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		pushOptions = append(pushOptions, "Cancel")
 
 		var selectedOption int
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(&survey.Select{
 			Message: fmt.Sprintf("Where should we push the '%s' branch?", headBranch),
 			Options: pushOptions,

@@ -319,6 +319,7 @@ func Test_editRun_interactive(t *testing.T) {
 			opts := &tt.opts
 			opts.HTTPClient = &http.Client{Transport: httpReg}
 			opts.IO = ios
+			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
 				tt.askStubs(as)
