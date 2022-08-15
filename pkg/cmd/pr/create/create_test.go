@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
@@ -844,7 +845,7 @@ func Test_createRun(t *testing.T) {
 			ios.SetStdoutTTY(tt.tty)
 			ios.SetStdinTTY(tt.tty)
 			ios.SetStderrTTY(tt.tty)
-			browser := &cmdutil.TestBrowser{}
+			browser := &browser.Stub{}
 			opts.IO = ios
 			opts.Browser = browser
 			opts.HttpClient = func() (*http.Client, error) {

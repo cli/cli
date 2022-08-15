@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
@@ -337,7 +338,7 @@ func Test_createRun(t *testing.T) {
 		ios, stdin, stdout, stderr := iostreams.Test()
 		tt.opts.IO = ios
 
-		browser := &cmdutil.TestBrowser{}
+		browser := &browser.Stub{}
 		tt.opts.Browser = browser
 
 		_, teardown := run.Stub()

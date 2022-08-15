@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/search"
@@ -26,7 +27,7 @@ const (
 )
 
 type IssuesOptions struct {
-	Browser  cmdutil.Browser
+	Browser  browser.Browser
 	Entity   EntityType
 	Exporter cmdutil.Exporter
 	IO       *iostreams.IOStreams
