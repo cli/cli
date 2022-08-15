@@ -22,7 +22,7 @@ type Prompter interface {
 	MarkdownEditor(string, string, bool) (string, error)
 }
 
-func NewPrompter(editorCmd string, stdin io.Reader, stdout, stderr io.Writer) Prompter {
+func New(editorCmd string, stdin io.Reader, stdout, stderr io.Writer) Prompter {
 	return &surveyPrompter{
 		editorCmd: editorCmd,
 		stdin:     stdin.(terminal.FileReader),
