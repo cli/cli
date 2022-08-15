@@ -272,15 +272,18 @@ func apiRun(opts *ApiOptions) error {
 		httpClient = api.NewCachedHTTPClient(httpClient, opts.CacheTTL)
 	}
 
-	headersOutputStream := opts.IO.Out
-	if opts.Silent {
-		opts.IO.Out = io.Discard
-	} else {
+	if !opts.Silent {
 		if err := opts.IO.StartPager(); err == nil {
 			defer opts.IO.StopPager()
 		} else {
 			fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 		}
+	}
+
+	bodyWriter := opts.IO.Out
+	headersWriter := opts.IO.Out
+	if opts.Silent {
+		bodyWriter = io.Discard
 	}
 
 	cfg, err := opts.Config()
@@ -303,7 +306,7 @@ func apiRun(opts *ApiOptions) error {
 			return err
 		}
 
-		endCursor, err := processResponse(resp, opts, headersOutputStream, &template)
+		endCursor, err := processResponse(resp, opts, bodyWriter, headersWriter, &template)
 		if err != nil {
 			return err
 		}
@@ -330,11 +333,11 @@ func apiRun(opts *ApiOptions) error {
 	return template.End()
 }
 
-func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream io.Writer, template *export.Template) (endCursor string, err error) {
+func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersWriter io.Writer, template *export.Template) (endCursor string, err error) {
 	if opts.ShowResponseHeaders {
-		fmt.Fprintln(headersOutputStream, resp.Proto, resp.Status)
-		printHeaders(headersOutputStream, resp.Header, opts.IO.ColorEnabled())
-		fmt.Fprint(headersOutputStream, "\r\n")
+		fmt.Fprintln(headersWriter, resp.Proto, resp.Status)
+		printHeaders(headersWriter, resp.Header, opts.IO.ColorEnabled())
+		fmt.Fprint(headersWriter, "\r\n")
 	}
 
 	if resp.StatusCode == 204 {
@@ -362,20 +365,20 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 
 	if opts.FilterOutput != "" && serverError == "" {
 		// TODO: reuse parsed query across pagination invocations
-		err = export.FilterJSON(opts.IO.Out, responseBody, opts.FilterOutput)
+		err = export.FilterJSON(bodyWriter, responseBody, opts.FilterOutput)
 		if err != nil {
 			return
 		}
 	} else if opts.Template != "" && serverError == "" {
 		// TODO: reuse parsed template across pagination invocations
-		err = template.Execute(responseBody)
+		err = template.Execute(bodyWriter, responseBody)
 		if err != nil {
 			return
 		}
 	} else if isJSON && opts.IO.ColorEnabled() {
-		err = jsoncolor.Write(opts.IO.Out, responseBody, "  ")
+		err = jsoncolor.Write(bodyWriter, responseBody, "  ")
 	} else {
-		_, err = io.Copy(opts.IO.Out, responseBody)
+		_, err = io.Copy(bodyWriter, responseBody)
 	}
 	if err != nil {
 		return

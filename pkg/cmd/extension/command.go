@@ -35,7 +35,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 			See the list of available extensions at <https://github.com/topics/gh-extension>.
 		`, "`"),
-		Aliases: []string{"extensions"},
+		Aliases: []string{"extensions", "ext"},
 	}
 
 	extCmd.AddCommand(
