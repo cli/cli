@@ -49,7 +49,7 @@ Additional Conda installation options available on the [gh-feedstock page](https
 
 ### Linux & BSD
 
-`gh` is available via [Homebrew](#homebrew), [Conda](#conda), [Spack](#spack), and as downloadable binaries from the [releases page][].
+`gh` is available via [Homebrew](#homebrew), [Conda](#conda), [Fedora](#fedora), [Spack](#spack), and as downloadable binaries from the [releases page][].
 
 For instructions on specific distributions and package managers, see [Linux & BSD installation](./docs/install_linux.md).
 
@@ -105,6 +105,7 @@ tool. Check out our [more detailed explanation][gh-vs-hub] to learn more.
 [scoop]: https://scoop.sh
 [Chocolatey]: https://chocolatey.org
 [Conda]: https://docs.conda.io/en/latest/
+[Fedora]: https://packages.fedoraproject.org/pkgs/gh/gh/
 [Spack]: https://spack.io
 [releases page]: https://github.com/cli/cli/releases/latest
 [hub]: https://github.com/github/hub
