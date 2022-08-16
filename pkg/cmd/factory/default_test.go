@@ -352,6 +352,7 @@ func Test_ioStreams_prompt(t *testing.T) {
 		name           string
 		config         config.Config
 		promptDisabled bool
+		env            map[string]string
 	}{
 		{
 			name:           "default config",
@@ -362,9 +363,25 @@ func Test_ioStreams_prompt(t *testing.T) {
 			config:         disablePromptConfig(),
 			promptDisabled: true,
 		},
+		{
+			name:           "prompt disabled via GH_PROMPT_DISABLED env var",
+			env:            map[string]string{"GH_PROMPT_DISABLED": "1"},
+			promptDisabled: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.env != nil {
+				for k, v := range tt.env {
+					old := os.Getenv(k)
+					os.Setenv(k, v)
+					if k == "GH_PROMPT_DISABLED" {
+						defer os.Unsetenv(k)
+					} else {
+						defer os.Setenv(k, old)
+					}
+				}
+			}
 			f := New("1")
 			f.Config = func() (config.Config, error) {
 				if tt.config == nil {
