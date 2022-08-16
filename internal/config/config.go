@@ -176,7 +176,7 @@ var configOptions = []ConfigOption{
 	},
 	{
 		Key:           "prompt",
-		Description:   "toggle interactive prompting in the terminal. Overridden if GH_PROMPT_DISABLED is set",
+		Description:   "toggle interactive prompting in the terminal",
 		DefaultValue:  "enabled",
 		AllowedValues: []string{"enabled", "disabled"},
 	},

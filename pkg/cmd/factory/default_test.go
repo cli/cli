@@ -373,13 +373,7 @@ func Test_ioStreams_prompt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.env != nil {
 				for k, v := range tt.env {
-					old := os.Getenv(k)
-					os.Setenv(k, v)
-					if k == "GH_PROMPT_DISABLED" {
-						defer os.Unsetenv(k)
-					} else {
-						defer os.Setenv(k, old)
-					}
+					t.Setenv(k, v)
 				}
 			}
 			f := New("1")
