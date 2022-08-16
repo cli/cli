@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -31,12 +32,15 @@ type ViewOptions struct {
 	SelectorArg string
 	BrowserMode bool
 	Comments    bool
+
+	Now func() time.Time
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
 		IO:      f.IOStreams,
 		Browser: f.Browser,
+		Now:     time.Now,
 	}
 
 	cmd := &cobra.Command{
@@ -81,7 +85,7 @@ var defaultFields = []string{
 	"isDraft", "maintainerCanModify", "mergeable", "additions", "deletions", "commitsCount",
 	"baseRefName", "headRefName", "headRepositoryOwner", "headRepository", "isCrossRepository",
 	"reviewRequests", "reviews", "assignees", "labels", "projectCards", "milestone",
-	"comments", "reactionGroups",
+	"comments", "reactionGroups", "createdAt",
 }
 
 func viewRun(opts *ViewOptions) error {
@@ -167,16 +171,19 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
+	now := opts.Now()
+	ago := now.Sub(pr.CreatedAt)
 
 	// Header (Title and State)
 	fmt.Fprintf(out, "%s #%d\n", cs.Bold(pr.Title), pr.Number)
 	fmt.Fprintf(out,
-		"%s • %s wants to merge %s into %s from %s • %s %s \n",
+		"%s • %s wants to merge %s into %s from %s • %s • %s %s \n",
 		shared.StateTitleWithColor(cs, *pr),
 		pr.Author.Login,
 		utils.Pluralize(pr.Commits.TotalCount, "commit"),
 		pr.BaseRefName,
 		pr.HeadRefName,
+		utils.FuzzyAgo(ago),
 		cs.Green("+"+strconv.Itoa(pr.Additions)),
 		cs.Red("-"+strconv.Itoa(pr.Deletions)),
 	)
