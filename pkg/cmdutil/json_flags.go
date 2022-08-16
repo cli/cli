@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/jsoncolor"
 	"github.com/cli/cli/v2/pkg/set"
+	"github.com/cli/go-gh/pkg/jq"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -137,7 +138,7 @@ func (e *exportFormat) Write(ios *iostreams.IOStreams, data interface{}) error {
 
 	w := ios.Out
 	if e.filter != "" {
-		return export.FilterJSON(w, &buf, e.filter)
+		return jq.Evaluate(&buf, w, e.filter)
 	} else if e.template != "" {
 		return export.ExecuteTemplate(ios, &buf, e.template)
 	} else if ios.ColorEnabled() {

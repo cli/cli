@@ -23,6 +23,7 @@ import (
 	"github.com/cli/cli/v2/pkg/export"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/jsoncolor"
+	"github.com/cli/go-gh/pkg/jq"
 	"github.com/spf13/cobra"
 )
 
@@ -365,7 +366,7 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 
 	if opts.FilterOutput != "" && serverError == "" {
 		// TODO: reuse parsed query across pagination invocations
-		err = export.FilterJSON(bodyWriter, responseBody, opts.FilterOutput)
+		err = jq.Evaluate(responseBody, bodyWriter, opts.FilterOutput)
 		if err != nil {
 			return
 		}
