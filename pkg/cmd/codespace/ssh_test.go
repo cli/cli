@@ -125,16 +125,33 @@ func TestAutomaticSSHKeyPairs(t *testing.T) {
 	}
 }
 
-func TestDontUseAutomaticSSHKeysWithCustomPrivateKey(t *testing.T) {
-	args := []string{"-i", "private-key"}
-	result, err := useAutomaticSSHKeys(context.Background(), ssh.Context{}, nil, args, sshOptions{})
-
-	if err != nil {
-		t.Errorf("Unexpected error from useAutomaticSSHKeys: %v", err)
+func TestUseAutomaticSSHKeysIdentityFileArg(t *testing.T) {
+	tests := []struct {
+		identityFileArg string
+		wantResult      bool
+	}{
+		{"custom-private-key", false},
+		{automaticPrivateKeyName, true},
+		{"", false}, // Edge case check for missing arg value
 	}
 
-	if result != false {
-		t.Errorf("Want useAutomaticSSHKeys to be false, got true")
+	for _, tt := range tests {
+		t.Logf("%v", tt.identityFileArg)
+
+		args := []string{"-i"}
+		if tt.identityFileArg != "" {
+			args = append(args, tt.identityFileArg)
+		}
+
+		result, err := useAutomaticSSHKeys(context.Background(), ssh.Context{}, nil, args, sshOptions{})
+
+		if err != nil {
+			t.Errorf("Unexpected error from useAutomaticSSHKeys: %v", err)
+		}
+
+		if result != tt.wantResult {
+			t.Errorf("Want useAutomaticSSHKeys to be %v, got %v", tt.wantResult, result)
+		}
 	}
 }
 

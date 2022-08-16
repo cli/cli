@@ -246,7 +246,11 @@ func useAutomaticSSHKeys(
 		arg := args[i]
 
 		if arg == "-i" {
-			// User specified the identity file so just trust it is correct
+			if i+1 < len(args) && path.Base(args[i+1]) == automaticPrivateKeyName {
+				return true, nil
+			}
+
+			// User specified a custom identity file so just trust it is correct
 			return false, nil
 		}
 
@@ -550,12 +554,10 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 		return fmt.Errorf("error formatting template: %w", err)
 	}
 
-	sshDir, err := config.HomeDirPath(".ssh")
+	automaticIdentityFilePath, err := automaticPrivateKeyPath()
 	if err != nil {
 		return fmt.Errorf("error finding .ssh directory: %w", err)
 	}
-
-	automaticIdentityFilePath := path.Join(sshDir, automaticPrivateKeyName)
 
 	ghExec := a.executable.Executable()
 	for result := range sshUsers {
@@ -597,6 +599,15 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 	}
 
 	return status
+}
+
+func automaticPrivateKeyPath() (string, error) {
+	sshDir, err := config.HomeDirPath(".ssh")
+	if err != nil {
+		return "", err
+	}
+
+	return path.Join(sshDir, automaticPrivateKeyName), nil
 }
 
 type cpOptions struct {
