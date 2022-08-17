@@ -271,7 +271,7 @@ func mainRun() exitCode {
 			ansi.Color(strings.TrimPrefix(buildVersion, "v"), "cyan"),
 			ansi.Color(strings.TrimPrefix(newRelease.Version, "v"), "cyan"))
 		if isHomebrew {
-			fmt.Fprintf(stderr, "To upgrade, run: %s\n", "brew update && brew upgrade gh")
+			fmt.Fprintf(stderr, "To upgrade, run: %s\n", "brew upgrade gh")
 		}
 		fmt.Fprintf(stderr, "%s\n\n",
 			ansi.Color(newRelease.URL, "yellow"))
