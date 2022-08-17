@@ -183,7 +183,9 @@ func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 		return io
 	}
 
-	if prompt, _ := cfg.GetOrDefault("", "prompt"); prompt == "disabled" {
+	if _, ghPromptDisabled := os.LookupEnv("GH_PROMPT_DISABLED"); ghPromptDisabled {
+		io.SetNeverPrompt(true)
+	} else if prompt, _ := cfg.GetOrDefault("", "prompt"); prompt == "disabled" {
 		io.SetNeverPrompt(true)
 	}
 
