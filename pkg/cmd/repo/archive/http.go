@@ -1,12 +1,9 @@
 package archive
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
-	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -25,8 +22,7 @@ func archiveRepo(client *http.Client, repo *api.Repository) error {
 		},
 	}
 
-	host := repo.RepoHost()
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(host), client)
-	err := gql.MutateNamed(context.Background(), "ArchiveRepository", &mutation, variables)
+	gql := api.NewClientFromHTTP(client)
+	err := gql.Mutate(repo.RepoHost(), "ArchiveRepository", &mutation, variables)
 	return err
 }

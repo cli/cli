@@ -1,7 +1,6 @@
 package shared
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -10,8 +9,6 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
-	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/shurcooL/githubv4"
 )
@@ -105,13 +102,13 @@ func ListGists(client *http.Client, hostname string, limit int, visibility strin
 		"visibility": githubv4.GistPrivacy(strings.ToUpper(visibility)),
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), client)
+	gql := api.NewClientFromHTTP(client)
 
 	gists := []Gist{}
 pagination:
 	for {
 		var result response
-		err := gql.QueryNamed(context.Background(), "GistList", &result, variables)
+		err := gql.Query(hostname, "GistList", &result, variables)
 		if err != nil {
 			return nil, err
 		}
