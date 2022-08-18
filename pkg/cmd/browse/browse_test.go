@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -448,7 +449,7 @@ func Test_runBrowse(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, stdout, stderr := iostreams.Test()
-			browser := cmdutil.TestBrowser{}
+			browser := browser.Stub{}
 
 			reg := httpmock.Registry{}
 			defer reg.Verify(t)

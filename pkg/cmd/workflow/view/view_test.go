@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	runShared "github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
@@ -412,7 +413,7 @@ func TestViewRun(t *testing.T) {
 			return ghrepo.FromFullName("OWNER/REPO")
 		}
 
-		browser := &cmdutil.TestBrowser{}
+		browser := &browser.Stub{}
 		tt.opts.Browser = browser
 
 		t.Run(tt.name, func(t *testing.T) {

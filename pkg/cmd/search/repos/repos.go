@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/pkg/cmd/search/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -16,7 +17,7 @@ import (
 )
 
 type ReposOptions struct {
-	Browser  cmdutil.Browser
+	Browser  browser.Browser
 	Exporter cmdutil.Exporter
 	IO       *iostreams.IOStreams
 	Query    search.Query

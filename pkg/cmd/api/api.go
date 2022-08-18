@@ -20,9 +20,10 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/export"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/jsoncolor"
+	"github.com/cli/go-gh/pkg/jq"
+	"github.com/cli/go-gh/pkg/template"
 	"github.com/spf13/cobra"
 )
 
@@ -297,7 +298,11 @@ func apiRun(opts *ApiOptions) error {
 		host = opts.Hostname
 	}
 
-	template := export.NewTemplate(opts.IO, opts.Template)
+	tmpl := template.New(bodyWriter, opts.IO.TerminalWidth(), opts.IO.ColorEnabled())
+	err = tmpl.Parse(opts.Template)
+	if err != nil {
+		return err
+	}
 
 	hasNextPage := true
 	for hasNextPage {
@@ -306,7 +311,7 @@ func apiRun(opts *ApiOptions) error {
 			return err
 		}
 
-		endCursor, err := processResponse(resp, opts, bodyWriter, headersWriter, &template)
+		endCursor, err := processResponse(resp, opts, bodyWriter, headersWriter, &tmpl)
 		if err != nil {
 			return err
 		}
@@ -330,10 +335,10 @@ func apiRun(opts *ApiOptions) error {
 		}
 	}
 
-	return template.End()
+	return tmpl.Flush()
 }
 
-func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersWriter io.Writer, template *export.Template) (endCursor string, err error) {
+func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersWriter io.Writer, template *template.Template) (endCursor string, err error) {
 	if opts.ShowResponseHeaders {
 		fmt.Fprintln(headersWriter, resp.Proto, resp.Status)
 		printHeaders(headersWriter, resp.Header, opts.IO.ColorEnabled())
@@ -365,13 +370,12 @@ func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersW
 
 	if opts.FilterOutput != "" && serverError == "" {
 		// TODO: reuse parsed query across pagination invocations
-		err = export.FilterJSON(bodyWriter, responseBody, opts.FilterOutput)
+		err = jq.Evaluate(responseBody, bodyWriter, opts.FilterOutput)
 		if err != nil {
 			return
 		}
 	} else if opts.Template != "" && serverError == "" {
-		// TODO: reuse parsed template across pagination invocations
-		err = template.Execute(bodyWriter, responseBody)
+		err = template.Execute(responseBody)
 		if err != nil {
 			return
 		}

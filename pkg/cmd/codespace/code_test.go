@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
@@ -62,7 +62,7 @@ func TestApp_VSCode(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := &cmdutil.TestBrowser{}
+			b := &browser.Stub{}
 			ios, _, stdout, stderr := iostreams.Test()
 			a := &App{
 				browser:   b,
