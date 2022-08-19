@@ -221,6 +221,42 @@ func Test_NewCmdCreate(t *testing.T) {
 				GenerateNotes: true,
 			},
 		},
+		{
+			name:  "generate release notes with previous tag",
+			args:  "v1.2.3 --generate-notes --previous-tag v1.1.0",
+			isTTY: true,
+			want: CreateOptions{
+				TagName:         "v1.2.3",
+				Target:          "",
+				Name:            "",
+				Body:            "",
+				BodyProvided:    false,
+				Draft:           false,
+				Prerelease:      false,
+				RepoOverride:    "",
+				Concurrency:     5,
+				Assets:          []*shared.AssetForUpload(nil),
+				GenerateNotes:   true,
+				PreviosuTagName: "v1.1.0",
+			},
+		},
+		{
+			name:  "only previosu tag",
+			args:  "--previous-tag v1.1.0",
+			isTTY: true,
+			want: CreateOptions{
+				TagName:      "",
+				Target:       "",
+				Name:         "",
+				Body:         "",
+				BodyProvided: false,
+				Draft:        false,
+				Prerelease:   false,
+				RepoOverride: "",
+				Concurrency:  5,
+				Assets:       []*shared.AssetForUpload(nil),
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -546,6 +582,46 @@ func Test_createRun(t *testing.T) {
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3-final\n",
 			wantStderr: ``,
 		},
+		{
+			name:  "with generate notes and previous tag",
+			isTTY: true,
+			opts: CreateOptions{
+				TagName:         "v1.2.3",
+				Name:            "",
+				Body:            "",
+				Target:          "",
+				BodyProvided:    false,
+				GenerateNotes:   true,
+				PreviosuTagName: "v1.1.0",
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
+					httpmock.RESTPayload(200, `{
+						"name": "generated name",
+						"body": "generated body"
+				}`, func(params map[string]interface{}) {
+						assert.Equal(t, map[string]interface{}{
+							"tag_name":          "v1.2.3",
+							"previous_tag_name": "v1.1.0",
+						}, params)
+					}))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"tag_name":   "v1.2.3",
+						"draft":      false,
+						"prerelease": false,
+						"body":       "generated body",
+						"name":       "generated name",
+					}, params)
+				}))
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantErr:    "",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -820,6 +896,42 @@ func Test_createRun_interactive(t *testing.T) {
 				"prerelease":       false,
 				"tag_name":         "v1.2.3",
 				"target_commitish": "main",
+			},
+			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+		},
+		{
+			name: "create a release using commit log as notes with previous tag ",
+			opts: &CreateOptions{
+				TagName:         "v1.2.3",
+				PreviosuTagName: "v1.1.0",
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Title (optional)").AnswerDefault()
+				as.StubPrompt("Release notes").
+					AssertOptions([]string{"Write my own", "Write using commit log as template", "Leave blank"}).
+					AnswerWith("Write using commit log as template")
+				as.StubPrompt("Is this a prerelease?").AnswerWith(false)
+				as.StubPrompt("Submit?").AnswerWith("Publish release")
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 1, "")
+				rs.Register(`git .+log .+v1\.1\.0\.\.HEAD$`, 0, "commit subject\n\ncommit body\n")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
+					httpmock.StatusStringResponse(404, `{}`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"),
+					httpmock.StatusStringResponse(201, `{
+						"url": "https://api.github.com/releases/123",
+						"upload_url": "https://api.github.com/assets/upload",
+						"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+					}`))
+			},
+			wantParams: map[string]interface{}{
+				"body":       "* commit subject\n\n  commit body\n  ",
+				"draft":      false,
+				"prerelease": false,
+				"tag_name":   "v1.2.3",
 			},
 			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 		},
