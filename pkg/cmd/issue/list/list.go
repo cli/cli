@@ -1,7 +1,6 @@
 package list
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -11,7 +10,6 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -19,7 +17,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
-	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -243,8 +240,8 @@ func milestoneByNumber(client *http.Client, repo ghrepo.Interface, number int32)
 		"number": githubv4.Int(number),
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), client)
-	if err := gql.QueryNamed(context.Background(), "RepositoryMilestoneByNumber", &query, variables); err != nil {
+	gql := api.NewClientFromHTTP(client)
+	if err := gql.Query(repo.RepoHost(), "RepositoryMilestoneByNumber", &query, variables); err != nil {
 		return nil, err
 	}
 	if query.Repository.Milestone == nil {
