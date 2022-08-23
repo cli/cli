@@ -230,6 +230,7 @@ func collectInputs(yamlContent []byte) (map[string]string, error) {
 	inputAnswer := InputAnswer{
 		providedInputs: providedInputs,
 	}
+	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 	err = prompt.SurveyAsk(qs, &inputAnswer)
 	if err != nil {
 		return nil, err

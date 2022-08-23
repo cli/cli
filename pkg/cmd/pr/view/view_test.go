@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -118,7 +119,7 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 	ios.SetStdinTTY(isTTY)
 	ios.SetStderrTTY(isTTY)
 
-	browser := &cmdutil.TestBrowser{}
+	browser := &browser.Stub{}
 	factory := &cmdutil.Factory{
 		IOStreams: ios,
 		Browser:   browser,

@@ -491,16 +491,6 @@ func TestBuildDisplayName(t *testing.T) {
 		expectedDisplayName  string
 	}{
 		{
-			name:                 "prebuild availability is pool",
-			prebuildAvailability: "pool",
-			expectedDisplayName:  "4 cores, 8 GB RAM, 32 GB storage (Prebuild ready)",
-		},
-		{
-			name:                 "prebuild availability is blob",
-			prebuildAvailability: "blob",
-			expectedDisplayName:  "4 cores, 8 GB RAM, 32 GB storage (Prebuild ready)",
-		},
-		{
 			name:                 "prebuild availability is none",
 			prebuildAvailability: "none",
 			expectedDisplayName:  "4 cores, 8 GB RAM, 32 GB storage",

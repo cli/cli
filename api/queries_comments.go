@@ -3,7 +3,6 @@ package api
 import (
 	"time"
 
-	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -46,7 +45,7 @@ func CommentCreate(client *Client, repoHost string, params CommentCreateInput) (
 	variables := map[string]interface{}{
 		"input": githubv4.AddCommentInput{
 			Body:      githubv4.String(params.Body),
-			SubjectID: graphql.ID(params.SubjectId),
+			SubjectID: githubv4.ID(params.SubjectId),
 		},
 	}
 

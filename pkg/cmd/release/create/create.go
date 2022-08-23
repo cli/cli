@@ -195,6 +195,7 @@ func createRun(opts *CreateOptions) error {
 				Options: options,
 				Default: options[0],
 			}
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err := prompt.SurveyAskOne(q, &tag)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
@@ -209,6 +210,7 @@ func createRun(opts *CreateOptions) error {
 			q := &survey.Input{
 				Message: "Tag name",
 			}
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err := prompt.SurveyAskOne(q, &opts.TagName)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
@@ -309,6 +311,7 @@ func createRun(opts *CreateOptions) error {
 				},
 			},
 		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 		err = prompt.SurveyAsk(qs, opts)
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
@@ -373,6 +376,7 @@ func createRun(opts *CreateOptions) error {
 			},
 		}
 
+		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 		err = prompt.SurveyAsk(qs, opts)
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)

@@ -17,6 +17,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
@@ -26,10 +27,6 @@ import (
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
-
-type browser interface {
-	Browse(string) error
-}
 
 type runLogCache interface {
 	Exists(string) bool
@@ -67,7 +64,7 @@ type ViewOptions struct {
 	HttpClient  func() (*http.Client, error)
 	IO          *iostreams.IOStreams
 	BaseRepo    func() (ghrepo.Interface, error)
-	Browser     browser
+	Browser     browser.Browser
 	RunLogCache runLogCache
 
 	RunID      string
@@ -446,6 +443,7 @@ func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, er
 	}
 
 	var selected int
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err := prompt.SurveyAskOne(&survey.Select{
 		Message:  "View a specific job in this run?",
 		Options:  candidates,

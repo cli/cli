@@ -6,12 +6,14 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -19,13 +21,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type browser interface {
-	Browse(string) error
-}
-
 type BrowseOptions struct {
 	BaseRepo         func() (ghrepo.Interface, error)
-	Browser          browser
+	Browser          browser.Browser
 	HttpClient       func() (*http.Client, error)
 	IO               *iostreams.IOStreams
 	PathFromRepoRoot func() string
@@ -61,6 +59,9 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 
 			$ gh browse 217
 			#=> Open issue or pull request 217
+
+			$ gh browse 77507cd94ccafcf568f8560cfecde965fcfa63
+			#=> Open commit page
 
 			$ gh browse --settings
 			#=> Open repository settings
@@ -169,6 +170,10 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 		return fmt.Sprintf("issues/%s", opts.SelectorArg), nil
 	}
 
+	if isCommit(opts.SelectorArg) {
+		return fmt.Sprintf("commit/%s", opts.SelectorArg), nil
+	}
+
 	filePath, rangeStart, rangeEnd, err := parseFile(*opts, opts.SelectorArg)
 	if err != nil {
 		return "", err
@@ -250,6 +255,13 @@ func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err 
 func isNumber(arg string) bool {
 	_, err := strconv.Atoi(arg)
 	return err == nil
+}
+
+// sha1 and sha256 are supported
+var commitHash = regexp.MustCompile(`\A[a-f0-9]{7,64}\z`)
+
+func isCommit(arg string) bool {
+	return commitHash.MatchString(arg)
 }
 
 // gitClient is used to implement functions that can be performed on both local and remote git repositories

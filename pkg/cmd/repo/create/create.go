@@ -232,6 +232,7 @@ func createRun(opts *CreateOptions) error {
 			"Create a new repository on GitHub from scratch",
 			"Push an existing local repository to GitHub",
 		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		if err := prompt.SurveyAskOne(&survey.Select{
 			Message: "What would you like to do?",
 			Options: modeOptions,
@@ -353,6 +354,7 @@ func createFromScratch(opts *CreateOptions) error {
 			Message: "Clone the new repository locally?",
 			Default: true,
 		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(cloneQuestion, &opts.Clone)
 		if err != nil {
 			return err
@@ -507,6 +509,7 @@ func createFromLocal(opts *CreateOptions) error {
 			Message: `Add a remote?`,
 			Default: true,
 		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(remoteQuesiton, &addRemote)
 		if err != nil {
 			return err
@@ -520,6 +523,7 @@ func createFromLocal(opts *CreateOptions) error {
 			Message: "What should the new remote be called?",
 			Default: "origin",
 		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(pushQuestion, &baseRemote)
 		if err != nil {
 			return err
@@ -536,6 +540,7 @@ func createFromLocal(opts *CreateOptions) error {
 			Message: fmt.Sprintf(`Would you like to push commits from the current branch to %q?`, baseRemote),
 			Default: true,
 		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(pushQuestion, &opts.Push)
 		if err != nil {
 			return err
@@ -684,6 +689,7 @@ func interactiveGitIgnore(client *http.Client, hostname string) (string, error) 
 	}
 
 	addGitIgnoreSurvey = append(addGitIgnoreSurvey, addGitIgnoreQuestion)
+	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 	err := prompt.SurveyAsk(addGitIgnoreSurvey, &addGitIgnore)
 	if err != nil {
 		return "", err
@@ -706,6 +712,7 @@ func interactiveGitIgnore(client *http.Client, hostname string) (string, error) 
 			},
 		}
 		gitIg = append(gitIg, gitIgnoreQuestion)
+		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 		err = prompt.SurveyAsk(gitIg, &wantedIgnoreTemplate)
 		if err != nil {
 			return "", err
@@ -730,6 +737,7 @@ func interactiveLicense(client *http.Client, hostname string) (string, error) {
 	}
 
 	addLicenseSurvey = append(addLicenseSurvey, addLicenseQuestion)
+	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 	err := prompt.SurveyAsk(addLicenseSurvey, &addLicense)
 	if err != nil {
 		return "", err
@@ -757,6 +765,7 @@ func interactiveLicense(client *http.Client, hostname string) (string, error) {
 			},
 		}
 		licenseQs = append(licenseQs, licenseQuestion)
+		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 		err = prompt.SurveyAsk(licenseQs, &wantedLicense)
 		if err != nil {
 			return "", err
@@ -794,6 +803,7 @@ func interactiveRepoInfo(defaultName string) (string, string, string, error) {
 		RepoVisibility  string
 	}{}
 
+	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 	err := prompt.SurveyAsk(qs, &answer)
 	if err != nil {
 		return "", "", "", err
@@ -808,6 +818,7 @@ func interactiveSource() (string, error) {
 		Message: "Path to local repository",
 		Default: "."}
 
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err := prompt.SurveyAskOne(sourcePrompt, &sourcePath)
 	if err != nil {
 		return "", err
@@ -823,6 +834,7 @@ func confirmSubmission(repoWithOwner, visibility string) error {
 	var answer struct {
 		ConfirmSubmit bool
 	}
+	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 	err := prompt.SurveyAsk([]*survey.Question{{
 		Name: "confirmSubmit",
 		Prompt: &survey.Confirm{

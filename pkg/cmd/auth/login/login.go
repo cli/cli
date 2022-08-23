@@ -6,14 +6,13 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/spf13/cobra"
 )
 
@@ -21,6 +20,7 @@ type LoginOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
+	Prompter   prompter.Prompter
 
 	MainExecutable string
 
@@ -38,6 +38,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		Prompter:   f.Prompter,
 	}
 
 	var tokenStdin bool
@@ -129,7 +130,7 @@ func loginRun(opts *LoginOptions) error {
 	hostname := opts.Hostname
 	if opts.Interactive && hostname == "" {
 		var err error
-		hostname, err = promptForHostname()
+		hostname, err = promptForHostname(opts)
 		if err != nil {
 			return err
 		}
@@ -152,22 +153,18 @@ func loginRun(opts *LoginOptions) error {
 		if err := shared.HasMinimumScopes(httpClient, hostname, opts.Token); err != nil {
 			return fmt.Errorf("error validating token: %w", err)
 		}
-
+		if opts.GitProtocol != "" {
+			cfg.Set(hostname, "git_protocol", opts.GitProtocol)
+		}
 		return cfg.Write()
 	}
 
 	existingToken, _ := cfg.AuthToken(hostname)
 	if existingToken != "" && opts.Interactive {
 		if err := shared.HasMinimumScopes(httpClient, hostname, existingToken); err == nil {
-			var keepGoing bool
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: fmt.Sprintf(
-					"You're already logged into %s. Do you want to re-authenticate?",
-					hostname),
-				Default: false,
-			}, &keepGoing)
+			keepGoing, err := opts.Prompter.Confirm(fmt.Sprintf("You're already logged into %s. Do you want to re-authenticate?", hostname), false)
 			if err != nil {
-				return fmt.Errorf("could not prompt: %w", err)
+				return err
 			}
 			if !keepGoing {
 				return nil
@@ -185,34 +182,28 @@ func loginRun(opts *LoginOptions) error {
 		Scopes:      opts.Scopes,
 		Executable:  opts.MainExecutable,
 		GitProtocol: opts.GitProtocol,
+		Prompter:    opts.Prompter,
 	})
 }
 
-func promptForHostname() (string, error) {
-	var hostType int
-	err := prompt.SurveyAskOne(&survey.Select{
-		Message: "What account do you want to log into?",
-		Options: []string{
+func promptForHostname(opts *LoginOptions) (string, error) {
+	hostType, err := opts.Prompter.Select(
+		"What account do you want to log into?",
+		"",
+		[]string{
 			"GitHub.com",
 			"GitHub Enterprise Server",
-		},
-	}, &hostType)
-
+		})
 	if err != nil {
-		return "", fmt.Errorf("could not prompt: %w", err)
+		return "", err
 	}
 
 	isEnterprise := hostType == 1
 
 	hostname := ghinstance.Default()
 	if isEnterprise {
-		err := prompt.SurveyAskOne(&survey.Input{
-			Message: "GHE hostname:",
-		}, &hostname, survey.WithValidator(ghinstance.HostnameValidator))
-		if err != nil {
-			return "", fmt.Errorf("could not prompt: %w", err)
-		}
+		hostname, err = opts.Prompter.InputHostname()
 	}
 
-	return hostname, nil
+	return hostname, err
 }

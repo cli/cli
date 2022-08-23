@@ -356,6 +356,7 @@ func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 
 	// TODO consider custom filter so it's fuzzier. right now matches start anywhere in string but
 	// become contiguous
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err := prompt.SurveyAskOne(&survey.Select{
 		Message:  "Select a workflow run",
 		Options:  candidates,

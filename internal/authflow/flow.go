@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
-	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
 	"github.com/cli/oauth"
@@ -106,8 +106,8 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 			fmt.Fprintf(w, "%s to open %s in your browser... ", cs.Bold("Press Enter"), oauthHost)
 			_ = waitForEnter(IO.In)
 
-			browser := cmdutil.NewBrowser(browserLauncher, IO.Out, IO.ErrOut)
-			if err := browser.Browse(authURL); err != nil {
+			b := browser.New(browserLauncher, IO.Out, IO.ErrOut)
+			if err := b.Browse(authURL); err != nil {
 				fmt.Fprintf(w, "%s Failed opening a web browser at %s\n", cs.Red("!"), authURL)
 				fmt.Fprintf(w, "  %s\n", err)
 				fmt.Fprint(w, "  Please try entering the URL in your browser manually\n")
@@ -129,7 +129,7 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 		return "", "", err
 	}
 
-	userLogin, err := getViewer(oauthHost, token.Token)
+	userLogin, err := getViewer(oauthHost, token.Token, IO.ErrOut)
 	if err != nil {
 		return "", "", err
 	}
@@ -145,8 +145,11 @@ func (c cfg) AuthToken(hostname string) (string, string) {
 	return c.authToken, "oauth_token"
 }
 
-func getViewer(hostname, token string) (string, error) {
-	opts := api.HTTPClientOptions{Config: cfg{authToken: token}}
+func getViewer(hostname, token string, logWriter io.Writer) (string, error) {
+	opts := api.HTTPClientOptions{
+		Config: cfg{authToken: token},
+		Log:    logWriter,
+	}
 	client, err := api.NewHTTPClient(opts)
 	if err != nil {
 		return "", err
@@ -180,5 +183,7 @@ func verboseLog(out io.Writer, logTraffic bool, colorize bool) func(http.RoundTr
 }
 
 func inspectableMIMEType(t string) bool {
-	return strings.HasPrefix(t, "text/") || jsonTypeRE.MatchString(t)
+	return strings.HasPrefix(t, "text/") ||
+		strings.HasPrefix(t, "application/x-www-form-urlencoded") ||
+		jsonTypeRE.MatchString(t)
 }

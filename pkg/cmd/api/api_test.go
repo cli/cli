@@ -17,8 +17,8 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/export"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/go-gh/pkg/template"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1298,11 +1298,13 @@ func Test_processResponse_template(t *testing.T) {
 		IO:       ios,
 		Template: `{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " }}){{"\n"}}{{end}}`,
 	}
-	template := export.NewTemplate(ios, opts.Template)
-	_, err := processResponse(&resp, &opts, io.Discard, &template)
-	require.NoError(t, err)
 
-	err = template.End()
+	tmpl := template.New(ios.Out, ios.TerminalWidth(), ios.ColorEnabled())
+	err := tmpl.Parse(opts.Template)
+	require.NoError(t, err)
+	_, err = processResponse(&resp, &opts, ios.Out, io.Discard, &tmpl)
+	require.NoError(t, err)
+	err = tmpl.Flush()
 	require.NoError(t, err)
 
 	assert.Equal(t, heredoc.Doc(`

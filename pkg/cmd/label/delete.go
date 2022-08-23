@@ -67,6 +67,7 @@ func deleteRun(opts *deleteOptions) error {
 
 	if !opts.Confirmed {
 		var valid string
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err := prompt.SurveyAskOne(
 			&survey.Input{Message: fmt.Sprintf("Type %s to confirm deletion:", opts.Name)},
 			&valid,

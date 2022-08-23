@@ -1,11 +1,10 @@
 package featuredetection
 
 import (
-	"context"
 	"net/http"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
-	graphql "github.com/cli/shurcooL-graphql"
 )
 
 type Detector interface {
@@ -90,9 +89,8 @@ func (d *detector) PullRequestFeatures() (PullRequestFeatures, error) {
 		} `graphql:"PullRequest: __type(name: \"PullRequest\")"`
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(d.host), d.httpClient)
-
-	err := gql.QueryNamed(context.Background(), "PullRequest_fields", &featureDetection, nil)
+	gql := api.NewClientFromHTTP(d.httpClient)
+	err := gql.Query(d.host, "PullRequest_fields", &featureDetection, nil)
 	if err != nil {
 		return features, err
 	}
@@ -124,9 +122,9 @@ func (d *detector) RepositoryFeatures() (RepositoryFeatures, error) {
 		} `graphql:"Repository: __type(name: \"Repository\")"`
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(d.host), d.httpClient)
+	gql := api.NewClientFromHTTP(d.httpClient)
 
-	err := gql.QueryNamed(context.Background(), "Repository_fields", &featureDetection, nil)
+	err := gql.Query(d.host, "Repository_fields", &featureDetection, nil)
 	if err != nil {
 		return features, err
 	}

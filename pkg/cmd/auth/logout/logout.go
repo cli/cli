@@ -79,6 +79,7 @@ func logoutRun(opts *LogoutOptions) error {
 		if len(candidates) == 1 {
 			hostname = candidates[0]
 		} else {
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err = prompt.SurveyAskOne(&survey.Select{
 				Message: "What account do you want to log out of?",
 				Options: candidates,

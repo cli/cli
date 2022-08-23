@@ -10,8 +10,10 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -31,7 +33,8 @@ func New(appVersion string) *cmdutil.Factory {
 	f.HttpClient = httpClientFunc(f, appVersion) // Depends on Config, IOStreams, and appVersion
 	f.Remotes = remotesFunc(f)                   // Depends on Config
 	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
-	f.Browser = browser(f)                       // Depends on Config, and IOStreams
+	f.Prompter = newPrompter(f)                  // Depends on Config and IOStreams
+	f.Browser = newBrowser(f)                    // Depends on Config, and IOStreams
 	f.ExtensionManager = extensionManager(f)     // Depends on Config, HttpClient, and IOStreams
 
 	return f
@@ -89,9 +92,10 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 			return nil, err
 		}
 		opts := api.HTTPClientOptions{
-			Config:     cfg,
-			Log:        io.ErrOut,
-			AppVersion: appVersion,
+			Config:      cfg,
+			Log:         io.ErrOut,
+			LogColorize: io.ColorEnabled(),
+			AppVersion:  appVersion,
 		}
 		client, err := api.NewHTTPClient(opts)
 		if err != nil {
@@ -102,9 +106,15 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 	}
 }
 
-func browser(f *cmdutil.Factory) cmdutil.Browser {
+func newBrowser(f *cmdutil.Factory) browser.Browser {
 	io := f.IOStreams
-	return cmdutil.NewBrowser(browserLauncher(f), io.Out, io.ErrOut)
+	return browser.New(browserLauncher(f), io.Out, io.ErrOut)
+}
+
+func newPrompter(f *cmdutil.Factory) prompter.Prompter {
+	editor, _ := cmdutil.DetermineEditor(f.Config)
+	io := f.IOStreams
+	return prompter.New(editor, io.In, io.Out, io.ErrOut)
 }
 
 // Browser precedence
@@ -174,7 +184,9 @@ func ioStreams(f *cmdutil.Factory) *iostreams.IOStreams {
 		return io
 	}
 
-	if prompt, _ := cfg.GetOrDefault("", "prompt"); prompt == "disabled" {
+	if _, ghPromptDisabled := os.LookupEnv("GH_PROMPT_DISABLED"); ghPromptDisabled {
+		io.SetNeverPrompt(true)
+	} else if prompt, _ := cfg.GetOrDefault("", "prompt"); prompt == "disabled" {
 		io.SetNeverPrompt(true)
 	}
 

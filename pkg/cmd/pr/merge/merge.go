@@ -370,6 +370,7 @@ func (m *mergeContext) deleteLocalBranch() error {
 	if m.merged {
 		// prompt for delete
 		if m.opts.IO.CanPrompt() && !m.opts.IsDeleteBranchIndicated {
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err := prompt.SurveyAskOne(&survey.Confirm{
 				Message: fmt.Sprintf("Pull request #%d was already merged. Delete the branch locally?", m.pr.Number),
 				Default: false,
@@ -571,6 +572,7 @@ func mergeMethodSurvey(baseRepo *api.Repository) (PullRequestMergeMethod, error)
 	}
 
 	var result int
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err := prompt.SurveyAskOne(mergeQuestion, &result)
 	return mergeOpts[result].method, err
 }
@@ -589,6 +591,7 @@ func deleteBranchSurvey(opts *MergeOptions, crossRepoPR, localBranchExists bool)
 			Message: message,
 			Default: false,
 		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err := prompt.SurveyAskOne(submit, &result)
 		return result, err
 	}
@@ -615,6 +618,7 @@ func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 		Message: "What's next?",
 		Options: options,
 	}
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err := prompt.SurveyAskOne(submit, &result)
 	if err != nil {
 		return shared.CancelAction, fmt.Errorf("could not prompt: %w", err)

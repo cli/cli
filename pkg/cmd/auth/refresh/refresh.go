@@ -94,6 +94,7 @@ func refreshRun(opts *RefreshOptions) error {
 		if len(candidates) == 1 {
 			hostname = candidates[0]
 		} else {
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err := prompt.SurveyAskOne(&survey.Select{
 				Message: "What account do you want to refresh auth for?",
 				Options: candidates,
