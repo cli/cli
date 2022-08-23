@@ -11,7 +11,6 @@
 package lock
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -19,12 +18,10 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -254,9 +251,8 @@ func lockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *api.
 		},
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
-
-	return gql.MutateNamed(context.Background(), "LockLockable", &mutation, variables)
+	gql := api.NewClientFromHTTP(httpClient)
+	return gql.Mutate(repo.RepoHost(), "LockLockable", &mutation, variables)
 }
 
 // unlockLockable will lock an issue or pull request
@@ -276,9 +272,8 @@ func unlockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *ap
 		},
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
-
-	return gql.MutateNamed(context.Background(), "UnlockLockable", &mutation, variables)
+	gql := api.NewClientFromHTTP(httpClient)
+	return gql.Mutate(repo.RepoHost(), "UnlockLockable", &mutation, variables)
 }
 
 // relockLockable will unlock then lock an issue or pull request.  A common use
