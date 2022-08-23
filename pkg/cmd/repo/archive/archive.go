@@ -115,6 +115,7 @@ func archiveRun(opts *ArchiveOptions) error {
 			Message: fmt.Sprintf("Archive %s?", fullName),
 			Default: false,
 		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(p, &opts.Confirmed)
 		if err != nil {
 			return fmt.Errorf("failed to prompt: %w", err)

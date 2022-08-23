@@ -69,6 +69,7 @@ func deleteAssetRun(opts *DeleteAssetOptions) error {
 
 	if !opts.SkipConfirm && opts.IO.CanPrompt() {
 		var confirmed bool
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err := prompt.SurveyAskOne(&survey.Confirm{
 			Message: fmt.Sprintf("Delete asset %s in release %s in %s?", opts.AssetName, release.TagName, ghrepo.FullName(baseRepo)),
 			Default: true,

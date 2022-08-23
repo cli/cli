@@ -10,10 +10,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cli/cli/v2/pkg/export"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/jsoncolor"
 	"github.com/cli/cli/v2/pkg/set"
+	"github.com/cli/go-gh/pkg/jq"
+	"github.com/cli/go-gh/pkg/template"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -137,9 +138,16 @@ func (e *exportFormat) Write(ios *iostreams.IOStreams, data interface{}) error {
 
 	w := ios.Out
 	if e.filter != "" {
-		return export.FilterJSON(w, &buf, e.filter)
+		return jq.Evaluate(&buf, w, e.filter)
 	} else if e.template != "" {
-		return export.ExecuteTemplate(ios, &buf, e.template)
+		t := template.New(w, ios.TerminalWidth(), ios.ColorEnabled())
+		if err := t.Parse(e.template); err != nil {
+			return err
+		}
+		if err := t.Execute(&buf); err != nil {
+			return err
+		}
+		return t.Flush()
 	} else if ios.ColorEnabled() {
 		return jsoncolor.Write(w, &buf, "  ")
 	}

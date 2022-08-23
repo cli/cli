@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strconv"
 	"strings"
 	"sync"
@@ -46,6 +47,7 @@ type IOStreams struct {
 
 	alternateScreenBufferEnabled bool
 	alternateScreenBufferActive  bool
+	alternateScreenBufferMu      sync.Mutex
 
 	stdinTTYOverride  bool
 	stdinIsTTY        bool
@@ -283,13 +285,29 @@ func (s *IOStreams) StopProgressIndicator() {
 
 func (s *IOStreams) StartAlternateScreenBuffer() {
 	if s.alternateScreenBufferEnabled {
+		s.alternateScreenBufferMu.Lock()
+		defer s.alternateScreenBufferMu.Unlock()
+
 		if _, err := fmt.Fprint(s.Out, "\x1b[?1049h"); err == nil {
 			s.alternateScreenBufferActive = true
+
+			ch := make(chan os.Signal, 1)
+			signal.Notify(ch, os.Interrupt)
+
+			go func() {
+				<-ch
+				s.StopAlternateScreenBuffer()
+
+				os.Exit(1)
+			}()
 		}
 	}
 }
 
 func (s *IOStreams) StopAlternateScreenBuffer() {
+	s.alternateScreenBufferMu.Lock()
+	defer s.alternateScreenBufferMu.Unlock()
+
 	if s.alternateScreenBufferActive {
 		fmt.Fprint(s.Out, "\x1b[?1049l")
 		s.alternateScreenBufferActive = false

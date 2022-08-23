@@ -1,10 +1,8 @@
 package create
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
@@ -183,672 +182,484 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 }
 
-func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
-	return runCommandWithRootDirOverridden(rt, remotes, branch, isTTY, cli, "")
-}
-
-func runCommandWithRootDirOverridden(rt http.RoundTripper, remotes context.Remotes, branch string, isTTY bool, cli string, rootDir string) (*test.CmdOut, error) {
-	ios, _, stdout, stderr := iostreams.Test()
-	ios.SetStdoutTTY(isTTY)
-	ios.SetStdinTTY(isTTY)
-	ios.SetStderrTTY(isTTY)
-
-	browser := &cmdutil.TestBrowser{}
-	factory := &cmdutil.Factory{
-		IOStreams: ios,
-		Browser:   browser,
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: rt}, nil
-		},
-		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
-		},
-		Remotes: func() (context.Remotes, error) {
-			if remotes != nil {
-				return remotes, nil
-			}
-			return context.Remotes{
-				{
-					Remote: &git.Remote{
-						Name:     "origin",
-						Resolved: "base",
-					},
-					Repo: ghrepo.New("OWNER", "REPO"),
-				},
-			}, nil
-		},
-		Branch: func() (string, error) {
-			return branch, nil
-		},
-	}
-
-	cmd := NewCmdCreate(factory, func(opts *CreateOptions) error {
-		opts.RootDirOverride = rootDir
-		return createRun(opts)
-	})
-	cmd.PersistentFlags().StringP("repo", "R", "", "")
-
-	argv, err := shlex.Split(cli)
-	if err != nil {
-		return nil, err
-	}
-	cmd.SetArgs(argv)
-
-	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(io.Discard)
-	cmd.SetErr(io.Discard)
-
-	_, err = cmd.ExecuteC()
-	return &test.CmdOut{
-		OutBuf:     stdout,
-		ErrBuf:     stderr,
-		BrowsedURL: browser.BrowsedURL(),
-	}, err
-}
-
-func initFakeHTTP() *httpmock.Registry {
-	return &httpmock.Registry{}
-}
-
-func TestPRCreate_nontty_web(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git status --porcelain`, 0, "")
-	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
-
-	output, err := runCommand(http, nil, "feature", false, `--web --head=feature`)
-	require.NoError(t, err)
-
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "", output.Stderr())
-	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1", output.BrowsedURL)
-}
-
-func TestPRCreate_recover(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	shared.RunCommandFinder("feature", nil, nil)
-	http.Register(
-		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
-		httpmock.StringResponse(`
-		{ "data": {
-			"u000": { "login": "jillValentine", "id": "JILLID" },
-			"repository": {},
-			"organization": {}
-		} }
-		`))
-	http.Register(
-		httpmock.GraphQL(`mutation PullRequestCreateRequestReviews\b`),
-		httpmock.GraphQLMutation(`
-		{ "data": { "requestReviews": {
-			"clientMutationId": ""
-		} } }
-	`, func(inputs map[string]interface{}) {
-			assert.Equal(t, []interface{}{"JILLID"}, inputs["userIds"])
-		}))
-	http.Register(
-		httpmock.GraphQL(`mutation PullRequestCreate\b`),
-		httpmock.GraphQLMutation(`
-		{ "data": { "createPullRequest": { "pullRequest": {
-			"URL": "https://github.com/OWNER/REPO/pull/12"
-		} } } }
-		`, func(input map[string]interface{}) {
-			assert.Equal(t, "recovered title", input["title"].(string))
-			assert.Equal(t, "recovered body", input["body"].(string))
-		}))
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git status --porcelain`, 0, "")
-	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
-
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-	as, teardown := prompt.InitAskStubber()
-	defer teardown()
-
-	as.StubPrompt("Title").AnswerDefault()
-	as.StubPrompt("Body").AnswerDefault()
-	as.StubPrompt("What's next?").AnswerDefault()
-
-	tmpfile, err := os.CreateTemp(t.TempDir(), "testrecover*")
-	assert.NoError(t, err)
-	defer tmpfile.Close()
-
-	state := prShared.IssueMetadataState{
-		Title:     "recovered title",
-		Body:      "recovered body",
-		Reviewers: []string{"jillValentine"},
-	}
-
-	data, err := json.Marshal(state)
-	assert.NoError(t, err)
-
-	_, err = tmpfile.Write(data)
-	assert.NoError(t, err)
-
-	args := fmt.Sprintf("--recover '%s' -Hfeature", tmpfile.Name())
-
-	output, err := runCommandWithRootDirOverridden(http, nil, "feature", true, args, "")
-	assert.NoError(t, err)
-
-	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
-}
-
-func TestPRCreate_nontty(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	shared.RunCommandFinder("feature", nil, nil)
-	http.Register(
-		httpmock.GraphQL(`mutation PullRequestCreate\b`),
-		httpmock.GraphQLMutation(`
-			{ "data": { "createPullRequest": { "pullRequest": {
-				"URL": "https://github.com/OWNER/REPO/pull/12"
-			} } } }`,
-			func(input map[string]interface{}) {
-				assert.Equal(t, "REPOID", input["repositoryId"])
-				assert.Equal(t, "my title", input["title"])
-				assert.Equal(t, "my body", input["body"])
-				assert.Equal(t, "master", input["baseRefName"])
-				assert.Equal(t, "feature", input["headRefName"])
-			}),
-	)
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git status --porcelain`, 0, "")
-
-	output, err := runCommand(http, nil, "feature", false, `-t "my title" -b "my body" -H feature`)
-	require.NoError(t, err)
-
-	assert.Equal(t, "", output.Stderr())
-	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
-}
-
-func TestPRCreate(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.StubRepoResponse("OWNER", "REPO")
-	http.Register(
-		httpmock.GraphQL(`query UserCurrent\b`),
-		httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
-	shared.RunCommandFinder("feature", nil, nil)
-	http.Register(
-		httpmock.GraphQL(`mutation PullRequestCreate\b`),
-		httpmock.GraphQLMutation(`
-		{ "data": { "createPullRequest": { "pullRequest": {
-			"URL": "https://github.com/OWNER/REPO/pull/12"
-		} } } }
-		`, func(input map[string]interface{}) {
-			assert.Equal(t, "REPOID", input["repositoryId"].(string))
-			assert.Equal(t, "my title", input["title"].(string))
-			assert.Equal(t, "my body", input["body"].(string))
-			assert.Equal(t, "master", input["baseRefName"].(string))
-			assert.Equal(t, "feature", input["headRefName"].(string))
-			assert.Equal(t, false, input["draft"].(bool))
-		}))
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git status --porcelain`, 0, "")
-	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
-	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
-
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-	ask, cleanupAsk := prompt.InitAskStubber()
-	defer cleanupAsk()
-
-	ask.StubPrompt("Where should we push the 'feature' branch?").AnswerDefault()
-
-	output, err := runCommand(http, nil, "feature", true, `-t "my title" -b "my body"`)
-	require.NoError(t, err)
-
-	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
-	assert.Equal(t, "\nCreating pull request for feature into master in OWNER/REPO\n\n", output.Stderr())
-}
-
-func TestPRCreate_NoMaintainerModify(t *testing.T) {
-	// TODO update this copypasta
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.StubRepoResponse("OWNER", "REPO")
-	http.Register(
-		httpmock.GraphQL(`query UserCurrent\b`),
-		httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
-	shared.RunCommandFinder("feature", nil, nil)
-	http.Register(
-		httpmock.GraphQL(`mutation PullRequestCreate\b`),
-		httpmock.GraphQLMutation(`
-		{ "data": { "createPullRequest": { "pullRequest": {
-			"URL": "https://github.com/OWNER/REPO/pull/12"
-		} } } }
-		`, func(input map[string]interface{}) {
-			assert.Equal(t, false, input["maintainerCanModify"].(bool))
-			assert.Equal(t, "REPOID", input["repositoryId"].(string))
-			assert.Equal(t, "my title", input["title"].(string))
-			assert.Equal(t, "my body", input["body"].(string))
-			assert.Equal(t, "master", input["baseRefName"].(string))
-			assert.Equal(t, "feature", input["headRefName"].(string))
-		}))
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-	cs.Register(`git status --porcelain`, 0, "")
-	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
-	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
-
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-	ask, cleanupAsk := prompt.InitAskStubber()
-	defer cleanupAsk()
-
-	ask.StubPrompt("Where should we push the 'feature' branch?").AnswerDefault()
-
-	output, err := runCommand(http, nil, "feature", true, `-t "my title" -b "my body" --no-maintainer-edit`)
-	require.NoError(t, err)
-
-	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
-	assert.Equal(t, "\nCreating pull request for feature into master in OWNER/REPO\n\n", output.Stderr())
-}
-
-func TestPRCreate_createFork(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.StubRepoResponse("OWNER", "REPO")
-	http.Register(
-		httpmock.GraphQL(`query UserCurrent\b`),
-		httpmock.StringResponse(`{"data": {"viewer": {"login": "monalisa"} } }`))
-	shared.RunCommandFinder("feature", nil, nil)
-	http.Register(
-		httpmock.REST("POST", "repos/OWNER/REPO/forks"),
-		httpmock.StatusStringResponse(201, `
-		{ "node_id": "NODEID",
-		  "name": "REPO",
-		  "owner": {"login": "monalisa"}
-		}
-		`))
-	http.Register(
-		httpmock.GraphQL(`mutation PullRequestCreate\b`),
-		httpmock.GraphQLMutation(`
-		{ "data": { "createPullRequest": { "pullRequest": {
-			"URL": "https://github.com/OWNER/REPO/pull/12"
-		} } } }
-		`, func(input map[string]interface{}) {
-			assert.Equal(t, "REPOID", input["repositoryId"].(string))
-			assert.Equal(t, "master", input["baseRefName"].(string))
-			assert.Equal(t, "monalisa:feature", input["headRefName"].(string))
-		}))
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-	cs.Register(`git status --porcelain`, 0, "")
-	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
-	cs.Register(`git remote add -f fork https://github.com/monalisa/REPO.git`, 0, "")
-	cs.Register(`git push --set-upstream fork HEAD:feature`, 0, "")
-
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-	ask, cleanupAsk := prompt.InitAskStubber()
-	defer cleanupAsk()
-
-	ask.StubPrompt("Where should we push the 'feature' branch?").
-		AssertOptions([]string{"OWNER/REPO", "Create a fork of OWNER/REPO", "Skip pushing the branch", "Cancel"}).
-		AnswerWith("Create a fork of OWNER/REPO")
-
-	output, err := runCommand(http, nil, "feature", true, `-t title -b body`)
-	require.NoError(t, err)
-
-	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
-}
-
-func TestPRCreate_pushedToNonBaseRepo(t *testing.T) {
-	remotes := context.Remotes{
+func Test_createRun(t *testing.T) {
+	tests := []struct {
+		name           string
+		setup          func(*CreateOptions, *testing.T) func()
+		cmdStubs       func(*run.CommandStubber)
+		askStubs       func(*prompt.AskStubber) // TODO eventually migrate to PrompterMock
+		httpStubs      func(*httpmock.Registry, *testing.T)
+		expectedOut    string
+		expectedErrOut string
+		expectedBrowse string
+		wantErr        string
+		tty            bool
+	}{
 		{
-			Remote: &git.Remote{
-				Name:     "upstream",
-				Resolved: "base",
+			name: "nontty web",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.WebMode = true
+				opts.HeadBranch = "feature"
+				return func() {}
 			},
-			Repo: ghrepo.New("OWNER", "REPO"),
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
+			},
+			expectedBrowse: "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1",
 		},
 		{
-			Remote: &git.Remote{
-				Name:     "origin",
-				Resolved: "base",
+			name: "nontty",
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+					{ "data": { "createPullRequest": { "pullRequest": {
+						"URL": "https://github.com/OWNER/REPO/pull/12"
+					} } } }`,
+						func(input map[string]interface{}) {
+							assert.Equal(t, "REPOID", input["repositoryId"])
+							assert.Equal(t, "my title", input["title"])
+							assert.Equal(t, "my body", input["body"])
+							assert.Equal(t, "master", input["baseRefName"])
+							assert.Equal(t, "feature", input["headRefName"])
+						}))
 			},
-			Repo: ghrepo.New("monalisa", "REPO"),
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.HeadBranch = "feature"
+				return func() {}
+			},
+			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
 		},
-	}
-
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	shared.RunCommandFinder("feature", nil, nil)
-	http.Register(
-		httpmock.GraphQL(`mutation PullRequestCreate\b`),
-		httpmock.GraphQLMutation(`
-		{ "data": { "createPullRequest": { "pullRequest": {
-			"URL": "https://github.com/OWNER/REPO/pull/12"
-		} } } }
-		`, func(input map[string]interface{}) {
-			assert.Equal(t, "REPOID", input["repositoryId"].(string))
-			assert.Equal(t, "master", input["baseRefName"].(string))
-			assert.Equal(t, "monalisa:feature", input["headRefName"].(string))
-		}))
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register("git status", 0, "")
-	cs.Register(`git config --get-regexp \^branch\\\.feature\\\.`, 1, "") // determineTrackingBranch
-	cs.Register("git show-ref --verify", 0, heredoc.Doc(`
+		{
+			name: "survey",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.StubRepoResponse("OWNER", "REPO")
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }`, func(input map[string]interface{}) {
+						assert.Equal(t, "REPOID", input["repositoryId"].(string))
+						assert.Equal(t, "my title", input["title"].(string))
+						assert.Equal(t, "my body", input["body"].(string))
+						assert.Equal(t, "master", input["baseRefName"].(string))
+						assert.Equal(t, "feature", input["headRefName"].(string))
+						assert.Equal(t, false, input["draft"].(bool))
+					}))
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
+				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Where should we push the 'feature' branch?").AnswerDefault()
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
+		},
+		{
+			name: "no maintainer modify",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.StubRepoResponse("OWNER", "REPO")
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }
+						`, func(input map[string]interface{}) {
+						assert.Equal(t, false, input["maintainerCanModify"].(bool))
+						assert.Equal(t, "REPOID", input["repositoryId"].(string))
+						assert.Equal(t, "my title", input["title"].(string))
+						assert.Equal(t, "my body", input["body"].(string))
+						assert.Equal(t, "master", input["baseRefName"].(string))
+						assert.Equal(t, "feature", input["headRefName"].(string))
+					}))
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
+				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Where should we push the 'feature' branch?").AnswerDefault()
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
+		},
+		{
+			name: "create fork",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "title"
+				opts.Body = "body"
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.StubRepoResponse("OWNER", "REPO")
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data": {"viewer": {"login": "monalisa"} } }`))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
+					httpmock.StatusStringResponse(201, `
+						{ "node_id": "NODEID",
+						  "name": "REPO",
+						  "owner": {"login": "monalisa"}
+						}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						}}}}`, func(input map[string]interface{}) {
+						assert.Equal(t, "REPOID", input["repositoryId"].(string))
+						assert.Equal(t, "master", input["baseRefName"].(string))
+						assert.Equal(t, "monalisa:feature", input["headRefName"].(string))
+					}))
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
+				cs.Register(`git remote add -f fork https://github.com/monalisa/REPO.git`, 0, "")
+				cs.Register(`git push --set-upstream fork HEAD:feature`, 0, "")
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Where should we push the 'feature' branch?").
+					AssertOptions([]string{"OWNER/REPO", "Create a fork of OWNER/REPO", "Skip pushing the branch", "Cancel"}).
+					AnswerWith("Create a fork of OWNER/REPO")
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for monalisa:feature into master in OWNER/REPO\n\n",
+		},
+		{
+			name: "pushed to non base repo",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "title"
+				opts.Body = "body"
+				opts.Remotes = func() (context.Remotes, error) {
+					return context.Remotes{
+						{
+							Remote: &git.Remote{
+								Name:     "upstream",
+								Resolved: "base",
+							},
+							Repo: ghrepo.New("OWNER", "REPO"),
+						},
+						{
+							Remote: &git.Remote{
+								Name:     "origin",
+								Resolved: "base",
+							},
+							Repo: ghrepo.New("monalisa", "REPO"),
+						},
+					}, nil
+				}
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }`, func(input map[string]interface{}) {
+						assert.Equal(t, "REPOID", input["repositoryId"].(string))
+						assert.Equal(t, "master", input["baseRefName"].(string))
+						assert.Equal(t, "monalisa:feature", input["headRefName"].(string))
+					}))
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp \^branch\\\.feature\\\.`, 1, "") // determineTrackingBranch
+				cs.Register("git show-ref --verify", 0, heredoc.Doc(`
 		deadbeef HEAD
 		deadb00f refs/remotes/upstream/feature
-		deadbeef refs/remotes/origin/feature
-	`)) // determineTrackingBranch
-
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-	_, cleanupAsk := prompt.InitAskStubber()
-	defer cleanupAsk()
-
-	output, err := runCommand(http, remotes, "feature", true, `-t title -b body`)
-	require.NoError(t, err)
-
-	assert.Equal(t, "\nCreating pull request for monalisa:feature into master in OWNER/REPO\n\n", output.Stderr())
-	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
-}
-
-func TestPRCreate_pushedToDifferentBranchName(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	shared.RunCommandFinder("feature", nil, nil)
-	http.Register(
-		httpmock.GraphQL(`mutation PullRequestCreate\b`),
-		httpmock.GraphQLMutation(`
+		deadbeef refs/remotes/origin/feature`)) // determineTrackingBranch
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for monalisa:feature into master in OWNER/REPO\n\n",
+		},
+		{
+			name: "pushed to different branch name",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "title"
+				opts.Body = "body"
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
 		{ "data": { "createPullRequest": { "pullRequest": {
 			"URL": "https://github.com/OWNER/REPO/pull/12"
 		} } } }
 		`, func(input map[string]interface{}) {
-			assert.Equal(t, "REPOID", input["repositoryId"].(string))
-			assert.Equal(t, "master", input["baseRefName"].(string))
-			assert.Equal(t, "my-feat2", input["headRefName"].(string))
-		}))
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register("git status", 0, "")
-	cs.Register(`git config --get-regexp \^branch\\\.feature\\\.`, 0, heredoc.Doc(`
+						assert.Equal(t, "REPOID", input["repositoryId"].(string))
+						assert.Equal(t, "master", input["baseRefName"].(string))
+						assert.Equal(t, "my-feat2", input["headRefName"].(string))
+					}))
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp \^branch\\\.feature\\\.`, 0, heredoc.Doc(`
 		branch.feature.remote origin
 		branch.feature.merge refs/heads/my-feat2
 	`)) // determineTrackingBranch
-	cs.Register("git show-ref --verify", 0, heredoc.Doc(`
+				cs.Register("git show-ref --verify", 0, heredoc.Doc(`
 		deadbeef HEAD
 		deadbeef refs/remotes/origin/my-feat2
 	`)) // determineTrackingBranch
-
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-	_, cleanupAsk := prompt.InitAskStubber()
-	defer cleanupAsk()
-
-	output, err := runCommand(http, nil, "feature", true, `-t title -b body`)
-	require.NoError(t, err)
-
-	assert.Equal(t, "\nCreating pull request for my-feat2 into master in OWNER/REPO\n\n", output.Stderr())
-	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
-}
-
-func TestPRCreate_nonLegacyTemplate(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	shared.RunCommandFinder("feature", nil, nil)
-	http.Register(
-		httpmock.GraphQL(`query PullRequestTemplates\b`),
-		httpmock.StringResponse(`
-			{ "data": { "repository": { "pullRequestTemplates": [
-				{ "filename": "template1",
-				  "body": "this is a bug" },
-				{ "filename": "template2",
-				  "body": "this is a enhancement" }
-			] } } }`),
-	)
-	http.Register(
-		httpmock.GraphQL(`mutation PullRequestCreate\b`),
-		httpmock.GraphQLMutation(`
-		{ "data": { "createPullRequest": { "pullRequest": {
-			"URL": "https://github.com/OWNER/REPO/pull/12"
-		} } } }
-		`, func(input map[string]interface{}) {
-			assert.Equal(t, "my title", input["title"].(string))
-			assert.Equal(t, "- commit 1\n- commit 0\n\nthis is a bug", input["body"].(string))
-		}))
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "1234567890,commit 0\n2345678901,commit 1")
-	cs.Register(`git status --porcelain`, 0, "")
-
-	as := prompt.NewAskStubber(t)
-
-	as.StubPrompt("Choose a template").
-		AssertOptions([]string{"template1", "template2", "Open a blank pull request"}).
-		AnswerWith("template1")
-	as.StubPrompt("Body").AnswerDefault()
-	as.StubPrompt("What's next?").
-		AssertOptions([]string{"Submit", "Submit as draft", "Continue in browser", "Add metadata", "Cancel"}).
-		AnswerDefault()
-
-	output, err := runCommandWithRootDirOverridden(http, nil, "feature", true, `-t "my title" -H feature`, "./fixtures/repoWithNonLegacyPRTemplates")
-	require.NoError(t, err)
-
-	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
-}
-
-func TestPRCreate_metadata(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	shared.RunCommandFinder("feature", nil, nil)
-	http.Register(
-		httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
-		httpmock.StringResponse(`
-		{ "data": {
-			"u000": { "login": "MonaLisa", "id": "MONAID" },
-			"u001": { "login": "hubot", "id": "HUBOTID" },
-			"repository": {
-				"l000": { "name": "bug", "id": "BUGID" },
-				"l001": { "name": "TODO", "id": "TODOID" }
 			},
-			"organization": {
-				"t000": { "slug": "core", "id": "COREID" },
-				"t001": { "slug": "robots", "id": "ROBOTID" }
-			}
-		} }
-		`))
-	http.Register(
-		httpmock.GraphQL(`query RepositoryMilestoneList\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "milestones": {
-			"nodes": [
-				{ "title": "GA", "id": "GAID" },
-				{ "title": "Big One.oh", "id": "BIGONEID" }
-			],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
-		`))
-	http.Register(
-		httpmock.GraphQL(`query RepositoryProjectList\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "projects": {
-			"nodes": [
-				{ "name": "Cleanup", "id": "CLEANUPID" },
-				{ "name": "Roadmap", "id": "ROADMAPID" }
-			],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
-		`))
-	http.Register(
-		httpmock.GraphQL(`query OrganizationProjectList\b`),
-		httpmock.StringResponse(`
-		{ "data": { "organization": { "projects": {
-			"nodes": [],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
-		`))
-	http.Register(
-		httpmock.GraphQL(`mutation PullRequestCreate\b`),
-		httpmock.GraphQLMutation(`
-		{ "data": { "createPullRequest": { "pullRequest": {
-			"id": "NEWPULLID",
-			"URL": "https://github.com/OWNER/REPO/pull/12"
-		} } } }
-	`, func(inputs map[string]interface{}) {
-			assert.Equal(t, "TITLE", inputs["title"])
-			assert.Equal(t, "BODY", inputs["body"])
-			if v, ok := inputs["assigneeIds"]; ok {
-				t.Errorf("did not expect assigneeIds: %v", v)
-			}
-			if v, ok := inputs["userIds"]; ok {
-				t.Errorf("did not expect userIds: %v", v)
-			}
-		}))
-	http.Register(
-		httpmock.GraphQL(`mutation PullRequestCreateMetadata\b`),
-		httpmock.GraphQLMutation(`
-		{ "data": { "updatePullRequest": {
-			"clientMutationId": ""
-		} } }
-	`, func(inputs map[string]interface{}) {
-			assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
-			assert.Equal(t, []interface{}{"MONAID"}, inputs["assigneeIds"])
-			assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
-			assert.Equal(t, []interface{}{"ROADMAPID"}, inputs["projectIds"])
-			assert.Equal(t, "BIGONEID", inputs["milestoneId"])
-		}))
-	http.Register(
-		httpmock.GraphQL(`mutation PullRequestCreateRequestReviews\b`),
-		httpmock.GraphQLMutation(`
-		{ "data": { "requestReviews": {
-			"clientMutationId": ""
-		} } }
-	`, func(inputs map[string]interface{}) {
-			assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
-			assert.Equal(t, []interface{}{"HUBOTID", "MONAID"}, inputs["userIds"])
-			assert.Equal(t, []interface{}{"COREID", "ROBOTID"}, inputs["teamIds"])
-			assert.Equal(t, true, inputs["union"])
-		}))
-
-	output, err := runCommand(http, nil, "feature", true, `-t TITLE -b BODY -H feature -a monalisa -l bug -l todo -p roadmap -m 'big one.oh' -r hubot -r monalisa -r /core -r /robots`)
-	assert.NoError(t, err)
-
-	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
-}
-
-func TestPRCreate_alreadyExists(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	shared.RunCommandFinder("feature", &api.PullRequest{URL: "https://github.com/OWNER/REPO/pull/123"}, ghrepo.New("OWNER", "REPO"))
-
-	_, err := runCommand(http, nil, "feature", true, `-t title -b body -H feature`)
-	assert.EqualError(t, err, "a pull request for branch \"feature\" into branch \"master\" already exists:\nhttps://github.com/OWNER/REPO/pull/123")
-}
-
-func TestPRCreate_web(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.StubRepoResponse("OWNER", "REPO")
-	http.Register(
-		httpmock.GraphQL(`query UserCurrent\b`),
-		httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-	cs.Register(`git status --porcelain`, 0, "")
-	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
-	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
-	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
-
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-	ask, cleanupAsk := prompt.InitAskStubber()
-	defer cleanupAsk()
-
-	ask.StubPrompt("Where should we push the 'feature' branch?").
-		AssertOptions([]string{"OWNER/REPO", "Skip pushing the branch", "Cancel"}).
-		AnswerDefault()
-
-	output, err := runCommand(http, nil, "feature", true, `--web`)
-	require.NoError(t, err)
-
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
-	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1", output.BrowsedURL)
-}
-
-func TestPRCreate_webLongURL(t *testing.T) {
-	longBodyFile := filepath.Join(t.TempDir(), "long-body.txt")
-	err := os.WriteFile(longBodyFile, make([]byte, 9216), 0600)
-	require.NoError(t, err)
-
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git status --porcelain`, 0, "")
-	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
-
-	_, err = runCommand(http, nil, "feature", false, fmt.Sprintf("--body-file '%s' --web --head=feature", longBodyFile))
-	require.EqualError(t, err, "cannot open in browser: maximum URL length exceeded")
-}
-
-func TestPRCreate_webProject(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	http.StubRepoResponse("OWNER", "REPO")
-	http.Register(
-		httpmock.GraphQL(`query UserCurrent\b`),
-		httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
-	http.Register(
-		httpmock.GraphQL(`query RepositoryProjectList\b`),
-		httpmock.StringResponse(`
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for my-feat2 into master in OWNER/REPO\n\n",
+		},
+		{
+			name: "non legacy template",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.Title = "my title"
+				opts.HeadBranch = "feature"
+				opts.RootDirOverride = "./fixtures/repoWithNonLegacyPRTemplates"
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestTemplates\b`),
+					httpmock.StringResponse(`
+				{ "data": { "repository": { "pullRequestTemplates": [
+					{ "filename": "template1",
+					  "body": "this is a bug" },
+					{ "filename": "template2",
+					  "body": "this is a enhancement" }
+				] } } }`))
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+			{ "data": { "createPullRequest": { "pullRequest": {
+				"URL": "https://github.com/OWNER/REPO/pull/12"
+			} } } }
+			`, func(input map[string]interface{}) {
+						assert.Equal(t, "my title", input["title"].(string))
+						assert.Equal(t, "- commit 1\n- commit 0\n\nthis is a bug", input["body"].(string))
+					}))
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "1234567890,commit 0\n2345678901,commit 1")
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Choose a template").
+					AssertOptions([]string{"template1", "template2", "Open a blank pull request"}).
+					AnswerWith("template1")
+				as.StubPrompt("Body").AnswerDefault()
+				as.StubPrompt("What's next?").
+					AssertOptions([]string{"Submit", "Submit as draft", "Continue in browser", "Add metadata", "Cancel"}).
+					AnswerDefault()
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
+		},
+		{
+			name: "metadata",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.Title = "TITLE"
+				opts.BodyProvided = true
+				opts.Body = "BODY"
+				opts.HeadBranch = "feature"
+				opts.Assignees = []string{"monalisa"}
+				opts.Labels = []string{"bug", "todo"}
+				opts.Projects = []string{"roadmap"}
+				opts.Reviewers = []string{"hubot", "monalisa", "/core", "/robots"}
+				opts.Milestone = "big one.oh"
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
+					httpmock.StringResponse(`
+				{ "data": {
+					"u000": { "login": "MonaLisa", "id": "MONAID" },
+					"u001": { "login": "hubot", "id": "HUBOTID" },
+					"repository": {
+						"l000": { "name": "bug", "id": "BUGID" },
+						"l001": { "name": "TODO", "id": "TODOID" }
+					},
+					"organization": {
+						"t000": { "slug": "core", "id": "COREID" },
+						"t001": { "slug": "robots", "id": "ROBOTID" }
+					}
+				} }
+				`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryMilestoneList\b`),
+					httpmock.StringResponse(`
+				{ "data": { "repository": { "milestones": {
+					"nodes": [
+						{ "title": "GA", "id": "GAID" },
+						{ "title": "Big One.oh", "id": "BIGONEID" }
+					],
+					"pageInfo": { "hasNextPage": false }
+				} } } }
+				`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryProjectList\b`),
+					httpmock.StringResponse(`
+				{ "data": { "repository": { "projects": {
+					"nodes": [
+						{ "name": "Cleanup", "id": "CLEANUPID" },
+						{ "name": "Roadmap", "id": "ROADMAPID" }
+					],
+					"pageInfo": { "hasNextPage": false }
+				} } } }
+				`))
+				reg.Register(
+					httpmock.GraphQL(`query OrganizationProjectList\b`),
+					httpmock.StringResponse(`
+				{ "data": { "organization": { "projects": {
+					"nodes": [],
+					"pageInfo": { "hasNextPage": false }
+				} } } }
+				`))
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+				{ "data": { "createPullRequest": { "pullRequest": {
+					"id": "NEWPULLID",
+					"URL": "https://github.com/OWNER/REPO/pull/12"
+				} } } }
+			`, func(inputs map[string]interface{}) {
+						assert.Equal(t, "TITLE", inputs["title"])
+						assert.Equal(t, "BODY", inputs["body"])
+						if v, ok := inputs["assigneeIds"]; ok {
+							t.Errorf("did not expect assigneeIds: %v", v)
+						}
+						if v, ok := inputs["userIds"]; ok {
+							t.Errorf("did not expect userIds: %v", v)
+						}
+					}))
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreateMetadata\b`),
+					httpmock.GraphQLMutation(`
+				{ "data": { "updatePullRequest": {
+					"clientMutationId": ""
+				} } }
+			`, func(inputs map[string]interface{}) {
+						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
+						assert.Equal(t, []interface{}{"MONAID"}, inputs["assigneeIds"])
+						assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
+						assert.Equal(t, []interface{}{"ROADMAPID"}, inputs["projectIds"])
+						assert.Equal(t, "BIGONEID", inputs["milestoneId"])
+					}))
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreateRequestReviews\b`),
+					httpmock.GraphQLMutation(`
+				{ "data": { "requestReviews": {
+					"clientMutationId": ""
+				} } }
+			`, func(inputs map[string]interface{}) {
+						assert.Equal(t, "NEWPULLID", inputs["pullRequestId"])
+						assert.Equal(t, []interface{}{"HUBOTID", "MONAID"}, inputs["userIds"])
+						assert.Equal(t, []interface{}{"COREID", "ROBOTID"}, inputs["teamIds"])
+						assert.Equal(t, true, inputs["union"])
+					}))
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
+		},
+		{
+			name: "already exists",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "title"
+				opts.Body = "body"
+				opts.HeadBranch = "feature"
+				opts.Finder = shared.NewMockFinder("feature", &api.PullRequest{URL: "https://github.com/OWNER/REPO/pull/123"}, ghrepo.New("OWNER", "REPO"))
+				return func() {}
+			},
+			wantErr: "a pull request for branch \"feature\" into branch \"master\" already exists:\nhttps://github.com/OWNER/REPO/pull/123",
+		},
+		{
+			name: "web",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.WebMode = true
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.StubRepoResponse("OWNER", "REPO")
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
+				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
+				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Where should we push the 'feature' branch?").
+					AssertOptions([]string{"OWNER/REPO", "Skip pushing the branch", "Cancel"}).
+					AnswerDefault()
+			},
+			expectedErrOut: "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n",
+			expectedBrowse: "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1",
+		},
+		{
+			name: "web project",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.WebMode = true
+				opts.Projects = []string{"Triage"}
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.StubRepoResponse("OWNER", "REPO")
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryProjectList\b`),
+					httpmock.StringResponse(`
 			{ "data": { "repository": { "projects": {
 				"nodes": [
 					{ "name": "Cleanup", "id": "CLEANUPID", "resourcePath": "/OWNER/REPO/projects/1" }
@@ -856,9 +667,9 @@ func TestPRCreate_webProject(t *testing.T) {
 				"pageInfo": { "hasNextPage": false }
 			} } } }
 			`))
-	http.Register(
-		httpmock.GraphQL(`query OrganizationProjectList\b`),
-		httpmock.StringResponse(`
+				reg.Register(
+					httpmock.GraphQL(`query OrganizationProjectList\b`),
+					httpmock.StringResponse(`
 			{ "data": { "organization": { "projects": {
 				"nodes": [
 					{ "name": "Triage", "id": "TRIAGEID", "resourcePath": "/orgs/ORG/projects/1"  }
@@ -866,163 +677,317 @@ func TestPRCreate_webProject(t *testing.T) {
 				"pageInfo": { "hasNextPage": false }
 			} } } }
 			`))
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
+				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
+				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-	cs.Register(`git status --porcelain`, 0, "")
-	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
-	cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
-	cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
-
-	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-	ask, cleanupAsk := prompt.InitAskStubber()
-	defer cleanupAsk()
-
-	ask.StubPrompt("Where should we push the 'feature' branch?").AnswerDefault()
-
-	output, err := runCommand(http, nil, "feature", true, `--web -p Triage`)
-	require.NoError(t, err)
-
-	assert.Equal(t, "", output.String())
-	assert.Equal(t, "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n", output.Stderr())
-	assert.Equal(t, "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1&projects=ORG%2F1", output.BrowsedURL)
-}
-
-func TestPRCreate_draft(t *testing.T) {
-	http := initFakeHTTP()
-	defer http.Verify(t)
-
-	http.StubRepoInfoResponse("OWNER", "REPO", "master")
-	shared.RunCommandFinder("feature", nil, nil)
-	http.Register(
-		httpmock.GraphQL(`query PullRequestTemplates\b`),
-		httpmock.StringResponse(`
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Where should we push the 'feature' branch?").AnswerDefault()
+			},
+			expectedErrOut: "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n",
+			expectedBrowse: "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1&projects=ORG%2F1",
+		},
+		{
+			name: "draft",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.Title = "my title"
+				opts.HeadBranch = "feature"
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestTemplates\b`),
+					httpmock.StringResponse(`
 			{ "data": { "repository": { "pullRequestTemplates": [
 				{ "filename": "template1",
 				  "body": "this is a bug" },
 				{ "filename": "template2",
 				  "body": "this is a enhancement" }
 			] } } }`),
-	)
-	http.Register(
-		httpmock.GraphQL(`mutation PullRequestCreate\b`),
-		httpmock.GraphQLMutation(`
+				)
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
 		{ "data": { "createPullRequest": { "pullRequest": {
 			"URL": "https://github.com/OWNER/REPO/pull/12"
 		} } } }
 		`, func(input map[string]interface{}) {
-			assert.Equal(t, true, input["draft"].(bool))
-		}))
-
-	as := prompt.NewAskStubber(t)
-
-	as.StubPrompt("Choose a template").AnswerDefault()
-	as.StubPrompt("Body").AnswerDefault()
-	as.StubPrompt("What's next?").
-		AssertOptions([]string{"Submit", "Submit as draft", "Continue in browser", "Add metadata", "Cancel"}).
-		AnswerWith("Submit as draft")
-
-	output, err := runCommand(http, nil, "feature", true, `-t "my title" -H feature`)
-	require.NoError(t, err)
-
-	assert.Equal(t, "https://github.com/OWNER/REPO/pull/12\n", output.String())
-}
-
-func Test_determineTrackingBranch_empty(t *testing.T) {
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-	cs.Register(`git show-ref --verify -- HEAD`, 0, "abc HEAD")
-
-	remotes := context.Remotes{}
-
-	ref := determineTrackingBranch(remotes, "feature")
-	if ref != nil {
-		t.Errorf("expected nil result, got %v", ref)
-	}
-}
-
-func Test_determineTrackingBranch_noMatch(t *testing.T) {
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-	cs.Register("git show-ref --verify -- HEAD refs/remotes/origin/feature refs/remotes/upstream/feature", 0, "abc HEAD\nbca refs/remotes/origin/feature")
-
-	remotes := context.Remotes{
-		&context.Remote{
-			Remote: &git.Remote{Name: "origin"},
-			Repo:   ghrepo.New("hubot", "Spoon-Knife"),
+						assert.Equal(t, true, input["draft"].(bool))
+					}))
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git -c log.ShowSignature=false log --pretty=format:%H,%s --cherry origin/master...feature`, 0, "")
+				cs.Register(`git rev-parse --show-toplevel`, 0, "")
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Choose a template").AnswerDefault()
+				as.StubPrompt("Body").AnswerDefault()
+				as.StubPrompt("What's next?").
+					AssertOptions([]string{"Submit", "Submit as draft", "Continue in browser", "Add metadata", "Cancel"}).
+					AnswerWith("Submit as draft")
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
 		},
-		&context.Remote{
-			Remote: &git.Remote{Name: "upstream"},
-			Repo:   ghrepo.New("octocat", "Spoon-Knife"),
+		{
+			name: "recover",
+			tty:  true,
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryResolveMetadataIDs\b`),
+					httpmock.StringResponse(`
+		{ "data": {
+			"u000": { "login": "jillValentine", "id": "JILLID" },
+			"repository": {},
+			"organization": {}
+		} }
+		`))
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreateRequestReviews\b`),
+					httpmock.GraphQLMutation(`
+		{ "data": { "requestReviews": {
+			"clientMutationId": ""
+		} } }
+	`, func(inputs map[string]interface{}) {
+						assert.Equal(t, []interface{}{"JILLID"}, inputs["userIds"])
+					}))
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+		{ "data": { "createPullRequest": { "pullRequest": {
+			"URL": "https://github.com/OWNER/REPO/pull/12"
+		} } } }
+		`, func(input map[string]interface{}) {
+						assert.Equal(t, "recovered title", input["title"].(string))
+						assert.Equal(t, "recovered body", input["body"].(string))
+					}))
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Title").AnswerDefault()
+				as.StubPrompt("Body").AnswerDefault()
+				as.StubPrompt("What's next?").AnswerDefault()
+			},
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				tmpfile, err := os.CreateTemp(t.TempDir(), "testrecover*")
+				assert.NoError(t, err)
+				state := prShared.IssueMetadataState{
+					Title:     "recovered title",
+					Body:      "recovered body",
+					Reviewers: []string{"jillValentine"},
+				}
+				data, err := json.Marshal(state)
+				assert.NoError(t, err)
+				_, err = tmpfile.Write(data)
+				assert.NoError(t, err)
+
+				opts.RecoverFile = tmpfile.Name()
+				opts.HeadBranch = "feature"
+				return func() { tmpfile.Close() }
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
+		},
+		{
+			name: "web long URL",
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
+			},
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				longBody := make([]byte, 9216)
+				opts.Body = string(longBody)
+				opts.BodyProvided = true
+				opts.WebMode = true
+				opts.HeadBranch = "feature"
+				return func() {}
+			},
+			wantErr: "cannot open in browser: maximum URL length exceeded",
 		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			branch := "feature"
 
-	ref := determineTrackingBranch(remotes, "feature")
-	if ref != nil {
-		t.Errorf("expected nil result, got %v", ref)
+			reg := &httpmock.Registry{}
+			reg.StubRepoInfoResponse("OWNER", "REPO", "master")
+			defer reg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg, t)
+			}
+
+			//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
+			ask, cleanupAsk := prompt.InitAskStubber()
+			defer cleanupAsk()
+			if tt.askStubs != nil {
+				tt.askStubs(ask)
+			}
+
+			cs, cmdTeardown := run.Stub()
+			defer cmdTeardown(t)
+			cs.Register(`git status --porcelain`, 0, "")
+
+			if tt.cmdStubs != nil {
+				tt.cmdStubs(cs)
+			}
+
+			opts := CreateOptions{}
+
+			ios, _, stdout, stderr := iostreams.Test()
+			// TODO do i need to bother with this
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStderrTTY(tt.tty)
+			browser := &browser.Stub{}
+			opts.IO = ios
+			opts.Browser = browser
+			opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			}
+			opts.Config = func() (config.Config, error) {
+				return config.NewBlankConfig(), nil
+			}
+			opts.Remotes = func() (context.Remotes, error) {
+				return context.Remotes{
+					{
+						Remote: &git.Remote{
+							Name:     "origin",
+							Resolved: "base",
+						},
+						Repo: ghrepo.New("OWNER", "REPO"),
+					},
+				}, nil
+			}
+			opts.Branch = func() (string, error) {
+				return branch, nil
+			}
+			opts.Finder = shared.NewMockFinder(branch, nil, nil)
+			cleanSetup := func() {}
+			if tt.setup != nil {
+				cleanSetup = tt.setup(&opts, t)
+			}
+			defer cleanSetup()
+
+			err := createRun(&opts)
+			output := &test.CmdOut{
+				OutBuf:     stdout,
+				ErrBuf:     stderr,
+				BrowsedURL: browser.BrowsedURL(),
+			}
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedOut, output.String())
+				assert.Equal(t, tt.expectedErrOut, output.Stderr())
+				assert.Equal(t, tt.expectedBrowse, output.BrowsedURL)
+			}
+		})
 	}
 }
 
-func Test_determineTrackingBranch_hasMatch(t *testing.T) {
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
-	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature refs/remotes/upstream/feature$`, 0, heredoc.Doc(`
+func Test_determineTrackingBranch(t *testing.T) {
+	tests := []struct {
+		name     string
+		cmdStubs func(*run.CommandStubber)
+		remotes  context.Remotes
+		assert   func(ref *git.TrackingRef, t *testing.T)
+	}{
+		{
+			name: "empty",
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+				cs.Register(`git show-ref --verify -- HEAD`, 0, "abc HEAD")
+			},
+			assert: func(ref *git.TrackingRef, t *testing.T) {
+				assert.Nil(t, ref)
+			},
+		},
+		{
+			name: "no match",
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+				cs.Register("git show-ref --verify -- HEAD refs/remotes/origin/feature refs/remotes/upstream/feature", 0, "abc HEAD\nbca refs/remotes/origin/feature")
+			},
+			remotes: context.Remotes{
+				&context.Remote{
+					Remote: &git.Remote{Name: "origin"},
+					Repo:   ghrepo.New("hubot", "Spoon-Knife"),
+				},
+				&context.Remote{
+					Remote: &git.Remote{Name: "upstream"},
+					Repo:   ghrepo.New("octocat", "Spoon-Knife"),
+				},
+			},
+			assert: func(ref *git.TrackingRef, t *testing.T) {
+				assert.Nil(t, ref)
+			},
+		},
+		{
+			name: "match",
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature refs/remotes/upstream/feature$`, 0, heredoc.Doc(`
 		deadbeef HEAD
 		deadb00f refs/remotes/origin/feature
 		deadbeef refs/remotes/upstream/feature
 	`))
-
-	remotes := context.Remotes{
-		&context.Remote{
-			Remote: &git.Remote{Name: "origin"},
-			Repo:   ghrepo.New("hubot", "Spoon-Knife"),
+			},
+			remotes: context.Remotes{
+				&context.Remote{
+					Remote: &git.Remote{Name: "origin"},
+					Repo:   ghrepo.New("hubot", "Spoon-Knife"),
+				},
+				&context.Remote{
+					Remote: &git.Remote{Name: "upstream"},
+					Repo:   ghrepo.New("octocat", "Spoon-Knife"),
+				},
+			},
+			assert: func(ref *git.TrackingRef, t *testing.T) {
+				assert.Equal(t, "upstream", ref.RemoteName)
+				assert.Equal(t, "feature", ref.BranchName)
+			},
 		},
-		&context.Remote{
-			Remote: &git.Remote{Name: "upstream"},
-			Repo:   ghrepo.New("octocat", "Spoon-Knife"),
-		},
-	}
-
-	ref := determineTrackingBranch(remotes, "feature")
-	if ref == nil {
-		t.Fatal("expected result, got nil")
-	}
-
-	assert.Equal(t, "upstream", ref.RemoteName)
-	assert.Equal(t, "feature", ref.BranchName)
-}
-
-func Test_determineTrackingBranch_respectTrackingConfig(t *testing.T) {
-	cs, cmdTeardown := run.Stub()
-	defer cmdTeardown(t)
-
-	cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, heredoc.Doc(`
+		{
+			name: "respect tracking config",
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, heredoc.Doc(`
 		branch.feature.remote origin
 		branch.feature.merge refs/heads/great-feat
 	`))
-	cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/great-feat refs/remotes/origin/feature$`, 0, heredoc.Doc(`
+				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/great-feat refs/remotes/origin/feature$`, 0, heredoc.Doc(`
 		deadbeef HEAD
 		deadb00f refs/remotes/origin/feature
 	`))
-
-	remotes := context.Remotes{
-		&context.Remote{
-			Remote: &git.Remote{Name: "origin"},
-			Repo:   ghrepo.New("hubot", "Spoon-Knife"),
+			},
+			remotes: context.Remotes{
+				&context.Remote{
+					Remote: &git.Remote{Name: "origin"},
+					Repo:   ghrepo.New("hubot", "Spoon-Knife"),
+				},
+			},
+			assert: func(ref *git.TrackingRef, t *testing.T) {
+				assert.Nil(t, ref)
+			},
 		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cs, cmdTeardown := run.Stub()
+			defer cmdTeardown(t)
 
-	ref := determineTrackingBranch(remotes, "feature")
-	if ref != nil {
-		t.Errorf("expected nil result, got %v", ref)
+			tt.cmdStubs(cs)
+
+			ref := determineTrackingBranch(tt.remotes, "feature")
+			tt.assert(ref, t)
+		})
 	}
 }
 

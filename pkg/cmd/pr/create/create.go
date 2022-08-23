@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -24,10 +25,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type browser interface {
-	Browse(string) error
-}
-
 type CreateOptions struct {
 	// This struct stores user input and factory functions
 	HttpClient func() (*http.Client, error)
@@ -35,7 +32,7 @@ type CreateOptions struct {
 	IO         *iostreams.IOStreams
 	Remotes    func() (context.Remotes, error)
 	Branch     func() (string, error)
-	Browser    browser
+	Browser    browser.Browser
 	Finder     shared.PRFinder
 
 	TitleProvided bool
@@ -569,6 +566,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		pushOptions = append(pushOptions, "Cancel")
 
 		var selectedOption int
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(&survey.Select{
 			Message: fmt.Sprintf("Where should we push the '%s' branch?", headBranch),
 			Options: pushOptions,

@@ -260,6 +260,7 @@ func forkRun(opts *ForkOptions) error {
 
 		remoteDesired := opts.Remote
 		if opts.PromptRemote {
+			//nolint:staticcheck // SA1019: prompt.Confirm is deprecated: use Prompter
 			err = prompt.Confirm("Would you like to add a remote for the fork?", &remoteDesired)
 			if err != nil {
 				return fmt.Errorf("failed to prompt: %w", err)
@@ -302,6 +303,7 @@ func forkRun(opts *ForkOptions) error {
 	} else {
 		cloneDesired := opts.Clone
 		if opts.PromptClone {
+			//nolint:staticcheck // SA1019: prompt.Confirm is deprecated: use Prompter
 			err = prompt.Confirm("Would you like to clone the fork?", &cloneDesired)
 			if err != nil {
 				return fmt.Errorf("failed to prompt: %w", err)

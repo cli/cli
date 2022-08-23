@@ -632,6 +632,7 @@ jobs:
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
+			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
 				tt.askStubs(as)

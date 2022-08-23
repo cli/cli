@@ -6,6 +6,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -16,13 +17,9 @@ import (
 
 const defaultInterval time.Duration = 10 * time.Second
 
-type browser interface {
-	Browse(string) error
-}
-
 type ChecksOptions struct {
 	IO      *iostreams.IOStreams
-	Browser browser
+	Browser browser.Browser
 
 	Finder shared.PRFinder
 

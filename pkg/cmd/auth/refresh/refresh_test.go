@@ -272,6 +272,7 @@ func Test_refreshRun(t *testing.T) {
 			)
 			tt.opts.httpClient = &http.Client{Transport: httpReg}
 
+			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
 				tt.askStubs(as)

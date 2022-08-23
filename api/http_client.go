@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -22,16 +23,23 @@ type HTTPClientOptions struct {
 	Config            tokenGetter
 	EnableCache       bool
 	Log               io.Writer
+	LogColorize       bool
 	SkipAcceptHeaders bool
 }
 
 func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 	// Provide invalid host, and token values so gh.HTTPClient will not automatically resolve them.
 	// The real host and token are inserted at request time.
-	clientOpts := ghAPI.ClientOptions{Host: "none", AuthToken: "none"}
+	clientOpts := ghAPI.ClientOptions{
+		Host:         "none",
+		AuthToken:    "none",
+		LogIgnoreEnv: true,
+	}
 
-	if debugEnabled, _ := utils.IsDebugEnabled(); debugEnabled {
+	if debugEnabled, debugValue := utils.IsDebugEnabled(); debugEnabled {
 		clientOpts.Log = opts.Log
+		clientOpts.LogColorize = opts.LogColorize
+		clientOpts.LogVerboseHTTP = strings.Contains(debugValue, "api")
 	}
 
 	headers := map[string]string{

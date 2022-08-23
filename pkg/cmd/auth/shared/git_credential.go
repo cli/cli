@@ -7,17 +7,17 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 )
 
 type GitCredentialFlow struct {
 	Executable string
+	Prompter   prompter.Prompter
 
 	shouldSetup bool
 	helper      string
@@ -32,13 +32,12 @@ func (flow *GitCredentialFlow) Prompt(hostname string) error {
 		return nil
 	}
 
-	err := prompt.SurveyAskOne(&survey.Confirm{
-		Message: "Authenticate Git with your GitHub credentials?",
-		Default: true,
-	}, &flow.shouldSetup)
+	result, err := flow.Prompter.Confirm("Authenticate Git with your GitHub credentials?", true)
 	if err != nil {
-		return fmt.Errorf("could not prompt: %w", err)
+		return err
 	}
+	flow.shouldSetup = result
+
 	if flow.shouldSetup {
 		if isGitMissing(gitErr) {
 			return gitErr

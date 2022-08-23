@@ -104,6 +104,7 @@ func SelectWorkflow(workflows []Workflow, promptMsg string, states []WorkflowSta
 
 	var selected int
 
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err := prompt.SurveyAskOne(&survey.Select{
 		Message:  promptMsg,
 		Options:  candidates,
