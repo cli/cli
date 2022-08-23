@@ -2,7 +2,7 @@
 // requests.
 //
 // Every pull request is an issue, but not every issue is a pull request.
-// Therefore, we should be able to use this in the package cmd/pr as well.
+// Therefore, this package is used in `cmd/pr` as well.
 //
 // A note on nomenclature for "comments", "conversations", and "discussions":
 // The GitHub documentation refers to a set of comments on an issue or pull
@@ -26,8 +26,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// the reason for not just declaring a map is so that I can put the keys in
-// alphabetical order
+// A slice is used here instead of a map in order to put options in alphabetical
+// order.
 var reasons = []string{"off_topic", "resolved", "spam", "too_heated"}
 var reasonsString = strings.Join(reasons, ", ")
 
@@ -55,6 +55,9 @@ type command struct {
 	Typename string // return value from issue.Typename
 }
 
+// The `FullName` should be capitalized as if starting a sentence since it is
+// used in print and error statements.  It's easier to manually capitalize and
+// call `ToLower`, when needed, than the other way around.
 var aliasIssue = command{"issue", "Issue", api.TypeIssue}
 var aliasPr = command{"pr", "Pull request", api.TypePullRequest}
 
@@ -158,6 +161,10 @@ func NewCmdUnlock(f *cmdutil.Factory, parentName string) *cobra.Command {
 	return cmd
 }
 
+// reason creates a sentence fragment so that the lock reason can be used in a
+// sentence.
+//
+// e.g. "resolved" -> " as RESOLVED"
 func reason(reason string) string {
 	result := ""
 	if reason != "" {
@@ -166,6 +173,10 @@ func reason(reason string) string {
 	return result
 }
 
+// status creates a string showing the result of a successful lock/unlock that
+// is parameterized on a bunch of options.
+//
+// Example output: "Locked as RESOLVED: Issue #31 (Title of issue)"
 func status(state string, lockable *api.Issue, opts *LockOptions) string {
 
 	return fmt.Sprintf("%sed%s: %s #%d (%s)",
@@ -255,7 +266,7 @@ func lockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *api.
 	return gql.Mutate(repo.RepoHost(), "LockLockable", &mutation, variables)
 }
 
-// unlockLockable will lock an issue or pull request
+// unlockLockable will unlock an issue or pull request
 func unlockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *api.Issue, opts *LockOptions) error {
 
 	var mutation struct {
@@ -278,6 +289,10 @@ func unlockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *ap
 
 // relockLockable will unlock then lock an issue or pull request.  A common use
 // case would be to change the reason for locking.
+//
+// The current api doesn't allow you to send a single lock request to update a
+// lockable item that is already locked; it will just ignore that request.  You
+// need to first unlock then lock with a new reason.
 func relockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *api.Issue, opts *LockOptions) (bool, error) {
 
 	var relocked bool
