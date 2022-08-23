@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -72,14 +73,18 @@ func TestPRList(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	out := output.String()
+	timeRE := regexp.MustCompile(`\d+ years`)
+	out = timeRE.ReplaceAllString(out, "X years")
+
 	assert.Equal(t, heredoc.Doc(`
 
 		Showing 3 of 3 open pull requests in OWNER/REPO
 
-		#32  New feature            feature
-		#29  Fixed bad bug          hubot:bug-fix
-		#28  Improve documentation  docs
-	`), output.String())
+		#32  New feature            feature        about X years ago
+		#29  Fixed bad bug          hubot:bug-fix  about X years ago
+		#28  Improve documentation  docs           about X years ago
+	`), out)
 	assert.Equal(t, ``, output.Stderr())
 }
 
@@ -96,10 +101,14 @@ func TestPRList_nontty(t *testing.T) {
 
 	assert.Equal(t, "", output.Stderr())
 
-	assert.Equal(t, `32	New feature	feature	DRAFT
-29	Fixed bad bug	hubot:bug-fix	OPEN
-28	Improve documentation	docs	MERGED
-`, output.String())
+	out := output.String()
+	timeRE := regexp.MustCompile(`\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d .\d\d\d\d UTC`)
+	out = timeRE.ReplaceAllString(out, "XXXX-XX-XX XX:XX:XX +XXXX UTC")
+
+	assert.Equal(t, `32	New feature	feature	DRAFT	XXXX-XX-XX XX:XX:XX +XXXX UTC
+29	Fixed bad bug	hubot:bug-fix	OPEN	XXXX-XX-XX XX:XX:XX +XXXX UTC
+28	Improve documentation	docs	MERGED	XXXX-XX-XX XX:XX:XX +XXXX UTC
+`, out)
 }
 
 func TestPRList_filtering(t *testing.T) {

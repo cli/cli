@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -120,6 +121,7 @@ var defaultFields = []string{
 	"headRepositoryOwner",
 	"isCrossRepository",
 	"isDraft",
+	"createdAt",
 }
 
 func listRun(opts *ListOptions) error {
@@ -199,11 +201,19 @@ func listRun(opts *ListOptions) error {
 		if table.IsTTY() {
 			prNum = "#" + prNum
 		}
+		now := time.Now()
+		ago := now.Sub(pr.CreatedAt)
+
 		table.AddField(prNum, nil, cs.ColorFromString(shared.ColorForPRState(pr)))
 		table.AddField(text.ReplaceExcessiveWhitespace(pr.Title), nil, nil)
 		table.AddField(pr.HeadLabel(), nil, cs.Cyan)
 		if !table.IsTTY() {
 			table.AddField(prStateWithDraft(&pr), nil, nil)
+		}
+		if table.IsTTY() {
+			table.AddField(utils.FuzzyAgo(ago), nil, cs.Gray)
+		} else {
+			table.AddField(pr.CreatedAt.String(), nil, nil)
 		}
 		table.EndRow()
 	}
