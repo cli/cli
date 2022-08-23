@@ -53,7 +53,14 @@ func NewCmdConfigGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Co
 }
 
 func getRun(opts *GetOptions) error {
-	val, err := opts.Config.GetOrDefault(opts.Hostname, opts.Key)
+	var host string
+	if opts.Hostname != "" {
+		host = opts.Hostname
+	} else {
+		host, _ = opts.Config.DefaultHost()
+	}
+
+	val, err := opts.Config.GetOrDefault(host, opts.Key)
 	if err != nil {
 		return err
 	}

@@ -108,6 +108,20 @@ func Test_getRun(t *testing.T) {
 			},
 			stdout: "vim\n",
 		},
+		{
+			name: "get key scoped by default host",
+			input: &GetOptions{
+				Hostname: "",
+				Key:      "git_protocol",
+				Config: func() config.Config {
+					cfg := config.NewBlankConfig()
+					cfg.Set("", "git_protocol", "https")
+					cfg.Set("github.com", "git_protocol", "ssh")
+					return cfg
+				}(),
+			},
+			stdout: "ssh\n",
+		},
 	}
 
 	for _, tt := range tests {
