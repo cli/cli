@@ -19,7 +19,7 @@
 
    #### Unix-like systems
    ```sh
-   # installs to '/usr/local' by default; sudo may be required
+   # installs to '/usr/local' by default; sudo may be required, or sudo -E for configured go environments
    $ make install
 
    # or, install to a different location
