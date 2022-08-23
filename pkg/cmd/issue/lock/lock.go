@@ -99,7 +99,7 @@ func (opts *LockOptions) setCommonOptions(f *cmdutil.Factory, cmd *cobra.Command
 	opts.SelectorArg = args[0]
 
 	opts.Fields = []string{
-		"id", "number", "title", "url", "locked", "activeLockReason"}
+		"activeLockReason", "id", "locked", "number", "title", "url"}
 
 }
 
