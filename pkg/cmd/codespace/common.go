@@ -112,7 +112,7 @@ type apiClient interface {
 	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
 	EditCodespace(ctx context.Context, codespaceName string, params *api.EditCodespaceParams) (*api.Codespace, error)
 	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
-	AuthorizedKeys(ctx context.Context, user string) ([]byte, error)
+	AuthorizedKeys(ctx context.Context, user string) ([]string, error)
 	GetCodespacesMachines(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error)
 	GetCodespaceRepositoryContents(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
 	ListDevContainers(ctx context.Context, repoID int, branch string, limit int) (devcontainers []api.DevContainerEntry, err error)

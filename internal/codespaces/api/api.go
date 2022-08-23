@@ -1062,7 +1062,7 @@ func (a *API) GetCodespaceRepositoryContents(ctx context.Context, codespace *Cod
 
 // AuthorizedKeys returns the public keys (in ~/.ssh/authorized_keys
 // format) registered by the specified GitHub user.
-func (a *API) AuthorizedKeys(ctx context.Context, user string) ([]byte, error) {
+func (a *API) AuthorizedKeys(ctx context.Context, user string) ([]string, error) {
 	url := fmt.Sprintf("%s/%s.keys", a.githubServer, user)
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -1082,7 +1082,20 @@ func (a *API) AuthorizedKeys(ctx context.Context, user string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
-	return b, nil
+
+	allKeys := string(b)
+
+	var splitKeys []string
+	for _, key := range strings.Split(allKeys, "\n") {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+
+		splitKeys = append(splitKeys, key)
+	}
+
+	return splitKeys, nil
 }
 
 // do executes the given request and returns the response. It creates an
