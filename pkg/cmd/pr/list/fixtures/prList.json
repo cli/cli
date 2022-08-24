@@ -8,7 +8,7 @@
             "number": 32,
             "title": "New feature",
             "url": "https://github.com/monalisa/hello/pull/32",
-            "createtedAt": "2011-01-26T19:01:12Z",
+            "createdAt": "2022-08-24T20:01:12Z",
             "headRefName": "feature",
             "state": "OPEN",
             "isDraft": true
@@ -17,7 +17,7 @@
             "number": 29,
             "title": "Fixed bad bug",
             "url": "https://github.com/monalisa/hello/pull/29",
-            "createtedAt": "2011-01-26T19:01:12Z",
+            "createdAt": "2022-07-20T19:01:12Z",
             "headRefName": "bug-fix",
             "state": "OPEN",
             "isDraft": false,
@@ -31,7 +31,7 @@
             "state": "MERGED",
             "isDraft": false,
             "title": "Improve documentation",
-            "createtedAt": "2011-01-26T19:01:12Z",
+            "createdAt": "2020-01-26T19:01:12Z",
             "url": "https://github.com/monalisa/hello/pull/28",
             "headRefName": "docs"
           }
