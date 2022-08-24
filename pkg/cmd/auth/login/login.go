@@ -187,13 +187,11 @@ func loginRun(opts *LoginOptions) error {
 }
 
 func promptForHostname(opts *LoginOptions) (string, error) {
+	options := []string{"GitHub.com", "GitHub Enterprise Server"}
 	hostType, err := opts.Prompter.Select(
 		"What account do you want to log into?",
-		"",
-		[]string{
-			"GitHub.com",
-			"GitHub Enterprise Server",
-		})
+		options[0],
+		options)
 	if err != nil {
 		return "", err
 	}
