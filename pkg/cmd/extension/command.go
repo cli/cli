@@ -247,11 +247,10 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				if err != nil {
 					return extName, -1, err
 				}
-				extTmplType, err := prompter.Select("What kind of extension?", "", []string{
-					"Script (Bash, Ruby, Python, etc)",
-					"Go",
-					"Other Precompiled (C++, Rust, etc)",
-				})
+				options := []string{"Script (Bash, Ruby, Python, etc)", "Go", "Other Precompiled (C++, Rust, etc)"}
+				extTmplType, err := prompter.Select("What kind of extension?",
+					options[0],
+					options)
 				return extName, extensions.ExtTemplateType(extTmplType), err
 			}
 			var flagType string
