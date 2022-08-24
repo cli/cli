@@ -10,13 +10,12 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/cli/cli/v2/pkg/prompt"
-	"github.com/cli/cli/v2/pkg/text"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -107,7 +106,7 @@ func viewRun(opts *ViewOptions) error {
 			gistURL = ghinstance.GistPrefix(hostname) + gistID
 		}
 		if opts.IO.IsStderrTTY() {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(gistURL))
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(gistURL))
 		}
 		return opts.Browser.Browse(gistURL)
 	}
@@ -236,9 +235,9 @@ func promptGists(client *http.Client, host string, cs *iostreams.ColorScheme) (g
 		sort.Strings(filenames)
 		gistName = filenames[0]
 
-		gistTime := utils.FuzzyAgo(time.Since(gist.UpdatedAt))
+		gistTime := text.FuzzyAgo(time.Now(), gist.UpdatedAt)
 		// TODO: support dynamic maxWidth
-		description = text.Truncate(100, text.ReplaceExcessiveWhitespace(description))
+		description = text.Truncate(100, text.RemoveExcessiveWhitespace(description))
 		opt := fmt.Sprintf("%s %s %s", cs.Bold(gistName), description, cs.Gray(gistTime))
 		opts = append(opts, opt)
 	}

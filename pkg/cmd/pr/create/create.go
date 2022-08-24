@@ -17,11 +17,11 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -206,7 +206,7 @@ func createRun(opts *CreateOptions) (err error) {
 		if err != nil {
 			return
 		}
-		if !utils.ValidURL(openURL) {
+		if !shared.ValidURL(openURL) {
 			err = fmt.Errorf("cannot open in browser: maximum URL length exceeded")
 			return
 		}
@@ -307,7 +307,7 @@ func createRun(opts *CreateOptions) (err error) {
 		return
 	}
 
-	allowPreview := !state.HasMetadata() && utils.ValidURL(openURL)
+	allowPreview := !state.HasMetadata() && shared.ValidURL(openURL)
 	allowMetadata := ctx.BaseRepo.ViewerCanTriage()
 	action, err := shared.ConfirmPRSubmission(allowPreview, allowMetadata, state.Draft)
 	if err != nil {
@@ -377,7 +377,7 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState) e
 		}
 		state.Body = body
 	} else {
-		state.Title = utils.Humanize(headRef)
+		state.Title = humanize(headRef)
 
 		var body strings.Builder
 		for i := len(commits) - 1; i >= 0; i-- {
@@ -510,7 +510,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	}
 
 	if ucc, err := git.UncommittedChangeCount(); err == nil && ucc > 0 {
-		fmt.Fprintf(opts.IO.ErrOut, "Warning: %s\n", utils.Pluralize(ucc, "uncommitted change"))
+		fmt.Fprintf(opts.IO.ErrOut, "Warning: %s\n", text.Pluralize(ucc, "uncommitted change"))
 	}
 
 	var headRepo ghrepo.Interface
@@ -661,7 +661,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 
 func previewPR(opts CreateOptions, openURL string) error {
 	if opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 	}
 	return opts.Browser.Browse(openURL)
 
@@ -732,7 +732,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 						pushTries++
 						// first wait 2 seconds after forking, then 4s, then 6s
 						waitSeconds := 2 * pushTries
-						fmt.Fprintf(opts.IO.ErrOut, "waiting %s before retrying...\n", utils.Pluralize(waitSeconds, "second"))
+						fmt.Fprintf(opts.IO.ErrOut, "waiting %s before retrying...\n", text.Pluralize(waitSeconds, "second"))
 						time.Sleep(time.Duration(waitSeconds) * time.Second)
 						continue
 					}
@@ -762,6 +762,18 @@ func generateCompareURL(ctx CreateContext, state shared.IssueMetadataState) (str
 		return "", err
 	}
 	return url, nil
+}
+
+// Humanize returns a copy of the string s that replaces all instance of '-' and '_' with spaces.
+func humanize(s string) string {
+	replace := "_-"
+	h := func(r rune) rune {
+		if strings.ContainsRune(replace, r) {
+			return ' '
+		}
+		return r
+	}
+	return strings.Map(h, s)
 }
 
 var gitPushRegexp = regexp.MustCompile("^remote: (Create a pull request.*by visiting|[[:space:]]*https://.*/pull/new/).*\n?$")
