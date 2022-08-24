@@ -205,9 +205,9 @@ func reviewRun(opts *ReviewOptions) error {
 }
 
 func reviewSurvey(opts *ReviewOptions, editorCommand string) (*api.PullRequestReviewInput, error) {
+	options := []string{"Comment", "Approve", "Request Changes"}
 	reviewType, err := opts.Prompter.Select(
-		"What kind of review do you want to give?", "",
-		[]string{"Comment", "Approve", "Request Changes"})
+		"What kind of review do you want to give?", options[0], options)
 	if err != nil {
 		return nil, err
 	}

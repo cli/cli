@@ -53,7 +53,7 @@ func Login(opts *LoginOptions) error {
 		}
 		result, err := opts.Prompter.Select(
 			"What is your preferred protocol for Git operations?",
-			"", options)
+			options[0], options)
 		if err != nil {
 			return err
 		}
@@ -82,7 +82,7 @@ func Login(opts *LoginOptions) error {
 		if len(pubKeys) > 0 {
 			options := append(pubKeys, "Skip")
 			keyChoice, err := opts.Prompter.Select(
-				"Upload your SSH public key to your GitHub account?", "",
+				"Upload your SSH public key to your GitHub account?", options[0],
 				options)
 			if err != nil {
 				return err
@@ -127,11 +127,12 @@ func Login(opts *LoginOptions) error {
 		authMode = 0
 	} else if opts.Interactive {
 		var err error
+		options := []string{
+			"Login with a web browser",
+			"Paste an authentication token"}
+
 		authMode, err = opts.Prompter.Select(
-			"How would you like to authenticate GitHub CLI?", "",
-			[]string{
-				"Login with a web browser",
-				"Paste an authentication token"})
+			"How would you like to authenticate GitHub CLI?", options[0], options)
 		if err != nil {
 			return err
 		}
