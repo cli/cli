@@ -26,9 +26,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// A slice is used here instead of a map in order to put options in alphabetical
-// order.
+// reasons contains all possible lock reasons allowed by GitHub.
+//
+// We don't directly construct a map so that we can maintain the reasons in
+// alphabetical order.
 var reasons = []string{"off_topic", "resolved", "spam", "too_heated"}
+
 var reasonsString = strings.Join(reasons, ", ")
 
 var reasonsApi = []githubv4.LockReason{
@@ -37,6 +40,10 @@ var reasonsApi = []githubv4.LockReason{
 	githubv4.LockReasonSpam,
 	githubv4.LockReasonTooHeated,
 }
+
+// If no reason is given (an empty string), reasonsMap will return the nil
+// value, since it is not contained in the map.  This, in turn, sets lock_reason
+// to null in GraphQL.
 var reasonsMap map[string]*githubv4.LockReason
 
 func init() {
@@ -44,9 +51,6 @@ func init() {
 	for i, reason := range reasons {
 		reasonsMap[reason] = &reasonsApi[i]
 	}
-
-	// If no reason given, set lock_reason to null in graphql
-	reasonsMap[""] = nil
 }
 
 type command struct {
