@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
@@ -38,7 +38,14 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 		},
 	}
 
-	cmd := NewCmdList(factory, nil)
+	fakeNow := func() time.Time {
+		return time.Date(2022, time.August, 24, 23, 50, 0, 0, time.UTC)
+	}
+
+	cmd := NewCmdList(factory, func(opts *ListOptions) error {
+		opts.Now = fakeNow
+		return listRun(opts)
+	})
 
 	argv, err := shlex.Split(cli)
 	if err != nil {
@@ -73,18 +80,14 @@ func TestPRList(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	out := output.String()
-	timeRE := regexp.MustCompile(`\d+ years`)
-	out = timeRE.ReplaceAllString(out, "X years")
-
 	assert.Equal(t, heredoc.Doc(`
 
 		Showing 3 of 3 open pull requests in OWNER/REPO
 
-		#32  New feature            feature        about X years ago
-		#29  Fixed bad bug          hubot:bug-fix  about X years ago
-		#28  Improve documentation  docs           about X years ago
-	`), out)
+		#32  New feature            feature        about 3 hours ago
+		#29  Fixed bad bug          hubot:bug-fix  about 1 month ago
+		#28  Improve documentation  docs           about 2 years ago
+	`), output.String())
 	assert.Equal(t, ``, output.Stderr())
 }
 
@@ -101,14 +104,10 @@ func TestPRList_nontty(t *testing.T) {
 
 	assert.Equal(t, "", output.Stderr())
 
-	out := output.String()
-	timeRE := regexp.MustCompile(`\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d .\d\d\d\d UTC`)
-	out = timeRE.ReplaceAllString(out, "XXXX-XX-XX XX:XX:XX +XXXX UTC")
-
-	assert.Equal(t, `32	New feature	feature	DRAFT	XXXX-XX-XX XX:XX:XX +XXXX UTC
-29	Fixed bad bug	hubot:bug-fix	OPEN	XXXX-XX-XX XX:XX:XX +XXXX UTC
-28	Improve documentation	docs	MERGED	XXXX-XX-XX XX:XX:XX +XXXX UTC
-`, out)
+	assert.Equal(t, `32	New feature	feature	DRAFT	2022-08-24 20:01:12 +0000 UTC
+29	Fixed bad bug	hubot:bug-fix	OPEN	2022-07-20 19:01:12 +0000 UTC
+28	Improve documentation	docs	MERGED	2020-01-26 19:01:12 +0000 UTC
+`, output.String())
 }
 
 func TestPRList_filtering(t *testing.T) {

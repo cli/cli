@@ -37,6 +37,8 @@ type ListOptions struct {
 	Assignee   string
 	Search     string
 	Draft      *bool
+
+	Now func() time.Time
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -44,6 +46,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
+		Now:        time.Now,
 	}
 
 	var appAuthor string
@@ -201,7 +204,7 @@ func listRun(opts *ListOptions) error {
 		if table.IsTTY() {
 			prNum = "#" + prNum
 		}
-		now := time.Now()
+		now := opts.Now()
 		ago := now.Sub(pr.CreatedAt)
 
 		table.AddField(prNum, nil, cs.ColorFromString(shared.ColorForPRState(pr)))
