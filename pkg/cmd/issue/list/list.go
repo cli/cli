@@ -193,7 +193,7 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
-	issueShared.PrintIssues(opts.IO, "", len(listResult.Issues), listResult.Issues)
+	issueShared.PrintIssues(opts.IO, opts.Now(), "", len(listResult.Issues), listResult.Issues)
 
 	return nil
 }

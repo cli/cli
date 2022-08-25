@@ -41,7 +41,7 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 	}
 
 	fakeNow := func() time.Time {
-		return time.Date(2022, time.August, 24, 23, 50, 0, 0, time.UTC)
+		return time.Date(2022, time.August, 25, 23, 50, 0, 0, time.UTC)
 	}
 
 	cmd := NewCmdList(factory, func(opts *ListOptions) error {
@@ -104,7 +104,7 @@ func TestIssueList_tty(t *testing.T) {
 
 		Showing 3 of 3 open issues in OWNER/REPO
 
-		#1  number won   label  less than a minute ago
+		#1  number won   label  about 1 day ago
 		#2  number too   label  about 1 month ago
 		#4  number fore  label  about 2 years ago
 	`), output.String())
