@@ -13,7 +13,7 @@ import (
 	"github.com/cli/cli/v2/utils"
 )
 
-func PrintIssues(io *iostreams.IOStreams, prefix string, totalCount int, issues []api.Issue) {
+func PrintIssues(io *iostreams.IOStreams, now time.Time, prefix string, totalCount int, issues []api.Issue) {
 	cs := io.ColorScheme()
 	table := utils.NewTablePrinter(io)
 	for _, issue := range issues {
@@ -22,7 +22,6 @@ func PrintIssues(io *iostreams.IOStreams, prefix string, totalCount int, issues 
 			issueNum = "#" + issueNum
 		}
 		issueNum = prefix + issueNum
-		now := time.Now()
 		ago := now.Sub(issue.UpdatedAt)
 		table.AddField(issueNum, nil, cs.ColorFromString(prShared.ColorForIssueState(issue)))
 		if !table.IsTTY() {
