@@ -223,6 +223,14 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/kevin/MinTy/issues/217",
 		},
 		{
+			name: "issue with hashtag argument",
+			opts: BrowseOptions{
+				SelectorArg: "#217",
+			},
+			baseRepo:    ghrepo.New("kevin", "MinTy"),
+			expectedURL: "https://github.com/kevin/MinTy/issues/217",
+		},
+		{
 			name: "branch flag",
 			opts: BrowseOptions{
 				Branch: "trunk",
