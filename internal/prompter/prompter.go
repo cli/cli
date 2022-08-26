@@ -25,9 +25,11 @@ type Prompter interface {
 func New(editorCmd string, stdin io.Reader, stdout, stderr io.Writer) Prompter {
 	return &surveyPrompter{
 		editorCmd: editorCmd,
-		stdin:     stdin.(terminal.FileReader),
+		// TODO figure out how to make this work on windows
+		/*stdin:     stdin.(terminal.FileReader),
 		stdout:    stdout.(terminal.FileWriter),
-		stderr:    stderr,
+		*/
+		stderr: stderr,
 	}
 }
 
@@ -65,7 +67,7 @@ func (p *surveyPrompter) MultiSelect(message, defaultValue string, options []str
 }
 
 func (p *surveyPrompter) ask(q survey.Prompt, response interface{}, opts ...survey.AskOpt) error {
-	opts = append(opts, survey.WithStdio(p.stdin, p.stdout, p.stderr))
+	//opts = append(opts, survey.WithStdio(p.stdin, p.stdout, p.stderr))
 	err := survey.AskOne(q, response, opts...)
 	if err == nil {
 		return nil
