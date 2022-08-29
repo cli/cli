@@ -68,9 +68,13 @@ func TestLevenshteinDistance(t *testing.T) {
 		t        string
 		expected int
 	}{
+		{"", "", 0},
+		{"", "s", 1},
+		{"k", "", 1},
 		{"k", "s", 1},
 		{"kitten", "kitten", 0},
 		{"kitten", "sitting", 3},
+		{"cli/cli", "cli/cii", 1},
 	}
 	for _, c := range cases {
 		got := LevenshteinDistance(c.s, c.t)
@@ -82,43 +86,5 @@ func TestLevenshteinDistance(t *testing.T) {
 				c.t,
 			)
 		}
-
-		got = LevenshteinDistanceIter(c.s, c.t)
-		if got != c.expected {
-			t.Errorf("unexpected LevenshteinDistanceIter: expected %d, got %d, for %s, %s",
-				c.expected,
-				got,
-				c.s,
-				c.t,
-			)
-		}
-
-		got = LevenshteinDistanceIter2(c.s, c.t)
-		if got != c.expected {
-			t.Errorf("unexpected LevenshteinDistanceIter2: expected %d, got %d, for %s, %s",
-				c.expected,
-				got,
-				c.s,
-				c.t,
-			)
-		}
-	}
-}
-
-func BenchmarkLevenshteinDistance(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		LevenshteinDistance("clifeaf/cli", "clijeaflj/cil")
-	}
-}
-
-func BenchmarkLevenshteinDistanceIter(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		LevenshteinDistanceIter("clifeaf/cli", "clijeaflj/cil")
-	}
-}
-
-func BenchmarkLevenshteinDistanceIter2(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		LevenshteinDistanceIter2("clifeaf/cli", "clijeaflj/cil")
 	}
 }

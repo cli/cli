@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"sort"
 	"strings"
 	"time"
 )
@@ -116,66 +115,17 @@ func IsDebugEnabled() (bool, string) {
 	}
 }
 
-func LevenshteinDistance(s, t string) int {
-	if len(s) == 0 {
-		return len(t)
-	}
-	if len(t) == 0 {
-		return len(s)
-	}
-	if s[0] == t[0] {
-		return LevenshteinDistance(s[1:], t[1:])
-	}
-
-	vals := []int{
-		LevenshteinDistance(s[1:], t[1:]),
-		LevenshteinDistance(s[1:], t),
-		LevenshteinDistance(s, t[1:]),
-	}
-
-	sort.Ints(vals)
-
-	min := vals[0]
-
-	return 1 + min
-}
-
-func LevenshteinDistanceIter(s, t string) int {
-	m := make([][]int, len(s)+1)
-	for i := 0; i <= len(s); i++ {
-		m[i] = make([]int, len(t)+1)
-	}
-
-	for i := 1; i <= len(s); i++ {
-		m[i][0] = i
-	}
-
-	for j := 1; j <= len(t); j++ {
-		m[0][j] = j
-	}
-
-	for j := 1; j <= len(t); j++ {
-		for i := 1; i <= len(s); i++ {
-
-			cost := 0
-			if s[i-1] != t[j-1] {
-				cost = 1
-			}
-
-			vals := []int{
-				m[i-1][j] + 1,      // deletion
-				m[i][j-1] + 1,      // insertion
-				m[i-1][j-1] + cost, // substitution
-			}
-
-			sort.Ints(vals)
-			m[i][j] = vals[0]
+func min(init int, rest ...int) int {
+	min := init
+	for _, v := range rest {
+		if min > v {
+			min = v
 		}
 	}
-	return m[len(s)][len(t)]
+	return min
 }
 
-func LevenshteinDistanceIter2(s, t string) int {
+func LevenshteinDistance(s, t string) int {
 	v0 := make([]int, len(t)+1)
 	v1 := make([]int, len(t)+1)
 	for i := 0; i <= len(t); i++ {
@@ -188,14 +138,12 @@ func LevenshteinDistanceIter2(s, t string) int {
 			if s[i] != t[j] {
 				cost = 1
 			}
-			vals := []int{
-				v0[j+1] + 1,  // deletion
-				v1[j] + 1,    // insertion
-				v0[j] + cost, // substitution
 
-			}
-			sort.Ints(vals)
-			v1[j+1] = vals[0]
+			v1[j+1] = min(
+				v0[j+1]+1,  // deletion
+				v1[j]+1,    // insertion
+				v0[j]+cost, // substitution
+			)
 		}
 		copy(v0, v1)
 	}
