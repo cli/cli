@@ -167,7 +167,7 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 	}
 
 	if isNumber(opts.SelectorArg) {
-		return fmt.Sprintf("issues/%s", opts.SelectorArg), nil
+		return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
 	}
 
 	if isCommit(opts.SelectorArg) {
@@ -253,7 +253,7 @@ func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err 
 }
 
 func isNumber(arg string) bool {
-	_, err := strconv.Atoi(arg)
+	_, err := strconv.Atoi(strings.TrimPrefix(arg, "#"))
 	return err == nil
 }
 
