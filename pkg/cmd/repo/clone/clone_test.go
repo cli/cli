@@ -343,36 +343,53 @@ func Test_RepoClone_RepoTypo(t *testing.T) {
 		{
 			"data": {
 				"repositoryOwner": {
-				"repositories": {
-					"totalCount": 3,
-					"nodes": [
-					{
-						"name": "hello-world",
-						"isFork": false,
-						"isPrivate": false,
-						"isArchived": false,
-						"visibility": "PUBLIC"
-					},
-					{
-						"name": "cli",
-						"isFork": true,
-						"isPrivate": false,
-						"isArchived": false,
-						"visibility": "PUBLIC"
-					},
-					{
-						"name": "REPO",
-						"isFork": false,
-						"isPrivate": true,
-						"isArchived": false,
-						"visibility": "PRIVATE"
-					}
-					],
-					"pageInfo": {
-					"hasNextPage": false,
-					"endCursor": ""
+					"repositories": {
+						"totalCount": 3,
+						"pageInfo": {
+							"hasNextPage": false,
+							"endCursor": ""
+						}
 					}
 				}
+			}
+	    }`))
+
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryList\b`),
+		httpmock.StringResponse(`
+		{
+			"data": {
+				"repositoryOwner": {
+					"repositories": {
+						"totalCount": 3,
+						"nodes": [
+							{
+								"name": "hello-world",
+								"isFork": false,
+								"isPrivate": false,
+								"isArchived": false,
+								"visibility": "PUBLIC"
+							},
+							{
+								"name": "cli",
+								"isFork": true,
+								"isPrivate": false,
+								"isArchived": false,
+								"visibility": "PUBLIC"
+							},
+							{
+								"name": "REPO",
+								"isFork": false,
+								"isPrivate": true,
+								"isArchived": false,
+								"visibility": "PRIVATE"
+							}
+						],
+						"pageInfo": {
+							"hasNextPage": false,
+							"endCursor": ""
+						}
+					}
 				}
 			}
 	}`))
