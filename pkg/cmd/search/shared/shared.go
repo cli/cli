@@ -88,10 +88,10 @@ func SearchIssues(opts *IssuesOptions) error {
 		return cmdutil.NewNoResultsError(msg)
 	}
 
-	return displayIssueResults(io, opts.Entity, result)
+	return displayIssueResults(io, opts.Entity, result, opts.Query.Qualifiers.User == "")
 }
 
-func displayIssueResults(io *iostreams.IOStreams, et EntityType, results search.IssuesResult) error {
+func displayIssueResults(io *iostreams.IOStreams, et EntityType, results search.IssuesResult, showOwner bool) error {
 	cs := io.ColorScheme()
 	tp := utils.NewTablePrinter(io)
 	for _, issue := range results.Items {
@@ -103,8 +103,13 @@ func displayIssueResults(io *iostreams.IOStreams, et EntityType, results search.
 			tp.AddField(kind, nil, nil)
 		}
 		comp := strings.Split(issue.RepositoryURL, "/")
-		name := comp[len(comp)-2:]
-		tp.AddField(strings.Join(name, "/"), nil, nil)
+		if showOwner {
+			nameWithOwner := comp[len(comp)-2:]
+			tp.AddField(strings.Join(nameWithOwner, "/"), nil, nil)
+		} else {
+			name := comp[len(comp)-1]
+			tp.AddField(name, nil, nil)
+		}
 		issueNum := strconv.Itoa(issue.Number)
 		if tp.IsTTY() {
 			issueNum = "#" + issueNum
