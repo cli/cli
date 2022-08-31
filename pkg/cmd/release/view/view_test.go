@@ -100,18 +100,20 @@ func Test_viewRun(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name       string
-		isTTY      bool
-		releasedAt time.Time
-		opts       ViewOptions
-		wantErr    string
-		wantStdout string
-		wantStderr string
+		name        string
+		isTTY       bool
+		releaseBody string
+		releasedAt  time.Time
+		opts        ViewOptions
+		wantErr     string
+		wantStdout  string
+		wantStderr  string
 	}{
 		{
-			name:       "view specific release",
-			isTTY:      true,
-			releasedAt: oneHourAgo,
+			name:        "view specific release",
+			isTTY:       true,
+			releaseBody: `* Fixed bugs\n`,
+			releasedAt:  oneHourAgo,
 			opts: ViewOptions{
 				TagName: "v1.2.3",
 			},
@@ -132,9 +134,10 @@ func Test_viewRun(t *testing.T) {
 			wantStderr: ``,
 		},
 		{
-			name:       "view latest release",
-			isTTY:      true,
-			releasedAt: oneHourAgo,
+			name:        "view latest release",
+			isTTY:       true,
+			releaseBody: `* Fixed bugs\n`,
+			releasedAt:  oneHourAgo,
 			opts: ViewOptions{
 				TagName: "",
 			},
@@ -155,9 +158,34 @@ func Test_viewRun(t *testing.T) {
 			wantStderr: ``,
 		},
 		{
-			name:       "view machine-readable",
-			isTTY:      false,
-			releasedAt: frozenTime,
+			name:        "view machine-readable",
+			isTTY:       false,
+			releaseBody: `* Fixed bugs\n`,
+			releasedAt:  frozenTime,
+			opts: ViewOptions{
+				TagName: "v1.2.3",
+			},
+			wantStdout: heredoc.Doc(`
+				title:	
+				tag:	v1.2.3
+				draft:	false
+				prerelease:	false
+				author:	MonaLisa
+				created:	2020-08-31T15:44:24+02:00
+				published:	2020-08-31T15:44:24+02:00
+				url:	https://github.com/OWNER/REPO/releases/tags/v1.2.3
+				asset:	windows.zip
+				asset:	linux.tgz
+				--
+				* Fixed bugs
+			`),
+			wantStderr: ``,
+		},
+		{
+			name:        "view machine-readable but body has no ending newline",
+			isTTY:       false,
+			releaseBody: `* Fixed bugs`,
+			releasedAt:  frozenTime,
 			opts: ViewOptions{
 				TagName: "v1.2.3",
 			},
@@ -195,7 +223,7 @@ func Test_viewRun(t *testing.T) {
 				"tag_name": "v1.2.3",
 				"draft": false,
 				"author": { "login": "MonaLisa" },
-				"body": "* Fixed bugs\n",
+				"body": "%[2]s",
 				"created_at": "%[1]s",
 				"published_at": "%[1]s",
 				"html_url": "https://github.com/OWNER/REPO/releases/tags/v1.2.3",
@@ -203,7 +231,7 @@ func Test_viewRun(t *testing.T) {
 					{ "name": "windows.zip", "size": 12 },
 					{ "name": "linux.tgz", "size": 34 }
 				]
-			}`, tt.releasedAt.Format(time.RFC3339))))
+			}`, tt.releasedAt.Format(time.RFC3339), tt.releaseBody)))
 
 			tt.opts.IO = ios
 			tt.opts.HttpClient = func() (*http.Client, error) {
