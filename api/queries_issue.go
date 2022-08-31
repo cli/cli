@@ -38,6 +38,7 @@ type Issue struct {
 	ProjectCards   ProjectCards
 	Milestone      *Milestone
 	ReactionGroups ReactionGroups
+	IsPinned       bool
 }
 
 func (i Issue) IsPullRequest() bool {
