@@ -46,7 +46,7 @@ func NewCmdPin(f *cmdutil.Factory, runF func(*PinOptions) error) *cobra.Command 
 			# Pin an issue by URL
 			$ gh issue pin https://github.com/owner/repo/issues/23
 
-			# Override the default repository
+			# Pin an issue to specific repository
 			$ gh issue pin 23 --repo owner/repo
 		`),
 		Args: cobra.ExactArgs(1),

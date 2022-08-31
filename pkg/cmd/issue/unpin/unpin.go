@@ -46,7 +46,7 @@ func NewCmdUnpin(f *cmdutil.Factory, runF func(*UnpinOptions) error) *cobra.Comm
 			# Unpin issue by URL
 			$ gh issue unpin https://github.com/owner/repo/issues/23
 
-			# Override the default repository
+			# Unpin an issue from specific repository
 			$ gh issue unpin 23 --repo owner/repo
 		`),
 		Args: cobra.ExactArgs(1),
