@@ -1,4 +1,4 @@
-package pin
+package unpin
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ func TestNewCmdPin(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   string
-		output  PinOptions
+		output  UnpinOptions
 		wantErr bool
 		errMsg  string
 	}{
@@ -31,14 +31,14 @@ func TestNewCmdPin(t *testing.T) {
 		{
 			name:  "issue number",
 			input: "6",
-			output: PinOptions{
+			output: UnpinOptions{
 				SelectorArg: "6",
 			},
 		},
 		{
 			name:  "issue url",
 			input: "https://github.com/cli/cli/6",
-			output: PinOptions{
+			output: UnpinOptions{
 				SelectorArg: "https://github.com/cli/cli/6",
 			},
 		},
@@ -53,8 +53,8 @@ func TestNewCmdPin(t *testing.T) {
 			}
 			argv, err := shlex.Split(tt.input)
 			assert.NoError(t, err)
-			var gotOpts *PinOptions
-			cmd := NewCmdPin(f, func(opts *PinOptions) error {
+			var gotOpts *UnpinOptions
+			cmd := NewCmdUnpin(f, func(opts *UnpinOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -76,43 +76,19 @@ func TestNewCmdPin(t *testing.T) {
 	}
 }
 
-func TestPinRun(t *testing.T) {
+func TestUnpinRun(t *testing.T) {
 	tests := []struct {
 		name       string
 		tty        bool
-		opts       *PinOptions
+		opts       *UnpinOptions
 		httpStubs  func(*httpmock.Registry)
 		wantStdout string
 		wantStderr string
 	}{
 		{
-			name: "pin issue",
+			name: "unpin issue",
 			tty:  true,
-			opts: &PinOptions{SelectorArg: "20"},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query IssueByNumber\b`),
-					httpmock.StringResponse(`
-            { "data": { "repository": {
-              "issue": { "id": "ISSUE-ID", "number": 20, "title": "Issue Title", "isPinned": false}
-            } } }`),
-				)
-				reg.Register(
-					httpmock.GraphQL(`mutation IssuePin\b`),
-					httpmock.GraphQLMutation(`{"id": "ISSUE-ID"}`,
-						func(inputs map[string]interface{}) {
-							assert.Equal(t, inputs["issueId"], "ISSUE-ID")
-						},
-					),
-				)
-			},
-			wantStdout: "",
-			wantStderr: "✓ Pinned issue #20 (Issue Title) to OWNER/REPO\n",
-		},
-		{
-			name: "issue already pinned",
-			tty:  true,
-			opts: &PinOptions{SelectorArg: "20"},
+			opts: &UnpinOptions{SelectorArg: "20"},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query IssueByNumber\b`),
@@ -121,8 +97,32 @@ func TestPinRun(t *testing.T) {
               "issue": { "id": "ISSUE-ID", "number": 20, "title": "Issue Title", "isPinned": true}
             } } }`),
 				)
+				reg.Register(
+					httpmock.GraphQL(`mutation IssueUnpin\b`),
+					httpmock.GraphQLMutation(`{"id": "ISSUE-ID"}`,
+						func(inputs map[string]interface{}) {
+							assert.Equal(t, inputs["issueId"], "ISSUE-ID")
+						},
+					),
+				)
 			},
-			wantStderr: "! Issue #20 (Issue Title) is already pinned to OWNER/REPO\n",
+			wantStdout: "",
+			wantStderr: "✓ Unpinned issue #20 (Issue Title) from OWNER/REPO\n",
+		},
+		{
+			name: "issue not pinned",
+			tty:  true,
+			opts: &UnpinOptions{SelectorArg: "20"},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`
+            { "data": { "repository": {
+              "issue": { "id": "ISSUE-ID", "number": 20, "title": "Issue Title", "isPinned": false}
+            } } }`),
+				)
+			},
+			wantStderr: "! Issue #20 (Issue Title) is not pinned to OWNER/REPO\n",
 		},
 	}
 	for _, tt := range tests {
@@ -149,7 +149,7 @@ func TestPinRun(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)
-			err := pinRun(tt.opts)
+			err := unpinRun(tt.opts)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantStdout, stdout.String())
 			assert.Equal(t, tt.wantStderr, stderr.String())
