@@ -182,6 +182,9 @@ func renderReleasePlain(w io.Writer, release *shared.Release) error {
 	}
 	fmt.Fprint(w, "--\n")
 	fmt.Fprint(w, release.Body)
+	if !strings.HasSuffix(release.Body, "\n") {
+		fmt.Fprintf(w, "\n")
+	}
 	return nil
 }
 
