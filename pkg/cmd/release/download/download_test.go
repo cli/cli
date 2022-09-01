@@ -2,7 +2,6 @@ package download
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -319,12 +318,12 @@ func Test_downloadRun(t *testing.T) {
 
 func Test_downloadRun_cloberAndSkip(t *testing.T) {
 	tests := []struct {
-		name                 string
-		opts                 DownloadOptions
-		httpStubs            func(*httpmock.Registry)
-		wantErr              string
-		wantOverwriteFile    bool
-		wantOverwriteArchive bool
+		name            string
+		opts            DownloadOptions
+		httpStubs       func(*httpmock.Registry)
+		wantErr         string
+		wantFileSize    int64
+		wantArchiveSize int64
 	}{
 		{
 			name: "no clobber or skip",
@@ -348,7 +347,7 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "assets/3456"), httpmock.StringResponse("somedata"))
 			},
-			wantOverwriteFile: true,
+			wantFileSize: 8,
 		},
 		{
 			name: "clobber archive",
@@ -367,7 +366,7 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 					),
 				)
 			},
-			wantOverwriteArchive: true,
+			wantArchiveSize: 8,
 		},
 		{
 			name: "skip",
@@ -448,17 +447,8 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 			assert.NoError(t, err)
 			as, err := os.Stat(archive)
 			assert.NoError(t, err)
-			if tt.wantOverwriteFile {
-				assert.Equal(t, int64(8), fs.Size())
-			} else {
-				assert.Equal(t, int64(0), fs.Size())
-			}
-			if tt.wantOverwriteArchive {
-				fmt.Println(as.Size())
-				assert.Equal(t, int64(8), as.Size())
-			} else {
-				assert.Equal(t, int64(0), as.Size())
-			}
+			assert.Equal(t, fs.Size(), tt.wantFileSize)
+			assert.Equal(t, as.Size(), tt.wantArchiveSize)
 		})
 	}
 }
