@@ -2,6 +2,7 @@ package download
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -345,7 +346,7 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 				OverwriteExisting: true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", "assets/3456"), httpmock.StringResponse(`3456`))
+				reg.Register(httpmock.REST("GET", "assets/3456"), httpmock.StringResponse("somedata"))
 			},
 			wantOverwriteFile: true,
 		},
@@ -409,12 +410,6 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 			assert.NoError(t, err)
 			_, err = os.Create(archive)
 			assert.NoError(t, err)
-			fs, err := os.Stat(file)
-			assert.NoError(t, err)
-			fCreatedAt := fs.ModTime()
-			as, err := os.Stat(archive)
-			assert.NoError(t, err)
-			aCreatedAt := as.ModTime()
 
 			tt.opts.Destination = dest
 
@@ -449,21 +444,20 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 			}
 			assert.NoError(t, err)
 
-			fs, err = os.Stat(file)
+			fs, err := os.Stat(file)
 			assert.NoError(t, err)
-			fModifiedAt := fs.ModTime()
-			as, err = os.Stat(archive)
+			as, err := os.Stat(archive)
 			assert.NoError(t, err)
-			aModifiedAt := as.ModTime()
 			if tt.wantOverwriteFile {
-				assert.Less(t, fCreatedAt, fModifiedAt)
+				assert.Equal(t, int64(8), fs.Size())
 			} else {
-				assert.Equal(t, fCreatedAt, fModifiedAt)
+				assert.Equal(t, int64(0), fs.Size())
 			}
 			if tt.wantOverwriteArchive {
-				assert.Less(t, aCreatedAt, aModifiedAt)
+				fmt.Println(as.Size())
+				assert.Equal(t, int64(8), as.Size())
 			} else {
-				assert.Equal(t, aCreatedAt, aModifiedAt)
+				assert.Equal(t, int64(0), as.Size())
 			}
 		})
 	}
