@@ -141,7 +141,9 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 		fmt.Fprintf(w, "%s\n", iofmt.Gray(fmt.Sprintf("%s released this %s", release.Author.Login, utils.FuzzyAgo(time.Since(*release.PublishedAt)))))
 	}
 
-	renderedDescription, err := markdown.Render(release.Body, markdown.WithIO(io))
+	renderedDescription, err := markdown.Render(release.Body,
+		markdown.WithIO(io),
+		markdown.WithWrap(io.TerminalWidth()))
 	if err != nil {
 		return err
 	}
