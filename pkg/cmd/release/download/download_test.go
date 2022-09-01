@@ -405,10 +405,12 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 			assert.NoError(t, err)
 			file := filepath.Join(dest, "windows-64bit.zip")
 			archive := filepath.Join(dest, "zipball.zip")
-			_, err = os.Create(file)
+			f1, err := os.Create(file)
 			assert.NoError(t, err)
-			_, err = os.Create(archive)
+			f1.Close()
+			f2, err := os.Create(archive)
 			assert.NoError(t, err)
+			f2.Close()
 
 			tt.opts.Destination = dest
 
@@ -439,9 +441,9 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 			err = downloadRun(&tt.opts)
 			if tt.wantErr != "" {
 				assert.ErrorContains(t, err, tt.wantErr)
-				return
+			} else {
+				assert.NoError(t, err)
 			}
-			assert.NoError(t, err)
 
 			fs, err := os.Stat(file)
 			assert.NoError(t, err)
