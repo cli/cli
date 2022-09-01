@@ -140,9 +140,8 @@ func Test_NewCmdDownload(t *testing.T) {
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)
 				return
-			} else {
-				assert.NoError(t, err)
 			}
+			assert.NoError(t, err)
 
 			assert.Equal(t, tt.want.TagName, opts.TagName)
 			assert.Equal(t, tt.want.FilePatterns, opts.FilePatterns)
@@ -319,14 +318,12 @@ func Test_downloadRun(t *testing.T) {
 
 func Test_downloadRun_cloberAndSkip(t *testing.T) {
 	tests := []struct {
-		name             string
-		overwriteFile    bool
-		overwriteArchive bool
-		opts             DownloadOptions
-		httpStubs        func(*httpmock.Registry)
-		wantErr          string
-		wantStdout       string
-		wantStderr       string
+		name                 string
+		opts                 DownloadOptions
+		httpStubs            func(*httpmock.Registry)
+		wantErr              string
+		wantOverwriteFile    bool
+		wantOverwriteArchive bool
 	}{
 		{
 			name: "no clobber or skip",
@@ -339,8 +336,7 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 			wantErr: "already exists (use `--clobber` to overwrite file or `--skip-existing` to skip file)",
 		},
 		{
-			name:          "clobber",
-			overwriteFile: true,
+			name: "clobber",
 			opts: DownloadOptions{
 				TagName:           "v1.2.3",
 				FilePatterns:      []string{"windows-64bit.zip"},
@@ -351,10 +347,10 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "assets/3456"), httpmock.StringResponse(`3456`))
 			},
+			wantOverwriteFile: true,
 		},
 		{
-			name:             "clobber archive",
-			overwriteArchive: true,
+			name: "clobber archive",
 			opts: DownloadOptions{
 				TagName:           "v1.2.3",
 				ArchiveType:       "zip",
@@ -370,6 +366,7 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 					),
 				)
 			},
+			wantOverwriteArchive: true,
 		},
 		{
 			name: "skip",
@@ -421,10 +418,7 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 
 			tt.opts.Destination = dest
 
-			ios, _, stdout, stderr := iostreams.Test()
-			ios.SetStdoutTTY(true)
-			ios.SetStdinTTY(true)
-			ios.SetStderrTTY(true)
+			ios, _, _, _ := iostreams.Test()
 			tt.opts.IO = ios
 
 			reg := &httpmock.Registry{}
@@ -455,23 +449,20 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 			}
 			assert.NoError(t, err)
 
-			assert.Equal(t, tt.wantStdout, stdout.String())
-			assert.Equal(t, tt.wantStderr, stderr.String())
-
 			fs, err = os.Stat(file)
 			assert.NoError(t, err)
 			fModifiedAt := fs.ModTime()
 			as, err = os.Stat(archive)
 			assert.NoError(t, err)
 			aModifiedAt := as.ModTime()
-			if tt.overwriteFile {
+			if tt.wantOverwriteFile {
 				assert.Less(t, fCreatedAt, fModifiedAt)
-				assert.Equal(t, aCreatedAt, aModifiedAt)
-			} else if tt.overwriteArchive {
-				assert.Equal(t, fCreatedAt, fModifiedAt)
-				assert.Less(t, aCreatedAt, aModifiedAt)
 			} else {
 				assert.Equal(t, fCreatedAt, fModifiedAt)
+			}
+			if tt.wantOverwriteArchive {
+				assert.Less(t, aCreatedAt, aModifiedAt)
+			} else {
 				assert.Equal(t, aCreatedAt, aModifiedAt)
 			}
 		})
