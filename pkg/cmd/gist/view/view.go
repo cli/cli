@@ -142,7 +142,7 @@ func viewRun(opts *ViewOptions) error {
 
 		if strings.Contains(gf.Type, "markdown") && !opts.Raw {
 			rendered, err := markdown.Render(gf.Content,
-				markdown.WithIO(opts.IO),
+				markdown.WithTheme(opts.IO.TerminalTheme()),
 				markdown.WithWrap(opts.IO.TerminalWidth()))
 			if err != nil {
 				return err

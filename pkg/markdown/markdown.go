@@ -19,12 +19,7 @@ func WithWrap(w int) glamour.TermRendererOption {
 	return ghMarkdown.WithWrap(w)
 }
 
-type IOStreams interface {
-	TerminalTheme() string
-}
-
-func WithIO(io IOStreams) glamour.TermRendererOption {
-	theme := io.TerminalTheme()
+func WithTheme(theme string) glamour.TermRendererOption {
 	return ghMarkdown.WithTheme(theme)
 }
 

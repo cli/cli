@@ -241,7 +241,7 @@ func reviewSurvey(opts *ReviewOptions, editorCommand string) (*api.PullRequestRe
 
 	if len(body) > 0 {
 		renderedBody, err := markdown.Render(body,
-			markdown.WithIO(opts.IO),
+			markdown.WithTheme(opts.IO.TerminalTheme()),
 			markdown.WithWrap(opts.IO.TerminalWidth()))
 		if err != nil {
 			return nil, err

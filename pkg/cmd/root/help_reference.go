@@ -20,7 +20,7 @@ func referenceHelpFn(io *iostreams.IOStreams) func(*cobra.Command, []string) {
 		}
 
 		md, err := markdown.Render(cmd.Long,
-			markdown.WithIO(io),
+			markdown.WithTheme(io.TerminalTheme()),
 			markdown.WithWrap(wrapWidth))
 		if err != nil {
 			fmt.Fprintln(io.ErrOut, err)

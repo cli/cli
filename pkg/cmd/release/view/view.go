@@ -142,7 +142,7 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 	}
 
 	renderedDescription, err := markdown.Render(release.Body,
-		markdown.WithIO(io),
+		markdown.WithTheme(io.TerminalTheme()),
 		markdown.WithWrap(io.TerminalWidth()))
 	if err != nil {
 		return err

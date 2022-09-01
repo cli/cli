@@ -125,7 +125,7 @@ func formatComment(io *iostreams.IOStreams, comment Comment, newest bool) (strin
 		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No body provided"))
 	} else {
 		md, err = markdown.Render(comment.Content(),
-			markdown.WithIO(io),
+			markdown.WithTheme(io.TerminalTheme()),
 			markdown.WithWrap(io.TerminalWidth()))
 		if err != nil {
 			return "", err

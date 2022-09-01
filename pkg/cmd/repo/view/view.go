@@ -181,7 +181,7 @@ func viewRun(opts *ViewOptions) error {
 	} else if isMarkdownFile(readme.Filename) {
 		var err error
 		readmeContent, err = markdown.Render(readme.Content,
-			markdown.WithIO(opts.IO),
+			markdown.WithTheme(opts.IO.TerminalTheme()),
 			markdown.WithWrap(opts.IO.TerminalWidth()),
 			markdown.WithBaseURL(readme.BaseURL))
 		if err != nil {

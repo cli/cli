@@ -171,7 +171,7 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, repo ghrepo.Inte
 
 		codeBlock := fmt.Sprintf("```yaml\n%s\n```", yaml)
 		rendered, err := markdown.Render(codeBlock,
-			markdown.WithIO(opts.IO),
+			markdown.WithTheme(opts.IO.TerminalTheme()),
 			markdown.WithoutIndentation(),
 			markdown.WithWrap(0))
 		if err != nil {
