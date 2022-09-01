@@ -333,7 +333,7 @@ func (p *mockPlatform) List(runID string) ([]shared.Artifact, error) {
 	return args.Get(0).([]shared.Artifact), args.Error(1)
 }
 
-func (p *mockPlatform) Download(url string, dir string, force bool, skip bool) error {
+func (p *mockPlatform) Download(url string, dir string) error {
 	args := p.Called(url, dir)
 	return args.Error(0)
 }

@@ -76,8 +76,8 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 				opts.TagName = args[0]
 			}
 
-			if opts.OverwriteExisting && opts.SkipExisting {
-				return errors.New("specify only one of --clobber or --skip-existing")
+			if err := cmdutil.MutuallyExclusive("specify only one of `--clobber` or `--skip-existing`", opts.OverwriteExisting, opts.SkipExisting); err != nil {
+				return err
 			}
 
 			// check archive type option validity
@@ -97,8 +97,8 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 	cmd.Flags().StringVarP(&opts.Destination, "dir", "D", ".", "The directory to download files into")
 	cmd.Flags().StringArrayVarP(&opts.FilePatterns, "pattern", "p", nil, "Download only assets that match a glob pattern")
 	cmd.Flags().StringVarP(&opts.ArchiveType, "archive", "A", "", "Download the source code archive in the specified `format` (zip or tar.gz)")
-	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Overwrite existing assets of the same name")
-	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", false, "Skip existing assets of the same name")
+	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Overwrite existing files of the same name")
+	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", false, "Skip downloading when files of the same name exist")
 
 	return cmd
 }
@@ -230,6 +230,13 @@ func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, d
 }
 
 func downloadAsset(httpClient *http.Client, assetURL, destinationDir string, fileName string, isArchive, force, skip bool) error {
+	var destinationPath = filepath.Join(destinationDir, fileName)
+	if len(fileName) != 0 {
+		if success, err := shouldWrite(destinationPath, force, skip); !success || err != nil {
+			return err
+		}
+	}
+
 	req, err := http.NewRequest("GET", assetURL, nil)
 	if err != nil {
 		return err
@@ -261,8 +268,6 @@ func downloadAsset(httpClient *http.Client, assetURL, destinationDir string, fil
 		return api.HandleHTTPError(resp)
 	}
 
-	var destinationPath = filepath.Join(destinationDir, fileName)
-
 	if len(fileName) == 0 {
 		contentDisposition := resp.Header.Get("Content-Disposition")
 
@@ -275,24 +280,14 @@ func downloadAsset(httpClient *http.Client, assetURL, destinationDir string, fil
 		} else {
 			return errors.New("unable to determine file name of archive")
 		}
+
+		if success, err := shouldWrite(destinationPath, force, skip); !success || err != nil {
+			return err
+		}
 	}
 
-	flag := os.O_WRONLY | os.O_CREATE
-	if !force {
-		flag = flag | os.O_EXCL
-	}
-	f, err := os.OpenFile(destinationPath, flag, 0644)
+	f, err := os.OpenFile(destinationPath, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
-		errExist := errors.Is(err, os.ErrExist)
-		if errExist && skip {
-			return nil
-		}
-		if errExist {
-			return fmt.Errorf(
-				"%s already exists (use `--clobber` to override or `--skip-existing` to skip)",
-				destinationPath,
-			)
-		}
 		return err
 	}
 	defer f.Close()
@@ -312,4 +307,20 @@ var codeloadLegacyRE = regexp.MustCompile(`^(/[^/]+/[^/]+/)legacy\.`)
 // Removing the "legacy." part results in a valid Codeload URL for our desired archive format.
 func removeLegacyFromCodeloadPath(p string) string {
 	return codeloadLegacyRE.ReplaceAllString(p, "$1")
+}
+
+// shouldWrite determines if writing to the dest should continue based on force and skip parameters.
+func shouldWrite(dest string, force, skip bool) (bool, error) {
+	if _, err := os.Stat(dest); err == nil {
+		if skip {
+			return false, nil
+		}
+		if !force {
+			return false, fmt.Errorf(
+				"%s already exists (use `--clobber` to overwrite file or `--skip-existing` to skip file)",
+				dest,
+			)
+		}
+	}
+	return true, nil
 }

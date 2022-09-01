@@ -2,7 +2,6 @@ package download
 
 import (
 	"archive/zip"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -16,20 +15,20 @@ const (
 	execMode os.FileMode = 0755
 )
 
-func extractZip(zr *zip.Reader, destDir string, force bool, skip bool) error {
+func extractZip(zr *zip.Reader, destDir string) error {
 	for _, zf := range zr.File {
 		fpath := filepath.Join(destDir, filepath.FromSlash(zf.Name))
 		if !filepathDescendsFrom(fpath, destDir) {
 			continue
 		}
-		if err := extractZipFile(zf, fpath, force, skip); err != nil {
+		if err := extractZipFile(zf, fpath); err != nil {
 			return fmt.Errorf("error extracting %q: %w", zf.Name, err)
 		}
 	}
 	return nil
 }
 
-func extractZipFile(zf *zip.File, dest string, force bool, skip bool) error {
+func extractZipFile(zf *zip.File, dest string) error {
 	zm := zf.Mode()
 	if zm.IsDir() {
 		return os.MkdirAll(dest, dirMode)
@@ -47,22 +46,8 @@ func extractZipFile(zf *zip.File, dest string, force bool, skip bool) error {
 		}
 	}
 
-	flag := os.O_WRONLY | os.O_CREATE
-	if !force {
-		flag = flag | os.O_EXCL
-	}
-	df, err := os.OpenFile(dest, flag, getPerm(zm))
+	df, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_EXCL, getPerm(zm))
 	if err != nil {
-		errExist := errors.Is(err, os.ErrExist)
-		if errExist && skip {
-			return nil
-		}
-		if errExist {
-			return fmt.Errorf(
-				"%s already exists (use `--clobber` to override or `--skip-existing` to skip)",
-				dest,
-			)
-		}
 		return err
 	}
 	defer df.Close()

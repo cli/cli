@@ -63,15 +63,14 @@ func Test_Download(t *testing.T) {
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)
 
-	matcher := httpmock.REST("GET", "repos/OWNER/REPO/actions/artifacts/12345/zip")
-	responder := httpmock.FileResponse("./fixtures/myproject.zip")
-	url := "https://api.github.com/repos/OWNER/REPO/actions/artifacts/12345/zip"
-	reg.Register(matcher, responder)
+	reg.Register(
+		httpmock.REST("GET", "repos/OWNER/REPO/actions/artifacts/12345/zip"),
+		httpmock.FileResponse("./fixtures/myproject.zip"))
 
 	api := &apiPlatform{
 		client: &http.Client{Transport: reg},
 	}
-	err := api.Download(url, destDir, false, false)
+	err := api.Download("https://api.github.com/repos/OWNER/REPO/actions/artifacts/12345/zip", destDir)
 	require.NoError(t, err)
 
 	var paths []string
@@ -104,40 +103,4 @@ func Test_Download(t *testing.T) {
 		filepath.Join("artifact", "src", "main.go"),
 		filepath.Join("artifact", "src", "util.go"),
 	}, paths)
-
-	// test --clobber/--skip-existing option
-	readme := parentPrefix + filepath.Join("artifact", "readme.md")
-	stat, err := os.Stat(readme)
-	require.NoError(t, err)
-	mtimeFirst := stat.ModTime()
-
-	// test existing error
-	reg.Register(matcher, responder)
-	err = api.Download(url, destDir, false, false)
-	require.ErrorContains(t, err, "(use `--clobber` to override or `--skip-existing` to skip)")
-
-	stat, err = os.Stat(readme)
-	require.NoError(t, err)
-	mtimeError := stat.ModTime()
-	require.Equal(t, mtimeFirst, mtimeError)
-
-	// test --clobber
-	reg.Register(matcher, responder)
-	err = api.Download(url, destDir, true, false)
-	require.NoError(t, err)
-
-	stat, err = os.Stat(readme)
-	require.NoError(t, err)
-	mtimeClobber := stat.ModTime()
-	require.Less(t, mtimeFirst, mtimeClobber)
-
-	// test --skip-existing
-	reg.Register(matcher, responder)
-	err = api.Download(url, destDir, false, true)
-	require.NoError(t, err)
-
-	stat, err = os.Stat(readme)
-	require.NoError(t, err)
-	mtimeSkip := stat.ModTime()
-	require.Equal(t, mtimeClobber, mtimeSkip)
 }

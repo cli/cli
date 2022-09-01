@@ -21,11 +21,11 @@ func (p *apiPlatform) List(runID string) ([]shared.Artifact, error) {
 	return shared.ListArtifacts(p.client, p.repo, runID)
 }
 
-func (p *apiPlatform) Download(url string, dir string, force bool, skip bool) error {
-	return downloadArtifact(p.client, url, dir, force, skip)
+func (p *apiPlatform) Download(url string, dir string) error {
+	return downloadArtifact(p.client, url, dir)
 }
 
-func downloadArtifact(httpClient *http.Client, url, destDir string, force bool, skip bool) error {
+func downloadArtifact(httpClient *http.Client, url, destDir string) error {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
@@ -61,7 +61,7 @@ func downloadArtifact(httpClient *http.Client, url, destDir string, force bool, 
 	if err != nil {
 		return fmt.Errorf("error extracting zip archive: %w", err)
 	}
-	if err := extractZip(zipfile, destDir, force, skip); err != nil {
+	if err := extractZip(zipfile, destDir); err != nil {
 		return fmt.Errorf("error extracting zip archive: %w", err)
 	}
 
