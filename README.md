@@ -8,7 +8,7 @@ GitHub CLI is available for repositories hosted on GitHub.com and GitHub Enterpr
 
 ## Documentation
 
-[See the manual][manual] for usage instructions. Scroll down for [installation](#Installation).
+For [installation options see below](#installation), for usage instructions [see the manual][manual].
 
 ## Contributing
 
