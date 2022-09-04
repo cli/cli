@@ -180,7 +180,10 @@ func viewRun(opts *ViewOptions) error {
 		readmeContent = cs.Gray("This repository does not have a README")
 	} else if isMarkdownFile(readme.Filename) {
 		var err error
-		readmeContent, err = markdown.Render(readme.Content, markdown.WithIO(opts.IO), markdown.WithBaseURL(readme.BaseURL))
+		readmeContent, err = markdown.Render(readme.Content,
+			markdown.WithTheme(opts.IO.TerminalTheme()),
+			markdown.WithWrap(opts.IO.TerminalWidth()),
+			markdown.WithBaseURL(readme.BaseURL))
 		if err != nil {
 			return fmt.Errorf("error rendering markdown: %w", err)
 		}

@@ -213,8 +213,10 @@ func (issue Issue) ExportData(fields []string) map[string]interface{} {
 			data[f] = labels
 		case "repository":
 			comp := strings.Split(issue.RepositoryURL, "/")
+			name := comp[len(comp)-1]
 			nameWithOwner := strings.Join(comp[len(comp)-2:], "/")
 			data[f] = map[string]interface{}{
+				"name":          name,
 				"nameWithOwner": nameWithOwner,
 			}
 		default:
