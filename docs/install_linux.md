@@ -11,7 +11,7 @@ our release schedule.
 
 ### Debian, Ubuntu Linux, Raspberry Pi OS (apt)
 
-:warning: :warning: :warning: :warning: This method is currently broken. Consumers of the .deb release are advised to either install the version of `gh` supplied by the official Debian/Ubuntu repositories or download the appropraite binary from https://github.com/cli/cli/releases/latest . :warning: :warning: :warning: :warning:
+:warning: :warning: :warning: :warning: This method is currently broken: https://github.com/cli/cli/issues/6175. Consumers of the .deb release are advised to either install the version of `gh` supplied by the official Debian/Ubuntu repositories or download the appropraite binary from https://github.com/cli/cli/releases/latest . :warning: :warning: :warning: :warning:
 
 Install:
 
