@@ -14,7 +14,6 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_NewCmdDownload(t *testing.T) {
@@ -130,7 +129,7 @@ func Test_NewCmdDownload(t *testing.T) {
 			cmd.PersistentFlags().StringP("repo", "R", "", "")
 
 			argv, err := shlex.Split(tt.args)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(&bytes.Buffer{})
@@ -139,11 +138,10 @@ func Test_NewCmdDownload(t *testing.T) {
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {
-				require.EqualError(t, err, tt.wantErr)
+				assert.EqualError(t, err, tt.wantErr)
 				return
-			} else {
-				require.NoError(t, err)
 			}
+			assert.NoError(t, err)
 
 			assert.Equal(t, tt.want.TagName, opts.TagName)
 			assert.Equal(t, tt.want.FilePatterns, opts.FilePatterns)
@@ -296,11 +294,10 @@ func Test_downloadRun(t *testing.T) {
 
 			err := downloadRun(&tt.opts)
 			if tt.wantErr != "" {
-				require.EqualError(t, err, tt.wantErr)
+				assert.EqualError(t, err, tt.wantErr)
 				return
-			} else {
-				require.NoError(t, err)
 			}
+			assert.NoError(t, err)
 
 			var expectedAcceptHeader = "application/octet-stream"
 			if len(tt.opts.ArchiveType) > 0 {
@@ -313,8 +310,147 @@ func Test_downloadRun(t *testing.T) {
 			assert.Equal(t, tt.wantStderr, stderr.String())
 
 			downloadedFiles, err := listFiles(tempDir)
-			require.NoError(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, tt.wantFiles, downloadedFiles)
+		})
+	}
+}
+
+func Test_downloadRun_cloberAndSkip(t *testing.T) {
+	tests := []struct {
+		name            string
+		opts            DownloadOptions
+		httpStubs       func(*httpmock.Registry)
+		wantErr         string
+		wantFileSize    int64
+		wantArchiveSize int64
+	}{
+		{
+			name: "no clobber or skip",
+			opts: DownloadOptions{
+				TagName:      "v1.2.3",
+				FilePatterns: []string{"windows-64bit.zip"},
+				Destination:  "tmp/packages",
+				Concurrency:  2,
+			},
+			wantErr: "already exists (use `--clobber` to overwrite file or `--skip-existing` to skip file)",
+		},
+		{
+			name: "clobber",
+			opts: DownloadOptions{
+				TagName:           "v1.2.3",
+				FilePatterns:      []string{"windows-64bit.zip"},
+				Destination:       "tmp/packages",
+				Concurrency:       2,
+				OverwriteExisting: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "assets/3456"), httpmock.StringResponse("somedata"))
+			},
+			wantFileSize: 8,
+		},
+		{
+			name: "clobber archive",
+			opts: DownloadOptions{
+				TagName:           "v1.2.3",
+				ArchiveType:       "zip",
+				Destination:       "tmp/packages",
+				Concurrency:       2,
+				OverwriteExisting: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/zipball/v1.2.3"),
+					httpmock.WithHeader(
+						httpmock.StringResponse("somedata"), "content-disposition", "attachment; filename=zipball.zip",
+					),
+				)
+			},
+			wantArchiveSize: 8,
+		},
+		{
+			name: "skip",
+			opts: DownloadOptions{
+				TagName:      "v1.2.3",
+				FilePatterns: []string{"windows-64bit.zip"},
+				Destination:  "tmp/packages",
+				Concurrency:  2,
+				SkipExisting: true,
+			},
+		},
+		{
+			name: "skip archive",
+			opts: DownloadOptions{
+				TagName:      "v1.2.3",
+				ArchiveType:  "zip",
+				Destination:  "tmp/packages",
+				Concurrency:  2,
+				SkipExisting: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/zipball/v1.2.3"),
+					httpmock.WithHeader(
+						httpmock.StringResponse("somedata"), "content-disposition", "attachment; filename=zipball.zip",
+					),
+				)
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			dest := filepath.Join(tempDir, tt.opts.Destination)
+			err := os.MkdirAll(dest, 0755)
+			assert.NoError(t, err)
+			file := filepath.Join(dest, "windows-64bit.zip")
+			archive := filepath.Join(dest, "zipball.zip")
+			f1, err := os.Create(file)
+			assert.NoError(t, err)
+			f1.Close()
+			f2, err := os.Create(archive)
+			assert.NoError(t, err)
+			f2.Close()
+
+			tt.opts.Destination = dest
+
+			ios, _, _, _ := iostreams.Test()
+			tt.opts.IO = ios
+
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			reg.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StringResponse(`{
+				"assets": [
+					{ "name": "windows-64bit.zip", "size": 34,
+					  "url": "https://api.github.com/assets/3456" }
+				],
+				"tarball_url": "https://api.github.com/repos/OWNER/REPO/tarball/v1.2.3",
+				"zipball_url": "https://api.github.com/repos/OWNER/REPO/zipball/v1.2.3"
+			}`))
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
+			}
+			tt.opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			}
+
+			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+				return ghrepo.FromFullName("OWNER/REPO")
+			}
+
+			err = downloadRun(&tt.opts)
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			fs, err := os.Stat(file)
+			assert.NoError(t, err)
+			as, err := os.Stat(archive)
+			assert.NoError(t, err)
+			assert.Equal(t, fs.Size(), tt.wantFileSize)
+			assert.Equal(t, as.Size(), tt.wantArchiveSize)
 		})
 	}
 }
