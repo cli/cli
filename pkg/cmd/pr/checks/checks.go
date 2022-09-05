@@ -111,7 +111,7 @@ func checksRun(opts *ChecksOptions) error {
 		return checksRunWebMode(opts)
 	}
 
-	if !opts.Watch {
+	if opts.Watch {
 		opts.IO.StartAlternateScreenBuffer()
 	} else {
 		// Only start pager in non-watch mode

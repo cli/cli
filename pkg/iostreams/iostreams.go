@@ -468,7 +468,7 @@ func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 	in := &bytes.Buffer{}
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
-	return &IOStreams{
+	io := &IOStreams{
 		In: &fdReader{
 			fd:         0,
 			ReadCloser: io.NopCloser(in),
@@ -478,7 +478,11 @@ func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 		ttySize: func() (int, int, error) {
 			return -1, -1, errors.New("ttySize not implemented in tests")
 		},
-	}, in, out, errOut
+	}
+	io.SetStdinTTY(false)
+	io.SetStdoutTTY(false)
+	io.SetStderrTTY(false)
+	return io, in, out, errOut
 }
 
 func isTerminal(f *os.File) bool {
