@@ -14,16 +14,11 @@ func (s *IOStreams) EnableVirtualTerminalProcessing() error {
 		return nil
 	}
 
-	f, ok := s.originalOut.(*os.File)
-	if !ok {
-		return nil
-	}
-
-	return enableVirtualTerminalProcessing(f)
+	return enableVirtualTerminalProcessing(s.Out.Fd())
 }
 
-func enableVirtualTerminalProcessing(f *os.File) error {
-	stdout := windows.Handle(f.Fd())
+func enableVirtualTerminalProcessing(fd uintptr) error {
+	stdout := windows.Handle(fd)
 
 	var originalMode uint32
 	windows.GetConsoleMode(stdout, &originalMode)

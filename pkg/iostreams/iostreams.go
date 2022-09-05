@@ -431,7 +431,7 @@ func System() *IOStreams {
 
 	isVirtualTerminal := false
 	if stdoutIsTTY {
-		if err := enableVirtualTerminalProcessing(os.Stdout); err == nil {
+		if err := enableVirtualTerminalProcessing(os.Stdout.Fd()); err == nil {
 			isVirtualTerminal = true
 		}
 	}
