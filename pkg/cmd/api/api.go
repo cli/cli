@@ -281,8 +281,8 @@ func apiRun(opts *ApiOptions) error {
 		}
 	}
 
-	bodyWriter := opts.IO.Out
-	headersWriter := opts.IO.Out
+	var bodyWriter io.Writer = opts.IO.Out
+	var headersWriter io.Writer = opts.IO.Out
 	if opts.Silent {
 		bodyWriter = io.Discard
 	}
