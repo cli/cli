@@ -50,7 +50,7 @@ type CreateOptions struct {
 	Concurrency        int
 	DiscussionCategory string
 	GenerateNotes      bool
-	NotesStartTag   string
+	NotesStartTag      string
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
