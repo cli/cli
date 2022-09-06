@@ -76,7 +76,17 @@ func getTags(httpClient *http.Client, repo ghrepo.Interface, limit int) ([]tag, 
 	return tags, err
 }
 
-func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, params map[string]interface{}) (*releaseNotes, error) {
+func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagName, target, previousTagName string) (*releaseNotes, error) {
+	params := map[string]interface{}{
+		"tag_name": tagName,
+	}
+	if target != "" {
+		params["target_commitish"] = target
+	}
+	if previousTagName != "" {
+		params["previous_tag_name"] = previousTagName
+	}
+
 	bodyBytes, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
