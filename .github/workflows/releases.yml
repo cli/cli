@@ -83,7 +83,7 @@ jobs:
           echo "${{secrets.GPG_KEY}}" | base64 -d | gpg --import --no-tty --batch --yes
           echo "allow-preset-passphrase" > ~/.gnupg/gpg-agent.conf
           gpg-connect-agent RELOADAGENT /bye
-          echo "${{secrets.GPG_PASSPHRASE}}" | /usr/lib/gnupg2/gpg-preset-passphrase --preset 867DAD5051270B843EF54F6186FA10E3A1D22DC5
+          echo "${{secrets.GPG_PASSPHRASE}}" | /usr/lib/gnupg2/gpg-preset-passphrase --preset "${{secrets.GPG_KEYGRIP}}"
       - name: Sign RPMs
         run: |
           cp script/rpmmacros ~/.rpmmacros
