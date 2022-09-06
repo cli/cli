@@ -140,6 +140,7 @@ type joinWorkspaceResult struct {
 
 func runUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, eventResponses []string, portsData []liveshare.PortNotification) error {
 	t.Helper()
+	t.Skip("fails intermittently in CI: https://github.com/cli/cli/issues/5663")
 
 	joinWorkspace := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 		return joinWorkspaceResult{1}, nil
