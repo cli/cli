@@ -214,9 +214,9 @@ func (s *IOStreams) StartPager() error {
 	if err != nil {
 		return err
 	}
-	s.Out = &fdWriter{
-		fd:     s.Out.Fd(),
-		Writer: &pagerWriter{pagedOut},
+	s.Out = &fdWriteCloser{
+		fd:          s.Out.Fd(),
+		WriteCloser: &pagerWriter{pagedOut},
 	}
 	err = pagerCmd.Start()
 	if err != nil {
@@ -231,6 +231,7 @@ func (s *IOStreams) StopPager() {
 		return
 	}
 
+	// if a pager was started, we're guaranteed to have a WriteCloser
 	_ = s.Out.(io.WriteCloser).Close()
 	_, _ = s.pagerProcess.Wait()
 	s.pagerProcess = nil
@@ -518,6 +519,16 @@ type fdWriter struct {
 }
 
 func (w *fdWriter) Fd() uintptr {
+	return w.fd
+}
+
+// fdWriteCloser represents a wrapped stdout Writer that preserves the original file descriptor
+type fdWriteCloser struct {
+	io.WriteCloser
+	fd uintptr
+}
+
+func (w *fdWriteCloser) Fd() uintptr {
 	return w.fd
 }
 
