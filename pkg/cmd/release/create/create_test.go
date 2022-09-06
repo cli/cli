@@ -222,39 +222,41 @@ func Test_NewCmdCreate(t *testing.T) {
 			},
 		},
 		{
-			name:  "generate release notes with previous tag",
-			args:  "v1.2.3 --generate-notes --previous-tag v1.1.0",
+			name:  "generate release notes with notes tag",
+			args:  "v1.2.3 --generate-notes --notes-tag v1.1.0",
 			isTTY: true,
 			want: CreateOptions{
-				TagName:         "v1.2.3",
-				Target:          "",
-				Name:            "",
-				Body:            "",
-				BodyProvided:    false,
-				Draft:           false,
-				Prerelease:      false,
-				RepoOverride:    "",
-				Concurrency:     5,
-				Assets:          []*shared.AssetForUpload(nil),
-				GenerateNotes:   true,
-				PreviosuTagName: "v1.1.0",
+				TagName:          "v1.2.3",
+				Target:           "",
+				Name:             "",
+				Body:             "",
+				BodyProvided:     true,
+				Draft:            false,
+				Prerelease:       false,
+				RepoOverride:     "",
+				Concurrency:      5,
+				Assets:           []*shared.AssetForUpload(nil),
+				GenerateNotes:    true,
+				PreviousNotesTag: "v1.1.0",
 			},
 		},
 		{
-			name:  "only previosu tag",
-			args:  "--previous-tag v1.1.0",
+			name:  "notes tag",
+			args:  "--notes-tag v1.1.0",
 			isTTY: true,
 			want: CreateOptions{
-				TagName:      "",
-				Target:       "",
-				Name:         "",
-				Body:         "",
-				BodyProvided: false,
-				Draft:        false,
-				Prerelease:   false,
-				RepoOverride: "",
-				Concurrency:  5,
-				Assets:       []*shared.AssetForUpload(nil),
+				TagName:          "",
+				Target:           "",
+				Name:             "",
+				Body:             "",
+				BodyProvided:     false,
+				Draft:            false,
+				Prerelease:       false,
+				RepoOverride:     "",
+				Concurrency:      5,
+				Assets:           []*shared.AssetForUpload(nil),
+				GenerateNotes:    false,
+				PreviousNotesTag: "v1.1.0",
 			},
 		},
 	}
@@ -307,6 +309,8 @@ func Test_NewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.want.Concurrency, opts.Concurrency)
 			assert.Equal(t, tt.want.RepoOverride, opts.RepoOverride)
 			assert.Equal(t, tt.want.DiscussionCategory, opts.DiscussionCategory)
+			assert.Equal(t, tt.want.GenerateNotes, opts.GenerateNotes)
+			assert.Equal(t, tt.want.PreviousNotesTag, opts.PreviousNotesTag)
 
 			require.Equal(t, len(tt.want.Assets), len(opts.Assets))
 			for i := range tt.want.Assets {
@@ -468,6 +472,86 @@ func Test_createRun(t *testing.T) {
 			wantErr:    "",
 		},
 		{
+			name:  "with generate notes and notes tag",
+			isTTY: true,
+			opts: CreateOptions{
+				TagName:          "v1.2.3",
+				Name:             "",
+				Body:             "",
+				Target:           "",
+				BodyProvided:     true,
+				GenerateNotes:    true,
+				PreviousNotesTag: "v1.1.0",
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
+					httpmock.RESTPayload(200, `{
+						"name": "generated name",
+						"body": "generated body"
+				}`, func(params map[string]interface{}) {
+						assert.Equal(t, map[string]interface{}{
+							"tag_name":          "v1.2.3",
+							"previous_tag_name": "v1.1.0",
+						}, params)
+					}))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"tag_name":   "v1.2.3",
+						"draft":      false,
+						"prerelease": false,
+						"body":       "generated body",
+						"name":       "generated name",
+					}, params)
+				}))
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantErr:    "",
+		},
+		{
+			name:  "with generate notes and notes tag and body and name",
+			isTTY: true,
+			opts: CreateOptions{
+				TagName:          "v1.2.3",
+				Name:             "name",
+				Body:             "body",
+				Target:           "",
+				BodyProvided:     true,
+				GenerateNotes:    true,
+				PreviousNotesTag: "v1.1.0",
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
+					httpmock.RESTPayload(200, `{
+						"name": "generated name",
+						"body": "generated body"
+				}`, func(params map[string]interface{}) {
+						assert.Equal(t, map[string]interface{}{
+							"tag_name":          "v1.2.3",
+							"previous_tag_name": "v1.1.0",
+						}, params)
+					}))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"tag_name":   "v1.2.3",
+						"draft":      false,
+						"prerelease": false,
+						"body":       "body\ngenerated body",
+						"name":       "name",
+					}, params)
+				}))
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantErr:    "",
+		},
+		{
 			name:  "publish after uploading files",
 			isTTY: true,
 			opts: CreateOptions{
@@ -581,46 +665,6 @@ func Test_createRun(t *testing.T) {
 			},
 			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3-final\n",
 			wantStderr: ``,
-		},
-		{
-			name:  "with generate notes and previous tag",
-			isTTY: true,
-			opts: CreateOptions{
-				TagName:         "v1.2.3",
-				Name:            "",
-				Body:            "",
-				Target:          "",
-				BodyProvided:    false,
-				GenerateNotes:   true,
-				PreviosuTagName: "v1.1.0",
-			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
-					httpmock.RESTPayload(200, `{
-						"name": "generated name",
-						"body": "generated body"
-				}`, func(params map[string]interface{}) {
-						assert.Equal(t, map[string]interface{}{
-							"tag_name":          "v1.2.3",
-							"previous_tag_name": "v1.1.0",
-						}, params)
-					}))
-				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
-					"url": "https://api.github.com/releases/123",
-					"upload_url": "https://api.github.com/assets/upload",
-					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
-				}`, func(params map[string]interface{}) {
-					assert.Equal(t, map[string]interface{}{
-						"tag_name":   "v1.2.3",
-						"draft":      false,
-						"prerelease": false,
-						"body":       "generated body",
-						"name":       "generated name",
-					}, params)
-				}))
-			},
-			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
-			wantErr:    "",
 		},
 	}
 	for _, tt := range tests {
@@ -900,10 +944,54 @@ func Test_createRun_interactive(t *testing.T) {
 			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
 		},
 		{
-			name: "create a release using commit log as notes with previous tag ",
+			name: "create a release using generated notes with previous tag",
 			opts: &CreateOptions{
-				TagName:         "v1.2.3",
-				PreviosuTagName: "v1.1.0",
+				TagName:          "v1.2.3",
+				PreviousNotesTag: "v1.1.0",
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Title (optional)").AnswerDefault()
+				as.StubPrompt("Release notes").
+					AssertOptions([]string{"Write my own", "Write using generated notes as template", "Leave blank"}).
+					AnswerWith("Write using generated notes as template")
+				as.StubPrompt("Is this a prerelease?").AnswerWith(false)
+				as.StubPrompt("Submit?").AnswerWith("Publish release")
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 1, "")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
+					httpmock.RESTPayload(200, `{
+						"name": "generated name",
+						"body": "generated body"
+				}`, func(params map[string]interface{}) {
+						assert.Equal(t, map[string]interface{}{
+							"tag_name":          "v1.2.3",
+							"previous_tag_name": "v1.1.0",
+						}, params)
+					}))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"),
+					httpmock.StatusStringResponse(201, `{
+						"url": "https://api.github.com/releases/123",
+						"upload_url": "https://api.github.com/assets/upload",
+						"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+					}`))
+			},
+			wantParams: map[string]interface{}{
+				"body":       "generated body",
+				"draft":      false,
+				"name":       "generated name",
+				"prerelease": false,
+				"tag_name":   "v1.2.3",
+			},
+			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+		},
+		{
+			name: "create a release using commit log as notes with previous tag",
+			opts: &CreateOptions{
+				TagName:          "v1.2.3",
+				PreviousNotesTag: "v1.1.0",
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubPrompt("Title (optional)").AnswerDefault()

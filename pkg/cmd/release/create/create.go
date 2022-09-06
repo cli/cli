@@ -50,7 +50,7 @@ type CreateOptions struct {
 	Concurrency        int
 	DiscussionCategory string
 	GenerateNotes      bool
-	PreviosuTagName    string
+	PreviousNotesTag   string
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -98,9 +98,6 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			Use automatically generated release notes
 			$ gh release create v1.2.3 --generate-notes
 
-			Use previous tag as starting point to automatically generate release notes
-			$ gh release create v1.2.3 --generate-notes --previous-tag v1.1.0
-
 			Use release notes from a file
 			$ gh release create v1.2.3 -F changelog.md
 
@@ -139,7 +136,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			opts.Concurrency = 5
 
-			opts.BodyProvided = cmd.Flags().Changed("notes") || (opts.GenerateNotes && opts.PreviosuTagName == "")
+			opts.BodyProvided = cmd.Flags().Changed("notes") || opts.GenerateNotes
 			if notesFile != "" {
 				b, err := cmdutil.ReadFile(notesFile, opts.IO.In)
 				if err != nil {
@@ -164,7 +161,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion in the specified category")
 	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate title and notes for the release")
-	cmd.Flags().StringVar(&opts.PreviosuTagName, "previous-tag", "", "Name of the previous tag to use as the starting point for the release notes")
+	cmd.Flags().StringVar(&opts.PreviousNotesTag, "notes-tag", "", "Tag to use as the starting point for the release notes")
 
 	return cmd
 }
@@ -246,7 +243,11 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
-	if !opts.BodyProvided {
+	if !opts.BodyProvided && opts.IO.CanPrompt() {
+		editorCommand, err := cmdutil.DetermineEditor(opts.Config)
+		if err != nil {
+			return err
+		}
 
 		var generatedNotes *releaseNotes
 		var generatedChangelog string
@@ -257,162 +258,147 @@ func createRun(opts *CreateOptions) error {
 		if opts.Target != "" {
 			params["target_commitish"] = opts.Target
 		}
-		if opts.PreviosuTagName != "" {
-			params["previous_tag_name"] = opts.PreviosuTagName
+		if opts.PreviousNotesTag != "" {
+			params["previous_tag_name"] = opts.PreviousNotesTag
 		}
 		generatedNotes, err = generateReleaseNotes(httpClient, baseRepo, params)
 		if err != nil && !errors.Is(err, notImplementedError) {
 			return err
 		}
 
-		if !opts.GenerateNotes && opts.IO.CanPrompt() {
-			editorCommand, err := cmdutil.DetermineEditor(opts.Config)
+		if opts.RepoOverride == "" {
+			headRef := opts.TagName
+			if tagDescription == "" {
+				if opts.Target != "" {
+					// TODO: use the remote-tracking version of the branch ref
+					headRef = opts.Target
+				} else {
+					headRef = "HEAD"
+				}
+			}
+			if generatedNotes == nil {
+				if opts.PreviousNotesTag != "" {
+					commits, _ := changelogForRange(fmt.Sprintf("%s..%s", opts.PreviousNotesTag, headRef))
+					generatedChangelog = generateChangelog(commits)
+				} else if prevTag, err := detectPreviousTag(headRef); err == nil {
+					commits, _ := changelogForRange(fmt.Sprintf("%s..%s", prevTag, headRef))
+					generatedChangelog = generateChangelog(commits)
+				}
+			}
+		}
+
+		editorOptions := []string{"Write my own"}
+		if generatedNotes != nil {
+			editorOptions = append(editorOptions, "Write using generated notes as template")
+		}
+		if generatedChangelog != "" {
+			editorOptions = append(editorOptions, "Write using commit log as template")
+		}
+		if tagDescription != "" {
+			editorOptions = append(editorOptions, "Write using git tag message as template")
+		}
+		editorOptions = append(editorOptions, "Leave blank")
+
+		defaultName := opts.Name
+		if defaultName == "" && generatedNotes != nil {
+			defaultName = generatedNotes.Name
+		}
+		qs := []*survey.Question{
+			{
+				Name: "name",
+				Prompt: &survey.Input{
+					Message: "Title (optional)",
+					Default: defaultName,
+				},
+			},
+			{
+				Name: "releaseNotesAction",
+				Prompt: &survey.Select{
+					Message: "Release notes",
+					Options: editorOptions,
+				},
+			},
+		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
+		err = prompt.SurveyAsk(qs, opts)
+		if err != nil {
+			return fmt.Errorf("could not prompt: %w", err)
+		}
+
+		var openEditor bool
+		var editorContents string
+
+		switch opts.ReleaseNotesAction {
+		case "Write my own":
+			openEditor = true
+		case "Write using generated notes as template":
+			openEditor = true
+			editorContents = generatedNotes.Body
+		case "Write using commit log as template":
+			openEditor = true
+			editorContents = generatedChangelog
+		case "Write using git tag message as template":
+			openEditor = true
+			editorContents = tagDescription
+		case "Leave blank":
+			openEditor = false
+		default:
+			return fmt.Errorf("invalid action: %v", opts.ReleaseNotesAction)
+		}
+
+		if openEditor {
+			text, err := opts.Edit(editorCommand, "*.md", editorContents,
+				opts.IO.In, opts.IO.Out, opts.IO.ErrOut)
 			if err != nil {
 				return err
 			}
+			opts.Body = text
+		}
 
-			if opts.RepoOverride == "" {
-				headRef := opts.TagName
-				if tagDescription == "" {
-					if opts.Target != "" {
-						// TODO: use the remote-tracking version of the branch ref
-						headRef = opts.Target
-					} else {
-						headRef = "HEAD"
-					}
-				}
-				if generatedNotes == nil {
-					var prevTag string
-					if opts.PreviosuTagName == "" {
-						prevTag, _ = detectPreviousTag(headRef)
-					} else {
-						prevTag = opts.PreviosuTagName
-					}
-					if prevTag != "" {
-						commits, _ := changelogForRange(fmt.Sprintf("%s..%s", prevTag, headRef))
-						generatedChangelog = generateChangelog(commits)
-					}
-				}
-			}
+		saveAsDraft := "Save as draft"
+		publishRelease := "Publish release"
+		defaultSubmit := publishRelease
+		if opts.Draft {
+			defaultSubmit = saveAsDraft
+		}
 
-			editorOptions := []string{"Write my own"}
-			if generatedNotes != nil {
-				editorOptions = append(editorOptions, "Write using generated notes as template")
-			}
-			if generatedChangelog != "" {
-				editorOptions = append(editorOptions, "Write using commit log as template")
-			}
-			if tagDescription != "" {
-				editorOptions = append(editorOptions, "Write using git tag message as template")
-			}
-			editorOptions = append(editorOptions, "Leave blank")
-
-			defaultName := opts.Name
-			if defaultName == "" && generatedNotes != nil {
-				defaultName = generatedNotes.Name
-			}
-			qs := []*survey.Question{
-				{
-					Name: "name",
-					Prompt: &survey.Input{
-						Message: "Title (optional)",
-						Default: defaultName,
-					},
+		qs = []*survey.Question{
+			{
+				Name: "prerelease",
+				Prompt: &survey.Confirm{
+					Message: "Is this a prerelease?",
+					Default: opts.Prerelease,
 				},
-				{
-					Name: "releaseNotesAction",
-					Prompt: &survey.Select{
-						Message: "Release notes",
-						Options: editorOptions,
+			},
+			{
+				Name: "submitAction",
+				Prompt: &survey.Select{
+					Message: "Submit?",
+					Options: []string{
+						publishRelease,
+						saveAsDraft,
+						"Cancel",
 					},
+					Default: defaultSubmit,
 				},
-			}
-			//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
-			err = prompt.SurveyAsk(qs, opts)
-			if err != nil {
-				return fmt.Errorf("could not prompt: %w", err)
-			}
+			},
+		}
 
-			var openEditor bool
-			var editorContents string
+		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
+		err = prompt.SurveyAsk(qs, opts)
+		if err != nil {
+			return fmt.Errorf("could not prompt: %w", err)
+		}
 
-			switch opts.ReleaseNotesAction {
-			case "Write my own":
-				openEditor = true
-			case "Write using generated notes as template":
-				openEditor = true
-				editorContents = generatedNotes.Body
-			case "Write using commit log as template":
-				openEditor = true
-				editorContents = generatedChangelog
-			case "Write using git tag message as template":
-				openEditor = true
-				editorContents = tagDescription
-			case "Leave blank":
-				openEditor = false
-			default:
-				return fmt.Errorf("invalid action: %v", opts.ReleaseNotesAction)
-			}
-
-			if openEditor {
-				text, err := opts.Edit(editorCommand, "*.md", editorContents,
-					opts.IO.In, opts.IO.Out, opts.IO.ErrOut)
-				if err != nil {
-					return err
-				}
-				opts.Body = text
-			}
-
-			saveAsDraft := "Save as draft"
-			publishRelease := "Publish release"
-			defaultSubmit := publishRelease
-			if opts.Draft {
-				defaultSubmit = saveAsDraft
-			}
-
-			qs = []*survey.Question{
-				{
-					Name: "prerelease",
-					Prompt: &survey.Confirm{
-						Message: "Is this a prerelease?",
-						Default: opts.Prerelease,
-					},
-				},
-				{
-					Name: "submitAction",
-					Prompt: &survey.Select{
-						Message: "Submit?",
-						Options: []string{
-							publishRelease,
-							saveAsDraft,
-							"Cancel",
-						},
-						Default: defaultSubmit,
-					},
-				},
-			}
-
-			//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
-			err = prompt.SurveyAsk(qs, opts)
-			if err != nil {
-				return fmt.Errorf("could not prompt: %w", err)
-			}
-
-			switch opts.SubmitAction {
-			case "Publish release":
-				opts.Draft = false
-			case "Save as draft":
-				opts.Draft = true
-			case "Cancel":
-				return cmdutil.CancelError
-			default:
-				return fmt.Errorf("invalid action: %v", opts.SubmitAction)
-			}
-		} else {
-			opts.Body = generatedNotes.Body
-			if opts.Name == "" {
-				opts.Name = generatedNotes.Name
-			}
+		switch opts.SubmitAction {
+		case "Publish release":
+			opts.Draft = false
+		case "Save as draft":
+			opts.Draft = true
+		case "Cancel":
+			return cmdutil.CancelError
+		default:
+			return fmt.Errorf("invalid action: %v", opts.SubmitAction)
 		}
 	}
 
@@ -433,8 +419,34 @@ func createRun(opts *CreateOptions) error {
 	if opts.DiscussionCategory != "" {
 		params["discussion_category_name"] = opts.DiscussionCategory
 	}
-	if opts.GenerateNotes && opts.PreviosuTagName == "" {
-		params["generate_release_notes"] = true
+	if opts.GenerateNotes {
+		if opts.PreviousNotesTag != "" {
+			notesParams := map[string]interface{}{
+				"tag_name": opts.TagName,
+			}
+			if opts.Target != "" {
+				notesParams["target_commitish"] = opts.Target
+			}
+			if opts.PreviousNotesTag != "" {
+				notesParams["previous_tag_name"] = opts.PreviousNotesTag
+			}
+			generatedNotes, err := generateReleaseNotes(httpClient, baseRepo, notesParams)
+			if err != nil && !errors.Is(err, notImplementedError) {
+				return err
+			}
+			if generatedNotes != nil {
+				if opts.Body == "" {
+					params["body"] = generatedNotes.Body
+				} else {
+					params["body"] = fmt.Sprintf("%s\n%s", opts.Body, generatedNotes.Body)
+				}
+				if opts.Name == "" {
+					params["name"] = generatedNotes.Name
+				}
+			}
+		} else {
+			params["generate_release_notes"] = true
+		}
 	}
 
 	hasAssets := len(opts.Assets) > 0
