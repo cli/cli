@@ -22,11 +22,11 @@ type DevelopOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser.Browser
 
-	IssueRepo   string
-	IssueNumber string
-	Name        string
-	BaseBranch  string
-	Checkout    bool
+	IssueRepo     string
+	IssueSelector string
+	Name          string
+	BaseBranch    string
+	Checkout      bool
 }
 
 func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.Command {
@@ -46,11 +46,12 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 			$ gh issue develop --issue-repo "github/cli" 123 list branches for issue 123 in repo "github/cli"
 			$ gh issue develop 123 --name "my-branch" --head main
 			`),
-		Args: cmdutil.NoArgsQuoteReminder,
+		Args: cmdutil.ExactArgs(1, "issue number is required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runF != nil {
 				return runF(opts)
 			}
+			opts.IssueSelector = args[0]
 			return developRun(opts)
 		},
 	}
@@ -62,15 +63,18 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 }
 
 func developRun(opts *DevelopOptions) (err error) {
+	fmt.Printf("starting\n")
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
 	}
+	fmt.Fprintf(opts.IO.ErrOut, "got the http client\n")
 	apiClient := api.NewClientFromHTTP(httpClient)
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
+	fmt.Fprintf(opts.IO.ErrOut, "got the baseRepo")
 	opts.IO.StartProgressIndicator()
 	fmt.Fprintf(opts.IO.ErrOut, "running")
 	repo, err := api.GitHubRepo(apiClient, baseRepo)
@@ -79,12 +83,12 @@ func developRun(opts *DevelopOptions) (err error) {
 		return err
 	}
 
-	oid, err := api.FindBaseOid(apiClient, repo, opts.BaseBranch)
+	oid, default_branch_oid, err := api.FindBaseOid(apiClient, repo, opts.BaseBranch)
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "found oid for %s", oid)
+	fmt.Fprintf(opts.IO.ErrOut, "found %s for ref %s, and found default branch oid %s\n", oid, opts.BaseBranch, default_branch_oid)
 	// get the id of the issue repo
 	issue, _, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.IssueNumber, []string{"id", "number", "title", "state"})
 	if err != nil {

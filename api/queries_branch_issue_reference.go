@@ -58,10 +58,15 @@ func CreateBranchIssueReference(client *Client, repo *Repository, params map[str
 
 }
 
-func FindBaseOid(client *Client, repo *Repository, ref string) (string, error) {
+func FindBaseOid(client *Client, repo *Repository, ref string) (string, string, error) {
 	query := `
-	query BranchIssueReferenceFindBaseOid($repositoryId: ID!, $ref: String!) {
-		repository(id: $repositoryId) {
+	query BranchIssueReferenceFindBaseOid($repositoryName: String!, $repositoryOwner: String!, $ref: String!) {
+		repository(name: $repositoryName, owner: $repositoryOwner) {
+			defaultBranchRef {
+				target {
+					oid
+				}
+			}
 			ref(qualifiedName: $ref) {
 				target {
 					oid
@@ -71,12 +76,18 @@ func FindBaseOid(client *Client, repo *Repository, ref string) (string, error) {
 	}`
 
 	variables := map[string]interface{}{
-		"repositoryId": repo.ID,
-		"ref":          ref,
+		"repositoryName":  repo.Name,
+		"repositoryOwner": repo.RepoOwner(),
+		"ref":             ref,
 	}
 
 	result := struct {
 		Repository struct {
+			DefaultBranchRef struct {
+				Target struct {
+					Oid string
+				}
+			}
 			Ref struct {
 				Target struct {
 					Oid string
@@ -87,7 +98,7 @@ func FindBaseOid(client *Client, repo *Repository, ref string) (string, error) {
 
 	err := client.GraphQL(repo.RepoHost(), query, variables, &result)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return result.Repository.Ref.Target.Oid, nil
+	return result.Repository.Ref.Target.Oid, result.Repository.DefaultBranchRef.Target.Oid, nil
 }
