@@ -112,9 +112,7 @@ func checksRun(opts *ChecksOptions) error {
 	}
 
 	if opts.Watch {
-		if err := opts.IO.EnableVirtualTerminalProcessing(); err != nil {
-			return err
-		}
+		opts.IO.StartAlternateScreenBuffer()
 	} else {
 		// Only start pager in non-watch mode
 		if err := opts.IO.StartPager(); err == nil {
@@ -126,10 +124,6 @@ func checksRun(opts *ChecksOptions) error {
 
 	var checks []check
 	var counts checkCounts
-
-	if opts.Watch {
-		opts.IO.StartAlternateScreenBuffer()
-	}
 
 	// Do not return err until we can StopAlternateScreenBuffer()
 	var err error

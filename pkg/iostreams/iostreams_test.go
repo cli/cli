@@ -3,6 +3,7 @@ package iostreams
 import (
 	"errors"
 	"fmt"
+	"io"
 	"testing"
 )
 
@@ -35,6 +36,10 @@ func TestIOStreams_ForceTerminal(t *testing.T) {
 		{
 			name: "measure width fails",
 			iostreams: &IOStreams{
+				Out: &fdWriter{
+					Writer: io.Discard,
+					fd:     1,
+				},
 				ttySize: func() (int, int, error) {
 					return -1, -1, errors.New("ttySize sabotage!")
 				},
