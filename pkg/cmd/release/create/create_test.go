@@ -223,40 +223,40 @@ func Test_NewCmdCreate(t *testing.T) {
 		},
 		{
 			name:  "generate release notes with notes tag",
-			args:  "v1.2.3 --generate-notes --notes-tag v1.1.0",
+			args:  "v1.2.3 --generate-notes --notes-start-tag v1.1.0",
 			isTTY: true,
 			want: CreateOptions{
-				TagName:          "v1.2.3",
-				Target:           "",
-				Name:             "",
-				Body:             "",
-				BodyProvided:     true,
-				Draft:            false,
-				Prerelease:       false,
-				RepoOverride:     "",
-				Concurrency:      5,
-				Assets:           []*shared.AssetForUpload(nil),
-				GenerateNotes:    true,
-				PreviousNotesTag: "v1.1.0",
+				TagName:       "v1.2.3",
+				Target:        "",
+				Name:          "",
+				Body:          "",
+				BodyProvided:  true,
+				Draft:         false,
+				Prerelease:    false,
+				RepoOverride:  "",
+				Concurrency:   5,
+				Assets:        []*shared.AssetForUpload(nil),
+				GenerateNotes: true,
+				NotesStartTag: "v1.1.0",
 			},
 		},
 		{
 			name:  "notes tag",
-			args:  "--notes-tag v1.1.0",
+			args:  "--notes-start-tag v1.1.0",
 			isTTY: true,
 			want: CreateOptions{
-				TagName:          "",
-				Target:           "",
-				Name:             "",
-				Body:             "",
-				BodyProvided:     false,
-				Draft:            false,
-				Prerelease:       false,
-				RepoOverride:     "",
-				Concurrency:      5,
-				Assets:           []*shared.AssetForUpload(nil),
-				GenerateNotes:    false,
-				PreviousNotesTag: "v1.1.0",
+				TagName:       "",
+				Target:        "",
+				Name:          "",
+				Body:          "",
+				BodyProvided:  false,
+				Draft:         false,
+				Prerelease:    false,
+				RepoOverride:  "",
+				Concurrency:   5,
+				Assets:        []*shared.AssetForUpload(nil),
+				GenerateNotes: false,
+				NotesStartTag: "v1.1.0",
 			},
 		},
 	}
@@ -310,7 +310,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.want.RepoOverride, opts.RepoOverride)
 			assert.Equal(t, tt.want.DiscussionCategory, opts.DiscussionCategory)
 			assert.Equal(t, tt.want.GenerateNotes, opts.GenerateNotes)
-			assert.Equal(t, tt.want.PreviousNotesTag, opts.PreviousNotesTag)
+			assert.Equal(t, tt.want.NotesStartTag, opts.NotesStartTag)
 
 			require.Equal(t, len(tt.want.Assets), len(opts.Assets))
 			for i := range tt.want.Assets {
@@ -475,13 +475,13 @@ func Test_createRun(t *testing.T) {
 			name:  "with generate notes and notes tag",
 			isTTY: true,
 			opts: CreateOptions{
-				TagName:          "v1.2.3",
-				Name:             "",
-				Body:             "",
-				Target:           "",
-				BodyProvided:     true,
-				GenerateNotes:    true,
-				PreviousNotesTag: "v1.1.0",
+				TagName:       "v1.2.3",
+				Name:          "",
+				Body:          "",
+				Target:        "",
+				BodyProvided:  true,
+				GenerateNotes: true,
+				NotesStartTag: "v1.1.0",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
@@ -515,13 +515,13 @@ func Test_createRun(t *testing.T) {
 			name:  "with generate notes and notes tag and body and name",
 			isTTY: true,
 			opts: CreateOptions{
-				TagName:          "v1.2.3",
-				Name:             "name",
-				Body:             "body",
-				Target:           "",
-				BodyProvided:     true,
-				GenerateNotes:    true,
-				PreviousNotesTag: "v1.1.0",
+				TagName:       "v1.2.3",
+				Name:          "name",
+				Body:          "body",
+				Target:        "",
+				BodyProvided:  true,
+				GenerateNotes: true,
+				NotesStartTag: "v1.1.0",
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
@@ -946,8 +946,8 @@ func Test_createRun_interactive(t *testing.T) {
 		{
 			name: "create a release using generated notes with previous tag",
 			opts: &CreateOptions{
-				TagName:          "v1.2.3",
-				PreviousNotesTag: "v1.1.0",
+				TagName:       "v1.2.3",
+				NotesStartTag: "v1.1.0",
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubPrompt("Title (optional)").AnswerDefault()
@@ -990,8 +990,8 @@ func Test_createRun_interactive(t *testing.T) {
 		{
 			name: "create a release using commit log as notes with previous tag",
 			opts: &CreateOptions{
-				TagName:          "v1.2.3",
-				PreviousNotesTag: "v1.1.0",
+				TagName:       "v1.2.3",
+				NotesStartTag: "v1.1.0",
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubPrompt("Title (optional)").AnswerDefault()

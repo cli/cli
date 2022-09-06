@@ -50,7 +50,7 @@ type CreateOptions struct {
 	Concurrency        int
 	DiscussionCategory string
 	GenerateNotes      bool
-	PreviousNotesTag   string
+	NotesStartTag   string
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -161,7 +161,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion in the specified category")
 	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate title and notes for the release")
-	cmd.Flags().StringVar(&opts.PreviousNotesTag, "notes-tag", "", "Tag to use as the starting point for the release notes")
+	cmd.Flags().StringVar(&opts.NotesStartTag, "notes-start-tag", "", "Tag to use as the starting point for generating release notes")
 
 	return cmd
 }
@@ -252,16 +252,7 @@ func createRun(opts *CreateOptions) error {
 		var generatedNotes *releaseNotes
 		var generatedChangelog string
 
-		params := map[string]interface{}{
-			"tag_name": opts.TagName,
-		}
-		if opts.Target != "" {
-			params["target_commitish"] = opts.Target
-		}
-		if opts.PreviousNotesTag != "" {
-			params["previous_tag_name"] = opts.PreviousNotesTag
-		}
-		generatedNotes, err = generateReleaseNotes(httpClient, baseRepo, params)
+		generatedNotes, err = generateReleaseNotes(httpClient, baseRepo, opts.TagName, opts.Target, opts.NotesStartTag)
 		if err != nil && !errors.Is(err, notImplementedError) {
 			return err
 		}
@@ -277,8 +268,8 @@ func createRun(opts *CreateOptions) error {
 				}
 			}
 			if generatedNotes == nil {
-				if opts.PreviousNotesTag != "" {
-					commits, _ := changelogForRange(fmt.Sprintf("%s..%s", opts.PreviousNotesTag, headRef))
+				if opts.NotesStartTag != "" {
+					commits, _ := changelogForRange(fmt.Sprintf("%s..%s", opts.NotesStartTag, headRef))
 					generatedChangelog = generateChangelog(commits)
 				} else if prevTag, err := detectPreviousTag(headRef); err == nil {
 					commits, _ := changelogForRange(fmt.Sprintf("%s..%s", prevTag, headRef))
@@ -420,17 +411,8 @@ func createRun(opts *CreateOptions) error {
 		params["discussion_category_name"] = opts.DiscussionCategory
 	}
 	if opts.GenerateNotes {
-		if opts.PreviousNotesTag != "" {
-			notesParams := map[string]interface{}{
-				"tag_name": opts.TagName,
-			}
-			if opts.Target != "" {
-				notesParams["target_commitish"] = opts.Target
-			}
-			if opts.PreviousNotesTag != "" {
-				notesParams["previous_tag_name"] = opts.PreviousNotesTag
-			}
-			generatedNotes, err := generateReleaseNotes(httpClient, baseRepo, notesParams)
+		if opts.NotesStartTag != "" {
+			generatedNotes, err := generateReleaseNotes(httpClient, baseRepo, opts.TagName, opts.Target, opts.NotesStartTag)
 			if err != nil && !errors.Is(err, notImplementedError) {
 				return err
 			}
