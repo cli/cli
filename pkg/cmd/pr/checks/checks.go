@@ -2,6 +2,7 @@ package checks
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -18,8 +19,9 @@ import (
 const defaultInterval time.Duration = 10 * time.Second
 
 type ChecksOptions struct {
-	IO      *iostreams.IOStreams
-	Browser browser.Browser
+	HttpClient func() (*http.Client, error)
+	IO         *iostreams.IOStreams
+	Browser    browser.Browser
 
 	Finder shared.PRFinder
 
@@ -33,9 +35,10 @@ type ChecksOptions struct {
 func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Command {
 	var interval int
 	opts := &ChecksOptions{
-		IO:       f.IOStreams,
-		Browser:  f.Browser,
-		Interval: defaultInterval,
+		HttpClient: f.HttpClient,
+		IO:         f.IOStreams,
+		Browser:    f.Browser,
+		Interval:   defaultInterval,
 	}
 
 	cmd := &cobra.Command{
@@ -113,6 +116,22 @@ func checksRun(opts *ChecksOptions) error {
 		return checksRunWebMode(opts)
 	}
 
+	findOptions := shared.FindOptions{
+		Selector: opts.SelectorArg,
+		Fields:   []string{"number", "headRefName"},
+	}
+
+	var pr *api.PullRequest
+	pr, repo, findErr := opts.Finder.Find(findOptions)
+	if findErr != nil {
+		return findErr
+	}
+
+	client, clientErr := opts.HttpClient()
+	if clientErr != nil {
+		return clientErr
+	}
+
 	if opts.Watch {
 		opts.IO.StartAlternateScreenBuffer()
 	} else {
@@ -129,14 +148,9 @@ func checksRun(opts *ChecksOptions) error {
 
 	// Do not return err until we can StopAlternateScreenBuffer()
 	var err error
-	for {
-		findOptions := shared.FindOptions{
-			Selector: opts.SelectorArg,
-			Fields:   []string{"number", "headRefName", "statusCheckRollup"},
-		}
 
-		var pr *api.PullRequest
-		pr, _, err = opts.Finder.Find(findOptions)
+	for {
+		err = populateStatusChecks(client, repo, pr)
 		if err != nil {
 			break
 		}
@@ -182,6 +196,66 @@ func checksRun(opts *ChecksOptions) error {
 	if counts.Failed+counts.Pending > 0 {
 		return cmdutil.SilentError
 	}
+
+	return nil
+}
+
+func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.PullRequest) error {
+	apiClient := api.NewClientFromHTTP(client)
+
+	type response struct {
+		Node *api.PullRequest
+	}
+
+	query := fmt.Sprintf(`
+	query PullRequestStatusChecks($id: ID!, $endCursor: String!) {
+		node(id: $id) {
+			...on PullRequest {
+				%s
+			}
+		}
+	}`, api.RequiredStatusCheckRollupGraphQL("$id", "$endCursor"))
+
+	variables := map[string]interface{}{
+		"id": pr.ID,
+	}
+
+	statusCheckRollup := api.CheckContexts{}
+	endCursor := ""
+
+	for {
+		variables["endCursor"] = endCursor
+		var resp response
+		err := apiClient.GraphQL(repo.RepoHost(), query, variables, &resp)
+		if err != nil {
+			return err
+		}
+
+		if len(resp.Node.StatusCheckRollup.Nodes) == 0 {
+			return nil
+		}
+
+		result := resp.Node.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts
+		statusCheckRollup.Nodes = append(
+			statusCheckRollup.Nodes,
+			result.Nodes...,
+		)
+
+		if !result.PageInfo.HasNextPage {
+			break
+		}
+		endCursor = result.PageInfo.EndCursor
+	}
+
+	statusCheckRollup.PageInfo.HasNextPage = false
+
+	pr.StatusCheckRollup.Nodes = []api.StatusCheckRollupNode{{
+		Commit: api.StatusCheckRollupCommit{
+			StatusCheckRollup: api.CommitStatusCheckRollup{
+				Contexts: statusCheckRollup,
+			},
+		},
+	}}
 
 	return nil
 }

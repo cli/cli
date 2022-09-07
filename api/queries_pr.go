@@ -67,19 +67,7 @@ type PullRequest struct {
 		Nodes      []PullRequestCommit
 	}
 	StatusCheckRollup struct {
-		Nodes []struct {
-			Commit struct {
-				StatusCheckRollup struct {
-					Contexts struct {
-						Nodes    []CheckContext
-						PageInfo struct {
-							HasNextPage bool
-							EndCursor   string
-						}
-					}
-				}
-			}
-		}
+		Nodes []StatusCheckRollupNode
 	}
 
 	Assignees      Assignees
@@ -91,6 +79,26 @@ type PullRequest struct {
 	Reviews        PullRequestReviews
 	LatestReviews  PullRequestReviews
 	ReviewRequests ReviewRequests
+}
+
+type StatusCheckRollupNode struct {
+	Commit StatusCheckRollupCommit
+}
+
+type StatusCheckRollupCommit struct {
+	StatusCheckRollup CommitStatusCheckRollup
+}
+
+type CommitStatusCheckRollup struct {
+	Contexts CheckContexts
+}
+
+type CheckContexts struct {
+	Nodes    []CheckContext
+	PageInfo struct {
+		HasNextPage bool
+		EndCursor   string
+	}
 }
 
 type CheckContext struct {

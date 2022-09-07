@@ -144,8 +144,45 @@ func StatusCheckRollupGraphQL(after string) string {
 								context,
 								state,
 								targetUrl,
+								createdAt
+							},
+							...on CheckRun {
+								name,
+								checkSuite{workflowRun{workflow{name}}},
+								status,
+								conclusion,
+								startedAt,
+								completedAt,
+								detailsUrl
+							}
+						},
+						pageInfo{hasNextPage,endCursor}
+					}
+				}
+			}
+		}
+	}`), afterClause)
+}
+
+func RequiredStatusCheckRollupGraphQL(prID, after string) string {
+	var afterClause string
+	if after != "" {
+		afterClause = ",after:" + after
+	}
+	return fmt.Sprintf(shortenQuery(`
+	statusCheckRollup: commits(last: 1) {
+		nodes {
+			commit {
+				statusCheckRollup {
+					contexts(first:100%[1]s) {
+						nodes {
+							__typename
+							...on StatusContext {
+								context,
+								state,
+								targetUrl,
 								createdAt,
-								isRequired(pullRequestNumber: $pr_number)
+                isRequired(pullRequestId: %[2]s)
 							},
 							...on CheckRun {
 								name,
@@ -155,7 +192,7 @@ func StatusCheckRollupGraphQL(after string) string {
 								startedAt,
 								completedAt,
 								detailsUrl,
-								isRequired(pullRequestNumber: $pr_number)
+                isRequired(pullRequestId: %[2]s)
 							}
 						},
 						pageInfo{hasNextPage,endCursor}
@@ -163,7 +200,7 @@ func StatusCheckRollupGraphQL(after string) string {
 				}
 			}
 		}
-	}`), afterClause)
+	}`), afterClause, prID)
 }
 
 var IssueFields = []string{
