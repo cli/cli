@@ -165,18 +165,6 @@ func TestNewCmdSet(t *testing.T) {
 				Application:     "Dependabot",
 			},
 		},
-		{
-			name: "Codespaces org",
-			cli:  `random_secret -ocoolOrg -b"random value" -vselected -r"coolRepo,cli/cli" -aCodespaces`,
-			wants: SetOptions{
-				SecretName:      "random_secret",
-				Visibility:      shared.Selected,
-				RepositoryNames: []string{"coolRepo", "cli/cli"},
-				Body:            "random value",
-				OrgName:         "coolOrg",
-				Application:     "Codespaces",
-			},
-		},
 	}
 
 	for _, tt := range tests {
