@@ -6,7 +6,6 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
@@ -20,7 +19,6 @@ type DevelopOptions struct {
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
-	Browser    browser.Browser
 
 	IssueRepo     string
 	IssueSelector string
@@ -34,7 +32,6 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
-		Browser:    f.Browser,
 		BaseRepo:   f.BaseRepo,
 	}
 
@@ -72,7 +69,6 @@ func developRun(opts *DevelopOptions) (err error) {
 	if err != nil {
 		return err
 	}
-	opts.IO.StartProgressIndicator()
 	repo, err := api.GitHubRepo(apiClient, baseRepo)
 	if err != nil {
 		return err
@@ -102,7 +98,6 @@ func developRun(opts *DevelopOptions) (err error) {
 	}
 
 	ref, err := api.CreateBranchIssueReference(apiClient, repo, params)
-	opts.IO.StopProgressIndicator()
 	if ref != nil {
 		fmt.Fprintf(opts.IO.Out, "Created %s\n", ref.BranchName)
 	}
