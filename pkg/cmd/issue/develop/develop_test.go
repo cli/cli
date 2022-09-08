@@ -8,7 +8,9 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/cli/cli/v2/test"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -34,25 +36,32 @@ func Test_developRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.StubRepoResponse("OWNER", "REPO")
+
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true
+						} } }`),
+				)
 				reg.Register(
 					httpmock.GraphQL(`query IssueByNumber\b`),
-					httpmock.StringResponse(`{"data":{"repository":{
-						"hasIssuesEnabled": true,
-						"issue":{"id":1, "number":123, "title":"my issue"},
-					}}}`))
+					httpmock.StringResponse(`{"data":{"repository":{ "hasIssuesEnabled": true, "issue":{"id": "yar", "number":123, "title":"my issue"} }}}`))
 				reg.Register(
 					httpmock.GraphQL(`query BranchIssueReferenceFindBaseOid\b`),
 					httpmock.StringResponse(`{"data":{"repository":{"ref":{"target":{"oid":"123"}}}}}`))
 
 				reg.Register(
 					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
-					httpmock.GraphQLMutation(`
-					{ "data": { "createLinkedBranch": { "linkedBranch": 1 } } }`,
+					httpmock.GraphQLMutation(`{ "data": { "createLinkedBranch": { "linkedBranch": {"id": 2, "ref": {"name": "my-branch"} } } } }`,
 						func(inputs map[string]interface{}) {
+
 						}),
 				)
 
 			},
+			expectedOut: "Created my-branch\n",
 		},
 	}
 	for _, tt := range tests {
@@ -64,6 +73,13 @@ func Test_developRun(t *testing.T) {
 			}
 
 			opts := DevelopOptions{}
+
+			ios, _, stdout, stderr := iostreams.Test()
+
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStderrTTY(tt.tty)
+			opts.IO = ios
 
 			opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
@@ -81,10 +97,16 @@ func Test_developRun(t *testing.T) {
 			defer cleanSetup()
 
 			err := developRun(&opts)
+			output := &test.CmdOut{
+				OutBuf: stdout,
+				ErrBuf: stderr,
+			}
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)
 			} else {
 				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedOut, output.String())
+				assert.Equal(t, tt.expectedErrOut, output.Stderr())
 			}
 		})
 	}

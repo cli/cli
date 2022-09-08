@@ -21,6 +21,9 @@ func CreateBranchIssueReference(client *Client, repo *Repository, params map[str
 			}) {
 				linkedBranch {
 					id
+					ref {
+						name
+					}
 				}
 			}
 		}
@@ -38,17 +41,25 @@ func CreateBranchIssueReference(client *Client, repo *Repository, params map[str
 
 	result := struct {
 		createLinkedBranch struct {
-			BranchIssueReference BranchIssueReference
+			LinkedBranch struct {
+				ID  int
+				Ref struct {
+					Name string
+				}
+			}
 		}
 	}{}
 
-	fmt.Printf("query variables %#v", inputParams)
 	err := client.GraphQL(repo.RepoHost(), query, inputParams, &result)
 	if err != nil {
 		return nil, err
 	}
-	ref := &result.createLinkedBranch.BranchIssueReference
-	return ref, nil
+	fmt.Printf("result %#v", &result)
+	ref := BranchIssueReference{
+		ID:         result.createLinkedBranch.LinkedBranch.ID,
+		BranchName: result.createLinkedBranch.LinkedBranch.Ref.Name,
+	}
+	return &ref, nil
 
 }
 
