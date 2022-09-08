@@ -1,5 +1,7 @@
 package api
 
+import "fmt"
+
 type BranchIssueReference struct {
 	ID                 int
 	BranchName         string
@@ -10,25 +12,19 @@ type BranchIssueReference struct {
 
 func CreateBranchIssueReference(client *Client, repo *Repository, params map[string]interface{}) (*BranchIssueReference, error) {
 	query := `
-	mutation BranchIssueReferenceCreate($input: CreateBranchIssueReferenceInput!) {
-		mutation($issueId: ID!, $oid: GitObjectID!, $name: String, $repositoryId: ID) {
+		mutation CreateLinkedBranch($issueId: ID!, $oid: GitObjectID!, $name: String, $repositoryId: ID) {
 			createLinkedBranch(input: {
 			  issueId: $issueId,
 			  name: $name,
-			  oid: $oid
+			  oid: $oid,
 			  repositoryId: $repositoryId
 			}) {
 				linkedBranch {
-					ref {
-						name
-						repository {
-							name
-						}
-					}
+					id
 				}
 			}
 		}
-	}`
+	`
 
 	inputParams := map[string]interface{}{
 		"repositoryId": repo.ID,
@@ -39,9 +35,6 @@ func CreateBranchIssueReference(client *Client, repo *Repository, params map[str
 			inputParams[key] = val
 		}
 	}
-	variables := map[string]interface{}{
-		"input": inputParams,
-	}
 
 	result := struct {
 		createLinkedBranch struct {
@@ -49,7 +42,8 @@ func CreateBranchIssueReference(client *Client, repo *Repository, params map[str
 		}
 	}{}
 
-	err := client.GraphQL(repo.RepoHost(), query, variables, &result)
+	fmt.Printf("query variables %#v", inputParams)
+	err := client.GraphQL(repo.RepoHost(), query, inputParams, &result)
 	if err != nil {
 		return nil, err
 	}

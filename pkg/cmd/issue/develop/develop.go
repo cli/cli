@@ -63,22 +63,17 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 }
 
 func developRun(opts *DevelopOptions) (err error) {
-	fmt.Printf("starting\n")
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(opts.IO.ErrOut, "got the http client\n")
 	apiClient := api.NewClientFromHTTP(httpClient)
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(opts.IO.ErrOut, "got the baseRepo")
 	opts.IO.StartProgressIndicator()
-	fmt.Fprintf(opts.IO.ErrOut, "running")
 	repo, err := api.GitHubRepo(apiClient, baseRepo)
-	fmt.Fprintf(opts.IO.ErrOut, "found your repo %s\n", repo.Name)
 	if err != nil {
 		return err
 	}
@@ -88,9 +83,12 @@ func developRun(opts *DevelopOptions) (err error) {
 		return err
 	}
 
-	fmt.Fprintf(opts.IO.ErrOut, "found %s for ref %s, and found default branch oid %s\n", oid, opts.BaseBranch, default_branch_oid)
+	if oid == "" {
+		oid = default_branch_oid
+	}
+
 	// get the id of the issue repo
-	issue, _, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.IssueNumber, []string{"id", "number", "title", "state"})
+	issue, _, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.IssueSelector, []string{"id", "number", "title"})
 	if err != nil {
 		return err
 	}
