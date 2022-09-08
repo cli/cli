@@ -19,7 +19,7 @@ const (
 	authorization   = "Authorization"
 	cacheTTL        = "X-GH-CACHE-TTL"
 	graphqlFeatures = "GraphQL-Features"
-	mergeQueue      = "merge_queue"
+	features        = "merge_queue,branch_for_issue_api"
 	userAgent       = "User-Agent"
 )
 
@@ -55,7 +55,7 @@ func (err HTTPError) ScopesSuggestion() string {
 // GraphQLError will be returned, but the data will also be parsed into the receiver.
 func (c Client) GraphQL(hostname string, query string, variables map[string]interface{}, data interface{}) error {
 	opts := clientOptions(hostname, c.http.Transport)
-	opts.Headers[graphqlFeatures] = mergeQueue
+	opts.Headers[graphqlFeatures] = features
 	gqlClient, err := gh.GQLClient(&opts)
 	if err != nil {
 		return err
@@ -67,7 +67,7 @@ func (c Client) GraphQL(hostname string, query string, variables map[string]inte
 // GraphQLError will be returned, but the data will also be parsed into the receiver.
 func (c Client) Mutate(hostname, name string, mutation interface{}, variables map[string]interface{}) error {
 	opts := clientOptions(hostname, c.http.Transport)
-	opts.Headers[graphqlFeatures] = mergeQueue
+	opts.Headers[graphqlFeatures] = features
 	gqlClient, err := gh.GQLClient(&opts)
 	if err != nil {
 		return err
@@ -79,7 +79,7 @@ func (c Client) Mutate(hostname, name string, mutation interface{}, variables ma
 // GraphQLError will be returned, but the data will also be parsed into the receiver.
 func (c Client) Query(hostname, name string, query interface{}, variables map[string]interface{}) error {
 	opts := clientOptions(hostname, c.http.Transport)
-	opts.Headers[graphqlFeatures] = mergeQueue
+	opts.Headers[graphqlFeatures] = features
 	gqlClient, err := gh.GQLClient(&opts)
 	if err != nil {
 		return err
