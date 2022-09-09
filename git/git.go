@@ -295,6 +295,15 @@ func CheckoutBranch(branch string) error {
 	return run.PrepareCmd(configCmd).Run()
 }
 
+func CheckoutNewBranch(remoteName, branch string) error {
+	track := fmt.Sprintf("%s/%s", remoteName, branch)
+	configCmd, err := GitCommand("checkout", "-b", branch, "--track", track)
+	if err != nil {
+		return err
+	}
+	return run.PrepareCmd(configCmd).Run()
+}
+
 // pull changes from remote branch without version history
 func Pull(remote, branch string) error {
 	pullCmd, err := GitCommand("pull", "--ff-only", remote, branch)
@@ -346,12 +355,12 @@ func RunClone(cloneURL string, args []string) (target string, err error) {
 	return
 }
 
-func AddUpstreamRemote(upstreamURL, cloneDir string, branches []string) error {
-	args := []string{"-C", cloneDir, "remote", "add"}
+func AddNamedRemote(url, name, dir string, branches []string) error {
+	args := []string{"-C", dir, "remote", "add"}
 	for _, branch := range branches {
 		args = append(args, "-t", branch)
 	}
-	args = append(args, "-f", "upstream", upstreamURL)
+	args = append(args, "-f", name, url)
 	cloneCmd, err := GitCommand(args...)
 	if err != nil {
 		return err

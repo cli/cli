@@ -36,12 +36,7 @@ func NormalizeHostname(h string) string {
 	return hostname
 }
 
-func HostnameValidator(v interface{}) error {
-	hostname, valid := v.(string)
-	if !valid {
-		return errors.New("hostname is not a string")
-	}
-
+func HostnameValidator(hostname string) error {
 	if len(strings.TrimSpace(hostname)) < 1 {
 		return errors.New("a value is required")
 	}
@@ -72,13 +67,23 @@ func RESTPrefix(hostname string) string {
 }
 
 func GistPrefix(hostname string) string {
+	prefix := "https://"
+
+	if strings.EqualFold(hostname, localhost) {
+		prefix = "http://"
+	}
+
+	return prefix + GistHost(hostname)
+}
+
+func GistHost(hostname string) string {
 	if IsEnterprise(hostname) {
-		return fmt.Sprintf("https://%s/gist/", hostname)
+		return fmt.Sprintf("%s/gist/", hostname)
 	}
 	if strings.EqualFold(hostname, localhost) {
-		return fmt.Sprintf("http://%s/gist/", hostname)
+		return fmt.Sprintf("%s/gist/", hostname)
 	}
-	return fmt.Sprintf("https://gist.%s/", hostname)
+	return fmt.Sprintf("gist.%s/", hostname)
 }
 
 func HostPrefix(hostname string) string {

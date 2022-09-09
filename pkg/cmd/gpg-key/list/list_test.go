@@ -48,19 +48,20 @@ func TestListRun(t *testing.T) {
 				},
 			},
 			wantStdout: "",
-			wantStderr: "No GPG keys present in GitHub account.\n",
+			wantStderr: "",
 			wantErr:    true,
+			isTTY:      true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 			opts := tt.opts
-			opts.IO = io
+			opts.IO = ios
 			opts.Config = func() (config.Config, error) { return config.NewBlankConfig(), nil }
 			err := listRun(&opts)
 			if tt.wantErr {

@@ -67,7 +67,6 @@ func statusRun(opts *StatusOptions) error {
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
 	baseRepo, err := opts.BaseRepo()
 	if err != nil {
@@ -91,7 +90,7 @@ func statusRun(opts *StatusOptions) error {
 		}
 	}
 
-	options := api.StatusOptions{
+	options := requestOptions{
 		Username:  "@me",
 		CurrentPR: currentPRNumber,
 		HeadRef:   currentPRHeadRef,
@@ -99,7 +98,7 @@ func statusRun(opts *StatusOptions) error {
 	if opts.Exporter != nil {
 		options.Fields = opts.Exporter.Fields()
 	}
-	prPayload, err := api.PullRequestStatus(apiClient, baseRepo, options)
+	prPayload, err := pullRequestStatus(httpClient, baseRepo, options)
 	if err != nil {
 		return err
 	}
@@ -192,11 +191,21 @@ func prSelectorForCurrentBranch(baseRepo ghrepo.Interface, prHeadRef string, rem
 		}
 		// prepend `OWNER:` if this branch is pushed to a fork
 		if !strings.EqualFold(branchOwner, baseRepo.RepoOwner()) {
-			selector = fmt.Sprintf("%s:%s", branchOwner, prHeadRef)
+			selector = fmt.Sprintf("%s:%s", branchOwner, selector)
 		}
 	}
 
 	return
+}
+
+func totalApprovals(pr *api.PullRequest) int {
+	approvals := 0
+	for _, review := range pr.LatestReviews.Nodes {
+		if review.State == "APPROVED" {
+			approvals++
+		}
+	}
+	return approvals
 }
 
 func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
@@ -206,7 +215,7 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 	for _, pr := range prs {
 		prNumber := fmt.Sprintf("#%d", pr.Number)
 
-		prStateColorFunc := cs.ColorFromString(shared.ColorForPR(pr))
+		prStateColorFunc := cs.ColorFromString(shared.ColorForPRState(pr))
 
 		fmt.Fprintf(w, "  %s  %s %s", prStateColorFunc(prNumber), text.Truncate(50, text.ReplaceExcessiveWhitespace(pr.Title)), cs.Cyan("["+pr.HeadLabel()+"]"))
 
@@ -246,7 +255,13 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 			} else if reviews.ReviewRequired {
 				fmt.Fprint(w, cs.Yellow("- Review required"))
 			} else if reviews.Approved {
-				fmt.Fprint(w, cs.Green("✓ Approved"))
+				numRequiredApprovals := pr.BaseRef.BranchProtectionRule.RequiredApprovingReviewCount
+				gotApprovals := totalApprovals(&pr)
+				s := fmt.Sprintf("%d", gotApprovals)
+				if numRequiredApprovals > 0 {
+					s = fmt.Sprintf("%d/%d", gotApprovals, numRequiredApprovals)
+				}
+				fmt.Fprint(w, cs.Green(fmt.Sprintf("✓ %s Approved", s)))
 			}
 
 			if pr.BaseRef.BranchProtectionRule.RequiresStrictStatusChecks {

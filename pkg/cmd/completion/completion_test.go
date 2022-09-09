@@ -24,7 +24,7 @@ func TestNewCmdCompletion(t *testing.T) {
 		{
 			name:    "zsh completion",
 			args:    "completion -s zsh",
-			wantOut: "#compdef _gh gh",
+			wantOut: "#compdef gh",
 		},
 		{
 			name:    "fish completion",
@@ -39,13 +39,13 @@ func TestNewCmdCompletion(t *testing.T) {
 		{
 			name:    "unsupported shell",
 			args:    "completion -s csh",
-			wantErr: "unsupported shell type \"csh\"",
+			wantErr: "invalid argument \"csh\" for \"-s, --shell\" flag: valid values are {bash|zsh|fish|powershell}",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, stdout, stderr := iostreams.Test()
-			completeCmd := NewCmdCompletion(io)
+			ios, _, stdout, stderr := iostreams.Test()
+			completeCmd := NewCmdCompletion(ios)
 			rootCmd := &cobra.Command{Use: "gh"}
 			rootCmd.AddCommand(completeCmd)
 
@@ -54,7 +54,7 @@ func TestNewCmdCompletion(t *testing.T) {
 				t.Fatalf("argument splitting error: %v", err)
 			}
 			rootCmd.SetArgs(argv)
-			rootCmd.SetOut(stdout)
+			rootCmd.SetOut(stderr)
 			rootCmd.SetErr(stderr)
 
 			_, err = rootCmd.ExecuteC()

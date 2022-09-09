@@ -35,7 +35,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		Args:  cobra.ExactArgs(0),
 		Short: "View authentication status",
 		Long: heredoc.Doc(`Verifies and displays information about your authentication state.
-			
+
 			This command will test your authentication state for each GitHub host that gh knows about and
 			report on any issues.
 		`),
@@ -68,10 +68,7 @@ func statusRun(opts *StatusOptions) error {
 
 	statusInfo := map[string][]string{}
 
-	hostnames, err := cfg.Hosts()
-	if err != nil {
-		return err
-	}
+	hostnames := cfg.Hosts()
 	if len(hostnames) == 0 {
 		fmt.Fprintf(stderr,
 			"You are not logged into any GitHub hosts. Run %s to authenticate.\n", cs.Bold("gh auth login"))
@@ -92,8 +89,8 @@ func statusRun(opts *StatusOptions) error {
 		}
 		isHostnameFound = true
 
-		token, tokenSource, _ := cfg.GetWithSource(hostname, "oauth_token")
-		tokenIsWriteable := cfg.CheckWriteable(hostname, "oauth_token") == nil
+		token, tokenSource := cfg.AuthToken(hostname)
+		_, tokenIsWriteable := shared.AuthTokenWriteable(cfg, hostname)
 
 		statusInfo[hostname] = []string{}
 		addMsg := func(x string, ys ...interface{}) {
@@ -127,7 +124,7 @@ func statusRun(opts *StatusOptions) error {
 				addMsg("%s %s: api call failed: %s", cs.Red("X"), hostname, err)
 			}
 			addMsg("%s Logged in to %s as %s (%s)", cs.SuccessIcon(), hostname, cs.Bold(username), tokenSource)
-			proto, _ := cfg.Get(hostname, "git_protocol")
+			proto, _ := cfg.GetOrDefault(hostname, "git_protocol")
 			if proto != "" {
 				addMsg("%s Git operations for %s configured to use %s protocol.",
 					cs.SuccessIcon(), hostname, cs.Bold(proto))

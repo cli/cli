@@ -42,6 +42,7 @@ type CommentableOptions struct {
 	Interactive           bool
 	InputType             InputType
 	Body                  string
+	Quiet                 bool
 }
 
 func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
@@ -65,13 +66,9 @@ func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
 
 	if inputFlags == 0 {
 		if !opts.IO.CanPrompt() {
-			return cmdutil.FlagErrorf("`--body`, `--body-file` or `--web` required when not running interactively")
+			return cmdutil.FlagErrorf("flags required when not running interactively")
 		}
 		opts.Interactive = true
-	} else if inputFlags == 1 {
-		if !opts.IO.CanPrompt() && opts.InputType == InputTypeEditor {
-			return cmdutil.FlagErrorf("`--body`, `--body-file` or `--web` required when not running interactively")
-		}
 	} else if inputFlags > 1 {
 		return cmdutil.FlagErrorf("specify only one of `--body`, `--body-file`, `--editor`, or `--web`")
 	}
@@ -88,7 +85,7 @@ func CommentableRun(opts *CommentableOptions) error {
 	switch opts.InputType {
 	case InputTypeWeb:
 		openURL := commentable.Link() + "#issuecomment-new"
-		if opts.IO.IsStdoutTTY() {
+		if opts.IO.IsStdoutTTY() && !opts.Quiet {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
 		}
 		return opts.OpenInBrowser(openURL)
@@ -125,7 +122,9 @@ func CommentableRun(opts *CommentableOptions) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(opts.IO.Out, url)
+	if !opts.Quiet {
+		fmt.Fprintln(opts.IO.Out, url)
+	}
 	return nil
 }
 
@@ -145,11 +144,8 @@ func CommentableInteractiveEditSurvey(cf func() (config.Config, error), io *iost
 		if err != nil {
 			return "", err
 		}
-		if editorCommand == "" {
-			editorCommand = surveyext.DefaultEditorName()
-		}
 		cs := io.ColorScheme()
-		fmt.Fprintf(io.Out, "- %s to draft your comment in %s... ", cs.Bold("Press Enter"), cs.Bold(editorCommand))
+		fmt.Fprintf(io.Out, "- %s to draft your comment in %s... ", cs.Bold("Press Enter"), cs.Bold(surveyext.EditorName(editorCommand)))
 		_ = waitForEnter(io.In)
 		return surveyext.Edit(editorCommand, "*.md", "", io.In, io.Out, io.ErrOut)
 	}

@@ -4,20 +4,35 @@ package codespace
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"os"
+	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
+	"sync"
+	"text/template"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces"
+	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/liveshare"
+	"github.com/cli/cli/v2/pkg/ssh"
+	"github.com/cli/safeexec"
 	"github.com/spf13/cobra"
 )
+
+// In 2.13.0 these commands started automatically generating key pairs named 'codespaces' and 'codespaces.pub'
+// which could collide with suggested the ssh config also named 'codespaces'. We now use 'codespaces.auto'
+// and 'codespaces.auto.pub' in order to avoid that collision.
+const automaticPrivateKeyNameOld = "codespaces"
+const automaticPrivateKeyName = "codespaces.auto"
 
 type sshOptions struct {
 	codespace  string
@@ -25,6 +40,8 @@ type sshOptions struct {
 	serverPort int
 	debug      bool
 	debugFile  string
+	stdio      bool
+	config     bool
 	scpArgs    []string // scp arguments, for 'cs cp' (nil for 'cs ssh')
 }
 
@@ -34,8 +51,71 @@ func newSSHCmd(app *App) *cobra.Command {
 	sshCmd := &cobra.Command{
 		Use:   "ssh [<flags>...] [-- <ssh-flags>...] [<command>]",
 		Short: "SSH into a codespace",
+		Long: heredoc.Doc(`
+			The 'ssh' command is used to SSH into a codespace. In its simplest form, you can
+			run 'gh cs ssh', select a codespace interactively, and connect.
+			
+			By default, the 'ssh' command will create a public/private ssh key pair to  
+			authenticate with the codespace inside the ~/.ssh directory.
+
+			The 'ssh' command also supports deeper integration with OpenSSH using a
+			'--config' option that generates per-codespace ssh configuration in OpenSSH
+			format. Including this configuration in your ~/.ssh/config improves the user
+			experience of tools that integrate with OpenSSH, such as bash/zsh completion of
+			ssh hostnames, remote path completion for scp/rsync/sshfs, git ssh remotes, and
+			so on.
+
+			Once that is set up (see the second example below), you can ssh to codespaces as
+			if they were ordinary remote hosts (using 'ssh', not 'gh cs ssh').
+
+			Note that the codespace you are connecting to must have an SSH server pre-installed.
+			If the docker image being used for the codespace does not have an SSH server,
+			install it in your Dockerfile or, for codespaces that use Debian-based images,
+			you can add the following to your devcontainer.json:
+
+			"features": {
+				"ghcr.io/devcontainers/features/sshd:1": {
+					"version": "latest"
+				}
+			}
+		`),
+		Example: heredoc.Doc(`
+			$ gh codespace ssh
+
+			$ gh codespace ssh --config > ~/.ssh/codespaces
+			$ printf 'Match all\nInclude ~/.ssh/codespaces\n' >> ~/.ssh/config
+		`),
+		PreRunE: func(c *cobra.Command, args []string) error {
+			if opts.stdio {
+				if opts.codespace == "" {
+					return errors.New("`--stdio` requires explicit `--codespace`")
+				}
+				if opts.config {
+					return errors.New("cannot use `--stdio` with `--config`")
+				}
+				if opts.serverPort != 0 {
+					return errors.New("cannot use `--stdio` with `--server-port`")
+				}
+				if opts.profile != "" {
+					return errors.New("cannot use `--stdio` with `--profile`")
+				}
+			}
+			if opts.config {
+				if opts.profile != "" {
+					return errors.New("cannot use `--config` with `--profile`")
+				}
+				if opts.serverPort != 0 {
+					return errors.New("cannot use `--config` with `--server-port`")
+				}
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.SSH(cmd.Context(), args, opts)
+			if opts.config {
+				return app.printOpenSSHConfig(cmd.Context(), opts)
+			} else {
+				return app.SSH(cmd.Context(), args, opts)
+			}
 		},
 		DisableFlagsInUseLine: true,
 	}
@@ -45,6 +125,11 @@ func newSSHCmd(app *App) *cobra.Command {
 	sshCmd.Flags().StringVarP(&opts.codespace, "codespace", "c", "", "Name of the codespace")
 	sshCmd.Flags().BoolVarP(&opts.debug, "debug", "d", false, "Log debug data to a file")
 	sshCmd.Flags().StringVarP(&opts.debugFile, "debug-file", "", "", "Path of the file log to")
+	sshCmd.Flags().BoolVarP(&opts.config, "config", "", false, "Write OpenSSH configuration to stdout")
+	sshCmd.Flags().BoolVar(&opts.stdio, "stdio", false, "Proxy sshd connection to stdio")
+	if err := sshCmd.Flags().MarkHidden("stdio"); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+	}
 
 	return sshCmd
 }
@@ -55,50 +140,53 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	args := sshArgs
+	if opts.scpArgs != nil {
+		args = opts.scpArgs
+	}
+
+	sshContext := ssh.Context{}
+	startSSHOptions := liveshare.StartSSHServerOptions{}
+
+	useAutoKeys, err := useAutomaticSSHKeys(ctx, sshContext, a.apiClient, args, opts)
+	if err != nil {
+		return fmt.Errorf("checking ssh key configuration: %w", err)
+	}
+
+	if useAutoKeys {
+		keyPair, err := setupAutomaticSSHKeys(sshContext)
+		if err != nil {
+			return fmt.Errorf("failed to generate ssh keys: %w", err)
+		}
+
+		startSSHOptions.UserPublicKeyFile = keyPair.PublicKeyPath
+		// For both cp and ssh, flags need to come first in the args (before a command in ssh and files in cp), so prepend this flag
+		args = append([]string{"-i", keyPair.PrivateKeyPath}, args...)
+	}
+
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
 	if err != nil {
-		return fmt.Errorf("get or choose codespace: %w", err)
-	}
-
-	// TODO(josebalius): We can fetch the user in parallel to everything else
-	// we should convert this call and others to happen async
-	user, err := a.apiClient.GetUser(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting user: %w", err)
-	}
-
-	authkeys := make(chan error, 1)
-	go func() {
-		authkeys <- checkAuthorizedKeys(ctx, a.apiClient, user.Login)
-	}()
-
-	liveshareLogger := noopLogger()
-	if opts.debug {
-		debugLogger, err := newFileLogger(opts.debugFile)
-		if err != nil {
-			return fmt.Errorf("error creating debug logger: %w", err)
-		}
-		defer safeClose(debugLogger, &err)
-
-		liveshareLogger = debugLogger.Logger
-		a.errLogger.Printf("Debug file located at: %s", debugLogger.Name())
-	}
-
-	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
-	if err != nil {
-		return fmt.Errorf("error connecting to codespace: %w", err)
-	}
-	defer safeClose(session, &err)
-
-	if err := <-authkeys; err != nil {
 		return err
 	}
 
+	session, err := startLiveShareSession(ctx, codespace, a, opts.debug, opts.debugFile)
+	if err != nil {
+		return err
+	}
+	defer safeClose(session, &err)
+
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
+	remoteSSHServerPort, sshUser, err := session.StartSSHServerWithOptions(ctx, startSSHOptions)
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
+	}
+
+	if opts.stdio {
+		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
+		stdio := newReadWriteCloser(os.Stdin, os.Stdout)
+		err := fwd.Forward(ctx, stdio) // always non-nil
+		return fmt.Errorf("tunnel closed: %w", err)
 	}
 
 	localSSHServerPort := opts.serverPort
@@ -129,9 +217,10 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	go func() {
 		var err error
 		if opts.scpArgs != nil {
-			err = codespaces.Copy(ctx, opts.scpArgs, localSSHServerPort, connectDestination)
+			// args is the correct variable to use here, we just use scpArgs as the check for which command to run
+			err = codespaces.Copy(ctx, args, localSSHServerPort, connectDestination)
 		} else {
-			err = codespaces.Shell(ctx, a.errLogger, sshArgs, localSSHServerPort, connectDestination, usingCustomPort)
+			err = codespaces.Shell(ctx, a.errLogger, args, localSSHServerPort, connectDestination, usingCustomPort)
 		}
 		shellClosed <- err
 	}()
@@ -147,6 +236,382 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 }
 
+func useAutomaticSSHKeys(
+	ctx context.Context,
+	sshContext ssh.Context,
+	apiClient apiClient,
+	args []string,
+	opts sshOptions,
+) (bool, error) {
+	customConfigPath := ""
+	for i := 0; i < len(args); i += 1 {
+		arg := args[i]
+
+		if arg == "-i" {
+			if i+1 < len(args) && path.Base(args[i+1]) == automaticPrivateKeyName {
+				return true, nil
+			}
+
+			// User specified a custom identity file so just trust it is correct
+			return false, nil
+		}
+
+		if arg == "-F" && i < len(args)-1 {
+			// ssh only pays attention to that last specified -F value, so it's correct to overwrite here
+			customConfigPath = args[i+1]
+		}
+	}
+
+	if automaticKeySSHKeysExist(sshContext) {
+		// If the automatic keys already exist, just use them
+		return true, nil
+	}
+
+	// If there is a public key uploaded which matches a configured
+	// private key, there is no need for automatic key generation
+	hasPublicKey, err := hasUploadedPublicKeyForConfig(ctx, apiClient, customConfigPath, opts.profile)
+
+	return !hasPublicKey, err
+}
+
+func automaticKeySSHKeysExist(sshContext ssh.Context) bool {
+	publicKeys, err := sshContext.LocalPublicKeys()
+	if err != nil {
+		return false
+	}
+
+	for _, publicKey := range publicKeys {
+		if filepath.Base(publicKey) != automaticPrivateKeyName+".pub" {
+			continue
+		}
+
+		privateKey := strings.TrimSuffix(publicKey, ".pub")
+
+		_, err := os.Stat(privateKey)
+		return err == nil
+	}
+
+	return false
+}
+
+func setupAutomaticSSHKeys(sshContext ssh.Context) (*ssh.KeyPair, error) {
+	keyPair := checkAndUpdateOldKeyPair(sshContext)
+	if keyPair != nil {
+		return keyPair, nil
+	}
+
+	keyPair, err := sshContext.GenerateSSHKey(automaticPrivateKeyName, "")
+	if err != nil && !errors.Is(err, ssh.ErrKeyAlreadyExists) {
+		return nil, err
+	}
+
+	return keyPair, nil
+}
+
+// checkAndUpdateOldKeyPair handles backward compatibility with the old keypair names.
+// If the old public and private keys both exist they are renamed to the new name.
+// The return value is non-nil only if the rename happens.
+func checkAndUpdateOldKeyPair(sshContext ssh.Context) *ssh.KeyPair {
+	publicKeys, err := sshContext.LocalPublicKeys()
+	if err != nil {
+		return nil
+	}
+
+	for _, publicKey := range publicKeys {
+		if filepath.Base(publicKey) != automaticPrivateKeyNameOld+".pub" {
+			continue
+		}
+
+		privateKey := strings.TrimSuffix(publicKey, ".pub")
+		_, err := os.Stat(privateKey)
+		if err != nil {
+			continue
+		}
+
+		// Both old public and private keys exist, rename them to the new name
+
+		sshDir := filepath.Dir(publicKey)
+
+		publicKeyNew := filepath.Join(sshDir, automaticPrivateKeyName+".pub")
+		err = os.Rename(publicKey, publicKeyNew)
+		if err != nil {
+			return nil
+		}
+
+		privateKeyNew := filepath.Join(sshDir, automaticPrivateKeyName)
+		err = os.Rename(privateKey, privateKeyNew)
+		if err != nil {
+			return nil
+		}
+
+		keyPair := &ssh.KeyPair{
+			PublicKeyPath:  publicKeyNew,
+			PrivateKeyPath: privateKeyNew,
+		}
+
+		return keyPair
+	}
+
+	return nil
+}
+
+// hasUploadedValidCustomKey checks which private keys are used in ssh configration and
+// compares them to uploaded public keys to see if there is a match
+func hasUploadedPublicKeyForConfig(
+	ctx context.Context,
+	apiClient apiClient,
+	customConfigFile string,
+	customHost string,
+) (bool, error) {
+	configuredPrivateKeyPaths, err := getConfiguredPrivateKeys(ctx, customConfigFile, customHost)
+	if err != nil {
+		return false, fmt.Errorf("getting local ssh keys: %w", err)
+	}
+
+	configuredPublicKeys := make(map[string]bool)
+	for _, privateKeyPath := range configuredPrivateKeyPaths {
+		publicKeyPath := privateKeyPath + ".pub"
+
+		publicKeyContent, err := os.ReadFile(publicKeyPath)
+		if err != nil {
+			// The default configuration includes standard keys like id_rsa or id_ed25519,
+			// but these may not actually exist so just skip them
+			continue
+		}
+
+		parts := strings.SplitN(string(publicKeyContent), " ", 3)
+		if len(parts) < 2 {
+			// Unexpected format, skip it
+			continue
+		}
+
+		publicKeyWithoutComment := strings.Join(parts[:2], " ")
+
+		configuredPublicKeys[publicKeyWithoutComment] = true
+	}
+
+	if len(configuredPublicKeys) == 0 {
+		// There are no local private keys which ssh would use
+		return false, nil
+	}
+
+	user, err := apiClient.GetUser(ctx)
+	if err != nil {
+		return false, fmt.Errorf("fetching user account: %w", err)
+	}
+
+	uploadedPublicKeys, err := apiClient.AuthorizedKeys(ctx, user.Login)
+	if err != nil {
+		return false, fmt.Errorf("fetching known ssh keys: %w", err)
+	}
+
+	if len(uploadedPublicKeys) == 0 {
+		return false, nil
+	}
+
+	for _, uploadedPublicKey := range uploadedPublicKeys {
+		if configuredPublicKeys[uploadedPublicKey] {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// getConfiguredPrivateKeys reads the effective configuration for a localhost
+// connection and returns all private keys which would be tried for authentication
+func getConfiguredPrivateKeys(
+	ctx context.Context,
+	customConfigFile string,
+	customHost string,
+) ([]string, error) {
+	sshExe, err := safeexec.LookPath("ssh")
+	if err != nil {
+		return nil, fmt.Errorf("could not find ssh executable: %w", err)
+	}
+
+	// The -G option tells ssh to output the effective config for the given host, but not connect
+	sshGArgs := []string{"-G"}
+
+	if customConfigFile != "" {
+		sshGArgs = append(sshGArgs, "-F", customConfigFile)
+	}
+
+	if customHost != "" {
+		sshGArgs = append(sshGArgs, customHost)
+	} else {
+		sshGArgs = append(sshGArgs, "localhost")
+	}
+
+	sshGCmd := exec.CommandContext(ctx, sshExe, sshGArgs...)
+	configBytes, err := sshGCmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("could not load ssh configuration: %w", err)
+	}
+
+	var privateKeyPaths []string
+
+	userHomeDir, _ := os.UserHomeDir()
+
+	configLines := strings.Split(string(configBytes), "\n")
+	for _, line := range configLines {
+		line = strings.TrimSpace(line)
+
+		if strings.HasPrefix(line, "identityfile ") {
+			path := strings.SplitN(line, " ", 2)[1]
+
+			if strings.HasPrefix(path, "~") {
+				// os.Stat can't handle ~, so convert it to the real path
+				path = strings.Replace(path, "~", userHomeDir, 1)
+			}
+
+			privateKeyPaths = append(privateKeyPaths, path)
+		}
+	}
+
+	return privateKeyPaths, nil
+}
+
+func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var csList []*api.Codespace
+	if opts.codespace == "" {
+		a.StartProgressIndicatorWithLabel("Fetching codespaces")
+		csList, err = a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{})
+		a.StopProgressIndicator()
+	} else {
+		var codespace *api.Codespace
+		codespace, err = getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
+		csList = []*api.Codespace{codespace}
+	}
+	if err != nil {
+		return fmt.Errorf("error getting codespace info: %w", err)
+	}
+
+	type sshResult struct {
+		codespace *api.Codespace
+		user      string // on success, the remote ssh username; else nil
+		err       error
+	}
+
+	sshUsers := make(chan sshResult, len(csList))
+	var wg sync.WaitGroup
+	var status error
+	for _, cs := range csList {
+		if cs.State != "Available" && opts.codespace == "" {
+			fmt.Fprintf(os.Stderr, "skipping unavailable codespace %s: %s\n", cs.Name, cs.State)
+			status = cmdutil.SilentError
+			continue
+		}
+
+		cs := cs
+		wg.Add(1)
+		go func() {
+			result := sshResult{}
+			defer wg.Done()
+
+			session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, cs)
+			if err != nil {
+				result.err = fmt.Errorf("error connecting to codespace: %w", err)
+			} else {
+				defer safeClose(session, &err)
+
+				_, result.user, err = session.StartSSHServer(ctx)
+				if err != nil {
+					result.err = fmt.Errorf("error getting ssh server details: %w", err)
+				} else {
+					result.codespace = cs
+				}
+			}
+
+			sshUsers <- result
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(sshUsers)
+	}()
+
+	// While the above fetches are running, ensure that the user has keys installed.
+	// That lets us report a more useful error message if they don't.
+	if err = checkAuthorizedKeys(ctx, a.apiClient); err != nil {
+		return err
+	}
+
+	t, err := template.New("ssh_config").Parse(heredoc.Doc(`
+		Host cs.{{.Name}}.{{.EscapedRef}}
+			User {{.SSHUser}}
+			ProxyCommand {{.GHExec}} cs ssh -c {{.Name}} --stdio -- -i {{.AutomaticIdentityFilePath}}
+			UserKnownHostsFile=/dev/null
+			StrictHostKeyChecking no
+			LogLevel quiet
+			ControlMaster auto
+			IdentityFile {{.AutomaticIdentityFilePath}}
+
+	`))
+	if err != nil {
+		return fmt.Errorf("error formatting template: %w", err)
+	}
+
+	automaticIdentityFilePath, err := automaticPrivateKeyPath()
+	if err != nil {
+		return fmt.Errorf("error finding .ssh directory: %w", err)
+	}
+
+	ghExec := a.executable.Executable()
+	for result := range sshUsers {
+		if result.err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", result.err)
+			status = cmdutil.SilentError
+			continue
+		}
+
+		// codespaceSSHConfig contains values needed to write an OpenSSH host
+		// configuration for a single codespace. For example:
+		//
+		// Host {{Name}}.{{EscapedRef}
+		//   User {{SSHUser}
+		//   ProxyCommand {{GHExec}} cs ssh -c {{Name}} --stdio
+		//
+		// EscapedRef is included in the name to help distinguish between codespaces
+		// when tab-completing ssh hostnames. '/' characters in EscapedRef are
+		// flattened to '-' to prevent problems with tab completion or when the
+		// hostname appears in ControlMaster socket paths.
+		type codespaceSSHConfig struct {
+			Name                      string // the codespace name, passed to `ssh -c`
+			EscapedRef                string // the currently checked-out branch
+			SSHUser                   string // the remote ssh username
+			GHExec                    string // path used for invoking the current `gh` binary
+			AutomaticIdentityFilePath string // path used for automatic private key `gh cs ssh` would generate
+		}
+
+		conf := codespaceSSHConfig{
+			Name:                      result.codespace.Name,
+			EscapedRef:                strings.ReplaceAll(result.codespace.GitStatus.Ref, "/", "-"),
+			SSHUser:                   result.user,
+			GHExec:                    ghExec,
+			AutomaticIdentityFilePath: automaticIdentityFilePath,
+		}
+		if err := t.Execute(a.io.Out, conf); err != nil {
+			return err
+		}
+	}
+
+	return status
+}
+
+func automaticPrivateKeyPath() (string, error) {
+	sshDir, err := config.HomeDirPath(".ssh")
+	if err != nil {
+		return "", err
+	}
+
+	return path.Join(sshDir, automaticPrivateKeyName), nil
+}
+
 type cpOptions struct {
 	sshOptions
 	recursive bool // -r
@@ -157,7 +622,7 @@ func newCpCmd(app *App) *cobra.Command {
 	var opts cpOptions
 
 	cpCmd := &cobra.Command{
-		Use:   "cp [-e] [-r] <sources>... <dest>",
+		Use:   "cp [-e] [-r] [-- [<scp flags>...]] <sources>... <dest>",
 		Short: "Copy files between local and remote file systems",
 		Long: heredoc.Docf(`
 			The cp command copies files between the local and remote file systems.
@@ -177,11 +642,15 @@ func newCpCmd(app *App) *cobra.Command {
 			be evaluated on the remote machine, subject to expansion of tildes, braces, globs,
 			environment variables, and backticks. For security, do not use this flag with arguments
 			provided by untrusted users; see <https://lwn.net/Articles/835962/> for discussion.
+			
+			By default, the 'cp' command will create a public/private ssh key pair to authenticate with 
+			the codespace inside the ~/.ssh directory.
 		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh codespace cp -e README.md 'remote:/workspaces/$RepositoryName/'
 			$ gh codespace cp -e 'remote:~/*.go' ./gofiles/
 			$ gh codespace cp -e 'remote:/workspaces/myproj/go.{mod,sum}' ./gofiles/
+			$ gh codespace cp -e -- -F ~/.ssh/codespaces_config 'remote:~/*.go' ./gofiles/
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.Copy(cmd.Context(), args, opts)
@@ -193,6 +662,7 @@ func newCpCmd(app *App) *cobra.Command {
 	cpCmd.Flags().BoolVarP(&opts.recursive, "recursive", "r", false, "Recursively copy directories")
 	cpCmd.Flags().BoolVarP(&opts.expand, "expand", "e", false, "Expand remote file names on remote shell")
 	cpCmd.Flags().StringVarP(&opts.codespace, "codespace", "c", "", "Name of the codespace")
+	cpCmd.Flags().StringVarP(&opts.profile, "profile", "p", "", "Name of the SSH profile to use")
 	return cpCmd
 }
 
@@ -205,7 +675,7 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) error {
 	if opts.recursive {
 		opts.scpArgs = append(opts.scpArgs, "-r")
 	}
-	opts.scpArgs = append(opts.scpArgs, "--")
+
 	hasRemote := false
 	for _, arg := range args {
 		if rest := strings.TrimPrefix(arg, "remote:"); rest != arg {
@@ -253,7 +723,7 @@ type fileLogger struct {
 func newFileLogger(file string) (fl *fileLogger, err error) {
 	var f *os.File
 	if file == "" {
-		f, err = ioutil.TempFile("", "")
+		f, err = os.CreateTemp("", "")
 		if err != nil {
 			return nil, fmt.Errorf("failed to create tmp file: %w", err)
 		}
@@ -276,4 +746,22 @@ func (fl *fileLogger) Name() string {
 
 func (fl *fileLogger) Close() error {
 	return fl.f.Close()
+}
+
+type combinedReadWriteCloser struct {
+	io.ReadCloser
+	io.WriteCloser
+}
+
+func newReadWriteCloser(reader io.ReadCloser, writer io.WriteCloser) io.ReadWriteCloser {
+	return &combinedReadWriteCloser{reader, writer}
+}
+
+func (crwc *combinedReadWriteCloser) Close() error {
+	werr := crwc.WriteCloser.Close()
+	rerr := crwc.ReadCloser.Close()
+	if werr != nil {
+		return werr
+	}
+	return rerr
 }

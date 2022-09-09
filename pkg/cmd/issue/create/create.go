@@ -6,6 +6,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -16,16 +17,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type browser interface {
-	Browse(string) error
-}
-
 type CreateOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
-	Browser    browser
+	Browser    browser.Browser
 
 	RootDirOverride string
 
@@ -64,7 +61,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh issue create --assignee "@me"
 			$ gh issue create --project "Roadmap"
 		`),
-		Args: cmdutil.NoArgsQuoteReminder,
+		Args:    cmdutil.NoArgsQuoteReminder,
+		Aliases: []string{"new"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
@@ -88,7 +86,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			opts.Interactive = !(titleProvided && bodyProvided)
 
 			if opts.Interactive && !opts.IO.CanPrompt() {
-				return cmdutil.FlagErrorf("must provide title and body when not running interactively")
+				return cmdutil.FlagErrorf("must provide `--title` and `--body` when not running interactively")
 			}
 
 			if runF != nil {
@@ -241,7 +239,7 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 
 		allowPreview := !tb.HasMetadata() && utils.ValidURL(openURL)
-		action, err = prShared.ConfirmSubmission(allowPreview, repo.ViewerCanTriage())
+		action, err = prShared.ConfirmIssueSubmission(allowPreview, repo.ViewerCanTriage())
 		if err != nil {
 			err = fmt.Errorf("unable to confirm: %w", err)
 			return
@@ -259,7 +257,7 @@ func createRun(opts *CreateOptions) (err error) {
 				return
 			}
 
-			action, err = prShared.ConfirmSubmission(!tb.HasMetadata(), false)
+			action, err = prShared.ConfirmIssueSubmission(!tb.HasMetadata(), false)
 			if err != nil {
 				return
 			}

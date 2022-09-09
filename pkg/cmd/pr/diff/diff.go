@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
-	"syscall"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -28,6 +28,7 @@ type DiffOptions struct {
 	SelectorArg string
 	UseColor    bool
 	Patch       bool
+	NameOnly    bool
 }
 
 func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Command {
@@ -67,7 +68,7 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 			case "never":
 				opts.UseColor = false
 			default:
-				return cmdutil.FlagErrorf("the value for `--color` must be one of \"auto\", \"always\", or \"never\"")
+				return fmt.Errorf("unsupported color %q", colorFlag)
 			}
 
 			if runF != nil {
@@ -77,8 +78,9 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().StringVar(&colorFlag, "color", "auto", "Use color in diff output: {always|never|auto}")
+	cmdutil.StringEnumFlag(cmd, &colorFlag, "color", "", "auto", []string{"always", "never", "auto"}, "Use color in diff output")
 	cmd.Flags().BoolVar(&opts.Patch, "patch", false, "Display diff in patch format")
+	cmd.Flags().BoolVar(&opts.NameOnly, "name-only", false, "Display only names of changed files")
 
 	return cmd
 }
@@ -98,23 +100,28 @@ func diffRun(opts *DiffOptions) error {
 		return err
 	}
 
+	if opts.NameOnly {
+		opts.Patch = false
+	}
+
 	diff, err := fetchDiff(httpClient, baseRepo, pr.Number, opts.Patch)
 	if err != nil {
 		return fmt.Errorf("could not find pull request diff: %w", err)
 	}
 	defer diff.Close()
 
-	err = opts.IO.StartPager()
-	if err != nil {
-		return err
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
-	defer opts.IO.StopPager()
+
+	if opts.NameOnly {
+		return changedFilesNames(opts.IO.Out, diff)
+	}
 
 	if !opts.UseColor {
 		_, err = io.Copy(opts.IO.Out, diff)
-		if errors.Is(err, syscall.EPIPE) {
-			return nil
-		}
 		return err
 	}
 
@@ -230,4 +237,23 @@ func isAdditionLine(l []byte) bool {
 
 func isRemovalLine(l []byte) bool {
 	return len(l) > 0 && l[0] == '-'
+}
+
+func changedFilesNames(w io.Writer, r io.Reader) error {
+	diff, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+
+	pattern := regexp.MustCompile(`(?:^|\n)diff\s--git.*\sb/(.*)`)
+	matches := pattern.FindAllStringSubmatch(string(diff), -1)
+
+	for _, val := range matches {
+		name := strings.TrimSpace(val[1])
+		if _, err := w.Write([]byte(name + "\n")); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

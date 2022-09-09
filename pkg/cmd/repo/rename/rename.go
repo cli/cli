@@ -6,6 +6,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
@@ -40,7 +41,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "rename [<new-name>]",
 		Short: "Rename a repository",
-		Long: heredoc.Doc(`Rename a GitHub repository
+		Long: heredoc.Doc(`Rename a GitHub repository.
 
 		By default, this renames the current repository; otherwise renames the specified repository.`),
 		Args: cobra.MaximumNArgs(1),
@@ -88,6 +89,7 @@ func renameRun(opts *RenameOptions) error {
 	}
 
 	if newRepoName == "" {
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(
 			&survey.Input{
 				Message: fmt.Sprintf("Rename %s to: ", ghrepo.FullName(currRepo)),
@@ -105,6 +107,7 @@ func renameRun(opts *RenameOptions) error {
 			Message: fmt.Sprintf("Rename %s to %s?", ghrepo.FullName(currRepo), newRepoName),
 			Default: false,
 		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(p, &confirmed)
 		if err != nil {
 			return fmt.Errorf("failed to prompt: %w", err)
@@ -114,10 +117,14 @@ func renameRun(opts *RenameOptions) error {
 		}
 	}
 
-	newRepo, err := apiRename(httpClient, currRepo, newRepoName)
+	apiClient := api.NewClientFromHTTP(httpClient)
+
+	newRepo, err := api.RenameRepo(apiClient, currRepo, newRepoName)
 	if err != nil {
 		return err
 	}
+
+	renamedRepo := ghrepo.New(newRepo.Owner.Login, newRepo.Name)
 
 	cs := opts.IO.ColorScheme()
 	if opts.IO.IsStdoutTTY() {
@@ -128,7 +135,7 @@ func renameRun(opts *RenameOptions) error {
 		return nil
 	}
 
-	remote, err := updateRemote(currRepo, newRepo, opts)
+	remote, err := updateRemote(currRepo, renamedRepo, opts)
 	if err != nil {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Warning: unable to update remote %q: %v\n", cs.WarningIcon(), remote.Name, err)
 	} else if opts.IO.IsStdoutTTY() {
@@ -144,7 +151,7 @@ func updateRemote(repo ghrepo.Interface, renamed ghrepo.Interface, opts *RenameO
 		return nil, err
 	}
 
-	protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
+	protocol, err := cfg.GetOrDefault(repo.RepoHost(), "git_protocol")
 	if err != nil {
 		return nil, err
 	}

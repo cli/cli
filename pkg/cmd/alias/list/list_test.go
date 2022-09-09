@@ -2,7 +2,7 @@ package list
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -18,6 +18,7 @@ func TestAliasList(t *testing.T) {
 		name       string
 		config     string
 		isTTY      bool
+		wantErr    bool
 		wantStdout string
 		wantStderr string
 	}{
@@ -25,8 +26,9 @@ func TestAliasList(t *testing.T) {
 			name:       "empty",
 			config:     "",
 			isTTY:      true,
+			wantErr:    true,
 			wantStdout: "",
-			wantStderr: "no aliases configured\n",
+			wantStderr: "",
 		},
 		{
 			name: "some",
@@ -42,19 +44,15 @@ func TestAliasList(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// TODO: change underlying config implementation so Write is not
-			// automatically called when editing aliases in-memory
-			defer config.StubWriteConfig(ioutil.Discard, ioutil.Discard)()
-
 			cfg := config.NewFromString(tt.config)
 
-			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			factory := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 				Config: func() (config.Config, error) {
 					return cfg, nil
 				},
@@ -64,11 +62,15 @@ func TestAliasList(t *testing.T) {
 			cmd.SetArgs([]string{})
 
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err := cmd.ExecuteC()
-			require.NoError(t, err)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 
 			assert.Equal(t, tt.wantStdout, stdout.String())
 			assert.Equal(t, tt.wantStderr, stderr.String())

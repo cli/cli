@@ -17,6 +17,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
@@ -26,10 +27,6 @@ import (
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
-
-type browser interface {
-	Browse(string) error
-}
 
 type runLogCache interface {
 	Exists(string) bool
@@ -67,7 +64,7 @@ type ViewOptions struct {
 	HttpClient  func() (*http.Client, error)
 	IO          *iostreams.IOStreams
 	BaseRepo    func() (ghrepo.Interface, error)
-	Browser     browser
+	Browser     browser.Browser
 	RunLogCache runLogCache
 
 	RunID      string
@@ -78,7 +75,8 @@ type ViewOptions struct {
 	LogFailed  bool
 	Web        bool
 
-	Prompt bool
+	Prompt   bool
+	Exporter cmdutil.Exporter
 
 	Now func() time.Time
 }
@@ -155,6 +153,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.Log, "log", false, "View full log for either a run or specific job")
 	cmd.Flags().BoolVar(&opts.LogFailed, "log-failed", false, "View the log for any failed steps in a run or specific job")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open run in the browser")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.RunFields)
 
 	return cmd
 }
@@ -181,7 +180,7 @@ func runView(opts *ViewOptions) error {
 
 	if jobID != "" {
 		opts.IO.StartProgressIndicator()
-		selectedJob, err = getJob(client, repo, jobID)
+		selectedJob, err = shared.GetJob(client, repo, jobID)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get job: %w", err)
@@ -195,7 +194,7 @@ func runView(opts *ViewOptions) error {
 	if opts.Prompt {
 		// TODO arbitrary limit
 		opts.IO.StartProgressIndicator()
-		runs, err := shared.GetRuns(client, repo, 10)
+		runs, err := shared.GetRuns(client, repo, nil, 10)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get runs: %w", err)
@@ -226,6 +225,16 @@ func runView(opts *ViewOptions) error {
 				return err
 			}
 		}
+	}
+
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+	}
+
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, run)
 	}
 
 	if opts.Web {
@@ -270,7 +279,7 @@ func runView(opts *ViewOptions) error {
 
 		attachRunLog(runLogZip, jobs)
 
-		return displayRunLog(opts.IO, jobs, opts.LogFailed)
+		return displayRunLog(opts.IO.Out, jobs, opts.LogFailed)
 	}
 
 	prNumber := ""
@@ -307,7 +316,7 @@ func runView(opts *ViewOptions) error {
 
 	out := opts.IO.Out
 
-	ago := opts.Now().Sub(run.CreatedAt)
+	ago := opts.Now().Sub(run.StartedTime())
 
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, utils.FuzzyAgo(ago), prNumber))
@@ -356,8 +365,10 @@ func runView(opts *ViewOptions) error {
 		fmt.Fprintln(out)
 		if shared.IsFailureState(run.Conclusion) {
 			fmt.Fprintf(out, "To see what failed, try: gh run view %d --log-failed\n", run.ID)
+		} else if len(jobs) == 1 {
+			fmt.Fprintf(out, "For more information about the job, try: gh run view --job=%d\n", jobs[0].ID)
 		} else {
-			fmt.Fprintln(out, "For more information about a job, try: gh run view --job=<job-id>")
+			fmt.Fprintf(out, "For more information about a job, try: gh run view --job=<job-id>\n")
 		}
 		fmt.Fprintf(out, cs.Gray("View this run on GitHub: %s\n"), run.URL)
 
@@ -381,18 +392,6 @@ func runView(opts *ViewOptions) error {
 	return nil
 }
 
-func getJob(client *api.Client, repo ghrepo.Interface, jobID string) (*shared.Job, error) {
-	path := fmt.Sprintf("repos/%s/actions/jobs/%s", ghrepo.FullName(repo), jobID)
-
-	var result shared.Job
-	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return &result, nil
-}
-
 func getLog(httpClient *http.Client, logURL string) (io.ReadCloser, error) {
 	req, err := http.NewRequest("GET", logURL, nil)
 	if err != nil {
@@ -414,7 +413,7 @@ func getLog(httpClient *http.Client, logURL string) (io.ReadCloser, error) {
 }
 
 func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface, run *shared.Run) (*zip.ReadCloser, error) {
-	filename := fmt.Sprintf("run-log-%d-%d.zip", run.ID, run.CreatedAt.Unix())
+	filename := fmt.Sprintf("run-log-%d-%d.zip", run.ID, run.StartedTime().Unix())
 	filepath := filepath.Join(os.TempDir(), "gh-cli-cache", filename)
 	if !cache.Exists(filepath) {
 		// Run log does not exist in cache so retrieve and store it
@@ -444,6 +443,7 @@ func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, er
 	}
 
 	var selected int
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err := prompt.SurveyAskOne(&survey.Select{
 		Message:  "View a specific job in this run?",
 		Options:  candidates,
@@ -494,13 +494,7 @@ func attachRunLog(rlz *zip.ReadCloser, jobs []shared.Job) {
 	}
 }
 
-func displayRunLog(io *iostreams.IOStreams, jobs []shared.Job, failed bool) error {
-	err := io.StartPager()
-	if err != nil {
-		return err
-	}
-	defer io.StopPager()
-
+func displayRunLog(w io.Writer, jobs []shared.Job, failed bool) error {
 	for _, job := range jobs {
 		steps := job.Steps
 		sort.Sort(steps)
@@ -518,7 +512,7 @@ func displayRunLog(io *iostreams.IOStreams, jobs []shared.Job, failed bool) erro
 			}
 			scanner := bufio.NewScanner(f)
 			for scanner.Scan() {
-				fmt.Fprintf(io.Out, "%s%s\n", prefix, scanner.Text())
+				fmt.Fprintf(w, "%s%s\n", prefix, scanner.Text())
 			}
 			f.Close()
 		}

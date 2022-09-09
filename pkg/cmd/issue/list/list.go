@@ -5,9 +5,11 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
@@ -16,19 +18,16 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
+	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
-
-type browser interface {
-	Browse(string) error
-}
 
 type ListOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
-	Browser    browser
+	Browser    browser.Browser
 
 	WebMode  bool
 	Exporter cmdutil.Exporter
@@ -41,6 +40,8 @@ type ListOptions struct {
 	Mention      string
 	Milestone    string
 	Search       string
+
+	Now func() time.Time
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -49,26 +50,43 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
 		Browser:    f.Browser,
+		Now:        time.Now,
 	}
+
+	var appAuthor string
 
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List and filter issues in this repository",
+		Short: "List issues in a repository",
+		Long: heredoc.Doc(`
+			List issues in a GitHub repository.
+
+			The search query syntax is documented here:
+			<https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests>
+		`),
 		Example: heredoc.Doc(`
-			$ gh issue list -l "bug" -l "help wanted"
-			$ gh issue list -A monalisa
-			$ gh issue list -a "@me"
-			$ gh issue list --web
+			$ gh issue list --label "bug" --label "help wanted"
+			$ gh issue list --author monalisa
+			$ gh issue list --assignee "@me"
 			$ gh issue list --milestone "The big 1.0"
 			$ gh issue list --search "error no:assignee sort:created-asc"
 		`),
-		Args: cmdutil.NoArgsQuoteReminder,
+		Aliases: []string{"ls"},
+		Args:    cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
 			if opts.LimitResults < 1 {
 				return cmdutil.FlagErrorf("invalid limit: %v", opts.LimitResults)
+			}
+
+			if cmd.Flags().Changed("author") && cmd.Flags().Changed("app") {
+				return cmdutil.FlagErrorf("specify only `--author` or `--app`")
+			}
+
+			if cmd.Flags().Changed("app") {
+				opts.Author = fmt.Sprintf("app/%s", appAuthor)
 			}
 
 			if runF != nil {
@@ -78,17 +96,15 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the browser to list the issue(s)")
+	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "List issues in the web browser")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
-	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by labels")
-	cmd.Flags().StringVarP(&opts.State, "state", "s", "open", "Filter by state: {open|closed|all}")
-	_ = cmd.RegisterFlagCompletionFunc("state", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"open", "closed", "all"}, cobra.ShellCompDirectiveNoFileComp
-	})
+	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by label")
+	cmdutil.StringEnumFlag(cmd, &opts.State, "state", "s", "open", []string{"open", "closed", "all"}, "Filter by state")
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of issues to fetch")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
+	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
 	cmd.Flags().StringVar(&opts.Mention, "mention", "", "Filter by mention")
-	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Filter by milestone `number` or `title`")
+	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Filter by milestone number or title")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search issues with `query`")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.IssueFields)
 
@@ -156,11 +172,11 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	err = opts.IO.StartPager()
-	if err != nil {
-		return err
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
-	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
 		return opts.Exporter.Write(opts.IO, listResult.Issues)
@@ -169,12 +185,15 @@ func listRun(opts *ListOptions) error {
 	if listResult.SearchCapped {
 		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
 	}
+	if len(listResult.Issues) == 0 {
+		return prShared.ListNoResults(ghrepo.FullName(baseRepo), "issue", !filterOptions.IsDefault())
+	}
 	if isTerminal {
 		title := prShared.ListHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, !filterOptions.IsDefault())
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
-	issueShared.PrintIssues(opts.IO, "", len(listResult.Issues), listResult.Issues)
+	issueShared.PrintIssues(opts.IO, opts.Now(), "", len(listResult.Issues), listResult.Issues)
 
 	return nil
 }
@@ -182,9 +201,9 @@ func listRun(opts *ListOptions) error {
 func issueList(client *http.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.IssuesAndTotalCount, error) {
 	apiClient := api.NewClientFromHTTP(client)
 
-	if filters.Search != "" || len(filters.Labels) > 0 {
+	if filters.Search != "" || len(filters.Labels) > 0 || filters.Milestone != "" {
 		if milestoneNumber, err := strconv.ParseInt(filters.Milestone, 10, 32); err == nil {
-			milestone, err := api.MilestoneByNumber(apiClient, repo, int32(milestoneNumber))
+			milestone, err := milestoneByNumber(client, repo, int32(milestoneNumber))
 			if err != nil {
 				return nil, err
 			}
@@ -210,4 +229,28 @@ func issueList(client *http.Client, repo ghrepo.Interface, filters prShared.Filt
 	}
 
 	return listIssues(apiClient, repo, filters, limit)
+}
+
+func milestoneByNumber(client *http.Client, repo ghrepo.Interface, number int32) (*api.RepoMilestone, error) {
+	var query struct {
+		Repository struct {
+			Milestone *api.RepoMilestone `graphql:"milestone(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":  githubv4.String(repo.RepoOwner()),
+		"name":   githubv4.String(repo.RepoName()),
+		"number": githubv4.Int(number),
+	}
+
+	gql := api.NewClientFromHTTP(client)
+	if err := gql.Query(repo.RepoHost(), "RepositoryMilestoneByNumber", &query, variables); err != nil {
+		return nil, err
+	}
+	if query.Repository.Milestone == nil {
+		return nil, fmt.Errorf("no milestone found with number '%d'", number)
+	}
+
+	return query.Repository.Milestone, nil
 }

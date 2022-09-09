@@ -8,7 +8,7 @@ release:
 before:
   hooks:
     - go mod tidy
-    - make manpages
+    - make manpages GH_VERSION={{.Version}}
 
 builds:
   - <<: &build_defaults
@@ -31,7 +31,10 @@ builds:
   - <<: *build_defaults
     id: windows
     goos: [windows]
-    goarch: [386, amd64]
+    goarch: [386, amd64, arm64]
+    hooks:
+      post:
+        - ./script/sign-windows-executable.sh '{{ .Path }}'
 
 archives:
   - id: nix

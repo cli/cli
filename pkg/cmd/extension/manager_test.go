@@ -3,7 +3,6 @@ package extension
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -48,7 +47,7 @@ func TestHelperProcess(t *testing.T) {
 	os.Exit(0)
 }
 
-func newTestManager(dir string, client *http.Client, io *iostreams.IOStreams) *Manager {
+func newTestManager(dir string, client *http.Client, ios *iostreams.IOStreams) *Manager {
 	return &Manager{
 		dataDir:  func() string { return dir },
 		lookPath: func(exe string) (string, error) { return exe, nil },
@@ -56,15 +55,15 @@ func newTestManager(dir string, client *http.Client, io *iostreams.IOStreams) *M
 		newCommand: func(exe string, args ...string) *exec.Cmd {
 			args = append([]string{os.Args[0], "-test.run=TestHelperProcess", "--", exe}, args...)
 			cmd := exec.Command(args[0], args[1:]...)
-			if io != nil {
-				cmd.Stdout = io.Out
-				cmd.Stderr = io.ErrOut
+			if ios != nil {
+				cmd.Stdout = ios.Out
+				cmd.Stderr = ios.ErrOut
 			}
 			cmd.Env = []string{"GH_WANT_HELPER_PROCESS=1"}
 			return cmd
 		},
 		config: config.NewBlankConfig(),
-		io:     io,
+		io:     ios,
 		client: client,
 		platform: func() (string, string) {
 			return "windows-amd64", ".exe"
@@ -87,14 +86,14 @@ func TestManager_List(t *testing.T) {
 		}))
 
 	m := newTestManager(tempDir, nil, nil)
-	exts := m.List(false)
+	exts := m.List()
 	assert.Equal(t, 3, len(exts))
 	assert.Equal(t, "bin-ext", exts[0].Name())
 	assert.Equal(t, "hello", exts[1].Name())
 	assert.Equal(t, "two", exts[2].Name())
 }
 
-func TestManager_List_binary_update(t *testing.T) {
+func TestManager_list_includeMetadata(t *testing.T) {
 	tempDir := t.TempDir()
 
 	assert.NoError(t, stubBinaryExtension(
@@ -125,7 +124,8 @@ func TestManager_List_binary_update(t *testing.T) {
 
 	m := newTestManager(tempDir, &client, nil)
 
-	exts := m.List(true)
+	exts, err := m.list(true)
+	assert.NoError(t, err)
 	assert.Equal(t, 1, len(exts))
 	assert.Equal(t, "bin-ext", exts[0].Name())
 	assert.True(t, exts[0].UpdateAvailable())
@@ -186,7 +186,7 @@ func TestManager_Remove(t *testing.T) {
 	err := m.Remove("hello")
 	assert.NoError(t, err)
 
-	items, err := ioutil.ReadDir(filepath.Join(tempDir, "extensions"))
+	items, err := os.ReadDir(filepath.Join(tempDir, "extensions"))
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(items))
 	assert.Equal(t, "gh-two", items[0].Name())
@@ -194,8 +194,8 @@ func TestManager_Remove(t *testing.T) {
 
 func TestManager_Upgrade_NoExtensions(t *testing.T) {
 	tempDir := t.TempDir()
-	io, _, stdout, stderr := iostreams.Test()
-	m := newTestManager(tempDir, nil, io)
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, nil, ios)
 	err := m.Upgrade("", false)
 	assert.EqualError(t, err, "no extensions installed")
 	assert.Equal(t, "", stdout.String())
@@ -205,8 +205,8 @@ func TestManager_Upgrade_NoExtensions(t *testing.T) {
 func TestManager_Upgrade_NoMatchingExtension(t *testing.T) {
 	tempDir := t.TempDir()
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-hello", "gh-hello")))
-	io, _, stdout, stderr := iostreams.Test()
-	m := newTestManager(tempDir, nil, io)
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, nil, ios)
 	err := m.Upgrade("invalid", false)
 	assert.EqualError(t, err, `no extension matched "invalid"`)
 	assert.Equal(t, "", stdout.String())
@@ -218,8 +218,8 @@ func TestManager_UpgradeExtensions(t *testing.T) {
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-hello", "gh-hello")))
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-two", "gh-two")))
 	assert.NoError(t, stubLocalExtension(tempDir, filepath.Join(tempDir, "extensions", "gh-local", "gh-local")))
-	io, _, stdout, stderr := iostreams.Test()
-	m := newTestManager(tempDir, nil, io)
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, nil, ios)
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(exts))
@@ -232,13 +232,40 @@ func TestManager_UpgradeExtensions(t *testing.T) {
 	assert.Equal(t, heredoc.Docf(
 		`
 		[hello]: [git -C %s pull --ff-only]
-		upgrade complete
+		upgraded from old vers to new vers
 		[local]: local extensions can not be upgraded
 		[two]: [git -C %s pull --ff-only]
-		upgrade complete
+		upgraded from old vers to new vers
 		`,
 		filepath.Join(tempDir, "extensions", "gh-hello"),
 		filepath.Join(tempDir, "extensions", "gh-two"),
+	), stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
+func TestManager_UpgradeExtensions_DryRun(t *testing.T) {
+	tempDir := t.TempDir()
+	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-hello", "gh-hello")))
+	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-two", "gh-two")))
+	assert.NoError(t, stubLocalExtension(tempDir, filepath.Join(tempDir, "extensions", "gh-local", "gh-local")))
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, nil, ios)
+	m.EnableDryRunMode()
+	exts, err := m.list(false)
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(exts))
+	for i := 0; i < 3; i++ {
+		exts[i].currentVersion = fmt.Sprintf("%d", i)
+		exts[i].latestVersion = fmt.Sprintf("%d", i+1)
+	}
+	err = m.upgradeExtensions(exts, false)
+	assert.NoError(t, err)
+	assert.Equal(t, heredoc.Doc(
+		`
+ 		[hello]: would have upgraded from 0 to 1
+ 		[local]: local extensions can not be upgraded
+ 		[two]: would have upgraded from 2 to 3
+ 		`,
 	), stdout.String())
 	assert.Equal(t, "", stderr.String())
 }
@@ -247,8 +274,24 @@ func TestManager_UpgradeExtension_LocalExtension(t *testing.T) {
 	tempDir := t.TempDir()
 	assert.NoError(t, stubLocalExtension(tempDir, filepath.Join(tempDir, "extensions", "gh-local", "gh-local")))
 
-	io, _, stdout, stderr := iostreams.Test()
-	m := newTestManager(tempDir, nil, io)
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, nil, ios)
+	exts, err := m.list(false)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(exts))
+	err = m.upgradeExtension(exts[0], false)
+	assert.EqualError(t, err, "local extensions can not be upgraded")
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
+func TestManager_UpgradeExtension_LocalExtension_DryRun(t *testing.T) {
+	tempDir := t.TempDir()
+	assert.NoError(t, stubLocalExtension(tempDir, filepath.Join(tempDir, "extensions", "gh-local", "gh-local")))
+
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, nil, ios)
+	m.EnableDryRunMode()
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(exts))
@@ -261,8 +304,8 @@ func TestManager_UpgradeExtension_LocalExtension(t *testing.T) {
 func TestManager_UpgradeExtension_GitExtension(t *testing.T) {
 	tempDir := t.TempDir()
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-remote", "gh-remote")))
-	io, _, stdout, stderr := iostreams.Test()
-	m := newTestManager(tempDir, nil, io)
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, nil, ios)
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(exts))
@@ -280,12 +323,30 @@ func TestManager_UpgradeExtension_GitExtension(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 }
 
+func TestManager_UpgradeExtension_GitExtension_DryRun(t *testing.T) {
+	tempDir := t.TempDir()
+	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-remote", "gh-remote")))
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, nil, ios)
+	m.EnableDryRunMode()
+	exts, err := m.list(false)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(exts))
+	ext := exts[0]
+	ext.currentVersion = "old version"
+	ext.latestVersion = "new version"
+	err = m.upgradeExtension(ext, false)
+	assert.NoError(t, err)
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
 func TestManager_UpgradeExtension_GitExtension_Force(t *testing.T) {
 	tempDir := t.TempDir()
 	extensionDir := filepath.Join(tempDir, "extensions", "gh-remote")
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-remote", "gh-remote")))
-	io, _, stdout, stderr := iostreams.Test()
-	m := newTestManager(tempDir, nil, io)
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, nil, ios)
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(exts))
@@ -307,12 +368,12 @@ func TestManager_UpgradeExtension_GitExtension_Force(t *testing.T) {
 func TestManager_MigrateToBinaryExtension(t *testing.T) {
 	tempDir := t.TempDir()
 	assert.NoError(t, stubExtension(filepath.Join(tempDir, "extensions", "gh-remote", "gh-remote")))
-	io, _, stdout, stderr := iostreams.Test()
+	ios, _, stdout, stderr := iostreams.Test()
 
 	reg := httpmock.Registry{}
 	defer reg.Verify(t)
 	client := http.Client{Transport: &reg}
-	m := newTestManager(tempDir, &client, io)
+	m := newTestManager(tempDir, &client, ios)
 	exts, err := m.list(false)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(exts))
@@ -396,8 +457,8 @@ func TestManager_UpgradeExtension_BinaryExtension(t *testing.T) {
 			Tag:   "v1.0.1",
 		}))
 
-	io, _, stdout, stderr := iostreams.Test()
-	m := newTestManager(tempDir, &http.Client{Transport: &reg}, io)
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, &http.Client{Transport: &reg}, ios)
 	reg.Register(
 		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
 		httpmock.JSONResponse(
@@ -445,6 +506,103 @@ func TestManager_UpgradeExtension_BinaryExtension(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 }
 
+func TestManager_UpgradeExtension_BinaryExtension_DryRun(t *testing.T) {
+	tempDir := t.TempDir()
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+	assert.NoError(t, stubBinaryExtension(
+		filepath.Join(tempDir, "extensions", "gh-bin-ext"),
+		binManifest{
+			Owner: "owner",
+			Name:  "gh-bin-ext",
+			Host:  "example.com",
+			Tag:   "v1.0.1",
+		}))
+
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, &http.Client{Transport: &reg}, ios)
+	m.EnableDryRunMode()
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Tag: "v1.0.2",
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-windows-amd64.exe",
+						APIURL: "https://example.com/release/cool2",
+					},
+				},
+			}))
+	exts, err := m.list(false)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(exts))
+	ext := exts[0]
+	ext.latestVersion = "v1.0.2"
+	err = m.upgradeExtension(ext, false)
+	assert.NoError(t, err)
+
+	manifest, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext", manifestName))
+	assert.NoError(t, err)
+
+	var bm binManifest
+	err = yaml.Unmarshal(manifest, &bm)
+	assert.NoError(t, err)
+
+	assert.Equal(t, binManifest{
+		Name:  "gh-bin-ext",
+		Owner: "owner",
+		Host:  "example.com",
+		Tag:   "v1.0.1",
+	}, bm)
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
+func TestManager_UpgradeExtension_BinaryExtension_Pinned(t *testing.T) {
+	tempDir := t.TempDir()
+
+	assert.NoError(t, stubBinaryExtension(
+		filepath.Join(tempDir, "extensions", "gh-bin-ext"),
+		binManifest{
+			Owner:    "owner",
+			Name:     "gh-bin-ext",
+			Host:     "example.com",
+			Tag:      "v1.6.3",
+			IsPinned: true,
+		}))
+
+	ios, _, _, _ := iostreams.Test()
+	m := newTestManager(tempDir, nil, ios)
+	exts, err := m.list(false)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(exts))
+	ext := exts[0]
+
+	err = m.upgradeExtension(ext, false)
+	assert.NotNil(t, err)
+	assert.Equal(t, err, pinnedExtensionUpgradeError)
+}
+
+func TestManager_UpgradeExtenion_GitExtension_Pinned(t *testing.T) {
+	tempDir := t.TempDir()
+	extDir := filepath.Join(tempDir, "extensions", "gh-remote")
+	assert.NoError(t, stubPinnedExtension(filepath.Join(extDir, "gh-remote"), "abcd1234"))
+
+	ios, _, _, _ := iostreams.Test()
+	m := newTestManager(tempDir, nil, ios)
+	exts, err := m.list(false)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(exts))
+	ext := exts[0]
+	ext.isPinned = true
+	ext.latestVersion = "new version"
+
+	err = m.upgradeExtension(ext, false)
+	assert.NotNil(t, err)
+	assert.Equal(t, err, pinnedExtensionUpgradeError)
+}
+
 func TestManager_Install_git(t *testing.T) {
 	tempDir := t.TempDir()
 
@@ -452,8 +610,8 @@ func TestManager_Install_git(t *testing.T) {
 	defer reg.Verify(t)
 	client := http.Client{Transport: &reg}
 
-	io, _, stdout, stderr := iostreams.Test()
-	m := newTestManager(tempDir, &client, io)
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, &client, ios)
 
 	reg.Register(
 		httpmock.REST("GET", "repos/owner/gh-some-ext/releases/latest"),
@@ -472,10 +630,111 @@ func TestManager_Install_git(t *testing.T) {
 
 	repo := ghrepo.New("owner", "gh-some-ext")
 
-	err := m.Install(repo)
+	err := m.Install(repo, "")
 	assert.NoError(t, err)
 	assert.Equal(t, fmt.Sprintf("[git clone https://github.com/owner/gh-some-ext.git %s]\n", filepath.Join(tempDir, "extensions", "gh-some-ext")), stdout.String())
 	assert.Equal(t, "", stderr.String())
+}
+
+func TestManager_Install_git_pinned(t *testing.T) {
+	tempDir := t.TempDir()
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+	client := http.Client{Transport: &reg}
+
+	ios, _, _, stderr := iostreams.Test()
+	m := newTestManager(tempDir, &client, ios)
+
+	reg.Register(
+		httpmock.REST("GET", "repos/owner/gh-cool-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Assets: []releaseAsset{
+					{
+						Name:   "not-a-binary",
+						APIURL: "https://example.com/release/cool",
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "repos/owner/gh-cool-ext/commits/some-ref"),
+		httpmock.StringResponse("abcd1234"))
+	reg.Register(
+		httpmock.REST("GET", "repos/owner/gh-cool-ext/contents/gh-cool-ext"),
+		httpmock.StringResponse("script"))
+
+	_ = os.MkdirAll(filepath.Join(m.installDir(), "gh-cool-ext"), 0700)
+	repo := ghrepo.New("owner", "gh-cool-ext")
+	err := m.Install(repo, "some-ref")
+	assert.NoError(t, err)
+	assert.Equal(t, "", stderr.String())
+}
+
+func TestManager_Install_binary_pinned(t *testing.T) {
+	repo := ghrepo.NewWithHost("owner", "gh-bin-ext", "example.com")
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-windows-amd64.exe",
+						APIURL: "https://example.com/release/cool",
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/tags/v1.6.3-pre"),
+		httpmock.JSONResponse(
+			release{
+				Tag: "v1.6.3-pre",
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-windows-amd64.exe",
+						APIURL: "https://example.com/release/cool",
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "release/cool"),
+		httpmock.StringResponse("FAKE BINARY"))
+
+	ios, _, stdout, stderr := iostreams.Test()
+	tempDir := t.TempDir()
+
+	m := newTestManager(tempDir, &http.Client{Transport: &reg}, ios)
+
+	err := m.Install(repo, "v1.6.3-pre")
+	assert.NoError(t, err)
+
+	manifest, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext", manifestName))
+	assert.NoError(t, err)
+
+	var bm binManifest
+	err = yaml.Unmarshal(manifest, &bm)
+	assert.NoError(t, err)
+
+	assert.Equal(t, binManifest{
+		Name:     "gh-bin-ext",
+		Owner:    "owner",
+		Host:     "example.com",
+		Tag:      "v1.6.3-pre",
+		IsPinned: true,
+		Path:     filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext.exe"),
+	}, bm)
+
+	fakeBin, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext.exe"))
+	assert.NoError(t, err)
+	assert.Equal(t, "FAKE BINARY", string(fakeBin))
+
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "", stderr.String())
+
 }
 
 func TestManager_Install_binary_unsupported(t *testing.T) {
@@ -509,12 +768,12 @@ func TestManager_Install_binary_unsupported(t *testing.T) {
 				},
 			}))
 
-	io, _, stdout, stderr := iostreams.Test()
+	ios, _, stdout, stderr := iostreams.Test()
 	tempDir := t.TempDir()
 
-	m := newTestManager(tempDir, &client, io)
+	m := newTestManager(tempDir, &client, ios)
 
-	err := m.Install(repo)
+	err := m.Install(repo, "")
 	assert.EqualError(t, err, "gh-bin-ext unsupported for windows-amd64. Open an issue: `gh issue create -R owner/gh-bin-ext -t'Support windows-amd64'`")
 
 	assert.Equal(t, "", stdout.String())
@@ -554,12 +813,12 @@ func TestManager_Install_binary(t *testing.T) {
 		httpmock.REST("GET", "release/cool"),
 		httpmock.StringResponse("FAKE BINARY"))
 
-	io, _, stdout, stderr := iostreams.Test()
+	ios, _, stdout, stderr := iostreams.Test()
 	tempDir := t.TempDir()
 
-	m := newTestManager(tempDir, &http.Client{Transport: &reg}, io)
+	m := newTestManager(tempDir, &http.Client{Transport: &reg}, ios)
 
-	err := m.Install(repo)
+	err := m.Install(repo, "")
 	assert.NoError(t, err)
 
 	manifest, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext", manifestName))
@@ -587,12 +846,12 @@ func TestManager_Install_binary(t *testing.T) {
 
 func TestManager_Create(t *testing.T) {
 	chdirTemp(t)
-	io, _, stdout, stderr := iostreams.Test()
-	m := newTestManager(".", nil, io)
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(".", nil, ios)
 
 	err := m.Create("gh-test", extensions.GitTemplateType)
 	assert.NoError(t, err)
-	files, err := ioutil.ReadDir("gh-test")
+	files, err := os.ReadDir("gh-test")
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"gh-test"}, fileNames(files))
 
@@ -611,13 +870,13 @@ func TestManager_Create_go_binary(t *testing.T) {
 		httpmock.GraphQL(`query UserCurrent\b`),
 		httpmock.StringResponse(`{"data":{"viewer":{"login":"jillv"}}}`))
 
-	io, _, stdout, stderr := iostreams.Test()
-	m := newTestManager(".", &http.Client{Transport: &reg}, io)
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(".", &http.Client{Transport: &reg}, ios)
 
 	err := m.Create("gh-test", extensions.GoBinTemplateType)
 	require.NoError(t, err)
 
-	files, err := ioutil.ReadDir("gh-test")
+	files, err := os.ReadDir("gh-test")
 	require.NoError(t, err)
 	assert.Equal(t, []string{".github", ".gitignore", "main.go"}, fileNames(files))
 
@@ -628,7 +887,7 @@ func TestManager_Create_go_binary(t *testing.T) {
 		/gh-test.exe
 	`), string(gitignore))
 
-	files, err = ioutil.ReadDir(filepath.Join("gh-test", ".github", "workflows"))
+	files, err = os.ReadDir(filepath.Join("gh-test", ".github", "workflows"))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"release.yml"}, fileNames(files))
 
@@ -644,21 +903,21 @@ func TestManager_Create_go_binary(t *testing.T) {
 
 func TestManager_Create_other_binary(t *testing.T) {
 	chdirTemp(t)
-	io, _, stdout, stderr := iostreams.Test()
-	m := newTestManager(".", nil, io)
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(".", nil, ios)
 
 	err := m.Create("gh-test", extensions.OtherBinTemplateType)
 	assert.NoError(t, err)
 
-	files, err := ioutil.ReadDir("gh-test")
+	files, err := os.ReadDir("gh-test")
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(files))
 
-	files, err = ioutil.ReadDir(filepath.Join("gh-test", ".github", "workflows"))
+	files, err = os.ReadDir(filepath.Join("gh-test", ".github", "workflows"))
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"release.yml"}, fileNames(files))
 
-	files, err = ioutil.ReadDir(filepath.Join("gh-test", "script"))
+	files, err = os.ReadDir(filepath.Join("gh-test", "script"))
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"build.sh"}, fileNames(files))
 
@@ -682,7 +941,7 @@ func chdirTemp(t *testing.T) {
 	})
 }
 
-func fileNames(files []os.FileInfo) []string {
+func fileNames(files []os.DirEntry) []string {
 	names := make([]string, len(files))
 	for i, f := range files {
 		names[i] = f.Name()
@@ -702,8 +961,26 @@ func stubExtension(path string) error {
 	return f.Close()
 }
 
+func stubPinnedExtension(path string, pinnedVersion string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_CREATE, 0755)
+	if err != nil {
+		return err
+	}
+	f.Close()
+
+	pinPath := filepath.Join(filepath.Dir(path), fmt.Sprintf(".pin-%s", pinnedVersion))
+	f, err = os.OpenFile(pinPath, os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		return err
+	}
+	return f.Close()
+}
+
 func stubLocalExtension(tempDir, path string) error {
-	extDir, err := ioutil.TempDir(tempDir, "local-ext")
+	extDir, err := os.MkdirTemp(tempDir, "local-ext")
 	if err != nil {
 		return err
 	}

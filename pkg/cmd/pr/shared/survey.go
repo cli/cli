@@ -22,19 +22,34 @@ const (
 	CancelAction
 	MetadataAction
 	EditCommitMessageAction
+	EditCommitSubjectAction
+	SubmitDraftAction
 
 	noMilestone = "(none)"
+
+	submitLabel      = "Submit"
+	submitDraftLabel = "Submit as draft"
+	previewLabel     = "Continue in browser"
+	metadataLabel    = "Add metadata"
+	cancelLabel      = "Cancel"
 )
 
-func ConfirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
-	const (
-		submitLabel   = "Submit"
-		previewLabel  = "Continue in browser"
-		metadataLabel = "Add metadata"
-		cancelLabel   = "Cancel"
-	)
+func ConfirmIssueSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
+	return confirmSubmission(allowPreview, allowMetadata, false, false)
+}
 
-	options := []string{submitLabel}
+func ConfirmPRSubmission(allowPreview, allowMetadata, isDraft bool) (Action, error) {
+	return confirmSubmission(allowPreview, allowMetadata, true, isDraft)
+}
+
+func confirmSubmission(allowPreview, allowMetadata, allowDraft, isDraft bool) (Action, error) {
+	var options []string
+	if !isDraft {
+		options = append(options, submitLabel)
+	}
+	if allowDraft {
+		options = append(options, submitDraftLabel)
+	}
 	if allowPreview {
 		options = append(options, previewLabel)
 	}
@@ -56,6 +71,7 @@ func ConfirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
 		},
 	}
 
+	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 	err := prompt.SurveyAsk(confirmQs, &confirmAnswers)
 	if err != nil {
 		return -1, fmt.Errorf("could not prompt: %w", err)
@@ -64,6 +80,8 @@ func ConfirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
 	switch options[confirmAnswers.Confirmation] {
 	case submitLabel:
 		return SubmitAction, nil
+	case submitDraftLabel:
+		return SubmitDraftAction, nil
 	case previewLabel:
 		return PreviewAction, nil
 	case metadataLabel:
@@ -105,6 +123,7 @@ func BodySurvey(state *IssueMetadataState, templateContent, editorCommand string
 		},
 	}
 
+	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 	err := prompt.SurveyAsk(qs, state)
 	if err != nil {
 		return err
@@ -131,6 +150,7 @@ func TitleSurvey(state *IssueMetadataState) error {
 		},
 	}
 
+	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 	err := prompt.SurveyAsk(qs, state)
 	if err != nil {
 		return err
@@ -180,6 +200,7 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 	}
 	extraFieldsOptions = append(extraFieldsOptions, "Assignees", "Labels", "Projects", "Milestone")
 
+	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 	err := prompt.SurveyAsk([]*survey.Question{
 		{
 			Name: "metadata",
@@ -207,7 +228,7 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 
 	var users []string
 	for _, u := range metadataResult.AssignableUsers {
-		users = append(users, u.Login)
+		users = append(users, u.DisplayName())
 	}
 	var teams []string
 	for _, t := range metadataResult.Teams {
@@ -310,16 +331,27 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 		Milestone string
 	}{}
 
-	err = prompt.SurveyAsk(mqs, &values, survey.WithKeepFilter(true))
+	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
+	err = prompt.SurveyAsk(mqs, &values)
 	if err != nil {
 		return fmt.Errorf("could not prompt: %w", err)
 	}
 
 	if isChosen("Reviewers") {
-		state.Reviewers = values.Reviewers
+		var logins []string
+		for _, r := range values.Reviewers {
+			// Extract user login from display name
+			logins = append(logins, (strings.Split(r, " "))[0])
+		}
+		state.Reviewers = logins
 	}
 	if isChosen("Assignees") {
-		state.Assignees = values.Assignees
+		var logins []string
+		for _, a := range values.Assignees {
+			// Extract user login from display name
+			logins = append(logins, (strings.Split(a, " "))[0])
+		}
+		state.Assignees = logins
 	}
 	if isChosen("Labels") {
 		state.Labels = values.Labels

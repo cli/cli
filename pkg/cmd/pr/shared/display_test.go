@@ -16,28 +16,6 @@ func Test_listHeader(t *testing.T) {
 		want string
 	}{
 		{
-			name: "no results",
-			args: args{
-				repoName:        "REPO",
-				itemName:        "table",
-				matchCount:      0,
-				totalMatchCount: 0,
-				hasFilters:      false,
-			},
-			want: "There are no open tables in REPO",
-		},
-		{
-			name: "no matches after filters",
-			args: args{
-				repoName:        "REPO",
-				itemName:        "Luftballon",
-				matchCount:      0,
-				totalMatchCount: 0,
-				hasFilters:      true,
-			},
-			want: "No Luftballons match your search in REPO",
-		},
-		{
 			name: "one result",
 			args: args{
 				repoName:        "REPO",

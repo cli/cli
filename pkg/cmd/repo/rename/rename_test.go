@@ -73,11 +73,11 @@ func TestNewCmdRename(t *testing.T) {
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			argv, err := shlex.Split(tt.input)
@@ -117,12 +117,13 @@ func TestRenameRun(t *testing.T) {
 			name:    "none argument",
 			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n✓ Updated the \"origin\" remote\n",
 			askStubs: func(q *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
 				q.StubOne("NEW_REPO")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.StatusStringResponse(204, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
+					httpmock.StatusStringResponse(200, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git remote set-url origin https://github.com/OWNER/NEW_REPO.git`, 0, "")
@@ -136,12 +137,13 @@ func TestRenameRun(t *testing.T) {
 			},
 			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n",
 			askStubs: func(q *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
 				q.StubOne("NEW_REPO")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.StatusStringResponse(204, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
+					httpmock.StatusStringResponse(200, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
 			},
 			tty: true,
 		},
@@ -154,7 +156,7 @@ func TestRenameRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.StatusStringResponse(204, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
+					httpmock.StatusStringResponse(200, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git remote set-url origin https://github.com/OWNER/NEW_REPO.git`, 0, "")
@@ -169,7 +171,7 @@ func TestRenameRun(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.StatusStringResponse(204, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
+					httpmock.StatusStringResponse(200, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git remote set-url origin https://github.com/OWNER/NEW_REPO.git`, 0, "")
@@ -184,12 +186,13 @@ func TestRenameRun(t *testing.T) {
 			},
 			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n✓ Updated the \"origin\" remote\n",
 			askStubs: func(q *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
 				q.StubOne(true)
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO"),
-					httpmock.StatusStringResponse(204, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
+					httpmock.StatusStringResponse(200, `{"name":"NEW_REPO","owner":{"login":"OWNER"}}`))
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git remote set-url origin https://github.com/OWNER/NEW_REPO.git`, 0, "")
@@ -204,6 +207,7 @@ func TestRenameRun(t *testing.T) {
 				DoConfirm:       true,
 			},
 			askStubs: func(q *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
 				q.StubOne(false)
 			},
 			wantOut: "",
@@ -211,6 +215,7 @@ func TestRenameRun(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
+		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 		q, teardown := prompt.InitAskStubber()
 		defer teardown()
 		if tt.askStubs != nil {
@@ -249,10 +254,10 @@ func TestRenameRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdinTTY(tt.tty)
-		io.SetStdoutTTY(tt.tty)
-		tt.opts.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdinTTY(tt.tty)
+		ios.SetStdoutTTY(tt.tty)
+		tt.opts.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)

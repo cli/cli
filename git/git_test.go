@@ -181,37 +181,40 @@ func TestParseExtraCloneArgs(t *testing.T) {
 	}
 }
 
-func TestAddUpstreamRemote(t *testing.T) {
+func TestAddNamedRemote(t *testing.T) {
 	tests := []struct {
-		name        string
-		upstreamURL string
-		cloneDir    string
-		branches    []string
-		want        string
+		title    string
+		name     string
+		url      string
+		dir      string
+		branches []string
+		want     string
 	}{
 		{
-			name:        "fetch all",
-			upstreamURL: "URL",
-			cloneDir:    "DIRECTORY",
-			branches:    []string{},
-			want:        "git -C DIRECTORY remote add -f upstream URL",
+			title:    "fetch all",
+			name:     "test",
+			url:      "URL",
+			dir:      "DIRECTORY",
+			branches: []string{},
+			want:     "git -C DIRECTORY remote add -f test URL",
 		},
 		{
-			name:        "fetch specific branches only",
-			upstreamURL: "URL",
-			cloneDir:    "DIRECTORY",
-			branches:    []string{"master", "dev"},
-			want:        "git -C DIRECTORY remote add -t master -t dev -f upstream URL",
+			title:    "fetch specific branches only",
+			name:     "test",
+			url:      "URL",
+			dir:      "DIRECTORY",
+			branches: []string{"trunk", "dev"},
+			want:     "git -C DIRECTORY remote add -t trunk -t dev -f test URL",
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.title, func(t *testing.T) {
 			cs, cmdTeardown := run.Stub()
 			defer cmdTeardown(t)
 
 			cs.Register(tt.want, 0, "")
 
-			err := AddUpstreamRemote(tt.upstreamURL, tt.cloneDir, tt.branches)
+			err := AddNamedRemote(tt.url, tt.name, tt.dir, tt.branches)
 			if err != nil {
 				t.Fatalf("error running command `git remote add -f`: %v", err)
 			}

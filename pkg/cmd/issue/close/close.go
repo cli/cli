@@ -1,18 +1,16 @@
 package close
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -24,6 +22,7 @@ type CloseOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	SelectorArg string
+	Comment     string
 }
 
 func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Command {
@@ -52,6 +51,8 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 		},
 	}
 
+	cmd.Flags().StringVarP(&opts.Comment, "comment", "c", "", "Leave a closing comment")
+
 	return cmd
 }
 
@@ -71,6 +72,22 @@ func closeRun(opts *CloseOptions) error {
 	if issue.State == "CLOSED" {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Issue #%d (%s) is already closed\n", cs.Yellow("!"), issue.Number, issue.Title)
 		return nil
+	}
+
+	if opts.Comment != "" {
+		commentOpts := &prShared.CommentableOptions{
+			Body:       opts.Comment,
+			HttpClient: opts.HttpClient,
+			InputType:  prShared.InputTypeInline,
+			Quiet:      true,
+			RetrieveCommentable: func() (prShared.Commentable, ghrepo.Interface, error) {
+				return issue, baseRepo, nil
+			},
+		}
+		err := prShared.CommentableRun(commentOpts)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = apiClose(httpClient, baseRepo, issue)
@@ -102,6 +119,6 @@ func apiClose(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue) 
 		},
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
-	return gql.MutateNamed(context.Background(), "IssueClose", &mutation, variables)
+	gql := api.NewClientFromHTTP(httpClient)
+	return gql.Mutate(repo.RepoHost(), "IssueClose", &mutation, variables)
 }

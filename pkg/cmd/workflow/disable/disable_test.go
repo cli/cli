@@ -2,7 +2,7 @@ package disable
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -54,12 +54,12 @@ func TestNewCmdDisable(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			argv, err := shlex.Split(tt.cli)
@@ -72,8 +72,8 @@ func TestNewCmdDisable(t *testing.T) {
 			})
 			cmd.SetArgs(argv)
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
@@ -121,7 +121,7 @@ func TestDisableRun(t *testing.T) {
 					httpmock.StatusStringResponse(204, "{}"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(1)
+				as.StubPrompt("Select a workflow").AnswerWith("another workflow (another.yml)")
 			},
 			wantOut: "✓ Disabled another workflow\n",
 		},
@@ -176,7 +176,7 @@ func TestDisableRun(t *testing.T) {
 					httpmock.StatusStringResponse(204, "{}"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(1)
+				as.StubPrompt("Which workflow do you mean?").AnswerWith("another workflow (yetanother.yml)")
 			},
 			wantOut: "✓ Disabled another workflow\n",
 		},
@@ -269,21 +269,21 @@ func TestDisableRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdoutTTY(tt.tty)
-		io.SetStdinTTY(tt.tty)
-		tt.opts.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdoutTTY(tt.tty)
+		ios.SetStdinTTY(tt.tty)
+		tt.opts.IO = ios
 		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("OWNER/REPO")
 		}
 
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
-		}
-
 		t.Run(tt.name, func(t *testing.T) {
+			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
+			as := prompt.NewAskStubber(t)
+			if tt.askStubs != nil {
+				tt.askStubs(as)
+			}
+
 			err := runDisable(tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)

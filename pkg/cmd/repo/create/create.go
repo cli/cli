@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -16,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
@@ -27,28 +27,25 @@ type CreateOptions struct {
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 
-	Name              string
-	Description       string
-	Homepage          string
-	Team              string
-	Template          string
-	Public            bool
-	Private           bool
-	Internal          bool
-	Visibility        string
-	Push              bool
-	Clone             bool
-	Source            string
-	Remote            string
-	GitIgnoreTemplate string
-	LicenseTemplate   string
-	DisableIssues     bool
-	DisableWiki       bool
-	Interactive       bool
-
-	ConfirmSubmit bool
-	EnableIssues  bool
-	EnableWiki    bool
+	Name               string
+	Description        string
+	Homepage           string
+	Team               string
+	Template           string
+	Public             bool
+	Private            bool
+	Internal           bool
+	Visibility         string
+	Push               bool
+	Clone              bool
+	Source             string
+	Remote             string
+	GitIgnoreTemplate  string
+	LicenseTemplate    string
+	DisableIssues      bool
+	DisableWiki        bool
+	Interactive        bool
+	IncludeAllBranches bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -57,6 +54,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
 	}
+
+	var enableIssues bool
+	var enableWiki bool
 
 	cmd := &cobra.Command{
 		Use:   "create [<name>]",
@@ -69,12 +69,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			To create a remote repository non-interactively, supply the repository name and one of %[1]s--public%[1]s, %[1]s--private%[1]s, or %[1]s--internal%[1]s.
 			Pass %[1]s--clone%[1]s to clone the new repository locally.
 
-			To create a remote repository from an existing local repository, specify the source directory with %[1]s--source%[1]s. 
-			By default, the remote repository name will be the name of the source directory. 
+			To create a remote repository from an existing local repository, specify the source directory with %[1]s--source%[1]s.
+			By default, the remote repository name will be the name of the source directory.
 			Pass %[1]s--push%[1]s to push any local commits to the new repository.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# create a repository interactively 
+			# create a repository interactively
 			gh repo create
 
 			# create a new remote repository and clone it locally
@@ -83,7 +83,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			# create a remote repository from the current directory
 			gh repo create my-project --private --source=. --remote=upstream
 		`),
-		Args: cobra.MaximumNArgs(1),
+		Args:    cobra.MaximumNArgs(1),
+		Aliases: []string{"new"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				opts.Name = args[0]
@@ -135,13 +136,17 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 
 			if cmd.Flags().Changed("enable-issues") {
-				opts.DisableIssues = !opts.EnableIssues
+				opts.DisableIssues = !enableIssues
 			}
 			if cmd.Flags().Changed("enable-wiki") {
-				opts.DisableWiki = !opts.EnableWiki
+				opts.DisableWiki = !enableWiki
 			}
 			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "" || opts.DisableIssues || opts.DisableWiki) {
 				return cmdutil.FlagErrorf("the `--template` option is not supported with `--homepage`, `--team`, `--disable-issues`, or `--disable-wiki`")
+			}
+
+			if opts.Template == "" && opts.IncludeAllBranches {
+				return cmdutil.FlagErrorf("the `--include-all-branches` option is only supported when using `--template`")
 			}
 
 			if runF != nil {
@@ -166,11 +171,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.Clone, "clone", "c", false, "Clone the new repository to the current directory")
 	cmd.Flags().BoolVar(&opts.DisableIssues, "disable-issues", false, "Disable issues in the new repository")
 	cmd.Flags().BoolVar(&opts.DisableWiki, "disable-wiki", false, "Disable wiki in the new repository")
+	cmd.Flags().BoolVar(&opts.IncludeAllBranches, "include-all-branches", false, "Include all branches from template repository")
 
 	// deprecated flags
-	cmd.Flags().BoolVarP(&opts.ConfirmSubmit, "confirm", "y", false, "Skip the confirmation prompt")
-	cmd.Flags().BoolVar(&opts.EnableIssues, "enable-issues", true, "Enable issues in the new repository")
-	cmd.Flags().BoolVar(&opts.EnableWiki, "enable-wiki", true, "Enable wiki in the new repository")
+	cmd.Flags().BoolP("confirm", "y", false, "Skip the confirmation prompt")
+	cmd.Flags().BoolVar(&enableIssues, "enable-issues", true, "Enable issues in the new repository")
+	cmd.Flags().BoolVar(&enableWiki, "enable-wiki", true, "Enable wiki in the new repository")
 
 	_ = cmd.Flags().MarkDeprecated("confirm", "Pass any argument to skip confirmation prompt")
 	_ = cmd.Flags().MarkDeprecated("enable-issues", "Disable issues with `--disable-issues`")
@@ -185,10 +191,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
-		hostname, err := cfg.DefaultHost()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveError
-		}
+		hostname, _ := cfg.DefaultHost()
 		results, err := listGitIgnoreTemplates(httpClient, hostname)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
@@ -205,10 +208,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
-		hostname, err := cfg.DefaultHost()
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveError
-		}
+		hostname, _ := cfg.DefaultHost()
 		licenses, err := listLicenseTemplates(httpClient, hostname)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
@@ -224,31 +224,28 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 }
 
 func createRun(opts *CreateOptions) error {
-	var fromScratch bool
-	modeOptions := []string{
-		"Create a new repository on GitHub from scratch",
-		"Push an existing local repository to GitHub"}
+	fromScratch := opts.Source == ""
 
 	if opts.Interactive {
-		var createMode string
-		createModePrompt := &survey.Select{
+		var selectedMode string
+		modeOptions := []string{
+			"Create a new repository on GitHub from scratch",
+			"Push an existing local repository to GitHub",
+		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
+		if err := prompt.SurveyAskOne(&survey.Select{
 			Message: "What would you like to do?",
 			Options: modeOptions,
-		}
-		err := prompt.SurveyAskOne(createModePrompt, &createMode)
-		if err != nil {
+		}, &selectedMode); err != nil {
 			return err
 		}
-		fromScratch = createMode == modeOptions[0]
-	} else {
-		fromScratch = opts.Source == ""
+		fromScratch = selectedMode == modeOptions[0]
 	}
 
 	if fromScratch {
 		return createFromScratch(opts)
-	} else {
-		return createFromLocal(opts)
 	}
+	return createFromLocal(opts)
 }
 
 // create new repo on remote host
@@ -264,10 +261,7 @@ func createFromScratch(opts *CreateOptions) error {
 		return err
 	}
 
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
 	if opts.Interactive {
 		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo("")
@@ -280,6 +274,10 @@ func createFromScratch(opts *CreateOptions) error {
 		}
 		opts.LicenseTemplate, err = interactiveLicense(httpClient, host)
 		if err != nil {
+			return err
+		}
+
+		if err := confirmSubmission(opts.Name, opts.Visibility); err != nil {
 			return err
 		}
 	}
@@ -295,16 +293,17 @@ func createFromScratch(opts *CreateOptions) error {
 	}
 
 	input := repoCreateInput{
-		Name:              repoToCreate.RepoName(),
-		Visibility:        opts.Visibility,
-		OwnerLogin:        repoToCreate.RepoOwner(),
-		TeamSlug:          opts.Team,
-		Description:       opts.Description,
-		HomepageURL:       opts.Homepage,
-		HasIssuesEnabled:  !opts.DisableIssues,
-		HasWikiEnabled:    !opts.DisableWiki,
-		GitIgnoreTemplate: opts.GitIgnoreTemplate,
-		LicenseTemplate:   opts.LicenseTemplate,
+		Name:               repoToCreate.RepoName(),
+		Visibility:         opts.Visibility,
+		OwnerLogin:         repoToCreate.RepoOwner(),
+		TeamSlug:           opts.Team,
+		Description:        opts.Description,
+		HomepageURL:        opts.Homepage,
+		HasIssuesEnabled:   !opts.DisableIssues,
+		HasWikiEnabled:     !opts.DisableWiki,
+		GitIgnoreTemplate:  opts.GitIgnoreTemplate,
+		LicenseTemplate:    opts.LicenseTemplate,
+		IncludeAllBranches: opts.IncludeAllBranches,
 	}
 
 	var templateRepoMainBranch string
@@ -339,16 +338,6 @@ func createFromScratch(opts *CreateOptions) error {
 		return err
 	}
 
-	if opts.Interactive {
-		doCreate, err := confirmSubmission(opts.Name, repoToCreate.RepoOwner(), opts.Visibility)
-		if err != nil {
-			return err
-		}
-		if !doCreate {
-			return cmdutil.CancelError
-		}
-	}
-
 	cs := opts.IO.ColorScheme()
 	isTTY := opts.IO.IsStdoutTTY()
 	if isTTY {
@@ -356,6 +345,8 @@ func createFromScratch(opts *CreateOptions) error {
 			"%s Created repository %s on GitHub\n",
 			cs.SuccessIconWithColor(cs.Green),
 			ghrepo.FullName(repo))
+	} else {
+		fmt.Fprintln(opts.IO.Out, repo.URL)
 	}
 
 	if opts.Interactive {
@@ -363,6 +354,7 @@ func createFromScratch(opts *CreateOptions) error {
 			Message: "Clone the new repository locally?",
 			Default: true,
 		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(cloneQuestion, &opts.Clone)
 		if err != nil {
 			return err
@@ -370,7 +362,7 @@ func createFromScratch(opts *CreateOptions) error {
 	}
 
 	if opts.Clone {
-		protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
+		protocol, err := cfg.GetOrDefault(repo.RepoHost(), "git_protocol")
 		if err != nil {
 			return err
 		}
@@ -410,10 +402,7 @@ func createFromLocal(opts *CreateOptions) error {
 	if err != nil {
 		return err
 	}
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
 	if opts.Interactive {
 		opts.Source, err = interactiveSource()
@@ -442,9 +431,9 @@ func createFromLocal(opts *CreateOptions) error {
 	}
 	if !isRepo {
 		if repoPath == "." {
-			return fmt.Errorf("current directory is not a git repository. Run `git init` to initalize it")
+			return fmt.Errorf("current directory is not a git repository. Run `git init` to initialize it")
 		}
-		return fmt.Errorf("%s is not a git repository. Run `git -C %s init` to initialize it", absPath, repoPath)
+		return fmt.Errorf("%s is not a git repository. Run `git -C \"%s\" init` to initialize it", absPath, repoPath)
 	}
 
 	committed, err := hasCommits(repoPath)
@@ -503,9 +492,11 @@ func createFromLocal(opts *CreateOptions) error {
 			"%s Created repository %s on GitHub\n",
 			cs.SuccessIconWithColor(cs.Green),
 			ghrepo.FullName(repo))
+	} else {
+		fmt.Fprintln(stdout, repo.URL)
 	}
 
-	protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
+	protocol, err := cfg.GetOrDefault(repo.RepoHost(), "git_protocol")
 	if err != nil {
 		return err
 	}
@@ -518,6 +509,7 @@ func createFromLocal(opts *CreateOptions) error {
 			Message: `Add a remote?`,
 			Default: true,
 		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(remoteQuesiton, &addRemote)
 		if err != nil {
 			return err
@@ -531,6 +523,7 @@ func createFromLocal(opts *CreateOptions) error {
 			Message: "What should the new remote be called?",
 			Default: "origin",
 		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(pushQuestion, &baseRemote)
 		if err != nil {
 			return err
@@ -541,12 +534,13 @@ func createFromLocal(opts *CreateOptions) error {
 		return err
 	}
 
-	// don't prompt for push if there's no commits
+	// don't prompt for push if there are no commits
 	if opts.Interactive && committed {
 		pushQuestion := &survey.Confirm{
-			Message: fmt.Sprintf(`Would you like to push commits from the current branch to the %q?`, baseRemote),
+			Message: fmt.Sprintf(`Would you like to push commits from the current branch to %q?`, baseRemote),
 			Default: true,
 		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(pushQuestion, &opts.Push)
 		if err != nil {
 			return err
@@ -590,7 +584,7 @@ func sourceInit(io *iostreams.IOStreams, remoteURL, baseRemote, repoPath string)
 	return nil
 }
 
-// check if local repository has commited changes
+// check if local repository has committed changes
 func hasCommits(repoPath string) (bool, error) {
 	hasCommitsCmd, err := git.GitCommand("-C", repoPath, "rev-parse", "HEAD")
 	if err != nil {
@@ -695,6 +689,7 @@ func interactiveGitIgnore(client *http.Client, hostname string) (string, error) 
 	}
 
 	addGitIgnoreSurvey = append(addGitIgnoreSurvey, addGitIgnoreQuestion)
+	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 	err := prompt.SurveyAsk(addGitIgnoreSurvey, &addGitIgnore)
 	if err != nil {
 		return "", err
@@ -717,6 +712,7 @@ func interactiveGitIgnore(client *http.Client, hostname string) (string, error) 
 			},
 		}
 		gitIg = append(gitIg, gitIgnoreQuestion)
+		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 		err = prompt.SurveyAsk(gitIg, &wantedIgnoreTemplate)
 		if err != nil {
 			return "", err
@@ -741,6 +737,7 @@ func interactiveLicense(client *http.Client, hostname string) (string, error) {
 	}
 
 	addLicenseSurvey = append(addLicenseSurvey, addLicenseQuestion)
+	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 	err := prompt.SurveyAsk(addLicenseSurvey, &addLicense)
 	if err != nil {
 		return "", err
@@ -768,6 +765,7 @@ func interactiveLicense(client *http.Client, hostname string) (string, error) {
 			},
 		}
 		licenseQs = append(licenseQs, licenseQuestion)
+		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 		err = prompt.SurveyAsk(licenseQs, &wantedLicense)
 		if err != nil {
 			return "", err
@@ -783,13 +781,13 @@ func interactiveRepoInfo(defaultName string) (string, string, string, error) {
 		{
 			Name: "repoName",
 			Prompt: &survey.Input{
-				Message: "Repository Name: ",
+				Message: "Repository name",
 				Default: defaultName,
 			},
 		},
 		{
 			Name:   "repoDescription",
-			Prompt: &survey.Input{Message: "Description: "},
+			Prompt: &survey.Input{Message: "Description"},
 		},
 		{
 			Name: "repoVisibility",
@@ -805,6 +803,7 @@ func interactiveRepoInfo(defaultName string) (string, string, string, error) {
 		RepoVisibility  string
 	}{}
 
+	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 	err := prompt.SurveyAsk(qs, &answer)
 	if err != nil {
 		return "", "", "", err
@@ -816,9 +815,10 @@ func interactiveRepoInfo(defaultName string) (string, string, string, error) {
 func interactiveSource() (string, error) {
 	var sourcePath string
 	sourcePrompt := &survey.Input{
-		Message: "Path to local repository: ",
+		Message: "Path to local repository",
 		Default: "."}
 
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err := prompt.SurveyAskOne(sourcePrompt, &sourcePath)
 	if err != nil {
 		return "", err
@@ -826,36 +826,27 @@ func interactiveSource() (string, error) {
 	return sourcePath, nil
 }
 
-func confirmSubmission(repoName, repoOwner, visibility string) (bool, error) {
-	qs := []*survey.Question{}
-	targetRepo := normalizeRepoName(repoName)
-	if repoOwner != "" {
-		targetRepo = fmt.Sprintf("%s/%s", repoOwner, targetRepo)
+func confirmSubmission(repoWithOwner, visibility string) error {
+	targetRepo := shared.NormalizeRepoName(repoWithOwner)
+	if idx := strings.IndexRune(repoWithOwner, '/'); idx > 0 {
+		targetRepo = repoWithOwner[0:idx+1] + shared.NormalizeRepoName(repoWithOwner[idx+1:])
 	}
-	promptString := fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(visibility))
-
-	confirmSubmitQuestion := &survey.Question{
+	var answer struct {
+		ConfirmSubmit bool
+	}
+	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
+	err := prompt.SurveyAsk([]*survey.Question{{
 		Name: "confirmSubmit",
 		Prompt: &survey.Confirm{
-			Message: promptString,
+			Message: fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(visibility)),
 			Default: true,
 		},
-	}
-	qs = append(qs, confirmSubmitQuestion)
-
-	answer := struct {
-		ConfirmSubmit bool
-	}{}
-
-	err := prompt.SurveyAsk(qs, &answer)
+	}}, &answer)
 	if err != nil {
-		return false, err
+		return err
 	}
-
-	return answer.ConfirmSubmit, nil
-}
-
-// normalizeRepoName takes in the repo name the user inputted and normalizes it using the same logic as GitHub (GitHub.com/new)
-func normalizeRepoName(repoName string) string {
-	return strings.TrimSuffix(regexp.MustCompile(`[^\w._-]+`).ReplaceAllString(repoName, "-"), ".git")
+	if !answer.ConfirmSubmit {
+		return cmdutil.CancelError
+	}
+	return nil
 }

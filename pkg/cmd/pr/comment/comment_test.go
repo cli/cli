@@ -3,12 +3,13 @@ package comment
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -21,7 +22,7 @@ import (
 
 func TestNewCmdComment(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "my-body.md")
-	err := ioutil.WriteFile(tmpFile, []byte("a body from file"), 0600)
+	err := os.WriteFile(tmpFile, []byte("a body from file"), 0600)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -162,18 +163,18 @@ func TestNewCmdComment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, _, _ := iostreams.Test()
-			io.SetStdoutTTY(true)
-			io.SetStdinTTY(true)
-			io.SetStderrTTY(true)
+			ios, stdin, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			ios.SetStdinTTY(true)
+			ios.SetStderrTTY(true)
 
 			if tt.stdin != "" {
 				_, _ = stdin.WriteString(tt.stdin)
 			}
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
-				Browser:   &cmdutil.TestBrowser{},
+				IOStreams: ios,
+				Browser:   &browser.Stub{},
 			}
 
 			argv, err := shlex.Split(tt.input)
@@ -267,10 +268,10 @@ func Test_commentRun(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		io, _, stdout, stderr := iostreams.Test()
-		io.SetStdoutTTY(true)
-		io.SetStdinTTY(true)
-		io.SetStderrTTY(true)
+		ios, _, stdout, stderr := iostreams.Test()
+		ios.SetStdoutTTY(true)
+		ios.SetStdinTTY(true)
+		ios.SetStderrTTY(true)
 
 		reg := &httpmock.Registry{}
 		defer reg.Verify(t)
@@ -280,7 +281,7 @@ func Test_commentRun(t *testing.T) {
 
 		httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
 
-		tt.input.IO = io
+		tt.input.IO = ios
 		tt.input.HttpClient = httpClient
 		tt.input.RetrieveCommentable = func() (shared.Commentable, ghrepo.Interface, error) {
 			return &api.PullRequest{

@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	Active           WorkflowState = "active"
-	DisabledManually WorkflowState = "disabled_manually"
+	Active             WorkflowState = "active"
+	DisabledManually   WorkflowState = "disabled_manually"
+	DisabledInactivity WorkflowState = "disabled_inactivity"
 )
 
 type WorkflowState string
@@ -103,6 +104,7 @@ func SelectWorkflow(workflows []Workflow, promptMsg string, states []WorkflowSta
 
 	var selected int
 
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err := prompt.SurveyAskOne(&survey.Select{
 		Message:  promptMsg,
 		Options:  candidates,

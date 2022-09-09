@@ -50,6 +50,7 @@ type CreateOptions struct {
 	Concurrency        int
 	DiscussionCategory string
 	GenerateNotes      bool
+	NotesStartTag      string
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -109,6 +110,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			Create a release and start a discussion
 			$ gh release create v1.2.3 --discussion-category "General"
 		`),
+		Aliases: []string{"new"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cmd.Flags().Changed("discussion-category") && opts.Draft {
 				return errors.New("discussions for draft releases not supported")
@@ -157,8 +159,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Name, "title", "t", "", "Release title")
 	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
-	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion of the specified category")
+	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion in the specified category")
 	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate title and notes for the release")
+	cmd.Flags().StringVar(&opts.NotesStartTag, "notes-start-tag", "", "Tag to use as the starting point for generating release notes")
 
 	return cmd
 }
@@ -174,6 +177,7 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
+	var existingTag bool
 	if opts.TagName == "" {
 		tags, err := getTags(httpClient, baseRepo, 5)
 		if err != nil {
@@ -193,11 +197,13 @@ func createRun(opts *CreateOptions) error {
 				Options: options,
 				Default: options[0],
 			}
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err := prompt.SurveyAskOne(q, &tag)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
 			if tag != createNewTagOption {
+				existingTag = true
 				opts.TagName = tag
 			}
 		}
@@ -206,9 +212,33 @@ func createRun(opts *CreateOptions) error {
 			q := &survey.Input{
 				Message: "Tag name",
 			}
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err := prompt.SurveyAskOne(q, &opts.TagName)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
+			}
+		}
+	}
+
+	var tagDescription string
+	if opts.RepoOverride == "" {
+		tagDescription, _ = gitTagInfo(opts.TagName)
+		// If there is a local tag with the same name as specified
+		// the user may not want to create a new tag on the remote
+		// as the local one might be annotated or signed.
+		// If the user specifies the target take that as explicit instruction
+		// to create the tag on the remote pointing to the target regardless
+		// of local tag status.
+		// If a remote tag with the same name as specified exists already
+		// then a new tag will not be created so ignore local tag status.
+		if tagDescription != "" && !existingTag && opts.Target == "" {
+			remoteExists, err := remoteTagExists(httpClient, baseRepo, opts.TagName)
+			if err != nil {
+				return err
+			}
+			if !remoteExists {
+				return fmt.Errorf("tag %s exists locally but has not been pushed to %s, please push it before continuing or specify the `--target` flag to create a new tag",
+					opts.TagName, ghrepo.FullName(baseRepo))
 			}
 		}
 	}
@@ -220,23 +250,15 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		var generatedNotes *releaseNotes
-		var tagDescription string
 		var generatedChangelog string
 
-		params := map[string]interface{}{
-			"tag_name": opts.TagName,
-		}
-		if opts.Target != "" {
-			params["target_commitish"] = opts.Target
-		}
-		generatedNotes, err = generateReleaseNotes(httpClient, baseRepo, params)
+		generatedNotes, err = generateReleaseNotes(httpClient, baseRepo, opts.TagName, opts.Target, opts.NotesStartTag)
 		if err != nil && !errors.Is(err, notImplementedError) {
 			return err
 		}
 
-		if opts.RepoOverride == "" && generatedNotes == nil {
+		if opts.RepoOverride == "" {
 			headRef := opts.TagName
-			tagDescription, _ = gitTagInfo(opts.TagName)
 			if tagDescription == "" {
 				if opts.Target != "" {
 					// TODO: use the remote-tracking version of the branch ref
@@ -245,9 +267,14 @@ func createRun(opts *CreateOptions) error {
 					headRef = "HEAD"
 				}
 			}
-			if prevTag, err := detectPreviousTag(headRef); err == nil {
-				commits, _ := changelogForRange(fmt.Sprintf("%s..%s", prevTag, headRef))
-				generatedChangelog = generateChangelog(commits)
+			if generatedNotes == nil {
+				if opts.NotesStartTag != "" {
+					commits, _ := changelogForRange(fmt.Sprintf("%s..%s", opts.NotesStartTag, headRef))
+					generatedChangelog = generateChangelog(commits)
+				} else if prevTag, err := detectPreviousTag(headRef); err == nil {
+					commits, _ := changelogForRange(fmt.Sprintf("%s..%s", prevTag, headRef))
+					generatedChangelog = generateChangelog(commits)
+				}
 			}
 		}
 
@@ -283,6 +310,7 @@ func createRun(opts *CreateOptions) error {
 				},
 			},
 		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 		err = prompt.SurveyAsk(qs, opts)
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
@@ -347,6 +375,7 @@ func createRun(opts *CreateOptions) error {
 			},
 		}
 
+		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 		err = prompt.SurveyAsk(qs, opts)
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
@@ -362,13 +391,6 @@ func createRun(opts *CreateOptions) error {
 		default:
 			return fmt.Errorf("invalid action: %v", opts.SubmitAction)
 		}
-	}
-
-	if opts.Draft && len(opts.DiscussionCategory) > 0 {
-		return fmt.Errorf(
-			"%s Discussions not supported with draft releases",
-			opts.IO.ColorScheme().FailureIcon(),
-		)
 	}
 
 	params := map[string]interface{}{
@@ -389,7 +411,24 @@ func createRun(opts *CreateOptions) error {
 		params["discussion_category_name"] = opts.DiscussionCategory
 	}
 	if opts.GenerateNotes {
-		params["generate_release_notes"] = true
+		if opts.NotesStartTag != "" {
+			generatedNotes, err := generateReleaseNotes(httpClient, baseRepo, opts.TagName, opts.Target, opts.NotesStartTag)
+			if err != nil && !errors.Is(err, notImplementedError) {
+				return err
+			}
+			if generatedNotes != nil {
+				if opts.Body == "" {
+					params["body"] = generatedNotes.Body
+				} else {
+					params["body"] = fmt.Sprintf("%s\n%s", opts.Body, generatedNotes.Body)
+				}
+				if opts.Name == "" {
+					params["name"] = generatedNotes.Name
+				}
+			}
+		} else {
+			params["generate_release_notes"] = true
+		}
 	}
 
 	hasAssets := len(opts.Assets) > 0
@@ -418,7 +457,7 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		if !opts.Draft {
-			rel, err := publishRelease(httpClient, newRelease.APIURL)
+			rel, err := publishRelease(httpClient, newRelease.APIURL, opts.DiscussionCategory)
 			if err != nil {
 				return err
 			}

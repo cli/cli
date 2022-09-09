@@ -2,37 +2,43 @@ package shared
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 )
 
 func StateTitleWithColor(cs *iostreams.ColorScheme, pr api.PullRequest) string {
-	prStateColorFunc := cs.ColorFromString(ColorForPR(pr))
-
+	prStateColorFunc := cs.ColorFromString(ColorForPRState(pr))
 	if pr.State == "OPEN" && pr.IsDraft {
-		return prStateColorFunc(strings.Title(strings.ToLower("Draft")))
+		return prStateColorFunc("Draft")
 	}
-	return prStateColorFunc(strings.Title(strings.ToLower(pr.State)))
+	return prStateColorFunc(text.Title(pr.State))
 }
 
-func ColorForPR(pr api.PullRequest) string {
-	if pr.State == "OPEN" && pr.IsDraft {
-		return "gray"
-	}
-	return ColorForState(pr.State)
-}
-
-// ColorForState returns a color constant for a PR/Issue state
-func ColorForState(state string) string {
-	switch state {
+func ColorForPRState(pr api.PullRequest) string {
+	switch pr.State {
 	case "OPEN":
+		if pr.IsDraft {
+			return "gray"
+		}
 		return "green"
 	case "CLOSED":
 		return "red"
 	case "MERGED":
+		return "magenta"
+	default:
+		return ""
+	}
+}
+
+func ColorForIssueState(issue api.Issue) string {
+	switch issue.State {
+	case "OPEN":
+		return "green"
+	case "CLOSED":
 		return "magenta"
 	default:
 		return ""
@@ -47,14 +53,14 @@ func PrintMessage(io *iostreams.IOStreams, s string) {
 	fmt.Fprintln(io.Out, io.ColorScheme().Gray(s))
 }
 
-func ListHeader(repoName string, itemName string, matchCount int, totalMatchCount int, hasFilters bool) string {
-	if totalMatchCount == 0 {
-		if hasFilters {
-			return fmt.Sprintf("No %ss match your search in %s", itemName, repoName)
-		}
-		return fmt.Sprintf("There are no open %ss in %s", itemName, repoName)
+func ListNoResults(repoName string, itemName string, hasFilters bool) error {
+	if hasFilters {
+		return cmdutil.NewNoResultsError(fmt.Sprintf("no %ss match your search in %s", itemName, repoName))
 	}
+	return cmdutil.NewNoResultsError(fmt.Sprintf("no open %ss in %s", itemName, repoName))
+}
 
+func ListHeader(repoName string, itemName string, matchCount int, totalMatchCount int, hasFilters bool) string {
 	if hasFilters {
 		matchVerb := "match"
 		if totalMatchCount == 1 {

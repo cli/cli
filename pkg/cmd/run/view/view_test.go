@@ -5,12 +5,12 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -120,12 +120,12 @@ func TestNewCmdView(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			argv, err := shlex.Split(tt.cli)
@@ -138,8 +138,8 @@ func TestNewCmdView(t *testing.T) {
 			})
 			cmd.SetArgs(argv)
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
@@ -207,7 +207,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/10/annotations"),
 					httpmock.JSONResponse([]shared.Annotation{}))
 			},
-			wantOut: "\n✓ trunk successful #2898 · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about a job, try: gh run view --job=<job-id>\nView this run on GitHub: https://github.com/runs/3\n",
+			wantOut: "\n✓ trunk successful #2898 · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about the job, try: gh run view --job=10\nView this run on GitHub: https://github.com/runs/3\n",
 		},
 		{
 			name: "exit status, failed run",
@@ -308,7 +308,7 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/check-runs/10/annotations"),
 					httpmock.JSONResponse([]shared.Annotation{}))
 			},
-			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about a job, try: gh run view --job=<job-id>\nView this run on GitHub: https://github.com/runs/3\n",
+			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about the job, try: gh run view --job=10\nView this run on GitHub: https://github.com/runs/3\n",
 		},
 		{
 			name: "verbose",
@@ -375,12 +375,13 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse([]shared.Annotation{}))
 			},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(2)
 			},
 			opts: &ViewOptions{
 				Prompt: true,
 			},
-			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about a job, try: gh run view --job=<job-id>\nView this run on GitHub: https://github.com/runs/3\n",
+			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n\nFor more information about the job, try: gh run view --job=10\nView this run on GitHub: https://github.com/runs/3\n",
 		},
 		{
 			name: "interactive with log",
@@ -411,7 +412,9 @@ func TestViewRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/run_log.zip"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(2)
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(1)
 			},
 			wantOut: coolJobRunLogOutput,
@@ -464,7 +467,9 @@ func TestViewRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/run_log.zip"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(2)
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(0)
 			},
 			wantOut: expectedRunLogOutput,
@@ -523,7 +528,9 @@ func TestViewRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/run_log.zip"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(4)
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(2)
 			},
 			wantOut: quuxTheBarfLogOutput,
@@ -576,7 +583,9 @@ func TestViewRun(t *testing.T) {
 					httpmock.FileResponse("./fixtures/run_log.zip"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(4)
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(0)
 			},
 			wantOut: quuxTheBarfLogOutput,
@@ -700,7 +709,9 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse(shared.FailedJobAnnotations))
 			},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(2)
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(0)
 			},
 			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nFor more information about a job, try: gh run view --job=<job-id>\nView this run on GitHub: https://github.com/runs/3\n",
@@ -733,7 +744,9 @@ func TestViewRun(t *testing.T) {
 					httpmock.JSONResponse([]shared.Annotation{}))
 			},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(2)
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(1)
 			},
 			wantOut: "\n✓ trunk successful · 3\nTriggered via push about 59 minutes ago\n\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\nTo see the full job log, try: gh run view --log --job=10\nView this run on GitHub: https://github.com/runs/3\n",
@@ -823,20 +836,21 @@ func TestViewRun(t *testing.T) {
 			return notnow
 		}
 
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdoutTTY(tt.tty)
-		tt.opts.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdoutTTY(tt.tty)
+		tt.opts.IO = ios
 		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("OWNER/REPO")
 		}
 
+		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 		as, teardown := prompt.InitAskStubber()
 		defer teardown()
 		if tt.askStubs != nil {
 			tt.askStubs(as)
 		}
 
-		browser := &cmdutil.TestBrowser{}
+		browser := &browser.Stub{}
 		tt.opts.Browser = browser
 		rlc := testRunLogCache{}
 		tt.opts.RunLogCache = rlc

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -37,9 +36,10 @@ type Manager struct {
 	client     *http.Client
 	config     config.Config
 	io         *iostreams.IOStreams
+	dryRunMode bool
 }
 
-func NewManager(io *iostreams.IOStreams) *Manager {
+func NewManager(ios *iostreams.IOStreams) *Manager {
 	return &Manager{
 		dataDir:    config.DataDir,
 		lookPath:   safeexec.LookPath,
@@ -52,7 +52,7 @@ func NewManager(io *iostreams.IOStreams) *Manager {
 			}
 			return fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH), ext
 		},
-		io: io,
+		io: ios,
 	}
 }
 
@@ -62,6 +62,10 @@ func (m *Manager) SetConfig(cfg config.Config) {
 
 func (m *Manager) SetClient(client *http.Client) {
 	m.client = client
+}
+
+func (m *Manager) EnableDryRunMode() {
+	m.dryRunMode = true
 }
 
 func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Writer) (bool, error) {
@@ -109,8 +113,8 @@ func (m *Manager) Dispatch(args []string, stdin io.Reader, stdout, stderr io.Wri
 	return true, externalCmd.Run()
 }
 
-func (m *Manager) List(includeMetadata bool) []extensions.Extension {
-	exts, _ := m.list(includeMetadata)
+func (m *Manager) List() []extensions.Extension {
+	exts, _ := m.list(false)
 	r := make([]extensions.Extension, len(exts))
 	for i, v := range exts {
 		val := v
@@ -121,7 +125,7 @@ func (m *Manager) List(includeMetadata bool) []extensions.Extension {
 
 func (m *Manager) list(includeMetadata bool) ([]Extension, error) {
 	dir := m.installDir()
-	entries, err := ioutil.ReadDir(dir)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -155,11 +159,11 @@ func (m *Manager) list(includeMetadata bool) ([]Extension, error) {
 	return results, nil
 }
 
-func (m *Manager) parseExtensionFile(fi fs.FileInfo) (Extension, error) {
+func (m *Manager) parseExtensionFile(fi fs.DirEntry) (Extension, error) {
 	ext := Extension{isLocal: true}
 	id := m.installDir()
 	exePath := filepath.Join(id, fi.Name(), fi.Name())
-	if !isSymlink(fi.Mode()) {
+	if !isSymlink(fi.Type()) {
 		// if this is a regular file, its contents is the local directory of the extension
 		p, err := readPathFromFile(filepath.Join(id, fi.Name()))
 		if err != nil {
@@ -171,7 +175,7 @@ func (m *Manager) parseExtensionFile(fi fs.FileInfo) (Extension, error) {
 	return ext, nil
 }
 
-func (m *Manager) parseExtensionDir(fi fs.FileInfo) (Extension, error) {
+func (m *Manager) parseExtensionDir(fi fs.DirEntry) (Extension, error) {
 	id := m.installDir()
 	if _, err := os.Stat(filepath.Join(id, fi.Name(), manifestName)); err == nil {
 		return m.parseBinaryExtensionDir(fi)
@@ -180,7 +184,7 @@ func (m *Manager) parseExtensionDir(fi fs.FileInfo) (Extension, error) {
 	return m.parseGitExtensionDir(fi)
 }
 
-func (m *Manager) parseBinaryExtensionDir(fi fs.FileInfo) (Extension, error) {
+func (m *Manager) parseBinaryExtensionDir(fi fs.DirEntry) (Extension, error) {
 	id := m.installDir()
 	exePath := filepath.Join(id, fi.Name(), fi.Name())
 	ext := Extension{path: exePath, kind: BinaryKind}
@@ -198,20 +202,29 @@ func (m *Manager) parseBinaryExtensionDir(fi fs.FileInfo) (Extension, error) {
 	remoteURL := ghrepo.GenerateRepoURL(repo, "")
 	ext.url = remoteURL
 	ext.currentVersion = bm.Tag
+	ext.isPinned = bm.IsPinned
 	return ext, nil
 }
 
-func (m *Manager) parseGitExtensionDir(fi fs.FileInfo) (Extension, error) {
+func (m *Manager) parseGitExtensionDir(fi fs.DirEntry) (Extension, error) {
 	id := m.installDir()
 	exePath := filepath.Join(id, fi.Name(), fi.Name())
 	remoteUrl := m.getRemoteUrl(fi.Name())
 	currentVersion := m.getCurrentVersion(fi.Name())
+
+	var isPinned bool
+	pinPath := filepath.Join(id, fi.Name(), fmt.Sprintf(".pin-%s", currentVersion))
+	if _, err := os.Stat(pinPath); err == nil {
+		isPinned = true
+	}
+
 	return Extension{
 		path:           exePath,
 		url:            remoteUrl,
 		isLocal:        false,
 		currentVersion: currentVersion,
 		kind:           GitKind,
+		isPinned:       isPinned,
 	}, nil
 }
 
@@ -224,6 +237,7 @@ func (m *Manager) getCurrentVersion(extension string) string {
 	dir := m.installDir()
 	gitDir := "--git-dir=" + filepath.Join(dir, extension, ".git")
 	cmd := m.newCommand(gitExe, gitDir, "rev-parse", "HEAD")
+
 	localSha, err := cmd.Output()
 	if err != nil {
 		return ""
@@ -273,7 +287,7 @@ func (m *Manager) populateLatestVersions(exts []Extension) {
 
 func (m *Manager) getLatestVersion(ext Extension) (string, error) {
 	if ext.isLocal {
-		return "", fmt.Errorf("unable to get latest version for local extensions")
+		return "", localExtensionUpgradeError
 	}
 	if ext.IsBinary() {
 		repo, err := ghrepo.FromFullName(ext.url)
@@ -312,21 +326,23 @@ func (m *Manager) InstallLocal(dir string) error {
 }
 
 type binManifest struct {
-	Owner string
-	Name  string
-	Host  string
-	Tag   string
+	Owner    string
+	Name     string
+	Host     string
+	Tag      string
+	IsPinned bool
 	// TODO I may end up not using this; just thinking ahead to local installs
 	Path string
 }
 
-func (m *Manager) Install(repo ghrepo.Interface) error {
+// Install installs an extension from repo, and pins to commitish if provided
+func (m *Manager) Install(repo ghrepo.Interface, target string) error {
 	isBin, err := isBinExtension(m.client, repo)
 	if err != nil {
 		return fmt.Errorf("could not check for binary extension: %w", err)
 	}
 	if isBin {
-		return m.installBin(repo)
+		return m.installBin(repo, target)
 	}
 
 	hs, err := hasScript(m.client, repo)
@@ -334,26 +350,45 @@ func (m *Manager) Install(repo ghrepo.Interface) error {
 		return err
 	}
 	if !hs {
-		return errors.New("extension is uninstallable: missing executable")
+		return errors.New("extension is not installable: missing executable")
 	}
 
-	protocol, _ := m.config.Get(repo.RepoHost(), "git_protocol")
-	return m.installGit(ghrepo.FormatRemoteURL(repo, protocol), m.io.Out, m.io.ErrOut)
+	return m.installGit(repo, target, m.io.Out, m.io.ErrOut)
 }
 
-func (m *Manager) installBin(repo ghrepo.Interface) error {
+func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	var r *release
-	r, err := fetchLatestRelease(m.client, repo)
+	var err error
+	isPinned := target != ""
+	if isPinned {
+		r, err = fetchReleaseFromTag(m.client, repo, target)
+	} else {
+		r, err = fetchLatestRelease(m.client, repo)
+	}
 	if err != nil {
 		return err
 	}
 
 	platform, ext := m.platform()
+	isMacARM := platform == "darwin-arm64"
+	trueARMBinary := false
+
 	var asset *releaseAsset
 	for _, a := range r.Assets {
 		if strings.HasSuffix(a.Name, platform+ext) {
 			asset = &a
+			trueARMBinary = isMacARM
 			break
+		}
+	}
+
+	// if an arm64 binary is unavailable, fall back to amd64 if it can be executed through Rosetta 2
+	if asset == nil && isMacARM && hasRosetta() {
+		for _, a := range r.Assets {
+			if strings.HasSuffix(a.Name, "darwin-amd64") {
+				asset = &a
+				break
+			}
 		}
 	}
 
@@ -365,26 +400,37 @@ func (m *Manager) installBin(repo ghrepo.Interface) error {
 
 	name := repo.RepoName()
 	targetDir := filepath.Join(m.installDir(), name)
+
 	// TODO clean this up if function errs?
-	err = os.MkdirAll(targetDir, 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create installation directory: %w", err)
+	if !m.dryRunMode {
+		err = os.MkdirAll(targetDir, 0755)
+		if err != nil {
+			return fmt.Errorf("failed to create installation directory: %w", err)
+		}
 	}
 
 	binPath := filepath.Join(targetDir, name)
 	binPath += ext
 
-	err = downloadAsset(m.client, *asset, binPath)
-	if err != nil {
-		return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
+	if !m.dryRunMode {
+		err = downloadAsset(m.client, *asset, binPath)
+		if err != nil {
+			return fmt.Errorf("failed to download asset %s: %w", asset.Name, err)
+		}
+		if trueARMBinary {
+			if err := codesignBinary(binPath); err != nil {
+				return fmt.Errorf("failed to codesign downloaded binary: %w", err)
+			}
+		}
 	}
 
 	manifest := binManifest{
-		Name:  name,
-		Owner: repo.RepoOwner(),
-		Host:  repo.RepoHost(),
-		Path:  binPath,
-		Tag:   r.Tag,
+		Name:     name,
+		Owner:    repo.RepoOwner(),
+		Host:     repo.RepoHost(),
+		Path:     binPath,
+		Tag:      r.Tag,
+		IsPinned: isPinned,
 	}
 
 	bs, err := yaml.Marshal(manifest)
@@ -392,26 +438,39 @@ func (m *Manager) installBin(repo ghrepo.Interface) error {
 		return fmt.Errorf("failed to serialize manifest: %w", err)
 	}
 
-	manifestPath := filepath.Join(targetDir, manifestName)
+	if !m.dryRunMode {
+		manifestPath := filepath.Join(targetDir, manifestName)
 
-	f, err := os.OpenFile(manifestPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return fmt.Errorf("failed to open manifest for writing: %w", err)
-	}
-	defer f.Close()
+		f, err := os.OpenFile(manifestPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+		if err != nil {
+			return fmt.Errorf("failed to open manifest for writing: %w", err)
+		}
+		defer f.Close()
 
-	_, err = f.Write(bs)
-	if err != nil {
-		return fmt.Errorf("failed write manifest file: %w", err)
+		_, err = f.Write(bs)
+		if err != nil {
+			return fmt.Errorf("failed write manifest file: %w", err)
+		}
 	}
 
 	return nil
 }
 
-func (m *Manager) installGit(cloneURL string, stdout, stderr io.Writer) error {
+func (m *Manager) installGit(repo ghrepo.Interface, target string, stdout, stderr io.Writer) error {
+	protocol, _ := m.config.GetOrDefault(repo.RepoHost(), "git_protocol")
+	cloneURL := ghrepo.FormatRemoteURL(repo, protocol)
+
 	exe, err := m.lookPath("git")
 	if err != nil {
 		return err
+	}
+
+	var commitSHA string
+	if target != "" {
+		commitSHA, err = fetchCommitSHA(m.client, repo, target)
+		if err != nil {
+			return err
+		}
 	}
 
 	name := strings.TrimSuffix(path.Base(cloneURL), ".git")
@@ -420,9 +479,29 @@ func (m *Manager) installGit(cloneURL string, stdout, stderr io.Writer) error {
 	externalCmd := m.newCommand(exe, "clone", cloneURL, targetDir)
 	externalCmd.Stdout = stdout
 	externalCmd.Stderr = stderr
-	return externalCmd.Run()
+	if err := externalCmd.Run(); err != nil {
+		return err
+	}
+	if commitSHA == "" {
+		return nil
+	}
+
+	checkoutCmd := m.newCommand(exe, "-C", targetDir, "checkout", commitSHA)
+	checkoutCmd.Stdout = stdout
+	checkoutCmd.Stderr = stderr
+	if err := checkoutCmd.Run(); err != nil {
+		return err
+	}
+
+	pinPath := filepath.Join(targetDir, fmt.Sprintf(".pin-%s", commitSHA))
+	f, err := os.OpenFile(pinPath, os.O_WRONLY|os.O_CREATE, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to create pin file in directory: %w", err)
+	}
+	return f.Close()
 }
 
+var pinnedExtensionUpgradeError = errors.New("pinned extensions can not be upgraded")
 var localExtensionUpgradeError = errors.New("local extensions can not be upgraded")
 var upToDateError = errors.New("already up to date")
 var noExtensionsInstalledError = errors.New("no extensions installed")
@@ -430,7 +509,7 @@ var noExtensionsInstalledError = errors.New("no extensions installed")
 func (m *Manager) Upgrade(name string, force bool) error {
 	// Fetch metadata during list only when upgrading all extensions.
 	// This is a performance improvement so that we don't make a
-	// bunch of unecessary network requests when trying to upgrade a single extension.
+	// bunch of unnecessary network requests when trying to upgrade a single extension.
 	fetchMetadata := name == ""
 	exts, _ := m.list(fetchMetadata)
 	if len(exts) == 0 {
@@ -462,13 +541,20 @@ func (m *Manager) upgradeExtensions(exts []Extension, force bool) error {
 		err := m.upgradeExtension(f, force)
 		if err != nil {
 			if !errors.Is(err, localExtensionUpgradeError) &&
-				!errors.Is(err, upToDateError) {
+				!errors.Is(err, upToDateError) &&
+				!errors.Is(err, pinnedExtensionUpgradeError) {
 				failed = true
 			}
 			fmt.Fprintf(m.io.Out, "%s\n", err)
 			continue
 		}
-		fmt.Fprintf(m.io.Out, "upgrade complete\n")
+		currentVersion := displayExtensionVersion(&f, f.currentVersion)
+		latestVersion := displayExtensionVersion(&f, f.latestVersion)
+		if m.dryRunMode {
+			fmt.Fprintf(m.io.Out, "would have upgraded from %s to %s\n", currentVersion, latestVersion)
+		} else {
+			fmt.Fprintf(m.io.Out, "upgraded from %s to %s\n", currentVersion, latestVersion)
+		}
 	}
 	if failed {
 		return errors.New("some extensions failed to upgrade")
@@ -479,6 +565,9 @@ func (m *Manager) upgradeExtensions(exts []Extension, force bool) error {
 func (m *Manager) upgradeExtension(ext Extension, force bool) error {
 	if ext.isLocal {
 		return localExtensionUpgradeError
+	}
+	if ext.IsPinned() {
+		return pinnedExtensionUpgradeError
 	}
 	if !ext.UpdateAvailable() {
 		return upToDateError
@@ -494,11 +583,10 @@ func (m *Manager) upgradeExtension(ext Extension, force bool) error {
 			isBin, _ = isBinExtension(m.client, repo)
 		}
 		if isBin {
-			err = m.Remove(ext.Name())
-			if err != nil {
+			if err := m.Remove(ext.Name()); err != nil {
 				return fmt.Errorf("failed to migrate to new precompiled extension format: %w", err)
 			}
-			return m.installBin(repo)
+			return m.installBin(repo, "")
 		}
 		err = m.upgradeGitExtension(ext, force)
 	}
@@ -511,6 +599,9 @@ func (m *Manager) upgradeGitExtension(ext Extension, force bool) error {
 		return err
 	}
 	dir := filepath.Dir(ext.path)
+	if m.dryRunMode {
+		return nil
+	}
 	if force {
 		if err := m.newCommand(exe, "-C", dir, "fetch", "origin", "HEAD").Run(); err != nil {
 			return err
@@ -525,13 +616,16 @@ func (m *Manager) upgradeBinExtension(ext Extension) error {
 	if err != nil {
 		return fmt.Errorf("failed to parse URL %s: %w", ext.url, err)
 	}
-	return m.installBin(repo)
+	return m.installBin(repo, "")
 }
 
 func (m *Manager) Remove(name string) error {
 	targetDir := filepath.Join(m.installDir(), "gh-"+name)
 	if _, err := os.Lstat(targetDir); os.IsNotExist(err) {
 		return fmt.Errorf("no extension found: %q", targetDir)
+	}
+	if m.dryRunMode {
+		return nil
 	}
 	return os.RemoveAll(targetDir)
 }
@@ -608,10 +702,7 @@ func (m *Manager) goBinScaffolding(gitExe, name string) error {
 		return err
 	}
 
-	host, err := m.config.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := m.config.DefaultHost()
 
 	currentUser, err := api.CurrentLoginName(api.NewClientFromHTTP(m.client), host)
 	if err != nil {
@@ -766,5 +857,20 @@ func possibleDists() []string {
 		"windows-386",
 		"windows-amd64",
 		"windows-arm",
+		"windows-arm64",
 	}
+}
+
+func hasRosetta() bool {
+	_, err := os.Stat("/Library/Apple/usr/libexec/oah/libRosettaRuntime")
+	return err == nil
+}
+
+func codesignBinary(binPath string) error {
+	codesignExe, err := safeexec.LookPath("codesign")
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(codesignExe, "--sign", "-", "--force", "--preserve-metadata=entitlements,requirements,flags,runtime", binPath)
+	return cmd.Run()
 }

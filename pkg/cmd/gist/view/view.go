@@ -86,10 +86,7 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	hostname, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	hostname, _ := cfg.DefaultHost()
 
 	cs := opts.IO.ColorScheme()
 	if gistID == "" {
@@ -128,8 +125,7 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	theme := opts.IO.DetectTerminalTheme()
-	markdownStyle := markdown.GetStyle(theme)
+	opts.IO.DetectTerminalTheme()
 	if err := opts.IO.StartPager(); err != nil {
 		fmt.Fprintf(opts.IO.ErrOut, "starting pager failed: %v\n", err)
 	}
@@ -145,7 +141,9 @@ func viewRun(opts *ViewOptions) error {
 		}
 
 		if strings.Contains(gf.Type, "markdown") && !opts.Raw {
-			rendered, err := markdown.Render(gf.Content, markdownStyle)
+			rendered, err := markdown.Render(gf.Content,
+				markdown.WithTheme(opts.IO.TerminalTheme()),
+				markdown.WithWrap(opts.IO.TerminalWidth()))
 			if err != nil {
 				return err
 			}
@@ -250,6 +248,7 @@ func promptGists(client *http.Client, host string, cs *iostreams.ColorScheme) (g
 		Options: opts,
 	}
 
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err = prompt.SurveyAskOne(questions, &result)
 
 	if err != nil {

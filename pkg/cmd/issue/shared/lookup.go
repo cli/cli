@@ -79,10 +79,10 @@ func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 			issue: issueOrPullRequest(number: $number) {
 				__typename
 				...on Issue{%[1]s}
-				...on PullRequest{%[1]s}
+				...on PullRequest{%[2]s}
 			}
 		}
-	}`, api.PullRequestGraphQL(fields))
+	}`, api.IssueGraphQL(fields), api.PullRequestGraphQL(fields))
 
 	variables := map[string]interface{}{
 		"owner":  repo.RepoOwner(),
@@ -93,7 +93,7 @@ func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 	var resp response
 	client := api.NewClientFromHTTP(httpClient)
 	if err := client.GraphQL(repo.RepoHost(), query, variables, &resp); err != nil {
-		var gerr *api.GraphQLErrorResponse
+		var gerr api.GraphQLError
 		if errors.As(err, &gerr) {
 			if gerr.Match("NOT_FOUND", "repository.issue") && !resp.Repository.HasIssuesEnabled {
 				return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))

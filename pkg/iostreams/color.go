@@ -210,8 +210,17 @@ func (c *ColorScheme) ColorFromString(s string) func(string) string {
 	return fn
 }
 
+// ColorFromRGB returns a function suitable for TablePrinter.AddField
+// that calls HexToRGB, coloring text if supported by the terminal.
+func (c *ColorScheme) ColorFromRGB(hex string) func(string) string {
+	return func(s string) string {
+		return c.HexToRGB(hex, s)
+	}
+}
+
+// HexToRGB uses the given hex to color x if supported by the terminal.
 func (c *ColorScheme) HexToRGB(hex string, x string) string {
-	if !c.enabled || !c.hasTrueColor {
+	if !c.enabled || !c.hasTrueColor || len(hex) != 6 {
 		return x
 	}
 

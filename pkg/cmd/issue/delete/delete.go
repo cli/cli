@@ -1,20 +1,18 @@
 package delete
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
-	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -26,6 +24,7 @@ type DeleteOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	SelectorArg string
+	Confirmed   bool
 }
 
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
@@ -54,6 +53,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		},
 	}
 
+	cmd.Flags().BoolVar(&opts.Confirmed, "confirm", false, "confirm deletion without prompting")
 	return cmd
 }
 
@@ -73,9 +73,11 @@ func deleteRun(opts *DeleteOptions) error {
 		return fmt.Errorf("issue #%d is a pull request and cannot be deleted", issue.Number)
 	}
 
-	// When executed in an interactive shell, require confirmation. Otherwise skip confirmation.
-	if opts.IO.CanPrompt() {
+	// When executed in an interactive shell, require confirmation, unless
+	// already provided. Otherwise skip confirmation.
+	if opts.IO.CanPrompt() && !opts.Confirmed {
 		answer := ""
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(
 			&survey.Input{
 				Message: fmt.Sprintf("You're going to delete issue #%d. This action cannot be reversed. To confirm, type the issue number:", issue.Number),
@@ -118,6 +120,6 @@ func apiDelete(httpClient *http.Client, repo ghrepo.Interface, issueID string) e
 		},
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
-	return gql.MutateNamed(context.Background(), "IssueDelete", &mutation, variables)
+	gql := api.NewClientFromHTTP(httpClient)
+	return gql.Mutate(repo.RepoHost(), "IssueDelete", &mutation, variables)
 }

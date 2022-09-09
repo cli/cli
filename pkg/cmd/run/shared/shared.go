@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
 
@@ -42,20 +43,57 @@ type Status string
 type Conclusion string
 type Level string
 
+var RunFields = []string{
+	"name",
+	"headBranch",
+	"headSha",
+	"createdAt",
+	"updatedAt",
+	"startedAt",
+	"status",
+	"conclusion",
+	"event",
+	"databaseId",
+	"workflowDatabaseId",
+	"url",
+}
+
 type Run struct {
 	Name           string
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+	StartedAt      time.Time `json:"run_started_at"`
 	Status         Status
 	Conclusion     Conclusion
 	Event          string
 	ID             int64
+	WorkflowID     int64  `json:"workflow_id"`
+	Attempts       uint8  `json:"run_attempt"`
 	HeadBranch     string `json:"head_branch"`
 	JobsURL        string `json:"jobs_url"`
 	HeadCommit     Commit `json:"head_commit"`
 	HeadSha        string `json:"head_sha"`
 	URL            string `json:"html_url"`
 	HeadRepository Repo   `json:"head_repository"`
+}
+
+func (r *Run) StartedTime() time.Time {
+	if r.StartedAt.IsZero() {
+		return r.CreatedAt
+	}
+	return r.StartedAt
+}
+
+func (r *Run) Duration(now time.Time) time.Duration {
+	endTime := r.UpdatedAt
+	if r.Status != Completed {
+		endTime = now
+	}
+	d := endTime.Sub(r.StartedTime())
+	if d < 0 {
+		return 0
+	}
+	return d.Round(time.Second)
 }
 
 type Repo struct {
@@ -76,6 +114,30 @@ func (r Run) CommitMsg() string {
 	} else {
 		return r.HeadSha[0:8]
 	}
+}
+
+func (r *Run) ExportData(fields []string) map[string]interface{} {
+	v := reflect.ValueOf(r).Elem()
+	fieldByName := func(v reflect.Value, field string) reflect.Value {
+		return v.FieldByNameFunc(func(s string) bool {
+			return strings.EqualFold(field, s)
+		})
+	}
+	data := map[string]interface{}{}
+
+	for _, f := range fields {
+		switch f {
+		case "databaseId":
+			data[f] = r.ID
+		case "workflowDatabaseId":
+			data[f] = r.WorkflowID
+		default:
+			sf := fieldByName(v, f)
+			data[f] = sf.Interface()
+		}
+	}
+
+	return data
 }
 
 type Job struct {
@@ -165,9 +227,14 @@ type RunsPayload struct {
 	WorkflowRuns []Run `json:"workflow_runs"`
 }
 
-func GetRunsWithFilter(client *api.Client, repo ghrepo.Interface, limit int, f func(Run) bool) ([]Run, error) {
+type FilterOptions struct {
+	Branch string
+	Actor  string
+}
+
+func GetRunsWithFilter(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, limit int, f func(Run) bool) ([]Run, error) {
 	path := fmt.Sprintf("repos/%s/actions/runs", ghrepo.FullName(repo))
-	runs, err := getRuns(client, repo, path, 50)
+	runs, err := getRuns(client, repo, path, opts, 50)
 	if err != nil {
 		return nil, err
 	}
@@ -184,17 +251,17 @@ func GetRunsWithFilter(client *api.Client, repo ghrepo.Interface, limit int, f f
 	return filtered, nil
 }
 
-func GetRunsByWorkflow(client *api.Client, repo ghrepo.Interface, limit int, workflowID int64) ([]Run, error) {
+func GetRunsByWorkflow(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, limit int, workflowID int64) ([]Run, error) {
 	path := fmt.Sprintf("repos/%s/actions/workflows/%d/runs", ghrepo.FullName(repo), workflowID)
-	return getRuns(client, repo, path, limit)
+	return getRuns(client, repo, path, opts, limit)
 }
 
-func GetRuns(client *api.Client, repo ghrepo.Interface, limit int) ([]Run, error) {
+func GetRuns(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, limit int) ([]Run, error) {
 	path := fmt.Sprintf("repos/%s/actions/runs", ghrepo.FullName(repo))
-	return getRuns(client, repo, path, limit)
+	return getRuns(client, repo, path, opts, limit)
 }
 
-func getRuns(client *api.Client, repo ghrepo.Interface, path string, limit int) ([]Run, error) {
+func getRuns(client *api.Client, repo ghrepo.Interface, path string, opts *FilterOptions, limit int) ([]Run, error) {
 	perPage := limit
 	page := 1
 	if limit > 100 {
@@ -213,6 +280,14 @@ func getRuns(client *api.Client, repo ghrepo.Interface, path string, limit int) 
 		query := parsed.Query()
 		query.Set("per_page", fmt.Sprintf("%d", perPage))
 		query.Set("page", fmt.Sprintf("%d", page))
+		if opts != nil {
+			if opts.Branch != "" {
+				query.Set("branch", opts.Branch)
+			}
+			if opts.Actor != "" {
+				query.Set("actor", opts.Actor)
+			}
+		}
 		parsed.RawQuery = query.Encode()
 		pagedPath := parsed.String()
 
@@ -254,6 +329,18 @@ func GetJobs(client *api.Client, repo ghrepo.Interface, run Run) ([]Job, error) 
 	return result.Jobs, nil
 }
 
+func GetJob(client *api.Client, repo ghrepo.Interface, jobID string) (*Job, error) {
+	path := fmt.Sprintf("repos/%s/actions/jobs/%s", ghrepo.FullName(repo), jobID)
+
+	var result Job
+	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
 func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 	var selected int
 	now := time.Now()
@@ -264,11 +351,12 @@ func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 		symbol, _ := Symbol(cs, run.Status, run.Conclusion)
 		candidates = append(candidates,
 			// TODO truncate commit message, long ones look terrible
-			fmt.Sprintf("%s %s, %s (%s) %s", symbol, run.CommitMsg(), run.Name, run.HeadBranch, preciseAgo(now, run.CreatedAt)))
+			fmt.Sprintf("%s %s, %s (%s) %s", symbol, run.CommitMsg(), run.Name, run.HeadBranch, preciseAgo(now, run.StartedTime())))
 	}
 
 	// TODO consider custom filter so it's fuzzier. right now matches start anywhere in string but
 	// become contiguous
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err := prompt.SurveyAskOne(&survey.Select{
 		Message:  "Select a workflow run",
 		Options:  candidates,
@@ -303,7 +391,7 @@ func Symbol(cs *iostreams.ColorScheme, status Status, conclusion Conclusion) (st
 		switch conclusion {
 		case Success:
 			return cs.SuccessIconWithColor(noColor), cs.Green
-		case Skipped, Cancelled, Neutral:
+		case Skipped, Neutral:
 			return "-", cs.Gray
 		default:
 			return cs.FailureIconWithColor(noColor), cs.Red

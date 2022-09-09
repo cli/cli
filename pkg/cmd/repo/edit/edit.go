@@ -6,46 +6,77 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
+	"strings"
+	"time"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/pkg/set"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
 )
 
+const (
+	allowMergeCommits = "Allow Merge Commits"
+	allowSquashMerge  = "Allow Squash Merging"
+	allowRebaseMerge  = "Allow Rebase Merging"
+
+	optionAllowForking      = "Allow Forking"
+	optionDefaultBranchName = "Default Branch Name"
+	optionDescription       = "Description"
+	optionHomePageURL       = "Home Page URL"
+	optionIssues            = "Issues"
+	optionMergeOptions      = "Merge Options"
+	optionProjects          = "Projects"
+	optionTemplateRepo      = "Template Repository"
+	optionTopics            = "Topics"
+	optionVisibility        = "Visibility"
+	optionWikis             = "Wikis"
+)
+
 type EditOptions struct {
-	HTTPClient   *http.Client
-	Repository   ghrepo.Interface
-	Edits        EditRepositoryInput
-	AddTopics    []string
-	RemoveTopics []string
+	HTTPClient      *http.Client
+	Repository      ghrepo.Interface
+	IO              *iostreams.IOStreams
+	Edits           EditRepositoryInput
+	AddTopics       []string
+	RemoveTopics    []string
+	InteractiveMode bool
+	Detector        fd.Detector
+	// Cache of current repo topics to avoid retrieving them
+	// in multiple flows.
+	topicsCache []string
 }
 
 type EditRepositoryInput struct {
-	Description         *string `json:"description,omitempty"`
-	Homepage            *string `json:"homepage,omitempty"`
-	Visibility          *string `json:"visibility,omitempty"`
-	EnableIssues        *bool   `json:"has_issues,omitempty"`
-	EnableProjects      *bool   `json:"has_projects,omitempty"`
-	EnableWiki          *bool   `json:"has_wiki,omitempty"`
-	IsTemplate          *bool   `json:"is_template,omitempty"`
-	DefaultBranch       *string `json:"default_branch,omitempty"`
-	EnableSquashMerge   *bool   `json:"allow_squash_merge,omitempty"`
-	EnableMergeCommit   *bool   `json:"allow_merge_commit,omitempty"`
-	EnableRebaseMerge   *bool   `json:"allow_rebase_merge,omitempty"`
-	EnableAutoMerge     *bool   `json:"allow_auto_merge,omitempty"`
-	DeleteBranchOnMerge *bool   `json:"delete_branch_on_merge,omitempty"`
 	AllowForking        *bool   `json:"allow_forking,omitempty"`
+	DefaultBranch       *string `json:"default_branch,omitempty"`
+	DeleteBranchOnMerge *bool   `json:"delete_branch_on_merge,omitempty"`
+	Description         *string `json:"description,omitempty"`
+	EnableAutoMerge     *bool   `json:"allow_auto_merge,omitempty"`
+	EnableIssues        *bool   `json:"has_issues,omitempty"`
+	EnableMergeCommit   *bool   `json:"allow_merge_commit,omitempty"`
+	EnableProjects      *bool   `json:"has_projects,omitempty"`
+	EnableRebaseMerge   *bool   `json:"allow_rebase_merge,omitempty"`
+	EnableSquashMerge   *bool   `json:"allow_squash_merge,omitempty"`
+	EnableWiki          *bool   `json:"has_wiki,omitempty"`
+	Homepage            *string `json:"homepage,omitempty"`
+	IsTemplate          *bool   `json:"is_template,omitempty"`
+	Visibility          *string `json:"visibility,omitempty"`
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobra.Command {
-	opts := &EditOptions{}
+	opts := &EditOptions{
+		IO: f.IOStreams,
+	}
 
 	cmd := &cobra.Command{
 		Use:   "edit [<repository>]",
@@ -57,12 +88,20 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 				- by URL, e.g. "https://github.com/OWNER/REPO"
 			`),
 		},
-		Args: cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if cmd.Flags().NFlag() == 0 {
-				return cmdutil.FlagErrorf("at least one flag is required")
-			}
+		Long: heredoc.Docf(`
+			Edit repository settings.
 
+			To toggle a setting off, use the %[1]s--flag=false%[1]s syntax.
+		`, "`"),
+		Args: cobra.MaximumNArgs(1),
+		Example: heredoc.Doc(`
+			# enable issues and wiki
+			gh repo edit --enable-issues --enable-wiki
+
+			# disable projects
+			gh repo edit --enable-projects=false
+		`),
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				var err error
 				opts.Repository, err = ghrepo.FromFullName(args[0])
@@ -81,6 +120,14 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 				opts.HTTPClient = httpClient
 			} else {
 				return err
+			}
+
+			if cmd.Flags().NFlag() == 0 {
+				opts.InteractiveMode = true
+			}
+
+			if opts.InteractiveMode && !opts.IO.CanPrompt() {
+				return cmdutil.FlagErrorf("specify properties to edit when not running interactively")
 			}
 
 			if runF != nil {
@@ -112,6 +159,53 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 
 func editRun(ctx context.Context, opts *EditOptions) error {
 	repo := opts.Repository
+
+	if opts.InteractiveMode {
+		detector := opts.Detector
+		if detector == nil {
+			cachedClient := api.NewCachedHTTPClient(opts.HTTPClient, time.Hour*24)
+			detector = fd.NewDetector(cachedClient, repo.RepoHost())
+		}
+		repoFeatures, err := detector.RepositoryFeatures()
+		if err != nil {
+			return err
+		}
+
+		apiClient := api.NewClientFromHTTP(opts.HTTPClient)
+		fieldsToRetrieve := []string{
+			"defaultBranchRef",
+			"deleteBranchOnMerge",
+			"description",
+			"hasIssuesEnabled",
+			"hasProjectsEnabled",
+			"hasWikiEnabled",
+			"homepageUrl",
+			"isInOrganization",
+			"isTemplate",
+			"mergeCommitAllowed",
+			"rebaseMergeAllowed",
+			"repositoryTopics",
+			"squashMergeAllowed",
+		}
+		if repoFeatures.VisibilityField {
+			fieldsToRetrieve = append(fieldsToRetrieve, "visibility")
+		}
+		if repoFeatures.AutoMerge {
+			fieldsToRetrieve = append(fieldsToRetrieve, "autoMergeAllowed")
+		}
+
+		opts.IO.StartProgressIndicator()
+		fetchedRepo, err := api.FetchRepository(apiClient, opts.Repository, fieldsToRetrieve)
+		opts.IO.StopProgressIndicator()
+		if err != nil {
+			return err
+		}
+		err = interactiveRepoEdit(opts, fetchedRepo)
+		if err != nil {
+			return err
+		}
+	}
+
 	apiPath := fmt.Sprintf("repos/%s/%s", repo.RepoOwner(), repo.RepoName())
 
 	body := &bytes.Buffer{}
@@ -132,16 +226,19 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 
 	if len(opts.AddTopics) > 0 || len(opts.RemoveTopics) > 0 {
 		g.Go(func() error {
-			existingTopics, err := getTopics(ctx, opts.HTTPClient, repo)
-			if err != nil {
-				return err
+			// opts.topicsCache gets populated in interactive mode
+			if !opts.InteractiveMode {
+				var err error
+				opts.topicsCache, err = getTopics(ctx, opts.HTTPClient, repo)
+				if err != nil {
+					return err
+				}
 			}
-
 			oldTopics := set.NewStringSet()
-			oldTopics.AddValues(existingTopics)
+			oldTopics.AddValues(opts.topicsCache)
 
 			newTopics := set.NewStringSet()
-			newTopics.AddValues(existingTopics)
+			newTopics.AddValues(opts.topicsCache)
 			newTopics.AddValues(opts.AddTopics)
 			newTopics.RemoveValues(opts.RemoveTopics)
 
@@ -152,7 +249,232 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 		})
 	}
 
-	return g.Wait()
+	err := g.Wait()
+	if err != nil {
+		return err
+	}
+
+	if opts.IO.IsStdoutTTY() {
+		cs := opts.IO.ColorScheme()
+		fmt.Fprintf(opts.IO.Out,
+			"%s Edited repository %s\n",
+			cs.SuccessIcon(),
+			ghrepo.FullName(repo))
+	}
+
+	return nil
+}
+
+func interactiveChoice(r *api.Repository) ([]string, error) {
+	options := []string{
+		optionDefaultBranchName,
+		optionDescription,
+		optionHomePageURL,
+		optionIssues,
+		optionMergeOptions,
+		optionProjects,
+		optionTemplateRepo,
+		optionTopics,
+		optionVisibility,
+		optionWikis,
+	}
+	if r.IsInOrganization {
+		options = append(options, optionAllowForking)
+	}
+	var answers []string
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
+	err := prompt.SurveyAskOne(&survey.MultiSelect{
+		Message: "What do you want to edit?",
+		Options: options,
+	}, &answers, survey.WithPageSize(11))
+	return answers, err
+}
+
+func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
+	for _, v := range r.RepositoryTopics.Nodes {
+		opts.topicsCache = append(opts.topicsCache, v.Topic.Name)
+	}
+	choices, err := interactiveChoice(r)
+	if err != nil {
+		return err
+	}
+	for _, c := range choices {
+		switch c {
+		case optionDescription:
+			opts.Edits.Description = &r.Description
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
+			err = prompt.SurveyAskOne(&survey.Input{
+				Message: "Description of the repository",
+				Default: r.Description,
+			}, opts.Edits.Description)
+			if err != nil {
+				return err
+			}
+		case optionHomePageURL:
+			opts.Edits.Homepage = &r.HomepageURL
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
+			err = prompt.SurveyAskOne(&survey.Input{
+				Message: "Repository home page URL",
+				Default: r.HomepageURL,
+			}, opts.Edits.Homepage)
+			if err != nil {
+				return err
+			}
+		case optionTopics:
+			var addTopics string
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
+			err = prompt.SurveyAskOne(&survey.Input{
+				Message: "Add topics?(csv format)",
+			}, &addTopics)
+			if err != nil {
+				return err
+			}
+			if len(strings.TrimSpace(addTopics)) > 0 {
+				opts.AddTopics = parseTopics(addTopics)
+			}
+
+			if len(opts.topicsCache) > 0 {
+				//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
+				err = prompt.SurveyAskOne(&survey.MultiSelect{
+					Message: "Remove Topics",
+					Options: opts.topicsCache,
+				}, &opts.RemoveTopics)
+				if err != nil {
+					return err
+				}
+			}
+		case optionDefaultBranchName:
+			opts.Edits.DefaultBranch = &r.DefaultBranchRef.Name
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
+			err = prompt.SurveyAskOne(&survey.Input{
+				Message: "Default branch name",
+				Default: r.DefaultBranchRef.Name,
+			}, opts.Edits.DefaultBranch)
+			if err != nil {
+				return err
+			}
+		case optionWikis:
+			opts.Edits.EnableWiki = &r.HasWikiEnabled
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: "Enable Wikis?",
+				Default: r.HasWikiEnabled,
+			}, opts.Edits.EnableWiki)
+			if err != nil {
+				return err
+			}
+		case optionIssues:
+			opts.Edits.EnableIssues = &r.HasIssuesEnabled
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: "Enable Issues?",
+				Default: r.HasIssuesEnabled,
+			}, opts.Edits.EnableIssues)
+			if err != nil {
+				return err
+			}
+		case optionProjects:
+			opts.Edits.EnableProjects = &r.HasProjectsEnabled
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: "Enable Projects?",
+				Default: r.HasProjectsEnabled,
+			}, opts.Edits.EnableProjects)
+			if err != nil {
+				return err
+			}
+		case optionVisibility:
+			opts.Edits.Visibility = &r.Visibility
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
+			err = prompt.SurveyAskOne(&survey.Select{
+				Message: "Visibility",
+				Options: []string{"public", "private", "internal"},
+				Default: strings.ToLower(r.Visibility),
+			}, opts.Edits.Visibility)
+			if err != nil {
+				return err
+			}
+		case optionMergeOptions:
+			var defaultMergeOptions []string
+			var selectedMergeOptions []string
+			if r.MergeCommitAllowed {
+				defaultMergeOptions = append(defaultMergeOptions, allowMergeCommits)
+			}
+			if r.SquashMergeAllowed {
+				defaultMergeOptions = append(defaultMergeOptions, allowSquashMerge)
+			}
+			if r.RebaseMergeAllowed {
+				defaultMergeOptions = append(defaultMergeOptions, allowRebaseMerge)
+			}
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
+			err = prompt.SurveyAskOne(&survey.MultiSelect{
+				Message: "Allowed merge strategies",
+				Default: defaultMergeOptions,
+				Options: []string{allowMergeCommits, allowSquashMerge, allowRebaseMerge},
+			}, &selectedMergeOptions)
+			if err != nil {
+				return err
+			}
+			enableMergeCommit := isIncluded(allowMergeCommits, selectedMergeOptions)
+			opts.Edits.EnableMergeCommit = &enableMergeCommit
+			enableSquashMerge := isIncluded(allowSquashMerge, selectedMergeOptions)
+			opts.Edits.EnableSquashMerge = &enableSquashMerge
+			enableRebaseMerge := isIncluded(allowRebaseMerge, selectedMergeOptions)
+			opts.Edits.EnableRebaseMerge = &enableRebaseMerge
+			if !enableMergeCommit && !enableSquashMerge && !enableRebaseMerge {
+				return fmt.Errorf("you need to allow at least one merge strategy")
+			}
+
+			opts.Edits.EnableAutoMerge = &r.AutoMergeAllowed
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: "Enable Auto Merge?",
+				Default: r.AutoMergeAllowed,
+			}, opts.Edits.EnableAutoMerge)
+			if err != nil {
+				return err
+			}
+
+			opts.Edits.DeleteBranchOnMerge = &r.DeleteBranchOnMerge
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: "Automatically delete head branches after merging?",
+				Default: r.DeleteBranchOnMerge,
+			}, opts.Edits.DeleteBranchOnMerge)
+			if err != nil {
+				return err
+			}
+		case optionTemplateRepo:
+			opts.Edits.IsTemplate = &r.IsTemplate
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: "Convert into a template repository?",
+				Default: r.IsTemplate,
+			}, opts.Edits.IsTemplate)
+			if err != nil {
+				return err
+			}
+		case optionAllowForking:
+			opts.Edits.AllowForking = &r.ForkingAllowed
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: "Allow forking (of an organization repository)?",
+				Default: r.ForkingAllowed,
+			}, opts.Edits.AllowForking)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func parseTopics(s string) []string {
+	topics := strings.Split(s, ",")
+	for i, topic := range topics {
+		topics[i] = strings.TrimSpace(topic)
+	}
+	return topics
 }
 
 func getTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interface) ([]string, error) {
@@ -211,8 +533,17 @@ func setTopics(ctx context.Context, httpClient *http.Client, repo ghrepo.Interfa
 	}
 
 	if res.Body != nil {
-		_, _ = io.Copy(ioutil.Discard, res.Body)
+		_, _ = io.Copy(io.Discard, res.Body)
 	}
 
 	return nil
+}
+
+func isIncluded(value string, opts []string) bool {
+	for _, opt := range opts {
+		if strings.EqualFold(opt, value) {
+			return true
+		}
+	}
+	return false
 }

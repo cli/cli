@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -29,10 +29,7 @@ func REST(method, p string) Matcher {
 		if !strings.EqualFold(req.Method, method) {
 			return false
 		}
-		if req.URL.Path != "/"+p {
-			return false
-		}
-		return true
+		return req.URL.Path == "/"+p
 	}
 }
 
@@ -56,11 +53,29 @@ func GraphQL(q string) Matcher {
 	}
 }
 
+func QueryMatcher(method string, path string, query url.Values) Matcher {
+	return func(req *http.Request) bool {
+		if !REST(method, path)(req) {
+			return false
+		}
+
+		actualQuery := req.URL.Query()
+
+		for param := range query {
+			if !(actualQuery.Get(param) == query.Get(param)) {
+				return false
+			}
+		}
+
+		return true
+	}
+}
+
 func readBody(req *http.Request) ([]byte, error) {
 	bodyCopy := &bytes.Buffer{}
 	r := io.TeeReader(req.Body, bodyCopy)
-	req.Body = ioutil.NopCloser(bodyCopy)
-	return ioutil.ReadAll(r)
+	req.Body = io.NopCloser(bodyCopy)
+	return io.ReadAll(r)
 }
 
 func decodeJSONBody(req *http.Request, dest interface{}) error {
@@ -163,7 +178,7 @@ func ScopesResponder(scopes string) func(*http.Request) (*http.Response, error) 
 			Header: map[string][]string{
 				"X-Oauth-Scopes": {scopes},
 			},
-			Body: ioutil.NopCloser(bytes.NewBufferString("")),
+			Body: io.NopCloser(bytes.NewBufferString("")),
 		}, nil
 	}
 }
@@ -172,7 +187,7 @@ func httpResponse(status int, req *http.Request, body io.Reader) *http.Response 
 	return &http.Response{
 		StatusCode: status,
 		Request:    req,
-		Body:       ioutil.NopCloser(body),
+		Body:       io.NopCloser(body),
 		Header:     http.Header{},
 	}
 }

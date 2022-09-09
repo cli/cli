@@ -5,9 +5,11 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -17,15 +19,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type browser interface {
-	Browse(string) error
-}
-
 type ListOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
-	Browser    browser
+	Browser    browser.Browser
 
 	WebMode      bool
 	LimitResults int
@@ -38,7 +36,9 @@ type ListOptions struct {
 	Author     string
 	Assignee   string
 	Search     string
-	Draft      string
+	Draft      *bool
+
+	Now func() time.Time
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -46,30 +46,35 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
+		Now:        time.Now,
 	}
 
-	var draft bool
+	var appAuthor string
 
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List and filter pull requests in this repository",
+		Short: "List pull requests in a repository",
+		Long: heredoc.Doc(`
+			List pull requests in a GitHub repository.
+
+			The search query syntax is documented here:
+			<https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests>
+		`),
 		Example: heredoc.Doc(`
 			List PRs authored by you
 			$ gh pr list --author "@me"
 
-			List PRs assigned to you
-			$ gh pr list --assignee "@me"
-
-			List PRs by label, combining multiple labels with AND
+			List only PRs with all of the given labels
 			$ gh pr list --label bug --label "priority 1"
 
-			List PRs using search syntax
+			Filter PRs using search syntax
 			$ gh pr list --search "status:success review:required"
 
-			Open the list of PRs in a web browser
-			$ gh pr list --web
+			Find a PR that introduced a given commit
+			$ gh pr list --search "<SHA>" --state merged
     	`),
-		Args: cmdutil.NoArgsQuoteReminder,
+		Aliases: []string{"ls"},
+		Args:    cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
@@ -78,8 +83,12 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("invalid value for --limit: %v", opts.LimitResults)
 			}
 
-			if cmd.Flags().Changed("draft") {
-				opts.Draft = strconv.FormatBool(draft)
+			if cmd.Flags().Changed("author") && cmd.Flags().Changed("app") {
+				return cmdutil.FlagErrorf("specify only `--author` or `--app`")
+			}
+
+			if cmd.Flags().Changed("app") {
+				opts.Author = fmt.Sprintf("app/%s", appAuthor)
 			}
 
 			if runF != nil {
@@ -89,19 +98,17 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the browser to list the pull requests")
+	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "List pull requests in the web browser")
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of items to fetch")
-	cmd.Flags().StringVarP(&opts.State, "state", "s", "open", "Filter by state: {open|closed|merged|all}")
-	_ = cmd.RegisterFlagCompletionFunc("state", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"open", "closed", "merged", "all"}, cobra.ShellCompDirectiveNoFileComp
-	})
+	cmdutil.StringEnumFlag(cmd, &opts.State, "state", "s", "open", []string{"open", "closed", "merged", "all"}, "Filter by state")
 	cmd.Flags().StringVarP(&opts.BaseBranch, "base", "B", "", "Filter by base branch")
 	cmd.Flags().StringVarP(&opts.HeadBranch, "head", "H", "", "Filter by head branch")
-	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by labels")
+	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by label")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
+	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
-	cmd.Flags().BoolVarP(&draft, "draft", "d", false, "Filter by draft state")
+	cmdutil.NilBoolFlag(cmd, &opts.Draft, "draft", "d", "Filter by draft state")
 
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
@@ -117,6 +124,7 @@ var defaultFields = []string{
 	"headRepositoryOwner",
 	"isCrossRepository",
 	"isDraft",
+	"createdAt",
 }
 
 func listRun(opts *ListOptions) error {
@@ -181,6 +189,9 @@ func listRun(opts *ListOptions) error {
 	if listResult.SearchCapped {
 		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
 	}
+	if len(listResult.PullRequests) == 0 {
+		return shared.ListNoResults(ghrepo.FullName(baseRepo), "pull request", !filters.IsDefault())
+	}
 	if opts.IO.IsStdoutTTY() {
 		title := shared.ListHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, !filters.IsDefault())
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
@@ -193,11 +204,19 @@ func listRun(opts *ListOptions) error {
 		if table.IsTTY() {
 			prNum = "#" + prNum
 		}
-		table.AddField(prNum, nil, cs.ColorFromString(shared.ColorForPR(pr)))
+		now := opts.Now()
+		ago := now.Sub(pr.CreatedAt)
+
+		table.AddField(prNum, nil, cs.ColorFromString(shared.ColorForPRState(pr)))
 		table.AddField(text.ReplaceExcessiveWhitespace(pr.Title), nil, nil)
 		table.AddField(pr.HeadLabel(), nil, cs.Cyan)
 		if !table.IsTTY() {
 			table.AddField(prStateWithDraft(&pr), nil, nil)
+		}
+		if table.IsTTY() {
+			table.AddField(utils.FuzzyAgo(ago), nil, cs.Gray)
+		} else {
+			table.AddField(pr.CreatedAt.String(), nil, nil)
 		}
 		table.EndRow()
 	}

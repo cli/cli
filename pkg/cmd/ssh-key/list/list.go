@@ -1,7 +1,6 @@
 package list
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -26,9 +25,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "Lists SSH keys in your GitHub account",
-		Args:  cobra.ExactArgs(0),
+		Use:     "list",
+		Short:   "Lists SSH keys in your GitHub account",
+		Aliases: []string{"ls"},
+		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runF != nil {
 				return runF(opts)
@@ -51,10 +51,7 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
 	sshKeys, err := userKeys(apiClient, host, "")
 	if err != nil {
@@ -62,8 +59,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(sshKeys) == 0 {
-		fmt.Fprintln(opts.IO.ErrOut, "No SSH keys present in GitHub account.")
-		return cmdutil.SilentError
+		return cmdutil.NewNoResultsError("no SSH keys present in the GitHub account")
 	}
 
 	t := utils.NewTablePrinter(opts.IO)

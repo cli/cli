@@ -3,15 +3,6 @@
 
 package iostreams
 
-import (
-	"errors"
-	"os"
-)
-
-func (s *IOStreams) EnableVirtualTerminalProcessing() error {
+func enableVirtualTerminalProcessing(fd uintptr) error {
 	return nil
-}
-
-func enableVirtualTerminalProcessing(f *os.File) error {
-	return errors.New("not implemented")
 }

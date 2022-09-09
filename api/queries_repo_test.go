@@ -18,7 +18,7 @@ func TestGitHubRepo_notFound(t *testing.T) {
 		httpmock.GraphQL(`query RepositoryInfo\b`),
 		httpmock.StringResponse(`{ "data": { "repository": null } }`))
 
-	client := NewClient(ReplaceTripper(httpReg))
+	client := newTestClient(httpReg)
 	repo, err := GitHubRepo(client, ghrepo.New("OWNER", "REPO"))
 	if err == nil {
 		t.Fatal("GitHubRepo did not return an error")
@@ -33,7 +33,7 @@ func TestGitHubRepo_notFound(t *testing.T) {
 
 func Test_RepoMetadata(t *testing.T) {
 	http := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(http))
+	client := newTestClient(http)
 
 	repo, _ := ghrepo.FromFullName("OWNER/REPO")
 	input := RepoMetadataInput{
@@ -182,7 +182,7 @@ func Test_ProjectsToPaths(t *testing.T) {
 
 func Test_ProjectNamesToPaths(t *testing.T) {
 	http := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(http))
+	client := newTestClient(http)
 
 	repo, _ := ghrepo.FromFullName("OWNER/REPO")
 
@@ -221,7 +221,7 @@ func Test_ProjectNamesToPaths(t *testing.T) {
 
 func Test_RepoResolveMetadataIDs(t *testing.T) {
 	http := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(http))
+	client := newTestClient(http)
 
 	repo, _ := ghrepo.FromFullName("OWNER/REPO")
 	input := RepoResolveInput{
@@ -350,7 +350,7 @@ func Test_RepoMilestones(t *testing.T) {
 			query = buf.String()
 			return httpmock.StringResponse("{}")(req)
 		})
-		client := NewClient(ReplaceTripper(reg))
+		client := newTestClient(reg)
 
 		_, err := RepoMilestones(client, ghrepo.New("OWNER", "REPO"), tt.state)
 		if (err != nil) != tt.wantErr {
@@ -359,6 +359,31 @@ func Test_RepoMilestones(t *testing.T) {
 		}
 		if !strings.Contains(query, tt.want) {
 			t.Errorf("query does not contain %v", tt.want)
+		}
+	}
+}
+
+func TestDisplayName(t *testing.T) {
+	tests := []struct {
+		name     string
+		assignee RepoAssignee
+		want     string
+	}{
+		{
+			name:     "assignee with name",
+			assignee: RepoAssignee{"123", "octocat123", "Octavious Cath"},
+			want:     "octocat123 (Octavious Cath)",
+		},
+		{
+			name:     "assignee without name",
+			assignee: RepoAssignee{"123", "octocat123", ""},
+			want:     "octocat123",
+		},
+	}
+	for _, tt := range tests {
+		actual := tt.assignee.DisplayName()
+		if actual != tt.want {
+			t.Errorf("display name was %s wanted %s", actual, tt.want)
 		}
 	}
 }

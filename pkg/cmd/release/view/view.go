@@ -141,8 +141,9 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 		fmt.Fprintf(w, "%s\n", iofmt.Gray(fmt.Sprintf("%s released this %s", release.Author.Login, utils.FuzzyAgo(time.Since(*release.PublishedAt)))))
 	}
 
-	style := markdown.GetStyle(io.TerminalTheme())
-	renderedDescription, err := markdown.Render(release.Body, style)
+	renderedDescription, err := markdown.Render(release.Body,
+		markdown.WithTheme(io.TerminalTheme()),
+		markdown.WithWrap(io.TerminalWidth()))
 	if err != nil {
 		return err
 	}
@@ -183,6 +184,9 @@ func renderReleasePlain(w io.Writer, release *shared.Release) error {
 	}
 	fmt.Fprint(w, "--\n")
 	fmt.Fprint(w, release.Body)
+	if !strings.HasSuffix(release.Body, "\n") {
+		fmt.Fprintf(w, "\n")
+	}
 	return nil
 }
 

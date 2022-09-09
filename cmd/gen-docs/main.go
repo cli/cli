@@ -40,9 +40,9 @@ func run(args []string) error {
 		return fmt.Errorf("error: --doc-path not set")
 	}
 
-	io, _, _, _ := iostreams.Test()
+	ios, _, _, _ := iostreams.Test()
 	rootCmd := root.NewCmdRoot(&cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		Browser:   &browser{},
 	}, "", "")
 	rootCmd.InitDefaultHelpCmd()
@@ -58,13 +58,7 @@ func run(args []string) error {
 	}
 
 	if *manPage {
-		header := &docs.GenManHeader{
-			Title:   "gh",
-			Section: "1",
-			Source:  "",
-			Manual:  "",
-		}
-		if err := docs.GenManTree(rootCmd, header, *dir); err != nil {
+		if err := docs.GenManTree(rootCmd, *dir); err != nil {
 			return err
 		}
 	}

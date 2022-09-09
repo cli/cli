@@ -3,7 +3,7 @@ package diff
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -28,6 +28,13 @@ func Test_NewCmdDiff(t *testing.T) {
 		want    DiffOptions
 		wantErr string
 	}{
+		{
+			name: "name only",
+			args: "--name-only",
+			want: DiffOptions{
+				NameOnly: true,
+			},
+		},
 		{
 			name:  "number argument",
 			args:  "123",
@@ -83,19 +90,19 @@ func Test_NewCmdDiff(t *testing.T) {
 			name:    "invalid --color argument",
 			args:    "--color doublerainbow",
 			isTTY:   true,
-			wantErr: "the value for `--color` must be one of \"auto\", \"always\", or \"never\"",
+			wantErr: "invalid argument \"doublerainbow\" for \"--color\" flag: valid values are {always|never|auto}",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
-			io.SetColorEnabled(tt.isTTY)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
+			ios.SetColorEnabled(tt.isTTY)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			var opts *DiffOptions
@@ -110,8 +117,8 @@ func Test_NewCmdDiff(t *testing.T) {
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {
@@ -170,6 +177,18 @@ func Test_diffRun(t *testing.T) {
 			wantAccept: "application/vnd.github.v3.patch",
 			wantStdout: fmt.Sprintf(testDiff, "", "", "", ""),
 		},
+		{
+			name: "name only",
+			opts: DiffOptions{
+				SelectorArg: "123",
+				UseColor:    false,
+				Patch:       false,
+				NameOnly:    true,
+			},
+			rawDiff:    fmt.Sprintf(testDiff, "", "", "", ""),
+			wantAccept: "application/vnd.github.v3.diff",
+			wantStdout: ".github/workflows/releases.yml\nMakefile\n",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -184,7 +203,7 @@ func Test_diffRun(t *testing.T) {
 					return &http.Response{
 						StatusCode: 200,
 						Request:    req,
-						Body:       ioutil.NopCloser(strings.NewReader(tt.rawDiff)),
+						Body:       io.NopCloser(strings.NewReader(tt.rawDiff)),
 					}, nil
 				})
 
@@ -193,9 +212,8 @@ func Test_diffRun(t *testing.T) {
 				return &http.Client{Transport: httpReg}, nil
 			}
 
-			io, _, stdout, stderr := iostreams.Test()
-			opts.IO = io
-
+			ios, _, stdout, stderr := iostreams.Test()
+			opts.IO = ios
 			finder := shared.NewMockFinder("123", pr, ghrepo.New("OWNER", "REPO"))
 			finder.ExpectFields([]string{"number"})
 			opts.Finder = finder
@@ -239,12 +257,12 @@ const testDiff = `%[2]sdiff --git a/.github/workflows/releases.yml b/.github/wor
 @@ -22,8 +22,8 @@ test:
  	go test ./...
  .PHONY: test
- 
+
 %[4]s-site:%[1]s
 %[4]s-	git clone https://github.com/github/cli.github.com.git "$@"%[1]s
 %[3]s+site: bin/gh%[1]s
 %[3]s+	bin/gh repo clone github/cli.github.com "$@"%[1]s
- 
+
  site-docs: site
  	git -C site pull
 `
@@ -284,6 +302,46 @@ func Test_colorDiffLines(t *testing.T) {
 	for _, tt := range inputs {
 		buf := bytes.Buffer{}
 		if err := colorDiffLines(&buf, strings.NewReader(tt.input)); err != nil {
+			t.Fatalf("unexpected error: %s", err)
+		}
+		if got := buf.String(); got != tt.output {
+			t.Errorf("expected: %q, got: %q", tt.output, got)
+		}
+	}
+}
+
+func Test_changedFileNames(t *testing.T) {
+	inputs := []struct {
+		input, output string
+	}{
+		{
+			input:  "",
+			output: "",
+		},
+		{
+			input:  "\n",
+			output: "",
+		},
+		{
+			input:  "diff --git a/cmd.go b/cmd.go\n--- /dev/null\n+++ b/cmd.go\n@@ -0,0 +1,313 @@",
+			output: "cmd.go\n",
+		},
+		{
+			input:  "diff --git a/cmd.go b/cmd.go\n--- a/cmd.go\n+++ /dev/null\n@@ -0,0 +1,313 @@",
+			output: "cmd.go\n",
+		},
+		{
+			input:  fmt.Sprintf("diff --git a/baz.go b/rename.go\n--- a/baz.go\n+++ b/rename.go\n+foo\n-b%sr", strings.Repeat("a", 2*lineBufferSize)),
+			output: "rename.go\n",
+		},
+		{
+			input:  fmt.Sprintf("diff --git a/baz.go b/baz.go\n--- a/baz.go\n+++ b/baz.go\n+foo\n-b%sr", strings.Repeat("a", 2*lineBufferSize)),
+			output: "baz.go\n",
+		},
+	}
+	for _, tt := range inputs {
+		buf := bytes.Buffer{}
+		if err := changedFilesNames(&buf, strings.NewReader(tt.input)); err != nil {
 			t.Fatalf("unexpected error: %s", err)
 		}
 		if got := buf.String(); got != tt.output {

@@ -77,10 +77,7 @@ func runAdd(opts *AddOptions) error {
 		return err
 	}
 
-	hostname, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	hostname, _ := cfg.DefaultHost()
 
 	err = SSHKeyUpload(httpClient, hostname, keyReader, opts.Title)
 	if err != nil {

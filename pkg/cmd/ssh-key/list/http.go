@@ -3,7 +3,7 @@ package list
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -38,7 +38,7 @@ func userKeys(httpClient *http.Client, host, userHandle string) ([]sshKey, error
 		return nil, api.HandleHTTPError(resp)
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

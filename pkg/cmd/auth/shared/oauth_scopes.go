@@ -3,7 +3,6 @@ package shared
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -50,7 +49,7 @@ func GetScopes(httpClient httpClient, hostname, authToken string) (string, error
 	defer func() {
 		// Ensure the response body is fully read and closed
 		// before we reconnect, so that we reuse the same TCPconnection.
-		_, _ = io.Copy(ioutil.Discard, res.Body)
+		_, _ = io.Copy(io.Discard, res.Body)
 		res.Body.Close()
 	}()
 

@@ -101,16 +101,32 @@ func TestNewCmdCreate(t *testing.T) {
 			wantsErr: true,
 			errMsg:   "the `--source` option is not supported with `--clone`, `--template`, `--license`, or `--gitignore`",
 		},
+		{
+			name:     "include all branches without template",
+			cli:      "--source=/path/to/repo --private --include-all-branches",
+			wantsErr: true,
+			errMsg:   "the `--include-all-branches` option is only supported when using `--template`",
+		},
+		{
+			name: "new remote from template with include all branches",
+			cli:  "template-repo --template https://github.com/OWNER/REPO --public --include-all-branches",
+			wantsOpts: CreateOptions{
+				Name:               "template-repo",
+				Public:             true,
+				Template:           "https://github.com/OWNER/REPO",
+				IncludeAllBranches: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			var opts *CreateOptions
@@ -171,22 +187,30 @@ func Test_createRun(t *testing.T) {
 			tty:        true,
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n",
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne("Create a new repository on GitHub from scratch")
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoName", Value: "REPO"},
 					{Name: "repoDescription", Value: "my new repo"},
-					{Name: "repoVisibility", Value: "PRIVATE"},
+					{Name: "repoVisibility", Value: "Private"},
 				})
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "addGitIgnore", Value: true}})
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "chooseGitIgnore", Value: "Go"}})
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "addLicense", Value: true}})
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "chooseLicense", Value: "GNU Lesser General Public License v3.0"}})
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "confirmSubmit", Value: true}})
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(true) //clone locally?
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -206,17 +230,48 @@ func Test_createRun(t *testing.T) {
 			},
 		},
 		{
+			name: "interactive create from scratch but cancel before submit",
+			opts: &CreateOptions{Interactive: true},
+			tty:  true,
+			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				as.StubOne("Create a new repository on GitHub from scratch")
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "repoName", Value: "REPO"},
+					{Name: "repoDescription", Value: "my new repo"},
+					{Name: "repoVisibility", Value: "Private"},
+				})
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "addGitIgnore", Value: false}})
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "addLicense", Value: false}})
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
+				as.Stub([]*prompt.QuestionStub{
+					{Name: "confirmSubmit", Value: false}})
+			},
+			wantStdout: "",
+			wantErr:    true,
+			errMsg:     "CancelError",
+		},
+		{
 			name: "interactive with existing repository public",
 			opts: &CreateOptions{Interactive: true},
 			tty:  true,
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne("Push an existing local repository to GitHub")
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(".")
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoName", Value: "REPO"},
 					{Name: "repoDescription", Value: "my new repo"},
-					{Name: "repoVisibility", Value: "PRIVATE"},
+					{Name: "repoVisibility", Value: "Private"},
 				})
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(false)
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -247,16 +302,22 @@ func Test_createRun(t *testing.T) {
 			opts: &CreateOptions{Interactive: true},
 			tty:  true,
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne("Push an existing local repository to GitHub")
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(".")
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoName", Value: "REPO"},
 					{Name: "repoDescription", Value: "my new repo"},
-					{Name: "repoVisibility", Value: "PRIVATE"},
+					{Name: "repoVisibility", Value: "Private"},
 				})
-				as.StubOne(true)     //ask for adding a remote
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				as.StubOne(true) //ask for adding a remote
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne("origin") //ask for remote name
-				as.StubOne(false)    //ask to push to remote
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				as.StubOne(false) //ask to push to remote
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -287,16 +348,22 @@ func Test_createRun(t *testing.T) {
 			opts: &CreateOptions{Interactive: true},
 			tty:  true,
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne("Push an existing local repository to GitHub")
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(".")
+				//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 				as.Stub([]*prompt.QuestionStub{
 					{Name: "repoName", Value: "REPO"},
 					{Name: "repoDescription", Value: "my new repo"},
-					{Name: "repoVisibility", Value: "PRIVATE"},
+					{Name: "repoVisibility", Value: "Private"},
 				})
-				as.StubOne(true)     //ask for adding a remote
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				as.StubOne(true) //ask for adding a remote
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne("origin") //ask for remote name
-				as.StubOne(true)     //ask to push to remote
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+				as.StubOne(true) //ask to push to remote
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -323,8 +390,69 @@ func Test_createRun(t *testing.T) {
 			},
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n✓ Pushed commits to https://github.com/OWNER/REPO.git\n",
 		},
+		{
+			name: "noninteractive create from scratch",
+			opts: &CreateOptions{
+				Interactive: false,
+				Name:        "REPO",
+				Visibility:  "PRIVATE",
+			},
+			tty: false,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation RepositoryCreate\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"createRepository": {
+								"repository": {
+									"id": "REPOID",
+									"name": "REPO",
+									"owner": {"login":"OWNER"},
+									"url": "https://github.com/OWNER/REPO"
+								}
+							}
+						}
+					}`))
+			},
+			wantStdout: "https://github.com/OWNER/REPO\n",
+		},
+		{
+			name: "noninteractive create from source",
+			opts: &CreateOptions{
+				Interactive: false,
+				Source:      ".",
+				Name:        "REPO",
+				Visibility:  "PRIVATE",
+			},
+			tty: false,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`mutation RepositoryCreate\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"createRepository": {
+								"repository": {
+									"id": "REPOID",
+									"name": "REPO",
+									"owner": {"login":"OWNER"},
+									"url": "https://github.com/OWNER/REPO"
+								}
+							}
+						}
+					}`))
+			},
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git -C . rev-parse --git-dir`, 0, ".git")
+				cs.Register(`git -C . rev-parse HEAD`, 0, "commithash")
+				cs.Register(`git -C . remote add origin https://github.com/OWNER/REPO`, 0, "")
+			},
+			wantStdout: "https://github.com/OWNER/REPO\n",
+		},
 	}
 	for _, tt := range tests {
+		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 		q, teardown := prompt.InitAskStubber()
 		defer teardown()
 		if tt.askStubs != nil {
@@ -348,10 +476,10 @@ func Test_createRun(t *testing.T) {
 			tt.execStubs(cs)
 		}
 
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdinTTY(tt.tty)
-		io.SetStdoutTTY(tt.tty)
-		tt.opts.IO = io
+		ios, _, stdout, stderr := iostreams.Test()
+		ios.SetStdinTTY(tt.tty)
+		ios.SetStdoutTTY(tt.tty)
+		tt.opts.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)
@@ -363,47 +491,7 @@ func Test_createRun(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantStdout, stdout.String())
+			assert.Equal(t, "", stderr.String())
 		})
-	}
-}
-
-func Test_getModifiedNormalizedName(t *testing.T) {
-	// confirmed using GitHub.com/new
-	tests := []struct {
-		LocalName      string
-		NormalizedName string
-	}{
-		{
-			LocalName:      "cli",
-			NormalizedName: "cli",
-		},
-		{
-			LocalName:      "cli.git",
-			NormalizedName: "cli",
-		},
-		{
-			LocalName:      "@-#$^",
-			NormalizedName: "---",
-		},
-		{
-			LocalName:      "[cli]",
-			NormalizedName: "-cli-",
-		},
-		{
-			LocalName:      "Hello World, I'm a new repo!",
-			NormalizedName: "Hello-World-I-m-a-new-repo-",
-		},
-		{
-			LocalName:      " @E3H*(#$#_$-ZVp,n.7lGq*_eMa-(-zAZSJYg!",
-			NormalizedName: "-E3H-_--ZVp-n.7lGq-_eMa---zAZSJYg-",
-		},
-		{
-			LocalName:      "I'm a crazy .git repo name .git.git .git",
-			NormalizedName: "I-m-a-crazy-.git-repo-name-.git.git-",
-		},
-	}
-	for _, tt := range tests {
-		output := normalizeRepoName(tt.LocalName)
-		assert.Equal(t, tt.NormalizedName, output)
 	}
 }

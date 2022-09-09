@@ -18,7 +18,8 @@ type ListOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	LimitResults int
+	LimitResults  int
+	ExcludeDrafts bool
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -28,9 +29,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List releases in a repository",
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Short:   "List releases in a repository",
+		Aliases: []string{"ls"},
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
@@ -43,6 +45,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of items to fetch")
+	cmd.Flags().BoolVar(&opts.ExcludeDrafts, "exclude-drafts", false, "Exclude draft releases")
 
 	return cmd
 }
@@ -58,15 +61,24 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	releases, err := fetchReleases(httpClient, baseRepo, opts.LimitResults)
+	releases, err := fetchReleases(httpClient, baseRepo, opts.LimitResults, opts.ExcludeDrafts)
 	if err != nil {
 		return err
+	}
+
+	if len(releases) == 0 {
+		return cmdutil.NewNoResultsError("no releases found")
+	}
+
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
 
 	now := time.Now()
 	table := utils.NewTablePrinter(opts.IO)
 	iofmt := opts.IO.ColorScheme()
-	seenLatest := false
 	for _, rel := range releases {
 		title := text.ReplaceExcessiveWhitespace(rel.Name)
 		if title == "" {
@@ -76,10 +88,9 @@ func listRun(opts *ListOptions) error {
 
 		badge := ""
 		var badgeColor func(string) string
-		if !rel.IsDraft && !rel.IsPrerelease && !seenLatest {
+		if rel.IsLatest {
 			badge = "Latest"
 			badgeColor = iofmt.Green
-			seenLatest = true
 		} else if rel.IsDraft {
 			badge = "Draft"
 			badgeColor = iofmt.Red

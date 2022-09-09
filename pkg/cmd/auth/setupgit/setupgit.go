@@ -54,10 +54,7 @@ func setupGitRun(opts *SetupGitOptions) error {
 		return err
 	}
 
-	hostnames, err := cfg.Hosts()
-	if err != nil {
-		return err
-	}
+	hostnames := cfg.Hosts()
 
 	stderr := opts.IO.ErrOut
 	cs := opts.IO.ColorScheme()

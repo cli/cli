@@ -38,28 +38,14 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
 	if err != nil {
-		return fmt.Errorf("get or choose codespace: %w", err)
-	}
-
-	user, err := a.apiClient.GetUser(ctx)
-	if err != nil {
-		return fmt.Errorf("getting user: %w", err)
-	}
-
-	authkeys := make(chan error, 1)
-	go func() {
-		authkeys <- checkAuthorizedKeys(ctx, a.apiClient, user.Login)
-	}()
-
-	session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, codespace)
-	if err != nil {
-		return fmt.Errorf("connecting to codespace: %w", err)
-	}
-	defer safeClose(session, &err)
-
-	if err := <-authkeys; err != nil {
 		return err
 	}
+
+	session, err := startLiveShareSession(ctx, codespace, a, false, "")
+	if err != nil {
+		return err
+	}
+	defer safeClose(session, &err)
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
 	listen, err := net.Listen("tcp", "127.0.0.1:0") // arbitrary port

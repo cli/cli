@@ -6,13 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
+	"github.com/shurcooL/githubv4"
 )
 
 type tag struct {
@@ -25,6 +25,25 @@ type releaseNotes struct {
 }
 
 var notImplementedError = errors.New("not implemented")
+
+func remoteTagExists(httpClient *http.Client, repo ghrepo.Interface, tagName string) (bool, error) {
+	gql := api.NewClientFromHTTP(httpClient)
+	qualifiedTagName := fmt.Sprintf("refs/tags/%s", tagName)
+	var query struct {
+		Repository struct {
+			Ref struct {
+				ID string
+			} `graphql:"ref(qualifiedName: $tagName)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+	variables := map[string]interface{}{
+		"owner":   githubv4.String(repo.RepoOwner()),
+		"name":    githubv4.String(repo.RepoName()),
+		"tagName": githubv4.String(qualifiedTagName),
+	}
+	err := gql.Query(repo.RepoHost(), "RepositoryFindRef", &query, variables)
+	return query.Repository.Ref.ID != "", err
+}
 
 func getTags(httpClient *http.Client, repo ghrepo.Interface, limit int) ([]tag, error) {
 	path := fmt.Sprintf("repos/%s/%s/tags?per_page=%d", repo.RepoOwner(), repo.RepoName(), limit)
@@ -57,7 +76,17 @@ func getTags(httpClient *http.Client, repo ghrepo.Interface, limit int) ([]tag, 
 	return tags, err
 }
 
-func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, params map[string]interface{}) (*releaseNotes, error) {
+func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagName, target, previousTagName string) (*releaseNotes, error) {
+	params := map[string]interface{}{
+		"tag_name": tagName,
+	}
+	if target != "" {
+		params["target_commitish"] = target
+	}
+	if previousTagName != "" {
+		params["previous_tag_name"] = previousTagName
+	}
+
 	bodyBytes, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
@@ -88,7 +117,7 @@ func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, params
 		return nil, api.HandleHTTPError(resp)
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +153,7 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 		return nil, api.HandleHTTPError(resp)
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -134,8 +163,17 @@ func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[st
 	return &newRelease, err
 }
 
-func publishRelease(httpClient *http.Client, releaseURL string) (*shared.Release, error) {
-	req, err := http.NewRequest("PATCH", releaseURL, bytes.NewBufferString(`{"draft":false}`))
+func publishRelease(httpClient *http.Client, releaseURL string, discussionCategory string) (*shared.Release, error) {
+	params := map[string]interface{}{"draft": false}
+	if discussionCategory != "" {
+		params["discussion_category_name"] = discussionCategory
+	}
+
+	bodyBytes, err := json.Marshal(params)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest("PATCH", releaseURL, bytes.NewBuffer(bodyBytes))
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +190,7 @@ func publishRelease(httpClient *http.Client, releaseURL string) (*shared.Release
 		return nil, api.HandleHTTPError(resp)
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

@@ -3,7 +3,8 @@ package shared
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
+	"os"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -77,25 +78,25 @@ func Test_PreserveInput(t *testing.T) {
 				tt.state = &IssueMetadataState{}
 			}
 
-			io, _, _, errOut := iostreams.Test()
+			ios, _, _, errOut := iostreams.Test()
 
-			tf, tferr := ioutil.TempFile(tempDir, "testfile*")
+			tf, tferr := os.CreateTemp(tempDir, "testfile*")
 			assert.NoError(t, tferr)
 			defer tf.Close()
 
-			io.TempFileOverride = tf
+			ios.TempFileOverride = tf
 
 			var err error
 			if tt.err {
 				err = errors.New("error during creation")
 			}
 
-			PreserveInput(io, tt.state, &err)()
+			PreserveInput(ios, tt.state, &err)()
 
 			_, err = tf.Seek(0, 0)
 			assert.NoError(t, err)
 
-			data, err := ioutil.ReadAll(tf)
+			data, err := io.ReadAll(tf)
 			assert.NoError(t, err)
 
 			if tt.wantPreservation {

@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
@@ -27,7 +29,7 @@ import (
 
 func TestNewCmdCreate(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "my-body.md")
-	err := ioutil.WriteFile(tmpFile, []byte("a body from file"), 0600)
+	err := os.WriteFile(tmpFile, []byte("a body from file"), 0600)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -93,16 +95,16 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, stdout, stderr := iostreams.Test()
+			ios, stdin, stdout, stderr := iostreams.Test()
 			if tt.stdin != "" {
 				_, _ = stdin.WriteString(tt.stdin)
 			} else if tt.tty {
-				io.SetStdinTTY(true)
-				io.SetStdoutTTY(true)
+				ios.SetStdinTTY(true)
+				ios.SetStdoutTTY(true)
 			}
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			var opts *CreateOptions
@@ -114,8 +116,8 @@ func TestNewCmdCreate(t *testing.T) {
 			args, err := shlex.Split(tt.cli)
 			require.NoError(t, err)
 			cmd.SetArgs(args)
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
 				assert.Error(t, err)
@@ -256,17 +258,17 @@ func Test_createRun(t *testing.T) {
 				tt.httpStubs(httpReg)
 			}
 
-			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdoutTTY(true)
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(true)
 			opts := &tt.opts
-			opts.IO = io
+			opts.IO = ios
 			opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: httpReg}, nil
 			}
 			opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			}
-			browser := &cmdutil.TestBrowser{}
+			browser := &browser.Stub{}
 			opts.Browser = browser
 
 			err := createRun(opts)
@@ -291,14 +293,14 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 }
 
 func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli string, rootDir string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(isTTY)
-	io.SetStdinTTY(isTTY)
-	io.SetStderrTTY(isTTY)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(isTTY)
+	ios.SetStdinTTY(isTTY)
+	ios.SetStderrTTY(isTTY)
 
-	browser := &cmdutil.TestBrowser{}
+	browser := &browser.Stub{}
 	factory := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
@@ -323,8 +325,8 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli strin
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
@@ -401,29 +403,14 @@ func TestIssueCreate_recover(t *testing.T) {
 			assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
 		}))
 
-	as, teardown := prompt.InitAskStubber()
-	defer teardown()
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
+	as := prompt.NewAskStubber(t)
 
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:    "Title",
-			Default: true,
-		},
-	})
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:    "Body",
-			Default: true,
-		},
-	})
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "confirmation",
-			Value: 0,
-		},
-	})
+	as.StubPrompt("Title").AnswerDefault()
+	as.StubPrompt("Body").AnswerDefault()
+	as.StubPrompt("What's next?").AnswerWith("Submit")
 
-	tmpfile, err := ioutil.TempFile(t.TempDir(), "testrecover*")
+	tmpfile, err := os.CreateTemp(t.TempDir(), "testrecover*")
 	assert.NoError(t, err)
 	defer tmpfile.Close()
 
@@ -484,25 +471,14 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 			}),
 	)
 
-	as, teardown := prompt.InitAskStubber()
-	defer teardown()
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
+	as := prompt.NewAskStubber(t)
 
-	// template
-	as.StubOne(1)
-	// body
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:    "Body",
-			Default: true,
-		},
-	}) // body
-	// confirm
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "confirmation",
-			Value: 0,
-		},
-	})
+	as.StubPrompt("Choose a template").AnswerWith("Submit a request")
+	as.StubPrompt("Body").AnswerDefault()
+	as.StubPrompt("What's next?").
+		AssertOptions([]string{"Submit", "Continue in browser", "Cancel"}).
+		AnswerWith("Submit")
 
 	output, err := runCommandWithRootDirOverridden(http, true, `-t hello`, "./fixtures/repoWithNonLegacyIssueTemplates")
 	if err != nil {
@@ -526,23 +502,11 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 			} } }`),
 	)
 
-	as, teardown := prompt.InitAskStubber()
-	defer teardown()
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
+	as := prompt.NewAskStubber(t)
 
-	// title
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "Title",
-			Value: "hello",
-		},
-	})
-	// confirm
-	as.Stub([]*prompt.QuestionStub{
-		{
-			Name:  "confirmation",
-			Value: 1,
-		},
-	})
+	as.StubPrompt("Title").AnswerWith("hello")
+	as.StubPrompt("What's next?").AnswerWith("Continue in browser")
 
 	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)

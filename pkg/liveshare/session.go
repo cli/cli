@@ -3,9 +3,21 @@ package liveshare
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/opentracing/opentracing-go"
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/sync/errgroup"
 )
+
+// A ChannelID is an identifier for an exposed port on a remote
+// container that may be used to open an SSH channel to it.
+type ChannelID struct {
+	name, condition string
+}
 
 // A Session represents the session between a connected Live Share client and server.
 type Session struct {
@@ -15,6 +27,10 @@ type Session struct {
 	clientName      string
 	keepAliveReason chan string
 	logger          logger
+}
+
+type StartSSHServerOptions struct {
+	UserPublicKeyFile string
 }
 
 // Close should be called by users to clean up RPC and SSH resources whenever the session
@@ -30,57 +46,25 @@ func (s *Session) Close() error {
 	return nil
 }
 
-// Port describes a port exposed by the container.
-type Port struct {
-	SourcePort                       int    `json:"sourcePort"`
-	DestinationPort                  int    `json:"destinationPort"`
-	SessionName                      string `json:"sessionName"`
-	StreamName                       string `json:"streamName"`
-	StreamCondition                  string `json:"streamCondition"`
-	BrowseURL                        string `json:"browseUrl"`
-	IsPublic                         bool   `json:"isPublic"`
-	IsTCPServerConnectionEstablished bool   `json:"isTCPServerConnectionEstablished"`
-	HasTLSHandshakePassed            bool   `json:"hasTLSHandshakePassed"`
-	Privacy                          string `json:"privacy"`
+// registerRequestHandler registers a handler for the given request type with the RPC
+// server and returns a callback function to deregister the handler
+func (s *Session) registerRequestHandler(requestType string, h handler) func() {
+	return s.rpc.register(requestType, h)
 }
 
-// startSharing tells the Live Share host to start sharing the specified port from the container.
-// The sessionName describes the purpose of the remote port or service.
-// It returns an identifier that can be used to open an SSH channel to the remote port.
-func (s *Session) startSharing(ctx context.Context, sessionName string, port int) (channelID, error) {
-	args := []interface{}{port, sessionName, fmt.Sprintf("http://localhost:%d", port)}
-	var response Port
-	if err := s.rpc.do(ctx, "serverSharing.startSharing", args, &response); err != nil {
-		return channelID{}, err
-	}
-
-	return channelID{response.StreamName, response.StreamCondition}, nil
-}
-
-// GetSharedServers returns a description of each container port
-// shared by a prior call to StartSharing by some client.
-func (s *Session) GetSharedServers(ctx context.Context) ([]*Port, error) {
-	var response []*Port
-	if err := s.rpc.do(ctx, "serverSharing.getSharedServers", []string{}, &response); err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
-// UpdateSharedServerPrivacy controls port permissions and visibility scopes for who can access its URLs
-// in the browser.
-func (s *Session) UpdateSharedServerPrivacy(ctx context.Context, port int, visibility string) error {
-	if err := s.rpc.do(ctx, "serverSharing.updateSharedServerPrivacy", []interface{}{port, visibility}, nil); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// StartsSSHServer starts an SSH server in the container, installing sshd if necessary,
-// and returns the port on which it listens and the user name clients should provide.
+// StartSSHServer starts an SSH server in the container, installing sshd if necessary, applies specified
+// options, and returns the port on which it listens and the user name clients should provide.
 func (s *Session) StartSSHServer(ctx context.Context) (int, string, error) {
+	return s.StartSSHServerWithOptions(ctx, StartSSHServerOptions{})
+}
+
+// StartSSHServerWithOptions starts an SSH server in the container, installing sshd if necessary, applies specified
+// options, and returns the port on which it listens and the user name clients should provide.
+func (s *Session) StartSSHServerWithOptions(ctx context.Context, options StartSSHServerOptions) (int, string, error) {
+	var params struct {
+		UserPublicKey string `json:"userPublicKey"`
+	}
+
 	var response struct {
 		Result     bool   `json:"result"`
 		ServerPort string `json:"serverPort"`
@@ -88,7 +72,16 @@ func (s *Session) StartSSHServer(ctx context.Context) (int, string, error) {
 		Message    string `json:"message"`
 	}
 
-	if err := s.rpc.do(ctx, "ISshServerHostService.startRemoteServer", []string{}, &response); err != nil {
+	if options.UserPublicKeyFile != "" {
+		publicKeyBytes, err := os.ReadFile(options.UserPublicKeyFile)
+		if err != nil {
+			return 0, "", fmt.Errorf("failed to read public key file: %w", err)
+		}
+
+		params.UserPublicKey = strings.TrimSpace(string(publicKeyBytes))
+	}
+
+	if err := s.rpc.do(ctx, "ISshServerHostService.startRemoteServerWithOptions", params, &response); err != nil {
 		return 0, "", err
 	}
 
@@ -104,8 +97,36 @@ func (s *Session) StartSSHServer(ctx context.Context) (int, string, error) {
 	return port, response.User, nil
 }
 
+// StartJupyterServer starts a Juypyter server in the container and returns
+// the port on which it listens and the server URL.
+func (s *Session) StartJupyterServer(ctx context.Context) (int, string, error) {
+	var response struct {
+		Result    bool   `json:"result"`
+		Message   string `json:"message"`
+		Port      string `json:"port"`
+		ServerUrl string `json:"serverUrl"`
+	}
+
+	if err := s.rpc.do(ctx, "IJupyterServerHostService.getRunningServer", []string{}, &response); err != nil {
+		return 0, "", fmt.Errorf("failed to invoke JupyterLab RPC: %w", err)
+	}
+
+	if !response.Result {
+		return 0, "", fmt.Errorf("failed to start JupyterLab: %s", response.Message)
+	}
+
+	port, err := strconv.Atoi(response.Port)
+	if err != nil {
+		return 0, "", fmt.Errorf("failed to parse JupyterLab port: %w", err)
+	}
+
+	return port, response.ServerUrl, nil
+}
+
 // heartbeat runs until context cancellation, periodically checking whether there is a
 // reason to keep the connection alive, and if so, notifying the Live Share host to do so.
+// Heartbeat ensures it does not send more than one request every "interval" to ratelimit
+// how many KeepAlives we send at a time.
 func (s *Session) heartbeat(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -132,13 +153,76 @@ func (s *Session) notifyHostOfActivity(ctx context.Context, activity string) err
 	return s.rpc.do(ctx, "ICodespaceHostService.notifyCodespaceOfClientActivity", params, nil)
 }
 
-// keepAlive accepts a reason that is retained if there is no active reason
+// KeepAlive accepts a reason that is retained if there is no active reason
 // to send to the server.
-func (s *Session) keepAlive(reason string) {
+func (s *Session) KeepAlive(reason string) {
 	select {
 	case s.keepAliveReason <- reason:
 	default:
 		// there is already an active keep alive reason
 		// so we can ignore this one
 	}
+}
+
+// StartSharing tells the Live Share host to start sharing the specified port from the container.
+// The sessionName describes the purpose of the remote port or service.
+// It returns an identifier that can be used to open an SSH channel to the remote port.
+func (s *Session) StartSharing(ctx context.Context, sessionName string, port int) (ChannelID, error) {
+	args := []interface{}{port, sessionName, fmt.Sprintf("http://localhost:%d", port)}
+	g, ctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		startNotification, err := s.WaitForPortNotification(ctx, port, PortChangeKindStart)
+		if err != nil {
+			return fmt.Errorf("error while waiting for port notification: %w", err)
+
+		}
+		if !startNotification.Success {
+			return fmt.Errorf("error while starting port sharing: %s", startNotification.ErrorDetail)
+		}
+		return nil // success
+	})
+
+	var response Port
+	g.Go(func() error {
+		return s.rpc.do(ctx, "serverSharing.startSharing", args, &response)
+	})
+
+	if err := g.Wait(); err != nil {
+		return ChannelID{}, err
+	}
+
+	return ChannelID{response.StreamName, response.StreamCondition}, nil
+}
+
+func (s *Session) OpenStreamingChannel(ctx context.Context, id ChannelID) (ssh.Channel, error) {
+	type getStreamArgs struct {
+		StreamName string `json:"streamName"`
+		Condition  string `json:"condition"`
+	}
+	args := getStreamArgs{
+		StreamName: id.name,
+		Condition:  id.condition,
+	}
+	var streamID string
+	if err := s.rpc.do(ctx, "streamManager.getStream", args, &streamID); err != nil {
+		return nil, fmt.Errorf("error getting stream id: %w", err)
+	}
+
+	span, ctx := opentracing.StartSpanFromContext(ctx, "Session.OpenChannel+SendRequest")
+	defer span.Finish()
+	_ = ctx // ctx is not currently used
+
+	channel, reqs, err := s.ssh.conn.OpenChannel("session", nil)
+	if err != nil {
+		return nil, fmt.Errorf("error opening ssh channel for transport: %w", err)
+	}
+	go ssh.DiscardRequests(reqs)
+
+	requestType := fmt.Sprintf("stream-transport-%s", streamID)
+	if _, err = channel.SendRequest(requestType, true, nil); err != nil {
+		return nil, fmt.Errorf("error sending channel request: %w", err)
+	}
+
+	return channel, nil
 }

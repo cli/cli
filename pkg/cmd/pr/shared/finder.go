@@ -10,15 +10,15 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/v2/api"
 	remotes "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/ghinstance"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/set"
-	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
 	"golang.org/x/sync/errgroup"
 )
@@ -110,7 +110,13 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 			f.branchName = branch
 		}
 	} else if f.prNumber == 0 {
-		if prNumber, err := strconv.Atoi(strings.TrimPrefix(opts.Selector, "#")); err == nil {
+		// If opts.Selector is a valid number then assume it is the
+		// PR number unless opts.BaseBranch is specified. This is a
+		// special case for PR create command which will always want
+		// to assume that a numerical selector is a branch name rather
+		// than PR number.
+		prNumber, err := strconv.Atoi(strings.TrimPrefix(opts.Selector, "#"))
+		if opts.BaseBranch == "" && err == nil {
 			f.prNumber = prNumber
 		} else {
 			f.branchName = opts.Selector
@@ -132,6 +138,19 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 	fields.AddValues(opts.Fields)
 	numberFieldOnly := fields.Len() == 1 && fields.Contains("number")
 	fields.Add("id") // for additional preload queries below
+
+	if fields.Contains("isInMergeQueue") || fields.Contains("isMergeQueueEnabled") {
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		detector := fd.NewDetector(cachedClient, f.repo.RepoHost())
+		prFeatures, err := detector.PullRequestFeatures()
+		if err != nil {
+			return nil, nil, err
+		}
+		if !prFeatures.MergeQueue {
+			fields.Remove("isInMergeQueue")
+			fields.Remove("isMergeQueueEnabled")
+		}
+	}
 
 	var pr *api.PullRequest
 	if f.prNumber > 0 {
@@ -272,6 +291,9 @@ func findForBranch(httpClient *http.Client, repo ghrepo.Interface, baseBranch, h
 			PullRequests struct {
 				Nodes []api.PullRequest
 			}
+			DefaultBranchRef struct {
+				Name string
+			}
 		}
 	}
 
@@ -286,6 +308,7 @@ func findForBranch(httpClient *http.Client, repo ghrepo.Interface, baseBranch, h
 			pullRequests(headRefName: $headRefName, states: $states, first: 30, orderBy: { field: CREATED_AT, direction: DESC }) {
 				nodes {%s}
 			}
+			defaultBranchRef { name }
 		}
 	}`, api.PullRequestGraphQL(fieldSet.ToSlice()))
 
@@ -314,7 +337,7 @@ func findForBranch(httpClient *http.Client, repo ghrepo.Interface, baseBranch, h
 	})
 
 	for _, pr := range prs {
-		if pr.HeadLabel() == headBranch && (baseBranch == "" || pr.BaseRefName == baseBranch) {
+		if pr.HeadLabel() == headBranch && (baseBranch == "" || pr.BaseRefName == baseBranch) && (pr.State == "OPEN" || resp.Repository.DefaultBranchRef.Name != headBranch) {
 			return &pr, nil
 		}
 	}
@@ -340,11 +363,11 @@ func preloadPrReviews(httpClient *http.Client, repo ghrepo.Interface, pr *api.Pu
 		"endCursor": githubv4.String(pr.Reviews.PageInfo.EndCursor),
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
+	gql := api.NewClientFromHTTP(httpClient)
 
 	for {
 		var query response
-		err := gql.QueryNamed(context.Background(), "ReviewsForPullRequest", &query, variables)
+		err := gql.Query(repo.RepoHost(), "ReviewsForPullRequest", &query, variables)
 		if err != nil {
 			return err
 		}
@@ -380,11 +403,11 @@ func preloadPrComments(client *http.Client, repo ghrepo.Interface, pr *api.PullR
 		"endCursor": githubv4.String(pr.Comments.PageInfo.EndCursor),
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), client)
+	gql := api.NewClientFromHTTP(client)
 
 	for {
 		var query response
-		err := gql.QueryNamed(context.Background(), "CommentsForPullRequest", &query, variables)
+		err := gql.Query(repo.RepoHost(), "CommentsForPullRequest", &query, variables)
 		if err != nil {
 			return err
 		}
