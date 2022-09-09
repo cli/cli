@@ -35,7 +35,6 @@ func Test_developRun(t *testing.T) {
 				return func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.StubRepoResponse("OWNER", "REPO")
 
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryInfo\b`),
@@ -56,7 +55,9 @@ func Test_developRun(t *testing.T) {
 					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
 					httpmock.GraphQLMutation(`{ "data": { "createLinkedBranch": { "linkedBranch": {"id": 2, "ref": {"name": "my-branch"} } } } }`,
 						func(inputs map[string]interface{}) {
-
+							assert.Equal(t, "REPOID", inputs["repositoryId"])
+							assert.Equal(t, "my-branch", inputs["name"])
+							assert.Equal(t, "yar", inputs["issueId"])
 						}),
 				)
 

@@ -1,7 +1,5 @@
 package api
 
-import "fmt"
-
 type BranchIssueReference struct {
 	ID                 int
 	BranchName         string
@@ -40,7 +38,7 @@ func CreateBranchIssueReference(client *Client, repo *Repository, params map[str
 	}
 
 	result := struct {
-		createLinkedBranch struct {
+		CreateLinkedBranch struct {
 			LinkedBranch struct {
 				ID  int
 				Ref struct {
@@ -54,10 +52,10 @@ func CreateBranchIssueReference(client *Client, repo *Repository, params map[str
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("result %#v", &result)
+
 	ref := BranchIssueReference{
-		ID:         result.createLinkedBranch.LinkedBranch.ID,
-		BranchName: result.createLinkedBranch.LinkedBranch.Ref.Name,
+		ID:         result.CreateLinkedBranch.LinkedBranch.ID,
+		BranchName: result.CreateLinkedBranch.LinkedBranch.Ref.Name,
 	}
 	return &ref, nil
 
