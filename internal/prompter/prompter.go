@@ -5,7 +5,6 @@ import (
 	"io"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/surveyext"
 )
@@ -22,19 +21,29 @@ type Prompter interface {
 	MarkdownEditor(string, string, bool) (string, error)
 }
 
-func New(editorCmd string, stdin io.Reader, stdout, stderr io.Writer) Prompter {
+type fileWriter interface {
+	io.Writer
+	Fd() uintptr
+}
+
+type fileReader interface {
+	io.Reader
+	Fd() uintptr
+}
+
+func New(editorCmd string, stdin fileReader, stdout fileWriter, stderr io.Writer) Prompter {
 	return &surveyPrompter{
 		editorCmd: editorCmd,
-		stdin:     stdin.(terminal.FileReader),
-		stdout:    stdout.(terminal.FileWriter),
+		stdin:     stdin,
+		stdout:    stdout,
 		stderr:    stderr,
 	}
 }
 
 type surveyPrompter struct {
 	editorCmd string
-	stdin     terminal.FileReader
-	stdout    terminal.FileWriter
+	stdin     fileReader
+	stdout    fileWriter
 	stderr    io.Writer
 }
 
