@@ -164,6 +164,45 @@ func StatusCheckRollupGraphQL(after string) string {
 	}`), afterClause)
 }
 
+func RequiredStatusCheckRollupGraphQL(prID, after string) string {
+	var afterClause string
+	if after != "" {
+		afterClause = ",after:" + after
+	}
+	return fmt.Sprintf(shortenQuery(`
+	statusCheckRollup: commits(last: 1) {
+		nodes {
+			commit {
+				statusCheckRollup {
+					contexts(first:100%[1]s) {
+						nodes {
+							__typename
+							...on StatusContext {
+								context,
+								state,
+								targetUrl,
+								createdAt,
+                isRequired(pullRequestId: %[2]s)
+							},
+							...on CheckRun {
+								name,
+								checkSuite{workflowRun{workflow{name}}},
+								status,
+								conclusion,
+								startedAt,
+								completedAt,
+								detailsUrl,
+                isRequired(pullRequestId: %[2]s)
+							}
+						},
+						pageInfo{hasNextPage,endCursor}
+					}
+				}
+			}
+		}
+	}`), afterClause, prID)
+}
+
 var IssueFields = []string{
 	"assignees",
 	"author",

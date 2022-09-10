@@ -15,23 +15,26 @@
                       "name": "cool tests",
                       "completedAt": "2020-08-27T19:00:12Z",
                       "startedAt": "2020-08-27T18:58:46Z",
-                      "detailsUrl": "sweet link"
+                      "detailsUrl": "sweet link",
+                      "isRequired": true
                     },
                     {
-                      "conclusion": "SUCCESS",
+                      "conclusion": "SKIPPED",
                       "status": "COMPLETED",
                       "name": "rad tests",
                       "completedAt": "2020-08-27T19:00:12Z",
                       "startedAt": "2020-08-27T18:58:46Z",
-                      "detailsUrl": "sweet link"
+                      "detailsUrl": "sweet link",
+                      "isRequired": false
                     },
                     {
-                      "conclusion": "SUCCESS",
+                      "conclusion": "SKIPPED",
                       "status": "COMPLETED",
-                      "name": "awesome tests",
+                      "name": "skip tests",
                       "completedAt": "2020-08-27T19:00:12Z",
                       "startedAt": "2020-08-27T18:58:46Z",
-                      "detailsUrl": "sweet link"
+                      "detailsUrl": "sweet link",
+                      "isRequired": false
                     }
                   ]
                 }
