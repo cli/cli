@@ -108,32 +108,13 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 
 func newBrowser(f *cmdutil.Factory) browser.Browser {
 	io := f.IOStreams
-	return browser.New(browserLauncher(f), io.Out, io.ErrOut)
+	return browser.New("", io.Out, io.ErrOut)
 }
 
 func newPrompter(f *cmdutil.Factory) prompter.Prompter {
 	editor, _ := cmdutil.DetermineEditor(f.Config)
 	io := f.IOStreams
 	return prompter.New(editor, io.In, io.Out, io.ErrOut)
-}
-
-// Browser precedence
-// 1. GH_BROWSER
-// 2. browser from config
-// 3. BROWSER
-func browserLauncher(f *cmdutil.Factory) string {
-	if ghBrowser := os.Getenv("GH_BROWSER"); ghBrowser != "" {
-		return ghBrowser
-	}
-
-	cfg, err := f.Config()
-	if err == nil {
-		if cfgBrowser, _ := cfg.Get("", "browser"); cfgBrowser != "" {
-			return cfgBrowser
-		}
-	}
-
-	return os.Getenv("BROWSER")
 }
 
 func configFunc() func() (config.Config, error) {
