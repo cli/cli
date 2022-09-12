@@ -3,9 +3,10 @@ package close
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/config"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -17,19 +18,20 @@ import (
 
 type CloseOptions struct {
 	HttpClient func() (*http.Client, error)
-	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	SelectorArg string
 	Comment     string
+	Reason      string
+
+	Detector fd.Detector
 }
 
 func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Command {
 	opts := &CloseOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		Config:     f.Config,
 	}
 
 	cmd := &cobra.Command{
@@ -52,6 +54,7 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().StringVarP(&opts.Comment, "comment", "c", "", "Leave a closing comment")
+	cmdutil.StringEnumFlag(cmd, &opts.Reason, "reason", "r", "", []string{"completed", "not planned"}, "Reason for closing")
 
 	return cmd
 }
@@ -62,6 +65,31 @@ func closeRun(opts *CloseOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
+	}
+
+	var baseRepo ghrepo.Interface
+	if _, r := shared.IssueMetadataFromURL(opts.SelectorArg); r != nil {
+		baseRepo = r
+	} else {
+		baseRepo, err = opts.BaseRepo()
+		if err != nil {
+			return err
+		}
+	}
+
+	if opts.Reason != "" {
+		if opts.Detector == nil {
+			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+			opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+		}
+		features, err := opts.Detector.IssueFeatures()
+		if err != nil {
+			return err
+		}
+		if !features.StateReason {
+			// If StateReason is not supported silently close issue without setting StateReason.
+			opts.Reason = ""
+		}
 	}
 
 	issue, baseRepo, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, []string{"id", "number", "title", "state"})
@@ -90,7 +118,7 @@ func closeRun(opts *CloseOptions) error {
 		}
 	}
 
-	err = apiClose(httpClient, baseRepo, issue)
+	err = apiClose(httpClient, baseRepo, issue, opts.Reason)
 	if err != nil {
 		return err
 	}
@@ -100,7 +128,7 @@ func closeRun(opts *CloseOptions) error {
 	return nil
 }
 
-func apiClose(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue) error {
+func apiClose(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue, reason string) error {
 	if issue.IsPullRequest() {
 		return api.PullRequestClose(httpClient, repo, issue.ID)
 	}
@@ -113,12 +141,27 @@ func apiClose(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue) 
 		} `graphql:"closeIssue(input: $input)"`
 	}
 
+	switch reason {
+	case "":
+		// If no reason is specified do not set it.
+	case "not planned":
+		reason = "NOT_PLANNED"
+	default:
+		reason = "COMPLETED"
+	}
+
 	variables := map[string]interface{}{
-		"input": githubv4.CloseIssueInput{
-			IssueID: issue.ID,
+		"input": CloseIssueInput{
+			IssueID:     issue.ID,
+			StateReason: reason,
 		},
 	}
 
 	gql := api.NewClientFromHTTP(httpClient)
 	return gql.Mutate(repo.RepoHost(), "IssueClose", &mutation, variables)
+}
+
+type CloseIssueInput struct {
+	IssueID     string `json:"issueId"`
+	StateReason string `json:"stateReason,omitempty"`
 }
