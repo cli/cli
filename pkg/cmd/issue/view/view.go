@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -88,9 +89,14 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	baseRepo, err := opts.BaseRepo()
-	if err != nil {
-		return err
+	var baseRepo ghrepo.Interface
+	if _, r := shared.IssueMetadataFromURL(opts.SelectorArg); r != nil {
+		baseRepo = r
+	} else {
+		baseRepo, err = opts.BaseRepo()
+		if err != nil {
+			return err
+		}
 	}
 
 	lookupFields := set.NewStringSet()
