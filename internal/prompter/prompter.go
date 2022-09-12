@@ -48,6 +48,10 @@ type surveyPrompter struct {
 }
 
 func (p *surveyPrompter) Select(message, defaultValue string, options []string) (result int, err error) {
+	if defaultValue == "" {
+		defaultValue = options[0]
+	}
+
 	q := &survey.Select{
 		Message:  message,
 		Default:  defaultValue,
