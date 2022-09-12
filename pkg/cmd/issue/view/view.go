@@ -11,6 +11,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -33,7 +34,8 @@ type ViewOptions struct {
 	Comments    bool
 	Exporter    cmdutil.Exporter
 
-	Now func() time.Time
+	Detector fd.Detector
+	Now      func() time.Time
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -86,17 +88,33 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
+	baseRepo, err := opts.BaseRepo()
+	if err != nil {
+		return err
+	}
+
 	lookupFields := set.NewStringSet()
 	if opts.Exporter != nil {
 		lookupFields.AddValues(opts.Exporter.Fields())
 	} else if opts.WebMode {
 		lookupFields.Add("url")
 	} else {
+		if opts.Comments {
+			lookupFields.Add("comments")
+			lookupFields.Remove("lastComment")
+		}
+		if opts.Detector == nil {
+			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+			opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+		}
+		features, err := opts.Detector.IssueFeatures()
+		if err != nil {
+			return err
+		}
+		if features.StateReason {
+			lookupFields.Add("stateReason")
+		}
 		lookupFields.AddValues(defaultFields)
-	}
-	if opts.Comments {
-		lookupFields.Add("comments")
-		lookupFields.Remove("lastComment")
 	}
 
 	opts.IO.StartProgressIndicator()

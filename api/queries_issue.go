@@ -177,7 +177,7 @@ func IssueStatus(client *Client, repo ghrepo.Interface, options IssueStatusOptio
 		}
 	}
 
-	fragments := fmt.Sprintf("fragment issue on Issue{%s}", PullRequestGraphQL(options.Fields))
+	fragments := fmt.Sprintf("fragment issue on Issue{%s}", IssueGraphQL(options.Fields))
 	query := fragments + `
 	query IssueStatus($owner: String!, $repo: String!, $viewer: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
