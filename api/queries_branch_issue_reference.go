@@ -1,11 +1,8 @@
 package api
 
 type BranchIssueReference struct {
-	ID                 int
-	BranchName         string
-	BranchRepositoryId int
-	IssueId            int
-	IssueRepositoryId  int
+	ID         string
+	BranchName string
 }
 
 func CreateBranchIssueReference(client *Client, repo *Repository, params map[string]interface{}) (*BranchIssueReference, error) {
@@ -40,7 +37,7 @@ func CreateBranchIssueReference(client *Client, repo *Repository, params map[str
 	result := struct {
 		CreateLinkedBranch struct {
 			LinkedBranch struct {
-				ID  int
+				ID  string
 				Ref struct {
 					Name string
 				}

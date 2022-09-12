@@ -53,8 +53,8 @@ func Test_developRun(t *testing.T) {
 
 				reg.Register(
 					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
-					httpmock.GraphQLMutation(`{ "data": { "createLinkedBranch": { "linkedBranch": {"id": 2, "ref": {"name": "my-branch"} } } } }`,
-						func(inputs map[string]interface{}) {
+					httpmock.GraphQLQuery(`{ "data": { "createLinkedBranch": { "linkedBranch": {"id": 2, "ref": {"name": "my-branch"} } } } }`,
+						func(query string, inputs map[string]interface{}) {
 							assert.Equal(t, "REPOID", inputs["repositoryId"])
 							assert.Equal(t, "my-branch", inputs["name"])
 							assert.Equal(t, "yar", inputs["issueId"])
