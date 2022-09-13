@@ -88,6 +88,17 @@ func developRun(opts *DevelopOptions) (err error) {
 		return err
 	}
 
+	issueNumber, issueRepo, err := issueMetadata(opts.IssueSelector, opts.IssueRepoSelector, baseRepo)
+	if err != nil {
+		return err
+	}
+
+	// get the id of the issue
+	issue, _, err := shared.IssueFromArgWithFields(httpClient, func() (ghrepo.Interface, error) { return issueRepo, nil }, fmt.Sprint(issueNumber), []string{"id"})
+	if err != nil {
+		return err
+	}
+
 	oid, default_branch_oid, err := api.FindBaseOid(apiClient, repo, opts.BaseBranch)
 	if err != nil {
 		return err
@@ -95,12 +106,6 @@ func developRun(opts *DevelopOptions) (err error) {
 
 	if oid == "" {
 		oid = default_branch_oid
-	}
-
-	// get the id of the issue repo
-	issue, _, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.IssueSelector, []string{"id", "number", "title"})
-	if err != nil {
-		return err
 	}
 
 	// get the oid of the branch from the base repo
@@ -126,6 +131,25 @@ func developRun(opts *DevelopOptions) (err error) {
 	return
 }
 
+func issueMetadata(issueSelector string, issueRepoSelector string, baseRepo ghrepo.Interface) (issueNumber int, issueRepo ghrepo.Interface, err error) {
+	if issueRepoSelector != "" {
+		issueRepo, err = ghrepo.FromFullNameWithHost(issueRepoSelector, baseRepo.RepoHost())
+		if err != nil {
+			return 0, nil, err
+		}
+	}
+
+	targetRepo := baseRepo
+	if issueRepo != nil {
+		targetRepo = issueRepo
+	}
+	issueNumber, issueRepo, err = shared.IssueNumberAndRepoFromArg(issueSelector, targetRepo)
+	if err != nil {
+		return 0, nil, err
+	}
+	return issueNumber, issueRepo, nil
+}
+
 func developRunList(opts *DevelopOptions) (err error) {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
@@ -139,19 +163,7 @@ func developRunList(opts *DevelopOptions) (err error) {
 	}
 
 	opts.IO.StartProgressIndicator()
-	var issueRepo ghrepo.Interface
-	if opts.IssueRepoSelector != "" {
-		issueRepo, err = ghrepo.FromFullNameWithHost(opts.IssueRepoSelector, baseRepo.RepoHost())
-		if err != nil {
-			return err
-		}
-	}
-
-	targetRepo := baseRepo
-	if issueRepo != nil {
-		targetRepo = issueRepo
-	}
-	issueNumber, issueRepo, err := shared.IssueNumberAndRepoFromArg(opts.IssueSelector, targetRepo)
+	issueNumber, issueRepo, err := issueMetadata(opts.IssueSelector, opts.IssueRepoSelector, baseRepo)
 	if err != nil {
 		return err
 	}
