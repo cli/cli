@@ -32,6 +32,180 @@ func Test_developRun(t *testing.T) {
 		wantErr        string
 		tty            bool
 	}{
+		{name: "list branches for an issue",
+			setup: func(opts *DevelopOptions, t *testing.T) func() {
+				opts.IssueSelector = "42"
+				opts.List = true
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query BranchIssueReferenceListLinkedBranches\b`),
+					httpmock.GraphQLQuery(`{
+						"data": {
+							"repository": {
+								"issue": {
+									"linkedBranches": {
+										"edges": [
+										{
+											"node": {
+												"ref": {
+													"name": "foo"
+												}
+											}
+										},
+										{
+											"node": {
+												"ref": {
+													"name": "bar"
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					}
+					}
+					`, func(query string, inputs map[string]interface{}) {
+						assert.Equal(t, float64(42), inputs["issueNumber"])
+						assert.Equal(t, "OWNER", inputs["repositoryOwner"])
+						assert.Equal(t, "REPO", inputs["repositoryName"])
+					}))
+			},
+			expectedOut: "foo\nbar\n",
+		},
+		{name: "list branches for an issue providing an issue url",
+			setup: func(opts *DevelopOptions, t *testing.T) func() {
+				opts.IssueSelector = "https://github.com/cli/test-repo/issues/42"
+				opts.List = true
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query BranchIssueReferenceListLinkedBranches\b`),
+					httpmock.GraphQLQuery(`{
+						"data": {
+							"repository": {
+								"issue": {
+									"linkedBranches": {
+										"edges": [
+										{
+											"node": {
+												"ref": {
+													"name": "foo"
+												}
+											}
+										},
+										{
+											"node": {
+												"ref": {
+													"name": "bar"
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					}
+					}
+					`, func(query string, inputs map[string]interface{}) {
+						assert.Equal(t, float64(42), inputs["issueNumber"])
+						assert.Equal(t, "cli", inputs["repositoryOwner"])
+						assert.Equal(t, "test-repo", inputs["repositoryName"])
+					}))
+			},
+			expectedOut: "foo\nbar\n",
+		},
+		{name: "list branches for an issue providing an issue repo",
+			setup: func(opts *DevelopOptions, t *testing.T) func() {
+				opts.IssueSelector = "42"
+				opts.IssueRepoSelector = "cli/test-repo"
+				opts.List = true
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query BranchIssueReferenceListLinkedBranches\b`),
+					httpmock.GraphQLQuery(`{
+						"data": {
+							"repository": {
+								"issue": {
+									"linkedBranches": {
+										"edges": [
+										{
+											"node": {
+												"ref": {
+													"name": "foo"
+												}
+											}
+										},
+										{
+											"node": {
+												"ref": {
+													"name": "bar"
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					}
+					}
+					`, func(query string, inputs map[string]interface{}) {
+						assert.Equal(t, float64(42), inputs["issueNumber"])
+						assert.Equal(t, "cli", inputs["repositoryOwner"])
+						assert.Equal(t, "test-repo", inputs["repositoryName"])
+					}))
+			},
+			expectedOut: "foo\nbar\n",
+		},
+		{name: "list branches for an issue providing an issue url and specifying its repo returns an error",
+			setup: func(opts *DevelopOptions, t *testing.T) func() {
+				opts.IssueSelector = "https://github.com/cli/test-repo/issues/42"
+				opts.IssueRepoSelector = "cli/test-repo"
+				opts.List = true
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query BranchIssueReferenceListLinkedBranches\b`),
+					httpmock.GraphQLQuery(`{
+					"data": {
+						"repository": {
+							"issue": {
+								"linkedBranches": {
+									"edges": [
+									{
+										"node": {
+											"ref": {
+												"name": "foo"
+											}
+										}
+									},
+									{
+										"node": {
+											"ref": {
+												"name": "bar"
+											}
+										}
+									}
+								]
+							}
+						}
+					}
+				}
+				}
+				`, func(query string, inputs map[string]interface{}) {
+						assert.Equal(t, float64(42), inputs["issueNumber"])
+						assert.Equal(t, "cli", inputs["repositoryOwner"])
+						assert.Equal(t, "test-repo", inputs["repositoryName"])
+					}))
+			},
+			expectedErrOut: "error: --issue-repo cannot be used when providing an issue URL\n",
+		},
 		{name: "develop new branch",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
 				opts.Name = "my-branch"
@@ -219,7 +393,13 @@ func Test_developRun(t *testing.T) {
 			}
 			defer cleanSetup()
 
-			err := developRun(&opts)
+			var err error
+			if opts.List {
+				err = developRunList(&opts)
+			} else {
+
+				err = developRun(&opts)
+			}
 			output := &test.CmdOut{
 				OutBuf: stdout,
 				ErrBuf: stderr,
