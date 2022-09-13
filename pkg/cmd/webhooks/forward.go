@@ -33,13 +33,19 @@ type createHookRequest struct {
 }
 
 type hookConfig struct {
-	URL string `json:"url"`
+	ContentType string `json:"content-type"`
+	InsecureSSL string `json:"insecure_ssl"`
+	URL         string `json:"url"`
 }
 
 type createHookResponse struct {
-	Name   string     `json:"name"`
-	ID     string     `json:"id"`
+	Active bool       `json:"active"`
 	Config hookConfig `json:"config"`
+	Events []string   `json:"events"`
+	ID     int        `json:"id"`
+	Name   string     `json:"name"`
+	URL    string     `json:"url"`
+	WsURL  string     `json:"ws_url"`
 }
 
 func newCmdForward(f *cmdutil.Factory, runF func(*hookOptions) error) *cobra.Command {
@@ -81,21 +87,23 @@ func newCmdForward(f *cmdutil.Factory, runF func(*hookOptions) error) *cobra.Com
 }
 
 func createHook(o *hookOptions) (string, error) {
-	// post to /repositories/:repository_id/hooks, operation_id: "repos/create-webhook"
 	httpClient, err := o.HttpClient()
 	if err != nil {
 		return "", err
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 	path := fmt.Sprintf("repos/%s/hooks", o.Repo)
-	b := createHookRequest{
+	req := createHookRequest{
 		Name:   "dev",
 		Events: []string{o.EventType},
 		Active: true,
-		Config: hookConfig{},
+		Config: hookConfig{
+			ContentType: "json",
+			InsecureSSL: "0",
+		},
 	}
 
-	reqBytes, err := json.Marshal(b)
+	reqBytes, err := json.Marshal(req)
 	if err != nil {
 		return "", err
 	}
@@ -104,7 +112,7 @@ func createHook(o *hookOptions) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return res.Config.URL, nil
+	return res.WsURL, nil
 }
 
 func forwardEvents(u *url.URL) error {
