@@ -1,5 +1,7 @@
 package api
 
+import "github.com/cli/cli/v2/internal/ghrepo"
+
 type BranchIssueReference struct {
 	ID         string
 	BranchName string
@@ -55,6 +57,61 @@ func CreateBranchIssueReference(client *Client, repo *Repository, params map[str
 		BranchName: result.CreateLinkedBranch.LinkedBranch.Ref.Name,
 	}
 	return &ref, nil
+
+}
+
+func ListLinkedBranches(client *Client, repo ghrepo.Interface, issueNumber int) ([]string, error) {
+	// query uses name and owner
+	query := `
+	query BranchIssueReferenceListLinkedBranches($repositoryName: String!, $repositoryOwner: String!, $issueNumber: Int!) {
+		repository(name: $repositoryName, owner: $repositoryOwner) {
+			issue(number: $issueNumber) {
+				linkedBranches(first: 30) {
+					edges {
+						node {
+							ref {
+								name
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	`
+	variables := map[string]interface{}{
+		"repositoryName":  repo.RepoName(),
+		"repositoryOwner": repo.RepoOwner(),
+		"issueNumber":     issueNumber,
+	}
+
+	result := struct {
+		Repository struct {
+			Issue struct {
+				LinkedBranches struct {
+					Edges []struct {
+						Node struct {
+							Ref struct {
+								Name string
+							}
+						}
+					}
+				}
+			}
+		}
+	}{}
+
+	err := client.GraphQL(repo.RepoHost(), query, variables, &result)
+	var branchNames []string
+	if err != nil {
+		return branchNames, err
+	}
+
+	for _, edge := range result.Repository.Issue.LinkedBranches.Edges {
+		branchNames = append(branchNames, edge.Node.Ref.Name)
+	}
+
+	return branchNames, nil
 
 }
 

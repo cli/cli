@@ -60,6 +60,26 @@ func issueMetadataFromURL(s string) (int, ghrepo.Interface) {
 	return issueNumber, repo
 }
 
+//TODO: Returns the issue number and base repo if the issue URL is provided, falling back to the
+// supplied repo if the base repo is not specified in the URL.
+func IssueNumberAndRepoFromArg(arg string, fallbackRepo ghrepo.Interface) (int, ghrepo.Interface, error) {
+	issueNumber, baseRepo := issueMetadataFromURL(arg)
+
+	if issueNumber == 0 {
+		var err error
+		issueNumber, err = strconv.Atoi(strings.TrimPrefix(arg, "#"))
+		if err != nil {
+			return 0, nil, fmt.Errorf("invalid issue format: %q", arg)
+		}
+	}
+
+	if baseRepo == nil {
+		baseRepo = fallbackRepo
+	}
+
+	return issueNumber, baseRepo, nil
+}
+
 type PartialLoadError struct {
 	error
 }

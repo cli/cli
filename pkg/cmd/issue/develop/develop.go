@@ -24,11 +24,12 @@ type DevelopOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (context.Remotes, error)
 
-	IssueRepo     string
-	IssueSelector string
-	Name          string
-	BaseBranch    string
-	Checkout      bool
+	IssueRepoSelector string
+	IssueSelector     string
+	Name              string
+	BaseBranch        string
+	Checkout          bool
+	List              bool
 }
 
 func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.Command {
@@ -45,23 +46,28 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 		Short: "Manage linked branches for an issue",
 		Example: heredoc.Doc(`
 			$ gh issue develop --list 123 # list branches for issue 123
-			$ gh issue develop --issue-repo "github/cli" 123 list branches for issue 123 in repo "github/cli"
+			$ gh issue develop --list --issue-repo "github/cli" 123 list branches for issue 123 in repo "github/cli"
+			$ gh issue develop --list https://github.com/github/cli/issues/123 # list branches for issue 123 in repo "github/cli"
 			$ gh issue develop 123 --name "my-branch" --head main
 			$ gh issue develop 123 --checkout # checkout the branch for issue 123 after creating it
 			`),
-		Args: cmdutil.ExactArgs(1, "issue number is required"),
+		Args: cmdutil.ExactArgs(1, "issue number or url is required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runF != nil {
 				return runF(opts)
 			}
 			opts.IssueSelector = args[0]
+			if opts.List {
+				return developRunList(opts)
+			}
 			return developRun(opts)
 		},
 	}
 	fl := cmd.Flags()
 	fl.StringVarP(&opts.BaseBranch, "base-branch", "b", "", "Name of the base branch")
 	fl.BoolVarP(&opts.Checkout, "checkout", "c", false, "Checkout the branch after creating it")
-	fl.StringVarP(&opts.IssueRepo, "issue-repo", "i", "", "Name or URL of the issue's repository")
+	fl.StringVarP(&opts.IssueRepoSelector, "issue-repo", "i", "", "Name or URL of the issue's repository")
+	fl.BoolVarP(&opts.List, "list", "l", false, "List branches for the issue")
 	fl.StringVarP(&opts.Name, "name", "n", "", "Name of the branch to create")
 	return cmd
 }
@@ -118,6 +124,58 @@ func developRun(opts *DevelopOptions) (err error) {
 		return err
 	}
 	return
+}
+
+func developRunList(opts *DevelopOptions) (err error) {
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+
+	apiClient := api.NewClientFromHTTP(httpClient)
+	baseRepo, err := opts.BaseRepo()
+	if err != nil {
+		return err
+	}
+
+	opts.IO.StartProgressIndicator()
+	var issueRepo ghrepo.Interface
+	if opts.IssueRepoSelector != "" {
+		issueRepo, err = ghrepo.FromFullNameWithHost(opts.IssueRepoSelector, baseRepo.RepoHost())
+		if err != nil {
+			return err
+		}
+	}
+
+	targetRepo := baseRepo
+	if issueRepo != nil {
+		targetRepo = issueRepo
+	}
+	issueNumber, issueRepo, err := shared.IssueNumberAndRepoFromArg(opts.IssueSelector, targetRepo)
+	if err != nil {
+		return err
+	}
+
+	branches, err := api.ListLinkedBranches(apiClient, issueRepo, issueNumber)
+	if err != nil {
+		return err
+	}
+
+	opts.IO.StopProgressIndicator()
+	if len(branches) == 0 {
+		return cmdutil.NewNoResultsError(fmt.Sprintf("no linked branches found for %s/%s#%d", issueRepo.RepoOwner(), issueRepo.RepoName(), issueNumber))
+	}
+
+	if opts.IO.IsStdoutTTY() {
+		fmt.Fprintf(opts.IO.Out, "\nShowing linked branches for %s/%s#%d\n\n", issueRepo.RepoOwner(), issueRepo.RepoName(), issueNumber)
+	}
+
+	for _, branch := range branches {
+		fmt.Fprintf(opts.IO.Out, "%s\n", branch)
+	}
+
+	return nil
+
 }
 
 func checkoutBranch(opts *DevelopOptions, baseRepo ghrepo.Interface, checkoutBranch string) (err error) {
