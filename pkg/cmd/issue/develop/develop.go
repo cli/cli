@@ -119,7 +119,8 @@ func developRun(opts *DevelopOptions) (err error) {
 	ref, err := api.CreateBranchIssueReference(apiClient, repo, params)
 	opts.IO.StopProgressIndicator()
 	if ref != nil {
-		fmt.Fprintf(opts.IO.Out, "Created %s\n", ref.BranchName)
+		baseRepo.RepoHost()
+		fmt.Fprintf(opts.IO.Out, "%s/%s/%s/tree/%s\n", baseRepo.RepoHost(), baseRepo.RepoOwner(), baseRepo.RepoName(), ref.BranchName)
 
 		if opts.Checkout {
 			return checkoutBranch(opts, baseRepo, ref.BranchName)
