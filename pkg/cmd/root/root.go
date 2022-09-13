@@ -32,6 +32,7 @@ import (
 	sshKeyCmd "github.com/cli/cli/v2/pkg/cmd/ssh-key"
 	statusCmd "github.com/cli/cli/v2/pkg/cmd/status"
 	versionCmd "github.com/cli/cli/v2/pkg/cmd/version"
+	webhooksCmd "github.com/cli/cli/v2/pkg/cmd/webhooks"
 	workflowCmd "github.com/cli/cli/v2/pkg/cmd/workflow"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -87,6 +88,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
 	cmd.AddCommand(statusCmd.NewCmdStatus(f, nil))
 	cmd.AddCommand(newCodespaceCmd(f))
+	cmd.AddCommand(webhooksCmd.NewCmdWebhooks(f))
 
 	// the `api` command should not inherit any extra HTTP headers
 	bareHTTPCmdFactory := *f
