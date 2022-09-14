@@ -67,7 +67,7 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 	fl.StringVarP(&opts.BaseBranch, "base-branch", "b", "", "Name of the base branch")
 	fl.BoolVarP(&opts.Checkout, "checkout", "c", false, "Checkout the branch after creating it")
 	fl.StringVarP(&opts.IssueRepoSelector, "issue-repo", "i", "", "Name or URL of the issue's repository")
-	fl.BoolVarP(&opts.List, "list", "l", false, "List branches for the issue")
+	fl.BoolVarP(&opts.List, "list", "l", false, "List linked branches for the issue")
 	fl.StringVarP(&opts.Name, "name", "n", "", "Name of the branch to create")
 	return cmd
 }

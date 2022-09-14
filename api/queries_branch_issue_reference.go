@@ -1,18 +1,29 @@
 package api
 
-import "github.com/cli/cli/v2/internal/ghrepo"
+import (
+	"fmt"
+
+	"github.com/cli/cli/v2/internal/ghrepo"
+)
 
 type BranchIssueReference struct {
 	ID         string
 	BranchName string
 }
 
+func nameParam(params map[string]interface{}) string {
+	if params["name"] != "" {
+		return "name: $name,"
+	}
+	return ""
+}
+
 func CreateBranchIssueReference(client *Client, repo *Repository, params map[string]interface{}) (*BranchIssueReference, error) {
-	query := `
+	query := fmt.Sprintf(`
 		mutation CreateLinkedBranch($issueId: ID!, $oid: GitObjectID!, $name: String, $repositoryId: ID) {
 			createLinkedBranch(input: {
 			  issueId: $issueId,
-			  name: $name,
+			  %[1]s
 			  oid: $oid,
 			  repositoryId: $repositoryId
 			}) {
@@ -23,8 +34,7 @@ func CreateBranchIssueReference(client *Client, repo *Repository, params map[str
 					}
 				}
 			}
-		}
-	`
+		}`, nameParam(params))
 
 	inputParams := map[string]interface{}{
 		"repositoryId": repo.ID,

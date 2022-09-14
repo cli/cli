@@ -215,7 +215,7 @@ func Test_developRun(t *testing.T) {
 			},
 			wantErr: "issue repo in url cli/test-repo does not match the repo from --issue-repo cli/other",
 		},
-		{name: "develop new branch",
+		{name: "develop new branch with a name provided",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
 				opts.Name = "my-branch"
 				opts.BaseBranch = "main"
@@ -240,7 +240,7 @@ func Test_developRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"repository":{"ref":{"target":{"oid":"123"}}}}}`))
 
 				reg.Register(
-					httpmock.GraphQL(`mutation CreateLinkedBranch\b`),
+					httpmock.GraphQL(`(?s)mutation CreateLinkedBranch\b.*issueId: \$issueId,\s+name: \$name,\s+oid: \$oid,`),
 					httpmock.GraphQLQuery(`{ "data": { "createLinkedBranch": { "linkedBranch": {"id": "2", "ref": {"name": "my-branch"} } } } }`,
 						func(query string, inputs map[string]interface{}) {
 							assert.Equal(t, "REPOID", inputs["repositoryId"])
@@ -251,6 +251,43 @@ func Test_developRun(t *testing.T) {
 
 			},
 			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
+		},
+		{name: "develop new branch without a name provided omits the param from the mutation",
+			setup: func(opts *DevelopOptions, t *testing.T) func() {
+				opts.Name = ""
+				opts.BaseBranch = "main"
+				opts.IssueSelector = "123"
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true
+						} } }`),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{ "hasIssuesEnabled": true, "issue":{"id": "yar", "number":123, "title":"my issue"} }}}`))
+				reg.Register(
+					httpmock.GraphQL(`query BranchIssueReferenceFindBaseOid\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"ref":{"target":{"oid":"123"}}}}}`))
+
+				reg.Register(
+					httpmock.GraphQL(`(?s)mutation CreateLinkedBranch\b.*issueId: \$issueId,\s+oid: \$oid,`),
+					httpmock.GraphQLQuery(`{ "data": { "createLinkedBranch": { "linkedBranch": {"id": "2", "ref": {"name": "my-issue-1"} } } } }`,
+						func(query string, inputs map[string]interface{}) {
+							assert.Equal(t, "REPOID", inputs["repositoryId"])
+							assert.Equal(t, "", inputs["name"])
+							assert.Equal(t, "yar", inputs["issueId"])
+						}),
+				)
+
+			},
+			expectedOut: "github.com/OWNER/REPO/tree/my-issue-1\n",
 		},
 		{name: "develop providing an issue url and specifying a different repo returns an error",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
