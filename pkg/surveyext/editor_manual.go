@@ -15,7 +15,17 @@ type showable interface {
 	Show() error
 }
 
-func Edit(editorCommand, fn, initialValue string, stdin io.Reader, stdout io.Writer, stderr io.Writer) (string, error) {
+type FileWriter interface {
+	io.Writer
+	Fd() uintptr
+}
+
+type FileReader interface {
+	io.Reader
+	Fd() uintptr
+}
+
+func Edit(editorCommand, fn, initialValue string, stdin FileReader, stdout FileWriter, stderr io.Writer) (string, error) {
 	return edit(editorCommand, fn, initialValue, stdin, stdout, stderr, nil, defaultLookPath)
 }
 
@@ -40,7 +50,7 @@ func needsBom() bool {
 	return runtime.GOOS == "windows"
 }
 
-func edit(editorCommand, fn, initialValue string, stdin io.Reader, stdout io.Writer, stderr io.Writer, cursor showable, lookPath func(string) ([]string, []string, error)) (string, error) {
+func edit(editorCommand, fn, initialValue string, stdin FileReader, stdout FileWriter, stderr io.Writer, cursor showable, lookPath func(string) ([]string, []string, error)) (string, error) {
 	// prepare the temp file
 	pattern := fn
 	if pattern == "" {
@@ -86,8 +96,8 @@ func edit(editorCommand, fn, initialValue string, stdin io.Reader, stdout io.Wri
 
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Env = env
-	cmd.Stdin = stdin
-	cmd.Stdout = stdout
+	cmd.Stdin = os.NewFile(stdin.Fd(), "stdin")
+	cmd.Stdout = os.NewFile(stdout.Fd(), "stdout")
 	cmd.Stderr = stderr
 
 	if cursor != nil {

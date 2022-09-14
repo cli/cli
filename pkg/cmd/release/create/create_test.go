@@ -18,6 +18,7 @@ import (
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/cli/cli/v2/pkg/surveyext"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1046,7 +1047,7 @@ func Test_createRun_interactive(t *testing.T) {
 			return config.NewBlankConfig(), nil
 		}
 
-		tt.opts.Edit = func(_, _, val string, _ io.Reader, _, _ io.Writer) (string, error) {
+		tt.opts.Edit = func(_, _, val string, _ surveyext.FileReader, _ surveyext.FileWriter, _ io.Writer) (string, error) {
 			return val, nil
 		}
 

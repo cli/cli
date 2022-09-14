@@ -28,7 +28,7 @@ type CreateOptions struct {
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
-	Edit       func(string, string, string, io.Reader, io.Writer, io.Writer) (string, error)
+	Edit       func(string, string, string, surveyext.FileReader, surveyext.FileWriter, io.Writer) (string, error)
 
 	TagName      string
 	Target       string
