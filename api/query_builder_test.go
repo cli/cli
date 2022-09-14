@@ -30,7 +30,7 @@ func TestPullRequestGraphQL(t *testing.T) {
 		},
 		{
 			name:   "invalid fields",
-			fields: []string{"isPinned", "number"},
+			fields: []string{"isPinned", "stateReason", "number"},
 			want:   "number",
 		},
 	}

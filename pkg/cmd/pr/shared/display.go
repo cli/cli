@@ -38,6 +38,9 @@ func ColorForIssueState(issue api.Issue) string {
 	case "OPEN":
 		return "green"
 	case "CLOSED":
+		if issue.StateReason == "NOT_PLANNED" {
+			return "gray"
+		}
 		return "magenta"
 	default:
 		return ""

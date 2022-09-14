@@ -131,6 +131,7 @@ type Issue struct {
 	PullRequestLinks  PullRequestLinks `json:"pull_request"`
 	RepositoryURL     string           `json:"repository_url"`
 	State             string           `json:"state"`
+	StateReason       string           `json:"state_reason"`
 	Title             string           `json:"title"`
 	URL               string           `json:"html_url"`
 	UpdatedAt         time.Time        `json:"updated_at"`

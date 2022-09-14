@@ -77,7 +77,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 var defaultFields = []string{
 	"number", "url", "state", "createdAt", "title", "body", "author", "milestone",
-	"assignees", "labels", "projectCards", "reactionGroups", "lastComment",
+	"assignees", "labels", "projectCards", "reactionGroups", "lastComment", "stateReason",
 }
 
 func viewRun(opts *ViewOptions) error {
@@ -93,11 +93,13 @@ func viewRun(opts *ViewOptions) error {
 		lookupFields.Add("url")
 	} else {
 		lookupFields.AddValues(defaultFields)
+		if opts.Comments {
+			lookupFields.Add("comments")
+			lookupFields.Remove("lastComment")
+		}
 	}
-	if opts.Comments {
-		lookupFields.Add("comments")
-		lookupFields.Remove("lastComment")
-	}
+
+	opts.IO.DetectTerminalTheme()
 
 	opts.IO.StartProgressIndicator()
 	issue, err := findIssue(httpClient, opts.BaseRepo, opts.SelectorArg, lookupFields.ToSlice())
@@ -119,7 +121,6 @@ func viewRun(opts *ViewOptions) error {
 		return opts.Browser.Browse(openURL)
 	}
 
-	opts.IO.DetectTerminalTheme()
 	if err := opts.IO.StartPager(); err != nil {
 		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
