@@ -139,7 +139,7 @@ func getWorkflowByID(client *api.Client, repo ghrepo.Interface, ID string) (*Wor
 	var workflow Workflow
 
 	err := client.REST(repo.RepoHost(), "GET",
-		fmt.Sprintf("repos/%s/actions/workflows/%s", ghrepo.FullName(repo), ID),
+		fmt.Sprintf("repos/%s/actions/workflows/%s", ghrepo.FullName(repo), url.PathEscape(ID)),
 		nil, &workflow)
 
 	if err != nil {
