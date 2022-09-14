@@ -67,31 +67,6 @@ func closeRun(opts *CloseOptions) error {
 		return err
 	}
 
-	var baseRepo ghrepo.Interface
-	if _, r := shared.IssueMetadataFromURL(opts.SelectorArg); r != nil {
-		baseRepo = r
-	} else {
-		baseRepo, err = opts.BaseRepo()
-		if err != nil {
-			return err
-		}
-	}
-
-	if opts.Reason != "" {
-		if opts.Detector == nil {
-			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-			opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
-		}
-		features, err := opts.Detector.IssueFeatures()
-		if err != nil {
-			return err
-		}
-		if !features.StateReason {
-			// If StateReason is not supported silently close issue without setting StateReason.
-			opts.Reason = ""
-		}
-	}
-
 	issue, baseRepo, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, []string{"id", "number", "title", "state"})
 	if err != nil {
 		return err
@@ -118,7 +93,7 @@ func closeRun(opts *CloseOptions) error {
 		}
 	}
 
-	err = apiClose(httpClient, baseRepo, issue, opts.Reason)
+	err = apiClose(httpClient, baseRepo, issue, opts.Detector, opts.Reason)
 	if err != nil {
 		return err
 	}
@@ -128,17 +103,24 @@ func closeRun(opts *CloseOptions) error {
 	return nil
 }
 
-func apiClose(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue, reason string) error {
+func apiClose(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue, detector fd.Detector, reason string) error {
 	if issue.IsPullRequest() {
 		return api.PullRequestClose(httpClient, repo, issue.ID)
 	}
 
-	var mutation struct {
-		CloseIssue struct {
-			Issue struct {
-				ID githubv4.ID
-			}
-		} `graphql:"closeIssue(input: $input)"`
+	if reason != "" {
+		if detector == nil {
+			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+			detector = fd.NewDetector(cachedClient, repo.RepoHost())
+		}
+		features, err := detector.IssueFeatures()
+		if err != nil {
+			return err
+		}
+		if !features.StateReason {
+			// If StateReason is not supported silently close issue without setting StateReason.
+			reason = ""
+		}
 	}
 
 	switch reason {
@@ -148,6 +130,14 @@ func apiClose(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue, 
 		reason = "NOT_PLANNED"
 	default:
 		reason = "COMPLETED"
+	}
+
+	var mutation struct {
+		CloseIssue struct {
+			Issue struct {
+				ID githubv4.ID
+			}
+		} `graphql:"closeIssue(input: $input)"`
 	}
 
 	variables := map[string]interface{}{

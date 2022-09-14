@@ -8,15 +8,18 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/set"
 )
 
 // IssueFromArgWithFields loads an issue or pull request with the specified fields. If some of the fields
 // could not be fetched by GraphQL, this returns a non-nil issue and a *PartialLoadError.
 func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.Interface, error), arg string, fields []string) (*api.Issue, ghrepo.Interface, error) {
-	issueNumber, baseRepo := IssueMetadataFromURL(arg)
+	issueNumber, baseRepo := issueMetadataFromURL(arg)
 
 	if issueNumber == 0 {
 		var err error
@@ -40,7 +43,7 @@ func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.I
 
 var issueURLRE = regexp.MustCompile(`^/([^/]+)/([^/]+)/issues/(\d+)`)
 
-func IssueMetadataFromURL(s string) (int, ghrepo.Interface) {
+func issueMetadataFromURL(s string) (int, ghrepo.Interface) {
 	u, err := url.Parse(s)
 	if err != nil {
 		return 0, nil
@@ -65,6 +68,21 @@ type PartialLoadError struct {
 }
 
 func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, fields []string) (*api.Issue, error) {
+	fieldSet := set.NewStringSet()
+	fieldSet.AddValues(fields)
+	if fieldSet.Contains("stateReason") {
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		detector := fd.NewDetector(cachedClient, repo.RepoHost())
+		features, err := detector.IssueFeatures()
+		if err != nil {
+			return nil, err
+		}
+		if !features.StateReason {
+			fieldSet.Remove("stateReason")
+		}
+	}
+	fields = fieldSet.ToSlice()
+
 	type response struct {
 		Repository struct {
 			HasIssuesEnabled bool

@@ -11,9 +11,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
-	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -35,8 +33,7 @@ type ViewOptions struct {
 	Comments    bool
 	Exporter    cmdutil.Exporter
 
-	Detector fd.Detector
-	Now      func() time.Time
+	Now func() time.Time
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -80,7 +77,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 var defaultFields = []string{
 	"number", "url", "state", "createdAt", "title", "body", "author", "milestone",
-	"assignees", "labels", "projectCards", "reactionGroups", "lastComment",
+	"assignees", "labels", "projectCards", "reactionGroups", "lastComment", "stateReason",
 }
 
 func viewRun(opts *ViewOptions) error {
@@ -89,39 +86,20 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	var baseRepo ghrepo.Interface
-	if _, r := shared.IssueMetadataFromURL(opts.SelectorArg); r != nil {
-		baseRepo = r
-	} else {
-		baseRepo, err = opts.BaseRepo()
-		if err != nil {
-			return err
-		}
-	}
-
 	lookupFields := set.NewStringSet()
 	if opts.Exporter != nil {
 		lookupFields.AddValues(opts.Exporter.Fields())
 	} else if opts.WebMode {
 		lookupFields.Add("url")
 	} else {
+		lookupFields.AddValues(defaultFields)
 		if opts.Comments {
 			lookupFields.Add("comments")
 			lookupFields.Remove("lastComment")
 		}
-		if opts.Detector == nil {
-			cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
-			opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
-		}
-		features, err := opts.Detector.IssueFeatures()
-		if err != nil {
-			return err
-		}
-		if features.StateReason {
-			lookupFields.Add("stateReason")
-		}
-		lookupFields.AddValues(defaultFields)
 	}
+
+	opts.IO.DetectTerminalTheme()
 
 	opts.IO.StartProgressIndicator()
 	issue, err := findIssue(httpClient, opts.BaseRepo, opts.SelectorArg, lookupFields.ToSlice())
@@ -143,7 +121,6 @@ func viewRun(opts *ViewOptions) error {
 		return opts.Browser.Browse(openURL)
 	}
 
-	opts.IO.DetectTerminalTheme()
 	if err := opts.IO.StartPager(); err != nil {
 		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
