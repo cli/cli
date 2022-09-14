@@ -22,10 +22,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type prompter interface {
+	Input(string, string) (string, error)
+	Select(string, string, []string) (int, error)
+	Confirm(string, bool) (bool, error)
+}
+
 type CreateOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
+	Prompter   prompter
 
 	Name               string
 	Description        string
@@ -46,6 +53,7 @@ type CreateOptions struct {
 	DisableWiki        bool
 	Interactive        bool
 	IncludeAllBranches bool
+	AddReadme          bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -53,6 +61,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
+		Prompter:   f.Prompter,
 	}
 
 	var enableIssues bool
@@ -135,6 +144,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf(".gitignore and license templates are not added when template is provided")
 			}
 
+			if opts.Template != "" && opts.AddReadme {
+				return cmdutil.FlagErrorf("the `--add-readme` option is not supported with `--template`")
+			}
+
 			if cmd.Flags().Changed("enable-issues") {
 				opts.DisableIssues = !enableIssues
 			}
@@ -172,6 +185,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVar(&opts.DisableIssues, "disable-issues", false, "Disable issues in the new repository")
 	cmd.Flags().BoolVar(&opts.DisableWiki, "disable-wiki", false, "Disable wiki in the new repository")
 	cmd.Flags().BoolVar(&opts.IncludeAllBranches, "include-all-branches", false, "Include all branches from template repository")
+	cmd.Flags().BoolVar(&opts.AddReadme, "add-readme", false, "Add a README file to the new repository")
 
 	// deprecated flags
 	cmd.Flags().BoolP("confirm", "y", false, "Skip the confirmation prompt")
@@ -268,6 +282,10 @@ func createFromScratch(opts *CreateOptions) error {
 		if err != nil {
 			return err
 		}
+		opts.AddReadme, err = opts.Prompter.Confirm("Would you like to add a README file?", false)
+		if err != nil {
+			return err
+		}
 		opts.GitIgnoreTemplate, err = interactiveGitIgnore(httpClient, host)
 		if err != nil {
 			return err
@@ -304,6 +322,7 @@ func createFromScratch(opts *CreateOptions) error {
 		GitIgnoreTemplate:  opts.GitIgnoreTemplate,
 		LicenseTemplate:    opts.LicenseTemplate,
 		IncludeAllBranches: opts.IncludeAllBranches,
+		InitReadme:         opts.AddReadme,
 	}
 
 	var templateRepoMainBranch string
