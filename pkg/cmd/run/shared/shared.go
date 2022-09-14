@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	workflow "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
 )
@@ -94,6 +96,17 @@ func (r *Run) Duration(now time.Time) time.Duration {
 		return 0
 	}
 	return d.Round(time.Second)
+}
+
+func (r *Run) GetWorkflowName(client *api.Client, repo ghrepo.Interface, workflowID int64) (string, error) {
+	workflows, err := workflow.FindWorkflow(client, repo, strconv.FormatInt(workflowID, 10), nil)
+	if err != nil {
+		return "", err
+	} else if len(workflows) != 1 {
+		return "", errors.New("could not find workflow")
+	}
+
+	return workflows[0].Name, nil
 }
 
 type Repo struct {
