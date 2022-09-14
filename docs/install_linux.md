@@ -21,6 +21,9 @@ curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo 
 && sudo apt install gh -y
 ```
 
+> **Note**
+> We were recently forced to change our GPG signing key. If you've previously downloaded the `githubcli-archive-keyring.gpg` file, you should re-download it again per above instructions. If you are using a keyserver to download the key, the ID of the new key is `23F3D4EA75716059`.
+
 Upgrade:
 
 ```bash

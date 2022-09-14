@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/search"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 )
 
@@ -54,7 +54,7 @@ func SearchIssues(opts *IssuesOptions) error {
 	if opts.WebMode {
 		url := opts.Searcher.URL(opts.Query)
 		if io.IsStdoutTTY() {
-			fmt.Fprintf(io.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(url))
+			fmt.Fprintf(io.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(url))
 		}
 		return opts.Browser.Browse(url)
 	}
@@ -112,17 +112,15 @@ func displayIssueResults(io *iostreams.IOStreams, et EntityType, results search.
 		if issue.IsPullRequest() {
 			tp.AddField(issueNum, nil, cs.ColorFromString(colorForPRState(issue.State)))
 		} else {
-			tp.AddField(issueNum, nil, cs.ColorFromString(colorForIssueState(issue.State)))
+			tp.AddField(issueNum, nil, cs.ColorFromString(colorForIssueState(issue.State, issue.StateReason)))
 		}
 		if !tp.IsTTY() {
 			tp.AddField(issue.State, nil, nil)
 		}
-		tp.AddField(text.ReplaceExcessiveWhitespace(issue.Title), nil, nil)
+		tp.AddField(text.RemoveExcessiveWhitespace(issue.Title), nil, nil)
 		tp.AddField(listIssueLabels(&issue, cs, tp.IsTTY()), nil, nil)
-		now := time.Now()
-		ago := now.Sub(issue.UpdatedAt)
 		if tp.IsTTY() {
-			tp.AddField(utils.FuzzyAgo(ago), nil, cs.Gray)
+			tp.AddField(text.FuzzyAgo(time.Now(), issue.UpdatedAt), nil, cs.Gray)
 		} else {
 			tp.AddField(issue.UpdatedAt.String(), nil, nil)
 		}
@@ -159,11 +157,14 @@ func listIssueLabels(issue *search.Issue, cs *iostreams.ColorScheme, colorize bo
 	return strings.Join(labelNames, ", ")
 }
 
-func colorForIssueState(state string) string {
+func colorForIssueState(state, reason string) string {
 	switch state {
 	case "open":
 		return "green"
 	case "closed":
+		if reason == "not_planned" {
+			return "gray"
+		}
 		return "magenta"
 	default:
 		return ""

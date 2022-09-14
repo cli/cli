@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
@@ -140,6 +141,9 @@ type joinWorkspaceResult struct {
 
 func runUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, eventResponses []string, portsData []liveshare.PortNotification) error {
 	t.Helper()
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		t.Skip("fails intermittently in CI: https://github.com/cli/cli/issues/5663")
+	}
 
 	joinWorkspace := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 		return joinWorkspaceResult{1}, nil

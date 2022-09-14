@@ -406,7 +406,8 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 				showStatus:  false,
 				idleTimeout: 30 * time.Minute,
 			},
-			wantStdout: "  ✓ Codespaces usage for this repository is paid for by megacorp\nmegacorp-private-abcd1234\n",
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by megacorp\n",
+			wantStdout: "megacorp-private-abcd1234\n",
 		},
 		{
 			name: "doesn't mention billable owner when it's the individual",

@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
@@ -119,12 +119,12 @@ func listRun(opts *ListOptions) error {
 
 		gistTime := gist.UpdatedAt.Format(time.RFC3339)
 		if tp.IsTTY() {
-			gistTime = utils.FuzzyAgo(time.Since(gist.UpdatedAt))
+			gistTime = text.FuzzyAgo(time.Now(), gist.UpdatedAt)
 		}
 
 		tp.AddField(gist.ID, nil, nil)
-		tp.AddField(text.ReplaceExcessiveWhitespace(description), nil, cs.Bold)
-		tp.AddField(utils.Pluralize(fileCount, "file"), nil, nil)
+		tp.AddField(text.RemoveExcessiveWhitespace(description), nil, cs.Bold)
+		tp.AddField(text.Pluralize(fileCount, "file"), nil, nil)
 		tp.AddField(visibility, nil, visColor)
 		tp.AddField(gistTime, nil, cs.Gray)
 		tp.EndRow()

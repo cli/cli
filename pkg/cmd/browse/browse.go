@@ -15,9 +15,9 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -148,7 +148,7 @@ func runBrowse(opts *BrowseOptions) error {
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(url))
+		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(url))
 	}
 	return opts.Browser.Browse(url)
 }
@@ -167,7 +167,7 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 	}
 
 	if isNumber(opts.SelectorArg) {
-		return fmt.Sprintf("issues/%s", opts.SelectorArg), nil
+		return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
 	}
 
 	if isCommit(opts.SelectorArg) {
@@ -253,7 +253,7 @@ func parseFile(opts BrowseOptions, f string) (p string, start int, end int, err 
 }
 
 func isNumber(arg string) bool {
-	_, err := strconv.Atoi(arg)
+	_, err := strconv.Atoi(strings.TrimPrefix(arg, "#"))
 	return err == nil
 }
 

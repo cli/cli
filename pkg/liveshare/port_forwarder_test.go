@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -32,6 +33,10 @@ type portUpdateNotification struct {
 }
 
 func TestPortForwarderStart(t *testing.T) {
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		t.Skip("fails intermittently in CI: https://github.com/cli/cli/issues/5338")
+	}
+
 	streamName, streamCondition := "stream-name", "stream-condition"
 	const port = 8000
 	sendNotification := make(chan portUpdateNotification)
