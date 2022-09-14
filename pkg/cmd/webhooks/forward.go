@@ -1,8 +1,6 @@
 /* Package webhooks CLI commands
 
 TODO:
-1. Get the auth header from somewhere inside this codebase.
-2. Handle process signal cancellation.
 3. TODO below (closing the body out of the loop)
 7. Reconnect when disconnected abruptly from the server.
 
@@ -10,6 +8,8 @@ Done:
 6. Get the right GitHub Host (hopefully from shared code): maybe default to .com and have an optional -h for github.localhost.
 5. What happens when we don't pass events: make it required.
 4. Add a --print (or if you don't pass a port).
+2. Handle process signal cancellation.
+1. Get the auth header from somewhere inside this codebase.
 
 */
 
@@ -29,6 +29,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/gorilla/websocket"
@@ -41,6 +42,7 @@ const gitHubAPIProdURL = "http://api.github.com"
 type hookOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
+	Config     func() (config.Config, error)
 
 	Host      string
 	EventType string
@@ -75,6 +77,7 @@ func newCmdForward(f *cmdutil.Factory, runF func(*hookOptions) error) *cobra.Com
 	opts := hookOptions{
 		HttpClient: f.HttpClient,
 		IO:         f.IOStreams,
+		Config:     f.Config,
 	}
 	cmd := cobra.Command{
 		Use:   "forward --event=<event_type> --repo=<repo> --port=<port>",
@@ -101,21 +104,24 @@ func newCmdForward(f *cmdutil.Factory, runF func(*hookOptions) error) *cobra.Com
 			if opts.Port == 0 {
 				fmt.Fprintf(opts.IO.Out, "No --port specified, printing webhook payloads to stdout \n")
 			}
-			fmt.Printf("Received gh webhooks forward command with event flag: %v, repo: %v, port: %v \n", opts.EventType, opts.Repo, opts.Port)
-			//
-			// wsURLString, err := createHook(&opts)
-			// if err != nil {
-			// 	return err
-			// }
-			// fmt.Printf("Received hook url from dotcom: %s \n", wsURLString)
-			// wsURL, err := url.Parse(wsURLString)
-			// if err != nil {
-			// 	return err
-			// }
 
-			wsURL := url.URL{Scheme: "ws", Host: "localhost:8088", Path: "/hi"}
+			wsURLString, err := createHook(&opts)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Received WS hook url from dotcom: %s \n", wsURLString)
+			wsURL, err := url.Parse(wsURLString)
+			if err != nil {
+				return err
+			}
 
-			err := forwardEvents(&wsURL, "TODO!", opts.Port)
+			cfg, err := opts.Config()
+			if err != nil {
+				return err
+			}
+			token, _ := cfg.AuthToken(opts.Host)
+
+			err = forwardEvents(wsURL, token, opts.Port)
 			if err != nil {
 				return err
 			}
@@ -204,28 +210,28 @@ func forwardEvents(u *url.URL, token string, port int) error {
 
 			fmt.Printf("received message: %#+v \n", r)
 
-			// req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://localhost:%d", port), bytes.NewReader(r.Body))
-			// if err != nil {
-			// 	return err
-			// }
-			//
-			// for k := range r.Header {
-			// 	req.Header.Set(k, r.Header.Get(k))
-			// }
-			// resp, err := http.DefaultClient.Do(req)
-			// if err != nil {
-			// 	return err
-			// }
-			// defer resp.Body.Close() // TODO: This is inside a loop!
-			// body, err := io.ReadAll(resp.Body)
-			// if err != nil {
-			// 	return err
-			// }
-			// c.WriteJSON(wsResponse{
-			// 	Status: resp.StatusCode,
-			// 	Header: resp.Header,
-			// 	Body:   body,
-			// })
+			req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://localhost:%d", port), bytes.NewReader(r.Body))
+			if err != nil {
+				return err
+			}
+
+			for k := range r.Header {
+				req.Header.Set(k, r.Header.Get(k))
+			}
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close() // TODO: This is inside a loop!
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			c.WriteJSON(wsResponse{
+				Status: resp.StatusCode,
+				Header: resp.Header,
+				Body:   body,
+			})
 		}
 	}
 
