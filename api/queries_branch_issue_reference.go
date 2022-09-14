@@ -71,7 +71,6 @@ func CreateBranchIssueReference(client *Client, repo *Repository, params map[str
 }
 
 func ListLinkedBranches(client *Client, repo ghrepo.Interface, issueNumber int) ([]string, error) {
-	// query uses name and owner
 	query := `
 	query BranchIssueReferenceListLinkedBranches($repositoryName: String!, $repositoryOwner: String!, $issueNumber: Int!) {
 		repository(name: $repositoryName, owner: $repositoryOwner) {
@@ -125,6 +124,7 @@ func ListLinkedBranches(client *Client, repo ghrepo.Interface, issueNumber int) 
 
 }
 
+// This fetches the oids for the repo's default branch (`main`, etc) and the name the user might have provided in one shot.
 func FindBaseOid(client *Client, repo *Repository, ref string) (string, string, error) {
 	query := `
 	query BranchIssueReferenceFindBaseOid($repositoryName: String!, $repositoryOwner: String!, $ref: String!) {

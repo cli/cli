@@ -46,10 +46,10 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 		Short: "Manage linked branches for an issue",
 		Example: heredoc.Doc(`
 			$ gh issue develop --list 123 # list branches for issue 123
-			$ gh issue develop --list --issue-repo "github/cli" 123 list branches for issue 123 in repo "github/cli"
+			$ gh issue develop --list --issue-repo "github/cli" 123 # list branches for issue 123 in repo "github/cli"
 			$ gh issue develop --list https://github.com/github/cli/issues/123 # list branches for issue 123 in repo "github/cli"
-			$ gh issue develop 123 --name "my-branch" --head main
-			$ gh issue develop 123 --checkout # checkout the branch for issue 123 after creating it
+			$ gh issue develop 123 --name "my-branch" --base my-feature # create a branch for issue 123 based on the my-feature branch
+			$ gh issue develop 123 --checkout # fetch and checkout the branch for issue 123 after creating it
 			`),
 		Args: cmdutil.ExactArgs(1, "issue number or url is required"),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -64,7 +64,7 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 		},
 	}
 	fl := cmd.Flags()
-	fl.StringVarP(&opts.BaseBranch, "base-branch", "b", "", "Name of the base branch")
+	fl.StringVarP(&opts.BaseBranch, "base", "b", "", "Name of the base branch you want to make your new branch from")
 	fl.BoolVarP(&opts.Checkout, "checkout", "c", false, "Checkout the branch after creating it")
 	fl.StringVarP(&opts.IssueRepoSelector, "issue-repo", "i", "", "Name or URL of the issue's repository")
 	fl.BoolVarP(&opts.List, "list", "l", false, "List linked branches for the issue")
@@ -83,23 +83,24 @@ func developRunCreate(opts *DevelopOptions) (err error) {
 		return err
 	}
 
-	issueNumber, issueRepo, err := issueMetadata(opts.IssueSelector, opts.IssueRepoSelector, baseRepo)
-	if err != nil {
-		return err
-	}
-
 	opts.IO.StartProgressIndicator()
 	repo, err := api.GitHubRepo(apiClient, baseRepo)
 	if err != nil {
 		return err
 	}
 
-	// get the id of the issue
+	issueNumber, issueRepo, err := issueMetadata(opts.IssueSelector, opts.IssueRepoSelector, baseRepo)
+	if err != nil {
+		return err
+	}
+
+	// The mutation requires the issue id, not just its number
 	issue, _, err := shared.IssueFromArgWithFields(httpClient, func() (ghrepo.Interface, error) { return issueRepo, nil }, fmt.Sprint(issueNumber), []string{"id"})
 	if err != nil {
 		return err
 	}
 
+	// The mutation takes an oid instead of a branch name as it's a more stable reference
 	oid, default_branch_oid, err := api.FindBaseOid(apiClient, repo, opts.BaseBranch)
 	if err != nil {
 		return err

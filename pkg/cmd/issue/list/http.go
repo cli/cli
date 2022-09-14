@@ -22,7 +22,6 @@ func listIssues(client *api.Client, repo ghrepo.Interface, filters prShared.Filt
 	}
 
 	fragments := fmt.Sprintf("fragment issue on Issue {%s}", api.PullRequestGraphQL(filters.Fields))
-	// TODO try to paginate like this
 	query := fragments + `
 	query IssueList($owner: String!, $repo: String!, $limit: Int, $endCursor: String, $states: [IssueState!] = OPEN, $assignee: String, $author: String, $mention: String) {
 		repository(owner: $owner, name: $repo) {
