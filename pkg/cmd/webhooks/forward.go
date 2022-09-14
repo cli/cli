@@ -4,13 +4,18 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/gorilla/websocket"
 	"github.com/spf13/cobra"
 )
 
@@ -64,6 +69,7 @@ func newCmdForward(f *cmdutil.Factory, runF func(*hookOptions) error) *cobra.Com
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Printf("Received gh webhooks forward command with event flag: %v, repo: %v, port: %v \n", opts.EventType, opts.Repo, opts.Port)
+
 			wsURLString, err := createHook(&opts)
 			if err != nil {
 				return err
@@ -73,6 +79,7 @@ func newCmdForward(f *cmdutil.Factory, runF func(*hookOptions) error) *cobra.Com
 			if err != nil {
 				return err
 			}
+
 			err = forwardEvents(wsURL)
 			if err != nil {
 				return err
@@ -116,6 +123,33 @@ func createHook(o *hookOptions) (string, error) {
 }
 
 func forwardEvents(u *url.URL) error {
-	// open ws connection and read
+	// handle signals
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, syscall.SIGTERM, syscall.SIGINT)
+	defer signal.Stop(shutdown)
+
+	// dial ws server
+	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+
+	// read messages
+	for {
+		select {
+		case <-shutdown:
+			log.Println("received CTRL+C, closing connection")
+			return nil
+		default:
+			_, message, err := c.ReadMessage()
+			if err != nil {
+				log.Println("error reading message:", err)
+				return err
+			}
+			log.Printf("received message: %s", message)
+		}
+	}
+
 	return nil
 }
