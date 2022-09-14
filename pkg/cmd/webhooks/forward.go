@@ -1,9 +1,20 @@
+// Package webhooks CLI commands
+//
+// TODO:
+// 1. Get the auth header from somewhere inside this codebase.
+// 2. Handle process signal cancellation.
+// 3. TODO below (closing the body out of the loop)
+// 4. Add a --print (or if you don't pass a port).
+// 5. What happens when we don't pass events: make it required.
+// 6. Get the right GitHub Host (hopefully from shared code): maybe default to .com and have an optional -h for github.localhost.
+// 7. Reconnect when disconnected abruptly from the server.
 package webhooks
 
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -38,7 +49,7 @@ type createHookRequest struct {
 }
 
 type hookConfig struct {
-	ContentType string `json:"content-type"`
+	ContentType string `json:"content_type"`
 	InsecureSSL string `json:"insecure_ssl"`
 	URL         string `json:"url"`
 }
@@ -80,7 +91,7 @@ func newCmdForward(f *cmdutil.Factory, runF func(*hookOptions) error) *cobra.Com
 				return err
 			}
 
-			err = forwardEvents(wsURL)
+			err = forwardEvents(wsURL, "TODO!", opts.Port)
 			if err != nil {
 				return err
 			}
@@ -89,7 +100,7 @@ func newCmdForward(f *cmdutil.Factory, runF func(*hookOptions) error) *cobra.Com
 	}
 	cmd.Flags().StringVarP(&opts.EventType, "event", "E", "", "Name of the event type to forward")
 	cmd.Flags().StringVarP(&opts.Repo, "repo", "R", "", "Name of the repo where the webhook is installed")
-	cmd.Flags().IntVarP(&opts.Port, "port", "P", 9999, "Local port to receive webhooks on")
+	cmd.Flags().IntVarP(&opts.Port, "port", "P", 0, "Local port to receive webhooks on")
 	return &cmd
 }
 
@@ -122,15 +133,33 @@ func createHook(o *hookOptions) (string, error) {
 	return res.WsURL, nil
 }
 
-func forwardEvents(u *url.URL) error {
+type wsRequest struct {
+	Header http.Header
+	Body   []byte
+}
+
+type wsResponse struct {
+	Status int
+	Header http.Header
+	Body   []byte
+}
+
+func forwardEvents(u *url.URL, token string, port int) error {
 	// handle signals
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, syscall.SIGTERM, syscall.SIGINT)
 	defer signal.Stop(shutdown)
 
 	// dial ws server
-	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	h := make(http.Header)
+	h.Set("Authorization", token)
+
+	c, resp, err := websocket.DefaultDialer.Dial(u.String(), h)
 	if err != nil {
+		if resp != nil {
+			bts, _ := io.ReadAll(resp.Body)
+			err = fmt.Errorf("ws err %d - %s - %v", resp.StatusCode, bts, err)
+		}
 		return err
 	}
 	defer c.Close()
@@ -142,12 +171,34 @@ func forwardEvents(u *url.URL) error {
 			log.Println("received CTRL+C, closing connection")
 			return nil
 		default:
-			_, message, err := c.ReadMessage()
+			var r wsRequest
+			err := c.ReadJSON(&r)
 			if err != nil {
 				log.Println("error reading message:", err)
 				return err
 			}
-			log.Printf("received message: %s", message)
+			req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://localhost:%d", port), bytes.NewReader(r.Body))
+			if err != nil {
+				return err
+			}
+			fmt.Println("Got headers:")
+			for k := range r.Header {
+				req.Header.Set(k, r.Header.Get(k))
+			}
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close() // TODO: This is inside a loop!
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+			c.WriteJSON(wsResponse{
+				Status: resp.StatusCode,
+				Header: resp.Header,
+				Body:   body,
+			})
 		}
 	}
 
