@@ -162,7 +162,7 @@ func Test_developRun(t *testing.T) {
 			},
 			expectedOut: "foo\nbar\n",
 		},
-		{name: "list branches for an issue providing an issue url and specifying its repo returns an error",
+		{name: "list branches for an issue providing an issue url and specifying the same repo works",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
 				opts.IssueSelector = "https://github.com/cli/test-repo/issues/42"
 				opts.IssueRepoSelector = "cli/test-repo"
@@ -204,7 +204,16 @@ func Test_developRun(t *testing.T) {
 						assert.Equal(t, "test-repo", inputs["repositoryName"])
 					}))
 			},
-			expectedErrOut: "error: --issue-repo cannot be used when providing an issue URL\n",
+			expectedOut: "foo\nbar\n",
+		},
+		{name: "list branches for an issue providing an issue url and specifying a different repo returns an error",
+			setup: func(opts *DevelopOptions, t *testing.T) func() {
+				opts.IssueSelector = "https://github.com/cli/test-repo/issues/42"
+				opts.IssueRepoSelector = "cli/other"
+				opts.List = true
+				return func() {}
+			},
+			wantErr: "issue repo in url cli/test-repo does not match the repo from --issue-repo cli/other",
 		},
 		{name: "develop new branch",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
@@ -242,6 +251,14 @@ func Test_developRun(t *testing.T) {
 
 			},
 			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
+		},
+		{name: "develop providing an issue url and specifying a different repo returns an error",
+			setup: func(opts *DevelopOptions, t *testing.T) func() {
+				opts.IssueSelector = "https://github.com/cli/test-repo/issues/42"
+				opts.IssueRepoSelector = "cli/other"
+				return func() {}
+			},
+			wantErr: "issue repo in url cli/test-repo does not match the repo from --issue-repo cli/other",
 		},
 		{name: "develop new branch with checkout when the branch exists locally",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
@@ -288,7 +305,8 @@ func Test_developRun(t *testing.T) {
 				cs.Register(`git pull --ff-only origin my-branch`, 0, "")
 			},
 			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
-		}, {name: "develop new branch with checkout when the branch does not exist locally",
+		},
+		{name: "develop new branch with checkout when the branch does not exist locally",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
 				opts.Name = "my-branch"
 				opts.BaseBranch = "main"
@@ -398,7 +416,7 @@ func Test_developRun(t *testing.T) {
 				err = developRunList(&opts)
 			} else {
 
-				err = developRun(&opts)
+				err = developRunCreate(&opts)
 			}
 			output := &test.CmdOut{
 				OutBuf: stdout,

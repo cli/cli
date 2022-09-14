@@ -60,7 +60,7 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 			if opts.List {
 				return developRunList(opts)
 			}
-			return developRun(opts)
+			return developRunCreate(opts)
 		},
 	}
 	fl := cmd.Flags()
@@ -72,7 +72,7 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 	return cmd
 }
 
-func developRun(opts *DevelopOptions) (err error) {
+func developRunCreate(opts *DevelopOptions) (err error) {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -82,13 +82,14 @@ func developRun(opts *DevelopOptions) (err error) {
 	if err != nil {
 		return err
 	}
-	opts.IO.StartProgressIndicator()
-	repo, err := api.GitHubRepo(apiClient, baseRepo)
+
+	issueNumber, issueRepo, err := issueMetadata(opts.IssueSelector, opts.IssueRepoSelector, baseRepo)
 	if err != nil {
 		return err
 	}
 
-	issueNumber, issueRepo, err := issueMetadata(opts.IssueSelector, opts.IssueRepoSelector, baseRepo)
+	opts.IO.StartProgressIndicator()
+	repo, err := api.GitHubRepo(apiClient, baseRepo)
 	if err != nil {
 		return err
 	}
@@ -132,23 +133,47 @@ func developRun(opts *DevelopOptions) (err error) {
 	return
 }
 
-func issueMetadata(issueSelector string, issueRepoSelector string, baseRepo ghrepo.Interface) (issueNumber int, issueRepo ghrepo.Interface, err error) {
+// If the issue is in the base repo, we can use the issue number directly. Otherwise, we need to use the issue's url or the IssueRepoSelector argument.
+// If the repo from the URL doesn't match the IssueRepoSelector argument, we error.
+func issueMetadata(issueSelector string, issueRepoSelector string, baseRepo ghrepo.Interface) (issueNumber int, issueFlagRepo ghrepo.Interface, err error) {
+	var targetRepo ghrepo.Interface
 	if issueRepoSelector != "" {
-		issueRepo, err = ghrepo.FromFullNameWithHost(issueRepoSelector, baseRepo.RepoHost())
+		issueFlagRepo, err = ghrepo.FromFullNameWithHost(issueRepoSelector, baseRepo.RepoHost())
 		if err != nil {
 			return 0, nil, err
 		}
 	}
 
-	targetRepo := baseRepo
-	if issueRepo != nil {
-		targetRepo = issueRepo
+	if issueFlagRepo != nil {
+		targetRepo = issueFlagRepo
 	}
-	issueNumber, issueRepo, err = shared.IssueNumberAndRepoFromArg(issueSelector, targetRepo)
+
+	issueNumber, issueArgRepo, err := shared.IssueNumberAndRepoFromArg(issueSelector)
 	if err != nil {
 		return 0, nil, err
 	}
-	return issueNumber, issueRepo, nil
+
+	if issueArgRepo != nil {
+		targetRepo = issueArgRepo
+
+		if issueFlagRepo != nil {
+			differentOwner := (issueFlagRepo.RepoOwner() != issueArgRepo.RepoOwner())
+			differentName := (issueFlagRepo.RepoName() != issueArgRepo.RepoName())
+			if differentOwner || differentName {
+				return 0, nil, fmt.Errorf("issue repo in url %s/%s does not match the repo from --issue-repo %s/%s", issueArgRepo.RepoOwner(), issueArgRepo.RepoName(), issueFlagRepo.RepoOwner(), issueFlagRepo.RepoName())
+			}
+		}
+	}
+
+	if issueFlagRepo == nil && issueArgRepo == nil {
+		targetRepo = baseRepo
+	}
+
+	if targetRepo == nil {
+		return 0, nil, fmt.Errorf("could not determine issue repo")
+	}
+
+	return issueNumber, targetRepo, nil
 }
 
 func developRunList(opts *DevelopOptions) (err error) {
