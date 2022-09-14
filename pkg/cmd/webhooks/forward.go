@@ -1,13 +1,18 @@
-// Package webhooks CLI commands
-//
-// TODO:
-// 1. Get the auth header from somewhere inside this codebase.
-// 2. Handle process signal cancellation.
-// 3. TODO below (closing the body out of the loop)
-// 4. Add a --print (or if you don't pass a port).
-// 5. What happens when we don't pass events: make it required.
-// 6. Get the right GitHub Host (hopefully from shared code): maybe default to .com and have an optional -h for github.localhost.
-// 7. Reconnect when disconnected abruptly from the server.
+/* Package webhooks CLI commands
+
+TODO:
+1. Get the auth header from somewhere inside this codebase.
+2. Handle process signal cancellation.
+3. TODO below (closing the body out of the loop)
+7. Reconnect when disconnected abruptly from the server.
+
+Done:
+6. Get the right GitHub Host (hopefully from shared code): maybe default to .com and have an optional -h for github.localhost.
+5. What happens when we don't pass events: make it required.
+4. Add a --print (or if you don't pass a port).
+
+*/
+
 package webhooks
 
 import (
@@ -30,12 +35,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const gitHubAPIBaseURL = "http://api.github.localhost"
+const gitHubAPILocalURL = "http://api.github.localhost"
+const gitHubAPIProdURL = "http://api.github.com"
 
 type hookOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 
+	Host      string
 	EventType string
 	Repo      string
 	Port      int
@@ -79,19 +86,36 @@ func newCmdForward(f *cmdutil.Factory, runF func(*hookOptions) error) *cobra.Com
 			$ gh webhooks forward --event=issue_open --repo=monalisa/smile --port=9999 
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if opts.EventType == "" {
+				return cmdutil.FlagErrorf("`--event` flag required")
+			}
+			if opts.Repo == "" {
+				return cmdutil.FlagErrorf("`--repo` flag required")
+			}
+			if opts.Host == "" {
+				fmt.Fprintf(opts.IO.Out, "No --host specified, connecting to default GitHub.com \n")
+				opts.Host = gitHubAPIProdURL
+			} else {
+				opts.Host = gitHubAPILocalURL
+			}
+			if opts.Port == 0 {
+				fmt.Fprintf(opts.IO.Out, "No --port specified, printing webhook payloads to stdout \n")
+			}
 			fmt.Printf("Received gh webhooks forward command with event flag: %v, repo: %v, port: %v \n", opts.EventType, opts.Repo, opts.Port)
+			//
+			// wsURLString, err := createHook(&opts)
+			// if err != nil {
+			// 	return err
+			// }
+			// fmt.Printf("Received hook url from dotcom: %s \n", wsURLString)
+			// wsURL, err := url.Parse(wsURLString)
+			// if err != nil {
+			// 	return err
+			// }
 
-			wsURLString, err := createHook(&opts)
-			if err != nil {
-				return err
-			}
-			fmt.Printf("Received hook url from dotcom: %s \n", wsURLString)
-			wsURL, err := url.Parse(wsURLString)
-			if err != nil {
-				return err
-			}
+			wsURL := url.URL{Scheme: "ws", Host: "localhost:8088", Path: "/hi"}
 
-			err = forwardEvents(wsURL, "TODO!", opts.Port)
+			err := forwardEvents(&wsURL, "TODO!", opts.Port)
 			if err != nil {
 				return err
 			}
@@ -126,7 +150,7 @@ func createHook(o *hookOptions) (string, error) {
 		return "", err
 	}
 	var res createHookResponse
-	err = apiClient.REST(gitHubAPIBaseURL, "POST", path, bytes.NewReader(reqBytes), &res)
+	err = apiClient.REST(gitHubAPILocalURL, "POST", path, bytes.NewReader(reqBytes), &res)
 	if err != nil {
 		return "", err
 	}
@@ -177,28 +201,31 @@ func forwardEvents(u *url.URL, token string, port int) error {
 				log.Println("error reading message:", err)
 				return err
 			}
-			req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://localhost:%d", port), bytes.NewReader(r.Body))
-			if err != nil {
-				return err
-			}
-			fmt.Println("Got headers:")
-			for k := range r.Header {
-				req.Header.Set(k, r.Header.Get(k))
-			}
-			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				return err
-			}
-			defer resp.Body.Close() // TODO: This is inside a loop!
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return err
-			}
-			c.WriteJSON(wsResponse{
-				Status: resp.StatusCode,
-				Header: resp.Header,
-				Body:   body,
-			})
+
+			fmt.Printf("received message: %#+v \n", r)
+
+			// req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://localhost:%d", port), bytes.NewReader(r.Body))
+			// if err != nil {
+			// 	return err
+			// }
+			//
+			// for k := range r.Header {
+			// 	req.Header.Set(k, r.Header.Get(k))
+			// }
+			// resp, err := http.DefaultClient.Do(req)
+			// if err != nil {
+			// 	return err
+			// }
+			// defer resp.Body.Close() // TODO: This is inside a loop!
+			// body, err := io.ReadAll(resp.Body)
+			// if err != nil {
+			// 	return err
+			// }
+			// c.WriteJSON(wsResponse{
+			// 	Status: resp.StatusCode,
+			// 	Header: resp.Header,
+			// 	Body:   body,
+			// })
 		}
 	}
 
