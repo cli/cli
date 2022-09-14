@@ -7,11 +7,11 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/search/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/search"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
@@ -127,7 +127,7 @@ func reposRun(opts *ReposOptions) error {
 	if opts.WebMode {
 		url := opts.Searcher.URL(opts.Query)
 		if io.IsStdoutTTY() {
-			fmt.Fprintf(io.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(url))
+			fmt.Fprintf(io.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(url))
 		}
 		return opts.Browser.Browse(url)
 	}
@@ -169,10 +169,10 @@ func displayResults(io *iostreams.IOStreams, results search.RepositoriesResult) 
 		}
 		tp.AddField(repo.FullName, nil, cs.Bold)
 		description := repo.Description
-		tp.AddField(text.ReplaceExcessiveWhitespace(description), nil, nil)
+		tp.AddField(text.RemoveExcessiveWhitespace(description), nil, nil)
 		tp.AddField(info, nil, infoColor)
 		if tp.IsTTY() {
-			tp.AddField(utils.FuzzyAgoAbbr(time.Now(), repo.UpdatedAt), nil, cs.Gray)
+			tp.AddField(text.FuzzyAgoAbbr(time.Now(), repo.UpdatedAt), nil, cs.Gray)
 		} else {
 			tp.AddField(repo.UpdatedAt.Format(time.RFC3339), nil, nil)
 		}

@@ -4,10 +4,9 @@ import (
 	"fmt"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/text"
-	"github.com/cli/cli/v2/utils"
 )
 
 func StateTitleWithColor(cs *iostreams.ColorScheme, pr api.PullRequest) string {
@@ -66,8 +65,8 @@ func ListHeader(repoName string, itemName string, matchCount int, totalMatchCoun
 		if totalMatchCount == 1 {
 			matchVerb = "matches"
 		}
-		return fmt.Sprintf("Showing %d of %s in %s that %s your search", matchCount, utils.Pluralize(totalMatchCount, itemName), repoName, matchVerb)
+		return fmt.Sprintf("Showing %d of %s in %s that %s your search", matchCount, text.Pluralize(totalMatchCount, itemName), repoName, matchVerb)
 	}
 
-	return fmt.Sprintf("Showing %d of %s in %s", matchCount, utils.Pluralize(totalMatchCount, fmt.Sprintf("open %s", itemName)), repoName)
+	return fmt.Sprintf("Showing %d of %s in %s", matchCount, text.Pluralize(totalMatchCount, fmt.Sprintf("open %s", itemName)), repoName)
 }

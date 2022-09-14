@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cli/cli/v2/pkg/text"
+	"github.com/cli/cli/v2/internal/text"
 )
 
 type Visibility string

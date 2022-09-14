@@ -5,8 +5,8 @@ import (
 	"io"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/spf13/cobra"
 )
 
