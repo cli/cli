@@ -49,8 +49,9 @@ func TestListRun(t *testing.T) {
 			},
 			isTTY: true,
 			wantStdout: heredoc.Doc(`
-				Mac            ssh-rsa AAAABbBB123  1d
-				hubot@Windows  ssh-rsa EEEEEEEK247  1d
+				TITLE          KEY                  AGE  ID
+				Mac            ssh-rsa AAAABbBB123  1d   1234
+				hubot@Windows  ssh-rsa EEEEEEEK247  1d   5678
 			`),
 			wantStderr: "",
 		},
@@ -82,8 +83,8 @@ func TestListRun(t *testing.T) {
 			},
 			isTTY: false,
 			wantStdout: heredoc.Doc(`
-				Mac	ssh-rsa AAAABbBB123	2020-08-31T15:44:24+02:00
-				hubot@Windows	ssh-rsa EEEEEEEK247	2020-08-31T15:44:24+02:00
+				Mac	ssh-rsa AAAABbBB123	2020-08-31T15:44:24+02:00	1234
+				hubot@Windows	ssh-rsa EEEEEEEK247	2020-08-31T15:44:24+02:00	5678
 			`),
 			wantStderr: "",
 		},

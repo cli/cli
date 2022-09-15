@@ -2,6 +2,7 @@ package list
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/cli/cli/v2/internal/config"
@@ -66,6 +67,14 @@ func listRun(opts *ListOptions) error {
 	cs := opts.IO.ColorScheme()
 	now := time.Now()
 
+	if t.IsTTY() {
+		t.AddField("TITLE", nil, nil)
+		t.AddField("KEY", nil, nil)
+		t.AddField("AGE", nil, nil)
+		t.AddField("ID", nil, nil)
+		t.EndRow()
+	}
+
 	for _, sshKey := range sshKeys {
 		t.AddField(sshKey.Title, nil, nil)
 		t.AddField(sshKey.Key, truncateMiddle, nil)
@@ -74,7 +83,9 @@ func listRun(opts *ListOptions) error {
 		if t.IsTTY() {
 			createdAt = utils.FuzzyAgoAbbr(now, sshKey.CreatedAt)
 		}
-		t.AddField(createdAt, nil, cs.Gray)
+		t.AddField(createdAt, nil, nil)
+
+		t.AddField(strconv.Itoa(sshKey.ID), nil, cs.Cyan)
 		t.EndRow()
 	}
 
