@@ -13,7 +13,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	workflow "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
+	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
 )
@@ -61,7 +61,7 @@ var RunFields = []string{
 }
 
 type Run struct {
-	Name           string
+	Name           string    `json:"-"` // Omitting name and getting it from workflow
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 	StartedAt      time.Time `json:"run_started_at"`
@@ -96,17 +96,6 @@ func (r *Run) Duration(now time.Time) time.Duration {
 		return 0
 	}
 	return d.Round(time.Second)
-}
-
-func (r *Run) GetWorkflowName(client *api.Client, repo ghrepo.Interface, workflowID int64) (string, error) {
-	workflows, err := workflow.FindWorkflow(client, repo, strconv.FormatInt(workflowID, 10), nil)
-	if err != nil {
-		return "", err
-	} else if len(workflows) != 1 {
-		return "", errors.New("could not find workflow")
-	}
-
-	return workflows[0].Name, nil
 }
 
 type Repo struct {
@@ -327,6 +316,24 @@ func getRuns(client *api.Client, repo ghrepo.Interface, path string, opts *Filte
 		page++
 	}
 
+	// Set WorkflowRun.name by getting the name from the workflow
+	workflows, err := workflowShared.GetWorkflows(client, repo, 0)
+	if err != nil {
+		return runs, err
+	}
+
+	wfIDToName := map[int64]string{}
+	for _, wf := range workflows {
+		wfIDToName[wf.ID] = wf.Name
+	}
+	for i, run := range runs {
+		if name, ok := wfIDToName[run.WorkflowID]; !ok {
+			return nil, fmt.Errorf("could not find workflow for workflow ID %d", run.WorkflowID)
+		} else {
+			runs[i].Name = name
+		}
+	}
+
 	return runs, nil
 }
 
@@ -391,6 +398,16 @@ func GetRun(client *api.Client, repo ghrepo.Interface, runID string) (*Run, erro
 	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
 	if err != nil {
 		return nil, err
+	}
+
+	// Set name to workflow name
+	workflows, err := workflowShared.FindWorkflow(client, repo, strconv.FormatInt(result.WorkflowID, 10), nil)
+	if err != nil {
+		return nil, err
+	} else if len(workflows) != 1 {
+		return nil, errors.New("could not find workflow")
+	} else {
+		result.Name = workflows[0].Name
 	}
 
 	return &result, nil

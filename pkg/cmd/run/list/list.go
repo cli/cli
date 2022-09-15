@@ -137,17 +137,7 @@ func listRun(opts *ListOptions) error {
 		tp.EndRow()
 	}
 
-	IDToName := make(map[int64]string)
-
 	for _, run := range runs {
-		if _, ok := IDToName[run.WorkflowID]; !ok {
-			name, err := run.GetWorkflowName(client, baseRepo, run.WorkflowID)
-			if err != nil {
-				return fmt.Errorf("failed to get workflow name: %w", err)
-			}
-			IDToName[run.WorkflowID] = name
-		}
-
 		if tp.IsTTY() {
 			symbol, symbolColor := shared.Symbol(cs, run.Status, run.Conclusion)
 			tp.AddField(symbol, nil, symbolColor)
@@ -158,7 +148,7 @@ func listRun(opts *ListOptions) error {
 
 		tp.AddField(run.CommitMsg(), nil, cs.Bold)
 
-		tp.AddField(IDToName[run.WorkflowID], nil, nil)
+		tp.AddField(run.Name, nil, nil)
 		tp.AddField(run.HeadBranch, nil, cs.Bold)
 		tp.AddField(string(run.Event), nil, nil)
 		tp.AddField(fmt.Sprintf("%d", run.ID), nil, cs.Cyan)
