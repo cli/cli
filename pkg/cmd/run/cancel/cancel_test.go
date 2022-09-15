@@ -8,6 +8,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
+	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -82,8 +83,8 @@ func TestNewCmdCancel(t *testing.T) {
 }
 
 func TestRunCancel(t *testing.T) {
-	inProgressRun := shared.TestRun("more runs", 1234, shared.InProgress, "")
-	completedRun := shared.TestRun("more runs", 4567, shared.Completed, shared.Failure)
+	inProgressRun := shared.TestRun(1234, shared.InProgress, "")
+	completedRun := shared.TestRun(4567, shared.Completed, shared.Failure)
 	tests := []struct {
 		name      string
 		httpStubs func(*httpmock.Registry)
@@ -103,6 +104,9 @@ func TestRunCancel(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
 					httpmock.JSONResponse(inProgressRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/1234/cancel"),
 					httpmock.StatusStringResponse(202, "{}"))
@@ -134,6 +138,9 @@ func TestRunCancel(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/4567"),
 					httpmock.JSONResponse(completedRun))
 				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/4567/cancel"),
 					httpmock.StatusStringResponse(409, ""),
 				)
@@ -154,6 +161,13 @@ func TestRunCancel(t *testing.T) {
 							completedRun,
 						},
 					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
+					}))
 			},
 		},
 		{
@@ -167,6 +181,13 @@ func TestRunCancel(t *testing.T) {
 					httpmock.JSONResponse(shared.RunsPayload{
 						WorkflowRuns: []shared.Run{
 							inProgressRun,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
 						},
 					}))
 				reg.Register(

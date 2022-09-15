@@ -9,6 +9,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
+	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -98,13 +99,13 @@ func TestNewCmdWatch(t *testing.T) {
 
 func TestWatchRun(t *testing.T) {
 	failedRunStubs := func(reg *httpmock.Registry) {
-		inProgressRun := shared.TestRun("more runs", 2, shared.InProgress, "")
-		completedRun := shared.TestRun("more runs", 2, shared.Completed, shared.Failure)
+		inProgressRun := shared.TestRunWithCommit(2, shared.InProgress, "", "commit2")
+		completedRun := shared.TestRun(2, shared.Completed, shared.Failure)
 		reg.Register(
 			httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
 			httpmock.JSONResponse(shared.RunsPayload{
 				WorkflowRuns: []shared.Run{
-					shared.TestRun("run", 1, shared.InProgress, ""),
+					shared.TestRunWithCommit(1, shared.InProgress, "", "commit1"),
 					inProgressRun,
 				},
 			}))
@@ -128,15 +129,28 @@ func TestWatchRun(t *testing.T) {
 		reg.Register(
 			httpmock.REST("GET", "repos/OWNER/REPO/check-runs/20/annotations"),
 			httpmock.JSONResponse(shared.FailedJobAnnotations))
+		reg.Register(
+			httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+			httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+				Workflows: []workflowShared.Workflow{
+					shared.TestWorkflow,
+				},
+			}))
+		reg.Register(
+			httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+			httpmock.JSONResponse(shared.TestWorkflow))
+		reg.Register(
+			httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+			httpmock.JSONResponse(shared.TestWorkflow))
 	}
 	successfulRunStubs := func(reg *httpmock.Registry) {
-		inProgressRun := shared.TestRun("more runs", 2, shared.InProgress, "")
-		completedRun := shared.TestRun("more runs", 2, shared.Completed, shared.Success)
+		inProgressRun := shared.TestRunWithCommit(2, shared.InProgress, "", "commit2")
+		completedRun := shared.TestRun(2, shared.Completed, shared.Success)
 		reg.Register(
 			httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
 			httpmock.JSONResponse(shared.RunsPayload{
 				WorkflowRuns: []shared.Run{
-					shared.TestRun("run", 1, shared.InProgress, ""),
+					shared.TestRunWithCommit(1, shared.InProgress, "", "commit1"),
 					inProgressRun,
 				},
 			}))
@@ -163,6 +177,19 @@ func TestWatchRun(t *testing.T) {
 					shared.SuccessfulJob,
 				},
 			}))
+		reg.Register(
+			httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+			httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+				Workflows: []workflowShared.Workflow{
+					shared.TestWorkflow,
+				},
+			}))
+		reg.Register(
+			httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+			httpmock.JSONResponse(shared.TestWorkflow))
+		reg.Register(
+			httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+			httpmock.JSONResponse(shared.TestWorkflow))
 	}
 
 	tests := []struct {
@@ -184,8 +211,11 @@ func TestWatchRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
 					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
 			},
-			wantOut: "Run failed (1234) has already completed with 'failure'\n",
+			wantOut: "Run CI (1234) has already completed with 'failure'\n",
 		},
 		{
 			name: "already completed, exit status",
@@ -197,8 +227,11 @@ func TestWatchRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
 					httpmock.JSONResponse(shared.FailedRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
 			},
-			wantOut: "Run failed (1234) has already completed with 'failure'\n",
+			wantOut: "Run CI (1234) has already completed with 'failure'\n",
 			wantErr: true,
 			errMsg:  "SilentError",
 		},
@@ -219,6 +252,13 @@ func TestWatchRun(t *testing.T) {
 							shared.SuccessfulRun,
 						},
 					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
+					}))
 			},
 		},
 		{
@@ -231,10 +271,10 @@ func TestWatchRun(t *testing.T) {
 			httpStubs: successfulRunStubs,
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubPrompt("Select a workflow run").
-					AssertOptions([]string{"* cool commit, run (trunk) Feb 23, 2021", "* cool commit, more runs (trunk) Feb 23, 2021"}).
-					AnswerWith("* cool commit, more runs (trunk) Feb 23, 2021")
+					AssertOptions([]string{"* commit1, CI (trunk) Feb 23, 2021", "* commit2, CI (trunk) Feb 23, 2021"}).
+					AnswerWith("* commit2, CI (trunk) Feb 23, 2021")
 			},
-			wantOut: "\x1b[?1049h\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n* trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\x1b[?1049l✓ trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\n✓ Run more runs (2) completed with 'success'\n",
+			wantOut: "\x1b[?1049h\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n* trunk CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\x1b[?1049l✓ trunk CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\n✓ Run CI (2) completed with 'success'\n",
 		},
 		{
 			name: "exit status respected",
@@ -247,10 +287,10 @@ func TestWatchRun(t *testing.T) {
 			httpStubs: failedRunStubs,
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubPrompt("Select a workflow run").
-					AssertOptions([]string{"* cool commit, run (trunk) Feb 23, 2021", "* cool commit, more runs (trunk) Feb 23, 2021"}).
-					AnswerWith("* cool commit, more runs (trunk) Feb 23, 2021")
+					AssertOptions([]string{"* commit1, CI (trunk) Feb 23, 2021", "* commit2, CI (trunk) Feb 23, 2021"}).
+					AnswerWith("* commit2, CI (trunk) Feb 23, 2021")
 			},
-			wantOut: "\x1b[?1049h\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n* trunk more runs · 2\nTriggered via push about 59 minutes ago\n\n\x1b[?1049lX trunk more runs · 2\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nX Run more runs (2) completed with 'failure'\n",
+			wantOut: "\x1b[?1049h\x1b[0;0H\x1b[JRefreshing run status every 0 seconds. Press Ctrl+C to quit.\n\n* trunk CI · 2\nTriggered via push about 59 minutes ago\n\n\x1b[?1049lX trunk CI · 2\nTriggered via push about 59 minutes ago\n\nJOBS\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nX Run CI (2) completed with 'failure'\n",
 			wantErr: true,
 			errMsg:  "SilentError",
 		},

@@ -7,6 +7,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	runShared "github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
+	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 )
 
 type workflowRuns struct {
@@ -26,6 +27,24 @@ func getWorkflowRuns(client *api.Client, repo ghrepo.Interface, workflow *shared
 
 	wr.Total = result.TotalCount
 	wr.Runs = append(wr.Runs, result.WorkflowRuns...)
+
+	// Set WorkflowRun.name by getting the name from the workflow
+	workflows, err := workflowShared.GetWorkflows(client, repo, 0)
+	if err != nil {
+		return wr, err
+	}
+
+	wfIDToName := map[int64]string{}
+	for _, wf := range workflows {
+		wfIDToName[wf.ID] = wf.Name
+	}
+	for i, run := range wr.Runs {
+		if name, ok := wfIDToName[run.WorkflowID]; !ok {
+			return wr, fmt.Errorf("could not find workflow for workflow ID %d", run.WorkflowID)
+		} else {
+			wr.Runs[i].Name = name
+		}
+	}
 
 	return wr, nil
 }

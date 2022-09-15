@@ -3,13 +3,19 @@ package shared
 import (
 	"fmt"
 	"time"
+
+	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 )
 
 var TestRunStartTime, _ = time.Parse("2006-01-02 15:04:05", "2021-02-23 04:51:00")
 
 func TestRun(id int64, s Status, c Conclusion) Run {
+	return TestRunWithCommit(id, s, c, "cool commit")
+}
+
+func TestRunWithCommit(id int64, s Status, c Conclusion, commit string) Run {
 	return Run{
-		WorkflowID: 1,
+		WorkflowID: 123,
 		ID:         id,
 		CreatedAt:  TestRunStartTime,
 		UpdatedAt:  TestRunStartTime.Add(time.Minute*4 + time.Second*34),
@@ -19,7 +25,7 @@ func TestRun(id int64, s Status, c Conclusion) Run {
 		HeadBranch: "trunk",
 		JobsURL:    fmt.Sprintf("https://api.github.com/runs/%d/jobs", id),
 		HeadCommit: Commit{
-			Message: "cool commit",
+			Message: commit,
 		},
 		HeadSha: "1234567890",
 		URL:     fmt.Sprintf("https://github.com/runs/%d", id),
@@ -110,4 +116,9 @@ var FailedJobAnnotations []Annotation = []Annotation{
 		Level:     "failure",
 		StartLine: 420,
 	},
+}
+
+var TestWorkflow workflowShared.Workflow = workflowShared.Workflow{
+	Name: "CI",
+	ID:   123,
 }
