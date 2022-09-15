@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
@@ -18,11 +17,10 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/spf13/cobra"
 )
 
-type prompter interface {
+type iprompter interface {
 	Input(string, string) (string, error)
 	Select(string, string, []string) (int, error)
 	Confirm(string, bool) (bool, error)
@@ -32,7 +30,7 @@ type CreateOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
-	Prompter   prompter
+	Prompter   iprompter
 
 	Name               string
 	Description        string
@@ -241,19 +239,14 @@ func createRun(opts *CreateOptions) error {
 	fromScratch := opts.Source == ""
 
 	if opts.Interactive {
-		var selectedMode string
-		modeOptions := []string{
+		selected, err := opts.Prompter.Select("What would you like to do?", "", []string{
 			"Create a new repository on GitHub from scratch",
 			"Push an existing local repository to GitHub",
-		}
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		if err := prompt.SurveyAskOne(&survey.Select{
-			Message: "What would you like to do?",
-			Options: modeOptions,
-		}, &selectedMode); err != nil {
+		})
+		if err != nil {
 			return err
 		}
-		fromScratch = selectedMode == modeOptions[0]
+		fromScratch = selected == 0
 	}
 
 	if fromScratch {
@@ -278,7 +271,7 @@ func createFromScratch(opts *CreateOptions) error {
 	host, _ := cfg.DefaultHost()
 
 	if opts.Interactive {
-		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo("")
+		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(opts.Prompter, "")
 		if err != nil {
 			return err
 		}
@@ -286,17 +279,24 @@ func createFromScratch(opts *CreateOptions) error {
 		if err != nil {
 			return err
 		}
-		opts.GitIgnoreTemplate, err = interactiveGitIgnore(httpClient, host)
+		opts.GitIgnoreTemplate, err = interactiveGitIgnore(httpClient, host, opts.Prompter)
 		if err != nil {
 			return err
 		}
-		opts.LicenseTemplate, err = interactiveLicense(httpClient, host)
+		opts.LicenseTemplate, err = interactiveLicense(httpClient, host, opts.Prompter)
 		if err != nil {
 			return err
 		}
 
-		if err := confirmSubmission(opts.Name, opts.Visibility); err != nil {
+		targetRepo := shared.NormalizeRepoName(opts.Name)
+		if idx := strings.IndexRune(targetRepo, '/'); idx > 0 {
+			targetRepo = targetRepo[0:idx+1] + shared.NormalizeRepoName(targetRepo[idx+1:])
+		}
+		confirmed, err := opts.Prompter.Confirm(fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(opts.Visibility)), true)
+		if err != nil {
 			return err
+		} else if !confirmed {
+			return cmdutil.CancelError
 		}
 	}
 
@@ -369,12 +369,8 @@ func createFromScratch(opts *CreateOptions) error {
 	}
 
 	if opts.Interactive {
-		cloneQuestion := &survey.Confirm{
-			Message: "Clone the new repository locally?",
-			Default: true,
-		}
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		err = prompt.SurveyAskOne(cloneQuestion, &opts.Clone)
+		var err error
+		opts.Clone, err = opts.Prompter.Confirm("Clone the new repository locally?", true)
 		if err != nil {
 			return err
 		}
@@ -424,7 +420,8 @@ func createFromLocal(opts *CreateOptions) error {
 	host, _ := cfg.DefaultHost()
 
 	if opts.Interactive {
-		opts.Source, err = interactiveSource()
+		var err error
+		opts.Source, err = opts.Prompter.Input("Path to local repository", ".")
 		if err != nil {
 			return err
 		}
@@ -467,7 +464,7 @@ func createFromLocal(opts *CreateOptions) error {
 	}
 
 	if opts.Interactive {
-		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(filepath.Base(absPath))
+		opts.Name, opts.Description, opts.Visibility, err = interactiveRepoInfo(opts.Prompter, filepath.Base(absPath))
 		if err != nil {
 			return err
 		}
@@ -523,27 +520,15 @@ func createFromLocal(opts *CreateOptions) error {
 	remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
 	if opts.Interactive {
-		var addRemote bool
-		remoteQuesiton := &survey.Confirm{
-			Message: `Add a remote?`,
-			Default: true,
-		}
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		err = prompt.SurveyAskOne(remoteQuesiton, &addRemote)
+		addRemote, err := opts.Prompter.Confirm("Add a remote?", true)
 		if err != nil {
 			return err
 		}
-
 		if !addRemote {
 			return nil
 		}
 
-		pushQuestion := &survey.Input{
-			Message: "What should the new remote be called?",
-			Default: "origin",
-		}
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		err = prompt.SurveyAskOne(pushQuestion, &baseRemote)
+		baseRemote, err = opts.Prompter.Input("What should the new remote be called?", "origin")
 		if err != nil {
 			return err
 		}
@@ -555,12 +540,8 @@ func createFromLocal(opts *CreateOptions) error {
 
 	// don't prompt for push if there are no commits
 	if opts.Interactive && committed {
-		pushQuestion := &survey.Confirm{
-			Message: fmt.Sprintf(`Would you like to push commits from the current branch to %q?`, baseRemote),
-			Default: true,
-		}
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		err = prompt.SurveyAskOne(pushQuestion, &opts.Push)
+		var err error
+		opts.Push, err = opts.Prompter.Confirm(fmt.Sprintf("Would you like to push commits from the current branch to %q?", baseRemote), true)
 		if err != nil {
 			return err
 		}
@@ -695,177 +676,65 @@ func localInit(io *iostreams.IOStreams, remoteURL, path, checkoutBranch string) 
 	return run.PrepareCmd(gitCheckout).Run()
 }
 
-func interactiveGitIgnore(client *http.Client, hostname string) (string, error) {
-	var addGitIgnore bool
-	var addGitIgnoreSurvey []*survey.Question
-
-	addGitIgnoreQuestion := &survey.Question{
-		Name: "addGitIgnore",
-		Prompt: &survey.Confirm{
-			Message: "Would you like to add a .gitignore?",
-			Default: false,
-		},
+func interactiveGitIgnore(client *http.Client, hostname string, prompter iprompter) (string, error) {
+	confirmed, err := prompter.Confirm("Would you like to add a .gitignore?", false)
+	if err != nil {
+		return "", err
+	} else if !confirmed {
+		return "", nil
 	}
 
-	addGitIgnoreSurvey = append(addGitIgnoreSurvey, addGitIgnoreQuestion)
-	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
-	err := prompt.SurveyAsk(addGitIgnoreSurvey, &addGitIgnore)
+	templates, err := listGitIgnoreTemplates(client, hostname)
 	if err != nil {
 		return "", err
 	}
-
-	var wantedIgnoreTemplate string
-
-	if addGitIgnore {
-		var gitIg []*survey.Question
-
-		gitIgnoretemplates, err := listGitIgnoreTemplates(client, hostname)
-		if err != nil {
-			return "", err
-		}
-		gitIgnoreQuestion := &survey.Question{
-			Name: "chooseGitIgnore",
-			Prompt: &survey.Select{
-				Message: "Choose a .gitignore template",
-				Options: gitIgnoretemplates,
-			},
-		}
-		gitIg = append(gitIg, gitIgnoreQuestion)
-		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
-		err = prompt.SurveyAsk(gitIg, &wantedIgnoreTemplate)
-		if err != nil {
-			return "", err
-		}
-
+	selected, err := prompter.Select("Choose a .gitignore template", "", templates)
+	if err != nil {
+		return "", err
 	}
-
-	return wantedIgnoreTemplate, nil
+	return templates[selected], nil
 }
 
-func interactiveLicense(client *http.Client, hostname string) (string, error) {
-	var addLicense bool
-	var addLicenseSurvey []*survey.Question
-	var wantedLicense string
-
-	addLicenseQuestion := &survey.Question{
-		Name: "addLicense",
-		Prompt: &survey.Confirm{
-			Message: "Would you like to add a license?",
-			Default: false,
-		},
+func interactiveLicense(client *http.Client, hostname string, prompter iprompter) (string, error) {
+	confirmed, err := prompter.Confirm("Would you like to add a license?", false)
+	if err != nil {
+		return "", err
+	} else if !confirmed {
+		return "", nil
 	}
 
-	addLicenseSurvey = append(addLicenseSurvey, addLicenseQuestion)
-	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
-	err := prompt.SurveyAsk(addLicenseSurvey, &addLicense)
+	licenses, err := listLicenseTemplates(client, hostname)
 	if err != nil {
 		return "", err
 	}
-
-	licenseKey := map[string]string{}
-
-	if addLicense {
-		licenseTemplates, err := listLicenseTemplates(client, hostname)
-		if err != nil {
-			return "", err
-		}
-		var licenseNames []string
-		for _, l := range licenseTemplates {
-			licenseNames = append(licenseNames, l.Name)
-			licenseKey[l.Name] = l.Key
-		}
-		var licenseQs []*survey.Question
-
-		licenseQuestion := &survey.Question{
-			Name: "chooseLicense",
-			Prompt: &survey.Select{
-				Message: "Choose a license",
-				Options: licenseNames,
-			},
-		}
-		licenseQs = append(licenseQs, licenseQuestion)
-		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
-		err = prompt.SurveyAsk(licenseQs, &wantedLicense)
-		if err != nil {
-			return "", err
-		}
-		return licenseKey[wantedLicense], nil
+	licenseNames := make([]string, 0, len(licenses))
+	for _, license := range licenses {
+		licenseNames = append(licenseNames, license.Name)
 	}
-	return "", nil
+	selected, err := prompter.Select("Choose a license", "", licenseNames)
+	if err != nil {
+		return "", err
+	}
+	return licenses[selected].Key, nil
 }
 
 // name, description, and visibility
-func interactiveRepoInfo(defaultName string) (string, string, string, error) {
-	qs := []*survey.Question{
-		{
-			Name: "repoName",
-			Prompt: &survey.Input{
-				Message: "Repository name",
-				Default: defaultName,
-			},
-		},
-		{
-			Name:   "repoDescription",
-			Prompt: &survey.Input{Message: "Description"},
-		},
-		{
-			Name: "repoVisibility",
-			Prompt: &survey.Select{
-				Message: "Visibility",
-				Options: []string{"Public", "Private", "Internal"},
-			},
-		}}
-
-	answer := struct {
-		RepoName        string
-		RepoDescription string
-		RepoVisibility  string
-	}{}
-
-	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
-	err := prompt.SurveyAsk(qs, &answer)
+func interactiveRepoInfo(prompter iprompter, defaultName string) (string, string, string, error) {
+	name, err := prompter.Input("Repository name", defaultName)
 	if err != nil {
 		return "", "", "", err
 	}
 
-	return answer.RepoName, answer.RepoDescription, strings.ToUpper(answer.RepoVisibility), nil
-}
-
-func interactiveSource() (string, error) {
-	var sourcePath string
-	sourcePrompt := &survey.Input{
-		Message: "Path to local repository",
-		Default: "."}
-
-	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-	err := prompt.SurveyAskOne(sourcePrompt, &sourcePath)
+	description, err := prompter.Input("Description", defaultName)
 	if err != nil {
-		return "", err
+		return "", "", "", err
 	}
-	return sourcePath, nil
-}
 
-func confirmSubmission(repoWithOwner, visibility string) error {
-	targetRepo := shared.NormalizeRepoName(repoWithOwner)
-	if idx := strings.IndexRune(repoWithOwner, '/'); idx > 0 {
-		targetRepo = repoWithOwner[0:idx+1] + shared.NormalizeRepoName(repoWithOwner[idx+1:])
-	}
-	var answer struct {
-		ConfirmSubmit bool
-	}
-	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
-	err := prompt.SurveyAsk([]*survey.Question{{
-		Name: "confirmSubmit",
-		Prompt: &survey.Confirm{
-			Message: fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(visibility)),
-			Default: true,
-		},
-	}}, &answer)
+	visibilityOptions := []string{"Public", "Private", "Internal"}
+	selected, err := prompter.Select("Visibility", "Public", visibilityOptions)
 	if err != nil {
-		return err
+		return "", "", "", err
 	}
-	if !answer.ConfirmSubmit {
-		return cmdutil.CancelError
-	}
-	return nil
+
+	return name, description, strings.ToUpper(visibilityOptions[selected]), nil
 }
