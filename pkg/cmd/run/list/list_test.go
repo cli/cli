@@ -131,9 +131,11 @@ func TestListRun(t *testing.T) {
 						WorkflowRuns: shared.TestRuns,
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/1"),
-					httpmock.JSONResponse(workflowShared.Workflow{
-						Name: "CI",
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
 					}))
 			},
 			wantOut: "STATUS  NAME         WORKFLOW  BRANCH  EVENT  ID    ELAPSED  AGE\nX       cool commit  CI        trunk   push   1     4m34s    Feb 23, 2021\n*       cool commit  CI        trunk   push   2     4m34s    Feb 23, 2021\n✓       cool commit  CI        trunk   push   3     4m34s    Feb 23, 2021\nX       cool commit  CI        trunk   push   4     4m34s    Feb 23, 2021\nX       cool commit  CI        trunk   push   1234  4m34s    Feb 23, 2021\n-       cool commit  CI        trunk   push   6     4m34s    Feb 23, 2021\n-       cool commit  CI        trunk   push   7     4m34s    Feb 23, 2021\n*       cool commit  CI        trunk   push   8     4m34s    Feb 23, 2021\n*       cool commit  CI        trunk   push   9     4m34s    Feb 23, 2021\nX       cool commit  CI        trunk   push   10    4m34s    Feb 23, 2021\n",
@@ -152,9 +154,11 @@ func TestListRun(t *testing.T) {
 						WorkflowRuns: shared.TestRuns,
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/1"),
-					httpmock.JSONResponse(workflowShared.Workflow{
-						Name: "CI",
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
 					}))
 			},
 			wantOut: "completed	timed_out	cool commit	CI	trunk	push	1	4m34s	Feb 23, 2021\nin_progress		cool commit	CI	trunk	push	2	4m34s	Feb 23, 2021\ncompleted	success	cool commit	CI	trunk	push	3	4m34s	Feb 23, 2021\ncompleted	cancelled	cool commit	CI	trunk	push	4	4m34s	Feb 23, 2021\ncompleted	failure	cool commit	CI	trunk	push	1234	4m34s	Feb 23, 2021\ncompleted	neutral	cool commit	CI	trunk	push	6	4m34s	Feb 23, 2021\ncompleted	skipped	cool commit	CI	trunk	push	7	4m34s	Feb 23, 2021\nrequested		cool commit	CI	trunk	push	8	4m34s	Feb 23, 2021\nqueued		cool commit	CI	trunk	push	9	4m34s	Feb 23, 2021\ncompleted	stale	cool commit	CI	trunk	push	10	4m34s	Feb 23, 2021\n",
@@ -184,9 +188,11 @@ func TestListRun(t *testing.T) {
 						WorkflowRuns: runs[100:],
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/1"),
-					httpmock.JSONResponse(workflowShared.Workflow{
-						Name: "CI",
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
 					}))
 			},
 			wantOut: longRunOutput,
@@ -201,6 +207,13 @@ func TestListRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs"),
 					httpmock.JSONResponse(shared.RunsPayload{}),
 				)
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
+					}))
 			},
 			wantErr: true,
 		},
@@ -222,9 +235,11 @@ func TestListRun(t *testing.T) {
 						WorkflowRuns: shared.WorkflowRuns,
 					}))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/1"),
-					httpmock.JSONResponse(workflowShared.Workflow{
-						Name: "CI",
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
 					}))
 			},
 			wantOut: "STATUS  NAME         WORKFLOW  BRANCH  EVENT  ID    ELAPSED  AGE\n*       cool commit  CI        trunk   push   2     4m34s    Feb 23, 2021\n✓       cool commit  CI        trunk   push   3     4m34s    Feb 23, 2021\nX       cool commit  CI        trunk   push   1234  4m34s    Feb 23, 2021\n",
@@ -242,6 +257,13 @@ func TestListRun(t *testing.T) {
 					}),
 					httpmock.JSONResponse(shared.RunsPayload{}),
 				)
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
+					}))
 			},
 			wantErr: true,
 		},
@@ -258,6 +280,13 @@ func TestListRun(t *testing.T) {
 					}),
 					httpmock.JSONResponse(shared.RunsPayload{}),
 				)
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
+					}))
 			},
 			wantErr: true,
 		},
