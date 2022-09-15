@@ -142,7 +142,7 @@ func createHook(o *hookOptions) (string, error) {
 	apiClient := api.NewClientFromHTTP(httpClient)
 	path := fmt.Sprintf("repos/%s/hooks", o.Repo)
 	req := createHookRequest{
-		Name:   "dev",
+		Name:   "cli",
 		Events: []string{o.EventType},
 		Active: true,
 		Config: hookConfig{
