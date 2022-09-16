@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -40,7 +41,16 @@ func getWorkflowRuns(client *api.Client, repo ghrepo.Interface, workflow *shared
 	}
 	for i, run := range wr.Runs {
 		if name, ok := wfIDToName[run.WorkflowID]; !ok {
-			return wr, fmt.Errorf("could not find workflow for workflow ID %d", run.WorkflowID)
+			// Try getting specific workflow because it may have been deleted
+			workflows, err := workflowShared.FindWorkflow(client, repo, strconv.FormatInt(run.WorkflowID, 10), nil)
+			if err != nil {
+				return workflowRuns{}, err
+			} else if len(workflows) != 1 {
+				return wr, fmt.Errorf("could not find workflow for workflow ID %d", run.WorkflowID)
+			} else {
+				wfIDToName[run.WorkflowID] = workflows[0].Name
+				wr.Runs[i].Name = workflows[0].Name
+			}
 		} else {
 			wr.Runs[i].Name = name
 		}
