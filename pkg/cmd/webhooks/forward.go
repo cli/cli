@@ -10,8 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -89,9 +87,6 @@ func newCmdForward(f *cmdutil.Factory, runF func(*hookOptions) error) *cobra.Com
 			var retries int
 			events := make(chan wsEventReceived)
 			errorsChan := make(chan error)
-			shutdown := make(chan os.Signal, 1)
-			signal.Notify(shutdown, syscall.SIGTERM, syscall.SIGINT)
-			defer signal.Stop(shutdown)
 
 			// Retry connecting 3 times only
 			for {
@@ -118,7 +113,8 @@ func newCmdForward(f *cmdutil.Factory, runF func(*hookOptions) error) *cobra.Com
 				retries = 0
 
 				connCloser := &ConnCloser{Conn: conn}
-				err = forwardEvents(connCloser, &opts, shutdown, events, errorsChan)
+				// err = forwardEvents(connCloser, &opts, shutdown, events, errorsChan)
+				err = forwardEvents(connCloser, &opts, events, errorsChan)
 
 				// If an error happened and it's a server disconnect (1006), retry connecting
 				if err != nil && websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
@@ -187,7 +183,7 @@ func dial(token string, url *url.URL, opts *hookOptions) (*websocket.Conn, error
 	return c, nil
 }
 
-func forwardEvents(conn *ConnCloser, opts *hookOptions, shutdown chan os.Signal, events chan wsEventReceived, errors chan error) error {
+func forwardEvents(conn *ConnCloser, opts *hookOptions, events chan wsEventReceived, errors chan error) error {
 	go func() {
 		for {
 			var ev wsEventReceived
@@ -205,10 +201,6 @@ func forwardEvents(conn *ConnCloser, opts *hookOptions, shutdown chan os.Signal,
 
 	for {
 		select {
-		case <-shutdown:
-			log.Println("[LOG] received CTRL+C, closing connection")
-			conn.Close()
-			return nil
 		case ev := <-events:
 			log.Printf("[LOG] received event with headers: %v \n", ev.Header)
 			req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://localhost:%d", opts.Port), bytes.NewReader(ev.Body))
