@@ -1,0 +1,10 @@
+BEGIN:VCARD
+VERSION;TYPE=WORK:3.0
+FN;CHARSET=UTF-8:EthicalAds
+N;CHARSET=UTF-8:EthicalAds;;;;
+PROFILE:VCARD
+ADR;CHARSET=UTF-8:;;818 SW 3rd Ave # 221-7718;Portland;OR;97204-2405;USA
+EMAIL:ads@ethicalads.io
+ORG;CHARSET=UTF-8:EthicalAds by Read the Docs
+URL:http://ethicalads.io
+END:VCARD
