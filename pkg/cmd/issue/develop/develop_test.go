@@ -277,7 +277,7 @@ func Test_developRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"repository":{"ref":{"target":{"oid":"123"}}}}}`))
 
 				reg.Register(
-					httpmock.GraphQL(`(?s)mutation CreateLinkedBranch\b.*issueId: \$issueId,\s+oid: \$oid,`),
+					httpmock.GraphQL(`(?s)mutation CreateLinkedBranch\b.*\$oid: GitObjectID!, \$repositoryId:.*issueId: \$issueId,\s+oid: \$oid,`),
 					httpmock.GraphQLQuery(`{ "data": { "createLinkedBranch": { "linkedBranch": {"id": "2", "ref": {"name": "my-issue-1"} } } } }`,
 						func(query string, inputs map[string]interface{}) {
 							assert.Equal(t, "REPOID", inputs["repositoryId"])
@@ -294,6 +294,17 @@ func Test_developRun(t *testing.T) {
 				opts.IssueSelector = "https://github.com/cli/test-repo/issues/42"
 				opts.IssueRepoSelector = "cli/other"
 				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": {
+							"id": "REPOID",
+							"hasIssuesEnabled": true
+						} } }`),
+				)
 			},
 			wantErr: "issue repo in url cli/test-repo does not match the repo from --issue-repo cli/other",
 		},

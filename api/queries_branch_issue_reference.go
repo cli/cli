@@ -18,12 +18,20 @@ func nameParam(params map[string]interface{}) string {
 	return ""
 }
 
+func nameArg(params map[string]interface{}) string {
+	if params["name"] != "" {
+		return "$name: String, "
+	}
+
+	return ""
+}
+
 func CreateBranchIssueReference(client *Client, repo *Repository, params map[string]interface{}) (*BranchIssueReference, error) {
 	query := fmt.Sprintf(`
-		mutation CreateLinkedBranch($issueId: ID!, $oid: GitObjectID!, $name: String, $repositoryId: ID) {
+		mutation CreateLinkedBranch($issueId: ID!, $oid: GitObjectID!, %[1]s$repositoryId: ID) {
 			createLinkedBranch(input: {
 			  issueId: $issueId,
-			  %[1]s
+			  %[2]s
 			  oid: $oid,
 			  repositoryId: $repositoryId
 			}) {
@@ -34,7 +42,7 @@ func CreateBranchIssueReference(client *Client, repo *Repository, params map[str
 					}
 				}
 			}
-		}`, nameParam(params))
+		}`, nameArg(params), nameParam(params))
 
 	inputParams := map[string]interface{}{
 		"repositoryId": repo.ID,
