@@ -491,12 +491,6 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 		close(sshUsers)
 	}()
 
-	// While the above fetches are running, ensure that the user has keys installed.
-	// That lets us report a more useful error message if they don't.
-	if err = checkAuthorizedKeys(ctx, a.apiClient); err != nil {
-		return err
-	}
-
 	t, err := template.New("ssh_config").Parse(heredoc.Doc(`
 		Host cs.{{.Name}}.{{.EscapedRef}}
 			User {{.SSHUser}}

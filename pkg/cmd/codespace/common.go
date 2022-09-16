@@ -70,13 +70,6 @@ type liveshareSession interface {
 
 // Connects to a codespace using Live Share and returns that session
 func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App, debug bool, debugFile string) (session liveshareSession, err error) {
-	// While connecting, ensure in the background that the user has keys installed.
-	// That lets us report a more useful error message if they don't.
-	authkeys := make(chan error, 1)
-	go func() {
-		authkeys <- checkAuthorizedKeys(ctx, a.apiClient)
-	}()
-
 	liveshareLogger := noopLogger()
 	if debug {
 		debugLogger, err := newFileLogger(debugFile)
@@ -91,9 +84,6 @@ func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App
 
 	session, err = codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
 	if err != nil {
-		if authErr := <-authkeys; authErr != nil {
-			return nil, fmt.Errorf("failed to fetch authorization keys: %w", authErr)
-		}
 		return nil, fmt.Errorf("failed to connect to Live Share: %w", err)
 	}
 
@@ -102,7 +92,6 @@ func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App
 
 //go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
 type apiClient interface {
-	GetUser(ctx context.Context) (*api.User, error)
 	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
 	GetOrgMemberCodespace(ctx context.Context, orgName string, userName string, codespaceName string) (*api.Codespace, error)
 	ListCodespaces(ctx context.Context, opts api.ListCodespacesOptions) ([]*api.Codespace, error)
@@ -112,7 +101,6 @@ type apiClient interface {
 	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
 	EditCodespace(ctx context.Context, codespaceName string, params *api.EditCodespaceParams) (*api.Codespace, error)
 	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
-	AuthorizedKeys(ctx context.Context, user string) ([]string, error)
 	GetCodespacesMachines(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error)
 	GetCodespaceRepositoryContents(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
 	ListDevContainers(ctx context.Context, repoID int, branch string, limit int) (devcontainers []api.DevContainerEntry, err error)
@@ -235,25 +223,6 @@ func ask(qs []*survey.Question, response interface{}) error {
 		select {}
 	}
 	return err
-}
-
-// checkAuthorizedKeys reports an error if the user has not registered any SSH keys;
-// see https://github.com/cli/cli/v2/issues/166#issuecomment-921769703.
-// The check is not required for security but it improves the error message.
-func checkAuthorizedKeys(ctx context.Context, client apiClient) error {
-	user, err := client.GetUser(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting user: %w", err)
-	}
-
-	keys, err := client.AuthorizedKeys(ctx, user.Login)
-	if err != nil {
-		return fmt.Errorf("failed to read GitHub-authorized SSH keys for %s: %w", user, err)
-	}
-	if len(keys) == 0 {
-		return fmt.Errorf("user %s has no GitHub-authorized SSH keys", user)
-	}
-	return nil // success
 }
 
 var ErrTooManyArgs = errors.New("the command accepts no arguments")
