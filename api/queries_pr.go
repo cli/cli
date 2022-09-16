@@ -304,7 +304,10 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 			inputParams[key] = val
 		}
 	}
-	variables := inputParams
+	variables := map[string]interface{}{
+		"input": inputParams,
+	}
+
 	result := struct {
 		CreatePullRequest struct {
 			PullRequest PullRequest
