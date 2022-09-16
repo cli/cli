@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
@@ -240,23 +239,4 @@ func forwardEvents(conn *ConnCloser, opts *hookOptions, shutdown chan os.Signal,
 	}
 
 	return nil
-}
-
-type ConnCloser struct {
-	*websocket.Conn
-	mu     sync.Mutex
-	closed bool
-}
-
-func (c *ConnCloser) Close() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.closed = true
-	return c.Conn.Close()
-}
-
-func (c *ConnCloser) IsClosed() bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.closed
 }
