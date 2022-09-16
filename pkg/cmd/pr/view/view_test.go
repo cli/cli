@@ -353,7 +353,8 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are from a fork #12`,
-				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago.+100.-10`,
+				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
@@ -366,7 +367,8 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are from a fork #12`,
-				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago.+100.-10`,
+				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10`,
 				`Reviewers:.*1 \(.*Requested.*\)\n`,
 				`Assignees:.*marseilles, monaco\n`,
 				`Labels:.*one, two, three, four, five\n`,
@@ -398,7 +400,8 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are from a fork #12`,
-				`Closed.*nobody wants to merge 12 commits into master from blueberries . about X years ago.+100.-10`,
+				`Closed.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
@@ -411,7 +414,8 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are from a fork #12`,
-				`Merged.*nobody wants to merge 12 commits into master from blueberries . about X years ago.+100.-10`,
+				`Merged.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
@@ -424,7 +428,8 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are from a fork #12`,
-				`Draft.*nobody wants to merge 12 commits into master from blueberries . about X years ago.+100.-10`,
+				`Draft.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
