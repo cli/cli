@@ -18,6 +18,23 @@ import (
 )
 
 func Test_developRun(t *testing.T) {
+	featureEnabledPayload := `{
+		"data": {
+			"LinkedBranch": {
+				"fields": [
+					{
+						"name": "id"
+					},
+					{
+						"name": "ref"
+					}
+				]
+			}
+		}
+	}`
+
+	featureDisabledPayload := `{ "data": { "LinkedBranch": null } }`
+
 	tests := []struct {
 		name           string
 		setup          func(*DevelopOptions, *testing.T) func()
@@ -39,6 +56,10 @@ func Test_developRun(t *testing.T) {
 				return func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranch_fields\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
 				reg.Register(
 					httpmock.GraphQL(`query BranchIssueReferenceListLinkedBranches\b`),
 					httpmock.GraphQLQuery(`{
@@ -82,6 +103,10 @@ func Test_developRun(t *testing.T) {
 				return func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranch_fields\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
 				reg.Register(
 					httpmock.GraphQL(`query BranchIssueReferenceListLinkedBranches\b`),
 					httpmock.GraphQLQuery(`{
@@ -127,6 +152,10 @@ func Test_developRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.Register(
+					httpmock.GraphQL(`query LinkedBranch_fields\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
 					httpmock.GraphQL(`query BranchIssueReferenceListLinkedBranches\b`),
 					httpmock.GraphQLQuery(`{
 						"data": {
@@ -171,6 +200,10 @@ func Test_developRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
 				reg.Register(
+					httpmock.GraphQL(`query LinkedBranch_fields\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
 					httpmock.GraphQL(`query BranchIssueReferenceListLinkedBranches\b`),
 					httpmock.GraphQLQuery(`{
 					"data": {
@@ -213,7 +246,27 @@ func Test_developRun(t *testing.T) {
 				opts.List = true
 				return func() {}
 			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranch_fields\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+			},
 			wantErr: "issue repo in url cli/test-repo does not match the repo from --issue-repo cli/other",
+		},
+		{name: "returns an error when the feature isn't enabled in the GraphQL API",
+			setup: func(opts *DevelopOptions, t *testing.T) func() {
+				opts.IssueSelector = "https://github.com/cli/test-repo/issues/42"
+				opts.List = true
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranch_fields\b`),
+					httpmock.StringResponse(featureDisabledPayload),
+				)
+			},
+			wantErr: "the `gh issue develop` command is not currently available",
 		},
 		{name: "develop new branch with a name provided",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
@@ -223,7 +276,10 @@ func Test_developRun(t *testing.T) {
 				return func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranch_fields\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryInfo\b`),
 					httpmock.StringResponse(`
@@ -260,7 +316,10 @@ func Test_developRun(t *testing.T) {
 				return func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranch_fields\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryInfo\b`),
 					httpmock.StringResponse(`
@@ -296,7 +355,10 @@ func Test_developRun(t *testing.T) {
 				return func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranch_fields\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryInfo\b`),
 					httpmock.StringResponse(`
@@ -320,7 +382,10 @@ func Test_developRun(t *testing.T) {
 				"origin": "OWNER/REPO",
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranch_fields\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryInfo\b`),
 					httpmock.StringResponse(`
@@ -366,7 +431,10 @@ func Test_developRun(t *testing.T) {
 				"origin": "OWNER/REPO",
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranch_fields\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryInfo\b`),
 					httpmock.StringResponse(`

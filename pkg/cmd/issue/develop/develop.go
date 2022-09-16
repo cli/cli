@@ -223,6 +223,10 @@ func developRunList(opts *DevelopOptions) (err error) {
 		fmt.Fprintf(opts.IO.Out, "%s\n", branch)
 	}
 
+	if opts.IO.IsStdoutTTY() {
+		fmt.Fprintf(opts.IO.Out, "\nShowing linked branches for %s/%s#%d\n\n", issueRepo.RepoOwner(), issueRepo.RepoName(), issueNumber)
+	}
+
 	return nil
 
 }
