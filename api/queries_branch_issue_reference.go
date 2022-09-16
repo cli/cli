@@ -132,6 +132,28 @@ func ListLinkedBranches(client *Client, repo ghrepo.Interface, issueNumber int) 
 
 }
 
+// introspects the schema to see if we expose the LinkedBranch type
+func CheckLinkedBranchFeature(client *Client, host string) (err error) {
+	var featureDetection struct {
+		Name struct {
+			Fields []struct {
+				Name string
+			}
+		} `graphql:"LinkedBranch: __type(name: \"LinkedBranch\")"`
+	}
+
+	err = client.Query(host, "LinkedBranch_fields", &featureDetection, nil)
+
+	if err != nil {
+		return err
+	}
+
+	if len(featureDetection.Name.Fields) == 0 {
+		return fmt.Errorf("the `gh issue develop` command is not currently available")
+	}
+	return nil
+}
+
 // This fetches the oids for the repo's default branch (`main`, etc) and the name the user might have provided in one shot.
 func FindBaseOid(client *Client, repo *Repository, ref string) (string, string, error) {
 	query := `

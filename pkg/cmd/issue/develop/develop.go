@@ -84,6 +84,11 @@ func developRunCreate(opts *DevelopOptions) (err error) {
 	}
 
 	opts.IO.StartProgressIndicator()
+	err = api.CheckLinkedBranchFeature(apiClient, baseRepo.RepoHost())
+	if err != nil {
+		return err
+	}
+
 	repo, err := api.GitHubRepo(apiClient, baseRepo)
 	if err != nil {
 		return err
@@ -190,6 +195,11 @@ func developRunList(opts *DevelopOptions) (err error) {
 	}
 
 	opts.IO.StartProgressIndicator()
+
+	err = api.CheckLinkedBranchFeature(apiClient, baseRepo.RepoHost())
+	if err != nil {
+		return err
+	}
 	issueNumber, issueRepo, err := issueMetadata(opts.IssueSelector, opts.IssueRepoSelector, baseRepo)
 	if err != nil {
 		return err
