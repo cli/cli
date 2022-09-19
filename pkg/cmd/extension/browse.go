@@ -67,6 +67,8 @@ func (m sidebarModel) Init() tea.Cmd {
 	return nil
 }
 
+// TODO figure out best way to get currently selected list item's readme into the content for viewport
+
 func (m sidebarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// TODO
 	switch msg := msg.(type) {
