@@ -3,6 +3,7 @@ package extension
 import (
 	"fmt"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -25,6 +26,29 @@ func (e extEntry) FilterValue() string { return fmt.Sprintf("%s/%s", e.Owner, e.
 // TODO what is this
 type delegateKeyMap struct{}
 
+type keyMap struct {
+	install key.Binding
+	remove  key.Binding
+	sort    key.Binding
+}
+
+func newKeyMap() *keyMap {
+	return &keyMap{
+		install: key.NewBinding(
+			key.WithKeys("i"),
+			key.WithHelp("i", "install"),
+		),
+		remove: key.NewBinding(
+			key.WithKeys("r"),
+			key.WithHelp("r", "remove"),
+		),
+		sort: key.NewBinding(
+			key.WithKeys("s"),
+			key.WithHelp("s", "sort"),
+		),
+	}
+}
+
 func newItemDelegate(keys *delegateKeyMap) list.DefaultDelegate {
 	// TODO unsure if i'll need this
 	return list.NewDefaultDelegate()
@@ -32,6 +56,7 @@ func newItemDelegate(keys *delegateKeyMap) list.DefaultDelegate {
 
 type model struct {
 	list list.Model
+	keys *keyMap
 	// TODO keybindings
 }
 
@@ -79,8 +104,19 @@ func newModel() model {
 	}
 	list := list.New(items, newItemDelegate(nil), 0, 0)
 
+	keys := newKeyMap()
+	list.Title = "gh extensions"
+	list.AdditionalShortHelpKeys = func() []key.Binding {
+		return []key.Binding{
+			keys.remove,
+			keys.install,
+			keys.sort,
+		}
+	}
+
 	return model{
 		list: list,
+		keys: keys,
 	}
 }
 
@@ -112,7 +148,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	return m.list.View()
+	return appStyle.Render(m.list.View())
 }
 
 // TODO
