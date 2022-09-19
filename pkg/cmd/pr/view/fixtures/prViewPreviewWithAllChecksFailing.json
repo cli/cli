@@ -46,7 +46,7 @@
                   "contexts": {
                     "nodes": [
                       {
-                        "conclusion": "SUCCESS",
+                        "conclusion": "FAILURE",
                         "status": "COMPLETED",
                         "name": "cool tests",
                         "completedAt": "2020-08-27T19:00:12Z",

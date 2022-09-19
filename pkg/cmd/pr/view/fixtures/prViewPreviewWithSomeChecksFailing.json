@@ -46,15 +46,15 @@
                   "contexts": {
                     "nodes": [
                       {
-                        "conclusion": "",
-                        "status": "WAITING",
+                        "conclusion": "SUCCESS",
+                        "status": "COMPLETED",
                         "name": "cool tests",
                         "completedAt": "2020-08-27T19:00:12Z",
                         "startedAt": "2020-08-27T18:58:46Z",
                         "detailsUrl": "sweet link"
                       },
                       {
-                        "conclusion": "SUCCESS",
+                        "conclusion": "FAILURE",
                         "status": "COMPLETED",
                         "name": "sad tests",
                         "completedAt": "2020-08-27T19:00:12Z",

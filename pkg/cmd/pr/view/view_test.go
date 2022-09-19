@@ -434,6 +434,62 @@ func TestPRView_Preview(t *testing.T) {
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
 		},
+		"Open PR with all checks passing": {
+			branch: "master",
+			args:   "12",
+			fixtures: map[string]string{
+				"PullRequestByNumber": "./fixtures/prViewPreviewWithAllChecksPassing.json",
+			},
+			expectedOutputs: []string{
+				`Blueberries are from a fork #12`,
+				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10 • ✓ Checks passing`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
+			},
+		},
+		"Open PR with all checks failing": {
+			branch: "master",
+			args:   "12",
+			fixtures: map[string]string{
+				"PullRequestByNumber": "./fixtures/prViewPreviewWithAllChecksFailing.json",
+			},
+			expectedOutputs: []string{
+				`Blueberries are from a fork #12`,
+				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10 • × All checks failing`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
+			},
+		},
+		"Open PR with some checks failing": {
+			branch: "master",
+			args:   "12",
+			fixtures: map[string]string{
+				"PullRequestByNumber": "./fixtures/prViewPreviewWithSomeChecksFailing.json",
+			},
+			expectedOutputs: []string{
+				`Blueberries are from a fork #12`,
+				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10 • × 1/2 checks failing`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
+			},
+		},
+		"Open PR with some checks pending": {
+			branch: "master",
+			args:   "12",
+			fixtures: map[string]string{
+				"PullRequestByNumber": "./fixtures/prViewPreviewWithSomeChecksPending.json",
+			},
+			expectedOutputs: []string{
+				`Blueberries are from a fork #12`,
+				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10 • - Checks pending`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
+			},
+		},
 	}
 
 	for name, tc := range tests {

@@ -46,8 +46,8 @@
                   "contexts": {
                     "nodes": [
                       {
-                        "conclusion": "",
-                        "status": "WAITING",
+                        "conclusion": "SUCCESS",
+                        "status": "COMPLETED",
                         "name": "cool tests",
                         "completedAt": "2020-08-27T19:00:12Z",
                         "startedAt": "2020-08-27T18:58:46Z",
@@ -56,7 +56,15 @@
                       {
                         "conclusion": "SUCCESS",
                         "status": "COMPLETED",
-                        "name": "sad tests",
+                        "name": "rad tests",
+                        "completedAt": "2020-08-27T19:00:12Z",
+                        "startedAt": "2020-08-27T18:58:46Z",
+                        "detailsUrl": "sweet link"
+                      },
+                      {
+                        "conclusion": "SUCCESS",
+                        "status": "COMPLETED",
+                        "name": "awesome tests",
                         "completedAt": "2020-08-27T19:00:12Z",
                         "startedAt": "2020-08-27T18:58:46Z",
                         "detailsUrl": "sweet link"
