@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -17,13 +18,15 @@ type extEntry struct {
 	Official  bool
 }
 
+func (e extEntry) Title() string       { return fmt.Sprintf("%s/%s", e.Owner, e.Name) }
+func (e extEntry) Description() string { return fmt.Sprintf("%s/%s", e.Owner, e.Name) }
 func (e extEntry) FilterValue() string { return fmt.Sprintf("%s/%s", e.Owner, e.Name) }
 
 // TODO what is this
 type delegateKeyMap struct{}
 
 func newItemDelegate(keys *delegateKeyMap) list.DefaultDelegate {
-	// TODO
+	// TODO unsure if i'll need this
 	return list.NewDefaultDelegate()
 }
 
@@ -81,6 +84,8 @@ func newModel() model {
 	}
 }
 
+var appStyle = lipgloss.NewStyle().Padding(1, 2)
+
 func (m model) Init() tea.Cmd {
 	// TODO the docs say not to do this but the example code in bubbles does:
 	return tea.EnterAltScreen
@@ -88,7 +93,22 @@ func (m model) Init() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// TODO probably fill this in in debugging why list not showing
-	return m, nil
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		w, h := appStyle.GetFrameSize()
+		m.list.SetSize(msg.Width-w, msg.Height-h)
+	case tea.KeyMsg:
+		if m.list.FilterState() == list.Filtering {
+			break
+		}
+		switch {
+		//case.keyMatches(msg, )
+		}
+	}
+
+	nm, cmd := m.list.Update(msg)
+	m.list = nm
+	return m, cmd
 }
 
 func (m model) View() string {
