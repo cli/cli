@@ -10,7 +10,6 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/ghinstance"
-	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/ssh-key/add"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/ssh"
@@ -34,7 +33,7 @@ type LoginOptions struct {
 	Scopes      []string
 	Executable  string
 	GitProtocol string
-	Prompter    prompter.Prompter
+	Prompter    Prompt
 
 	sshContext ssh.Context
 }
