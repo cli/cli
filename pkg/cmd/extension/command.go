@@ -217,15 +217,14 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			},
 		},
 		&cobra.Command{
-			Use:   "manage",
+			Use:   "browse",
 			Short: "Enter a UI for browsing, adding, and removing extensions",
 			Args:  cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, args []string) error {
 				if !io.CanPrompt() {
 					return errors.New("this command runs an interactive UI and needs to be run in a terminal")
 				}
-				// TODO
-				return nil
+				return extBrowse(cmd)
 			},
 		},
 		&cobra.Command{
