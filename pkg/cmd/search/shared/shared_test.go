@@ -34,7 +34,8 @@ func TestSearchIssues(t *testing.T) {
 		},
 	}
 
-	var updatedAt = time.Date(2021, 2, 28, 12, 30, 0, 0, time.UTC)
+	updatedAt := time.Date(2021, 2, 28, 12, 30, 0, 0, time.UTC)
+	updatedAtRelative := time.Now().Add(time.Duration(-24*400) * time.Hour)
 	tests := []struct {
 		errMsg     string
 		name       string
@@ -54,9 +55,9 @@ func TestSearchIssues(t *testing.T) {
 						return search.IssuesResult{
 							IncompleteResults: false,
 							Items: []search.Issue{
-								{RepositoryURL: "github.com/test/cli", Number: 123, State: "open", Title: "something broken", Labels: []search.Label{{Name: "bug"}, {Name: "p1"}}, UpdatedAt: updatedAt},
-								{RepositoryURL: "github.com/what/what", Number: 456, State: "closed", Title: "feature request", Labels: []search.Label{{Name: "enhancement"}}, UpdatedAt: updatedAt},
-								{RepositoryURL: "github.com/blah/test", Number: 789, State: "open", Title: "some title", UpdatedAt: updatedAt},
+								{RepositoryURL: "github.com/test/cli", Number: 123, State: "open", Title: "something broken", Labels: []search.Label{{Name: "bug"}, {Name: "p1"}}, UpdatedAt: updatedAtRelative},
+								{RepositoryURL: "github.com/what/what", Number: 456, State: "closed", Title: "feature request", Labels: []search.Label{{Name: "enhancement"}}, UpdatedAt: updatedAtRelative},
+								{RepositoryURL: "github.com/blah/test", Number: 789, State: "open", Title: "some title", UpdatedAt: updatedAtRelative},
 							},
 							Total: 300,
 						}, nil
@@ -76,8 +77,8 @@ func TestSearchIssues(t *testing.T) {
 						return search.IssuesResult{
 							IncompleteResults: false,
 							Items: []search.Issue{
-								{RepositoryURL: "github.com/test/cli", Number: 123, State: "open", Title: "bug", Labels: []search.Label{{Name: "bug"}, {Name: "p1"}}, UpdatedAt: updatedAt},
-								{RepositoryURL: "github.com/what/what", Number: 456, State: "open", Title: "fix bug", Labels: []search.Label{{Name: "fix"}}, PullRequestLinks: search.PullRequestLinks{URL: "someurl"}, UpdatedAt: updatedAt},
+								{RepositoryURL: "github.com/test/cli", Number: 123, State: "open", Title: "bug", Labels: []search.Label{{Name: "bug"}, {Name: "p1"}}, UpdatedAt: updatedAtRelative},
+								{RepositoryURL: "github.com/what/what", Number: 456, State: "open", Title: "fix bug", Labels: []search.Label{{Name: "fix"}}, PullRequestLinks: search.PullRequestLinks{URL: "someurl"}, UpdatedAt: updatedAtRelative},
 							},
 							Total: 300,
 						}, nil
