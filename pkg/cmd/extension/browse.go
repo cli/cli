@@ -5,10 +5,90 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
+
+var appStyle = lipgloss.NewStyle().Padding(1, 2)
+var sidebarStyle = lipgloss.NewStyle()
+
+type uiModel struct {
+	sidebar sidebarModel
+	extList extListModel
+	// TODO move keymap here i guess? i don't know
+}
+
+func newUIModel() uiModel {
+	return uiModel{
+		extList: newExtListModel(),
+		sidebar: newSidebarModel(),
+	}
+}
+
+func (m uiModel) Init() tea.Cmd {
+	// TODO the docs say not to do this but the example code in bubbles does:
+	return tea.EnterAltScreen
+}
+
+func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+	var cmd tea.Cmd
+	var newModel tea.Model
+
+	newModel, cmd = m.extList.Update(msg)
+	cmds = append(cmds, cmd)
+	m.extList = newModel.(extListModel)
+
+	newModel, cmd = m.sidebar.Update(msg)
+	cmds = append(cmds, cmd)
+	m.sidebar = newModel.(sidebarModel)
+
+	return m, tea.Batch(cmds...)
+}
+
+func (m uiModel) View() string {
+	return lipgloss.JoinHorizontal(lipgloss.Top, m.extList.View(), m.sidebar.View())
+}
+
+type sidebarModel struct {
+	content  string
+	viewport viewport.Model
+	ready    bool
+}
+
+func newSidebarModel() sidebarModel {
+	// TODO
+	return sidebarModel{}
+}
+
+func (m sidebarModel) Init() tea.Cmd {
+	return nil
+}
+
+func (m sidebarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// TODO
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		if !m.ready {
+			m.viewport = viewport.New(80, msg.Height)
+			m.viewport.SetContent("LOL TODO")
+			m.ready = true
+		} else {
+			m.viewport.Height = msg.Height
+		}
+
+	}
+
+	newvp, cmd := m.viewport.Update(msg)
+	m.viewport = newvp
+	return m, cmd
+}
+
+func (m sidebarModel) View() string {
+	return sidebarStyle.Render(m.viewport.View())
+}
 
 type extEntry struct {
 	Owner     string
@@ -54,13 +134,13 @@ func newItemDelegate(keys *delegateKeyMap) list.DefaultDelegate {
 	return list.NewDefaultDelegate()
 }
 
-type model struct {
+type extListModel struct {
 	list list.Model
 	keys *keyMap
 	// TODO keybindings
 }
 
-func newModel() model {
+func newExtListModel() extListModel {
 	items := make([]list.Item, 5)
 	items[0] = extEntry{
 		Owner:     "cli",
@@ -114,20 +194,17 @@ func newModel() model {
 		}
 	}
 
-	return model{
+	return extListModel{
 		list: list,
 		keys: keys,
 	}
 }
 
-var appStyle = lipgloss.NewStyle().Padding(1, 2)
-
-func (m model) Init() tea.Cmd {
-	// TODO the docs say not to do this but the example code in bubbles does:
-	return tea.EnterAltScreen
+func (m extListModel) Init() tea.Cmd {
+	return nil
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m extListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// TODO probably fill this in in debugging why list not showing
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -147,7 +224,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m model) View() string {
+func (m extListModel) View() string {
 	return appStyle.Render(m.list.View())
 }
 
@@ -156,5 +233,5 @@ func (m model) View() string {
 func extBrowse(cmd *cobra.Command) error {
 	// TODO
 
-	return tea.NewProgram(newModel()).Start()
+	return tea.NewProgram(newUIModel()).Start()
 }
