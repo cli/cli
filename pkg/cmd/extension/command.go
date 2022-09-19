@@ -12,7 +12,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/utils"
-	"github.com/rivo/tview"
 	"github.com/spf13/cobra"
 )
 
@@ -226,11 +225,6 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return errors.New("this command runs an interactive UI and needs to be run in a terminal")
 				}
 				// TODO
-				ps := []tview.Primitive{}
-				box := tview.NewBox().SetBorder(true).SetTitle("Hello, world!")
-				if err := tview.NewApplication().SetRoot(box, true).Run(); err != nil {
-					panic(err)
-				}
 				return nil
 			},
 		},
