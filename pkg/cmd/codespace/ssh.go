@@ -34,6 +34,8 @@ import (
 const automaticPrivateKeyNameOld = "codespaces"
 const automaticPrivateKeyName = "codespaces.auto"
 
+var errKeyFileNotFound = errors.New("SSH key file does not exist")
+
 type sshOptions struct {
 	codespace  string
 	profile    string
@@ -276,7 +278,7 @@ func selectSSHKeys(
 	}
 
 	configKeyPair, err := firstConfiguredKeyPair(ctx, customConfigPath, opts.profile)
-	if err != nil {
+	if err != nil && !errors.Is(err, errKeyFileNotFound) {
 		return nil, false, fmt.Errorf("checking configured keys: %w", err)
 	}
 
@@ -298,6 +300,7 @@ func selectSSHKeys(
 func automaticSSHKeyPair(sshContext ssh.Context) *ssh.KeyPair {
 	publicKeys, err := sshContext.LocalPublicKeys()
 	if err != nil {
+		// The error would be that the .ssh dir doesn't exist, which just means that the keypair also doesn't exist
 		return nil
 	}
 
@@ -412,8 +415,6 @@ func firstConfiguredKeyPair(
 		return nil, fmt.Errorf("could not load ssh configuration: %w", err)
 	}
 
-	userHomeDir, _ := os.UserHomeDir()
-
 	configLines := strings.Split(string(configBytes), "\n")
 	for _, line := range configLines {
 		line = strings.TrimSpace(line)
@@ -421,30 +422,48 @@ func firstConfiguredKeyPair(
 		if strings.HasPrefix(line, "identityfile ") {
 			privateKeyPath := strings.SplitN(line, " ", 2)[1]
 
-			if strings.HasPrefix(privateKeyPath, "~") {
-				// os.Stat can't handle ~, so convert it to the real path
-				privateKeyPath = strings.Replace(privateKeyPath, "~", userHomeDir, 1)
-			}
-
-			// The default configuration includes standard keys like id_rsa or id_ed25519,
-			// but these may not actually exist
-			if _, err := os.Stat(privateKeyPath); err != nil {
+			keypair, err := keypairForPrivateKey(privateKeyPath)
+			if errors.Is(err, errKeyFileNotFound) {
 				continue
 			}
-
-			publicKeyPath := privateKeyPath + ".pub"
-			if _, err := os.Stat(publicKeyPath); err != nil {
-				continue
+			if err != nil {
+				return nil, fmt.Errorf("loading ssh config: %w", err)
 			}
 
-			return &ssh.KeyPair{
-				PrivateKeyPath: privateKeyPath,
-				PublicKeyPath:  publicKeyPath,
-			}, nil
+			return keypair, nil
 		}
 	}
 
-	return nil, nil
+	return nil, errKeyFileNotFound
+}
+
+// keypairForPrivateKey returns the KeyPair with the specified private key if it and the public key both exist
+func keypairForPrivateKey(privateKeyPath string) (*ssh.KeyPair, error) {
+	if strings.HasPrefix(privateKeyPath, "~") {
+		userHomeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("getting home dir: %w", err)
+		}
+
+		// os.Stat can't handle ~, so convert it to the real path
+		privateKeyPath = strings.Replace(privateKeyPath, "~", userHomeDir, 1)
+	}
+
+	// The default configuration includes standard keys like id_rsa or id_ed25519,
+	// but these may not actually exist
+	if _, err := os.Stat(privateKeyPath); err != nil {
+		return nil, errKeyFileNotFound
+	}
+
+	publicKeyPath := privateKeyPath + ".pub"
+	if _, err := os.Stat(publicKeyPath); err != nil {
+		return nil, errKeyFileNotFound
+	}
+
+	return &ssh.KeyPair{
+		PrivateKeyPath: privateKeyPath,
+		PublicKeyPath:  publicKeyPath,
+	}, nil
 }
 
 func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err error) {
