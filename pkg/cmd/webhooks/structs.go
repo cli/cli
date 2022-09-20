@@ -2,9 +2,6 @@ package webhooks
 
 import (
 	"net/http"
-	"sync"
-
-	"github.com/gorilla/websocket"
 )
 
 type createHookRequest struct {
@@ -39,23 +36,4 @@ type httpEventForward struct {
 	Status int
 	Header http.Header
 	Body   []byte
-}
-
-type ConnCloser struct {
-	*websocket.Conn
-	mu     sync.Mutex
-	closed bool
-}
-
-func (c *ConnCloser) Close() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.closed = true
-	return c.Conn.Close()
-}
-
-func (c *ConnCloser) IsClosed() bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.closed
 }
