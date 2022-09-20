@@ -277,23 +277,20 @@ func selectSSHKeys(
 		return autoKeyPair, true, nil
 	}
 
-	configKeyPair, err := firstConfiguredKeyPair(ctx, customConfigPath, opts.profile)
-	if err != nil && !errors.Is(err, errKeyFileNotFound) {
-		return nil, false, fmt.Errorf("checking configured keys: %w", err)
-	}
-
-	// Even if there was no error, there may simply be no configured keys, so still check for nil here
-	if configKeyPair != nil {
-		return configKeyPair, true, nil
-	}
-
-	// Finally, fall back to generating new automatic keys
-	autoKeyPair, err := generateAutomaticSSHKeys(sshContext)
+	keyPair, err := firstConfiguredKeyPair(ctx, customConfigPath, opts.profile)
 	if err != nil {
-		return nil, false, fmt.Errorf("generating automatic keypair: %w", err)
+		if !errors.Is(err, errKeyFileNotFound) {
+			return nil, false, fmt.Errorf("checking configured keys: %w", err)
+		}
+
+		// no valid key in ssh config, generate one
+		keyPair, err = generateAutomaticSSHKeys(sshContext)
+		if err != nil {
+			return nil, false, fmt.Errorf("generating automatic keypair: %w", err)
+		}
 	}
 
-	return autoKeyPair, true, nil
+	return keyPair, true, nil
 }
 
 // automaticSSHKeyPair returns the paths to the automatic key pair files, if they both exist
