@@ -26,11 +26,11 @@ func TestPendingOperationDisallowsSSH(t *testing.T) {
 	}
 }
 
-func TestAutomaticSSHKeyPairs(t *testing.T) {
+func TestGenerateAutomaticSSHKeys(t *testing.T) {
 	tests := []struct {
-		// These files exist when calling setupAutomaticSSHKeys
+		// These files exist when calling generateAutomaticSSHKeys
 		existingFiles []string
-		// These files should exist after setupAutomaticSSHKeys finishes
+		// These files should exist after generateAutomaticSSHKeys finishes
 		wantFinalFiles []string
 	}{
 		// Basic case: no existing keys, they should be created
@@ -81,12 +81,12 @@ func TestAutomaticSSHKeyPairs(t *testing.T) {
 			f.Close()
 		}
 
-		keyPair, err := setupAutomaticSSHKeys(sshContext)
+		keyPair, err := generateAutomaticSSHKeys(sshContext)
 		if err != nil {
-			t.Errorf("Unexpected error from setupAutomaticSSHKeys: %v", err)
+			t.Errorf("Unexpected error from generateAutomaticSSHKeys: %v", err)
 		}
 		if keyPair == nil {
-			t.Fatal("Unexpected nil KeyPair from setupAutomaticSSHKeys")
+			t.Fatal("Unexpected nil KeyPair from generateAutomaticSSHKeys")
 		}
 		if !strings.HasSuffix(keyPair.PrivateKeyPath, automaticPrivateKeyName) {
 			t.Errorf("Expected private key path %v, got %v", automaticPrivateKeyName, keyPair.PrivateKeyPath)
@@ -98,7 +98,7 @@ func TestAutomaticSSHKeyPairs(t *testing.T) {
 		// Check that all the expected files are present
 		for _, file := range tt.wantFinalFiles {
 			if _, err := os.Stat(filepath.Join(dir, file)); err != nil {
-				t.Errorf("Want file %q to exist after setupAutomaticSSHKeys but it doesn't", file)
+				t.Errorf("Want file %q to exist after generateAutomaticSSHKeys but it doesn't", file)
 			}
 		}
 
@@ -118,7 +118,7 @@ func TestAutomaticSSHKeyPairs(t *testing.T) {
 			}
 
 			if !isWantedFile {
-				t.Errorf("Unexpected file %q exists after setupAutomaticSSHKeys", filename)
+				t.Errorf("Unexpected file %q exists after generateAutomaticSSHKeys", filename)
 			}
 		}
 	}

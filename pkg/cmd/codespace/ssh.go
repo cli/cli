@@ -286,7 +286,7 @@ func selectSSHKeys(
 	}
 
 	// Finally, fall back to generating new automatic keys
-	autoKeyPair, err := setupAutomaticSSHKeys(sshContext)
+	autoKeyPair, err := generateAutomaticSSHKeys(sshContext)
 	if err != nil {
 		return nil, false, fmt.Errorf("generating automatic keypair: %v", err)
 	}
@@ -320,7 +320,7 @@ func automaticSSHKeyPair(sshContext ssh.Context) *ssh.KeyPair {
 	return nil
 }
 
-func setupAutomaticSSHKeys(sshContext ssh.Context) (*ssh.KeyPair, error) {
+func generateAutomaticSSHKeys(sshContext ssh.Context) (*ssh.KeyPair, error) {
 	keyPair := checkAndUpdateOldKeyPair(sshContext)
 	if keyPair != nil {
 		return keyPair, nil
