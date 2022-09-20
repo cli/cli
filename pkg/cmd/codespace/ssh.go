@@ -277,7 +277,7 @@ func selectSSHKeys(
 
 	configKeyPair, err := firstConfiguredKeyPair(ctx, customConfigPath, opts.profile)
 	if err != nil {
-		return nil, false, fmt.Errorf("checking configured keys: %v", err)
+		return nil, false, fmt.Errorf("checking configured keys: %w", err)
 	}
 
 	// Even if there was no error, there may simply be no configured keys, so still check for nil here
@@ -288,7 +288,7 @@ func selectSSHKeys(
 	// Finally, fall back to generating new automatic keys
 	autoKeyPair, err := setupAutomaticSSHKeys(sshContext)
 	if err != nil {
-		return nil, false, fmt.Errorf("generating automatic keypair: %v", err)
+		return nil, false, fmt.Errorf("generating automatic keypair: %w", err)
 	}
 
 	return autoKeyPair, true, nil
