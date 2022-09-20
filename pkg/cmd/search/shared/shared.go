@@ -31,6 +31,7 @@ type IssuesOptions struct {
 	Entity   EntityType
 	Exporter cmdutil.Exporter
 	IO       *iostreams.IOStreams
+	Now      time.Time
 	Query    search.Query
 	Searcher search.Searcher
 	WebMode  bool
@@ -88,10 +89,13 @@ func SearchIssues(opts *IssuesOptions) error {
 		return cmdutil.NewNoResultsError(msg)
 	}
 
-	return displayIssueResults(io, opts.Entity, result)
+	return displayIssueResults(io, opts.Now, opts.Entity, result)
 }
 
-func displayIssueResults(io *iostreams.IOStreams, et EntityType, results search.IssuesResult) error {
+func displayIssueResults(io *iostreams.IOStreams, now time.Time, et EntityType, results search.IssuesResult) error {
+	if now.IsZero() {
+		now = time.Now()
+	}
 	cs := io.ColorScheme()
 	tp := utils.NewTablePrinter(io)
 	for _, issue := range results.Items {
@@ -120,7 +124,7 @@ func displayIssueResults(io *iostreams.IOStreams, et EntityType, results search.
 		tp.AddField(text.RemoveExcessiveWhitespace(issue.Title), nil, nil)
 		tp.AddField(listIssueLabels(&issue, cs, tp.IsTTY()), nil, nil)
 		if tp.IsTTY() {
-			tp.AddField(text.FuzzyAgo(time.Now(), issue.UpdatedAt), nil, cs.Gray)
+			tp.AddField(text.FuzzyAgo(now, issue.UpdatedAt), nil, cs.Gray)
 		} else {
 			tp.AddField(issue.UpdatedAt.String(), nil, nil)
 		}

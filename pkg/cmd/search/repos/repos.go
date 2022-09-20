@@ -20,6 +20,7 @@ type ReposOptions struct {
 	Browser  browser.Browser
 	Exporter cmdutil.Exporter
 	IO       *iostreams.IOStreams
+	Now      time.Time
 	Query    search.Query
 	Searcher search.Searcher
 	WebMode  bool
@@ -148,10 +149,14 @@ func reposRun(opts *ReposOptions) error {
 	if len(result.Items) == 0 {
 		return cmdutil.NewNoResultsError("no repositories matched your search")
 	}
-	return displayResults(io, result)
+
+	return displayResults(io, opts.Now, result)
 }
 
-func displayResults(io *iostreams.IOStreams, results search.RepositoriesResult) error {
+func displayResults(io *iostreams.IOStreams, now time.Time, results search.RepositoriesResult) error {
+	if now.IsZero() {
+		now = time.Now()
+	}
 	cs := io.ColorScheme()
 	tp := utils.NewTablePrinter(io)
 	for _, repo := range results.Items {
@@ -172,13 +177,12 @@ func displayResults(io *iostreams.IOStreams, results search.RepositoriesResult) 
 		tp.AddField(text.RemoveExcessiveWhitespace(description), nil, nil)
 		tp.AddField(info, nil, infoColor)
 		if tp.IsTTY() {
-			tp.AddField(text.FuzzyAgoAbbr(time.Now(), repo.UpdatedAt), nil, cs.Gray)
+			tp.AddField(text.FuzzyAgoAbbr(now, repo.UpdatedAt), nil, cs.Gray)
 		} else {
 			tp.AddField(repo.UpdatedAt.Format(time.RFC3339), nil, nil)
 		}
 		tp.EndRow()
 	}
-
 	if io.IsStdoutTTY() {
 		header := fmt.Sprintf("Showing %d of %d repositories\n\n", len(results.Items), results.Total)
 		fmt.Fprintf(io.Out, "\n%s", header)
