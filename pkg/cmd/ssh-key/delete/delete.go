@@ -64,7 +64,7 @@ func deleteRun(opts *DeleteOptions) error {
 		return err
 	}
 
-	if opts.IO.CanPrompt() && !opts.Confirmed {
+	if !opts.Confirmed {
 		confirmed, err := opts.Prompter.Confirm("Confirm deletion:", true)
 		if err != nil {
 			return err
