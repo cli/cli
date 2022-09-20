@@ -69,23 +69,28 @@ func listRun(opts *ListOptions) error {
 
 	if t.IsTTY() {
 		t.AddField("TITLE", nil, nil)
+		t.AddField("ID", nil, nil)
 		t.AddField("KEY", nil, nil)
 		t.AddField("ADDED", nil, nil)
-		t.AddField("ID", nil, nil)
 		t.EndRow()
 	}
 
 	for _, sshKey := range sshKeys {
-		t.AddField(sshKey.Title, nil, nil)
-		t.AddField(sshKey.Key, truncateMiddle, nil)
-
+		id := strconv.Itoa(sshKey.ID)
 		createdAt := sshKey.CreatedAt.Format(time.RFC3339)
-		if t.IsTTY() {
-			createdAt = utils.FuzzyAgoAbbr(now, sshKey.CreatedAt)
-		}
-		t.AddField(createdAt, nil, cs.Gray)
 
-		t.AddField(strconv.Itoa(sshKey.ID), nil, nil)
+		if t.IsTTY() {
+			t.AddField(sshKey.Title, nil, nil)
+			t.AddField(id, nil, nil)
+			t.AddField(sshKey.Key, truncateMiddle, nil)
+			t.AddField(utils.FuzzyAgoAbbr(now, sshKey.CreatedAt), nil, cs.Gray)
+		} else {
+			t.AddField(sshKey.Title, nil, nil)
+			t.AddField(sshKey.Key, nil, nil)
+			t.AddField(createdAt, nil, nil)
+			t.AddField(id, nil, nil)
+		}
+
 		t.EndRow()
 	}
 
