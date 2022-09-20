@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -206,7 +205,7 @@ func TestSelectSSHKeys(t *testing.T) {
 		sshContext := ssh.Context{ConfigDir: sshDir}
 
 		for _, file := range tt.sshDirFiles {
-			f, err := os.Create(path.Join(sshDir, file))
+			f, err := os.Create(filepath.Join(sshDir, file))
 			if err != nil {
 				t.Errorf("Failed to create test ssh dir file %q: %v", file, err)
 			}
@@ -214,11 +213,11 @@ func TestSelectSSHKeys(t *testing.T) {
 		}
 
 		if tt.sshConfigKeys != nil {
-			configPath := path.Join(sshDir, "test-config")
+			configPath := filepath.Join(sshDir, "test-config")
 
 			configContent := ""
 			for _, key := range tt.sshConfigKeys {
-				configContent += fmt.Sprintf("IdentityFile %s\n", path.Join(sshDir, key))
+				configContent += fmt.Sprintf("IdentityFile %s\n", filepath.Join(sshDir, key))
 			}
 
 			err := os.WriteFile(configPath, []byte(configContent), 0666)
@@ -255,8 +254,8 @@ func TestSelectSSHKeys(t *testing.T) {
 		}
 
 		// Strip the dir (sshDir) from the gotKeyPair paths so that they match wantKeyPair (which doesn't know the directory)
-		gotKeyPair.PrivateKeyPath = path.Base(gotKeyPair.PrivateKeyPath)
-		gotKeyPair.PublicKeyPath = path.Base(gotKeyPair.PublicKeyPath)
+		gotKeyPair.PrivateKeyPath = filepath.Base(gotKeyPair.PrivateKeyPath)
+		gotKeyPair.PublicKeyPath = filepath.Base(gotKeyPair.PublicKeyPath)
 
 		if fmt.Sprintf("%v", gotKeyPair) != fmt.Sprintf("%v", tt.wantKeyPair) {
 			t.Errorf("Want selectSSHKeys result to be %v, got %v", tt.wantKeyPair, gotKeyPair)
