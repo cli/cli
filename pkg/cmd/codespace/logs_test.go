@@ -21,7 +21,6 @@ func TestPendingOperationDisallowsLogs(t *testing.T) {
 }
 
 func testingLogsApp() *App {
-	user := &api.User{Login: "monalisa"}
 	disabledCodespace := &api.Codespace{
 		Name:                           "disabledCodespace",
 		PendingOperation:               true,
@@ -33,12 +32,6 @@ func testingLogsApp() *App {
 				return disabledCodespace, nil
 			}
 			return nil, nil
-		},
-		GetUserFunc: func(_ context.Context) (*api.User, error) {
-			return user, nil
-		},
-		AuthorizedKeysFunc: func(_ context.Context, _ string) ([]string, error) {
-			return []string{}, nil
 		},
 	}
 

@@ -101,7 +101,6 @@ func testingCodeApp() *App {
 }
 
 func testCodeApiMock() *apiClientMock {
-	user := &api.User{Login: "monalisa"}
 	testingCodespace := &api.Codespace{
 		Name:   "monalisa-cli-cli-abcdef",
 		WebURL: "https://monalisa-cli-cli-abcdef.github.dev",
@@ -117,12 +116,6 @@ func testCodeApiMock() *apiClientMock {
 				return disabledCodespace, nil
 			}
 			return testingCodespace, nil
-		},
-		GetUserFunc: func(_ context.Context) (*api.User, error) {
-			return user, nil
-		},
-		AuthorizedKeysFunc: func(_ context.Context, _ string) ([]string, error) {
-			return []string{}, nil
 		},
 	}
 }
