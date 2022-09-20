@@ -70,7 +70,7 @@ func listRun(opts *ListOptions) error {
 	if t.IsTTY() {
 		t.AddField("TITLE", nil, nil)
 		t.AddField("KEY", nil, nil)
-		t.AddField("AGE", nil, nil)
+		t.AddField("ADDED", nil, nil)
 		t.AddField("ID", nil, nil)
 		t.EndRow()
 	}

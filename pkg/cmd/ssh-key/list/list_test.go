@@ -49,9 +49,9 @@ func TestListRun(t *testing.T) {
 			},
 			isTTY: true,
 			wantStdout: heredoc.Doc(`
-				TITLE          KEY                  AGE  ID
-				Mac            ssh-rsa AAAABbBB123  1d   1234
-				hubot@Windows  ssh-rsa EEEEEEEK247  1d   5678
+				TITLE          KEY                  ADDED  ID
+				Mac            ssh-rsa AAAABbBB123  1d     1234
+				hubot@Windows  ssh-rsa EEEEEEEK247  1d     5678
 			`),
 			wantStderr: "",
 		},
