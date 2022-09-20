@@ -127,11 +127,12 @@ func TestAutomaticSSHKeyPairs(t *testing.T) {
 
 func TestSelectSSHKeys(t *testing.T) {
 	tests := []struct {
-		sshDirFiles   []string
-		sshConfigKeys []string
-		sshArgs       []string
-		profileOpt    string
-		wantKeyPair   *ssh.KeyPair
+		sshDirFiles      []string
+		sshConfigKeys    []string
+		sshArgs          []string
+		profileOpt       string
+		wantKeyPair      *ssh.KeyPair
+		wantShouldAddArg bool
 	}{
 		// -i tests
 		{
@@ -149,46 +150,54 @@ func TestSelectSSHKeys(t *testing.T) {
 
 		// Auto key exists tests
 		{
-			sshDirFiles: []string{automaticPrivateKeyName, automaticPrivateKeyName + ".pub"},
-			wantKeyPair: &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
+			sshDirFiles:      []string{automaticPrivateKeyName, automaticPrivateKeyName + ".pub"},
+			wantKeyPair:      &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
+			wantShouldAddArg: true,
 		},
 		{
-			sshDirFiles: []string{automaticPrivateKeyName, automaticPrivateKeyName + ".pub", "custom-private-key", "custom-private-key.pub"},
-			wantKeyPair: &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
+			sshDirFiles:      []string{automaticPrivateKeyName, automaticPrivateKeyName + ".pub", "custom-private-key", "custom-private-key.pub"},
+			wantKeyPair:      &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
+			wantShouldAddArg: true,
 		},
 
 		// SSH config tests
 		{
-			sshDirFiles:   []string{"custom-private-key", "custom-private-key.pub"},
-			sshConfigKeys: []string{"custom-private-key"},
-			wantKeyPair:   &ssh.KeyPair{PrivateKeyPath: "custom-private-key", PublicKeyPath: "custom-private-key.pub"},
+			sshDirFiles:      []string{"custom-private-key", "custom-private-key.pub"},
+			sshConfigKeys:    []string{"custom-private-key"},
+			wantKeyPair:      &ssh.KeyPair{PrivateKeyPath: "custom-private-key", PublicKeyPath: "custom-private-key.pub"},
+			wantShouldAddArg: true,
 		},
 		{
 			// 2 pairs, but only 1 is configured
-			sshDirFiles:   []string{"custom-private-key", "custom-private-key.pub", "custom-private-key-2", "custom-private-key-2.pub"},
-			sshConfigKeys: []string{"custom-private-key-2"},
-			wantKeyPair:   &ssh.KeyPair{PrivateKeyPath: "custom-private-key-2", PublicKeyPath: "custom-private-key-2.pub"},
+			sshDirFiles:      []string{"custom-private-key", "custom-private-key.pub", "custom-private-key-2", "custom-private-key-2.pub"},
+			sshConfigKeys:    []string{"custom-private-key-2"},
+			wantKeyPair:      &ssh.KeyPair{PrivateKeyPath: "custom-private-key-2", PublicKeyPath: "custom-private-key-2.pub"},
+			wantShouldAddArg: true,
 		},
 		{
 			// 2 pairs, but only 1 has both public and private
-			sshDirFiles:   []string{"custom-private-key", "custom-private-key-2", "custom-private-key-2.pub"},
-			sshConfigKeys: []string{"custom-private-key", "custom-private-key-2"},
-			wantKeyPair:   &ssh.KeyPair{PrivateKeyPath: "custom-private-key-2", PublicKeyPath: "custom-private-key-2.pub"},
+			sshDirFiles:      []string{"custom-private-key", "custom-private-key-2", "custom-private-key-2.pub"},
+			sshConfigKeys:    []string{"custom-private-key", "custom-private-key-2"},
+			wantKeyPair:      &ssh.KeyPair{PrivateKeyPath: "custom-private-key-2", PublicKeyPath: "custom-private-key-2.pub"},
+			wantShouldAddArg: true,
 		},
 
 		// Automatic key tests
 		{
-			wantKeyPair: &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
+			wantKeyPair:      &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
+			wantShouldAddArg: true,
 		},
 		{
 			// Renames old key pair to new
-			sshDirFiles: []string{automaticPrivateKeyNameOld, automaticPrivateKeyNameOld + ".pub"},
-			wantKeyPair: &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
+			sshDirFiles:      []string{automaticPrivateKeyNameOld, automaticPrivateKeyNameOld + ".pub"},
+			wantKeyPair:      &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
+			wantShouldAddArg: true,
 		},
 		{
 			// Other key is configured, but doesn't exist
-			sshConfigKeys: []string{"custom-private-key"},
-			wantKeyPair:   &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
+			sshConfigKeys:    []string{"custom-private-key"},
+			wantKeyPair:      &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
+			wantShouldAddArg: true,
 		},
 	}
 
@@ -220,7 +229,7 @@ func TestSelectSSHKeys(t *testing.T) {
 			tt.sshArgs = append(tt.sshArgs, "-F", configPath)
 		}
 
-		gotKeyPair, err := selectSSHKeys(context.Background(), sshContext, tt.sshArgs, sshOptions{profile: tt.profileOpt})
+		gotKeyPair, gotShouldAddArg, err := selectSSHKeys(context.Background(), sshContext, tt.sshArgs, sshOptions{profile: tt.profileOpt})
 
 		if tt.wantKeyPair == nil {
 			if err == nil {
@@ -237,6 +246,11 @@ func TestSelectSSHKeys(t *testing.T) {
 
 		if gotKeyPair == nil {
 			t.Errorf("Expected non-nil result from selectSSHKeys but got nil")
+			continue
+		}
+
+		if gotShouldAddArg != tt.wantShouldAddArg {
+			t.Errorf("Got wrong shouldAddArg value from selectSSHKeys, wanted %v got %v", tt.wantShouldAddArg, gotShouldAddArg)
 			continue
 		}
 

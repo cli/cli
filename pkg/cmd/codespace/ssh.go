@@ -148,14 +148,17 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	sshContext := ssh.Context{}
 	startSSHOptions := liveshare.StartSSHServerOptions{}
 
-	keyPair, err := selectSSHKeys(ctx, sshContext, args, opts)
+	keyPair, shouldAddArg, err := selectSSHKeys(ctx, sshContext, args, opts)
 	if err != nil {
 		return fmt.Errorf("selecting ssh keys: %w", err)
 	}
 
 	startSSHOptions.UserPublicKeyFile = keyPair.PublicKeyPath
-	// For both cp and ssh, flags need to come first in the args (before a command in ssh and files in cp), so prepend this flag
-	args = append([]string{"-i", keyPair.PrivateKeyPath}, args...)
+
+	if shouldAddArg {
+		// For both cp and ssh, flags need to come first in the args (before a command in ssh and files in cp), so prepend this flag
+		args = append([]string{"-i", keyPair.PrivateKeyPath}, args...)
+	}
 
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
 	if err != nil {
@@ -229,26 +232,36 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 }
 
+// selectSSHKeys evaluates available key pairs and select which should be used to connect to the codespace
+// using the precedence rules below. If there is no error, a keypair is always returned and additionally a
+// bool flag is returned to specify if the private key need be appended to the ssh arguments (it doesn't need
+// to be if the key was selected from a -i argument).
+//
+// Precedence rules:
+// 1. Key which is specified by -i
+// 2. Automatic key, if it already exists
+// 3. First valid keypair in ssh config (according to ssh -G)
+// 4. Automatic key, newly created
 func selectSSHKeys(
 	ctx context.Context,
 	sshContext ssh.Context,
 	args []string,
 	opts sshOptions,
-) (*ssh.KeyPair, error) {
+) (*ssh.KeyPair, bool, error) {
 	customConfigPath := ""
 	for i := 0; i < len(args); i += 1 {
 		arg := args[i]
 
 		if arg == "-i" {
 			if i+1 >= len(args) {
-				return nil, errors.New("missing value to -i argument")
+				return nil, false, errors.New("missing value to -i argument")
 			}
 
 			// User manually specified an identity file so just trust it is correct
 			return &ssh.KeyPair{
 				PrivateKeyPath: args[i+1],
 				PublicKeyPath:  args[i+1] + ".pub",
-			}, nil
+			}, false, nil
 		}
 
 		if arg == "-F" && i+1 < len(args) {
@@ -259,21 +272,26 @@ func selectSSHKeys(
 
 	if autoKeyPair := automaticSSHKeyPair(sshContext); autoKeyPair != nil {
 		// If the automatic keys already exist, just use them
-		return autoKeyPair, nil
+		return autoKeyPair, true, nil
 	}
 
 	configKeyPair, err := firstConfiguredKeyPair(ctx, customConfigPath, opts.profile)
 	if err != nil {
-		return nil, err
+		return nil, false, fmt.Errorf("checking configured keys: %v", err)
 	}
 
 	// Even if there was no error, there may simply be no configured keys, so still check for nil here
 	if configKeyPair != nil {
-		return configKeyPair, nil
+		return configKeyPair, true, nil
 	}
 
 	// Finally, fall back to generating new automatic keys
-	return setupAutomaticSSHKeys(sshContext)
+	autoKeyPair, err := setupAutomaticSSHKeys(sshContext)
+	if err != nil {
+		return nil, false, fmt.Errorf("generating automatic keypair: %v", err)
+	}
+
+	return autoKeyPair, true, nil
 }
 
 // automaticSSHKeyPair returns the paths to the automatic key pair files, if they both exist
