@@ -5,8 +5,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
-
-	"github.com/cli/cli/v2/pkg/text"
+	"unicode"
 )
 
 const (
@@ -84,7 +83,7 @@ func (q Qualifiers) Map() map[string][]string {
 	t := reflect.TypeOf(q)
 	for i := 0; i < v.NumField(); i++ {
 		fieldName := t.Field(i).Name
-		key := text.CamelToKebab(fieldName)
+		key := camelToKebab(fieldName)
 		typ := v.FieldByName(fieldName).Kind()
 		value := v.FieldByName(fieldName)
 		switch typ {
@@ -139,4 +138,30 @@ func formatKeywords(ks []string) []string {
 		ks[i] = quote(k)
 	}
 	return ks
+}
+
+// CamelToKebab returns a copy of the string s that is converted from camel case form to '-' separated form.
+func camelToKebab(s string) string {
+	var output []rune
+	var segment []rune
+	for _, r := range s {
+		if !unicode.IsLower(r) && string(r) != "-" && !unicode.IsNumber(r) {
+			output = addSegment(output, segment)
+			segment = nil
+		}
+		segment = append(segment, unicode.ToLower(r))
+	}
+	output = addSegment(output, segment)
+	return string(output)
+}
+
+func addSegment(inrune, segment []rune) []rune {
+	if len(segment) == 0 {
+		return inrune
+	}
+	if len(inrune) != 0 {
+		inrune = append(inrune, '-')
+	}
+	inrune = append(inrune, segment...)
+	return inrune
 }

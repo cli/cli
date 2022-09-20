@@ -11,9 +11,9 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 )
 
@@ -165,7 +165,6 @@ func listRun(opts *ListOptions) error {
 
 	cs := opts.IO.ColorScheme()
 	tp := utils.NewTablePrinter(opts.IO)
-	now := opts.Now()
 
 	for _, repo := range listResult.Repositories {
 		info := repoInfo(repo)
@@ -181,10 +180,10 @@ func listRun(opts *ListOptions) error {
 		}
 
 		tp.AddField(repo.NameWithOwner, nil, cs.Bold)
-		tp.AddField(text.ReplaceExcessiveWhitespace(repo.Description), nil, nil)
+		tp.AddField(text.RemoveExcessiveWhitespace(repo.Description), nil, nil)
 		tp.AddField(info, nil, infoColor)
 		if tp.IsTTY() {
-			tp.AddField(utils.FuzzyAgoAbbr(now, *t), nil, cs.Gray)
+			tp.AddField(text.FuzzyAgoAbbr(opts.Now(), *t), nil, cs.Gray)
 		} else {
 			tp.AddField(t.Format(time.RFC3339), nil, nil)
 		}

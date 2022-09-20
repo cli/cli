@@ -10,14 +10,13 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghinstance"
-	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/google/shlex"
 )
 
 type GitCredentialFlow struct {
 	Executable string
-	Prompter   prompter.Prompter
+	Prompter   Prompt
 
 	shouldSetup bool
 	helper      string

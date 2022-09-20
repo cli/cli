@@ -10,8 +10,8 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -150,7 +150,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return fmt.Errorf("error checking codespace ownership: %w", err)
 	} else if billableOwner != nil && billableOwner.Type == "Organization" {
 		cs := a.io.ColorScheme()
-		fmt.Fprintln(a.io.Out, cs.Blue("  ✓ Codespaces usage for this repository is paid for by "+billableOwner.Login))
+		fmt.Fprintln(a.io.ErrOut, cs.Blue("  ✓ Codespaces usage for this repository is paid for by "+billableOwner.Login))
 	}
 
 	if promptForRepoAndBranch {
@@ -192,12 +192,12 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		if len(devcontainers) > 0 {
 
 			// if there is only one devcontainer.json file and it is one of the default paths we can auto-select it
-			if len(devcontainers) == 1 && utils.StringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
+			if len(devcontainers) == 1 && stringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
 				devContainerPath = devcontainers[0].Path
 			} else {
 				promptOptions := []string{}
 
-				if !utils.StringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
+				if !stringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
 					promptOptions = []string{DEVCONTAINER_PROMPT_DEFAULT}
 				}
 
@@ -284,7 +284,7 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 	var (
 		isInteractive = a.io.CanPrompt()
 		cs            = a.io.ColorScheme()
-		displayURL    = utils.DisplayURL(allowPermissionsURL)
+		displayURL    = text.DisplayURL(allowPermissionsURL)
 	)
 
 	fmt.Fprintf(a.io.ErrOut, "You must authorize or deny additional permissions requested by this codespace before continuing.\n")
@@ -497,4 +497,13 @@ func buildDisplayName(displayName string, prebuildAvailability string) string {
 	default:
 		return displayName
 	}
+}
+
+func stringInSlice(a string, slice []string) bool {
+	for _, b := range slice {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }

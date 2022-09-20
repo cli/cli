@@ -10,12 +10,11 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/markdown"
-	"github.com/cli/cli/v2/pkg/text"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -105,7 +104,7 @@ func viewRun(opts *ViewOptions) error {
 	if opts.BrowserMode {
 		openURL := pr.URL
 		if connectedToTerminal {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 		}
 		return opts.Browser.Browse(openURL)
 	}
@@ -168,8 +167,6 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
-	now := opts.Now()
-	ago := now.Sub(pr.CreatedAt)
 
 	// Header (Title and State)
 	fmt.Fprintf(out, "%s #%d\n", cs.Bold(pr.Title), pr.Number)
@@ -177,10 +174,10 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 		"%s • %s wants to merge %s into %s from %s • %s • %s %s \n",
 		shared.StateTitleWithColor(cs, *pr),
 		pr.Author.Login,
-		utils.Pluralize(pr.Commits.TotalCount, "commit"),
+		text.Pluralize(pr.Commits.TotalCount, "commit"),
 		pr.BaseRefName,
 		pr.HeadRefName,
-		utils.FuzzyAgo(ago),
+		text.FuzzyAgo(opts.Now(), pr.CreatedAt),
 		cs.Green("+"+strconv.Itoa(pr.Additions)),
 		cs.Red("-"+strconv.Itoa(pr.Deletions)),
 	)

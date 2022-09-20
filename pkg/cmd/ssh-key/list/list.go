@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
@@ -83,7 +84,7 @@ func listRun(opts *ListOptions) error {
 			t.AddField(sshKey.Title, nil, nil)
 			t.AddField(id, nil, nil)
 			t.AddField(sshKey.Key, truncateMiddle, nil)
-			t.AddField(utils.FuzzyAgoAbbr(now, sshKey.CreatedAt), nil, cs.Gray)
+			t.AddField(text.FuzzyAgoAbbr(now, sshKey.CreatedAt), nil, cs.Gray)
 		} else {
 			t.AddField(sshKey.Title, nil, nil)
 			t.AddField(sshKey.Key, nil, nil)

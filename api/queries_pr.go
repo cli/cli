@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -456,6 +457,6 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 }
 
 func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) error {
-	path := fmt.Sprintf("repos/%s/%s/git/refs/heads/%s", repo.RepoOwner(), repo.RepoName(), branch)
+	path := fmt.Sprintf("repos/%s/%s/git/refs/heads/%s", repo.RepoOwner(), repo.RepoName(), url.PathEscape(branch))
 	return client.REST(repo.RepoHost(), "DELETE", path, nil, nil)
 }

@@ -11,13 +11,14 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -29,9 +30,6 @@ type ListOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser.Browser
 
-	WebMode  bool
-	Exporter cmdutil.Exporter
-
 	Assignee     string
 	Labels       []string
 	State        string
@@ -40,8 +38,11 @@ type ListOptions struct {
 	Mention      string
 	Milestone    string
 	Search       string
+	WebMode      bool
+	Exporter     cmdutil.Exporter
 
-	Now func() time.Time
+	Detector fd.Detector
+	Now      func() time.Time
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -136,6 +137,19 @@ func listRun(opts *ListOptions) error {
 		issueState = ""
 	}
 
+	if opts.Detector == nil {
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+	}
+	features, err := opts.Detector.IssueFeatures()
+	if err != nil {
+		return err
+	}
+	fields := defaultFields
+	if features.StateReason {
+		fields = append(defaultFields, "stateReason")
+	}
+
 	filterOptions := prShared.FilterOptions{
 		Entity:    "issue",
 		State:     issueState,
@@ -145,7 +159,7 @@ func listRun(opts *ListOptions) error {
 		Mention:   opts.Mention,
 		Milestone: opts.Milestone,
 		Search:    opts.Search,
-		Fields:    defaultFields,
+		Fields:    fields,
 	}
 
 	isTerminal := opts.IO.IsStdoutTTY()
@@ -158,7 +172,7 @@ func listRun(opts *ListOptions) error {
 		}
 
 		if isTerminal {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 		}
 		return opts.Browser.Browse(openURL)
 	}

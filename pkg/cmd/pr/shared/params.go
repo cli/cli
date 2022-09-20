@@ -44,6 +44,11 @@ func WithPrAndIssueQueryParams(client *api.Client, baseRepo ghrepo.Interface, ba
 	return u.String(), nil
 }
 
+// Maximum length of a URL: 8192 bytes
+func ValidURL(urlStr string) bool {
+	return len(urlStr) < 8192
+}
+
 // Ensure that tb.MetadataResult object exists and contains enough pre-fetched API data to be able
 // to resolve all object listed in tb to GraphQL IDs.
 func fillMetadata(client *api.Client, baseRepo ghrepo.Interface, tb *IssueMetadataState) error {

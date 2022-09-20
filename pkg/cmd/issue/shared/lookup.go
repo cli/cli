@@ -8,9 +8,12 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/set"
 )
 
 // IssueFromArgWithFields loads an issue or pull request with the specified fields. If some of the fields
@@ -65,6 +68,21 @@ type PartialLoadError struct {
 }
 
 func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, fields []string) (*api.Issue, error) {
+	fieldSet := set.NewStringSet()
+	fieldSet.AddValues(fields)
+	if fieldSet.Contains("stateReason") {
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		detector := fd.NewDetector(cachedClient, repo.RepoHost())
+		features, err := detector.IssueFeatures()
+		if err != nil {
+			return nil, err
+		}
+		if !features.StateReason {
+			fieldSet.Remove("stateReason")
+		}
+	}
+	fields = fieldSet.ToSlice()
+
 	type response struct {
 		Repository struct {
 			HasIssuesEnabled bool

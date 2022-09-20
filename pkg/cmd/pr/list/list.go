@@ -11,10 +11,10 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
@@ -166,7 +166,7 @@ func listRun(opts *ListOptions) error {
 		}
 
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 		}
 		return opts.Browser.Browse(openURL)
 	}
@@ -204,17 +204,15 @@ func listRun(opts *ListOptions) error {
 		if table.IsTTY() {
 			prNum = "#" + prNum
 		}
-		now := opts.Now()
-		ago := now.Sub(pr.CreatedAt)
 
 		table.AddField(prNum, nil, cs.ColorFromString(shared.ColorForPRState(pr)))
-		table.AddField(text.ReplaceExcessiveWhitespace(pr.Title), nil, nil)
+		table.AddField(text.RemoveExcessiveWhitespace(pr.Title), nil, nil)
 		table.AddField(pr.HeadLabel(), nil, cs.Cyan)
 		if !table.IsTTY() {
 			table.AddField(prStateWithDraft(&pr), nil, nil)
 		}
 		if table.IsTTY() {
-			table.AddField(utils.FuzzyAgo(ago), nil, cs.Gray)
+			table.AddField(text.FuzzyAgo(opts.Now(), pr.CreatedAt), nil, cs.Gray)
 		} else {
 			table.AddField(pr.CreatedAt.String(), nil, nil)
 		}

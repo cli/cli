@@ -18,7 +18,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -139,7 +138,7 @@ func forkRun(opts *ForkOptions) error {
 	} else {
 		repoArg := opts.Repository
 
-		if utils.IsURL(repoArg) {
+		if isURL(repoArg) {
 			parsedURL, err := url.Parse(repoArg)
 			if err != nil {
 				return fmt.Errorf("did not understand argument: %w", err)
@@ -329,4 +328,8 @@ func forkRun(opts *ForkOptions) error {
 	}
 
 	return nil
+}
+
+func isURL(s string) bool {
+	return strings.HasPrefix(s, "http:/") || strings.HasPrefix(s, "https:/")
 }

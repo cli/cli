@@ -12,13 +12,13 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/cli/cli/v2/pkg/set"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -77,7 +77,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 
 var defaultFields = []string{
 	"number", "url", "state", "createdAt", "title", "body", "author", "milestone",
-	"assignees", "labels", "projectCards", "reactionGroups", "lastComment",
+	"assignees", "labels", "projectCards", "reactionGroups", "lastComment", "stateReason",
 }
 
 func viewRun(opts *ViewOptions) error {
@@ -93,11 +93,13 @@ func viewRun(opts *ViewOptions) error {
 		lookupFields.Add("url")
 	} else {
 		lookupFields.AddValues(defaultFields)
+		if opts.Comments {
+			lookupFields.Add("comments")
+			lookupFields.Remove("lastComment")
+		}
 	}
-	if opts.Comments {
-		lookupFields.Add("comments")
-		lookupFields.Remove("lastComment")
-	}
+
+	opts.IO.DetectTerminalTheme()
 
 	opts.IO.StartProgressIndicator()
 	issue, err := findIssue(httpClient, opts.BaseRepo, opts.SelectorArg, lookupFields.ToSlice())
@@ -114,12 +116,11 @@ func viewRun(opts *ViewOptions) error {
 	if opts.WebMode {
 		openURL := issue.URL
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 		}
 		return opts.Browser.Browse(openURL)
 	}
 
-	opts.IO.DetectTerminalTheme()
 	if err := opts.IO.StartPager(); err != nil {
 		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
@@ -184,8 +185,6 @@ func printRawIssuePreview(out io.Writer, issue *api.Issue) error {
 
 func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 	out := opts.IO.Out
-	now := opts.Now()
-	ago := now.Sub(issue.CreatedAt)
 	cs := opts.IO.ColorScheme()
 
 	// Header (Title and State)
@@ -194,8 +193,8 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 		"%s • %s opened %s • %s\n",
 		issueStateTitleWithColor(cs, issue),
 		issue.Author.Login,
-		utils.FuzzyAgo(ago),
-		utils.Pluralize(issue.Comments.TotalCount, "comment"),
+		text.FuzzyAgo(opts.Now(), issue.CreatedAt),
+		text.Pluralize(issue.Comments.TotalCount, "comment"),
 	)
 
 	// Reactions
