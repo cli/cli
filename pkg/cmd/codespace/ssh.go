@@ -276,6 +276,7 @@ func selectSSHKeys(
 	return setupAutomaticSSHKeys(sshContext)
 }
 
+// automaticSSHKeyPair returns the paths to the automatic key pair files, if they both exist
 func automaticSSHKeyPair(sshContext ssh.Context) *ssh.KeyPair {
 	publicKeys, err := sshContext.LocalPublicKeys()
 	if err != nil {
