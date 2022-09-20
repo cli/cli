@@ -83,9 +83,9 @@ func listRun(opts *ListOptions) error {
 		if t.IsTTY() {
 			createdAt = utils.FuzzyAgoAbbr(now, sshKey.CreatedAt)
 		}
-		t.AddField(createdAt, nil, nil)
+		t.AddField(createdAt, nil, cs.Gray)
 
-		t.AddField(strconv.Itoa(sshKey.ID), nil, cs.Cyan)
+		t.AddField(strconv.Itoa(sshKey.ID), nil, nil)
 		t.EndRow()
 	}
 
