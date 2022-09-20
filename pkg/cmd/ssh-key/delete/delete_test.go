@@ -106,6 +106,7 @@ func TestNewCmdDelete(t *testing.T) {
 }
 
 func Test_deleteRun(t *testing.T) {
+	keyResp := "{\"title\":\"My Key\"}"
 	tests := []struct {
 		name          string
 		tty           bool
@@ -121,15 +122,16 @@ func Test_deleteRun(t *testing.T) {
 			tty:  true,
 			opts: DeleteOptions{KeyID: "123"},
 			prompterStubs: func(pm *prompter.PrompterMock) {
-				pm.ConfirmFunc = func(s string, b bool) (bool, error) {
-					return true, nil
+				pm.InputFunc = func(s1 string, s2 string) (string, error) {
+					return "My Key", nil
 				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("DELETE", "user/keys/123"), httpmock.StatusStringResponse(204, "{}"))
+				reg.Register(httpmock.REST("GET", "user/keys/123"), httpmock.StatusStringResponse(200, keyResp))
+				reg.Register(httpmock.REST("DELETE", "user/keys/123"), httpmock.StatusStringResponse(204, ""))
 			},
 			wantErr:    false,
-			wantStdout: "✓ Deleted SSH key id 123 from your account\n",
+			wantStdout: "✓ SSH key \"My Key\" (123) deleted from your account\n",
 			wantErrMsg: "",
 		},
 		{
@@ -137,9 +139,12 @@ func Test_deleteRun(t *testing.T) {
 			tty:  true,
 			opts: DeleteOptions{KeyID: "123"},
 			prompterStubs: func(pm *prompter.PrompterMock) {
-				pm.ConfirmFunc = func(s string, b bool) (bool, error) {
-					return false, nil
+				pm.InputFunc = func(s1 string, s2 string) (string, error) {
+					return "", nil
 				}
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", "user/keys/123"), httpmock.StatusStringResponse(200, keyResp))
 			},
 			wantErr:    true,
 			wantStdout: "",
@@ -150,23 +155,19 @@ func Test_deleteRun(t *testing.T) {
 			tty:  true,
 			opts: DeleteOptions{KeyID: "123", Confirmed: true},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("DELETE", "user/keys/123"), httpmock.StatusStringResponse(204, "{}"))
+				reg.Register(httpmock.REST("GET", "user/keys/123"), httpmock.StatusStringResponse(200, keyResp))
+				reg.Register(httpmock.REST("DELETE", "user/keys/123"), httpmock.StatusStringResponse(204, ""))
 			},
 			wantErr:    false,
-			wantStdout: "✓ Deleted SSH key id 123 from your account\n",
+			wantStdout: "✓ SSH key \"My Key\" (123) deleted from your account\n",
 			wantErrMsg: "",
 		},
 		{
 			name: "not found tty",
 			tty:  true,
 			opts: DeleteOptions{KeyID: "123"},
-			prompterStubs: func(pm *prompter.PrompterMock) {
-				pm.ConfirmFunc = func(s string, b bool) (bool, error) {
-					return true, nil
-				}
-			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("DELETE", "user/keys/123"), httpmock.StatusStringResponse(404, "{}"))
+				reg.Register(httpmock.REST("GET", "user/keys/123"), httpmock.StatusStringResponse(404, ""))
 			},
 			wantErr:    true,
 			wantStdout: "",
@@ -176,7 +177,8 @@ func Test_deleteRun(t *testing.T) {
 			name: "delete no tty",
 			opts: DeleteOptions{KeyID: "123", Confirmed: true},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("DELETE", "user/keys/123"), httpmock.StatusStringResponse(204, "{}"))
+				reg.Register(httpmock.REST("GET", "user/keys/123"), httpmock.StatusStringResponse(200, keyResp))
+				reg.Register(httpmock.REST("DELETE", "user/keys/123"), httpmock.StatusStringResponse(204, ""))
 			},
 			wantErr:    false,
 			wantStdout: "",
@@ -186,7 +188,7 @@ func Test_deleteRun(t *testing.T) {
 			name: "not found no tty",
 			opts: DeleteOptions{KeyID: "123", Confirmed: true},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("DELETE", "user/keys/123"), httpmock.StatusStringResponse(404, "{}"))
+				reg.Register(httpmock.REST("GET", "user/keys/123"), httpmock.StatusStringResponse(404, ""))
 			},
 			wantErr:    true,
 			wantStdout: "",

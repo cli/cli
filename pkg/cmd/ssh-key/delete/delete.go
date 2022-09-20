@@ -64,17 +64,27 @@ func deleteRun(opts *DeleteOptions) error {
 		return err
 	}
 
+	host, _ := cfg.DefaultHost()
+	key, err := getSSHKey(httpClient, host, opts.KeyID)
+	if err != nil {
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) && httpErr.StatusCode == 404 {
+			return fmt.Errorf("unable to delete SSH key id %s: either the SSH key is not found or it is not owned by you", opts.KeyID)
+		}
+
+		return err
+	}
+
 	if !opts.Confirmed {
-		confirmed, err := opts.Prompter.Confirm("Confirm deletion:", true)
+		confirmTitle, err := opts.Prompter.Input(fmt.Sprintf("Type \"%s\" to confirm deletion:", key.Title), "")
+
 		if err != nil {
 			return err
 		}
-		if !confirmed {
+		if confirmTitle != key.Title {
 			return cmdutil.CancelError
 		}
 	}
-
-	host, _ := cfg.DefaultHost()
 
 	err = deleteSSHKey(httpClient, host, opts.KeyID)
 	if err != nil {
@@ -88,7 +98,7 @@ func deleteRun(opts *DeleteOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.Out, "%s Deleted SSH key id %s from your account\n", cs.SuccessIcon(), opts.KeyID)
+		fmt.Fprintf(opts.IO.Out, "%s SSH key \"%s\" (%s) deleted from your account\n", cs.SuccessIcon(), key.Title, opts.KeyID)
 	}
 	return nil
 }
