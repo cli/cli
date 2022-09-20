@@ -174,7 +174,7 @@ func Test_deleteRun(t *testing.T) {
 		},
 		{
 			name: "delete no tty",
-			opts: DeleteOptions{KeyID: "123"},
+			opts: DeleteOptions{KeyID: "123", Confirmed: true},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("DELETE", "user/keys/123"), httpmock.StatusStringResponse(204, "{}"))
 			},
@@ -184,7 +184,7 @@ func Test_deleteRun(t *testing.T) {
 		},
 		{
 			name: "not found no tty",
-			opts: DeleteOptions{KeyID: "123"},
+			opts: DeleteOptions{KeyID: "123", Confirmed: true},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("DELETE", "user/keys/123"), httpmock.StatusStringResponse(404, "{}"))
 			},
