@@ -231,11 +231,12 @@ func CommitBody(sha string) (string, error) {
 }
 
 // Push publishes a git ref to a remote and sets up upstream configuration
-func Push(remote string, ref string, cmdOut, cmdErr io.Writer) error {
+func Push(remote string, ref string, cmdIn io.ReadCloser, cmdOut, cmdErr io.Writer) error {
 	pushCmd, err := GitCommand("push", "--set-upstream", remote, ref)
 	if err != nil {
 		return err
 	}
+	pushCmd.Stdin = cmdIn
 	pushCmd.Stdout = cmdOut
 	pushCmd.Stderr = cmdErr
 	return run.PrepareCmd(pushCmd).Run()
