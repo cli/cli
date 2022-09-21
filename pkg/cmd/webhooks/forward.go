@@ -33,10 +33,10 @@ type hookOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 
-	Host      string
-	EventType string
-	Repo      string
-	Port      int
+	Host       string
+	EventTypes []string
+	Repo       string
+	Port       int
 }
 
 func newCmdForward(f *cmdutil.Factory, runF func(*hookOptions) error) *cobra.Command {
@@ -46,17 +46,17 @@ func newCmdForward(f *cmdutil.Factory, runF func(*hookOptions) error) *cobra.Com
 		Config:     f.Config,
 	}
 	cmd := cobra.Command{
-		Use:   "forward --event=<event_type> --repo=<repo> --port=<port> [--host=<host>]",
+		Use:   "forward --events=<event_types> --repo=<repo> --port=<port> [--host=<host>]",
 		Short: "Receive test webhooks locally",
 		Example: heredoc.Doc(`
 			# create a dev webhook for the 'issue_open' event in the monalisa/smile repo in GitHub running locally, and
 			# forward payloads for the triggered event to localhost:9999
 
-			$ gh webhooks forward --event=issue_open --repo=monalisa/smile --port=9999 --host=api.github.localhost
+			$ gh webhooks forward --events=issue_open --repo=monalisa/smile --port=9999 --host=api.github.localhost
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if opts.EventType == "" {
-				return cmdutil.FlagErrorf("`--event` flag required")
+			if opts.EventTypes == nil {
+				return cmdutil.FlagErrorf("`--events` flag required")
 			}
 			if opts.Repo == "" {
 				return cmdutil.FlagErrorf("`--repo` flag required")
@@ -113,10 +113,10 @@ func newCmdForward(f *cmdutil.Factory, runF func(*hookOptions) error) *cobra.Com
 			}
 		},
 	}
-	cmd.Flags().StringVarP(&opts.EventType, "event", "E", "", "Name of the event type to forward")
+	cmd.Flags().StringSliceVarP(&opts.EventTypes, "events", "E", []string{}, "Name of the event types to forward")
 	cmd.Flags().StringVarP(&opts.Repo, "repo", "R", "", "Name of the repo where the webhook is installed")
 	cmd.Flags().IntVarP(&opts.Port, "port", "P", 0, "Local port to receive webhooks on")
-	cmd.Flags().StringVarP(&opts.Host, "host", "H", "", "Host address of GitHub API")
+	cmd.Flags().StringVarP(&opts.Host, "host", "H", "", "Host address of GitHub API (default: api.github.com)")
 	return &cmd
 }
 
@@ -130,7 +130,7 @@ func createHook(o *hookOptions) (string, error) {
 	path := fmt.Sprintf("repos/%s/hooks", o.Repo)
 	req := createHookRequest{
 		Name:   "cli",
-		Events: []string{o.EventType},
+		Events: o.EventTypes,
 		Active: true,
 		Config: hookConfig{
 			ContentType: "json",

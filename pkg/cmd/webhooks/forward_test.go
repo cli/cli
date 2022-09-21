@@ -31,11 +31,11 @@ func TestNewCmdForward(t *testing.T) {
 		return nil
 	})
 
-	event := "issues"
+	events := "issues"
 	port := 9999
 	repo := "monalisa/smile"
 	host := "api.github.localhost"
-	run := fmt.Sprintf("--event %s --port %d --repo %s --host %s", event, port, repo, host)
+	run := fmt.Sprintf("--events %s --port %d --repo %s --host %s", events, port, repo, host)
 
 	argv, err := shlex.Split(run)
 	assert.NoError(t, err)
@@ -46,7 +46,7 @@ func TestNewCmdForward(t *testing.T) {
 
 	_, err = cmd.ExecuteC()
 	assert.NoError(t, err)
-	assert.Equal(t, event, opts.EventType)
+	assert.Equal(t, []string{events}, opts.EventTypes)
 	assert.Equal(t, port, opts.Port)
 	assert.Equal(t, repo, opts.Repo)
 	assert.Equal(t, host, opts.Host)
@@ -85,13 +85,13 @@ func TestForwardRun(t *testing.T) {
 
 	maxRetries = 1
 	cmd := newCmdForward(f, nil)
-	event := "issues"
+	events := "issues"
 	splitURL := strings.Split(webhookRcvServerURL, ":")
 	port := splitURL[len(splitURL)-1]
 	repo := "monalisa/smile"
 	host := strings.TrimPrefix(ghAPIServer.URL, "https://")
 
-	run := fmt.Sprintf("--event %s --port %s --repo %s --host %s", event, port, repo, host)
+	run := fmt.Sprintf("--events %s --port %s --repo %s --host %s", events, port, repo, host)
 	argv, err := shlex.Split(run)
 	assert.NoError(t, err)
 	cmd.SetArgs(argv)
