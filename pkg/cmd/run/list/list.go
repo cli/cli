@@ -94,6 +94,7 @@ func listRun(opts *ListOptions) error {
 		states := []workflowShared.WorkflowState{workflowShared.Active}
 		if workflow, err := workflowShared.ResolveWorkflow(opts.IO, client, baseRepo, false, opts.WorkflowSelector, states); err == nil {
 			filters.WorkflowID = workflow.ID
+			filters.WorkflowName = workflow.Name
 		} else {
 			return err
 		}

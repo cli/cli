@@ -354,19 +354,12 @@ func TestListRun(t *testing.T) {
 					httpmock.JSONResponse(shared.RunsPayload{
 						WorkflowRuns: shared.WorkflowRuns,
 					}))
-				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
-					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
-						Workflows: []workflowShared.Workflow{
-							shared.TestWorkflow,
-						},
-					}))
 			},
 			wantOut: heredoc.Doc(`
-				STATUS  TITLE        WORKFLOW  BRANCH  EVENT  ID    ELAPSED  AGE
-				*       cool commit  CI        trunk   push   2     4m34s    Feb 23, 2021
-				✓       cool commit  CI        trunk   push   3     4m34s    Feb 23, 2021
-				X       cool commit  CI        trunk   push   1234  4m34s    Feb 23, 2021
+				STATUS  TITLE        WORKFLOW    BRANCH  EVENT  ID    ELAPSED  AGE
+				*       cool commit  a workflow  trunk   push   2     4m34s    Feb 23, 2021
+				✓       cool commit  a workflow  trunk   push   3     4m34s    Feb 23, 2021
+				X       cool commit  a workflow  trunk   push   1234  4m34s    Feb 23, 2021
 			`),
 		},
 		{
