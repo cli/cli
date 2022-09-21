@@ -80,7 +80,7 @@ func logoutRun(opts *LogoutOptions) error {
 			hostname = candidates[0]
 		} else {
 			selected, err := opts.Prompter.Select(
-				"What account to you want to log out of?", "", candidates)
+				"What account do you want to log out of?", "", candidates)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
