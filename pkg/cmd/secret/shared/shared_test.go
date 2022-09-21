@@ -167,9 +167,9 @@ func TestIsSupportedSecretEntity(t *testing.T) {
 			supportedEntities: []SecretEntity{
 				User,
 				Repository,
+				Organization,
 			},
 			unsupportedEntities: []SecretEntity{
-				Organization,
 				Environment,
 				Unknown,
 			},

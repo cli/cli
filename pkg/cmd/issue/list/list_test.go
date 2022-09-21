@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"io"
 	"net/http"
-	"regexp"
 	"testing"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
@@ -39,7 +40,14 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 		},
 	}
 
-	cmd := NewCmdList(factory, nil)
+	fakeNow := func() time.Time {
+		return time.Date(2022, time.August, 25, 23, 50, 0, 0, time.UTC)
+	}
+
+	cmd := NewCmdList(factory, func(opts *ListOptions) error {
+		opts.Now = fakeNow
+		return listRun(opts)
+	})
 
 	argv, err := shlex.Split(cli)
 	if err != nil {
@@ -92,18 +100,14 @@ func TestIssueList_tty(t *testing.T) {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
 
-	out := output.String()
-	timeRE := regexp.MustCompile(`\d+ years`)
-	out = timeRE.ReplaceAllString(out, "X years")
-
 	assert.Equal(t, heredoc.Doc(`
 
 		Showing 3 of 3 open issues in OWNER/REPO
 
-		#1  number won   label  about X years ago
-		#2  number too   label  about X years ago
-		#4  number fore  label  about X years ago
-	`), out)
+		#1  number won   label  about 1 day ago
+		#2  number too   label  about 1 month ago
+		#4  number fore  label  about 2 years ago
+	`), output.String())
 	assert.Equal(t, ``, output.Stderr())
 }
 
@@ -185,7 +189,7 @@ func TestIssueList_web(t *testing.T) {
 	ios, _, stdout, stderr := iostreams.Test()
 	ios.SetStdoutTTY(true)
 	ios.SetStderrTTY(true)
-	browser := &cmdutil.TestBrowser{}
+	browser := &browser.Stub{}
 
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)

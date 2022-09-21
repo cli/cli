@@ -17,19 +17,16 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
-
-type browser interface {
-	Browse(string) error
-}
 
 type runLogCache interface {
 	Exists(string) bool
@@ -67,7 +64,7 @@ type ViewOptions struct {
 	HttpClient  func() (*http.Client, error)
 	IO          *iostreams.IOStreams
 	BaseRepo    func() (ghrepo.Interface, error)
-	Browser     browser
+	Browser     browser.Browser
 	RunLogCache runLogCache
 
 	RunID      string
@@ -202,7 +199,7 @@ func runView(opts *ViewOptions) error {
 		if err != nil {
 			return fmt.Errorf("failed to get runs: %w", err)
 		}
-		runID, err = shared.PromptForRun(cs, runs)
+		runID, err = shared.PromptForRun(cs, runs.WorkflowRuns)
 		if err != nil {
 			return err
 		}
@@ -246,7 +243,7 @@ func runView(opts *ViewOptions) error {
 			url = selectedJob.URL + "?check_suite_focus=true"
 		}
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(url))
+			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(url))
 		}
 
 		return opts.Browser.Browse(url)
@@ -319,10 +316,8 @@ func runView(opts *ViewOptions) error {
 
 	out := opts.IO.Out
 
-	ago := opts.Now().Sub(run.StartedTime())
-
 	fmt.Fprintln(out)
-	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, utils.FuzzyAgo(ago), prNumber))
+	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, text.FuzzyAgo(opts.Now(), run.StartedTime()), prNumber))
 	fmt.Fprintln(out)
 
 	if len(jobs) == 0 && run.Conclusion == shared.Failure || run.Conclusion == shared.StartupFailure {
@@ -446,6 +441,7 @@ func promptForJob(cs *iostreams.ColorScheme, jobs []shared.Job) (*shared.Job, er
 	}
 
 	var selected int
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err := prompt.SurveyAskOne(&survey.Select{
 		Message:  "View a specific job in this run?",
 		Options:  candidates,
@@ -470,15 +466,17 @@ func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
 
 // This function takes a zip file of logs and a list of jobs.
 // Structure of zip file
-// zip/
-// ├── jobname1/
-// │   ├── 1_stepname.txt
-// │   ├── 2_anotherstepname.txt
-// │   ├── 3_stepstepname.txt
-// │   └── 4_laststepname.txt
-// └── jobname2/
-//     ├── 1_stepname.txt
-//     └── 2_somestepname.txt
+//
+//	zip/
+//	├── jobname1/
+//	│   ├── 1_stepname.txt
+//	│   ├── 2_anotherstepname.txt
+//	│   ├── 3_stepstepname.txt
+//	│   └── 4_laststepname.txt
+//	└── jobname2/
+//	    ├── 1_stepname.txt
+//	    └── 2_somestepname.txt
+//
 // It iterates through the list of jobs and trys to find the matching
 // log in the zip file. If the matching log is found it is attached
 // to the job.

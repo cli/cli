@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -173,7 +174,7 @@ func TestNewCmdComment(t *testing.T) {
 
 			f := &cmdutil.Factory{
 				IOStreams: ios,
-				Browser:   &cmdutil.TestBrowser{},
+				Browser:   &browser.Stub{},
 			}
 
 			argv, err := shlex.Split(tt.input)

@@ -6,13 +6,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/extensions"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
@@ -20,6 +18,7 @@ import (
 func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	m := f.ExtensionManager
 	io := f.IOStreams
+	prompter := f.Prompter
 
 	extCmd := cobra.Command{
 		Use:   "extension",
@@ -36,7 +35,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 			See the list of available extensions at <https://github.com/topics/gh-extension>.
 		`, "`"),
-		Aliases: []string{"extensions"},
+		Aliases: []string{"extensions", "ext"},
 	}
 
 	extCmd.AddCommand(
@@ -244,22 +243,14 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 		},
 		func() *cobra.Command {
 			promptCreate := func() (string, extensions.ExtTemplateType, error) {
-				var extName string
-				var extTmplType int
-				err := prompt.SurveyAskOne(&survey.Input{
-					Message: "Extension name:",
-				}, &extName)
+				extName, err := prompter.Input("Extension name:", "")
 				if err != nil {
 					return extName, -1, err
 				}
-				err = prompt.SurveyAskOne(&survey.Select{
-					Message: "What kind of extension?",
-					Options: []string{
-						"Script (Bash, Ruby, Python, etc)",
-						"Go",
-						"Other Precompiled (C++, Rust, etc)",
-					},
-				}, &extTmplType)
+				options := []string{"Script (Bash, Ruby, Python, etc)", "Go", "Other Precompiled (C++, Rust, etc)"}
+				extTmplType, err := prompter.Select("What kind of extension?",
+					options[0],
+					options)
 				return extName, extensions.ExtTemplateType(extTmplType), err
 			}
 			var flagType string

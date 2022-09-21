@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,13 +29,21 @@ type ErrClosedPagerPipe struct {
 	error
 }
 
+type fileWriter interface {
+	io.Writer
+	Fd() uintptr
+}
+
+type fileReader interface {
+	io.ReadCloser
+	Fd() uintptr
+}
+
 type IOStreams struct {
-	In     io.ReadCloser
-	Out    io.Writer
+	In     fileReader
+	Out    fileWriter
 	ErrOut io.Writer
 
-	// the original (non-colorable) output stream
-	originalOut   io.Writer
 	colorEnabled  bool
 	is256enabled  bool
 	hasTrueColor  bool
@@ -46,6 +55,7 @@ type IOStreams struct {
 
 	alternateScreenBufferEnabled bool
 	alternateScreenBufferActive  bool
+	alternateScreenBufferMu      sync.Mutex
 
 	stdinTTYOverride  bool
 	stdinIsTTY        bool
@@ -204,7 +214,10 @@ func (s *IOStreams) StartPager() error {
 	if err != nil {
 		return err
 	}
-	s.Out = &pagerWriter{pagedOut}
+	s.Out = &fdWriteCloser{
+		fd:          s.Out.Fd(),
+		WriteCloser: &pagerWriter{pagedOut},
+	}
 	err = pagerCmd.Start()
 	if err != nil {
 		return err
@@ -218,6 +231,7 @@ func (s *IOStreams) StopPager() {
 		return
 	}
 
+	// if a pager was started, we're guaranteed to have a WriteCloser
 	_ = s.Out.(io.WriteCloser).Close()
 	_, _ = s.pagerProcess.Wait()
 	s.pagerProcess = nil
@@ -283,13 +297,29 @@ func (s *IOStreams) StopProgressIndicator() {
 
 func (s *IOStreams) StartAlternateScreenBuffer() {
 	if s.alternateScreenBufferEnabled {
+		s.alternateScreenBufferMu.Lock()
+		defer s.alternateScreenBufferMu.Unlock()
+
 		if _, err := fmt.Fprint(s.Out, "\x1b[?1049h"); err == nil {
 			s.alternateScreenBufferActive = true
+
+			ch := make(chan os.Signal, 1)
+			signal.Notify(ch, os.Interrupt)
+
+			go func() {
+				<-ch
+				s.StopAlternateScreenBuffer()
+
+				os.Exit(1)
+			}()
 		}
 	}
 }
 
 func (s *IOStreams) StopAlternateScreenBuffer() {
+	s.alternateScreenBufferMu.Lock()
+	defer s.alternateScreenBufferMu.Unlock()
+
 	if s.alternateScreenBufferActive {
 		fmt.Fprint(s.Out, "\x1b[?1049l")
 		s.alternateScreenBufferActive = false
@@ -317,16 +347,12 @@ func (s *IOStreams) TerminalWidth() int {
 	}
 
 	defaultWidth := DefaultWidth
-	out := s.Out
-	if s.originalOut != nil {
-		out = s.originalOut
-	}
 
-	if w, _, err := terminalSize(out); err == nil {
+	if w, _, err := terminalSize(s.Out.Fd()); err == nil {
 		return w
 	}
 
-	if isCygwinTerminal(out) {
+	if isCygwinTerminal(s.Out.Fd()) {
 		tputExe, err := safeexec.LookPath("tput")
 		if err != nil {
 			return defaultWidth
@@ -404,17 +430,28 @@ func System() *IOStreams {
 	stdoutIsTTY := isTerminal(os.Stdout)
 	stderrIsTTY := isTerminal(os.Stderr)
 
+	var stdout fileWriter = os.Stdout
 	isVirtualTerminal := false
 	if stdoutIsTTY {
-		if err := enableVirtualTerminalProcessing(os.Stdout); err == nil {
+		// enables ANSI escape sequences on modern Windows
+		if err := enableVirtualTerminalProcessing(os.Stdout.Fd()); err == nil {
 			isVirtualTerminal = true
+		} else {
+			// as a fallback, translate ANSI escape sequences to Windows console syscalls
+			colorableStdout := colorable.NewColorable(os.Stdout)
+			if colorableStdout != os.Stdout {
+				// ensure that the file descriptor of the original stdout is preserved
+				stdout = &fdWriter{
+					fd:     os.Stdout.Fd(),
+					Writer: colorableStdout,
+				}
+			}
 		}
 	}
 
 	io := &IOStreams{
 		In:           os.Stdin,
-		originalOut:  os.Stdout,
-		Out:          colorable.NewColorable(os.Stdout),
+		Out:          stdout,
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		colorEnabled: EnvColorForced() || (!EnvColorDisabled() && stdoutIsTTY),
 		is256enabled: isVirtualTerminal || Is256ColorSupported(),
@@ -441,33 +478,34 @@ func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 	in := &bytes.Buffer{}
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
-	return &IOStreams{
-		In:     io.NopCloser(in),
-		Out:    out,
+	io := &IOStreams{
+		In: &fdReader{
+			fd:         0,
+			ReadCloser: io.NopCloser(in),
+		},
+		Out:    &fdWriter{fd: 1, Writer: out},
 		ErrOut: errOut,
 		ttySize: func() (int, int, error) {
 			return -1, -1, errors.New("ttySize not implemented in tests")
 		},
-	}, in, out, errOut
+	}
+	io.SetStdinTTY(false)
+	io.SetStdoutTTY(false)
+	io.SetStderrTTY(false)
+	return io, in, out, errOut
 }
 
 func isTerminal(f *os.File) bool {
 	return isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
 }
 
-func isCygwinTerminal(w io.Writer) bool {
-	if f, isFile := w.(*os.File); isFile {
-		return isatty.IsCygwinTerminal(f.Fd())
-	}
-	return false
+func isCygwinTerminal(fd uintptr) bool {
+	return isatty.IsCygwinTerminal(fd)
 }
 
 // terminalSize measures the viewport of the terminal that the output stream is connected to
-func terminalSize(w io.Writer) (int, int, error) {
-	if f, isFile := w.(*os.File); isFile {
-		return term.GetSize(int(f.Fd()))
-	}
-	return 0, 0, fmt.Errorf("%v is not a file", w)
+func terminalSize(fd uintptr) (int, int, error) {
+	return term.GetSize(int(fd))
 }
 
 // pagerWriter implements a WriteCloser that wraps all EPIPE errors in an ErrClosedPagerPipe type.
@@ -481,4 +519,34 @@ func (w *pagerWriter) Write(d []byte) (int, error) {
 		return n, &ErrClosedPagerPipe{err}
 	}
 	return n, err
+}
+
+// fdWriter represents a wrapped stdout Writer that preserves the original file descriptor
+type fdWriter struct {
+	io.Writer
+	fd uintptr
+}
+
+func (w *fdWriter) Fd() uintptr {
+	return w.fd
+}
+
+// fdWriteCloser represents a wrapped stdout Writer that preserves the original file descriptor
+type fdWriteCloser struct {
+	io.WriteCloser
+	fd uintptr
+}
+
+func (w *fdWriteCloser) Fd() uintptr {
+	return w.fd
+}
+
+// fdWriter represents a wrapped stdin ReadCloser that preserves the original file descriptor
+type fdReader struct {
+	io.ReadCloser
+	fd uintptr
+}
+
+func (r *fdReader) Fd() uintptr {
+	return r.fd
 }

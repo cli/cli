@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -362,7 +363,7 @@ func TestListRun(t *testing.T) {
 			ios.SetStdinTTY(tt.tty)
 			ios.SetStderrTTY(tt.tty)
 			tt.opts.IO = ios
-			tt.opts.Browser = &cmdutil.TestBrowser{}
+			tt.opts.Browser = &browser.Stub{}
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.New("OWNER", "REPO"), nil
 			}

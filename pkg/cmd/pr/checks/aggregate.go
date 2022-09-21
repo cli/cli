@@ -24,7 +24,7 @@ type checkCounts struct {
 	Skipping int
 }
 
-func aggregateChecks(pr *api.PullRequest) ([]check, checkCounts, error) {
+func aggregateChecks(pr *api.PullRequest, requiredChecks bool) ([]check, checkCounts, error) {
 	checks := []check{}
 	counts := checkCounts{}
 
@@ -39,6 +39,10 @@ func aggregateChecks(pr *api.PullRequest) ([]check, checkCounts, error) {
 
 	checkContexts := pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
 	for _, c := range eliminateDuplicates(checkContexts) {
+		if requiredChecks && !c.IsRequired {
+			continue
+		}
+
 		state := c.State
 		if state == "" {
 			if c.Status == "COMPLETED" {
@@ -81,6 +85,10 @@ func aggregateChecks(pr *api.PullRequest) ([]check, checkCounts, error) {
 		}
 
 		checks = append(checks, item)
+	}
+
+	if len(checks) == 0 && requiredChecks {
+		return checks, counts, fmt.Errorf("no required checks reported on the '%s' branch", pr.HeadRefName)
 	}
 
 	return checks, counts, nil

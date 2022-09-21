@@ -9,6 +9,70 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestIssueFeatures(t *testing.T) {
+	tests := []struct {
+		name          string
+		hostname      string
+		queryResponse map[string]string
+		wantFeatures  IssueFeatures
+		wantErr       bool
+	}{
+		{
+			name:     "github.com",
+			hostname: "github.com",
+			wantFeatures: IssueFeatures{
+				StateReason: true,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "GHE empty response",
+			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query Issue_fields\b`: `{"data": {}}`,
+			},
+			wantFeatures: IssueFeatures{
+				StateReason: false,
+			},
+			wantErr: false,
+		},
+		{
+			name:     "GHE has state reason field",
+			hostname: "git.my.org",
+			queryResponse: map[string]string{
+				`query Issue_fields\b`: heredoc.Doc(`
+					{ "data": { "Issue": { "fields": [
+						{"name": "stateReason"}
+					] } } }
+				`),
+			},
+			wantFeatures: IssueFeatures{
+				StateReason: true,
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			httpClient := &http.Client{}
+			httpmock.ReplaceTripper(httpClient, reg)
+			for query, resp := range tt.queryResponse {
+				reg.Register(httpmock.GraphQL(query), httpmock.StringResponse(resp))
+			}
+			detector := detector{host: tt.hostname, httpClient: httpClient}
+			gotFeatures, err := detector.IssueFeatures()
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantFeatures, gotFeatures)
+		})
+	}
+}
+
 func TestPullRequestFeatures(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -82,13 +146,13 @@ func TestPullRequestFeatures(t *testing.T) {
 				reg.Register(httpmock.GraphQL(query), httpmock.StringResponse(resp))
 			}
 			detector := detector{host: tt.hostname, httpClient: httpClient}
-			gotPrFeatures, err := detector.PullRequestFeatures()
+			gotFeatures, err := detector.PullRequestFeatures()
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tt.wantFeatures, gotPrFeatures)
+			assert.Equal(t, tt.wantFeatures, gotFeatures)
 		})
 	}
 }
@@ -188,13 +252,13 @@ func TestRepositoryFeatures(t *testing.T) {
 				reg.Register(httpmock.GraphQL(query), httpmock.StringResponse(resp))
 			}
 			detector := detector{host: tt.hostname, httpClient: httpClient}
-			gotPrFeatures, err := detector.RepositoryFeatures()
+			gotFeatures, err := detector.RepositoryFeatures()
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tt.wantFeatures, gotPrFeatures)
+			assert.Equal(t, tt.wantFeatures, gotFeatures)
 		})
 	}
 }

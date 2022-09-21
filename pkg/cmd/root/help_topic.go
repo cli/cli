@@ -5,8 +5,8 @@ import (
 	"io"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/spf13/cobra"
 )
 
@@ -81,6 +81,8 @@ var HelpTopics = map[string]map[string]string{
 
 			GH_CONFIG_DIR: the directory where gh will store configuration files. Default:
 			"$XDG_CONFIG_HOME/gh" or "$HOME/.config/gh".
+
+			GH_PROMPT_DISABLED: set to any value to disable interactive prompting in the terminal.
 		`),
 	},
 	"reference": {
@@ -127,6 +129,24 @@ var HelpTopics = map[string]map[string]string{
 			  {{tablerow "ASSIGNEE" "NAME"}}{{range .assignees}}{{tablerow .login .name}}{{end}}{{tablerender}}
 			  {{tablerow "REVIEWER" "STATE" "COMMENT"}}{{range .reviews}}{{tablerow .author.login .state .body}}{{end}}
 			  '
+		`),
+	},
+	"exit-codes": {
+		"short": "Exit codes used by gh",
+		"long": heredoc.Doc(`
+			gh follows normal conventions regarding exit codes.
+
+			- If a command completes successfully, the exit code will be 0
+			
+			- If a command fails for any reason, the exit code will be 1
+
+			- If a command is running but gets cancelled, the exit code will be 2
+
+			- If a command encounters an authentication issue, the exit code will be 4
+
+			NOTE: It is possible that a particular command may have more exit codes, so it is a good 
+			practice to check documentation for the command if you are relying on exit codes to 
+			control some behavior. 
 		`),
 	},
 }

@@ -24,6 +24,7 @@ type repoCreateInput struct {
 	GitIgnoreTemplate    string
 	LicenseTemplate      string
 	IncludeAllBranches   bool
+	InitReadme           bool
 }
 
 // createRepositoryInputV3 is the payload for the repo create REST API
@@ -38,6 +39,7 @@ type createRepositoryInputV3 struct {
 	HasWikiEnabled    bool   `json:"has_wiki"`
 	GitIgnoreTemplate string `json:"gitignore_template,omitempty"`
 	LicenseTemplate   string `json:"license_template,omitempty"`
+	InitReadme        bool   `json:"auto_init,omitempty"`
 }
 
 // createRepositoryInput is the payload for the repo create GraphQL mutation
@@ -134,7 +136,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 		return api.InitRepoHostname(&response.CloneTemplateRepository.Repository, hostname), nil
 	}
 
-	if input.GitIgnoreTemplate != "" || input.LicenseTemplate != "" {
+	if input.GitIgnoreTemplate != "" || input.LicenseTemplate != "" || input.InitReadme {
 		inputv3 := createRepositoryInputV3{
 			Name:              input.Name,
 			HomepageURL:       input.HomepageURL,
@@ -145,6 +147,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 			HasWikiEnabled:    input.HasWikiEnabled,
 			GitIgnoreTemplate: input.GitIgnoreTemplate,
 			LicenseTemplate:   input.LicenseTemplate,
+			InitReadme:        input.InitReadme,
 		}
 
 		path := "user/repos"

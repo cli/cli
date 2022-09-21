@@ -131,6 +131,7 @@ type Issue struct {
 	PullRequestLinks  PullRequestLinks `json:"pull_request"`
 	RepositoryURL     string           `json:"repository_url"`
 	State             string           `json:"state"`
+	StateReason       string           `json:"state_reason"`
 	Title             string           `json:"title"`
 	URL               string           `json:"html_url"`
 	UpdatedAt         time.Time        `json:"updated_at"`
@@ -213,8 +214,10 @@ func (issue Issue) ExportData(fields []string) map[string]interface{} {
 			data[f] = labels
 		case "repository":
 			comp := strings.Split(issue.RepositoryURL, "/")
+			name := comp[len(comp)-1]
 			nameWithOwner := strings.Join(comp[len(comp)-2:], "/")
 			data[f] = map[string]interface{}{
+				"name":          name,
 				"nameWithOwner": nameWithOwner,
 			}
 		default:

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
@@ -187,7 +188,7 @@ func Test_createRun(t *testing.T) {
 				Filenames: []string{fixtureFile},
 			},
 			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
-			wantStderr: "- Creating gist fixture.txt\n✓ Created gist fixture.txt\n",
+			wantStderr: "- Creating gist fixture.txt\n✓ Created public gist fixture.txt\n",
 			wantErr:    false,
 			wantParams: map[string]interface{}{
 				"description": "",
@@ -208,7 +209,7 @@ func Test_createRun(t *testing.T) {
 				Filenames:   []string{fixtureFile},
 			},
 			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
-			wantStderr: "- Creating gist fixture.txt\n✓ Created gist fixture.txt\n",
+			wantStderr: "- Creating gist fixture.txt\n✓ Created secret gist fixture.txt\n",
 			wantErr:    false,
 			wantParams: map[string]interface{}{
 				"description": "an incredibly interesting gist",
@@ -229,7 +230,7 @@ func Test_createRun(t *testing.T) {
 			},
 			stdin:      "cool stdin content",
 			wantOut:    "https://gist.github.com/aa5a315d61ae9438b18d\n",
-			wantStderr: "- Creating gist with multiple files\n✓ Created gist fixture.txt\n",
+			wantStderr: "- Creating gist with multiple files\n✓ Created secret gist fixture.txt\n",
 			wantErr:    false,
 			wantParams: map[string]interface{}{
 				"description": "",
@@ -295,7 +296,7 @@ func Test_createRun(t *testing.T) {
 				Filenames: []string{fixtureFile},
 			},
 			wantOut:    "Opening gist.github.com/aa5a315d61ae9438b18d in your browser.\n",
-			wantStderr: "- Creating gist fixture.txt\n✓ Created gist fixture.txt\n",
+			wantStderr: "- Creating gist fixture.txt\n✓ Created secret gist fixture.txt\n",
 			wantErr:    false,
 			wantBrowse: "https://gist.github.com/aa5a315d61ae9438b18d",
 			wantParams: map[string]interface{}{
@@ -337,7 +338,7 @@ func Test_createRun(t *testing.T) {
 		ios, stdin, stdout, stderr := iostreams.Test()
 		tt.opts.IO = ios
 
-		browser := &cmdutil.TestBrowser{}
+		browser := &browser.Stub{}
 		tt.opts.Browser = browser
 
 		_, teardown := run.Stub()

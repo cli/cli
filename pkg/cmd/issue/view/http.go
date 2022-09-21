@@ -1,13 +1,10 @@
 package view
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -33,10 +30,10 @@ func preloadIssueComments(client *http.Client, repo ghrepo.Interface, issue *api
 		issue.Comments.Nodes = issue.Comments.Nodes[0:0]
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), client)
+	gql := api.NewClientFromHTTP(client)
 	for {
 		var query response
-		err := gql.QueryNamed(context.Background(), "CommentsForIssue", &query, variables)
+		err := gql.Query(repo.RepoHost(), "CommentsForIssue", &query, variables)
 		if err != nil {
 			return err
 		}

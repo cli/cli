@@ -6,26 +6,23 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
-
-type browser interface {
-	Browse(string) error
-}
 
 type CreateOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
-	Browser    browser
+	Browser    browser.Browser
 
 	RootDirOverride string
 
@@ -164,7 +161,7 @@ func createRun(opts *CreateOptions) (err error) {
 			if err != nil {
 				return
 			}
-			if !utils.ValidURL(openURL) {
+			if !prShared.ValidURL(openURL) {
 				err = fmt.Errorf("cannot open in browser: maximum URL length exceeded")
 				return
 			}
@@ -174,7 +171,7 @@ func createRun(opts *CreateOptions) (err error) {
 			openURL = ghrepo.GenerateRepoURL(baseRepo, "issues/new")
 		}
 		if isTerminal {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 		}
 		return opts.Browser.Browse(openURL)
 	}
@@ -241,7 +238,7 @@ func createRun(opts *CreateOptions) (err error) {
 			return
 		}
 
-		allowPreview := !tb.HasMetadata() && utils.ValidURL(openURL)
+		allowPreview := !tb.HasMetadata() && prShared.ValidURL(openURL)
 		action, err = prShared.ConfirmIssueSubmission(allowPreview, repo.ViewerCanTriage())
 		if err != nil {
 			err = fmt.Errorf("unable to confirm: %w", err)
@@ -280,7 +277,7 @@ func createRun(opts *CreateOptions) (err error) {
 
 	if action == prShared.PreviewAction {
 		if isTerminal {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 		}
 		return opts.Browser.Browse(openURL)
 	} else if action == prShared.SubmitAction {

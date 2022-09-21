@@ -7,6 +7,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -83,9 +84,6 @@ func listRun(opts *ListOptions) error {
 	}
 	client := api.NewClientFromHTTP(c)
 
-	var runs []shared.Run
-	var workflow *workflowShared.Workflow
-
 	filters := &shared.FilterOptions{
 		Branch: opts.Branch,
 		Actor:  opts.Actor,
@@ -94,18 +92,19 @@ func listRun(opts *ListOptions) error {
 	opts.IO.StartProgressIndicator()
 	if opts.WorkflowSelector != "" {
 		states := []workflowShared.WorkflowState{workflowShared.Active}
-		workflow, err = workflowShared.ResolveWorkflow(
-			opts.IO, client, baseRepo, false, opts.WorkflowSelector, states)
-		if err == nil {
-			runs, err = shared.GetRunsByWorkflow(client, baseRepo, filters, opts.Limit, workflow.ID)
+		if workflow, err := workflowShared.ResolveWorkflow(opts.IO, client, baseRepo, false, opts.WorkflowSelector, states); err == nil {
+			filters.WorkflowID = workflow.ID
+			filters.WorkflowName = workflow.Name
+		} else {
+			return err
 		}
-	} else {
-		runs, err = shared.GetRuns(client, baseRepo, filters, opts.Limit)
 	}
+	runsResult, err := shared.GetRuns(client, baseRepo, filters, opts.Limit)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to get runs: %w", err)
 	}
+	runs := runsResult.WorkflowRuns
 
 	if err := opts.IO.StartPager(); err == nil {
 		defer opts.IO.StopPager()
@@ -127,7 +126,7 @@ func listRun(opts *ListOptions) error {
 
 	if tp.IsTTY() {
 		tp.AddField("STATUS", nil, nil)
-		tp.AddField("NAME", nil, nil)
+		tp.AddField("TITLE", nil, nil)
 		tp.AddField("WORKFLOW", nil, nil)
 		tp.AddField("BRANCH", nil, nil)
 		tp.AddField("EVENT", nil, nil)
@@ -146,15 +145,15 @@ func listRun(opts *ListOptions) error {
 			tp.AddField(string(run.Conclusion), nil, nil)
 		}
 
-		tp.AddField(run.CommitMsg(), nil, cs.Bold)
+		tp.AddField(run.Title(), nil, cs.Bold)
 
-		tp.AddField(run.Name, nil, nil)
+		tp.AddField(run.WorkflowName(), nil, nil)
 		tp.AddField(run.HeadBranch, nil, cs.Bold)
 		tp.AddField(string(run.Event), nil, nil)
 		tp.AddField(fmt.Sprintf("%d", run.ID), nil, cs.Cyan)
 
 		tp.AddField(run.Duration(opts.now).String(), nil, nil)
-		tp.AddField(utils.FuzzyAgoAbbr(time.Now(), run.StartedTime()), nil, nil)
+		tp.AddField(text.FuzzyAgoAbbr(time.Now(), run.StartedTime()), nil, nil)
 		tp.EndRow()
 	}
 

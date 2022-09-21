@@ -5,21 +5,18 @@ import (
 	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
-type browser interface {
-	Browse(string) error
-}
-
 type listOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
-	Browser    browser
+	Browser    browser.Browser
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 
@@ -99,7 +96,7 @@ func listRun(opts *listOptions) error {
 		labelListURL := ghrepo.GenerateRepoURL(baseRepo, "labels")
 
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(labelListURL))
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(labelListURL))
 		}
 
 		return opts.Browser.Browse(labelListURL)
@@ -151,5 +148,5 @@ func printLabels(io *iostreams.IOStreams, labels []label) error {
 }
 
 func listHeader(repoName string, count int, totalCount int) string {
-	return fmt.Sprintf("Showing %d of %s in %s", count, utils.Pluralize(totalCount, "label"), repoName)
+	return fmt.Sprintf("Showing %d of %s in %s", count, text.Pluralize(totalCount, "label"), repoName)
 }

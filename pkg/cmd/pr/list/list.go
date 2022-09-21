@@ -5,27 +5,25 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
-
-type browser interface {
-	Browse(string) error
-}
 
 type ListOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
-	Browser    browser
+	Browser    browser.Browser
 
 	WebMode      bool
 	LimitResults int
@@ -39,6 +37,8 @@ type ListOptions struct {
 	Assignee   string
 	Search     string
 	Draft      *bool
+
+	Now func() time.Time
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -46,6 +46,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
+		Now:        time.Now,
 	}
 
 	var appAuthor string
@@ -123,6 +124,7 @@ var defaultFields = []string{
 	"headRepositoryOwner",
 	"isCrossRepository",
 	"isDraft",
+	"createdAt",
 }
 
 func listRun(opts *ListOptions) error {
@@ -164,7 +166,7 @@ func listRun(opts *ListOptions) error {
 		}
 
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 		}
 		return opts.Browser.Browse(openURL)
 	}
@@ -202,11 +204,17 @@ func listRun(opts *ListOptions) error {
 		if table.IsTTY() {
 			prNum = "#" + prNum
 		}
+
 		table.AddField(prNum, nil, cs.ColorFromString(shared.ColorForPRState(pr)))
-		table.AddField(text.ReplaceExcessiveWhitespace(pr.Title), nil, nil)
+		table.AddField(text.RemoveExcessiveWhitespace(pr.Title), nil, nil)
 		table.AddField(pr.HeadLabel(), nil, cs.Cyan)
 		if !table.IsTTY() {
 			table.AddField(prStateWithDraft(&pr), nil, nil)
+		}
+		if table.IsTTY() {
+			table.AddField(text.FuzzyAgo(opts.Now(), pr.CreatedAt), nil, cs.Gray)
+		} else {
+			table.AddField(pr.CreatedAt.String(), nil, nil)
 		}
 		table.EndRow()
 	}

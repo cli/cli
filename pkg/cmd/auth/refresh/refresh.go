@@ -5,14 +5,12 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/spf13/cobra"
 )
 
@@ -20,6 +18,7 @@ type RefreshOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	httpClient *http.Client
+	Prompter   shared.Prompt
 
 	MainExecutable string
 
@@ -39,6 +38,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			return err
 		},
 		httpClient: &http.Client{},
+		Prompter:   f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -94,14 +94,11 @@ func refreshRun(opts *RefreshOptions) error {
 		if len(candidates) == 1 {
 			hostname = candidates[0]
 		} else {
-			err := prompt.SurveyAskOne(&survey.Select{
-				Message: "What account do you want to refresh auth for?",
-				Options: candidates,
-			}, &hostname)
-
+			selected, err := opts.Prompter.Select("What account do you want to refresh auth for?", "", candidates)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
+			hostname = candidates[selected]
 		}
 	} else {
 		var found bool
@@ -137,6 +134,7 @@ func refreshRun(opts *RefreshOptions) error {
 
 	credentialFlow := &shared.GitCredentialFlow{
 		Executable: opts.MainExecutable,
+		Prompter:   opts.Prompter,
 	}
 	gitProtocol, _ := cfg.GetOrDefault(hostname, "git_protocol")
 	if opts.Interactive && gitProtocol == "https" {

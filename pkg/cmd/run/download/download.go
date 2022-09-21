@@ -198,6 +198,7 @@ func matchAnyPattern(patterns []string, name string) bool {
 type surveyPrompter struct{}
 
 func (sp *surveyPrompter) Prompt(message string, options []string, result interface{}) error {
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	return prompt.SurveyAskOne(&survey.MultiSelect{
 		Message: message,
 		Options: options,

@@ -406,7 +406,8 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 				showStatus:  false,
 				idleTimeout: 30 * time.Minute,
 			},
-			wantStdout: "  ✓ Codespaces usage for this repository is paid for by megacorp\nmegacorp-private-abcd1234\n",
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by megacorp\n",
+			wantStdout: "megacorp-private-abcd1234\n",
 		},
 		{
 			name: "doesn't mention billable owner when it's the individual",
@@ -490,16 +491,6 @@ func TestBuildDisplayName(t *testing.T) {
 		prebuildAvailability string
 		expectedDisplayName  string
 	}{
-		{
-			name:                 "prebuild availability is pool",
-			prebuildAvailability: "pool",
-			expectedDisplayName:  "4 cores, 8 GB RAM, 32 GB storage (Prebuild ready)",
-		},
-		{
-			name:                 "prebuild availability is blob",
-			prebuildAvailability: "blob",
-			expectedDisplayName:  "4 cores, 8 GB RAM, 32 GB storage (Prebuild ready)",
-		},
 		{
 			name:                 "prebuild availability is none",
 			prebuildAvailability: "none",

@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )

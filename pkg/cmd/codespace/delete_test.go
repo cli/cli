@@ -15,7 +15,6 @@ import (
 )
 
 func TestDelete(t *testing.T) {
-	user := &api.User{Login: "hubot"}
 	now, _ := time.Parse(time.RFC3339, "2021-09-22T00:00:00Z")
 	daysAgo := func(n int) string {
 		return now.Add(time.Hour * -time.Duration(24*n)).Format(time.RFC3339)
@@ -207,9 +206,6 @@ func TestDelete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			apiMock := &apiClientMock{
-				GetUserFunc: func(_ context.Context) (*api.User, error) {
-					return user, nil
-				},
 				DeleteCodespaceFunc: func(_ context.Context, name string, orgName string, userName string) error {
 					if tt.deleteErr != nil {
 						return tt.deleteErr

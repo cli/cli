@@ -1,19 +1,16 @@
 package reopen
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -122,6 +119,6 @@ func apiReopen(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue)
 		},
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
-	return gql.MutateNamed(context.Background(), "IssueReopen", &mutation, variables)
+	gql := api.NewClientFromHTTP(httpClient)
+	return gql.Mutate(repo.RepoHost(), "IssueReopen", &mutation, variables)
 }
