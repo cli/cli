@@ -80,7 +80,6 @@ func (m sidebarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.viewport.Height = msg.Height
 		}
-
 	}
 
 	newvp, cmd := m.viewport.Update(msg)
@@ -136,6 +135,7 @@ func newItemDelegate(keys *delegateKeyMap) list.DefaultDelegate {
 	return list.NewDefaultDelegate()
 }
 
+// TODO can the uiModel just create a list.Model and manage it directly?
 type extListModel struct {
 	list list.Model
 	keys *keyMap
@@ -207,7 +207,6 @@ func (m extListModel) Init() tea.Cmd {
 }
 
 func (m extListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// TODO probably fill this in in debugging why list not showing
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		w, h := appStyle.GetFrameSize()
