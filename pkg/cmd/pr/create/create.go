@@ -25,6 +25,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type iprompter interface {
+	Select(string, string, []string) (int, error)
+}
+
 type CreateOptions struct {
 	// This struct stores user input and factory functions
 	HttpClient func() (*http.Client, error)
@@ -33,6 +37,7 @@ type CreateOptions struct {
 	Remotes    func() (context.Remotes, error)
 	Branch     func() (string, error)
 	Browser    browser.Browser
+	Prompter   iprompter
 	Finder     shared.PRFinder
 
 	TitleProvided bool
@@ -83,6 +88,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
 		Browser:    f.Browser,
+		Prompter:   f.Prompter,
 	}
 
 	var bodyFile string
@@ -480,7 +486,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	}
 
 	var baseRepo *api.Repository
-	if br, err := repoContext.BaseRepo(opts.IO); err == nil {
+	if br, err := repoContext.BaseRepo(opts.IO, opts.Prompter); err == nil {
 		if r, ok := br.(*api.Repository); ok {
 			baseRepo = r
 		} else {
