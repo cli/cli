@@ -47,6 +47,7 @@ const (
 
 func main() {
 	code := mainRun()
+	fmt.Println("foobar")
 	os.Exit(int(code))
 }
 
