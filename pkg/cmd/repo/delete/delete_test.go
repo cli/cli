@@ -92,8 +92,8 @@ func Test_deleteRun(t *testing.T) {
 			opts:       &DeleteOptions{RepoArg: "OWNER/REPO"},
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
 			prompterStubs: func(p *prompter.PrompterMock) {
-				p.InputFunc = func(_, _ string) (string, error) {
-					return "OWNER/REPO", nil
+				p.ConfirmDeletionFunc = func(_ string) error {
+					return nil
 				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -108,8 +108,8 @@ func Test_deleteRun(t *testing.T) {
 			opts:       &DeleteOptions{},
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
 			prompterStubs: func(p *prompter.PrompterMock) {
-				p.InputFunc = func(_, _ string) (string, error) {
-					return "OWNER/REPO", nil
+				p.ConfirmDeletionFunc = func(_ string) error {
+					return nil
 				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -136,8 +136,8 @@ func Test_deleteRun(t *testing.T) {
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
 			tty:        true,
 			prompterStubs: func(p *prompter.PrompterMock) {
-				p.InputFunc = func(_, _ string) (string, error) {
-					return "OWNER/REPO", nil
+				p.ConfirmDeletionFunc = func(_ string) error {
+					return nil
 				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
