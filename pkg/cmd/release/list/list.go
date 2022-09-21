@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
@@ -76,11 +76,10 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
 
-	now := time.Now()
 	table := utils.NewTablePrinter(opts.IO)
 	iofmt := opts.IO.ColorScheme()
 	for _, rel := range releases {
-		title := text.ReplaceExcessiveWhitespace(rel.Name)
+		title := text.RemoveExcessiveWhitespace(rel.Name)
 		if title == "" {
 			title = rel.TagName
 		}
@@ -112,7 +111,7 @@ func listRun(opts *ListOptions) error {
 		}
 		publishedAt := pubDate.Format(time.RFC3339)
 		if table.IsTTY() {
-			publishedAt = utils.FuzzyAgo(now.Sub(pubDate))
+			publishedAt = text.FuzzyAgo(time.Now(), pubDate)
 		}
 		table.AddField(publishedAt, nil, iofmt.Gray)
 		table.EndRow()

@@ -14,12 +14,12 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/pkg/surveyext"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/spf13/cobra"
 )
 

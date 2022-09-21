@@ -34,6 +34,8 @@ import (
 const automaticPrivateKeyNameOld = "codespaces"
 const automaticPrivateKeyName = "codespaces.auto"
 
+var errKeyFileNotFound = errors.New("SSH key file does not exist")
+
 type sshOptions struct {
 	codespace  string
 	profile    string
@@ -148,18 +150,14 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	sshContext := ssh.Context{}
 	startSSHOptions := liveshare.StartSSHServerOptions{}
 
-	useAutoKeys, err := useAutomaticSSHKeys(ctx, sshContext, a.apiClient, args, opts)
+	keyPair, shouldAddArg, err := selectSSHKeys(ctx, sshContext, args, opts)
 	if err != nil {
-		return fmt.Errorf("checking ssh key configuration: %w", err)
+		return fmt.Errorf("selecting ssh keys: %w", err)
 	}
 
-	if useAutoKeys {
-		keyPair, err := setupAutomaticSSHKeys(sshContext)
-		if err != nil {
-			return fmt.Errorf("failed to generate ssh keys: %w", err)
-		}
+	startSSHOptions.UserPublicKeyFile = keyPair.PublicKeyPath
 
-		startSSHOptions.UserPublicKeyFile = keyPair.PublicKeyPath
+	if shouldAddArg {
 		// For both cp and ssh, flags need to come first in the args (before a command in ssh and files in cp), so prepend this flag
 		args = append([]string{"-i", keyPair.PrivateKeyPath}, args...)
 	}
@@ -236,48 +234,71 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 }
 
-func useAutomaticSSHKeys(
+// selectSSHKeys evaluates available key pairs and select which should be used to connect to the codespace
+// using the precedence rules below. If there is no error, a keypair is always returned and additionally a
+// bool flag is returned to specify if the private key need be appended to the ssh arguments (it doesn't need
+// to be if the key was selected from a -i argument).
+//
+// Precedence rules:
+// 1. Key which is specified by -i
+// 2. Automatic key, if it already exists
+// 3. First valid keypair in ssh config (according to ssh -G)
+// 4. Automatic key, newly created
+func selectSSHKeys(
 	ctx context.Context,
 	sshContext ssh.Context,
-	apiClient apiClient,
 	args []string,
 	opts sshOptions,
-) (bool, error) {
+) (*ssh.KeyPair, bool, error) {
 	customConfigPath := ""
 	for i := 0; i < len(args); i += 1 {
 		arg := args[i]
 
 		if arg == "-i" {
-			if i+1 < len(args) && path.Base(args[i+1]) == automaticPrivateKeyName {
-				return true, nil
+			if i+1 >= len(args) {
+				return nil, false, errors.New("missing value to -i argument")
 			}
 
-			// User specified a custom identity file so just trust it is correct
-			return false, nil
+			// User manually specified an identity file so just trust it is correct
+			return &ssh.KeyPair{
+				PrivateKeyPath: args[i+1],
+				PublicKeyPath:  args[i+1] + ".pub",
+			}, false, nil
 		}
 
-		if arg == "-F" && i < len(args)-1 {
+		if arg == "-F" && i+1 < len(args) {
 			// ssh only pays attention to that last specified -F value, so it's correct to overwrite here
 			customConfigPath = args[i+1]
 		}
 	}
 
-	if automaticKeySSHKeysExist(sshContext) {
+	if autoKeyPair := automaticSSHKeyPair(sshContext); autoKeyPair != nil {
 		// If the automatic keys already exist, just use them
-		return true, nil
+		return autoKeyPair, true, nil
 	}
 
-	// If there is a public key uploaded which matches a configured
-	// private key, there is no need for automatic key generation
-	hasPublicKey, err := hasUploadedPublicKeyForConfig(ctx, apiClient, customConfigPath, opts.profile)
+	keyPair, err := firstConfiguredKeyPair(ctx, customConfigPath, opts.profile)
+	if err != nil {
+		if !errors.Is(err, errKeyFileNotFound) {
+			return nil, false, fmt.Errorf("checking configured keys: %w", err)
+		}
 
-	return !hasPublicKey, err
+		// no valid key in ssh config, generate one
+		keyPair, err = generateAutomaticSSHKeys(sshContext)
+		if err != nil {
+			return nil, false, fmt.Errorf("generating automatic keypair: %w", err)
+		}
+	}
+
+	return keyPair, true, nil
 }
 
-func automaticKeySSHKeysExist(sshContext ssh.Context) bool {
+// automaticSSHKeyPair returns the paths to the automatic key pair files, if they both exist
+func automaticSSHKeyPair(sshContext ssh.Context) *ssh.KeyPair {
 	publicKeys, err := sshContext.LocalPublicKeys()
 	if err != nil {
-		return false
+		// The error would be that the .ssh dir doesn't exist, which just means that the keypair also doesn't exist
+		return nil
 	}
 
 	for _, publicKey := range publicKeys {
@@ -288,13 +309,18 @@ func automaticKeySSHKeysExist(sshContext ssh.Context) bool {
 		privateKey := strings.TrimSuffix(publicKey, ".pub")
 
 		_, err := os.Stat(privateKey)
-		return err == nil
+		if err == nil {
+			return &ssh.KeyPair{
+				PrivateKeyPath: privateKey,
+				PublicKeyPath:  publicKey,
+			}
+		}
 	}
 
-	return false
+	return nil
 }
 
-func setupAutomaticSSHKeys(sshContext ssh.Context) (*ssh.KeyPair, error) {
+func generateAutomaticSSHKeys(sshContext ssh.Context) (*ssh.KeyPair, error) {
 	keyPair := checkAndUpdateOldKeyPair(sshContext)
 	if keyPair != nil {
 		return keyPair, nil
@@ -355,76 +381,13 @@ func checkAndUpdateOldKeyPair(sshContext ssh.Context) *ssh.KeyPair {
 	return nil
 }
 
-// hasUploadedValidCustomKey checks which private keys are used in ssh configration and
-// compares them to uploaded public keys to see if there is a match
-func hasUploadedPublicKeyForConfig(
-	ctx context.Context,
-	apiClient apiClient,
-	customConfigFile string,
-	customHost string,
-) (bool, error) {
-	configuredPrivateKeyPaths, err := getConfiguredPrivateKeys(ctx, customConfigFile, customHost)
-	if err != nil {
-		return false, fmt.Errorf("getting local ssh keys: %w", err)
-	}
-
-	configuredPublicKeys := make(map[string]bool)
-	for _, privateKeyPath := range configuredPrivateKeyPaths {
-		publicKeyPath := privateKeyPath + ".pub"
-
-		publicKeyContent, err := os.ReadFile(publicKeyPath)
-		if err != nil {
-			// The default configuration includes standard keys like id_rsa or id_ed25519,
-			// but these may not actually exist so just skip them
-			continue
-		}
-
-		parts := strings.SplitN(string(publicKeyContent), " ", 3)
-		if len(parts) < 2 {
-			// Unexpected format, skip it
-			continue
-		}
-
-		publicKeyWithoutComment := strings.Join(parts[:2], " ")
-
-		configuredPublicKeys[publicKeyWithoutComment] = true
-	}
-
-	if len(configuredPublicKeys) == 0 {
-		// There are no local private keys which ssh would use
-		return false, nil
-	}
-
-	user, err := apiClient.GetUser(ctx)
-	if err != nil {
-		return false, fmt.Errorf("fetching user account: %w", err)
-	}
-
-	uploadedPublicKeys, err := apiClient.AuthorizedKeys(ctx, user.Login)
-	if err != nil {
-		return false, fmt.Errorf("fetching known ssh keys: %w", err)
-	}
-
-	if len(uploadedPublicKeys) == 0 {
-		return false, nil
-	}
-
-	for _, uploadedPublicKey := range uploadedPublicKeys {
-		if configuredPublicKeys[uploadedPublicKey] {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
-// getConfiguredPrivateKeys reads the effective configuration for a localhost
-// connection and returns all private keys which would be tried for authentication
-func getConfiguredPrivateKeys(
+// firstConfiguredKeyPair reads the effective configuration for a localhost
+// connection and returns the first valid key pair which would be tried for authentication
+func firstConfiguredKeyPair(
 	ctx context.Context,
 	customConfigFile string,
 	customHost string,
-) ([]string, error) {
+) (*ssh.KeyPair, error) {
 	sshExe, err := safeexec.LookPath("ssh")
 	if err != nil {
 		return nil, fmt.Errorf("could not find ssh executable: %w", err)
@@ -449,27 +412,55 @@ func getConfiguredPrivateKeys(
 		return nil, fmt.Errorf("could not load ssh configuration: %w", err)
 	}
 
-	var privateKeyPaths []string
-
-	userHomeDir, _ := os.UserHomeDir()
-
 	configLines := strings.Split(string(configBytes), "\n")
 	for _, line := range configLines {
 		line = strings.TrimSpace(line)
 
 		if strings.HasPrefix(line, "identityfile ") {
-			path := strings.SplitN(line, " ", 2)[1]
+			privateKeyPath := strings.SplitN(line, " ", 2)[1]
 
-			if strings.HasPrefix(path, "~") {
-				// os.Stat can't handle ~, so convert it to the real path
-				path = strings.Replace(path, "~", userHomeDir, 1)
+			keypair, err := keypairForPrivateKey(privateKeyPath)
+			if errors.Is(err, errKeyFileNotFound) {
+				continue
+			}
+			if err != nil {
+				return nil, fmt.Errorf("loading ssh config: %w", err)
 			}
 
-			privateKeyPaths = append(privateKeyPaths, path)
+			return keypair, nil
 		}
 	}
 
-	return privateKeyPaths, nil
+	return nil, errKeyFileNotFound
+}
+
+// keypairForPrivateKey returns the KeyPair with the specified private key if it and the public key both exist
+func keypairForPrivateKey(privateKeyPath string) (*ssh.KeyPair, error) {
+	if strings.HasPrefix(privateKeyPath, "~") {
+		userHomeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("getting home dir: %w", err)
+		}
+
+		// os.Stat can't handle ~, so convert it to the real path
+		privateKeyPath = strings.Replace(privateKeyPath, "~", userHomeDir, 1)
+	}
+
+	// The default configuration includes standard keys like id_rsa or id_ed25519,
+	// but these may not actually exist
+	if _, err := os.Stat(privateKeyPath); err != nil {
+		return nil, errKeyFileNotFound
+	}
+
+	publicKeyPath := privateKeyPath + ".pub"
+	if _, err := os.Stat(publicKeyPath); err != nil {
+		return nil, errKeyFileNotFound
+	}
+
+	return &ssh.KeyPair{
+		PrivateKeyPath: privateKeyPath,
+		PublicKeyPath:  publicKeyPath,
+	}, nil
 }
 
 func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err error) {
@@ -534,12 +525,6 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 		wg.Wait()
 		close(sshUsers)
 	}()
-
-	// While the above fetches are running, ensure that the user has keys installed.
-	// That lets us report a more useful error message if they don't.
-	if err = checkAuthorizedKeys(ctx, a.apiClient); err != nil {
-		return err
-	}
 
 	t, err := template.New("ssh_config").Parse(heredoc.Doc(`
 		Host cs.{{.Name}}.{{.EscapedRef}}

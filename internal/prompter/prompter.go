@@ -50,9 +50,12 @@ type surveyPrompter struct {
 func (p *surveyPrompter) Select(message, defaultValue string, options []string) (result int, err error) {
 	q := &survey.Select{
 		Message:  message,
-		Default:  defaultValue,
 		Options:  options,
 		PageSize: 20,
+	}
+
+	if defaultValue != "" {
+		q.Default = defaultValue
 	}
 
 	err = p.ask(q, &result)
@@ -63,9 +66,12 @@ func (p *surveyPrompter) Select(message, defaultValue string, options []string) 
 func (p *surveyPrompter) MultiSelect(message, defaultValue string, options []string) (result int, err error) {
 	q := &survey.MultiSelect{
 		Message:  message,
-		Default:  defaultValue,
 		Options:  options,
 		PageSize: 20,
+	}
+
+	if defaultValue != "" {
+		q.Default = defaultValue
 	}
 
 	err = p.ask(q, &result)

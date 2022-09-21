@@ -430,19 +430,28 @@ func System() *IOStreams {
 	stdoutIsTTY := isTerminal(os.Stdout)
 	stderrIsTTY := isTerminal(os.Stderr)
 
+	var stdout fileWriter = os.Stdout
 	isVirtualTerminal := false
 	if stdoutIsTTY {
+		// enables ANSI escape sequences on modern Windows
 		if err := enableVirtualTerminalProcessing(os.Stdout.Fd()); err == nil {
 			isVirtualTerminal = true
+		} else {
+			// as a fallback, translate ANSI escape sequences to Windows console syscalls
+			colorableStdout := colorable.NewColorable(os.Stdout)
+			if colorableStdout != os.Stdout {
+				// ensure that the file descriptor of the original stdout is preserved
+				stdout = &fdWriter{
+					fd:     os.Stdout.Fd(),
+					Writer: colorableStdout,
+				}
+			}
 		}
 	}
 
 	io := &IOStreams{
-		In: os.Stdin,
-		Out: &fdWriter{
-			fd:     os.Stdout.Fd(),
-			Writer: colorable.NewColorable(os.Stdout),
-		},
+		In:           os.Stdin,
+		Out:          stdout,
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		colorEnabled: EnvColorForced() || (!EnvColorDisabled() && stdoutIsTTY),
 		is256enabled: isVirtualTerminal || Is256ColorSupported(),

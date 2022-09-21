@@ -20,11 +20,11 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -243,7 +243,7 @@ func runView(opts *ViewOptions) error {
 			url = selectedJob.URL + "?check_suite_focus=true"
 		}
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(url))
+			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(url))
 		}
 
 		return opts.Browser.Browse(url)
@@ -316,10 +316,8 @@ func runView(opts *ViewOptions) error {
 
 	out := opts.IO.Out
 
-	ago := opts.Now().Sub(run.StartedTime())
-
 	fmt.Fprintln(out)
-	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, utils.FuzzyAgo(ago), prNumber))
+	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, text.FuzzyAgo(opts.Now(), run.StartedTime()), prNumber))
 	fmt.Fprintln(out)
 
 	if len(jobs) == 0 && run.Conclusion == shared.Failure || run.Conclusion == shared.StartupFailure {

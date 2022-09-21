@@ -5,15 +5,12 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +18,7 @@ type RefreshOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	httpClient *http.Client
-	Prompter   prompter.Prompter
+	Prompter   shared.Prompt
 
 	MainExecutable string
 
@@ -97,15 +94,11 @@ func refreshRun(opts *RefreshOptions) error {
 		if len(candidates) == 1 {
 			hostname = candidates[0]
 		} else {
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err := prompt.SurveyAskOne(&survey.Select{
-				Message: "What account do you want to refresh auth for?",
-				Options: candidates,
-			}, &hostname)
-
+			selected, err := opts.Prompter.Select("What account do you want to refresh auth for?", "", candidates)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
+			hostname = candidates[selected]
 		}
 	} else {
 		var found bool

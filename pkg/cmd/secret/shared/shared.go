@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cli/cli/v2/pkg/text"
+	"github.com/cli/cli/v2/internal/text"
 )
 
 type Visibility string
@@ -85,7 +85,7 @@ func IsSupportedSecretEntity(app App, entity SecretEntity) bool {
 	case Actions:
 		return entity == Repository || entity == Organization || entity == Environment
 	case Codespaces:
-		return entity == User || entity == Repository
+		return entity == User || entity == Organization || entity == Repository
 	case Dependabot:
 		return entity == Repository || entity == Organization
 	default:

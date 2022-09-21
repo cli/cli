@@ -10,10 +10,10 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -206,8 +206,6 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 		return nil, fmt.Errorf("failed to get run: %w", err)
 	}
 
-	ago := opts.Now().Sub(run.StartedTime())
-
 	jobs, err := shared.GetJobs(client, repo, *run)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get jobs: %w", err)
@@ -238,7 +236,7 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 		return nil, fmt.Errorf("failed to get annotations: %w", annotationErr)
 	}
 
-	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, utils.FuzzyAgo(ago), prNumber))
+	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, text.FuzzyAgo(opts.Now(), run.StartedTime()), prNumber))
 	fmt.Fprintln(out)
 
 	if len(jobs) == 0 {

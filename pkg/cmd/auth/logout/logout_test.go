@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -92,21 +92,23 @@ func Test_NewCmdLogout(t *testing.T) {
 
 func Test_logoutRun_tty(t *testing.T) {
 	tests := []struct {
-		name       string
-		opts       *LogoutOptions
-		askStubs   func(*prompt.AskStubber)
-		cfgHosts   []string
-		wantHosts  string
-		wantErrOut *regexp.Regexp
-		wantErr    string
+		name          string
+		opts          *LogoutOptions
+		prompterStubs func(*prompter.PrompterMock)
+		cfgHosts      []string
+		wantHosts     string
+		wantErrOut    *regexp.Regexp
+		wantErr       string
 	}{
 		{
 			name:      "no arguments, multiple hosts",
 			opts:      &LogoutOptions{},
 			cfgHosts:  []string{"cheryl.mason", "github.com"},
 			wantHosts: "cheryl.mason:\n    oauth_token: abc123\n",
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("What account do you want to log out of?").AnswerWith("github.com")
+			prompterStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(_, _ string, opts []string) (int, error) {
+					return prompter.IndexFor(opts, "github.com")
+				}
 			},
 			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'cybilb'`),
 		},
@@ -158,11 +160,11 @@ func Test_logoutRun_tty(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 
-			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-			as := prompt.NewAskStubber(t)
-			if tt.askStubs != nil {
-				tt.askStubs(as)
+			pm := &prompter.PrompterMock{}
+			if tt.prompterStubs != nil {
+				tt.prompterStubs(pm)
 			}
+			tt.opts.Prompter = pm
 
 			err := logoutRun(tt.opts)
 			if tt.wantErr != "" {

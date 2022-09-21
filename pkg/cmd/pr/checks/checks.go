@@ -9,10 +9,10 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -105,7 +105,7 @@ func checksRunWebMode(opts *ChecksOptions) error {
 	openURL := ghrepo.GenerateRepoURL(baseRepo, "pull/%d/checks", pr.Number)
 
 	if isTerminal {
-		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 	}
 
 	return opts.Browser.Browse(openURL)
