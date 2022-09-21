@@ -102,6 +102,6 @@ func TestForwardRun(t *testing.T) {
 	_, err = cmd.ExecuteC()
 	assert.NoError(t, err)
 	wg.Wait()
-	assert.Equal(t, "lol\n", string(forwarded.event.Body))
+	assert.Equal(t, "lol", forwarded.event.Body)
 	assert.Equal(t, forwarded.event.Header.Get("Someheader"), "somevalue")
 }

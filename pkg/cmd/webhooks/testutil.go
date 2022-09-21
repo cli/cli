@@ -16,7 +16,7 @@ type wsMsg struct {
 }
 
 type localEvent struct {
-	Body   []byte `json:"body"`
+	Body   string `json:"body"`
 	Header http.Header
 }
 
@@ -88,7 +88,7 @@ func getWSServer(t *testing.T) *httptest.Server {
 		header.Add("Someheader", "somevalue")
 		msg := wsMsg{
 			Header: header,
-			Body:   []byte(`{"body": "bG9sCg=="}`),
+			Body:   []byte(`{"body": "lol"}`),
 		}
 		send, _ := json.Marshal(msg)
 		err = c.WriteMessage(1, send)
