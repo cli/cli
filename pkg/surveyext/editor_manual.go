@@ -87,7 +87,7 @@ func edit(editorCommand, fn, initialValue string, stdin io.Reader, stdout io.Wri
 	cmd := exec.Command(args[0], args[1:]...)
 	cmd.Env = env
 	cmd.Stdin = stdin
-	cmd.Stdout = os.Stdout
+	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 
 	if cursor != nil {
