@@ -32,6 +32,7 @@ type ErrClosedPagerPipe struct {
 type fileWriter interface {
 	io.Writer
 	Fd() uintptr
+	File() *os.File
 }
 
 type fileReader interface {
@@ -150,7 +151,7 @@ func (s *IOStreams) IsStdoutTTY() bool {
 	if s.stdoutTTYOverride {
 		return s.stdoutIsTTY
 	}
-	if stdout, ok := s.Out.(*os.File); ok {
+	if stdout := s.Out.File(); stdout != nil {
 		return isTerminal(stdout)
 	}
 	return false
@@ -208,7 +209,11 @@ func (s *IOStreams) StartPager() error {
 	}
 	pagerCmd := exec.Command(pagerExe, pagerArgs[1:]...)
 	pagerCmd.Env = pagerEnv
-	pagerCmd.Stdout = s.Out
+	if stdout := s.Out.File(); stdout != nil {
+		pagerCmd.Stdout = stdout
+	} else {
+		pagerCmd.Stdout = s.Out
+	}
 	pagerCmd.Stderr = s.ErrOut
 	pagedOut, err := pagerCmd.StdinPipe()
 	if err != nil {
@@ -521,10 +526,36 @@ func (w *pagerWriter) Write(d []byte) (int, error) {
 	return n, err
 }
 
+func (w *pagerWriter) File() *os.File {
+	if w == nil {
+		return nil
+	}
+	switch fd := w.WriteCloser.(type) {
+	case *os.File:
+		return fd
+	default:
+		return nil
+	}
+}
+
 // fdWriter represents a wrapped stdout Writer that preserves the original file descriptor
 type fdWriter struct {
 	io.Writer
 	fd uintptr
+}
+
+func (w *fdWriter) File() *os.File {
+	if w == nil {
+		return nil
+	}
+	switch fd := w.Writer.(type) {
+	case *os.File:
+		return fd
+	case *pagerWriter:
+		return fd.File()
+	default:
+		return nil
+	}
 }
 
 func (w *fdWriter) Fd() uintptr {
@@ -539,6 +570,20 @@ type fdWriteCloser struct {
 
 func (w *fdWriteCloser) Fd() uintptr {
 	return w.fd
+}
+
+func (w *fdWriteCloser) File() *os.File {
+	if w == nil {
+		return nil
+	}
+	switch fd := w.WriteCloser.(type) {
+	case *os.File:
+		return fd
+	case *pagerWriter:
+		return fd.File()
+	default:
+		return nil
+	}
 }
 
 // fdWriter represents a wrapped stdin ReadCloser that preserves the original file descriptor
