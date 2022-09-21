@@ -24,6 +24,7 @@ import (
 
 const gitHubAPIProdURL = "http://api.github.com"
 
+var retries = 0
 var maxRetries = 3
 var webhookRcvServerURL = ""
 
@@ -89,62 +90,27 @@ func newCmdForward(f *cmdutil.Factory, runF func(*hookOptions) error) *cobra.Com
 			}
 			token, _ := cfg.AuthToken(opts.Host)
 
-			var retries int
-			events := make(chan wsEventReceived)
-			replies := make(chan httpEventForward)
-
-			go forwardEvents(&opts, events, replies)
-
 			for {
 				if retries >= maxRetries {
 					fmt.Fprintf(opts.IO.Out, "Unable to connect to webhooks server, forwarding stopped.\n")
 					return nil
 				}
 
-				done := make(chan struct{})
-				defer close(done)
-				conn, err := handleWebsocket(token, wsURL, &opts, events)
-
+				err := handleWebsocket(&opts, token, wsURL)
 				if err != nil {
 					unwrapped := errors.Unwrap(err)
 					var syscallErr *os.SyscallError
-					// If the error is a TCP handleWebsocket error, retry connecting
-					if errors.As(unwrapped, &syscallErr) && (unwrapped.Error() == "connect: connection refused") {
+					// If the error is a TCP handleWebsocket error or a server disconnect (1006), retry connecting
+					if errors.As(unwrapped, &syscallErr) && (unwrapped.Error() == "connect: connection refused") || websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
 						retries += 1
 						time.Sleep(5 * time.Second)
 						continue
 					}
-					// If the error is a server disconnect (1006), retry connecting
-					if websocket.IsCloseError(err, websocket.CloseAbnormalClosure) {
-						retries += 1
-						time.Sleep(10 * time.Second)
-						continue
-					}
-
 					if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
 						return nil
 					}
-					return err
 				}
-
-				fmt.Fprintf(opts.IO.Out, "Connected to webhooks server, forwarding \n")
-				retries = 0
-
-				go func() {
-					for {
-						select {
-						case <-done:
-							return
-						case reply := <-replies:
-							err := conn.WriteJSON(reply)
-							if err != nil {
-								return
-							}
-						}
-					}
-				}()
 			}
-			return nil
 		},
 	}
 	cmd.Flags().StringVarP(&opts.EventType, "event", "E", "", "Name of the event type to forward")
@@ -184,70 +150,76 @@ func createHook(o *hookOptions) (string, error) {
 	return res.WsURL, nil
 }
 
-// handleWebsocket connects to the websocket server and saves received events to a channel
-func handleWebsocket(token string, url *url.URL, opts *hookOptions, events chan wsEventReceived) (*websocket.Conn, error) {
+// handleWebsocket mediates between websocket server and local web server
+func handleWebsocket(opts *hookOptions, token string, url *url.URL) error {
 	fmt.Fprintf(opts.IO.Out, "Attempting to connect to webhooks server...\n")
-	h := make(http.Header)
-	h.Set("Authorization", token)
-
-	c, resp, err := websocket.DefaultDialer.Dial(url.String(), h)
+	c, err := dial(token, url)
 	if err != nil {
-		if resp != nil {
-			bts, _ := io.ReadAll(resp.Body)
-			err = fmt.Errorf("ws err %d - %s - %v", resp.StatusCode, bts, err)
-		}
-		return nil, err
+		return err
 	}
-
 	defer c.Close()
+	retries = 0
 
 	for {
 		var ev wsEventReceived
 		err := c.ReadJSON(&ev)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		events <- ev
-	}
 
+		resp, err := forwardEvent(opts, ev)
+		if err != nil {
+			continue
+		}
+
+		err = c.WriteJSON(resp)
+		if err != nil {
+			return err
+		}
+	}
+}
+
+// dial connects to the websocket server
+func dial(token string, url *url.URL) (*websocket.Conn, error) {
+	h := make(http.Header)
+	h.Set("Authorization", token)
+	c, _, err := websocket.DefaultDialer.Dial(url.String(), h)
+	if err != nil {
+		return nil, err
+	}
 	return c, nil
 }
 
-// forwardEvents forwards events to the server running on the local port specified by the user
-func forwardEvents(opts *hookOptions, events chan wsEventReceived, replies chan httpEventForward) error {
-	for ev := range events {
-		// TODO remove before merging
-		log.Printf("[LOG] received event with headers: %v \n", ev.Header)
-		if webhookRcvServerURL == "" {
-			webhookRcvServerURL = fmt.Sprintf("http://localhost:%d", opts.Port)
-		}
-
-		req, err := http.NewRequest(http.MethodPost, webhookRcvServerURL, bytes.NewReader(ev.Body))
-		if err != nil {
-			return err
-		}
-
-		for k := range ev.Header {
-			req.Header.Set(k, ev.Header.Get(k))
-		}
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return err
-		}
-
-		defer resp.Body.Close()
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-
-		replies <- httpEventForward{
-			Status: resp.StatusCode,
-			Header: resp.Header,
-			Body:   body,
-		}
+// forwardEvent forwards events to the server running on the local port specified by the user
+func forwardEvent(opts *hookOptions, ev wsEventReceived) (*httpEventForward, error) {
+	log.Printf("[LOG] received event with headers: %v \n", ev.Header)
+	if webhookRcvServerURL == "" {
+		webhookRcvServerURL = fmt.Sprintf("http://localhost:%d", opts.Port)
 	}
 
-	return nil
+	req, err := http.NewRequest(http.MethodPost, webhookRcvServerURL, bytes.NewReader(ev.Body))
+	if err != nil {
+		return nil, err
+	}
+
+	for k := range ev.Header {
+		req.Header.Set(k, ev.Header.Get(k))
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return &httpEventForward{
+		Status: resp.StatusCode,
+		Header: resp.Header,
+		Body:   body,
+	}, nil
 }
