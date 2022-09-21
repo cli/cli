@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -849,7 +850,7 @@ func TestViewRun(t *testing.T) {
 			tt.askStubs(as)
 		}
 
-		browser := &cmdutil.TestBrowser{}
+		browser := &browser.Stub{}
 		tt.opts.Browser = browser
 		rlc := testRunLogCache{}
 		tt.opts.RunLogCache = rlc

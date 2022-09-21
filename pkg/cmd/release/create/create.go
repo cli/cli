@@ -14,12 +14,12 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/pkg/surveyext"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/spf13/cobra"
 )
 
@@ -50,6 +50,7 @@ type CreateOptions struct {
 	Concurrency        int
 	DiscussionCategory string
 	GenerateNotes      bool
+	NotesStartTag      string
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -160,6 +161,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion in the specified category")
 	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate title and notes for the release")
+	cmd.Flags().StringVar(&opts.NotesStartTag, "notes-start-tag", "", "Tag to use as the starting point for generating release notes")
 	cmdutil.RegisterBranchCompletionFlags(cmd, "target")
 
 	return cmd
@@ -196,6 +198,7 @@ func createRun(opts *CreateOptions) error {
 				Options: options,
 				Default: options[0],
 			}
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err := prompt.SurveyAskOne(q, &tag)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
@@ -210,6 +213,7 @@ func createRun(opts *CreateOptions) error {
 			q := &survey.Input{
 				Message: "Tag name",
 			}
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err := prompt.SurveyAskOne(q, &opts.TagName)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
@@ -249,13 +253,7 @@ func createRun(opts *CreateOptions) error {
 		var generatedNotes *releaseNotes
 		var generatedChangelog string
 
-		params := map[string]interface{}{
-			"tag_name": opts.TagName,
-		}
-		if opts.Target != "" {
-			params["target_commitish"] = opts.Target
-		}
-		generatedNotes, err = generateReleaseNotes(httpClient, baseRepo, params)
+		generatedNotes, err = generateReleaseNotes(httpClient, baseRepo, opts.TagName, opts.Target, opts.NotesStartTag)
 		if err != nil && !errors.Is(err, notImplementedError) {
 			return err
 		}
@@ -271,7 +269,10 @@ func createRun(opts *CreateOptions) error {
 				}
 			}
 			if generatedNotes == nil {
-				if prevTag, err := detectPreviousTag(headRef); err == nil {
+				if opts.NotesStartTag != "" {
+					commits, _ := changelogForRange(fmt.Sprintf("%s..%s", opts.NotesStartTag, headRef))
+					generatedChangelog = generateChangelog(commits)
+				} else if prevTag, err := detectPreviousTag(headRef); err == nil {
 					commits, _ := changelogForRange(fmt.Sprintf("%s..%s", prevTag, headRef))
 					generatedChangelog = generateChangelog(commits)
 				}
@@ -310,6 +311,7 @@ func createRun(opts *CreateOptions) error {
 				},
 			},
 		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 		err = prompt.SurveyAsk(qs, opts)
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
@@ -374,6 +376,7 @@ func createRun(opts *CreateOptions) error {
 			},
 		}
 
+		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 		err = prompt.SurveyAsk(qs, opts)
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
@@ -409,7 +412,24 @@ func createRun(opts *CreateOptions) error {
 		params["discussion_category_name"] = opts.DiscussionCategory
 	}
 	if opts.GenerateNotes {
-		params["generate_release_notes"] = true
+		if opts.NotesStartTag != "" {
+			generatedNotes, err := generateReleaseNotes(httpClient, baseRepo, opts.TagName, opts.Target, opts.NotesStartTag)
+			if err != nil && !errors.Is(err, notImplementedError) {
+				return err
+			}
+			if generatedNotes != nil {
+				if opts.Body == "" {
+					params["body"] = generatedNotes.Body
+				} else {
+					params["body"] = fmt.Sprintf("%s\n%s", opts.Body, generatedNotes.Body)
+				}
+				if opts.Name == "" {
+					params["name"] = generatedNotes.Name
+				}
+			}
+		} else {
+			params["generate_release_notes"] = true
+		}
 	}
 
 	hasAssets := len(opts.Assets) > 0

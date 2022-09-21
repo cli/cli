@@ -15,18 +15,15 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
-
-type browser interface {
-	Browse(string) error
-}
 
 type CreateOptions struct {
 	IO *iostreams.IOStreams
@@ -39,7 +36,7 @@ type CreateOptions struct {
 
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
-	Browser    browser
+	Browser    browser.Browser
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -115,6 +112,7 @@ func createRun(opts *CreateOptions) error {
 		return fmt.Errorf("failed to collect files for posting: %w", err)
 	}
 
+	cs := opts.IO.ColorScheme()
 	gistName := guessGistName(files)
 
 	processMessage := "Creating gist..."
@@ -125,10 +123,12 @@ func createRun(opts *CreateOptions) error {
 		} else {
 			processMessage = fmt.Sprintf("Creating gist %s", gistName)
 		}
-		completionMessage = fmt.Sprintf("Created gist %s", gistName)
+		if opts.Public {
+			completionMessage = fmt.Sprintf("Created %s gist %s", cs.Red("public"), gistName)
+		} else {
+			completionMessage = fmt.Sprintf("Created %s gist %s", cs.Green("secret"), gistName)
+		}
 	}
-
-	cs := opts.IO.ColorScheme()
 
 	errOut := opts.IO.ErrOut
 	fmt.Fprintf(errOut, "%s %s\n", cs.Gray("-"), processMessage)
@@ -164,7 +164,7 @@ func createRun(opts *CreateOptions) error {
 	fmt.Fprintf(errOut, "%s %s\n", cs.SuccessIconWithColor(cs.Green), completionMessage)
 
 	if opts.WebMode {
-		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(gist.HTMLURL))
+		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(gist.HTMLURL))
 
 		return opts.Browser.Browse(gist.HTMLURL)
 	}

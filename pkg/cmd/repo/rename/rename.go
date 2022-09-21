@@ -89,6 +89,7 @@ func renameRun(opts *RenameOptions) error {
 	}
 
 	if newRepoName == "" {
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(
 			&survey.Input{
 				Message: fmt.Sprintf("Rename %s to: ", ghrepo.FullName(currRepo)),
@@ -106,6 +107,7 @@ func renameRun(opts *RenameOptions) error {
 			Message: fmt.Sprintf("Rename %s to %s?", ghrepo.FullName(currRepo), newRepoName),
 			Default: false,
 		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(p, &confirmed)
 		if err != nil {
 			return fmt.Errorf("failed to prompt: %w", err)

@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -67,19 +68,7 @@ type PullRequest struct {
 		Nodes      []PullRequestCommit
 	}
 	StatusCheckRollup struct {
-		Nodes []struct {
-			Commit struct {
-				StatusCheckRollup struct {
-					Contexts struct {
-						Nodes    []CheckContext
-						PageInfo struct {
-							HasNextPage bool
-							EndCursor   string
-						}
-					}
-				}
-			}
-		}
+		Nodes []StatusCheckRollupNode
 	}
 
 	Assignees      Assignees
@@ -93,9 +82,30 @@ type PullRequest struct {
 	ReviewRequests ReviewRequests
 }
 
+type StatusCheckRollupNode struct {
+	Commit StatusCheckRollupCommit
+}
+
+type StatusCheckRollupCommit struct {
+	StatusCheckRollup CommitStatusCheckRollup
+}
+
+type CommitStatusCheckRollup struct {
+	Contexts CheckContexts
+}
+
+type CheckContexts struct {
+	Nodes    []CheckContext
+	PageInfo struct {
+		HasNextPage bool
+		EndCursor   string
+	}
+}
+
 type CheckContext struct {
 	TypeName   string `json:"__typename"`
 	Name       string `json:"name"`
+	IsRequired bool   `json:"isRequired"`
 	CheckSuite struct {
 		WorkflowRun struct {
 			Workflow struct {
@@ -447,6 +457,6 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 }
 
 func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) error {
-	path := fmt.Sprintf("repos/%s/%s/git/refs/heads/%s", repo.RepoOwner(), repo.RepoName(), branch)
+	path := fmt.Sprintf("repos/%s/%s/git/refs/heads/%s", repo.RepoOwner(), repo.RepoName(), url.PathEscape(branch))
 	return client.REST(repo.RepoHost(), "DELETE", path, nil, nil)
 }

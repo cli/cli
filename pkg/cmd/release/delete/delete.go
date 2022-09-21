@@ -69,6 +69,7 @@ func deleteRun(opts *DeleteOptions) error {
 
 	if !opts.SkipConfirm && opts.IO.CanPrompt() {
 		var confirmed bool
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err := prompt.SurveyAskOne(&survey.Confirm{
 			Message: fmt.Sprintf("Delete release %s in %s?", release.TagName, ghrepo.FullName(baseRepo)),
 			Default: true,

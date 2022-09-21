@@ -1,41 +1,34 @@
 package list
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
-	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
-
-type browser interface {
-	Browse(string) error
-}
 
 type ListOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
-	Browser    browser
-
-	WebMode  bool
-	Exporter cmdutil.Exporter
+	Browser    browser.Browser
 
 	Assignee     string
 	Labels       []string
@@ -45,6 +38,11 @@ type ListOptions struct {
 	Mention      string
 	Milestone    string
 	Search       string
+	WebMode      bool
+	Exporter     cmdutil.Exporter
+
+	Detector fd.Detector
+	Now      func() time.Time
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -53,6 +51,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
 		Browser:    f.Browser,
+		Now:        time.Now,
 	}
 
 	var appAuthor string
@@ -138,6 +137,19 @@ func listRun(opts *ListOptions) error {
 		issueState = ""
 	}
 
+	if opts.Detector == nil {
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, baseRepo.RepoHost())
+	}
+	features, err := opts.Detector.IssueFeatures()
+	if err != nil {
+		return err
+	}
+	fields := defaultFields
+	if features.StateReason {
+		fields = append(defaultFields, "stateReason")
+	}
+
 	filterOptions := prShared.FilterOptions{
 		Entity:    "issue",
 		State:     issueState,
@@ -147,7 +159,7 @@ func listRun(opts *ListOptions) error {
 		Mention:   opts.Mention,
 		Milestone: opts.Milestone,
 		Search:    opts.Search,
-		Fields:    defaultFields,
+		Fields:    fields,
 	}
 
 	isTerminal := opts.IO.IsStdoutTTY()
@@ -160,7 +172,7 @@ func listRun(opts *ListOptions) error {
 		}
 
 		if isTerminal {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 		}
 		return opts.Browser.Browse(openURL)
 	}
@@ -195,7 +207,7 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
-	issueShared.PrintIssues(opts.IO, "", len(listResult.Issues), listResult.Issues)
+	issueShared.PrintIssues(opts.IO, opts.Now(), "", len(listResult.Issues), listResult.Issues)
 
 	return nil
 }
@@ -246,8 +258,8 @@ func milestoneByNumber(client *http.Client, repo ghrepo.Interface, number int32)
 		"number": githubv4.Int(number),
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), client)
-	if err := gql.QueryNamed(context.Background(), "RepositoryMilestoneByNumber", &query, variables); err != nil {
+	gql := api.NewClientFromHTTP(client)
+	if err := gql.Query(repo.RepoHost(), "RepositoryMilestoneByNumber", &query, variables); err != nil {
 		return nil, err
 	}
 	if query.Repository.Milestone == nil {

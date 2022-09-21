@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
@@ -81,7 +82,7 @@ func listRun(opts *ListOptions) error {
 
 		createdAt := gpgKey.CreatedAt.Format(time.RFC3339)
 		if t.IsTTY() {
-			createdAt = "Created " + utils.FuzzyAgoAbbr(now, gpgKey.CreatedAt)
+			createdAt = "Created " + text.FuzzyAgoAbbr(now, gpgKey.CreatedAt)
 		}
 		t.AddField(createdAt, nil, cs.Gray)
 

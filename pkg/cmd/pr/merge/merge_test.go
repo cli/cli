@@ -960,6 +960,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 	as := prompt.NewAskStubber(t)
 	as.StubPrompt("Pull request #4 was already merged. Delete the branch locally?").AnswerWith(true)
 
@@ -1021,6 +1022,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_TTY(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 	cs.Register(`git branch -D `, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 	as := prompt.NewAskStubber(t)
 	as.StubPrompt("Pull request #4 was already merged. Delete the branch locally?").AnswerWith(true)
 
@@ -1100,6 +1102,7 @@ func TestPRMergeTTY(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 	as := prompt.NewAskStubber(t)
 	as.StubPrompt("What merge method would you like to use?").AnswerDefault()
 	as.StubPrompt("Delete the branch locally and on GitHub?").AnswerDefault()
@@ -1161,6 +1164,7 @@ func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 	as := prompt.NewAskStubber(t)
 	as.StubPrompt("What merge method would you like to use?").AnswerDefault()
 	as.StubPrompt("What's next?").AnswerWith("Submit")
@@ -1220,6 +1224,7 @@ func TestPRMergeTTY_squashEditCommitMsgAndSubject(t *testing.T) {
 	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 	as := prompt.NewAskStubber(t)
 	as.StubPrompt("What merge method would you like to use?").AnswerWith("Squash and merge")
 	as.StubPrompt("Delete the branch on GitHub?").AnswerDefault()
@@ -1298,6 +1303,7 @@ func TestPRTTY_cancelled(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 	as := prompt.NewAskStubber(t)
 	as.StubPrompt("What merge method would you like to use?").AnswerDefault()
 	as.StubPrompt("Delete the branch locally and on GitHub?").AnswerDefault()
@@ -1317,6 +1323,7 @@ func Test_mergeMethodSurvey(t *testing.T) {
 		RebaseMergeAllowed: true,
 		SquashMergeAllowed: true,
 	}
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 	as := prompt.NewAskStubber(t)
 	as.StubPrompt("What merge method would you like to use?").AnswerWith("Rebase and merge")
 
@@ -1624,6 +1631,7 @@ func TestPrAddToMergeQueueAdmin(t *testing.T) {
 	defer cmdTeardown(t)
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 	as := prompt.NewAskStubber(t)
 	as.StubPrompt("What merge method would you like to use?").AnswerDefault()
 	as.StubPrompt("Delete the branch locally and on GitHub?").AnswerDefault()

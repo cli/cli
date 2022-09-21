@@ -355,6 +355,7 @@ func Test_viewRun(t *testing.T) {
 				)),
 			)
 
+			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 			as := prompt.NewAskStubber(t)
 			as.StubPrompt("Select a gist").AnswerDefault()
 		}
@@ -469,6 +470,7 @@ func Test_promptGists(t *testing.T) {
 		client := &http.Client{Transport: reg}
 
 		t.Run(tt.name, func(t *testing.T) {
+			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
 				tt.askStubs(as)

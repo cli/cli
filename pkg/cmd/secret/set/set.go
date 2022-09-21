@@ -58,7 +58,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			Set a value for a secret on one of the following levels:
 			- repository (default): available to Actions runs or Dependabot in a repository
 			- environment: available to Actions runs for a deployment environment in a repository
-			- organization: available to Actions runs or Dependabot within an organization
+			- organization: available to Actions runs, Dependabot, or Codespaces within an organization
 			- user: available to Codespaces for your user
 
 			Organization and user secrets can optionally be restricted to only be available to
@@ -373,6 +373,7 @@ func getBody(opts *SetOptions) ([]byte, error) {
 
 	if opts.IO.CanPrompt() {
 		var bodyInput string
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err := prompt.SurveyAskOne(&survey.Password{
 			Message: "Paste your secret",
 		}, &bodyInput)

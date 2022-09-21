@@ -104,6 +104,7 @@ func SelectWorkflow(workflows []Workflow, promptMsg string, states []WorkflowSta
 
 	var selected int
 
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err := prompt.SurveyAskOne(&survey.Select{
 		Message:  promptMsg,
 		Options:  candidates,
@@ -138,7 +139,7 @@ func getWorkflowByID(client *api.Client, repo ghrepo.Interface, ID string) (*Wor
 	var workflow Workflow
 
 	err := client.REST(repo.RepoHost(), "GET",
-		fmt.Sprintf("repos/%s/actions/workflows/%s", ghrepo.FullName(repo), ID),
+		fmt.Sprintf("repos/%s/actions/workflows/%s", ghrepo.FullName(repo), url.PathEscape(ID)),
 		nil, &workflow)
 
 	if err != nil {

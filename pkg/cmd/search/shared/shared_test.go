@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
-	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/search"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +23,9 @@ func TestSearcher(t *testing.T) {
 }
 
 func TestSearchIssues(t *testing.T) {
-	query := search.Query{
+	var now = time.Date(2022, 2, 28, 12, 30, 0, 0, time.UTC)
+	var updatedAt = time.Date(2021, 2, 28, 12, 30, 0, 0, time.UTC)
+	var query = search.Query{
 		Keywords: []string{"keyword"},
 		Kind:     "issues",
 		Limit:    30,
@@ -33,8 +35,6 @@ func TestSearchIssues(t *testing.T) {
 			Is:       []string{"public", "locked"},
 		},
 	}
-
-	var updatedAt = time.Date(2021, 2, 28, 12, 30, 0, 0, time.UTC)
 	tests := []struct {
 		errMsg     string
 		name       string
@@ -159,7 +159,7 @@ func TestSearchIssues(t *testing.T) {
 		{
 			name: "opens browser for web mode tty",
 			opts: &IssuesOptions{
-				Browser: &cmdutil.TestBrowser{},
+				Browser: &browser.Stub{},
 				Entity:  Issues,
 				Query:   query,
 				Searcher: &search.SearcherMock{
@@ -175,7 +175,7 @@ func TestSearchIssues(t *testing.T) {
 		{
 			name: "opens browser for web mode notty",
 			opts: &IssuesOptions{
-				Browser: &cmdutil.TestBrowser{},
+				Browser: &browser.Stub{},
 				Entity:  Issues,
 				Query:   query,
 				Searcher: &search.SearcherMock{
@@ -193,6 +193,7 @@ func TestSearchIssues(t *testing.T) {
 		ios.SetStdoutTTY(tt.tty)
 		ios.SetStderrTTY(tt.tty)
 		tt.opts.IO = ios
+		tt.opts.Now = now
 		t.Run(tt.name, func(t *testing.T) {
 			err := SearchIssues(tt.opts)
 			if tt.wantErr {

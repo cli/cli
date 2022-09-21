@@ -282,6 +282,7 @@ func interactiveChoice(r *api.Repository) ([]string, error) {
 		options = append(options, optionAllowForking)
 	}
 	var answers []string
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err := prompt.SurveyAskOne(&survey.MultiSelect{
 		Message: "What do you want to edit?",
 		Options: options,
@@ -301,6 +302,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 		switch c {
 		case optionDescription:
 			opts.Edits.Description = &r.Description
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err = prompt.SurveyAskOne(&survey.Input{
 				Message: "Description of the repository",
 				Default: r.Description,
@@ -310,6 +312,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 		case optionHomePageURL:
 			opts.Edits.Homepage = &r.HomepageURL
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err = prompt.SurveyAskOne(&survey.Input{
 				Message: "Repository home page URL",
 				Default: r.HomepageURL,
@@ -319,6 +322,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 		case optionTopics:
 			var addTopics string
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err = prompt.SurveyAskOne(&survey.Input{
 				Message: "Add topics?(csv format)",
 			}, &addTopics)
@@ -330,6 +334,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 
 			if len(opts.topicsCache) > 0 {
+				//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 				err = prompt.SurveyAskOne(&survey.MultiSelect{
 					Message: "Remove Topics",
 					Options: opts.topicsCache,
@@ -340,6 +345,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 		case optionDefaultBranchName:
 			opts.Edits.DefaultBranch = &r.DefaultBranchRef.Name
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err = prompt.SurveyAskOne(&survey.Input{
 				Message: "Default branch name",
 				Default: r.DefaultBranchRef.Name,
@@ -349,6 +355,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 		case optionWikis:
 			opts.Edits.EnableWiki = &r.HasWikiEnabled
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err = prompt.SurveyAskOne(&survey.Confirm{
 				Message: "Enable Wikis?",
 				Default: r.HasWikiEnabled,
@@ -358,6 +365,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 		case optionIssues:
 			opts.Edits.EnableIssues = &r.HasIssuesEnabled
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err = prompt.SurveyAskOne(&survey.Confirm{
 				Message: "Enable Issues?",
 				Default: r.HasIssuesEnabled,
@@ -367,6 +375,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 		case optionProjects:
 			opts.Edits.EnableProjects = &r.HasProjectsEnabled
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err = prompt.SurveyAskOne(&survey.Confirm{
 				Message: "Enable Projects?",
 				Default: r.HasProjectsEnabled,
@@ -376,6 +385,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 		case optionVisibility:
 			opts.Edits.Visibility = &r.Visibility
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err = prompt.SurveyAskOne(&survey.Select{
 				Message: "Visibility",
 				Options: []string{"public", "private", "internal"},
@@ -396,6 +406,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			if r.RebaseMergeAllowed {
 				defaultMergeOptions = append(defaultMergeOptions, allowRebaseMerge)
 			}
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err = prompt.SurveyAskOne(&survey.MultiSelect{
 				Message: "Allowed merge strategies",
 				Default: defaultMergeOptions,
@@ -415,6 +426,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 
 			opts.Edits.EnableAutoMerge = &r.AutoMergeAllowed
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err = prompt.SurveyAskOne(&survey.Confirm{
 				Message: "Enable Auto Merge?",
 				Default: r.AutoMergeAllowed,
@@ -424,6 +436,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 
 			opts.Edits.DeleteBranchOnMerge = &r.DeleteBranchOnMerge
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err = prompt.SurveyAskOne(&survey.Confirm{
 				Message: "Automatically delete head branches after merging?",
 				Default: r.DeleteBranchOnMerge,
@@ -433,6 +446,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 		case optionTemplateRepo:
 			opts.Edits.IsTemplate = &r.IsTemplate
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err = prompt.SurveyAskOne(&survey.Confirm{
 				Message: "Convert into a template repository?",
 				Default: r.IsTemplate,
@@ -442,6 +456,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			}
 		case optionAllowForking:
 			opts.Edits.AllowForking = &r.ForkingAllowed
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err = prompt.SurveyAskOne(&survey.Confirm{
 				Message: "Allow forking (of an organization repository)?",
 				Default: r.ForkingAllowed,

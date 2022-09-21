@@ -2,7 +2,6 @@ package create
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,7 +12,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
-	graphql "github.com/cli/shurcooL-graphql"
+	"github.com/shurcooL/githubv4"
 )
 
 type tag struct {
@@ -28,7 +27,7 @@ type releaseNotes struct {
 var notImplementedError = errors.New("not implemented")
 
 func remoteTagExists(httpClient *http.Client, repo ghrepo.Interface, tagName string) (bool, error) {
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
+	gql := api.NewClientFromHTTP(httpClient)
 	qualifiedTagName := fmt.Sprintf("refs/tags/%s", tagName)
 	var query struct {
 		Repository struct {
@@ -38,11 +37,11 @@ func remoteTagExists(httpClient *http.Client, repo ghrepo.Interface, tagName str
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 	variables := map[string]interface{}{
-		"owner":   graphql.String(repo.RepoOwner()),
-		"name":    graphql.String(repo.RepoName()),
-		"tagName": graphql.String(qualifiedTagName),
+		"owner":   githubv4.String(repo.RepoOwner()),
+		"name":    githubv4.String(repo.RepoName()),
+		"tagName": githubv4.String(qualifiedTagName),
 	}
-	err := gql.QueryNamed(context.Background(), "RepositoryFindRef", &query, variables)
+	err := gql.Query(repo.RepoHost(), "RepositoryFindRef", &query, variables)
 	return query.Repository.Ref.ID != "", err
 }
 
@@ -77,7 +76,17 @@ func getTags(httpClient *http.Client, repo ghrepo.Interface, limit int) ([]tag, 
 	return tags, err
 }
 
-func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, params map[string]interface{}) (*releaseNotes, error) {
+func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagName, target, previousTagName string) (*releaseNotes, error) {
+	params := map[string]interface{}{
+		"tag_name": tagName,
+	}
+	if target != "" {
+		params["target_commitish"] = target
+	}
+	if previousTagName != "" {
+		params["previous_tag_name"] = previousTagName
+	}
+
 	bodyBytes, err := json.Marshal(params)
 	if err != nil {
 		return nil, err

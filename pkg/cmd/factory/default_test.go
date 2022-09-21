@@ -352,6 +352,7 @@ func Test_ioStreams_prompt(t *testing.T) {
 		name           string
 		config         config.Config
 		promptDisabled bool
+		env            map[string]string
 	}{
 		{
 			name:           "default config",
@@ -362,9 +363,19 @@ func Test_ioStreams_prompt(t *testing.T) {
 			config:         disablePromptConfig(),
 			promptDisabled: true,
 		},
+		{
+			name:           "prompt disabled via GH_PROMPT_DISABLED env var",
+			env:            map[string]string{"GH_PROMPT_DISABLED": "1"},
+			promptDisabled: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.env != nil {
+				for k, v := range tt.env {
+					t.Setenv(k, v)
+				}
+			}
 			f := New("1")
 			f.Config = func() (config.Config, error) {
 				if tt.config == nil {
@@ -375,80 +386,6 @@ func Test_ioStreams_prompt(t *testing.T) {
 			}
 			io := ioStreams(f)
 			assert.Equal(t, tt.promptDisabled, io.GetNeverPrompt())
-		})
-	}
-}
-
-func Test_browserLauncher(t *testing.T) {
-	tests := []struct {
-		name        string
-		env         map[string]string
-		config      config.Config
-		wantBrowser string
-	}{
-		{
-			name: "GH_BROWSER set",
-			env: map[string]string{
-				"GH_BROWSER": "GH_BROWSER",
-			},
-			wantBrowser: "GH_BROWSER",
-		},
-		{
-			name:        "config browser set",
-			config:      config.NewFromString("browser: CONFIG_BROWSER"),
-			wantBrowser: "CONFIG_BROWSER",
-		},
-		{
-			name: "BROWSER set",
-			env: map[string]string{
-				"BROWSER": "BROWSER",
-			},
-			wantBrowser: "BROWSER",
-		},
-		{
-			name: "GH_BROWSER and config browser set",
-			env: map[string]string{
-				"GH_BROWSER": "GH_BROWSER",
-			},
-			config:      config.NewFromString("browser: CONFIG_BROWSER"),
-			wantBrowser: "GH_BROWSER",
-		},
-		{
-			name: "config browser and BROWSER set",
-			env: map[string]string{
-				"BROWSER": "BROWSER",
-			},
-			config:      config.NewFromString("browser: CONFIG_BROWSER"),
-			wantBrowser: "CONFIG_BROWSER",
-		},
-		{
-			name: "GH_BROWSER and BROWSER set",
-			env: map[string]string{
-				"BROWSER":    "BROWSER",
-				"GH_BROWSER": "GH_BROWSER",
-			},
-			wantBrowser: "GH_BROWSER",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.env != nil {
-				for k, v := range tt.env {
-					old := os.Getenv(k)
-					os.Setenv(k, v)
-					defer os.Setenv(k, old)
-				}
-			}
-			f := New("1")
-			f.Config = func() (config.Config, error) {
-				if tt.config == nil {
-					return config.NewBlankConfig(), nil
-				} else {
-					return tt.config, nil
-				}
-			}
-			browser := browserLauncher(f)
-			assert.Equal(t, tt.wantBrowser, browser)
 		})
 	}
 }
