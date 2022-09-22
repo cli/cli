@@ -2,6 +2,8 @@ package extension
 
 import (
 	"fmt"
+	"log"
+	"os"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -17,13 +19,14 @@ var sidebarStyle = lipgloss.NewStyle()
 type uiModel struct {
 	sidebar sidebarModel
 	extList extListModel
-	// TODO move keymap here i guess? i don't know
+	logger  *log.Logger
 }
 
-func newUIModel() uiModel {
+func newUIModel(l *log.Logger) uiModel {
 	return uiModel{
-		extList: newExtListModel(),
-		sidebar: newSidebarModel(),
+		extList: newExtListModel(l),
+		sidebar: newSidebarModel(l),
+		logger:  l,
 	}
 }
 
@@ -33,6 +36,8 @@ func (m uiModel) Init() tea.Cmd {
 }
 
 func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	m.logger.Printf("%#v", msg)
+
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
 	var newModel tea.Model
@@ -40,6 +45,9 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	newModel, cmd = m.extList.Update(msg)
 	cmds = append(cmds, cmd)
 	m.extList = newModel.(extListModel)
+
+	item := newModel.(extListModel).SelectedItem()
+	m.sidebar.Content = item.(extEntry).Readme
 
 	newModel, cmd = m.sidebar.Update(msg)
 	cmds = append(cmds, cmd)
@@ -53,33 +61,38 @@ func (m uiModel) View() string {
 }
 
 type sidebarModel struct {
-	content  string
+	logger   *log.Logger
+	Content  string
 	viewport viewport.Model
 	ready    bool
 }
 
-func newSidebarModel() sidebarModel {
+func newSidebarModel(l *log.Logger) sidebarModel {
 	// TODO
-	return sidebarModel{}
+	return sidebarModel{
+		logger: l,
+	}
 }
 
 func (m sidebarModel) Init() tea.Cmd {
 	return nil
 }
 
-// TODO figure out best way to get currently selected list item's readme into the content for viewport
-
 func (m sidebarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	m.logger.Printf("%#v", msg)
 	// TODO
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		if !m.ready {
 			m.viewport = viewport.New(80, msg.Height)
-			m.viewport.SetContent("LOL TODO")
+			m.viewport.SetContent(m.Content)
 			m.ready = true
 		} else {
+			m.viewport.SetContent(m.Content)
 			m.viewport.Height = msg.Height
 		}
+	default:
+		m.viewport.SetContent(m.Content)
 	}
 
 	newvp, cmd := m.viewport.Update(msg)
@@ -130,19 +143,13 @@ func newKeyMap() *keyMap {
 	}
 }
 
-func newItemDelegate(keys *delegateKeyMap) list.DefaultDelegate {
-	// TODO unsure if i'll need this
-	return list.NewDefaultDelegate()
-}
-
-// TODO can the uiModel just create a list.Model and manage it directly?
 type extListModel struct {
-	list list.Model
-	keys *keyMap
-	// TODO keybindings
+	list   list.Model
+	keys   *keyMap
+	logger *log.Logger
 }
 
-func newExtListModel() extListModel {
+func newExtListModel(l *log.Logger) extListModel {
 	items := make([]list.Item, 5)
 	items[0] = extEntry{
 		Owner:     "cli",
@@ -184,7 +191,7 @@ func newExtListModel() extListModel {
 		Installed: false,
 		Official:  false,
 	}
-	list := list.New(items, newItemDelegate(nil), 0, 0)
+	list := list.New(items, list.NewDefaultDelegate(), 0, 0)
 
 	keys := newKeyMap()
 	list.Title = "gh extensions"
@@ -197,8 +204,9 @@ func newExtListModel() extListModel {
 	}
 
 	return extListModel{
-		list: list,
-		keys: keys,
+		logger: l,
+		list:   list,
+		keys:   keys,
 	}
 }
 
@@ -207,6 +215,7 @@ func (m extListModel) Init() tea.Cmd {
 }
 
 func (m extListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	m.logger.Printf("%#v", msg)
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		w, h := appStyle.GetFrameSize()
@@ -222,17 +231,30 @@ func (m extListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	nm, cmd := m.list.Update(msg)
 	m.list = nm
+
 	return m, cmd
+}
+
+func (m extListModel) SelectedItem() list.Item {
+	m.logger.Printf("%#v", m.list.SelectedItem())
+	return m.list.SelectedItem()
 }
 
 func (m extListModel) View() string {
 	return appStyle.Render(m.list.View())
 }
 
-// TODO
-
 func extBrowse(cmd *cobra.Command) error {
 	// TODO
 
-	return tea.NewProgram(newUIModel()).Start()
+	f, err := os.CreateTemp("/tmp", "extBrowse-*.txt")
+	if err != nil {
+		return err
+	}
+
+	defer os.Remove(f.Name())
+
+	l := log.New(f, "", log.Lshortfile)
+
+	return tea.NewProgram(newUIModel(l)).Start()
 }
