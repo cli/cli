@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/search"
 	"github.com/spf13/cobra"
 )
@@ -116,9 +117,27 @@ type extEntry struct {
 	description string
 }
 
-func (e extEntry) Title() string       { return e.FullName }
+func (e extEntry) Title() string {
+	installedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#62FF42"))
+	officialStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F2DB74"))
+
+	// TODO color -- our thing or lipgloss? probably need to rely on lipgloss.
+	var installed string
+	var official string
+
+	if e.Installed {
+		installed = installedStyle.Render("✓ ")
+	}
+
+	if e.Official {
+		official = officialStyle.Render("* ")
+	}
+
+	return fmt.Sprintf("%s%s%s", installed, official, e.FullName)
+}
+
 func (e extEntry) Description() string { return e.description }
-func (e extEntry) FilterValue() string { return fmt.Sprintf("%s/%s", e.Owner, e.Name) }
+func (e extEntry) FilterValue() string { return e.FullName }
 
 type keyMap struct {
 	install key.Binding
@@ -212,7 +231,7 @@ func (m extListModel) View() string {
 	return appStyle.Render(m.list.View())
 }
 
-func extBrowse(cmd *cobra.Command, searcher search.Searcher) error {
+func extBrowse(cmd *cobra.Command, searcher search.Searcher, em extensions.ExtensionManager) error {
 	// TODO support turning debug mode on/off
 	f, err := os.CreateTemp("/tmp", "extBrowse-*.txt")
 	if err != nil {
@@ -223,6 +242,8 @@ func extBrowse(cmd *cobra.Command, searcher search.Searcher) error {
 	l := log.New(f, "", log.Lshortfile)
 
 	// TODO spinner
+	// TODO get manager to tell me what's installed so I can cross ref
+	installed := em.List()
 
 	result, err := searcher.Repositories(search.Query{
 		Kind:  search.KindRepositories,
@@ -244,6 +265,12 @@ func extBrowse(cmd *cobra.Command, searcher search.Searcher) error {
 			Name:        repo.Name,
 			Stars:       repo.StargazersCount,
 			description: repo.Description,
+		}
+		for _, v := range installed {
+			// TODO the former is git URL and the latter is HTML URL so this doesn't
+			// work, do something else. A Repo() method on extension would be ideal.
+			l.Printf("%s %s", v.URL(), repo.URL)
+			ee.Installed = v.URL() == repo.URL
 		}
 		if ee.Owner == "cli" || ee.Owner == "github" {
 			ee.Official = true

@@ -238,7 +238,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 				searcher := search.NewSearcher(client, host)
 
-				return extBrowse(cmd, searcher)
+				return extBrowse(cmd, searcher, m)
 			},
 		},
 		&cobra.Command{
