@@ -23,9 +23,9 @@ type uiModel struct {
 	logger  *log.Logger
 }
 
-func newUIModel(l *log.Logger) uiModel {
+func newUIModel(l *log.Logger, extEntries []extEntry) uiModel {
 	return uiModel{
-		extList: newExtListModel(l),
+		extList: newExtListModel(l, extEntries),
 		sidebar: newSidebarModel(l),
 		logger:  l,
 	}
@@ -106,25 +106,26 @@ func (m sidebarModel) View() string {
 }
 
 type extEntry struct {
-	Owner     string
-	Name      string
-	Readme    string
-	Stars     int
-	Installed bool
-	Official  bool
+	Owner       string
+	Name        string
+	FullName    string
+	Readme      string
+	Stars       int
+	Installed   bool
+	Official    bool
+	description string
 }
 
-func (e extEntry) Title() string       { return fmt.Sprintf("%s/%s", e.Owner, e.Name) }
-func (e extEntry) Description() string { return fmt.Sprintf("%s/%s", e.Owner, e.Name) }
+func (e extEntry) Title() string       { return e.FullName }
+func (e extEntry) Description() string { return e.description }
 func (e extEntry) FilterValue() string { return fmt.Sprintf("%s/%s", e.Owner, e.Name) }
-
-// TODO what is this
-type delegateKeyMap struct{}
 
 type keyMap struct {
 	install key.Binding
 	remove  key.Binding
-	sort    key.Binding
+	// TODO instead of sorting, consider a toggle for Official Only
+	// TODO add key for opening in web
+	sort key.Binding
 }
 
 func newKeyMap() *keyMap {
@@ -150,47 +151,10 @@ type extListModel struct {
 	logger *log.Logger
 }
 
-func newExtListModel(l *log.Logger) extListModel {
-	items := make([]list.Item, 5)
-	items[0] = extEntry{
-		Owner:     "cli",
-		Name:      "user-status",
-		Readme:    "It's good",
-		Stars:     1000,
-		Installed: true,
-		Official:  true,
-	}
-	items[1] = extEntry{
-		Owner:     "github",
-		Name:      "something",
-		Readme:    "It's pretty good",
-		Stars:     10000,
-		Installed: false,
-		Official:  true,
-	}
-	items[2] = extEntry{
-		Owner:     "vilmibm",
-		Name:      "screenssaver",
-		Readme:    "rainbow characters",
-		Stars:     0,
-		Installed: true,
-		Official:  false,
-	}
-	items[3] = extEntry{
-		Owner:     "mislav",
-		Name:      "branch",
-		Readme:    "trees are nice",
-		Stars:     100,
-		Installed: true,
-		Official:  false,
-	}
-	items[4] = extEntry{
-		Owner:     "samcoe",
-		Name:      "triage",
-		Readme:    "things are sometimes",
-		Stars:     10,
-		Installed: false,
-		Official:  false,
+func newExtListModel(l *log.Logger, extEntries []extEntry) extListModel {
+	items := make([]list.Item, len(extEntries))
+	for i := range items {
+		items[i] = extEntries[i]
 	}
 	list := list.New(items, list.NewDefaultDelegate(), 0, 0)
 
@@ -271,7 +235,22 @@ func extBrowse(cmd *cobra.Command, searcher search.Searcher) error {
 		return fmt.Errorf("failed to search for extensions: %w", err)
 	}
 
-	l.Printf("%#v", result)
+	extEntries := []extEntry{}
 
-	return tea.NewProgram(newUIModel(l)).Start()
+	for _, repo := range result.Items {
+		ee := extEntry{
+			FullName:    repo.FullName,
+			Owner:       repo.Owner.Login,
+			Name:        repo.Name,
+			Stars:       repo.StargazersCount,
+			description: repo.Description,
+		}
+		if ee.Owner == "cli" || ee.Owner == "github" {
+			ee.Official = true
+		}
+
+		extEntries = append(extEntries, ee)
+	}
+
+	return tea.NewProgram(newUIModel(l, extEntries)).Start()
 }
