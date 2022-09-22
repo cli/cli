@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/cli/cli/v2/pkg/search"
 	"github.com/spf13/cobra"
 )
 
@@ -225,6 +226,9 @@ func (m extListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 		switch {
+		// TODO handle install
+		// TODO handle remove
+		// TODO handle open in web
 		//case.keyMatches(msg, )
 		}
 	}
@@ -244,17 +248,30 @@ func (m extListModel) View() string {
 	return appStyle.Render(m.list.View())
 }
 
-func extBrowse(cmd *cobra.Command) error {
-	// TODO
-
+func extBrowse(cmd *cobra.Command, searcher search.Searcher) error {
+	// TODO support turning debug mode on/off
 	f, err := os.CreateTemp("/tmp", "extBrowse-*.txt")
 	if err != nil {
 		return err
 	}
-
 	defer os.Remove(f.Name())
 
 	l := log.New(f, "", log.Lshortfile)
+
+	// TODO spinner
+
+	result, err := searcher.Repositories(search.Query{
+		Kind:  search.KindRepositories,
+		Limit: 1000,
+		Qualifiers: search.Qualifiers{
+			Topic: []string{"gh-extension"},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to search for extensions: %w", err)
+	}
+
+	l.Printf("%#v", result)
 
 	return tea.NewProgram(newUIModel(l)).Start()
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/extensions"
+	"github.com/cli/cli/v2/pkg/search"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
@@ -19,6 +20,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	m := f.ExtensionManager
 	io := f.IOStreams
 	prompter := f.Prompter
+	config := f.Config
 
 	extCmd := cobra.Command{
 		Use:   "extension",
@@ -224,7 +226,19 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				if !io.CanPrompt() {
 					return errors.New("this command runs an interactive UI and needs to be run in a terminal")
 				}
-				return extBrowse(cmd)
+				cfg, err := config()
+				if err != nil {
+					return err
+				}
+				host, _ := cfg.DefaultHost()
+				client, err := f.HttpClient()
+				if err != nil {
+					return err
+				}
+
+				searcher := search.NewSearcher(client, host)
+
+				return extBrowse(cmd, searcher)
 			},
 		},
 		&cobra.Command{
