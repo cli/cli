@@ -212,21 +212,21 @@ func TestSelectSSHKeys(t *testing.T) {
 			f.Close()
 		}
 
-		if tt.sshConfigKeys != nil {
-			configPath := filepath.Join(sshDir, "test-config")
+		configPath := filepath.Join(sshDir, "test-config")
 
-			configContent := ""
-			for _, key := range tt.sshConfigKeys {
-				configContent += fmt.Sprintf("IdentityFile %s\n", filepath.Join(sshDir, key))
-			}
+		// Seed the config with a non-existent key so that the default config won't apply
+		configContent := "IdentityFile dummy\n"
 
-			err := os.WriteFile(configPath, []byte(configContent), 0666)
-			if err != nil {
-				t.Fatalf("could not write test config %v", err)
-			}
-
-			tt.sshArgs = append(tt.sshArgs, "-F", configPath)
+		for _, key := range tt.sshConfigKeys {
+			configContent += fmt.Sprintf("IdentityFile %s\n", filepath.Join(sshDir, key))
 		}
+
+		err := os.WriteFile(configPath, []byte(configContent), 0666)
+		if err != nil {
+			t.Fatalf("could not write test config %v", err)
+		}
+
+		tt.sshArgs = append([]string{"-F", configPath}, tt.sshArgs...)
 
 		gotKeyPair, gotShouldAddArg, err := selectSSHKeys(context.Background(), sshContext, tt.sshArgs, sshOptions{profile: tt.profileOpt})
 
