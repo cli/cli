@@ -53,6 +53,24 @@ Upgrade:
 sudo dnf update gh
 ```
 
+### Amazon Linux 2 (yum)
+
+Install using our package repository for immediate access to latest releases:
+
+```bash
+sudo yum-config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+sudo yum install gh
+```
+
+> **Note**
+> We were recently forced to change our GPG signing key. If you've added the repository previously and now you're getting a GPG signing key error, disable the repository first with `sudo yum-config-manager --disable gh-cli` and add it again with `sudo yum-config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo`.
+
+Upgrade:
+
+```bash
+sudo yum update gh
+```
+
 ### openSUSE/SUSE Linux (zypper)
 
 Install:
