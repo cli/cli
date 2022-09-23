@@ -54,6 +54,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				cs := io.ColorScheme()
 				t := utils.NewTablePrinter(io)
 				for _, c := range cmds {
+					// TODO consider a Repo() on Extension interface
 					var repo string
 					if u, err := git.ParseURL(c.URL()); err == nil {
 						if r, err := ghrepo.FromURL(u); err == nil {
@@ -238,7 +239,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 				searcher := search.NewSearcher(client, host)
 
-				return extBrowse(cmd, searcher, m)
+				return extBrowse(cmd, searcher, m, client)
 			},
 		},
 		&cobra.Command{

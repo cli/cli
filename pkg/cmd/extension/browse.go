@@ -3,6 +3,7 @@ package extension
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -10,6 +11,9 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/repo/view"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/search"
 	"github.com/spf13/cobra"
@@ -19,22 +23,53 @@ var appStyle = lipgloss.NewStyle().Padding(1, 2)
 var sidebarStyle = lipgloss.NewStyle()
 
 type uiModel struct {
-	sidebar sidebarModel
-	extList extListModel
-	logger  *log.Logger
+	sidebar      sidebarModel
+	extList      extListModel
+	logger       *log.Logger
+	readmeGetter readmeGetter
 }
 
-func newUIModel(l *log.Logger, extEntries []extEntry) uiModel {
+func newUIModel(l *log.Logger, extEntries []extEntry, rg readmeGetter) uiModel {
 	return uiModel{
-		extList: newExtListModel(l, extEntries),
-		sidebar: newSidebarModel(l),
-		logger:  l,
+		extList:      newExtListModel(l, extEntries),
+		sidebar:      newSidebarModel(l),
+		logger:       l,
+		readmeGetter: rg,
 	}
 }
 
 func (m uiModel) Init() tea.Cmd {
 	// TODO the docs say not to do this but the example code in bubbles does:
 	return tea.EnterAltScreen
+}
+
+type readmeGetter interface {
+	Get(string) (string, error)
+}
+
+type cachingReadmeGetter struct {
+	client *http.Client
+	cache  map[string]string
+}
+
+func newReadmeGetter(client *http.Client) readmeGetter {
+	return &cachingReadmeGetter{
+		client: client,
+		cache:  map[string]string{},
+	}
+}
+
+func (g *cachingReadmeGetter) Get(repoFullName string) (string, error) {
+	if readme, ok := g.cache[repoFullName]; ok {
+		return readme, nil
+	}
+	repo, err := ghrepo.FromFullName(repoFullName)
+	readme, err := view.RepositoryReadme(g.client, repo, "")
+	if err != nil {
+		return "", err
+	}
+	g.cache[repoFullName] = readme.Content
+	return readme.Content, nil
 }
 
 func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -49,7 +84,18 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.extList = newModel.(extListModel)
 
 	item := newModel.(extListModel).SelectedItem()
-	m.sidebar.Content = item.(extEntry).Readme
+	if item != nil {
+		ee := item.(extEntry)
+		if ee.Readme == "" {
+			var err error
+			ee.Readme, err = m.readmeGetter.Get(ee.FullName)
+			if err != nil {
+				ee.Readme = "could not fetch readme x_x"
+				m.logger.Println(err.Error())
+			}
+		}
+		m.sidebar.Content = ee.Readme
+	}
 
 	newModel, cmd = m.sidebar.Update(msg)
 	cmds = append(cmds, cmd)
@@ -121,30 +167,27 @@ func (e extEntry) Title() string {
 	installedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#62FF42"))
 	officialStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F2DB74"))
 
-	// TODO color -- our thing or lipgloss? probably need to rely on lipgloss.
 	var installed string
 	var official string
 
 	if e.Installed {
-		installed = installedStyle.Render("✓ ")
+		installed = installedStyle.Render(" [installed]")
 	}
 
 	if e.Official {
-		official = officialStyle.Render("* ")
+		official = officialStyle.Render(" [official]")
 	}
 
-	return fmt.Sprintf("%s%s%s", installed, official, e.FullName)
+	return fmt.Sprintf("%s%s%s", e.FullName, official, installed)
 }
 
 func (e extEntry) Description() string { return e.description }
-func (e extEntry) FilterValue() string { return e.FullName }
+func (e extEntry) FilterValue() string { return e.Title() }
 
 type keyMap struct {
 	install key.Binding
 	remove  key.Binding
-	// TODO instead of sorting, consider a toggle for Official Only
-	// TODO add key for opening in web
-	sort key.Binding
+	web     key.Binding
 }
 
 func newKeyMap() *keyMap {
@@ -157,9 +200,9 @@ func newKeyMap() *keyMap {
 			key.WithKeys("r"),
 			key.WithHelp("r", "remove"),
 		),
-		sort: key.NewBinding(
-			key.WithKeys("s"),
-			key.WithHelp("s", "sort"),
+		web: key.NewBinding(
+			key.WithKeys("w"),
+			key.WithHelp("w", "open on web"),
 		),
 	}
 }
@@ -183,7 +226,7 @@ func newExtListModel(l *log.Logger, extEntries []extEntry) extListModel {
 		return []key.Binding{
 			keys.remove,
 			keys.install,
-			keys.sort,
+			keys.web,
 		}
 	}
 
@@ -231,7 +274,7 @@ func (m extListModel) View() string {
 	return appStyle.Render(m.list.View())
 }
 
-func extBrowse(cmd *cobra.Command, searcher search.Searcher, em extensions.ExtensionManager) error {
+func extBrowse(cmd *cobra.Command, searcher search.Searcher, em extensions.ExtensionManager, client *http.Client) error {
 	// TODO support turning debug mode on/off
 	f, err := os.CreateTemp("/tmp", "extBrowse-*.txt")
 	if err != nil {
@@ -267,10 +310,16 @@ func extBrowse(cmd *cobra.Command, searcher search.Searcher, em extensions.Exten
 			description: repo.Description,
 		}
 		for _, v := range installed {
-			// TODO the former is git URL and the latter is HTML URL so this doesn't
-			// work, do something else. A Repo() method on extension would be ideal.
-			l.Printf("%s %s", v.URL(), repo.URL)
-			ee.Installed = v.URL() == repo.URL
+			// TODO consider a Repo() on Extension interface
+			var installedRepo string
+			if u, err := git.ParseURL(v.URL()); err == nil {
+				if r, err := ghrepo.FromURL(u); err == nil {
+					installedRepo = ghrepo.FullName(r)
+				}
+			}
+			if repo.FullName == installedRepo {
+				ee.Installed = true
+			}
 		}
 		if ee.Owner == "cli" || ee.Owner == "github" {
 			ee.Official = true
@@ -279,5 +328,7 @@ func extBrowse(cmd *cobra.Command, searcher search.Searcher, em extensions.Exten
 		extEntries = append(extEntries, ee)
 	}
 
-	return tea.NewProgram(newUIModel(l, extEntries)).Start()
+	rg := newReadmeGetter(client)
+
+	return tea.NewProgram(newUIModel(l, extEntries, rg)).Start()
 }
