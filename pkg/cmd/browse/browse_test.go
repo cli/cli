@@ -149,15 +149,6 @@ func TestNewCmdBrowse(t *testing.T) {
 	}
 }
 
-func setGitDir(t *testing.T, dir string) {
-	// taken from git_test.go
-	old_GIT_DIR := os.Getenv("GIT_DIR")
-	os.Setenv("GIT_DIR", dir)
-	t.Cleanup(func() {
-		os.Setenv("GIT_DIR", old_GIT_DIR)
-	})
-}
-
 type testGitClient struct{}
 
 func (gc *testGitClient) LastCommit() (*git.Commit, error) {
@@ -166,7 +157,7 @@ func (gc *testGitClient) LastCommit() (*git.Commit, error) {
 
 func Test_runBrowse(t *testing.T) {
 	s := string(os.PathSeparator)
-	setGitDir(t, "../../../git/fixtures/simple.git")
+	t.Setenv("GIT_DIR", "../../../git/fixtures/simple.git")
 	tests := []struct {
 		name          string
 		opts          BrowseOptions

@@ -3,7 +3,6 @@ package login
 import (
 	"bytes"
 	"net/http"
-	"os"
 	"regexp"
 	"runtime"
 	"testing"
@@ -27,11 +26,7 @@ func stubHomeDir(t *testing.T, dir string) {
 	case "plan9":
 		homeEnv = "home"
 	}
-	oldHomeDir := os.Getenv(homeEnv)
-	os.Setenv(homeEnv, dir)
-	t.Cleanup(func() {
-		os.Setenv(homeEnv, oldHomeDir)
-	})
+	t.Setenv(homeEnv, dir)
 }
 
 func Test_NewCmdLogin(t *testing.T) {
