@@ -10,12 +10,12 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/repo/view"
 	"github.com/cli/cli/v2/pkg/extensions"
-	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/cli/cli/v2/pkg/search"
 	"github.com/spf13/cobra"
 )
@@ -85,6 +85,7 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.extList = newModel.(extListModel)
 
 	item := newModel.(extListModel).SelectedItem()
+
 	if item != nil {
 		ee := item.(extEntry)
 		readme, err := m.readmeGetter.Get(ee.FullName)
@@ -92,10 +93,19 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			ee.Readme = "could not fetch readme x_x"
 			m.logger.Println(err.Error())
 		} else {
-			ee.Readme, err = markdown.Render(readme)
+			renderer, err := glamour.NewTermRenderer(
+				glamour.WithAutoStyle(),
+				glamour.WithWordWrap(100),
+			)
 			if err != nil {
 				ee.Readme = "could not render readme x_x"
 				m.logger.Println(err.Error())
+			} else {
+				ee.Readme, err = renderer.Render(readme)
+				if err != nil {
+					ee.Readme = "could not render readme x_x"
+					m.logger.Println(err.Error())
+				}
 			}
 		}
 		m.sidebar.Content = ee.Readme
@@ -153,7 +163,8 @@ func (m sidebarModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m sidebarModel) View() string {
-	return sidebarStyle.Render(m.viewport.View())
+	return m.viewport.View()
+	//return sidebarStyle.Render(m.viewport.View())
 }
 
 type extEntry struct {
@@ -249,8 +260,8 @@ func (m extListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.logger.Printf("%#v", msg)
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		w, h := appStyle.GetFrameSize()
-		m.list.SetSize(msg.Width-w, msg.Height-h)
+		_, h := appStyle.GetFrameSize()
+		m.list.SetSize(msg.Width-100, msg.Height-h)
 	case tea.KeyMsg:
 		if m.list.FilterState() == list.Filtering {
 			break
