@@ -15,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/repo/view"
 	"github.com/cli/cli/v2/pkg/extensions"
+	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/cli/cli/v2/pkg/search"
 	"github.com/spf13/cobra"
 )
@@ -86,11 +87,14 @@ func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	item := newModel.(extListModel).SelectedItem()
 	if item != nil {
 		ee := item.(extEntry)
-		if ee.Readme == "" {
-			var err error
-			ee.Readme, err = m.readmeGetter.Get(ee.FullName)
+		readme, err := m.readmeGetter.Get(ee.FullName)
+		if err != nil {
+			ee.Readme = "could not fetch readme x_x"
+			m.logger.Println(err.Error())
+		} else {
+			ee.Readme, err = markdown.Render(readme)
 			if err != nil {
-				ee.Readme = "could not fetch readme x_x"
+				ee.Readme = "could not render readme x_x"
 				m.logger.Println(err.Error())
 			}
 		}
