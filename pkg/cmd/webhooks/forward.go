@@ -46,8 +46,10 @@ func newCmdForward(f *cmdutil.Factory, runF func(*hookOptions) error) *cobra.Com
 		Config:     f.Config,
 	}
 	cmd := cobra.Command{
-		Use:   "forward --events=<event_types> --repo=<repo> --port=<port> [--host=<host>]",
-		Short: "Receive test webhooks locally",
+		Use:   "forward --events=<event_types> --repo=<repo> [--port=<port>] [--host=<host>]",
+		Short: "Receive test events on a server running locally",
+		Long: heredoc.Doc(`To output event payloads to stdout instead of sending to a server,
+			omit the --port flag. If the --host flag is not specified, webhooks will be created against github.com`),
 		Example: heredoc.Doc(`
 			# create a dev webhook for the 'issue_open' event in the monalisa/smile repo in GitHub running locally, and
 			# forward payloads for the triggered event to localhost:9999
@@ -109,14 +111,17 @@ func newCmdForward(f *cmdutil.Factory, runF func(*hookOptions) error) *cobra.Com
 					if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
 						return nil
 					}
+					// An unexpected error occurred, display a generic message
+					fmt.Fprintf(opts.IO.Out, "An error occurred, please try again. \n")
+					return nil
 				}
 			}
 		},
 	}
-	cmd.Flags().StringSliceVarP(&opts.EventTypes, "events", "E", []string{}, "Name of the event types to forward")
-	cmd.Flags().StringVarP(&opts.Repo, "repo", "R", "", "Name of the repo where the webhook is installed")
-	cmd.Flags().IntVarP(&opts.Port, "port", "P", 0, "Local port to receive webhooks on")
-	cmd.Flags().StringVarP(&opts.Host, "host", "H", "", "Host address of GitHub API (default: api.github.com)")
+	cmd.Flags().StringSliceVarP(&opts.EventTypes, "events", "E", []string{}, "(required) Names of the event types to forward")
+	cmd.Flags().StringVarP(&opts.Repo, "repo", "R", "", "(required) Name of the repo where the webhook is installed")
+	cmd.Flags().IntVarP(&opts.Port, "port", "P", 0, "(optional) Local port where the server which will receive webhooks is running")
+	cmd.Flags().StringVarP(&opts.Host, "host", "H", "", "(optional) Host address of GitHub API, default: api.github.com")
 	return &cmd
 }
 
