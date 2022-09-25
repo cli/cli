@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -21,6 +22,7 @@ type Factory struct {
 	Browser   browser.Browser
 
 	HttpClient func() (*http.Client, error)
+	GitClient  func() (*git.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (context.Remotes, error)
 	Config     func() (config.Config, error)

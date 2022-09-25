@@ -13,7 +13,6 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -279,7 +278,7 @@ func forkRun(opts *ForkOptions) error {
 					if err != nil {
 						return err
 					}
-					err = run.PrepareCmd(renameCmd).Run()
+					err = renameCmd.Run()
 					if err != nil {
 						return err
 					}
