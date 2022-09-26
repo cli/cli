@@ -124,7 +124,7 @@ func FindWorkflow(client *api.Client, repo ghrepo.Interface, workflowSelector st
 		return nil, errors.New("empty workflow selector")
 	}
 
-	if _, err := strconv.Atoi(workflowSelector); err == nil || strings.HasSuffix(workflowSelector, ".yml") {
+	if _, err := strconv.Atoi(workflowSelector); err == nil || isWorkflowFile(workflowSelector) {
 		workflow, err := getWorkflowByID(client, repo, workflowSelector)
 		if err != nil {
 			return nil, err
@@ -137,6 +137,11 @@ func FindWorkflow(client *api.Client, repo ghrepo.Interface, workflowSelector st
 
 func GetWorkflow(client *api.Client, repo ghrepo.Interface, workflowID int64) (*Workflow, error) {
 	return getWorkflowByID(client, repo, strconv.FormatInt(workflowID, 10))
+}
+
+func isWorkflowFile(f string) bool {
+	name := strings.ToLower(f)
+	return strings.HasSuffix(name, ".yml") || strings.HasSuffix(name, ".yaml")
 }
 
 // ID can be either a numeric database ID or the workflow file name
