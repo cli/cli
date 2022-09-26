@@ -14,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -182,6 +183,22 @@ func issueMetadata(issueSelector string, issueRepoSelector string, baseRepo ghre
 	return issueNumber, targetRepo, nil
 }
 
+func printLinkedBranches(io *iostreams.IOStreams, branches []api.LinkedBranch) {
+
+	cs := io.ColorScheme()
+	table := utils.NewTablePrinter(io)
+
+	for _, branch := range branches {
+		table.AddField(branch.BranchName, nil, cs.ColorFromString("cyan"))
+		if table.IsTTY() {
+			table.AddField(branch.Url(), nil, nil)
+		}
+		table.EndRow()
+	}
+
+	_ = table.Render()
+}
+
 func developRunList(opts *DevelopOptions) (err error) {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
@@ -219,13 +236,7 @@ func developRunList(opts *DevelopOptions) (err error) {
 		fmt.Fprintf(opts.IO.Out, "\nShowing linked branches for %s/%s#%d\n\n", issueRepo.RepoOwner(), issueRepo.RepoName(), issueNumber)
 	}
 
-	for _, branch := range branches {
-		fmt.Fprintf(opts.IO.Out, "%s\n", branch)
-	}
-
-	if opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.Out, "\nShowing linked branches for %s/%s#%d\n\n", issueRepo.RepoOwner(), issueRepo.RepoName(), issueNumber)
-	}
+	printLinkedBranches(opts.IO, branches)
 
 	return nil
 

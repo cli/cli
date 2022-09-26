@@ -96,6 +96,60 @@ func Test_developRun(t *testing.T) {
 			},
 			expectedOut: "foo\nbar\n",
 		},
+		{name: "list branches for an issue in tty",
+			setup: func(opts *DevelopOptions, t *testing.T) func() {
+				opts.IssueSelector = "42"
+				opts.List = true
+				return func() {}
+			},
+			tty: true,
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`query LinkedBranch_fields\b`),
+					httpmock.StringResponse(featureEnabledPayload),
+				)
+				reg.Register(
+					httpmock.GraphQL(`query BranchIssueReferenceListLinkedBranches\b`),
+					httpmock.GraphQLQuery(`{
+						"data": {
+							"repository": {
+								"issue": {
+									"linkedBranches": {
+										"edges": [
+										{
+											"node": {
+												"ref": {
+													"name": "foo",
+													"repository": {
+														"url": "http://github.localhost/OWNER/REPO"
+													}
+												}
+											}
+										},
+										{
+											"node": {
+												"ref": {
+													"name": "bar",
+													"repository": {
+														"url": "http://github.localhost/OWNER/OTHER-REPO"
+													}
+												}
+											}
+										}
+									]
+								}
+							}
+						}
+					}
+					}
+					`, func(query string, inputs map[string]interface{}) {
+						assert.Equal(t, float64(42), inputs["issueNumber"])
+						assert.Equal(t, "OWNER", inputs["repositoryOwner"])
+						assert.Equal(t, "REPO", inputs["repositoryName"])
+					}))
+			},
+			expectedOut: "\nShowing linked branches for OWNER/REPO#42\n\nfoo  http://github.localhost/OWNER/REPO/tree/foo\nbar  http://github.localhost/OWNER/OTHER-REPO/tree/bar\n",
+		},
 		{name: "list branches for an issue providing an issue url",
 			setup: func(opts *DevelopOptions, t *testing.T) func() {
 				opts.IssueSelector = "https://github.com/cli/test-repo/issues/42"
