@@ -70,7 +70,7 @@ func getWebhookRcvServer(t *testing.T, done func(), returnErr bool, returnStatus
 // Creates a mock GitHub API server
 func getGHAPIServer(wsServerURL string, wantErr bool, wantStatusCode int, t *testing.T) *httptest.Server {
 	t.Helper()
-	ghAPIHandler := http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+	ghAPIHandler := http.HandlerFunc(func(res http.ResponseWriter, _ *http.Request) {
 		if wantErr {
 			res.WriteHeader(wantStatusCode)
 			return

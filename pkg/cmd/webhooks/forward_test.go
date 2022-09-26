@@ -15,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdForward(t *testing.T) {
@@ -46,7 +47,7 @@ func TestNewCmdForward(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 
 	_, err = cmd.ExecuteC()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, []string{events}, opts.EventTypes)
 	assert.Equal(t, port, opts.Port)
 	assert.Equal(t, repo, opts.Repo)
@@ -61,7 +62,10 @@ func TestForwardRun_HappyPath(t *testing.T) {
 	f := &cmdutil.Factory{
 		IOStreams: ios,
 		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
+			cfg := config.ConfigMock{
+				AuthTokenFunc: func(s string) (string, string) { return "abc", "abc" },
+			}
+			return &cfg, nil
 		},
 		HttpClient: func() (*http.Client, error) {
 			tr := &http.Transport{
@@ -101,7 +105,7 @@ func TestForwardRun_HappyPath(t *testing.T) {
 	cmd.SetErr(&bytes.Buffer{})
 
 	_, err = cmd.ExecuteC()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	wg.Wait()
 	assert.Equal(t, "lol", forwarded.event.Body)
 	assert.Equal(t, forwarded.event.Header.Get("Someheader"), "somevalue")
@@ -115,7 +119,8 @@ func TestForwardRun_Errors(t *testing.T) {
 	f := &cmdutil.Factory{
 		IOStreams: ios,
 		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
+			cfg := config.ConfigMock{AuthTokenFunc: func(s string) (string, string) { return "abc", "abc" }}
+			return &cfg, nil
 		},
 		HttpClient: func() (*http.Client, error) {
 			tr := &http.Transport{
