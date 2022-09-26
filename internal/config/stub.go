@@ -72,9 +72,7 @@ func NewFromString(cfgStr string) *ConfigMock {
 func StubWriteConfig(t *testing.T) func(io.Writer, io.Writer) {
 	t.Helper()
 	tempDir := t.TempDir()
-	old := os.Getenv("GH_CONFIG_DIR")
-	os.Setenv("GH_CONFIG_DIR", tempDir)
-	t.Cleanup(func() { os.Setenv("GH_CONFIG_DIR", old) })
+	t.Setenv("GH_CONFIG_DIR", tempDir)
 	return func(wc io.Writer, wh io.Writer) {
 		config, err := os.Open(filepath.Join(tempDir, "config.yml"))
 		if err != nil {
