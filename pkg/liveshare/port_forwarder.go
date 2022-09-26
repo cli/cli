@@ -13,6 +13,9 @@ import (
 type portForwardingSession interface {
 	StartSharing(context.Context, string, int) (ChannelID, error)
 	OpenStreamingChannel(context.Context, ChannelID) (ssh.Channel, error)
+}
+
+type grpcClient interface {
 	KeepAlive(string)
 }
 
@@ -20,6 +23,7 @@ type portForwardingSession interface {
 // container to a local destination such as a network port or Go reader/writer.
 type PortForwarder struct {
 	session    portForwardingSession
+	grpcClient grpcClient
 	name       string
 	remotePort int
 	keepAlive  bool
@@ -29,9 +33,10 @@ type PortForwarder struct {
 // remote port and Live Share session. The name describes the purpose
 // of the remote port or service. The keepAlive flag indicates whether
 // the session should be kept alive with port forwarding traffic.
-func NewPortForwarder(session portForwardingSession, name string, remotePort int, keepAlive bool) *PortForwarder {
+func NewPortForwarder(session portForwardingSession, grpcClient grpcClient, name string, remotePort int, keepAlive bool) *PortForwarder {
 	return &PortForwarder{
 		session:    session,
+		grpcClient: grpcClient,
 		name:       name,
 		remotePort: remotePort,
 		keepAlive:  keepAlive,
@@ -178,8 +183,8 @@ func (fwd *PortForwarder) handleConnection(ctx context.Context, id ChannelID, co
 	// If the forwader has been configured to keep the session alive
 	// it will monitor the I/O and notify the session of the traffic.
 	if fwd.keepAlive {
-		channelReader = newTrafficMonitor(channelReader, fwd.session, "output")
-		connReader = newTrafficMonitor(connReader, fwd.session, "input")
+		channelReader = newTrafficMonitor(channelReader, fwd.grpcClient, "output")
+		connReader = newTrafficMonitor(connReader, fwd.grpcClient, "input")
 	}
 
 	go copyConn(conn, channelReader)

@@ -398,7 +398,7 @@ func (a *App) showStatus(ctx context.Context, codespace *api.Codespace) error {
 		}
 	}
 
-	err := codespaces.PollPostCreateStates(ctx, a, a.apiClient, codespace, poller)
+	err := codespaces.PollPostCreateStates(ctx, a, a.apiClient, a.grpcClient, codespace, poller)
 	if err != nil {
 		if errors.Is(err, context.Canceled) && breakNextState {
 			return nil // we cancelled the context to stop polling, we can ignore the error

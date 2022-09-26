@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/grpc"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/liveshare"
 )
@@ -38,7 +39,7 @@ type PostCreateState struct {
 // PollPostCreateStates watches for state changes in a codespace,
 // and calls the supplied poller for each batch of state changes.
 // It runs until it encounters an error, including cancellation of the context.
-func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiClient apiClient, codespace *api.Codespace, poller func([]PostCreateState)) (err error) {
+func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiClient ApiClient, grpcClient GrpcClient, codespace *api.Codespace, poller func([]PostCreateState)) (err error) {
 	noopLogger := log.New(io.Discard, "", 0)
 
 	session, err := ConnectToLiveshare(ctx, progress, noopLogger, apiClient, codespace)
@@ -51,6 +52,11 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 		}
 	}()
 
+	err = ConnectToGrpcServer(ctx, grpcClient, codespace.Connection.SessionToken, session)
+	if err != nil {
+		return fmt.Errorf("failed to connect to the internal server: %w", err)
+	}
+
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
 	listen, err := net.Listen("tcp", "127.0.0.1:0") // arbitrary port
 	if err != nil {
@@ -60,7 +66,7 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 
 	progress.StartProgressIndicatorWithLabel("Fetching SSH Details")
 	defer progress.StopProgressIndicator()
-	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
+	remoteSSHServerPort, sshUser, err := grpcClient.StartRemoteServer(grpc.StartSSHServerOptions{})
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}
@@ -68,7 +74,7 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 	progress.StartProgressIndicatorWithLabel("Fetching status")
 	tunnelClosed := make(chan error, 1) // buffered to avoid sender stuckness
 	go func() {
-		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, false)
+		fwd := liveshare.NewPortForwarder(session, grpcClient, "sshd", remoteSSHServerPort, false)
 		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // error is non-nil
 	}()
 

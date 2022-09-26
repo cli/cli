@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+option go_package = "./codespace";
+
+package Codespaces.Grpc.CodespaceHostService.v1;
+
+service CodespaceHost {
+  rpc NotifyCodespaceOfClientActivity (NotifyCodespaceOfClientActivityRequest) returns (NotifyCodespaceOfClientActivityResponse);
+}
+
+message NotifyCodespaceOfClientActivityRequest {
+  string ClientId = 1;
+  repeated string ClientActivities = 2;
+}
+message NotifyCodespaceOfClientActivityResponse {
+  bool Result = 1;
+  string Message = 2;
+}

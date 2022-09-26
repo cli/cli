@@ -8,6 +8,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	codespacesAPI "github.com/cli/cli/v2/internal/codespaces/api"
+	codespacesGRPC "github.com/cli/cli/v2/internal/codespaces/grpc"
 	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
 	aliasCmd "github.com/cli/cli/v2/pkg/cmd/alias"
 	apiCmd "github.com/cli/cli/v2/pkg/cmd/api"
@@ -153,6 +154,7 @@ func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
 			vscsURL,
 			&lazyLoadedHTTPClient{factory: f},
 		),
+		codespacesGRPC.New(),
 		f.Browser,
 	)
 	cmd := codespaceCmd.NewRootCmd(app)

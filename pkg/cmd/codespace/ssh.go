@@ -20,6 +20,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/grpc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/liveshare"
@@ -148,7 +149,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 
 	sshContext := ssh.Context{}
-	startSSHOptions := liveshare.StartSSHServerOptions{}
+	startSSHOptions := grpc.StartSSHServerOptions{}
 
 	keyPair, shouldAddArg, err := selectSSHKeys(ctx, sshContext, args, opts)
 	if err != nil {
@@ -173,15 +174,20 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 	defer safeClose(session, &err)
 
+	err = codespaces.ConnectToGrpcServer(ctx, a.grpcClient, codespace.Connection.SessionToken, session)
+	if err != nil {
+		return fmt.Errorf("failed to connect to the internal server: %w", err)
+	}
+
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	remoteSSHServerPort, sshUser, err := session.StartSSHServerWithOptions(ctx, startSSHOptions)
+	remoteSSHServerPort, sshUser, err := a.grpcClient.StartRemoteServer(startSSHOptions)
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}
 
 	if opts.stdio {
-		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
+		fwd := liveshare.NewPortForwarder(session, a.grpcClient, "sshd", remoteSSHServerPort, true)
 		stdio := newReadWriteCloser(os.Stdin, os.Stdout)
 		err := fwd.Forward(ctx, stdio) // always non-nil
 		return fmt.Errorf("tunnel closed: %w", err)
@@ -207,7 +213,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 
 	tunnelClosed := make(chan error, 1)
 	go func() {
-		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
+		fwd := liveshare.NewPortForwarder(session, a.grpcClient, "sshd", remoteSSHServerPort, true)
 		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // always non-nil
 	}()
 
@@ -509,7 +515,12 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 			} else {
 				defer safeClose(session, &err)
 
-				_, result.user, err = session.StartSSHServer(ctx)
+				err = codespaces.ConnectToGrpcServer(ctx, a.grpcClient, cs.Connection.SessionToken, session)
+				if err != nil {
+					result.err = fmt.Errorf("failed to connect to the internal server: %w", err)
+				}
+
+				_, result.user, err = a.grpcClient.StartRemoteServer(grpc.StartSSHServerOptions{})
 				if err != nil {
 					result.err = fmt.Errorf("error getting ssh server details: %w", err)
 				} else {

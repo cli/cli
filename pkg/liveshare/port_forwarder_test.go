@@ -21,7 +21,7 @@ func TestNewPortForwarder(t *testing.T) {
 		t.Errorf("create mock client: %v", err)
 	}
 	defer testServer.Close()
-	pf := NewPortForwarder(session, "ssh", 80, false)
+	pf := NewPortForwarder(session, nil, "ssh", 80, false)
 	if pf == nil {
 		t.Error("port forwarder is nil")
 	}
@@ -82,7 +82,7 @@ func TestPortForwarderStart(t *testing.T) {
 
 	done := make(chan error, 2)
 	go func() {
-		done <- NewPortForwarder(session, "ssh", port, false).ForwardToListener(ctx, listen)
+		done <- NewPortForwarder(session, nil, "ssh", port, false).ForwardToListener(ctx, listen)
 	}()
 
 	go func() {
@@ -122,28 +122,5 @@ func TestPortForwarderStart(t *testing.T) {
 		if err != nil {
 			t.Errorf("error from client: %v", err)
 		}
-	}
-}
-
-func TestPortForwarderTrafficMonitor(t *testing.T) {
-	buf := bytes.NewBufferString("some-input")
-	session := &Session{keepAliveReason: make(chan string, 1)}
-	trafficType := "io"
-
-	tm := newTrafficMonitor(buf, session, trafficType)
-	l := len(buf.Bytes())
-
-	bb := make([]byte, l)
-	n, err := tm.Read(bb)
-	if err != nil {
-		t.Errorf("failed to read from traffic monitor: %v", err)
-	}
-	if n != l {
-		t.Errorf("expected to read %d bytes, got %d", l, n)
-	}
-
-	keepAliveReason := <-session.keepAliveReason
-	if keepAliveReason != trafficType {
-		t.Errorf("expected keep alive reason to be %s, got %s", trafficType, keepAliveReason)
 	}
 }

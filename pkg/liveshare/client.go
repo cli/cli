@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/opentracing/opentracing-go"
 )
@@ -110,13 +109,10 @@ func Connect(ctx context.Context, opts Options) (*Session, error) {
 	}
 
 	s := &Session{
-		ssh:             ssh,
-		rpc:             rpc,
-		clientName:      opts.ClientName,
-		keepAliveReason: make(chan string, 1),
-		logger:          opts.Logger,
+		ssh:    ssh,
+		rpc:    rpc,
+		logger: opts.Logger,
 	}
-	go s.heartbeat(ctx, 1*time.Minute)
 
 	return s, nil
 }

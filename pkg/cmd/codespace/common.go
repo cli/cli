@@ -17,9 +17,7 @@ import (
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
 )
 
@@ -30,17 +28,31 @@ type executable interface {
 type App struct {
 	io         *iostreams.IOStreams
 	apiClient  apiClient
+	grpcClient grpcClient
 	errLogger  *log.Logger
 	executable executable
 	browser    browser.Browser
 }
 
-func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browser browser.Browser) *App {
+type apiClient interface {
+	codespaces.ApiClient
+}
+
+type grpcClient interface {
+	codespaces.GrpcClient
+}
+
+type liveshareSession interface {
+	codespaces.LiveshareSession
+}
+
+func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, grpcClient grpcClient, browser browser.Browser) *App {
 	errLogger := log.New(io.ErrOut, "", 0)
 
 	return &App{
 		io:         io,
 		apiClient:  apiClient,
+		grpcClient: grpcClient,
 		errLogger:  errLogger,
 		executable: exe,
 		browser:    browser,
@@ -55,17 +67,6 @@ func (a *App) StartProgressIndicatorWithLabel(s string) {
 // StopProgressIndicator stops the progress indicator.
 func (a *App) StopProgressIndicator() {
 	a.io.StopProgressIndicator()
-}
-
-type liveshareSession interface {
-	Close() error
-	GetSharedServers(context.Context) ([]*liveshare.Port, error)
-	KeepAlive(string)
-	OpenStreamingChannel(context.Context, liveshare.ChannelID) (ssh.Channel, error)
-	StartJupyterServer(context.Context) (int, string, error)
-	StartSharing(context.Context, string, int) (liveshare.ChannelID, error)
-	StartSSHServer(context.Context) (int, string, error)
-	StartSSHServerWithOptions(context.Context, liveshare.StartSSHServerOptions) (int, string, error)
 }
 
 // Connects to a codespace using Live Share and returns that session
@@ -88,24 +89,6 @@ func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App
 	}
 
 	return session, nil
-}
-
-//go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
-type apiClient interface {
-	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
-	GetOrgMemberCodespace(ctx context.Context, orgName string, userName string, codespaceName string) (*api.Codespace, error)
-	ListCodespaces(ctx context.Context, opts api.ListCodespacesOptions) ([]*api.Codespace, error)
-	DeleteCodespace(ctx context.Context, name string, orgName string, userName string) error
-	StartCodespace(ctx context.Context, name string) error
-	StopCodespace(ctx context.Context, name string, orgName string, userName string) error
-	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
-	EditCodespace(ctx context.Context, codespaceName string, params *api.EditCodespaceParams) (*api.Codespace, error)
-	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
-	GetCodespacesMachines(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error)
-	GetCodespaceRepositoryContents(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
-	ListDevContainers(ctx context.Context, repoID int, branch string, limit int) (devcontainers []api.DevContainerEntry, err error)
-	GetCodespaceRepoSuggestions(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error)
-	GetCodespaceBillableOwner(ctx context.Context, nwo string) (*api.User, error)
 }
 
 var errNoCodespaces = errors.New("you have no codespaces")

@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
 )
@@ -43,8 +44,13 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	}
 	defer safeClose(session, &err)
 
+	err = codespaces.ConnectToGrpcServer(ctx, a.grpcClient, codespace.Connection.SessionToken, session)
+	if err != nil {
+		return fmt.Errorf("failed to connect to the internal server: %w", err)
+	}
+
 	a.StartProgressIndicatorWithLabel("Starting JupyterLab on codespace")
-	serverPort, serverUrl, err := session.StartJupyterServer(ctx)
+	serverPort, serverUrl, err := a.grpcClient.GetRunningServer()
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to start JupyterLab server: %w", err)
@@ -60,7 +66,7 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 
 	tunnelClosed := make(chan error, 1)
 	go func() {
-		fwd := liveshare.NewPortForwarder(session, "jupyter", serverPort, true)
+		fwd := liveshare.NewPortForwarder(session, a.grpcClient, "jupyter", serverPort, true)
 		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // always non-nil
 	}()
 

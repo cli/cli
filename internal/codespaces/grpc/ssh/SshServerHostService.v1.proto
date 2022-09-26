@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option go_package = "./ssh";
+
+package Codespaces.Grpc.SshServerHostService.v1;
+
+service SshServerHost {
+  rpc StartRemoteServerAsync (StartRemoteServerRequest) returns (StartRemoteServerResponse);
+}
+
+message StartRemoteServerRequest {
+  string UserPublicKey = 1;
+}
+
+message StartRemoteServerResponse {
+  bool Result = 1;
+  string ServerPort = 2;
+  string User = 3;
+  string Message = 4;
+}

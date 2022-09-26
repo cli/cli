@@ -397,7 +397,7 @@ func (a *App) ForwardPorts(ctx context.Context, codespaceName string, ports []st
 
 			a.errLogger.Printf("Forwarding ports: remote %d <=> local %d", pair.remote, pair.local)
 			name := fmt.Sprintf("share-%d", pair.remote)
-			fwd := liveshare.NewPortForwarder(session, name, pair.remote, false)
+			fwd := liveshare.NewPortForwarder(session, a.grpcClient, name, pair.remote, false)
 			return fwd.ForwardToListener(ctx, listen) // error always non-nil
 		})
 	}

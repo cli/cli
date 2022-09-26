@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"github.com/cli/cli/v2/internal/codespaces"
+	"github.com/cli/cli/v2/internal/codespaces/grpc"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
 )
@@ -47,6 +48,11 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 	}
 	defer safeClose(session, &err)
 
+	err = codespaces.ConnectToGrpcServer(ctx, a.grpcClient, codespace.Connection.SessionToken, session)
+	if err != nil {
+		return fmt.Errorf("failed to connect to the internal server: %w", err)
+	}
+
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
 	listen, err := net.Listen("tcp", "127.0.0.1:0") // arbitrary port
 	if err != nil {
@@ -56,7 +62,7 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 	localPort := listen.Addr().(*net.TCPAddr).Port
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
+	remoteSSHServerPort, sshUser, err := a.grpcClient.StartRemoteServer(grpc.StartSSHServerOptions{})
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
@@ -77,7 +83,7 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 
 	tunnelClosed := make(chan error, 1)
 	go func() {
-		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, false)
+		fwd := liveshare.NewPortForwarder(session, a.grpcClient, "sshd", remoteSSHServerPort, false)
 		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // error is non-nil
 	}()
 
