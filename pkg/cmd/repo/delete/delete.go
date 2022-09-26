@@ -6,12 +6,11 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-
 	"github.com/cli/cli/v2/pkg/iostreams"
+	ghAuth "github.com/cli/go-gh/pkg/auth"
 	"github.com/spf13/cobra"
 )
 
@@ -78,7 +77,8 @@ func deleteRun(opts *DeleteOptions) error {
 	} else {
 		repoSelector := opts.RepoArg
 		if !strings.Contains(repoSelector, "/") {
-			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+			defaultHost, _ := ghAuth.DefaultHost()
+			currentUser, err := api.CurrentLoginName(apiClient, defaultHost)
 			if err != nil {
 				return err
 			}
