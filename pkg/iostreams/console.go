@@ -3,6 +3,8 @@
 
 package iostreams
 
+import "errors"
+
 func enableVirtualTerminalProcessing(fd uintptr) error {
-	return nil
+	return errors.New("not implemented")
 }
