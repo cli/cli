@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/v2/pkg/grpc"
+	"github.com/cli/cli/v2/internal/codespaces/grpc"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -119,7 +119,7 @@ func Connect(ctx context.Context, opts Options) (*Session, error) {
 	s := &Session{
 		ssh:             ssh,
 		rpc:             rpc,
-		grpc:            grpc.New(),
+		grpc:            grpc.NewClient(),
 		clientName:      opts.ClientName,
 		keepAliveReason: make(chan string, 1),
 		logger:          opts.Logger,
@@ -127,7 +127,10 @@ func Connect(ctx context.Context, opts Options) (*Session, error) {
 	go s.heartbeat(ctx, 1*time.Minute)
 
 	// Connect to the gRPC server so we can make requests anywhere we have access to the session
-	s.connectToGrpcServer(ctx, opts.SessionToken)
+	err = s.connectToGrpcServer(ctx, opts.SessionToken)
+	if err != nil {
+		return nil, fmt.Errorf("error connecting to internal server: %w", err)
+	}
 
 	return s, nil
 }
@@ -136,7 +139,7 @@ func Connect(ctx context.Context, opts Options) (*Session, error) {
 func (s *Session) connectToGrpcServer(ctx context.Context, token string) error {
 	listen, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", 0))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to listen to local port over tcp: %w", err)
 	}
 
 	// Tunnel the remote gRPC server port to the local port
@@ -148,10 +151,10 @@ func (s *Session) connectToGrpcServer(ctx context.Context, token string) error {
 	}()
 
 	// Make a connection to the gRPC server
-	err = s.grpc.Connect(ctx, localGrpcServerPort, token)
+	err = s.grpc.Connect(ctx, listen, localGrpcServerPort, token)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to establish connection on port %d: %w", localGrpcServerPort, err)
 	}
 
 	select {
