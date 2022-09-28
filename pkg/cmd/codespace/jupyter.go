@@ -44,7 +44,7 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	}
 	defer safeClose(session, &err)
 
-	client, err := grpc.Connect(ctx, session, "")
+	client, err := grpc.Connect(ctx, session, codespace.Connection.SessionToken)
 	if err != nil {
 		return fmt.Errorf("error connecting to internal server: %w", err)
 	}
