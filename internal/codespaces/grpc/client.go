@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces/grpc/jupyter"
+	"github.com/cli/cli/v2/pkg/liveshare"
+	"golang.org/x/crypto/ssh"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
@@ -21,6 +23,11 @@ const (
 	requestTimeout    = 30 * time.Second
 )
 
+const (
+	codespacesInternalPort        = 16634
+	codespacesInternalSessionName = "CodespacesInternal"
+)
+
 type Client struct {
 	conn          *grpc.ClientConn
 	token         string
@@ -28,24 +35,41 @@ type Client struct {
 	jupyterClient jupyter.JupyterServerHostClient
 }
 
-func NewClient() *Client {
-	return &Client{}
+type liveshareSession interface {
+	KeepAlive(string)
+	OpenStreamingChannel(context.Context, liveshare.ChannelID) (ssh.Channel, error)
+	StartSharing(context.Context, string, int) (liveshare.ChannelID, error)
 }
 
 // Connects to the gRPC server on the given port
-func (g *Client) Connect(ctx context.Context, listener net.Listener, port int, token string) error {
-	// Attempt to connect to the given port
-	conn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", port), grpc.WithTimeout(connectionTimeout), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+func Connect(ctx context.Context, session liveshareSession, token string) (*Client, error) {
+	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", 0))
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to listen to local port over tcp: %w", err)
 	}
 
-	g.conn = conn
-	g.token = token
-	g.listener = listener
-	g.jupyterClient = jupyter.NewJupyterServerHostClient(conn)
+	// Tunnel the remote gRPC server port to the local port
+	localGrpcServerPort := listener.Addr().(*net.TCPAddr).Port
+	internalTunnelClosed := make(chan error, 1)
+	go func() {
+		fwd := liveshare.NewPortForwarder(session, codespacesInternalSessionName, codespacesInternalPort, true)
+		internalTunnelClosed <- fwd.ForwardToListener(ctx, listener)
+	}()
 
-	return nil
+	// Attempt to connect to the given port
+	conn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", localGrpcServerPort), grpc.WithTimeout(connectionTimeout), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	if err != nil {
+		return nil, err
+	}
+
+	g := &Client{
+		conn:          conn,
+		token:         token,
+		listener:      listener,
+		jupyterClient: jupyter.NewJupyterServerHostClient(conn),
+	}
+
+	return g, nil
 }
 
 // Closes the gRPC connection

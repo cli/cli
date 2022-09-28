@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/v2/internal/codespaces/grpc"
 	"github.com/opentracing/opentracing-go"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/sync/errgroup"
@@ -22,9 +21,8 @@ type ChannelID struct {
 
 // A Session represents the session between a connected Live Share client and server.
 type Session struct {
-	ssh  *sshSession
-	rpc  *rpcClient
-	grpc *grpc.Client
+	ssh *sshSession
+	rpc *rpcClient
 
 	clientName      string
 	keepAliveReason chan string
@@ -43,11 +41,6 @@ func (s *Session) Close() error {
 	if err := s.rpc.Close(); err != nil {
 		s.ssh.Close() // close SSH and ignore error
 		return fmt.Errorf("error while closing Live Share session: %w", err)
-	}
-
-	// Close the connection to the gRPC server
-	if err := s.grpc.Close(); err != nil {
-		return fmt.Errorf("error while closing internal server connection: %w", err)
 	}
 
 	return nil
@@ -107,7 +100,27 @@ func (s *Session) StartSSHServerWithOptions(ctx context.Context, options StartSS
 // StartJupyterServer starts a Juypyter server in the container and returns
 // the port on which it listens and the server URL.
 func (s *Session) StartJupyterServer(ctx context.Context) (int, string, error) {
-	return s.grpc.StartJupyterServer()
+	var response struct {
+		Result    bool   `json:"result"`
+		Message   string `json:"message"`
+		Port      string `json:"port"`
+		ServerUrl string `json:"serverUrl"`
+	}
+
+	if err := s.rpc.do(ctx, "IJupyterServerHostService.getRunningServer", []string{}, &response); err != nil {
+		return 0, "", fmt.Errorf("failed to invoke JupyterLab RPC: %w", err)
+	}
+
+	if !response.Result {
+		return 0, "", fmt.Errorf("failed to start JupyterLab: %s", response.Message)
+	}
+
+	port, err := strconv.Atoi(response.Port)
+	if err != nil {
+		return 0, "", fmt.Errorf("failed to parse JupyterLab port: %w", err)
+	}
+
+	return port, response.ServerUrl, nil
 }
 
 // heartbeat runs until context cancellation, periodically checking whether there is a

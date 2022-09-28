@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/cli/cli/v2/internal/codespaces/grpc"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
 )
@@ -43,8 +44,14 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	}
 	defer safeClose(session, &err)
 
+	client, err := grpc.Connect(ctx, session, "")
+	if err != nil {
+		return fmt.Errorf("error connecting to internal server: %w", err)
+	}
+	defer safeClose(client, &err)
+
 	a.StartProgressIndicatorWithLabel("Starting JupyterLab on codespace")
-	serverPort, serverUrl, err := session.StartJupyterServer(ctx)
+	serverPort, serverUrl, err := client.StartJupyterServer()
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to start JupyterLab server: %w", err)
