@@ -171,7 +171,7 @@ func Test_deleteRun(t *testing.T) {
 			},
 			wantErr:    true,
 			wantStdout: "",
-			wantErrMsg: "unable to delete SSH key id 123: either the SSH key is not found or it is not owned by you",
+			wantErrMsg: "HTTP 404 (https://api.github.com/user/keys/123)",
 		},
 		{
 			name: "delete no tty",
@@ -192,7 +192,7 @@ func Test_deleteRun(t *testing.T) {
 			},
 			wantErr:    true,
 			wantStdout: "",
-			wantErrMsg: "unable to delete SSH key id 123: either the SSH key is not found or it is not owned by you",
+			wantErrMsg: "HTTP 404 (https://api.github.com/user/keys/123)",
 		},
 	}
 

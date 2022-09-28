@@ -1,11 +1,9 @@
 package delete
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -67,11 +65,6 @@ func deleteRun(opts *DeleteOptions) error {
 	host, _ := cfg.DefaultHost()
 	key, err := getSSHKey(httpClient, host, opts.KeyID)
 	if err != nil {
-		var httpErr api.HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == 404 {
-			return fmt.Errorf("unable to delete SSH key id %s: either the SSH key is not found or it is not owned by you", opts.KeyID)
-		}
-
 		return err
 	}
 
@@ -88,11 +81,6 @@ func deleteRun(opts *DeleteOptions) error {
 
 	err = deleteSSHKey(httpClient, host, opts.KeyID)
 	if err != nil {
-		var httpErr api.HTTPError
-		if errors.As(err, &httpErr) && httpErr.StatusCode == 404 {
-			return fmt.Errorf("unable to delete SSH key id %s: either the SSH key is not found or it is not owned by you", opts.KeyID)
-		}
-
 		return err
 	}
 
