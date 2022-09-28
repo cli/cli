@@ -292,6 +292,7 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 				pullRequest {
 					id
 					url
+					number
 				}
 			}
 	}`

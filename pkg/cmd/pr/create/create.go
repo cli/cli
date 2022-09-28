@@ -31,14 +31,15 @@ type iprompter interface {
 
 type CreateOptions struct {
 	// This struct stores user input and factory functions
-	HttpClient func() (*http.Client, error)
-	Config     func() (config.Config, error)
-	IO         *iostreams.IOStreams
-	Remotes    func() (context.Remotes, error)
-	Branch     func() (string, error)
-	Browser    browser.Browser
-	Prompter   iprompter
-	Finder     shared.PRFinder
+	HttpClient  func() (*http.Client, error)
+	Config      func() (config.Config, error)
+	IO          *iostreams.IOStreams
+	Remotes     func() (context.Remotes, error)
+	Branch      func() (string, error)
+	Browser     browser.Browser
+	Prompter    iprompter
+	Finder      shared.PRFinder
+	SelectorArg string
 
 	TitleProvided bool
 	BodyProvided  bool
@@ -63,6 +64,8 @@ type CreateOptions struct {
 	Milestone string
 
 	MaintainerCanModify bool
+
+	Exporter cmdutil.Exporter
 }
 
 type CreateContext struct {
@@ -163,10 +166,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			return createRun(opts)
 		},
 	}
-
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 	fl := cmd.Flags()
 	fl.BoolVarP(&opts.IsDraft, "draft", "d", false, "Mark pull request as a draft")
-	fl.StringVarP(&opts.Title, "title", "t", "", "Title for the pull request")
+	fl.StringVarP(&opts.Title, "title", "x", "", "Title for the pull request")
 	fl.StringVarP(&opts.Body, "body", "b", "", "Body for the pull request")
 	fl.StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	fl.StringVarP(&opts.BaseBranch, "base", "B", "", "The `branch` into which you want your code merged")
@@ -182,6 +185,14 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 
 	return cmd
+}
+
+var defaultFields = []string{
+	"url", "number", "title", "state", "body", "author",
+	"isDraft", "maintainerCanModify", "mergeable", "additions", "deletions", "commitsCount",
+	"baseRefName", "headRefName", "headRepositoryOwner", "headRepository", "isCrossRepository",
+	"reviewRequests", "reviews", "assignees", "labels", "projectCards", "milestone",
+	"comments", "reactionGroups", "createdAt",
 }
 
 func createRun(opts *CreateOptions) (err error) {
@@ -653,6 +664,9 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 	opts.IO.StartProgressIndicator()
 	pr, err := api.CreatePullRequest(client, ctx.BaseRepo, params)
 	opts.IO.StopProgressIndicator()
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, pr)
+	}
 	if pr != nil {
 		fmt.Fprintln(opts.IO.Out, pr.URL)
 	}
