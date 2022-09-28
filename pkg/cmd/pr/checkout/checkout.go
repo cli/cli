@@ -3,8 +3,6 @@ package checkout
 import (
 	"fmt"
 	"net/http"
-	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
@@ -12,11 +10,9 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/safeexec"
 	"github.com/spf13/cobra"
 )
 
@@ -127,11 +123,11 @@ func checkoutRun(opts *CheckoutOptions) error {
 	}
 
 	if opts.RecurseSubmodules {
-		cmdQueue = append(cmdQueue, []string{"git", "submodule", "sync", "--recursive"})
-		cmdQueue = append(cmdQueue, []string{"git", "submodule", "update", "--init", "--recursive"})
+		cmdQueue = append(cmdQueue, []string{"submodule", "sync", "--recursive"})
+		cmdQueue = append(cmdQueue, []string{"submodule", "update", "--init", "--recursive"})
 	}
 
-	err = executeCmds(cmdQueue)
+	err = executeCmds(cmdQueue, opts.IO)
 	if err != nil {
 		return err
 	}
@@ -148,7 +144,7 @@ func cmdsForExistingRemote(remote *context.Remote, pr *api.PullRequest, opts *Ch
 		refSpec += fmt.Sprintf(":refs/remotes/%s", remoteBranch)
 	}
 
-	cmds = append(cmds, []string{"git", "fetch", remote.Name, refSpec})
+	cmds = append(cmds, []string{"fetch", remote.Name, refSpec})
 
 	localBranch := pr.HeadRefName
 	if opts.BranchName != "" {
@@ -157,17 +153,17 @@ func cmdsForExistingRemote(remote *context.Remote, pr *api.PullRequest, opts *Ch
 
 	switch {
 	case opts.Detach:
-		cmds = append(cmds, []string{"git", "checkout", "--detach", "FETCH_HEAD"})
+		cmds = append(cmds, []string{"checkout", "--detach", "FETCH_HEAD"})
 	case localBranchExists(localBranch):
-		cmds = append(cmds, []string{"git", "checkout", localBranch})
+		cmds = append(cmds, []string{"checkout", localBranch})
 		if opts.Force {
-			cmds = append(cmds, []string{"git", "reset", "--hard", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
+			cmds = append(cmds, []string{"reset", "--hard", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
 		} else {
 			// TODO: check if non-fast-forward and suggest to use `--force`
-			cmds = append(cmds, []string{"git", "merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
+			cmds = append(cmds, []string{"merge", "--ff-only", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
 		}
 	default:
-		cmds = append(cmds, []string{"git", "checkout", "-b", localBranch, "--track", remoteBranch})
+		cmds = append(cmds, []string{"checkout", "-b", localBranch, "--track", remoteBranch})
 	}
 
 	return cmds
@@ -178,8 +174,8 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 	ref := fmt.Sprintf("refs/pull/%d/head", pr.Number)
 
 	if opts.Detach {
-		cmds = append(cmds, []string{"git", "fetch", baseURLOrName, ref})
-		cmds = append(cmds, []string{"git", "checkout", "--detach", "FETCH_HEAD"})
+		cmds = append(cmds, []string{"fetch", baseURLOrName, ref})
+		cmds = append(cmds, []string{"checkout", "--detach", "FETCH_HEAD"})
 		return cmds
 	}
 
@@ -194,22 +190,22 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 	currentBranch, _ := opts.Branch()
 	if localBranch == currentBranch {
 		// PR head matches currently checked out branch
-		cmds = append(cmds, []string{"git", "fetch", baseURLOrName, ref})
+		cmds = append(cmds, []string{"fetch", baseURLOrName, ref})
 		if opts.Force {
-			cmds = append(cmds, []string{"git", "reset", "--hard", "FETCH_HEAD"})
+			cmds = append(cmds, []string{"reset", "--hard", "FETCH_HEAD"})
 		} else {
 			// TODO: check if non-fast-forward and suggest to use `--force`
-			cmds = append(cmds, []string{"git", "merge", "--ff-only", "FETCH_HEAD"})
+			cmds = append(cmds, []string{"merge", "--ff-only", "FETCH_HEAD"})
 		}
 	} else {
 		if opts.Force {
-			cmds = append(cmds, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch), "--force"})
+			cmds = append(cmds, []string{"fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch), "--force"})
 		} else {
 			// TODO: check if non-fast-forward and suggest to use `--force`
-			cmds = append(cmds, []string{"git", "fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch)})
+			cmds = append(cmds, []string{"fetch", baseURLOrName, fmt.Sprintf("%s:%s", ref, localBranch)})
 		}
 
-		cmds = append(cmds, []string{"git", "checkout", localBranch})
+		cmds = append(cmds, []string{"checkout", localBranch})
 	}
 
 	remote := baseURLOrName
@@ -223,9 +219,9 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 		// .remote is needed for `git pull` to work
 		// .pushRemote is needed for `git push` to work, if user has set `remote.pushDefault`.
 		// see https://git-scm.com/docs/git-config#Documentation/git-config.txt-branchltnamegtremote
-		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.remote", localBranch), remote})
-		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.pushRemote", localBranch), remote})
-		cmds = append(cmds, []string{"git", "config", fmt.Sprintf("branch.%s.merge", localBranch), mergeRef})
+		cmds = append(cmds, []string{"config", fmt.Sprintf("branch.%s.remote", localBranch), remote})
+		cmds = append(cmds, []string{"config", fmt.Sprintf("branch.%s.pushRemote", localBranch), remote})
+		cmds = append(cmds, []string{"config", fmt.Sprintf("branch.%s.merge", localBranch), mergeRef})
 	}
 
 	return cmds
@@ -241,17 +237,18 @@ func localBranchExists(b string) bool {
 	return err == nil
 }
 
-func executeCmds(cmdQueue [][]string) error {
+func executeCmds(cmdQueue [][]string, ios *iostreams.IOStreams) error {
+	//TODO: Replace with factory GitClient
+	client := git.Client{
+		Stdout: ios.Out,
+		Stderr: ios.ErrOut,
+	}
 	for _, args := range cmdQueue {
-		// TODO: reuse the result of this lookup across loop iteration
-		exe, err := safeexec.LookPath(args[0])
+		cmd, err := client.Command(args...)
 		if err != nil {
 			return err
 		}
-		cmd := exec.Command(exe, args[1:]...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := run.PrepareCmd(cmd).Run(); err != nil {
+		if err := cmd.Run(); err != nil {
 			return err
 		}
 	}
