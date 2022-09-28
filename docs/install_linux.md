@@ -11,7 +11,7 @@ our release schedule.
 
 ### Debian, Ubuntu Linux, Raspberry Pi OS (apt)
 
-Install:
+Install from our package repository for immediate access to latest releases:
 
 ```bash
 type -p curl >/dev/null || sudo apt install curl -y
@@ -31,6 +31,8 @@ Upgrade:
 sudo apt update
 sudo apt install gh
 ```
+
+Alternatively, install from [Debian](https://packages.debian.org/search?keywords=gh&exact=1) or [Ubuntu](https://packages.ubuntu.com/search?keywords=gh&exact=1) repository.
 
 ### Fedora, CentOS, Red Hat Enterprise Linux (dnf)
 
