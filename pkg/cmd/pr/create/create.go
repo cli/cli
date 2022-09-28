@@ -169,7 +169,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 	fl := cmd.Flags()
 	fl.BoolVarP(&opts.IsDraft, "draft", "d", false, "Mark pull request as a draft")
-	fl.StringVarP(&opts.Title, "title", "x", "", "Title for the pull request")
+	fl.StringVarP(&opts.Title, "title", "T", "", "Title for the pull request")
 	fl.StringVarP(&opts.Body, "body", "b", "", "Body for the pull request")
 	fl.StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	fl.StringVarP(&opts.BaseBranch, "base", "B", "", "The `branch` into which you want your code merged")
