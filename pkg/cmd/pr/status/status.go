@@ -30,6 +30,7 @@ type StatusOptions struct {
 
 	HasRepoOverride bool
 	Exporter        cmdutil.Exporter
+	ShowConflicts   bool
 }
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
@@ -57,6 +58,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		},
 	}
 
+	cmd.Flags().BoolVar(&opts.ShowConflicts, "show-conflicts", false, "Show merge conflicts on pull requests")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
@@ -91,13 +93,15 @@ func statusRun(opts *StatusOptions) error {
 	}
 
 	options := requestOptions{
-		Username:  "@me",
-		CurrentPR: currentPRNumber,
-		HeadRef:   currentPRHeadRef,
+		Username:      "@me",
+		CurrentPR:     currentPRNumber,
+		HeadRef:       currentPRHeadRef,
+		ShowConflicts: opts.ShowConflicts,
 	}
 	if opts.Exporter != nil {
 		options.Fields = opts.Exporter.Fields()
 	}
+
 	prPayload, err := pullRequestStatus(httpClient, baseRepo, options)
 	if err != nil {
 		return err
@@ -262,6 +266,10 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 					s = fmt.Sprintf("%d/%d", gotApprovals, numRequiredApprovals)
 				}
 				fmt.Fprint(w, cs.Green(fmt.Sprintf("✓ %s Approved", s)))
+			}
+
+			if pr.Mergeable == "CONFLICTING" {
+				fmt.Fprintf(w, " %s", cs.Red("× Merge conflicts"))
 			}
 
 			if pr.BaseRef.BranchProtectionRule.RequiresStrictStatusChecks {

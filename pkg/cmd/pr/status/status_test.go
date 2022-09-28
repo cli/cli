@@ -116,6 +116,7 @@ func TestPRStatus_reviewsAndChecks(t *testing.T) {
 		"✓ Checks passing + Changes requested",
 		"- Checks pending ✓ 2 Approved",
 		"× 1/3 checks failing - Review required",
+		"✓ Checks passing × Merge conflicts",
 	}
 
 	for _, line := range expected {

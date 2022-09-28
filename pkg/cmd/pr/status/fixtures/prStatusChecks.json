@@ -7,7 +7,7 @@
       }
     },
     "viewerCreated": {
-      "totalCount": 3,
+      "totalCount": 4,
       "edges": [
         {
           "node": {
@@ -116,6 +116,33 @@
                           {
                             "status": "COMPLETED",
                             "conclusion": "NEUTRAL"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "node": {
+            "number": 5,
+            "title": "Why can't berries get along?",
+            "state": "OPEN",
+            "url": "https://github.com/cli/cli/pull/5",
+            "headRefName": "strawberries",
+            "mergeable": "CONFLICTING",
+            "statusCheckRollup": {
+              "nodes": [
+                {
+                  "commit": {
+                    "statusCheckRollup": {
+                      "contexts": {
+                        "nodes": [
+                          {
+                            "state": "SUCCESS"
                           }
                         ]
                       }
