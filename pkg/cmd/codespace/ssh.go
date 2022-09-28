@@ -60,12 +60,11 @@ func newSSHCmd(app *App) *cobra.Command {
 			By default, the 'ssh' command will create a public/private ssh key pair to  
 			authenticate with the codespace inside the ~/.ssh directory.
 
-			The 'ssh' command also supports deeper integration with OpenSSH using a
-			'--config' option that generates per-codespace ssh configuration in OpenSSH
-			format. Including this configuration in your ~/.ssh/config improves the user
-			experience of tools that integrate with OpenSSH, such as bash/zsh completion of
-			ssh hostnames, remote path completion for scp/rsync/sshfs, git ssh remotes, and
-			so on.
+			The 'ssh' command also supports deeper integration with OpenSSH using a '--config'
+			option that generates per-codespace ssh configuration in OpenSSH format.
+			Including this configuration in your ~/.ssh/config improves the user experience
+			of tools that integrate with OpenSSH, such as bash/zsh completion of ssh hostnames,
+			remote path completion for scp/rsync/sshfs, git ssh remotes, and so on.
 
 			Once that is set up (see the second example below), you can ssh to codespaces as
 			if they were ordinary remote hosts (using 'ssh', not 'gh cs ssh').
