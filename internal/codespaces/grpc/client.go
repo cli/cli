@@ -89,8 +89,8 @@ func (g *Client) appendMetadata(ctx context.Context) context.Context {
 }
 
 // Starts a remote JupyterLab server to allow the user to connect to the codespace via JupyterLab in their browser
-func (g *Client) StartJupyterServer() (port int, serverUrl string, err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+func (g *Client) StartJupyterServer(ctx context.Context) (port int, serverUrl string, err error) {
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	ctx = g.appendMetadata(ctx)
 	defer cancel()
 

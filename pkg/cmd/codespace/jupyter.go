@@ -51,7 +51,7 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	defer safeClose(client, &err)
 
 	a.StartProgressIndicatorWithLabel("Starting JupyterLab on codespace")
-	serverPort, serverUrl, err := client.StartJupyterServer()
+	serverPort, serverUrl, err := client.StartJupyterServer(ctx)
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to start JupyterLab server: %w", err)
