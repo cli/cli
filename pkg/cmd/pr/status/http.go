@@ -12,11 +12,11 @@ import (
 )
 
 type requestOptions struct {
-	CurrentPR     int
-	HeadRef       string
-	Username      string
-	Fields        []string
-	ShowConflicts bool
+	CurrentPR      int
+	HeadRef        string
+	Username       string
+	Fields         []string
+	ConflictStatus bool
 }
 
 type pullRequestsPayload struct {
@@ -57,7 +57,7 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 		fragments = fmt.Sprintf("fragment pr on PullRequest{%s}fragment prWithReviews on PullRequest{...pr}", gr)
 	} else {
 		var err error
-		fragments, err = pullRequestFragment(repo.RepoHost(), options.ShowConflicts)
+		fragments, err = pullRequestFragment(repo.RepoHost(), options.ConflictStatus)
 		if err != nil {
 			return nil, err
 		}

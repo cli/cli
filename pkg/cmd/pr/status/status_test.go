@@ -113,9 +113,9 @@ func TestPRStatus_reviewsAndChecks(t *testing.T) {
 	}
 
 	expected := []string{
-		"✓ Checks passing + Changes requested",
+		"✓ Checks passing + Changes requested ? Merge conflict status unknown",
 		"- Checks pending ✓ 2 Approved",
-		"× 1/3 checks failing - Review required",
+		"× 1/3 checks failing - Review required ✓ No merge conflicts",
 		"✓ Checks passing × Merge conflicts",
 	}
 
