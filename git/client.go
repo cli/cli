@@ -144,6 +144,7 @@ func (c *Client) AddRemote(name, urlStr string, trackingBranches []string) (*Rem
 		args = append(args, "-t", branch)
 	}
 	args = append(args, "-f", name, urlStr)
+	//TODO: Use AuthenticatedCommand
 	cmd, err := c.Command(args...)
 	if err != nil {
 		return nil, err
@@ -333,6 +334,7 @@ func (c *Client) CommitBody(sha string) (string, error) {
 // Push publishes a git ref to a remote and sets up upstream configuration.
 func (c *Client) Push(remote string, ref string) error {
 	args := []string{"push", "--set-upstream", remote, ref}
+	//TODO: Use AuthenticatedCommand
 	cmd, err := c.Command(args...)
 	if err != nil {
 		return err
@@ -398,6 +400,7 @@ func (c *Client) HasLocalBranch(branch string) bool {
 
 func (c *Client) CheckoutBranch(branch string) error {
 	args := []string{"checkout", branch}
+	//TODO: Use AuthenticatedCommand
 	cmd, err := c.Command(args...)
 	if err != nil {
 		return err
@@ -408,6 +411,7 @@ func (c *Client) CheckoutBranch(branch string) error {
 func (c *Client) CheckoutNewBranch(remoteName, branch string) error {
 	track := fmt.Sprintf("%s/%s", remoteName, branch)
 	args := []string{"checkout", "-b", branch, "--track", track}
+	//TODO: Use AuthenticatedCommand
 	cmd, err := c.Command(args...)
 	if err != nil {
 		return err
@@ -417,6 +421,7 @@ func (c *Client) CheckoutNewBranch(remoteName, branch string) error {
 
 func (c *Client) Pull(remote, branch string) error {
 	args := []string{"pull", "--ff-only", remote, branch}
+	//TODO: Use AuthenticatedCommand
 	cmd, err := c.Command(args...)
 	if err != nil {
 		return err
@@ -427,7 +432,6 @@ func (c *Client) Pull(remote, branch string) error {
 func (c *Client) Clone(cloneURL string, args []string) (target string, err error) {
 	cloneArgs, target := parseCloneArgs(args)
 	cloneArgs = append(cloneArgs, cloneURL)
-
 	// If the args contain an explicit target, pass it to clone
 	// otherwise, parse the URL to determine where git cloned it to so we can return it
 	if target != "" {
@@ -435,14 +439,12 @@ func (c *Client) Clone(cloneURL string, args []string) (target string, err error
 	} else {
 		target = path.Base(strings.TrimSuffix(cloneURL, ".git"))
 	}
-
 	cloneArgs = append([]string{"clone"}, cloneArgs...)
-
+	//TODO: Use AuthenticatedCommand
 	cmd, err := c.Command(cloneArgs...)
 	if err != nil {
 		return "", err
 	}
-
 	err = cmd.Run()
 	return
 }
@@ -512,7 +514,6 @@ func firstLine(output []byte) string {
 
 func parseCloneArgs(extraArgs []string) (args []string, target string) {
 	args = extraArgs
-
 	if len(args) > 0 {
 		if !strings.HasPrefix(args[0], "-") {
 			target, args = args[0], args[1:]

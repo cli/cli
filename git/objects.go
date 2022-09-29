@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// RemoteSet is a slice of git remotes
+// RemoteSet is a slice of git remotes.
 type RemoteSet []*Remote
 
 func (r RemoteSet) Len() int      { return len(r) }
@@ -27,7 +27,7 @@ func remoteNameSortScore(name string) int {
 	}
 }
 
-// Remote is a parsed git remote
+// Remote is a parsed git remote.
 type Remote struct {
 	Name     string
 	Resolved string
@@ -48,13 +48,13 @@ func NewRemote(name string, u string) *Remote {
 	}
 }
 
-// Ref represents a git commit reference
+// Ref represents a git commit reference.
 type Ref struct {
 	Hash string
 	Name string
 }
 
-// TrackingRef represents a ref for a remote tracking branch
+// TrackingRef represents a ref for a remote tracking branch.
 type TrackingRef struct {
 	RemoteName string
 	BranchName string

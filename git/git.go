@@ -46,7 +46,7 @@ func CommitBody(sha string) (string, error) {
 }
 
 func Push(remote string, ref string, cmdIn io.ReadCloser, cmdOut, cmdErr io.Writer) error {
-	//TODO: Replace with factory GitClient
+	//TODO: Replace with factory GitClient and use AuthenticatedCommand
 	c := &Client{
 		Stdin:  cmdIn,
 		Stdout: cmdOut,
@@ -71,17 +71,19 @@ func HasLocalBranch(branch string) bool {
 }
 
 func CheckoutBranch(branch string) error {
+	//TODO: Replace with factory GitClient and use AuthenticatedCommand
 	c := &Client{}
 	return c.CheckoutBranch(branch)
 }
 
 func CheckoutNewBranch(remoteName, branch string) error {
+	//TODO: Replace with factory GitClient and use AuthenticatedCommand
 	c := &Client{}
 	return c.CheckoutNewBranch(remoteName, branch)
 }
 
 func Pull(remote, branch string) error {
-	//TODO: Replace with factory GitClient
+	//TODO: Replace with factory GitClient and use AuthenticatedCommand
 	c := &Client{
 		Stdin:  os.Stdin,
 		Stdout: os.Stdout,
@@ -91,7 +93,7 @@ func Pull(remote, branch string) error {
 }
 
 func RunClone(cloneURL string, args []string) (target string, err error) {
-	//TODO: Replace with factory GitClient
+	//TODO: Replace with factory GitClient and use AuthenticatedCommand
 	c := &Client{
 		Stdin:  os.Stdin,
 		Stdout: os.Stdout,

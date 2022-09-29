@@ -239,6 +239,7 @@ func localBranchExists(b string) bool {
 
 func executeCmds(cmdQueue [][]string, ios *iostreams.IOStreams) error {
 	//TODO: Replace with factory GitClient
+	//TODO: Use AuthenticatedCommand
 	client := git.Client{
 		Stdout: ios.Out,
 		Stderr: ios.ErrOut,
