@@ -10,6 +10,86 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestClientCommand(t *testing.T) {
+	tests := []struct {
+		name     string
+		repoDir  string
+		gitPath  string
+		wantExe  string
+		wantArgs []string
+	}{
+		{
+			name:     "creates command",
+			gitPath:  "path/to/git",
+			wantExe:  "path/to/git",
+			wantArgs: []string{"path/to/git", "ref-log"},
+		},
+		{
+			name:     "adds repo directory configuration",
+			repoDir:  "path/to/repo",
+			gitPath:  "path/to/git",
+			wantExe:  "path/to/git",
+			wantArgs: []string{"path/to/git", "-C", "path/to/repo", "ref-log"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			in, out, errOut := &bytes.Buffer{}, &bytes.Buffer{}, &bytes.Buffer{}
+			client := Client{
+				Stdin:   in,
+				Stdout:  out,
+				Stderr:  errOut,
+				RepoDir: tt.repoDir,
+				GitPath: tt.gitPath,
+			}
+			cmd, err := client.Command("ref-log")
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantExe, cmd.Path)
+			assert.Equal(t, tt.wantArgs, cmd.Args)
+			assert.Equal(t, in, cmd.Stdin)
+			assert.Equal(t, out, cmd.Stdout)
+			assert.Equal(t, errOut, cmd.Stderr)
+		})
+	}
+}
+
+func TestClientAuthenticatedCommand(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		hosts    []string
+		wantArgs []string
+	}{
+		{
+			name:     "adds credential helper config options",
+			path:     "path/to/gh",
+			wantArgs: []string{"git", "-c", "credential.helper=", "-c", "credential.helper=!path/to/gh auth git-credential", "fetch"},
+		},
+		{
+			name:     "adds credential helper config options for hosts",
+			path:     "path/to/gh",
+			hosts:    []string{"somehost.com"},
+			wantArgs: []string{"git", "-c", "credential.helper=", "-c", "credential.https://somehost.com.helper=", "-c", "credential.helper=!path/to/gh auth git-credential", "fetch"},
+		},
+		{
+			name:     "fallback when GhPath is not set",
+			wantArgs: []string{"git", "-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential", "fetch"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := Client{
+				AuthHosts: tt.hosts,
+				GhPath:    tt.path,
+				GitPath:   "git",
+			}
+			cmd, err := client.AuthenticatedCommand("fetch")
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantArgs, cmd.Args)
+		})
+	}
+}
+
 func TestClientRemotes(t *testing.T) {
 	tempDir := t.TempDir()
 	initRepo(t, tempDir)

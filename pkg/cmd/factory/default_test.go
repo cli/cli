@@ -435,6 +435,46 @@ func TestSSOURL(t *testing.T) {
 	}
 }
 
+func TestGitClientFunc(t *testing.T) {
+	tests := []struct {
+		name          string
+		config        config.Config
+		executable    string
+		wantAuthHosts []string
+		wantGhPath    string
+	}{
+		{
+			name:          "creates git client",
+			config:        defaultConfig(),
+			executable:    "path/to/gh",
+			wantAuthHosts: []string{"nonsense.com"},
+			wantGhPath:    "path/to/gh",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := New("1")
+			f.Config = func() (config.Config, error) {
+				if tt.config == nil {
+					return config.NewBlankConfig(), nil
+				} else {
+					return tt.config, nil
+				}
+			}
+			f.ExecutableName = tt.executable
+			ios, _, _, _ := iostreams.Test()
+			f.IOStreams = ios
+			c, err := gitClientFunc(f)()
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantAuthHosts, c.AuthHosts)
+			assert.Equal(t, tt.wantGhPath, c.GhPath)
+			assert.Equal(t, ios.In, c.Stdin)
+			assert.Equal(t, ios.Out, c.Stdout)
+			assert.Equal(t, ios.ErrOut, c.Stderr)
+		})
+	}
+}
+
 func defaultConfig() *config.ConfigMock {
 	cfg := config.NewFromString("")
 	cfg.Set("nonsense.com", "oauth_token", "BLAH")
