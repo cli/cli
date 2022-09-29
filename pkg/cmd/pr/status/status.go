@@ -58,7 +58,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.ShowConflicts, "show-conflicts", false, "Show merge conflicts on pull requests")
+	cmd.Flags().BoolVarP(&opts.ShowConflicts, "show-conflicts", "c", false, "Show merge conflicts on pull requests")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
