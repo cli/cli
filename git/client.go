@@ -61,19 +61,9 @@ type Client struct {
 }
 
 func (c *Client) Command(args ...string) (*gitCommand, error) {
-	preArgs := []string{}
-	if c.GhPath != "" {
-		preArgs = append(preArgs, "-c", "credential.helper=''")
-		for _, host := range c.AuthHosts {
-			preArgs = append(preArgs, "-c", fmt.Sprintf("credential.https://%s.helper=''", host))
-		}
-		credHelper := fmt.Sprintf("!%s auth git-credential", c.GhPath)
-		preArgs = append(preArgs, "-c", fmt.Sprintf("credential.helper='%s'", credHelper))
-	}
 	if c.RepoDir != "" {
-		preArgs = append(preArgs, "-C", c.RepoDir)
+		args = append([]string{"-C", c.RepoDir}, args...)
 	}
-	args = append(preArgs, args...)
 	if c.commandContext == nil {
 		c.commandContext = exec.CommandContext
 	}
@@ -95,15 +85,28 @@ func (c *Client) Command(args ...string) (*gitCommand, error) {
 		}
 	}
 	cmd := c.commandContext(context.Background(), c.GitPath, args...)
-	//TODO: Will this swallow yubi key and other 2FA prompts?
-	if c.GhPath != "" {
-		cmd.Env = append(cmd.Env, "GIT_TERMINAL_PROMPT=0")
-	}
 	cmd.Stderr = c.Stderr
-	//TODO: Somehow make it so stdin doesnt close and is useable after executing a command. Does this actually close stdin??
 	cmd.Stdin = c.Stdin
 	cmd.Stdout = c.Stdout
 	return &gitCommand{cmd}, nil
+}
+
+// AuthenticatedCommand is a wrapper around Command that included configuration to use gh
+// as the credential helper for git.
+func (c *Client) AuthenticatedCommand(args ...string) (*gitCommand, error) {
+	preArgs := []string{}
+	preArgs = append(preArgs, "-c", "credential.helper=")
+	for _, host := range c.AuthHosts {
+		preArgs = append(preArgs, "-c", fmt.Sprintf("credential.https://%s.helper=", host))
+	}
+	if c.GhPath == "" {
+		// Assumes that gh is in PATH.
+		c.GhPath = "gh"
+	}
+	credHelper := fmt.Sprintf("!%s auth git-credential", c.GhPath)
+	preArgs = append(preArgs, "-c", fmt.Sprintf("credential.helper=%s", credHelper))
+	args = append(preArgs, args...)
+	return c.Command(args...)
 }
 
 func (c *Client) Remotes() (RemoteSet, error) {
