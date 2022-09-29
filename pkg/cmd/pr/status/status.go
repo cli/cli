@@ -275,7 +275,7 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 				fmt.Fprintf(w, " %s", cs.Green("✓ No merge conflicts"))
 			} else if pr.Mergeable == "CONFLICTING" {
 				fmt.Fprintf(w, " %s", cs.Red("× Merge conflicts"))
-			} else if pr.Mergeable == "UNKNOWN" {
+			} else {
 				fmt.Fprintf(w, " %s", cs.Yellow("? Merge conflict status unknown"))
 			}
 
