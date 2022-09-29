@@ -57,7 +57,12 @@ func Connect(ctx context.Context, session liveshareSession, token string) (*Clie
 	}()
 
 	// Attempt to connect to the given port
-	conn, err := grpc.Dial(fmt.Sprintf("127.0.0.1:%d", localGrpcServerPort), grpc.WithTimeout(connectionTimeout), grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock())
+	opts := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithBlock(),
+	}
+	ctx, _ = context.WithTimeout(ctx, connectionTimeout)
+	conn, err := grpc.DialContext(ctx, fmt.Sprintf("127.0.0.1:%d", localGrpcServerPort), opts...)
 	if err != nil {
 		return nil, err
 	}
