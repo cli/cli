@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"testing"
 
 	"github.com/cli/cli/v2/git"
@@ -446,9 +447,9 @@ func TestGitClientFunc(t *testing.T) {
 		{
 			name:          "creates git client",
 			config:        defaultConfig(),
-			executable:    "path/to/gh",
+			executable:    filepath.Join("path", "to", "gh"),
 			wantAuthHosts: []string{"nonsense.com"},
-			wantGhPath:    "path/to/gh",
+			wantGhPath:    filepath.Join("path", "to", "gh"),
 		},
 	}
 	for _, tt := range tests {
