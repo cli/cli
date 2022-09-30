@@ -41,7 +41,7 @@ type liveshareSession interface {
 	StartSharing(context.Context, string, int) (liveshare.ChannelID, error)
 }
 
-// Connects to the gRPC server on the given port
+// Finds a free port to listen on and creates a new gRPC client that connects to that port
 func Connect(ctx context.Context, session liveshareSession, token string) (*Client, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", 0))
 	if err != nil {
@@ -49,20 +49,34 @@ func Connect(ctx context.Context, session liveshareSession, token string) (*Clie
 	}
 
 	// Tunnel the remote gRPC server port to the local port
-	localGrpcServerPort := listener.Addr().(*net.TCPAddr).Port
+	localPort := listener.Addr().(*net.TCPAddr).Port
 	internalTunnelClosed := make(chan error, 1)
 	go func() {
 		fwd := liveshare.NewPortForwarder(session, codespacesInternalSessionName, codespacesInternalPort, true)
 		internalTunnelClosed <- fwd.ForwardToListener(ctx, listener)
 	}()
 
+	// Create the gRPC client
+	client, err := NewClient(ctx, session, token, localPort)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	// Attach the listener so we can close it later
+	client.listener = listener
+
+	return client, err
+}
+
+// Creates a new gRPC client that connects to the given port
+func NewClient(ctx context.Context, session liveshareSession, token string, localPort int) (*Client, error) {
 	// Attempt to connect to the given port
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 	}
 	ctx, _ = context.WithTimeout(ctx, connectionTimeout)
-	conn, err := grpc.DialContext(ctx, fmt.Sprintf("127.0.0.1:%d", localGrpcServerPort), opts...)
+	conn, err := grpc.DialContext(ctx, fmt.Sprintf("127.0.0.1:%d", localPort), opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +84,6 @@ func Connect(ctx context.Context, session liveshareSession, token string) (*Clie
 	g := &Client{
 		conn:          conn,
 		token:         token,
-		listener:      listener,
 		jupyterClient: jupyter.NewJupyterServerHostClient(conn),
 	}
 
