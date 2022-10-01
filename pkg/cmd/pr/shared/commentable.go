@@ -125,14 +125,15 @@ func CommentableRun(opts *CommentableOptions) error {
 		if err != nil {
 			return err
 		}
-		if commentable.LastCommentIdentifier(username) == "" {
+		lastCommentId := commentable.LastCommentIdentifier(username)
+		if lastCommentId == "" {
 			params := api.CommentCreateInput{Body: opts.Body, SubjectId: commentable.Identifier()}
 			url, err = api.CommentCreate(apiClient, repo.RepoHost(), params)
 			if err != nil {
 				return err
 			}
 		} else {
-			params := api.CommentUpdateInput{Body: opts.Body, CommentId: commentable.LastCommentIdentifier(username)}
+			params := api.CommentUpdateInput{Body: opts.Body, CommentId: lastCommentId}
 			url, err = api.CommentUpdate(apiClient, repo.RepoHost(), params)
 			if err != nil {
 				return err
