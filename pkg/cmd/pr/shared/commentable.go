@@ -29,6 +29,7 @@ const (
 type Commentable interface {
 	Link() string
 	Identifier() string
+	LastCommentIdentifier(username string) string
 }
 
 type CommentableOptions struct {
@@ -42,6 +43,7 @@ type CommentableOptions struct {
 	Interactive           bool
 	InputType             InputType
 	Body                  string
+	EditLast              bool
 	Quiet                 bool
 }
 
@@ -117,10 +119,31 @@ func CommentableRun(opts *CommentableOptions) error {
 		return err
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
-	params := api.CommentCreateInput{Body: opts.Body, SubjectId: commentable.Identifier()}
-	url, err := api.CommentCreate(apiClient, repo.RepoHost(), params)
-	if err != nil {
-		return err
+	url := ""
+	if opts.EditLast {
+		username, err := api.CurrentLoginName(apiClient, repo.RepoHost())
+		if err != nil {
+			return err
+		}
+		if commentable.LastCommentIdentifier(username) == "" {
+			params := api.CommentCreateInput{Body: opts.Body, SubjectId: commentable.Identifier()}
+			url, err = api.CommentCreate(apiClient, repo.RepoHost(), params)
+			if err != nil {
+				return err
+			}
+		} else {
+			params := api.CommentUpdateInput{Body: opts.Body, CommentId: commentable.LastCommentIdentifier(username)}
+			url, err = api.CommentUpdate(apiClient, repo.RepoHost(), params)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		params := api.CommentCreateInput{Body: opts.Body, SubjectId: commentable.Identifier()}
+		url, err = api.CommentCreate(apiClient, repo.RepoHost(), params)
+		if err != nil {
+			return err
+		}
 	}
 	if !opts.Quiet {
 		fmt.Fprintln(opts.IO.Out, url)

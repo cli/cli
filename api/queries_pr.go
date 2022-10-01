@@ -214,6 +214,10 @@ func (pr PullRequest) Identifier() string {
 	return pr.ID
 }
 
+func (pr PullRequest) LastCommentIdentifier(username string) string {
+	return pr.Comments.LastCommentID(username)
+}
+
 func (pr PullRequest) IsOpen() bool {
 	return pr.State == "OPEN"
 }

@@ -283,6 +283,9 @@ func (c mockCommentable) Identifier() string {
 func (c mockCommentable) Link() string {
 	return "https://github.com/OWNER/REPO/issues/123"
 }
+func (c mockCommentable) LastCommentIdentifier(username string) string {
+	return "COMMENT-ID"
+}
 
 func mockCommentCreate(t *testing.T, reg *httpmock.Registry) {
 	reg.Register(

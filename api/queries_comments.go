@@ -15,7 +15,18 @@ type Comments struct {
 	}
 }
 
+func (c Comments) LastCommentID(username string) string {
+	id := ""
+	for _, c := range c.Nodes {
+		if c.Author.Login == username {
+			id = c.ID
+		}
+	}
+	return id
+}
+
 type Comment struct {
+	ID                  string         `json:"id"`
 	Author              Author         `json:"author"`
 	AuthorAssociation   string         `json:"authorAssociation"`
 	Body                string         `json:"body"`
@@ -29,6 +40,11 @@ type Comment struct {
 type CommentCreateInput struct {
 	Body      string
 	SubjectId string
+}
+
+type CommentUpdateInput struct {
+	Body      string
+	CommentId string
 }
 
 func CommentCreate(client *Client, repoHost string, params CommentCreateInput) (string, error) {
@@ -55,6 +71,30 @@ func CommentCreate(client *Client, repoHost string, params CommentCreateInput) (
 	}
 
 	return mutation.AddComment.CommentEdge.Node.URL, nil
+}
+
+func CommentUpdate(client *Client, repoHost string, params CommentUpdateInput) (string, error) {
+	var mutation struct {
+		UpdateIssueComment struct {
+			IssueComment struct {
+				URL string
+			}
+		} `graphql:"updateIssueComment(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": githubv4.UpdateIssueCommentInput{
+			Body: githubv4.String(params.Body),
+			ID:   githubv4.ID(params.CommentId),
+		},
+	}
+
+	err := client.Mutate(repoHost, "CommentUpdate", &mutation, variables)
+	if err != nil {
+		return "", err
+	}
+
+	return mutation.UpdateIssueComment.IssueComment.URL, nil
 }
 
 func (c Comment) AuthorLogin() string {

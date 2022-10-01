@@ -23,6 +23,7 @@ func shortenQuery(q string) string {
 var issueComments = shortenQuery(`
 	comments(first: 100) {
 		nodes {
+			id,
 			author{login},
 			authorAssociation,
 			body,
