@@ -91,44 +91,96 @@ var HelpTopics = map[string]map[string]string{
 	"formatting": {
 		"short": "Formatting options for JSON data exported from gh",
 		"long": heredoc.Docf(`
-			Some gh commands support exporting the data as JSON as an alternative to their usual
-			line-based plain text output. This is suitable for passing structured data to scripts.
-			The JSON output is enabled with the %[1]s--json%[1]s option, followed by the list of fields
-			to fetch. Use the flag without a value to get the list of available fields.
+		By default, the result of %[1]sgh%[1]s commands are output in line-based plain text format. Some commands support passing the --json flag, which converts the output to JSON format. Once in JSON, the output can be further formatted according to a required formatting string by adding either the --jq or --template flag. This is useful for selecting a subset of data, creating new data structures, displaying the data in a different format, or as input to another command line script.
 
-			The %[1]s--jq%[1]s option accepts a query in jq syntax and will print only the resulting
-			values that match the query. This is equivalent to piping the output to %[1]sjq -r%[1]s,
-			but does not require the jq utility to be installed on the system. To learn more
-			about the query syntax, see: <https://stedolan.github.io/jq/manual/v1.6/>
+		The --json flag requires a comma separated list of fields which match the JSON field names from an API response. For a list of available fields, see: <https://docs.github.com/en/graphql/reference/>. Note that you must pass the --json flag and field names to use the --jq or --template flags.
 
-			With %[1]s--template%[1]s, the provided Go template is rendered using the JSON data as input.
-			For the syntax of Go templates, see: <https://golang.org/pkg/text/template/>
+		The --jq flag requires a string argument in %[1]sjq%[1]s query syntax, and will only print those JSON values which match the query. %[1]sjq%[1]s queries can be used to select elements from an array, fields from an object, create a new array, and more. The %[1]sjq%[1]s utility does not need to be installed on the system to use this formatting directive. To learn about %[1]sjq%[1]s query syntax, see: <https://stedolan.github.io/jq/manual/v1.6/>
 
-			The following functions are available in templates:
-			- %[1]sautocolor%[1]s: like %[1]scolor%[1]s, but only emits color to terminals
-			- %[1]scolor <style> <input>%[1]s: colorize input using <https://github.com/mgutz/ansi>
-			- %[1]sjoin <sep> <list>%[1]s: joins values in the list using a separator
-			- %[1]spluck <field> <list>%[1]s: collects values of a field from all items in the input
-			- %[1]stablerow <fields>...%[1]s: aligns fields in output vertically as a table
-			- %[1]stablerender%[1]s: renders fields added by tablerow in place
-			- %[1]stimeago <time>%[1]s: renders a timestamp as relative to now
-			- %[1]stimefmt <format> <time>%[1]s: formats a timestamp using Go's Time.Format function
-			- %[1]struncate <length> <input>%[1]s: ensures input fits within length
+		The --template flag requires a string argument in Go template syntax, and will only print those JSON values which match the query. In addition to the Go template functions in the standard library, the following functions can be used with this formatting directive:
+		- %[1]sautocolor%[1]s: like %[1]scolor%[1]s, but only emits color to terminals
+		- %[1]scolor <style> <input>%[1]s: colorize input using <https://github.com/mgutz/ansi>
+		- %[1]sjoin <sep> <list>%[1]s: joins values in the list using a separator
+		- %[1]spluck <field> <list>%[1]s: collects values of a field from all items in the input
+		- %[1]stablerow <fields>...%[1]s: aligns fields in output vertically as a table
+		- %[1]stablerender%[1]s: renders fields added by tablerow in place
+		- %[1]stimeago <time>%[1]s: renders a timestamp as relative to now
+		- %[1]stimefmt <format> <time>%[1]s: formats a timestamp using Go's Time.Format function
+		- %[1]struncate <length> <input>%[1]s: ensures input fits within length
+
+		To learn more about Go templates, see: <https://golang.org/pkg/text/template/>.
 		`, "`"),
 		"example": heredoc.Doc(`
-			# format issues as table
-			$ gh issue list --json number,title --template \
-			  '{{range .}}{{tablerow (printf "#%v" .number | autocolor "green") .title}}{{end}}'
+			# default output format
+			$ gh pr list
+			Showing 23 of 23 open pull requests in cli/cli
 
-			# format a pull request using multiple tables with headers
+			#123  A helpful contribution          contribution-branch              about 1 day ago
+			#124  Improve the docs                docs-branch                      about 2 days ago
+			#125  An exciting new feature         feature-branch                   about 2 days ago
+
+
+			# adding the --json flag with a list of field names
+			$ gh pr list --json number,title,author
+			[
+			  {
+				"author": {
+				  "login": "monalisa"
+				},
+				"number": 123,
+				"title": "A helpful contribution"
+			  },
+			  {
+				"author": {
+				  "login": "codercat"
+				},
+				"number": 124,
+				"title": "Improve the docs"
+			  },
+			  {
+				"author": {
+				  "login": "cli-maintainer"
+				},
+				"number": 125,
+				"title": "An exciting new feature"
+			  }
+			]
+
+
+			# adding the --jq flag and filtering the output to select the second result
+			$ gh pr list --json number,title,author --jq '.[1]'
+			{"author": {"login": "codercat"},"number":124,"title": "Improve the docs"}
+
+
+			# adding the --template flag and modifying the display format
+			$ gh pr list --json number,title,headRefName,updatedAt --template \
+				'{{range .}}{{tablerow (printf "#%v" .number | autocolor "green") .title .headRefName (timeago .updatedAt)}}{{end}}'
+
+			#123  A helpful contribution      contribution-branch       about 1 day ago
+			#124  Improve the docs            docs-branch               about 2 days ago
+			#125  An exciting new feature     feature-branch            about 2 days ago
+
+
+			# a more complex example with the --template flag which formats a pull request using multiple tables with headers:
 			$ gh pr view 3519 --json number,title,body,reviews,assignees --template \
-			  '{{printf "#%v" .number}} {{.title}}
+			'{{printf "#%v" .number}} {{.title}}
 
-			  {{.body}}
+			{{.body}}
 
-			  {{tablerow "ASSIGNEE" "NAME"}}{{range .assignees}}{{tablerow .login .name}}{{end}}{{tablerender}}
-			  {{tablerow "REVIEWER" "STATE" "COMMENT"}}{{range .reviews}}{{tablerow .author.login .state .body}}{{end}}
-			  '
+			{{tablerow "ASSIGNEE" "NAME"}}{{range .assignees}}{{tablerow .login .name}}{{end}}{{tablerender}}
+			{{tablerow "REVIEWER" "STATE" "COMMENT"}}{{range .reviews}}{{tablerow .author.login .state .body}}{{end}}
+			'
+
+			#3519 Add table and helper template functions
+
+			Resolves #3488
+
+			ASSIGNEE  NAME
+			mislav    Mislav Marohnić
+
+
+			REVIEWER  STATE              COMMENT
+			mislav    COMMENTED          This is going along great! Thanks for working on this ❤️
 		`),
 	},
 	"exit-codes": {
@@ -137,16 +189,16 @@ var HelpTopics = map[string]map[string]string{
 			gh follows normal conventions regarding exit codes.
 
 			- If a command completes successfully, the exit code will be 0
-			
+
 			- If a command fails for any reason, the exit code will be 1
 
 			- If a command is running but gets cancelled, the exit code will be 2
 
 			- If a command encounters an authentication issue, the exit code will be 4
 
-			NOTE: It is possible that a particular command may have more exit codes, so it is a good 
-			practice to check documentation for the command if you are relying on exit codes to 
-			control some behavior. 
+			NOTE: It is possible that a particular command may have more exit codes, so it is a good
+			practice to check documentation for the command if you are relying on exit codes to
+			control some behavior.
 		`),
 	},
 }
