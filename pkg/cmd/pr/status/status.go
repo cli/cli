@@ -58,7 +58,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.ConflictStatus, "conflict-status", "c", false, "Display the conflict status of each pull request")
+	cmd.Flags().BoolVarP(&opts.ConflictStatus, "conflict-status", "c", false, "Display the merge conflict status of each pull request")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
@@ -275,8 +275,8 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 				fmt.Fprintf(w, " %s", cs.Green("✓ No merge conflicts"))
 			} else if pr.Mergeable == "CONFLICTING" {
 				fmt.Fprintf(w, " %s", cs.Red("× Merge conflicts"))
-			} else {
-				fmt.Fprintf(w, " %s", cs.Yellow("? Merge conflict status unknown"))
+			} else if pr.Mergeable == "UNKNOWN" {
+				fmt.Fprintf(w, " %s", cs.Yellow("! Merge conflict status unknown"))
 			}
 
 			if pr.BaseRef.BranchProtectionRule.RequiresStrictStatusChecks {
