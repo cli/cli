@@ -45,7 +45,7 @@ func TestApp_Create(t *testing.T) {
 					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
 						return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
 					},
-					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
 						return []*api.Machine{
 							{
 								Name:        "GIGA",
@@ -99,7 +99,7 @@ func TestApp_Create(t *testing.T) {
 							Type:  "User",
 						}, nil
 					},
-					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
 						return []*api.Machine{
 							{
 								Name:        "GIGA",
@@ -156,7 +156,7 @@ func TestApp_Create(t *testing.T) {
 					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
 						return []api.DevContainerEntry{}, nil
 					},
-					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
 						return []*api.Machine{
 							{
 								Name:        "GIGA",
@@ -246,7 +246,7 @@ func TestApp_Create(t *testing.T) {
 					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
 						return []api.DevContainerEntry{}, nil
 					},
-					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
 						return []*api.Machine{
 							{
 								Name:        "GIGA",
@@ -302,7 +302,7 @@ func TestApp_Create(t *testing.T) {
 					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
 						return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
 					},
-					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
 						return []*api.Machine{
 							{
 								Name:        "GIGA",
@@ -384,7 +384,7 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
 						return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
 					},
-					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
 						return []*api.Machine{
 							{
 								Name:        "GIGA",
@@ -429,7 +429,7 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 					ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
 						return []api.DevContainerEntry{{Path: ".devcontainer/devcontainer.json"}}, nil
 					},
-					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error) {
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
 						return []*api.Machine{
 							{
 								Name:        "GIGA",
