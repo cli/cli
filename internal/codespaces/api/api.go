@@ -527,7 +527,7 @@ type Machine struct {
 }
 
 // GetCodespacesMachines returns the codespaces machines for the given repo, branch and location.
-func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, location string) ([]*Machine, error) {
+func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*Machine, error) {
 	reqURL := fmt.Sprintf("%s/repositories/%d/codespaces/machines", a.githubAPI, repoID)
 	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 	if err != nil {
@@ -537,6 +537,7 @@ func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, loc
 	q := req.URL.Query()
 	q.Add("location", location)
 	q.Add("ref", branch)
+	q.Add("devcontainer_path", devcontainerPath)
 	req.URL.RawQuery = q.Encode()
 
 	a.setHeaders(req)
