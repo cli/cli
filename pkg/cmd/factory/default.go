@@ -31,11 +31,11 @@ func New(appVersion string) *cmdutil.Factory {
 
 	f.IOStreams = ioStreams(f)                   // Depends on Config
 	f.HttpClient = httpClientFunc(f, appVersion) // Depends on Config, IOStreams, and appVersion
-	f.GitClient = gitClientFunc(f)               // Depends on Config, IOStreams, and Executable
 	f.Remotes = remotesFunc(f)                   // Depends on Config
 	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
 	f.Prompter = newPrompter(f)                  // Depends on Config and IOStreams
 	f.Browser = newBrowser(f)                    // Depends on Config, and IOStreams
+	f.GitClient = newGitClient(f)                // Depends on IOStreams, and Executable
 	f.ExtensionManager = extensionManager(f)     // Depends on Config, HttpClient, and IOStreams
 
 	return f
@@ -107,24 +107,16 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 	}
 }
 
-func gitClientFunc(f *cmdutil.Factory) func() (*git.Client, error) {
-	return func() (*git.Client, error) {
-		io := f.IOStreams
-		cfg, err := f.Config()
-		if err != nil {
-			return nil, err
-		}
-		hosts := cfg.Hosts()
-		ghPath := f.Executable()
-		client := &git.Client{
-			AuthHosts: hosts,
-			GhPath:    ghPath,
-			Stderr:    io.ErrOut,
-			Stdin:     io.In,
-			Stdout:    io.Out,
-		}
-		return client, nil
+func newGitClient(f *cmdutil.Factory) *git.Client {
+	io := f.IOStreams
+	ghPath := f.Executable()
+	client := &git.Client{
+		GhPath: ghPath,
+		Stderr: io.ErrOut,
+		Stdin:  io.In,
+		Stdout: io.Out,
 	}
+	return client
 }
 
 func newBrowser(f *cmdutil.Factory) browser.Browser {

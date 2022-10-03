@@ -58,31 +58,23 @@ func TestClientAuthenticatedCommand(t *testing.T) {
 	tests := []struct {
 		name     string
 		path     string
-		hosts    []string
 		wantArgs []string
 	}{
 		{
 			name:     "adds credential helper config options",
 			path:     "path/to/gh",
-			wantArgs: []string{"git", "-c", "credential.helper=", "-c", "credential.helper=!path/to/gh auth git-credential", "fetch"},
-		},
-		{
-			name:     "adds credential helper config options for hosts",
-			path:     "path/to/gh",
-			hosts:    []string{"somehost.com"},
-			wantArgs: []string{"git", "-c", "credential.helper=", "-c", "credential.https://somehost.com.helper=", "-c", "credential.helper=!path/to/gh auth git-credential", "fetch"},
+			wantArgs: []string{"git", "-c", "credential.helper=", "-c", "credential.helper=!\"path/to/gh\" auth git-credential", "fetch"},
 		},
 		{
 			name:     "fallback when GhPath is not set",
-			wantArgs: []string{"git", "-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential", "fetch"},
+			wantArgs: []string{"git", "-c", "credential.helper=", "-c", "credential.helper=!\"gh\" auth git-credential", "fetch"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := Client{
-				AuthHosts: tt.hosts,
-				GhPath:    tt.path,
-				GitPath:   "git",
+				GhPath:  tt.path,
+				GitPath: "git",
 			}
 			cmd, err := client.AuthenticatedCommand(context.Background(), "fetch")
 			assert.NoError(t, err)

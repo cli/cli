@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/safeexec"
@@ -49,46 +50,57 @@ func (gc *gitCommand) Output() ([]byte, error) {
 }
 
 type Client struct {
-	GhPath    string
-	RepoDir   string
-	GitPath   string
-	AuthHosts []string
-	Stderr    io.Writer
-	Stdin     io.Reader
-	Stdout    io.Writer
+	GhPath  string
+	RepoDir string
+	GitPath string
+	Stderr  io.Writer
+	Stdin   io.Reader
+	Stdout  io.Writer
 
 	commandContext func(ctx context.Context, name string, args ...string) *exec.Cmd
+	mu             sync.Mutex
 }
 
 func (c *Client) Command(ctx context.Context, args ...string) (*gitCommand, error) {
 	if c.RepoDir != "" {
 		args = append([]string{"-C", c.RepoDir}, args...)
 	}
-	if c.commandContext == nil {
-		c.commandContext = exec.CommandContext
+	commandContext := exec.CommandContext
+	if c.commandContext != nil {
+		commandContext = c.commandContext
 	}
+	var err error
+	c.mu.Lock()
 	if c.GitPath == "" {
-		var err error
-		c.GitPath, err = safeexec.LookPath("git")
-		if err != nil {
-			if errors.Is(err, exec.ErrNotFound) {
-				programName := "git"
-				if runtime.GOOS == "windows" {
-					programName = "Git for Windows"
-				}
-				return nil, &NotInstalled{
-					message: fmt.Sprintf("unable to find git executable in PATH; please install %s before retrying", programName),
-					error:   err,
-				}
-			}
-			return nil, err
-		}
+		c.GitPath, err = resolveGitPath()
 	}
-	cmd := c.commandContext(ctx, c.GitPath, args...)
+	c.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	cmd := commandContext(ctx, c.GitPath, args...)
 	cmd.Stderr = c.Stderr
 	cmd.Stdin = c.Stdin
 	cmd.Stdout = c.Stdout
 	return &gitCommand{cmd}, nil
+}
+
+func resolveGitPath() (string, error) {
+	path, err := safeexec.LookPath("git")
+	if err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			programName := "git"
+			if runtime.GOOS == "windows" {
+				programName = "Git for Windows"
+			}
+			return "", &NotInstalled{
+				message: fmt.Sprintf("unable to find git executable in PATH; please install %s before retrying", programName),
+				error:   err,
+			}
+		}
+		return "", err
+	}
+	return path, nil
 }
 
 // AuthenticatedCommand is a wrapper around Command that included configuration to use gh
@@ -96,14 +108,11 @@ func (c *Client) Command(ctx context.Context, args ...string) (*gitCommand, erro
 func (c *Client) AuthenticatedCommand(ctx context.Context, args ...string) (*gitCommand, error) {
 	preArgs := []string{}
 	preArgs = append(preArgs, "-c", "credential.helper=")
-	for _, host := range c.AuthHosts {
-		preArgs = append(preArgs, "-c", fmt.Sprintf("credential.https://%s.helper=", host))
-	}
 	if c.GhPath == "" {
 		// Assumes that gh is in PATH.
 		c.GhPath = "gh"
 	}
-	credHelper := fmt.Sprintf("!%s auth git-credential", c.GhPath)
+	credHelper := fmt.Sprintf("!%q auth git-credential", c.GhPath)
 	preArgs = append(preArgs, "-c", fmt.Sprintf("credential.helper=%s", credHelper))
 	args = append(preArgs, args...)
 	return c.Command(ctx, args...)
@@ -115,10 +124,9 @@ func (c *Client) Remotes(ctx context.Context) (RemoteSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	remoteOutBuf, remoteErrBuf := bytes.Buffer{}, bytes.Buffer{}
-	remoteCmd.Stderr, remoteCmd.Stdout = &remoteErrBuf, &remoteOutBuf
-	if err := remoteCmd.Run(); err != nil {
-		return nil, fmt.Errorf("failed to run git: %s. error: %w", remoteErrBuf.String(), err)
+	remoteOut, remoteErr := remoteCmd.Output()
+	if remoteErr != nil {
+		return nil, wrapErrorResponse(remoteErr)
 	}
 
 	configArgs := []string{"config", "--get-regexp", `^remote\..*\.gh-resolved$`}
@@ -126,14 +134,13 @@ func (c *Client) Remotes(ctx context.Context) (RemoteSet, error) {
 	if err != nil {
 		return nil, err
 	}
-	configOutBuf, configErrBuf := bytes.Buffer{}, bytes.Buffer{}
-	configCmd.Stderr, configCmd.Stdout = &configErrBuf, &configOutBuf
-	if err := configCmd.Run(); err != nil {
-		return nil, fmt.Errorf("failed to run git: %s. error: %w", configErrBuf.String(), err)
+	configOut, configErr := configCmd.Output()
+	if configErr != nil {
+		return nil, wrapErrorResponse(configErr)
 	}
 
-	remotes := parseRemotes(outputLines(remoteOutBuf.Bytes()))
-	populateResolvedRemotes(remotes, outputLines(configOutBuf.Bytes()))
+	remotes := parseRemotes(outputLines(remoteOut))
+	populateResolvedRemotes(remotes, outputLines(configOut))
 	sort.Sort(remotes)
 	return remotes, nil
 }
@@ -197,15 +204,16 @@ func (c *Client) CurrentBranch(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	outBuf, errBuf := bytes.Buffer{}, bytes.Buffer{}
-	cmd.Stdout, cmd.Stderr = &outBuf, &errBuf
-	if err := cmd.Run(); err != nil {
+	errBuf := bytes.Buffer{}
+	cmd.Stderr = &errBuf
+	out, err := cmd.Output()
+	if err != nil {
 		if errBuf.Len() == 0 {
 			return "", ErrNotOnAnyBranch
 		}
 		return "", fmt.Errorf("failed to run git: %s. error: %w", errBuf.String(), err)
 	}
-	branch := firstLine(outBuf.Bytes())
+	branch := firstLine(out)
 	return strings.TrimPrefix(branch, "refs/heads/"), nil
 }
 
@@ -216,13 +224,12 @@ func (c *Client) ShowRefs(ctx context.Context, ref ...string) ([]Ref, error) {
 	if err != nil {
 		return nil, err
 	}
-	outBuf, errBuf := bytes.Buffer{}, bytes.Buffer{}
-	cmd.Stdout, cmd.Stderr = &outBuf, &errBuf
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("failed to run git: %s. error: %w", errBuf.String(), err)
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, wrapErrorResponse(err)
 	}
 	var refs []Ref
-	for _, line := range outputLines(outBuf.Bytes()) {
+	for _, line := range outputLines(out) {
 		parts := strings.SplitN(line, " ", 2)
 		if len(parts) < 2 {
 			continue
@@ -241,12 +248,17 @@ func (c *Client) Config(ctx context.Context, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	outBuf, errBuf := bytes.Buffer{}, bytes.Buffer{}
-	cmd.Stdout, cmd.Stderr = &outBuf, &errBuf
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("unknown config key: %s", name)
+	errBuf := bytes.Buffer{}
+	cmd.Stderr = &errBuf
+	out, err := cmd.Output()
+	if err != nil {
+		var exitError *exec.ExitError
+		if ok := errors.As(err, &exitError); ok && exitError.Error() == "1" {
+			return "", fmt.Errorf("unknown config key: %s", name)
+		}
+		return "", fmt.Errorf("failed to run git: %s. error: %w", errBuf.String(), err)
 	}
-	return firstLine(outBuf.Bytes()), nil
+	return firstLine(out), nil
 }
 
 func (c *Client) UncommittedChangeCount(ctx context.Context) (int, error) {
@@ -255,12 +267,11 @@ func (c *Client) UncommittedChangeCount(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	outBuf, errBuf := bytes.Buffer{}, bytes.Buffer{}
-	cmd.Stdout, cmd.Stderr = &outBuf, &errBuf
-	if err := cmd.Run(); err != nil {
-		return 0, fmt.Errorf("failed to run git: %s. error: %w", errBuf.String(), err)
+	out, err := cmd.Output()
+	if err != nil {
+		return 0, wrapErrorResponse(err)
 	}
-	lines := strings.Split(outBuf.String(), "\n")
+	lines := strings.Split(string(out), "\n")
 	count := 0
 	for _, l := range lines {
 		if l != "" {
@@ -276,15 +287,14 @@ func (c *Client) Commits(ctx context.Context, baseRef, headRef string) ([]*Commi
 	if err != nil {
 		return nil, err
 	}
-	outBuf, errBuf := bytes.Buffer{}, bytes.Buffer{}
-	cmd.Stdout, cmd.Stderr = &outBuf, &errBuf
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("failed to run git: %s. error: %w", errBuf.String(), err)
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, wrapErrorResponse(err)
 	}
 	commits := []*Commit{}
 	sha := 0
 	title := 1
-	for _, line := range outputLines(outBuf.Bytes()) {
+	for _, line := range outputLines(out) {
 		split := strings.SplitN(line, ",", 2)
 		if len(split) != 2 {
 			continue
@@ -306,12 +316,11 @@ func (c *Client) lookupCommit(ctx context.Context, sha, format string) ([]byte, 
 	if err != nil {
 		return nil, err
 	}
-	outBuf, errBuf := bytes.Buffer{}, bytes.Buffer{}
-	cmd.Stdout, cmd.Stderr = &outBuf, &errBuf
-	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("failed to run git: %s. error: %w", errBuf.String(), err)
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, wrapErrorResponse(err)
 	}
-	return outBuf.Bytes(), nil
+	return out, nil
 }
 
 func (c *Client) LastCommit(ctx context.Context) (*Commit, error) {
@@ -350,12 +359,11 @@ func (c *Client) ReadBranchConfig(ctx context.Context, branch string) (cfg Branc
 	if err != nil {
 		return
 	}
-	outBuf, errBuf := bytes.Buffer{}, bytes.Buffer{}
-	cmd.Stdout, cmd.Stderr = &outBuf, &errBuf
-	if err := cmd.Run(); err != nil {
+	out, err := cmd.Output()
+	if err != nil {
 		return
 	}
-	for _, line := range outputLines(outBuf.Bytes()) {
+	for _, line := range outputLines(out) {
 		parts := strings.SplitN(line, " ", 2)
 		if len(parts) < 2 {
 			continue
@@ -454,12 +462,11 @@ func (c *Client) ToplevelDir(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	outBuf, errBuf := bytes.Buffer{}, bytes.Buffer{}
-	cmd.Stdout, cmd.Stderr = &outBuf, &errBuf
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to run git: %s. error: %w", errBuf.String(), err)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", wrapErrorResponse(err)
 	}
-	return firstLine(outBuf.Bytes()), nil
+	return firstLine(out), nil
 }
 
 func (c *Client) GitDir(ctx context.Context) (string, error) {
@@ -468,12 +475,11 @@ func (c *Client) GitDir(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	outBuf, errBuf := bytes.Buffer{}, bytes.Buffer{}
-	cmd.Stdout, cmd.Stderr = &outBuf, &errBuf
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("failed to run git: %s. error: %w", errBuf.String(), err)
+	out, err := cmd.Output()
+	if err != nil {
+		return "", wrapErrorResponse(err)
 	}
-	return firstLine(outBuf.Bytes()), nil
+	return firstLine(out), nil
 }
 
 // Show current directory relative to the top-level directory of repository.
@@ -483,12 +489,11 @@ func (c *Client) PathFromRoot(ctx context.Context) string {
 	if err != nil {
 		return ""
 	}
-	outBuf, errBuf := bytes.Buffer{}, bytes.Buffer{}
-	cmd.Stdout, cmd.Stderr = &outBuf, &errBuf
-	if err := cmd.Run(); err != nil {
+	out, err := cmd.Output()
+	if err != nil {
 		return ""
 	}
-	if path := firstLine(outBuf.Bytes()); path != "" {
+	if path := firstLine(out); path != "" {
 		return path[:len(path)-1]
 	}
 	return ""
@@ -576,4 +581,13 @@ func populateResolvedRemotes(remotes RemoteSet, resolved []string) {
 			}
 		}
 	}
+}
+
+func wrapErrorResponse(err error) error {
+	var stderr string
+	var exitError *exec.ExitError
+	if errors.As(err, &exitError) {
+		stderr = string(exitError.Stderr)
+	}
+	return fmt.Errorf("failed to run git: %s. error: %w", stderr, err)
 }

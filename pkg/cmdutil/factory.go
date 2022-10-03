@@ -20,9 +20,9 @@ type Factory struct {
 	IOStreams *iostreams.IOStreams
 	Prompter  prompter.Prompter
 	Browser   browser.Browser
+	GitClient *git.Client
 
 	HttpClient func() (*http.Client, error)
-	GitClient  func() (*git.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (context.Remotes, error)
 	Config     func() (config.Config, error)

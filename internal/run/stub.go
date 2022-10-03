@@ -2,7 +2,6 @@ package run
 
 import (
 	"fmt"
-	"io"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -27,7 +26,6 @@ func Stub() (*CommandStubber, func(T)) {
 			c(cmd.Args)
 		}
 		s.matched = true
-		s.stdout = cmd.Stdout
 		return s
 	})
 
@@ -76,7 +74,7 @@ func (cs *CommandStubber) Register(pattern string, exitStatus int, output string
 	cs.stubs = append(cs.stubs, &commandStub{
 		pattern:    regexp.MustCompile(pattern),
 		exitStatus: exitStatus,
-		output:     output,
+		stdout:     output,
 		callbacks:  callbacks,
 	})
 }
@@ -94,21 +92,17 @@ func (cs *CommandStubber) find(args []string) *commandStub {
 type CommandCallback func([]string)
 
 type commandStub struct {
-	callbacks  []CommandCallback
-	exitStatus int
-	matched    bool
-	output     string
 	pattern    *regexp.Regexp
-	stdout     io.Writer
+	matched    bool
+	exitStatus int
+	stdout     string
+	callbacks  []CommandCallback
 }
 
 // Run satisfies Runnable
 func (s *commandStub) Run() error {
 	if s.exitStatus != 0 {
 		return fmt.Errorf("%s exited with status %d", s.pattern, s.exitStatus)
-	}
-	if s.stdout != nil && s.output != "" {
-		fmt.Fprint(s.stdout, s.output)
 	}
 	return nil
 }
@@ -118,5 +112,5 @@ func (s *commandStub) Output() ([]byte, error) {
 	if s.exitStatus != 0 {
 		return []byte(nil), fmt.Errorf("%s exited with status %d", s.pattern, s.exitStatus)
 	}
-	return []byte(s.output), nil
+	return []byte(s.stdout), nil
 }

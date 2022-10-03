@@ -436,7 +436,7 @@ func TestSSOURL(t *testing.T) {
 	}
 }
 
-func TestGitClientFunc(t *testing.T) {
+func TestNewGitClient(t *testing.T) {
 	tests := []struct {
 		name          string
 		config        config.Config
@@ -465,9 +465,7 @@ func TestGitClientFunc(t *testing.T) {
 			f.ExecutableName = tt.executable
 			ios, _, _, _ := iostreams.Test()
 			f.IOStreams = ios
-			c, err := gitClientFunc(f)()
-			assert.NoError(t, err)
-			assert.Equal(t, tt.wantAuthHosts, c.AuthHosts)
+			c := newGitClient(f)
 			assert.Equal(t, tt.wantGhPath, c.GhPath)
 			assert.Equal(t, ios.In, c.Stdin)
 			assert.Equal(t, ios.Out, c.Stdout)
