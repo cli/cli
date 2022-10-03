@@ -30,6 +30,7 @@ type StatusOptions struct {
 
 	HasRepoOverride bool
 	Exporter        cmdutil.Exporter
+	ConflictStatus  bool
 }
 
 func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Command {
@@ -57,6 +58,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 		},
 	}
 
+	cmd.Flags().BoolVarP(&opts.ConflictStatus, "conflict-status", "c", false, "Display the merge conflict status of each pull request")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
 
 	return cmd
@@ -91,13 +93,15 @@ func statusRun(opts *StatusOptions) error {
 	}
 
 	options := requestOptions{
-		Username:  "@me",
-		CurrentPR: currentPRNumber,
-		HeadRef:   currentPRHeadRef,
+		Username:       "@me",
+		CurrentPR:      currentPRNumber,
+		HeadRef:        currentPRHeadRef,
+		ConflictStatus: opts.ConflictStatus,
 	}
 	if opts.Exporter != nil {
 		options.Fields = opts.Exporter.Fields()
 	}
+
 	prPayload, err := pullRequestStatus(httpClient, baseRepo, options)
 	if err != nil {
 		return err
@@ -262,6 +266,17 @@ func printPrs(io *iostreams.IOStreams, totalCount int, prs ...api.PullRequest) {
 					s = fmt.Sprintf("%d/%d", gotApprovals, numRequiredApprovals)
 				}
 				fmt.Fprint(w, cs.Green(fmt.Sprintf("✓ %s Approved", s)))
+			}
+
+			if pr.Mergeable == "MERGEABLE" {
+				// prefer "No merge conflicts" to "Mergeable" as there is more to mergeability
+				// than the git status. Missing or failing required checks prevent merging
+				// even though a PR is technically mergeable, which is often a source of confusion.
+				fmt.Fprintf(w, " %s", cs.Green("✓ No merge conflicts"))
+			} else if pr.Mergeable == "CONFLICTING" {
+				fmt.Fprintf(w, " %s", cs.Red("× Merge conflicts"))
+			} else if pr.Mergeable == "UNKNOWN" {
+				fmt.Fprintf(w, " %s", cs.Yellow("! Merge conflict status unknown"))
 			}
 
 			if pr.BaseRef.BranchProtectionRule.RequiresStrictStatusChecks {

@@ -12,10 +12,11 @@ import (
 )
 
 type requestOptions struct {
-	CurrentPR int
-	HeadRef   string
-	Username  string
-	Fields    []string
+	CurrentPR      int
+	HeadRef        string
+	Username       string
+	Fields         []string
+	ConflictStatus bool
 }
 
 type pullRequestsPayload struct {
@@ -56,7 +57,7 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 		fragments = fmt.Sprintf("fragment pr on PullRequest{%s}fragment prWithReviews on PullRequest{...pr}", gr)
 	} else {
 		var err error
-		fragments, err = pullRequestFragment(httpClient, repo.RepoHost())
+		fragments, err = pullRequestFragment(repo.RepoHost(), options.ConflictStatus)
 		if err != nil {
 			return nil, err
 		}
@@ -186,11 +187,15 @@ func pullRequestStatus(httpClient *http.Client, repo ghrepo.Interface, options r
 	return &payload, nil
 }
 
-func pullRequestFragment(httpClient *http.Client, hostname string) (string, error) {
+func pullRequestFragment(hostname string, conflictStatus bool) (string, error) {
 	fields := []string{
 		"number", "title", "state", "url", "isDraft", "isCrossRepository",
 		"headRefName", "headRepositoryOwner", "mergeStateStatus",
 		"statusCheckRollup", "requiresStrictStatusChecks",
+	}
+
+	if conflictStatus {
+		fields = append(fields, "mergeable")
 	}
 	reviewFields := []string{"reviewDecision", "latestReviews"}
 	fragments := fmt.Sprintf(`
