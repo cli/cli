@@ -91,24 +91,38 @@ var HelpTopics = map[string]map[string]string{
 	"formatting": {
 		"short": "Formatting options for JSON data exported from gh",
 		"long": heredoc.Docf(`
-		By default, the result of %[1]sgh%[1]s commands are output in line-based plain text format. Some commands support passing the --json flag, which converts the output to JSON format. Once in JSON, the output can be further formatted according to a required formatting string by adding either the --jq or --template flag. This is useful for selecting a subset of data, creating new data structures, displaying the data in a different format, or as input to another command line script.
+			By default, the result of %[1]sgh%[1]s commands are output in line-based plain text format.
+			Some commands support passing the %[1]s--json%[1]s flag, which converts the output to JSON format.
+			Once in JSON, the output can be further formatted according to a required formatting string by
+			adding either the %[1]s--jq%[1]s or %[1]s--template%[1]s flag. This is useful for selecting a subset of data,
+			creating new data structures, displaying the data in a different format, or as input to another
+			command line script.
 
-		The --json flag requires a comma separated list of fields which match the JSON field names from an API response. For a list of available fields, see: <https://docs.github.com/en/graphql/reference/>. Note that you must pass the --json flag and field names to use the --jq or --template flags.
+			The %[1]s--json%[1]s flag requires a comma separated list of fields to fetch. To view the possible JSON
+			field names for a command omit the string argument to the %[1]s--json%[1]s flag when you run the command.
+			Note that you must pass the %[1]s--json%[1]s flag and field names to use the %[1]s--jq%[1]s or %[1]s--template%[1]s flags.
 
-		The --jq flag requires a string argument in %[1]sjq%[1]s query syntax, and will only print those JSON values which match the query. %[1]sjq%[1]s queries can be used to select elements from an array, fields from an object, create a new array, and more. The %[1]sjq%[1]s utility does not need to be installed on the system to use this formatting directive. To learn about %[1]sjq%[1]s query syntax, see: <https://stedolan.github.io/jq/manual/v1.6/>
+			The %[1]s--jq%[1]s flag requires a string argument in jq query syntax, and will only print
+			those JSON values which match the query. jq queries can be used to select elements from an
+			array, fields from an object, create a new array, and more. The jq utility does not need
+			to be installed on the system to use this formatting directive.
+			To learn about jq query syntax, see: <https://stedolan.github.io/jq/manual/v1.6/>
 
-		The --template flag requires a string argument in Go template syntax, and will only print those JSON values which match the query. In addition to the Go template functions in the standard library, the following functions can be used with this formatting directive:
-		- %[1]sautocolor%[1]s: like %[1]scolor%[1]s, but only emits color to terminals
-		- %[1]scolor <style> <input>%[1]s: colorize input using <https://github.com/mgutz/ansi>
-		- %[1]sjoin <sep> <list>%[1]s: joins values in the list using a separator
-		- %[1]spluck <field> <list>%[1]s: collects values of a field from all items in the input
-		- %[1]stablerow <fields>...%[1]s: aligns fields in output vertically as a table
-		- %[1]stablerender%[1]s: renders fields added by tablerow in place
-		- %[1]stimeago <time>%[1]s: renders a timestamp as relative to now
-		- %[1]stimefmt <format> <time>%[1]s: formats a timestamp using Go's Time.Format function
-		- %[1]struncate <length> <input>%[1]s: ensures input fits within length
+			The %[1]s--template%[1]s flag requires a string argument in Go template syntax, and will only print
+			those JSON values which match the query.
+			In addition to the Go template functions in the standard library, the following functions can be used
+			with this formatting directive:
+			- %[1]sautocolor%[1]s: like %[1]scolor%[1]s, but only emits color to terminals
+			- %[1]scolor <style> <input>%[1]s: colorize input using <https://github.com/mgutz/ansi>
+			- %[1]sjoin <sep> <list>%[1]s: joins values in the list using a separator
+			- %[1]spluck <field> <list>%[1]s: collects values of a field from all items in the input
+			- %[1]stablerow <fields>...%[1]s: aligns fields in output vertically as a table
+			- %[1]stablerender%[1]s: renders fields added by tablerow in place
+			- %[1]stimeago <time>%[1]s: renders a timestamp as relative to now
+			- %[1]stimefmt <format> <time>%[1]s: formats a timestamp using Go's Time.Format function
+			- %[1]struncate <length> <input>%[1]s: ensures input fits within length
 
-		To learn more about Go templates, see: <https://golang.org/pkg/text/template/>.
+			To learn more about Go templates, see: <https://golang.org/pkg/text/template/>.
 		`, "`"),
 		"example": heredoc.Doc(`
 			# default output format
@@ -147,9 +161,11 @@ var HelpTopics = map[string]map[string]string{
 			]
 
 
-			# adding the --jq flag and filtering the output to select the second result
-			$ gh pr list --json number,title,author --jq '.[1]'
-			{"author": {"login": "codercat"},"number":124,"title": "Improve the docs"}
+			# adding the --jq flag and selecting fields from the array
+			$ gh pr list --json author --jq '.[].author.login'
+			monalisa
+			codercat
+			cli-maintainer
 
 
 			# adding the --template flag and modifying the display format
