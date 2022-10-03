@@ -1,12 +1,13 @@
 package checkout
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/context"
+	cliContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -20,7 +21,7 @@ type CheckoutOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
-	Remotes    func() (context.Remotes, error)
+	Remotes    func() (cliContext.Remotes, error)
 	Branch     func() (string, error)
 
 	Finder shared.PRFinder
@@ -135,7 +136,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 	return nil
 }
 
-func cmdsForExistingRemote(remote *context.Remote, pr *api.PullRequest, opts *CheckoutOptions) [][]string {
+func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts *CheckoutOptions) [][]string {
 	var cmds [][]string
 	remoteBranch := fmt.Sprintf("%s/%s", remote.Name, pr.HeadRefName)
 
@@ -245,7 +246,7 @@ func executeCmds(cmdQueue [][]string, ios *iostreams.IOStreams) error {
 		Stderr: ios.ErrOut,
 	}
 	for _, args := range cmdQueue {
-		cmd, err := client.Command(args...)
+		cmd, err := client.Command(context.Background(), args...)
 		if err != nil {
 			return err
 		}

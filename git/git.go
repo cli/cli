@@ -1,48 +1,49 @@
 package git
 
 import (
+	"context"
 	"io"
 	"os"
 )
 
 func GitCommand(args ...string) (*gitCommand, error) {
 	c := &Client{}
-	return c.Command(args...)
+	return c.Command(context.Background(), args...)
 }
 
 func ShowRefs(ref ...string) ([]Ref, error) {
 	c := &Client{}
-	return c.ShowRefs(ref...)
+	return c.ShowRefs(context.Background(), ref...)
 }
 
 func CurrentBranch() (string, error) {
 	c := &Client{}
-	return c.CurrentBranch()
+	return c.CurrentBranch(context.Background())
 }
 
 func Config(name string) (string, error) {
 	c := &Client{}
-	return c.Config(name)
+	return c.Config(context.Background(), name)
 }
 
 func UncommittedChangeCount() (int, error) {
 	c := &Client{}
-	return c.UncommittedChangeCount()
+	return c.UncommittedChangeCount(context.Background())
 }
 
 func Commits(baseRef, headRef string) ([]*Commit, error) {
 	c := &Client{}
-	return c.Commits(baseRef, headRef)
+	return c.Commits(context.Background(), baseRef, headRef)
 }
 
 func LastCommit() (*Commit, error) {
 	c := &Client{}
-	return c.LastCommit()
+	return c.LastCommit(context.Background())
 }
 
 func CommitBody(sha string) (string, error) {
 	c := &Client{}
-	return c.CommitBody(sha)
+	return c.CommitBody(context.Background(), sha)
 }
 
 func Push(remote string, ref string, cmdIn io.ReadCloser, cmdOut, cmdErr io.Writer) error {
@@ -52,34 +53,32 @@ func Push(remote string, ref string, cmdIn io.ReadCloser, cmdOut, cmdErr io.Writ
 		Stdout: cmdOut,
 		Stderr: cmdErr,
 	}
-	return c.Push(remote, ref)
+	return c.Push(context.Background(), remote, ref)
 }
 
 func ReadBranchConfig(branch string) (cfg BranchConfig) {
 	c := &Client{}
-	return c.ReadBranchConfig(branch)
+	return c.ReadBranchConfig(context.Background(), branch)
 }
 
 func DeleteLocalBranch(branch string) error {
 	c := &Client{}
-	return c.DeleteLocalBranch(branch)
+	return c.DeleteLocalBranch(context.Background(), branch)
 }
 
 func HasLocalBranch(branch string) bool {
 	c := &Client{}
-	return c.HasLocalBranch(branch)
+	return c.HasLocalBranch(context.Background(), branch)
 }
 
 func CheckoutBranch(branch string) error {
-	//TODO: Replace with factory GitClient and use AuthenticatedCommand
 	c := &Client{}
-	return c.CheckoutBranch(branch)
+	return c.CheckoutBranch(context.Background(), branch)
 }
 
 func CheckoutNewBranch(remoteName, branch string) error {
-	//TODO: Replace with factory GitClient and use AuthenticatedCommand
 	c := &Client{}
-	return c.CheckoutNewBranch(remoteName, branch)
+	return c.CheckoutNewBranch(context.Background(), remoteName, branch)
 }
 
 func Pull(remote, branch string) error {
@@ -89,7 +88,7 @@ func Pull(remote, branch string) error {
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
 	}
-	return c.Pull(remote, branch)
+	return c.Pull(context.Background(), remote, branch)
 }
 
 func RunClone(cloneURL string, args []string) (target string, err error) {
@@ -99,57 +98,57 @@ func RunClone(cloneURL string, args []string) (target string, err error) {
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
 	}
-	return c.Clone(cloneURL, args)
+	return c.Clone(context.Background(), cloneURL, args)
 }
 
 func ToplevelDir() (string, error) {
 	c := &Client{}
-	return c.ToplevelDir()
+	return c.ToplevelDir(context.Background())
 }
 
 func GetDirFromPath(repoDir string) (string, error) {
 	c := &Client{
 		RepoDir: repoDir,
 	}
-	return c.GitDir()
+	return c.GitDir(context.Background())
 }
 
 func PathFromRepoRoot() string {
 	c := &Client{}
-	return c.PathFromRoot()
+	return c.PathFromRoot(context.Background())
 }
 
 func Remotes() (RemoteSet, error) {
 	c := &Client{}
-	return c.Remotes()
+	return c.Remotes(context.Background())
 }
 
 func RemotesForPath(repoDir string) (RemoteSet, error) {
 	c := &Client{
 		RepoDir: repoDir,
 	}
-	return c.Remotes()
+	return c.Remotes(context.Background())
 }
 
 func AddRemote(name, url string) (*Remote, error) {
 	c := &Client{}
-	return c.AddRemote(name, url, []string{})
+	return c.AddRemote(context.Background(), name, url, []string{})
 }
 
 func AddNamedRemote(url, name, repoDir string, branches []string) error {
 	c := &Client{
 		RepoDir: repoDir,
 	}
-	_, err := c.AddRemote(name, url, branches)
+	_, err := c.AddRemote(context.Background(), name, url, branches)
 	return err
 }
 
 func UpdateRemoteURL(name, url string) error {
 	c := &Client{}
-	return c.UpdateRemoteURL(name, url)
+	return c.UpdateRemoteURL(context.Background(), name, url)
 }
 
 func SetRemoteResolution(name, resolution string) error {
 	c := &Client{}
-	return c.SetRemoteResolution(name, resolution)
+	return c.SetRemoteResolution(context.Background(), name, resolution)
 }

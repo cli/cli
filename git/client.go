@@ -60,7 +60,7 @@ type Client struct {
 	commandContext func(ctx context.Context, name string, args ...string) *exec.Cmd
 }
 
-func (c *Client) Command(args ...string) (*gitCommand, error) {
+func (c *Client) Command(ctx context.Context, args ...string) (*gitCommand, error) {
 	if c.RepoDir != "" {
 		args = append([]string{"-C", c.RepoDir}, args...)
 	}
@@ -84,7 +84,7 @@ func (c *Client) Command(args ...string) (*gitCommand, error) {
 			return nil, err
 		}
 	}
-	cmd := c.commandContext(context.Background(), c.GitPath, args...)
+	cmd := c.commandContext(ctx, c.GitPath, args...)
 	cmd.Stderr = c.Stderr
 	cmd.Stdin = c.Stdin
 	cmd.Stdout = c.Stdout
@@ -93,7 +93,7 @@ func (c *Client) Command(args ...string) (*gitCommand, error) {
 
 // AuthenticatedCommand is a wrapper around Command that included configuration to use gh
 // as the credential helper for git.
-func (c *Client) AuthenticatedCommand(args ...string) (*gitCommand, error) {
+func (c *Client) AuthenticatedCommand(ctx context.Context, args ...string) (*gitCommand, error) {
 	preArgs := []string{}
 	preArgs = append(preArgs, "-c", "credential.helper=")
 	for _, host := range c.AuthHosts {
@@ -106,12 +106,12 @@ func (c *Client) AuthenticatedCommand(args ...string) (*gitCommand, error) {
 	credHelper := fmt.Sprintf("!%s auth git-credential", c.GhPath)
 	preArgs = append(preArgs, "-c", fmt.Sprintf("credential.helper=%s", credHelper))
 	args = append(preArgs, args...)
-	return c.Command(args...)
+	return c.Command(ctx, args...)
 }
 
-func (c *Client) Remotes() (RemoteSet, error) {
+func (c *Client) Remotes(ctx context.Context) (RemoteSet, error) {
 	remoteArgs := []string{"remote", "-v"}
-	remoteCmd, err := c.Command(remoteArgs...)
+	remoteCmd, err := c.Command(ctx, remoteArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (c *Client) Remotes() (RemoteSet, error) {
 	}
 
 	configArgs := []string{"config", "--get-regexp", `^remote\..*\.gh-resolved$`}
-	configCmd, err := c.Command(configArgs...)
+	configCmd, err := c.Command(ctx, configArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -138,14 +138,14 @@ func (c *Client) Remotes() (RemoteSet, error) {
 	return remotes, nil
 }
 
-func (c *Client) AddRemote(name, urlStr string, trackingBranches []string) (*Remote, error) {
+func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBranches []string) (*Remote, error) {
 	args := []string{"remote", "add"}
 	for _, branch := range trackingBranches {
 		args = append(args, "-t", branch)
 	}
 	args = append(args, "-f", name, urlStr)
 	//TODO: Use AuthenticatedCommand
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -172,18 +172,18 @@ func (c *Client) AddRemote(name, urlStr string, trackingBranches []string) (*Rem
 	return remote, nil
 }
 
-func (c *Client) UpdateRemoteURL(name, url string) error {
+func (c *Client) UpdateRemoteURL(ctx context.Context, name, url string) error {
 	args := []string{"remote", "set-url", name, url}
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return err
 	}
 	return cmd.Run()
 }
 
-func (c *Client) SetRemoteResolution(name, resolution string) error {
+func (c *Client) SetRemoteResolution(ctx context.Context, name, resolution string) error {
 	args := []string{"config", "--add", fmt.Sprintf("remote.%s.gh-resolved", name), resolution}
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return err
 	}
@@ -191,9 +191,9 @@ func (c *Client) SetRemoteResolution(name, resolution string) error {
 }
 
 // CurrentBranch reads the checked-out branch for the git repository.
-func (c *Client) CurrentBranch() (string, error) {
+func (c *Client) CurrentBranch(ctx context.Context) (string, error) {
 	args := []string{"symbolic-ref", "--quiet", "HEAD"}
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return "", err
 	}
@@ -210,9 +210,9 @@ func (c *Client) CurrentBranch() (string, error) {
 }
 
 // ShowRefs resolves fully-qualified refs to commit hashes.
-func (c *Client) ShowRefs(ref ...string) ([]Ref, error) {
+func (c *Client) ShowRefs(ctx context.Context, ref ...string) ([]Ref, error) {
 	args := append([]string{"show-ref", "--verify", "--"}, ref...)
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -235,9 +235,9 @@ func (c *Client) ShowRefs(ref ...string) ([]Ref, error) {
 	return refs, nil
 }
 
-func (c *Client) Config(name string) (string, error) {
+func (c *Client) Config(ctx context.Context, name string) (string, error) {
 	args := []string{"config", name}
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return "", err
 	}
@@ -249,9 +249,9 @@ func (c *Client) Config(name string) (string, error) {
 	return firstLine(outBuf.Bytes()), nil
 }
 
-func (c *Client) UncommittedChangeCount() (int, error) {
+func (c *Client) UncommittedChangeCount(ctx context.Context) (int, error) {
 	args := []string{"status", "--porcelain"}
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return 0, err
 	}
@@ -270,9 +270,9 @@ func (c *Client) UncommittedChangeCount() (int, error) {
 	return count, nil
 }
 
-func (c *Client) Commits(baseRef, headRef string) ([]*Commit, error) {
+func (c *Client) Commits(ctx context.Context, baseRef, headRef string) ([]*Commit, error) {
 	args := []string{"-c", "log.ShowSignature=false", "log", "--pretty=format:%H,%s", "--cherry", fmt.Sprintf("%s...%s", baseRef, headRef)}
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -300,9 +300,9 @@ func (c *Client) Commits(baseRef, headRef string) ([]*Commit, error) {
 	return commits, nil
 }
 
-func (c *Client) lookupCommit(sha, format string) ([]byte, error) {
+func (c *Client) lookupCommit(ctx context.Context, sha, format string) ([]byte, error) {
 	args := []string{"-c", "log.ShowSignature=false", "show", "-s", "--pretty=format:" + format, sha}
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -314,8 +314,8 @@ func (c *Client) lookupCommit(sha, format string) ([]byte, error) {
 	return outBuf.Bytes(), nil
 }
 
-func (c *Client) LastCommit() (*Commit, error) {
-	output, err := c.lookupCommit("HEAD", "%H,%s")
+func (c *Client) LastCommit(ctx context.Context) (*Commit, error) {
+	output, err := c.lookupCommit(ctx, "HEAD", "%H,%s")
 	if err != nil {
 		return nil, err
 	}
@@ -326,16 +326,16 @@ func (c *Client) LastCommit() (*Commit, error) {
 	}, nil
 }
 
-func (c *Client) CommitBody(sha string) (string, error) {
-	output, err := c.lookupCommit(sha, "%b")
+func (c *Client) CommitBody(ctx context.Context, sha string) (string, error) {
+	output, err := c.lookupCommit(ctx, sha, "%b")
 	return string(output), err
 }
 
 // Push publishes a git ref to a remote and sets up upstream configuration.
-func (c *Client) Push(remote string, ref string) error {
+func (c *Client) Push(ctx context.Context, remote string, ref string) error {
 	args := []string{"push", "--set-upstream", remote, ref}
 	//TODO: Use AuthenticatedCommand
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return err
 	}
@@ -343,10 +343,10 @@ func (c *Client) Push(remote string, ref string) error {
 }
 
 // ReadBranchConfig parses the `branch.BRANCH.(remote|merge)` part of git config.
-func (c *Client) ReadBranchConfig(branch string) (cfg BranchConfig) {
+func (c *Client) ReadBranchConfig(ctx context.Context, branch string) (cfg BranchConfig) {
 	prefix := regexp.QuoteMeta(fmt.Sprintf("branch.%s.", branch))
 	args := []string{"config", "--get-regexp", fmt.Sprintf("^%s(remote|merge)$", prefix)}
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return
 	}
@@ -379,18 +379,18 @@ func (c *Client) ReadBranchConfig(branch string) (cfg BranchConfig) {
 	return
 }
 
-func (c *Client) DeleteLocalBranch(branch string) error {
+func (c *Client) DeleteLocalBranch(ctx context.Context, branch string) error {
 	args := []string{"branch", "-D", branch}
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return err
 	}
 	return cmd.Run()
 }
 
-func (c *Client) HasLocalBranch(branch string) bool {
+func (c *Client) HasLocalBranch(ctx context.Context, branch string) bool {
 	args := []string{"rev-parse", "--verify", "refs/heads/" + branch}
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return false
 	}
@@ -398,38 +398,36 @@ func (c *Client) HasLocalBranch(branch string) bool {
 	return err == nil
 }
 
-func (c *Client) CheckoutBranch(branch string) error {
+func (c *Client) CheckoutBranch(ctx context.Context, branch string) error {
 	args := []string{"checkout", branch}
-	//TODO: Use AuthenticatedCommand
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return err
 	}
 	return cmd.Run()
 }
 
-func (c *Client) CheckoutNewBranch(remoteName, branch string) error {
+func (c *Client) CheckoutNewBranch(ctx context.Context, remoteName, branch string) error {
 	track := fmt.Sprintf("%s/%s", remoteName, branch)
 	args := []string{"checkout", "-b", branch, "--track", track}
-	//TODO: Use AuthenticatedCommand
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return err
 	}
 	return cmd.Run()
 }
 
-func (c *Client) Pull(remote, branch string) error {
+func (c *Client) Pull(ctx context.Context, remote, branch string) error {
 	args := []string{"pull", "--ff-only", remote, branch}
 	//TODO: Use AuthenticatedCommand
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return err
 	}
 	return cmd.Run()
 }
 
-func (c *Client) Clone(cloneURL string, args []string) (target string, err error) {
+func (c *Client) Clone(ctx context.Context, cloneURL string, args []string) (target string, err error) {
 	cloneArgs, target := parseCloneArgs(args)
 	cloneArgs = append(cloneArgs, cloneURL)
 	// If the args contain an explicit target, pass it to clone
@@ -441,7 +439,7 @@ func (c *Client) Clone(cloneURL string, args []string) (target string, err error
 	}
 	cloneArgs = append([]string{"clone"}, cloneArgs...)
 	//TODO: Use AuthenticatedCommand
-	cmd, err := c.Command(cloneArgs...)
+	cmd, err := c.Command(ctx, cloneArgs...)
 	if err != nil {
 		return "", err
 	}
@@ -450,9 +448,9 @@ func (c *Client) Clone(cloneURL string, args []string) (target string, err error
 }
 
 // ToplevelDir returns the top-level directory path of the current repository.
-func (c *Client) ToplevelDir() (string, error) {
+func (c *Client) ToplevelDir(ctx context.Context) (string, error) {
 	args := []string{"rev-parse", "--show-toplevel"}
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return "", err
 	}
@@ -464,9 +462,9 @@ func (c *Client) ToplevelDir() (string, error) {
 	return firstLine(outBuf.Bytes()), nil
 }
 
-func (c *Client) GitDir() (string, error) {
+func (c *Client) GitDir(ctx context.Context) (string, error) {
 	args := []string{"rev-parse", "--git-dir"}
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return "", err
 	}
@@ -479,9 +477,9 @@ func (c *Client) GitDir() (string, error) {
 }
 
 // Show current directory relative to the top-level directory of repository.
-func (c *Client) PathFromRoot() string {
+func (c *Client) PathFromRoot(ctx context.Context) string {
 	args := []string{"rev-parse", "--show-prefix"}
-	cmd, err := c.Command(args...)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return ""
 	}

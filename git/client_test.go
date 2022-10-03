@@ -2,6 +2,7 @@ package git
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -42,7 +43,7 @@ func TestClientCommand(t *testing.T) {
 				RepoDir: tt.repoDir,
 				GitPath: tt.gitPath,
 			}
-			cmd, err := client.Command("ref-log")
+			cmd, err := client.Command(context.Background(), "ref-log")
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantExe, cmd.Path)
 			assert.Equal(t, tt.wantArgs, cmd.Args)
@@ -83,7 +84,7 @@ func TestClientAuthenticatedCommand(t *testing.T) {
 				GhPath:    tt.path,
 				GitPath:   "git",
 			}
-			cmd, err := client.AuthenticatedCommand("fetch")
+			cmd, err := client.AuthenticatedCommand(context.Background(), "fetch")
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantArgs, cmd.Args)
 		})
@@ -116,7 +117,7 @@ func TestClientRemotes(t *testing.T) {
 	client := Client{
 		RepoDir: tempDir,
 	}
-	rs, err := client.Remotes()
+	rs, err := client.Remotes(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, 4, len(rs))
 	assert.Equal(t, "upstream", rs[0].Name)
@@ -169,7 +170,7 @@ func TestClientLastCommit(t *testing.T) {
 	client := Client{
 		RepoDir: "./fixtures/simple.git",
 	}
-	c, err := client.LastCommit()
+	c, err := client.LastCommit(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, "6f1a2405cace1633d89a79c74c65f22fe78f9659", c.Sha)
 	assert.Equal(t, "Second commit", c.Title)
@@ -179,7 +180,7 @@ func TestClientCommitBody(t *testing.T) {
 	client := Client{
 		RepoDir: "./fixtures/simple.git",
 	}
-	body, err := client.CommitBody("6f1a2405cace1633d89a79c74c65f22fe78f9659")
+	body, err := client.CommitBody(context.Background(), "6f1a2405cace1633d89a79c74c65f22fe78f9659")
 	assert.NoError(t, err)
 	assert.Equal(t, "I'm starting to get the hang of things\n", body)
 }
@@ -212,7 +213,7 @@ func TestClientUncommittedChangeCount(t *testing.T) {
 			defer restore(t)
 			cs.Register(`git status --porcelain`, 0, tt.output)
 			client := Client{}
-			ucc, err := client.UncommittedChangeCount()
+			ucc, err := client.UncommittedChangeCount(context.Background())
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, ucc)
 		})
@@ -247,7 +248,7 @@ func TestClientCurrentBranch(t *testing.T) {
 			defer teardown(t)
 			cs.Register(`git symbolic-ref --quiet HEAD`, 0, tt.stub)
 			client := Client{}
-			branch, err := client.CurrentBranch()
+			branch, err := client.CurrentBranch(context.Background())
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expected, branch)
 		})
@@ -259,7 +260,7 @@ func TestClientCurrentBranch_detached_head(t *testing.T) {
 	defer teardown(t)
 	cs.Register(`git symbolic-ref --quiet HEAD`, 1, "")
 	client := Client{}
-	_, err := client.CurrentBranch()
+	_, err := client.CurrentBranch(context.Background())
 	assert.EqualError(t, err, ErrNotOnAnyBranch.Error())
 }
 
@@ -349,7 +350,7 @@ func TestClientAddRemote(t *testing.T) {
 			client := Client{
 				RepoDir: tt.dir,
 			}
-			_, err := client.AddRemote(tt.name, tt.url, tt.branches)
+			_, err := client.AddRemote(context.Background(), tt.name, tt.url, tt.branches)
 			assert.NoError(t, err)
 		})
 	}
@@ -365,7 +366,7 @@ func initRepo(t *testing.T, dir string) {
 		Stdin:   inBuf,
 		Stdout:  outBuf,
 	}
-	cmd, err := client.Command([]string{"init", "--quiet"}...)
+	cmd, err := client.Command(context.Background(), []string{"init", "--quiet"}...)
 	assert.NoError(t, err)
 	err = cmd.Run()
 	assert.NoError(t, err)
