@@ -55,6 +55,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				MergeStrategyEmpty:      true,
 				Body:                    "",
 				BodySet:                 false,
+				AuthorEmail:             "",
 			},
 		},
 		{
@@ -70,6 +71,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				MergeStrategyEmpty:      true,
 				Body:                    "",
 				BodySet:                 false,
+				AuthorEmail:             "",
 			},
 		},
 		{
@@ -85,6 +87,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				MergeStrategyEmpty:      true,
 				Body:                    "a body from file",
 				BodySet:                 true,
+				AuthorEmail:             "",
 			},
 		},
 		{
@@ -101,6 +104,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				MergeStrategyEmpty:      true,
 				Body:                    "this is on standard input",
 				BodySet:                 true,
+				AuthorEmail:             "",
 			},
 		},
 		{
@@ -116,6 +120,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				MergeStrategyEmpty:      true,
 				Body:                    "cool",
 				BodySet:                 true,
+				AuthorEmail:             "",
 			},
 		},
 		{
@@ -132,6 +137,23 @@ func Test_NewCmdMerge(t *testing.T) {
 				Body:                    "",
 				BodySet:                 false,
 				MatchHeadCommit:         "555",
+				AuthorEmail:             "",
+			},
+		},
+		{
+			name:  "author email",
+			args:  "123 --author-email octocat@github.com",
+			isTTY: true,
+			want: MergeOptions{
+				SelectorArg:             "123",
+				DeleteBranch:            false,
+				IsDeleteBranchIndicated: false,
+				CanDeleteLocalBranch:    true,
+				MergeMethod:             PullRequestMergeMethodMerge,
+				MergeStrategyEmpty:      true,
+				Body:                    "",
+				BodySet:                 false,
+				AuthorEmail:             "octocat@github.com",
 			},
 		},
 		{
@@ -205,6 +227,7 @@ func Test_NewCmdMerge(t *testing.T) {
 			assert.Equal(t, tt.want.Body, opts.Body)
 			assert.Equal(t, tt.want.BodySet, opts.BodySet)
 			assert.Equal(t, tt.want.MatchHeadCommit, opts.MatchHeadCommit)
+			assert.Equal(t, tt.want.AuthorEmail, opts.AuthorEmail)
 		})
 	}
 }
@@ -526,6 +549,48 @@ func TestPrMerge_withMatchCommitHeadFlag(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "main", true, "pr merge 1 --merge --match-head-commit 285ed5ab740f53ff6b0b4b629c59a9df23b9c6db")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Merged pull request #1 \(The title of the PR\)`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPrMerge_withAuthorFlag(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "main"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.Equal(t, "octocat@github.com", input["authorEmail"].(string))
+			assert.NotContains(t, input, "commitHeadline")
+		}),
+	)
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+
+	output, err := runCommand(http, "main", true, "pr merge 1 --merge --author-email octocat@github.com")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
