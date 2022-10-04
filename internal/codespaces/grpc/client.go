@@ -56,21 +56,9 @@ func Connect(ctx context.Context, session liveshareSession, token string) (*Clie
 		internalTunnelClosed <- fwd.ForwardToListener(ctx, listener)
 	}()
 
-	// Create the gRPC client
-	client, err := NewClient(ctx, session, token, localPort)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create client: %w", err)
-	}
+	time.Sleep(time.Millisecond)
 
-	// Attach the listener so we can close it later
-	client.listener = listener
-
-	return client, err
-}
-
-// Creates a new gRPC client that connects to the given port
-func NewClient(ctx context.Context, session liveshareSession, token string, localPort int) (*Client, error) {
-	// Attempt to connect to the given port
+	// Attempt to connect to the port
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
@@ -84,6 +72,7 @@ func NewClient(ctx context.Context, session liveshareSession, token string, loca
 	g := &Client{
 		conn:          conn,
 		token:         token,
+		listener:      listener,
 		jupyterClient: jupyter.NewJupyterServerHostClient(conn),
 	}
 
