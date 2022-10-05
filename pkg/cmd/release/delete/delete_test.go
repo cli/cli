@@ -31,7 +31,7 @@ func Test_NewCmdDelete(t *testing.T) {
 			want: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: false,
-				CleanupTag: false,
+				CleanupTag:  false,
 			},
 		},
 		{
@@ -41,7 +41,7 @@ func Test_NewCmdDelete(t *testing.T) {
 			want: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: true,
-				CleanupTag: false,
+				CleanupTag:  false,
 			},
 		},
 		{
@@ -51,7 +51,7 @@ func Test_NewCmdDelete(t *testing.T) {
 			want: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: false,
-				CleanupTag: true,
+				CleanupTag:  true,
 			},
 		},
 		{
@@ -95,7 +95,6 @@ func Test_NewCmdDelete(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-
 			assert.Equal(t, tt.want.TagName, opts.TagName)
 			assert.Equal(t, tt.want.SkipConfirm, opts.SkipConfirm)
 			assert.Equal(t, tt.want.CleanupTag, opts.CleanupTag)
@@ -118,7 +117,7 @@ func Test_deleteRun(t *testing.T) {
 			opts: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: true,
-				CleanupTag: false,
+				CleanupTag:  false,
 			},
 			wantStdout: ``,
 			wantStderr: heredoc.Doc(`
@@ -132,7 +131,7 @@ func Test_deleteRun(t *testing.T) {
 			opts: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: false,
-				CleanupTag: false,
+				CleanupTag:  false,
 			},
 			wantStdout: ``,
 			wantStderr: ``,
@@ -143,11 +142,11 @@ func Test_deleteRun(t *testing.T) {
 			opts: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: true,
-				CleanupTag: true,
+				CleanupTag:  true,
 			},
 			wantStdout: ``,
 			wantStderr: heredoc.Doc(`
-				✓ Deleted release v1.2.3 and cleanup the tag
+				✓ Deleted release and tag v1.2.3
 			`),
 		},
 		{
@@ -156,7 +155,7 @@ func Test_deleteRun(t *testing.T) {
 			opts: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: false,
-				CleanupTag: true,
+				CleanupTag:  true,
 			},
 			wantStdout: ``,
 			wantStderr: ``,
@@ -178,7 +177,6 @@ func Test_deleteRun(t *testing.T) {
 
 			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/releases/23456"), httpmock.StatusStringResponse(204, ""))
 			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/tags/v1.2.3"), httpmock.StatusStringResponse(204, ""))
-
 
 			tt.opts.IO = ios
 			tt.opts.HttpClient = func() (*http.Client, error) {
