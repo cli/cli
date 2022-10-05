@@ -122,8 +122,8 @@ func Test_deleteRun(t *testing.T) {
 			tty:  true,
 			opts: DeleteOptions{KeyID: "123"},
 			prompterStubs: func(pm *prompter.PrompterMock) {
-				pm.InputFunc = func(s1 string, s2 string) (string, error) {
-					return "My Key", nil
+				pm.ConfirmDeletionFunc = func(_ string) error {
+					return nil
 				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -133,22 +133,6 @@ func Test_deleteRun(t *testing.T) {
 			wantErr:    false,
 			wantStdout: "✓ SSH key \"My Key\" (123) deleted from your account\n",
 			wantErrMsg: "",
-		},
-		{
-			name: "cancel delete tty",
-			tty:  true,
-			opts: DeleteOptions{KeyID: "123"},
-			prompterStubs: func(pm *prompter.PrompterMock) {
-				pm.InputFunc = func(s1 string, s2 string) (string, error) {
-					return "", nil
-				}
-			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", "user/keys/123"), httpmock.StatusStringResponse(200, keyResp))
-			},
-			wantErr:    true,
-			wantStdout: "",
-			wantErrMsg: "CancelError",
 		},
 		{
 			name: "delete with confirm flag tty",

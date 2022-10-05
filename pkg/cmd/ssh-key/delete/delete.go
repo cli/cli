@@ -69,13 +69,8 @@ func deleteRun(opts *DeleteOptions) error {
 	}
 
 	if !opts.Confirmed {
-		confirmTitle, err := opts.Prompter.Input(fmt.Sprintf("Type \"%s\" to confirm deletion:", key.Title), "")
-
-		if err != nil {
+		if err := opts.Prompter.ConfirmDeletion(key.Title); err != nil {
 			return err
-		}
-		if confirmTitle != key.Title {
-			return cmdutil.CancelError
 		}
 	}
 
