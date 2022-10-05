@@ -118,7 +118,7 @@ func Test_deleteRun(t *testing.T) {
 		wantErrMsg    string
 	}{
 		{
-			name: "prompting confirmation delete tty",
+			name: "delete tty",
 			tty:  true,
 			opts: DeleteOptions{KeyID: "123"},
 			prompterStubs: func(pm *prompter.PrompterMock) {
@@ -130,9 +130,7 @@ func Test_deleteRun(t *testing.T) {
 				reg.Register(httpmock.REST("GET", "user/keys/123"), httpmock.StatusStringResponse(200, keyResp))
 				reg.Register(httpmock.REST("DELETE", "user/keys/123"), httpmock.StatusStringResponse(204, ""))
 			},
-			wantErr:    false,
 			wantStdout: "✓ SSH key \"My Key\" (123) deleted from your account\n",
-			wantErrMsg: "",
 		},
 		{
 			name: "delete with confirm flag tty",
@@ -142,9 +140,7 @@ func Test_deleteRun(t *testing.T) {
 				reg.Register(httpmock.REST("GET", "user/keys/123"), httpmock.StatusStringResponse(200, keyResp))
 				reg.Register(httpmock.REST("DELETE", "user/keys/123"), httpmock.StatusStringResponse(204, ""))
 			},
-			wantErr:    false,
 			wantStdout: "✓ SSH key \"My Key\" (123) deleted from your account\n",
-			wantErrMsg: "",
 		},
 		{
 			name: "not found tty",
@@ -154,7 +150,6 @@ func Test_deleteRun(t *testing.T) {
 				reg.Register(httpmock.REST("GET", "user/keys/123"), httpmock.StatusStringResponse(404, ""))
 			},
 			wantErr:    true,
-			wantStdout: "",
 			wantErrMsg: "HTTP 404 (https://api.github.com/user/keys/123)",
 		},
 		{
@@ -164,9 +159,7 @@ func Test_deleteRun(t *testing.T) {
 				reg.Register(httpmock.REST("GET", "user/keys/123"), httpmock.StatusStringResponse(200, keyResp))
 				reg.Register(httpmock.REST("DELETE", "user/keys/123"), httpmock.StatusStringResponse(204, ""))
 			},
-			wantErr:    false,
 			wantStdout: "",
-			wantErrMsg: "",
 		},
 		{
 			name: "not found no tty",
@@ -175,7 +168,6 @@ func Test_deleteRun(t *testing.T) {
 				reg.Register(httpmock.REST("GET", "user/keys/123"), httpmock.StatusStringResponse(404, ""))
 			},
 			wantErr:    true,
-			wantStdout: "",
 			wantErrMsg: "HTTP 404 (https://api.github.com/user/keys/123)",
 		},
 	}
