@@ -19,7 +19,7 @@ const (
 	authorization   = "Authorization"
 	cacheTTL        = "X-GH-CACHE-TTL"
 	graphqlFeatures = "GraphQL-Features"
-	features        = "merge_queue,branch_for_issue_api"
+	features        = "merge_queue"
 	userAgent       = "User-Agent"
 )
 
