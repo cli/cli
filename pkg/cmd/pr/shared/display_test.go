@@ -104,6 +104,16 @@ func TestPrCheckStatusSummaryWithColor(t *testing.T) {
 		want string
 	}{
 		{
+			Name: "No Checks",
+			args: api.PullRequestChecksStatus{
+				Total:   0,
+				Failing: 0,
+				Passing: 0,
+				Pending: 0,
+			},
+			want: "No checks",
+		},
+		{
 			Name: "All Passing",
 			args: api.PullRequestChecksStatus{
 				Total:   3,
