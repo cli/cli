@@ -257,6 +257,24 @@ func Test_commentRun(t *testing.T) {
 			stderr: "Opening github.com/OWNER/REPO/pull/123 in your browser.\n",
 		},
 		{
+			name: "non-interactive web with edit last",
+			input: &shared.CommentableOptions{
+				Interactive: false,
+				InputType:   shared.InputTypeWeb,
+				Body:        "",
+				EditLast:    true,
+
+				OpenInBrowser: func(string) error { return nil },
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`),
+				)
+			},
+			stderr: "Opening github.com/OWNER/REPO/pull/123 in your browser.\n",
+		},
+		{
 			name: "non-interactive editor",
 			input: &shared.CommentableOptions{
 				Interactive: false,
@@ -332,8 +350,8 @@ func Test_commentRun(t *testing.T) {
 				Number: 123,
 				URL:    "https://github.com/OWNER/REPO/pull/123",
 				Comments: api.Comments{Nodes: []api.Comment{
-					{ID: "id1", Author: api.Author{Login: "octocat"}},
-					{ID: "id2", Author: api.Author{Login: "monalisa"}},
+					{ID: "id1", Author: api.Author{Login: "octocat"}, URL: "https://github.com/OWNER/REPO/pull/123#issuecomment-111"},
+					{ID: "id2", Author: api.Author{Login: "monalisa"}, URL: "https://github.com/OWNER/REPO/pull/123#issuecomment-222"},
 				}},
 			}, ghrepo.New("OWNER", "REPO"), nil
 		}

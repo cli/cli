@@ -35,6 +35,7 @@ type Comment struct {
 	IsMinimized         bool           `json:"isMinimized"`
 	MinimizedReason     string         `json:"minimizedReason"`
 	ReactionGroups      ReactionGroups `json:"reactionGroups"`
+	URL                 string         `json:"url,omitempty"`
 }
 
 type CommentCreateInput struct {
@@ -130,7 +131,7 @@ func (c Comment) IsHidden() bool {
 }
 
 func (c Comment) Link() string {
-	return ""
+	return c.URL
 }
 
 func (c Comment) Reactions() ReactionGroups {

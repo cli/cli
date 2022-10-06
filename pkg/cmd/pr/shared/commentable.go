@@ -101,7 +101,12 @@ func CommentableRun(opts *CommentableOptions) error {
 
 	switch opts.InputType {
 	case InputTypeWeb:
-		openURL := commentable.Link() + "#issuecomment-new"
+		openURL := ""
+		if lastComment == nil {
+			openURL = commentable.Link() + "#issuecomment-new"
+		} else {
+			openURL = lastComment.Link()
+		}
 		if opts.IO.IsStdoutTTY() && !opts.Quiet {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 		}

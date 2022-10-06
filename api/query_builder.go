@@ -31,7 +31,8 @@ var issueComments = shortenQuery(`
 			includesCreatedEdit,
 			isMinimized,
 			minimizedReason,
-			reactionGroups{content,users{totalCount}}
+			reactionGroups{content,users{totalCount}},
+			url
 		},
 		pageInfo{hasNextPage,endCursor},
 		totalCount
