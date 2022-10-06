@@ -269,6 +269,7 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 		}
 		summary.Total++
 	}
+
 	return
 }
 
