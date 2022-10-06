@@ -29,15 +29,15 @@ const (
 type Commentable interface {
 	Link() string
 	Identifier() string
-	LastCommentIdentifier(username string) string
+	LastComment(username string) api.Comment
 }
 
 type CommentableOptions struct {
 	IO                    *iostreams.IOStreams
 	HttpClient            func() (*http.Client, error)
 	RetrieveCommentable   func() (Commentable, ghrepo.Interface, error)
-	EditSurvey            func() (string, error)
-	InteractiveEditSurvey func() (string, error)
+	EditSurvey            func(string) (string, error)
+	InteractiveEditSurvey func(string) (string, error)
 	ConfirmSubmitSurvey   func() (bool, error)
 	OpenInBrowser         func(string) error
 	Interactive           bool
@@ -84,6 +84,21 @@ func CommentableRun(opts *CommentableOptions) error {
 		return err
 	}
 
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+	apiClient := api.NewClientFromHTTP(httpClient)
+
+	var lastComment Comment
+	if opts.EditLast {
+		username, err := api.CurrentLoginName(apiClient, repo.RepoHost())
+		if err != nil {
+			return err
+		}
+		lastComment = commentable.LastComment(username)
+	}
+
 	switch opts.InputType {
 	case InputTypeWeb:
 		openURL := commentable.Link() + "#issuecomment-new"
@@ -93,10 +108,14 @@ func CommentableRun(opts *CommentableOptions) error {
 		return opts.OpenInBrowser(openURL)
 	case InputTypeEditor:
 		var body string
+		initialValue := ""
+		if lastComment != nil {
+			initialValue = lastComment.Content()
+		}
 		if opts.Interactive {
-			body, err = opts.InteractiveEditSurvey()
+			body, err = opts.InteractiveEditSurvey(initialValue)
 		} else {
-			body, err = opts.EditSurvey()
+			body, err = opts.EditSurvey(initialValue)
 		}
 		if err != nil {
 			return err
@@ -114,26 +133,16 @@ func CommentableRun(opts *CommentableOptions) error {
 		}
 	}
 
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 	url := ""
 	if opts.EditLast {
-		username, err := api.CurrentLoginName(apiClient, repo.RepoHost())
-		if err != nil {
-			return err
-		}
-		lastCommentId := commentable.LastCommentIdentifier(username)
-		if lastCommentId == "" {
+		if lastComment == nil {
 			params := api.CommentCreateInput{Body: opts.Body, SubjectId: commentable.Identifier()}
 			url, err = api.CommentCreate(apiClient, repo.RepoHost(), params)
 			if err != nil {
 				return err
 			}
 		} else {
-			params := api.CommentUpdateInput{Body: opts.Body, CommentId: lastCommentId}
+			params := api.CommentUpdateInput{Body: opts.Body, CommentId: lastComment.Identifier()}
 			url, err = api.CommentUpdate(apiClient, repo.RepoHost(), params)
 			if err != nil {
 				return err
@@ -162,8 +171,8 @@ func CommentableConfirmSubmitSurvey() (bool, error) {
 	return confirm, err
 }
 
-func CommentableInteractiveEditSurvey(cf func() (config.Config, error), io *iostreams.IOStreams) func() (string, error) {
-	return func() (string, error) {
+func CommentableInteractiveEditSurvey(cf func() (config.Config, error), io *iostreams.IOStreams) func(string) (string, error) {
+	return func(initialValue string) (string, error) {
 		editorCommand, err := cmdutil.DetermineEditor(cf)
 		if err != nil {
 			return "", err
@@ -171,17 +180,17 @@ func CommentableInteractiveEditSurvey(cf func() (config.Config, error), io *iost
 		cs := io.ColorScheme()
 		fmt.Fprintf(io.Out, "- %s to draft your comment in %s... ", cs.Bold("Press Enter"), cs.Bold(surveyext.EditorName(editorCommand)))
 		_ = waitForEnter(io.In)
-		return surveyext.Edit(editorCommand, "*.md", "", io.In, io.Out, io.ErrOut)
+		return surveyext.Edit(editorCommand, "*.md", initialValue, io.In, io.Out, io.ErrOut)
 	}
 }
 
-func CommentableEditSurvey(cf func() (config.Config, error), io *iostreams.IOStreams) func() (string, error) {
-	return func() (string, error) {
+func CommentableEditSurvey(cf func() (config.Config, error), io *iostreams.IOStreams) func(string) (string, error) {
+	return func(initialValue string) (string, error) {
 		editorCommand, err := cmdutil.DetermineEditor(cf)
 		if err != nil {
 			return "", err
 		}
-		return surveyext.Edit(editorCommand, "*.md", "", io.In, io.Out, io.ErrOut)
+		return surveyext.Edit(editorCommand, "*.md", initialValue, io.In, io.Out, io.ErrOut)
 	}
 }
 

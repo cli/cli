@@ -15,14 +15,14 @@ type Comments struct {
 	}
 }
 
-func (c Comments) LastCommentID(username string) string {
-	id := ""
-	for _, c := range c.Nodes {
+func (cs Comments) LastComment(username string) Comment {
+	var lastComment Comment
+	for _, c := range cs.Nodes {
 		if c.Author.Login == username {
-			id = c.ID
+			lastComment = c
 		}
 	}
-	return id
+	return lastComment
 }
 
 type Comment struct {
@@ -95,6 +95,10 @@ func CommentUpdate(client *Client, repoHost string, params CommentUpdateInput) (
 	}
 
 	return mutation.UpdateIssueComment.IssueComment.URL, nil
+}
+
+func (c Comment) Identifier() string {
+	return c.ID
 }
 
 func (c Comment) AuthorLogin() string {
