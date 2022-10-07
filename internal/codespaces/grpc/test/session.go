@@ -21,6 +21,7 @@ func (s *Session) StartSharing(ctx context.Context, sessionName string, port int
 	return liveshare.ChannelID{}, nil
 }
 
+// Creates mock SSH channel connected to the mock gRPC server
 func (s *Session) OpenStreamingChannel(ctx context.Context, id liveshare.ChannelID) (ssh.Channel, error) {
 	dialer := net.Dialer{}
 	conn, err := dialer.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", ServerPort))

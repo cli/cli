@@ -49,14 +49,15 @@ func Connect(ctx context.Context, session liveshareSession, token string) (*Clie
 	}
 
 	// Tunnel the remote gRPC server port to the local port
-	localPort := listener.Addr().(*net.TCPAddr).Port
+	localAddress := fmt.Sprintf("127.0.0.1:%d", listener.Addr().(*net.TCPAddr).Port)
 	internalTunnelClosed := make(chan error, 1)
 	go func() {
 		fwd := liveshare.NewPortForwarder(session, codespacesInternalSessionName, codespacesInternalPort, true)
 		internalTunnelClosed <- fwd.ForwardToListener(ctx, listener)
 	}()
 
-	time.Sleep(time.Millisecond)
+	// Ping the port to ensure that it is fully forwarded before continuing
+	liveshare.WaitForPortConnection(ctx, localAddress)
 
 	// Attempt to connect to the port
 	opts := []grpc.DialOption{
@@ -64,7 +65,7 @@ func Connect(ctx context.Context, session liveshareSession, token string) (*Clie
 		grpc.WithBlock(),
 	}
 	ctx, _ = context.WithTimeout(ctx, connectionTimeout)
-	conn, err := grpc.DialContext(ctx, fmt.Sprintf("127.0.0.1:%d", localPort), opts...)
+	conn, err := grpc.DialContext(ctx, localAddress, opts...)
 	if err != nil {
 		return nil, err
 	}

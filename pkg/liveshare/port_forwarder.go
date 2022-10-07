@@ -5,9 +5,15 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	"github.com/opentracing/opentracing-go"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/sync/errgroup"
+)
+
+const (
+	connectionTimeout = 30 * time.Second
 )
 
 type portForwardingSession interface {
@@ -50,6 +56,12 @@ func NewPortForwarder(session portForwardingSession, name string, remotePort int
 // responsible for closing the listening port.
 func (fwd *PortForwarder) ForwardToListener(ctx context.Context, listen net.Listener) (err error) {
 	id, err := fwd.shareRemotePort(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Ping the port to ensure that it is fully forwarded before continuing
+	err = WaitForPortConnection(ctx, listen.Addr().String())
 	if err != nil {
 		return err
 	}
@@ -97,6 +109,43 @@ func (fwd *PortForwarder) Forward(ctx context.Context, conn io.ReadWriteCloser) 
 		errc <- fwd.handleConnection(ctx, id, conn)
 	}()
 	return awaitError(ctx, errc)
+}
+
+// Connects to and pings a given address to ensure that the server is shared and the port is forwarded.
+func WaitForPortConnection(ctx context.Context, address string) error {
+	waitCtx, cancel := context.WithTimeout(ctx, connectionTimeout)
+	g, waitCtx := errgroup.WithContext(waitCtx)
+	defer cancel()
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	g.Go(func() error {
+		for {
+			select {
+			case <-waitCtx.Done():
+				return fmt.Errorf("timed out waiting for connection")
+			case <-ticker.C:
+				// Verify that the port can be connected to
+				conn, err := net.Dial("tcp", address)
+				if err != nil {
+					continue
+				}
+
+				defer conn.Close()
+
+				// Send a ping and make sure it succeed
+				_, err = conn.Write([]byte("ping"))
+				if err != nil {
+					continue
+				}
+
+				return nil
+			}
+		}
+	})
+
+	return g.Wait()
 }
 
 func (fwd *PortForwarder) shareRemotePort(ctx context.Context) (ChannelID, error) {
