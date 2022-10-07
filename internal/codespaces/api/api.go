@@ -210,6 +210,8 @@ const (
 	CodespaceStateShutdown = "Shutdown"
 	// CodespaceStateStarting is the state for a starting codespace environment.
 	CodespaceStateStarting = "Starting"
+	// CodespaceStateRebuilding is the state for a rebuilding codespace environment.
+	CodespaceStateRebuilding = "Rebuilding"
 )
 
 type CodespaceConnection struct {
