@@ -34,8 +34,7 @@ func (a *App) Rebuild(ctx context.Context, codespaceName string) (err error) {
 		return err
 	}
 
-	// Users can't change their codespace while it's rebuilding, so there's
-	// no need to execute this command.
+	// There's no need to rebuild again because users can't modify their codespace while it rebuilds
 	if codespace.State == api.CodespaceStateRebuilding {
 		fmt.Fprintf(a.io.Out, "%s is already rebuilding\n", codespace.Name)
 		return nil
@@ -43,13 +42,13 @@ func (a *App) Rebuild(ctx context.Context, codespaceName string) (err error) {
 
 	session, err := startLiveShareSession(ctx, codespace, a, false, "")
 	if err != nil {
-		return err
+		return fmt.Errorf("starting Live Share session: %w", err)
 	}
 	defer safeClose(session, &err)
 
 	err = session.Rebuild(ctx)
 	if err != nil {
-		return fmt.Errorf("couldn't rebuild codespace: %w", err)
+		return fmt.Errorf("rebuilding codespace via session: %w", err)
 	}
 
 	fmt.Fprintf(a.io.Out, "%s is rebuilding\n", codespace.Name)

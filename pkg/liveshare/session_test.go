@@ -413,7 +413,7 @@ func TestRebuild(t *testing.T) {
 
 	err = session.Rebuild(context.Background())
 	if err != nil {
-		t.Fatalf("rebuilding codespace over mock session: %v", err)
+		t.Fatalf("rebuilding codespace via mock session: %v", err)
 	}
 }
 

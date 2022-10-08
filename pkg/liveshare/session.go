@@ -124,13 +124,13 @@ func (s *Session) StartJupyterServer(ctx context.Context) (int, string, error) {
 }
 
 func (s *Session) Rebuild(ctx context.Context) error {
-	var success bool
-	err := s.rpc.do(ctx, "IEnvironmentConfigurationService.rebuildContainer", []string{}, &success)
+	var rebuildSuccess bool
+	err := s.rpc.do(ctx, "IEnvironmentConfigurationService.rebuildContainer", []string{}, &rebuildSuccess)
 	if err != nil {
 		return fmt.Errorf("invoking rebuild RPC: %w", err)
 	}
 
-	if !success {
+	if !rebuildSuccess {
 		return fmt.Errorf("couldn't rebuild codespace")
 	} else {
 		return nil
