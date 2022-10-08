@@ -399,6 +399,24 @@ func TestSessionHeartbeat(t *testing.T) {
 	}
 }
 
+func TestRebuild(t *testing.T) {
+	getSharedServers := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
+		return true, nil
+	}
+	testServer, session, err := makeMockSession(
+		livesharetest.WithService("IEnvironmentConfigurationService.rebuildContainer", getSharedServers),
+	)
+	if err != nil {
+		t.Fatalf("creating mock session: %v", err)
+	}
+	defer testServer.Close()
+
+	err = session.Rebuild(context.Background())
+	if err != nil {
+		t.Fatalf("rebuilding codespace over mock session: %v", err)
+	}
+}
+
 type mockLogger struct {
 	sync.Mutex
 	buf *bytes.Buffer
