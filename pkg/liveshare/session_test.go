@@ -400,7 +400,9 @@ func TestSessionHeartbeat(t *testing.T) {
 }
 
 func TestRebuild(t *testing.T) {
+	requestCount := 0
 	getSharedServers := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
+		requestCount++
 		return true, nil
 	}
 	testServer, session, err := makeMockSession(
@@ -414,6 +416,10 @@ func TestRebuild(t *testing.T) {
 	err = session.Rebuild(context.Background())
 	if err != nil {
 		t.Fatalf("rebuilding codespace via mock session: %v", err)
+	}
+
+	if requestCount == 0 {
+		t.Fatalf("no requests were made")
 	}
 }
 
