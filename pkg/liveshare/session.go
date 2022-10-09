@@ -132,9 +132,9 @@ func (s *Session) Rebuild(ctx context.Context) error {
 
 	if !rebuildSuccess {
 		return fmt.Errorf("couldn't rebuild codespace")
-	} else {
-		return nil
 	}
+
+	return nil
 }
 
 // heartbeat runs until context cancellation, periodically checking whether there is a
