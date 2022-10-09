@@ -125,7 +125,7 @@ func (s *Session) StartJupyterServer(ctx context.Context) (int, string, error) {
 
 func (s *Session) Rebuild(ctx context.Context) error {
 	var rebuildSuccess bool
-	err := s.rpc.do(ctx, "IEnvironmentConfigurationService.rebuildContainer", []string{}, &rebuildSuccess)
+	err := s.rpc.do(ctx, "IEnvironmentConfigurationService.rebuildContainer", nil, &rebuildSuccess)
 	if err != nil {
 		return fmt.Errorf("invoking rebuild RPC: %w", err)
 	}
