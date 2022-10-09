@@ -9,7 +9,11 @@ import (
 )
 
 func TestAlreadyRebuildingCodespace(t *testing.T) {
-	app := testingRebuildApp()
+	rebuildingCodespace := &api.Codespace{
+		Name:  "rebuildingCodespace",
+		State: api.CodespaceStateRebuilding,
+	}
+	app := testingRebuildApp(*rebuildingCodespace)
 
 	err := app.Rebuild(context.Background(), "rebuildingCodespace")
 	if err != nil {
@@ -17,15 +21,11 @@ func TestAlreadyRebuildingCodespace(t *testing.T) {
 	}
 }
 
-func testingRebuildApp() *App {
-	rebuildingCodespace := &api.Codespace{
-		Name:  "rebuildingCodespace",
-		State: api.CodespaceStateRebuilding,
-	}
+func testingRebuildApp(mockCodespace api.Codespace) *App {
 	apiMock := &apiClientMock{
 		GetCodespaceFunc: func(_ context.Context, name string, _ bool) (*api.Codespace, error) {
-			if name == rebuildingCodespace.Name {
-				return rebuildingCodespace, nil
+			if name == mockCodespace.Name {
+				return &mockCodespace, nil
 			}
 			return nil, nil
 		},
