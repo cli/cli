@@ -142,6 +142,10 @@ type PullRequest struct {
 	MergedAt time.Time `json:"merged_at"`
 }
 
+func (p PullRequest) Merged() bool {
+	return !p.MergedAt.IsZero()
+}
+
 type Label struct {
 	Color       string `json:"color"`
 	Description string `json:"description"`
@@ -222,9 +226,10 @@ func (issue Issue) ExportData(fields []string) map[string]interface{} {
 				"nameWithOwner": nameWithOwner,
 			}
 		case "state":
-			if !issue.PullRequest.MergedAt.IsZero() {
+			if issue.PullRequest.Merged() {
 				data[f] = "merged"
 			} else {
+				// either an issue or a pull request that is not merged
 				data[f] = issue.State
 			}
 		default:
