@@ -77,7 +77,7 @@ func TestSearchIssues(t *testing.T) {
 							IncompleteResults: false,
 							Items: []search.Issue{
 								{RepositoryURL: "github.com/test/cli", Number: 123, State: "open", Title: "bug", Labels: []search.Label{{Name: "bug"}, {Name: "p1"}}, UpdatedAt: updatedAt},
-								{RepositoryURL: "github.com/what/what", Number: 456, State: "open", Title: "fix bug", Labels: []search.Label{{Name: "fix"}}, PullRequestLinks: search.PullRequestLinks{URL: "someurl"}, UpdatedAt: updatedAt},
+								{RepositoryURL: "github.com/what/what", Number: 456, State: "open", Title: "fix bug", Labels: []search.Label{{Name: "fix"}}, PullRequest: search.PullRequest{URL: "someurl"}, UpdatedAt: updatedAt},
 							},
 							Total: 300,
 						}, nil
@@ -119,7 +119,7 @@ func TestSearchIssues(t *testing.T) {
 							IncompleteResults: false,
 							Items: []search.Issue{
 								{RepositoryURL: "github.com/test/cli", Number: 123, State: "open", Title: "bug", Labels: []search.Label{{Name: "bug"}, {Name: "p1"}}, UpdatedAt: updatedAt},
-								{RepositoryURL: "github.com/what/what", Number: 456, State: "open", Title: "fix bug", Labels: []search.Label{{Name: "fix"}}, PullRequestLinks: search.PullRequestLinks{URL: "someurl"}, UpdatedAt: updatedAt},
+								{RepositoryURL: "github.com/what/what", Number: 456, State: "open", Title: "fix bug", Labels: []search.Label{{Name: "fix"}}, PullRequest: search.PullRequest{URL: "someurl"}, UpdatedAt: updatedAt},
 							},
 							Total: 300,
 						}, nil
