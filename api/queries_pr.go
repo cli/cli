@@ -214,7 +214,7 @@ func (pr PullRequest) Identifier() string {
 	return pr.ID
 }
 
-func (pr PullRequest) LastComment(username string) Comment {
+func (pr PullRequest) LastComment(username string) (*Comment, error) {
 	return pr.Comments.LastComment(username)
 }
 

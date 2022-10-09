@@ -29,7 +29,7 @@ const (
 type Commentable interface {
 	Link() string
 	Identifier() string
-	LastComment(username string) api.Comment
+	LastComment(username string) (*api.Comment, error)
 }
 
 type CommentableOptions struct {
@@ -90,13 +90,13 @@ func CommentableRun(opts *CommentableOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	var lastComment Comment
+	var lastComment *api.Comment
 	if opts.EditLast {
 		username, err := api.CurrentLoginName(apiClient, repo.RepoHost())
 		if err != nil {
 			return err
 		}
-		lastComment = commentable.LastComment(username)
+		lastComment, _ = commentable.LastComment(username)
 	}
 
 	switch opts.InputType {
@@ -139,23 +139,15 @@ func CommentableRun(opts *CommentableOptions) error {
 	}
 
 	url := ""
-	if opts.EditLast {
-		if lastComment == nil {
-			params := api.CommentCreateInput{Body: opts.Body, SubjectId: commentable.Identifier()}
-			url, err = api.CommentCreate(apiClient, repo.RepoHost(), params)
-			if err != nil {
-				return err
-			}
-		} else {
-			params := api.CommentUpdateInput{Body: opts.Body, CommentId: lastComment.Identifier()}
-			url, err = api.CommentUpdate(apiClient, repo.RepoHost(), params)
-			if err != nil {
-				return err
-			}
-		}
-	} else {
+	if lastComment == nil {
 		params := api.CommentCreateInput{Body: opts.Body, SubjectId: commentable.Identifier()}
 		url, err = api.CommentCreate(apiClient, repo.RepoHost(), params)
+		if err != nil {
+			return err
+		}
+	} else {
+		params := api.CommentUpdateInput{Body: opts.Body, CommentId: lastComment.Identifier()}
+		url, err = api.CommentUpdate(apiClient, repo.RepoHost(), params)
 		if err != nil {
 			return err
 		}
