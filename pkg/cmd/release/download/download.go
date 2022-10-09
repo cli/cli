@@ -7,6 +7,7 @@ import (
 	"mime"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 
@@ -33,6 +34,7 @@ type DownloadOptions struct {
 	Concurrency int
 
 	ArchiveType string
+	Output      string
 }
 
 func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobra.Command {
@@ -80,6 +82,10 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 				return err
 			}
 
+			if err := cmdutil.MutuallyExclusive("specify only one of '--destination' or '--output'", opts.Destination != ".", opts.Output != ""); err != nil {
+				return err
+			}
+
 			// check archive type option validity
 			if err := checkArchiveTypeOption(opts); err != nil {
 				return err
@@ -99,6 +105,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 	cmd.Flags().StringVarP(&opts.ArchiveType, "archive", "A", "", "Download the source code archive in the specified `format` (zip or tar.gz)")
 	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Overwrite existing files of the same name")
 	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", false, "Skip downloading when files of the same name exist")
+	cmd.Flags().StringVarP(&opts.Output, "output", "O", "", "File descriptor to download a file into")
 
 	return cmd
 }
@@ -175,6 +182,10 @@ func downloadRun(opts *DownloadOptions) error {
 		return errors.New("no assets to download")
 	}
 
+	if len(toDownload) > 1 && opts.Output != "" {
+		return errors.New("cannot have more than one asset to download when 'output' option is specified")
+	}
+
 	if opts.Destination != "." {
 		err := os.MkdirAll(opts.Destination, 0755)
 		if err != nil {
@@ -182,7 +193,29 @@ func downloadRun(opts *DownloadOptions) error {
 		}
 	}
 
-	return downloadAssets(httpClient, toDownload, opts.Destination, opts.Concurrency, isArchive, opts.OverwriteExisting, opts.SkipExisting)
+	var toStdout bool
+	if len(opts.Output) > 0 {
+		if opts.Output == "-" {
+			toStdout = true
+		} else {
+			destination := path.Dir(opts.Output)
+			if destination != "." {
+				err := os.MkdirAll(destination, 0755)
+				if err != nil {
+					return err
+				}
+			}
+			fileName := path.Base(opts.Output)
+			toDownload[0].Name = fileName
+			opts.Destination = destination
+
+			if len(fileName) == 0 {
+				return errors.New("please provide a filename for the destination")
+			}
+		}
+	}
+
+	return downloadAssets(httpClient, toDownload, opts.Destination, opts.Concurrency, isArchive, opts.OverwriteExisting, opts.SkipExisting, toStdout)
 }
 
 func matchAny(patterns []string, name string) bool {
@@ -194,7 +227,7 @@ func matchAny(patterns []string, name string) bool {
 	return false
 }
 
-func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, destDir string, numWorkers int, isArchive, force, skip bool) error {
+func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, destDir string, numWorkers int, isArchive, force, skip, toStdout bool) error {
 	if numWorkers == 0 {
 		return errors.New("the number of concurrent workers needs to be greater than 0")
 	}
@@ -209,7 +242,7 @@ func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, d
 	for w := 1; w <= numWorkers; w++ {
 		go func() {
 			for a := range jobs {
-				results <- downloadAsset(httpClient, a.APIURL, destDir, a.Name, isArchive, force, skip)
+				results <- downloadAsset(httpClient, a.APIURL, destDir, a.Name, isArchive, force, skip, toStdout)
 			}
 		}()
 	}
@@ -229,9 +262,9 @@ func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, d
 	return downloadError
 }
 
-func downloadAsset(httpClient *http.Client, assetURL, destinationDir string, fileName string, isArchive, force, skip bool) error {
+func downloadAsset(httpClient *http.Client, assetURL, destinationDir string, fileName string, isArchive, force, skip, toStdout bool) error {
 	var destinationPath = filepath.Join(destinationDir, fileName)
-	if len(fileName) != 0 {
+	if len(fileName) != 0 && !toStdout {
 		if success, err := shouldWrite(destinationPath, force, skip); !success || err != nil {
 			return err
 		}
@@ -268,6 +301,11 @@ func downloadAsset(httpClient *http.Client, assetURL, destinationDir string, fil
 		return api.HandleHTTPError(resp)
 	}
 
+	if toStdout {
+		_, err = io.Copy(os.Stdout, resp.Body)
+		return err
+	}
+
 	if len(fileName) == 0 {
 		contentDisposition := resp.Header.Get("Content-Disposition")
 
@@ -286,6 +324,7 @@ func downloadAsset(httpClient *http.Client, assetURL, destinationDir string, fil
 		}
 	}
 
+	println(destinationPath)
 	f, err := os.OpenFile(destinationPath, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return err
@@ -302,7 +341,7 @@ var codeloadLegacyRE = regexp.MustCompile(`^(/[^/]+/[^/]+/)legacy\.`)
 // when you choose to download "Source code (zip/tar.gz)" from a tagged release on the web. The legacy URLs
 // look like this:
 //
-//   https://codeload.github.com/OWNER/REPO/legacy.zip/refs/tags/TAGNAME
+//	https://codeload.github.com/OWNER/REPO/legacy.zip/refs/tags/TAGNAME
 //
 // Removing the "legacy." part results in a valid Codeload URL for our desired archive format.
 func removeLegacyFromCodeloadPath(p string) string {
