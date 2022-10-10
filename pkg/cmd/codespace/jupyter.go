@@ -44,13 +44,13 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	}
 	defer safeClose(session, &err)
 
+	a.StartProgressIndicatorWithLabel("Starting JupyterLab on codespace")
 	client, err := grpc.Connect(ctx, session, codespace.Connection.SessionToken)
 	if err != nil {
 		return fmt.Errorf("error connecting to internal server: %w", err)
 	}
 	defer safeClose(client, &err)
 
-	a.StartProgressIndicatorWithLabel("Starting JupyterLab on codespace")
 	serverPort, serverUrl, err := client.StartJupyterServer(ctx)
 	a.StopProgressIndicator()
 	if err != nil {

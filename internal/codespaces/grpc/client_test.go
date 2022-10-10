@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/codespaces/grpc/test"
@@ -18,6 +19,7 @@ func TestMain(m *testing.M) {
 	}()
 
 	m.Run()
+	os.Exit(0)
 }
 
 func connect(t *testing.T) (ctx context.Context, client *Client) {

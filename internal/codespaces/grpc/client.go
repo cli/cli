@@ -58,7 +58,9 @@ func Connect(ctx context.Context, session liveshareSession, token string) (*Clie
 	}()
 
 	// Ping the port to ensure that it is fully forwarded before continuing
-	err = liveshare.WaitForPortConnection(ctx, localAddress, portConnectionTimeout)
+	connctx, cancel := context.WithTimeout(ctx, portConnectionTimeout)
+	defer cancel()
+	err = liveshare.WaitForPortConnection(connctx, localAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to local port: %w", err)
 	}
@@ -68,7 +70,8 @@ func Connect(ctx context.Context, session liveshareSession, token string) (*Clie
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 	}
-	ctx, _ = context.WithTimeout(ctx, serverConnectionTimeout)
+	ctx, cancel = context.WithTimeout(ctx, serverConnectionTimeout)
+	defer cancel()
 	conn, err := grpc.DialContext(ctx, localAddress, opts...)
 	if err != nil {
 		return nil, err

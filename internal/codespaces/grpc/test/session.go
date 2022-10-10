@@ -14,7 +14,6 @@ type Session struct {
 }
 
 func (s *Session) KeepAlive(reason string) {
-	return
 }
 
 func (s *Session) StartSharing(ctx context.Context, sessionName string, port int) (liveshare.ChannelID, error) {
