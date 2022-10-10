@@ -123,7 +123,7 @@ func (s *Session) StartJupyterServer(ctx context.Context) (int, string, error) {
 	return port, response.ServerUrl, nil
 }
 
-func (s *Session) Rebuild(ctx context.Context) error {
+func (s *Session) RebuildContainer(ctx context.Context) error {
 	var rebuildSuccess bool
 	err := s.rpc.do(ctx, "IEnvironmentConfigurationService.rebuildContainer", nil, &rebuildSuccess)
 	if err != nil {

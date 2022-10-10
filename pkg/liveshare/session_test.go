@@ -413,7 +413,7 @@ func TestRebuild(t *testing.T) {
 	}
 	defer testServer.Close()
 
-	err = session.Rebuild(context.Background())
+	err = session.RebuildContainer(context.Background())
 	if err != nil {
 		t.Fatalf("rebuilding codespace via mock session: %v", err)
 	}

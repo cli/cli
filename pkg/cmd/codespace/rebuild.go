@@ -46,7 +46,7 @@ func (a *App) Rebuild(ctx context.Context, codespaceName string) (err error) {
 	}
 	defer safeClose(session, &err)
 
-	err = session.Rebuild(ctx)
+	err = session.RebuildContainer(ctx)
 	if err != nil {
 		return fmt.Errorf("rebuilding codespace via session: %w", err)
 	}
