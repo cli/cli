@@ -31,19 +31,31 @@ func stubHomeDir(t *testing.T, dir string) {
 
 func Test_NewCmdLogin(t *testing.T) {
 	tests := []struct {
-		name     string
-		cli      string
-		stdin    string
-		stdinTTY bool
-		wants    LoginOptions
-		wantsErr bool
+		name        string
+		cli         string
+		stdin       string
+		stdinTTY    bool
+		defaultHost string
+		wants       LoginOptions
+		wantsErr    bool
 	}{
 		{
-			name:  "nontty, with-token",
-			stdin: "abc123\n",
-			cli:   "--with-token",
+			name:        "nontty, with-token",
+			stdin:       "abc123\n",
+			cli:         "--with-token",
+			defaultHost: "github.com",
 			wants: LoginOptions{
 				Hostname: "github.com",
+				Token:    "abc123",
+			},
+		},
+		{
+			name:        "nontty, Enterprise host",
+			stdin:       "abc123\n",
+			cli:         "--with-token",
+			defaultHost: "git.example.com",
+			wants: LoginOptions{
+				Hostname: "git.example.com",
 				Token:    "abc123",
 			},
 		},
@@ -163,6 +175,8 @@ func Test_NewCmdLogin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("GH_HOST", tt.defaultHost)
+
 			ios, stdin, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
 				IOStreams: ios,

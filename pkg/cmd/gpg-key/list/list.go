@@ -58,7 +58,7 @@ func listRun(opts *ListOptions) error {
 
 	gpgKeys, err := userKeys(apiClient, host, "")
 	if err != nil {
-		if errors.Is(err, scopesError) {
+		if errors.Is(err, errScopes) {
 			cs := opts.IO.ColorScheme()
 			fmt.Fprint(opts.IO.ErrOut, "Error: insufficient OAuth scopes to list GPG keys\n")
 			fmt.Fprintf(opts.IO.ErrOut, "Run the following to grant scopes: %s\n", cs.Bold("gh auth refresh -s read:gpg_key"))
@@ -75,23 +75,32 @@ func listRun(opts *ListOptions) error {
 	cs := opts.IO.ColorScheme()
 	now := time.Now()
 
+	if t.IsTTY() {
+		t.AddField("EMAIL", nil, nil)
+		t.AddField("KEY ID", nil, nil)
+		t.AddField("PUBLIC KEY", nil, nil)
+		t.AddField("ADDED", nil, nil)
+		t.AddField("EXPIRES", nil, nil)
+		t.EndRow()
+	}
+
 	for _, gpgKey := range gpgKeys {
 		t.AddField(gpgKey.Emails.String(), nil, nil)
-		t.AddField(gpgKey.KeyId, nil, nil)
+		t.AddField(gpgKey.KeyID, nil, nil)
 		t.AddField(gpgKey.PublicKey, truncateMiddle, nil)
 
 		createdAt := gpgKey.CreatedAt.Format(time.RFC3339)
 		if t.IsTTY() {
-			createdAt = "Created " + text.FuzzyAgoAbbr(now, gpgKey.CreatedAt)
+			createdAt = text.FuzzyAgoAbbr(now, gpgKey.CreatedAt)
 		}
 		t.AddField(createdAt, nil, cs.Gray)
 
 		expiresAt := gpgKey.ExpiresAt.Format(time.RFC3339)
 		if t.IsTTY() {
 			if gpgKey.ExpiresAt.IsZero() {
-				expiresAt = "Never expires"
+				expiresAt = "Never"
 			} else {
-				expiresAt = "Expires " + gpgKey.ExpiresAt.Format("2006-01-02")
+				expiresAt = gpgKey.ExpiresAt.Format("2006-01-02")
 			}
 		}
 		t.AddField(expiresAt, nil, cs.Gray)

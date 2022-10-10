@@ -31,6 +31,7 @@ func Test_NewCmdDelete(t *testing.T) {
 			want: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: false,
+				CleanupTag:  false,
 			},
 		},
 		{
@@ -40,6 +41,17 @@ func Test_NewCmdDelete(t *testing.T) {
 			want: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: true,
+				CleanupTag:  false,
+			},
+		},
+		{
+			name:  "cleanup tag",
+			args:  "v1.2.3 --cleanup-tag",
+			isTTY: true,
+			want: DeleteOptions{
+				TagName:     "v1.2.3",
+				SkipConfirm: false,
+				CleanupTag:  true,
 			},
 		},
 		{
@@ -85,6 +97,7 @@ func Test_NewCmdDelete(t *testing.T) {
 
 			assert.Equal(t, tt.want.TagName, opts.TagName)
 			assert.Equal(t, tt.want.SkipConfirm, opts.SkipConfirm)
+			assert.Equal(t, tt.want.CleanupTag, opts.CleanupTag)
 		})
 	}
 }
@@ -104,6 +117,7 @@ func Test_deleteRun(t *testing.T) {
 			opts: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: true,
+				CleanupTag:  false,
 			},
 			wantStdout: ``,
 			wantStderr: heredoc.Doc(`
@@ -117,6 +131,31 @@ func Test_deleteRun(t *testing.T) {
 			opts: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: false,
+				CleanupTag:  false,
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+		},
+		{
+			name:  "cleanup-tag & skipping confirmation",
+			isTTY: true,
+			opts: DeleteOptions{
+				TagName:     "v1.2.3",
+				SkipConfirm: true,
+				CleanupTag:  true,
+			},
+			wantStdout: ``,
+			wantStderr: heredoc.Doc(`
+				✓ Deleted release and tag v1.2.3
+			`),
+		},
+		{
+			name:  "cleanup-tag",
+			isTTY: false,
+			opts: DeleteOptions{
+				TagName:     "v1.2.3",
+				SkipConfirm: false,
+				CleanupTag:  true,
 			},
 			wantStdout: ``,
 			wantStderr: ``,
@@ -135,7 +174,9 @@ func Test_deleteRun(t *testing.T) {
 				"draft": false,
 				"url": "https://api.github.com/repos/OWNER/REPO/releases/23456"
 			}`))
+
 			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/releases/23456"), httpmock.StatusStringResponse(204, ""))
+			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/tags/v1.2.3"), httpmock.StatusStringResponse(204, ""))
 
 			tt.opts.IO = ios
 			tt.opts.HttpClient = func() (*http.Client, error) {
