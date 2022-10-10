@@ -12,10 +12,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
-	connectionTimeout = 30 * time.Second
-)
-
 type portForwardingSession interface {
 	StartSharing(context.Context, string, int) (ChannelID, error)
 	OpenStreamingChannel(context.Context, ChannelID) (ssh.Channel, error)
@@ -56,12 +52,6 @@ func NewPortForwarder(session portForwardingSession, name string, remotePort int
 // responsible for closing the listening port.
 func (fwd *PortForwarder) ForwardToListener(ctx context.Context, listen net.Listener) (err error) {
 	id, err := fwd.shareRemotePort(ctx)
-	if err != nil {
-		return err
-	}
-
-	// Ping the port to ensure that it is fully forwarded before continuing
-	err = WaitForPortConnection(ctx, listen.Addr().String())
 	if err != nil {
 		return err
 	}
@@ -112,20 +102,17 @@ func (fwd *PortForwarder) Forward(ctx context.Context, conn io.ReadWriteCloser) 
 }
 
 // Connects to and pings a given address to ensure that the server is shared and the port is forwarded.
-func WaitForPortConnection(ctx context.Context, address string) error {
-	waitCtx, cancel := context.WithTimeout(ctx, connectionTimeout)
+func WaitForPortConnection(ctx context.Context, address string, timeout time.Duration) error {
+	waitCtx, cancel := context.WithTimeout(ctx, timeout)
 	g, waitCtx := errgroup.WithContext(waitCtx)
 	defer cancel()
-
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
 
 	g.Go(func() error {
 		for {
 			select {
 			case <-waitCtx.Done():
 				return fmt.Errorf("timed out waiting for connection")
-			case <-ticker.C:
+			default:
 				// Verify that the port can be connected to
 				conn, err := net.Dial("tcp", address)
 				if err != nil {

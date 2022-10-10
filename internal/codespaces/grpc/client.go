@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	connectionTimeout = 5 * time.Second
-	requestTimeout    = 30 * time.Second
+	serverConnectionTimeout = 5 * time.Second
+	requestTimeout          = 30 * time.Second
+	portConnectionTimeout   = 30 * time.Second
 )
 
 const (
@@ -57,14 +58,17 @@ func Connect(ctx context.Context, session liveshareSession, token string) (*Clie
 	}()
 
 	// Ping the port to ensure that it is fully forwarded before continuing
-	liveshare.WaitForPortConnection(ctx, localAddress)
+	err = liveshare.WaitForPortConnection(ctx, localAddress, portConnectionTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to local port: %w", err)
+	}
 
 	// Attempt to connect to the port
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 	}
-	ctx, _ = context.WithTimeout(ctx, connectionTimeout)
+	ctx, _ = context.WithTimeout(ctx, serverConnectionTimeout)
 	conn, err := grpc.DialContext(ctx, localAddress, opts...)
 	if err != nil {
 		return nil, err
