@@ -47,16 +47,20 @@ func NewTablePrinterWithOptions(ios *iostreams.IOStreams, opts TablePrinterOptio
 		}
 	}
 	tp := tableprinter.New(out, opts.IsTTY, maxWidth)
-	return &printer{tp: tp}
+	return &printer{
+		tp:    tp,
+		isTTY: opts.IsTTY,
+	}
 }
 
 type printer struct {
 	tp       tableprinter.TablePrinter
 	colIndex int
+	isTTY    bool
 }
 
 func (p printer) IsTTY() bool {
-	return true
+	return p.isTTY
 }
 
 func (p *printer) AddField(s string, truncateFunc func(int, string) string, colorFunc func(string) string) {
