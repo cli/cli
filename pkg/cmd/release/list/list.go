@@ -3,13 +3,12 @@ package list
 import (
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -76,14 +75,15 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
 
-	table := utils.NewTablePrinter(opts.IO)
+	table := tableprinter.New(opts.IO)
 	iofmt := opts.IO.ColorScheme()
+	table.HeaderRow("Title", "Type", "Tag name", "Published")
 	for _, rel := range releases {
 		title := text.RemoveExcessiveWhitespace(rel.Name)
 		if title == "" {
 			title = rel.TagName
 		}
-		table.AddField(title, nil, nil)
+		table.AddField(title)
 
 		badge := ""
 		var badgeColor func(string) string
@@ -97,23 +97,15 @@ func listRun(opts *ListOptions) error {
 			badge = "Pre-release"
 			badgeColor = iofmt.Yellow
 		}
-		table.AddField(badge, nil, badgeColor)
+		table.AddField(badge, tableprinter.WithColor(badgeColor))
 
-		tagName := rel.TagName
-		if table.IsTTY() {
-			tagName = fmt.Sprintf("(%s)", tagName)
-		}
-		table.AddField(tagName, nil, nil)
+		table.AddField(rel.TagName, tableprinter.WithTruncate(nil))
 
 		pubDate := rel.PublishedAt
 		if rel.PublishedAt.IsZero() {
 			pubDate = rel.CreatedAt
 		}
-		publishedAt := pubDate.Format(time.RFC3339)
-		if table.IsTTY() {
-			publishedAt = text.FuzzyAgo(time.Now(), pubDate)
-		}
-		table.AddField(publishedAt, nil, iofmt.Gray)
+		table.AddTimeField(pubDate, iofmt.Gray)
 		table.EndRow()
 	}
 	err = table.Render()
