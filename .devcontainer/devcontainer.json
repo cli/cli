@@ -12,10 +12,7 @@
 			"settings": {
 				"go.toolsManagement.checkForUpdates": "local",
 				"go.useLanguageServer": true,
-				"go.gopath": "/go",
-				"search.exclude": {
-					"vendor/**": true
-				}
+				"go.gopath": "/go"
 			}
 		}
 	},
