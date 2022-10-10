@@ -198,6 +198,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	cs := opts.IO.ColorScheme()
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	table := utils.NewTablePrinter(opts.IO)
 	for _, pr := range listResult.PullRequests {
 		prNum := strconv.Itoa(pr.Number)

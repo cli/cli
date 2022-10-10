@@ -134,6 +134,7 @@ func listRun(opts *listOptions) error {
 
 func printLabels(io *iostreams.IOStreams, labels []label) error {
 	cs := io.ColorScheme()
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	table := utils.NewTablePrinter(io)
 
 	for _, label := range labels {

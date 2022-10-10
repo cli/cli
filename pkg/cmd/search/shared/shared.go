@@ -97,6 +97,7 @@ func displayIssueResults(io *iostreams.IOStreams, now time.Time, et EntityType, 
 		now = time.Now()
 	}
 	cs := io.ColorScheme()
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(io)
 	for _, issue := range results.Items {
 		if et == Both {

@@ -21,12 +21,14 @@ type TablePrinterOptions struct {
 	Out      io.Writer
 }
 
+// Deprecated: use internal/tableprinter
 func NewTablePrinter(io *iostreams.IOStreams) TablePrinter {
 	return NewTablePrinterWithOptions(io, TablePrinterOptions{
 		IsTTY: io.IsStdoutTTY(),
 	})
 }
 
+// Deprecated: use internal/tableprinter
 func NewTablePrinterWithOptions(ios *iostreams.IOStreams, opts TablePrinterOptions) TablePrinter {
 	var out io.Writer
 	if opts.Out != nil {
