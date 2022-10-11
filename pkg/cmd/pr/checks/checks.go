@@ -132,6 +132,20 @@ func checksRun(opts *ChecksOptions) error {
 		return clientErr
 	}
 
+	var checks []check
+	var counts checkCounts
+	var err error
+
+	err = populateStatusChecks(client, repo, pr)
+	if err != nil {
+		return err
+	}
+
+	checks, counts, err = aggregateChecks(pr, opts.Required)
+	if err != nil {
+		return err
+	}
+
 	if opts.Watch {
 		opts.IO.StartAlternateScreenBuffer()
 	} else {
@@ -143,23 +157,8 @@ func checksRun(opts *ChecksOptions) error {
 		}
 	}
 
-	var checks []check
-	var counts checkCounts
-
 	// Do not return err until we can StopAlternateScreenBuffer()
-	var err error
-
 	for {
-		err = populateStatusChecks(client, repo, pr)
-		if err != nil {
-			break
-		}
-
-		checks, counts, err = aggregateChecks(pr, opts.Required)
-		if err != nil {
-			break
-		}
-
 		if counts.Pending != 0 && opts.Watch {
 			opts.IO.RefreshScreen()
 			cs := opts.IO.ColorScheme()
@@ -177,6 +176,16 @@ func checksRun(opts *ChecksOptions) error {
 		}
 
 		time.Sleep(opts.Interval)
+
+		err = populateStatusChecks(client, repo, pr)
+		if err != nil {
+			break
+		}
+
+		checks, counts, err = aggregateChecks(pr, opts.Required)
+		if err != nil {
+			break
+		}
 	}
 
 	opts.IO.StopAlternateScreenBuffer()
