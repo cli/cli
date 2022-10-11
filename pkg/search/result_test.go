@@ -72,7 +72,7 @@ func TestIssueExportData(t *testing.T) {
 			name:   "state when issue",
 			fields: []string{"isPullRequest", "state"},
 			issue: Issue{
-				State: "closed",
+				StateInternal: "closed",
 			},
 			output: `{"isPullRequest":false,"state":"closed"}`,
 		},
@@ -84,7 +84,7 @@ func TestIssueExportData(t *testing.T) {
 					MergedAt: time.Now(),
 					URL:      "a-url",
 				},
-				State: "closed",
+				StateInternal: "closed",
 			},
 			output: `{"isPullRequest":true,"state":"merged"}`,
 		},

@@ -114,12 +114,12 @@ func displayIssueResults(io *iostreams.IOStreams, now time.Time, et EntityType, 
 			issueNum = "#" + issueNum
 		}
 		if issue.IsPullRequest() {
-			tp.AddField(issueNum, nil, cs.ColorFromString(colorForPRState(issue.State)))
+			tp.AddField(issueNum, nil, cs.ColorFromString(colorForPRState(issue.State())))
 		} else {
-			tp.AddField(issueNum, nil, cs.ColorFromString(colorForIssueState(issue.State, issue.StateReason)))
+			tp.AddField(issueNum, nil, cs.ColorFromString(colorForIssueState(issue.State(), issue.StateReason)))
 		}
 		if !tp.IsTTY() {
-			tp.AddField(issue.State, nil, nil)
+			tp.AddField(issue.State(), nil, nil)
 		}
 		tp.AddField(text.RemoveExcessiveWhitespace(issue.Title), nil, nil)
 		tp.AddField(listIssueLabels(&issue, cs, tp.IsTTY()), nil, nil)

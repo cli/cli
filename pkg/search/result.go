@@ -130,11 +130,12 @@ type Issue struct {
 	Number            int         `json:"number"`
 	PullRequest       PullRequest `json:"pull_request"`
 	RepositoryURL     string      `json:"repository_url"`
-	State             string      `json:"state"`
-	StateReason       string      `json:"state_reason"`
-	Title             string      `json:"title"`
-	URL               string      `json:"html_url"`
-	UpdatedAt         time.Time   `json:"updated_at"`
+	// StateInternal should not be used directly. Use State() instead.
+	StateInternal string    `json:"state"`
+	StateReason   string    `json:"state_reason"`
+	Title         string    `json:"title"`
+	URL           string    `json:"html_url"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type PullRequest struct {
@@ -142,8 +143,16 @@ type PullRequest struct {
 	MergedAt time.Time `json:"merged_at"`
 }
 
-func (p PullRequest) Merged() bool {
-	return !p.MergedAt.IsZero()
+// the state of an issue or a pull request,
+// may be either open or closed.
+// for a pull request, the "merged" state is
+// inferred from a value for merged_at and
+// which we take return instead of the "closed" state.
+func (issue Issue) State() string {
+	if !issue.PullRequest.MergedAt.IsZero() {
+		return "merged"
+	}
+	return issue.StateInternal
 }
 
 type Label struct {
@@ -226,12 +235,7 @@ func (issue Issue) ExportData(fields []string) map[string]interface{} {
 				"nameWithOwner": nameWithOwner,
 			}
 		case "state":
-			if issue.PullRequest.Merged() {
-				data[f] = "merged"
-			} else {
-				// either an issue or a pull request that is not merged
-				data[f] = issue.State
-			}
+			data[f] = issue.State()
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()
