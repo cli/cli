@@ -40,10 +40,8 @@ func NewTablePrinterWithOptions(ios *iostreams.IOStreams, opts TablePrinterOptio
 		var maxWidth int
 		if opts.MaxWidth > 0 {
 			maxWidth = opts.MaxWidth
-		} else if ios.IsStdoutTTY() {
-			maxWidth = ios.TerminalWidth()
 		} else {
-			maxWidth = ios.ProcessTerminalWidth()
+			maxWidth = ios.TerminalWidth()
 		}
 		return &ttyTablePrinter{
 			out:      out,
