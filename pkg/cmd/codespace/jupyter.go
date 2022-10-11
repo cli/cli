@@ -89,7 +89,8 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 }
 
 func connectToGRPCServer(ctx context.Context, session liveshareSession, token string) (*grpc.Client, error) {
-	ctx, _ = context.WithTimeout(ctx, grpc.ConnectionTimeout)
+	ctx, cancel := context.WithTimeout(ctx, grpc.ConnectionTimeout)
+	defer cancel()
 
 	client, err := grpc.Connect(ctx, session, token)
 	if err != nil {
