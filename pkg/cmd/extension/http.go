@@ -19,26 +19,25 @@ func hasScript(httpClient *http.Client, repo ghrepo.Interface) (hs bool, err err
 	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return
+		return false, err
 	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return
+		return false, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 404 {
-		return
+		return false, repositoryNotFoundErr
 	}
 
 	if resp.StatusCode > 299 {
 		err = api.HandleHTTPError(resp)
-		return
+		return false, err
 	}
 
-	hs = true
-	return
+	return true, nil
 }
 
 type releaseAsset struct {
@@ -80,8 +79,9 @@ func downloadAsset(httpClient *http.Client, asset releaseAsset, destPath string)
 	return err
 }
 
-var releaseNotFoundErr = errors.New("release not found")
 var commitNotFoundErr = errors.New("commit not found")
+var releaseNotFoundErr = errors.New("release not found")
+var repositoryNotFoundErr = errors.New("repository not found")
 
 // fetchLatestRelease finds the latest published release for a repository.
 func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*release, error) {
