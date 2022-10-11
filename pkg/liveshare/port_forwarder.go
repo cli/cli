@@ -99,41 +99,6 @@ func (fwd *PortForwarder) Forward(ctx context.Context, conn io.ReadWriteCloser) 
 	return awaitError(ctx, errc)
 }
 
-// Loops until we can connect to the address or the context is canceled.
-func WaitForPortConnection(ctx context.Context, address string) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			err := connectToAddr(address)
-			if err != nil {
-				continue
-			}
-
-			return nil // success
-		}
-	}
-}
-
-// Connects to and pings a given address to ensure that the server is shared and the port is forwarded.
-func connectToAddr(address string) error {
-	// Verify that the port can be connected to
-	conn, err := net.Dial("tcp", address)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	// Send a ping and make sure it succeed
-	_, err = conn.Write([]byte("ping"))
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (fwd *PortForwarder) shareRemotePort(ctx context.Context) (ChannelID, error) {
 	id, err := fwd.session.StartSharing(ctx, fwd.name, fwd.remotePort)
 	if err != nil {

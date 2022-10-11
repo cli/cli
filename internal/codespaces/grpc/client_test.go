@@ -3,29 +3,35 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"os"
+	"log"
 	"testing"
 
-	"github.com/cli/cli/v2/internal/codespaces/grpc/test"
+	grpctest "github.com/cli/cli/v2/internal/codespaces/grpc/test"
 )
 
-func TestMain(m *testing.M) {
+func startServer(t *testing.T) {
+	t.Helper()
+
+	ctx, cancel := context.WithCancel(context.Background())
+
 	// Start the gRPC server in the background
 	go func() {
-		err := test.StartServer()
-		if err != nil {
-			panic(err)
+		err := grpctest.StartServer(ctx)
+		if err != nil && err != context.Canceled {
+			log.Println(fmt.Errorf("error starting test server: %v", err))
 		}
 	}()
 
-	m.Run()
-	os.Exit(0)
+	// Stop the gRPC server when the test is done
+	t.Cleanup(func() {
+		cancel()
+	})
 }
 
-func connect(t *testing.T) (ctx context.Context, client *Client) {
+func connect(t *testing.T) (client *Client) {
 	t.Helper()
-	ctx = context.Background()
-	client, err := Connect(ctx, &test.Session{}, "token")
+
+	client, err := Connect(context.Background(), &grpctest.Session{}, "token")
 	if err != nil {
 		t.Fatalf("error connecting to internal server: %v", err)
 	}
@@ -34,31 +40,34 @@ func connect(t *testing.T) (ctx context.Context, client *Client) {
 		client.Close()
 	})
 
-	return ctx, client
+	return client
 }
 
 // Test that the gRPC client returns the correct port and URL when the JupyterLab server starts successfully
 func TestStartJupyterServerSuccess(t *testing.T) {
-	ctx, client := connect(t)
-	port, url, err := client.StartJupyterServer(ctx)
+	startServer(t)
+	client := connect(t)
+
+	port, url, err := client.StartJupyterServer(context.Background())
 	if err != nil {
 		t.Fatalf("expected %v, got %v", nil, err)
 	}
-	if port != test.JupyterPort {
-		t.Fatalf("expected %d, got %d", test.JupyterPort, port)
+	if port != grpctest.JupyterPort {
+		t.Fatalf("expected %d, got %d", grpctest.JupyterPort, port)
 	}
-	if url != test.JupyterServerUrl {
-		t.Fatalf("expected %s, got %s", test.JupyterServerUrl, url)
+	if url != grpctest.JupyterServerUrl {
+		t.Fatalf("expected %s, got %s", grpctest.JupyterServerUrl, url)
 	}
 }
 
 // Test that the gRPC client returns an error when the JupyterLab server fails to start
 func TestStartJupyterServerFailure(t *testing.T) {
-	ctx, client := connect(t)
-	test.JupyterMessage = "error message"
-	test.JupyterResult = false
-	errorMessage := fmt.Sprintf("failed to start JupyterLab: %s", test.JupyterMessage)
-	port, url, err := client.StartJupyterServer(ctx)
+	startServer(t)
+	client := connect(t)
+	grpctest.JupyterMessage = "error message"
+	grpctest.JupyterResult = false
+	errorMessage := fmt.Sprintf("failed to start JupyterLab: %s", grpctest.JupyterMessage)
+	port, url, err := client.StartJupyterServer(context.Background())
 	if err.Error() != errorMessage {
 		t.Fatalf("expected %v, got %v", errorMessage, err)
 	}

@@ -35,7 +35,7 @@ func (s *server) GetRunningServer(ctx context.Context, in *jupyter.GetRunningSer
 }
 
 // Starts the mock gRPC server listening on port 50051
-func StartServer() error {
+func StartServer(ctx context.Context) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", ServerPort))
 	if err != nil {
 		return fmt.Errorf("failed to listen: %v", err)
@@ -44,9 +44,19 @@ func StartServer() error {
 
 	s := grpc.NewServer()
 	jupyter.RegisterJupyterServerHostServer(s, &server{})
-	if err := s.Serve(listener); err != nil {
-		return fmt.Errorf("failed to serve: %v", err)
-	}
 
-	return nil
+	ch := make(chan error, 1)
+	go func() {
+		if err := s.Serve(listener); err != nil {
+			ch <- fmt.Errorf("failed to serve: %v", err)
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		s.Stop()
+		return ctx.Err()
+	case err := <-ch:
+		return err
+	}
 }
