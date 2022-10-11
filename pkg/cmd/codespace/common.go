@@ -66,6 +66,7 @@ type liveshareSession interface {
 	StartSharing(context.Context, string, int) (liveshare.ChannelID, error)
 	StartSSHServer(context.Context) (int, string, error)
 	StartSSHServerWithOptions(context.Context, liveshare.StartSSHServerOptions) (int, string, error)
+	RebuildContainer(context.Context) error
 }
 
 // Connects to a codespace using Live Share and returns that session
