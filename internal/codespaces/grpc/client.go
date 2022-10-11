@@ -19,9 +19,8 @@ import (
 )
 
 const (
-	serverConnectionTimeout = 5 * time.Second
-	requestTimeout          = 30 * time.Second
-	portConnectionTimeout   = 30 * time.Second
+	ConnectionTimeout = 5 * time.Second
+	RequestTimeout    = 30 * time.Second
 )
 
 const (
@@ -34,6 +33,7 @@ type Client struct {
 	token         string
 	listener      net.Listener
 	jupyterClient jupyter.JupyterServerHostClient
+	cancelPF      context.CancelFunc
 }
 
 type liveshareSession interface {
@@ -49,32 +49,50 @@ func Connect(ctx context.Context, session liveshareSession, token string) (*Clie
 		return nil, fmt.Errorf("failed to listen to local port over tcp: %w", err)
 	}
 
-	// Tunnel the remote gRPC server port to the local port
-	localAddress := fmt.Sprintf("127.0.0.1:%d", listener.Addr().(*net.TCPAddr).Port)
-	internalTunnelClosed := make(chan error, 1)
-	go func() {
-		fwd := liveshare.NewPortForwarder(session, codespacesInternalSessionName, codespacesInternalPort, true)
-		internalTunnelClosed <- fwd.ForwardToListener(ctx, listener)
+	// Create a cancelable context to be able to cancel background tasks
+	// if we encounter an error while connecting to the gRPC server
+	connectctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		if err != nil {
+			cancel()
+		}
 	}()
 
-	// Ping the port to ensure that it is fully forwarded before continuing
-	connctx, cancel := context.WithTimeout(ctx, portConnectionTimeout)
-	defer cancel()
-	err = liveshare.WaitForPortConnection(connctx, localAddress)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to local port: %w", err)
-	}
+	// Ensure we close the port forwarder if we encounter an error
+	// or once the gRPC connection is closed. pfcancel is retained
+	// to close the PF whenever we close the gRPC connection.
+	pfctx, pfcancel := context.WithCancel(connectctx)
+
+	ch := make(chan error, 2) // Buffered channel to ensure we don't block on the goroutine
+
+	// Tunnel the remote gRPC server port to the local port
+	localAddress := fmt.Sprintf("127.0.0.1:%d", listener.Addr().(*net.TCPAddr).Port)
+	go func() {
+		fwd := liveshare.NewPortForwarder(session, codespacesInternalSessionName, codespacesInternalPort, true)
+		ch <- fwd.ForwardToListener(pfctx, listener)
+	}()
 
 	// Attempt to connect to the port
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 	}
-	ctx, cancel = context.WithTimeout(ctx, serverConnectionTimeout)
-	defer cancel()
-	conn, err := grpc.DialContext(ctx, localAddress, opts...)
-	if err != nil {
-		return nil, err
+
+	var conn *grpc.ClientConn
+
+	go func() {
+		conn, err = grpc.DialContext(connectctx, localAddress, opts...)
+		ch <- err // nil if we successfully connected
+	}()
+
+	// Wait for the connection to be established or for the context to be cancelled
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case err := <-ch:
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	g := &Client{
@@ -82,6 +100,7 @@ func Connect(ctx context.Context, session liveshareSession, token string) (*Clie
 		token:         token,
 		listener:      listener,
 		jupyterClient: jupyter.NewJupyterServerHostClient(conn),
+		cancelPF:      pfcancel,
 	}
 
 	return g, nil
@@ -89,6 +108,8 @@ func Connect(ctx context.Context, session liveshareSession, token string) (*Clie
 
 // Closes the gRPC connection
 func (g *Client) Close() error {
+	g.cancelPF()
+
 	// Closing the local listener effectively closes the gRPC connection
 	if err := g.listener.Close(); err != nil {
 		g.conn.Close() // If we fail to close the listener, explicitly close the gRPC connection and ignore any error
@@ -105,9 +126,7 @@ func (g *Client) appendMetadata(ctx context.Context) context.Context {
 
 // Starts a remote JupyterLab server to allow the user to connect to the codespace via JupyterLab in their browser
 func (g *Client) StartJupyterServer(ctx context.Context) (port int, serverUrl string, err error) {
-	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	ctx = g.appendMetadata(ctx)
-	defer cancel()
 
 	response, err := g.jupyterClient.GetRunningServer(ctx, &jupyter.GetRunningServerRequest{})
 	if err != nil {

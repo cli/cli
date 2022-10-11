@@ -45,17 +45,17 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	defer safeClose(session, &err)
 
 	a.StartProgressIndicatorWithLabel("Starting JupyterLab on codespace")
-	client, err := grpc.Connect(ctx, session, codespace.Connection.SessionToken)
+	client, err := connectToGRPCServer(ctx, session, codespace.Connection.SessionToken)
 	if err != nil {
-		return fmt.Errorf("error connecting to internal server: %w", err)
+		return fmt.Errorf("failed to connect to internal server: %w", err)
 	}
 	defer safeClose(client, &err)
 
-	serverPort, serverUrl, err := client.StartJupyterServer(ctx)
-	a.StopProgressIndicator()
+	serverPort, serverUrl, err := startJupyterServer(ctx, client)
 	if err != nil {
 		return fmt.Errorf("failed to start JupyterLab server: %w", err)
 	}
+	a.StopProgressIndicator()
 
 	// Pass 0 to pick a random port
 	listen, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", 0))
@@ -86,4 +86,27 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	case <-ctx.Done():
 		return nil // success
 	}
+}
+
+func connectToGRPCServer(ctx context.Context, session liveshareSession, token string) (*grpc.Client, error) {
+	ctx, _ = context.WithTimeout(ctx, grpc.ConnectionTimeout)
+
+	client, err := grpc.Connect(ctx, session, token)
+	if err != nil {
+		return nil, fmt.Errorf("error connecting to internal server: %w", err)
+	}
+
+	return client, nil
+}
+
+func startJupyterServer(ctx context.Context, client *grpc.Client) (int, string, error) {
+	ctx, cancel := context.WithTimeout(ctx, grpc.RequestTimeout)
+	defer cancel()
+
+	serverPort, serverUrl, err := client.StartJupyterServer(ctx)
+	if err != nil {
+		return 0, "", fmt.Errorf("failed to start JupyterLab server: %w", err)
+	}
+
+	return serverPort, serverUrl, nil
 }
