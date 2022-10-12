@@ -2,7 +2,6 @@ package delete
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,8 +9,6 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 )
-
-var errScopes = errors.New("insufficient OAuth scopes")
 
 type gpgKey struct {
 	ID    int
@@ -31,20 +28,15 @@ func deleteGPGKey(httpClient *http.Client, host, id string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 404 {
-		return errScopes
-	} else if resp.StatusCode > 299 {
+	if resp.StatusCode > 299 {
 		return api.HandleHTTPError(resp)
 	}
 
 	return nil
 }
 
-func getGPGKeys(httpClient *http.Client, host, userHandle string) ([]gpgKey, error) {
+func getGPGKeys(httpClient *http.Client, host string) ([]gpgKey, error) {
 	resource := "user/gpg_keys"
-	if userHandle != "" {
-		resource = fmt.Sprintf("users/%s/gpg_keys", userHandle)
-	}
 	url := fmt.Sprintf("%s%s?per_page=%d", ghinstance.RESTPrefix(host), resource, 100)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -57,9 +49,7 @@ func getGPGKeys(httpClient *http.Client, host, userHandle string) ([]gpgKey, err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 404 {
-		return nil, errScopes
-	} else if resp.StatusCode > 299 {
+	if resp.StatusCode > 299 {
 		return nil, api.HandleHTTPError(resp)
 	}
 

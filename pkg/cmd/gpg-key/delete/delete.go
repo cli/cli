@@ -64,7 +64,7 @@ func deleteRun(opts *DeleteOptions) error {
 	}
 
 	host, _ := cfg.DefaultHost()
-	gpgKeys, err := getGPGKeys(httpClient, host, "")
+	gpgKeys, err := getGPGKeys(httpClient, host)
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func deleteRun(opts *DeleteOptions) error {
 	}
 
 	if id == "" {
-		return fmt.Errorf("unable to delete GPG key id %s: either the GPG key is not found or it is not owned by you", opts.KeyID)
+		return fmt.Errorf("unable to delete GPG key %s: either the GPG key is not found or it is not owned by you", opts.KeyID)
 	}
 
 	if !opts.Confirmed {
@@ -94,7 +94,8 @@ func deleteRun(opts *DeleteOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.Out, "%s GPG key id %s deleted from your account\n", cs.SuccessIcon(), opts.KeyID)
+		fmt.Fprintf(opts.IO.Out, "%s GPG key %s deleted from your account\n", cs.SuccessIcon(), opts.KeyID)
 	}
+
 	return nil
 }

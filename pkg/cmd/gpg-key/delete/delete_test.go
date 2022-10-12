@@ -130,7 +130,7 @@ func Test_deleteRun(t *testing.T) {
 				reg.Register(httpmock.REST("GET", "user/gpg_keys"), httpmock.StatusStringResponse(200, keysResp))
 				reg.Register(httpmock.REST("DELETE", "user/gpg_keys/123"), httpmock.StatusStringResponse(204, ""))
 			},
-			wantStdout: "✓ GPG key id ABC123 deleted from your account\n",
+			wantStdout: "✓ GPG key ABC123 deleted from your account\n",
 		},
 		{
 			name: "delete with confirm flag tty",
@@ -140,7 +140,7 @@ func Test_deleteRun(t *testing.T) {
 				reg.Register(httpmock.REST("GET", "user/gpg_keys"), httpmock.StatusStringResponse(200, keysResp))
 				reg.Register(httpmock.REST("DELETE", "user/gpg_keys/123"), httpmock.StatusStringResponse(204, ""))
 			},
-			wantStdout: "✓ GPG key id ABC123 deleted from your account\n",
+			wantStdout: "✓ GPG key ABC123 deleted from your account\n",
 		},
 		{
 			name: "not found tty",
@@ -150,7 +150,7 @@ func Test_deleteRun(t *testing.T) {
 				reg.Register(httpmock.REST("GET", "user/gpg_keys"), httpmock.StatusStringResponse(200, "[]"))
 			},
 			wantErr:    true,
-			wantErrMsg: "unable to delete GPG key id ABC123: either the GPG key is not found or it is not owned by you",
+			wantErrMsg: "unable to delete GPG key ABC123: either the GPG key is not found or it is not owned by you",
 		},
 		{
 			name: "delete no tty",
@@ -168,7 +168,7 @@ func Test_deleteRun(t *testing.T) {
 				reg.Register(httpmock.REST("GET", "user/gpg_keys"), httpmock.StatusStringResponse(200, "[]"))
 			},
 			wantErr:    true,
-			wantErrMsg: "unable to delete GPG key id ABC123: either the GPG key is not found or it is not owned by you",
+			wantErrMsg: "unable to delete GPG key ABC123: either the GPG key is not found or it is not owned by you",
 		},
 	}
 
