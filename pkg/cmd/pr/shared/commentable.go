@@ -36,6 +36,7 @@ type CommentableOptions struct {
 	IO                    *iostreams.IOStreams
 	HttpClient            func() (*http.Client, error)
 	RetrieveCommentable   func() (Commentable, ghrepo.Interface, error)
+	RetrieveCurrentUser   func() (string, error)
 	EditSurvey            func(string) (string, error)
 	InteractiveEditSurvey func(string) (string, error)
 	ConfirmSubmitSurvey   func() (bool, error)
@@ -84,15 +85,9 @@ func CommentableRun(opts *CommentableOptions) error {
 		return err
 	}
 
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
-	}
-	apiClient := api.NewClientFromHTTP(httpClient)
-
 	var lastComment *api.Comment
 	if opts.EditLast {
-		username, err := api.CurrentLoginName(apiClient, repo.RepoHost())
+		username, err := opts.RetrieveCurrentUser()
 		if err != nil {
 			return err
 		}
@@ -138,6 +133,11 @@ func CommentableRun(opts *CommentableOptions) error {
 		}
 	}
 
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+	apiClient := api.NewClientFromHTTP(httpClient)
 	url := ""
 	if lastComment == nil {
 		params := api.CommentCreateInput{Body: opts.Body, SubjectId: commentable.Identifier()}

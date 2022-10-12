@@ -266,12 +266,6 @@ func Test_commentRun(t *testing.T) {
 
 				OpenInBrowser: func(string) error { return nil },
 			},
-			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`),
-				)
-			},
 			stderr: "Opening github.com/OWNER/REPO/pull/123 in your browser.\n",
 		},
 		{
@@ -355,6 +349,9 @@ func Test_commentRun(t *testing.T) {
 				}},
 			}, ghrepo.New("OWNER", "REPO"), nil
 		}
+		tt.input.RetrieveCurrentUser = func() (string, error) {
+			return "octocat", nil
+		}
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := shared.CommentableRun(tt.input)
@@ -379,10 +376,6 @@ func mockCommentCreate(t *testing.T, reg *httpmock.Registry) {
 }
 
 func mockCommentUpdate(t *testing.T, reg *httpmock.Registry) {
-	reg.Register(
-		httpmock.GraphQL(`query UserCurrent\b`),
-		httpmock.StringResponse(`{"data":{"viewer":{"login":"octocat"}}}`),
-	)
 	reg.Register(
 		httpmock.GraphQL(`mutation CommentUpdate\b`),
 		httpmock.GraphQLMutation(`
