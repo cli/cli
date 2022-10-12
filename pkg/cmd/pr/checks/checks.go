@@ -231,7 +231,7 @@ func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.Pu
 		}
 
 		if len(resp.Node.StatusCheckRollup.Nodes) == 0 {
-			return aggregateChecks(pr, requiredChecks)
+			break
 		}
 
 		result := resp.Node.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts
