@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"testing"
 
 	grpctest "github.com/cli/cli/v2/internal/codespaces/grpc/test"
@@ -11,6 +12,9 @@ import (
 
 func startServer(t *testing.T) {
 	t.Helper()
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		t.Skip("fails intermittently in CI: https://github.com/cli/cli/issues/5663")
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
