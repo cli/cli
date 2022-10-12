@@ -81,7 +81,7 @@ func deleteRun(opts *DeleteOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.Out, "%s SSH key \"%s\" (%s) deleted from your account\n", cs.SuccessIcon(), key.Title, opts.KeyID)
+		fmt.Fprintf(opts.IO.Out, "%s SSH key %q (%s) deleted from your account\n", cs.SuccessIcon(), key.Title, opts.KeyID)
 	}
 	return nil
 }
