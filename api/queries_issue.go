@@ -245,6 +245,6 @@ func (i Issue) Identifier() string {
 	return i.ID
 }
 
-func (i Issue) LastComment(username string) (*Comment, error) {
-	return i.Comments.LastComment(username)
+func (i Issue) CommentsForUser(username string) []Comment {
+	return i.Comments.CommentsForUser(username)
 }

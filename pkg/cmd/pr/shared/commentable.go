@@ -29,7 +29,7 @@ const (
 type Commentable interface {
 	Link() string
 	Identifier() string
-	LastComment(username string) (*api.Comment, error)
+	CommentsForUser(username string) []api.Comment
 }
 
 type CommentableOptions struct {
@@ -91,7 +91,10 @@ func CommentableRun(opts *CommentableOptions) error {
 		if err != nil {
 			return err
 		}
-		lastComment, _ = commentable.LastComment(username)
+		comments := commentable.CommentsForUser(username)
+		if len(comments) > 0 {
+			lastComment = &comments[len(comments)-1]
+		}
 	}
 
 	switch opts.InputType {

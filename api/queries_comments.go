@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"time"
 
 	"github.com/shurcooL/githubv4"
@@ -16,20 +15,14 @@ type Comments struct {
 	}
 }
 
-func (cs Comments) LastComment(username string) (*Comment, error) {
-	var lastComment Comment
-	found := false
+func (cs Comments) CommentsForUser(username string) []Comment {
+	var comments []Comment
 	for _, c := range cs.Nodes {
 		if c.Author.Login == username {
-			lastComment = c
-			found = true
+			comments = append(comments, c)
 		}
 	}
-	if found {
-		return &lastComment, nil
-	} else {
-		return nil, errors.New("not found")
-	}
+	return comments
 }
 
 type Comment struct {
