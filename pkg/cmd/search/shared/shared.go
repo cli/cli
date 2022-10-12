@@ -65,7 +65,7 @@ func SearchIssues(opts *IssuesOptions) error {
 	if err != nil {
 		return err
 	}
-	if len(result.Items) == 0 {
+	if len(result.Items) == 0 && opts.Exporter == nil {
 		var msg string
 		switch opts.Entity {
 		case Both:

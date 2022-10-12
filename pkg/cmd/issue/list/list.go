@@ -185,7 +185,7 @@ func listRun(opts *ListOptions) error {
 	if err != nil {
 		return err
 	}
-	if len(listResult.Issues) == 0 {
+	if len(listResult.Issues) == 0 && opts.Exporter == nil {
 		return prShared.ListNoResults(ghrepo.FullName(baseRepo), "issue", !filterOptions.IsDefault())
 	}
 

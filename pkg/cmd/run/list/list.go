@@ -105,7 +105,7 @@ func listRun(opts *ListOptions) error {
 		return fmt.Errorf("failed to get runs: %w", err)
 	}
 	runs := runsResult.WorkflowRuns
-	if len(runs) == 0 {
+	if len(runs) == 0 && opts.Exporter == nil {
 		return cmdutil.NewNoResultsError("no runs found")
 	}
 

@@ -175,7 +175,7 @@ func listRun(opts *ListOptions) error {
 	if err != nil {
 		return err
 	}
-	if len(listResult.PullRequests) == 0 {
+	if len(listResult.PullRequests) == 0 && opts.Exporter == nil {
 		return shared.ListNoResults(ghrepo.FullName(baseRepo), "pull request", !filters.IsDefault())
 	}
 
