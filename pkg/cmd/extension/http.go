@@ -13,7 +13,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
-func hasScript(httpClient *http.Client, repo ghrepo.Interface) (hs bool, err error) {
+func hasScript(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 	path := fmt.Sprintf("repos/%s/%s/contents/%s",
 		repo.RepoOwner(), repo.RepoName(), repo.RepoName())
 	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
