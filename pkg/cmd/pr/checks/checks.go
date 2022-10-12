@@ -136,12 +136,7 @@ func checksRun(opts *ChecksOptions) error {
 	var counts checkCounts
 	var err error
 
-	err = populateStatusChecks(client, repo, pr)
-	if err != nil {
-		return err
-	}
-
-	checks, counts, err = aggregateChecks(pr, opts.Required)
+	checks, counts, err = populateStatusChecks(client, repo, pr, opts.Required)
 	if err != nil {
 		return err
 	}
@@ -177,12 +172,7 @@ func checksRun(opts *ChecksOptions) error {
 
 		time.Sleep(opts.Interval)
 
-		err = populateStatusChecks(client, repo, pr)
-		if err != nil {
-			break
-		}
-
-		checks, counts, err = aggregateChecks(pr, opts.Required)
+		checks, counts, err = populateStatusChecks(client, repo, pr, opts.Required)
 		if err != nil {
 			break
 		}
@@ -209,7 +199,7 @@ func checksRun(opts *ChecksOptions) error {
 	return nil
 }
 
-func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.PullRequest) error {
+func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.PullRequest, requiredChecks bool) ([]check, checkCounts, error) {
 	apiClient := api.NewClientFromHTTP(client)
 
 	type response struct {
@@ -237,11 +227,11 @@ func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.Pu
 		var resp response
 		err := apiClient.GraphQL(repo.RepoHost(), query, variables, &resp)
 		if err != nil {
-			return err
+			return nil, checkCounts{}, err
 		}
 
 		if len(resp.Node.StatusCheckRollup.Nodes) == 0 {
-			return nil
+			return aggregateChecks(pr, requiredChecks)
 		}
 
 		result := resp.Node.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts
@@ -266,5 +256,5 @@ func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.Pu
 		},
 	}}
 
-	return nil
+	return aggregateChecks(pr, requiredChecks)
 }
