@@ -14,7 +14,7 @@ import (
 )
 
 func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
-	url := fmt.Sprintf("%s%s/%s", ghinstance.HostPrefix(repo.RepoHost()), repo.RepoOwner(), repo.RepoName())
+	url := fmt.Sprintf("%s%s/%s", ghinstance.RESTPrefix(repo.RepoHost()), repo.RepoOwner(), repo.RepoName())
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return false, err

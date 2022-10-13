@@ -687,7 +687,7 @@ func TestManager_Install_binary_pinned(t *testing.T) {
 	defer reg.Verify(t)
 
 	reg.Register(
-		httpmock.REST("GET", "owner/gh-bin-ext"),
+		httpmock.REST("GET", "api/v3/owner/gh-bin-ext"),
 		httpmock.StringResponse(""),
 	)
 
@@ -759,7 +759,7 @@ func TestManager_Install_binary_unsupported(t *testing.T) {
 	client := http.Client{Transport: &reg}
 
 	reg.Register(
-		httpmock.REST("GET", "owner/gh-bin-ext"),
+		httpmock.REST("GET", "api/v3/owner/gh-bin-ext"),
 		httpmock.StringResponse(""),
 	)
 
@@ -806,7 +806,7 @@ func TestManager_Install_binary(t *testing.T) {
 	defer reg.Verify(t)
 
 	reg.Register(
-		httpmock.REST("GET", "owner/gh-bin-ext"),
+		httpmock.REST("GET", "api/v3/owner/gh-bin-ext"),
 		httpmock.StringResponse(""),
 	)
 
