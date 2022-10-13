@@ -44,7 +44,7 @@ type CommentableOptions struct {
 	Interactive           bool
 	InputType             InputType
 	Body                  string
-	EditLast              bool
+	Upsert                bool
 	Quiet                 bool
 }
 
@@ -86,7 +86,7 @@ func CommentableRun(opts *CommentableOptions) error {
 	}
 
 	var lastComment *api.Comment
-	if opts.EditLast {
+	if opts.Upsert {
 		username, err := opts.RetrieveCurrentUser()
 		if err != nil {
 			return err

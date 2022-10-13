@@ -2,6 +2,7 @@ package comment
 
 import (
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -48,6 +49,17 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*shared.CommentableOptions) err
 					Fields:   []string{"id", "url", "comments"},
 				})
 			}
+			opts.RetrieveCurrentUser = func() (string, error) {
+				httpClient, err := f.HttpClient()
+				if err != nil {
+					return "", err
+				}
+				baseRepo, err := f.BaseRepo()
+				if err != nil {
+					return "", err
+				}
+				return api.CurrentLoginName(api.NewClientFromHTTP(httpClient), baseRepo.RepoHost())
+			}
 			return shared.CommentablePreRun(cmd, opts)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -70,7 +82,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*shared.CommentableOptions) err
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().BoolP("editor", "e", false, "Skip prompts and open the text editor to write the body in")
 	cmd.Flags().BoolP("web", "w", false, "Open the web browser to write the comment")
-	cmd.Flags().BoolVar(&opts.EditLast, "edit-last", false, "Edit the last comment of the same author")
+	cmd.Flags().BoolVar(&opts.Upsert, "edit-last", false, "Edit the last comment of the same author")
 
 	return cmd
 }
