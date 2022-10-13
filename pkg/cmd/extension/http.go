@@ -13,6 +13,24 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
+func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
+	url := fmt.Sprintf("%s%s/%s", ghinstance.HostPrefix(repo.RepoHost()), repo.RepoOwner(), repo.RepoName())
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return false, err
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		return false, nil
+	}
+	return true, nil
+}
 func hasScript(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 	path := fmt.Sprintf("repos/%s/%s/contents/%s",
 		repo.RepoOwner(), repo.RepoName(), repo.RepoName())
@@ -29,7 +47,7 @@ func hasScript(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 404 {
-		return false, repositoryNotFoundErr
+		return false, nil
 	}
 
 	if resp.StatusCode > 299 {

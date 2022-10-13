@@ -337,6 +337,14 @@ type binManifest struct {
 
 // Install installs an extension from repo, and pins to commitish if provided
 func (m *Manager) Install(repo ghrepo.Interface, target string) error {
+	exists, err := repoExists(m.client, repo)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return repositoryNotFoundErr
+	}
+
 	isBin, err := isBinExtension(m.client, repo)
 	if err != nil {
 		return fmt.Errorf("could not check for binary extension: %w", err)

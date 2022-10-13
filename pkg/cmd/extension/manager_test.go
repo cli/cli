@@ -614,6 +614,10 @@ func TestManager_Install_git(t *testing.T) {
 	m := newTestManager(tempDir, &client, ios)
 
 	reg.Register(
+		httpmock.REST("GET", "owner/gh-some-ext"),
+		httpmock.StringResponse(""),
+	)
+	reg.Register(
 		httpmock.REST("GET", "repos/owner/gh-some-ext/releases/latest"),
 		httpmock.JSONResponse(
 			release{
@@ -647,6 +651,11 @@ func TestManager_Install_git_pinned(t *testing.T) {
 	m := newTestManager(tempDir, &client, ios)
 
 	reg.Register(
+		httpmock.REST("GET", "owner/gh-cool-ext"),
+		httpmock.StringResponse(""),
+	)
+
+	reg.Register(
 		httpmock.REST("GET", "repos/owner/gh-cool-ext/releases/latest"),
 		httpmock.JSONResponse(
 			release{
@@ -676,6 +685,11 @@ func TestManager_Install_binary_pinned(t *testing.T) {
 
 	reg := httpmock.Registry{}
 	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.REST("GET", "owner/gh-bin-ext"),
+		httpmock.StringResponse(""),
+	)
 
 	reg.Register(
 		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
@@ -745,6 +759,11 @@ func TestManager_Install_binary_unsupported(t *testing.T) {
 	client := http.Client{Transport: &reg}
 
 	reg.Register(
+		httpmock.REST("GET", "owner/gh-bin-ext"),
+		httpmock.StringResponse(""),
+	)
+
+	reg.Register(
 		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
 		httpmock.JSONResponse(
 			release{
@@ -785,6 +804,11 @@ func TestManager_Install_binary(t *testing.T) {
 
 	reg := httpmock.Registry{}
 	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.REST("GET", "owner/gh-bin-ext"),
+		httpmock.StringResponse(""),
+	)
 
 	reg.Register(
 		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
