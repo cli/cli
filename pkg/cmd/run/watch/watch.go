@@ -121,7 +121,7 @@ func watchRun(opts *WatchOptions) error {
 	}
 
 	if run.Status == shared.Completed {
-		fmt.Fprintf(opts.IO.Out, "Run %s (%s) has already completed with '%s'\n", cs.Bold(run.Name), cs.Cyanf("%d", run.ID), run.Conclusion)
+		fmt.Fprintf(opts.IO.Out, "Run %s (%s) has already completed with '%s'\n", cs.Bold(run.WorkflowName()), cs.Cyanf("%d", run.ID), run.Conclusion)
 		if opts.ExitStatus && run.Conclusion != shared.Success {
 			return cmdutil.SilentError
 		}
@@ -186,7 +186,7 @@ func watchRun(opts *WatchOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		fmt.Fprintln(opts.IO.Out)
-		fmt.Fprintf(opts.IO.Out, "%s Run %s (%s) completed with '%s'\n", symbolColor(symbol), cs.Bold(run.Name), id, run.Conclusion)
+		fmt.Fprintf(opts.IO.Out, "%s Run %s (%s) completed with '%s'\n", symbolColor(symbol), cs.Bold(run.WorkflowName()), id, run.Conclusion)
 	}
 
 	if opts.ExitStatus && run.Conclusion != shared.Success {

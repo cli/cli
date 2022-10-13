@@ -39,6 +39,8 @@ type MergeOptions struct {
 	AutoMergeEnable  bool
 	AutoMergeDisable bool
 
+	AuthorEmail string
+
 	Body    string
 	BodySet bool
 	Subject string
@@ -177,6 +179,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	cmd.Flags().BoolVar(&opts.AutoMergeEnable, "auto", false, "Automatically merge only after necessary requirements are met")
 	cmd.Flags().BoolVar(&opts.AutoMergeDisable, "disable-auto", false, "Disable auto-merge for this pull request")
 	cmd.Flags().StringVar(&opts.MatchHeadCommit, "match-head-commit", "", "Commit `SHA` that the pull request head must match to allow merge")
+	cmd.Flags().StringVarP(&opts.AuthorEmail, "author-email", "A", "", "Email `text` for merge commit author")
 	return cmd
 }
 
@@ -280,6 +283,7 @@ func (m *mergeContext) merge() error {
 		commitBody:      m.opts.Body,
 		setCommitBody:   m.opts.BodySet,
 		expectedHeadOid: m.opts.MatchHeadCommit,
+		authorEmail:     m.opts.AuthorEmail,
 	}
 
 	if m.shouldAddToMergeQueue() {

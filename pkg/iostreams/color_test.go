@@ -1,22 +1,12 @@
 package iostreams
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestEnvColorDisabled(t *testing.T) {
-	orig_NO_COLOR := os.Getenv("NO_COLOR")
-	orig_CLICOLOR := os.Getenv("CLICOLOR")
-	orig_CLICOLOR_FORCE := os.Getenv("CLICOLOR_FORCE")
-	t.Cleanup(func() {
-		os.Setenv("NO_COLOR", orig_NO_COLOR)
-		os.Setenv("CLICOLOR", orig_CLICOLOR)
-		os.Setenv("CLICOLOR_FORCE", orig_CLICOLOR_FORCE)
-	})
-
 	tests := []struct {
 		name           string
 		NO_COLOR       string
@@ -62,9 +52,9 @@ func TestEnvColorDisabled(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("NO_COLOR", tt.NO_COLOR)
-			os.Setenv("CLICOLOR", tt.CLICOLOR)
-			os.Setenv("CLICOLOR_FORCE", tt.CLICOLOR_FORCE)
+			t.Setenv("NO_COLOR", tt.NO_COLOR)
+			t.Setenv("CLICOLOR", tt.CLICOLOR)
+			t.Setenv("CLICOLOR_FORCE", tt.CLICOLOR_FORCE)
 
 			if got := EnvColorDisabled(); got != tt.want {
 				t.Errorf("EnvColorDisabled(): want %v, got %v", tt.want, got)
@@ -74,15 +64,6 @@ func TestEnvColorDisabled(t *testing.T) {
 }
 
 func TestEnvColorForced(t *testing.T) {
-	orig_NO_COLOR := os.Getenv("NO_COLOR")
-	orig_CLICOLOR := os.Getenv("CLICOLOR")
-	orig_CLICOLOR_FORCE := os.Getenv("CLICOLOR_FORCE")
-	t.Cleanup(func() {
-		os.Setenv("NO_COLOR", orig_NO_COLOR)
-		os.Setenv("CLICOLOR", orig_CLICOLOR)
-		os.Setenv("CLICOLOR_FORCE", orig_CLICOLOR_FORCE)
-	})
-
 	tests := []struct {
 		name           string
 		NO_COLOR       string
@@ -135,9 +116,9 @@ func TestEnvColorForced(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("NO_COLOR", tt.NO_COLOR)
-			os.Setenv("CLICOLOR", tt.CLICOLOR)
-			os.Setenv("CLICOLOR_FORCE", tt.CLICOLOR_FORCE)
+			t.Setenv("NO_COLOR", tt.NO_COLOR)
+			t.Setenv("CLICOLOR", tt.CLICOLOR)
+			t.Setenv("CLICOLOR_FORCE", tt.CLICOLOR_FORCE)
 
 			if got := EnvColorForced(); got != tt.want {
 				t.Errorf("EnvColorForced(): want %v, got %v", tt.want, got)

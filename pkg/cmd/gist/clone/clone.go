@@ -7,6 +7,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -92,9 +93,15 @@ func cloneRun(opts *CloneOptions) error {
 }
 
 func formatRemoteURL(hostname string, gistID string, protocol string) string {
+	if ghinstance.IsEnterprise(hostname) {
+		if protocol == "ssh" {
+			return fmt.Sprintf("git@%s:gist/%s.git", hostname, gistID)
+		}
+		return fmt.Sprintf("https://%s/gist/%s.git", hostname, gistID)
+	}
+
 	if protocol == "ssh" {
 		return fmt.Sprintf("git@gist.%s:%s.git", hostname, gistID)
 	}
-
 	return fmt.Sprintf("https://gist.%s/%s.git", hostname, gistID)
 }

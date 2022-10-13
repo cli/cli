@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -27,11 +26,11 @@ func TestPendingOperationDisallowsSSH(t *testing.T) {
 	}
 }
 
-func TestAutomaticSSHKeyPairs(t *testing.T) {
+func TestGenerateAutomaticSSHKeys(t *testing.T) {
 	tests := []struct {
-		// These files exist when calling setupAutomaticSSHKeys
+		// These files exist when calling generateAutomaticSSHKeys
 		existingFiles []string
-		// These files should exist after setupAutomaticSSHKeys finishes
+		// These files should exist after generateAutomaticSSHKeys finishes
 		wantFinalFiles []string
 	}{
 		// Basic case: no existing keys, they should be created
@@ -82,12 +81,12 @@ func TestAutomaticSSHKeyPairs(t *testing.T) {
 			f.Close()
 		}
 
-		keyPair, err := setupAutomaticSSHKeys(sshContext)
+		keyPair, err := generateAutomaticSSHKeys(sshContext)
 		if err != nil {
-			t.Errorf("Unexpected error from setupAutomaticSSHKeys: %v", err)
+			t.Errorf("Unexpected error from generateAutomaticSSHKeys: %v", err)
 		}
 		if keyPair == nil {
-			t.Fatal("Unexpected nil KeyPair from setupAutomaticSSHKeys")
+			t.Fatal("Unexpected nil KeyPair from generateAutomaticSSHKeys")
 		}
 		if !strings.HasSuffix(keyPair.PrivateKeyPath, automaticPrivateKeyName) {
 			t.Errorf("Expected private key path %v, got %v", automaticPrivateKeyName, keyPair.PrivateKeyPath)
@@ -99,7 +98,7 @@ func TestAutomaticSSHKeyPairs(t *testing.T) {
 		// Check that all the expected files are present
 		for _, file := range tt.wantFinalFiles {
 			if _, err := os.Stat(filepath.Join(dir, file)); err != nil {
-				t.Errorf("Want file %q to exist after setupAutomaticSSHKeys but it doesn't", file)
+				t.Errorf("Want file %q to exist after generateAutomaticSSHKeys but it doesn't", file)
 			}
 		}
 
@@ -119,157 +118,107 @@ func TestAutomaticSSHKeyPairs(t *testing.T) {
 			}
 
 			if !isWantedFile {
-				t.Errorf("Unexpected file %q exists after setupAutomaticSSHKeys", filename)
+				t.Errorf("Unexpected file %q exists after generateAutomaticSSHKeys", filename)
 			}
 		}
 	}
 }
 
-func TestUseAutomaticSSHKeysIdentityFileArg(t *testing.T) {
+func TestSelectSSHKeys(t *testing.T) {
 	tests := []struct {
-		identityFileArg string
-		wantResult      bool
+		sshDirFiles      []string
+		sshConfigKeys    []string
+		sshArgs          []string
+		profileOpt       string
+		wantKeyPair      *ssh.KeyPair
+		wantShouldAddArg bool
 	}{
-		{"custom-private-key", false},
-		{automaticPrivateKeyName, true},
-		{"", false}, // Edge case check for missing arg value
-	}
-
-	for _, tt := range tests {
-		t.Logf("%v", tt.identityFileArg)
-
-		args := []string{"-i"}
-		if tt.identityFileArg != "" {
-			args = append(args, tt.identityFileArg)
-		}
-
-		result, err := useAutomaticSSHKeys(context.Background(), ssh.Context{}, nil, args, sshOptions{})
-
-		if err != nil {
-			t.Errorf("Unexpected error from useAutomaticSSHKeys: %v", err)
-		}
-
-		if result != tt.wantResult {
-			t.Errorf("Want useAutomaticSSHKeys to be %v, got %v", tt.wantResult, result)
-		}
-	}
-}
-
-func TestUseAutomaticSSHKeysWithAutoKeysExist(t *testing.T) {
-	dir := t.TempDir()
-
-	f, err := os.Create(path.Join(dir, automaticPrivateKeyName))
-	if err != nil {
-		t.Errorf("Failed to create test private key: %v", err)
-	}
-	f.Close()
-
-	f, err = os.Create(path.Join(dir, automaticPrivateKeyName+".pub"))
-	if err != nil {
-		t.Errorf("Failed to create test public key: %v", err)
-	}
-	f.Close()
-
-	sshContext := ssh.Context{
-		ConfigDir: dir,
-	}
-	result, err := useAutomaticSSHKeys(context.Background(), sshContext, nil, nil, sshOptions{})
-
-	if err != nil {
-		t.Errorf("Unexpected error from useAutomaticSSHKeys: %v", err)
-	}
-
-	if result != true {
-		t.Errorf("Want useAutomaticSSHKeys to be true, got false")
-	}
-}
-
-func TestHasUploadedPublicKeyForConfig(t *testing.T) {
-	type testLocalKeyPair struct {
-		privateKeyFile   string
-		publicKeyContent string
-	}
-
-	tests := []struct {
-		apiAuthorizedPublicKeys []string
-		localKeyPairs           []testLocalKeyPair
-		wantResult              bool
-	}{
-		// Failure tests
+		// -i tests
 		{
-			// No API keys and no local keys
-			wantResult: false,
+			sshArgs:     []string{"-i", "custom-private-key"},
+			wantKeyPair: &ssh.KeyPair{PrivateKeyPath: "custom-private-key", PublicKeyPath: "custom-private-key.pub"},
 		},
 		{
-			// Has API keys, but no local keys
-			apiAuthorizedPublicKeys: []string{"ssh-rsa test-key"},
-			wantResult:              false,
+			sshArgs:     []string{"-i", automaticPrivateKeyName},
+			wantKeyPair: &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
 		},
 		{
-			// No API keys, but has local keys
-			localKeyPairs: []testLocalKeyPair{{"keyfile", "ssh-rsa test-key"}},
-			wantResult:    false,
-		},
-		{
-			// API keys and local keys, but not matching
-			apiAuthorizedPublicKeys: []string{"ssh-rsa test-api-key"},
-			localKeyPairs:           []testLocalKeyPair{{"keyfile", "ssh-rsa test-local-key"}},
-			wantResult:              false,
+			// Edge case check for missing arg value
+			sshArgs: []string{"-i"},
 		},
 
-		// Successful tests
+		// Auto key exists tests
 		{
-			apiAuthorizedPublicKeys: []string{"ssh-rsa test-key"},
-			localKeyPairs:           []testLocalKeyPair{{"keyfile", "ssh-rsa test-key"}},
-			wantResult:              true,
+			sshDirFiles:      []string{automaticPrivateKeyName, automaticPrivateKeyName + ".pub"},
+			wantKeyPair:      &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
+			wantShouldAddArg: true,
 		},
 		{
-			apiAuthorizedPublicKeys: []string{"ssh-rsa test-key-1", "ssh-rsa test-key-2"},
-			localKeyPairs:           []testLocalKeyPair{{"keyfile1", "ssh-rsa test-key-1"}},
-			wantResult:              true,
-		},
-		{
-			apiAuthorizedPublicKeys: []string{"ssh-rsa test-key-1"},
-			localKeyPairs:           []testLocalKeyPair{{"keyfile1", "ssh-rsa test-key-1"}, {"keyfile2", "ssh-rsa test-key-2"}},
-			wantResult:              true,
-		},
-		{
-			apiAuthorizedPublicKeys: []string{"ssh-rsa test-key-1", "ssh-rsa test-key-2"},
-			localKeyPairs:           []testLocalKeyPair{{"keyfile3", "ssh-rsa test-key-3"}, {"keyfile2", "ssh-rsa test-key-2"}},
-			wantResult:              true,
+			sshDirFiles:      []string{automaticPrivateKeyName, automaticPrivateKeyName + ".pub", "custom-private-key", "custom-private-key.pub"},
+			wantKeyPair:      &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
+			wantShouldAddArg: true,
 		},
 
-		// Extra case - local key contain comments
+		// SSH config tests
 		{
-			apiAuthorizedPublicKeys: []string{"ssh-rsa test-key-1", "ssh-rsa test-key"},
-			localKeyPairs:           []testLocalKeyPair{{"keyfile3", "ssh-rsa test-key a comment on the key"}},
-			wantResult:              true,
+			sshDirFiles:      []string{"custom-private-key", "custom-private-key.pub"},
+			sshConfigKeys:    []string{"custom-private-key"},
+			wantKeyPair:      &ssh.KeyPair{PrivateKeyPath: "custom-private-key", PublicKeyPath: "custom-private-key.pub"},
+			wantShouldAddArg: true,
+		},
+		{
+			// 2 pairs, but only 1 is configured
+			sshDirFiles:      []string{"custom-private-key", "custom-private-key.pub", "custom-private-key-2", "custom-private-key-2.pub"},
+			sshConfigKeys:    []string{"custom-private-key-2"},
+			wantKeyPair:      &ssh.KeyPair{PrivateKeyPath: "custom-private-key-2", PublicKeyPath: "custom-private-key-2.pub"},
+			wantShouldAddArg: true,
+		},
+		{
+			// 2 pairs, but only 1 has both public and private
+			sshDirFiles:      []string{"custom-private-key", "custom-private-key-2", "custom-private-key-2.pub"},
+			sshConfigKeys:    []string{"custom-private-key", "custom-private-key-2"},
+			wantKeyPair:      &ssh.KeyPair{PrivateKeyPath: "custom-private-key-2", PublicKeyPath: "custom-private-key-2.pub"},
+			wantShouldAddArg: true,
+		},
+
+		// Automatic key tests
+		{
+			wantKeyPair:      &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
+			wantShouldAddArg: true,
+		},
+		{
+			// Renames old key pair to new
+			sshDirFiles:      []string{automaticPrivateKeyNameOld, automaticPrivateKeyNameOld + ".pub"},
+			wantKeyPair:      &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
+			wantShouldAddArg: true,
+		},
+		{
+			// Other key is configured, but doesn't exist
+			sshConfigKeys:    []string{"custom-private-key"},
+			wantKeyPair:      &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
+			wantShouldAddArg: true,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Logf("%+v", tt)
+		sshDir := t.TempDir()
+		sshContext := ssh.Context{ConfigDir: sshDir}
 
-		mockApi := &apiClientMock{
-			GetUserFunc: func(ctx context.Context) (*api.User, error) {
-				return &api.User{Login: "test"}, nil
-			},
-			AuthorizedKeysFunc: func(_ context.Context, _ string) ([]string, error) {
-				return tt.apiAuthorizedPublicKeys, nil
-			},
-		}
-
-		dir := t.TempDir()
-		configPath := path.Join(dir, "test-config")
-
-		configContent := ""
-		for _, pair := range tt.localKeyPairs {
-			configContent += fmt.Sprintf("IdentityFile %s\n", path.Join(dir, pair.privateKeyFile))
-
-			err := os.WriteFile(path.Join(dir, pair.privateKeyFile+".pub"), []byte(pair.publicKeyContent), 0666)
+		for _, file := range tt.sshDirFiles {
+			f, err := os.Create(filepath.Join(sshDir, file))
 			if err != nil {
-				t.Fatalf("could not write test public key file %v", err)
+				t.Errorf("Failed to create test ssh dir file %q: %v", file, err)
 			}
+			f.Close()
+		}
+
+		configPath := filepath.Join(sshDir, "test-config")
+
+		// Seed the config with a non-existent key so that the default config won't apply
+		configContent := "IdentityFile dummy\n"
+
+		for _, key := range tt.sshConfigKeys {
+			configContent += fmt.Sprintf("IdentityFile %s\n", filepath.Join(sshDir, key))
 		}
 
 		err := os.WriteFile(configPath, []byte(configContent), 0666)
@@ -277,19 +226,44 @@ func TestHasUploadedPublicKeyForConfig(t *testing.T) {
 			t.Fatalf("could not write test config %v", err)
 		}
 
-		result, err := hasUploadedPublicKeyForConfig(context.Background(), mockApi, configPath, "")
-		if err != nil {
-			t.Errorf("Unexpected error from hasUploadedPublicKeyForConfig: %v", err)
+		tt.sshArgs = append([]string{"-F", configPath}, tt.sshArgs...)
+
+		gotKeyPair, gotShouldAddArg, err := selectSSHKeys(context.Background(), sshContext, tt.sshArgs, sshOptions{profile: tt.profileOpt})
+
+		if tt.wantKeyPair == nil {
+			if err == nil {
+				t.Errorf("Expected error from selectSSHKeys but got nil")
+			}
+
+			continue
 		}
 
-		if result != tt.wantResult {
-			t.Errorf("Want hasUploadedPublicKeyForConfig to be %v, got %v", tt.wantResult, result)
+		if err != nil {
+			t.Errorf("Unexpected error from selectSSHKeys: %v", err)
+			continue
+		}
+
+		if gotKeyPair == nil {
+			t.Errorf("Expected non-nil result from selectSSHKeys but got nil")
+			continue
+		}
+
+		if gotShouldAddArg != tt.wantShouldAddArg {
+			t.Errorf("Got wrong shouldAddArg value from selectSSHKeys, wanted %v got %v", tt.wantShouldAddArg, gotShouldAddArg)
+			continue
+		}
+
+		// Strip the dir (sshDir) from the gotKeyPair paths so that they match wantKeyPair (which doesn't know the directory)
+		gotKeyPair.PrivateKeyPath = filepath.Base(gotKeyPair.PrivateKeyPath)
+		gotKeyPair.PublicKeyPath = filepath.Base(gotKeyPair.PublicKeyPath)
+
+		if fmt.Sprintf("%v", gotKeyPair) != fmt.Sprintf("%v", tt.wantKeyPair) {
+			t.Errorf("Want selectSSHKeys result to be %v, got %v", tt.wantKeyPair, gotKeyPair)
 		}
 	}
 }
 
 func testingSSHApp() *App {
-	user := &api.User{Login: "monalisa"}
 	disabledCodespace := &api.Codespace{
 		Name:                           "disabledCodespace",
 		PendingOperation:               true,
@@ -301,12 +275,6 @@ func testingSSHApp() *App {
 				return disabledCodespace, nil
 			}
 			return nil, nil
-		},
-		GetUserFunc: func(_ context.Context) (*api.User, error) {
-			return user, nil
-		},
-		AuthorizedKeysFunc: func(_ context.Context, _ string) ([]string, error) {
-			return []string{}, nil
 		},
 	}
 

@@ -123,6 +123,20 @@ func (s *Session) StartJupyterServer(ctx context.Context) (int, string, error) {
 	return port, response.ServerUrl, nil
 }
 
+func (s *Session) RebuildContainer(ctx context.Context) error {
+	var rebuildSuccess bool
+	err := s.rpc.do(ctx, "IEnvironmentConfigurationService.rebuildContainer", nil, &rebuildSuccess)
+	if err != nil {
+		return fmt.Errorf("invoking rebuild RPC: %w", err)
+	}
+
+	if !rebuildSuccess {
+		return fmt.Errorf("couldn't rebuild codespace")
+	}
+
+	return nil
+}
+
 // heartbeat runs until context cancellation, periodically checking whether there is a
 // reason to keep the connection alive, and if so, notifying the Live Share host to do so.
 // Heartbeat ensures it does not send more than one request every "interval" to ratelimit

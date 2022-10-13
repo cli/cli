@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"os"
 	"testing"
 )
 
@@ -195,9 +194,7 @@ func TestFromFullName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.hostOverride != "" {
-				old := os.Getenv("GH_HOST")
-				os.Setenv("GH_HOST", tt.hostOverride)
-				defer os.Setenv("GH_HOST", old)
+				t.Setenv("GH_HOST", tt.hostOverride)
 			}
 			r, err := FromFullName(tt.input)
 			if tt.wantErr != nil {

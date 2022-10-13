@@ -269,6 +269,7 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 		}
 		summary.Total++
 	}
+
 	return
 }
 
@@ -454,6 +455,24 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 	}
 
 	return client.Mutate(repo.RepoHost(), "PullRequestReadyForReview", &mutation, variables)
+}
+
+func ConvertPullRequestToDraft(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+	var mutation struct {
+		ConvertPullRequestToDraft struct {
+			PullRequest struct {
+				ID githubv4.ID
+			}
+		} `graphql:"convertPullRequestToDraft(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": githubv4.ConvertPullRequestToDraftInput{
+			PullRequestID: pr.ID,
+		},
+	}
+
+	return client.Mutate(repo.RepoHost(), "ConvertPullRequestToDraft", &mutation, variables)
 }
 
 func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) error {

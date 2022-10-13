@@ -165,18 +165,12 @@ func TestNewHTTPClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			oldDebug := os.Getenv("DEBUG")
-			oldGhDebug := os.Getenv("GH_DEBUG")
-			os.Setenv("DEBUG", tt.envDebug)
+			t.Setenv("DEBUG", tt.envDebug)
 			if tt.setGhDebug {
-				os.Setenv("GH_DEBUG", tt.envGhDebug)
+				t.Setenv("GH_DEBUG", tt.envGhDebug)
 			} else {
 				os.Unsetenv("GH_DEBUG")
 			}
-			t.Cleanup(func() {
-				os.Setenv("DEBUG", oldDebug)
-				os.Setenv("GH_DEBUG", oldGhDebug)
-			})
 
 			ios, _, _, stderr := iostreams.Test()
 			client, err := NewHTTPClient(HTTPClientOptions{

@@ -199,7 +199,7 @@ func runView(opts *ViewOptions) error {
 		if err != nil {
 			return fmt.Errorf("failed to get runs: %w", err)
 		}
-		runID, err = shared.PromptForRun(cs, runs)
+		runID, err = shared.PromptForRun(cs, runs.WorkflowRuns)
 		if err != nil {
 			return err
 		}
@@ -466,15 +466,17 @@ func logFilenameRegexp(job shared.Job, step shared.Step) *regexp.Regexp {
 
 // This function takes a zip file of logs and a list of jobs.
 // Structure of zip file
-// zip/
-// ├── jobname1/
-// │   ├── 1_stepname.txt
-// │   ├── 2_anotherstepname.txt
-// │   ├── 3_stepstepname.txt
-// │   └── 4_laststepname.txt
-// └── jobname2/
-//     ├── 1_stepname.txt
-//     └── 2_somestepname.txt
+//
+//	zip/
+//	├── jobname1/
+//	│   ├── 1_stepname.txt
+//	│   ├── 2_anotherstepname.txt
+//	│   ├── 3_stepstepname.txt
+//	│   └── 4_laststepname.txt
+//	└── jobname2/
+//	    ├── 1_stepname.txt
+//	    └── 2_somestepname.txt
+//
 // It iterates through the list of jobs and trys to find the matching
 // log in the zip file. If the matching log is found it is attached
 // to the job.

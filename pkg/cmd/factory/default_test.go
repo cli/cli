@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"testing"
 
 	"github.com/cli/cli/v2/git"
@@ -245,9 +244,7 @@ func Test_OverrideBaseRepo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.envOverride != "" {
-				old := os.Getenv("GH_REPO")
-				os.Setenv("GH_REPO", tt.envOverride)
-				defer os.Setenv("GH_REPO", old)
+				t.Setenv("GH_REPO", tt.envOverride)
 			}
 			f := New("1")
 			rr := &remoteResolver{
@@ -324,13 +321,7 @@ func Test_ioStreams_pager(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.env != nil {
 				for k, v := range tt.env {
-					old := os.Getenv(k)
-					os.Setenv(k, v)
-					if k == "GH_PAGER" {
-						defer os.Unsetenv(k)
-					} else {
-						defer os.Setenv(k, old)
-					}
+					t.Setenv(k, v)
 				}
 			}
 			f := New("1")

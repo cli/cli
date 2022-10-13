@@ -68,6 +68,26 @@ func TestIssueExportData(t *testing.T) {
 			},
 			output: `{"assignees":[{"id":"","login":"test","type":""}],"body":"body","commentsCount":1,"isLocked":true,"labels":[{"color":"","description":"","id":"","name":"label1"},{"color":"","description":"","id":"","name":"label2"}],"repository":{"name":"repo","nameWithOwner":"owner/repo"},"title":"title","updatedAt":"2021-02-28T12:30:00Z"}`,
 		},
+		{
+			name:   "state when issue",
+			fields: []string{"isPullRequest", "state"},
+			issue: Issue{
+				StateInternal: "closed",
+			},
+			output: `{"isPullRequest":false,"state":"closed"}`,
+		},
+		{
+			name:   "state when pull request",
+			fields: []string{"isPullRequest", "state"},
+			issue: Issue{
+				PullRequest: PullRequest{
+					MergedAt: time.Now(),
+					URL:      "a-url",
+				},
+				StateInternal: "closed",
+			},
+			output: `{"isPullRequest":true,"state":"merged"}`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
