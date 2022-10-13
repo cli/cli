@@ -464,7 +464,7 @@ func System() *IOStreams {
 		io.progressIndicatorEnabled = true
 	}
 
-	if stdoutIsTTY && isVirtualTerminal {
+	if stdoutIsTTY {
 		io.alternateScreenBufferEnabled = true
 	}
 
