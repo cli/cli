@@ -138,6 +138,9 @@ func reposRun(opts *ReposOptions) error {
 	if err != nil {
 		return err
 	}
+	if len(result.Items) == 0 && opts.Exporter == nil {
+		return cmdutil.NewNoResultsError("no repositories matched your search")
+	}
 	if err := io.StartPager(); err == nil {
 		defer io.StopPager()
 	} else {
@@ -145,9 +148,6 @@ func reposRun(opts *ReposOptions) error {
 	}
 	if opts.Exporter != nil {
 		return opts.Exporter.Write(io, result.Items)
-	}
-	if len(result.Items) == 0 {
-		return cmdutil.NewNoResultsError("no repositories matched your search")
 	}
 
 	return displayResults(io, opts.Now, result)

@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -132,6 +133,15 @@ func checksRun(opts *ChecksOptions) error {
 		return clientErr
 	}
 
+	var checks []check
+	var counts checkCounts
+	var err error
+
+	checks, counts, err = populateStatusChecks(client, repo, pr, opts.Required)
+	if err != nil {
+		return err
+	}
+
 	if opts.Watch {
 		opts.IO.StartAlternateScreenBuffer()
 	} else {
@@ -143,23 +153,8 @@ func checksRun(opts *ChecksOptions) error {
 		}
 	}
 
-	var checks []check
-	var counts checkCounts
-
 	// Do not return err until we can StopAlternateScreenBuffer()
-	var err error
-
 	for {
-		err = populateStatusChecks(client, repo, pr)
-		if err != nil {
-			break
-		}
-
-		checks, counts, err = aggregateChecks(pr, opts.Required)
-		if err != nil {
-			break
-		}
-
 		if counts.Pending != 0 && opts.Watch {
 			opts.IO.RefreshScreen()
 			cs := opts.IO.ColorScheme()
@@ -177,6 +172,11 @@ func checksRun(opts *ChecksOptions) error {
 		}
 
 		time.Sleep(opts.Interval)
+
+		checks, counts, err = populateStatusChecks(client, repo, pr, opts.Required)
+		if err != nil {
+			break
+		}
 	}
 
 	opts.IO.StopAlternateScreenBuffer()
@@ -200,7 +200,7 @@ func checksRun(opts *ChecksOptions) error {
 	return nil
 }
 
-func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.PullRequest) error {
+func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.PullRequest, requiredChecks bool) ([]check, checkCounts, error) {
 	apiClient := api.NewClientFromHTTP(client)
 
 	type response struct {
@@ -208,7 +208,7 @@ func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.Pu
 	}
 
 	query := fmt.Sprintf(`
-	query PullRequestStatusChecks($id: ID!, $endCursor: String!) {
+	query PullRequestStatusChecks($id: ID!, $endCursor: String) {
 		node(id: $id) {
 			...on PullRequest {
 				%s
@@ -221,18 +221,16 @@ func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.Pu
 	}
 
 	statusCheckRollup := api.CheckContexts{}
-	endCursor := ""
 
 	for {
-		variables["endCursor"] = endCursor
 		var resp response
 		err := apiClient.GraphQL(repo.RepoHost(), query, variables, &resp)
 		if err != nil {
-			return err
+			return nil, checkCounts{}, err
 		}
 
 		if len(resp.Node.StatusCheckRollup.Nodes) == 0 {
-			return nil
+			return nil, checkCounts{}, errors.New("no commit found on the pull request")
 		}
 
 		result := resp.Node.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts
@@ -244,18 +242,16 @@ func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.Pu
 		if !result.PageInfo.HasNextPage {
 			break
 		}
-		endCursor = result.PageInfo.EndCursor
+		variables["endCursor"] = result.PageInfo.EndCursor
 	}
 
-	statusCheckRollup.PageInfo.HasNextPage = false
+	if len(statusCheckRollup.Nodes) == 0 {
+		return nil, checkCounts{}, fmt.Errorf("no checks reported on the '%s' branch", pr.HeadRefName)
+	}
 
-	pr.StatusCheckRollup.Nodes = []api.StatusCheckRollupNode{{
-		Commit: api.StatusCheckRollupCommit{
-			StatusCheckRollup: api.CommitStatusCheckRollup{
-				Contexts: statusCheckRollup,
-			},
-		},
-	}}
-
-	return nil
+	checks, counts := aggregateChecks(statusCheckRollup.Nodes, requiredChecks)
+	if len(checks) == 0 && requiredChecks {
+		return checks, counts, fmt.Errorf("no required checks reported on the '%s' branch", pr.HeadRefName)
+	}
+	return checks, counts, nil
 }
