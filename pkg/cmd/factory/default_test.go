@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"testing"
 
 	"github.com/cli/cli/v2/git"
@@ -431,6 +432,44 @@ func TestSSOURL(t *testing.T) {
 			assert.Equal(t, 204, res.StatusCode)
 			assert.Equal(t, tt.wantStderr, stderr.String())
 			assert.Equal(t, tt.wantSSO, SSOURL())
+		})
+	}
+}
+
+func TestNewGitClient(t *testing.T) {
+	tests := []struct {
+		name          string
+		config        config.Config
+		executable    string
+		wantAuthHosts []string
+		wantGhPath    string
+	}{
+		{
+			name:          "creates git client",
+			config:        defaultConfig(),
+			executable:    filepath.Join("path", "to", "gh"),
+			wantAuthHosts: []string{"nonsense.com"},
+			wantGhPath:    filepath.Join("path", "to", "gh"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := New("1")
+			f.Config = func() (config.Config, error) {
+				if tt.config == nil {
+					return config.NewBlankConfig(), nil
+				} else {
+					return tt.config, nil
+				}
+			}
+			f.ExecutableName = tt.executable
+			ios, _, _, _ := iostreams.Test()
+			f.IOStreams = ios
+			c := newGitClient(f)
+			assert.Equal(t, tt.wantGhPath, c.GhPath)
+			assert.Equal(t, ios.In, c.Stdin)
+			assert.Equal(t, ios.Out, c.Stdout)
+			assert.Equal(t, ios.ErrOut, c.Stderr)
 		})
 	}
 }

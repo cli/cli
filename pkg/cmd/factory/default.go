@@ -35,6 +35,7 @@ func New(appVersion string) *cmdutil.Factory {
 	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
 	f.Prompter = newPrompter(f)                  // Depends on Config and IOStreams
 	f.Browser = newBrowser(f)                    // Depends on Config, and IOStreams
+	f.GitClient = newGitClient(f)                // Depends on IOStreams, and Executable
 	f.ExtensionManager = extensionManager(f)     // Depends on Config, HttpClient, and IOStreams
 
 	return f
@@ -104,6 +105,18 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 		client.Transport = api.ExtractHeader("X-GitHub-SSO", &ssoHeader)(client.Transport)
 		return client, nil
 	}
+}
+
+func newGitClient(f *cmdutil.Factory) *git.Client {
+	io := f.IOStreams
+	ghPath := f.Executable()
+	client := &git.Client{
+		GhPath: ghPath,
+		Stderr: io.ErrOut,
+		Stdin:  io.In,
+		Stdout: io.Out,
+	}
+	return client
 }
 
 func newBrowser(f *cmdutil.Factory) browser.Browser {

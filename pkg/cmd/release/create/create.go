@@ -13,7 +13,6 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -475,7 +474,7 @@ func gitTagInfo(tagName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	b, err := run.PrepareCmd(cmd).Output()
+	b, err := cmd.Output()
 	return string(b), err
 }
 
@@ -484,7 +483,7 @@ func detectPreviousTag(headRef string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	b, err := run.PrepareCmd(cmd).Output()
+	b, err := cmd.Output()
 	return strings.TrimSpace(string(b)), err
 }
 
@@ -498,7 +497,7 @@ func changelogForRange(refRange string) ([]logEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	b, err := run.PrepareCmd(cmd).Output()
+	b, err := cmd.Output()
 	if err != nil {
 		return nil, err
 	}

@@ -492,18 +492,18 @@ func Test_createRun(t *testing.T) {
 			return config.NewBlankConfig(), nil
 		}
 
-		cs, restoreRun := run.Stub()
-		defer restoreRun(t)
-		if tt.execStubs != nil {
-			tt.execStubs(cs)
-		}
-
 		ios, _, stdout, stderr := iostreams.Test()
 		ios.SetStdinTTY(tt.tty)
 		ios.SetStdoutTTY(tt.tty)
 		tt.opts.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
+			cs, restoreRun := run.Stub()
+			defer restoreRun(t)
+			if tt.execStubs != nil {
+				tt.execStubs(cs)
+			}
+
 			defer reg.Verify(t)
 			err := createRun(tt.opts)
 			if tt.wantErr {
