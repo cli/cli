@@ -253,7 +253,7 @@ func TestClientCurrentBranch_detached_head(t *testing.T) {
 	cs.Register(`git symbolic-ref --quiet HEAD`, 1, "")
 	client := Client{}
 	_, err := client.CurrentBranch(context.Background())
-	assert.EqualError(t, err, ErrNotOnAnyBranch.Error())
+	assert.EqualError(t, err, "failed to run git: not on any branch")
 }
 
 func TestParseCloneArgs(t *testing.T) {
