@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -15,6 +14,11 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
+)
+
+const (
+	notFastForwardErrorMessage     = "Update is not a fast forward"
+	branchDoesNotExistErrorMessage = "Reference does not exist"
 )
 
 type SyncOptions struct {
@@ -315,16 +319,14 @@ func executeRemoteRepoSync(client *api.Client, destRepo, srcRepo ghrepo.Interfac
 
 	// This is not a great way to detect the error returned by the API
 	// Unfortunately API returns 422 for multiple reasons
-	notFastForwardErrorMessage := regexp.MustCompile(`^Update is not a fast forward$`)
-	branchDoesNotExistErrorMessage := regexp.MustCompile(`^Reference does not exist$`)
 	err = syncFork(client, destRepo, branchName, commit.Object.SHA, opts.Force)
 	var httpErr api.HTTPError
 	if err != nil {
 		if errors.As(err, &httpErr) {
-			switch msg := httpErr.Message; {
-			case notFastForwardErrorMessage.MatchString(msg):
+			switch httpErr.Message {
+			case notFastForwardErrorMessage:
 				return "", divergingError
-			case branchDoesNotExistErrorMessage.MatchString(msg):
+			case branchDoesNotExistErrorMessage:
 				return "", fmt.Errorf("%s branch does not exist on %s repository", branchName, ghrepo.FullName(destRepo))
 			}
 		}
