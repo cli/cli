@@ -614,10 +614,6 @@ func TestManager_Install_git(t *testing.T) {
 	m := newTestManager(tempDir, &client, ios)
 
 	reg.Register(
-		httpmock.REST("GET", "owner/gh-some-ext"),
-		httpmock.StringResponse(""),
-	)
-	reg.Register(
 		httpmock.REST("GET", "repos/owner/gh-some-ext/releases/latest"),
 		httpmock.JSONResponse(
 			release{
@@ -651,11 +647,6 @@ func TestManager_Install_git_pinned(t *testing.T) {
 	m := newTestManager(tempDir, &client, ios)
 
 	reg.Register(
-		httpmock.REST("GET", "owner/gh-cool-ext"),
-		httpmock.StringResponse(""),
-	)
-
-	reg.Register(
 		httpmock.REST("GET", "repos/owner/gh-cool-ext/releases/latest"),
 		httpmock.JSONResponse(
 			release{
@@ -685,11 +676,6 @@ func TestManager_Install_binary_pinned(t *testing.T) {
 
 	reg := httpmock.Registry{}
 	defer reg.Verify(t)
-
-	reg.Register(
-		httpmock.REST("GET", "api/v3/owner/gh-bin-ext"),
-		httpmock.StringResponse(""),
-	)
 
 	reg.Register(
 		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
@@ -759,11 +745,6 @@ func TestManager_Install_binary_unsupported(t *testing.T) {
 	client := http.Client{Transport: &reg}
 
 	reg.Register(
-		httpmock.REST("GET", "api/v3/owner/gh-bin-ext"),
-		httpmock.StringResponse(""),
-	)
-
-	reg.Register(
 		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
 		httpmock.JSONResponse(
 			release{
@@ -804,11 +785,6 @@ func TestManager_Install_binary(t *testing.T) {
 
 	reg := httpmock.Registry{}
 	defer reg.Verify(t)
-
-	reg.Register(
-		httpmock.REST("GET", "api/v3/owner/gh-bin-ext"),
-		httpmock.StringResponse(""),
-	)
 
 	reg.Register(
 		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
@@ -863,6 +839,32 @@ func TestManager_Install_binary(t *testing.T) {
 	fakeBin, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext.exe"))
 	assert.NoError(t, err)
 	assert.Equal(t, "FAKE BINARY", string(fakeBin))
+
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
+func TestManager_repo_not_found(t *testing.T) {
+	repo := ghrepo.NewWithHost("owner", "gh-bin-ext", "example.com")
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.StatusStringResponse(404, `{}`))
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext"),
+		httpmock.StatusStringResponse(404, `{}`))
+
+	ios, _, stdout, stderr := iostreams.Test()
+	tempDir := t.TempDir()
+
+	m := newTestManager(tempDir, &http.Client{Transport: &reg}, ios)
+
+	if err := m.Install(repo, ""); err != repositoryNotFoundErr {
+		t.Errorf("expected repositoryNotFoundErr, got: %v", err)
+	}
 
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())

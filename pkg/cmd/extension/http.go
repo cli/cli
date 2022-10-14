@@ -14,7 +14,7 @@ import (
 )
 
 func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
-	url := fmt.Sprintf("%s%s/%s", ghinstance.RESTPrefix(repo.RepoHost()), repo.RepoOwner(), repo.RepoName())
+	url := fmt.Sprintf("%srepos/%s/%s", ghinstance.RESTPrefix(repo.RepoHost()), repo.RepoOwner(), repo.RepoName())
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return false, err
@@ -26,11 +26,16 @@ func repoExists(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == 404 {
+	switch resp.StatusCode {
+	case 200:
+		return true, nil
+	case 404:
 		return false, nil
+	default:
+		return false, api.HandleHTTPError(resp)
 	}
-	return true, nil
 }
+
 func hasScript(httpClient *http.Client, repo ghrepo.Interface) (bool, error) {
 	path := fmt.Sprintf("repos/%s/%s/contents/%s",
 		repo.RepoOwner(), repo.RepoName(), repo.RepoName())
@@ -116,6 +121,9 @@ func fetchLatestRelease(httpClient *http.Client, baseRepo ghrepo.Interface) (*re
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == 404 {
+		return nil, releaseNotFoundErr
+	}
 	if resp.StatusCode > 299 {
 		return nil, api.HandleHTTPError(resp)
 	}
@@ -180,7 +188,7 @@ func fetchCommitSHA(httpClient *http.Client, baseRepo ghrepo.Interface, targetRe
 		return "", err
 	}
 
-	req.Header.Set("Accept", "application/vnd.github.VERSION.sha")
+	req.Header.Set("Accept", "application/vnd.github.v3.sha")
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", err
