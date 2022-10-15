@@ -147,8 +147,3 @@ func UpdateRemoteURL(name, url string) error {
 	c := &Client{}
 	return c.UpdateRemoteURL(context.Background(), name, url)
 }
-
-func SetRemoteResolution(name, resolution string) error {
-	c := &Client{}
-	return c.SetRemoteResolution(context.Background(), name, resolution)
-}
