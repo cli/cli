@@ -9,7 +9,9 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -92,6 +94,16 @@ func Test_NewCmdDiff(t *testing.T) {
 			isTTY:   true,
 			wantErr: "invalid argument \"doublerainbow\" for \"--color\" flag: valid values are {always|never|auto}",
 		},
+		{
+			name:  "web mode",
+			args:  "123 --web",
+			isTTY: true,
+			want: DiffOptions{
+				SelectorArg: "123",
+				UseColor:    true,
+				BrowserMode: true,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -130,6 +142,7 @@ func Test_NewCmdDiff(t *testing.T) {
 
 			assert.Equal(t, tt.want.SelectorArg, opts.SelectorArg)
 			assert.Equal(t, tt.want.UseColor, opts.UseColor)
+			assert.Equal(t, tt.want.BrowserMode, opts.BrowserMode)
 		})
 	}
 }
@@ -348,4 +361,42 @@ func Test_changedFileNames(t *testing.T) {
 			t.Errorf("expected: %q, got: %q", tt.output, got)
 		}
 	}
+}
+
+func TestPRDiff_web(t *testing.T) {
+	httpReg := &httpmock.Registry{}
+	defer httpReg.Verify(t)
+
+	shared.RunCommandFinder("123", &api.PullRequest{URL: "https://github.com/OWNER/REPO/pull/123"}, ghrepo.New("OWNER", "REPO"))
+
+	_, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdinTTY(true)
+	ios.SetStderrTTY(true)
+	ios.SetStdoutTTY(true)
+
+	browser := &browser.Stub{}
+	factory := &cmdutil.Factory{
+		IOStreams: ios,
+		Browser:   browser,
+	}
+
+	cmd := NewCmdDiff(factory, nil)
+
+	cmd.SetArgs([]string{"123", "--web"})
+
+	cmd.SetIn(&bytes.Buffer{})
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+
+	_, err := cmd.ExecuteC()
+	if err != nil {
+		t.Fatalf("error running command `pr diff`: %v", err)
+	}
+
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "Opening github.com/OWNER/REPO/pull/123/files in your browser.\n", stderr.String())
+	assert.Equal(t, "https://github.com/OWNER/REPO/pull/123/files", browser.BrowsedURL())
 }
