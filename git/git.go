@@ -142,8 +142,3 @@ func AddNamedRemote(url, name, repoDir string, branches []string) error {
 	_, err := c.AddRemote(context.Background(), name, url, branches)
 	return err
 }
-
-func UpdateRemoteURL(name, url string) error {
-	c := &Client{}
-	return c.UpdateRemoteURL(context.Background(), name, url)
-}
