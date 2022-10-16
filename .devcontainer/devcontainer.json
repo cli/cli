@@ -1,0 +1,57 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
+// https://github.com/microsoft/vscode-dev-containers/tree/v0.245.2/containers/java-postgres
+{
+	"name": "Java & PostgreSQL",
+	"dockerComposeFile": "docker-compose.yml",
+	"service": "app",
+	"workspaceFolder": "/workspace",
+
+	// Configure tool-specific properties.
+	"customizations": {
+		// Configure properties specific to VS Code.
+		"vscode": {
+			// Set *default* container specific settings.json values on container create.
+			"settings": { 
+			},
+			
+			// Add the IDs of extensions you want installed when the container is created.
+			"extensions": [
+				"vscjava.vscode-java-pack",
+				"cerebus.atasm-altirra-bridge",
+				"platformio.platformio-ide",
+				"utsavm9.c-cpp-flag-debugging"
+			]
+		}
+	},
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// This can be used to network with other containers or with the host.
+	// "forwardPorts": [5432],
+
+	// Use 'postCreateCommand' to run commands after the container is created.
+	// "postCreateCommand": "java -version",
+
+	// Comment out to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
+	"remoteUser": "vscode",
+	"features": {
+		"docker-in-docker": "latest",
+		"docker-from-docker": "latest",
+		"kubectl-helm-minikube": "latest",
+		"terraform": "latest",
+		"git": "os-provided",
+		"git-lfs": "latest",
+		"github-cli": "latest",
+		"aws-cli": "latest",
+		"azure-cli": "latest",
+		"sshd": "latest",
+		"desktop-lite": "latest",
+		"homebrew": "latest",
+		"fish": "latest",
+		"python": "os-provided",
+		"golang": "latest",
+		"ruby": "latest",
+		"rust": "latest",
+		"powershell": "latest",
+		"dotnet": "latest"
+	}
+}

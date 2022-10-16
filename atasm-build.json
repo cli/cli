@@ -1,0 +1,21 @@
+{
+	"comment": "Altirra configuration file.",
+
+	"_1": "Which asm file is to be compiled?",
+	"input": "theapp.asm",
+
+	"_2": "Array of folders that will be searched when files are .include(d)",
+	"includes": [],
+
+	"_3": "Which folder will all the output files be written to. 'out' by default. Always in the workspace!",
+	"outputFolder": "out",
+
+	"_4": "Additional atasm parameters:-v -s -u -r -fvalue",
+	"params": "",
+
+	"_5": "List of symbols to be set via the parameter list",
+	"symbols": [],
+
+	"_6": "If debug is enabled then symbol table and listings are generated for Altirra debugging",
+	"withDebug": true
+}
