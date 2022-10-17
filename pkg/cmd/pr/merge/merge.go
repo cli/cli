@@ -1,6 +1,7 @@
 package merge
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -8,7 +9,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/context"
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -26,9 +27,10 @@ type editor interface {
 
 type MergeOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitClient  *git.Client
 	IO         *iostreams.IOStreams
 	Branch     func() (string, error)
-	Remotes    func() (context.Remotes, error)
+	Remotes    func() (ghContext.Remotes, error)
 
 	Finder shared.PRFinder
 
@@ -60,6 +62,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	opts := &MergeOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Branch:     f.Branch,
 		Remotes:    f.Remotes,
 	}
@@ -188,6 +191,7 @@ type mergeContext struct {
 	pr                 *api.PullRequest
 	baseRepo           ghrepo.Interface
 	httpClient         *http.Client
+	gitClient          *git.Client
 	opts               *MergeOptions
 	cs                 *iostreams.ColorScheme
 	isTerminal         bool
@@ -224,7 +228,7 @@ func (m *mergeContext) warnIfDiverged() {
 		return
 	}
 
-	localBranchLastCommit, err := git.LastCommit()
+	localBranchLastCommit, err := m.opts.GitClient.LastCommit(context.Background())
 	if err != nil {
 		return
 	}
@@ -730,7 +734,7 @@ func allowsAdminOverride(status string) bool {
 	}
 }
 
-func remoteForMergeConflictResolution(baseRepo ghrepo.Interface, pr *api.PullRequest, opts *MergeOptions) *context.Remote {
+func remoteForMergeConflictResolution(baseRepo ghrepo.Interface, pr *api.PullRequest, opts *MergeOptions) *ghContext.Remote {
 	if !mergeConflictStatus(pr.MergeStateStatus) || !opts.CanDeleteLocalBranch {
 		return nil
 	}

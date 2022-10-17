@@ -15,11 +15,6 @@ func Config(name string) (string, error) {
 	return c.Config(context.Background(), name)
 }
 
-func LastCommit() (*Commit, error) {
-	c := &Client{}
-	return c.LastCommit(context.Background())
-}
-
 func ReadBranchConfig(branch string) (cfg BranchConfig) {
 	c := &Client{}
 	return c.ReadBranchConfig(context.Background(), branch)
