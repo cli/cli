@@ -31,11 +31,11 @@ func New(appVersion string) *cmdutil.Factory {
 
 	f.IOStreams = ioStreams(f)                   // Depends on Config
 	f.HttpClient = httpClientFunc(f, appVersion) // Depends on Config, IOStreams, and appVersion
-	f.Remotes = remotesFunc(f)                   // Depends on Config
+	f.GitClient = newGitClient(f)                // Depends on IOStreams, and Executable
+	f.Remotes = remotesFunc(f)                   // Depends on Config, and GitClient
 	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
 	f.Prompter = newPrompter(f)                  // Depends on Config and IOStreams
 	f.Browser = newBrowser(f)                    // Depends on Config, and IOStreams
-	f.GitClient = newGitClient(f)                // Depends on IOStreams, and Executable
 	f.ExtensionManager = extensionManager(f)     // Depends on Config, HttpClient, and IOStreams
 	f.Branch = branchFunc(f)                     // Depends on GitClient
 
@@ -80,8 +80,10 @@ func SmartBaseRepoFunc(f *cmdutil.Factory) func() (ghrepo.Interface, error) {
 
 func remotesFunc(f *cmdutil.Factory) func() (ghContext.Remotes, error) {
 	rr := &remoteResolver{
-		readRemotes: git.Remotes,
-		getConfig:   f.Config,
+		readRemotes: func() (git.RemoteSet, error) {
+			return f.GitClient.Remotes(context.Background())
+		},
+		getConfig: f.Config,
 	}
 	return rr.Resolver()
 }

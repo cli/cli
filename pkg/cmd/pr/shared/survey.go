@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -372,7 +373,8 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 
 func FindTemplates(dir, path string) ([]string, string) {
 	if dir == "" {
-		rootDir, err := git.ToplevelDir()
+		gitClient := &git.Client{}
+		rootDir, err := gitClient.ToplevelDir(context.Background())
 		if err != nil {
 			return []string{}, ""
 		}

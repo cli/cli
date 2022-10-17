@@ -506,7 +506,7 @@ func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 		deleteBranch:       opts.DeleteBranch,
 		crossRepoPR:        pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner(),
 		autoMerge:          opts.AutoMergeEnable && !isImmediatelyMergeable(pr.MergeStateStatus),
-		localBranchExists:  opts.CanDeleteLocalBranch && opts.GitClient.HasLocalBranch(pr.HeadRefName),
+		localBranchExists:  opts.CanDeleteLocalBranch && opts.GitClient.HasLocalBranch(context.Background(), pr.HeadRefName),
 		mergeQueueRequired: pr.IsMergeQueueEnabled,
 	}, nil
 }
