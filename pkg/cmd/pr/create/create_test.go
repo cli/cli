@@ -15,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -188,6 +189,7 @@ func Test_createRun(t *testing.T) {
 		setup          func(*CreateOptions, *testing.T) func()
 		cmdStubs       func(*run.CommandStubber)
 		askStubs       func(*prompt.AskStubber) // TODO eventually migrate to PrompterMock
+		promptStubs    func(*prompter.PrompterMock)
 		httpStubs      func(*httpmock.Registry, *testing.T)
 		expectedOut    string
 		expectedErrOut string
@@ -268,8 +270,14 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Where should we push the 'feature' branch?").AnswerDefault()
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+					if p == "Where should we push the 'feature' branch?" {
+						return 0, nil
+					} else {
+						return -1, prompter.NoSuchPromptErr(p)
+					}
+				}
 			},
 			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
 			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
@@ -309,8 +317,14 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Where should we push the 'feature' branch?").AnswerDefault()
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+					if p == "Where should we push the 'feature' branch?" {
+						return 0, nil
+					} else {
+						return -1, prompter.NoSuchPromptErr(p)
+					}
+				}
 			},
 			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
 			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
@@ -354,10 +368,14 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git remote add -f fork https://github.com/monalisa/REPO.git`, 0, "")
 				cs.Register(`git push --set-upstream fork HEAD:feature`, 0, "")
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Where should we push the 'feature' branch?").
-					AssertOptions([]string{"OWNER/REPO", "Create a fork of OWNER/REPO", "Skip pushing the branch", "Cancel"}).
-					AnswerWith("Create a fork of OWNER/REPO")
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+					if p == "Where should we push the 'feature' branch?" {
+						return prompter.IndexFor(opts, "Create a fork of OWNER/REPO")
+					} else {
+						return -1, prompter.NoSuchPromptErr(p)
+					}
+				}
 			},
 			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
 			expectedErrOut: "\nCreating pull request for monalisa:feature into master in OWNER/REPO\n\n",
@@ -486,10 +504,22 @@ func Test_createRun(t *testing.T) {
 				as.StubPrompt("Choose a template").
 					AssertOptions([]string{"template1", "template2", "Open a blank pull request"}).
 					AnswerWith("template1")
-				as.StubPrompt("Body").AnswerDefault()
-				as.StubPrompt("What's next?").
-					AssertOptions([]string{"Submit", "Submit as draft", "Continue in browser", "Add metadata", "Cancel"}).
-					AnswerDefault()
+			},
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.MarkdownEditorFunc = func(p, d string, ba bool) (string, error) {
+					if p == "Body" {
+						return d, nil
+					} else {
+						return "", prompter.NoSuchPromptErr(p)
+					}
+				}
+				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+					if p == "What's next?" {
+						return 0, nil
+					} else {
+						return -1, prompter.NoSuchPromptErr(p)
+					}
+				}
 			},
 			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
 			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
@@ -636,10 +666,14 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Where should we push the 'feature' branch?").
-					AssertOptions([]string{"OWNER/REPO", "Skip pushing the branch", "Cancel"}).
-					AnswerDefault()
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+					if p == "Where should we push the 'feature' branch?" {
+						return 0, nil
+					} else {
+						return -1, prompter.NoSuchPromptErr(p)
+					}
+				}
 			},
 			expectedErrOut: "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n",
 			expectedBrowse: "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1",
@@ -685,8 +719,14 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
 
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Where should we push the 'feature' branch?").AnswerDefault()
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+					if p == "Where should we push the 'feature' branch?" {
+						return 0, nil
+					} else {
+						return -1, prompter.NoSuchPromptErr(p)
+					}
+				}
 			},
 			expectedErrOut: "Opening github.com/OWNER/REPO/compare/master...feature in your browser.\n",
 			expectedBrowse: "https://github.com/OWNER/REPO/compare/master...feature?body=&expand=1&projects=ORG%2F1",
@@ -727,10 +767,22 @@ func Test_createRun(t *testing.T) {
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubPrompt("Choose a template").AnswerDefault()
-				as.StubPrompt("Body").AnswerDefault()
-				as.StubPrompt("What's next?").
-					AssertOptions([]string{"Submit", "Submit as draft", "Continue in browser", "Add metadata", "Cancel"}).
-					AnswerWith("Submit as draft")
+			},
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.MarkdownEditorFunc = func(p, d string, ba bool) (string, error) {
+					if p == "Body" {
+						return d, nil
+					} else {
+						return "", prompter.NoSuchPromptErr(p)
+					}
+				}
+				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+					if p == "What's next?" {
+						return prompter.IndexFor(opts, "Submit as draft")
+					} else {
+						return -1, prompter.NoSuchPromptErr(p)
+					}
+				}
 			},
 			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
 			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
@@ -771,10 +823,28 @@ func Test_createRun(t *testing.T) {
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Title").AnswerDefault()
-				as.StubPrompt("Body").AnswerDefault()
-				as.StubPrompt("What's next?").AnswerDefault()
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.InputFunc = func(p, d string) (string, error) {
+					if p == "Title" {
+						return d, nil
+					} else {
+						return "", prompter.NoSuchPromptErr(p)
+					}
+				}
+				pm.MarkdownEditorFunc = func(p, d string, ba bool) (string, error) {
+					if p == "Body" {
+						return d, nil
+					} else {
+						return "", prompter.NoSuchPromptErr(p)
+					}
+				}
+				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+					if p == "What's next?" {
+						return 0, nil
+					} else {
+						return -1, prompter.NoSuchPromptErr(p)
+					}
+				}
 			},
 			setup: func(opts *CreateOptions, t *testing.T) func() {
 				tmpfile, err := os.CreateTemp(t.TempDir(), "testrecover*")
@@ -830,6 +900,12 @@ func Test_createRun(t *testing.T) {
 				tt.askStubs(ask)
 			}
 
+			pm := &prompter.PrompterMock{}
+
+			if tt.promptStubs != nil {
+				tt.promptStubs(pm)
+			}
+
 			cs, cmdTeardown := run.Stub()
 			defer cmdTeardown(t)
 			cs.Register(`git status --porcelain`, 0, "")
@@ -839,6 +915,7 @@ func Test_createRun(t *testing.T) {
 			}
 
 			opts := CreateOptions{}
+			opts.Prompter = pm
 
 			ios, _, stdout, stderr := iostreams.Test()
 			// TODO do i need to bother with this
@@ -1064,3 +1141,5 @@ func Test_generateCompareURL(t *testing.T) {
 		})
 	}
 }
+
+// TODO interactive metadata tests once: 1) we have test utils for Prompter and 2) metadata questions use Prompter

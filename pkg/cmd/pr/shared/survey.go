@@ -9,7 +9,6 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
-	"github.com/cli/cli/v2/pkg/surveyext"
 )
 
 type Action int
@@ -32,15 +31,21 @@ const (
 	cancelLabel      = "Cancel"
 )
 
-func ConfirmIssueSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
-	return confirmSubmission(allowPreview, allowMetadata, false, false)
+type Prompt interface {
+	Input(string, string) (string, error)
+	Select(string, string, []string) (int, error)
+	MarkdownEditor(string, string, bool) (string, error)
 }
 
-func ConfirmPRSubmission(allowPreview, allowMetadata, isDraft bool) (Action, error) {
-	return confirmSubmission(allowPreview, allowMetadata, true, isDraft)
+func ConfirmIssueSubmission(p Prompt, allowPreview bool, allowMetadata bool) (Action, error) {
+	return confirmSubmission(p, allowPreview, allowMetadata, false, false)
 }
 
-func confirmSubmission(allowPreview, allowMetadata, allowDraft, isDraft bool) (Action, error) {
+func ConfirmPRSubmission(p Prompt, allowPreview, allowMetadata, isDraft bool) (Action, error) {
+	return confirmSubmission(p, allowPreview, allowMetadata, true, isDraft)
+}
+
+func confirmSubmission(p Prompt, allowPreview, allowMetadata, allowDraft, isDraft bool) (Action, error) {
 	var options []string
 	if !isDraft {
 		options = append(options, submitLabel)
@@ -56,26 +61,12 @@ func confirmSubmission(allowPreview, allowMetadata, allowDraft, isDraft bool) (A
 	}
 	options = append(options, cancelLabel)
 
-	confirmAnswers := struct {
-		Confirmation int
-	}{}
-	confirmQs := []*survey.Question{
-		{
-			Name: "confirmation",
-			Prompt: &survey.Select{
-				Message: "What's next?",
-				Options: options,
-			},
-		},
-	}
-
-	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
-	err := prompt.SurveyAsk(confirmQs, &confirmAnswers)
+	result, err := p.Select("What's next?", "", options)
 	if err != nil {
 		return -1, fmt.Errorf("could not prompt: %w", err)
 	}
 
-	switch options[confirmAnswers.Confirmation] {
+	switch options[result] {
 	case submitLabel:
 		return SubmitAction, nil
 	case submitDraftLabel:
@@ -87,11 +78,11 @@ func confirmSubmission(allowPreview, allowMetadata, allowDraft, isDraft bool) (A
 	case cancelLabel:
 		return CancelAction, nil
 	default:
-		return -1, fmt.Errorf("invalid index: %d", confirmAnswers.Confirmation)
+		return -1, fmt.Errorf("invalid index: %d", result)
 	}
 }
 
-func BodySurvey(state *IssueMetadataState, templateContent, editorCommand string) error {
+func BodySurvey(p Prompt, state *IssueMetadataState, templateContent string) error {
 	if templateContent != "" {
 		if state.Body != "" {
 			// prevent excessive newlines between default body and template
@@ -101,62 +92,31 @@ func BodySurvey(state *IssueMetadataState, templateContent, editorCommand string
 		state.Body += templateContent
 	}
 
-	preBody := state.Body
-
-	// TODO should just be an AskOne but ran into problems with the stubber
-	qs := []*survey.Question{
-		{
-			Name: "Body",
-			Prompt: &surveyext.GhEditor{
-				BlankAllowed:  true,
-				EditorCommand: editorCommand,
-				Editor: &survey.Editor{
-					Message:       "Body",
-					FileName:      "*.md",
-					Default:       state.Body,
-					HideDefault:   true,
-					AppendDefault: true,
-				},
-			},
-		},
-	}
-
-	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
-	err := prompt.SurveyAsk(qs, state)
+	result, err := p.MarkdownEditor("Body", state.Body, true)
 	if err != nil {
 		return err
 	}
 
-	if preBody != state.Body {
+	if state.Body != result {
 		state.MarkDirty()
 	}
+
+	state.Body = result
 
 	return nil
 }
 
-func TitleSurvey(state *IssueMetadataState) error {
-	preTitle := state.Title
-
-	// TODO should just be an AskOne but ran into problems with the stubber
-	qs := []*survey.Question{
-		{
-			Name: "Title",
-			Prompt: &survey.Input{
-				Message: "Title",
-				Default: state.Title,
-			},
-		},
-	}
-
-	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
-	err := prompt.SurveyAsk(qs, state)
+func TitleSurvey(p Prompt, state *IssueMetadataState) error {
+	result, err := p.Input("Title", state.Title)
 	if err != nil {
 		return err
 	}
 
-	if preTitle != state.Title {
+	if result != state.Title {
 		state.MarkDirty()
 	}
+
+	state.Title = result
 
 	return nil
 }
