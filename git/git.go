@@ -2,18 +2,12 @@ package git
 
 import (
 	"context"
-	"io"
 	"os"
 )
 
 func GitCommand(args ...string) (*gitCommand, error) {
 	c := &Client{}
 	return c.Command(context.Background(), args...)
-}
-
-func ShowRefs(ref ...string) ([]Ref, error) {
-	c := &Client{}
-	return c.ShowRefs(context.Background(), ref...)
 }
 
 func CurrentBranch() (string, error) {
@@ -26,34 +20,9 @@ func Config(name string) (string, error) {
 	return c.Config(context.Background(), name)
 }
 
-func UncommittedChangeCount() (int, error) {
-	c := &Client{}
-	return c.UncommittedChangeCount(context.Background())
-}
-
-func Commits(baseRef, headRef string) ([]*Commit, error) {
-	c := &Client{}
-	return c.Commits(context.Background(), baseRef, headRef)
-}
-
 func LastCommit() (*Commit, error) {
 	c := &Client{}
 	return c.LastCommit(context.Background())
-}
-
-func CommitBody(sha string) (string, error) {
-	c := &Client{}
-	return c.CommitBody(context.Background(), sha)
-}
-
-func Push(remote string, ref string, cmdIn io.ReadCloser, cmdOut, cmdErr io.Writer) error {
-	//TODO: Replace with factory GitClient and use AuthenticatedCommand
-	c := &Client{
-		Stdin:  cmdIn,
-		Stdout: cmdOut,
-		Stderr: cmdErr,
-	}
-	return c.Push(context.Background(), remote, ref)
 }
 
 func ReadBranchConfig(branch string) (cfg BranchConfig) {

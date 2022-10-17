@@ -19,6 +19,7 @@ import (
 
 type CheckoutOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitClient  *git.Client
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	Remotes    func() (cliContext.Remotes, error)
@@ -37,6 +38,7 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 	opts := &CheckoutOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Config:     f.Config,
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
@@ -128,7 +130,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 		cmdQueue = append(cmdQueue, []string{"git", "submodule", "update", "--init", "--recursive"})
 	}
 
-	err = executeCmds(cmdQueue, opts.IO)
+	err = executeCmds(opts.GitClient, cmdQueue)
 	if err != nil {
 		return err
 	}
@@ -155,7 +157,7 @@ func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts 
 	switch {
 	case opts.Detach:
 		cmds = append(cmds, []string{"git", "checkout", "--detach", "FETCH_HEAD"})
-	case localBranchExists(localBranch):
+	case localBranchExists(opts.GitClient, localBranch):
 		cmds = append(cmds, []string{"git", "checkout", localBranch})
 		if opts.Force {
 			cmds = append(cmds, []string{"git", "reset", "--hard", fmt.Sprintf("refs/remotes/%s", remoteBranch)})
@@ -216,7 +218,7 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 		remote = ghrepo.FormatRemoteURL(headRepo, protocol)
 		mergeRef = fmt.Sprintf("refs/heads/%s", pr.HeadRefName)
 	}
-	if missingMergeConfigForBranch(localBranch) {
+	if missingMergeConfigForBranch(opts.GitClient, localBranch) {
 		// .remote is needed for `git pull` to work
 		// .pushRemote is needed for `git push` to work, if user has set `remote.pushDefault`.
 		// see https://git-scm.com/docs/git-config#Documentation/git-config.txt-branchltnamegtremote
@@ -228,24 +230,19 @@ func cmdsForMissingRemote(pr *api.PullRequest, baseURLOrName, repoHost, defaultB
 	return cmds
 }
 
-func missingMergeConfigForBranch(b string) bool {
-	mc, err := git.Config(fmt.Sprintf("branch.%s.merge", b))
+func missingMergeConfigForBranch(client *git.Client, b string) bool {
+	mc, err := client.Config(context.Background(), fmt.Sprintf("branch.%s.merge", b))
 	return err != nil || mc == ""
 }
 
-func localBranchExists(b string) bool {
-	_, err := git.ShowRefs("refs/heads/" + b)
+func localBranchExists(client *git.Client, b string) bool {
+	_, err := client.ShowRefs(context.Background(), "refs/heads/"+b)
 	return err == nil
 }
 
-func executeCmds(cmdQueue [][]string, ios *iostreams.IOStreams) error {
-	//TODO: Replace with factory GitClient
-	//TODO: Use AuthenticatedCommand
-	client := git.Client{
-		Stdout: ios.Out,
-		Stderr: ios.ErrOut,
-	}
+func executeCmds(client *git.Client, cmdQueue [][]string) error {
 	for _, args := range cmdQueue {
+		//TODO: Use AuthenticatedCommand
 		cmd, err := client.Command(context.Background(), args[1:]...)
 		if err != nil {
 			return err
