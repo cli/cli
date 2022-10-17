@@ -42,11 +42,13 @@ type BrowseOptions struct {
 
 func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Command {
 	opts := &BrowseOptions{
-		Browser:          f.Browser,
-		HttpClient:       f.HttpClient,
-		IO:               f.IOStreams,
-		PathFromRepoRoot: git.PathFromRepoRoot,
-		GitClient:        &localGitClient{client: f.GitClient},
+		Browser:    f.Browser,
+		HttpClient: f.HttpClient,
+		IO:         f.IOStreams,
+		PathFromRepoRoot: func() string {
+			return f.GitClient.PathFromRoot(context.Background())
+		},
+		GitClient: &localGitClient{client: f.GitClient},
 	}
 
 	cmd := &cobra.Command{

@@ -27,21 +27,11 @@ func GetDirFromPath(repoDir string) (string, error) {
 	return c.GitDir(context.Background())
 }
 
-func PathFromRepoRoot() string {
-	c := &Client{}
-	return c.PathFromRoot(context.Background())
-}
-
 func RemotesForPath(repoDir string) (RemoteSet, error) {
 	c := &Client{
 		RepoDir: repoDir,
 	}
 	return c.Remotes(context.Background())
-}
-
-func AddRemote(name, url string) (*Remote, error) {
-	c := &Client{}
-	return c.AddRemote(context.Background(), name, url, []string{})
 }
 
 func AddNamedRemote(url, name, repoDir string, branches []string) error {
