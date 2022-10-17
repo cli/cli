@@ -60,6 +60,8 @@ func (flow *GitCredentialFlow) Setup(hostname, username, authToken string) error
 }
 
 func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password string) error {
+	gitClient := &git.Client{}
+
 	if flow.helper == "" {
 		credHelperKeys := []string{
 			gitCredentialHelperKey(hostname),
@@ -77,7 +79,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 				break
 			}
 			// first use a blank value to indicate to git we want to sever the chain of credential helpers
-			preConfigureCmd, err := git.GitCommand("config", "--global", "--replace-all", credHelperKey, "")
+			preConfigureCmd, err := gitClient.Command(context.Background(), "config", "--global", "--replace-all", credHelperKey, "")
 			if err != nil {
 				configErr = err
 				break
@@ -88,7 +90,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 			}
 
 			// second configure the actual helper for this host
-			configureCmd, err := git.GitCommand(
+			configureCmd, err := gitClient.Command(context.Background(),
 				"config", "--global", "--add",
 				credHelperKey,
 				fmt.Sprintf("!%s auth git-credential", shellQuote(flow.Executable)),
@@ -104,7 +106,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 	}
 
 	// clear previous cached credentials
-	rejectCmd, err := git.GitCommand("credential", "reject")
+	rejectCmd, err := gitClient.Command(context.Background(), "credential", "reject")
 	if err != nil {
 		return err
 	}
@@ -119,7 +121,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 		return err
 	}
 
-	approveCmd, err := git.GitCommand("credential", "approve")
+	approveCmd, err := gitClient.Command(context.Background(), "credential", "approve")
 	if err != nil {
 		return err
 	}
