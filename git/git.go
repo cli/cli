@@ -10,11 +10,6 @@ func GitCommand(args ...string) (*gitCommand, error) {
 	return c.Command(context.Background(), args...)
 }
 
-func CurrentBranch() (string, error) {
-	c := &Client{}
-	return c.CurrentBranch(context.Background())
-}
-
 func Config(name string) (string, error) {
 	c := &Client{}
 	return c.Config(context.Background(), name)
