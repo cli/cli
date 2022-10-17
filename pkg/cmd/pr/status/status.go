@@ -1,6 +1,7 @@
 package status
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/context"
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -25,7 +26,7 @@ type StatusOptions struct {
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
-	Remotes    func() (context.Remotes, error)
+	Remotes    func() (ghContext.Remotes, error)
 	Branch     func() (string, error)
 
 	HasRepoOverride bool
@@ -165,9 +166,10 @@ func statusRun(opts *StatusOptions) error {
 	return nil
 }
 
-func prSelectorForCurrentBranch(baseRepo ghrepo.Interface, prHeadRef string, rem context.Remotes) (prNumber int, selector string, err error) {
+func prSelectorForCurrentBranch(baseRepo ghrepo.Interface, prHeadRef string, rem ghContext.Remotes) (prNumber int, selector string, err error) {
 	selector = prHeadRef
-	branchConfig := git.ReadBranchConfig(prHeadRef)
+	gitClient := &git.Client{}
+	branchConfig := gitClient.ReadBranchConfig(context.Background(), prHeadRef)
 
 	// the branch is configured to merge a special PR head ref
 	prHeadRE := regexp.MustCompile(`^refs/pull/(\d+)/head$`)

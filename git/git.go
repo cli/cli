@@ -10,16 +10,6 @@ func GitCommand(args ...string) (*gitCommand, error) {
 	return c.Command(context.Background(), args...)
 }
 
-func Config(name string) (string, error) {
-	c := &Client{}
-	return c.Config(context.Background(), name)
-}
-
-func ReadBranchConfig(branch string) (cfg BranchConfig) {
-	c := &Client{}
-	return c.ReadBranchConfig(context.Background(), branch)
-}
-
 func DeleteLocalBranch(branch string) error {
 	c := &Client{}
 	return c.DeleteLocalBranch(context.Background(), branch)

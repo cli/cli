@@ -2,6 +2,7 @@ package shared
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -144,11 +145,12 @@ func gitCredentialHelperKey(hostname string) string {
 }
 
 func gitCredentialHelper(hostname string) (helper string, err error) {
-	helper, err = git.Config(gitCredentialHelperKey(hostname))
+	gitClient := &git.Client{}
+	helper, err = gitClient.Config(context.Background(), gitCredentialHelperKey(hostname))
 	if helper != "" {
 		return
 	}
-	helper, err = git.Config("credential.helper")
+	helper, err = gitClient.Config(context.Background(), "credential.helper")
 	return
 }
 
