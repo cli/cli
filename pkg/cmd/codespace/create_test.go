@@ -137,6 +137,77 @@ func TestApp_Create(t *testing.T) {
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
 		},
 		{
+			name: "create codespace with devcontainer path results in selecting the correct machine type",
+			fields: fields{
+				apiClient: &apiClientMock{
+					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+						return &api.Repository{
+							ID:            1234,
+							FullName:      nwo,
+							DefaultBranch: "main",
+						}, nil
+					},
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Login: "monalisa",
+							Type:  "User",
+						}, nil
+					},
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
+						if devcontainerPath == "" {
+							return []*api.Machine{
+								{
+									Name:        "GIGA",
+									DisplayName: "Gigabits of a machine",
+								},
+							}, nil
+						} else {
+							return []*api.Machine{
+								{
+									Name:        "MEGA",
+									DisplayName: "Megabits of a machine",
+								},
+								{
+									Name:        "GIGA",
+									DisplayName: "Gigabits of a machine",
+								},
+							}, nil
+						}
+					},
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						if params.Branch != "main" {
+							return nil, fmt.Errorf("got branch %q, want %q", params.Branch, "main")
+						}
+						if params.IdleTimeoutMinutes != 30 {
+							return nil, fmt.Errorf("idle timeout minutes was %v", params.IdleTimeoutMinutes)
+						}
+						if params.RetentionPeriodMinutes != nil {
+							return nil, fmt.Errorf("retention period minutes expected nil, was %v", params.RetentionPeriodMinutes)
+						}
+						if params.DevContainerPath != ".devcontainer/foobar/devcontainer.json" {
+							return nil, fmt.Errorf("got dev container path %q, want %q", params.DevContainerPath, ".devcontainer/foobar/devcontainer.json")
+						}
+						return &api.Codespace{
+							Name: "monalisa-dotfiles-abcd1234",
+							Machine: api.CodespaceMachine{
+								Name:        "MEGA",
+								DisplayName: "Megabits of a machine",
+							},
+						}, nil
+					},
+				},
+			},
+			opts: createOptions{
+				repo:             "monalisa/dotfiles",
+				branch:           "",
+				machine:          "MEGA",
+				showStatus:       false,
+				idleTimeout:      30 * time.Minute,
+				devContainerPath: ".devcontainer/foobar/devcontainer.json",
+			},
+			wantStdout: "monalisa-dotfiles-abcd1234\n",
+		},
+		{
 			name: "create codespace with default branch with default devcontainer if no path provided and no devcontainer files exist in the repo",
 			fields: fields{
 				apiClient: &apiClientMock{
