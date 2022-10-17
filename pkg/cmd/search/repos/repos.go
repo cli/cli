@@ -158,6 +158,7 @@ func displayResults(io *iostreams.IOStreams, now time.Time, results search.Repos
 		now = time.Now()
 	}
 	cs := io.ColorScheme()
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(io)
 	for _, repo := range results.Items {
 		tags := []string{visibilityLabel(repo)}

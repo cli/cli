@@ -50,6 +50,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return cmdutil.NewNoResultsError("no installed extensions found")
 				}
 				cs := io.ColorScheme()
+				//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 				t := utils.NewTablePrinter(io)
 				for _, c := range cmds {
 					var repo string
