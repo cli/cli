@@ -10,36 +10,6 @@ func GitCommand(args ...string) (*gitCommand, error) {
 	return c.Command(context.Background(), args...)
 }
 
-func DeleteLocalBranch(branch string) error {
-	c := &Client{}
-	return c.DeleteLocalBranch(context.Background(), branch)
-}
-
-func HasLocalBranch(branch string) bool {
-	c := &Client{}
-	return c.HasLocalBranch(context.Background(), branch)
-}
-
-func CheckoutBranch(branch string) error {
-	c := &Client{}
-	return c.CheckoutBranch(context.Background(), branch)
-}
-
-func CheckoutNewBranch(remoteName, branch string) error {
-	c := &Client{}
-	return c.CheckoutNewBranch(context.Background(), remoteName, branch)
-}
-
-func Pull(remote, branch string) error {
-	//TODO: Replace with factory GitClient and use AuthenticatedCommand
-	c := &Client{
-		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-	}
-	return c.Pull(context.Background(), remote, branch)
-}
-
 func RunClone(cloneURL string, args []string) (target string, err error) {
 	//TODO: Replace with factory GitClient and use AuthenticatedCommand
 	c := &Client{

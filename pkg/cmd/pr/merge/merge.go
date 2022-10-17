@@ -191,7 +191,6 @@ type mergeContext struct {
 	pr                 *api.PullRequest
 	baseRepo           ghrepo.Interface
 	httpClient         *http.Client
-	gitClient          *git.Client
 	opts               *MergeOptions
 	cs                 *iostreams.ColorScheme
 	isTerminal         bool
@@ -413,24 +412,24 @@ func (m *mergeContext) deleteLocalBranch() error {
 		}
 
 		targetBranch := m.pr.BaseRefName
-		if git.HasLocalBranch(targetBranch) {
-			if err := git.CheckoutBranch(targetBranch); err != nil {
+		if m.opts.GitClient.HasLocalBranch(context.Background(), targetBranch) {
+			if err := m.opts.GitClient.CheckoutBranch(context.Background(), targetBranch); err != nil {
 				return err
 			}
 		} else {
-			if err := git.CheckoutNewBranch(baseRemote.Name, targetBranch); err != nil {
+			if err := m.opts.GitClient.CheckoutNewBranch(context.Background(), baseRemote.Name, targetBranch); err != nil {
 				return err
 			}
 		}
 
-		if err := git.Pull(baseRemote.Name, targetBranch); err != nil {
+		if err := m.opts.GitClient.Pull(context.Background(), baseRemote.Name, targetBranch); err != nil {
 			_ = m.warnf(fmt.Sprintf("%s warning: not possible to fast-forward to: %q\n", m.cs.WarningIcon(), targetBranch))
 		}
 
 		m.switchedToBranch = targetBranch
 	}
 
-	if err := git.DeleteLocalBranch(m.pr.HeadRefName); err != nil {
+	if err := m.opts.GitClient.DeleteLocalBranch(context.Background(), m.pr.HeadRefName); err != nil {
 		return fmt.Errorf("failed to delete local branch %s: %w", m.cs.Cyan(m.pr.HeadRefName), err)
 	}
 
@@ -507,7 +506,7 @@ func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 		deleteBranch:       opts.DeleteBranch,
 		crossRepoPR:        pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner(),
 		autoMerge:          opts.AutoMergeEnable && !isImmediatelyMergeable(pr.MergeStateStatus),
-		localBranchExists:  opts.CanDeleteLocalBranch && git.HasLocalBranch(pr.HeadRefName),
+		localBranchExists:  opts.CanDeleteLocalBranch && opts.GitClient.HasLocalBranch(pr.HeadRefName),
 		mergeQueueRequired: pr.IsMergeQueueEnabled,
 	}, nil
 }

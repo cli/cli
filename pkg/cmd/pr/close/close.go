@@ -1,6 +1,7 @@
 package close
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -15,6 +16,7 @@ import (
 
 type CloseOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitClient  *git.Client
 	IO         *iostreams.IOStreams
 	Branch     func() (string, error)
 
@@ -30,6 +32,7 @@ func NewCmdClose(f *cmdutil.Factory, runF func(*CloseOptions) error) *cobra.Comm
 	opts := &CloseOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Branch:     f.Branch,
 	}
 
@@ -110,7 +113,7 @@ func closeRun(opts *CloseOptions) error {
 	if opts.DeleteBranch {
 		branchSwitchString := ""
 		apiClient := api.NewClientFromHTTP(httpClient)
-		localBranchExists := git.HasLocalBranch(pr.HeadRefName)
+		localBranchExists := opts.GitClient.HasLocalBranch(context.Background(), pr.HeadRefName)
 
 		if opts.DeleteLocalBranch {
 			if localBranchExists {
@@ -125,13 +128,13 @@ func closeRun(opts *CloseOptions) error {
 					if err != nil {
 						return err
 					}
-					err = git.CheckoutBranch(branchToSwitchTo)
+					err = opts.GitClient.CheckoutBranch(context.Background(), branchToSwitchTo)
 					if err != nil {
 						return err
 					}
 				}
 
-				if err := git.DeleteLocalBranch(pr.HeadRefName); err != nil {
+				if err := opts.GitClient.DeleteLocalBranch(context.Background(), pr.HeadRefName); err != nil {
 					return fmt.Errorf("failed to delete local branch %s: %w", cs.Cyan(pr.HeadRefName), err)
 				}
 
