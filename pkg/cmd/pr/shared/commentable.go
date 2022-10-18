@@ -44,8 +44,9 @@ type CommentableOptions struct {
 	Interactive           bool
 	InputType             InputType
 	Body                  string
-	Upsert                bool
+	EditLast              bool
 	Quiet                 bool
+	Host                  string
 }
 
 func CommentablePreRun(cmd *cobra.Command, opts *CommentableOptions) error {
@@ -84,37 +85,88 @@ func CommentableRun(opts *CommentableOptions) error {
 	if err != nil {
 		return err
 	}
-
-	var lastComment *api.Comment
-	if opts.Upsert {
-		username, err := opts.RetrieveCurrentUser()
-		if err != nil {
-			return err
-		}
-		comments := commentable.CommentsForUser(username)
-		if len(comments) > 0 {
-			lastComment = &comments[len(comments)-1]
-		}
+	opts.Host = repo.RepoHost()
+	if opts.EditLast {
+		return updateComment(commentable, opts)
 	}
+	return createComment(commentable, opts)
+}
 
+func createComment(commentable Commentable, opts *CommentableOptions) error {
 	switch opts.InputType {
 	case InputTypeWeb:
-		openURL := ""
-		if lastComment == nil {
-			openURL = commentable.Link() + "#issuecomment-new"
-		} else {
-			openURL = lastComment.Link()
-		}
+		openURL := commentable.Link() + "#issuecomment-new"
 		if opts.IO.IsStdoutTTY() && !opts.Quiet {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 		}
 		return opts.OpenInBrowser(openURL)
 	case InputTypeEditor:
 		var body string
-		initialValue := ""
-		if lastComment != nil {
-			initialValue = lastComment.Content()
+		var err error
+		if opts.Interactive {
+			body, err = opts.InteractiveEditSurvey("")
+		} else {
+			body, err = opts.EditSurvey("")
 		}
+		if err != nil {
+			return err
+		}
+		opts.Body = body
+	}
+
+	if opts.Interactive {
+		cont, err := opts.ConfirmSubmitSurvey()
+		if err != nil {
+			return err
+		}
+		if !cont {
+			return errors.New("Discarding...")
+		}
+	}
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+
+	apiClient := api.NewClientFromHTTP(httpClient)
+	params := api.CommentCreateInput{Body: opts.Body, SubjectId: commentable.Identifier()}
+	url, err := api.CommentCreate(apiClient, opts.Host, params)
+	if err != nil {
+		return err
+	}
+
+	if !opts.Quiet {
+		fmt.Fprintln(opts.IO.Out, url)
+	}
+
+	return nil
+}
+
+func updateComment(commentable Commentable, opts *CommentableOptions) error {
+	username, err := opts.RetrieveCurrentUser()
+	if err != nil {
+		return err
+	}
+
+	comments := commentable.CommentsForUser(username)
+	if len(comments) == 0 {
+		return fmt.Errorf("no comments created by %s found", username)
+	}
+
+	lastComment := &comments[len(comments)-1]
+
+	switch opts.InputType {
+	case InputTypeWeb:
+		openURL := lastComment.Link()
+		if opts.IO.IsStdoutTTY() && !opts.Quiet {
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
+		}
+		return opts.OpenInBrowser(openURL)
+	case InputTypeEditor:
+		var body string
+		var err error
+		initialValue := lastComment.Content()
 		if opts.Interactive {
 			body, err = opts.InteractiveEditSurvey(initialValue)
 		} else {
@@ -140,24 +192,18 @@ func CommentableRun(opts *CommentableOptions) error {
 	if err != nil {
 		return err
 	}
+
 	apiClient := api.NewClientFromHTTP(httpClient)
-	url := ""
-	if lastComment == nil {
-		params := api.CommentCreateInput{Body: opts.Body, SubjectId: commentable.Identifier()}
-		url, err = api.CommentCreate(apiClient, repo.RepoHost(), params)
-		if err != nil {
-			return err
-		}
-	} else {
-		params := api.CommentUpdateInput{Body: opts.Body, CommentId: lastComment.Identifier()}
-		url, err = api.CommentUpdate(apiClient, repo.RepoHost(), params)
-		if err != nil {
-			return err
-		}
+	params := api.CommentUpdateInput{Body: opts.Body, CommentId: lastComment.Identifier()}
+	url, err := api.CommentUpdate(apiClient, opts.Host, params)
+	if err != nil {
+		return err
 	}
+
 	if !opts.Quiet {
 		fmt.Fprintln(opts.IO.Out, url)
 	}
+
 	return nil
 }
 

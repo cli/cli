@@ -235,7 +235,7 @@ func Test_commentRun(t *testing.T) {
 				Interactive: true,
 				InputType:   0,
 				Body:        "",
-				Upsert:      true,
+				EditLast:    true,
 
 				InteractiveEditSurvey: func(string) (string, error) { return "comment body", nil },
 				ConfirmSubmitSurvey:   func() (bool, error) { return true, nil },
@@ -262,7 +262,7 @@ func Test_commentRun(t *testing.T) {
 				Interactive: false,
 				InputType:   shared.InputTypeWeb,
 				Body:        "",
-				Upsert:      true,
+				EditLast:    true,
 
 				OpenInBrowser: func(string) error { return nil },
 			},
@@ -288,7 +288,7 @@ func Test_commentRun(t *testing.T) {
 				Interactive: false,
 				InputType:   shared.InputTypeEditor,
 				Body:        "",
-				Upsert:      true,
+				EditLast:    true,
 
 				EditSurvey: func(string) (string, error) { return "comment body", nil },
 			},
@@ -315,7 +315,7 @@ func Test_commentRun(t *testing.T) {
 				Interactive: false,
 				InputType:   shared.InputTypeInline,
 				Body:        "comment body",
-				Upsert:      true,
+				EditLast:    true,
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockCommentUpdate(t, reg)
