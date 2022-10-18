@@ -22,7 +22,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
@@ -188,7 +187,6 @@ func Test_createRun(t *testing.T) {
 		name           string
 		setup          func(*CreateOptions, *testing.T) func()
 		cmdStubs       func(*run.CommandStubber)
-		askStubs       func(*prompt.AskStubber) // TODO eventually migrate to PrompterMock
 		promptStubs    func(*prompter.PrompterMock)
 		httpStubs      func(*httpmock.Registry, *testing.T)
 		expectedOut    string
@@ -500,11 +498,6 @@ func Test_createRun(t *testing.T) {
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "1234567890,commit 0\n2345678901,commit 1")
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Choose a template").
-					AssertOptions([]string{"template1", "template2", "Open a blank pull request"}).
-					AnswerWith("template1")
-			},
 			promptStubs: func(pm *prompter.PrompterMock) {
 				pm.MarkdownEditorFunc = func(p, d string, ba bool) (string, error) {
 					if p == "Body" {
@@ -514,9 +507,12 @@ func Test_createRun(t *testing.T) {
 					}
 				}
 				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
-					if p == "What's next?" {
+					switch p {
+					case "What's next?":
 						return 0, nil
-					} else {
+					case "Choose a template":
+						return prompter.IndexFor(opts, "template1")
+					default:
 						return -1, prompter.NoSuchPromptErr(p)
 					}
 				}
@@ -765,9 +761,6 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git -c log.ShowSignature=false log --pretty=format:%H,%s --cherry origin/master...feature`, 0, "")
 				cs.Register(`git rev-parse --show-toplevel`, 0, "")
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Choose a template").AnswerDefault()
-			},
 			promptStubs: func(pm *prompter.PrompterMock) {
 				pm.MarkdownEditorFunc = func(p, d string, ba bool) (string, error) {
 					if p == "Body" {
@@ -777,9 +770,12 @@ func Test_createRun(t *testing.T) {
 					}
 				}
 				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
-					if p == "What's next?" {
+					switch p {
+					case "What's next?":
 						return prompter.IndexFor(opts, "Submit as draft")
-					} else {
+					case "Choose a template":
+						return 0, nil
+					default:
 						return -1, prompter.NoSuchPromptErr(p)
 					}
 				}
@@ -891,13 +887,6 @@ func Test_createRun(t *testing.T) {
 			defer reg.Verify(t)
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg, t)
-			}
-
-			//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-			ask, cleanupAsk := prompt.InitAskStubber()
-			defer cleanupAsk()
-			if tt.askStubs != nil {
-				tt.askStubs(ask)
 			}
 
 			pm := &prompter.PrompterMock{}

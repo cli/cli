@@ -6,13 +6,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/githubtemplate"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -112,6 +110,10 @@ type Template interface {
 	Body() []byte
 }
 
+type iprompter interface {
+	Select(string, string, []string) (int, error)
+}
+
 type templateManager struct {
 	repo       ghrepo.Interface
 	rootDir    string
@@ -119,6 +121,7 @@ type templateManager struct {
 	isPR       bool
 	httpClient *http.Client
 	detector   fd.Detector
+	prompter   iprompter
 
 	templates      []Template
 	legacyTemplate Template
@@ -127,7 +130,7 @@ type templateManager struct {
 	fetchError error
 }
 
-func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, dir string, allowFS bool, isPR bool) *templateManager {
+func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, p iprompter, dir string, allowFS bool, isPR bool) *templateManager {
 	cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
 	return &templateManager{
 		repo:       repo,
@@ -135,6 +138,7 @@ func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, dir stri
 		allowFS:    allowFS,
 		isPR:       isPR,
 		httpClient: httpClient,
+		prompter:   p,
 		detector:   fd.NewDetector(cachedClient, repo.RepoHost()),
 	}
 }
@@ -184,12 +188,7 @@ func (m *templateManager) Choose() (Template, error) {
 		blankOption = "Open a blank pull request"
 	}
 
-	var selectedOption int
-	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-	err := prompt.SurveyAskOne(&survey.Select{
-		Message: "Choose a template",
-		Options: append(names, blankOption),
-	}, &selectedOption)
+	selectedOption, err := m.prompter.Select("Choose a template", "", append(names, blankOption))
 	if err != nil {
 		return nil, fmt.Errorf("could not prompt: %w", err)
 	}

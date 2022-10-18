@@ -21,7 +21,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
@@ -489,12 +488,6 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 			}),
 	)
 
-	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-	as := prompt.NewAskStubber(t)
-
-	// TODO fix
-	as.StubPrompt("Choose a template").AnswerWith("Submit a request")
-
 	pm := &prompter.PrompterMock{}
 	pm.MarkdownEditorFunc = func(p, d string, ba bool) (string, error) {
 		if p == "Body" {
@@ -504,9 +497,12 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 		}
 	}
 	pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
-		if p == "What's next?" {
+		switch p {
+		case "What's next?":
 			return prompter.IndexFor(opts, "Submit")
-		} else {
+		case "Choose a template":
+			return prompter.IndexFor(opts, "Submit a request")
+		default:
 			return -1, prompter.NoSuchPromptErr(p)
 		}
 	}
