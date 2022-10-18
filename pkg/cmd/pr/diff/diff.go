@@ -88,7 +88,7 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 	cmdutil.StringEnumFlag(cmd, &colorFlag, "color", "", "auto", []string{"always", "never", "auto"}, "Use color in diff output")
 	cmd.Flags().BoolVar(&opts.Patch, "patch", false, "Display diff in patch format")
 	cmd.Flags().BoolVar(&opts.NameOnly, "name-only", false, "Display only names of changed files")
-	cmd.Flags().BoolVarP(&opts.BrowserMode, "web", "w", false, "Open the pull request diff in a web browser")
+	cmd.Flags().BoolVarP(&opts.BrowserMode, "web", "w", false, "Open the pull request diff in the browser")
 
 	return cmd
 }
@@ -113,7 +113,6 @@ func diffRun(opts *DiffOptions) error {
 		if opts.IO.IsStdoutTTY() {
 			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openUrl))
 		}
-
 		return opts.Browser.Browse(openUrl)
 	}
 
