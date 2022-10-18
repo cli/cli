@@ -163,7 +163,7 @@ func (c *Client) Remotes(ctx context.Context) (RemoteSet, error) {
 	}
 	configOut, configErr := configCmd.Output()
 	if configErr != nil {
-		// Ignore exit code 1, it says there are no ".gh-resolved" keys.
+		// Ignore exit code 1 as it means there are no resolved remotes.
 		var exitErr *exec.ExitError
 		if errors.As(configErr, &exitErr) && exitErr.ExitCode() != 1 {
 			return nil, &GitError{err: configErr}

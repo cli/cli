@@ -122,7 +122,7 @@ func TestClientRemotes(t *testing.T) {
 	assert.Equal(t, "other", rs[3].Resolved)
 }
 
-func TestClientRemotesNoGhResolved(t *testing.T) {
+func TestClientRemotesNoResolvedRemote(t *testing.T) {
 	tempDir := t.TempDir()
 	initRepo(t, tempDir)
 	gitDir := filepath.Join(tempDir, ".git")
