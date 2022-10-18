@@ -35,6 +35,7 @@ type Prompt interface {
 	Input(string, string) (string, error)
 	Select(string, string, []string) (int, error)
 	MarkdownEditor(string, string, bool) (string, error)
+	Confirm(string, bool) (bool, error)
 }
 
 func ConfirmIssueSubmission(p Prompt, allowPreview bool, allowMetadata bool) (Action, error) {
