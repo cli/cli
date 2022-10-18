@@ -20,6 +20,7 @@ import (
 
 type RenameOptions struct {
 	HttpClient      func() (*http.Client, error)
+	GitClient       *git.Client
 	IO              *iostreams.IOStreams
 	Config          func() (config.Config, error)
 	BaseRepo        func() (ghrepo.Interface, error)
@@ -33,6 +34,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 	opts := &RenameOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Remotes:    f.Remotes,
 		Config:     f.Config,
 	}
@@ -168,8 +170,7 @@ func updateRemote(repo ghrepo.Interface, renamed ghrepo.Interface, opts *RenameO
 	}
 
 	remoteURL := ghrepo.FormatRemoteURL(renamed, protocol)
-	c := &git.Client{}
-	err = c.UpdateRemoteURL(context.Background(), remote.Name, remoteURL)
+	err = opts.GitClient.UpdateRemoteURL(context.Background(), remote.Name, remoteURL)
 
 	return remote, err
 }
