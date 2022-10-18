@@ -23,6 +23,7 @@ func shortenQuery(q string) string {
 var issueComments = shortenQuery(`
 	comments(first: 100) {
 		nodes {
+			id,
 			author{login},
 			authorAssociation,
 			body,
@@ -30,7 +31,9 @@ var issueComments = shortenQuery(`
 			includesCreatedEdit,
 			isMinimized,
 			minimizedReason,
-			reactionGroups{content,users{totalCount}}
+			reactionGroups{content,users{totalCount}},
+			url,
+			viewerDidAuthor
 		},
 		pageInfo{hasNextPage,endCursor},
 		totalCount

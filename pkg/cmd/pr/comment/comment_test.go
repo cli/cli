@@ -221,13 +221,29 @@ func Test_commentRun(t *testing.T) {
 				InputType:   0,
 				Body:        "",
 
-				InteractiveEditSurvey: func() (string, error) { return "comment body", nil },
+				InteractiveEditSurvey: func(string) (string, error) { return "comment body", nil },
 				ConfirmSubmitSurvey:   func() (bool, error) { return true, nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockCommentCreate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
+		},
+		{
+			name: "interactive editor with edit last",
+			input: &shared.CommentableOptions{
+				Interactive: true,
+				InputType:   0,
+				Body:        "",
+				EditLast:    true,
+
+				InteractiveEditSurvey: func(string) (string, error) { return "comment body", nil },
+				ConfirmSubmitSurvey:   func() (bool, error) { return true, nil },
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockCommentUpdate(t, reg)
+			},
+			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-111\n",
 		},
 		{
 			name: "non-interactive web",
@@ -241,18 +257,45 @@ func Test_commentRun(t *testing.T) {
 			stderr: "Opening github.com/OWNER/REPO/pull/123 in your browser.\n",
 		},
 		{
+			name: "non-interactive web with edit last",
+			input: &shared.CommentableOptions{
+				Interactive: false,
+				InputType:   shared.InputTypeWeb,
+				Body:        "",
+				EditLast:    true,
+
+				OpenInBrowser: func(string) error { return nil },
+			},
+			stderr: "Opening github.com/OWNER/REPO/pull/123 in your browser.\n",
+		},
+		{
 			name: "non-interactive editor",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeEditor,
 				Body:        "",
 
-				EditSurvey: func() (string, error) { return "comment body", nil },
+				EditSurvey: func(string) (string, error) { return "comment body", nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockCommentCreate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
+		},
+		{
+			name: "non-interactive editor with edit last",
+			input: &shared.CommentableOptions{
+				Interactive: false,
+				InputType:   shared.InputTypeEditor,
+				Body:        "",
+				EditLast:    true,
+
+				EditSurvey: func(string) (string, error) { return "comment body", nil },
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockCommentUpdate(t, reg)
+			},
+			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-111\n",
 		},
 		{
 			name: "non-interactive inline",
@@ -265,6 +308,19 @@ func Test_commentRun(t *testing.T) {
 				mockCommentCreate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
+		},
+		{
+			name: "non-interactive inline with edit last",
+			input: &shared.CommentableOptions{
+				Interactive: false,
+				InputType:   shared.InputTypeInline,
+				Body:        "comment body",
+				EditLast:    true,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockCommentUpdate(t, reg)
+			},
+			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-111\n",
 		},
 	}
 	for _, tt := range tests {
@@ -287,6 +343,10 @@ func Test_commentRun(t *testing.T) {
 			return &api.PullRequest{
 				Number: 123,
 				URL:    "https://github.com/OWNER/REPO/pull/123",
+				Comments: api.Comments{Nodes: []api.Comment{
+					{ID: "id1", Author: api.Author{Login: "octocat"}, URL: "https://github.com/OWNER/REPO/pull/123#issuecomment-111", ViewerDidAuthor: true},
+					{ID: "id2", Author: api.Author{Login: "monalisa"}, URL: "https://github.com/OWNER/REPO/pull/123#issuecomment-222"},
+				}},
 			}, ghrepo.New("OWNER", "REPO"), nil
 		}
 
@@ -307,6 +367,20 @@ func mockCommentCreate(t *testing.T, reg *httpmock.Registry) {
 			"url": "https://github.com/OWNER/REPO/pull/123#issuecomment-456"
 		} } } } }`,
 			func(inputs map[string]interface{}) {
+				assert.Equal(t, "comment body", inputs["body"])
+			}),
+	)
+}
+
+func mockCommentUpdate(t *testing.T, reg *httpmock.Registry) {
+	reg.Register(
+		httpmock.GraphQL(`mutation CommentUpdate\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "updateIssueComment": { "issueComment": {
+			"url": "https://github.com/OWNER/REPO/pull/123#issuecomment-111"
+		} } } }`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, "id1", inputs["id"])
 				assert.Equal(t, "comment body", inputs["body"])
 			}),
 	)
