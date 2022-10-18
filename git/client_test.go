@@ -122,6 +122,40 @@ func TestClientRemotes(t *testing.T) {
 	assert.Equal(t, "other", rs[3].Resolved)
 }
 
+func TestClientRemotesNoGhResolved(t *testing.T) {
+	tempDir := t.TempDir()
+	initRepo(t, tempDir)
+	gitDir := filepath.Join(tempDir, ".git")
+	remoteFile := filepath.Join(gitDir, "config")
+	remotes := `
+[remote "origin"]
+	url = git@example.com:monalisa/origin.git
+[remote "test"]
+	url = git://github.com/hubot/test.git
+[remote "upstream"]
+	url = https://github.com/monalisa/upstream.git
+[remote "github"]
+	url = git@github.com:hubot/github.git
+`
+	f, err := os.OpenFile(remoteFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0755)
+	assert.NoError(t, err)
+	_, err = f.Write([]byte(remotes))
+	assert.NoError(t, err)
+	err = f.Close()
+	assert.NoError(t, err)
+	client := Client{
+		RepoDir: tempDir,
+	}
+	rs, err := client.Remotes(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, 4, len(rs))
+	assert.Equal(t, "upstream", rs[0].Name)
+	assert.Equal(t, "github", rs[1].Name)
+	assert.Equal(t, "origin", rs[2].Name)
+	assert.Equal(t, "", rs[2].Resolved)
+	assert.Equal(t, "test", rs[3].Name)
+}
+
 func TestParseRemotes(t *testing.T) {
 	remoteList := []string{
 		"mona\tgit@github.com:monalisa/myfork.git (fetch)",
