@@ -15,10 +15,10 @@ type Comments struct {
 	}
 }
 
-func (cs Comments) CommentsForUser(username string) []Comment {
+func (cs Comments) CurrentUserComments() []Comment {
 	var comments []Comment
 	for _, c := range cs.Nodes {
-		if c.Author.Login == username {
+		if c.ViewerDidAuthor {
 			comments = append(comments, c)
 		}
 	}
@@ -36,6 +36,7 @@ type Comment struct {
 	MinimizedReason     string         `json:"minimizedReason"`
 	ReactionGroups      ReactionGroups `json:"reactionGroups"`
 	URL                 string         `json:"url,omitempty"`
+	ViewerDidAuthor     bool           `json:"viewerDidAuthor"`
 }
 
 type CommentCreateInput struct {

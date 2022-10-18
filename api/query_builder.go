@@ -33,6 +33,7 @@ var issueComments = shortenQuery(`
 			minimizedReason,
 			reactionGroups{content,users{totalCount}},
 			url
+			viewerDidAuthor
 		},
 		pageInfo{hasNextPage,endCursor},
 		totalCount

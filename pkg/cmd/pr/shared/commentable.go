@@ -29,7 +29,7 @@ const (
 type Commentable interface {
 	Link() string
 	Identifier() string
-	CommentsForUser(username string) []api.Comment
+	CurrentUserComments() []api.Comment
 }
 
 type CommentableOptions struct {
@@ -149,7 +149,7 @@ func updateComment(commentable Commentable, opts *CommentableOptions) error {
 		return err
 	}
 
-	comments := commentable.CommentsForUser(username)
+	comments := commentable.CurrentUserComments()
 	if len(comments) == 0 {
 		return fmt.Errorf("no comments created by %s found", username)
 	}

@@ -214,8 +214,8 @@ func (pr PullRequest) Identifier() string {
 	return pr.ID
 }
 
-func (pr PullRequest) CommentsForUser(username string) []Comment {
-	return pr.Comments.CommentsForUser(username)
+func (pr PullRequest) CurrentUserComments() []Comment {
+	return pr.Comments.CurrentUserComments()
 }
 
 func (pr PullRequest) IsOpen() bool {
