@@ -329,7 +329,8 @@ func Test_prSelectorForCurrentBranch(t *testing.T) {
 			Repo:   repo,
 		},
 	}
-	prNum, headRef, err := prSelectorForCurrentBranch(&git.Client{GitPath: "some/path/git"}, repo, "Frederick888/main", rem)
+	gitClient := &git.Client{GitPath: "some/path/git"}
+	prNum, headRef, err := prSelectorForCurrentBranch(gitClient, repo, "Frederick888/main", rem)
 	if err != nil {
 		t.Fatalf("prSelectorForCurrentBranch error: %v", err)
 	}

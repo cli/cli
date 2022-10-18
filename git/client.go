@@ -76,6 +76,46 @@ func (gc *gitCommand) Output() ([]byte, error) {
 	return run.PrepareCmd(gc.Cmd).Output()
 }
 
+func (gc *gitCommand) SetRepoDir(repoDir string) {
+	fmt.Println(gc.Args)
+	for i, arg := range gc.Args {
+		if arg == "-C" {
+			gc.Args[i+1] = repoDir
+			return
+		}
+	}
+	gc.Args = append(gc.Args[:3], gc.Args[1:]...)
+	gc.Args[1] = "-C"
+	gc.Args[2] = repoDir
+}
+
+// Allow individual commands to be modified from the default client options.
+type CommandModifier func(*gitCommand)
+
+func WithStderr(stderr io.Writer) CommandModifier {
+	return func(gc *gitCommand) {
+		gc.Stderr = stderr
+	}
+}
+
+func WithStdout(stdout io.Writer) CommandModifier {
+	return func(gc *gitCommand) {
+		gc.Stdout = stdout
+	}
+}
+
+func WithStdin(stdin io.Reader) CommandModifier {
+	return func(gc *gitCommand) {
+		gc.Stdin = stdin
+	}
+}
+
+func WithRepoDir(repoDir string) CommandModifier {
+	return func(gc *gitCommand) {
+		gc.SetRepoDir(repoDir)
+	}
+}
+
 type Client struct {
 	GhPath  string
 	RepoDir string
@@ -133,8 +173,7 @@ func resolveGitPath() (string, error) {
 // AuthenticatedCommand is a wrapper around Command that included configuration to use gh
 // as the credential helper for git.
 func (c *Client) AuthenticatedCommand(ctx context.Context, args ...string) (*gitCommand, error) {
-	preArgs := []string{}
-	preArgs = append(preArgs, "-c", "credential.helper=")
+	preArgs := []string{"-c", "credential.helper="}
 	if c.GhPath == "" {
 		// Assumes that gh is in PATH.
 		c.GhPath = "gh"
@@ -176,7 +215,7 @@ func (c *Client) Remotes(ctx context.Context) (RemoteSet, error) {
 	return remotes, nil
 }
 
-func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBranches []string) (*Remote, error) {
+func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBranches []string, mods ...CommandModifier) (*Remote, error) {
 	args := []string{"remote", "add"}
 	for _, branch := range trackingBranches {
 		args = append(args, "-t", branch)
@@ -186,6 +225,9 @@ func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBra
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return nil, err
+	}
+	for _, mod := range mods {
+		mod(cmd)
 	}
 	if err := cmd.Run(); err != nil {
 		return nil, err
@@ -372,12 +414,15 @@ func (c *Client) CommitBody(ctx context.Context, sha string) (string, error) {
 }
 
 // Push publishes a git ref to a remote and sets up upstream configuration.
-func (c *Client) Push(ctx context.Context, remote string, ref string) error {
+func (c *Client) Push(ctx context.Context, remote string, ref string, mods ...CommandModifier) error {
 	args := []string{"push", "--set-upstream", remote, ref}
 	//TODO: Use AuthenticatedCommand
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return err
+	}
+	for _, mod := range mods {
+		mod(cmd)
 	}
 	return cmd.Run()
 }

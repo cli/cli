@@ -48,14 +48,15 @@ func (g *gitExecuter) UpdateBranch(branch, ref string) error {
 }
 
 func (g *gitExecuter) CreateBranch(branch, ref, upstream string) error {
-	cmd, err := g.client.Command(context.Background(), "branch", branch, ref)
+	ctx := context.Background()
+	cmd, err := g.client.Command(ctx, "branch", branch, ref)
 	if err != nil {
 		return err
 	}
 	if err := cmd.Run(); err != nil {
 		return err
 	}
-	cmd, err = g.client.Command(context.Background(), "branch", "--set-upstream-to", upstream, branch)
+	cmd, err = g.client.Command(ctx, "branch", "--set-upstream-to", upstream, branch)
 	if err != nil {
 		return err
 	}

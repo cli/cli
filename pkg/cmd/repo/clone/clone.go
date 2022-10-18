@@ -156,7 +156,8 @@ func cloneRun(opts *CloneOptions) error {
 	}
 
 	gitClient := opts.GitClient
-	cloneDir, err := gitClient.Clone(context.Background(), canonicalCloneURL, opts.GitArgs)
+	ctx := context.Background()
+	cloneDir, err := gitClient.Clone(ctx, canonicalCloneURL, opts.GitArgs)
 	if err != nil {
 		return err
 	}
@@ -174,8 +175,7 @@ func cloneRun(opts *CloneOptions) error {
 			upstreamName = canonicalRepo.Parent.RepoOwner()
 		}
 
-		gitClient.RepoDir = cloneDir
-		_, err = gitClient.AddRemote(context.Background(), upstreamName, upstreamURL, []string{canonicalRepo.Parent.DefaultBranchRef.Name})
+		_, err = gitClient.AddRemote(ctx, upstreamName, upstreamURL, []string{canonicalRepo.Parent.DefaultBranchRef.Name}, git.WithRepoDir(cloneDir))
 		if err != nil {
 			return err
 		}

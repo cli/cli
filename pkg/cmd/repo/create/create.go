@@ -629,7 +629,8 @@ func isLocalRepo(gitClient *git.Client) (bool, error) {
 
 // clone the checkout branch to specified path
 func localInit(gitClient *git.Client, remoteURL, path, checkoutBranch string) error {
-	gitInit, err := gitClient.Command(context.Background(), "init", path)
+	ctx := context.Background()
+	gitInit, err := gitClient.Command(ctx, "init", path)
 	if err != nil {
 		return err
 	}
@@ -638,9 +639,11 @@ func localInit(gitClient *git.Client, remoteURL, path, checkoutBranch string) er
 		return err
 	}
 
-	gitClient.RepoDir = path
+	// Clone the client so we do not modify the original client's RepoDir.
+	gc := cloneGitClient(gitClient)
+	gc.RepoDir = path
 
-	gitRemoteAdd, err := gitClient.Command(context.Background(), "remote", "add", "origin", remoteURL)
+	gitRemoteAdd, err := gc.Command(ctx, "remote", "add", "origin", remoteURL)
 	if err != nil {
 		return err
 	}
@@ -653,7 +656,7 @@ func localInit(gitClient *git.Client, remoteURL, path, checkoutBranch string) er
 		return nil
 	}
 
-	gitFetch, err := gitClient.Command(context.Background(), "fetch", "origin", fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/origin/%[1]s", checkoutBranch))
+	gitFetch, err := gc.Command(ctx, "fetch", "origin", fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/origin/%[1]s", checkoutBranch))
 	if err != nil {
 		return err
 	}
@@ -662,7 +665,7 @@ func localInit(gitClient *git.Client, remoteURL, path, checkoutBranch string) er
 		return err
 	}
 
-	gitCheckout, err := gitClient.Command(context.Background(), "checkout", checkoutBranch)
+	gitCheckout, err := gc.Command(ctx, "checkout", checkoutBranch)
 	if err != nil {
 		return err
 	}
@@ -730,4 +733,15 @@ func interactiveRepoInfo(prompter iprompter, defaultName string) (string, string
 	}
 
 	return name, description, strings.ToUpper(visibilityOptions[selected]), nil
+}
+
+func cloneGitClient(c *git.Client) *git.Client {
+	return &git.Client{
+		GhPath:  c.GhPath,
+		RepoDir: c.RepoDir,
+		GitPath: c.GitPath,
+		Stderr:  c.Stderr,
+		Stdin:   c.Stdin,
+		Stdout:  c.Stdout,
+	}
 }

@@ -111,9 +111,10 @@ func closeRun(opts *CloseOptions) error {
 	fmt.Fprintf(opts.IO.ErrOut, "%s Closed pull request #%d (%s)\n", cs.SuccessIconWithColor(cs.Red), pr.Number, pr.Title)
 
 	if opts.DeleteBranch {
+		ctx := context.Background()
 		branchSwitchString := ""
 		apiClient := api.NewClientFromHTTP(httpClient)
-		localBranchExists := opts.GitClient.HasLocalBranch(context.Background(), pr.HeadRefName)
+		localBranchExists := opts.GitClient.HasLocalBranch(ctx, pr.HeadRefName)
 
 		if opts.DeleteLocalBranch {
 			if localBranchExists {
@@ -128,13 +129,13 @@ func closeRun(opts *CloseOptions) error {
 					if err != nil {
 						return err
 					}
-					err = opts.GitClient.CheckoutBranch(context.Background(), branchToSwitchTo)
+					err = opts.GitClient.CheckoutBranch(ctx, branchToSwitchTo)
 					if err != nil {
 						return err
 					}
 				}
 
-				if err := opts.GitClient.DeleteLocalBranch(context.Background(), pr.HeadRefName); err != nil {
+				if err := opts.GitClient.DeleteLocalBranch(ctx, pr.HeadRefName); err != nil {
 					return fmt.Errorf("failed to delete local branch %s: %w", cs.Cyan(pr.HeadRefName), err)
 				}
 

@@ -737,13 +737,11 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 			pushTries := 0
 			maxPushTries := 3
 			for {
-				r := NewRegexpWriter(opts.IO.ErrOut, gitPushRegexp, "")
-				defer r.Flush()
+				w := NewRegexpWriter(opts.IO.ErrOut, gitPushRegexp, "")
+				defer w.Flush()
 				gitClient := ctx.GitClient
-				oldStderr := gitClient.Stderr
-				gitClient.Stderr = r
-				defer func() { gitClient.Stderr = oldStderr }()
-				if err := gitClient.Push(context.Background(), headRemote.Name, fmt.Sprintf("HEAD:%s", ctx.HeadBranch)); err != nil {
+				ref := fmt.Sprintf("HEAD:%s", ctx.HeadBranch)
+				if err := gitClient.Push(context.Background(), headRemote.Name, ref, git.WithStderr(w)); err != nil {
 					if didForkRepo && pushTries < maxPushTries {
 						pushTries++
 						// first wait 2 seconds after forking, then 4s, then 6s

@@ -399,6 +399,8 @@ func (m *mergeContext) deleteLocalBranch() error {
 		return err
 	}
 
+	ctx := context.Background()
+
 	// branch the command was run on is the same as the pull request branch
 	if currentBranch == m.pr.HeadRefName {
 		remotes, err := m.opts.Remotes()
@@ -412,24 +414,24 @@ func (m *mergeContext) deleteLocalBranch() error {
 		}
 
 		targetBranch := m.pr.BaseRefName
-		if m.opts.GitClient.HasLocalBranch(context.Background(), targetBranch) {
-			if err := m.opts.GitClient.CheckoutBranch(context.Background(), targetBranch); err != nil {
+		if m.opts.GitClient.HasLocalBranch(ctx, targetBranch) {
+			if err := m.opts.GitClient.CheckoutBranch(ctx, targetBranch); err != nil {
 				return err
 			}
 		} else {
-			if err := m.opts.GitClient.CheckoutNewBranch(context.Background(), baseRemote.Name, targetBranch); err != nil {
+			if err := m.opts.GitClient.CheckoutNewBranch(ctx, baseRemote.Name, targetBranch); err != nil {
 				return err
 			}
 		}
 
-		if err := m.opts.GitClient.Pull(context.Background(), baseRemote.Name, targetBranch); err != nil {
+		if err := m.opts.GitClient.Pull(ctx, baseRemote.Name, targetBranch); err != nil {
 			_ = m.warnf(fmt.Sprintf("%s warning: not possible to fast-forward to: %q\n", m.cs.WarningIcon(), targetBranch))
 		}
 
 		m.switchedToBranch = targetBranch
 	}
 
-	if err := m.opts.GitClient.DeleteLocalBranch(context.Background(), m.pr.HeadRefName); err != nil {
+	if err := m.opts.GitClient.DeleteLocalBranch(ctx, m.pr.HeadRefName); err != nil {
 		return fmt.Errorf("failed to delete local branch %s: %w", m.cs.Cyan(m.pr.HeadRefName), err)
 	}
 

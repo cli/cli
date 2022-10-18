@@ -62,6 +62,7 @@ func (flow *GitCredentialFlow) Setup(hostname, username, authToken string) error
 
 func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password string) error {
 	gitClient := flow.GitClient
+	ctx := context.Background()
 
 	if flow.helper == "" {
 		credHelperKeys := []string{
@@ -80,7 +81,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 				break
 			}
 			// first use a blank value to indicate to git we want to sever the chain of credential helpers
-			preConfigureCmd, err := gitClient.Command(context.Background(), "config", "--global", "--replace-all", credHelperKey, "")
+			preConfigureCmd, err := gitClient.Command(ctx, "config", "--global", "--replace-all", credHelperKey, "")
 			if err != nil {
 				configErr = err
 				break
@@ -91,7 +92,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 			}
 
 			// second configure the actual helper for this host
-			configureCmd, err := gitClient.Command(context.Background(),
+			configureCmd, err := gitClient.Command(ctx,
 				"config", "--global", "--add",
 				credHelperKey,
 				fmt.Sprintf("!%s auth git-credential", shellQuote(flow.Executable)),
@@ -107,7 +108,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 	}
 
 	// clear previous cached credentials
-	rejectCmd, err := gitClient.Command(context.Background(), "credential", "reject")
+	rejectCmd, err := gitClient.Command(ctx, "credential", "reject")
 	if err != nil {
 		return err
 	}
@@ -122,7 +123,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 		return err
 	}
 
-	approveCmd, err := gitClient.Command(context.Background(), "credential", "approve")
+	approveCmd, err := gitClient.Command(ctx, "credential", "approve")
 	if err != nil {
 		return err
 	}
@@ -148,11 +149,12 @@ func gitCredentialHelperKey(hostname string) string {
 }
 
 func gitCredentialHelper(gitClient *git.Client, hostname string) (helper string, err error) {
-	helper, err = gitClient.Config(context.Background(), gitCredentialHelperKey(hostname))
+	ctx := context.Background()
+	helper, err = gitClient.Config(ctx, gitCredentialHelperKey(hostname))
 	if helper != "" {
 		return
 	}
-	helper, err = gitClient.Config(context.Background(), "credential.helper")
+	helper, err = gitClient.Config(ctx, "credential.helper")
 	return
 }
 
