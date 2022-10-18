@@ -2,7 +2,6 @@ package comment
 
 import (
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -42,23 +41,16 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*shared.CommentableOptions) err
 			if len(args) > 0 {
 				selector = args[0]
 			}
+			fields := []string{"id", "url"}
+			if opts.EditLast {
+				fields = append(fields, "comments")
+			}
 			finder := shared.NewFinder(f)
 			opts.RetrieveCommentable = func() (shared.Commentable, ghrepo.Interface, error) {
 				return finder.Find(shared.FindOptions{
 					Selector: selector,
-					Fields:   []string{"id", "url", "comments"},
+					Fields:   fields,
 				})
-			}
-			opts.RetrieveCurrentUser = func() (string, error) {
-				httpClient, err := f.HttpClient()
-				if err != nil {
-					return "", err
-				}
-				baseRepo, err := f.BaseRepo()
-				if err != nil {
-					return "", err
-				}
-				return api.CurrentLoginName(api.NewClientFromHTTP(httpClient), baseRepo.RepoHost())
 			}
 			return shared.CommentablePreRun(cmd, opts)
 		},

@@ -2,7 +2,6 @@ package comment
 
 import (
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -41,18 +40,11 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 				if err != nil {
 					return nil, nil, err
 				}
-				return issueShared.IssueFromArgWithFields(httpClient, f.BaseRepo, args[0], []string{"id", "url", "comments"})
-			}
-			opts.RetrieveCurrentUser = func() (string, error) {
-				httpClient, err := f.HttpClient()
-				if err != nil {
-					return "", err
+				fields := []string{"id", "url"}
+				if opts.EditLast {
+					fields = append(fields, "comments")
 				}
-				baseRepo, err := f.BaseRepo()
-				if err != nil {
-					return "", err
-				}
-				return api.CurrentLoginName(api.NewClientFromHTTP(httpClient), baseRepo.RepoHost())
+				return issueShared.IssueFromArgWithFields(httpClient, f.BaseRepo, args[0], fields)
 			}
 			return prShared.CommentablePreRun(cmd, opts)
 		},

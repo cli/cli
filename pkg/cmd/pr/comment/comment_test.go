@@ -349,9 +349,6 @@ func Test_commentRun(t *testing.T) {
 				}},
 			}, ghrepo.New("OWNER", "REPO"), nil
 		}
-		tt.input.RetrieveCurrentUser = func() (string, error) {
-			return "octocat", nil
-		}
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := shared.CommentableRun(tt.input)

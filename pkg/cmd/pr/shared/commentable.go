@@ -36,7 +36,6 @@ type CommentableOptions struct {
 	IO                    *iostreams.IOStreams
 	HttpClient            func() (*http.Client, error)
 	RetrieveCommentable   func() (Commentable, ghrepo.Interface, error)
-	RetrieveCurrentUser   func() (string, error)
 	EditSurvey            func(string) (string, error)
 	InteractiveEditSurvey func(string) (string, error)
 	ConfirmSubmitSurvey   func() (bool, error)
@@ -144,14 +143,9 @@ func createComment(commentable Commentable, opts *CommentableOptions) error {
 }
 
 func updateComment(commentable Commentable, opts *CommentableOptions) error {
-	username, err := opts.RetrieveCurrentUser()
-	if err != nil {
-		return err
-	}
-
 	comments := commentable.CurrentUserComments()
 	if len(comments) == 0 {
-		return fmt.Errorf("no comments created by %s found", username)
+		return fmt.Errorf("no comments found for current user")
 	}
 
 	lastComment := &comments[len(comments)-1]
