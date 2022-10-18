@@ -17,6 +17,7 @@ import (
 type GitCredentialFlow struct {
 	Executable string
 	Prompter   Prompt
+	GitClient  *git.Client
 
 	shouldSetup bool
 	helper      string
@@ -25,7 +26,7 @@ type GitCredentialFlow struct {
 
 func (flow *GitCredentialFlow) Prompt(hostname string) error {
 	var gitErr error
-	flow.helper, gitErr = gitCredentialHelper(hostname)
+	flow.helper, gitErr = gitCredentialHelper(flow.GitClient, hostname)
 	if isOurCredentialHelper(flow.helper) {
 		flow.scopes = append(flow.scopes, "workflow")
 		return nil
@@ -60,7 +61,7 @@ func (flow *GitCredentialFlow) Setup(hostname, username, authToken string) error
 }
 
 func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password string) error {
-	gitClient := &git.Client{}
+	gitClient := flow.GitClient
 
 	if flow.helper == "" {
 		credHelperKeys := []string{
@@ -146,8 +147,7 @@ func gitCredentialHelperKey(hostname string) string {
 	return fmt.Sprintf("credential.%s.helper", host)
 }
 
-func gitCredentialHelper(hostname string) (helper string, err error) {
-	gitClient := &git.Client{}
+func gitCredentialHelper(gitClient *git.Client, hostname string) (helper string, err error) {
 	helper, err = gitClient.Config(context.Background(), gitCredentialHelperKey(hostname))
 	if helper != "" {
 		return
