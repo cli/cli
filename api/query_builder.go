@@ -182,7 +182,7 @@ func RequiredStatusCheckRollupGraphQL(prID, after string) string {
 								state,
 								targetUrl,
 								createdAt,
-                isRequired(pullRequestId: %[2]s)
+								isRequired(pullRequestId: %[2]s)
 							},
 							...on CheckRun {
 								name,
@@ -192,7 +192,7 @@ func RequiredStatusCheckRollupGraphQL(prID, after string) string {
 								startedAt,
 								completedAt,
 								detailsUrl,
-                isRequired(pullRequestId: %[2]s)
+								isRequired(pullRequestId: %[2]s)
 							}
 						},
 						pageInfo{hasNextPage,endCursor}
