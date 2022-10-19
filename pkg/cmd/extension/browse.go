@@ -24,27 +24,6 @@ import (
 var appStyle = lipgloss.NewStyle().Padding(1, 2)
 var sidebarStyle = lipgloss.NewStyle()
 
-type uiModel struct {
-	sidebar      sidebarModel
-	extList      extListModel
-	logger       *log.Logger
-	readmeGetter readmeGetter
-}
-
-func newUIModel(opts extBrowseOpts, extEntries []extEntry) uiModel {
-	return uiModel{
-		extList:      newExtListModel(opts, extEntries),
-		sidebar:      newSidebarModel(opts.logger),
-		logger:       opts.logger,
-		readmeGetter: opts.rg,
-	}
-}
-
-func (m uiModel) Init() tea.Cmd {
-	// TODO the docs say not to do this but the example code in bubbles does:
-	return tea.EnterAltScreen
-}
-
 type readmeGetter interface {
 	Get(string) (string, error)
 }
@@ -72,6 +51,27 @@ func (g *cachingReadmeGetter) Get(repoFullName string) (string, error) {
 	}
 	g.cache[repoFullName] = readme.Content
 	return readme.Content, nil
+}
+
+type uiModel struct {
+	sidebar      sidebarModel
+	extList      extListModel
+	logger       *log.Logger
+	readmeGetter readmeGetter
+}
+
+func newUIModel(opts extBrowseOpts, extEntries []extEntry) uiModel {
+	return uiModel{
+		extList:      newExtListModel(opts, extEntries),
+		sidebar:      newSidebarModel(opts.logger),
+		logger:       opts.logger,
+		readmeGetter: opts.rg,
+	}
+}
+
+func (m uiModel) Init() tea.Cmd {
+	// TODO the docs say not to do this but the example code in bubbles does:
+	return tea.EnterAltScreen
 }
 
 func (m uiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
