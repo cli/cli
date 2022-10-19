@@ -64,15 +64,17 @@ type gitCommand struct {
 	*exec.Cmd
 }
 
-// This is a hack in order to not break the hundreds of
-// existing tests that rely on `run.PrepareCmd` to be invoked.
 func (gc *gitCommand) Run() error {
+	// This is a hack in order to not break the hundreds of
+	// existing tests that rely on `run.PrepareCmd` to be invoked.
 	return run.PrepareCmd(gc.Cmd).Run()
 }
 
-// This is a hack in order to not break the hundreds of
-// existing tests that rely on `run.PrepareCmd` to be invoked.
 func (gc *gitCommand) Output() ([]byte, error) {
+	gc.Stdout = nil
+	gc.Stderr = nil
+	// This is a hack in order to not break the hundreds of
+	// existing tests that rely on `run.PrepareCmd` to be invoked.
 	return run.PrepareCmd(gc.Cmd).Output()
 }
 
