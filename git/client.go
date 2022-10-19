@@ -79,7 +79,6 @@ func (gc *gitCommand) Output() ([]byte, error) {
 }
 
 func (gc *gitCommand) SetRepoDir(repoDir string) {
-	fmt.Println(gc.Args)
 	for i, arg := range gc.Args {
 		if arg == "-C" {
 			gc.Args[i+1] = repoDir
