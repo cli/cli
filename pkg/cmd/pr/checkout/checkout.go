@@ -242,7 +242,7 @@ func localBranchExists(client *git.Client, b string) bool {
 
 func executeCmds(client *git.Client, cmdQueue [][]string) error {
 	for _, args := range cmdQueue {
-		//TODO: Use AuthenticatedCommand
+		// TODO: Use AuthenticatedCommand
 		cmd, err := client.Command(context.Background(), args...)
 		if err != nil {
 			return err

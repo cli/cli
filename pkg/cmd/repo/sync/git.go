@@ -70,12 +70,7 @@ func (g *gitExecuter) CurrentBranch() (string, error) {
 }
 
 func (g *gitExecuter) Fetch(remote, ref string) error {
-	args := []string{"fetch", "-q", remote, ref}
-	cmd, err := g.client.Command(context.Background(), args...)
-	if err != nil {
-		return err
-	}
-	return cmd.Run()
+	return g.client.Fetch(context.Background(), remote, ref)
 }
 
 func (g *gitExecuter) HasLocalBranch(branch string) bool {
@@ -93,18 +88,11 @@ func (g *gitExecuter) IsAncestor(ancestor, progeny string) (bool, error) {
 }
 
 func (g *gitExecuter) IsDirty() (bool, error) {
-	cmd, err := g.client.Command(context.Background(), "status", "--untracked-files=no", "--porcelain")
+	changeCount, err := g.client.UncommittedChangeCount(context.Background())
 	if err != nil {
 		return false, err
 	}
-	output, err := cmd.Output()
-	if err != nil {
-		return true, err
-	}
-	if len(output) > 0 {
-		return true, nil
-	}
-	return false, nil
+	return changeCount != 0, nil
 }
 
 func (g *gitExecuter) MergeFastForward(ref string) error {

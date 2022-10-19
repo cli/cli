@@ -410,7 +410,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git -C . rev-parse --git-dir`, 0, ".git")
 				cs.Register(`git -C . rev-parse HEAD`, 0, "commithash")
 				cs.Register(`git -C . remote add origin https://github.com/OWNER/REPO`, 0, "")
-				cs.Register(`git -C . push -u origin HEAD`, 0, "")
+				cs.Register(`git -C . push --set-upstream origin HEAD`, 0, "")
 			},
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n✓ Pushed commits to https://github.com/OWNER/REPO.git\n",
 		},

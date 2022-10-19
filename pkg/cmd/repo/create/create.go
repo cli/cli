@@ -551,15 +551,10 @@ func createFromLocal(opts *CreateOptions) error {
 	}
 
 	if opts.Push {
-		repoPush, err := opts.GitClient.Command(context.Background(), "push", "-u", baseRemote, "HEAD")
+		err := opts.GitClient.Push(context.Background(), baseRemote, "HEAD")
 		if err != nil {
 			return err
 		}
-		err = repoPush.Run()
-		if err != nil {
-			return err
-		}
-
 		if isTTY {
 			fmt.Fprintf(stdout, "%s Pushed commits to %s\n", cs.SuccessIcon(), remoteURL)
 		}
@@ -569,20 +564,16 @@ func createFromLocal(opts *CreateOptions) error {
 
 func sourceInit(gitClient *git.Client, io *iostreams.IOStreams, remoteURL, baseRemote string) error {
 	cs := io.ColorScheme()
-	isTTY := io.IsStdoutTTY()
-	stdout := io.Out
-
 	remoteAdd, err := gitClient.Command(context.Background(), "remote", "add", baseRemote, remoteURL)
 	if err != nil {
 		return err
 	}
-
 	_, err = remoteAdd.Output()
 	if err != nil {
 		return fmt.Errorf("%s Unable to add remote %q", cs.FailureIcon(), baseRemote)
 	}
-	if isTTY {
-		fmt.Fprintf(stdout, "%s Added remote %s\n", cs.SuccessIcon(), remoteURL)
+	if io.IsStdoutTTY() {
+		fmt.Fprintf(io.Out, "%s Added remote %s\n", cs.SuccessIcon(), remoteURL)
 	}
 	return nil
 }
@@ -656,21 +647,13 @@ func localInit(gitClient *git.Client, remoteURL, path, checkoutBranch string) er
 		return nil
 	}
 
-	gitFetch, err := gc.Command(ctx, "fetch", "origin", fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/origin/%[1]s", checkoutBranch))
-	if err != nil {
-		return err
-	}
-	err = gitFetch.Run()
+	refspec := fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/origin/%[1]s", checkoutBranch)
+	err = gc.Fetch(ctx, "origin", refspec)
 	if err != nil {
 		return err
 	}
 
-	gitCheckout, err := gc.Command(ctx, "checkout", checkoutBranch)
-	if err != nil {
-		return err
-	}
-	_, err = gitCheckout.Output()
-	return err
+	return gc.CheckoutBranch(ctx, checkoutBranch)
 }
 
 func interactiveGitIgnore(client *http.Client, hostname string, prompter iprompter) (string, error) {
