@@ -257,7 +257,6 @@ func (m extListModel) Init() tea.Cmd {
 }
 
 func (m extListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	m.logger.Printf("%#v", msg)
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		_, h := appStyle.GetFrameSize()
@@ -267,10 +266,12 @@ func (m extListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 		switch {
-		// TODO handle install
-		// TODO handle remove
-		// TODO handle open in web
-		//case.keyMatches(msg, )
+		case key.Matches(msg, m.keys.web):
+			panic("YEAH BOY")
+		case key.Matches(msg, m.keys.install):
+			panic("INSTALL!")
+		case key.Matches(msg, m.keys.remove):
+			panic("REMOVE!")
 		}
 	}
 
