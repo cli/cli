@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
@@ -491,6 +492,8 @@ func Test_createRun(t *testing.T) {
 		tt.opts.Config = func() (config.Config, error) {
 			return config.NewBlankConfig(), nil
 		}
+
+		tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
 
 		ios, _, stdout, stderr := iostreams.Test()
 		ios.SetStdinTTY(tt.tty)

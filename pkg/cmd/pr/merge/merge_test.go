@@ -270,6 +270,7 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 				},
 			}, nil
 		},
+		GitClient: &git.Client{GitPath: "some/path/git"},
 	}
 
 	cmd := NewCmdMerge(factory, nil)

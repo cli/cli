@@ -2,6 +2,7 @@ package create
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -26,6 +27,7 @@ type CreateOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
+	GitClient  *git.Client
 	BaseRepo   func() (ghrepo.Interface, error)
 	Edit       func(string, string, string, io.Reader, io.Writer, io.Writer) (string, error)
 
@@ -56,6 +58,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Config:     f.Config,
 		Edit:       surveyext.Edit,
 	}
@@ -221,7 +224,7 @@ func createRun(opts *CreateOptions) error {
 
 	var tagDescription string
 	if opts.RepoOverride == "" {
-		tagDescription, _ = gitTagInfo(opts.TagName)
+		tagDescription, _ = gitTagInfo(opts.GitClient, opts.TagName)
 		// If there is a local tag with the same name as specified
 		// the user may not want to create a new tag on the remote
 		// as the local one might be annotated or signed.
@@ -268,10 +271,10 @@ func createRun(opts *CreateOptions) error {
 			}
 			if generatedNotes == nil {
 				if opts.NotesStartTag != "" {
-					commits, _ := changelogForRange(fmt.Sprintf("%s..%s", opts.NotesStartTag, headRef))
+					commits, _ := changelogForRange(opts.GitClient, fmt.Sprintf("%s..%s", opts.NotesStartTag, headRef))
 					generatedChangelog = generateChangelog(commits)
-				} else if prevTag, err := detectPreviousTag(headRef); err == nil {
-					commits, _ := changelogForRange(fmt.Sprintf("%s..%s", prevTag, headRef))
+				} else if prevTag, err := detectPreviousTag(opts.GitClient, headRef); err == nil {
+					commits, _ := changelogForRange(opts.GitClient, fmt.Sprintf("%s..%s", prevTag, headRef))
 					generatedChangelog = generateChangelog(commits)
 				}
 			}
@@ -469,8 +472,8 @@ func createRun(opts *CreateOptions) error {
 	return nil
 }
 
-func gitTagInfo(tagName string) (string, error) {
-	cmd, err := git.GitCommand("tag", "--list", tagName, "--format=%(contents:subject)%0a%0a%(contents:body)")
+func gitTagInfo(client *git.Client, tagName string) (string, error) {
+	cmd, err := client.Command(context.Background(), "tag", "--list", tagName, "--format=%(contents:subject)%0a%0a%(contents:body)")
 	if err != nil {
 		return "", err
 	}
@@ -478,8 +481,8 @@ func gitTagInfo(tagName string) (string, error) {
 	return string(b), err
 }
 
-func detectPreviousTag(headRef string) (string, error) {
-	cmd, err := git.GitCommand("describe", "--tags", "--abbrev=0", fmt.Sprintf("%s^", headRef))
+func detectPreviousTag(client *git.Client, headRef string) (string, error) {
+	cmd, err := client.Command(context.Background(), "describe", "--tags", "--abbrev=0", fmt.Sprintf("%s^", headRef))
 	if err != nil {
 		return "", err
 	}
@@ -492,8 +495,8 @@ type logEntry struct {
 	Body    string
 }
 
-func changelogForRange(refRange string) ([]logEntry, error) {
-	cmd, err := git.GitCommand("-c", "log.ShowSignature=false", "log", "--first-parent", "--reverse", "--pretty=format:%B%x00", refRange)
+func changelogForRange(client *git.Client, refRange string) ([]logEntry, error) {
+	cmd, err := client.Command(context.Background(), "-c", "log.ShowSignature=false", "log", "--first-parent", "--reverse", "--pretty=format:%B%x00", refRange)
 	if err != nil {
 		return nil, err
 	}
