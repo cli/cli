@@ -78,7 +78,7 @@ func (gc *gitCommand) Output() ([]byte, error) {
 	return run.PrepareCmd(gc.Cmd).Output()
 }
 
-func (gc *gitCommand) SetRepoDir(repoDir string) {
+func (gc *gitCommand) setRepoDir(repoDir string) {
 	for i, arg := range gc.Args {
 		if arg == "-C" {
 			gc.Args[i+1] = repoDir
@@ -113,7 +113,7 @@ func WithStdin(stdin io.Reader) CommandModifier {
 
 func WithRepoDir(repoDir string) CommandModifier {
 	return func(gc *gitCommand) {
-		gc.SetRepoDir(repoDir)
+		gc.setRepoDir(repoDir)
 	}
 }
 
@@ -222,7 +222,6 @@ func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBra
 		args = append(args, "-t", branch)
 	}
 	args = append(args, "-f", name, urlStr)
-	//TODO: Use AuthenticatedCommand
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return nil, err
@@ -230,8 +229,8 @@ func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBra
 	for _, mod := range mods {
 		mod(cmd)
 	}
-	if err := cmd.Run(); err != nil {
-		return nil, err
+	if _, err := cmd.Output(); err != nil {
+		return nil, &GitError{err: err}
 	}
 	var urlParsed *url.URL
 	if strings.HasPrefix(urlStr, "https") {
@@ -259,7 +258,11 @@ func (c *Client) UpdateRemoteURL(ctx context.Context, name, url string) error {
 	if err != nil {
 		return err
 	}
-	return cmd.Run()
+	_, err = cmd.Output()
+	if err != nil {
+		return &GitError{err: err}
+	}
+	return nil
 }
 
 func (c *Client) SetRemoteResolution(ctx context.Context, name, resolution string) error {
@@ -268,7 +271,11 @@ func (c *Client) SetRemoteResolution(ctx context.Context, name, resolution strin
 	if err != nil {
 		return err
 	}
-	return cmd.Run()
+	_, err = cmd.Output()
+	if err != nil {
+		return &GitError{err: err}
+	}
+	return nil
 }
 
 // CurrentBranch reads the checked-out branch for the git repository.
@@ -425,7 +432,11 @@ func (c *Client) Push(ctx context.Context, remote string, ref string, mods ...Co
 	for _, mod := range mods {
 		mod(cmd)
 	}
-	return cmd.Run()
+	err = cmd.Run()
+	if err != nil {
+		return &GitError{err: err}
+	}
+	return nil
 }
 
 // ReadBranchConfig parses the `branch.BRANCH.(remote|merge)` part of git config.
@@ -470,7 +481,11 @@ func (c *Client) DeleteLocalBranch(ctx context.Context, branch string) error {
 	if err != nil {
 		return err
 	}
-	return cmd.Run()
+	_, err = cmd.Output()
+	if err != nil {
+		return &GitError{err: err}
+	}
+	return nil
 }
 
 func (c *Client) HasLocalBranch(ctx context.Context, branch string) bool {
@@ -479,7 +494,7 @@ func (c *Client) HasLocalBranch(ctx context.Context, branch string) bool {
 	if err != nil {
 		return false
 	}
-	err = cmd.Run()
+	_, err = cmd.Output()
 	return err == nil
 }
 
@@ -489,7 +504,11 @@ func (c *Client) CheckoutBranch(ctx context.Context, branch string) error {
 	if err != nil {
 		return err
 	}
-	return cmd.Run()
+	_, err = cmd.Output()
+	if err != nil {
+		return &GitError{err: err}
+	}
+	return nil
 }
 
 func (c *Client) CheckoutNewBranch(ctx context.Context, remoteName, branch string) error {
@@ -499,7 +518,11 @@ func (c *Client) CheckoutNewBranch(ctx context.Context, remoteName, branch strin
 	if err != nil {
 		return err
 	}
-	return cmd.Run()
+	_, err = cmd.Output()
+	if err != nil {
+		return &GitError{err: err}
+	}
+	return nil
 }
 
 func (c *Client) Pull(ctx context.Context, remote, branch string) error {
@@ -509,10 +532,14 @@ func (c *Client) Pull(ctx context.Context, remote, branch string) error {
 	if err != nil {
 		return err
 	}
-	return cmd.Run()
+	err = cmd.Run()
+	if err != nil {
+		return &GitError{err: err}
+	}
+	return nil
 }
 
-func (c *Client) Clone(ctx context.Context, cloneURL string, args []string) (target string, err error) {
+func (c *Client) Clone(ctx context.Context, cloneURL string, args []string) (string, error) {
 	cloneArgs, target := parseCloneArgs(args)
 	cloneArgs = append(cloneArgs, cloneURL)
 	// If the args contain an explicit target, pass it to clone
@@ -529,7 +556,10 @@ func (c *Client) Clone(ctx context.Context, cloneURL string, args []string) (tar
 		return "", err
 	}
 	err = cmd.Run()
-	return
+	if err != nil {
+		return "", &GitError{err: err}
+	}
+	return target, nil
 }
 
 // ToplevelDir returns the top-level directory path of the current repository.
