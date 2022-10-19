@@ -577,7 +577,7 @@ func sourceInit(gitClient *git.Client, io *iostreams.IOStreams, remoteURL, baseR
 		return err
 	}
 
-	err = remoteAdd.Run()
+	_, err = remoteAdd.Output()
 	if err != nil {
 		return fmt.Errorf("%s Unable to add remote %q", cs.FailureIcon(), baseRemote)
 	}
@@ -593,7 +593,7 @@ func hasCommits(gitClient *git.Client) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	err = hasCommitsCmd.Run()
+	_, err = hasCommitsCmd.Output()
 	if err == nil {
 		return true, nil
 	}
@@ -634,7 +634,7 @@ func localInit(gitClient *git.Client, remoteURL, path, checkoutBranch string) er
 	if err != nil {
 		return err
 	}
-	err = gitInit.Run()
+	_, err = gitInit.Output()
 	if err != nil {
 		return err
 	}
@@ -647,7 +647,7 @@ func localInit(gitClient *git.Client, remoteURL, path, checkoutBranch string) er
 	if err != nil {
 		return err
 	}
-	err = gitRemoteAdd.Run()
+	_, err = gitRemoteAdd.Output()
 	if err != nil {
 		return err
 	}
@@ -669,7 +669,8 @@ func localInit(gitClient *git.Client, remoteURL, path, checkoutBranch string) er
 	if err != nil {
 		return err
 	}
-	return gitCheckout.Run()
+	_, err = gitCheckout.Output()
+	return err
 }
 
 func interactiveGitIgnore(client *http.Client, hostname string, prompter iprompter) (string, error) {

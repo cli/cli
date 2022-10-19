@@ -44,7 +44,8 @@ func (g *gitExecuter) UpdateBranch(branch, ref string) error {
 	if err != nil {
 		return err
 	}
-	return cmd.Run()
+	_, err = cmd.Output()
+	return err
 }
 
 func (g *gitExecuter) CreateBranch(branch, ref, upstream string) error {
@@ -53,14 +54,15 @@ func (g *gitExecuter) CreateBranch(branch, ref, upstream string) error {
 	if err != nil {
 		return err
 	}
-	if err := cmd.Run(); err != nil {
+	if _, err := cmd.Output(); err != nil {
 		return err
 	}
 	cmd, err = g.client.Command(ctx, "branch", "--set-upstream-to", upstream, branch)
 	if err != nil {
 		return err
 	}
-	return cmd.Run()
+	_, err = cmd.Output()
+	return err
 }
 
 func (g *gitExecuter) CurrentBranch() (string, error) {
@@ -86,7 +88,7 @@ func (g *gitExecuter) IsAncestor(ancestor, progeny string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	err = cmd.Run()
+	_, err = cmd.Output()
 	return err == nil, nil
 }
 
@@ -111,7 +113,8 @@ func (g *gitExecuter) MergeFastForward(ref string) error {
 	if err != nil {
 		return err
 	}
-	return cmd.Run()
+	_, err = cmd.Output()
+	return err
 }
 
 func (g *gitExecuter) ResetHard(ref string) error {
@@ -120,5 +123,6 @@ func (g *gitExecuter) ResetHard(ref string) error {
 	if err != nil {
 		return err
 	}
-	return cmd.Run()
+	_, err = cmd.Output()
+	return err
 }

@@ -38,22 +38,16 @@ func (e *NotInstalled) Unwrap() error {
 }
 
 type GitError struct {
-	stderr string
-	err    error
+	ExitCode int
+	Stderr   string
+	err      error
 }
 
 func (ge *GitError) Error() string {
-	stderr := ge.stderr
-	if stderr == "" {
-		var exitError *exec.ExitError
-		if errors.As(ge.err, &exitError) {
-			stderr = string(exitError.Stderr)
-		}
-	}
-	if stderr == "" {
+	if ge.Stderr == "" {
 		return fmt.Sprintf("failed to run git: %v", ge.err)
 	}
-	return fmt.Sprintf("failed to run git: %s", stderr)
+	return fmt.Sprintf("failed to run git: %s", ge.Stderr)
 }
 
 func (ge *GitError) Unwrap() error {
@@ -67,7 +61,17 @@ type gitCommand struct {
 func (gc *gitCommand) Run() error {
 	// This is a hack in order to not break the hundreds of
 	// existing tests that rely on `run.PrepareCmd` to be invoked.
-	return run.PrepareCmd(gc.Cmd).Run()
+	err := run.PrepareCmd(gc.Cmd).Run()
+	if err != nil {
+		ge := GitError{err: err}
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
+			ge.Stderr = string(exitError.Stderr)
+			ge.ExitCode = exitError.ExitCode()
+		}
+		return &ge
+	}
+	return nil
 }
 
 func (gc *gitCommand) Output() ([]byte, error) {
@@ -75,7 +79,17 @@ func (gc *gitCommand) Output() ([]byte, error) {
 	gc.Stderr = nil
 	// This is a hack in order to not break the hundreds of
 	// existing tests that rely on `run.PrepareCmd` to be invoked.
-	return run.PrepareCmd(gc.Cmd).Output()
+	out, err := run.PrepareCmd(gc.Cmd).Output()
+	if err != nil {
+		ge := GitError{err: err}
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
+			ge.Stderr = string(exitError.Stderr)
+			ge.ExitCode = exitError.ExitCode()
+		}
+		return []byte{}, &ge
+	}
+	return out, nil
 }
 
 func (gc *gitCommand) setRepoDir(repoDir string) {
@@ -193,7 +207,7 @@ func (c *Client) Remotes(ctx context.Context) (RemoteSet, error) {
 	}
 	remoteOut, remoteErr := remoteCmd.Output()
 	if remoteErr != nil {
-		return nil, &GitError{err: remoteErr}
+		return nil, remoteErr
 	}
 
 	configArgs := []string{"config", "--get-regexp", `^remote\..*\.gh-resolved$`}
@@ -204,9 +218,9 @@ func (c *Client) Remotes(ctx context.Context) (RemoteSet, error) {
 	configOut, configErr := configCmd.Output()
 	if configErr != nil {
 		// Ignore exit code 1 as it means there are no resolved remotes.
-		var exitErr *exec.ExitError
-		if errors.As(configErr, &exitErr) && exitErr.ExitCode() != 1 {
-			return nil, &GitError{err: configErr}
+		var gitErr *GitError
+		if ok := errors.As(configErr, &gitErr); ok && gitErr.ExitCode != 1 {
+			return nil, gitErr
 		}
 	}
 
@@ -230,7 +244,7 @@ func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBra
 		mod(cmd)
 	}
 	if _, err := cmd.Output(); err != nil {
-		return nil, &GitError{err: err}
+		return nil, err
 	}
 	var urlParsed *url.URL
 	if strings.HasPrefix(urlStr, "https") {
@@ -260,7 +274,7 @@ func (c *Client) UpdateRemoteURL(ctx context.Context, name, url string) error {
 	}
 	_, err = cmd.Output()
 	if err != nil {
-		return &GitError{err: err}
+		return err
 	}
 	return nil
 }
@@ -273,7 +287,7 @@ func (c *Client) SetRemoteResolution(ctx context.Context, name, resolution strin
 	}
 	_, err = cmd.Output()
 	if err != nil {
-		return &GitError{err: err}
+		return err
 	}
 	return nil
 }
@@ -285,14 +299,14 @@ func (c *Client) CurrentBranch(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	errBuf := bytes.Buffer{}
-	cmd.Stderr = &errBuf
 	out, err := cmd.Output()
 	if err != nil {
-		if errBuf.Len() == 0 {
-			return "", &GitError{err: err, stderr: "not on any branch"}
+		var gitErr *GitError
+		if ok := errors.As(err, &gitErr); ok && len(gitErr.Stderr) == 0 {
+			gitErr.Stderr = "not on any branch"
+			return "", gitErr
 		}
-		return "", &GitError{err: err, stderr: errBuf.String()}
+		return "", err
 	}
 	branch := firstLine(out)
 	return strings.TrimPrefix(branch, "refs/heads/"), nil
@@ -307,7 +321,7 @@ func (c *Client) ShowRefs(ctx context.Context, ref ...string) ([]Ref, error) {
 	}
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, &GitError{err: err}
+		return nil, err
 	}
 	var refs []Ref
 	for _, line := range outputLines(out) {
@@ -329,15 +343,14 @@ func (c *Client) Config(ctx context.Context, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	errBuf := bytes.Buffer{}
-	cmd.Stderr = &errBuf
 	out, err := cmd.Output()
 	if err != nil {
-		var exitError *exec.ExitError
-		if ok := errors.As(err, &exitError); ok && exitError.Error() == "1" {
-			return "", &GitError{err: err, stderr: fmt.Sprintf("unknown config key %s", name)}
+		var gitErr *GitError
+		if ok := errors.As(err, &gitErr); ok && gitErr.ExitCode == 1 {
+			gitErr.Stderr = fmt.Sprintf("unknown config key %s", name)
+			return "", gitErr
 		}
-		return "", &GitError{err: err, stderr: errBuf.String()}
+		return "", err
 	}
 	return firstLine(out), nil
 }
@@ -350,7 +363,7 @@ func (c *Client) UncommittedChangeCount(ctx context.Context) (int, error) {
 	}
 	out, err := cmd.Output()
 	if err != nil {
-		return 0, &GitError{err: err}
+		return 0, err
 	}
 	lines := strings.Split(string(out), "\n")
 	count := 0
@@ -370,7 +383,7 @@ func (c *Client) Commits(ctx context.Context, baseRef, headRef string) ([]*Commi
 	}
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, &GitError{err: err}
+		return nil, err
 	}
 	commits := []*Commit{}
 	sha := 0
@@ -399,7 +412,7 @@ func (c *Client) lookupCommit(ctx context.Context, sha, format string) ([]byte, 
 	}
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, &GitError{err: err}
+		return nil, err
 	}
 	return out, nil
 }
@@ -432,11 +445,7 @@ func (c *Client) Push(ctx context.Context, remote string, ref string, mods ...Co
 	for _, mod := range mods {
 		mod(cmd)
 	}
-	err = cmd.Run()
-	if err != nil {
-		return &GitError{err: err}
-	}
-	return nil
+	return cmd.Run()
 }
 
 // ReadBranchConfig parses the `branch.BRANCH.(remote|merge)` part of git config.
@@ -483,7 +492,7 @@ func (c *Client) DeleteLocalBranch(ctx context.Context, branch string) error {
 	}
 	_, err = cmd.Output()
 	if err != nil {
-		return &GitError{err: err}
+		return err
 	}
 	return nil
 }
@@ -506,7 +515,7 @@ func (c *Client) CheckoutBranch(ctx context.Context, branch string) error {
 	}
 	_, err = cmd.Output()
 	if err != nil {
-		return &GitError{err: err}
+		return err
 	}
 	return nil
 }
@@ -520,7 +529,7 @@ func (c *Client) CheckoutNewBranch(ctx context.Context, remoteName, branch strin
 	}
 	_, err = cmd.Output()
 	if err != nil {
-		return &GitError{err: err}
+		return err
 	}
 	return nil
 }
@@ -532,11 +541,7 @@ func (c *Client) Pull(ctx context.Context, remote, branch string) error {
 	if err != nil {
 		return err
 	}
-	err = cmd.Run()
-	if err != nil {
-		return &GitError{err: err}
-	}
-	return nil
+	return cmd.Run()
 }
 
 func (c *Client) Clone(ctx context.Context, cloneURL string, args []string) (string, error) {
@@ -557,7 +562,7 @@ func (c *Client) Clone(ctx context.Context, cloneURL string, args []string) (str
 	}
 	err = cmd.Run()
 	if err != nil {
-		return "", &GitError{err: err}
+		return "", err
 	}
 	return target, nil
 }
@@ -571,7 +576,7 @@ func (c *Client) ToplevelDir(ctx context.Context) (string, error) {
 	}
 	out, err := cmd.Output()
 	if err != nil {
-		return "", &GitError{err: err}
+		return "", err
 	}
 	return firstLine(out), nil
 }
@@ -584,7 +589,7 @@ func (c *Client) GitDir(ctx context.Context) (string, error) {
 	}
 	out, err := cmd.Output()
 	if err != nil {
-		return "", &GitError{err: err}
+		return "", err
 	}
 	return firstLine(out), nil
 }

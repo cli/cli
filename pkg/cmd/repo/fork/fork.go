@@ -285,7 +285,7 @@ func forkRun(opts *ForkOptions) error {
 					if err != nil {
 						return err
 					}
-					err = renameCmd.Run()
+					_, err = renameCmd.Output()
 					if err != nil {
 						return err
 					}

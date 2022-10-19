@@ -86,7 +86,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 				configErr = err
 				break
 			}
-			if err = preConfigureCmd.Run(); err != nil {
+			if _, err = preConfigureCmd.Output(); err != nil {
 				configErr = err
 				break
 			}
@@ -100,7 +100,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 			if err != nil {
 				configErr = err
 			} else {
-				configErr = configureCmd.Run()
+				_, configErr = configureCmd.Output()
 			}
 		}
 
@@ -118,7 +118,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 		host=%s
 	`, hostname))
 
-	err = rejectCmd.Run()
+	_, err = rejectCmd.Output()
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 		password=%s
 	`, hostname, username, password))
 
-	err = approveCmd.Run()
+	_, err = approveCmd.Output()
 	if err != nil {
 		return err
 	}
