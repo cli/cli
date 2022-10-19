@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/repo/view"
 	"github.com/cli/cli/v2/pkg/extensions"
@@ -30,12 +31,12 @@ type uiModel struct {
 	readmeGetter readmeGetter
 }
 
-func newUIModel(l *log.Logger, extEntries []extEntry, rg readmeGetter) uiModel {
+func newUIModel(opts extBrowseOpts, extEntries []extEntry) uiModel {
 	return uiModel{
-		extList:      newExtListModel(l, extEntries),
-		sidebar:      newSidebarModel(l),
-		logger:       l,
-		readmeGetter: rg,
+		extList:      newExtListModel(opts, extEntries),
+		sidebar:      newSidebarModel(opts.logger),
+		logger:       opts.logger,
+		readmeGetter: opts.rg,
 	}
 }
 
@@ -168,6 +169,7 @@ func (m sidebarModel) View() string {
 }
 
 type extEntry struct {
+	URL         string
 	Owner       string
 	Name        string
 	FullName    string
@@ -223,12 +225,13 @@ func newKeyMap() *keyMap {
 }
 
 type extListModel struct {
-	list   list.Model
-	keys   *keyMap
-	logger *log.Logger
+	list    list.Model
+	keys    *keyMap
+	logger  *log.Logger
+	browser ibrowser
 }
 
-func newExtListModel(l *log.Logger, extEntries []extEntry) extListModel {
+func newExtListModel(opts extBrowseOpts, extEntries []extEntry) extListModel {
 	items := make([]list.Item, len(extEntries))
 	for i := range items {
 		items[i] = extEntries[i]
@@ -246,9 +249,10 @@ func newExtListModel(l *log.Logger, extEntries []extEntry) extListModel {
 	}
 
 	return extListModel{
-		logger: l,
-		list:   list,
-		keys:   keys,
+		logger:  opts.logger,
+		list:    list,
+		keys:    keys,
+		browser: opts.browser,
 	}
 }
 
@@ -267,7 +271,11 @@ func (m extListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		switch {
 		case key.Matches(msg, m.keys.web):
-			panic("YEAH BOY")
+			item := m.SelectedItem()
+			ee := item.(extEntry)
+			if err := m.browser.Browse(ee.URL); err != nil {
+				m.logger.Printf("failed to open '%s': %s", ee.URL, err.Error())
+			}
 		case key.Matches(msg, m.keys.install):
 			panic("INSTALL!")
 		case key.Matches(msg, m.keys.remove):
@@ -290,7 +298,22 @@ func (m extListModel) View() string {
 	return appStyle.Render(m.list.View())
 }
 
-func extBrowse(cmd *cobra.Command, searcher search.Searcher, em extensions.ExtensionManager, client *http.Client) error {
+type ibrowser interface {
+	Browse(string) error
+}
+
+type extBrowseOpts struct {
+	cmd      *cobra.Command
+	browser  ibrowser
+	searcher search.Searcher
+	em       extensions.ExtensionManager
+	client   *http.Client
+	logger   *log.Logger
+	cfg      config.Config
+	rg       readmeGetter
+}
+
+func extBrowse(opts extBrowseOpts) error {
 	// TODO support turning debug mode on/off
 	f, err := os.CreateTemp("/tmp", "extBrowse-*.txt")
 	if err != nil {
@@ -298,13 +321,13 @@ func extBrowse(cmd *cobra.Command, searcher search.Searcher, em extensions.Exten
 	}
 	defer os.Remove(f.Name())
 
-	l := log.New(f, "", log.Lshortfile)
+	opts.logger = log.New(f, "", log.Lshortfile)
 
 	// TODO spinner
 	// TODO get manager to tell me what's installed so I can cross ref
-	installed := em.List()
+	installed := opts.em.List()
 
-	result, err := searcher.Repositories(search.Query{
+	result, err := opts.searcher.Repositories(search.Query{
 		Kind:  search.KindRepositories,
 		Limit: 1000,
 		Qualifiers: search.Qualifiers{
@@ -315,10 +338,13 @@ func extBrowse(cmd *cobra.Command, searcher search.Searcher, em extensions.Exten
 		return fmt.Errorf("failed to search for extensions: %w", err)
 	}
 
+	host, _ := opts.cfg.DefaultHost()
+
 	extEntries := []extEntry{}
 
 	for _, repo := range result.Items {
 		ee := extEntry{
+			URL:         "https://" + host + "/" + repo.FullName,
 			FullName:    repo.FullName,
 			Owner:       repo.Owner.Login,
 			Name:        repo.Name,
@@ -344,7 +370,7 @@ func extBrowse(cmd *cobra.Command, searcher search.Searcher, em extensions.Exten
 		extEntries = append(extEntries, ee)
 	}
 
-	rg := newReadmeGetter(client)
+	opts.rg = newReadmeGetter(opts.client)
 
-	return tea.NewProgram(newUIModel(l, extEntries, rg)).Start()
+	return tea.NewProgram(newUIModel(opts, extEntries)).Start()
 }

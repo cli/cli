@@ -21,6 +21,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	io := f.IOStreams
 	prompter := f.Prompter
 	config := f.Config
+	browser := f.Browser
 
 	extCmd := cobra.Command{
 		Use:   "extension",
@@ -237,9 +238,16 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return err
 				}
 
-				searcher := search.NewSearcher(client, host)
+				opts := extBrowseOpts{
+					cmd:      cmd,
+					browser:  browser,
+					searcher: search.NewSearcher(client, host),
+					em:       m,
+					client:   client,
+					cfg:      cfg,
+				}
 
-				return extBrowse(cmd, searcher, m, client)
+				return extBrowse(opts)
 			},
 		},
 		&cobra.Command{
