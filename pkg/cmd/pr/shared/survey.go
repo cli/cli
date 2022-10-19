@@ -178,8 +178,13 @@ func (mf *MetadataFetcher) RepoMetadataFetch(input api.RepoMetadataInput) (*api.
 	return metadataResult, err
 }
 
+func (mf *MetadataFetcher) currentUserID() (string, error) {
+	return api.CurrentUserID(mf.APIClient, mf.Repo.RepoHost())
+}
+
 type RepoMetadataFetcher interface {
 	RepoMetadataFetch(api.RepoMetadataInput) (*api.RepoMetadataResult, error)
+	currentUserID() (string, error)
 }
 
 func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher RepoMetadataFetcher, state *IssueMetadataState) error {
@@ -214,6 +219,10 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 		return fmt.Errorf("could not prompt: %w", err)
 	}
 
+	currentUserID, err := fetcher.currentUserID()
+	if err != nil {
+		return err
+	}
 	metadataInput := api.RepoMetadataInput{
 		Reviewers:  isChosen("Reviewers"),
 		Assignees:  isChosen("Assignees"),
@@ -226,13 +235,18 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 		return fmt.Errorf("error fetching metadata options: %w", err)
 	}
 
-	var users []string
+	var reviewers []string
 	for _, u := range metadataResult.AssignableUsers {
-		users = append(users, u.DisplayName())
+		if u.ID != currentUserID {
+			reviewers = append(reviewers, u.DisplayName())
+		}
 	}
-	var teams []string
 	for _, t := range metadataResult.Teams {
-		teams = append(teams, fmt.Sprintf("%s/%s", baseRepo.RepoOwner(), t.Slug))
+		reviewers = append(reviewers, fmt.Sprintf("%s/%s", baseRepo.RepoOwner(), t.Slug))
+	}
+	var assignees []string
+	for _, u := range metadataResult.AssignableUsers {
+		assignees = append(assignees, u.DisplayName())
 	}
 	var labels []string
 	for _, l := range metadataResult.Labels {
@@ -249,12 +263,12 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 
 	var mqs []*survey.Question
 	if isChosen("Reviewers") {
-		if len(users) > 0 || len(teams) > 0 {
+		if len(reviewers) > 0 {
 			mqs = append(mqs, &survey.Question{
 				Name: "reviewers",
 				Prompt: &survey.MultiSelect{
 					Message: "Reviewers",
-					Options: append(users, teams...),
+					Options: reviewers,
 					Default: state.Reviewers,
 				},
 			})
@@ -263,12 +277,12 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 		}
 	}
 	if isChosen("Assignees") {
-		if len(users) > 0 {
+		if len(assignees) > 0 {
 			mqs = append(mqs, &survey.Question{
 				Name: "assignees",
 				Prompt: &survey.MultiSelect{
 					Message: "Assignees",
-					Options: users,
+					Options: assignees,
 					Default: state.Assignees,
 				},
 			})
