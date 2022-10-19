@@ -13,7 +13,6 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -552,7 +551,7 @@ func createFromLocal(opts *CreateOptions) error {
 		if err != nil {
 			return err
 		}
-		err = run.PrepareCmd(repoPush).Run()
+		err = repoPush.Run()
 		if err != nil {
 			return err
 		}
@@ -574,7 +573,7 @@ func sourceInit(io *iostreams.IOStreams, remoteURL, baseRemote, repoPath string)
 		return err
 	}
 
-	err = run.PrepareCmd(remoteAdd).Run()
+	err = remoteAdd.Run()
 	if err != nil {
 		return fmt.Errorf("%s Unable to add remote %q", cs.FailureIcon(), baseRemote)
 	}
@@ -590,8 +589,7 @@ func hasCommits(repoPath string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	prepareCmd := run.PrepareCmd(hasCommitsCmd)
-	err = prepareCmd.Run()
+	err = hasCommitsCmd.Run()
 	if err == nil {
 		return true, nil
 	}
@@ -636,7 +634,7 @@ func localInit(io *iostreams.IOStreams, remoteURL, path, checkoutBranch string) 
 		gitInit.Stdout = io.Out
 	}
 	gitInit.Stderr = io.ErrOut
-	err = run.PrepareCmd(gitInit).Run()
+	err = gitInit.Run()
 	if err != nil {
 		return err
 	}
@@ -647,7 +645,7 @@ func localInit(io *iostreams.IOStreams, remoteURL, path, checkoutBranch string) 
 	}
 	gitRemoteAdd.Stdout = io.Out
 	gitRemoteAdd.Stderr = io.ErrOut
-	err = run.PrepareCmd(gitRemoteAdd).Run()
+	err = gitRemoteAdd.Run()
 	if err != nil {
 		return err
 	}
@@ -662,7 +660,7 @@ func localInit(io *iostreams.IOStreams, remoteURL, path, checkoutBranch string) 
 	}
 	gitFetch.Stdout = io.Out
 	gitFetch.Stderr = io.ErrOut
-	err = run.PrepareCmd(gitFetch).Run()
+	err = gitFetch.Run()
 	if err != nil {
 		return err
 	}
@@ -673,7 +671,7 @@ func localInit(io *iostreams.IOStreams, remoteURL, path, checkoutBranch string) 
 	}
 	gitCheckout.Stdout = io.Out
 	gitCheckout.Stderr = io.ErrOut
-	return run.PrepareCmd(gitCheckout).Run()
+	return gitCheckout.Run()
 }
 
 func interactiveGitIgnore(client *http.Client, hostname string, prompter iprompter) (string, error) {

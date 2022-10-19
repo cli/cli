@@ -41,11 +41,15 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*shared.CommentableOptions) err
 			if len(args) > 0 {
 				selector = args[0]
 			}
+			fields := []string{"id", "url"}
+			if opts.EditLast {
+				fields = append(fields, "comments")
+			}
 			finder := shared.NewFinder(f)
 			opts.RetrieveCommentable = func() (shared.Commentable, ghrepo.Interface, error) {
 				return finder.Find(shared.FindOptions{
 					Selector: selector,
-					Fields:   []string{"id", "url"},
+					Fields:   fields,
 				})
 			}
 			return shared.CommentablePreRun(cmd, opts)
@@ -70,6 +74,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*shared.CommentableOptions) err
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().BoolP("editor", "e", false, "Skip prompts and open the text editor to write the body in")
 	cmd.Flags().BoolP("web", "w", false, "Open the web browser to write the comment")
+	cmd.Flags().BoolVar(&opts.EditLast, "edit-last", false, "Edit the last comment of the same author")
 
 	return cmd
 }

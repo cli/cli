@@ -10,7 +10,6 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghinstance"
-	"github.com/cli/cli/v2/internal/run"
 	"github.com/google/shlex"
 )
 
@@ -82,7 +81,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 				configErr = err
 				break
 			}
-			if err = run.PrepareCmd(preConfigureCmd).Run(); err != nil {
+			if err = preConfigureCmd.Run(); err != nil {
 				configErr = err
 				break
 			}
@@ -96,7 +95,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 			if err != nil {
 				configErr = err
 			} else {
-				configErr = run.PrepareCmd(configureCmd).Run()
+				configErr = configureCmd.Run()
 			}
 		}
 
@@ -114,7 +113,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 		host=%s
 	`, hostname))
 
-	err = run.PrepareCmd(rejectCmd).Run()
+	err = rejectCmd.Run()
 	if err != nil {
 		return err
 	}
@@ -131,7 +130,7 @@ func (flow *GitCredentialFlow) gitCredentialSetup(hostname, username, password s
 		password=%s
 	`, hostname, username, password))
 
-	err = run.PrepareCmd(approveCmd).Run()
+	err = approveCmd.Run()
 	if err != nil {
 		return err
 	}

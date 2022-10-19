@@ -1,22 +1,19 @@
 package checkout
 
 import (
+	"context"
 	"fmt"
 	"net/http"
-	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/context"
+	cliContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/safeexec"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +21,7 @@ type CheckoutOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
-	Remotes    func() (context.Remotes, error)
+	Remotes    func() (cliContext.Remotes, error)
 	Branch     func() (string, error)
 
 	Finder shared.PRFinder
@@ -131,7 +128,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 		cmdQueue = append(cmdQueue, []string{"git", "submodule", "update", "--init", "--recursive"})
 	}
 
-	err = executeCmds(cmdQueue)
+	err = executeCmds(cmdQueue, opts.IO)
 	if err != nil {
 		return err
 	}
@@ -139,7 +136,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 	return nil
 }
 
-func cmdsForExistingRemote(remote *context.Remote, pr *api.PullRequest, opts *CheckoutOptions) [][]string {
+func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts *CheckoutOptions) [][]string {
 	var cmds [][]string
 	remoteBranch := fmt.Sprintf("%s/%s", remote.Name, pr.HeadRefName)
 
@@ -241,17 +238,19 @@ func localBranchExists(b string) bool {
 	return err == nil
 }
 
-func executeCmds(cmdQueue [][]string) error {
+func executeCmds(cmdQueue [][]string, ios *iostreams.IOStreams) error {
+	//TODO: Replace with factory GitClient
+	//TODO: Use AuthenticatedCommand
+	client := git.Client{
+		Stdout: ios.Out,
+		Stderr: ios.ErrOut,
+	}
 	for _, args := range cmdQueue {
-		// TODO: reuse the result of this lookup across loop iteration
-		exe, err := safeexec.LookPath(args[0])
+		cmd, err := client.Command(context.Background(), args[1:]...)
 		if err != nil {
 			return err
 		}
-		cmd := exec.Command(exe, args[1:]...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := run.PrepareCmd(cmd).Run(); err != nil {
+		if err := cmd.Run(); err != nil {
 			return err
 		}
 	}
