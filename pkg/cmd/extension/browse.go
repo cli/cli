@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/glamour"
@@ -123,6 +124,42 @@ func (m uiModel) View() string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, m.extList.View(), m.sidebar.View())
 }
 
+type managerModel struct {
+	logger  *log.Logger
+	content string
+	spinner spinner.Model
+}
+
+func newManagerModel(l *log.Logger) managerModel {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	return managerModel{
+		logger:  l,
+		spinner: s,
+	}
+}
+
+func (m managerModel) Install(repoFullName string) {
+	// TODO
+}
+
+func (m managerModel) Init() tea.Cmd {
+	return m.spinner.Tick
+}
+
+func (m managerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	m.logger.Printf("%#v", msg)
+	var cmd tea.Cmd
+	m.spinner, cmd = m.spinner.Update(msg)
+	return m, cmd
+}
+
+func (m managerModel) View() string {
+	// TODO punting on spinner for now; it just would not animate
+	//return fmt.Sprintf("%s installing...", m.spinner.View())
+	return m.content
+}
+
 type sidebarModel struct {
 	logger   *log.Logger
 	Content  string
@@ -227,6 +264,7 @@ func newKeyMap() *keyMap {
 type extListModel struct {
 	list    list.Model
 	keys    *keyMap
+	manager tea.Model
 	logger  *log.Logger
 	browser ibrowser
 }
@@ -250,6 +288,7 @@ func newExtListModel(opts extBrowseOpts, extEntries []extEntry) extListModel {
 
 	return extListModel{
 		logger:  opts.logger,
+		manager: newManagerModel(opts.logger),
 		list:    list,
 		keys:    keys,
 		browser: opts.browser,
@@ -269,24 +308,30 @@ func (m extListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.list.FilterState() == list.Filtering {
 			break
 		}
+		item := m.SelectedItem()
+		ee := item.(extEntry)
 		switch {
 		case key.Matches(msg, m.keys.web):
-			item := m.SelectedItem()
-			ee := item.(extEntry)
 			if err := m.browser.Browse(ee.URL); err != nil {
 				m.logger.Printf("failed to open '%s': %s", ee.URL, err.Error())
 			}
 		case key.Matches(msg, m.keys.install):
-			panic("INSTALL!")
+			m.manager.(managerModel).Install(ee.FullName)
 		case key.Matches(msg, m.keys.remove):
 			panic("REMOVE!")
 		}
 	}
 
-	nm, cmd := m.list.Update(msg)
-	m.list = nm
+	var cmds []tea.Cmd
 
-	return m, cmd
+	nlm, cmd := m.list.Update(msg)
+	m.list = nlm
+	cmds = append(cmds, cmd)
+
+	nfm, cmd := m.manager.Update(msg)
+	m.manager = nfm
+
+	return m, tea.Batch(cmds...)
 }
 
 func (m extListModel) SelectedItem() list.Item {
@@ -295,7 +340,7 @@ func (m extListModel) SelectedItem() list.Item {
 }
 
 func (m extListModel) View() string {
-	return appStyle.Render(m.list.View())
+	return appStyle.Render(m.list.View()) + "\n" + m.manager.View()
 }
 
 type ibrowser interface {
