@@ -1,7 +1,6 @@
 package browse
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -42,13 +41,11 @@ type BrowseOptions struct {
 
 func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Command {
 	opts := &BrowseOptions{
-		Browser:    f.Browser,
-		HttpClient: f.HttpClient,
-		IO:         f.IOStreams,
-		PathFromRepoRoot: func() string {
-			return f.GitClient.PathFromRoot(context.Background())
-		},
-		GitClient: &localGitClient{client: f.GitClient},
+		Browser:          f.Browser,
+		HttpClient:       f.HttpClient,
+		IO:               f.IOStreams,
+		PathFromRepoRoot: git.PathFromRepoRoot,
+		GitClient:        &localGitClient{},
 	}
 
 	cmd := &cobra.Command{
@@ -272,18 +269,14 @@ type gitClient interface {
 	LastCommit() (*git.Commit, error)
 }
 
-type localGitClient struct {
-	client *git.Client
-}
+type localGitClient struct{}
 
 type remoteGitClient struct {
 	repo       func() (ghrepo.Interface, error)
 	httpClient func() (*http.Client, error)
 }
 
-func (gc *localGitClient) LastCommit() (*git.Commit, error) {
-	return gc.client.LastCommit(context.Background())
-}
+func (gc *localGitClient) LastCommit() (*git.Commit, error) { return git.LastCommit() }
 
 func (gc *remoteGitClient) LastCommit() (*git.Commit, error) {
 	httpClient, err := gc.httpClient()

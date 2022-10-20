@@ -39,7 +39,7 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		BaseRepo:   f.BaseRepo,
 		Remotes:    f.Remotes,
-		Git:        &gitExecuter{client: f.GitClient},
+		Git:        &gitExecuter{io: f.IOStreams},
 	}
 
 	cmd := &cobra.Command{

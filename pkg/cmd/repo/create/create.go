@@ -1,7 +1,6 @@
 package create
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -28,7 +27,6 @@ type iprompter interface {
 
 type CreateOptions struct {
 	HttpClient func() (*http.Client, error)
-	GitClient  *git.Client
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	Prompter   iprompter
@@ -59,7 +57,6 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		GitClient:  f.GitClient,
 		Config:     f.Config,
 		Prompter:   f.Prompter,
 	}
@@ -393,10 +390,10 @@ func createFromScratch(opts *CreateOptions) error {
 				// use the template's default branch
 				checkoutBranch = templateRepoMainBranch
 			}
-			if err := localInit(opts.GitClient, remoteURL, repo.RepoName(), checkoutBranch); err != nil {
+			if err := localInit(opts.IO, remoteURL, repo.RepoName(), checkoutBranch); err != nil {
 				return err
 			}
-		} else if _, err := opts.GitClient.Clone(context.Background(), remoteURL, []string{}); err != nil {
+		} else if _, err := git.RunClone(remoteURL, []string{}); err != nil {
 			return err
 		}
 	}
@@ -430,7 +427,6 @@ func createFromLocal(opts *CreateOptions) error {
 	}
 
 	repoPath := opts.Source
-	opts.GitClient.RepoDir = repoPath
 
 	var baseRemote string
 	if opts.Remote == "" {
@@ -444,7 +440,7 @@ func createFromLocal(opts *CreateOptions) error {
 		return err
 	}
 
-	isRepo, err := isLocalRepo(opts.GitClient)
+	isRepo, err := isLocalRepo(repoPath)
 	if err != nil {
 		return err
 	}
@@ -455,7 +451,7 @@ func createFromLocal(opts *CreateOptions) error {
 		return fmt.Errorf("%s is not a git repository. Run `git -C \"%s\" init` to initialize it", absPath, repoPath)
 	}
 
-	committed, err := hasCommits(opts.GitClient)
+	committed, err := hasCommits(repoPath)
 	if err != nil {
 		return err
 	}
@@ -537,7 +533,7 @@ func createFromLocal(opts *CreateOptions) error {
 		}
 	}
 
-	if err := sourceInit(opts.GitClient, opts.IO, remoteURL, baseRemote); err != nil {
+	if err := sourceInit(opts.IO, remoteURL, baseRemote, repoPath); err != nil {
 		return err
 	}
 
@@ -551,7 +547,7 @@ func createFromLocal(opts *CreateOptions) error {
 	}
 
 	if opts.Push {
-		repoPush, err := opts.GitClient.Command(context.Background(), "push", "-u", baseRemote, "HEAD")
+		repoPush, err := git.GitCommand("-C", repoPath, "push", "-u", baseRemote, "HEAD")
 		if err != nil {
 			return err
 		}
@@ -567,17 +563,17 @@ func createFromLocal(opts *CreateOptions) error {
 	return nil
 }
 
-func sourceInit(gitClient *git.Client, io *iostreams.IOStreams, remoteURL, baseRemote string) error {
+func sourceInit(io *iostreams.IOStreams, remoteURL, baseRemote, repoPath string) error {
 	cs := io.ColorScheme()
 	isTTY := io.IsStdoutTTY()
 	stdout := io.Out
 
-	remoteAdd, err := gitClient.Command(context.Background(), "remote", "add", baseRemote, remoteURL)
+	remoteAdd, err := git.GitCommand("-C", repoPath, "remote", "add", baseRemote, remoteURL)
 	if err != nil {
 		return err
 	}
 
-	_, err = remoteAdd.Output()
+	err = remoteAdd.Run()
 	if err != nil {
 		return fmt.Errorf("%s Unable to add remote %q", cs.FailureIcon(), baseRemote)
 	}
@@ -588,12 +584,12 @@ func sourceInit(gitClient *git.Client, io *iostreams.IOStreams, remoteURL, baseR
 }
 
 // check if local repository has committed changes
-func hasCommits(gitClient *git.Client) (bool, error) {
-	hasCommitsCmd, err := gitClient.Command(context.Background(), "rev-parse", "HEAD")
+func hasCommits(repoPath string) (bool, error) {
+	hasCommitsCmd, err := git.GitCommand("-C", repoPath, "rev-parse", "HEAD")
 	if err != nil {
 		return false, err
 	}
-	_, err = hasCommitsCmd.Output()
+	err = hasCommitsCmd.Run()
 	if err == nil {
 		return true, nil
 	}
@@ -610,8 +606,8 @@ func hasCommits(gitClient *git.Client) (bool, error) {
 }
 
 // check if path is the top level directory of a git repo
-func isLocalRepo(gitClient *git.Client) (bool, error) {
-	projectDir, projectDirErr := gitClient.GitDir(context.Background())
+func isLocalRepo(repoPath string) (bool, error) {
+	projectDir, projectDirErr := git.GetDirFromPath(repoPath)
 	if projectDirErr != nil {
 		var execError *exec.ExitError
 		if errors.As(projectDirErr, &execError) {
@@ -628,26 +624,28 @@ func isLocalRepo(gitClient *git.Client) (bool, error) {
 }
 
 // clone the checkout branch to specified path
-func localInit(gitClient *git.Client, remoteURL, path, checkoutBranch string) error {
-	ctx := context.Background()
-	gitInit, err := gitClient.Command(ctx, "init", path)
+func localInit(io *iostreams.IOStreams, remoteURL, path, checkoutBranch string) error {
+	gitInit, err := git.GitCommand("init", path)
 	if err != nil {
 		return err
 	}
-	_, err = gitInit.Output()
+	isTTY := io.IsStdoutTTY()
+	if isTTY {
+		gitInit.Stdout = io.Out
+	}
+	gitInit.Stderr = io.ErrOut
+	err = gitInit.Run()
 	if err != nil {
 		return err
 	}
 
-	// Clone the client so we do not modify the original client's RepoDir.
-	gc := cloneGitClient(gitClient)
-	gc.RepoDir = path
-
-	gitRemoteAdd, err := gc.Command(ctx, "remote", "add", "origin", remoteURL)
+	gitRemoteAdd, err := git.GitCommand("-C", path, "remote", "add", "origin", remoteURL)
 	if err != nil {
 		return err
 	}
-	_, err = gitRemoteAdd.Output()
+	gitRemoteAdd.Stdout = io.Out
+	gitRemoteAdd.Stderr = io.ErrOut
+	err = gitRemoteAdd.Run()
 	if err != nil {
 		return err
 	}
@@ -656,21 +654,24 @@ func localInit(gitClient *git.Client, remoteURL, path, checkoutBranch string) er
 		return nil
 	}
 
-	gitFetch, err := gc.Command(ctx, "fetch", "origin", fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/origin/%[1]s", checkoutBranch))
+	gitFetch, err := git.GitCommand("-C", path, "fetch", "origin", fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/origin/%[1]s", checkoutBranch))
 	if err != nil {
 		return err
 	}
+	gitFetch.Stdout = io.Out
+	gitFetch.Stderr = io.ErrOut
 	err = gitFetch.Run()
 	if err != nil {
 		return err
 	}
 
-	gitCheckout, err := gc.Command(ctx, "checkout", checkoutBranch)
+	gitCheckout, err := git.GitCommand("-C", path, "checkout", checkoutBranch)
 	if err != nil {
 		return err
 	}
-	_, err = gitCheckout.Output()
-	return err
+	gitCheckout.Stdout = io.Out
+	gitCheckout.Stderr = io.ErrOut
+	return gitCheckout.Run()
 }
 
 func interactiveGitIgnore(client *http.Client, hostname string, prompter iprompter) (string, error) {
@@ -734,15 +735,4 @@ func interactiveRepoInfo(prompter iprompter, defaultName string) (string, string
 	}
 
 	return name, description, strings.ToUpper(visibilityOptions[selected]), nil
-}
-
-func cloneGitClient(c *git.Client) *git.Client {
-	return &git.Client{
-		GhPath:  c.GhPath,
-		RepoDir: c.RepoDir,
-		GitPath: c.GitPath,
-		Stderr:  c.Stderr,
-		Stdin:   c.Stdin,
-		Stdout:  c.Stdout,
-	}
 }

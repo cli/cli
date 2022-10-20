@@ -76,10 +76,6 @@ func (e CmdError) Error() string {
 	return fmt.Sprintf("%s%s: %s", msg, e.Args[0], e.Err)
 }
 
-func (e CmdError) Unwrap() error {
-	return e.Err
-}
-
 func printArgs(w io.Writer, args []string) error {
 	if len(args) > 0 {
 		// print commands, but omit the full path to an executable

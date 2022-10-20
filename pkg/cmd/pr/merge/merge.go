@@ -1,7 +1,6 @@
 package merge
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,7 +8,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	ghContext "github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -27,10 +26,9 @@ type editor interface {
 
 type MergeOptions struct {
 	HttpClient func() (*http.Client, error)
-	GitClient  *git.Client
 	IO         *iostreams.IOStreams
 	Branch     func() (string, error)
-	Remotes    func() (ghContext.Remotes, error)
+	Remotes    func() (context.Remotes, error)
 
 	Finder shared.PRFinder
 
@@ -62,7 +60,6 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	opts := &MergeOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		GitClient:  f.GitClient,
 		Branch:     f.Branch,
 		Remotes:    f.Remotes,
 	}
@@ -227,7 +224,7 @@ func (m *mergeContext) warnIfDiverged() {
 		return
 	}
 
-	localBranchLastCommit, err := m.opts.GitClient.LastCommit(context.Background())
+	localBranchLastCommit, err := git.LastCommit()
 	if err != nil {
 		return
 	}
@@ -399,8 +396,6 @@ func (m *mergeContext) deleteLocalBranch() error {
 		return err
 	}
 
-	ctx := context.Background()
-
 	// branch the command was run on is the same as the pull request branch
 	if currentBranch == m.pr.HeadRefName {
 		remotes, err := m.opts.Remotes()
@@ -414,24 +409,24 @@ func (m *mergeContext) deleteLocalBranch() error {
 		}
 
 		targetBranch := m.pr.BaseRefName
-		if m.opts.GitClient.HasLocalBranch(ctx, targetBranch) {
-			if err := m.opts.GitClient.CheckoutBranch(ctx, targetBranch); err != nil {
+		if git.HasLocalBranch(targetBranch) {
+			if err := git.CheckoutBranch(targetBranch); err != nil {
 				return err
 			}
 		} else {
-			if err := m.opts.GitClient.CheckoutNewBranch(ctx, baseRemote.Name, targetBranch); err != nil {
+			if err := git.CheckoutNewBranch(baseRemote.Name, targetBranch); err != nil {
 				return err
 			}
 		}
 
-		if err := m.opts.GitClient.Pull(ctx, baseRemote.Name, targetBranch); err != nil {
+		if err := git.Pull(baseRemote.Name, targetBranch); err != nil {
 			_ = m.warnf(fmt.Sprintf("%s warning: not possible to fast-forward to: %q\n", m.cs.WarningIcon(), targetBranch))
 		}
 
 		m.switchedToBranch = targetBranch
 	}
 
-	if err := m.opts.GitClient.DeleteLocalBranch(ctx, m.pr.HeadRefName); err != nil {
+	if err := git.DeleteLocalBranch(m.pr.HeadRefName); err != nil {
 		return fmt.Errorf("failed to delete local branch %s: %w", m.cs.Cyan(m.pr.HeadRefName), err)
 	}
 
@@ -508,7 +503,7 @@ func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 		deleteBranch:       opts.DeleteBranch,
 		crossRepoPR:        pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner(),
 		autoMerge:          opts.AutoMergeEnable && !isImmediatelyMergeable(pr.MergeStateStatus),
-		localBranchExists:  opts.CanDeleteLocalBranch && opts.GitClient.HasLocalBranch(context.Background(), pr.HeadRefName),
+		localBranchExists:  opts.CanDeleteLocalBranch && git.HasLocalBranch(pr.HeadRefName),
 		mergeQueueRequired: pr.IsMergeQueueEnabled,
 	}, nil
 }
@@ -735,7 +730,7 @@ func allowsAdminOverride(status string) bool {
 	}
 }
 
-func remoteForMergeConflictResolution(baseRepo ghrepo.Interface, pr *api.PullRequest, opts *MergeOptions) *ghContext.Remote {
+func remoteForMergeConflictResolution(baseRepo ghrepo.Interface, pr *api.PullRequest, opts *MergeOptions) *context.Remote {
 	if !mergeConflictStatus(pr.MergeStateStatus) || !opts.CanDeleteLocalBranch {
 		return nil
 	}
