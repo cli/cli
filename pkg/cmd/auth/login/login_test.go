@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
@@ -596,6 +597,8 @@ func Test_loginRun_Survey(t *testing.T) {
 				tt.prompterStubs(pm)
 			}
 			tt.opts.Prompter = pm
+
+			tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
 
 			rs, restoreRun := run.Stub()
 			defer restoreRun(t)

@@ -1,6 +1,7 @@
 package clone
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -18,6 +19,7 @@ import (
 
 type CloneOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitClient  *git.Client
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 
@@ -30,6 +32,7 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 	opts := &CloneOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Config:     f.Config,
 	}
 
@@ -152,7 +155,9 @@ func cloneRun(opts *CloneOptions) error {
 		canonicalCloneURL = strings.TrimSuffix(canonicalCloneURL, ".git") + ".wiki.git"
 	}
 
-	cloneDir, err := git.RunClone(canonicalCloneURL, opts.GitArgs)
+	gitClient := opts.GitClient
+	ctx := context.Background()
+	cloneDir, err := gitClient.Clone(ctx, canonicalCloneURL, opts.GitArgs)
 	if err != nil {
 		return err
 	}
@@ -170,7 +175,7 @@ func cloneRun(opts *CloneOptions) error {
 			upstreamName = canonicalRepo.Parent.RepoOwner()
 		}
 
-		err = git.AddNamedRemote(upstreamURL, upstreamName, cloneDir, []string{canonicalRepo.Parent.DefaultBranchRef.Name})
+		_, err = gitClient.AddRemote(ctx, upstreamName, upstreamURL, []string{canonicalRepo.Parent.DefaultBranchRef.Name}, git.WithRepoDir(cloneDir))
 		if err != nil {
 			return err
 		}

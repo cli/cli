@@ -52,6 +52,7 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 			}
 			return branch, nil
 		},
+		GitClient: &git.Client{GitPath: "some/path/git"},
 	}
 
 	cmd := NewCmdStatus(factory, nil)
@@ -328,7 +329,8 @@ func Test_prSelectorForCurrentBranch(t *testing.T) {
 			Repo:   repo,
 		},
 	}
-	prNum, headRef, err := prSelectorForCurrentBranch(repo, "Frederick888/main", rem)
+	gitClient := &git.Client{GitPath: "some/path/git"}
+	prNum, headRef, err := prSelectorForCurrentBranch(gitClient, repo, "Frederick888/main", rem)
 	if err != nil {
 		t.Fatalf("prSelectorForCurrentBranch error: %v", err)
 	}

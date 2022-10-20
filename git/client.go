@@ -38,22 +38,16 @@ func (e *NotInstalled) Unwrap() error {
 }
 
 type GitError struct {
-	stderr string
-	err    error
+	ExitCode int
+	Stderr   string
+	err      error
 }
 
 func (ge *GitError) Error() string {
-	stderr := ge.stderr
-	if stderr == "" {
-		var exitError *exec.ExitError
-		if errors.As(ge.err, &exitError) {
-			stderr = string(exitError.Stderr)
-		}
-	}
-	if stderr == "" {
+	if ge.Stderr == "" {
 		return fmt.Sprintf("failed to run git: %v", ge.err)
 	}
-	return fmt.Sprintf("failed to run git: %s", stderr)
+	return fmt.Sprintf("failed to run git: %s", ge.Stderr)
 }
 
 func (ge *GitError) Unwrap() error {
@@ -64,16 +58,77 @@ type gitCommand struct {
 	*exec.Cmd
 }
 
-// This is a hack in order to not break the hundreds of
-// existing tests that rely on `run.PrepareCmd` to be invoked.
 func (gc *gitCommand) Run() error {
-	return run.PrepareCmd(gc.Cmd).Run()
+	// This is a hack in order to not break the hundreds of
+	// existing tests that rely on `run.PrepareCmd` to be invoked.
+	err := run.PrepareCmd(gc.Cmd).Run()
+	if err != nil {
+		ge := GitError{err: err}
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
+			ge.Stderr = string(exitError.Stderr)
+			ge.ExitCode = exitError.ExitCode()
+		}
+		return &ge
+	}
+	return nil
 }
 
-// This is a hack in order to not break the hundreds of
-// existing tests that rely on `run.PrepareCmd` to be invoked.
 func (gc *gitCommand) Output() ([]byte, error) {
-	return run.PrepareCmd(gc.Cmd).Output()
+	gc.Stdout = nil
+	gc.Stderr = nil
+	// This is a hack in order to not break the hundreds of
+	// existing tests that rely on `run.PrepareCmd` to be invoked.
+	out, err := run.PrepareCmd(gc.Cmd).Output()
+	if err != nil {
+		ge := GitError{err: err}
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
+			ge.Stderr = string(exitError.Stderr)
+			ge.ExitCode = exitError.ExitCode()
+		}
+		err = &ge
+	}
+	return out, err
+}
+
+func (gc *gitCommand) setRepoDir(repoDir string) {
+	for i, arg := range gc.Args {
+		if arg == "-C" {
+			gc.Args[i+1] = repoDir
+			return
+		}
+	}
+	gc.Args = append(gc.Args[:3], gc.Args[1:]...)
+	gc.Args[1] = "-C"
+	gc.Args[2] = repoDir
+}
+
+// Allow individual commands to be modified from the default client options.
+type CommandModifier func(*gitCommand)
+
+func WithStderr(stderr io.Writer) CommandModifier {
+	return func(gc *gitCommand) {
+		gc.Stderr = stderr
+	}
+}
+
+func WithStdout(stdout io.Writer) CommandModifier {
+	return func(gc *gitCommand) {
+		gc.Stdout = stdout
+	}
+}
+
+func WithStdin(stdin io.Reader) CommandModifier {
+	return func(gc *gitCommand) {
+		gc.Stdin = stdin
+	}
+}
+
+func WithRepoDir(repoDir string) CommandModifier {
+	return func(gc *gitCommand) {
+		gc.setRepoDir(repoDir)
+	}
 }
 
 type Client struct {
@@ -133,8 +188,7 @@ func resolveGitPath() (string, error) {
 // AuthenticatedCommand is a wrapper around Command that included configuration to use gh
 // as the credential helper for git.
 func (c *Client) AuthenticatedCommand(ctx context.Context, args ...string) (*gitCommand, error) {
-	preArgs := []string{}
-	preArgs = append(preArgs, "-c", "credential.helper=")
+	preArgs := []string{"-c", "credential.helper="}
 	if c.GhPath == "" {
 		// Assumes that gh is in PATH.
 		c.GhPath = "gh"
@@ -153,7 +207,7 @@ func (c *Client) Remotes(ctx context.Context) (RemoteSet, error) {
 	}
 	remoteOut, remoteErr := remoteCmd.Output()
 	if remoteErr != nil {
-		return nil, &GitError{err: remoteErr}
+		return nil, remoteErr
 	}
 
 	configArgs := []string{"config", "--get-regexp", `^remote\..*\.gh-resolved$`}
@@ -164,9 +218,9 @@ func (c *Client) Remotes(ctx context.Context) (RemoteSet, error) {
 	configOut, configErr := configCmd.Output()
 	if configErr != nil {
 		// Ignore exit code 1 as it means there are no resolved remotes.
-		var exitErr *exec.ExitError
-		if errors.As(configErr, &exitErr) && exitErr.ExitCode() != 1 {
-			return nil, &GitError{err: configErr}
+		var gitErr *GitError
+		if ok := errors.As(configErr, &gitErr); ok && gitErr.ExitCode != 1 {
+			return nil, gitErr
 		}
 	}
 
@@ -176,18 +230,20 @@ func (c *Client) Remotes(ctx context.Context) (RemoteSet, error) {
 	return remotes, nil
 }
 
-func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBranches []string) (*Remote, error) {
+func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBranches []string, mods ...CommandModifier) (*Remote, error) {
 	args := []string{"remote", "add"}
 	for _, branch := range trackingBranches {
 		args = append(args, "-t", branch)
 	}
 	args = append(args, "-f", name, urlStr)
-	//TODO: Use AuthenticatedCommand
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
-	if err := cmd.Run(); err != nil {
+	for _, mod := range mods {
+		mod(cmd)
+	}
+	if _, err := cmd.Output(); err != nil {
 		return nil, err
 	}
 	var urlParsed *url.URL
@@ -216,7 +272,11 @@ func (c *Client) UpdateRemoteURL(ctx context.Context, name, url string) error {
 	if err != nil {
 		return err
 	}
-	return cmd.Run()
+	_, err = cmd.Output()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *Client) SetRemoteResolution(ctx context.Context, name, resolution string) error {
@@ -225,7 +285,11 @@ func (c *Client) SetRemoteResolution(ctx context.Context, name, resolution strin
 	if err != nil {
 		return err
 	}
-	return cmd.Run()
+	_, err = cmd.Output()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // CurrentBranch reads the checked-out branch for the git repository.
@@ -235,14 +299,14 @@ func (c *Client) CurrentBranch(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	errBuf := bytes.Buffer{}
-	cmd.Stderr = &errBuf
 	out, err := cmd.Output()
 	if err != nil {
-		if errBuf.Len() == 0 {
-			return "", &GitError{err: err, stderr: "not on any branch"}
+		var gitErr *GitError
+		if ok := errors.As(err, &gitErr); ok && len(gitErr.Stderr) == 0 {
+			gitErr.Stderr = "not on any branch"
+			return "", gitErr
 		}
-		return "", &GitError{err: err, stderr: errBuf.String()}
+		return "", err
 	}
 	branch := firstLine(out)
 	return strings.TrimPrefix(branch, "refs/heads/"), nil
@@ -278,15 +342,14 @@ func (c *Client) Config(ctx context.Context, name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	errBuf := bytes.Buffer{}
-	cmd.Stderr = &errBuf
 	out, err := cmd.Output()
 	if err != nil {
-		var exitError *exec.ExitError
-		if ok := errors.As(err, &exitError); ok && exitError.Error() == "1" {
-			return "", &GitError{err: err, stderr: fmt.Sprintf("unknown config key %s", name)}
+		var gitErr *GitError
+		if ok := errors.As(err, &gitErr); ok && gitErr.ExitCode == 1 {
+			gitErr.Stderr = fmt.Sprintf("unknown config key %s", name)
+			return "", gitErr
 		}
-		return "", &GitError{err: err, stderr: errBuf.String()}
+		return "", err
 	}
 	return firstLine(out), nil
 }
@@ -299,7 +362,7 @@ func (c *Client) UncommittedChangeCount(ctx context.Context) (int, error) {
 	}
 	out, err := cmd.Output()
 	if err != nil {
-		return 0, &GitError{err: err}
+		return 0, err
 	}
 	lines := strings.Split(string(out), "\n")
 	count := 0
@@ -319,7 +382,7 @@ func (c *Client) Commits(ctx context.Context, baseRef, headRef string) ([]*Commi
 	}
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, &GitError{err: err}
+		return nil, err
 	}
 	commits := []*Commit{}
 	sha := 0
@@ -348,7 +411,7 @@ func (c *Client) lookupCommit(ctx context.Context, sha, format string) ([]byte, 
 	}
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, &GitError{err: err}
+		return nil, err
 	}
 	return out, nil
 }
@@ -371,12 +434,15 @@ func (c *Client) CommitBody(ctx context.Context, sha string) (string, error) {
 }
 
 // Push publishes a git ref to a remote and sets up upstream configuration.
-func (c *Client) Push(ctx context.Context, remote string, ref string) error {
+func (c *Client) Push(ctx context.Context, remote string, ref string, mods ...CommandModifier) error {
 	args := []string{"push", "--set-upstream", remote, ref}
 	//TODO: Use AuthenticatedCommand
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return err
+	}
+	for _, mod := range mods {
+		mod(cmd)
 	}
 	return cmd.Run()
 }
@@ -423,7 +489,11 @@ func (c *Client) DeleteLocalBranch(ctx context.Context, branch string) error {
 	if err != nil {
 		return err
 	}
-	return cmd.Run()
+	_, err = cmd.Output()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *Client) HasLocalBranch(ctx context.Context, branch string) bool {
@@ -432,7 +502,7 @@ func (c *Client) HasLocalBranch(ctx context.Context, branch string) bool {
 	if err != nil {
 		return false
 	}
-	err = cmd.Run()
+	_, err = cmd.Output()
 	return err == nil
 }
 
@@ -442,7 +512,11 @@ func (c *Client) CheckoutBranch(ctx context.Context, branch string) error {
 	if err != nil {
 		return err
 	}
-	return cmd.Run()
+	_, err = cmd.Output()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *Client) CheckoutNewBranch(ctx context.Context, remoteName, branch string) error {
@@ -452,7 +526,11 @@ func (c *Client) CheckoutNewBranch(ctx context.Context, remoteName, branch strin
 	if err != nil {
 		return err
 	}
-	return cmd.Run()
+	_, err = cmd.Output()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *Client) Pull(ctx context.Context, remote, branch string) error {
@@ -465,7 +543,7 @@ func (c *Client) Pull(ctx context.Context, remote, branch string) error {
 	return cmd.Run()
 }
 
-func (c *Client) Clone(ctx context.Context, cloneURL string, args []string) (target string, err error) {
+func (c *Client) Clone(ctx context.Context, cloneURL string, args []string) (string, error) {
 	cloneArgs, target := parseCloneArgs(args)
 	cloneArgs = append(cloneArgs, cloneURL)
 	// If the args contain an explicit target, pass it to clone
@@ -482,7 +560,10 @@ func (c *Client) Clone(ctx context.Context, cloneURL string, args []string) (tar
 		return "", err
 	}
 	err = cmd.Run()
-	return
+	if err != nil {
+		return "", err
+	}
+	return target, nil
 }
 
 // ToplevelDir returns the top-level directory path of the current repository.
@@ -494,7 +575,7 @@ func (c *Client) ToplevelDir(ctx context.Context) (string, error) {
 	}
 	out, err := cmd.Output()
 	if err != nil {
-		return "", &GitError{err: err}
+		return "", err
 	}
 	return firstLine(out), nil
 }
@@ -507,7 +588,7 @@ func (c *Client) GitDir(ctx context.Context) (string, error) {
 	}
 	out, err := cmd.Output()
 	if err != nil {
-		return "", &GitError{err: err}
+		return "", err
 	}
 	return firstLine(out), nil
 }
