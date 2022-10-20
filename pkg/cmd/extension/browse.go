@@ -185,9 +185,32 @@ func extBrowse(opts extBrowseOpts) error {
 
 	innerFlex.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		opts.logger.Printf("%#v", event.Rune())
+		opts.logger.Printf("%#v", event.Key())
 		switch event.Rune() {
 		case 'q':
 			app.Stop()
+		case 'k':
+			return tcell.NewEventKey(tcell.KeyUp, rune(0), 0)
+		case 'j':
+			return tcell.NewEventKey(tcell.KeyDown, rune(0), 0)
+		case 'i':
+			opts.logger.Println("INSTALL REQUESTED")
+		case 'r':
+			opts.logger.Println("REMOVE REQUESTED")
+		case '/':
+			opts.logger.Println("FILTER REQUESTED")
+		}
+		switch event.Key() {
+		case tcell.KeyLeft:
+			opts.logger.Println("PAGE UP LIST")
+		case tcell.KeyRight:
+			opts.logger.Println("PAGE DOWN LIST")
+		case tcell.KeyPgUp:
+			opts.logger.Println("SCROLL UP README")
+			return nil
+		case tcell.KeyPgDn:
+			opts.logger.Println("SCROLL DOWN README")
+			return nil
 		}
 		return event
 	})
