@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/repo/view"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/search"
+	"github.com/rivo/tview"
 	"github.com/spf13/cobra"
 )
 
@@ -61,18 +62,20 @@ type extEntry struct {
 }
 
 func (e extEntry) Title() string {
-	installedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#62FF42"))
-	officialStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F2DB74"))
+	//installedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#62FF42"))
+	//officialStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F2DB74"))
 
 	var installed string
 	var official string
 
 	if e.Installed {
-		installed = installedStyle.Render(" [installed]")
+		//installed = installedStyle.Render(" [installed]")
+		installed = " [installed]"
 	}
 
 	if e.Official {
-		official = officialStyle.Render(" [official]")
+		//official = officialStyle.Render(" [official]")
+		official = " [official]"
 	}
 
 	return fmt.Sprintf("%s%s%s", e.FullName, official, installed)
@@ -154,6 +157,38 @@ func extBrowse(opts extBrowseOpts) error {
 	}
 
 	opts.rg = newReadmeGetter(opts.client)
+
+	outerFlex := tview.NewFlex()
+	innerFlex := tview.NewFlex()
+
+	header := tview.NewTextView().SetText("gh extensions")
+	list := tview.NewList()
+	readme := tview.NewTextView().SetText("lol hi")
+	help := tview.NewTextView().SetText("help area")
+
+	for x := range extEntries {
+		ee := extEntries[len(extEntries)-1-x]
+		list.AddItem(ee.Title(), ee.Description(), ' ', func() {})
+	}
+
+	outerFlex.SetDirection(tview.FlexRow)
+	outerFlex.AddItem(header, 1, -1, false)
+	innerFlex.SetDirection(tview.FlexColumn)
+	innerFlex.AddItem(list, 0, 1, true)
+	innerFlex.AddItem(readme, 0, 1, false)
+	outerFlex.AddItem(innerFlex, 0, 1, false)
+	outerFlex.AddItem(help, 1, -1, false)
+
+	// header one row, all cols
+	// list buncha rows, 30% cols
+	// readme buncha rows, 60% cols
+	// help legend one row, all cols
+	// filter input in a modal
+	// install/remove feedback in a modal
+
+	if err := tview.NewApplication().SetRoot(outerFlex, true).Run(); err != nil {
+		return err
+	}
 
 	return nil
 }
