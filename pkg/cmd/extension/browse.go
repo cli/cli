@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/repo/view"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/search"
+	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"github.com/spf13/cobra"
 )
@@ -180,14 +181,21 @@ func extBrowse(opts extBrowseOpts) error {
 	outerFlex.AddItem(innerFlex, 0, 1, true)
 	outerFlex.AddItem(help, 1, -1, false)
 
-	// header one row, all cols
-	// list buncha rows, 30% cols
-	// readme buncha rows, 60% cols
-	// help legend one row, all cols
-	// filter input in a modal
-	// install/remove feedback in a modal
+	app := tview.NewApplication().SetRoot(outerFlex, true)
 
-	if err := tview.NewApplication().SetRoot(outerFlex, true).Run(); err != nil {
+	innerFlex.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		opts.logger.Printf("%#v", event.Rune())
+		switch event.Rune() {
+		case 'q':
+			app.Stop()
+		}
+		return event
+	})
+
+	// TODO filter input in a modal
+	// TODO install/remove feedback in a modal
+
+	if err := app.Run(); err != nil {
 		return err
 	}
 
