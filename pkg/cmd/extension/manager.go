@@ -2,6 +2,7 @@ package extension
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -789,7 +790,8 @@ func isBinExtension(client *http.Client, repo ghrepo.Interface) (isBin bool, err
 }
 
 func repoFromPath(path string) (ghrepo.Interface, error) {
-	remotes, err := git.RemotesForPath(path)
+	gitClient := &git.Client{RepoDir: path}
+	remotes, err := gitClient.Remotes(context.Background())
 	if err != nil {
 		return nil, err
 	}

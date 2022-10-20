@@ -1,6 +1,7 @@
 package fork
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -9,7 +10,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/context"
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -25,10 +26,11 @@ const defaultRemoteName = "origin"
 
 type ForkOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitClient  *git.Client
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
-	Remotes    func() (context.Remotes, error)
+	Remotes    func() (ghContext.Remotes, error)
 	Since      func(time.Time) time.Duration
 
 	GitArgs      []string
@@ -51,6 +53,7 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 	opts := &ForkOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Config:     f.Config,
 		BaseRepo:   f.BaseRepo,
 		Remotes:    f.Remotes,
@@ -226,6 +229,9 @@ func forkRun(opts *ForkOptions) error {
 	}
 	protocol, _ := cfg.Get(repoToFork.RepoHost(), "git_protocol")
 
+	gitClient := opts.GitClient
+	ctx := context.Background()
+
 	if inParent {
 		remotes, err := opts.Remotes()
 		if err != nil {
@@ -264,6 +270,7 @@ func forkRun(opts *ForkOptions) error {
 				return fmt.Errorf("failed to prompt: %w", err)
 			}
 		}
+
 		if remoteDesired {
 			remoteName := opts.RemoteName
 			remotes, err := opts.Remotes()
@@ -274,11 +281,11 @@ func forkRun(opts *ForkOptions) error {
 			if _, err := remotes.FindByName(remoteName); err == nil {
 				if opts.Rename {
 					renameTarget := "upstream"
-					renameCmd, err := git.GitCommand("remote", "rename", remoteName, renameTarget)
+					renameCmd, err := gitClient.Command(ctx, "remote", "rename", remoteName, renameTarget)
 					if err != nil {
 						return err
 					}
-					err = renameCmd.Run()
+					_, err = renameCmd.Output()
 					if err != nil {
 						return err
 					}
@@ -289,7 +296,7 @@ func forkRun(opts *ForkOptions) error {
 
 			forkedRepoCloneURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
 
-			_, err = git.AddRemote(remoteName, forkedRepoCloneURL)
+			_, err = gitClient.AddRemote(ctx, remoteName, forkedRepoCloneURL, []string{})
 			if err != nil {
 				return fmt.Errorf("failed to add remote: %w", err)
 			}
@@ -309,13 +316,13 @@ func forkRun(opts *ForkOptions) error {
 		}
 		if cloneDesired {
 			forkedRepoURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
-			cloneDir, err := git.RunClone(forkedRepoURL, opts.GitArgs)
+			cloneDir, err := gitClient.Clone(ctx, forkedRepoURL, opts.GitArgs)
 			if err != nil {
 				return fmt.Errorf("failed to clone fork: %w", err)
 			}
 
 			upstreamURL := ghrepo.FormatRemoteURL(repoToFork, protocol)
-			err = git.AddNamedRemote(upstreamURL, "upstream", cloneDir, []string{})
+			_, err = gitClient.AddRemote(ctx, "upstream", upstreamURL, []string{}, git.WithRepoDir(cloneDir))
 			if err != nil {
 				return err
 			}

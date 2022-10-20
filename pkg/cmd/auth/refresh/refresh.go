@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
@@ -17,7 +18,8 @@ import (
 type RefreshOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
-	httpClient *http.Client
+	HttpClient *http.Client
+	GitClient  *git.Client
 	Prompter   shared.Prompt
 
 	MainExecutable string
@@ -37,7 +39,8 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			_, err := authflow.AuthFlowWithConfig(cfg, io, hostname, "", scopes, interactive)
 			return err
 		},
-		httpClient: &http.Client{},
+		HttpClient: &http.Client{},
+		GitClient:  f.GitClient,
 		Prompter:   f.Prompter,
 	}
 
@@ -122,7 +125,7 @@ func refreshRun(opts *RefreshOptions) error {
 
 	var additionalScopes []string
 	if oldToken, _ := cfg.AuthToken(hostname); oldToken != "" {
-		if oldScopes, err := shared.GetScopes(opts.httpClient, hostname, oldToken); err == nil {
+		if oldScopes, err := shared.GetScopes(opts.HttpClient, hostname, oldToken); err == nil {
 			for _, s := range strings.Split(oldScopes, ",") {
 				s = strings.TrimSpace(s)
 				if s != "" {
@@ -135,6 +138,7 @@ func refreshRun(opts *RefreshOptions) error {
 	credentialFlow := &shared.GitCredentialFlow{
 		Executable: opts.MainExecutable,
 		Prompter:   opts.Prompter,
+		GitClient:  opts.GitClient,
 	}
 	gitProtocol, _ := cfg.GetOrDefault(hostname, "git_protocol")
 	if opts.Interactive && gitProtocol == "https" {

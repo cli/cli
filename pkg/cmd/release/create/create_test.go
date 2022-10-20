@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
@@ -688,6 +689,8 @@ func Test_createRun(t *testing.T) {
 				return ghrepo.FromFullName("OWNER/REPO")
 			}
 
+			tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
+
 			err := createRun(&tt.opts)
 			if tt.wantErr != "" {
 				require.EqualError(t, err, tt.wantErr)
@@ -1049,6 +1052,8 @@ func Test_createRun_interactive(t *testing.T) {
 		tt.opts.Edit = func(_, _, val string, _ io.Reader, _, _ io.Writer) (string, error) {
 			return val, nil
 		}
+
+		tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
 
 		t.Run(tt.name, func(t *testing.T) {
 			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
