@@ -2,7 +2,6 @@
 package context
 
 import (
-	"context"
 	"errors"
 	"sort"
 
@@ -139,8 +138,7 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams, p iprompter) (ghrepo
 	}
 
 	// cache the result to git config
-	c := &git.Client{}
-	err := c.SetRemoteResolution(context.Background(), remote.Name, resolution)
+	err := git.SetRemoteResolution(remote.Name, resolution)
 	return selectedRepo, err
 }
 

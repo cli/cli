@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -26,7 +25,6 @@ func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) 
 		Config: func() (config.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
-		GitClient: &git.Client{GitPath: "some/path/git"},
 	}
 
 	cmd := NewCmdClone(fac, nil)

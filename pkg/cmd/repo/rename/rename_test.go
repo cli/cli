@@ -259,8 +259,6 @@ func TestRenameRun(t *testing.T) {
 		ios.SetStdoutTTY(tt.tty)
 		tt.opts.IO = ios
 
-		tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
-
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)
 			err := renameRun(&tt.opts)

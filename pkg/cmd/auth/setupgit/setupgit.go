@@ -34,7 +34,6 @@ func NewCmdSetupGit(f *cmdutil.Factory, runF func(*SetupGitOptions) error) *cobr
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.gitConfigure = &shared.GitCredentialFlow{
 				Executable: f.Executable(),
-				GitClient:  f.GitClient,
 			}
 
 			if runF != nil {

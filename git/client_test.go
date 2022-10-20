@@ -394,6 +394,6 @@ func initRepo(t *testing.T, dir string) {
 	}
 	cmd, err := client.Command(context.Background(), []string{"init", "--quiet"}...)
 	assert.NoError(t, err)
-	_, err = cmd.Output()
+	err = cmd.Run()
 	assert.NoError(t, err)
 }

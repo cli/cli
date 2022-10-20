@@ -466,7 +466,7 @@ func Test_runBrowse(t *testing.T) {
 			}
 			opts.Browser = &browser
 			if opts.PathFromRepoRoot == nil {
-				opts.PathFromRepoRoot = func() string { return "" }
+				opts.PathFromRepoRoot = git.PathFromRepoRoot
 			}
 
 			err := runBrowse(&opts)

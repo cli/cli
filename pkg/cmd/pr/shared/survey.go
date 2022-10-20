@@ -6,7 +6,9 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/githubtemplate"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/pkg/surveyext"
@@ -366,4 +368,19 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 	}
 
 	return nil
+}
+
+func FindTemplates(dir, path string) ([]string, string) {
+	if dir == "" {
+		rootDir, err := git.ToplevelDir()
+		if err != nil {
+			return []string{}, ""
+		}
+		dir = rootDir
+	}
+
+	templateFiles := githubtemplate.FindNonLegacy(dir, path)
+	legacyTemplate := githubtemplate.FindLegacy(dir, path)
+
+	return templateFiles, legacyTemplate
 }

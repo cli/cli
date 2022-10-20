@@ -3,7 +3,6 @@ package shared
 import (
 	"testing"
 
-	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/run"
 )
 
@@ -16,7 +15,6 @@ func TestGitCredentialSetup_configureExisting(t *testing.T) {
 	f := GitCredentialFlow{
 		Executable: "gh",
 		helper:     "osxkeychain",
-		GitClient:  &git.Client{GitPath: "some/path/git"},
 	}
 
 	if err := f.gitCredentialSetup("example.com", "monalisa", "PASSWD"); err != nil {
@@ -63,7 +61,6 @@ func TestGitCredentialsSetup_setOurs_GH(t *testing.T) {
 	f := GitCredentialFlow{
 		Executable: "/path/to/gh",
 		helper:     "",
-		GitClient:  &git.Client{GitPath: "some/path/git"},
 	}
 
 	if err := f.gitCredentialSetup("github.com", "monalisa", "PASSWD"); err != nil {
@@ -95,7 +92,6 @@ func TestGitCredentialSetup_setOurs_nonGH(t *testing.T) {
 	f := GitCredentialFlow{
 		Executable: "/path/to/gh",
 		helper:     "",
-		GitClient:  &git.Client{GitPath: "some/path/git"},
 	}
 
 	if err := f.gitCredentialSetup("example.com", "monalisa", "PASSWD"); err != nil {

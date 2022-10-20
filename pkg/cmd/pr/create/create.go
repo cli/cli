@@ -1,7 +1,6 @@
 package create
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -13,7 +12,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	ghContext "github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
@@ -33,10 +32,9 @@ type iprompter interface {
 type CreateOptions struct {
 	// This struct stores user input and factory functions
 	HttpClient func() (*http.Client, error)
-	GitClient  *git.Client
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
-	Remotes    func() (ghContext.Remotes, error)
+	Remotes    func() (context.Remotes, error)
 	Branch     func() (string, error)
 	Browser    browser.Browser
 	Prompter   iprompter
@@ -70,24 +68,22 @@ type CreateOptions struct {
 type CreateContext struct {
 	// This struct stores contextual data about the creation process and is for building up enough
 	// data to create a pull request
-	RepoContext        *ghContext.ResolvedRemotes
+	RepoContext        *context.ResolvedRemotes
 	BaseRepo           *api.Repository
 	HeadRepo           ghrepo.Interface
 	BaseTrackingBranch string
 	BaseBranch         string
 	HeadBranch         string
 	HeadBranchLabel    string
-	HeadRemote         *ghContext.Remote
+	HeadRemote         *context.Remote
 	IsPushEnabled      bool
 	Client             *api.Client
-	GitClient          *git.Client
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
-		GitClient:  f.GitClient,
 		Config:     f.Config,
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
@@ -373,16 +369,15 @@ func createRun(opts *CreateOptions) (err error) {
 func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState) error {
 	baseRef := ctx.BaseTrackingBranch
 	headRef := ctx.HeadBranch
-	gitClient := ctx.GitClient
 
-	commits, err := gitClient.Commits(context.Background(), baseRef, headRef)
+	commits, err := git.Commits(baseRef, headRef)
 	if err != nil {
 		return err
 	}
 
 	if len(commits) == 1 {
 		state.Title = commits[0].Title
-		body, err := gitClient.CommitBody(context.Background(), commits[0].Sha)
+		body, err := git.CommitBody(commits[0].Sha)
 		if err != nil {
 			return err
 		}
@@ -400,11 +395,11 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState) e
 	return nil
 }
 
-func determineTrackingBranch(gitClient *git.Client, remotes ghContext.Remotes, headBranch string) *git.TrackingRef {
+func determineTrackingBranch(remotes context.Remotes, headBranch string) *git.TrackingRef {
 	refsForLookup := []string{"HEAD"}
 	var trackingRefs []git.TrackingRef
 
-	headBranchConfig := gitClient.ReadBranchConfig(context.Background(), headBranch)
+	headBranchConfig := git.ReadBranchConfig(headBranch)
 	if headBranchConfig.RemoteName != "" {
 		tr := git.TrackingRef{
 			RemoteName: headBranchConfig.RemoteName,
@@ -423,7 +418,7 @@ func determineTrackingBranch(gitClient *git.Client, remotes ghContext.Remotes, h
 		refsForLookup = append(refsForLookup, tr.String())
 	}
 
-	resolvedRefs, _ := gitClient.ShowRefs(context.Background(), refsForLookup...)
+	resolvedRefs, _ := git.ShowRefs(refsForLookup...)
 	if len(resolvedRefs) > 1 {
 		for _, r := range resolvedRefs[1:] {
 			if r.Hash != resolvedRefs[0].Hash {
@@ -485,7 +480,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		return nil, err
 	}
 
-	repoContext, err := ghContext.ResolveRemotesToRepos(remotes, client, opts.RepoOverride)
+	repoContext, err := context.ResolveRemotesToRepos(remotes, client, opts.RepoOverride)
 	if err != nil {
 		return nil, err
 	}
@@ -520,17 +515,16 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		headBranch = headBranch[idx+1:]
 	}
 
-	gitClient := opts.GitClient
-	if ucc, err := gitClient.UncommittedChangeCount(context.Background()); err == nil && ucc > 0 {
+	if ucc, err := git.UncommittedChangeCount(); err == nil && ucc > 0 {
 		fmt.Fprintf(opts.IO.ErrOut, "Warning: %s\n", text.Pluralize(ucc, "uncommitted change"))
 	}
 
 	var headRepo ghrepo.Interface
-	var headRemote *ghContext.Remote
+	var headRemote *context.Remote
 
 	if isPushEnabled {
 		// determine whether the head branch is already pushed to a remote
-		if pushedTo := determineTrackingBranch(gitClient, remotes, headBranch); pushedTo != nil {
+		if pushedTo := determineTrackingBranch(remotes, headBranch); pushedTo != nil {
 			isPushEnabled = false
 			if r, err := remotes.FindByName(pushedTo.RemoteName); err == nil {
 				headRepo = r
@@ -631,7 +625,6 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		IsPushEnabled:      isPushEnabled,
 		RepoContext:        repoContext,
 		Client:             client,
-		GitClient:          gitClient,
 	}, nil
 
 }
@@ -720,12 +713,11 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 		headRepoURL := ghrepo.FormatRemoteURL(headRepo, cloneProtocol)
 
 		// TODO: prevent clashes with another remote of a same name
-		gitClient := ctx.GitClient
-		gitRemote, err := gitClient.AddRemote(context.Background(), "fork", headRepoURL, []string{})
+		gitRemote, err := git.AddRemote("fork", headRepoURL)
 		if err != nil {
 			return fmt.Errorf("error adding remote: %w", err)
 		}
-		headRemote = &ghContext.Remote{
+		headRemote = &context.Remote{
 			Remote: gitRemote,
 			Repo:   headRepo,
 		}
@@ -737,11 +729,12 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 			pushTries := 0
 			maxPushTries := 3
 			for {
-				w := NewRegexpWriter(opts.IO.ErrOut, gitPushRegexp, "")
-				defer w.Flush()
-				gitClient := ctx.GitClient
-				ref := fmt.Sprintf("HEAD:%s", ctx.HeadBranch)
-				if err := gitClient.Push(context.Background(), headRemote.Name, ref, git.WithStderr(w)); err != nil {
+				r := NewRegexpWriter(opts.IO.ErrOut, gitPushRegexp, "")
+				defer r.Flush()
+				cmdErr := r
+				cmdIn := opts.IO.In
+				cmdOut := opts.IO.Out
+				if err := git.Push(headRemote.Name, fmt.Sprintf("HEAD:%s", ctx.HeadBranch), cmdIn, cmdOut, cmdErr); err != nil {
 					if didForkRepo && pushTries < maxPushTries {
 						pushTries++
 						// first wait 2 seconds after forking, then 4s, then 6s
