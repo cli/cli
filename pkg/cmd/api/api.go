@@ -177,7 +177,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 
 			if strings.HasPrefix(opts.RequestPath, "/") {
 				warningIcon := opts.IO.ColorScheme().WarningIcon()
-				fmt.Fprintf(opts.IO.ErrOut, "%s warning: '%s' An absolute window-styled path was passed which is likely to fail. Try dropping or escaping the starting slash in the endpoint if it fails. \n", warningIcon, opts.RequestPath)
+				fmt.Fprintf(opts.IO.ErrOut, "%s warning: '%s' An absolute window-styled path was passed which is likely to fail. Try dropping or escaping the leading slash in the endpoint if it fails. \n", warningIcon, opts.RequestPath)
 			}
 
 			if c.Flags().Changed("hostname") {

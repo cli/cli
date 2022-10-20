@@ -319,7 +319,7 @@ func Test_NewCmdApi(t *testing.T) {
 				FilterOutput:        "",
 			},
 			wantsErr: false,
-			stderr:   "! warning: '/users/repos' An absolute window-styled path was passed which is likely to fail. Try dropping or escaping the starting slash in the endpoint if it fails. \n",
+			stderr:   "! warning: '/users/repos' An absolute window-styled path was passed which is likely to fail. Try dropping or escaping the leading slash in the endpoint if it fails. \n",
 		},
 		{
 			name:     "--silent with --jq",
