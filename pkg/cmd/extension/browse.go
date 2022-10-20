@@ -164,19 +164,20 @@ func extBrowse(opts extBrowseOpts) error {
 	header := tview.NewTextView().SetText("gh extensions")
 	list := tview.NewList()
 	readme := tview.NewTextView().SetText("lol hi")
-	help := tview.NewTextView().SetText("help area")
+	help := tview.NewTextView().SetText("/: filter list i: install r: remove w: open in web q: quit")
 
 	for x := range extEntries {
 		ee := extEntries[len(extEntries)-1-x]
 		list.AddItem(ee.Title(), ee.Description(), ' ', func() {})
 	}
 
-	outerFlex.SetDirection(tview.FlexRow)
-	outerFlex.AddItem(header, 1, -1, false)
 	innerFlex.SetDirection(tview.FlexColumn)
 	innerFlex.AddItem(list, 0, 1, true)
 	innerFlex.AddItem(readme, 0, 1, false)
-	outerFlex.AddItem(innerFlex, 0, 1, false)
+
+	outerFlex.SetDirection(tview.FlexRow)
+	outerFlex.AddItem(header, 1, -1, false)
+	outerFlex.AddItem(innerFlex, 0, 1, true)
 	outerFlex.AddItem(help, 1, -1, false)
 
 	// header one row, all cols
