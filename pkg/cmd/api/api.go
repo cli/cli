@@ -175,6 +175,11 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			opts.RequestPath = args[0]
 			opts.RequestMethodPassed = c.Flags().Changed("method")
 
+			if strings.HasPrefix(opts.RequestPath, "/") {
+				warningIcon := opts.IO.ColorScheme().WarningIcon()
+				fmt.Fprintf(opts.IO.ErrOut, "%s warning: '%s' An absolute window-styled path was passed which is likely to fail. Try dropping or escaping the starting slash in the endpoint if it fails. \n", warningIcon, opts.RequestPath)
+			}
+
 			if c.Flags().Changed("hostname") {
 				if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
 					return cmdutil.FlagErrorf("error parsing `--hostname`: %w", err)

@@ -25,13 +25,12 @@ import (
 )
 
 func Test_NewCmdApi(t *testing.T) {
-	f := &cmdutil.Factory{}
-
 	tests := []struct {
 		name     string
 		cli      string
 		wants    ApiOptions
 		wantsErr bool
+		stderr   string
 	}{
 		{
 			name: "no flags",
@@ -301,6 +300,28 @@ func Test_NewCmdApi(t *testing.T) {
 			wantsErr: false,
 		},
 		{
+			name: "endpoint starting with slash",
+			cli:  "/users/repos",
+			wants: ApiOptions{
+				Hostname:            "",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "/users/repos",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
+			},
+			wantsErr: false,
+			stderr:   "! warning: '/users/repos' An absolute window-styled path was passed which is likely to fail. Try dropping or escaping the starting slash in the endpoint if it fails. \n",
+		},
+		{
 			name:     "--silent with --jq",
 			cli:      "user --silent -q .foo",
 			wantsErr: true,
@@ -319,6 +340,10 @@ func Test_NewCmdApi(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var opts *ApiOptions
+
+			ios, in, stdout, stderr := iostreams.Test()
+			f := &cmdutil.Factory{IOStreams: ios}
+
 			cmd := NewCmdApi(f, func(o *ApiOptions) error {
 				opts = o
 				return nil
@@ -327,9 +352,9 @@ func Test_NewCmdApi(t *testing.T) {
 			argv, err := shlex.Split(tt.cli)
 			assert.NoError(t, err)
 			cmd.SetArgs(argv)
-			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(&bytes.Buffer{})
-			cmd.SetErr(&bytes.Buffer{})
+			cmd.SetIn(in)
+			cmd.SetOut(stdout)
+			cmd.SetErr(stderr)
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
 				assert.Error(t, err)
@@ -351,6 +376,7 @@ func Test_NewCmdApi(t *testing.T) {
 			assert.Equal(t, tt.wants.CacheTTL, opts.CacheTTL)
 			assert.Equal(t, tt.wants.Template, opts.Template)
 			assert.Equal(t, tt.wants.FilterOutput, opts.FilterOutput)
+			assert.Equal(t, tt.stderr, stderr.String())
 		})
 	}
 }
