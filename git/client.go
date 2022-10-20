@@ -255,10 +255,9 @@ func (c *Client) ShowRefs(ctx context.Context, ref ...string) ([]Ref, error) {
 	if err != nil {
 		return nil, err
 	}
+	// This functionality relies on parsing output from the git command despite
+	// an error status being returned from git.
 	out, err := cmd.Output()
-	if err != nil {
-		return nil, &GitError{err: err}
-	}
 	var refs []Ref
 	for _, line := range outputLines(out) {
 		parts := strings.SplitN(line, " ", 2)
@@ -270,7 +269,7 @@ func (c *Client) ShowRefs(ctx context.Context, ref ...string) ([]Ref, error) {
 			Name: parts[1],
 		})
 	}
-	return refs, nil
+	return refs, err
 }
 
 func (c *Client) Config(ctx context.Context, name string) (string, error) {
