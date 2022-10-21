@@ -214,7 +214,7 @@ func extBrowse(opts extBrowseOpts) error {
 
 	app := tview.NewApplication().SetRoot(outerFlex, true)
 
-	innerFlex.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		opts.logger.Printf("%#v", event.Rune())
 		opts.logger.Printf("%#v", event.Key())
 		switch event.Rune() {
