@@ -160,10 +160,13 @@ func extBrowse(opts extBrowseOpts) error {
 
 	opts.rg = newReadmeGetter(opts.client)
 
+	app := tview.NewApplication()
+
 	outerFlex := tview.NewFlex()
 	innerFlex := tview.NewFlex()
 
-	header := tview.NewTextView().SetText("gh extensions")
+	header := tview.NewTextView().SetText("gh extensions").SetTextAlign(tview.AlignCenter)
+	filter := tview.NewInputField().SetLabel("filter: ")
 	list := tview.NewList()
 	readme := tview.NewTextView()
 	help := tview.NewTextView().SetText("/: filter i: install r: remove w: open in browser pgup/pgdn: scroll readme q: quit")
@@ -203,20 +206,34 @@ func extBrowse(opts extBrowseOpts) error {
 	// Force fetching of initial readme:
 	onSelectItem(0, "", "", rune(0))
 
+	filter.SetChangedFunc(func(text string) {
+		// TODO filter list
+	})
+	filter.SetDoneFunc(func(key tcell.Key) {
+		switch key {
+		case tcell.KeyEnter:
+			app.SetFocus(list)
+			// TODO
+		case tcell.KeyEscape:
+			filter.SetText("")
+			app.SetFocus(list)
+			// TODO clear active filter
+		}
+	})
+
 	innerFlex.SetDirection(tview.FlexColumn)
 	innerFlex.AddItem(list, 0, 1, true)
 	innerFlex.AddItem(readme, 0, 1, false)
 
 	outerFlex.SetDirection(tview.FlexRow)
 	outerFlex.AddItem(header, 1, -1, false)
+	outerFlex.AddItem(filter, 1, -1, false)
 	outerFlex.AddItem(innerFlex, 0, 1, true)
 	outerFlex.AddItem(help, 1, -1, false)
 
-	app := tview.NewApplication().SetRoot(outerFlex, true)
+	app.SetRoot(outerFlex, true)
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		opts.logger.Printf("%#v", event.Rune())
-		opts.logger.Printf("%#v", event.Key())
 		switch event.Rune() {
 		case 'q':
 			app.Stop()
@@ -229,7 +246,8 @@ func extBrowse(opts extBrowseOpts) error {
 		case 'r':
 			opts.logger.Println("REMOVE REQUESTED")
 		case '/':
-			opts.logger.Println("FILTER REQUESTED")
+			app.SetFocus(filter)
+			return nil
 		}
 		switch event.Key() {
 		case tcell.KeyLeft:
