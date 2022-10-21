@@ -12,6 +12,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/repo/view"
 	"github.com/cli/cli/v2/pkg/extensions"
+	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/cli/cli/v2/pkg/search"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -164,13 +165,43 @@ func extBrowse(opts extBrowseOpts) error {
 
 	header := tview.NewTextView().SetText("gh extensions")
 	list := tview.NewList()
-	readme := tview.NewTextView().SetText("lol hi")
-	help := tview.NewTextView().SetText("/: filter list i: install r: remove w: open in web q: quit")
+	readme := tview.NewTextView()
+	help := tview.NewTextView().SetText("/: filter i: install r: remove w: open in browser pgup/pgdn: scroll readme q: quit")
 
-	for x := range extEntries {
-		ee := extEntries[len(extEntries)-1-x]
+	for _, ee := range extEntries {
 		list.AddItem(ee.Title(), ee.Description(), ' ', func() {})
 	}
+
+	onSelectItem := func(ix int, _, _ string, _ rune) {
+		fullName := extEntries[ix].FullName
+		rm, err := opts.rg.Get(fullName)
+		if err != nil {
+			opts.logger.Println(err.Error())
+			readme.SetText("unable to fetch readme :(")
+			return
+		}
+
+		// TODO sanity check what happens for non markdown readmes
+
+		rendered, err := markdown.Render(rm)
+		if err != nil {
+			opts.logger.Println(err.Error())
+			readme.SetText("unable to render readme :(")
+			return
+		}
+
+		readme.SetText("")
+		readme.SetDynamicColors(true)
+
+		w := tview.ANSIWriter(readme)
+		w.Write([]byte(rendered))
+
+		readme.ScrollToBeginning()
+	}
+
+	list.SetChangedFunc(onSelectItem)
+	// Force fetching of initial readme:
+	onSelectItem(0, "", "", rune(0))
 
 	innerFlex.SetDirection(tview.FlexColumn)
 	innerFlex.AddItem(list, 0, 1, true)
@@ -206,10 +237,14 @@ func extBrowse(opts extBrowseOpts) error {
 		case tcell.KeyRight:
 			opts.logger.Println("PAGE DOWN LIST")
 		case tcell.KeyPgUp:
-			opts.logger.Println("SCROLL UP README")
+			row, col := readme.GetScrollOffset()
+			if row > 0 {
+				readme.ScrollTo(row-2, col)
+			}
 			return nil
 		case tcell.KeyPgDn:
-			opts.logger.Println("SCROLL DOWN README")
+			row, col := readme.GetScrollOffset()
+			readme.ScrollTo(row+2, col)
 			return nil
 		}
 		return event
