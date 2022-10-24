@@ -11,10 +11,10 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -188,12 +188,12 @@ func issueMetadata(issueSelector string, issueRepoSelector string, baseRepo ghre
 func printLinkedBranches(io *iostreams.IOStreams, branches []api.LinkedBranch) {
 
 	cs := io.ColorScheme()
-	table := utils.NewTablePrinter(io)
+	table := tableprinter.New(io)
 
 	for _, branch := range branches {
-		table.AddField(branch.BranchName, nil, cs.ColorFromString("cyan"))
-		if table.IsTTY() {
-			table.AddField(branch.Url(), nil, nil)
+		table.AddField(branch.BranchName, tableprinter.WithColor(cs.ColorFromString("cyan")))
+		if io.CanPrompt() {
+			table.AddField(branch.Url())
 		}
 		table.EndRow()
 	}
