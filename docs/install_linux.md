@@ -186,9 +186,9 @@ emerge --sync
 emerge -u github-cli
 ```
 
-### Kiss Linux
+### Linux
 
-Kiss Linux users can install from the [community repos](https://github.com/kisslinux/community):
+Linux users can install from the [community repos]
 
 ```bash
 kiss b github-cli && kiss i github-cli
