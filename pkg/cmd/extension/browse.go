@@ -172,7 +172,7 @@ func extBrowse(opts extBrowseOpts) error {
 	help := tview.NewTextView().SetText("/: filter i: install r: remove w: open in browser pgup/pgdn: scroll readme q: quit")
 
 	for _, ee := range extEntries {
-		list.AddItem(ee.Title(), ee.Description(), ' ', func() {})
+		list.AddItem(ee.Title(), ee.Description(), rune(0), func() {})
 	}
 
 	onSelectItem := func(ix int, _, _ string, _ rune) {
@@ -207,15 +207,42 @@ func extBrowse(opts extBrowseOpts) error {
 	onSelectItem(0, "", "", rune(0))
 
 	filter.SetChangedFunc(func(text string) {
-		// TODO filter list
+		// I think live updating just isn't feasible
 	})
 	filter.SetDoneFunc(func(key tcell.Key) {
 		switch key {
 		case tcell.KeyEnter:
+			text := filter.GetText()
+			indices := list.FindItems(text, text, false, true)
+			for x := range extEntries {
+				opts.logger.Printf("is %d being filtered in?", x)
+				found := false
+				for _, y := range indices {
+					opts.logger.Printf("does %d = %d?", x, y)
+					if x == y {
+						found = true
+					}
+				}
+				// TODO this is a Cluster Fuck. it's removing everything but one thing (correct) but it's the wrong thing AND it takes FOREVER. need a totally different approach.
+				if !found {
+					opts.logger.Printf("let's remove %d", x)
+					opts.logger.Printf("%d items in list", list.GetItemCount())
+					// I think I'm hitting a bug here. list.currentItem is getting decremented when I don't think it should be, leading to a subscript of -1.
+					list.SetCurrentItem(len(extEntries) - 1)
+					list.RemoveItem(x)
+					list.SetCurrentItem(0)
+				}
+			}
+			opts.logger.Println("HI OK")
 			app.SetFocus(list)
-			// TODO
 		case tcell.KeyEscape:
 			filter.SetText("")
+			for x, ee := range extEntries {
+				title, _ := list.GetItemText(x)
+				if title != ee.Title() {
+					list.InsertItem(x, ee.Title(), ee.Description(), rune(0), func() {})
+				}
+			}
 			app.SetFocus(list)
 			// TODO clear active filter
 		}
