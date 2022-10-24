@@ -569,6 +569,8 @@ func Test_developRun(t *testing.T) {
 				return remotes, nil
 			}
 
+			opts.GitClient = &git.Client{GitPath: "some/path/git"}
+
 			cmdStubs, cmdTeardown := run.Stub()
 			defer cmdTeardown(t)
 			if tt.runStubs != nil {

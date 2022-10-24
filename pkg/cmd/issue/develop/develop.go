@@ -1,6 +1,7 @@
 package develop
 
 import (
+	ctx "context"
 	"fmt"
 	"net/http"
 
@@ -10,16 +11,16 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
 type DevelopOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitClient  *git.Client
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
@@ -37,6 +38,7 @@ func NewCmdDevelop(f *cmdutil.Factory, runF func(*DevelopOptions) error) *cobra.
 	opts := &DevelopOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Config:     f.Config,
 		BaseRepo:   f.BaseRepo,
 		Remotes:    f.Remotes,
@@ -186,12 +188,12 @@ func issueMetadata(issueSelector string, issueRepoSelector string, baseRepo ghre
 func printLinkedBranches(io *iostreams.IOStreams, branches []api.LinkedBranch) {
 
 	cs := io.ColorScheme()
-	table := utils.NewTablePrinter(io)
+	table := tableprinter.New(io)
 
 	for _, branch := range branches {
-		table.AddField(branch.BranchName, nil, cs.ColorFromString("cyan"))
-		if table.IsTTY() {
-			table.AddField(branch.Url(), nil, nil)
+		table.AddField(branch.BranchName, tableprinter.WithColor(cs.ColorFromString("cyan")))
+		if io.CanPrompt() {
+			table.AddField(branch.Url())
 		}
 		table.EndRow()
 	}
@@ -254,12 +256,12 @@ func checkoutBranch(opts *DevelopOptions, baseRepo ghrepo.Interface, checkoutBra
 		return err
 	}
 
-	if git.HasLocalBranch(checkoutBranch) {
-		if err := git.CheckoutBranch(checkoutBranch); err != nil {
+	if opts.GitClient.HasLocalBranch(ctx.Background(), checkoutBranch) {
+		if err := opts.GitClient.CheckoutBranch(ctx.Background(), checkoutBranch); err != nil {
 			return err
 		}
 	} else {
-		gitFetch, err := git.GitCommand("fetch", "origin", fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/origin/%[1]s", checkoutBranch))
+		gitFetch, err := opts.GitClient.Command(ctx.Background(), "fetch", "origin", fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/origin/%[1]s", checkoutBranch))
 
 		if err != nil {
 			return err
@@ -267,16 +269,16 @@ func checkoutBranch(opts *DevelopOptions, baseRepo ghrepo.Interface, checkoutBra
 
 		gitFetch.Stdout = opts.IO.Out
 		gitFetch.Stderr = opts.IO.ErrOut
-		err = run.PrepareCmd(gitFetch).Run()
+		err = gitFetch.Run()
 		if err != nil {
 			return err
 		}
-		if err := git.CheckoutNewBranch(baseRemote.Name, checkoutBranch); err != nil {
+		if err := opts.GitClient.CheckoutNewBranch(ctx.Background(), baseRemote.Name, checkoutBranch); err != nil {
 			return err
 		}
 	}
 
-	if err := git.Pull(baseRemote.Name, checkoutBranch); err != nil {
+	if err := opts.GitClient.Pull(ctx.Background(), baseRemote.Name, checkoutBranch); err != nil {
 		_, _ = fmt.Fprintf(opts.IO.ErrOut, "%s warning: not possible to fast-forward to: %q\n", opts.IO.ColorScheme().WarningIcon(), checkoutBranch)
 	}
 
