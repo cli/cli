@@ -86,6 +86,7 @@ func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Expo
 		return cmdutil.NewNoResultsError("no codespaces found")
 	}
 
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(a.io)
 	if tp.IsTTY() {
 		tp.AddField("NAME", nil, nil)

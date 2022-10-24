@@ -40,7 +40,11 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 				if err != nil {
 					return nil, nil, err
 				}
-				return issueShared.IssueFromArgWithFields(httpClient, f.BaseRepo, args[0], []string{"id", "url"})
+				fields := []string{"id", "url"}
+				if opts.EditLast {
+					fields = append(fields, "comments")
+				}
+				return issueShared.IssueFromArgWithFields(httpClient, f.BaseRepo, args[0], fields)
 			}
 			return prShared.CommentablePreRun(cmd, opts)
 		},
@@ -64,6 +68,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	cmd.Flags().BoolP("editor", "e", false, "Skip prompts and open the text editor to write the body in")
 	cmd.Flags().BoolP("web", "w", false, "Open the web browser to write the comment")
+	cmd.Flags().BoolVar(&opts.EditLast, "edit-last", false, "Edit the last comment of the same author")
 
 	return cmd
 }

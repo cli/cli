@@ -424,6 +424,39 @@ func Test_SyncRun(t *testing.T) {
 			wantErr: true,
 			errMsg:  "can't sync because there are diverging changes; use `--force` to overwrite the destination branch",
 		},
+		{
+			name: "sync remote fork with parent and no existing branch on fork",
+			tty:  true,
+			opts: &SyncOptions{
+				DestArg: "OWNER/REPO-FORK",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryFindParent\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"parent":{"name":"REPO","owner":{"login": "OWNER"}}}}}`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO-FORK/merge-upstream"),
+					httpmock.StatusStringResponse(409, `{"message": "Merge conflict"}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads/trunk"),
+					httpmock.StringResponse(`{"object":{"sha":"0xDEADBEEF"}}`))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads/trunk"),
+					func(req *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: 422,
+							Request:    req,
+							Header:     map[string][]string{"Content-Type": {"application/json"}},
+							Body:       io.NopCloser(bytes.NewBufferString(`{"message":"Reference does not exist"}`)),
+						}, nil
+					})
+			},
+			wantErr: true,
+			errMsg:  "trunk branch does not exist on OWNER/REPO-FORK repository",
+		},
 	}
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}

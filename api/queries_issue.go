@@ -244,3 +244,7 @@ func (i Issue) Link() string {
 func (i Issue) Identifier() string {
 	return i.ID
 }
+
+func (i Issue) CurrentUserComments() []Comment {
+	return i.Comments.CurrentUserComments()
+}

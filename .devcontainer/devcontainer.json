@@ -1,22 +1,24 @@
 {
-    "extensions": [
-		"golang.go"
-	],
-	"build": {
-		"dockerfile": "Dockerfile",
-		"args": {
-			"VARIANT": "1.18"
-		}
+	"image": "mcr.microsoft.com/devcontainers/go:1.18",
+	"features": {
+		"ghcr.io/devcontainers/features/sshd:1": {}
 	},
-	"settings": {
-		"go.toolsManagement.checkForUpdates": "local",
-		"go.useLanguageServer": true,
-		"go.gopath": "/go"
+	"remoteUser": "vscode",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"golang.go"
+			],
+			"settings": {
+				"go.toolsManagement.checkForUpdates": "local",
+				"go.useLanguageServer": true,
+				"go.gopath": "/go"
+			}
+		}
 	},
 	"runArgs": [
 		"--cap-add=SYS_PTRACE",
 		"--security-opt",
 		"seccomp=unconfined"
-	],
-	"remoteUser": "vscode"
+	]
 }

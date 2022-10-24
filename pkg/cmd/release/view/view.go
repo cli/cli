@@ -152,6 +152,7 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 
 	if len(release.Assets) > 0 {
 		fmt.Fprintf(w, "%s\n", iofmt.Bold("Assets"))
+		//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 		table := utils.NewTablePrinter(io)
 		for _, a := range release.Assets {
 			table.AddField(a.Name, nil, nil)

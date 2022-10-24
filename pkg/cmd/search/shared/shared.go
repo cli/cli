@@ -65,18 +65,7 @@ func SearchIssues(opts *IssuesOptions) error {
 	if err != nil {
 		return err
 	}
-
-	if err := io.StartPager(); err == nil {
-		defer io.StopPager()
-	} else {
-		fmt.Fprintf(io.ErrOut, "failed to start pager: %v\n", err)
-	}
-
-	if opts.Exporter != nil {
-		return opts.Exporter.Write(io, result.Items)
-	}
-
-	if len(result.Items) == 0 {
+	if len(result.Items) == 0 && opts.Exporter == nil {
 		var msg string
 		switch opts.Entity {
 		case Both:
@@ -89,6 +78,16 @@ func SearchIssues(opts *IssuesOptions) error {
 		return cmdutil.NewNoResultsError(msg)
 	}
 
+	if err := io.StartPager(); err == nil {
+		defer io.StopPager()
+	} else {
+		fmt.Fprintf(io.ErrOut, "failed to start pager: %v\n", err)
+	}
+
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(io, result.Items)
+	}
+
 	return displayIssueResults(io, opts.Now, opts.Entity, result)
 }
 
@@ -97,6 +96,7 @@ func displayIssueResults(io *iostreams.IOStreams, now time.Time, et EntityType, 
 		now = time.Now()
 	}
 	cs := io.ColorScheme()
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(io)
 	for _, issue := range results.Items {
 		if et == Both {
@@ -114,12 +114,12 @@ func displayIssueResults(io *iostreams.IOStreams, now time.Time, et EntityType, 
 			issueNum = "#" + issueNum
 		}
 		if issue.IsPullRequest() {
-			tp.AddField(issueNum, nil, cs.ColorFromString(colorForPRState(issue.State)))
+			tp.AddField(issueNum, nil, cs.ColorFromString(colorForPRState(issue.State())))
 		} else {
-			tp.AddField(issueNum, nil, cs.ColorFromString(colorForIssueState(issue.State, issue.StateReason)))
+			tp.AddField(issueNum, nil, cs.ColorFromString(colorForIssueState(issue.State(), issue.StateReason)))
 		}
 		if !tp.IsTTY() {
-			tp.AddField(issue.State, nil, nil)
+			tp.AddField(issue.State(), nil, nil)
 		}
 		tp.AddField(text.RemoveExcessiveWhitespace(issue.Title), nil, nil)
 		tp.AddField(listIssueLabels(&issue, cs, tp.IsTTY()), nil, nil)

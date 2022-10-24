@@ -54,9 +54,9 @@ func TestSearchIssues(t *testing.T) {
 						return search.IssuesResult{
 							IncompleteResults: false,
 							Items: []search.Issue{
-								{RepositoryURL: "github.com/test/cli", Number: 123, State: "open", Title: "something broken", Labels: []search.Label{{Name: "bug"}, {Name: "p1"}}, UpdatedAt: updatedAt},
-								{RepositoryURL: "github.com/what/what", Number: 456, State: "closed", Title: "feature request", Labels: []search.Label{{Name: "enhancement"}}, UpdatedAt: updatedAt},
-								{RepositoryURL: "github.com/blah/test", Number: 789, State: "open", Title: "some title", UpdatedAt: updatedAt},
+								{RepositoryURL: "github.com/test/cli", Number: 123, StateInternal: "open", Title: "something broken", Labels: []search.Label{{Name: "bug"}, {Name: "p1"}}, UpdatedAt: updatedAt},
+								{RepositoryURL: "github.com/what/what", Number: 456, StateInternal: "closed", Title: "feature request", Labels: []search.Label{{Name: "enhancement"}}, UpdatedAt: updatedAt},
+								{RepositoryURL: "github.com/blah/test", Number: 789, StateInternal: "open", Title: "some title", UpdatedAt: updatedAt},
 							},
 							Total: 300,
 						}, nil
@@ -76,8 +76,8 @@ func TestSearchIssues(t *testing.T) {
 						return search.IssuesResult{
 							IncompleteResults: false,
 							Items: []search.Issue{
-								{RepositoryURL: "github.com/test/cli", Number: 123, State: "open", Title: "bug", Labels: []search.Label{{Name: "bug"}, {Name: "p1"}}, UpdatedAt: updatedAt},
-								{RepositoryURL: "github.com/what/what", Number: 456, State: "open", Title: "fix bug", Labels: []search.Label{{Name: "fix"}}, PullRequestLinks: search.PullRequestLinks{URL: "someurl"}, UpdatedAt: updatedAt},
+								{RepositoryURL: "github.com/test/cli", Number: 123, StateInternal: "open", Title: "bug", Labels: []search.Label{{Name: "bug"}, {Name: "p1"}}, UpdatedAt: updatedAt},
+								{RepositoryURL: "github.com/what/what", Number: 456, StateInternal: "open", Title: "fix bug", Labels: []search.Label{{Name: "fix"}}, PullRequest: search.PullRequest{URL: "someurl"}, UpdatedAt: updatedAt},
 							},
 							Total: 300,
 						}, nil
@@ -97,9 +97,9 @@ func TestSearchIssues(t *testing.T) {
 						return search.IssuesResult{
 							IncompleteResults: false,
 							Items: []search.Issue{
-								{RepositoryURL: "github.com/test/cli", Number: 123, State: "open", Title: "something broken", Labels: []search.Label{{Name: "bug"}, {Name: "p1"}}, UpdatedAt: updatedAt},
-								{RepositoryURL: "github.com/what/what", Number: 456, State: "closed", Title: "feature request", Labels: []search.Label{{Name: "enhancement"}}, UpdatedAt: updatedAt},
-								{RepositoryURL: "github.com/blah/test", Number: 789, State: "open", Title: "some title", UpdatedAt: updatedAt},
+								{RepositoryURL: "github.com/test/cli", Number: 123, StateInternal: "open", Title: "something broken", Labels: []search.Label{{Name: "bug"}, {Name: "p1"}}, UpdatedAt: updatedAt},
+								{RepositoryURL: "github.com/what/what", Number: 456, StateInternal: "closed", Title: "feature request", Labels: []search.Label{{Name: "enhancement"}}, UpdatedAt: updatedAt},
+								{RepositoryURL: "github.com/blah/test", Number: 789, StateInternal: "open", Title: "some title", UpdatedAt: updatedAt},
 							},
 							Total: 300,
 						}, nil
@@ -118,8 +118,8 @@ func TestSearchIssues(t *testing.T) {
 						return search.IssuesResult{
 							IncompleteResults: false,
 							Items: []search.Issue{
-								{RepositoryURL: "github.com/test/cli", Number: 123, State: "open", Title: "bug", Labels: []search.Label{{Name: "bug"}, {Name: "p1"}}, UpdatedAt: updatedAt},
-								{RepositoryURL: "github.com/what/what", Number: 456, State: "open", Title: "fix bug", Labels: []search.Label{{Name: "fix"}}, PullRequestLinks: search.PullRequestLinks{URL: "someurl"}, UpdatedAt: updatedAt},
+								{RepositoryURL: "github.com/test/cli", Number: 123, StateInternal: "open", Title: "bug", Labels: []search.Label{{Name: "bug"}, {Name: "p1"}}, UpdatedAt: updatedAt},
+								{RepositoryURL: "github.com/what/what", Number: 456, StateInternal: "open", Title: "fix bug", Labels: []search.Label{{Name: "fix"}}, PullRequest: search.PullRequest{URL: "someurl"}, UpdatedAt: updatedAt},
 							},
 							Total: 300,
 						}, nil

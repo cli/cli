@@ -272,7 +272,7 @@ func Test_refreshRun(t *testing.T) {
 					}, nil
 				},
 			)
-			tt.opts.httpClient = &http.Client{Transport: httpReg}
+			tt.opts.HttpClient = &http.Client{Transport: httpReg}
 
 			pm := &prompter.PrompterMock{}
 			if tt.prompterStubs != nil {

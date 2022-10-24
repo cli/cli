@@ -147,7 +147,7 @@ jobs:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Prepare PATH
         id: setupmsbuild
-        uses: microsoft/setup-msbuild@v1.0.3
+        uses: microsoft/setup-msbuild@v1.1.3
       - name: Build MSI
         id: buildmsi
         shell: bash

@@ -50,6 +50,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return cmdutil.NewNoResultsError("no installed extensions found")
 				}
 				cs := io.ColorScheme()
+				//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 				t := utils.NewTablePrinter(io)
 				for _, c := range cmds {
 					var repo string
@@ -124,6 +125,9 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						} else if errors.Is(err, commitNotFoundErr) {
 							return fmt.Errorf("%s %s does not exist in %s",
 								cs.FailureIcon(), cs.Cyan(pinFlag), args[0])
+						} else if errors.Is(err, repositoryNotFoundErr) {
+							return fmt.Errorf("%s Could not find extension '%s' on host %s",
+								cs.FailureIcon(), args[0], repo.RepoHost())
 						}
 						return err
 					}

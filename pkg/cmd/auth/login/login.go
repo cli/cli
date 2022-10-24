@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
@@ -20,6 +21,7 @@ type LoginOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
+	GitClient  *git.Client
 	Prompter   shared.Prompt
 
 	MainExecutable string
@@ -38,6 +40,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Prompter:   f.Prompter,
 	}
 
@@ -183,6 +186,7 @@ func loginRun(opts *LoginOptions) error {
 		Executable:  opts.MainExecutable,
 		GitProtocol: opts.GitProtocol,
 		Prompter:    opts.Prompter,
+		GitClient:   opts.GitClient,
 	})
 }
 

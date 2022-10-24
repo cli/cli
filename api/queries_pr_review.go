@@ -30,6 +30,7 @@ type PullRequestReviews struct {
 }
 
 type PullRequestReview struct {
+	ID                  string         `json:"id"`
 	Author              Author         `json:"author"`
 	AuthorAssociation   string         `json:"authorAssociation"`
 	Body                string         `json:"body"`
@@ -65,6 +66,10 @@ func AddReview(client *Client, repo ghrepo.Interface, pr *PullRequest, input *Pu
 	}
 
 	return client.Mutate(repo.RepoHost(), "PullRequestReviewAdd", &mutation, variables)
+}
+
+func (prr PullRequestReview) Identifier() string {
+	return prr.ID
 }
 
 func (prr PullRequestReview) AuthorLogin() string {
