@@ -61,6 +61,9 @@ type IOStreams struct {
 	stderrTTYOverride bool
 	stderrIsTTY       bool
 
+	colorOverride bool
+	colorEnabled  bool
+
 	pagerCommand string
 	pagerProcess *os.Process
 
@@ -70,14 +73,23 @@ type IOStreams struct {
 }
 
 func (s *IOStreams) ColorEnabled() bool {
+	if s.colorOverride {
+		return s.colorEnabled
+	}
 	return s.term.IsColorEnabled()
 }
 
 func (s *IOStreams) ColorSupport256() bool {
+	if s.colorOverride {
+		return s.colorEnabled
+	}
 	return s.term.Is256ColorSupported()
 }
 
 func (s *IOStreams) HasTrueColor() bool {
+	if s.colorOverride {
+		return s.colorEnabled
+	}
 	return s.term.IsTrueColorSupported()
 }
 
@@ -109,7 +121,8 @@ func (s *IOStreams) TerminalTheme() string {
 }
 
 func (s *IOStreams) SetColorEnabled(colorEnabled bool) {
-	//s.colorEnabled = colorEnabled
+	s.colorOverride = true
+	s.colorEnabled = colorEnabled
 }
 
 func (s *IOStreams) SetStdinTTY(isTTY bool) {
