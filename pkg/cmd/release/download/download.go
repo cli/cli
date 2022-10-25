@@ -82,7 +82,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 				return err
 			}
 
-			if err := cmdutil.MutuallyExclusive("specify only one of '--destination' or '--output'", opts.Destination != ".", opts.Output != ""); err != nil {
+			if err := cmdutil.MutuallyExclusive("specify only one of `--destination` or `--output`", opts.Destination != ".", opts.Output != ""); err != nil {
 				return err
 			}
 
@@ -183,7 +183,7 @@ func downloadRun(opts *DownloadOptions) error {
 	}
 
 	if len(toDownload) > 1 && opts.Output != "" {
-		return errors.New("cannot have more than one asset to download when 'output' option is specified")
+		return errors.New("cannot have more than one asset to download when `output` option is specified")
 	}
 
 	if opts.Destination != "." {
@@ -215,7 +215,7 @@ func downloadRun(opts *DownloadOptions) error {
 		}
 	}
 
-	return downloadAssets(httpClient, toDownload, opts.Destination, opts.Concurrency, isArchive, opts.OverwriteExisting, opts.SkipExisting, toStdout)
+	return downloadAssets(httpClient, toDownload, opts.Destination, opts.Concurrency, opts.IO, isArchive, opts.OverwriteExisting, opts.SkipExisting, toStdout)
 }
 
 func matchAny(patterns []string, name string) bool {
@@ -227,7 +227,7 @@ func matchAny(patterns []string, name string) bool {
 	return false
 }
 
-func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, destDir string, numWorkers int, isArchive, force, skip, toStdout bool) error {
+func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, destDir string, numWorkers int, optIO *iostreams.IOStreams, isArchive, force, skip, toStdout bool) error {
 	if numWorkers == 0 {
 		return errors.New("the number of concurrent workers needs to be greater than 0")
 	}
@@ -242,7 +242,7 @@ func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, d
 	for w := 1; w <= numWorkers; w++ {
 		go func() {
 			for a := range jobs {
-				results <- downloadAsset(httpClient, a.APIURL, destDir, a.Name, isArchive, force, skip, toStdout)
+				results <- downloadAsset(httpClient, a.APIURL, destDir, a.Name, optIO, isArchive, force, skip, toStdout)
 			}
 		}()
 	}
@@ -262,7 +262,7 @@ func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, d
 	return downloadError
 }
 
-func downloadAsset(httpClient *http.Client, assetURL, destinationDir string, fileName string, isArchive, force, skip, toStdout bool) error {
+func downloadAsset(httpClient *http.Client, assetURL, destinationDir, fileName string, optIO *iostreams.IOStreams, isArchive, force, skip, toStdout bool) error {
 	var destinationPath = filepath.Join(destinationDir, fileName)
 	if len(fileName) != 0 && !toStdout {
 		if success, err := shouldWrite(destinationPath, force, skip); !success || err != nil {
@@ -302,7 +302,7 @@ func downloadAsset(httpClient *http.Client, assetURL, destinationDir string, fil
 	}
 
 	if toStdout {
-		_, err = io.Copy(os.Stdout, resp.Body)
+		_, err = io.Copy(optIO.Out, resp.Body)
 		return err
 	}
 
@@ -324,7 +324,6 @@ func downloadAsset(httpClient *http.Client, assetURL, destinationDir string, fil
 		}
 	}
 
-	println(destinationPath)
 	f, err := os.OpenFile(destinationPath, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return err
