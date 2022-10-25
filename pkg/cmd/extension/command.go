@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/extension/browse"
@@ -239,12 +241,13 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return err
 				}
 
-				// TODO to make searcher cache, pass result of NewCachedHTTPClient
+				cacheTTL, _ := time.ParseDuration("24h")
+				searcher := search.NewSearcher(api.NewCachedHTTPClient(client, cacheTTL), host)
 
 				opts := browse.ExtBrowseOpts{
 					Cmd:      cmd,
 					Browser:  browser,
-					Searcher: search.NewSearcher(client, host),
+					Searcher: searcher,
 					Em:       m,
 					Client:   client,
 					Cfg:      cfg,

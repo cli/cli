@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
@@ -19,8 +20,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// TODO add caching to search
-// TODO make readme getter cache to disk
 // TODO see if there is any way to make readme viewing prettier
 // TODO see if it's possible to add padding to list and/or readme viewer
 
@@ -147,8 +146,8 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		extEntries = append(extEntries, ee)
 	}
 
-	// TODO pass a cache TTL
-	opts.Rg = newReadmeGetter(opts.Client)
+	cacheTTL, _ := time.ParseDuration("24h")
+	opts.Rg = newReadmeGetter(opts.Client, cacheTTL)
 
 	app := tview.NewApplication()
 
@@ -241,6 +240,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	// TODO make functions for this stuff (scrolling stuff, install/remove, etc)
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		// TODO not updating readme on filter
 		switch event.Rune() {
 		case 'q':
 			app.Stop()
