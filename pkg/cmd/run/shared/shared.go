@@ -59,6 +59,7 @@ var RunFields = []string{
 	"workflowDatabaseId",
 	"workflowName",
 	"url",
+	"jobs",
 }
 
 type Run struct {
@@ -80,6 +81,7 @@ type Run struct {
 	HeadSha        string `json:"head_sha"`
 	URL            string `json:"html_url"`
 	HeadRepository Repo   `json:"head_repository"`
+	Jobs           []Job
 }
 
 func (r *Run) StartedTime() time.Time {
@@ -149,6 +151,30 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 			data[f] = r.WorkflowID
 		case "workflowName":
 			data[f] = r.WorkflowName()
+		case "jobs":
+			jobs := make([]interface{}, 0, len(r.Jobs))
+			for _, j := range r.Jobs {
+				steps := make([]interface{}, 0, len(j.Steps))
+				for _, s := range j.Steps {
+					steps = append(steps, map[string]interface{}{
+						"name":       s.Name,
+						"status":     s.Status,
+						"conclusion": s.Conclusion,
+						"number":     s.Number,
+					})
+				}
+				jobs = append(jobs, map[string]interface{}{
+					"databaseId":  j.ID,
+					"status":      j.Status,
+					"conclusion":  j.Conclusion,
+					"name":        j.Name,
+					"steps":       steps,
+					"startedAt":   j.StartedAt,
+					"completedAt": j.CompletedAt,
+					"url":         j.URL,
+				})
+				data[f] = jobs
+			}
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()
@@ -362,12 +388,13 @@ type JobsPayload struct {
 	Jobs []Job
 }
 
-func GetJobs(client *api.Client, repo ghrepo.Interface, run Run) ([]Job, error) {
+func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run) error {
 	var result JobsPayload
 	if err := client.REST(repo.RepoHost(), "GET", run.JobsURL, nil, &result); err != nil {
-		return nil, err
+		return err
 	}
-	return result.Jobs, nil
+	run.Jobs = result.Jobs
+	return nil
 }
 
 func GetJob(client *api.Client, repo ghrepo.Interface, jobID string) (*Job, error) {

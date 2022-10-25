@@ -214,11 +214,12 @@ func runView(opts *ViewOptions) error {
 
 	if opts.Prompt {
 		opts.IO.StartProgressIndicator()
-		jobs, err = shared.GetJobs(client, repo, *run)
+		err = shared.GetJobs(client, repo, run)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
 		}
+		jobs = run.Jobs
 		if len(jobs) > 1 {
 			selectedJob, err = promptForJob(cs, jobs)
 			if err != nil {
@@ -234,6 +235,7 @@ func runView(opts *ViewOptions) error {
 	}
 
 	if opts.Exporter != nil {
+		err = shared.GetJobs(client, repo, run)
 		return opts.Exporter.Write(opts.IO, run)
 	}
 
@@ -251,11 +253,12 @@ func runView(opts *ViewOptions) error {
 
 	if selectedJob == nil && len(jobs) == 0 {
 		opts.IO.StartProgressIndicator()
-		jobs, err = shared.GetJobs(client, repo, *run)
+		err = shared.GetJobs(client, repo, run)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get jobs: %w", err)
 		}
+		jobs = run.Jobs
 	} else if selectedJob != nil {
 		jobs = []shared.Job{*selectedJob}
 	}

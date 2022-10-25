@@ -206,7 +206,7 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 		return nil, fmt.Errorf("failed to get run: %w", err)
 	}
 
-	jobs, err := shared.GetJobs(client, repo, *run)
+	err = shared.GetJobs(client, repo, run)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get jobs: %w", err)
 	}
@@ -215,7 +215,7 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 
 	var annotationErr error
 	var as []shared.Annotation
-	for _, job := range jobs {
+	for _, job := range run.Jobs {
 		if as, ok := annotationCache[job.ID]; ok {
 			annotations = as
 			continue
@@ -239,13 +239,13 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, text.FuzzyAgo(opts.Now(), run.StartedTime()), prNumber))
 	fmt.Fprintln(out)
 
-	if len(jobs) == 0 {
+	if len(run.Jobs) == 0 {
 		return run, nil
 	}
 
 	fmt.Fprintln(out, cs.Bold("JOBS"))
 
-	fmt.Fprintln(out, shared.RenderJobs(cs, jobs, true))
+	fmt.Fprintln(out, shared.RenderJobs(cs, run.Jobs, true))
 
 	if len(annotations) > 0 {
 		fmt.Fprintln(out)
