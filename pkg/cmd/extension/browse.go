@@ -21,6 +21,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// TODO add caching to search
+// TODO make readme getter cache to disk
+// TODO see if there is any way to make readme viewing prettier
+// TODO see if it's possible to add padding to list and/or readme viewer
+
 const pagingOffset = 25
 
 var appStyle = lipgloss.NewStyle().Padding(1, 2)
@@ -131,7 +136,6 @@ func extBrowse(opts extBrowseOpts) error {
 
 	opts.logger = log.New(f, "", log.Lshortfile)
 
-	// TODO spinner
 	installed := opts.em.List()
 
 	result, err := opts.searcher.Repositories(search.Query{
@@ -260,7 +264,14 @@ func extBrowse(opts extBrowseOpts) error {
 	outerFlex.AddItem(innerFlex, 0, 1, true)
 	outerFlex.AddItem(help, 1, -1, false)
 
+	// modal is used to output the result of install/remove operations
+	modal := tview.NewModal().AddButtons([]string{"ok"}).SetDoneFunc(func(_ int, _ string) {
+		app.SetRoot(outerFlex, true)
+	})
+
 	app.SetRoot(outerFlex, true)
+
+	// TODO make functions for this stuff (scrolling stuff, install/remove, etc)
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Rune() {
@@ -278,8 +289,16 @@ func extBrowse(opts extBrowseOpts) error {
 			opts.browser.Browse(ee.URL)
 			return nil
 		case 'i':
+			// TODO get selected extEntry
+			// TODO install
+			// TODO set text on modal regarding success/failure
+			app.SetRoot(modal, true)
 			opts.logger.Println("INSTALL REQUESTED")
 		case 'r':
+			// TODO
+			// TODO get selected extEntry
+			// TODO remove
+			// TODO set text on modal regarding success/failure
 			opts.logger.Println("REMOVE REQUESTED")
 		case ' ':
 			// TODO the Modifiers check isn't working. add some logging.
@@ -321,8 +340,6 @@ func extBrowse(opts extBrowseOpts) error {
 		}
 		return event
 	})
-
-	// TODO install/remove feedback in a modal
 
 	if err := app.Run(); err != nil {
 		return err
