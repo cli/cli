@@ -217,22 +217,19 @@ func extBrowse(opts extBrowseOpts) error {
 	onSelectItem(0, "", "", rune(0))
 
 	filter.SetChangedFunc(func(text string) {
-		// I think live updating just isn't feasible
+		indices := filterEntries(extEntries, text)
+		list.Clear()
+		for ex, ee := range extEntries {
+			for _, fx := range indices {
+				if fx == ex {
+					list.AddItem(ee.Title(), ee.Description(), rune(0), func() {})
+				}
+			}
+		}
 	})
 	filter.SetDoneFunc(func(key tcell.Key) {
 		switch key {
 		case tcell.KeyEnter:
-			text := filter.GetText()
-			indices := filterEntries(extEntries, text)
-			list.Clear()
-			for ex, ee := range extEntries {
-				for _, fx := range indices {
-					if fx == ex {
-						list.AddItem(ee.Title(), ee.Description(), rune(0), func() {})
-					}
-				}
-			}
-			opts.logger.Println("HI OK")
 			app.SetFocus(list)
 		case tcell.KeyEscape:
 			filter.SetText("")
