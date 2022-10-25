@@ -21,6 +21,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const pagingOffset = 25
+
 var appStyle = lipgloss.NewStyle().Padding(1, 2)
 var sidebarStyle = lipgloss.NewStyle()
 
@@ -184,7 +186,7 @@ func extBrowse(opts extBrowseOpts) error {
 
 	header := tview.NewTextView().SetText("gh extensions").SetTextAlign(tview.AlignCenter)
 	filter := tview.NewInputField().SetLabel("filter: ")
-	list := tview.NewList()
+	list := tview.NewList().SetWrapAround(false)
 	readme := tview.NewTextView()
 	help := tview.NewTextView().SetText("/: filter i: install r: remove w: open in browser pgup/pgdn: scroll readme q: quit")
 
@@ -279,17 +281,33 @@ func extBrowse(opts extBrowseOpts) error {
 			opts.logger.Println("INSTALL REQUESTED")
 		case 'r':
 			opts.logger.Println("REMOVE REQUESTED")
+		case ' ':
+			// TODO the Modifiers check isn't working. add some logging.
+			if event.Modifiers()&tcell.ModShift != 0 {
+				i := list.GetCurrentItem() - pagingOffset
+				if i < 0 {
+					i = 0
+				}
+				list.SetCurrentItem(i)
+			} else {
+				list.SetCurrentItem(list.GetCurrentItem() + pagingOffset)
+			}
+			return nil
 		case '/':
 			app.SetFocus(filter)
 			return nil
 		}
 		switch event.Key() {
-		case tcell.KeyLeft:
-			// TODO
-			opts.logger.Println("PAGE UP LIST")
-		case tcell.KeyRight:
-			// TODO
-			opts.logger.Println("PAGE DOWN LIST")
+		case tcell.KeyCtrlJ:
+			list.SetCurrentItem(list.GetCurrentItem() + pagingOffset)
+			return nil
+		case tcell.KeyCtrlK:
+			i := list.GetCurrentItem() - pagingOffset
+			if i < 0 {
+				i = 0
+			}
+			list.SetCurrentItem(i)
+			return nil
 		case tcell.KeyPgUp:
 			row, col := readme.GetScrollOffset()
 			if row > 0 {
