@@ -1,6 +1,7 @@
 package extension
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -74,20 +75,26 @@ func filterEntries(extEntries []extEntry, term string) []int {
 	return indices
 }
 
-func (e extEntry) Title() string {
-	//installedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#62FF42"))
-	//officialStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F2DB74"))
+// findCurrentEntry returns whatever extEntry is currently selected by the list
+func findCurrentEntry(list *tview.List, extEntries []extEntry) (extEntry, error) {
+	title, desc := list.GetItemText(list.GetCurrentItem())
+	for _, e := range extEntries {
+		if e.Title() == title && e.Description() == desc {
+			return e, nil
+		}
+	}
+	return extEntry{}, errors.New("not found")
+}
 
+func (e extEntry) Title() string {
 	var installed string
 	var official string
 
 	if e.Installed {
-		//installed = installedStyle.Render(" [installed]")
 		installed = " [installed]"
 	}
 
 	if e.Official {
-		//official = officialStyle.Render(" [official]")
 		official = " [official]"
 	}
 
@@ -261,6 +268,13 @@ func extBrowse(opts extBrowseOpts) error {
 			return tcell.NewEventKey(tcell.KeyUp, rune(0), 0)
 		case 'j':
 			return tcell.NewEventKey(tcell.KeyDown, rune(0), 0)
+		case 'w':
+			ee, err := findCurrentEntry(list, extEntries)
+			if err != nil {
+				opts.logger.Println(fmt.Errorf("tried to find entry, but: %w", err))
+			}
+			opts.browser.Browse(ee.URL)
+			return nil
 		case 'i':
 			opts.logger.Println("INSTALL REQUESTED")
 		case 'r':
@@ -271,8 +285,10 @@ func extBrowse(opts extBrowseOpts) error {
 		}
 		switch event.Key() {
 		case tcell.KeyLeft:
+			// TODO
 			opts.logger.Println("PAGE UP LIST")
 		case tcell.KeyRight:
+			// TODO
 			opts.logger.Println("PAGE DOWN LIST")
 		case tcell.KeyPgUp:
 			row, col := readme.GetScrollOffset()
@@ -288,7 +304,6 @@ func extBrowse(opts extBrowseOpts) error {
 		return event
 	})
 
-	// TODO filter input in a modal
 	// TODO install/remove feedback in a modal
 
 	if err := app.Run(); err != nil {
