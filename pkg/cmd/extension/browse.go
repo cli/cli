@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -27,9 +26,6 @@ import (
 // TODO see if it's possible to add padding to list and/or readme viewer
 
 const pagingOffset = 25
-
-var appStyle = lipgloss.NewStyle().Padding(1, 2)
-var sidebarStyle = lipgloss.NewStyle()
 
 type readmeGetter interface {
 	Get(string) (string, error)
@@ -181,6 +177,7 @@ func extBrowse(opts extBrowseOpts) error {
 		extEntries = append(extEntries, ee)
 	}
 
+	// TODO use NewCachedHTTPClient here
 	opts.rg = newReadmeGetter(opts.client)
 
 	app := tview.NewApplication()

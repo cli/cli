@@ -238,6 +238,8 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					return err
 				}
 
+				// TODO to make searcher cache, pass result of NewCachedHTTPClient
+
 				opts := extBrowseOpts{
 					cmd:      cmd,
 					browser:  browser,
