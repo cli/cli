@@ -32,6 +32,31 @@ sudo apt update
 sudo apt install gh
 ```
 
+### Debian, Ubuntu Linux, Raspberry Pi OS (deb-get)
+
+For users of Debian and Ubuntu based distributions, you can also install and
+update the official `.deb` packages we publish in our GitHub releases page using [deb-get](https://github.com/wimpysworld/deb-get).
+
+First install `deb-get` using these commands in a terminal:
+
+```bash
+sudo apt install curl
+curl -sL https://raw.githubusercontent.com/wimpysworld/deb-get/main/deb-get | sudo -E bash -s install deb-get
+```
+
+Then install Github CLI using the following command in terminal:
+
+```bash
+deb-get install gh
+```
+
+Once Github CLI is installed it can be kept upto date using:
+
+```bash
+deb-get update
+deb-get upgrade
+```
+
 ### Fedora, CentOS, Red Hat Enterprise Linux (dnf)
 
 Install from our package repository for immediate access to latest releases:
