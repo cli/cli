@@ -236,6 +236,9 @@ func runView(opts *ViewOptions) error {
 
 	if opts.Exporter != nil {
 		err = shared.GetJobs(client, repo, run)
+		if err != nil {
+			return err
+		}
 		return opts.Exporter.Write(opts.IO, run)
 	}
 
