@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/cli/cli/v2/git"
@@ -63,6 +64,16 @@ type extEntry struct {
 	description string
 }
 
+func filterEntries(extEntries []extEntry, term string) []int {
+	indices := []int{}
+	for x, ee := range extEntries {
+		if strings.Index(ee.Title()+ee.Description(), term) > -1 {
+			indices = append(indices, x)
+		}
+	}
+	return indices
+}
+
 func (e extEntry) Title() string {
 	//installedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#62FF42"))
 	//officialStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F2DB74"))
@@ -112,7 +123,6 @@ func extBrowse(opts extBrowseOpts) error {
 	opts.logger = log.New(f, "", log.Lshortfile)
 
 	// TODO spinner
-	// TODO get manager to tell me what's installed so I can cross ref
 	installed := opts.em.List()
 
 	result, err := opts.searcher.Repositories(search.Query{
@@ -213,38 +223,24 @@ func extBrowse(opts extBrowseOpts) error {
 		switch key {
 		case tcell.KeyEnter:
 			text := filter.GetText()
-			indices := list.FindItems(text, text, false, true)
-			for x := range extEntries {
-				opts.logger.Printf("is %d being filtered in?", x)
-				found := false
-				for _, y := range indices {
-					opts.logger.Printf("does %d = %d?", x, y)
-					if x == y {
-						found = true
+			indices := filterEntries(extEntries, text)
+			list.Clear()
+			for ex, ee := range extEntries {
+				for _, fx := range indices {
+					if fx == ex {
+						list.AddItem(ee.Title(), ee.Description(), rune(0), func() {})
 					}
-				}
-				// TODO this is a Cluster Fuck. it's removing everything but one thing (correct) but it's the wrong thing AND it takes FOREVER. need a totally different approach.
-				if !found {
-					opts.logger.Printf("let's remove %d", x)
-					opts.logger.Printf("%d items in list", list.GetItemCount())
-					// I think I'm hitting a bug here. list.currentItem is getting decremented when I don't think it should be, leading to a subscript of -1.
-					list.SetCurrentItem(len(extEntries) - 1)
-					list.RemoveItem(x)
-					list.SetCurrentItem(0)
 				}
 			}
 			opts.logger.Println("HI OK")
 			app.SetFocus(list)
 		case tcell.KeyEscape:
 			filter.SetText("")
-			for x, ee := range extEntries {
-				title, _ := list.GetItemText(x)
-				if title != ee.Title() {
-					list.InsertItem(x, ee.Title(), ee.Description(), rune(0), func() {})
-				}
+			list.Clear()
+			for _, ee := range extEntries {
+				list.AddItem(ee.Title(), ee.Description(), rune(0), func() {})
 			}
 			app.SetFocus(list)
-			// TODO clear active filter
 		}
 	})
 
