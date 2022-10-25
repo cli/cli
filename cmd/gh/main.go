@@ -70,6 +70,7 @@ func mainRun() exitCode {
 	}
 	if !cmdFactory.IOStreams.ColorEnabled() {
 		surveyCore.DisableColor = true
+		ansi.DisableColors(true)
 	} else {
 		// override survey's poor choice of color
 		surveyCore.TemplateFuncsWithColor["color"] = func(style string) string {
