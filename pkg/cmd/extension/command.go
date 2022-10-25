@@ -9,6 +9,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/extension/browse"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/search"
@@ -240,16 +241,16 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 				// TODO to make searcher cache, pass result of NewCachedHTTPClient
 
-				opts := extBrowseOpts{
-					cmd:      cmd,
-					browser:  browser,
-					searcher: search.NewSearcher(client, host),
-					em:       m,
-					client:   client,
-					cfg:      cfg,
+				opts := browse.ExtBrowseOpts{
+					Cmd:      cmd,
+					Browser:  browser,
+					Searcher: search.NewSearcher(client, host),
+					Em:       m,
+					Client:   client,
+					Cfg:      cfg,
 				}
 
-				return extBrowse(opts)
+				return browse.ExtBrowse(opts)
 			},
 		},
 		&cobra.Command{

@@ -1,4 +1,4 @@
-package extension
+package browse
 
 import (
 	"errors"
@@ -111,18 +111,18 @@ type ibrowser interface {
 	Browse(string) error
 }
 
-type extBrowseOpts struct {
-	cmd      *cobra.Command
-	browser  ibrowser
-	searcher search.Searcher
-	em       extensions.ExtensionManager
-	client   *http.Client
-	logger   *log.Logger
-	cfg      config.Config
-	rg       readmeGetter
+type ExtBrowseOpts struct {
+	Cmd      *cobra.Command
+	Browser  ibrowser
+	Searcher search.Searcher
+	Em       extensions.ExtensionManager
+	Client   *http.Client
+	Logger   *log.Logger
+	Cfg      config.Config
+	Rg       readmeGetter
 }
 
-func extBrowse(opts extBrowseOpts) error {
+func ExtBrowse(opts ExtBrowseOpts) error {
 	// TODO support turning debug mode on/off
 	f, err := os.CreateTemp("/tmp", "extBrowse-*.txt")
 	if err != nil {
@@ -130,11 +130,11 @@ func extBrowse(opts extBrowseOpts) error {
 	}
 	defer os.Remove(f.Name())
 
-	opts.logger = log.New(f, "", log.Lshortfile)
+	opts.Logger = log.New(f, "", log.Lshortfile)
 
-	installed := opts.em.List()
+	installed := opts.Em.List()
 
-	result, err := opts.searcher.Repositories(search.Query{
+	result, err := opts.Searcher.Repositories(search.Query{
 		Kind:  search.KindRepositories,
 		Limit: 1000,
 		Qualifiers: search.Qualifiers{
@@ -145,7 +145,7 @@ func extBrowse(opts extBrowseOpts) error {
 		return fmt.Errorf("failed to search for extensions: %w", err)
 	}
 
-	host, _ := opts.cfg.DefaultHost()
+	host, _ := opts.Cfg.DefaultHost()
 
 	extEntries := []extEntry{}
 
@@ -178,7 +178,7 @@ func extBrowse(opts extBrowseOpts) error {
 	}
 
 	// TODO use NewCachedHTTPClient here
-	opts.rg = newReadmeGetter(opts.client)
+	opts.Rg = newReadmeGetter(opts.Client)
 
 	app := tview.NewApplication()
 
@@ -197,9 +197,9 @@ func extBrowse(opts extBrowseOpts) error {
 
 	onSelectItem := func(ix int, _, _ string, _ rune) {
 		fullName := extEntries[ix].FullName
-		rm, err := opts.rg.Get(fullName)
+		rm, err := opts.Rg.Get(fullName)
 		if err != nil {
-			opts.logger.Println(err.Error())
+			opts.Logger.Println(err.Error())
 			readme.SetText("unable to fetch readme :(")
 			return
 		}
@@ -208,7 +208,7 @@ func extBrowse(opts extBrowseOpts) error {
 
 		rendered, err := markdown.Render(rm)
 		if err != nil {
-			opts.logger.Println(err.Error())
+			opts.Logger.Println(err.Error())
 			readme.SetText("unable to render readme :(")
 			return
 		}
@@ -281,22 +281,22 @@ func extBrowse(opts extBrowseOpts) error {
 		case 'w':
 			ee, err := findCurrentEntry(list, extEntries)
 			if err != nil {
-				opts.logger.Println(fmt.Errorf("tried to find entry, but: %w", err))
+				opts.Logger.Println(fmt.Errorf("tried to find entry, but: %w", err))
 			}
-			opts.browser.Browse(ee.URL)
+			opts.Browser.Browse(ee.URL)
 			return nil
 		case 'i':
 			// TODO get selected extEntry
 			// TODO install
 			// TODO set text on modal regarding success/failure
 			app.SetRoot(modal, true)
-			opts.logger.Println("INSTALL REQUESTED")
+			opts.Logger.Println("INSTALL REQUESTED")
 		case 'r':
 			// TODO
 			// TODO get selected extEntry
 			// TODO remove
 			// TODO set text on modal regarding success/failure
-			opts.logger.Println("REMOVE REQUESTED")
+			opts.Logger.Println("REMOVE REQUESTED")
 		case ' ':
 			// TODO the Modifiers check isn't working. add some logging.
 			if event.Modifiers()&tcell.ModShift != 0 {
