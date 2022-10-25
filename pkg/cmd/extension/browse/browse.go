@@ -11,7 +11,6 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/pkg/cmd/repo/view"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/cli/cli/v2/pkg/search"
@@ -26,35 +25,6 @@ import (
 // TODO see if it's possible to add padding to list and/or readme viewer
 
 const pagingOffset = 25
-
-type readmeGetter interface {
-	Get(string) (string, error)
-}
-
-type cachingReadmeGetter struct {
-	client *http.Client
-	cache  map[string]string
-}
-
-func newReadmeGetter(client *http.Client) readmeGetter {
-	return &cachingReadmeGetter{
-		client: client,
-		cache:  map[string]string{},
-	}
-}
-
-func (g *cachingReadmeGetter) Get(repoFullName string) (string, error) {
-	if readme, ok := g.cache[repoFullName]; ok {
-		return readme, nil
-	}
-	repo, err := ghrepo.FromFullName(repoFullName)
-	readme, err := view.RepositoryReadme(g.client, repo, "")
-	if err != nil {
-		return "", err
-	}
-	g.cache[repoFullName] = readme.Content
-	return readme.Content, nil
-}
 
 type extEntry struct {
 	URL         string
@@ -177,7 +147,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		extEntries = append(extEntries, ee)
 	}
 
-	// TODO use NewCachedHTTPClient here
+	// TODO pass a cache TTL
 	opts.Rg = newReadmeGetter(opts.Client)
 
 	app := tview.NewApplication()
