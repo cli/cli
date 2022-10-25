@@ -37,8 +37,17 @@ type fileReader interface {
 	Fd() uintptr
 }
 
+type term interface {
+	IsTerminalOutput() bool
+	IsColorEnabled() bool
+	Is256ColorSupported() bool
+	IsTrueColorSupported() bool
+	Theme() string
+	Size() (int, int, error)
+}
+
 type IOStreams struct {
-	term ghTerm.Term
+	term term
 
 	In     fileReader
 	Out    fileWriter
@@ -149,10 +158,12 @@ func (s *IOStreams) IsStdoutTTY() bool {
 	if s.stdoutTTYOverride {
 		return s.stdoutIsTTY
 	}
-	if stdout, ok := s.Out.(*os.File); ok {
-		return isTerminal(stdout)
+	// support GH_FORCE_TTY
+	if s.term.IsTerminalOutput() {
+		return true
 	}
-	return false
+	stdout, ok := s.Out.(*os.File)
+	return ok && isCygwinTerminal(stdout.Fd())
 }
 
 func (s *IOStreams) SetStderrTTY(isTTY bool) {
@@ -376,10 +387,6 @@ func (s *IOStreams) TempFile(dir, pattern string) (*os.File, error) {
 func System() *IOStreams {
 	terminal := ghTerm.FromEnv()
 
-	// we avoid using terminal.IsTerminalOutput() in order to additionally support cygwin
-	stdoutIsTTY := isTerminal(os.Stdout)
-	stderrIsTTY := isTerminal(os.Stderr)
-
 	var stdout fileWriter = os.Stdout
 	// On Windows with no virtual terminal processing support, translate ANSI escape
 	// sequences to console syscalls
@@ -396,10 +403,12 @@ func System() *IOStreams {
 		Out:          stdout,
 		ErrOut:       colorable.NewColorable(os.Stderr),
 		pagerCommand: os.Getenv("PAGER"),
-		term:         terminal,
+		term:         &terminal,
 	}
 
-	if stdoutIsTTY && stderrIsTTY {
+	stdoutIsTTY := io.IsStdoutTTY()
+
+	if stdoutIsTTY && io.IsStderrTTY() {
 		io.progressIndicatorEnabled = true
 	}
 
@@ -407,10 +416,33 @@ func System() *IOStreams {
 		io.alternateScreenBufferEnabled = true
 	}
 
-	// prevent duplicate isTerminal queries now that we know the answer
-	io.SetStdoutTTY(stdoutIsTTY)
-	io.SetStderrTTY(stderrIsTTY)
 	return io
+}
+
+type fakeTerm struct{}
+
+func (t fakeTerm) IsTerminalOutput() bool {
+	return false
+}
+
+func (t fakeTerm) IsColorEnabled() bool {
+	return false
+}
+
+func (t fakeTerm) Is256ColorSupported() bool {
+	return false
+}
+
+func (t fakeTerm) IsTrueColorSupported() bool {
+	return false
+}
+
+func (t fakeTerm) Theme() string {
+	return ""
+}
+
+func (t fakeTerm) Size() (int, int, error) {
+	return 80, -1, nil
 }
 
 func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
@@ -424,6 +456,7 @@ func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 		},
 		Out:    &fdWriter{fd: 1, Writer: out},
 		ErrOut: errOut,
+		term:   &fakeTerm{},
 	}
 	io.SetStdinTTY(false)
 	io.SetStdoutTTY(false)
