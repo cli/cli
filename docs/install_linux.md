@@ -44,13 +44,13 @@ sudo apt install curl
 curl -sL https://raw.githubusercontent.com/wimpysworld/deb-get/main/deb-get | sudo -E bash -s install deb-get
 ```
 
-Then install Github CLI using the following command in terminal:
+Then install gh using the following command in terminal:
 
 ```bash
 deb-get install gh
 ```
 
-Once Github CLI is installed it can be kept upto date using:
+Once gh is installed it can be kept up to date using:
 
 ```bash
 deb-get update
