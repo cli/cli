@@ -219,6 +219,13 @@ func runView(opts *ViewOptions) error {
 				return err
 			}
 		}
+
+		if err := opts.IO.StartPager(); err == nil {
+			defer opts.IO.StopPager()
+		} else {
+			fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+		}
+
 		return opts.Exporter.Write(opts.IO, run)
 	}
 
@@ -238,12 +245,6 @@ func runView(opts *ViewOptions) error {
 		}
 	}
 
-	if err := opts.IO.StartPager(); err == nil {
-		defer opts.IO.StopPager()
-	} else {
-		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
-	}
-
 	if opts.Web {
 		url := run.URL
 		if selectedJob != nil {
@@ -254,6 +255,12 @@ func runView(opts *ViewOptions) error {
 		}
 
 		return opts.Browser.Browse(url)
+	}
+
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
 
 	if selectedJob == nil && len(jobs) == 0 {
