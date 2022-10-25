@@ -213,7 +213,7 @@ func runView(opts *ViewOptions) error {
 	}
 
 	if opts.Exporter != nil {
-		if run.Jobs == nil && contains(opts.Exporter.Fields(), "jobs") {
+		if len(run.Jobs) == 0 && contains(opts.Exporter.Fields(), "jobs") {
 			err = shared.GetJobs(client, repo, run)
 			if err != nil {
 				return err
