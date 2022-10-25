@@ -212,6 +212,16 @@ func runView(opts *ViewOptions) error {
 		return fmt.Errorf("failed to get run: %w", err)
 	}
 
+	if opts.Exporter != nil {
+		if run.Jobs == nil && contains(opts.Exporter.Fields(), "jobs") {
+			err = shared.GetJobs(client, repo, run)
+			if err != nil {
+				return err
+			}
+		}
+		return opts.Exporter.Write(opts.IO, run)
+	}
+
 	if opts.Prompt {
 		opts.IO.StartProgressIndicator()
 		err = shared.GetJobs(client, repo, run)
@@ -232,14 +242,6 @@ func runView(opts *ViewOptions) error {
 		defer opts.IO.StopPager()
 	} else {
 		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
-	}
-
-	if opts.Exporter != nil {
-		err = shared.GetJobs(client, repo, run)
-		if err != nil {
-			return err
-		}
-		return opts.Exporter.Write(opts.IO, run)
 	}
 
 	if opts.Web {
@@ -394,6 +396,15 @@ func runView(opts *ViewOptions) error {
 	}
 
 	return nil
+}
+
+func contains(s []string, e string) bool {
+	for _, x := range s {
+		if x == e {
+			return true
+		}
+	}
+	return false
 }
 
 func getLog(httpClient *http.Client, logURL string) (io.ReadCloser, error) {
