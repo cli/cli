@@ -298,20 +298,42 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 			ee, err := extList.FindSelected()
 			if err != nil {
 				opts.Logger.Println(fmt.Errorf("tried to find entry, but: %w", err))
+				return nil
 			}
 			opts.Browser.Browse(ee.URL)
-			return nil
 		case 'i':
-			// TODO get selected extEntry
-			// TODO install
-			// TODO set text on modal regarding success/failure
+			ee, err := extList.FindSelected()
+			if err != nil {
+				opts.Logger.Println(fmt.Errorf("failed to find selected ext: %w", err))
+				return nil
+			}
+			repo, err := ghrepo.FromFullName(ee.FullName)
+			if err != nil {
+				opts.Logger.Println(fmt.Errorf("failed to install '%s't: %w", ee.FullName, err))
+				return nil
+			}
+
+			err = opts.Em.Install(repo, "")
+			if err != nil {
+				modal.SetText(fmt.Sprintf("Failed to install %s: %s", ee.FullName, err.Error()))
+			} else {
+				modal.SetText(fmt.Sprintf("Installed %s!", ee.FullName))
+			}
 			app.SetRoot(modal, true)
-			opts.Logger.Println("INSTALL REQUESTED")
 		case 'r':
-			// TODO get selected extEntry
-			// TODO remove
-			// TODO set text on modal regarding success/failure
-			opts.Logger.Println("REMOVE REQUESTED")
+			ee, err := extList.FindSelected()
+			if err != nil {
+				opts.Logger.Println(fmt.Errorf("failed to find selected ext: %w", err))
+				return nil
+			}
+
+			err = opts.Em.Remove(strings.TrimPrefix(ee.Name, "gh-"))
+			if err != nil {
+				modal.SetText(fmt.Sprintf("Failed to remove %s: %s", ee.FullName, err.Error()))
+			} else {
+				modal.SetText(fmt.Sprintf("Removed %s.", ee.FullName))
+			}
+			app.SetRoot(modal, true)
 		case ' ':
 			extList.PageDown()
 		case '/':
