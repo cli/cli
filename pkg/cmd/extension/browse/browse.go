@@ -84,6 +84,8 @@ type extList struct {
 }
 
 func newExtList(app *tview.Application, list *tview.List, extEntries []extEntry) extensionListUI {
+	list.SetWrapAround(false)
+	list.SetBorderPadding(1, 1, 1, 1)
 	el := &extList{
 		list:       list,
 		extEntries: extEntries,
@@ -208,9 +210,10 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 
 	header := tview.NewTextView().SetText("gh extensions").SetTextAlign(tview.AlignCenter)
 	filter := tview.NewInputField().SetLabel("filter: ")
-	list := tview.NewList().SetWrapAround(false)
+	list := tview.NewList()
 	readme := tview.NewTextView()
-	help := tview.NewTextView().SetText("/: filter i: install r: remove w: open in browser pgup/pgdn: scroll readme q: quit")
+	readme.SetBorderPadding(1, 1, 0, 1)
+	help := tview.NewTextView().SetText("/: filter i/r: install/remove w: open in browser pgup/pgdn: scroll readme q: quit")
 
 	extList := newExtList(app, list, extEntries)
 
