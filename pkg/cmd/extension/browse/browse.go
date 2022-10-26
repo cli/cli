@@ -22,8 +22,22 @@ import (
 
 // TODO see if there is any way to make readme viewing prettier
 // TODO see if it's possible to add padding to list and/or readme viewer
-
 const pagingOffset = 25
+
+type ExtBrowseOpts struct {
+	Cmd      *cobra.Command
+	Browser  ibrowser
+	Searcher search.Searcher
+	Em       extensions.ExtensionManager
+	Client   *http.Client
+	Logger   *log.Logger
+	Cfg      config.Config
+	Rg       readmeGetter
+}
+
+type ibrowser interface {
+	Browse(string) error
+}
 
 type extEntry struct {
 	URL         string
@@ -35,27 +49,6 @@ type extEntry struct {
 	Installed   bool
 	Official    bool
 	description string
-}
-
-func filterEntries(extEntries []extEntry, term string) []int {
-	indices := []int{}
-	for x, ee := range extEntries {
-		if strings.Index(ee.Title()+ee.Description(), term) > -1 {
-			indices = append(indices, x)
-		}
-	}
-	return indices
-}
-
-// findCurrentEntry returns whatever extEntry is currently selected by the list
-func findCurrentEntry(list *tview.List, extEntries []extEntry) (extEntry, error) {
-	title, desc := list.GetItemText(list.GetCurrentItem())
-	for _, e := range extEntries {
-		if e.Title() == title && e.Description() == desc {
-			return e, nil
-		}
-	}
-	return extEntry{}, errors.New("not found")
 }
 
 func (e extEntry) Title() string {
@@ -74,21 +67,80 @@ func (e extEntry) Title() string {
 }
 
 func (e extEntry) Description() string { return e.description }
-func (e extEntry) FilterValue() string { return e.Title() }
 
-type ibrowser interface {
-	Browse(string) error
+type extensionListUI interface {
+	FindSelected() (extEntry, error)
+	Filter(text string)
+	Focus()
+	Reset()
+	PageDown()
+	PageUp()
 }
 
-type ExtBrowseOpts struct {
-	Cmd      *cobra.Command
-	Browser  ibrowser
-	Searcher search.Searcher
-	Em       extensions.ExtensionManager
-	Client   *http.Client
-	Logger   *log.Logger
-	Cfg      config.Config
-	Rg       readmeGetter
+type extList struct {
+	list       *tview.List
+	extEntries []extEntry
+	app        *tview.Application
+}
+
+func newExtList(app *tview.Application, list *tview.List, extEntries []extEntry) extensionListUI {
+	el := &extList{
+		list:       list,
+		extEntries: extEntries,
+		app:        app,
+	}
+	el.Reset()
+	return el
+}
+
+func (el *extList) Focus() {
+	el.app.SetFocus(el.list)
+}
+
+func (el *extList) Reset() {
+	el.list.Clear()
+	for _, ee := range el.extEntries {
+		el.list.AddItem(ee.Title(), ee.Description(), rune(0), func() {})
+	}
+}
+
+func (el *extList) PageDown() {
+	el.list.SetCurrentItem(el.list.GetCurrentItem() + pagingOffset)
+}
+
+func (el *extList) PageUp() {
+	i := el.list.GetCurrentItem() - pagingOffset
+	if i < 0 {
+		i = 0
+	}
+	el.list.SetCurrentItem(i)
+}
+
+func (el *extList) FindSelected() (extEntry, error) {
+	title, desc := el.list.GetItemText(el.list.GetCurrentItem())
+	for _, e := range el.extEntries {
+		if e.Title() == title && e.Description() == desc {
+			return e, nil
+		}
+	}
+	return extEntry{}, errors.New("not found")
+}
+
+func (el *extList) Filter(text string) {
+	indices := []int{}
+	for x, ee := range el.extEntries {
+		if strings.Index(ee.Title()+ee.Description(), text) > -1 {
+			indices = append(indices, x)
+		}
+	}
+	el.list.Clear()
+	for ex, ee := range el.extEntries {
+		for _, fx := range indices {
+			if fx == ex {
+				el.list.AddItem(ee.Title(), ee.Description(), rune(0), func() {})
+			}
+		}
+	}
 }
 
 func ExtBrowse(opts ExtBrowseOpts) error {
@@ -160,12 +212,10 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	readme := tview.NewTextView()
 	help := tview.NewTextView().SetText("/: filter i: install r: remove w: open in browser pgup/pgdn: scroll readme q: quit")
 
-	for _, ee := range extEntries {
-		list.AddItem(ee.Title(), ee.Description(), rune(0), func() {})
-	}
+	extList := newExtList(app, list, extEntries)
 
 	onSelectItem := func(ix int, _, _ string, _ rune) {
-		ee, err := findCurrentEntry(list, extEntries)
+		ee, err := extList.FindSelected()
 		if err != nil {
 			opts.Logger.Println(fmt.Errorf("tried to find entry, but: %w", err))
 			return
@@ -201,28 +251,16 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	// Force fetching of initial readme:
 	onSelectItem(0, "", "", rune(0))
 
-	filter.SetChangedFunc(func(text string) {
-		indices := filterEntries(extEntries, text)
-		list.Clear()
-		for ex, ee := range extEntries {
-			for _, fx := range indices {
-				if fx == ex {
-					list.AddItem(ee.Title(), ee.Description(), rune(0), func() {})
-				}
-			}
-		}
-	})
+	filter.SetChangedFunc(extList.Filter)
+
 	filter.SetDoneFunc(func(key tcell.Key) {
 		switch key {
 		case tcell.KeyEnter:
-			app.SetFocus(list)
+			extList.Focus()
 		case tcell.KeyEscape:
 			filter.SetText("")
-			list.Clear()
-			for _, ee := range extEntries {
-				list.AddItem(ee.Title(), ee.Description(), rune(0), func() {})
-			}
-			app.SetFocus(list)
+			extList.Reset()
+			extList.Focus()
 		}
 	})
 
@@ -250,7 +288,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		if filter.HasFocus() {
 			return event
 		}
-		// TODO not updating readme on filter
+
 		switch event.Rune() {
 		case 'q':
 			app.Stop()
@@ -259,7 +297,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		case 'j':
 			return tcell.NewEventKey(tcell.KeyDown, rune(0), 0)
 		case 'w':
-			ee, err := findCurrentEntry(list, extEntries)
+			ee, err := extList.FindSelected()
 			if err != nil {
 				opts.Logger.Println(fmt.Errorf("tried to find entry, but: %w", err))
 			}
@@ -272,34 +310,24 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 			app.SetRoot(modal, true)
 			opts.Logger.Println("INSTALL REQUESTED")
 		case 'r':
-			// TODO
 			// TODO get selected extEntry
 			// TODO remove
 			// TODO set text on modal regarding success/failure
 			opts.Logger.Println("REMOVE REQUESTED")
 		case ' ':
-			list.SetCurrentItem(list.GetCurrentItem() + pagingOffset)
-			return nil
+			extList.PageDown()
 		case '/':
 			app.SetFocus(filter)
 			return nil
 		}
 		switch event.Key() {
 		case tcell.KeyCtrlSpace:
-			i := list.GetCurrentItem() - pagingOffset
-			if i < 0 {
-				i = 0
-			}
-			list.SetCurrentItem(i)
+			extList.PageUp()
 		case tcell.KeyCtrlJ:
-			list.SetCurrentItem(list.GetCurrentItem() + pagingOffset)
+			extList.PageDown()
 			return nil
 		case tcell.KeyCtrlK:
-			i := list.GetCurrentItem() - pagingOffset
-			if i < 0 {
-				i = 0
-			}
-			list.SetCurrentItem(i)
+			extList.PageUp()
 			return nil
 		case tcell.KeyPgUp:
 			row, col := readme.GetScrollOffset()
