@@ -1,6 +1,7 @@
 package view
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,12 +11,15 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
+	"github.com/cli/cli/v2/pkg/cmd/release/internal"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/cli/cli/v2/utils"
+	"github.com/gobwas/glob"
 	"github.com/spf13/cobra"
+	"golang.org/x/mod/semver"
 )
 
 type browser interface {
@@ -29,8 +33,10 @@ type ViewOptions struct {
 	Browser    browser
 	Exporter   cmdutil.Exporter
 
-	TagName string
-	WebMode bool
+	TagName       string
+	WebMode       bool
+	LimitResults  int
+	ExcludeDrafts bool
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -41,7 +47,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "view [<tag>]",
+		Use:   "view [<tag>][..<tag>]",
 		Short: "View information about a release",
 		Long: heredoc.Doc(`
 			View information about a GitHub Release.
@@ -66,12 +72,99 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	}
 
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the release in the browser")
+	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of items to fetch")
+	cmd.Flags().BoolVar(&opts.ExcludeDrafts, "exclude-drafts", false, "Exclude draft releases")
+
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.ReleaseFields)
 
 	return cmd
 }
 
 func viewRun(opts *ViewOptions) error {
+	r, err := isRange(opts.TagName)
+	if err != nil {
+		return err
+	} else if r != nil {
+		return viewRunRange(r, opts)
+	} else {
+		fmt.Printf("default")
+		return viewRunDefault(opts)
+	}
+}
+
+var (
+	ErrNoWebMode       = errors.New("web mode unavailable when specifying range")
+	ErrInvalidPattern  = errors.New("tag range indicator should start with 'v' or '*'")
+	ErrInvalidInterval = errors.New("tags interval cannot include asterisks")
+)
+
+type ErrInvalidSemver struct {
+	Semver string
+}
+
+func (err *ErrInvalidSemver) Error() string {
+	return fmt.Sprintf("invalid semantic version: '%s'", err.Semver)
+}
+
+func viewRunRange(r Range, opts *ViewOptions) error {
+	if opts.WebMode {
+		return ErrNoWebMode
+	}
+
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+
+	baseRepo, err := opts.BaseRepo()
+	if err != nil {
+		return err
+	}
+
+	fetched, err := internal.FetchReleases(httpClient, baseRepo, opts.LimitResults, opts.ExcludeDrafts)
+	if err != nil {
+		return err
+	}
+
+	var releases []*shared.Release
+
+	for _, rel := range fetched {
+		if r.Match(rel.TagName) {
+			release, err := shared.FetchRelease(httpClient, baseRepo, rel.TagName)
+			if err != nil {
+				return err
+			}
+
+			releases = append(releases, release)
+		}
+	}
+
+	opts.IO.DetectTerminalTheme()
+	if err := opts.IO.StartPager(); err != nil {
+		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
+	}
+	defer opts.IO.StopPager()
+
+	for _, release := range releases {
+		if opts.Exporter != nil {
+			return opts.Exporter.Write(opts.IO, release)
+		}
+
+		if opts.IO.IsStdoutTTY() {
+			if err := renderReleaseTTY(opts.IO, release); err != nil {
+				return err
+			}
+		} else {
+			if err := renderReleasePlain(opts.IO.Out, release); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func viewRunDefault(opts *ViewOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
@@ -216,4 +309,105 @@ func floatToString(f float64, p uint8) string {
 	fs := fmt.Sprintf("%#f%0*s", f, p, "")
 	idx := strings.IndexRune(fs, '.')
 	return fs[:idx+int(p)+1]
+}
+
+func matchTag(pattern, tag string) (bool, error) {
+	g, err := glob.Compile(pattern)
+	if err != nil {
+		return false, err
+	}
+
+	return g.Match(tag), nil
+}
+
+type Range interface {
+	Match(string) bool
+}
+
+type Interval struct {
+	start string
+	end   string
+}
+
+func NewInterval(start, end string) (*Interval, error) {
+	if !semver.IsValid(start) {
+		return nil, &ErrInvalidSemver{Semver: start}
+	} else if !semver.IsValid(semver.Canonical(end)) {
+		return nil, &ErrInvalidSemver{Semver: end}
+	}
+
+	// protecting myself from stupid errors
+	if semver.Compare(start, end) == 1 {
+		return &Interval{
+			start: end,
+			end:   start,
+		}, nil
+	}
+
+	return &Interval{
+		start: start,
+		end:   end,
+	}, nil
+}
+
+func (i Interval) Match(tag string) bool {
+	if semver.Compare(i.start, tag) > 0 || semver.Compare(i.end, tag) < 0 {
+		return false
+	} else {
+		return true
+	}
+}
+
+type Glob struct {
+	glob glob.Glob
+}
+
+func NewGlob(pattern string) (*Glob, error) {
+	if len(pattern) == 0 {
+		return nil, nil
+	}
+
+	if pattern[0] != 'v' && pattern[0] != '*' {
+		return nil, ErrInvalidPattern
+	}
+
+	g, err := glob.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Glob{
+		glob: g,
+	}, nil
+}
+
+func (g *Glob) Match(tag string) bool {
+	return g.glob.Match(tag)
+}
+
+func isRange(tag string) (Range, error) {
+	tagRange := strings.Split(tag, "..")
+
+	if len(tagRange) == 1 {
+		// range can be defined by glob with asterisk
+		if !strings.Contains(tag, "*") {
+			return nil, nil
+		}
+		if i, err := NewGlob(tag); err != nil {
+			return nil, nil
+		} else {
+			return i, err
+		}
+	} else if len(tagRange) == 2 {
+		// intervals can not accept asterisks
+		if strings.Contains(tag, "*") {
+			return nil, ErrInvalidInterval
+		}
+		if i, err := NewInterval(tagRange[0], tagRange[1]); err != nil {
+			return nil, err
+		} else {
+			return i, nil
+		}
+	}
+	return nil, nil
 }

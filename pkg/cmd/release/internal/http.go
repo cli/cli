@@ -1,4 +1,4 @@
-package list
+package internal
 
 import (
 	"net/http"
@@ -19,7 +19,7 @@ type Release struct {
 	PublishedAt  time.Time
 }
 
-func fetchReleases(httpClient *http.Client, repo ghrepo.Interface, limit int, excludeDrafts bool) ([]Release, error) {
+func FetchReleases(httpClient *http.Client, repo ghrepo.Interface, limit int, excludeDrafts bool) ([]Release, error) {
 	type responseData struct {
 		Repository struct {
 			Releases struct {

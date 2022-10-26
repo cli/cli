@@ -53,6 +53,58 @@ func Test_NewCmdView(t *testing.T) {
 				WebMode: true,
 			},
 		},
+		{
+			name:  "interval",
+			args:  "v1.2.3..v1.2.4",
+			isTTY: true,
+			want: ViewOptions{
+				TagName: "v1.2.3..v1.2.4",
+			},
+		},
+		{
+			name:  "interval limit",
+			args:  "-L 10 v1.2.3..v1.2.4",
+			isTTY: true,
+			want: ViewOptions{
+				TagName:      "v1.2.3..v1.2.4",
+				LimitResults: 10,
+			},
+		},
+		{
+			name:  "interval web mode",
+			args:  "-w v1.2.3..v1.2.4",
+			isTTY: true,
+			want: ViewOptions{
+				WebMode: true,
+				TagName: "v1.2.3..v1.2.4",
+			},
+		},
+		{
+			name:  "glob",
+			args:  "v1.2.*",
+			isTTY: true,
+			want: ViewOptions{
+				TagName: "v1.2.*",
+			},
+		},
+		{
+			name:  "glob limit",
+			args:  "-L 10 v1.2.*",
+			isTTY: true,
+			want: ViewOptions{
+				TagName:      "v1.2.*",
+				LimitResults: 10,
+			},
+		},
+		{
+			name:  "glob web mode",
+			args:  "-w v1.2.*",
+			isTTY: true,
+			want: ViewOptions{
+				WebMode: true,
+				TagName: "v1.2.*",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -311,6 +363,203 @@ func Test_humanFileSize(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := humanFileSize(tt.size); got != tt.want {
 				t.Errorf("humanFileSize() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_isRange(t *testing.T) {
+	tests := []struct {
+		name    string
+		tag     string
+		wantNil bool
+	}{
+		{
+			name:    "semver basic",
+			tag:     "v1.1.0",
+			wantNil: true,
+		}, {
+			name:    "semver basic without v",
+			tag:     "1.1.0",
+			wantNil: true,
+		},
+		{
+			name:    "semver with sufix",
+			tag:     "v1.1.0-rc.1",
+			wantNil: true,
+		},
+		{
+			name:    "semver with sufix without v",
+			tag:     "1.1.0-rc.1",
+			wantNil: true,
+		},
+		{
+			name:    "tag with bad prefix",
+			tag:     "x1.1.0",
+			wantNil: true,
+		},
+		{
+			name:    "tag with bad interfix",
+			tag:     "v1.x.0",
+			wantNil: true,
+		},
+		{
+			name:    "tag with bad interfix without v",
+			tag:     "1.x.0",
+			wantNil: true,
+		},
+		{
+			name:    "tag with bad sufix",
+			tag:     "v1.0.x",
+			wantNil: true,
+		},
+		{
+			name:    "tag with bad sufix without v",
+			tag:     "1.0.x",
+			wantNil: true,
+		},
+		{
+			name:    "tag range asterisk",
+			tag:     "*",
+			wantNil: false,
+		},
+		{
+			name:    "tag range asterisk prefix",
+			tag:     "v*.1.0",
+			wantNil: false,
+		},
+		{
+			name:    "tag range asterisk prefix without v",
+			tag:     "*.1.0",
+			wantNil: false,
+		},
+		{
+			name:    "tag range asterisk interfix",
+			tag:     "v1.*.0",
+			wantNil: false,
+		},
+		{
+			name:    "tag range asterisk interfix without v",
+			tag:     "1.*.0",
+			wantNil: true,
+		},
+		{
+			name:    "tag range asterisk sufix",
+			tag:     "v1.1.*",
+			wantNil: false,
+		},
+		{
+			name:    "tag range asterisk sufix without v",
+			tag:     "1.1.*",
+			wantNil: true,
+		},
+		{
+			name:    "tag range dots",
+			tag:     "v1.1.0..v1.1.2",
+			wantNil: false,
+		},
+		{
+			name:    "tag range dots 1st wtihout v",
+			tag:     "1.1.0..v1.1.2",
+			wantNil: true,
+		},
+		{
+			name:    "tag range dots 2nd without v",
+			tag:     "v1.1.0..1.1.2",
+			wantNil: true,
+		},
+		{
+			name:    "tag range dots with asterisk right",
+			tag:     "1.*.0..1.1.2",
+			wantNil: true,
+		},
+		{
+			name:    "tag range dots with asterisk left",
+			tag:     "1.1.0..1.1.*",
+			wantNil: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got, err := isRange(tt.tag); (got != nil) == tt.wantNil {
+				t.Errorf("isRange() = %v, want nil=%v (%v)", got, tt.wantNil, err)
+			}
+		})
+	}
+}
+
+func Test_matchTag(t *testing.T) {
+	tests := []struct {
+		name    string
+		tag     string
+		pattern string
+		want    bool
+	}{
+		{
+			name:    "semver glob patch",
+			tag:     "1.1.0",
+			pattern: "1.1.*",
+			want:    true,
+		},
+		{
+			name:    "semver glob minor",
+			tag:     "1.1.0",
+			pattern: "1.*.0",
+			want:    true,
+		},
+		{
+			name:    "semver glob major",
+			tag:     "1.1.0",
+			pattern: "*.1.0",
+			want:    true,
+		},
+		{
+			name:    "semver glob prefix",
+			tag:     "1.1.0",
+			pattern: "*.0",
+			want:    true,
+		},
+		{
+			name:    "semver glob interfix",
+			tag:     "1.1.0",
+			pattern: "1*0",
+			want:    true,
+		},
+		{
+			name:    "semver glob sufix",
+			tag:     "1.1.0",
+			pattern: "1.*",
+			want:    true,
+		},
+		{
+			name:    "semver glob",
+			tag:     "1.1.0",
+			pattern: "*",
+			want:    true,
+		},
+		{
+			name:    "semver exact",
+			tag:     "1.1.0",
+			pattern: "1.1.0",
+			want:    true,
+		},
+		{
+			name:    "semver patch not matching",
+			tag:     "1.1.1",
+			pattern: "1.1.0",
+			want:    false,
+		},
+		{
+			name:    "semver glob patch not maching",
+			tag:     "1.1.2",
+			pattern: "1.*.0",
+			want:    false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got, _ := matchTag(tt.pattern, tt.tag); got != tt.want {
+				t.Errorf("matchTag() = %v, want %v", got, tt.want)
 			}
 		})
 	}

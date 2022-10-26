@@ -7,6 +7,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
+	"github.com/cli/cli/v2/pkg/cmd/release/internal"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -60,7 +61,7 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	releases, err := fetchReleases(httpClient, baseRepo, opts.LimitResults, opts.ExcludeDrafts)
+	releases, err := internal.FetchReleases(httpClient, baseRepo, opts.LimitResults, opts.ExcludeDrafts)
 	if err != nil {
 		return err
 	}
