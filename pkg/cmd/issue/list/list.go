@@ -71,6 +71,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			$ gh issue list --assignee "@me"
 			$ gh issue list --milestone "The big 1.0"
 			$ gh issue list --search "error no:assignee sort:created-asc"
+			$ gh issue list --json number --jq .[].number
 		`),
 		Aliases: []string{"ls"},
 		Args:    cmdutil.NoArgsQuoteReminder,
