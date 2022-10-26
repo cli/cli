@@ -281,8 +281,6 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 
 	app.SetRoot(outerFlex, true)
 
-	// TODO make functions for this stuff (scrolling stuff, install/remove, etc)
-
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		opts.Logger.Printf("%#v", event)
 		if filter.HasFocus() {
