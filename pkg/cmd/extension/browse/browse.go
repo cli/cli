@@ -20,8 +20,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// TODO see if there is any way to make readme viewing prettier
-// TODO see if it's possible to add padding to list and/or readme viewer
+// TODO colors
+// TODO set content to "loading..." for readme viewer when loading
+
 const pagingOffset = 25
 
 type ExtBrowseOpts struct {
@@ -210,6 +211,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 
 	header := tview.NewTextView().SetText("gh extensions").SetTextAlign(tview.AlignCenter)
 	filter := tview.NewInputField().SetLabel("filter: ")
+	filter.SetBorderPadding(0, 0, 20, 20)
 	list := tview.NewList()
 	readme := tview.NewTextView()
 	readme.SetBorderPadding(1, 1, 0, 1)
