@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/glamour"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/extensions"
-	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/cli/cli/v2/pkg/search"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -165,7 +165,12 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	}
 
 	onSelectItem := func(ix int, _, _ string, _ rune) {
-		fullName := extEntries[ix].FullName
+		ee, err := findCurrentEntry(list, extEntries)
+		if err != nil {
+			opts.Logger.Println(fmt.Errorf("tried to find entry, but: %w", err))
+			return
+		}
+		fullName := ee.FullName
 		rm, err := opts.Rg.Get(fullName)
 		if err != nil {
 			opts.Logger.Println(err.Error())
@@ -175,7 +180,8 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 
 		// TODO sanity check what happens for non markdown readmes
 
-		rendered, err := markdown.Render(rm)
+		// TODO be more careful about dark/light (sniff it earlier then set overall theming)
+		rendered, err := glamour.Render(rm, "dark")
 		if err != nil {
 			opts.Logger.Println(err.Error())
 			readme.SetText("unable to render readme :(")
@@ -240,6 +246,10 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	// TODO make functions for this stuff (scrolling stuff, install/remove, etc)
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		opts.Logger.Printf("%#v", event)
+		if filter.HasFocus() {
+			return event
+		}
 		// TODO not updating readme on filter
 		switch event.Rune() {
 		case 'q':
@@ -268,22 +278,19 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 			// TODO set text on modal regarding success/failure
 			opts.Logger.Println("REMOVE REQUESTED")
 		case ' ':
-			// TODO the Modifiers check isn't working. add some logging.
-			if event.Modifiers()&tcell.ModShift != 0 {
-				i := list.GetCurrentItem() - pagingOffset
-				if i < 0 {
-					i = 0
-				}
-				list.SetCurrentItem(i)
-			} else {
-				list.SetCurrentItem(list.GetCurrentItem() + pagingOffset)
-			}
+			list.SetCurrentItem(list.GetCurrentItem() + pagingOffset)
 			return nil
 		case '/':
 			app.SetFocus(filter)
 			return nil
 		}
 		switch event.Key() {
+		case tcell.KeyCtrlSpace:
+			i := list.GetCurrentItem() - pagingOffset
+			if i < 0 {
+				i = 0
+			}
+			list.SetCurrentItem(i)
 		case tcell.KeyCtrlJ:
 			list.SetCurrentItem(list.GetCurrentItem() + pagingOffset)
 			return nil
@@ -305,6 +312,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 			readme.ScrollTo(row+2, col)
 			return nil
 		}
+
 		return event
 	})
 
