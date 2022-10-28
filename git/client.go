@@ -317,16 +317,6 @@ func (c *Client) DeleteLocalBranch(ctx context.Context, branch string) error {
 	return nil
 }
 
-func (c *Client) HasLocalBranch(ctx context.Context, branch string) bool {
-	args := []string{"rev-parse", "--verify", "refs/heads/" + branch}
-	cmd, err := c.Command(ctx, args...)
-	if err != nil {
-		return false
-	}
-	_, err = cmd.Output()
-	return err == nil
-}
-
 func (c *Client) CheckoutBranch(ctx context.Context, branch string) error {
 	args := []string{"checkout", branch}
 	cmd, err := c.Command(ctx, args...)
@@ -354,14 +344,14 @@ func (c *Client) CheckoutNewBranch(ctx context.Context, remoteName, branch strin
 	return nil
 }
 
+func (c *Client) HasLocalBranch(ctx context.Context, branch string) bool {
+	_, err := c.revParse(ctx, "--verify", "refs/heads/"+branch)
+	return err == nil
+}
+
 // ToplevelDir returns the top-level directory path of the current repository.
 func (c *Client) ToplevelDir(ctx context.Context) (string, error) {
-	args := []string{"rev-parse", "--show-toplevel"}
-	cmd, err := c.Command(ctx, args...)
-	if err != nil {
-		return "", err
-	}
-	out, err := cmd.Output()
+	out, err := c.revParse(ctx, "--show-toplevel")
 	if err != nil {
 		return "", err
 	}
@@ -369,12 +359,7 @@ func (c *Client) ToplevelDir(ctx context.Context) (string, error) {
 }
 
 func (c *Client) GitDir(ctx context.Context) (string, error) {
-	args := []string{"rev-parse", "--git-dir"}
-	cmd, err := c.Command(ctx, args...)
-	if err != nil {
-		return "", err
-	}
-	out, err := cmd.Output()
+	out, err := c.revParse(ctx, "--git-dir")
 	if err != nil {
 		return "", err
 	}
@@ -383,12 +368,7 @@ func (c *Client) GitDir(ctx context.Context) (string, error) {
 
 // Show current directory relative to the top-level directory of repository.
 func (c *Client) PathFromRoot(ctx context.Context) string {
-	args := []string{"rev-parse", "--show-prefix"}
-	cmd, err := c.Command(ctx, args...)
-	if err != nil {
-		return ""
-	}
-	out, err := cmd.Output()
+	out, err := c.revParse(ctx, "--show-prefix")
 	if err != nil {
 		return ""
 	}
@@ -396,6 +376,15 @@ func (c *Client) PathFromRoot(ctx context.Context) string {
 		return path[:len(path)-1]
 	}
 	return ""
+}
+
+func (c *Client) revParse(ctx context.Context, args ...string) ([]byte, error) {
+	args = append([]string{"rev-parse"}, args...)
+	cmd, err := c.Command(ctx, args...)
+	if err != nil {
+		return nil, err
+	}
+	return cmd.Output()
 }
 
 // Below are commands that make network calls and need authentication credentials supplied from gh.
