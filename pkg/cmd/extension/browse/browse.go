@@ -21,6 +21,15 @@ import (
 )
 
 // TODO colors
+// - background
+// - filter label
+// - filter box
+// - list title
+// - list title selected
+// - list subtitle
+// - help text
+// - title text
+// - modal?
 // TODO set content to "loading..." for readme viewer when loading
 
 const pagingOffset = 25
@@ -209,13 +218,26 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	outerFlex := tview.NewFlex()
 	innerFlex := tview.NewFlex()
 
-	header := tview.NewTextView().SetText("gh extensions").SetTextAlign(tview.AlignCenter)
+	header := tview.NewTextView().SetText("gh extensions")
+	header.SetTextAlign(tview.AlignCenter).SetTextColor(tcell.ColorPurple)
+
 	filter := tview.NewInputField().SetLabel("filter: ")
+	filter.SetLabelColor(tcell.ColorGray).SetFieldBackgroundColor(tcell.ColorGray)
 	filter.SetBorderPadding(0, 0, 20, 20)
+
 	list := tview.NewList()
+	list.SetSelectedTextColor(tcell.ColorWhite)
+	list.SetSelectedBackgroundColor(tcell.ColorPurple)
+	list.SetSecondaryTextColor(tcell.ColorGray)
+
 	readme := tview.NewTextView()
 	readme.SetBorderPadding(1, 1, 0, 1)
-	help := tview.NewTextView().SetText("/: filter i/r: install/remove w: open in browser pgup/pgdn: scroll readme q: quit")
+	readme.SetBorder(true).SetBorderColor(tcell.ColorPurple)
+
+	help := tview.NewTextView()
+	help.SetText(
+		"/: filter i/r: install/remove w: open in browser pgup/pgdn: scroll readme q: quit")
+	help.SetTextColor(tcell.ColorGray).SetTextAlign(tview.AlignCenter)
 
 	extList := newExtList(app, list, extEntries)
 
