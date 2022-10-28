@@ -66,11 +66,11 @@ func (e extEntry) Title() string {
 	var official string
 
 	if e.Installed {
-		installed = " [installed]"
+		installed = " [green](installed)"
 	}
 
 	if e.Official {
-		official = " [official]"
+		official = " [yellow](official)"
 	}
 
 	return fmt.Sprintf("%s%s%s", e.FullName, official, installed)
@@ -91,15 +91,17 @@ type extList struct {
 	list       *tview.List
 	extEntries []extEntry
 	app        *tview.Application
+	logger     *log.Logger
 }
 
-func newExtList(app *tview.Application, list *tview.List, extEntries []extEntry) extensionListUI {
+func newExtList(app *tview.Application, list *tview.List, extEntries []extEntry, logger *log.Logger) extensionListUI {
 	list.SetWrapAround(false)
 	list.SetBorderPadding(1, 1, 1, 1)
 	el := &extList{
 		list:       list,
 		extEntries: extEntries,
 		app:        app,
+		logger:     logger,
 	}
 	el.Reset()
 	return el
@@ -219,7 +221,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	innerFlex := tview.NewFlex()
 
 	header := tview.NewTextView().SetText("gh extensions")
-	header.SetTextAlign(tview.AlignCenter).SetTextColor(tcell.ColorPurple)
+	header.SetTextAlign(tview.AlignCenter).SetTextColor(tcell.ColorWhite)
 
 	filter := tview.NewInputField().SetLabel("filter: ")
 	filter.SetLabelColor(tcell.ColorGray).SetFieldBackgroundColor(tcell.ColorGray)
@@ -239,7 +241,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		"/: filter i/r: install/remove w: open in browser pgup/pgdn: scroll readme q: quit")
 	help.SetTextColor(tcell.ColorGray).SetTextAlign(tview.AlignCenter)
 
-	extList := newExtList(app, list, extEntries)
+	extList := newExtList(app, list, extEntries, opts.Logger)
 
 	onSelectItem := func(ix int, _, _ string, _ rune) {
 		ee, err := extList.FindSelected()
