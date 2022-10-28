@@ -20,19 +20,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// TODO colors
-// - background
-// - filter label
-// - filter box
-// - list title
-// - list title selected
-// - list subtitle
-// - help text
-// - title text
-// - modal?
-// TODO set content to "loading..." for readme viewer when loading
-
-const pagingOffset = 25
+const pagingOffset = 24
 
 type ExtBrowseOpts struct {
 	Cmd      *cobra.Command
@@ -220,7 +208,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	outerFlex := tview.NewFlex()
 	innerFlex := tview.NewFlex()
 
-	header := tview.NewTextView().SetText("gh extensions")
+	header := tview.NewTextView().SetText(fmt.Sprintf("browsing %d gh extensions", len(extEntries)))
 	header.SetTextAlign(tview.AlignCenter).SetTextColor(tcell.ColorWhite)
 
 	filter := tview.NewInputField().SetLabel("filter: ")
@@ -244,6 +232,8 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	extList := newExtList(app, list, extEntries, opts.Logger)
 
 	onSelectItem := func(ix int, _, _ string, _ rune) {
+		readme.SetText("...fetching readme...")
+		app.ForceDraw()
 		ee, err := extList.FindSelected()
 		if err != nil {
 			opts.Logger.Println(fmt.Errorf("tried to find entry, but: %w", err))
@@ -308,6 +298,8 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		app.SetRoot(outerFlex, true)
 	})
 
+	modal.SetBackgroundColor(tcell.ColorPurple)
+
 	app.SetRoot(outerFlex, true)
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -342,13 +334,15 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 				return nil
 			}
 
+			app.SetRoot(modal, true)
+			modal.SetText(fmt.Sprintf("Installing %s...", ee.FullName))
+			app.ForceDraw()
 			err = opts.Em.Install(repo, "")
 			if err != nil {
 				modal.SetText(fmt.Sprintf("Failed to install %s: %s", ee.FullName, err.Error()))
 			} else {
 				modal.SetText(fmt.Sprintf("Installed %s!", ee.FullName))
 			}
-			app.SetRoot(modal, true)
 		case 'r':
 			ee, err := extList.FindSelected()
 			if err != nil {
@@ -365,6 +359,8 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 			app.SetRoot(modal, true)
 		case ' ':
 			extList.PageDown()
+			// this is a silly hack to trigger the onSelectItem which sadly was not happening
+			return tcell.NewEventKey(tcell.KeyDown, rune(0), 0)
 		case '/':
 			app.SetFocus(filter)
 			return nil
@@ -372,12 +368,17 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		switch event.Key() {
 		case tcell.KeyCtrlSpace:
 			extList.PageUp()
+			// this is a silly hack to trigger the onSelectItem which sadly was not happening
+			return tcell.NewEventKey(tcell.KeyUp, rune(0), 0)
+
 		case tcell.KeyCtrlJ:
 			extList.PageDown()
-			return nil
+			// this is a silly hack to trigger the onSelectItem which sadly was not happening
+			return tcell.NewEventKey(tcell.KeyDown, rune(0), 0)
 		case tcell.KeyCtrlK:
 			extList.PageUp()
-			return nil
+			// this is a silly hack to trigger the onSelectItem which sadly was not happening
+			return tcell.NewEventKey(tcell.KeyUp, rune(0), 0)
 		case tcell.KeyPgUp:
 			row, col := readme.GetScrollOffset()
 			if row > 0 {
