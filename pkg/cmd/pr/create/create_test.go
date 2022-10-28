@@ -2,6 +2,7 @@ package create
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -809,6 +810,31 @@ func Test_createRun(t *testing.T) {
 				return func() {}
 			},
 			wantErr: "cannot open in browser: maximum URL length exceeded",
+		},
+		{
+			name: "no local git repo",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.Title = "My PR"
+				opts.TitleProvided = true
+				opts.Body = ""
+				opts.BodyProvided = true
+				opts.HeadBranch = "feature"
+				opts.RepoOverride = "OWNER/REPO"
+				opts.Remotes = func() (context.Remotes, error) {
+					return nil, errors.New("not a git repository")
+				}
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.StringResponse(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }
+					`))
+			},
+			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
 		},
 	}
 	for _, tt := range tests {
