@@ -67,11 +67,11 @@ func TestClientAuthenticatedCommand(t *testing.T) {
 		{
 			name:     "adds credential helper config options",
 			path:     "path/to/gh",
-			wantArgs: []string{"path/to/git", "-c", "credential.helper=", "-c", "credential.helper=!\"path/to/gh\" auth git-credential", "fetch"},
+			wantArgs: []string{"path/to/git", "-c", "credential.helper=", "-c", `credential.helper=!"path/to/gh" auth git-credential`, "fetch"},
 		},
 		{
 			name:     "fallback when GhPath is not set",
-			wantArgs: []string{"path/to/git", "-c", "credential.helper=", "-c", "credential.helper=!\"gh\" auth git-credential", "fetch"},
+			wantArgs: []string{"path/to/git", "-c", "credential.helper=", "-c", `credential.helper=!"gh" auth git-credential`, "fetch"},
 		},
 	}
 	for _, tt := range tests {
@@ -846,18 +846,18 @@ func TestClientFetch(t *testing.T) {
 	}{
 		{
 			name:        "fetch",
-			wantCmdArgs: `path/to/git fetch origin trunk`,
+			wantCmdArgs: `path/to/git -c credential.helper= -c credential.helper=!"gh" auth git-credential fetch origin trunk`,
 		},
 		{
 			name:        "accepts command modifiers",
 			mods:        []CommandModifier{WithRepoDir("/path/to/repo")},
-			wantCmdArgs: `path/to/git -C /path/to/repo fetch origin trunk`,
+			wantCmdArgs: `path/to/git -C /path/to/repo -c credential.helper= -c credential.helper=!"gh" auth git-credential fetch origin trunk`,
 		},
 		{
 			name:          "git error",
 			cmdExitStatus: 1,
 			cmdStderr:     "git error message",
-			wantCmdArgs:   `path/to/git fetch origin trunk`,
+			wantCmdArgs:   `path/to/git -c credential.helper= -c credential.helper=!"gh" auth git-credential fetch origin trunk`,
 			wantErrorMsg:  "failed to run git: git error message",
 		},
 	}
@@ -891,18 +891,18 @@ func TestClientPull(t *testing.T) {
 	}{
 		{
 			name:        "pull",
-			wantCmdArgs: `path/to/git pull --ff-only origin trunk`,
+			wantCmdArgs: `path/to/git -c credential.helper= -c credential.helper=!"gh" auth git-credential pull --ff-only origin trunk`,
 		},
 		{
 			name:        "accepts command modifiers",
 			mods:        []CommandModifier{WithRepoDir("/path/to/repo")},
-			wantCmdArgs: `path/to/git -C /path/to/repo pull --ff-only origin trunk`,
+			wantCmdArgs: `path/to/git -C /path/to/repo -c credential.helper= -c credential.helper=!"gh" auth git-credential pull --ff-only origin trunk`,
 		},
 		{
 			name:          "git error",
 			cmdExitStatus: 1,
 			cmdStderr:     "git error message",
-			wantCmdArgs:   `path/to/git pull --ff-only origin trunk`,
+			wantCmdArgs:   `path/to/git -c credential.helper= -c credential.helper=!"gh" auth git-credential pull --ff-only origin trunk`,
 			wantErrorMsg:  "failed to run git: git error message",
 		},
 	}
@@ -936,18 +936,18 @@ func TestClientPush(t *testing.T) {
 	}{
 		{
 			name:        "push",
-			wantCmdArgs: `path/to/git push --set-upstream origin trunk`,
+			wantCmdArgs: `path/to/git -c credential.helper= -c credential.helper=!"gh" auth git-credential push --set-upstream origin trunk`,
 		},
 		{
 			name:        "accepts command modifiers",
 			mods:        []CommandModifier{WithRepoDir("/path/to/repo")},
-			wantCmdArgs: `path/to/git -C /path/to/repo push --set-upstream origin trunk`,
+			wantCmdArgs: `path/to/git -C /path/to/repo -c credential.helper= -c credential.helper=!"gh" auth git-credential push --set-upstream origin trunk`,
 		},
 		{
 			name:          "git error",
 			cmdExitStatus: 1,
 			cmdStderr:     "git error message",
-			wantCmdArgs:   `path/to/git push --set-upstream origin trunk`,
+			wantCmdArgs:   `path/to/git -c credential.helper= -c credential.helper=!"gh" auth git-credential push --set-upstream origin trunk`,
 			wantErrorMsg:  "failed to run git: git error message",
 		},
 	}
@@ -982,20 +982,20 @@ func TestClientClone(t *testing.T) {
 	}{
 		{
 			name:        "clone",
-			wantCmdArgs: `path/to/git clone github.com/cli/cli`,
+			wantCmdArgs: `path/to/git -c credential.helper= -c credential.helper=!"gh" auth git-credential clone github.com/cli/cli`,
 			wantTarget:  "cli",
 		},
 		{
 			name:        "accepts command modifiers",
 			mods:        []CommandModifier{WithRepoDir("/path/to/repo")},
-			wantCmdArgs: `path/to/git -C /path/to/repo clone github.com/cli/cli`,
+			wantCmdArgs: `path/to/git -C /path/to/repo -c credential.helper= -c credential.helper=!"gh" auth git-credential clone github.com/cli/cli`,
 			wantTarget:  "cli",
 		},
 		{
 			name:          "git error",
 			cmdExitStatus: 1,
 			cmdStderr:     "git error message",
-			wantCmdArgs:   `path/to/git clone github.com/cli/cli`,
+			wantCmdArgs:   `path/to/git -c credential.helper= -c credential.helper=!"gh" auth git-credential clone github.com/cli/cli`,
 			wantErrorMsg:  "failed to run git: git error message",
 		},
 	}
@@ -1089,7 +1089,7 @@ func TestClientAddRemote(t *testing.T) {
 			url:         "URL",
 			dir:         "DIRECTORY",
 			branches:    []string{},
-			wantCmdArgs: `path/to/git -C DIRECTORY remote add -f test URL`,
+			wantCmdArgs: `path/to/git -C DIRECTORY -c credential.helper= -c credential.helper=!"gh" auth git-credential remote add -f test URL`,
 		},
 		{
 			title:       "fetch specific branches only",
@@ -1097,7 +1097,7 @@ func TestClientAddRemote(t *testing.T) {
 			url:         "URL",
 			dir:         "DIRECTORY",
 			branches:    []string{"trunk", "dev"},
-			wantCmdArgs: `path/to/git -C DIRECTORY remote add -t trunk -t dev -f test URL`,
+			wantCmdArgs: `path/to/git -C DIRECTORY -c credential.helper= -c credential.helper=!"gh" auth git-credential remote add -t trunk -t dev -f test URL`,
 		},
 	}
 	for _, tt := range tests {

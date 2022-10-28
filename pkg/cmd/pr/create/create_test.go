@@ -266,7 +266,7 @@ func Test_createRun(t *testing.T) {
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
-				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential push --set-upstream origin HEAD:feature`, 0, "")
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubPrompt("Where should we push the 'feature' branch?").AnswerDefault()
@@ -307,7 +307,7 @@ func Test_createRun(t *testing.T) {
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
-				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential push --set-upstream origin HEAD:feature`, 0, "")
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubPrompt("Where should we push the 'feature' branch?").AnswerDefault()
@@ -351,8 +351,8 @@ func Test_createRun(t *testing.T) {
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
-				cs.Register(`git remote add -f fork https://github.com/monalisa/REPO.git`, 0, "")
-				cs.Register(`git push --set-upstream fork HEAD:feature`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential remote add -f fork https://github.com/monalisa/REPO.git`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential push --set-upstream fork HEAD:feature`, 0, "")
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubPrompt("Where should we push the 'feature' branch?").
@@ -634,7 +634,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
-				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential push --set-upstream origin HEAD:feature`, 0, "")
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				as.StubPrompt("Where should we push the 'feature' branch?").
@@ -682,7 +682,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
 				cs.Register(`git( .+)? log( .+)? origin/master\.\.\.feature`, 0, "")
-				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential push --set-upstream origin HEAD:feature`, 0, "")
 
 			},
 			askStubs: func(as *prompt.AskStubber) {
@@ -894,7 +894,10 @@ func Test_createRun(t *testing.T) {
 				return branch, nil
 			}
 			opts.Finder = shared.NewMockFinder(branch, nil, nil)
-			opts.GitClient = &git.Client{GitPath: "some/path/git"}
+			opts.GitClient = &git.Client{
+				GhPath:  "some/path/gh",
+				GitPath: "some/path/git",
+			}
 			cleanSetup := func() {}
 			if tt.setup != nil {
 				cleanSetup = tt.setup(&opts, t)
@@ -1011,7 +1014,10 @@ func Test_determineTrackingBranch(t *testing.T) {
 
 			tt.cmdStubs(cs)
 
-			gitClient := &git.Client{GitPath: "some/path/git"}
+			gitClient := &git.Client{
+				GhPath:  "some/path/gh",
+				GitPath: "some/path/git",
+			}
 			ref := determineTrackingBranch(gitClient, tt.remotes, "feature")
 			tt.assert(ref, t)
 		})

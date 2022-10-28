@@ -243,7 +243,7 @@ func Test_createRun(t *testing.T) {
 
 			},
 			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://github.com/OWNER/REPO.git`, 0, "")
 			},
 		},
 		{
@@ -410,7 +410,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git -C . rev-parse --git-dir`, 0, ".git")
 				cs.Register(`git -C . rev-parse HEAD`, 0, "commithash")
 				cs.Register(`git -C . remote add origin https://github.com/OWNER/REPO`, 0, "")
-				cs.Register(`git -C . push --set-upstream origin HEAD`, 0, "")
+				cs.Register(`git -C . -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential push --set-upstream origin HEAD`, 0, "")
 			},
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n✓ Pushed commits to https://github.com/OWNER/REPO.git\n",
 		},
@@ -493,7 +493,10 @@ func Test_createRun(t *testing.T) {
 			return config.NewBlankConfig(), nil
 		}
 
-		tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
+		tt.opts.GitClient = &git.Client{
+			GhPath:  "some/path/gh",
+			GitPath: "some/path/git",
+		}
 
 		ios, _, stdout, stderr := iostreams.Test()
 		ios.SetStdinTTY(tt.tty)

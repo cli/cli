@@ -26,7 +26,10 @@ func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) 
 		Config: func() (config.Config, error) {
 			return config.NewBlankConfig(), nil
 		},
-		GitClient: &git.Client{GitPath: "some/path/git"},
+		GitClient: &git.Client{
+			GhPath:  "some/path/gh",
+			GitPath: "some/path/git",
+		},
 	}
 
 	cmd := NewCmdClone(fac, nil)
@@ -60,32 +63,32 @@ func Test_GistClone(t *testing.T) {
 		{
 			name: "shorthand",
 			args: "GIST",
-			want: "git clone https://gist.github.com/GIST.git",
+			want: `git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://gist.github.com/GIST.git`,
 		},
 		{
 			name: "shorthand with directory",
 			args: "GIST target_directory",
-			want: "git clone https://gist.github.com/GIST.git target_directory",
+			want: `git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://gist.github.com/GIST.git target_directory`,
 		},
 		{
 			name: "clone arguments",
 			args: "GIST -- -o upstream --depth 1",
-			want: "git clone -o upstream --depth 1 https://gist.github.com/GIST.git",
+			want: `git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone -o upstream --depth 1 https://gist.github.com/GIST.git`,
 		},
 		{
 			name: "clone arguments with directory",
 			args: "GIST target_directory -- -o upstream --depth 1",
-			want: "git clone -o upstream --depth 1 https://gist.github.com/GIST.git target_directory",
+			want: `git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone -o upstream --depth 1 https://gist.github.com/GIST.git target_directory`,
 		},
 		{
 			name: "HTTPS URL",
 			args: "https://gist.github.com/OWNER/GIST",
-			want: "git clone https://gist.github.com/OWNER/GIST",
+			want: `git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://gist.github.com/OWNER/GIST`,
 		},
 		{
 			name: "SSH URL",
 			args: "git@gist.github.com:GIST.git",
-			want: "git clone git@gist.github.com:GIST.git",
+			want: `git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone git@gist.github.com:GIST.git`,
 		},
 	}
 	for _, tt := range tests {
@@ -97,7 +100,7 @@ func Test_GistClone(t *testing.T) {
 
 			cs, restore := run.Stub()
 			defer restore(t)
-			cs.Register(`git clone`, 0, "", func(s []string) {
+			cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone`, 0, "", func(s []string) {
 				assert.Equal(t, tt.want, strings.Join(s, " "))
 			})
 

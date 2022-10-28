@@ -391,8 +391,7 @@ func (c *Client) revParse(ctx context.Context, args ...string) ([]byte, error) {
 
 func (c *Client) Fetch(ctx context.Context, remote string, refspec string, mods ...CommandModifier) error {
 	args := []string{"fetch", remote, refspec}
-	// TODO: Use AuthenticatedCommand
-	cmd, err := c.Command(ctx, args...)
+	cmd, err := c.AuthenticatedCommand(ctx, args...)
 	if err != nil {
 		return err
 	}
@@ -407,8 +406,7 @@ func (c *Client) Pull(ctx context.Context, remote, branch string, mods ...Comman
 	if remote != "" && branch != "" {
 		args = append(args, remote, branch)
 	}
-	// TODO: Use AuthenticatedCommand
-	cmd, err := c.Command(ctx, args...)
+	cmd, err := c.AuthenticatedCommand(ctx, args...)
 	if err != nil {
 		return err
 	}
@@ -420,8 +418,7 @@ func (c *Client) Pull(ctx context.Context, remote, branch string, mods ...Comman
 
 func (c *Client) Push(ctx context.Context, remote string, ref string, mods ...CommandModifier) error {
 	args := []string{"push", "--set-upstream", remote, ref}
-	// TODO: Use AuthenticatedCommand
-	cmd, err := c.Command(ctx, args...)
+	cmd, err := c.AuthenticatedCommand(ctx, args...)
 	if err != nil {
 		return err
 	}
@@ -442,8 +439,7 @@ func (c *Client) Clone(ctx context.Context, cloneURL string, args []string, mods
 		target = path.Base(strings.TrimSuffix(cloneURL, ".git"))
 	}
 	cloneArgs = append([]string{"clone"}, cloneArgs...)
-	// TODO: Use AuthenticatedCommand
-	cmd, err := c.Command(ctx, cloneArgs...)
+	cmd, err := c.AuthenticatedCommand(ctx, cloneArgs...)
 	if err != nil {
 		return "", err
 	}
@@ -463,8 +459,7 @@ func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBra
 		args = append(args, "-t", branch)
 	}
 	args = append(args, "-f", name, urlStr)
-	// TODO: Use AuthenticatedCommand
-	cmd, err := c.Command(ctx, args...)
+	cmd, err := c.AuthenticatedCommand(ctx, args...)
 	if err != nil {
 		return nil, err
 	}

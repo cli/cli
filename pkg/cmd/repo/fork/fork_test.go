@@ -234,7 +234,7 @@ func TestRepoFork(t *testing.T) {
 			},
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git remote add -f fork https://github\.com/someone/REPO\.git`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential remote add -f fork https://github\.com/someone/REPO\.git`, 0, "")
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote fork\n",
 		},
@@ -258,7 +258,7 @@ func TestRepoFork(t *testing.T) {
 			},
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git remote add -f fork git@github\.com:someone/REPO\.git`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential remote add -f fork git@github\.com:someone/REPO\.git`, 0, "")
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote fork\n",
 		},
@@ -288,7 +288,7 @@ func TestRepoFork(t *testing.T) {
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register("git remote rename origin upstream", 0, "")
-				cs.Register(`git remote add -f origin https://github.com/someone/REPO.git`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential remote add -f origin https://github.com/someone/REPO.git`, 0, "")
 			},
 			askStubs: func(as *prompt.AskStubber) {
 				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
@@ -364,7 +364,7 @@ func TestRepoFork(t *testing.T) {
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register("git remote rename origin upstream", 0, "")
-				cs.Register(`git remote add -f origin https://github.com/someone/REPO.git`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential remote add -f origin https://github.com/someone/REPO.git`, 0, "")
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote origin\n",
 		},
@@ -418,7 +418,7 @@ func TestRepoFork(t *testing.T) {
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register("git remote rename origin upstream", 0, "")
-				cs.Register(`git remote add -f origin https://github.com/someone/REPO.git`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential remote add -f origin https://github.com/someone/REPO.git`, 0, "")
 			},
 		},
 		{
@@ -436,8 +436,8 @@ func TestRepoFork(t *testing.T) {
 			},
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git clone --depth 1 https://github.com/someone/REPO\.git`, 0, "")
-				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone --depth 1 https://github.com/someone/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\n",
 		},
@@ -466,8 +466,8 @@ func TestRepoFork(t *testing.T) {
 					})
 			},
 			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git clone https://github.com/gamehendge/REPO\.git`, 0, "")
-				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://github.com/gamehendge/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 			},
 			wantErrOut: "✓ Created fork gamehendge/REPO\n✓ Cloned fork\n",
 		},
@@ -480,8 +480,8 @@ func TestRepoFork(t *testing.T) {
 			},
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
-				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://github.com/someone/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\n",
 		},
@@ -512,8 +512,8 @@ func TestRepoFork(t *testing.T) {
 				as.StubOne(true)
 			},
 			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
-				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://github.com/someone/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\n",
 		},
@@ -533,8 +533,8 @@ func TestRepoFork(t *testing.T) {
 				as.StubOne(true)
 			},
 			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
-				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://github.com/someone/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 			},
 			wantErrOut: "! someone/REPO already exists\n✓ Cloned fork\n",
 		},
@@ -567,8 +567,8 @@ func TestRepoFork(t *testing.T) {
 			},
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
-				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://github.com/someone/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 			},
 			wantErrOut: "someone/REPO already exists",
 		},
@@ -580,8 +580,8 @@ func TestRepoFork(t *testing.T) {
 			},
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
-				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://github.com/someone/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 			},
 		},
 		{
@@ -700,7 +700,10 @@ func TestRepoFork(t *testing.T) {
 			return tt.remotes, nil
 		}
 
-		tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
+		tt.opts.GitClient = &git.Client{
+			GhPath:  "some/path/gh",
+			GitPath: "some/path/git",
+		}
 
 		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 		as, teardown := prompt.InitAskStubber()
