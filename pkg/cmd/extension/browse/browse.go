@@ -3,6 +3,7 @@ package browse
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -31,6 +32,7 @@ type ExtBrowseOpts struct {
 	Logger   *log.Logger
 	Cfg      config.Config
 	Rg       readmeGetter
+	Debug    bool
 }
 
 type ibrowser interface {
@@ -146,14 +148,17 @@ func (el *extList) Filter(text string) {
 }
 
 func ExtBrowse(opts ExtBrowseOpts) error {
-	// TODO support turning debug mode on/off
-	f, err := os.CreateTemp("/tmp", "extBrowse-*.txt")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(f.Name())
+	if opts.Debug {
+		f, err := os.CreateTemp("/tmp", "extBrowse-*.txt")
+		if err != nil {
+			return err
+		}
+		defer os.Remove(f.Name())
 
-	opts.Logger = log.New(f, "", log.Lshortfile)
+		opts.Logger = log.New(f, "", log.Lshortfile)
+	} else {
+		opts.Logger = log.New(io.Discard, "", 0)
+	}
 
 	installed := opts.Em.List()
 
@@ -303,7 +308,6 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	app.SetRoot(outerFlex, true)
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		opts.Logger.Printf("%#v", event)
 		if filter.HasFocus() {
 			return event
 		}

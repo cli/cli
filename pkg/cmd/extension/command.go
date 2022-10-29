@@ -223,39 +223,45 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				return nil
 			},
 		},
-		&cobra.Command{
-			Use:   "browse",
-			Short: "Enter a UI for browsing, adding, and removing extensions",
-			Args:  cobra.NoArgs,
-			RunE: func(cmd *cobra.Command, args []string) error {
-				if !io.CanPrompt() {
-					return errors.New("this command runs an interactive UI and needs to be run in a terminal")
-				}
-				cfg, err := config()
-				if err != nil {
-					return err
-				}
-				host, _ := cfg.DefaultHost()
-				client, err := f.HttpClient()
-				if err != nil {
-					return err
-				}
+		func() *cobra.Command {
+			var debug bool
+			cmd := &cobra.Command{
+				Use:   "browse",
+				Short: "Enter a UI for browsing, adding, and removing extensions",
+				Args:  cobra.NoArgs,
+				RunE: func(cmd *cobra.Command, args []string) error {
+					if !io.CanPrompt() {
+						return errors.New("this command runs an interactive UI and needs to be run in a terminal")
+					}
+					cfg, err := config()
+					if err != nil {
+						return err
+					}
+					host, _ := cfg.DefaultHost()
+					client, err := f.HttpClient()
+					if err != nil {
+						return err
+					}
 
-				cacheTTL, _ := time.ParseDuration("24h")
-				searcher := search.NewSearcher(api.NewCachedHTTPClient(client, cacheTTL), host)
+					cacheTTL, _ := time.ParseDuration("24h")
+					searcher := search.NewSearcher(api.NewCachedHTTPClient(client, cacheTTL), host)
 
-				opts := browse.ExtBrowseOpts{
-					Cmd:      cmd,
-					Browser:  browser,
-					Searcher: searcher,
-					Em:       m,
-					Client:   client,
-					Cfg:      cfg,
-				}
+					opts := browse.ExtBrowseOpts{
+						Cmd:      cmd,
+						Browser:  browser,
+						Searcher: searcher,
+						Em:       m,
+						Client:   client,
+						Cfg:      cfg,
+						Debug:    debug,
+					}
 
-				return browse.ExtBrowse(opts)
-			},
-		},
+					return browse.ExtBrowse(opts)
+				},
+			}
+			cmd.Flags().BoolVar(&debug, "debug", false, "log to /tmp/extBrowse-*")
+			return cmd
+		}(),
 		&cobra.Command{
 			Use:   "exec <name> [args]",
 			Short: "Execute an installed extension",
