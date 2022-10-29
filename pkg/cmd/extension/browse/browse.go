@@ -252,9 +252,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 			return
 		}
 
-		// TODO sanity check what happens for non markdown readmes
-
-		// TODO be more careful about dark/light (sniff it earlier then set overall theming)
+		// using glamour directly because if I don't horrible things happen
 		rendered, err := glamour.Render(rm, "dark")
 		if err != nil {
 			opts.Logger.Println(err.Error())
