@@ -53,7 +53,7 @@ func (gc *gitCommand) Output() ([]byte, error) {
 	return out, err
 }
 
-func (gc *gitCommand) setRepoDir(repoDir string) {
+func (gc *gitCommand) SetRepoDir(repoDir string) {
 	for i, arg := range gc.Args {
 		if arg == "-C" {
 			gc.Args[i+1] = repoDir
@@ -95,6 +95,6 @@ func WithStdin(stdin io.Reader) CommandModifier {
 
 func WithRepoDir(repoDir string) CommandModifier {
 	return func(gc *gitCommand) {
-		gc.setRepoDir(repoDir)
+		gc.SetRepoDir(repoDir)
 	}
 }
