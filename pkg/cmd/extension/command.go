@@ -248,6 +248,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					opts := browse.ExtBrowseOpts{
 						Cmd:      cmd,
+						IO:       io,
 						Browser:  browser,
 						Searcher: searcher,
 						Em:       m,

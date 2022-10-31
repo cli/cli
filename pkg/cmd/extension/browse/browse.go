@@ -15,6 +15,7 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/extensions"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/search"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -26,6 +27,7 @@ const pagingOffset = 24
 type ExtBrowseOpts struct {
 	Cmd      *cobra.Command
 	Browser  ibrowser
+	IO       *iostreams.IOStreams
 	Searcher search.Searcher
 	Em       extensions.ExtensionManager
 	Client   *http.Client
@@ -162,6 +164,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 
 	installed := opts.Em.List()
 
+	opts.IO.StartProgressIndicator()
 	result, err := opts.Searcher.Repositories(search.Query{
 		Kind:  search.KindRepositories,
 		Limit: 1000,
@@ -399,6 +402,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		return event
 	})
 
+	opts.IO.StopProgressIndicator()
 	if err := app.Run(); err != nil {
 		return err
 	}
