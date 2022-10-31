@@ -26,6 +26,9 @@ func newReadmeGetter(client *http.Client, cacheTTL time.Duration) readmeGetter {
 
 func (g *cachingReadmeGetter) Get(repoFullName string) (string, error) {
 	repo, err := ghrepo.FromFullName(repoFullName)
+	if err != nil {
+		return "", err
+	}
 	readme, err := view.RepositoryReadme(g.client, repo, "")
 	if err != nil {
 		return "", err

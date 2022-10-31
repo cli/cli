@@ -133,7 +133,7 @@ func (el *extList) FindSelected() (extEntry, error) {
 func (el *extList) Filter(text string) {
 	indices := []int{}
 	for x, ee := range el.extEntries {
-		if strings.Index(ee.Title()+ee.Description(), text) > -1 {
+		if strings.Contains(ee.Title()+ee.Description(), text) {
 			indices = append(indices, x)
 		}
 	}
@@ -264,7 +264,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		readme.SetDynamicColors(true)
 
 		w := tview.ANSIWriter(readme)
-		w.Write([]byte(rendered))
+		_, _ = w.Write([]byte(rendered))
 
 		readme.ScrollToBeginning()
 	}
@@ -323,7 +323,10 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 				opts.Logger.Println(fmt.Errorf("tried to find entry, but: %w", err))
 				return nil
 			}
-			opts.Browser.Browse(ee.URL)
+			err = opts.Browser.Browse(ee.URL)
+			if err != nil {
+				opts.Logger.Println(fmt.Errorf("could not open browser for '%s': %w", ee.URL, err))
+			}
 		case 'i':
 			ee, err := extList.FindSelected()
 			if err != nil {
