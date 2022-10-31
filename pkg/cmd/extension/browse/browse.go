@@ -150,6 +150,10 @@ func (el *extList) Filter(text string) {
 }
 
 func ExtBrowse(opts ExtBrowseOpts) error {
+	if !opts.IO.CanPrompt() {
+		return errors.New("command requires interactive terminal")
+	}
+
 	if opts.Debug {
 		f, err := os.CreateTemp("/tmp", "extBrowse-*.txt")
 		if err != nil {
@@ -374,6 +378,9 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 			return nil
 		}
 		switch event.Key() {
+		case tcell.KeyEscape:
+			filter.SetText("")
+			extList.Reset()
 		case tcell.KeyCtrlSpace:
 			extList.PageUp()
 			// this is a silly hack to trigger the onSelectItem which sadly was not happening

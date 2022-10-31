@@ -228,7 +228,34 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			cmd := &cobra.Command{
 				Use:   "browse",
 				Short: "Enter a UI for browsing, adding, and removing extensions",
-				Args:  cobra.NoArgs,
+				Long: heredoc.Doc(`
+					This command will take over your terminal and run a fully interactive
+					interface for browsing, adding, and removing gh extensions.
+
+					The extension list is navigated with the arrow keys or with j/k.
+					Space and control+space (or control + j/k) page the list up and down.
+					Extension readmes can be scrolled with page up/page down keys.
+
+					For highlighted extensions, you can press:
+
+					- w to open the extension in your web browser
+					- i to install the extension
+					- r to remove the extension
+
+					Press / to focus the filter input. Press enter to scroll the results.
+					Press Escape to clear the filter and return to the full list.
+
+					Press q to quit.
+
+					This command is a bad fit for screen readers as it features two
+					adjacent columns of text. In order to peruse extensions in a screen
+					reader friendly way, use:
+
+					gh search repos --topic gh-extension
+
+					along with gh ext install and gh ext remove.
+				`),
+				Args: cobra.NoArgs,
 				RunE: func(cmd *cobra.Command, args []string) error {
 					if !io.CanPrompt() {
 						return errors.New("this command runs an interactive UI and needs to be run in a terminal")
