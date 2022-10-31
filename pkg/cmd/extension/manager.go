@@ -2,7 +2,6 @@ package extension
 
 import (
 	"bytes"
-	"context"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -35,6 +34,7 @@ type Manager struct {
 	newCommand func(string, ...string) *exec.Cmd
 	platform   func() (string, string)
 	client     *http.Client
+	gitClient  gitClient
 	config     config.Config
 	io         *iostreams.IOStreams
 	dryRunMode bool
@@ -63,6 +63,10 @@ func (m *Manager) SetConfig(cfg config.Config) {
 
 func (m *Manager) SetClient(client *http.Client) {
 	m.client = client
+}
+
+func (m *Manager) SetGitClient(gitClient *git.Client) {
+	m.gitClient = &gitExecuter{client: gitClient}
 }
 
 func (m *Manager) EnableDryRunMode() {
@@ -231,15 +235,8 @@ func (m *Manager) parseGitExtensionDir(fi fs.DirEntry) (Extension, error) {
 
 // getCurrentVersion determines the current version for non-local git extensions.
 func (m *Manager) getCurrentVersion(extension string) string {
-	gitExe, err := m.lookPath("git")
-	if err != nil {
-		return ""
-	}
-	dir := m.installDir()
-	gitDir := "--git-dir=" + filepath.Join(dir, extension, ".git")
-	cmd := m.newCommand(gitExe, gitDir, "rev-parse", "HEAD")
-
-	localSha, err := cmd.Output()
+	dir := filepath.Join(m.installDir(), extension)
+	localSha, err := m.gitClient.CommandOutput([]string{"rev-parse", "HEAD"}, git.WithRepoDir(dir))
 	if err != nil {
 		return ""
 	}
@@ -248,14 +245,8 @@ func (m *Manager) getCurrentVersion(extension string) string {
 
 // getRemoteUrl determines the remote URL for non-local git extensions.
 func (m *Manager) getRemoteUrl(extension string) string {
-	gitExe, err := m.lookPath("git")
-	if err != nil {
-		return ""
-	}
-	dir := m.installDir()
-	gitDir := "--git-dir=" + filepath.Join(dir, extension, ".git")
-	cmd := m.newCommand(gitExe, gitDir, "config", "remote.origin.url")
-	url, err := cmd.Output()
+	dir := filepath.Join(m.installDir(), extension)
+	url, err := m.gitClient.Config("remote.origin.url", git.WithRepoDir(dir))
 	if err != nil {
 		return ""
 	}
@@ -301,14 +292,8 @@ func (m *Manager) getLatestVersion(ext Extension) (string, error) {
 		}
 		return r.Tag, nil
 	} else {
-		gitExe, err := m.lookPath("git")
-		if err != nil {
-			return "", err
-		}
 		extDir := filepath.Dir(ext.path)
-		gitDir := "--git-dir=" + filepath.Join(extDir, ".git")
-		cmd := m.newCommand(gitExe, gitDir, "ls-remote", "origin", "HEAD")
-		lsRemote, err := cmd.Output()
+		lsRemote, err := m.gitClient.CommandOutput([]string{"ls-remote", "origin", "HEAD"}, git.WithRepoDir(extDir))
 		if err != nil {
 			return "", err
 		}
@@ -469,13 +454,9 @@ func (m *Manager) installGit(repo ghrepo.Interface, target string, stdout, stder
 	protocol, _ := m.config.GetOrDefault(repo.RepoHost(), "git_protocol")
 	cloneURL := ghrepo.FormatRemoteURL(repo, protocol)
 
-	exe, err := m.lookPath("git")
-	if err != nil {
-		return err
-	}
-
 	var commitSHA string
 	if target != "" {
+		var err error
 		commitSHA, err = fetchCommitSHA(m.client, repo, target)
 		if err != nil {
 			return err
@@ -485,20 +466,16 @@ func (m *Manager) installGit(repo ghrepo.Interface, target string, stdout, stder
 	name := strings.TrimSuffix(path.Base(cloneURL), ".git")
 	targetDir := filepath.Join(m.installDir(), name)
 
-	externalCmd := m.newCommand(exe, "clone", cloneURL, targetDir)
-	externalCmd.Stdout = stdout
-	externalCmd.Stderr = stderr
-	if err := externalCmd.Run(); err != nil {
+	_, err := m.gitClient.Clone(cloneURL, []string{targetDir})
+	if err != nil {
 		return err
 	}
 	if commitSHA == "" {
 		return nil
 	}
 
-	checkoutCmd := m.newCommand(exe, "-C", targetDir, "checkout", commitSHA)
-	checkoutCmd.Stdout = stdout
-	checkoutCmd.Stderr = stderr
-	if err := checkoutCmd.Run(); err != nil {
+	err = m.gitClient.CheckoutBranch(commitSHA, git.WithRepoDir(targetDir))
+	if err != nil {
 		return err
 	}
 
@@ -587,7 +564,7 @@ func (m *Manager) upgradeExtension(ext Extension, force bool) error {
 	} else {
 		// Check if git extension has changed to a binary extension
 		var isBin bool
-		repo, repoErr := repoFromPath(filepath.Join(ext.Path(), ".."))
+		repo, repoErr := repoFromPath(m.gitClient, filepath.Join(ext.Path(), ".."))
 		if repoErr == nil {
 			isBin, _ = isBinExtension(m.client, repo)
 		}
@@ -603,21 +580,21 @@ func (m *Manager) upgradeExtension(ext Extension, force bool) error {
 }
 
 func (m *Manager) upgradeGitExtension(ext Extension, force bool) error {
-	exe, err := m.lookPath("git")
-	if err != nil {
-		return err
-	}
-	dir := filepath.Dir(ext.path)
 	if m.dryRunMode {
 		return nil
 	}
+	dir := filepath.Dir(ext.path)
 	if force {
-		if err := m.newCommand(exe, "-C", dir, "fetch", "origin", "HEAD").Run(); err != nil {
+		err := m.gitClient.Fetch("origin", "HEAD", git.WithRepoDir(dir))
+		if err != nil {
 			return err
 		}
-		return m.newCommand(exe, "-C", dir, "reset", "--hard", "origin/HEAD").Run()
+
+		_, err = m.gitClient.CommandOutput([]string{"reset", "--hard", "origin/HEAD"}, git.WithRepoDir(dir))
+		return err
 	}
-	return m.newCommand(exe, "-C", dir, "pull", "--ff-only").Run()
+
+	return m.gitClient.Pull("", "", git.WithRepoDir(dir))
 }
 
 func (m *Manager) upgradeBinExtension(ext Extension) error {
@@ -659,19 +636,14 @@ var scriptTmpl string
 var buildScript []byte
 
 func (m *Manager) Create(name string, tmplType extensions.ExtTemplateType) error {
-	exe, err := m.lookPath("git")
-	if err != nil {
-		return err
-	}
-
-	if err := m.newCommand(exe, "init", "--quiet", name).Run(); err != nil {
+	if _, err := m.gitClient.CommandOutput([]string{"init", "--quiet", name}); err != nil {
 		return err
 	}
 
 	if tmplType == extensions.GoBinTemplateType {
-		return m.goBinScaffolding(exe, name)
+		return m.goBinScaffolding(name)
 	} else if tmplType == extensions.OtherBinTemplateType {
-		return m.otherBinScaffolding(exe, name)
+		return m.otherBinScaffolding(name)
 	}
 
 	script := fmt.Sprintf(scriptTmpl, name)
@@ -679,10 +651,11 @@ func (m *Manager) Create(name string, tmplType extensions.ExtTemplateType) error
 		return err
 	}
 
-	return m.newCommand(exe, "-C", name, "add", name, "--chmod=+x").Run()
+	_, err := m.gitClient.CommandOutput([]string{"add", name, "--chmod=+x"}, git.WithRepoDir(name))
+	return err
 }
 
-func (m *Manager) otherBinScaffolding(gitExe, name string) error {
+func (m *Manager) otherBinScaffolding(name string) error {
 	if err := writeFile(filepath.Join(name, ".github", "workflows", "release.yml"), otherBinWorkflow, 0644); err != nil {
 		return err
 	}
@@ -690,13 +663,16 @@ func (m *Manager) otherBinScaffolding(gitExe, name string) error {
 	if err := writeFile(filepath.Join(name, buildScriptPath), buildScript, 0755); err != nil {
 		return err
 	}
-	if err := m.newCommand(gitExe, "-C", name, "add", buildScriptPath, "--chmod=+x").Run(); err != nil {
+
+	if _, err := m.gitClient.CommandOutput([]string{"add", buildScriptPath, "--chmod=+x"}, git.WithRepoDir(name)); err != nil {
 		return err
 	}
-	return m.newCommand(gitExe, "-C", name, "add", ".").Run()
+
+	_, err := m.gitClient.CommandOutput([]string{"add", "."}, git.WithRepoDir(name))
+	return err
 }
 
-func (m *Manager) goBinScaffolding(gitExe, name string) error {
+func (m *Manager) goBinScaffolding(name string) error {
 	goExe, err := m.lookPath("go")
 	if err != nil {
 		return fmt.Errorf("go is required for creating Go extensions: %w", err)
@@ -737,7 +713,8 @@ func (m *Manager) goBinScaffolding(gitExe, name string) error {
 		}
 	}
 
-	return m.newCommand(gitExe, "-C", name, "add", ".").Run()
+	_, err = m.gitClient.CommandOutput([]string{"add", "."}, git.WithRepoDir(name))
+	return err
 }
 
 func isSymlink(m os.FileMode) bool {
@@ -789,9 +766,8 @@ func isBinExtension(client *http.Client, repo ghrepo.Interface) (isBin bool, err
 	return
 }
 
-func repoFromPath(path string) (ghrepo.Interface, error) {
-	gitClient := &git.Client{RepoDir: path}
-	remotes, err := gitClient.Remotes(context.Background())
+func repoFromPath(gitClient gitClient, path string) (ghrepo.Interface, error) {
+	remotes, err := gitClient.Remotes(git.WithRepoDir(path))
 	if err != nil {
 		return nil, err
 	}

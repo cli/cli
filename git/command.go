@@ -12,11 +12,11 @@ import (
 
 type commandCtx = func(ctx context.Context, name string, args ...string) *exec.Cmd
 
-type gitCommand struct {
+type Command struct {
 	*exec.Cmd
 }
 
-func (gc *gitCommand) Run() error {
+func (gc *Command) Run() error {
 	stderr := &bytes.Buffer{}
 	if gc.Cmd.Stderr == nil {
 		gc.Cmd.Stderr = stderr
@@ -35,7 +35,7 @@ func (gc *gitCommand) Run() error {
 	return nil
 }
 
-func (gc *gitCommand) Output() ([]byte, error) {
+func (gc *Command) Output() ([]byte, error) {
 	gc.Stdout = nil
 	gc.Stderr = nil
 	// This is a hack in order to not break the hundreds of
@@ -53,7 +53,7 @@ func (gc *gitCommand) Output() ([]byte, error) {
 	return out, err
 }
 
-func (gc *gitCommand) SetRepoDir(repoDir string) {
+func (gc *Command) setRepoDir(repoDir string) {
 	for i, arg := range gc.Args {
 		if arg == "-C" {
 			gc.Args[i+1] = repoDir
@@ -73,28 +73,28 @@ func (gc *gitCommand) SetRepoDir(repoDir string) {
 }
 
 // Allow individual commands to be modified from the default client options.
-type CommandModifier func(*gitCommand)
+type CommandModifier func(*Command)
 
 func WithStderr(stderr io.Writer) CommandModifier {
-	return func(gc *gitCommand) {
+	return func(gc *Command) {
 		gc.Stderr = stderr
 	}
 }
 
 func WithStdout(stdout io.Writer) CommandModifier {
-	return func(gc *gitCommand) {
+	return func(gc *Command) {
 		gc.Stdout = stdout
 	}
 }
 
 func WithStdin(stdin io.Reader) CommandModifier {
-	return func(gc *gitCommand) {
+	return func(gc *Command) {
 		gc.Stdin = stdin
 	}
 }
 
 func WithRepoDir(repoDir string) CommandModifier {
-	return func(gc *gitCommand) {
-		gc.SetRepoDir(repoDir)
+	return func(gc *Command) {
+		gc.setRepoDir(repoDir)
 	}
 }

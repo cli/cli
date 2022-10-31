@@ -32,7 +32,7 @@ type Client struct {
 	mu             sync.Mutex
 }
 
-func (c *Client) Command(ctx context.Context, args ...string) (*gitCommand, error) {
+func (c *Client) Command(ctx context.Context, args ...string) (*Command, error) {
 	if c.RepoDir != "" {
 		args = append([]string{"-C", c.RepoDir}, args...)
 	}
@@ -53,12 +53,12 @@ func (c *Client) Command(ctx context.Context, args ...string) (*gitCommand, erro
 	cmd.Stderr = c.Stderr
 	cmd.Stdin = c.Stdin
 	cmd.Stdout = c.Stdout
-	return &gitCommand{cmd}, nil
+	return &Command{cmd}, nil
 }
 
 // AuthenticatedCommand is a wrapper around Command that included configuration to use gh
 // as the credential helper for git.
-func (c *Client) AuthenticatedCommand(ctx context.Context, args ...string) (*gitCommand, error) {
+func (c *Client) AuthenticatedCommand(ctx context.Context, args ...string) (*Command, error) {
 	preArgs := []string{"-c", "credential.helper="}
 	if c.GhPath == "" {
 		// Assumes that gh is in PATH.
