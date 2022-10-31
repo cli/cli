@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/liveshare"
 )
@@ -43,10 +44,14 @@ func ConnectToLiveshare(ctx context.Context, progress progressIndicator, session
 			return nil, fmt.Errorf("error starting codespace: %w", err)
 		}
 	}
+	expBackoff := backoff.NewExponentialBackOff()
+	expBackoff.Multiplier = 1.1
+	expBackoff.MaxElapsedTime = 5 * time.Minute
 
 	for retries := 0; !connectionReady(codespace); retries++ {
 		if retries > 1 {
-			time.Sleep(1 * time.Second)
+			duration := expBackoff.NextBackOff()
+			time.Sleep(duration)
 		}
 
 		if retries == 30 {
