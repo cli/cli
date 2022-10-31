@@ -1,13 +1,15 @@
 package status
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -118,8 +120,7 @@ func statusRun(opts *StatusOptions) error {
 			}
 			failed = true
 		} else {
-			apiClient := api.NewClientFromHTTP(httpClient)
-			username, err := api.CurrentLoginName(apiClient, hostname)
+			username, scopes, err := userAndScopes(httpClient)
 			if err != nil {
 				addMsg("%s %s: api call failed: %s", cs.Red("X"), hostname, err)
 			}
@@ -134,6 +135,12 @@ func statusRun(opts *StatusOptions) error {
 				tokenDisplay = token
 			}
 			addMsg("%s Token: %s", cs.SuccessIcon(), tokenDisplay)
+
+			if scopes != "" {
+				addMsg("%s Token Scopes: %s", cs.SuccessIcon(), scopes)
+			} else {
+				addMsg("%s Token Scopes: None found", cs.Red("X"))
+			}
 		}
 		addMsg("")
 
@@ -163,4 +170,27 @@ func statusRun(opts *StatusOptions) error {
 	}
 
 	return nil
+}
+
+func userAndScopes(httpClient *http.Client) (string, string, error) {
+	url := fmt.Sprintf("%suser", ghinstance.RESTPrefix(ghinstance.Default()))
+	resp, err := httpClient.Get(url)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+	scopes := resp.Header.Get("x-oauth-scopes")
+
+	var t struct {
+		Login string `json:"login"`
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", err
+	}
+	err = json.Unmarshal(body, &t)
+	if err != nil {
+		return "", "", err
+	}
+	return t.Login, scopes, nil
 }
