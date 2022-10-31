@@ -148,8 +148,8 @@ func (c *Client) CurrentBranch(ctx context.Context) (string, error) {
 }
 
 // ShowRefs resolves fully-qualified refs to commit hashes.
-func (c *Client) ShowRefs(ctx context.Context, ref ...string) ([]Ref, error) {
-	args := append([]string{"show-ref", "--verify", "--"}, ref...)
+func (c *Client) ShowRefs(ctx context.Context, refs []string) ([]Ref, error) {
+	args := append([]string{"show-ref", "--verify", "--"}, refs...)
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return nil, err
@@ -157,18 +157,18 @@ func (c *Client) ShowRefs(ctx context.Context, ref ...string) ([]Ref, error) {
 	// This functionality relies on parsing output from the git command despite
 	// an error status being returned from git.
 	out, err := cmd.Output()
-	var refs []Ref
+	var verified []Ref
 	for _, line := range outputLines(out) {
 		parts := strings.SplitN(line, " ", 2)
 		if len(parts) < 2 {
 			continue
 		}
-		refs = append(refs, Ref{
+		verified = append(verified, Ref{
 			Hash: parts[0],
 			Name: parts[1],
 		})
 	}
-	return refs, err
+	return verified, err
 }
 
 func (c *Client) Config(ctx context.Context, name string) (string, error) {

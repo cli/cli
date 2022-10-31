@@ -236,7 +236,7 @@ func missingMergeConfigForBranch(client *git.Client, b string) bool {
 }
 
 func localBranchExists(client *git.Client, b string) bool {
-	_, err := client.ShowRefs(context.Background(), "refs/heads/"+b)
+	_, err := client.ShowRefs(context.Background(), []string{"refs/heads/" + b})
 	return err == nil
 }
 

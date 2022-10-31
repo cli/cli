@@ -358,7 +358,7 @@ func TestClientShowRefs(t *testing.T) {
 				GitPath:        "path/to/git",
 				commandContext: cmdCtx,
 			}
-			refs, err := client.ShowRefs(context.Background(), "refs/heads/valid", "refs/heads/invalid")
+			refs, err := client.ShowRefs(context.Background(), []string{"refs/heads/valid", "refs/heads/invalid"})
 			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
 			assert.EqualError(t, err, tt.wantErrorMsg)
 			assert.Equal(t, tt.wantRefs, refs)
