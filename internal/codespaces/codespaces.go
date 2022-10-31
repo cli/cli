@@ -45,7 +45,9 @@ func ConnectToLiveshare(ctx context.Context, progress progressIndicator, session
 		}
 	}
 	expBackoff := backoff.NewExponentialBackOff()
+
 	expBackoff.Multiplier = 1.1
+	expBackoff.MaxInterval = 10 * time.Second
 	expBackoff.MaxElapsedTime = 5 * time.Minute
 
 	for retries := 0; !connectionReady(codespace); retries++ {
@@ -54,7 +56,7 @@ func ConnectToLiveshare(ctx context.Context, progress progressIndicator, session
 			time.Sleep(duration)
 		}
 
-		if retries == 30 {
+		if expBackoff.GetElapsedTime() >= expBackoff.MaxElapsedTime {
 			return nil, errors.New("timed out while waiting for the codespace to start")
 		}
 
