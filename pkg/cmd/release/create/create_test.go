@@ -610,7 +610,7 @@ func Test_createRun(t *testing.T) {
 			wantStderr: ``,
 		},
 		{
-			name:  "release already exists",
+			name:  "upload files but release already exists",
 			isTTY: true,
 			opts: CreateOptions{
 				TagName:      "v1.2.3",
