@@ -15,14 +15,17 @@ func newRebuildCmd(app *App) *cobra.Command {
 	rebuildCmd := &cobra.Command{
 		Use:   "rebuild",
 		Short: "Rebuild a codespace",
-		Args:  cobra.NoArgs,
+		Long: `Rebuilding recreates your codespace. Your code and any current changes will be
+preserved. Your codespace will be rebuilt using your working directory's
+dev container. A full rebuild also removes cached Docker images.`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.Rebuild(cmd.Context(), codespace, fullRebuild)
 		},
 	}
 
-	rebuildCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
-	rebuildCmd.Flags().BoolVar(&fullRebuild, "full", false, "Perform a full rebuild of the codespace")
+	rebuildCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "name of the codespace")
+	rebuildCmd.Flags().BoolVar(&fullRebuild, "full", false, "perform a full rebuild")
 
 	return rebuildCmd
 }
