@@ -416,12 +416,12 @@ func TestRebuild(t *testing.T) {
 
 	for _, tt := range tests {
 		requestCount := 0
-		getSharedServers := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
+		rebuildContainer := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 			requestCount++
 			return true, nil
 		}
 		testServer, session, err := makeMockSession(
-			livesharetest.WithService(tt.rpcService, getSharedServers),
+			livesharetest.WithService(tt.rpcService, rebuildContainer),
 		)
 		if err != nil {
 			t.Fatalf("creating mock session: %v", err)
