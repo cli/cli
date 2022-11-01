@@ -172,11 +172,8 @@ func Test_NewCmdDownload(t *testing.T) {
 }
 
 func Test_downloadRun(t *testing.T) {
-	if oldwd, err := os.Getwd(); err == nil {
-		t.Cleanup(func() {
-			_ = os.Chdir(oldwd)
-		})
-	} else {
+	oldwd, err := os.Getwd()
+	if err != nil {
 		t.Fatalf("could not determine working directory: %v", err)
 	}
 
@@ -313,7 +310,9 @@ func Test_downloadRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tempDir := t.TempDir()
-			if err := os.Chdir(tempDir); err != nil {
+			if err := os.Chdir(tempDir); err == nil {
+				t.Cleanup(func() { _ = os.Chdir(oldwd) })
+			} else {
 				t.Fatal(err)
 			}
 
