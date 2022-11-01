@@ -92,7 +92,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.Source, "source", false, "Show only non-forks")
 	cmd.Flags().BoolVar(&opts.Fork, "fork", false, "Show only forks")
 	cmd.Flags().StringVarP(&opts.Language, "language", "l", "", "Filter by primary coding language")
-	cmd.Flags().StringArrayVarP(&opts.Topic, "topic", "T", nil, "Filter by topic")
+	cmd.Flags().StringSliceVarP(&opts.Topic, "topic", "", nil, "Filter by topic")
 	cmdutil.StringEnumFlag(cmd, &opts.Visibility, "visibility", "", "", []string{"public", "private", "internal"}, "Filter by repository visibility")
 	cmd.Flags().BoolVar(&opts.Archived, "archived", false, "Show only archived repositories")
 	cmd.Flags().BoolVar(&opts.NonArchived, "no-archived", false, "Omit archived repositories")
