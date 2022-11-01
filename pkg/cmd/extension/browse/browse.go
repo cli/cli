@@ -79,8 +79,10 @@ type extensionListUI interface {
 	Filter(text string)
 	Focus()
 	Reset()
-	PageDown()
-	PageUp()
+	PageDown() int
+	PageUp() int
+	ScrollUp() int
+	ScrollDown() int
 }
 
 type extList struct {
@@ -114,16 +116,32 @@ func (el *extList) Reset() {
 	}
 }
 
-func (el *extList) PageDown() {
+func (el *extList) PageDown() int {
 	el.list.SetCurrentItem(el.list.GetCurrentItem() + pagingOffset)
+	return el.list.GetCurrentItem()
 }
 
-func (el *extList) PageUp() {
+func (el *extList) PageUp() int {
 	i := el.list.GetCurrentItem() - pagingOffset
 	if i < 0 {
 		i = 0
 	}
 	el.list.SetCurrentItem(i)
+	return el.list.GetCurrentItem()
+}
+
+func (el *extList) ScrollDown() int {
+	el.list.SetCurrentItem(el.list.GetCurrentItem() + 1)
+	return el.list.GetCurrentItem()
+}
+
+func (el *extList) ScrollUp() int {
+	i := el.list.GetCurrentItem() - 1
+	if i < 0 {
+		i = 0
+	}
+	el.list.SetCurrentItem(i)
+	return el.list.GetCurrentItem()
 }
 
 func (el *extList) FindSelected() (extEntry, error) {
@@ -280,11 +298,14 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		readme.ScrollToBeginning()
 	}
 
-	list.SetChangedFunc(onSelectItem)
+	// TODO would be nice to see if Draw worked in onSelectItem, but need to not invoke it prior to app.Run
 	// Force fetching of initial readme:
 	onSelectItem(0, "", "", rune(0))
 
-	filter.SetChangedFunc(extList.Filter)
+	filter.SetChangedFunc(func(text string) {
+		extList.Filter(text)
+		onSelectItem(0, "", "", rune(0))
+	})
 
 	filter.SetDoneFunc(func(key tcell.Key) {
 		switch key {
@@ -317,6 +338,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	app.SetRoot(outerFlex, true)
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		// TODO this will need to be smarter if we take out the filter changed func
 		if filter.HasFocus() {
 			return event
 		}
@@ -325,9 +347,9 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		case 'q':
 			app.Stop()
 		case 'k':
-			return tcell.NewEventKey(tcell.KeyUp, rune(0), 0)
+			onSelectItem(extList.ScrollUp(), "", "", rune(0))
 		case 'j':
-			return tcell.NewEventKey(tcell.KeyDown, rune(0), 0)
+			onSelectItem(extList.ScrollDown(), "", "", rune(0))
 		case 'w':
 			ee, err := extList.FindSelected()
 			if err != nil {
@@ -374,30 +396,28 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 			}
 			app.SetRoot(modal, true)
 		case ' ':
-			extList.PageDown()
-			// this is a silly hack to trigger the onSelectItem which sadly was not happening
-			return tcell.NewEventKey(tcell.KeyDown, rune(0), 0)
+			onSelectItem(extList.PageDown(), "", "", rune(0))
 		case '/':
 			app.SetFocus(filter)
 			return nil
 		}
 		switch event.Key() {
+		case tcell.KeyUp:
+			onSelectItem(extList.ScrollUp(), "", "", rune(0))
+			return nil
+		case tcell.KeyDown:
+			onSelectItem(extList.ScrollDown(), "", "", rune(0))
+			return nil
 		case tcell.KeyEscape:
 			filter.SetText("")
 			extList.Reset()
 		case tcell.KeyCtrlSpace:
-			extList.PageUp()
-			// this is a silly hack to trigger the onSelectItem which sadly was not happening
-			return tcell.NewEventKey(tcell.KeyUp, rune(0), 0)
-
+			// TODO broken on windows
+			onSelectItem(extList.PageUp(), "", "", rune(0))
 		case tcell.KeyCtrlJ:
-			extList.PageDown()
-			// this is a silly hack to trigger the onSelectItem which sadly was not happening
-			return tcell.NewEventKey(tcell.KeyDown, rune(0), 0)
+			onSelectItem(extList.PageDown(), "", "", rune(0))
 		case tcell.KeyCtrlK:
-			extList.PageUp()
-			// this is a silly hack to trigger the onSelectItem which sadly was not happening
-			return tcell.NewEventKey(tcell.KeyUp, rune(0), 0)
+			onSelectItem(extList.PageUp(), "", "", rune(0))
 		case tcell.KeyPgUp:
 			row, col := readme.GetScrollOffset()
 			if row > 0 {
