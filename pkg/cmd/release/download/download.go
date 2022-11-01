@@ -28,12 +28,12 @@ type DownloadOptions struct {
 	TagName           string
 	FilePatterns      []string
 	Destination       string
+	OutputFile        string
 
 	// maximum number of simultaneous downloads
 	Concurrency int
 
 	ArchiveType string
-	Output      string
 }
 
 func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobra.Command {
@@ -81,7 +81,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 				return err
 			}
 
-			if err := cmdutil.MutuallyExclusive("specify only one of `--dir` or `--output`", opts.Destination != ".", opts.Output != ""); err != nil {
+			if err := cmdutil.MutuallyExclusive("specify only one of `--dir` or `--output`", opts.Destination != ".", opts.OutputFile != ""); err != nil {
 				return err
 			}
 
@@ -99,7 +99,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Output, "output", "O", "", "The `file` to write a single asset to (use \"-\" to write to standard output)")
+	cmd.Flags().StringVarP(&opts.OutputFile, "output", "O", "", "The `file` to write a single asset to (use \"-\" to write to standard output)")
 	cmd.Flags().StringVarP(&opts.Destination, "dir", "D", ".", "The `directory` to download files into")
 	cmd.Flags().StringArrayVarP(&opts.FilePatterns, "pattern", "p", nil, "Download only assets that match a glob pattern")
 	cmd.Flags().StringVarP(&opts.ArchiveType, "archive", "A", "", "Download the source code archive in the specified `format` (zip or tar.gz)")
@@ -181,12 +181,12 @@ func downloadRun(opts *DownloadOptions) error {
 		return errors.New("no assets to download")
 	}
 
-	if len(toDownload) > 1 && opts.Output != "" {
+	if len(toDownload) > 1 && opts.OutputFile != "" {
 		return fmt.Errorf("unable to write more than one asset with `--output`, got %d assets", len(toDownload))
 	}
 
 	dest := destinationWriter{
-		file:         opts.Output,
+		file:         opts.OutputFile,
 		dir:          opts.Destination,
 		skipExisting: opts.SkipExisting,
 		overwrite:    opts.OverwriteExisting,

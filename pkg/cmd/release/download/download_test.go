@@ -96,7 +96,7 @@ func Test_NewCmdDownload(t *testing.T) {
 			args:  "v1.2.3 -A zip -O ./sample.zip",
 			isTTY: true,
 			want: DownloadOptions{
-				Output:       "./sample.zip",
+				OutputFile:   "./sample.zip",
 				TagName:      "v1.2.3",
 				FilePatterns: []string(nil),
 				Destination:  ".",
@@ -166,7 +166,7 @@ func Test_NewCmdDownload(t *testing.T) {
 			assert.Equal(t, tt.want.FilePatterns, opts.FilePatterns)
 			assert.Equal(t, tt.want.Destination, opts.Destination)
 			assert.Equal(t, tt.want.Concurrency, opts.Concurrency)
-			assert.Equal(t, tt.want.Output, opts.Output)
+			assert.Equal(t, tt.want.OutputFile, opts.OutputFile)
 		})
 	}
 }
@@ -268,7 +268,7 @@ func Test_downloadRun(t *testing.T) {
 			name:  "download archive in `tar.gz` format into output option",
 			isTTY: true,
 			opts: DownloadOptions{
-				Output:      "./tmp/my-tarball.tgz",
+				OutputFile:  "./tmp/my-tarball.tgz",
 				TagName:     "v1.2.3",
 				Destination: "",
 				Concurrency: 2,
@@ -284,7 +284,7 @@ func Test_downloadRun(t *testing.T) {
 			name:  "download single asset from matching patter into output option",
 			isTTY: true,
 			opts: DownloadOptions{
-				Output:       "./tmp/my-tarball.tgz",
+				OutputFile:   "./tmp/my-tarball.tgz",
 				TagName:      "v1.2.3",
 				Destination:  "",
 				Concurrency:  2,
@@ -300,7 +300,7 @@ func Test_downloadRun(t *testing.T) {
 			name:  "download single asset from matching patter into output 'stdout´",
 			isTTY: true,
 			opts: DownloadOptions{
-				Output:       "-",
+				OutputFile:   "-",
 				TagName:      "v1.2.3",
 				Destination:  "",
 				Concurrency:  2,
