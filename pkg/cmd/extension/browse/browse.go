@@ -24,6 +24,10 @@ import (
 
 const pagingOffset = 24
 
+// TODO saw STDOUT during an install
+// TODO update titles after install/remove
+// TODO description color is low-contrast in most settings
+
 type ExtBrowseOpts struct {
 	Cmd      *cobra.Command
 	Browser  ibrowser
