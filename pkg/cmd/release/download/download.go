@@ -7,7 +7,6 @@ import (
 	"mime"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 
@@ -82,7 +81,7 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 				return err
 			}
 
-			if err := cmdutil.MutuallyExclusive("specify only one of `--destination` or `--output`", opts.Destination != ".", opts.Output != ""); err != nil {
+			if err := cmdutil.MutuallyExclusive("specify only one of `--dir` or `--output`", opts.Destination != ".", opts.Output != ""); err != nil {
 				return err
 			}
 
@@ -100,12 +99,12 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Destination, "dir", "D", ".", "The directory to download files into")
+	cmd.Flags().StringVarP(&opts.Output, "output", "O", "", "The `file` to write a single asset to (use \"-\" to write to standard output)")
+	cmd.Flags().StringVarP(&opts.Destination, "dir", "D", ".", "The `directory` to download files into")
 	cmd.Flags().StringArrayVarP(&opts.FilePatterns, "pattern", "p", nil, "Download only assets that match a glob pattern")
 	cmd.Flags().StringVarP(&opts.ArchiveType, "archive", "A", "", "Download the source code archive in the specified `format` (zip or tar.gz)")
 	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Overwrite existing files of the same name")
 	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", false, "Skip downloading when files of the same name exist")
-	cmd.Flags().StringVarP(&opts.Output, "output", "O", "", "File descriptor to download a file into")
 
 	return cmd
 }
@@ -183,39 +182,18 @@ func downloadRun(opts *DownloadOptions) error {
 	}
 
 	if len(toDownload) > 1 && opts.Output != "" {
-		return errors.New("cannot have more than one asset to download when `output` option is specified")
+		return fmt.Errorf("unable to write more than one asset with `--output`, got %d assets", len(toDownload))
 	}
 
-	if opts.Destination != "." {
-		err := os.MkdirAll(opts.Destination, 0755)
-		if err != nil {
-			return err
-		}
+	dest := destinationWriter{
+		file:         opts.Output,
+		dir:          opts.Destination,
+		skipExisting: opts.SkipExisting,
+		overwrite:    opts.OverwriteExisting,
+		stdout:       opts.IO.Out,
 	}
 
-	var toStdout bool
-	if len(opts.Output) > 0 {
-		if opts.Output == "-" {
-			toStdout = true
-		} else {
-			destination := path.Dir(opts.Output)
-			if destination != "." {
-				err := os.MkdirAll(destination, 0755)
-				if err != nil {
-					return err
-				}
-			}
-			fileName := path.Base(opts.Output)
-			toDownload[0].Name = fileName
-			opts.Destination = destination
-
-			if len(fileName) == 0 {
-				return errors.New("please provide a filename for the destination")
-			}
-		}
-	}
-
-	return downloadAssets(httpClient, toDownload, opts.Destination, opts.Concurrency, opts.IO, isArchive, opts.OverwriteExisting, opts.SkipExisting, toStdout)
+	return downloadAssets(&dest, httpClient, toDownload, opts.Concurrency, isArchive)
 }
 
 func matchAny(patterns []string, name string) bool {
@@ -227,7 +205,7 @@ func matchAny(patterns []string, name string) bool {
 	return false
 }
 
-func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, destDir string, numWorkers int, optIO *iostreams.IOStreams, isArchive, force, skip, toStdout bool) error {
+func downloadAssets(dest *destinationWriter, httpClient *http.Client, toDownload []shared.ReleaseAsset, numWorkers int, isArchive bool) error {
 	if numWorkers == 0 {
 		return errors.New("the number of concurrent workers needs to be greater than 0")
 	}
@@ -242,7 +220,7 @@ func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, d
 	for w := 1; w <= numWorkers; w++ {
 		go func() {
 			for a := range jobs {
-				results <- downloadAsset(httpClient, a.APIURL, destDir, a.Name, optIO, isArchive, force, skip, toStdout)
+				results <- downloadAsset(dest, httpClient, a.APIURL, a.Name, isArchive)
 			}
 		}()
 	}
@@ -254,7 +232,7 @@ func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, d
 
 	var downloadError error
 	for i := 0; i < len(toDownload); i++ {
-		if err := <-results; err != nil {
+		if err := <-results; err != nil && !errors.Is(err, errSkipped) {
 			downloadError = err
 		}
 	}
@@ -262,12 +240,9 @@ func downloadAssets(httpClient *http.Client, toDownload []shared.ReleaseAsset, d
 	return downloadError
 }
 
-func downloadAsset(httpClient *http.Client, assetURL, destinationDir, fileName string, optIO *iostreams.IOStreams, isArchive, force, skip, toStdout bool) error {
-	var destinationPath = filepath.Join(destinationDir, fileName)
-	if len(fileName) != 0 && !toStdout {
-		if success, err := shouldWrite(destinationPath, force, skip); !success || err != nil {
-			return err
-		}
+func downloadAsset(dest *destinationWriter, httpClient *http.Client, assetURL, fileName string, isArchive bool) error {
+	if err := dest.Check(fileName); err != nil {
+		return err
 	}
 
 	req, err := http.NewRequest("GET", assetURL, nil)
@@ -301,11 +276,6 @@ func downloadAsset(httpClient *http.Client, assetURL, destinationDir, fileName s
 		return api.HandleHTTPError(resp)
 	}
 
-	if toStdout {
-		_, err = io.Copy(optIO.Out, resp.Body)
-		return err
-	}
-
 	if len(fileName) == 0 {
 		contentDisposition := resp.Header.Get("Content-Disposition")
 
@@ -314,24 +284,13 @@ func downloadAsset(httpClient *http.Client, assetURL, destinationDir, fileName s
 			return fmt.Errorf("unable to parse file name of archive: %w", err)
 		}
 		if serverFileName, ok := params["filename"]; ok {
-			destinationPath = filepath.Join(destinationDir, serverFileName)
+			fileName = serverFileName
 		} else {
 			return errors.New("unable to determine file name of archive")
 		}
-
-		if success, err := shouldWrite(destinationPath, force, skip); !success || err != nil {
-			return err
-		}
 	}
 
-	f, err := os.OpenFile(destinationPath, os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	_, err = io.Copy(f, resp.Body)
-	return err
+	return dest.Copy(fileName, resp.Body)
 }
 
 var codeloadLegacyRE = regexp.MustCompile(`^(/[^/]+/[^/]+/)legacy\.`)
@@ -347,18 +306,76 @@ func removeLegacyFromCodeloadPath(p string) string {
 	return codeloadLegacyRE.ReplaceAllString(p, "$1")
 }
 
-// shouldWrite determines if writing to the dest should continue based on force and skip parameters.
-func shouldWrite(dest string, force, skip bool) (bool, error) {
-	if _, err := os.Stat(dest); err == nil {
-		if skip {
-			return false, nil
+var errSkipped = errors.New("skipped")
+
+// destinationWriter handles writing content into destination files
+type destinationWriter struct {
+	file         string
+	dir          string
+	skipExisting bool
+	overwrite    bool
+	stdout       io.Writer
+}
+
+func (w destinationWriter) makePath(name string) string {
+	if w.file == "" {
+		return filepath.Join(w.dir, name)
+	}
+	return w.file
+}
+
+// Check returns an error if a file already exists at destination
+func (w destinationWriter) Check(name string) error {
+	if name == "" {
+		// skip check as file name will only be known after the API request
+		return nil
+	}
+	fp := w.makePath(name)
+	if fp == "-" {
+		// writing to stdout should always proceed
+		return nil
+	}
+	return w.check(fp)
+}
+
+func (w destinationWriter) check(fp string) error {
+	if _, err := os.Stat(fp); err == nil {
+		if w.skipExisting {
+			return errSkipped
 		}
-		if !force {
-			return false, fmt.Errorf(
+		if !w.overwrite {
+			return fmt.Errorf(
 				"%s already exists (use `--clobber` to overwrite file or `--skip-existing` to skip file)",
-				dest,
+				fp,
 			)
 		}
 	}
-	return true, nil
+	return nil
+}
+
+// Copy writes the data from r into a file specified by name
+func (w destinationWriter) Copy(name string, r io.Reader) error {
+	fp := w.makePath(name)
+	if fp == "-" {
+		_, err := io.Copy(w.stdout, r)
+		return err
+	}
+	if err := w.check(fp); err != nil {
+		return err
+	}
+
+	if dir := filepath.Dir(fp); dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	}
+
+	f, err := os.OpenFile(fp, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = io.Copy(f, r)
+	return err
 }

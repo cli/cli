@@ -126,7 +126,7 @@ func Test_NewCmdDownload(t *testing.T) {
 			name:    "simultaneous output and destination flags",
 			args:    "v1.2.3 -O ./file.xyz -D ./destination",
 			isTTY:   true,
-			wantErr: "specify only one of `--destination` or `--output`",
+			wantErr: "specify only one of `--dir` or `--output`",
 		},
 	}
 	for _, tt := range tests {
@@ -172,6 +172,14 @@ func Test_NewCmdDownload(t *testing.T) {
 }
 
 func Test_downloadRun(t *testing.T) {
+	if oldwd, err := os.Getwd(); err == nil {
+		t.Cleanup(func() {
+			_ = os.Chdir(oldwd)
+		})
+	} else {
+		t.Fatalf("could not determine working directory: %v", err)
+	}
+
 	tests := []struct {
 		name       string
 		isTTY      bool
@@ -305,10 +313,8 @@ func Test_downloadRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tempDir := t.TempDir()
-			tt.opts.Destination = filepath.Join(tempDir, tt.opts.Destination)
-			// we need to only set Output if it was explicitly defined due to asset count validation in 'downloadRun'
-			if tt.opts.Output != "" && tt.opts.Output != "-" {
-				tt.opts.Output = filepath.Join(tempDir, tt.opts.Output)
+			if err := os.Chdir(tempDir); err != nil {
+				t.Fatal(err)
 			}
 
 			ios, _, stdout, stderr := iostreams.Test()
@@ -378,7 +384,7 @@ func Test_downloadRun(t *testing.T) {
 			assert.Equal(t, tt.wantStdout, stdout.String())
 			assert.Equal(t, tt.wantStderr, stderr.String())
 
-			downloadedFiles, err := listFiles(tempDir)
+			downloadedFiles, err := listFiles(".")
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantFiles, downloadedFiles)
 		})
