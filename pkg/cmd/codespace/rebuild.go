@@ -10,22 +10,24 @@ import (
 
 func newRebuildCmd(app *App) *cobra.Command {
 	var codespace string
+	var fullRebuild bool
 
 	rebuildCmd := &cobra.Command{
 		Use:   "rebuild",
 		Short: "Rebuild a codespace",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.Rebuild(cmd.Context(), codespace)
+			return app.Rebuild(cmd.Context(), codespace, fullRebuild)
 		},
 	}
 
 	rebuildCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
+	rebuildCmd.Flags().BoolVar(&fullRebuild, "full", false, "Perform a full rebuild of the codespace")
 
 	return rebuildCmd
 }
 
-func (a *App) Rebuild(ctx context.Context, codespaceName string) (err error) {
+func (a *App) Rebuild(ctx context.Context, codespaceName string, full bool) (err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -46,7 +48,7 @@ func (a *App) Rebuild(ctx context.Context, codespaceName string) (err error) {
 	}
 	defer safeClose(session, &err)
 
-	err = session.RebuildContainer(ctx)
+	err = session.RebuildContainer(ctx, full)
 	if err != nil {
 		return fmt.Errorf("rebuilding codespace via session: %w", err)
 	}
