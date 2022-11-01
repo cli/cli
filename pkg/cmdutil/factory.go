@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -19,6 +20,7 @@ type Factory struct {
 	IOStreams *iostreams.IOStreams
 	Prompter  prompter.Prompter
 	Browser   browser.Browser
+	GitClient *git.Client
 
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)

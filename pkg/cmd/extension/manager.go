@@ -2,6 +2,7 @@ package extension
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -339,7 +340,15 @@ type binManifest struct {
 func (m *Manager) Install(repo ghrepo.Interface, target string) error {
 	isBin, err := isBinExtension(m.client, repo)
 	if err != nil {
-		return fmt.Errorf("could not check for binary extension: %w", err)
+		if errors.Is(err, releaseNotFoundErr) {
+			if ok, err := repoExists(m.client, repo); err != nil {
+				return err
+			} else if !ok {
+				return repositoryNotFoundErr
+			}
+		} else {
+			return fmt.Errorf("could not check for binary extension: %w", err)
+		}
 	}
 	if isBin {
 		return m.installBin(repo, target)
@@ -760,11 +769,6 @@ func isBinExtension(client *http.Client, repo ghrepo.Interface) (isBin bool, err
 	var r *release
 	r, err = fetchLatestRelease(client, repo)
 	if err != nil {
-		httpErr, ok := err.(api.HTTPError)
-		if ok && httpErr.StatusCode == 404 {
-			err = nil
-			return
-		}
 		return
 	}
 
@@ -786,7 +790,8 @@ func isBinExtension(client *http.Client, repo ghrepo.Interface) (isBin bool, err
 }
 
 func repoFromPath(path string) (ghrepo.Interface, error) {
-	remotes, err := git.RemotesForPath(path)
+	gitClient := &git.Client{RepoDir: path}
+	remotes, err := gitClient.Remotes(context.Background())
 	if err != nil {
 		return nil, err
 	}

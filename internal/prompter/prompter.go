@@ -3,6 +3,7 @@ package prompter
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -18,6 +19,7 @@ type Prompter interface {
 	Password(string) (string, error)
 	AuthToken() (string, error)
 	Confirm(string, bool) (bool, error)
+	ConfirmDeletion(string) error
 	MarkdownEditor(string, string, bool) (string, error)
 }
 
@@ -95,6 +97,22 @@ func (p *surveyPrompter) Input(prompt, defaultValue string) (result string, err 
 	}, &result)
 
 	return
+}
+
+func (p *surveyPrompter) ConfirmDeletion(requiredValue string) error {
+	var result string
+	return p.ask(
+		&survey.Input{
+			Message: fmt.Sprintf("Type %s to confirm deletion:", requiredValue),
+		},
+		&result,
+		survey.WithValidator(
+			func(val interface{}) error {
+				if str := val.(string); !strings.EqualFold(str, requiredValue) {
+					return fmt.Errorf("You entered %s", str)
+				}
+				return nil
+			}))
 }
 
 func (p *surveyPrompter) InputHostname() (result string, err error) {

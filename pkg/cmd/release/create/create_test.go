@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
@@ -572,6 +573,7 @@ func Test_createRun(t *testing.T) {
 				Concurrency: 1,
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(404, ``))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
 					"url": "https://api.github.com/releases/123",
 					"upload_url": "https://api.github.com/assets/upload",
@@ -608,6 +610,33 @@ func Test_createRun(t *testing.T) {
 			wantStderr: ``,
 		},
 		{
+			name:  "upload files but release already exists",
+			isTTY: true,
+			opts: CreateOptions{
+				TagName:      "v1.2.3",
+				Name:         "",
+				Body:         "",
+				BodyProvided: true,
+				Draft:        false,
+				Target:       "",
+				Assets: []*shared.AssetForUpload{
+					{
+						Name: "ball.tgz",
+						Open: func() (io.ReadCloser, error) {
+							return io.NopCloser(bytes.NewBufferString(`TARBALL`)), nil
+						},
+					},
+				},
+				Concurrency: 1,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(200, ``))
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+			wantErr:    `a release with the same tag name already exists: v1.2.3`,
+		},
+		{
 			name:  "upload files and create discussion",
 			isTTY: true,
 			opts: CreateOptions{
@@ -629,6 +658,7 @@ func Test_createRun(t *testing.T) {
 				Concurrency:        1,
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(404, ``))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
 					"url": "https://api.github.com/releases/123",
 					"upload_url": "https://api.github.com/assets/upload",
@@ -687,6 +717,8 @@ func Test_createRun(t *testing.T) {
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("OWNER/REPO")
 			}
+
+			tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
 
 			err := createRun(&tt.opts)
 			if tt.wantErr != "" {
@@ -1049,6 +1081,8 @@ func Test_createRun_interactive(t *testing.T) {
 		tt.opts.Edit = func(_, _, val string, _ io.Reader, _, _ io.Writer) (string, error) {
 			return val, nil
 		}
+
+		tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
 
 		t.Run(tt.name, func(t *testing.T) {
 			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock

@@ -88,6 +88,25 @@ func TestNewCmdExtension(t *testing.T) {
 			},
 		},
 		{
+			name: "error extension not found",
+			args: []string{"install", "owner/gh-some-ext"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.ListFunc = func() []extensions.Extension {
+					return []extensions.Extension{}
+				}
+				em.InstallFunc = func(_ ghrepo.Interface, _ string) error {
+					return repositoryNotFoundErr
+				}
+				return func(t *testing.T) {
+					installCalls := em.InstallCalls()
+					assert.Equal(t, 1, len(installCalls))
+					assert.Equal(t, "gh-some-ext", installCalls[0].InterfaceMoqParam.RepoName())
+				}
+			},
+			wantErr: true,
+			errMsg:  "X Could not find extension 'owner/gh-some-ext' on host github.com",
+		},
+		{
 			name:    "install local extension with pin",
 			args:    []string{"install", ".", "--pin", "v1.0.0"},
 			wantErr: true,

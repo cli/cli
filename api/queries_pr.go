@@ -214,6 +214,10 @@ func (pr PullRequest) Identifier() string {
 	return pr.ID
 }
 
+func (pr PullRequest) CurrentUserComments() []Comment {
+	return pr.Comments.CurrentUserComments()
+}
+
 func (pr PullRequest) IsOpen() bool {
 	return pr.State == "OPEN"
 }
@@ -269,6 +273,7 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 		}
 		summary.Total++
 	}
+
 	return
 }
 

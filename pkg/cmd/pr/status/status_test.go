@@ -52,6 +52,7 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 			}
 			return branch, nil
 		},
+		GitClient: &git.Client{GitPath: "some/path/git"},
 	}
 
 	cmd := NewCmdStatus(factory, nil)
@@ -113,9 +114,10 @@ func TestPRStatus_reviewsAndChecks(t *testing.T) {
 	}
 
 	expected := []string{
-		"✓ Checks passing + Changes requested",
+		"✓ Checks passing + Changes requested ! Merge conflict status unknown",
 		"- Checks pending ✓ 2 Approved",
-		"× 1/3 checks failing - Review required",
+		"× 1/3 checks failing - Review required ✓ No merge conflicts",
+		"✓ Checks passing × Merge conflicts",
 	}
 
 	for _, line := range expected {
@@ -327,7 +329,8 @@ func Test_prSelectorForCurrentBranch(t *testing.T) {
 			Repo:   repo,
 		},
 	}
-	prNum, headRef, err := prSelectorForCurrentBranch(repo, "Frederick888/main", rem)
+	gitClient := &git.Client{GitPath: "some/path/git"}
+	prNum, headRef, err := prSelectorForCurrentBranch(gitClient, repo, "Frederick888/main", rem)
 	if err != nil {
 		t.Fatalf("prSelectorForCurrentBranch error: %v", err)
 	}

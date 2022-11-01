@@ -37,7 +37,7 @@ import (
 // 			GetCodespaceRepositoryContentsFunc: func(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error) {
 // 				panic("mock out the GetCodespaceRepositoryContents method")
 // 			},
-// 			GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch string, location string) ([]*api.Machine, error) {
+// 			GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch string, location string, devcontainerPath string) ([]*api.Machine, error) {
 // 				panic("mock out the GetCodespacesMachines method")
 // 			},
 // 			GetOrgMemberCodespaceFunc: func(ctx context.Context, orgName string, userName string, codespaceName string) (*api.Codespace, error) {
@@ -87,7 +87,7 @@ type apiClientMock struct {
 	GetCodespaceRepositoryContentsFunc func(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
 
 	// GetCodespacesMachinesFunc mocks the GetCodespacesMachines method.
-	GetCodespacesMachinesFunc func(ctx context.Context, repoID int, branch string, location string) ([]*api.Machine, error)
+	GetCodespacesMachinesFunc func(ctx context.Context, repoID int, branch string, location string, devcontainerPath string) ([]*api.Machine, error)
 
 	// GetOrgMemberCodespaceFunc mocks the GetOrgMemberCodespace method.
 	GetOrgMemberCodespaceFunc func(ctx context.Context, orgName string, userName string, codespaceName string) (*api.Codespace, error)
@@ -180,6 +180,8 @@ type apiClientMock struct {
 			Branch string
 			// Location is the location argument value.
 			Location string
+			// DevcontainerPath is the devcontainerPath argument value.
+			DevcontainerPath string
 		}
 		// GetOrgMemberCodespace holds details about calls to the GetOrgMemberCodespace method.
 		GetOrgMemberCodespace []struct {
@@ -522,41 +524,45 @@ func (mock *apiClientMock) GetCodespaceRepositoryContentsCalls() []struct {
 }
 
 // GetCodespacesMachines calls GetCodespacesMachinesFunc.
-func (mock *apiClientMock) GetCodespacesMachines(ctx context.Context, repoID int, branch string, location string) ([]*api.Machine, error) {
+func (mock *apiClientMock) GetCodespacesMachines(ctx context.Context, repoID int, branch string, location string, devcontainerPath string) ([]*api.Machine, error) {
 	if mock.GetCodespacesMachinesFunc == nil {
 		panic("apiClientMock.GetCodespacesMachinesFunc: method is nil but apiClient.GetCodespacesMachines was just called")
 	}
 	callInfo := struct {
-		Ctx      context.Context
-		RepoID   int
-		Branch   string
-		Location string
+		Ctx              context.Context
+		RepoID           int
+		Branch           string
+		Location         string
+		DevcontainerPath string
 	}{
-		Ctx:      ctx,
-		RepoID:   repoID,
-		Branch:   branch,
-		Location: location,
+		Ctx:              ctx,
+		RepoID:           repoID,
+		Branch:           branch,
+		Location:         location,
+		DevcontainerPath: devcontainerPath,
 	}
 	mock.lockGetCodespacesMachines.Lock()
 	mock.calls.GetCodespacesMachines = append(mock.calls.GetCodespacesMachines, callInfo)
 	mock.lockGetCodespacesMachines.Unlock()
-	return mock.GetCodespacesMachinesFunc(ctx, repoID, branch, location)
+	return mock.GetCodespacesMachinesFunc(ctx, repoID, branch, location, devcontainerPath)
 }
 
 // GetCodespacesMachinesCalls gets all the calls that were made to GetCodespacesMachines.
 // Check the length with:
 //     len(mockedapiClient.GetCodespacesMachinesCalls())
 func (mock *apiClientMock) GetCodespacesMachinesCalls() []struct {
-	Ctx      context.Context
-	RepoID   int
-	Branch   string
-	Location string
+	Ctx              context.Context
+	RepoID           int
+	Branch           string
+	Location         string
+	DevcontainerPath string
 } {
 	var calls []struct {
-		Ctx      context.Context
-		RepoID   int
-		Branch   string
-		Location string
+		Ctx              context.Context
+		RepoID           int
+		Branch           string
+		Location         string
+		DevcontainerPath string
 	}
 	mock.lockGetCodespacesMachines.RLock()
 	calls = mock.calls.GetCodespacesMachines

@@ -700,6 +700,8 @@ func TestRepoFork(t *testing.T) {
 			return tt.remotes, nil
 		}
 
+		tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
+
 		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 		as, teardown := prompt.InitAskStubber()
 		defer teardown()

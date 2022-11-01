@@ -70,6 +70,7 @@ func mainRun() exitCode {
 	}
 	if !cmdFactory.IOStreams.ColorEnabled() {
 		surveyCore.DisableColor = true
+		ansi.DisableColors(true)
 	} else {
 		// override survey's poor choice of color
 		surveyCore.TemplateFuncsWithColor["color"] = func(style string) string {
@@ -314,7 +315,7 @@ func authHelp() string {
 		return heredoc.Doc(`
 			gh: To use GitHub CLI in a GitHub Actions workflow, set the GH_TOKEN environment variable. Example:
 			  env:
-			    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+			    GH_TOKEN: ${{ github.token }}
 		`)
 	}
 

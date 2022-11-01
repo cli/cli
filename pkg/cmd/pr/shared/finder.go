@@ -53,12 +53,14 @@ func NewFinder(factory *cmdutil.Factory) PRFinder {
 	}
 
 	return &finder{
-		baseRepoFn:   factory.BaseRepo,
-		branchFn:     factory.Branch,
-		remotesFn:    factory.Remotes,
-		httpClient:   factory.HttpClient,
-		progress:     factory.IOStreams,
-		branchConfig: git.ReadBranchConfig,
+		baseRepoFn: factory.BaseRepo,
+		branchFn:   factory.Branch,
+		remotesFn:  factory.Remotes,
+		httpClient: factory.HttpClient,
+		progress:   factory.IOStreams,
+		branchConfig: func(s string) git.BranchConfig {
+			return factory.GitClient.ReadBranchConfig(context.Background(), s)
+		},
 	}
 }
 

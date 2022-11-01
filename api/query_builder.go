@@ -23,6 +23,7 @@ func shortenQuery(q string) string {
 var issueComments = shortenQuery(`
 	comments(first: 100) {
 		nodes {
+			id,
 			author{login},
 			authorAssociation,
 			body,
@@ -30,7 +31,9 @@ var issueComments = shortenQuery(`
 			includesCreatedEdit,
 			isMinimized,
 			minimizedReason,
-			reactionGroups{content,users{totalCount}}
+			reactionGroups{content,users{totalCount}},
+			url,
+			viewerDidAuthor
 		},
 		pageInfo{hasNextPage,endCursor},
 		totalCount
@@ -182,7 +185,7 @@ func RequiredStatusCheckRollupGraphQL(prID, after string) string {
 								state,
 								targetUrl,
 								createdAt,
-                isRequired(pullRequestId: %[2]s)
+								isRequired(pullRequestId: %[2]s)
 							},
 							...on CheckRun {
 								name,
@@ -192,7 +195,7 @@ func RequiredStatusCheckRollupGraphQL(prID, after string) string {
 								startedAt,
 								completedAt,
 								detailsUrl,
-                isRequired(pullRequestId: %[2]s)
+								isRequired(pullRequestId: %[2]s)
 							}
 						},
 						pageInfo{hasNextPage,endCursor}
@@ -231,6 +234,7 @@ var PullRequestFields = append(IssueFields,
 	"deletions",
 	"files",
 	"headRefName",
+	"headRefOid",
 	"headRepository",
 	"headRepositoryOwner",
 	"isCrossRepository",
