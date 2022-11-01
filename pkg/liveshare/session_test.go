@@ -415,6 +415,9 @@ func TestRebuild(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		t.Logf("RPC service: %s", tt.rpcService)
+		t.Logf("full rebuild: %t", tt.fullRebuild)
+
 		requestCount := 0
 		rebuildContainer := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 			requestCount++
@@ -424,17 +427,17 @@ func TestRebuild(t *testing.T) {
 			livesharetest.WithService(tt.rpcService, rebuildContainer),
 		)
 		if err != nil {
-			t.Fatalf("creating mock session: %v", err)
+			t.Errorf("creating mock session: %v", err)
 		}
 		defer testServer.Close()
 
 		err = session.RebuildContainer(context.Background(), tt.fullRebuild)
 		if err != nil {
-			t.Fatalf("rebuilding codespace via mock session: %v", err)
+			t.Errorf("rebuilding codespace via mock session: %v", err)
 		}
 
 		if requestCount == 0 {
-			t.Fatalf("no requests were made")
+			t.Errorf("no requests were made")
 		}
 	}
 }
