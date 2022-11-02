@@ -70,19 +70,6 @@ func (e extEntry) Title() string {
 
 func (e extEntry) Description() string { return e.description }
 
-type extensionListUI interface {
-	FindSelected() (extEntry, int)
-	Filter(text string)
-	ToggleInstalled(int)
-	Focus()
-	Reset()
-	Refresh()
-	PageDown()
-	PageUp()
-	ScrollUp()
-	ScrollDown()
-}
-
 type extList struct {
 	list       *tview.List
 	extEntries []extEntry
@@ -91,7 +78,7 @@ type extList struct {
 	filter     string
 }
 
-func newExtList(app *tview.Application, list *tview.List, extEntries []extEntry, logger *log.Logger) extensionListUI {
+func newExtList(app *tview.Application, list *tview.List, extEntries []extEntry, logger *log.Logger) *extList {
 	list.SetWrapAround(false)
 	list.SetBorderPadding(1, 1, 1, 1)
 	el := &extList{
