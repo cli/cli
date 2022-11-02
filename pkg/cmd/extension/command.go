@@ -276,6 +276,9 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					searcher := search.NewSearcher(api.NewCachedHTTPClient(client, cacheTTL), host)
 
 					f, err := os.Open("/dev/null")
+					if err != nil {
+						return err
+					}
 
 					io.Out = f
 					io.ErrOut = ioutil.Discard
