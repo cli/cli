@@ -3,6 +3,7 @@ package extension
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -272,6 +273,11 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					cacheTTL, _ := time.ParseDuration("24h")
 					searcher := search.NewSearcher(api.NewCachedHTTPClient(client, cacheTTL), host)
+
+					f, err := os.Open("/dev/null")
+
+					io.Out = f
+					io.ErrOut = ioutil.Discard
 
 					opts := browse.ExtBrowseOpts{
 						Cmd:      cmd,

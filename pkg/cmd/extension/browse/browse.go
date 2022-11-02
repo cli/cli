@@ -154,6 +154,7 @@ func (el *extList) FindSelected() (extEntry, error) {
 	return extEntry{}, errors.New("not found")
 }
 
+// TODO simplify
 func (el *extList) Filter(text string) {
 	indices := []int{}
 	for x, ee := range el.extEntries {
@@ -265,9 +266,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 
 	extList := newExtList(app, list, extEntries, opts.Logger)
 
-	onSelectItem := func(ix int, _, _ string, _ rune) {
-		readme.SetText("...fetching readme...")
-		app.ForceDraw()
+	loadSelectedReadme := func() {
 		ee, err := extList.FindSelected()
 		if err != nil {
 			opts.Logger.Println(fmt.Errorf("tried to find entry, but: %w", err))
@@ -289,22 +288,24 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 			return
 		}
 
-		readme.SetText("")
-		readme.SetDynamicColors(true)
+		app.QueueUpdateDraw(func() {
 
-		w := tview.ANSIWriter(readme)
-		_, _ = w.Write([]byte(rendered))
+			readme.SetText("")
+			readme.SetDynamicColors(true)
 
-		readme.ScrollToBeginning()
+			w := tview.ANSIWriter(readme)
+			_, _ = w.Write([]byte(rendered))
+
+			readme.ScrollToBeginning()
+		})
 	}
 
-	// TODO would be nice to see if Draw worked in onSelectItem, but need to not invoke it prior to app.Run
 	// Force fetching of initial readme:
-	onSelectItem(0, "", "", rune(0))
+	go loadSelectedReadme()
 
 	filter.SetChangedFunc(func(text string) {
 		extList.Filter(text)
-		onSelectItem(0, "", "", rune(0))
+		go loadSelectedReadme()
 	})
 
 	filter.SetDoneFunc(func(key tcell.Key) {
@@ -347,9 +348,13 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		case 'q':
 			app.Stop()
 		case 'k':
-			onSelectItem(extList.ScrollUp(), "", "", rune(0))
+			extList.ScrollUp()
+			readme.SetText("...fetching readme...")
+			go loadSelectedReadme()
 		case 'j':
-			onSelectItem(extList.ScrollDown(), "", "", rune(0))
+			extList.ScrollDown()
+			readme.SetText("...fetching readme...")
+			go loadSelectedReadme()
 		case 'w':
 			ee, err := extList.FindSelected()
 			if err != nil {
@@ -374,7 +379,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 
 			app.SetRoot(modal, true)
 			modal.SetText(fmt.Sprintf("Installing %s...", ee.FullName))
-			app.ForceDraw()
+			app.ForceDraw() // TODO try to do with a goroutine
 			err = opts.Em.Install(repo, "")
 			if err != nil {
 				modal.SetText(fmt.Sprintf("Failed to install %s: %s", ee.FullName, err.Error()))
@@ -396,28 +401,34 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 			}
 			app.SetRoot(modal, true)
 		case ' ':
-			onSelectItem(extList.PageDown(), "", "", rune(0))
+			extList.PageDown()
+			go loadSelectedReadme()
 		case '/':
 			app.SetFocus(filter)
 			return nil
 		}
 		switch event.Key() {
 		case tcell.KeyUp:
-			onSelectItem(extList.ScrollUp(), "", "", rune(0))
+			extList.ScrollUp()
+			go loadSelectedReadme()
 			return nil
 		case tcell.KeyDown:
-			onSelectItem(extList.ScrollDown(), "", "", rune(0))
+			extList.ScrollDown()
+			go loadSelectedReadme()
 			return nil
 		case tcell.KeyEscape:
 			filter.SetText("")
 			extList.Reset()
 		case tcell.KeyCtrlSpace:
 			// TODO broken on windows
-			onSelectItem(extList.PageUp(), "", "", rune(0))
+			extList.PageUp()
+			go loadSelectedReadme()
 		case tcell.KeyCtrlJ:
-			onSelectItem(extList.PageDown(), "", "", rune(0))
+			extList.PageDown()
+			go loadSelectedReadme()
 		case tcell.KeyCtrlK:
-			onSelectItem(extList.PageUp(), "", "", rune(0))
+			extList.PageUp()
+			go loadSelectedReadme()
 		case tcell.KeyPgUp:
 			row, col := readme.GetScrollOffset()
 			if row > 0 {
