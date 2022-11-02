@@ -401,7 +401,12 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 			}
 			app.SetRoot(modal, true)
 		case ' ':
-			extList.PageDown()
+			// The shift check works on windows and not linux/mac:
+			if event.Modifiers()&tcell.ModShift != 0 {
+				extList.PageUp()
+			} else {
+				extList.PageDown()
+			}
 			go loadSelectedReadme()
 		case '/':
 			app.SetFocus(filter)
@@ -420,7 +425,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 			filter.SetText("")
 			extList.Reset()
 		case tcell.KeyCtrlSpace:
-			// TODO broken on windows
+			// The ctrl check works on windows/mac and not windows:
 			extList.PageUp()
 			go loadSelectedReadme()
 		case tcell.KeyCtrlJ:
