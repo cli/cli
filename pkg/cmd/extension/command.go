@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/search"
 	"github.com/cli/cli/v2/utils"
+	"github.com/rivo/tview"
 	"github.com/spf13/cobra"
 )
 
@@ -288,6 +289,9 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						Client:   client,
 						Cfg:      cfg,
 						Debug:    debug,
+						RunApp: func(app *tview.Application) error {
+							return app.Run()
+						},
 					}
 
 					return browse.ExtBrowse(opts)

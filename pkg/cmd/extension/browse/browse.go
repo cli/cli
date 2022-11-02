@@ -35,6 +35,7 @@ type ExtBrowseOpts struct {
 	Cfg      config.Config
 	Rg       readmeGetter
 	Debug    bool
+	RunApp   func(*tview.Application) error
 }
 
 type ibrowser interface {
@@ -79,8 +80,12 @@ type extList struct {
 }
 
 func newExtList(app *tview.Application, list *tview.List, extEntries []extEntry, logger *log.Logger) *extList {
+	list.SetTitleColor(tcell.ColorPurple)
+	list.SetSelectedTextColor(tcell.ColorWhite)
+	list.SetSelectedBackgroundColor(tcell.ColorPurple)
 	list.SetWrapAround(false)
 	list.SetBorderPadding(1, 1, 1, 1)
+
 	el := &extList{
 		list:       list,
 		extEntries: extEntries,
@@ -242,9 +247,6 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	filter.SetBorderPadding(0, 0, 20, 20)
 
 	list := tview.NewList()
-	list.SetTitleColor(tcell.ColorPurple)
-	list.SetSelectedTextColor(tcell.ColorWhite)
-	list.SetSelectedBackgroundColor(tcell.ColorPurple)
 
 	readme := tview.NewTextView()
 	readme.SetBorderPadding(1, 1, 0, 1)
@@ -446,7 +448,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	})
 
 	opts.IO.StopProgressIndicator()
-	if err := app.Run(); err != nil {
+	if err := opts.RunApp(app); err != nil {
 		return err
 	}
 
