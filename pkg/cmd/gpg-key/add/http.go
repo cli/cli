@@ -4,16 +4,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 var scopesError = errors.New("insufficient OAuth scopes")
 
-func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader) error {
+func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, ioStream *iostreams.IOStreams) error {
 	url := ghinstance.RESTPrefix(hostname) + "user/gpg_keys"
 
 	keyBytes, err := io.ReadAll(keyFile)
@@ -46,19 +49,24 @@ func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader) e
 	} else if resp.StatusCode > 299 {
 		var httpError api.HTTPError
 		err := api.HandleHTTPError(resp)
-		if errors.As(err, &httpError) && isDuplicateError(&httpError) {
-			return nil
-		}
-		if errors.As(err, &httpError) && isKeyInvalidError(&httpError) {
-			if !isGpgKeyArmored(keyBytes) {
-				return errors.New("it seems that the GPG key is not armored.\n" +
-					"please try to find your GPG key ID using:\n" +
-					"\tgpg --list-keys\n" +
-					"and use command below to add it to your accont:\n" +
-					"\tgpg --armor --export <GPG key ID> | gh gpg-key add -")
+		if errors.As(err, &httpError) {
+			cs := ioStream.ColorScheme()
+			if isDuplicateError(&httpError) {
+				fmt.Fprintf(ioStream.ErrOut, "%s Key already exists in your account\n", cs.FailureIcon())
+				return cmdutil.SilentError
 			}
+			if isKeyInvalidError(&httpError) {
+				if !isGpgKeyArmored(keyBytes) {
+					fmt.Fprintf(ioStream.ErrOut, "%s it seems that the GPG key is not armored.\n"+
+						"please try to find your GPG key ID using:\n"+
+						"\tgpg --list-keys\n"+
+						"and use command below to add it to your accont:\n"+
+						"\tgpg --armor --export <GPG key ID> | gh gpg-key add -\n", cs.FailureIcon())
+					return cmdutil.SilentError
+				}
+			}
+			return err
 		}
-		return err
 	}
 
 	_, err = io.Copy(io.Discard, resp.Body)

@@ -78,7 +78,7 @@ func runAdd(opts *AddOptions) error {
 
 	hostname, _ := cfg.DefaultHost()
 
-	err = gpgKeyUpload(httpClient, hostname, keyReader)
+	err = gpgKeyUpload(httpClient, hostname, keyReader, opts.IO)
 	if err != nil {
 		if errors.Is(err, scopesError) {
 			cs := opts.IO.ColorScheme()
@@ -91,7 +91,7 @@ func runAdd(opts *AddOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.ErrOut, "%s GPG key added to your account\n", cs.SuccessIcon())
+		fmt.Fprintf(opts.IO.Out, "%s GPG key added to your account\n", cs.SuccessIcon())
 	}
 	return nil
 }
