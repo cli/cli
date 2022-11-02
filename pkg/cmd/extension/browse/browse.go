@@ -24,8 +24,6 @@ import (
 
 const pagingOffset = 24
 
-// TODO description color is low-contrast in most settings
-
 type ExtBrowseOpts struct {
 	Cmd      *cobra.Command
 	Browser  ibrowser
@@ -79,10 +77,10 @@ type extensionListUI interface {
 	Focus()
 	Reset()
 	Refresh()
-	PageDown() int
-	PageUp() int
-	ScrollUp() int
-	ScrollDown() int
+	PageDown()
+	PageUp()
+	ScrollUp()
+	ScrollDown()
 }
 
 type extList struct {
@@ -128,32 +126,28 @@ func (el *extList) Reset() {
 	}
 }
 
-func (el *extList) PageDown() int {
+func (el *extList) PageDown() {
 	el.list.SetCurrentItem(el.list.GetCurrentItem() + pagingOffset)
-	return el.list.GetCurrentItem()
 }
 
-func (el *extList) PageUp() int {
+func (el *extList) PageUp() {
 	i := el.list.GetCurrentItem() - pagingOffset
 	if i < 0 {
 		i = 0
 	}
 	el.list.SetCurrentItem(i)
-	return el.list.GetCurrentItem()
 }
 
-func (el *extList) ScrollDown() int {
+func (el *extList) ScrollDown() {
 	el.list.SetCurrentItem(el.list.GetCurrentItem() + 1)
-	return el.list.GetCurrentItem()
 }
 
-func (el *extList) ScrollUp() int {
+func (el *extList) ScrollUp() {
 	i := el.list.GetCurrentItem() - 1
 	if i < 0 {
 		i = 0
 	}
 	el.list.SetCurrentItem(i)
-	return el.list.GetCurrentItem()
 }
 
 func (el *extList) FindSelected() (extEntry, int) {
