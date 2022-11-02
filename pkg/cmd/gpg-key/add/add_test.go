@@ -15,7 +15,8 @@ func Test_runAdd(t *testing.T) {
 		name       string
 		stdin      string
 		httpStubs  func(*httpmock.Registry)
-		wantsErr   bool
+		wantStdout string
+		wantStderr string
 		wantErrMsg string
 		wantsOpts  AddOptions
 	}{
@@ -28,7 +29,7 @@ func Test_runAdd(t *testing.T) {
 					"application/json",
 				),
 			)
-		}, false, "", AddOptions{}},
+		}, "✓ GPG key added to your account\n", "", "", AddOptions{}},
 		{"not_armored", "gCAAAAA7H7MHTZWFLJKD3vP4F7v", func(reg *httpmock.Registry) {
 			reg.Register(
 				httpmock.REST("POST", "user/gpg_keys"),
@@ -46,8 +47,11 @@ func Test_runAdd(t *testing.T) {
 					"application/json",
 				),
 			)
-		}, true, "it seems that the GPG key is not armored.\nplease try to find your GPG key ID using:\n\tgpg --list-keys\n" +
-			"and use command below to add it to your accont:\n\tgpg --armor --export <GPG key ID> | gh gpg-key add -", AddOptions{}},
+		}, "", "X it seems that the GPG key is not armored.\n" +
+			"please try to find your GPG key ID using:\n" +
+			"\tgpg --list-keys\n" +
+			"and use command below to add it to your accont:\n" +
+			"\tgpg --armor --export <GPG key ID> | gh gpg-key add -\n", "SilentError", AddOptions{}},
 		{"duplicate", "-----BEGIN PGP PUBLIC KEY BLOCK-----", func(reg *httpmock.Registry) {
 			reg.Register(
 				httpmock.REST("POST", "user/gpg_keys"),
@@ -71,11 +75,14 @@ func Test_runAdd(t *testing.T) {
 					"application/json",
 				),
 			)
-		}, false, "", AddOptions{}},
+		}, "", "X Key already exists in your account\n", "SilentError", AddOptions{}},
 	}
 
 	for _, tt := range tests {
-		ios, stdin, _, _ := iostreams.Test()
+		ios, stdin, stdout, stderr := iostreams.Test()
+		ios.SetStdinTTY(true)
+		ios.SetStdoutTTY(true)
+		ios.SetStderrTTY(true)
 		reg := &httpmock.Registry{}
 		defer reg.Verify(t)
 
@@ -94,13 +101,13 @@ func Test_runAdd(t *testing.T) {
 		stdin.WriteString(tt.stdin)
 		t.Run(tt.name, func(t *testing.T) {
 			err := runAdd(&tt.wantsOpts)
-			if tt.wantsErr {
-				if assert.Error(t, err) {
-					assert.Equal(t, tt.wantErrMsg, err.Error())
-				}
+			if tt.wantErrMsg != "" {
+				assert.Equal(t, tt.wantErrMsg, err.Error())
 			} else {
 				assert.NoError(t, err)
 			}
+			assert.Equal(t, tt.wantStdout, stdout.String())
+			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
 }
