@@ -92,6 +92,19 @@ func Test_NewCmdDownload(t *testing.T) {
 			},
 		},
 		{
+			name:  "download to output with valid option",
+			args:  "v1.2.3 -A zip -O ./sample.zip",
+			isTTY: true,
+			want: DownloadOptions{
+				OutputFile:   "./sample.zip",
+				TagName:      "v1.2.3",
+				FilePatterns: []string(nil),
+				Destination:  ".",
+				ArchiveType:  "zip",
+				Concurrency:  5,
+			},
+		},
+		{
 			name:    "no arguments",
 			args:    "",
 			isTTY:   true,
@@ -108,6 +121,12 @@ func Test_NewCmdDownload(t *testing.T) {
 			args:    "v1.2.3 -A abc",
 			isTTY:   true,
 			wantErr: "the value for `--archive` must be one of \"zip\" or \"tar.gz\"",
+		},
+		{
+			name:    "simultaneous output and destination flags",
+			args:    "v1.2.3 -O ./file.xyz -D ./destination",
+			isTTY:   true,
+			wantErr: "specify only one of `--dir` or `--output`",
 		},
 	}
 	for _, tt := range tests {
@@ -147,11 +166,17 @@ func Test_NewCmdDownload(t *testing.T) {
 			assert.Equal(t, tt.want.FilePatterns, opts.FilePatterns)
 			assert.Equal(t, tt.want.Destination, opts.Destination)
 			assert.Equal(t, tt.want.Concurrency, opts.Concurrency)
+			assert.Equal(t, tt.want.OutputFile, opts.OutputFile)
 		})
 	}
 }
 
 func Test_downloadRun(t *testing.T) {
+	oldwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("could not determine working directory: %v", err)
+	}
+
 	tests := []struct {
 		name       string
 		isTTY      bool
@@ -236,11 +261,60 @@ func Test_downloadRun(t *testing.T) {
 				"tmp/packages/tarball.tgz",
 			},
 		},
+		{
+			name:  "download archive in `tar.gz` format into output option",
+			isTTY: true,
+			opts: DownloadOptions{
+				OutputFile:  "./tmp/my-tarball.tgz",
+				TagName:     "v1.2.3",
+				Destination: "",
+				Concurrency: 2,
+				ArchiveType: "tar.gz",
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+			wantFiles: []string{
+				"tmp/my-tarball.tgz",
+			},
+		},
+		{
+			name:  "download single asset from matching patter into output option",
+			isTTY: true,
+			opts: DownloadOptions{
+				OutputFile:   "./tmp/my-tarball.tgz",
+				TagName:      "v1.2.3",
+				Destination:  "",
+				Concurrency:  2,
+				FilePatterns: []string{"*windows-32bit.zip"},
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+			wantFiles: []string{
+				"tmp/my-tarball.tgz",
+			},
+		},
+		{
+			name:  "download single asset from matching patter into output 'stdout´",
+			isTTY: true,
+			opts: DownloadOptions{
+				OutputFile:   "-",
+				TagName:      "v1.2.3",
+				Destination:  "",
+				Concurrency:  2,
+				FilePatterns: []string{"*windows-32bit.zip"},
+			},
+			wantStdout: `1234`,
+			wantStderr: ``,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tempDir := t.TempDir()
-			tt.opts.Destination = filepath.Join(tempDir, tt.opts.Destination)
+			if err := os.Chdir(tempDir); err == nil {
+				t.Cleanup(func() { _ = os.Chdir(oldwd) })
+			} else {
+				t.Fatal(err)
+			}
 
 			ios, _, stdout, stderr := iostreams.Test()
 			ios.SetStdoutTTY(tt.isTTY)
@@ -309,7 +383,7 @@ func Test_downloadRun(t *testing.T) {
 			assert.Equal(t, tt.wantStdout, stdout.String())
 			assert.Equal(t, tt.wantStderr, stderr.String())
 
-			downloadedFiles, err := listFiles(tempDir)
+			downloadedFiles, err := listFiles(".")
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantFiles, downloadedFiles)
 		})
