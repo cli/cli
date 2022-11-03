@@ -43,7 +43,9 @@ type ibrowser interface {
 }
 
 type uiRegistry struct {
-	// TODO
+	// references to some of the heavily cross-referenced tview primitives. Not
+	// everything is in here because most things are just used once in one place
+	// and don't need to be easy to look up like this.
 	App       *tview.Application
 	Modal     *tview.Modal
 	Outerflex *tview.Flex
