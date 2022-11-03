@@ -153,7 +153,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.Log, "log", false, "View full log for either a run or specific job")
 	cmd.Flags().BoolVar(&opts.LogFailed, "log-failed", false, "View the log for any failed steps in a run or specific job")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open run in the browser")
-	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.RunFields)
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.SingleRunFields)
 
 	return cmd
 }
@@ -212,37 +212,30 @@ func runView(opts *ViewOptions) error {
 		return fmt.Errorf("failed to get run: %w", err)
 	}
 
-	if opts.Exporter != nil {
-		if len(run.Jobs) == 0 && contains(opts.Exporter.Fields(), "jobs") {
-			err = shared.GetJobs(client, repo, run)
-			if err != nil {
-				return err
-			}
-		}
-
-		if err := opts.IO.StartPager(); err == nil {
-			defer opts.IO.StopPager()
-		} else {
-			fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
-		}
-
-		return opts.Exporter.Write(opts.IO, run)
-	}
-
-	if opts.Prompt {
+	if shouldFetchJobs(opts) {
 		opts.IO.StartProgressIndicator()
-		err = shared.GetJobs(client, repo, run)
+		jobs, err = shared.GetJobs(client, repo, run)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
 		}
-		jobs = run.Jobs
-		if len(jobs) > 1 {
-			selectedJob, err = promptForJob(cs, jobs)
-			if err != nil {
-				return err
-			}
+	}
+
+	if opts.Prompt && len(jobs) > 1 {
+		selectedJob, err = promptForJob(cs, jobs)
+		if err != nil {
+			return err
 		}
+	}
+
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+	}
+
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, run)
 	}
 
 	if opts.Web {
@@ -257,20 +250,13 @@ func runView(opts *ViewOptions) error {
 		return opts.Browser.Browse(url)
 	}
 
-	if err := opts.IO.StartPager(); err == nil {
-		defer opts.IO.StopPager()
-	} else {
-		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
-	}
-
 	if selectedJob == nil && len(jobs) == 0 {
 		opts.IO.StartProgressIndicator()
-		err = shared.GetJobs(client, repo, run)
+		jobs, err = shared.GetJobs(client, repo, run)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get jobs: %w", err)
 		}
-		jobs = run.Jobs
 	} else if selectedJob != nil {
 		jobs = []shared.Job{*selectedJob}
 	}
@@ -405,10 +391,15 @@ func runView(opts *ViewOptions) error {
 	return nil
 }
 
-func contains(s []string, e string) bool {
-	for _, x := range s {
-		if x == e {
-			return true
+func shouldFetchJobs(opts *ViewOptions) bool {
+	if opts.Prompt {
+		return true
+	}
+	if opts.Exporter != nil {
+		for _, f := range opts.Exporter.Fields() {
+			if f == "jobs" {
+				return true
+			}
 		}
 	}
 	return false

@@ -59,8 +59,9 @@ var RunFields = []string{
 	"workflowDatabaseId",
 	"workflowName",
 	"url",
-	"jobs",
 }
+
+var SingleRunFields = append(RunFields, "jobs")
 
 type Run struct {
 	Name           string    `json:"name"` // the semantics of this field are unclear
@@ -81,7 +82,7 @@ type Run struct {
 	HeadSha        string `json:"head_sha"`
 	URL            string `json:"html_url"`
 	HeadRepository Repo   `json:"head_repository"`
-	Jobs           []Job
+	Jobs           []Job  `json:"-"` // populated by GetJobs
 }
 
 func (r *Run) StartedTime() time.Time {
@@ -163,6 +164,10 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 						"number":     s.Number,
 					})
 				}
+				var completedAt *time.Time
+				if !j.CompletedAt.IsZero() {
+					completedAt = &j.CompletedAt
+				}
 				jobs = append(jobs, map[string]interface{}{
 					"databaseId":  j.ID,
 					"status":      j.Status,
@@ -170,7 +175,7 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 					"name":        j.Name,
 					"steps":       steps,
 					"startedAt":   j.StartedAt,
-					"completedAt": j.CompletedAt,
+					"completedAt": completedAt,
 					"url":         j.URL,
 				})
 				data[f] = jobs
@@ -310,6 +315,7 @@ func GetRuns(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, lim
 		perPage = 100
 	}
 	path += fmt.Sprintf("?per_page=%d", perPage)
+	path += "&exclude_pull_requests=true" // significantly reduces payload size
 
 	if opts != nil {
 		if opts.Branch != "" {
@@ -388,13 +394,16 @@ type JobsPayload struct {
 	Jobs []Job
 }
 
-func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run) error {
+func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run) ([]Job, error) {
+	if run.Jobs != nil {
+		return run.Jobs, nil
+	}
 	var result JobsPayload
 	if err := client.REST(repo.RepoHost(), "GET", run.JobsURL, nil, &result); err != nil {
-		return err
+		return nil, err
 	}
 	run.Jobs = result.Jobs
-	return nil
+	return result.Jobs, nil
 }
 
 func GetJob(client *api.Client, repo ghrepo.Interface, jobID string) (*Job, error) {
@@ -441,7 +450,7 @@ func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 func GetRun(client *api.Client, repo ghrepo.Interface, runID string) (*Run, error) {
 	var result Run
 
-	path := fmt.Sprintf("repos/%s/actions/runs/%s", ghrepo.FullName(repo), runID)
+	path := fmt.Sprintf("repos/%s/actions/runs/%s?exclude_pull_requests=true", ghrepo.FullName(repo), runID)
 
 	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
 	if err != nil {
