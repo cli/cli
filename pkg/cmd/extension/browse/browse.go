@@ -47,7 +47,6 @@ type uiRegistry struct {
 	// everything is in here because most things are just used once in one place
 	// and don't need to be easy to look up like this.
 	App       *tview.Application
-	Modal     *tview.Modal
 	Outerflex *tview.Flex
 	List      *tview.List
 }
@@ -93,10 +92,6 @@ func newExtList(opts ExtBrowseOpts, ui uiRegistry, extEntries []extEntry) *extLi
 	ui.List.SetWrapAround(false)
 	ui.List.SetBorderPadding(1, 1, 1, 1)
 
-	ui.Modal.SetBackgroundColor(tcell.ColorPurple)
-	// TODO don't add button til done installing/removing
-	ui.Modal.AddButtons([]string{"ok"})
-
 	el := &extList{
 		ui:         ui,
 		extEntries: extEntries,
@@ -104,13 +99,19 @@ func newExtList(opts ExtBrowseOpts, ui uiRegistry, extEntries []extEntry) *extLi
 		opts:       opts,
 	}
 
-	ui.Modal.SetDoneFunc(func(_ int, _ string) {
-		ui.App.SetRoot(ui.Outerflex, true)
+	el.Reset()
+	return el
+}
+
+func (el *extList) createModal() *tview.Modal {
+	m := tview.NewModal()
+	m.SetBackgroundColor(tcell.ColorPurple)
+	m.SetDoneFunc(func(_ int, _ string) {
+		el.ui.App.SetRoot(el.ui.Outerflex, true)
 		el.Refresh()
 	})
 
-	el.Reset()
-	return el
+	return m
 }
 
 func (el *extList) InstallSelected() {
@@ -125,15 +126,19 @@ func (el *extList) InstallSelected() {
 		return
 	}
 
-	el.ui.Modal.SetText(fmt.Sprintf("Installing %s...", ee.FullName))
-	el.ui.App.SetRoot(el.ui.Modal, true)
+	modal := el.createModal()
+
+	modal.SetText(fmt.Sprintf("Installing %s...", ee.FullName))
+	el.ui.App.SetRoot(modal, true)
 	// I could eliminate this with a goroutine but it seems to be working fine
 	el.app.ForceDraw()
 	err = el.opts.Em.Install(repo, "")
 	if err != nil {
-		el.ui.Modal.SetText(fmt.Sprintf("Failed to install %s: %s", ee.FullName, err.Error()))
+		modal.SetText(fmt.Sprintf("Failed to install %s: %s", ee.FullName, err.Error()))
 	} else {
-		el.ui.Modal.SetText(fmt.Sprintf("Installed %s!", ee.FullName))
+		modal.SetText(fmt.Sprintf("Installed %s!", ee.FullName))
+		modal.AddButtons([]string{"ok"})
+		el.ui.App.SetFocus(modal)
 	}
 
 	el.toggleInstalled(ix)
@@ -145,16 +150,21 @@ func (el *extList) RemoveSelected() {
 		el.opts.Logger.Println("failed to find selected extension")
 		return
 	}
-	el.ui.Modal.SetText(fmt.Sprintf("Removing %s...", ee.FullName))
-	el.ui.App.SetRoot(el.ui.Modal, true)
+
+	modal := el.createModal()
+
+	modal.SetText(fmt.Sprintf("Removing %s...", ee.FullName))
+	el.ui.App.SetRoot(modal, true)
 	// I could eliminate this with a goroutine but it seems to be working fine
 	el.ui.App.ForceDraw()
 
 	err := el.opts.Em.Remove(strings.TrimPrefix(ee.Name, "gh-"))
 	if err != nil {
-		el.ui.Modal.SetText(fmt.Sprintf("Failed to remove %s: %s", ee.FullName, err.Error()))
+		modal.SetText(fmt.Sprintf("Failed to remove %s: %s", ee.FullName, err.Error()))
 	} else {
-		el.ui.Modal.SetText(fmt.Sprintf("Removed %s.", ee.FullName))
+		modal.SetText(fmt.Sprintf("Removed %s.", ee.FullName))
+		modal.AddButtons([]string{"ok"})
+		el.ui.App.SetFocus(modal)
 	}
 	el.toggleInstalled(ix)
 }
@@ -319,8 +329,6 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 
 	list := tview.NewList()
 
-	modal := tview.NewModal()
-
 	readme := tview.NewTextView()
 	readme.SetBorderPadding(1, 1, 0, 1)
 	readme.SetBorder(true).SetBorderColor(tcell.ColorPurple)
@@ -334,7 +342,6 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		App:       app,
 		Outerflex: outerFlex,
 		List:      list,
-		Modal:     modal,
 	}
 
 	extList := newExtList(opts, ui, extEntries)
