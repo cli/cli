@@ -70,7 +70,12 @@ func (g *gitExecuter) CurrentBranch() (string, error) {
 }
 
 func (g *gitExecuter) Fetch(remote, ref string) error {
-	return g.client.Fetch(context.Background(), remote, ref)
+	args := []string{"fetch", "-q", remote, ref}
+	cmd, err := g.client.Command(context.Background(), args...)
+	if err != nil {
+		return err
+	}
+	return cmd.Run()
 }
 
 func (g *gitExecuter) HasLocalBranch(branch string) bool {
