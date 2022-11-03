@@ -423,7 +423,7 @@ func determineTrackingBranch(gitClient *git.Client, remotes ghContext.Remotes, h
 		refsForLookup = append(refsForLookup, tr.String())
 	}
 
-	resolvedRefs, _ := gitClient.ShowRefs(context.Background(), refsForLookup...)
+	resolvedRefs, _ := gitClient.ShowRefs(context.Background(), refsForLookup)
 	if len(resolvedRefs) > 1 {
 		for _, r := range resolvedRefs[1:] {
 			if r.Hash != resolvedRefs[0].Hash {

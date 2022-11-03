@@ -93,18 +93,11 @@ func (g *gitExecuter) IsAncestor(ancestor, progeny string) (bool, error) {
 }
 
 func (g *gitExecuter) IsDirty() (bool, error) {
-	cmd, err := g.client.Command(context.Background(), "status", "--untracked-files=no", "--porcelain")
+	changeCount, err := g.client.UncommittedChangeCount(context.Background())
 	if err != nil {
 		return false, err
 	}
-	output, err := cmd.Output()
-	if err != nil {
-		return true, err
-	}
-	if len(output) > 0 {
-		return true, nil
-	}
-	return false, nil
+	return changeCount != 0, nil
 }
 
 func (g *gitExecuter) MergeFastForward(ref string) error {

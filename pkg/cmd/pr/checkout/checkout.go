@@ -236,13 +236,13 @@ func missingMergeConfigForBranch(client *git.Client, b string) bool {
 }
 
 func localBranchExists(client *git.Client, b string) bool {
-	_, err := client.ShowRefs(context.Background(), "refs/heads/"+b)
+	_, err := client.ShowRefs(context.Background(), []string{"refs/heads/" + b})
 	return err == nil
 }
 
 func executeCmds(client *git.Client, cmdQueue [][]string) error {
 	for _, args := range cmdQueue {
-		//TODO: Use AuthenticatedCommand
+		// TODO: Use AuthenticatedCommand
 		cmd, err := client.Command(context.Background(), args...)
 		if err != nil {
 			return err

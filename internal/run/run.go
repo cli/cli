@@ -2,6 +2,7 @@ package run
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -33,16 +34,19 @@ func (c cmdWithStderr) Output() ([]byte, error) {
 	if isVerbose, _ := utils.IsDebugEnabled(); isVerbose {
 		_ = printArgs(os.Stderr, c.Cmd.Args)
 	}
-	if c.Cmd.Stderr != nil {
-		return c.Cmd.Output()
-	}
-	errStream := &bytes.Buffer{}
-	c.Cmd.Stderr = errStream
 	out, err := c.Cmd.Output()
-	if err != nil {
-		err = &CmdError{errStream, c.Cmd.Args, err}
+	if c.Cmd.Stderr != nil || err == nil {
+		return out, err
 	}
-	return out, err
+	cmdErr := &CmdError{
+		Args: c.Cmd.Args,
+		Err:  err,
+	}
+	var exitError *exec.ExitError
+	if errors.As(err, &exitError) {
+		cmdErr.Stderr = bytes.NewBuffer(exitError.Stderr)
+	}
+	return out, cmdErr
 }
 
 func (c cmdWithStderr) Run() error {
@@ -56,16 +60,20 @@ func (c cmdWithStderr) Run() error {
 	c.Cmd.Stderr = errStream
 	err := c.Cmd.Run()
 	if err != nil {
-		err = &CmdError{errStream, c.Cmd.Args, err}
+		err = &CmdError{
+			Args:   c.Cmd.Args,
+			Err:    err,
+			Stderr: errStream,
+		}
 	}
 	return err
 }
 
 // CmdError provides more visibility into why an exec.Cmd had failed
 type CmdError struct {
-	Stderr *bytes.Buffer
 	Args   []string
 	Err    error
+	Stderr *bytes.Buffer
 }
 
 func (e CmdError) Error() string {
