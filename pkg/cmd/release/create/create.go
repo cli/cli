@@ -38,6 +38,7 @@ type CreateOptions struct {
 	BodyProvided bool
 	Draft        bool
 	Prerelease   bool
+	IsLatest     *bool
 
 	Assets []*shared.AssetForUpload
 
@@ -164,6 +165,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion in the specified category")
 	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate title and notes for the release")
 	cmd.Flags().StringVar(&opts.NotesStartTag, "notes-start-tag", "", "Tag to use as the starting point for generating release notes")
+	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Mark this release as \"Latest\" (default: automatic based on date and version)")
 
 	return cmd
 }
@@ -408,6 +410,10 @@ func createRun(opts *CreateOptions) error {
 	}
 	if opts.Target != "" {
 		params["target_commitish"] = opts.Target
+	}
+	if opts.IsLatest != nil {
+		// valid values: true/false/legacy
+		params["make_latest"] = fmt.Sprintf("%v", *opts.IsLatest)
 	}
 	if opts.DiscussionCategory != "" {
 		params["discussion_category_name"] = opts.DiscussionCategory

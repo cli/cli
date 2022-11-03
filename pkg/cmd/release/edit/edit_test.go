@@ -103,6 +103,24 @@ func Test_NewCmdEdit(t *testing.T) {
 			},
 		},
 		{
+			name:  "latest",
+			args:  "v1.2.3 --latest",
+			isTTY: false,
+			want: EditOptions{
+				TagName:  "",
+				IsLatest: boolPtr(true),
+			},
+		},
+		{
+			name:  "not latest",
+			args:  "v1.2.3 --latest=false",
+			isTTY: false,
+			want: EditOptions{
+				TagName:  "",
+				IsLatest: boolPtr(false),
+			},
+		},
+		{
 			name:  "provide notes from file",
 			args:  fmt.Sprintf(`v1.2.3 -F '%s'`, tf.Name()),
 			isTTY: false,
@@ -169,6 +187,7 @@ func Test_NewCmdEdit(t *testing.T) {
 			assert.Equal(t, tt.want.DiscussionCategory, opts.DiscussionCategory)
 			assert.Equal(t, tt.want.Draft, opts.Draft)
 			assert.Equal(t, tt.want.Prerelease, opts.Prerelease)
+			assert.Equal(t, tt.want.IsLatest, opts.IsLatest)
 		})
 	}
 }
@@ -244,6 +263,23 @@ func Test_editRun(t *testing.T) {
 					assert.Equal(t, map[string]interface{}{
 						"tag_name":                 "v1.2.3",
 						"discussion_category_name": "some-category",
+					}, params)
+				})
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantStderr: "",
+		},
+		{
+			name:  "edit the latest marker",
+			isTTY: false,
+			opts: EditOptions{
+				IsLatest: boolPtr(true),
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockSuccessfulEditResponse(reg, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"tag_name":    "v1.2.3",
+						"make_latest": "true",
 					}, params)
 				})
 			},
