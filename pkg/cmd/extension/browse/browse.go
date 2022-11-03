@@ -42,6 +42,14 @@ type ibrowser interface {
 	Browse(string) error
 }
 
+type uiRegistry struct {
+	// TODO
+	App       *tview.Application
+	Modal     *tview.Modal
+	Outerflex *tview.Flex
+	List      *tview.List
+}
+
 type extEntry struct {
 	URL         string
 	Name        string
@@ -69,38 +77,94 @@ func (e extEntry) Title() string {
 func (e extEntry) Description() string { return e.description }
 
 type extList struct {
-	list       *tview.List
+	ui         uiRegistry
 	extEntries []extEntry
 	app        *tview.Application
-	logger     *log.Logger
 	filter     string
+	opts       ExtBrowseOpts
 }
 
-func newExtList(app *tview.Application, list *tview.List, extEntries []extEntry, logger *log.Logger) *extList {
-	list.SetTitleColor(tcell.ColorPurple)
-	list.SetSelectedTextColor(tcell.ColorWhite)
-	list.SetSelectedBackgroundColor(tcell.ColorPurple)
-	list.SetWrapAround(false)
-	list.SetBorderPadding(1, 1, 1, 1)
+func newExtList(opts ExtBrowseOpts, ui uiRegistry, extEntries []extEntry) *extList {
+	ui.List.SetTitleColor(tcell.ColorPurple)
+	ui.List.SetSelectedTextColor(tcell.ColorWhite)
+	ui.List.SetSelectedBackgroundColor(tcell.ColorPurple)
+	ui.List.SetWrapAround(false)
+	ui.List.SetBorderPadding(1, 1, 1, 1)
+
+	ui.Modal.SetBackgroundColor(tcell.ColorPurple)
+	// TODO don't add button til done installing/removing
+	ui.Modal.AddButtons([]string{"ok"})
 
 	el := &extList{
-		list:       list,
+		ui:         ui,
 		extEntries: extEntries,
-		app:        app,
-		logger:     logger,
+		app:        ui.App,
+		opts:       opts,
 	}
+
+	ui.Modal.SetDoneFunc(func(_ int, _ string) {
+		ui.App.SetRoot(ui.Outerflex, true)
+		el.Refresh()
+	})
+
 	el.Reset()
 	return el
 }
 
-func (el *extList) ToggleInstalled(ix int) {
+func (el *extList) InstallSelected() {
+	ee, ix := el.FindSelected()
+	if ix < 0 {
+		el.opts.Logger.Println("failed to find selected entry")
+		return
+	}
+	repo, err := ghrepo.FromFullName(ee.FullName)
+	if err != nil {
+		el.opts.Logger.Println(fmt.Errorf("failed to install '%s't: %w", ee.FullName, err))
+		return
+	}
+
+	el.ui.Modal.SetText(fmt.Sprintf("Installing %s...", ee.FullName))
+	el.ui.App.SetRoot(el.ui.Modal, true)
+	// I could eliminate this with a goroutine but it seems to be working fine
+	el.app.ForceDraw()
+	err = el.opts.Em.Install(repo, "")
+	if err != nil {
+		el.ui.Modal.SetText(fmt.Sprintf("Failed to install %s: %s", ee.FullName, err.Error()))
+	} else {
+		el.ui.Modal.SetText(fmt.Sprintf("Installed %s!", ee.FullName))
+	}
+
+	el.toggleInstalled(ix)
+}
+
+func (el *extList) RemoveSelected() {
+	ee, ix := el.FindSelected()
+	if ix < 0 {
+		el.opts.Logger.Println("failed to find selected extension")
+		return
+	}
+	el.ui.Modal.SetText(fmt.Sprintf("Removing %s...", ee.FullName))
+	el.ui.App.SetRoot(el.ui.Modal, true)
+	// I could eliminate this with a goroutine but it seems to be working fine
+	el.ui.App.ForceDraw()
+
+	err := el.opts.Em.Remove(strings.TrimPrefix(ee.Name, "gh-"))
+	if err != nil {
+		el.ui.Modal.SetText(fmt.Sprintf("Failed to remove %s: %s", ee.FullName, err.Error()))
+	} else {
+		el.ui.Modal.SetText(fmt.Sprintf("Removed %s.", ee.FullName))
+	}
+	el.toggleInstalled(ix)
+}
+
+func (el *extList) toggleInstalled(ix int) {
 	ee := el.extEntries[ix]
 	ee.Installed = !ee.Installed
 	el.extEntries[ix] = ee
 }
 
 func (el *extList) Focus() {
-	el.app.SetFocus(el.list)
+	el.app.SetFocus(el.ui.List)
 }
 
 func (el *extList) Refresh() {
@@ -109,41 +173,41 @@ func (el *extList) Refresh() {
 }
 
 func (el *extList) Reset() {
-	el.list.Clear()
+	el.ui.List.Clear()
 	for _, ee := range el.extEntries {
-		el.list.AddItem(ee.Title(), ee.Description(), rune(0), func() {})
+		el.ui.List.AddItem(ee.Title(), ee.Description(), rune(0), func() {})
 	}
 }
 
 func (el *extList) PageDown() {
-	el.list.SetCurrentItem(el.list.GetCurrentItem() + pagingOffset)
+	el.ui.List.SetCurrentItem(el.ui.List.GetCurrentItem() + pagingOffset)
 }
 
 func (el *extList) PageUp() {
-	i := el.list.GetCurrentItem() - pagingOffset
+	i := el.ui.List.GetCurrentItem() - pagingOffset
 	if i < 0 {
 		i = 0
 	}
-	el.list.SetCurrentItem(i)
+	el.ui.List.SetCurrentItem(i)
 }
 
 func (el *extList) ScrollDown() {
-	el.list.SetCurrentItem(el.list.GetCurrentItem() + 1)
+	el.ui.List.SetCurrentItem(el.ui.List.GetCurrentItem() + 1)
 }
 
 func (el *extList) ScrollUp() {
-	i := el.list.GetCurrentItem() - 1
+	i := el.ui.List.GetCurrentItem() - 1
 	if i < 0 {
 		i = 0
 	}
-	el.list.SetCurrentItem(i)
+	el.ui.List.SetCurrentItem(i)
 }
 
 func (el *extList) FindSelected() (extEntry, int) {
-	if el.list.GetItemCount() == 0 {
+	if el.ui.List.GetItemCount() == 0 {
 		return extEntry{}, -1
 	}
-	title, desc := el.list.GetItemText(el.list.GetCurrentItem())
+	title, desc := el.ui.List.GetItemText(el.ui.List.GetCurrentItem())
 	for x, e := range el.extEntries {
 		if e.Title() == title && e.Description() == desc {
 			return e, x
@@ -157,10 +221,10 @@ func (el *extList) Filter(text string) {
 	if text == "" {
 		return
 	}
-	el.list.Clear()
+	el.ui.List.Clear()
 	for _, ee := range el.extEntries {
 		if strings.Contains(ee.Title()+ee.Description(), text) {
-			el.list.AddItem(ee.Title(), ee.Description(), rune(0), func() {})
+			el.ui.List.AddItem(ee.Title(), ee.Description(), rune(0), func() {})
 		}
 	}
 }
@@ -253,6 +317,8 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 
 	list := tview.NewList()
 
+	modal := tview.NewModal()
+
 	readme := tview.NewTextView()
 	readme.SetBorderPadding(1, 1, 0, 1)
 	readme.SetBorder(true).SetBorderColor(tcell.ColorPurple)
@@ -262,7 +328,14 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		"/: filter i/r: install/remove w: open in browser pgup/pgdn: scroll readme q: quit")
 	help.SetTextAlign(tview.AlignCenter)
 
-	extList := newExtList(app, list, extEntries, opts.Logger)
+	ui := uiRegistry{
+		App:       app,
+		Outerflex: outerFlex,
+		List:      list,
+		Modal:     modal,
+	}
+
+	extList := newExtList(opts, ui, extEntries)
 
 	loadSelectedReadme := func() {
 		ee, ix := extList.FindSelected()
@@ -326,14 +399,6 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	outerFlex.AddItem(innerFlex, 0, 1, true)
 	outerFlex.AddItem(help, 1, -1, false)
 
-	// modal is used to output the result of install/remove operations
-	modal := tview.NewModal().AddButtons([]string{"ok"}).SetDoneFunc(func(_ int, _ string) {
-		app.SetRoot(outerFlex, true)
-		extList.Refresh()
-	})
-
-	modal.SetBackgroundColor(tcell.ColorPurple)
-
 	app.SetRoot(outerFlex, true)
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
@@ -363,46 +428,9 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 				opts.Logger.Println(fmt.Errorf("could not open browser for '%s': %w", ee.URL, err))
 			}
 		case 'i':
-			ee, ix := extList.FindSelected()
-			if ix < 0 {
-				opts.Logger.Println("failed to find selected entry")
-				return nil
-			}
-			repo, err := ghrepo.FromFullName(ee.FullName)
-			if err != nil {
-				opts.Logger.Println(fmt.Errorf("failed to install '%s't: %w", ee.FullName, err))
-				return nil
-			}
-
-			modal.SetText(fmt.Sprintf("Installing %s...", ee.FullName))
-			app.SetRoot(modal, true)
-			// I could eliminate this with a goroutine but it seems to be working fine
-			app.ForceDraw()
-			err = opts.Em.Install(repo, "")
-			if err != nil {
-				modal.SetText(fmt.Sprintf("Failed to install %s: %s", ee.FullName, err.Error()))
-			} else {
-				modal.SetText(fmt.Sprintf("Installed %s!", ee.FullName))
-			}
-			extList.ToggleInstalled(ix)
+			extList.InstallSelected()
 		case 'r':
-			ee, ix := extList.FindSelected()
-			if ix < 0 {
-				opts.Logger.Println("failed to find selected extension")
-				return nil
-			}
-			modal.SetText(fmt.Sprintf("Removing %s...", ee.FullName))
-			app.SetRoot(modal, true)
-			// I could eliminate this with a goroutine but it seems to be working fine
-			app.ForceDraw()
-
-			err = opts.Em.Remove(strings.TrimPrefix(ee.Name, "gh-"))
-			if err != nil {
-				modal.SetText(fmt.Sprintf("Failed to remove %s: %s", ee.FullName, err.Error()))
-			} else {
-				modal.SetText(fmt.Sprintf("Removed %s.", ee.FullName))
-			}
-			extList.ToggleInstalled(ix)
+			extList.RemoveSelected()
 		case ' ':
 			// The shift check works on windows and not linux/mac:
 			if event.Modifiers()&tcell.ModShift != 0 {

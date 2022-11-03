@@ -228,8 +228,17 @@ func Test_extEntry(t *testing.T) {
 }
 
 func Test_extList(t *testing.T) {
-	logger := log.New(io.Discard, "", 0)
+	opts := ExtBrowseOpts{
+		Logger: log.New(io.Discard, "", 0),
+	}
+	app := tview.NewApplication()
 	list := tview.NewList()
+	modal := tview.NewModal()
+	ui := uiRegistry{
+		List:  list,
+		Modal: modal,
+		App:   app,
+	}
 	extEntries := []extEntry{
 		{
 			Name:        "gh-cool",
@@ -260,27 +269,26 @@ func Test_extList(t *testing.T) {
 			description: "something something enterprise",
 		},
 	}
-	app := tview.NewApplication()
 
-	extList := newExtList(app, list, extEntries, logger)
+	extList := newExtList(opts, ui, extEntries)
 
 	extList.Filter("cool")
-	assert.Equal(t, 1, extList.list.GetItemCount())
+	assert.Equal(t, 1, extList.ui.List.GetItemCount())
 
-	title, _ := extList.list.GetItemText(0)
+	title, _ := extList.ui.List.GetItemText(0)
 	assert.Equal(t, "cli/gh-cool [yellow](official)", title)
 
-	extList.ToggleInstalled(0)
+	extList.toggleInstalled(0)
 	assert.True(t, extList.extEntries[0].Installed)
 
 	extList.Refresh()
-	assert.Equal(t, 1, extList.list.GetItemCount())
+	assert.Equal(t, 1, extList.ui.List.GetItemCount())
 
-	title, _ = extList.list.GetItemText(0)
+	title, _ = extList.ui.List.GetItemText(0)
 	assert.Equal(t, "cli/gh-cool [yellow](official) [green](installed)", title)
 
 	extList.Reset()
-	assert.Equal(t, 4, extList.list.GetItemCount())
+	assert.Equal(t, 4, extList.ui.List.GetItemCount())
 
 	ee, ix := extList.FindSelected()
 	assert.Equal(t, 0, ix)
@@ -305,4 +313,7 @@ func Test_extList(t *testing.T) {
 	ee, ix = extList.FindSelected()
 	assert.Equal(t, 0, ix)
 	assert.Equal(t, "cli/gh-cool [yellow](official) [green](installed)", ee.Title())
+
+	// TODO install
+	// TODO remove
 }
