@@ -33,7 +33,7 @@ type ExtBrowseOpts struct {
 	Client   *http.Client
 	Logger   *log.Logger
 	Cfg      config.Config
-	Rg       readmeGetter
+	Rg       *readmeGetter
 	Debug    bool
 	RunApp   func(*tview.Application) error
 }

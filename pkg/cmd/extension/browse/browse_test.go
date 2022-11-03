@@ -1,13 +1,16 @@
 package browse
 
 import (
+	"encoding/base64"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmd/repo/view"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/search"
@@ -16,8 +19,27 @@ import (
 )
 
 // TODO factor out install/remove for testing
-// TODO streamline/inline readmegetter (donno if worth testing after that)
 // TODO see if somehow loadSelectedReadme can be refactored to be testable (problem is the QueueUpdateDraw)
+
+func Test_readmeGetter(t *testing.T) {
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+
+	content := base64.StdEncoding.EncodeToString([]byte("lol"))
+
+	reg.Register(
+		httpmock.REST("GET", "repos/vilmibm/gh-screensaver/readme"),
+		httpmock.JSONResponse(view.RepoReadme{Content: content}))
+
+	client := &http.Client{Transport: &reg}
+
+	rg := newReadmeGetter(client, time.Second)
+
+	readme, err := rg.Get("vilmibm/gh-screensaver")
+	assert.NoError(t, err)
+
+	assert.Equal(t, "lol", readme)
+}
 
 func Test_getExtensionRepos(t *testing.T) {
 	reg := httpmock.Registry{}

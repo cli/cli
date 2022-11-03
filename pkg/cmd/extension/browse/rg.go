@@ -9,22 +9,18 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/repo/view"
 )
 
-type readmeGetter interface {
-	Get(string) (string, error)
-}
-
-type cachingReadmeGetter struct {
+type readmeGetter struct {
 	client *http.Client
 }
 
-func newReadmeGetter(client *http.Client, cacheTTL time.Duration) readmeGetter {
+func newReadmeGetter(client *http.Client, cacheTTL time.Duration) *readmeGetter {
 	cachingClient := api.NewCachedHTTPClient(client, cacheTTL)
-	return &cachingReadmeGetter{
+	return &readmeGetter{
 		client: cachingClient,
 	}
 }
 
-func (g *cachingReadmeGetter) Get(repoFullName string) (string, error) {
+func (g *readmeGetter) Get(repoFullName string) (string, error) {
 	repo, err := ghrepo.FromFullName(repoFullName)
 	if err != nil {
 		return "", err
