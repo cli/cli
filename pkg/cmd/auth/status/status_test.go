@@ -91,10 +91,13 @@ func Test_statusRun(t *testing.T) {
 				c.Set("github.com", "oauth_token", "abc123")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
+				// mocks for HasMinimumScopes and GetScopes api requests to a non-github.com host
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
+				// mock for CurrentLoginName
 				reg.Register(
-					httpmock.REST("GET", "user"),
-					httpmock.StringResponse(`{"login": "tess"}`))
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
 			},
 			wantErrOut: regexp.MustCompile(`Logged in to joel.miller as.*tess`),
 		},
@@ -106,8 +109,12 @@ func Test_statusRun(t *testing.T) {
 				c.Set("github.com", "oauth_token", "abc123")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
+				// mocks for HasMinimumScopes and GetScopes api requests to a non-github.com host
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo"))
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
+				// mocks for HasMinimumScopes api requests to github.com host
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				// mock for CurrentLoginName
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
@@ -123,8 +130,11 @@ func Test_statusRun(t *testing.T) {
 				c.Set("github.com", "oauth_token", "abc123")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
+				// mock for HasMinimumScopes api requests to a non-github.com host
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.StatusStringResponse(400, "no bueno"))
+				// mock for GetScopes api requests to github.com
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				// mock for CurrentLoginName
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
@@ -140,17 +150,30 @@ func Test_statusRun(t *testing.T) {
 				c.Set("joel.miller", "oauth_token", "abc123")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
-				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				// mocks for HasMinimumScopes and GetScopes api requests to a non-github.com host
+				// the second one unsets the scopes header
 				reg.Register(
-					httpmock.REST("GET", "user"),
-					httpmock.WithHeader(httpmock.StringResponse(`{"login": "tess"}`), "x-oauth-scopes", "read:org, read:packages"))
+					httpmock.REST("GET", "api/v3/"),
+					httpmock.WithHeader(httpmock.ScopesResponder("repo,read:org"), "X-Oauth-Scopes", "repo, read:org"))
 				reg.Register(
-					httpmock.REST("GET", "user"),
-					httpmock.StringResponse(`{"login": "tess"}`))
-
+					httpmock.REST("GET", "api/v3/"),
+					httpmock.WithHeader(httpmock.ScopesResponder("repo,read:org"), "X-Oauth-Scopes", ""))
+				// mocks for HasMinimumScopes and GetScopes api requests to github.com
+				reg.Register(
+					httpmock.REST("GET", ""),
+					httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(
+					httpmock.REST("GET", ""),
+					httpmock.ScopesResponder("repo,read:org"))
+				// mock for CurrentLoginName, one for each host
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
 			},
-			wantErrOut: regexp.MustCompile(`(?s)Logged in to github.com as.*tess.*Token Scopes: read:org, read:packages.*Logged in to joel.miller as.*tess.*X Token Scopes: None found`),
+			wantErrOut: regexp.MustCompile(`(?s)Logged in to github.com as.*tess.*Token Scopes: repo,read:org.*Logged in to joel.miller as.*tess.*X Token Scopes: None found`),
 		},
 		{
 			name: "hide token",
@@ -160,11 +183,20 @@ func Test_statusRun(t *testing.T) {
 				c.Set("github.com", "oauth_token", "xyz456")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
+				// mocks for HasMinimumScopes and GetScopes api requests to a non-github.com host
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
+				// mocks for HasMinimumScopes and GetScopes api requests to github.com
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				// mock for CurrentLoginName, one for each host
 				reg.Register(
-					httpmock.REST("GET", "user"),
-					httpmock.StringResponse(`{"login": "tess"}`))
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
+
 			},
 			wantErrOut: regexp.MustCompile(`(?s)Token: \*{19}.*Token: \*{19}`),
 		},
@@ -178,11 +210,19 @@ func Test_statusRun(t *testing.T) {
 				c.Set("joel.miller", "oauth_token", "abc123")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
+				// mocks for HasMinimumScopes and GetScopes on a non-github.com host
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
+				// mocks for HasMinimumScopes and GetScopes on github.com
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+				// mock for CurrentLoginName, one for each host
 				reg.Register(
-					httpmock.REST("GET", "user"),
-					httpmock.StringResponse(`{"login": "tess"}`))
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
 			},
 			wantErrOut: regexp.MustCompile(`(?s)Token: xyz456.*Token: abc123`),
 		},
