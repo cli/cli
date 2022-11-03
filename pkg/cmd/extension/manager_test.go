@@ -565,7 +565,7 @@ func TestManager_UpgradeExtension_BinaryExtension_Pinned_Force(t *testing.T) {
 		}))
 
 	ios, _, stdout, stderr := iostreams.Test()
-	m := newTestManager(tempDir, &http.Client{Transport: &reg}, ios)
+	m := newTestManager(tempDir, &http.Client{Transport: &reg}, nil, ios)
 	reg.Register(
 		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
 		httpmock.JSONResponse(
