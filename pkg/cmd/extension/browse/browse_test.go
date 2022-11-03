@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/repo/view"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -230,6 +231,16 @@ func Test_extEntry(t *testing.T) {
 func Test_extList(t *testing.T) {
 	opts := ExtBrowseOpts{
 		Logger: log.New(io.Discard, "", 0),
+		Em: &extensions.ExtensionManagerMock{
+			InstallFunc: func(repo ghrepo.Interface, _ string) error {
+				assert.Equal(t, "cli/gh-cool", ghrepo.FullName(repo))
+				return nil
+			},
+			RemoveFunc: func(name string) error {
+				assert.Equal(t, "cool", name)
+				return nil
+			},
+		},
 	}
 	app := tview.NewApplication()
 	list := tview.NewList()
@@ -278,7 +289,7 @@ func Test_extList(t *testing.T) {
 	title, _ := extList.ui.List.GetItemText(0)
 	assert.Equal(t, "cli/gh-cool [yellow](official)", title)
 
-	extList.toggleInstalled(0)
+	extList.InstallSelected()
 	assert.True(t, extList.extEntries[0].Installed)
 
 	extList.Refresh()
@@ -287,12 +298,21 @@ func Test_extList(t *testing.T) {
 	title, _ = extList.ui.List.GetItemText(0)
 	assert.Equal(t, "cli/gh-cool [yellow](official) [green](installed)", title)
 
+	extList.RemoveSelected()
+	assert.False(t, extList.extEntries[0].Installed)
+
+	extList.Refresh()
+	assert.Equal(t, 1, extList.ui.List.GetItemCount())
+
+	title, _ = extList.ui.List.GetItemText(0)
+	assert.Equal(t, "cli/gh-cool [yellow](official)", title)
+
 	extList.Reset()
 	assert.Equal(t, 4, extList.ui.List.GetItemCount())
 
 	ee, ix := extList.FindSelected()
 	assert.Equal(t, 0, ix)
-	assert.Equal(t, "cli/gh-cool [yellow](official) [green](installed)", ee.Title())
+	assert.Equal(t, "cli/gh-cool [yellow](official)", ee.Title())
 
 	extList.ScrollDown()
 	ee, ix = extList.FindSelected()
@@ -302,7 +322,7 @@ func Test_extList(t *testing.T) {
 	extList.ScrollUp()
 	ee, ix = extList.FindSelected()
 	assert.Equal(t, 0, ix)
-	assert.Equal(t, "cli/gh-cool [yellow](official) [green](installed)", ee.Title())
+	assert.Equal(t, "cli/gh-cool [yellow](official)", ee.Title())
 
 	extList.PageDown()
 	ee, ix = extList.FindSelected()
@@ -312,8 +332,5 @@ func Test_extList(t *testing.T) {
 	extList.PageUp()
 	ee, ix = extList.FindSelected()
 	assert.Equal(t, 0, ix)
-	assert.Equal(t, "cli/gh-cool [yellow](official) [green](installed)", ee.Title())
-
-	// TODO install
-	// TODO remove
+	assert.Equal(t, "cli/gh-cool [yellow](official)", ee.Title())
 }
