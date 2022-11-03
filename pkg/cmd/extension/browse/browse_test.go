@@ -19,27 +19,46 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TODO factor out install/remove for testing
-// TODO see if somehow loadSelectedReadme can be refactored to be testable (problem is the QueueUpdateDraw)
-
-func Test_readmeGetter(t *testing.T) {
+func Test_getSelectedReadme(t *testing.T) {
 	reg := httpmock.Registry{}
 	defer reg.Verify(t)
 
 	content := base64.StdEncoding.EncodeToString([]byte("lol"))
 
 	reg.Register(
-		httpmock.REST("GET", "repos/vilmibm/gh-screensaver/readme"),
+		httpmock.REST("GET", "repos/cli/gh-cool/readme"),
 		httpmock.JSONResponse(view.RepoReadme{Content: content}))
 
 	client := &http.Client{Transport: &reg}
 
 	rg := newReadmeGetter(client, time.Second)
+	opts := ExtBrowseOpts{
+		Rg: rg,
+	}
+	ui := uiRegistry{
+		List: tview.NewList(),
+	}
+	extEntries := []extEntry{
+		{
+			Name:        "gh-cool",
+			FullName:    "cli/gh-cool",
+			Installed:   false,
+			Official:    true,
+			description: "it's just cool ok",
+		},
+		{
+			Name:        "gh-screensaver",
+			FullName:    "vilmibm/gh-screensaver",
+			Installed:   true,
+			Official:    false,
+			description: "animations in your terminal",
+		},
+	}
+	el := newExtList(opts, ui, extEntries)
 
-	readme, err := rg.Get("vilmibm/gh-screensaver")
+	content, err := getSelectedReadme(opts, el)
 	assert.NoError(t, err)
-
-	assert.Equal(t, "lol", readme)
+	assert.Contains(t, content, "lol")
 }
 
 func Test_getExtensionRepos(t *testing.T) {
@@ -244,11 +263,9 @@ func Test_extList(t *testing.T) {
 	}
 	app := tview.NewApplication()
 	list := tview.NewList()
-	modal := tview.NewModal()
 	ui := uiRegistry{
-		List:  list,
-		Modal: modal,
-		App:   app,
+		List: list,
+		App:  app,
 	}
 	extEntries := []extEntry{
 		{

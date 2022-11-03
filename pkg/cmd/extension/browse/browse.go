@@ -49,6 +49,7 @@ type uiRegistry struct {
 	App       *tview.Application
 	Outerflex *tview.Flex
 	List      *tview.List
+	Readme    *tview.TextView
 }
 
 type extEntry struct {
@@ -241,6 +242,26 @@ func (el *extList) Filter(text string) {
 	}
 }
 
+func getSelectedReadme(opts ExtBrowseOpts, el *extList) (string, error) {
+	ee, ix := el.FindSelected()
+	if ix < 0 {
+		return "", errors.New("failed to find selected entry")
+	}
+	fullName := ee.FullName
+	rm, err := opts.Rg.Get(fullName)
+	if err != nil {
+		return "", err
+	}
+
+	// using glamour directly because if I don't horrible things happen
+	rendered, err := glamour.Render(rm, "dark")
+	if err != nil {
+		return "", err
+	}
+
+	return rendered, nil
+}
+
 func getExtensions(opts ExtBrowseOpts) ([]extEntry, error) {
 	extEntries := []extEntry{}
 
@@ -347,24 +368,10 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	extList := newExtList(opts, ui, extEntries)
 
 	loadSelectedReadme := func() {
-		ee, ix := extList.FindSelected()
-		if ix < 0 {
-			opts.Logger.Println(fmt.Errorf("tried to find entry, but: %w", err))
-			return
-		}
-		fullName := ee.FullName
-		rm, err := opts.Rg.Get(fullName)
+		rendered, err := getSelectedReadme(opts, extList)
 		if err != nil {
 			opts.Logger.Println(err.Error())
 			readme.SetText("unable to fetch readme :(")
-			return
-		}
-
-		// using glamour directly because if I don't horrible things happen
-		rendered, err := glamour.Render(rm, "dark")
-		if err != nil {
-			opts.Logger.Println(err.Error())
-			readme.SetText("unable to render readme :(")
 			return
 		}
 
