@@ -44,11 +44,8 @@ type ibrowser interface {
 
 type extEntry struct {
 	URL         string
-	Owner       string
 	Name        string
 	FullName    string
-	Readme      string
-	Stars       int
 	Installed   bool
 	Official    bool
 	description string
@@ -168,6 +165,53 @@ func (el *extList) Filter(text string) {
 	}
 }
 
+func getExtensions(opts ExtBrowseOpts) ([]extEntry, error) {
+	extEntries := []extEntry{}
+
+	installed := opts.Em.List()
+
+	result, err := opts.Searcher.Repositories(search.Query{
+		Kind:  search.KindRepositories,
+		Limit: 1000,
+		Qualifiers: search.Qualifiers{
+			Topic: []string{"gh-extension"},
+		},
+	})
+	if err != nil {
+		return extEntries, fmt.Errorf("failed to search for extensions: %w", err)
+	}
+
+	host, _ := opts.Cfg.DefaultHost()
+
+	for _, repo := range result.Items {
+		ee := extEntry{
+			URL:         "https://" + host + "/" + repo.FullName,
+			FullName:    repo.FullName,
+			Name:        repo.Name,
+			description: repo.Description,
+		}
+		for _, v := range installed {
+			// TODO consider a Repo() on Extension interface
+			var installedRepo string
+			if u, err := git.ParseURL(v.URL()); err == nil {
+				if r, err := ghrepo.FromURL(u); err == nil {
+					installedRepo = ghrepo.FullName(r)
+				}
+			}
+			if repo.FullName == installedRepo {
+				ee.Installed = true
+			}
+		}
+		if repo.Owner.Login == "cli" || repo.Owner.Login == "github" {
+			ee.Official = true
+		}
+
+		extEntries = append(extEntries, ee)
+	}
+
+	return extEntries, nil
+}
+
 func ExtBrowse(opts ExtBrowseOpts) error {
 	if !opts.IO.CanPrompt() {
 		return errors.New("command requires interactive terminal")
@@ -185,50 +229,11 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		opts.Logger = log.New(io.Discard, "", 0)
 	}
 
-	installed := opts.Em.List()
-
 	opts.IO.StartProgressIndicator()
-	result, err := opts.Searcher.Repositories(search.Query{
-		Kind:  search.KindRepositories,
-		Limit: 1000,
-		Qualifiers: search.Qualifiers{
-			Topic: []string{"gh-extension"},
-		},
-	})
+
+	extEntries, err := getExtensions(opts)
 	if err != nil {
-		return fmt.Errorf("failed to search for extensions: %w", err)
-	}
-
-	host, _ := opts.Cfg.DefaultHost()
-
-	extEntries := []extEntry{}
-
-	for _, repo := range result.Items {
-		ee := extEntry{
-			URL:         "https://" + host + "/" + repo.FullName,
-			FullName:    repo.FullName,
-			Owner:       repo.Owner.Login,
-			Name:        repo.Name,
-			Stars:       repo.StargazersCount,
-			description: repo.Description,
-		}
-		for _, v := range installed {
-			// TODO consider a Repo() on Extension interface
-			var installedRepo string
-			if u, err := git.ParseURL(v.URL()); err == nil {
-				if r, err := ghrepo.FromURL(u); err == nil {
-					installedRepo = ghrepo.FullName(r)
-				}
-			}
-			if repo.FullName == installedRepo {
-				ee.Installed = true
-			}
-		}
-		if ee.Owner == "cli" || ee.Owner == "github" {
-			ee.Official = true
-		}
-
-		extEntries = append(extEntries, ee)
+		return err
 	}
 
 	cacheTTL, _ := time.ParseDuration("24h")
