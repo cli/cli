@@ -575,7 +575,7 @@ func (m *Manager) upgradeExtension(ext Extension, force bool) error {
 	if ext.isLocal {
 		return localExtensionUpgradeError
 	}
-	if ext.IsPinned() {
+	if !force && ext.IsPinned() {
 		return pinnedExtensionUpgradeError
 	}
 	if !ext.UpdateAvailable() {

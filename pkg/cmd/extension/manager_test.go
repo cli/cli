@@ -506,6 +506,71 @@ func TestManager_UpgradeExtension_BinaryExtension(t *testing.T) {
 	assert.Equal(t, "", stderr.String())
 }
 
+func TestManager_UpgradeExtension_BinaryExtension_Pinned_Force(t *testing.T) {
+	tempDir := t.TempDir()
+
+	reg := httpmock.Registry{}
+	defer reg.Verify(t)
+
+	assert.NoError(t, stubBinaryExtension(
+		filepath.Join(tempDir, "extensions", "gh-bin-ext"),
+		binManifest{
+			Owner:    "owner",
+			Name:     "gh-bin-ext",
+			Host:     "example.com",
+			Tag:      "v1.0.1",
+			IsPinned: true,
+		}))
+
+	ios, _, stdout, stderr := iostreams.Test()
+	m := newTestManager(tempDir, &http.Client{Transport: &reg}, ios)
+	reg.Register(
+		httpmock.REST("GET", "api/v3/repos/owner/gh-bin-ext/releases/latest"),
+		httpmock.JSONResponse(
+			release{
+				Tag: "v1.0.2",
+				Assets: []releaseAsset{
+					{
+						Name:   "gh-bin-ext-windows-amd64.exe",
+						APIURL: "https://example.com/release/cool2",
+					},
+				},
+			}))
+	reg.Register(
+		httpmock.REST("GET", "release/cool2"),
+		httpmock.StringResponse("FAKE UPGRADED BINARY"))
+
+	exts, err := m.list(false)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(exts))
+	ext := exts[0]
+	ext.latestVersion = "v1.0.2"
+	err = m.upgradeExtension(ext, true)
+	assert.NoError(t, err)
+
+	manifest, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext", manifestName))
+	assert.NoError(t, err)
+
+	var bm binManifest
+	err = yaml.Unmarshal(manifest, &bm)
+	assert.NoError(t, err)
+
+	assert.Equal(t, binManifest{
+		Name:  "gh-bin-ext",
+		Owner: "owner",
+		Host:  "example.com",
+		Tag:   "v1.0.2",
+		Path:  filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext.exe"),
+	}, bm)
+
+	fakeBin, err := os.ReadFile(filepath.Join(tempDir, "extensions/gh-bin-ext/gh-bin-ext.exe"))
+	assert.NoError(t, err)
+	assert.Equal(t, "FAKE UPGRADED BINARY", string(fakeBin))
+
+	assert.Equal(t, "", stdout.String())
+	assert.Equal(t, "", stderr.String())
+}
+
 func TestManager_UpgradeExtension_BinaryExtension_DryRun(t *testing.T) {
 	tempDir := t.TempDir()
 	reg := httpmock.Registry{}
