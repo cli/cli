@@ -2,7 +2,7 @@
 
 Instructions for generating and adding gRPC protocol buffers.
 
-## Generate Protocol Buffers:
+## Generate Protocol Buffers
 
 1. [Download `protoc`](https://grpc.io/docs/protoc-installation/)
 2. [Download protocol compiler plugins for Go](https://grpc.io/docs/languages/go/quickstart/)
