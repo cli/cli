@@ -9,8 +9,11 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/extensions"
+	"github.com/cli/cli/v2/pkg/search"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
@@ -19,6 +22,9 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	m := f.ExtensionManager
 	io := f.IOStreams
 	prompter := f.Prompter
+	config := f.Config
+	browser := f.Browser
+	httpClient := f.HttpClient
 
 	extCmd := cobra.Command{
 		Use:   "extension",
@@ -39,6 +45,148 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	}
 
 	extCmd.AddCommand(
+		func() *cobra.Command {
+			query := search.Query{
+				Kind: search.KindRepositories,
+			}
+			qualifiers := search.Qualifiers{
+				Topic: []string{"gh-extension"},
+			}
+			var order string
+			var sort string
+			var webMode bool
+			var exporter cmdutil.Exporter
+
+			cmd := &cobra.Command{
+				Use:   "search [<query>]",
+				Short: "Search available gh extensions",
+				Long: heredoc.Doc(`
+				Search for gh extensions.
+
+				This command behaves similarly to 'gh search repos' but does not
+				support as many search qualifiers. For a finer grained search of
+				extensions, try using:
+
+				gh search repos --topic "gh-extension"
+
+				and adding qualifiers as needed. See 'gh help search repos' to learn
+				more about repository search.
+`),
+				RunE: func(cmd *cobra.Command, args []string) error {
+					cfg, err := config()
+					if err != nil {
+						return err
+					}
+					client, err := httpClient()
+					if err != nil {
+						return err
+					}
+
+					if cmd.Flags().Changed("order") {
+						query.Order = order
+					}
+					if cmd.Flags().Changed("sort") {
+						query.Sort = sort
+					}
+
+					query.Keywords = args
+					query.Qualifiers = qualifiers
+
+					host, _ := cfg.DefaultHost()
+					searcher := search.NewSearcher(client, host)
+					tp := tableprinter.New(io)
+
+					if webMode {
+						url := searcher.URL(query)
+						if io.IsStdoutTTY() {
+							fmt.Fprintf(io.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(url))
+						}
+						return browser.Browse(url)
+					}
+
+					result, err := searcher.Repositories(query)
+					if err != nil {
+						return err
+					}
+
+					if io.CanPrompt() {
+						fmt.Fprintf(io.Out, "Showing %d of %d gh extensions\n", query.Limit, result.Total)
+						fmt.Fprintln(io.Out)
+						tp.HeaderRow("NAME", "REPO", "INSTALLED", "OFFICIAL", "DESCRIPTION")
+					}
+
+					cs := io.ColorScheme()
+					installedExts := m.List()
+
+					isInstalled := func(repoFullName string) bool {
+						for _, e := range installedExts {
+							// TODO consider a Repo() on Extension interface
+							var installedRepo string
+							if u, err := git.ParseURL(e.URL()); err == nil {
+								if r, err := ghrepo.FromURL(u); err == nil {
+									installedRepo = ghrepo.FullName(r)
+								}
+							}
+							if repoFullName == installedRepo {
+								return true
+							}
+						}
+						return false
+					}
+
+					for _, repo := range result.Items {
+						if !strings.HasPrefix(repo.Name, "gh-") {
+							continue
+						}
+
+						official := ""
+						if repo.Owner.Login == "cli" || repo.Owner.Login == "github" {
+							if io.IsStdoutTTY() {
+								official = "✓"
+							} else {
+								official = "official"
+							}
+						}
+
+						installed := ""
+						if isInstalled(repo.FullName) {
+							if io.IsStdoutTTY() {
+								installed = "✓"
+							} else {
+								installed = "installed"
+							}
+						}
+
+						cmdName := strings.TrimPrefix(repo.Name, "gh-")
+
+						tp.AddField(cmdName, tableprinter.WithColor(cs.Bold))
+						tp.AddField(repo.FullName)
+						tp.AddField(installed, tableprinter.WithColor(cs.Green))
+						tp.AddField(official, tableprinter.WithColor(cs.Yellow))
+						tp.AddField(repo.Description)
+						tp.EndRow()
+					}
+
+					return tp.Render()
+				},
+			}
+
+			// Output flags
+			cmd.Flags().BoolVarP(&webMode, "web", "w", false, "Open the search query in the web browser")
+			cmdutil.AddJSONFlags(cmd, &exporter, search.RepositoryFields)
+
+			// Query parameter flags
+			cmd.Flags().IntVarP(&query.Limit, "limit", "L", 30, "Maximum number of extensions to fetch")
+			cmdutil.StringEnumFlag(cmd, &order, "order", "", "desc", []string{"asc", "desc"}, "Order of repositories returned, ignored unless '--sort' flag is specified")
+			cmdutil.StringEnumFlag(cmd, &sort, "sort", "", "best-match", []string{"forks", "help-wanted-issues", "stars", "updated"}, "Sort fetched repositories")
+
+			// Qualifier flags
+			cmd.Flags().StringVar(&qualifiers.Language, "language", "", "Filter based on the coding language")
+			cmd.Flags().StringSliceVar(&qualifiers.License, "license", nil, "Filter based on license type")
+			cmd.Flags().StringVar(&qualifiers.User, "owner", "", "Filter on owner")
+
+			return cmd
+		}(),
 		&cobra.Command{
 			Use:     "list",
 			Short:   "List installed extension commands",

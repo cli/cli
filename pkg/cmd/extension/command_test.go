@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
@@ -17,6 +19,7 @@ import (
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/search"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
@@ -32,12 +35,193 @@ func TestNewCmdExtension(t *testing.T) {
 		args          []string
 		managerStubs  func(em *extensions.ExtensionManagerMock) func(*testing.T)
 		prompterStubs func(pm *prompter.PrompterMock)
+		httpStubs     func(reg *httpmock.Registry)
+		browseStubs   func(*browser.Stub) func(*testing.T)
 		isTTY         bool
 		wantErr       bool
 		errMsg        string
 		wantStdout    string
 		wantStderr    string
 	}{
+		{
+			name: "search for extensions",
+			args: []string{"search"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.ListFunc = func() []extensions.Extension {
+					return []extensions.Extension{
+						&extensions.ExtensionMock{
+							URLFunc: func() string {
+								return "https://github.com/vilmibm/gh-screensaver"
+							},
+						},
+						&extensions.ExtensionMock{
+							URLFunc: func() string {
+								return "https://github.com/github/gh-gei"
+							},
+						},
+					}
+				}
+				return func(t *testing.T) {
+					listCalls := em.ListCalls()
+					assert.Equal(t, 1, len(listCalls))
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				values := url.Values{
+					"page":     []string{"1"},
+					"per_page": []string{"30"},
+					"q":        []string{"topic:gh-extension"},
+				}
+				reg.Register(
+					httpmock.QueryMatcher("GET", "search/repositories", values),
+					httpmock.JSONResponse(searchResults()),
+				)
+			},
+			isTTY:      true,
+			wantStdout: "screensaver  vilmibm/gh-screensaver  ✓     terminal animations\ncool         cli/gh-cool                ✓  it's just cool ok\ntriage       samcoe/gh-triage              helps with triage\ngei          github/gh-gei           ✓  ✓  something something enterprise\n",
+		},
+		{
+			name: "search for extensions non-tty",
+			args: []string{"search"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.ListFunc = func() []extensions.Extension {
+					return []extensions.Extension{
+						&extensions.ExtensionMock{
+							URLFunc: func() string {
+								return "https://github.com/vilmibm/gh-screensaver"
+							},
+						},
+						&extensions.ExtensionMock{
+							URLFunc: func() string {
+								return "https://github.com/github/gh-gei"
+							},
+						},
+					}
+				}
+				return func(t *testing.T) {
+					listCalls := em.ListCalls()
+					assert.Equal(t, 1, len(listCalls))
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				values := url.Values{
+					"page":     []string{"1"},
+					"per_page": []string{"30"},
+					"q":        []string{"topic:gh-extension"},
+				}
+				reg.Register(
+					httpmock.QueryMatcher("GET", "search/repositories", values),
+					httpmock.JSONResponse(searchResults()),
+				)
+			},
+			wantStdout: "screensaver\tvilmibm/gh-screensaver\tinstalled\t\tterminal animations\ncool\tcli/gh-cool\t\tofficial\tit's just cool ok\ntriage\tsamcoe/gh-triage\t\t\thelps with triage\ngei\tgithub/gh-gei\tinstalled\tofficial\tsomething something enterprise\n",
+		},
+		{
+			name: "search for extensions with keywords",
+			args: []string{"search", "screen"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.ListFunc = func() []extensions.Extension {
+					return []extensions.Extension{
+						&extensions.ExtensionMock{
+							URLFunc: func() string {
+								return "https://github.com/vilmibm/gh-screensaver"
+							},
+						},
+						&extensions.ExtensionMock{
+							URLFunc: func() string {
+								return "https://github.com/github/gh-gei"
+							},
+						},
+					}
+				}
+				return func(t *testing.T) {
+					listCalls := em.ListCalls()
+					assert.Equal(t, 1, len(listCalls))
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				values := url.Values{
+					"page":     []string{"1"},
+					"per_page": []string{"30"},
+					"q":        []string{"screen topic:gh-extension"},
+				}
+				results := searchResults()
+				results.Total = 1
+				results.Items = []search.Repository{results.Items[0]}
+				reg.Register(
+					httpmock.QueryMatcher("GET", "search/repositories", values),
+					httpmock.JSONResponse(results),
+				)
+			},
+			wantStdout: "screensaver\tvilmibm/gh-screensaver\tinstalled\t\tterminal animations\n",
+		},
+		{
+			name: "search for extensions with parameter flags",
+			args: []string{"search", "--limit", "1", "--order", "asc", "--sort", "stars"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.ListFunc = func() []extensions.Extension {
+					return []extensions.Extension{}
+				}
+				return func(t *testing.T) {
+					listCalls := em.ListCalls()
+					assert.Equal(t, 1, len(listCalls))
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				values := url.Values{
+					"page":     []string{"1"},
+					"order":    []string{"asc"},
+					"sort":     []string{"stars"},
+					"per_page": []string{"1"},
+					"q":        []string{"topic:gh-extension"},
+				}
+				results := searchResults()
+				results.Total = 1
+				results.Items = []search.Repository{results.Items[0]}
+				reg.Register(
+					httpmock.QueryMatcher("GET", "search/repositories", values),
+					httpmock.JSONResponse(results),
+				)
+			},
+			wantStdout: "screensaver\tvilmibm/gh-screensaver\t\t\tterminal animations\n",
+		},
+		{
+			name: "search for extensions with qualifier flags",
+			args: []string{"search", "--language", "Go", "--license", "GPLv3", "--owner", "jillvalentine"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.ListFunc = func() []extensions.Extension {
+					return []extensions.Extension{}
+				}
+				return func(t *testing.T) {
+					listCalls := em.ListCalls()
+					assert.Equal(t, 1, len(listCalls))
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				values := url.Values{
+					"page":     []string{"1"},
+					"per_page": []string{"30"},
+					"q":        []string{"language:Go license:GPLv3 topic:gh-extension user:jillvalentine"},
+				}
+				results := searchResults()
+				results.Total = 1
+				results.Items = []search.Repository{results.Items[0]}
+				reg.Register(
+					httpmock.QueryMatcher("GET", "search/repositories", values),
+					httpmock.JSONResponse(results),
+				)
+			},
+			wantStdout: "screensaver\tvilmibm/gh-screensaver\t\t\tterminal animations\n",
+		},
+		{
+			name: "search for extensions with web mode",
+			args: []string{"search", "--web"},
+			browseStubs: func(b *browser.Stub) func(*testing.T) {
+				return func(t *testing.T) {
+					b.Verify(t, "https://github.com/search?q=topic%3Agh-extension&type=repositories")
+				}
+			},
+		},
 		{
 			name: "install an extension",
 			args: []string{"install", "owner/gh-some-ext"},
@@ -595,6 +779,16 @@ func TestNewCmdExtension(t *testing.T) {
 			defer reg.Verify(t)
 			client := http.Client{Transport: &reg}
 
+			if tt.httpStubs != nil {
+				tt.httpStubs(&reg)
+			}
+
+			var assertBrowserFunc func(*testing.T)
+			browseStub := &browser.Stub{}
+			if tt.browseStubs != nil {
+				assertBrowserFunc = tt.browseStubs(browseStub)
+			}
+
 			f := cmdutil.Factory{
 				Config: func() (config.Config, error) {
 					return config.NewBlankConfig(), nil
@@ -602,6 +796,7 @@ func TestNewCmdExtension(t *testing.T) {
 				IOStreams:        ios,
 				ExtensionManager: em,
 				Prompter:         pm,
+				Browser:          browseStub,
 				HttpClient: func() (*http.Client, error) {
 					return &client, nil
 				},
@@ -621,6 +816,10 @@ func TestNewCmdExtension(t *testing.T) {
 
 			if assertFunc != nil {
 				assertFunc(t)
+			}
+
+			if assertBrowserFunc != nil {
+				assertBrowserFunc(t)
 			}
 
 			assert.Equal(t, tt.wantStdout, stdout.String())
@@ -706,5 +905,46 @@ func Test_checkValidExtension(t *testing.T) {
 				assert.EqualError(t, err, tt.wantError)
 			}
 		})
+	}
+}
+
+func searchResults() search.RepositoriesResult {
+	return search.RepositoriesResult{
+		IncompleteResults: false,
+		Items: []search.Repository{
+			{
+				FullName:    "vilmibm/gh-screensaver",
+				Name:        "gh-screensaver",
+				Description: "terminal animations",
+				Owner: search.User{
+					Login: "vilmibm",
+				},
+			},
+			{
+				FullName:    "cli/gh-cool",
+				Name:        "gh-cool",
+				Description: "it's just cool ok",
+				Owner: search.User{
+					Login: "cli",
+				},
+			},
+			{
+				FullName:    "samcoe/gh-triage",
+				Name:        "gh-triage",
+				Description: "helps with triage",
+				Owner: search.User{
+					Login: "samcoe",
+				},
+			},
+			{
+				FullName:    "github/gh-gei",
+				Name:        "gh-gei",
+				Description: "something something enterprise",
+				Owner: search.User{
+					Login: "github",
+				},
+			},
+		},
+		Total: 4,
 	}
 }
