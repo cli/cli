@@ -21,7 +21,6 @@ function generate {
   echo "Generated protocol buffers for $contract"
 }
 
-generate codespace/CodespaceHostService.v1.proto
 generate jupyter/JupyterServerHostService.v1.proto
 
 echo 'Done!'
