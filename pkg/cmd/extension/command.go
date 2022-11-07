@@ -61,17 +61,17 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				Use:   "search [<query>]",
 				Short: "Search available gh extensions",
 				Long: heredoc.Doc(`
-				Search for gh extensions.
+					Search for gh extensions.
 
-				This command behaves similarly to 'gh search repos' but does not
-				support as many search qualifiers. For a finer grained search of
-				extensions, try using:
+					This command behaves similarly to 'gh search repos' but does not
+					support as many search qualifiers. For a finer grained search of
+					extensions, try using:
 
-				gh search repos --topic "gh-extension"
+						gh search repos --topic "gh-extension"
 
-				and adding qualifiers as needed. See 'gh help search repos' to learn
-				more about repository search.
-`),
+					and adding qualifiers as needed. See 'gh help search repos' to learn
+					more about repository search.
+				`),
 				RunE: func(cmd *cobra.Command, args []string) error {
 					cfg, err := config()
 					if err != nil {
@@ -94,7 +94,6 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					host, _ := cfg.DefaultHost()
 					searcher := search.NewSearcher(client, host)
-					tp := tableprinter.New(io)
 
 					if webMode {
 						url := searcher.URL(query)
@@ -104,52 +103,56 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						return browser.Browse(url)
 					}
 
+					io.StartProgressIndicator()
 					result, err := searcher.Repositories(query)
+					io.StopProgressIndicator()
 					if err != nil {
 						return err
 					}
 
-					if io.CanPrompt() {
-						fmt.Fprintf(io.Out, "Showing %d of %d gh extensions\n", query.Limit, result.Total)
+					if exporter != nil {
+						return exporter.Write(io, result.Items)
+					}
+
+					if io.IsStdoutTTY() {
+						if len(result.Items) == 0 {
+							return errors.New("no extensions found")
+						}
+						fmt.Fprintf(io.Out, "Showing %d of %d extensions\n", len(result.Items), result.Total)
 						fmt.Fprintln(io.Out)
-						tp.HeaderRow("NAME", "REPO", "INSTALLED", "OFFICIAL", "DESCRIPTION")
 					}
 
 					cs := io.ColorScheme()
 					installedExts := m.List()
 
-					isInstalled := func(repoFullName string) bool {
+					isInstalled := func(repo search.Repository) bool {
+						searchRepo, err := ghrepo.FromFullName(repo.FullName)
+						if err != nil {
+							return false
+						}
 						for _, e := range installedExts {
 							// TODO consider a Repo() on Extension interface
-							var installedRepo string
 							if u, err := git.ParseURL(e.URL()); err == nil {
 								if r, err := ghrepo.FromURL(u); err == nil {
-									installedRepo = ghrepo.FullName(r)
+									if ghrepo.IsSame(searchRepo, r) {
+										return true
+									}
 								}
-							}
-							if repoFullName == installedRepo {
-								return true
 							}
 						}
 						return false
 					}
+
+					tp := tableprinter.New(io)
+					tp.HeaderRow("", "REPO", "DESCRIPTION")
 
 					for _, repo := range result.Items {
 						if !strings.HasPrefix(repo.Name, "gh-") {
 							continue
 						}
 
-						official := ""
-						if repo.Owner.Login == "cli" || repo.Owner.Login == "github" {
-							if io.IsStdoutTTY() {
-								official = "✓"
-							} else {
-								official = "official"
-							}
-						}
-
 						installed := ""
-						if isInstalled(repo.FullName) {
+						if isInstalled(repo) {
 							if io.IsStdoutTTY() {
 								installed = "✓"
 							} else {
@@ -157,12 +160,8 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 							}
 						}
 
-						cmdName := strings.TrimPrefix(repo.Name, "gh-")
-
-						tp.AddField(cmdName, tableprinter.WithColor(cs.Bold))
-						tp.AddField(repo.FullName)
 						tp.AddField(installed, tableprinter.WithColor(cs.Green))
-						tp.AddField(official, tableprinter.WithColor(cs.Yellow))
+						tp.AddField(repo.FullName, tableprinter.WithColor(cs.Bold))
 						tp.AddField(repo.Description)
 						tp.EndRow()
 					}
@@ -181,7 +180,6 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 			cmdutil.StringEnumFlag(cmd, &sort, "sort", "", "best-match", []string{"forks", "help-wanted-issues", "stars", "updated"}, "Sort fetched repositories")
 
 			// Qualifier flags
-			cmd.Flags().StringVar(&qualifiers.Language, "language", "", "Filter based on the coding language")
 			cmd.Flags().StringSliceVar(&qualifiers.License, "license", nil, "Filter based on license type")
 			cmd.Flags().StringVar(&qualifiers.User, "owner", "", "Filter on owner")
 

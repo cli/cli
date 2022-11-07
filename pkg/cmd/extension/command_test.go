@@ -78,7 +78,7 @@ func TestNewCmdExtension(t *testing.T) {
 				)
 			},
 			isTTY:      true,
-			wantStdout: "screensaver  vilmibm/gh-screensaver  ✓     terminal animations\ncool         cli/gh-cool                ✓  it's just cool ok\ntriage       samcoe/gh-triage              helps with triage\ngei          github/gh-gei           ✓  ✓  something something enterprise\n",
+			wantStdout: "Showing 4 of 4 extensions\n\n   REPO                    DESCRIPTION\n✓  vilmibm/gh-screensaver  terminal animations\n   cli/gh-cool             it's just cool ok\n   samcoe/gh-triage        helps with triage\n✓  github/gh-gei           something something enterprise\n",
 		},
 		{
 			name: "search for extensions non-tty",
@@ -114,7 +114,7 @@ func TestNewCmdExtension(t *testing.T) {
 					httpmock.JSONResponse(searchResults()),
 				)
 			},
-			wantStdout: "screensaver\tvilmibm/gh-screensaver\tinstalled\t\tterminal animations\ncool\tcli/gh-cool\t\tofficial\tit's just cool ok\ntriage\tsamcoe/gh-triage\t\t\thelps with triage\ngei\tgithub/gh-gei\tinstalled\tofficial\tsomething something enterprise\n",
+			wantStdout: "installed\tvilmibm/gh-screensaver\tterminal animations\n\tcli/gh-cool\tit's just cool ok\n\tsamcoe/gh-triage\thelps with triage\ninstalled\tgithub/gh-gei\tsomething something enterprise\n",
 		},
 		{
 			name: "search for extensions with keywords",
@@ -153,7 +153,7 @@ func TestNewCmdExtension(t *testing.T) {
 					httpmock.JSONResponse(results),
 				)
 			},
-			wantStdout: "screensaver\tvilmibm/gh-screensaver\tinstalled\t\tterminal animations\n",
+			wantStdout: "installed\tvilmibm/gh-screensaver\tterminal animations\n",
 		},
 		{
 			name: "search for extensions with parameter flags",
@@ -183,11 +183,11 @@ func TestNewCmdExtension(t *testing.T) {
 					httpmock.JSONResponse(results),
 				)
 			},
-			wantStdout: "screensaver\tvilmibm/gh-screensaver\t\t\tterminal animations\n",
+			wantStdout: "\tvilmibm/gh-screensaver\tterminal animations\n",
 		},
 		{
 			name: "search for extensions with qualifier flags",
-			args: []string{"search", "--language", "Go", "--license", "GPLv3", "--owner", "jillvalentine"},
+			args: []string{"search", "--license", "GPLv3", "--owner", "jillvalentine"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
 				em.ListFunc = func() []extensions.Extension {
 					return []extensions.Extension{}
@@ -201,7 +201,7 @@ func TestNewCmdExtension(t *testing.T) {
 				values := url.Values{
 					"page":     []string{"1"},
 					"per_page": []string{"30"},
-					"q":        []string{"language:Go license:GPLv3 topic:gh-extension user:jillvalentine"},
+					"q":        []string{"license:GPLv3 topic:gh-extension user:jillvalentine"},
 				}
 				results := searchResults()
 				results.Total = 1
@@ -211,7 +211,7 @@ func TestNewCmdExtension(t *testing.T) {
 					httpmock.JSONResponse(results),
 				)
 			},
-			wantStdout: "screensaver\tvilmibm/gh-screensaver\t\t\tterminal animations\n",
+			wantStdout: "\tvilmibm/gh-screensaver\tterminal animations\n",
 		},
 		{
 			name: "search for extensions with web mode",
