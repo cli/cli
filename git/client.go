@@ -70,14 +70,11 @@ func (c *Client) AuthenticatedCommand(ctx context.Context, args ...string) (*Com
 	return c.Command(ctx, args...)
 }
 
-func (c *Client) Remotes(ctx context.Context, mods ...CommandModifier) (RemoteSet, error) {
+func (c *Client) Remotes(ctx context.Context) (RemoteSet, error) {
 	remoteArgs := []string{"remote", "-v"}
 	remoteCmd, err := c.Command(ctx, remoteArgs...)
 	if err != nil {
 		return nil, err
-	}
-	for _, mod := range mods {
-		mod(remoteCmd)
 	}
 	remoteOut, remoteErr := remoteCmd.Output()
 	if remoteErr != nil {
@@ -88,9 +85,6 @@ func (c *Client) Remotes(ctx context.Context, mods ...CommandModifier) (RemoteSe
 	configCmd, err := c.Command(ctx, configArgs...)
 	if err != nil {
 		return nil, err
-	}
-	for _, mod := range mods {
-		mod(configCmd)
 	}
 	configOut, configErr := configCmd.Output()
 	if configErr != nil {
@@ -177,14 +171,11 @@ func (c *Client) ShowRefs(ctx context.Context, refs []string) ([]Ref, error) {
 	return verified, err
 }
 
-func (c *Client) Config(ctx context.Context, name string, mods ...CommandModifier) (string, error) {
+func (c *Client) Config(ctx context.Context, name string) (string, error) {
 	args := []string{"config", name}
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return "", err
-	}
-	for _, mod := range mods {
-		mod(cmd)
 	}
 	out, err := cmd.Output()
 	if err != nil {
@@ -336,14 +327,11 @@ func (c *Client) HasLocalBranch(ctx context.Context, branch string) bool {
 	return err == nil
 }
 
-func (c *Client) CheckoutBranch(ctx context.Context, branch string, mods ...CommandModifier) error {
+func (c *Client) CheckoutBranch(ctx context.Context, branch string) error {
 	args := []string{"checkout", branch}
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return err
-	}
-	for _, mod := range mods {
-		mod(cmd)
 	}
 	_, err = cmd.Output()
 	if err != nil {

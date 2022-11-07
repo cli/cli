@@ -236,7 +236,8 @@ func (m *Manager) parseGitExtensionDir(fi fs.DirEntry) (Extension, error) {
 // getCurrentVersion determines the current version for non-local git extensions.
 func (m *Manager) getCurrentVersion(extension string) string {
 	dir := filepath.Join(m.installDir(), extension)
-	localSha, err := m.gitClient.CommandOutput([]string{"rev-parse", "HEAD"}, git.WithRepoDir(dir))
+	scopedClient := m.gitClient.ForRepo(dir)
+	localSha, err := scopedClient.CommandOutput([]string{"rev-parse", "HEAD"})
 	if err != nil {
 		return ""
 	}
@@ -246,7 +247,8 @@ func (m *Manager) getCurrentVersion(extension string) string {
 // getRemoteUrl determines the remote URL for non-local git extensions.
 func (m *Manager) getRemoteUrl(extension string) string {
 	dir := filepath.Join(m.installDir(), extension)
-	url, err := m.gitClient.Config("remote.origin.url", git.WithRepoDir(dir))
+	scopedClient := m.gitClient.ForRepo(dir)
+	url, err := scopedClient.Config("remote.origin.url")
 	if err != nil {
 		return ""
 	}
@@ -293,7 +295,8 @@ func (m *Manager) getLatestVersion(ext Extension) (string, error) {
 		return r.Tag, nil
 	} else {
 		extDir := filepath.Dir(ext.path)
-		lsRemote, err := m.gitClient.CommandOutput([]string{"ls-remote", "origin", "HEAD"}, git.WithRepoDir(extDir))
+		scopedClient := m.gitClient.ForRepo(extDir)
+		lsRemote, err := scopedClient.CommandOutput([]string{"ls-remote", "origin", "HEAD"})
 		if err != nil {
 			return "", err
 		}
@@ -474,7 +477,8 @@ func (m *Manager) installGit(repo ghrepo.Interface, target string, stdout, stder
 		return nil
 	}
 
-	err = m.gitClient.CheckoutBranch(commitSHA, git.WithRepoDir(targetDir))
+	scopedClient := m.gitClient.ForRepo(targetDir)
+	err = scopedClient.CheckoutBranch(commitSHA)
 	if err != nil {
 		return err
 	}
@@ -584,17 +588,18 @@ func (m *Manager) upgradeGitExtension(ext Extension, force bool) error {
 		return nil
 	}
 	dir := filepath.Dir(ext.path)
+	scopedClient := m.gitClient.ForRepo(dir)
 	if force {
-		err := m.gitClient.Fetch("origin", "HEAD", git.WithRepoDir(dir))
+		err := scopedClient.Fetch("origin", "HEAD")
 		if err != nil {
 			return err
 		}
 
-		_, err = m.gitClient.CommandOutput([]string{"reset", "--hard", "origin/HEAD"}, git.WithRepoDir(dir))
+		_, err = scopedClient.CommandOutput([]string{"reset", "--hard", "origin/HEAD"})
 		return err
 	}
 
-	return m.gitClient.Pull("", "", git.WithRepoDir(dir))
+	return scopedClient.Pull("", "")
 }
 
 func (m *Manager) upgradeBinExtension(ext Extension) error {
@@ -651,7 +656,8 @@ func (m *Manager) Create(name string, tmplType extensions.ExtTemplateType) error
 		return err
 	}
 
-	_, err := m.gitClient.CommandOutput([]string{"add", name, "--chmod=+x"}, git.WithRepoDir(name))
+	scopedClient := m.gitClient.ForRepo(name)
+	_, err := scopedClient.CommandOutput([]string{"add", name, "--chmod=+x"})
 	return err
 }
 
@@ -664,11 +670,12 @@ func (m *Manager) otherBinScaffolding(name string) error {
 		return err
 	}
 
-	if _, err := m.gitClient.CommandOutput([]string{"add", buildScriptPath, "--chmod=+x"}, git.WithRepoDir(name)); err != nil {
+	scopedClient := m.gitClient.ForRepo(name)
+	if _, err := scopedClient.CommandOutput([]string{"add", buildScriptPath, "--chmod=+x"}); err != nil {
 		return err
 	}
 
-	_, err := m.gitClient.CommandOutput([]string{"add", "."}, git.WithRepoDir(name))
+	_, err := scopedClient.CommandOutput([]string{"add", "."})
 	return err
 }
 
@@ -713,7 +720,8 @@ func (m *Manager) goBinScaffolding(name string) error {
 		}
 	}
 
-	_, err = m.gitClient.CommandOutput([]string{"add", "."}, git.WithRepoDir(name))
+	scopedClient := m.gitClient.ForRepo(name)
+	_, err = scopedClient.CommandOutput([]string{"add", "."})
 	return err
 }
 
@@ -767,7 +775,8 @@ func isBinExtension(client *http.Client, repo ghrepo.Interface) (isBin bool, err
 }
 
 func repoFromPath(gitClient gitClient, path string) (ghrepo.Interface, error) {
-	remotes, err := gitClient.Remotes(git.WithRepoDir(path))
+	scopedClient := gitClient.ForRepo(path)
+	remotes, err := scopedClient.Remotes()
 	if err != nil {
 		return nil, err
 	}

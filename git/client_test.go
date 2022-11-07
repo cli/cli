@@ -369,7 +369,6 @@ func TestClientShowRefs(t *testing.T) {
 func TestClientConfig(t *testing.T) {
 	tests := []struct {
 		name          string
-		mods          []CommandModifier
 		cmdExitStatus int
 		cmdStdout     string
 		cmdStderr     string
@@ -381,13 +380,6 @@ func TestClientConfig(t *testing.T) {
 			name:        "get config key",
 			cmdStdout:   "test",
 			wantCmdArgs: `path/to/git config credential.helper`,
-			wantOut:     "test",
-		},
-		{
-			name:        "accepts command modifiers",
-			mods:        []CommandModifier{WithRepoDir("/path/to/repo")},
-			cmdStdout:   "test",
-			wantCmdArgs: `path/to/git -C /path/to/repo config credential.helper`,
 			wantOut:     "test",
 		},
 		{
@@ -412,7 +404,7 @@ func TestClientConfig(t *testing.T) {
 				GitPath:        "path/to/git",
 				commandContext: cmdCtx,
 			}
-			out, err := client.Config(context.Background(), "credential.helper", tt.mods...)
+			out, err := client.Config(context.Background(), "credential.helper")
 			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
 			if tt.wantErrorMsg == "" {
 				assert.NoError(t, err)
@@ -643,7 +635,6 @@ func TestClientHasLocalBranch(t *testing.T) {
 func TestClientCheckoutBranch(t *testing.T) {
 	tests := []struct {
 		name          string
-		mods          []CommandModifier
 		cmdExitStatus int
 		cmdStdout     string
 		cmdStderr     string
@@ -653,11 +644,6 @@ func TestClientCheckoutBranch(t *testing.T) {
 		{
 			name:        "checkout branch",
 			wantCmdArgs: `path/to/git checkout trunk`,
-		},
-		{
-			name:        "accepts command modifiers",
-			mods:        []CommandModifier{WithRepoDir("/path/to/repo")},
-			wantCmdArgs: `path/to/git -C /path/to/repo checkout trunk`,
 		},
 		{
 			name:          "git error",
@@ -674,7 +660,7 @@ func TestClientCheckoutBranch(t *testing.T) {
 				GitPath:        "path/to/git",
 				commandContext: cmdCtx,
 			}
-			err := client.CheckoutBranch(context.Background(), "trunk", tt.mods...)
+			err := client.CheckoutBranch(context.Background(), "trunk")
 			assert.Equal(t, tt.wantCmdArgs, strings.Join(cmd.Args[3:], " "))
 			if tt.wantErrorMsg == "" {
 				assert.NoError(t, err)

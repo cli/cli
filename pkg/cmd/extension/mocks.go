@@ -1,8 +1,6 @@
 package extension
 
 import (
-	"os/exec"
-
 	"github.com/cli/cli/v2/git"
 	"github.com/stretchr/testify/mock"
 )
@@ -11,47 +9,45 @@ type mockGitClient struct {
 	mock.Mock
 }
 
-func (g *mockGitClient) CheckoutBranch(branch string, mods ...git.CommandModifier) error {
-	args := g.Called(branch, extractRepoDir(mods))
+func (g *mockGitClient) CheckoutBranch(branch string) error {
+	args := g.Called(branch)
 	return args.Error(0)
 }
 
-func (g *mockGitClient) Clone(cloneURL string, cloneArgs []string, mods ...git.CommandModifier) (string, error) {
-	args := g.Called(cloneURL, cloneArgs, extractRepoDir(mods))
+func (g *mockGitClient) Clone(cloneURL string, cloneArgs []string) (string, error) {
+	args := g.Called(cloneURL, cloneArgs)
 	return args.String(0), args.Error(1)
 }
 
-func (g *mockGitClient) CommandOutput(commandArgs []string, mods ...git.CommandModifier) ([]byte, error) {
-	args := g.Called(commandArgs, extractRepoDir(mods))
+func (g *mockGitClient) CommandOutput(commandArgs []string) ([]byte, error) {
+	args := g.Called(commandArgs)
 	return []byte(args.String(0)), args.Error(1)
 }
 
-func (g *mockGitClient) Config(name string, mods ...git.CommandModifier) (string, error) {
-	args := g.Called(name, extractRepoDir(mods))
+func (g *mockGitClient) Config(name string) (string, error) {
+	args := g.Called(name)
 	return args.String(0), args.Error(1)
 }
 
-func (g *mockGitClient) Fetch(remote string, refspec string, mods ...git.CommandModifier) error {
-	args := g.Called(remote, refspec, extractRepoDir(mods))
+func (g *mockGitClient) Fetch(remote string, refspec string) error {
+	args := g.Called(remote, refspec)
 	return args.Error(0)
 }
 
-func (g *mockGitClient) Pull(remote, branch string, mods ...git.CommandModifier) error {
-	args := g.Called(remote, branch, extractRepoDir(mods))
-	return args.Error(0)
-}
-
-func (g *mockGitClient) Remotes(mods ...git.CommandModifier) (git.RemoteSet, error) {
-	args := g.Called(extractRepoDir(mods))
-	return nil, args.Error(1)
-}
-
-func extractRepoDir(mods []git.CommandModifier) string {
-	if len(mods) == 0 || len(mods) > 1 {
-		return ""
+func (g *mockGitClient) ForRepo(repoDir string) gitClient {
+	args := g.Called(repoDir)
+	if v, ok := args.Get(0).(*mockGitClient); ok {
+		return v
 	}
-	mod := mods[0]
-	gitCmd := &git.Command{Cmd: &exec.Cmd{Args: []string{"-C", ""}}}
-	mod(gitCmd)
-	return gitCmd.Args[1]
+	return nil
+}
+
+func (g *mockGitClient) Pull(remote, branch string) error {
+	args := g.Called(remote, branch)
+	return args.Error(0)
+}
+
+func (g *mockGitClient) Remotes() (git.RemoteSet, error) {
+	args := g.Called()
+	return nil, args.Error(1)
 }
