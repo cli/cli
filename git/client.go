@@ -414,7 +414,10 @@ func (c *Client) Fetch(ctx context.Context, remote string, refspec string, mods 
 }
 
 func (c *Client) Pull(ctx context.Context, remote, branch string, mods ...CommandModifier) error {
-	args := []string{"pull", "--ff-only", remote, branch}
+	args := []string{"pull", "--ff-only"}
+	if remote != "" && branch != "" {
+		args = append(args, remote, branch)
+	}
 	// TODO: Use AuthenticatedCommand
 	cmd, err := c.Command(ctx, args...)
 	if err != nil {
