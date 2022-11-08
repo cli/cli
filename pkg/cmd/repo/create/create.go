@@ -292,8 +292,8 @@ func createFromScratch(opts *CreateOptions) error {
 		}
 
 		targetRepo := shared.NormalizeRepoName(opts.Name)
-		if idx := strings.IndexRune(targetRepo, '/'); idx > 0 {
-			targetRepo = targetRepo[0:idx+1] + shared.NormalizeRepoName(targetRepo[idx+1:])
+		if idx := strings.IndexRune(opts.Name, '/'); idx > 0 {
+			targetRepo = opts.Name[0:idx+1] + shared.NormalizeRepoName(opts.Name[idx+1:])
 		}
 		confirmed, err := opts.Prompter.Confirm(fmt.Sprintf(`This will create "%s" as a %s repository on GitHub. Continue?`, targetRepo, strings.ToLower(opts.Visibility)), true)
 		if err != nil {
