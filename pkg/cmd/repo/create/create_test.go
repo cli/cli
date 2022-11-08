@@ -217,6 +217,8 @@ func Test_createRun(t *testing.T) {
 				}
 				p.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
 					switch message {
+					case "Repository owner":
+						return prompter.IndexFor(options, "someuser")
 					case "What would you like to do?":
 						return prompter.IndexFor(options, "Create a new repository on GitHub from scratch")
 					case "Visibility":
@@ -231,6 +233,9 @@ func Test_createRun(t *testing.T) {
 				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"someuser","organizations":{"nodes": [{"login": "org1"}, {"login": "org2"}]}}}}`))
 				reg.Register(
 					httpmock.REST("GET", "gitignore/templates"),
 					httpmock.StringResponse(`["Actionscript","Android","AppceleratorTitanium","Autotools","Bancha","C","C++","Go"]`))
@@ -286,6 +291,11 @@ func Test_createRun(t *testing.T) {
 					}
 				}
 			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"someuser","organizations":{"nodes": []}}}}`))
+			},
 			wantStdout: "",
 			wantErr:    true,
 			errMsg:     "CancelError",
@@ -327,6 +337,9 @@ func Test_createRun(t *testing.T) {
 				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"someuser","organizations":{"nodes": []}}}}`))
 				reg.Register(
 					httpmock.GraphQL(`mutation RepositoryCreate\b`),
 					httpmock.StringResponse(`
@@ -390,6 +403,9 @@ func Test_createRun(t *testing.T) {
 				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"someuser","organizations":{"nodes": []}}}}`))
 				reg.Register(
 					httpmock.GraphQL(`mutation RepositoryCreate\b`),
 					httpmock.StringResponse(`
