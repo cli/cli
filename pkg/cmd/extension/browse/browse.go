@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/charmbracelet/glamour"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
@@ -365,9 +366,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	readme.SetBorder(true).SetBorderColor(tcell.ColorPurple)
 
 	help := tview.NewTextView()
-	help.SetText(
-		"/: filter  i/r: install/remove  w: open in browser  pgup/pgdn: scroll readme  q: quit")
-	help.SetTextAlign(tview.AlignCenter)
+	help.SetText("?: help  q: quit")
 
 	ui := uiRegistry{
 		App:       app,
@@ -436,13 +435,65 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		app.SetAfterDrawFunc(nil)
 	})
 
+	helpActive := false
+
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if filter.HasFocus() {
 			return event
 		}
 
 		switch event.Rune() {
+		case '?':
+			if helpActive {
+				helpActive = false
+				app.SetRoot(outerFlex, true)
+				return nil
+			}
+			helpActive = true
+			helpBig := tview.NewTextView()
+			helpBig.SetDynamicColors(true)
+			helpBig.SetBorderPadding(0, 0, 2, 0)
+			helpBig.SetText(heredoc.Doc(`
+				[::b]= Application  =[-:-:-]
+
+				?: toggle help
+				q: quit
+
+				[::b]= Navigating =[-:-:-]
+
+				↓, j: scroll list of extensions down by 1
+				↑, k: scroll list of extensions up by 1
+
+				shift+j, space:                                   scroll list of extensions down by 25
+				shift+k, ctrl+space (mac), shift+space (windows): scroll list of extensions up by 25
+
+				[::b]= Extension Management =[-:-:-]
+
+				i: install highlighted extension
+				r: remove highlighted extension
+				w: open highlighted extension in web browser
+
+				[::b]= Filtering =[-:-:-]
+
+				/:      focus filter
+				enter:  finish filtering and go back to list
+				escape: clear filter and reset list
+
+				[::b]= Readmes =[-:-:-]
+
+				page down: scroll readme pane down
+				page up:   scroll readme pane up
+
+				(On a mac, page down and page up are fn+down arrow and fn+up arrow)
+
+			`))
+			app.SetRoot(helpBig, true)
 		case 'q':
+			if helpActive {
+				helpActive = false
+				app.SetRoot(outerFlex, true)
+				return nil
+			}
 			app.Stop()
 		case 'k':
 			extList.ScrollUp()
@@ -488,10 +539,15 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 			go loadSelectedReadme()
 			return nil
 		case tcell.KeyEscape:
+			if helpActive {
+				helpActive = false
+				app.SetRoot(outerFlex, true)
+				return nil
+			}
 			filter.SetText("")
 			extList.Reset()
 		case tcell.KeyCtrlSpace:
-			// The ctrl check works on windows/mac and not windows:
+			// The ctrl check works on linux/mac and not windows:
 			extList.PageUp()
 			go loadSelectedReadme()
 		case tcell.KeyCtrlJ:
