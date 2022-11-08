@@ -59,9 +59,22 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 			cmd := &cobra.Command{
 				Use:   "search [<query>]",
-				Short: "Search available gh extensions",
+				Short: "Search through available gh extensions",
 				Long: heredoc.Doc(`
 					Search for gh extensions.
+
+					With no arguments, this command prints out the first 30 available
+					extensions sorted by number of stars. More extensions can be fetched
+					by specifying a higher limit with the --limit flag.
+
+					When connected to a terminal, this command prints out three columns.
+					The first has a ✓ if the extension is installed locally. The second
+					is the full name of the extension repository in NAME/OWNER format.
+					The third is the extension's description.
+
+					When not connected to a terminal, the ✓ character is rendered as the
+					word "installed" but otherwise the order and content of the columns
+					is the same.
 
 					This command behaves similarly to 'gh search repos' but does not
 					support as many search qualifiers. For a finer grained search of
@@ -71,6 +84,28 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					and adding qualifiers as needed. See 'gh help search repos' to learn
 					more about repository search.
+				`),
+				Example: heredoc.Doc(`
+					# List the first 30 extensions sorted by star count, descending
+					$ gh ext search
+
+					# List more extensions
+					$ gh ext search -L300
+
+					# List extensions matching the term "branch"
+					$ gh ext search branch
+
+					# List extensions owned by organization "github"
+					$ gh ext search --owner github
+
+					# List extensions, sorting by recently updated, ascending
+					$ gh ext search --sort updated --order asc
+
+					# List extensions, filtering by license
+					$ gh ext search --license MIT
+
+					# Open search results in the browser
+					$ gh ext search -w
 				`),
 				RunE: func(cmd *cobra.Command, args []string) error {
 					cfg, err := config()
