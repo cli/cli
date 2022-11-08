@@ -59,7 +59,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 			cmd := &cobra.Command{
 				Use:   "search [<query>]",
-				Short: "Search through extensions to the GitHub CLI",
+				Short: "Search extensions to the GitHub CLI",
 				Long: heredoc.Doc(`
 					Search for gh extensions.
 
@@ -95,7 +95,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					$ gh ext search
 
 					# List more extensions
-					$ gh ext search -L300
+					$ gh ext search --limit 300
 
 					# List extensions matching the term "branch"
 					$ gh ext search branch
