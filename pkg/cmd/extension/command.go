@@ -59,18 +59,18 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 			cmd := &cobra.Command{
 				Use:   "search [<query>]",
-				Short: "Search through available gh extensions",
+				Short: "Search through extensions to the GitHub CLI",
 				Long: heredoc.Doc(`
 					Search for gh extensions.
 
-					With no arguments, this command prints out the first 30 available
-					extensions sorted by number of stars. More extensions can be fetched
-					by specifying a higher limit with the --limit flag.
+					With no arguments, this command prints out the first 30 extensions
+					available to install sorted by number of stars. More extensions can
+					be fetched by specifying a higher limit with the --limit flag.
 
 					When connected to a terminal, this command prints out three columns.
-					The first has a ✓ if the extension is installed locally. The second
-					is the full name of the extension repository in NAME/OWNER format.
-					The third is the extension's description.
+					The first has a ✓ if the extension is already installed locally. The
+					second is the full name of the extension repository in NAME/OWNER
+					format. The third is the extension's description.
 
 					When not connected to a terminal, the ✓ character is rendered as the
 					word "installed" but otherwise the order and content of the columns
@@ -84,6 +84,11 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					and adding qualifiers as needed. See 'gh help search repos' to learn
 					more about repository search.
+
+					For listing just the extensions that are already installed locally,
+					see:
+
+						gh ext list
 				`),
 				Example: heredoc.Doc(`
 					# List the first 30 extensions sorted by star count, descending
