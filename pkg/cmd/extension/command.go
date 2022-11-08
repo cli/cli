@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
+	"github.com/cli/cli/v2/pkg/cmd/extension/browse"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/extensions"
 	"github.com/cli/cli/v2/pkg/search"
@@ -239,6 +242,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 				t := utils.NewTablePrinter(io)
 				for _, c := range cmds {
+					// TODO consider a Repo() on Extension interface
 					var repo string
 					if u, err := git.ParseURL(c.URL()); err == nil {
 						if r, err := ghrepo.FromURL(u); err == nil {
@@ -406,6 +410,74 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 				return nil
 			},
 		},
+		func() *cobra.Command {
+			var debug bool
+			cmd := &cobra.Command{
+				Use:   "browse",
+				Short: "Enter a UI for browsing, adding, and removing extensions",
+				Long: heredoc.Doc(`
+					This command will take over your terminal and run a fully interactive
+					interface for browsing, adding, and removing gh extensions.
+
+					The extension list is navigated with the arrow keys or with j/k.
+					Space and control+space (or control + j/k) page the list up and down.
+					Extension readmes can be scrolled with page up/page down keys
+					(fn + arrow up/down on a mac keyboard).
+
+					For highlighted extensions, you can press:
+
+					- w to open the extension in your web browser
+					- i to install the extension
+					- r to remove the extension
+
+					Press / to focus the filter input. Press enter to scroll the results.
+					Press Escape to clear the filter and return to the full list.
+
+					Press q to quit.
+
+					The output of this command may be difficult to navigate for screen reader
+					users, users operating at high zoom and other users of assistive technology. It
+					is also not advised for automation scripts. We advise those users to use the
+					alternative command:
+
+						gh ext search
+
+					along with gh ext install, gh ext remove, and gh repo view.
+				`),
+				Args: cobra.NoArgs,
+				RunE: func(cmd *cobra.Command, args []string) error {
+					if !io.CanPrompt() {
+						return errors.New("this command runs an interactive UI and needs to be run in a terminal")
+					}
+					cfg, err := config()
+					if err != nil {
+						return err
+					}
+					host, _ := cfg.DefaultHost()
+					client, err := f.HttpClient()
+					if err != nil {
+						return err
+					}
+
+					searcher := search.NewSearcher(api.NewCachedHTTPClient(client, time.Hour*24), host)
+
+					opts := browse.ExtBrowseOpts{
+						Cmd:      cmd,
+						IO:       io,
+						Browser:  browser,
+						Searcher: searcher,
+						Em:       m,
+						Client:   client,
+						Cfg:      cfg,
+						Debug:    debug,
+					}
+
+					return browse.ExtBrowse(opts)
+				},
+			}
+			cmd.Flags().BoolVar(&debug, "debug", false, "log to /tmp/extBrowse-*")
+			return cmd
+		}(),
 		&cobra.Command{
 			Use:   "exec <name> [args]",
 			Short: "Execute an installed extension",

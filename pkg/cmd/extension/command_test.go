@@ -756,6 +756,12 @@ func TestNewCmdExtension(t *testing.T) {
 			},
 			wantStdout: "test output",
 		},
+		{
+			name:    "browse",
+			args:    []string{"browse"},
+			wantErr: true,
+			errMsg:  "this command runs an interactive UI and needs to be run in a terminal",
+		},
 	}
 
 	for _, tt := range tests {
