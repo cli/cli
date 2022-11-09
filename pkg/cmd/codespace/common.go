@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/grpc"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
@@ -66,7 +67,6 @@ type liveshareSession interface {
 	StartSharing(context.Context, string, int) (liveshare.ChannelID, error)
 	StartSSHServer(context.Context) (int, string, error)
 	StartSSHServerWithOptions(context.Context, liveshare.StartSSHServerOptions) (int, string, error)
-	RebuildContainer(context.Context, bool) error
 }
 
 // Connects to a codespace using Live Share and returns that session
@@ -89,6 +89,19 @@ func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App
 	}
 
 	return session, nil
+}
+
+// Creates and returns a client that connects to the gRPC server in the codespace
+func connectToGRPCServer(ctx context.Context, session liveshareSession, token string) (*grpc.Client, error) {
+	ctx, cancel := context.WithTimeout(ctx, grpc.ConnectionTimeout)
+	defer cancel()
+
+	client, err := grpc.Connect(ctx, session, token)
+	if err != nil {
+		return nil, fmt.Errorf("error connecting to internal server: %w", err)
+	}
+
+	return client, nil
 }
 
 //go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient

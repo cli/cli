@@ -22,5 +22,6 @@ function generate {
 }
 
 generate jupyter/JupyterServerHostService.v1.proto
+generate codespace/CodespaceHostService.v1.proto
 
 echo 'Done!'

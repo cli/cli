@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cli/cli/v2/internal/codespaces/grpc/codespace"
 	"github.com/cli/cli/v2/internal/codespaces/grpc/jupyter"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"golang.org/x/crypto/ssh"
@@ -29,11 +30,12 @@ const (
 )
 
 type Client struct {
-	conn          *grpc.ClientConn
-	token         string
-	listener      net.Listener
-	jupyterClient jupyter.JupyterServerHostClient
-	cancelPF      context.CancelFunc
+	conn            *grpc.ClientConn
+	token           string
+	listener        net.Listener
+	jupyterClient   jupyter.JupyterServerHostClient
+	codespaceClient codespace.CodespaceHostClient
+	cancelPF        context.CancelFunc
 }
 
 type liveshareSession interface {
@@ -101,6 +103,7 @@ func Connect(ctx context.Context, session liveshareSession, token string) (*Clie
 
 	client.conn = conn
 	client.jupyterClient = jupyter.NewJupyterServerHostClient(conn)
+	client.codespaceClient = codespace.NewCodespaceHostClient(conn)
 
 	return client, nil
 }
@@ -142,4 +145,19 @@ func (g *Client) StartJupyterServer(ctx context.Context) (port int, serverUrl st
 	}
 
 	return port, response.ServerUrl, err
+}
+
+func (g *Client) RebuildContainer(ctx context.Context, incremental bool) error {
+	ctx = g.appendMetadata(ctx)
+
+	response, err := g.codespaceClient.RebuildContainerAsync(ctx, &codespace.RebuildContainerRequest{Incremental: &incremental})
+	if err != nil {
+		return fmt.Errorf("failed to invoke rebuild RPC: %w", err)
+	}
+
+	if !response.RebuildContainer {
+		return fmt.Errorf("couldn't rebuild codespace")
+	}
+
+	return nil
 }

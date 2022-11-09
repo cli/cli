@@ -399,49 +399,6 @@ func TestSessionHeartbeat(t *testing.T) {
 	}
 }
 
-func TestRebuild(t *testing.T) {
-	tests := []struct {
-		fullRebuild bool
-		rpcService  string
-	}{
-		{
-			fullRebuild: false,
-			rpcService:  "IEnvironmentConfigurationService.incrementalRebuildContainer",
-		},
-		{
-			fullRebuild: true,
-			rpcService:  "IEnvironmentConfigurationService.rebuildContainer",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Logf("RPC service: %s", tt.rpcService)
-		t.Logf("full rebuild: %t", tt.fullRebuild)
-
-		requestCount := 0
-		rebuildContainer := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
-			requestCount++
-			return true, nil
-		}
-		testServer, session, err := makeMockSession(
-			livesharetest.WithService(tt.rpcService, rebuildContainer),
-		)
-		if err != nil {
-			t.Errorf("creating mock session: %v", err)
-		}
-		defer testServer.Close()
-
-		err = session.RebuildContainer(context.Background(), tt.fullRebuild)
-		if err != nil {
-			t.Errorf("rebuilding codespace via mock session: %v", err)
-		}
-
-		if requestCount == 0 {
-			t.Errorf("no requests were made")
-		}
-	}
-}
-
 type mockLogger struct {
 	sync.Mutex
 	buf *bytes.Buffer

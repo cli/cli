@@ -88,18 +88,6 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	}
 }
 
-func connectToGRPCServer(ctx context.Context, session liveshareSession, token string) (*grpc.Client, error) {
-	ctx, cancel := context.WithTimeout(ctx, grpc.ConnectionTimeout)
-	defer cancel()
-
-	client, err := grpc.Connect(ctx, session, token)
-	if err != nil {
-		return nil, fmt.Errorf("error connecting to internal server: %w", err)
-	}
-
-	return client, nil
-}
-
 func startJupyterServer(ctx context.Context, client *grpc.Client) (int, string, error) {
 	ctx, cancel := context.WithTimeout(ctx, grpc.RequestTimeout)
 	defer cancel()

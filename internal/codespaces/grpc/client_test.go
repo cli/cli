@@ -82,3 +82,32 @@ func TestStartJupyterServerFailure(t *testing.T) {
 		t.Fatalf("expected %s, got %s", "", url)
 	}
 }
+
+func TestRebuildContainerSuccess(t *testing.T) {
+	startServer(t)
+	client := connect(t)
+	err := client.RebuildContainer(context.Background(), false)
+	if err != nil {
+		t.Fatalf("expected %v, got %v", nil, err)
+	}
+}
+
+func TestRebuildContainerFullSuccess(t *testing.T) {
+	startServer(t)
+	client := connect(t)
+	err := client.RebuildContainer(context.Background(), true)
+	if err != nil {
+		t.Fatalf("expected %v, got %v", nil, err)
+	}
+}
+
+func TestRebuildContainerFailure(t *testing.T) {
+	startServer(t)
+	client := connect(t)
+	grpctest.RebuildContainer = false
+	errorMessage := "couldn't rebuild codespace"
+	err := client.RebuildContainer(context.Background(), false)
+	if err.Error() != errorMessage {
+		t.Fatalf("expected %v, got %v", errorMessage, err)
+	}
+}

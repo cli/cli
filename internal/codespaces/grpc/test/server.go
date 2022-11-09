@@ -6,6 +6,7 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/cli/cli/v2/internal/codespaces/grpc/codespace"
 	"github.com/cli/cli/v2/internal/codespaces/grpc/jupyter"
 	"google.golang.org/grpc"
 )
@@ -21,8 +22,13 @@ var (
 	JupyterResult    = true
 )
 
+var (
+	RebuildContainer = true
+)
+
 type server struct {
 	jupyter.UnimplementedJupyterServerHostServer
+	codespace.UnimplementedCodespaceHostServer
 }
 
 func (s *server) GetRunningServer(ctx context.Context, in *jupyter.GetRunningServerRequest) (*jupyter.GetRunningServerResponse, error) {
@@ -31,6 +37,12 @@ func (s *server) GetRunningServer(ctx context.Context, in *jupyter.GetRunningSer
 		ServerUrl: JupyterServerUrl,
 		Message:   JupyterMessage,
 		Result:    JupyterResult,
+	}, nil
+}
+
+func (s *server) RebuildContainerAsync(ctx context.Context, in *codespace.RebuildContainerRequest) (*codespace.RebuildContainerResponse, error) {
+	return &codespace.RebuildContainerResponse{
+		RebuildContainer: RebuildContainer,
 	}, nil
 }
 
@@ -44,6 +56,7 @@ func StartServer(ctx context.Context) error {
 
 	s := grpc.NewServer()
 	jupyter.RegisterJupyterServerHostServer(s, &server{})
+	codespace.RegisterCodespaceHostServer(s, &server{})
 
 	ch := make(chan error, 1)
 	go func() {
