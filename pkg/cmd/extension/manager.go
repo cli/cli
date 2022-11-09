@@ -40,7 +40,7 @@ type Manager struct {
 	dryRunMode bool
 }
 
-func NewManager(ios *iostreams.IOStreams) *Manager {
+func NewManager(ios *iostreams.IOStreams, gc *git.Client) *Manager {
 	return &Manager{
 		dataDir:    config.DataDir,
 		lookPath:   safeexec.LookPath,
@@ -53,7 +53,8 @@ func NewManager(ios *iostreams.IOStreams) *Manager {
 			}
 			return fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH), ext
 		},
-		io: ios,
+		io:        ios,
+		gitClient: &gitExecuter{client: gc},
 	}
 }
 
@@ -63,10 +64,6 @@ func (m *Manager) SetConfig(cfg config.Config) {
 
 func (m *Manager) SetClient(client *http.Client) {
 	m.client = client
-}
-
-func (m *Manager) SetGitClient(gitClient *git.Client) {
-	m.gitClient = &gitExecuter{client: gitClient}
 }
 
 func (m *Manager) EnableDryRunMode() {
