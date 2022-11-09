@@ -13,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/root"
 	"github.com/cpuguy83/go-md2man/v2/md2man"
 	"github.com/spf13/cobra"
+	"github.com/spf13/cobra/doc"
 	"github.com/spf13/pflag"
 )
 
@@ -22,20 +23,26 @@ import (
 // subcmds, `sub` and `sub-third`, and `sub` has a subcommand called `third`
 // it is undefined which help output will be in the file `cmd-sub-third.1`.
 func GenManTree(cmd *cobra.Command, dir string) error {
-	return GenManTreeFromOpts(cmd, GenManTreeOptions{
+	if os.Getenv("GH_COBRA") != "" {
+		return doc.GenManTreeFromOpts(cmd, doc.GenManTreeOptions{
+			Path:             dir,
+			CommandSeparator: "-",
+		})
+	}
+	return genManTreeFromOpts(cmd, GenManTreeOptions{
 		Path:             dir,
 		CommandSeparator: "-",
 	})
 }
 
-// GenManTreeFromOpts generates a man page for the command and all descendants.
+// genManTreeFromOpts generates a man page for the command and all descendants.
 // The pages are written to the opts.Path directory.
-func GenManTreeFromOpts(cmd *cobra.Command, opts GenManTreeOptions) error {
+func genManTreeFromOpts(cmd *cobra.Command, opts GenManTreeOptions) error {
 	for _, c := range cmd.Commands() {
 		if !c.IsAvailableCommand() || c.IsAdditionalHelpTopicCommand() {
 			continue
 		}
-		if err := GenManTreeFromOpts(c, opts); err != nil {
+		if err := genManTreeFromOpts(c, opts); err != nil {
 			return err
 		}
 	}
@@ -58,7 +65,7 @@ func GenManTreeFromOpts(cmd *cobra.Command, opts GenManTreeOptions) error {
 		versionString = "GitHub CLI " + v
 	}
 
-	return GenMan(cmd, &GenManHeader{
+	return renderMan(cmd, &GenManHeader{
 		Section: section,
 		Source:  versionString,
 		Manual:  "GitHub CLI manual",
@@ -83,9 +90,9 @@ type GenManHeader struct {
 	Manual  string
 }
 
-// GenMan will generate a man page for the given command and write it to
+// renderMan will generate a man page for the given command and write it to
 // w. The header argument may be nil, however obviously w may not.
-func GenMan(cmd *cobra.Command, header *GenManHeader, w io.Writer) error {
+func renderMan(cmd *cobra.Command, header *GenManHeader, w io.Writer) error {
 	if err := fillHeader(header, cmd.CommandPath()); err != nil {
 		return err
 	}
