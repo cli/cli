@@ -49,9 +49,6 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 			$ gh pr checkout 321
 		`),
 		Annotations: map[string]string{
-			"help:feedback": heredoc.Doc(`
-				Open an issue using 'gh issue create -R github.com/cli/cli'
-			`),
 			"versionInfo": versionCmd.Format(version, buildDate),
 		},
 	}
