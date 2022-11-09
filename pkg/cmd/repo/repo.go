@@ -30,13 +30,13 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 			$ gh repo view --web
 		`),
 		Annotations: map[string]string{
-			"IsCore": "true",
 			"help:arguments": heredoc.Doc(`
 				A repository can be supplied as an argument in any of the following formats:
 				- "OWNER/REPO"
 				- by URL, e.g. "https://github.com/OWNER/REPO"
 			`),
 		},
+		GroupID: "core",
 	}
 
 	cmd.AddCommand(repoViewCmd.NewCmdView(f, nil))

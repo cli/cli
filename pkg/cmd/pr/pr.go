@@ -31,7 +31,6 @@ func NewCmdPR(f *cmdutil.Factory) *cobra.Command {
 			$ gh pr view --web
 		`),
 		Annotations: map[string]string{
-			"IsCore": "true",
 			"help:arguments": heredoc.Doc(`
 				A pull request can be supplied as argument in any of the following formats:
 				- by number, e.g. "123";
@@ -39,6 +38,7 @@ func NewCmdPR(f *cmdutil.Factory) *cobra.Command {
 				- by the name of its head branch, e.g. "patch-1" or "OWNER:patch-1".
 			`),
 		},
+		GroupID: "core",
 	}
 
 	cmdutil.EnableRepoOverride(cmd, f)

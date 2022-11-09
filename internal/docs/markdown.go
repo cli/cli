@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cli/cli/v2/pkg/cmd/root"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -99,11 +100,8 @@ func GenMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string)
 		fmt.Fprintf(w, "%s\n\n", cmd.Long)
 	}
 
-	for _, g := range subcommandGroups(cmd) {
-		if len(g.Commands) == 0 {
-			continue
-		}
-		fmt.Fprintf(w, "### %s\n\n", g.Name)
+	for _, g := range root.GroupedCommands(cmd) {
+		fmt.Fprintf(w, "### %s\n\n", g.Title)
 		for _, subcmd := range g.Commands {
 			fmt.Fprintf(w, "* [%s](%s)\n", subcmd.CommandPath(), linkHandler(cmdManualPath(subcmd)))
 		}
@@ -128,56 +126,6 @@ func GenMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string)
 	}
 
 	return nil
-}
-
-type commandGroup struct {
-	Name     string
-	Commands []*cobra.Command
-}
-
-// subcommandGroups lists child commands of a Cobra command split into groups.
-// TODO: have rootHelpFunc use this instead of repeating the same logic.
-func subcommandGroups(c *cobra.Command) []commandGroup {
-	var rest []*cobra.Command
-	var core []*cobra.Command
-	var actions []*cobra.Command
-
-	for _, subcmd := range c.Commands() {
-		if !subcmd.IsAvailableCommand() {
-			continue
-		}
-		if _, ok := subcmd.Annotations["IsCore"]; ok {
-			core = append(core, subcmd)
-		} else if _, ok := subcmd.Annotations["IsActions"]; ok {
-			actions = append(actions, subcmd)
-		} else {
-			rest = append(rest, subcmd)
-		}
-	}
-
-	if len(core) > 0 {
-		return []commandGroup{
-			{
-				Name:     "Core commands",
-				Commands: core,
-			},
-			{
-				Name:     "Actions commands",
-				Commands: actions,
-			},
-			{
-				Name:     "Additional commands",
-				Commands: rest,
-			},
-		}
-	}
-
-	return []commandGroup{
-		{
-			Name:     "Commands",
-			Commands: rest,
-		},
-	}
 }
 
 // GenMarkdownTree will generate a markdown page for this command and all

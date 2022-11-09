@@ -15,11 +15,9 @@ import (
 
 func NewCmdRelease(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "release <command>",
-		Short: "Manage releases",
-		Annotations: map[string]string{
-			"IsCore": "true",
-		},
+		Use:     "release <command>",
+		Short:   "Manage releases",
+		GroupID: "core",
 	}
 
 	cmdutil.EnableRepoOverride(cmd, f)

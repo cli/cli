@@ -30,13 +30,13 @@ func NewCmdIssue(f *cmdutil.Factory) *cobra.Command {
 			$ gh issue view 123 --web
 		`),
 		Annotations: map[string]string{
-			"IsCore": "true",
 			"help:arguments": heredoc.Doc(`
 				An issue can be supplied as argument in any of the following formats:
 				- by number, e.g. "123"; or
 				- by URL, e.g. "https://github.com/OWNER/REPO/issues/123".
 			`),
 		},
+		GroupID: "core",
 	}
 
 	cmdutil.EnableRepoOverride(cmd, f)

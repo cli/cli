@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cli/cli/v2/pkg/cmd/root"
 	"github.com/cpuguy83/go-md2man/v2/md2man"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -175,11 +176,8 @@ func genMan(cmd *cobra.Command, header *GenManHeader) []byte {
 	buf := new(bytes.Buffer)
 
 	manPreamble(buf, header, cmd, dashCommandName)
-	for _, g := range subcommandGroups(cmd) {
-		if len(g.Commands) == 0 {
-			continue
-		}
-		fmt.Fprintf(buf, "# %s\n", strings.ToUpper(g.Name))
+	for _, g := range root.GroupedCommands(cmd) {
+		fmt.Fprintf(buf, "# %s\n", strings.ToUpper(g.Title))
 		for _, subcmd := range g.Commands {
 			fmt.Fprintf(buf, "`%s`\n:   %s\n\n", manLink(subcmd), subcmd.Short)
 		}
