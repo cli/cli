@@ -32,7 +32,7 @@ require (
 	github.com/rivo/tview v0.0.0-20221029100920-c4a7e501810d
 	github.com/shurcooL/githubv4 v0.0.0-20220520033151-0b4e3294ff00
 	github.com/sourcegraph/jsonrpc2 v0.1.0
-	github.com/spf13/cobra v1.5.0
+	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.5
 	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
@@ -56,7 +56,7 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/itchyny/gojq v0.12.8 // indirect
 	github.com/itchyny/timefmt-go v0.1.3 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
