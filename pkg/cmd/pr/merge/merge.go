@@ -126,23 +126,6 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 			bodyProvided := cmd.Flags().Changed("body")
 			bodyFileProvided := bodyFile != ""
 
-			if err := cmdutil.MutuallyExclusive(
-				"specify only one of `--auto`, `--disable-auto`, or `--admin`",
-				opts.AutoMergeEnable,
-				opts.AutoMergeDisable,
-				opts.UseAdmin,
-			); err != nil {
-				return err
-			}
-
-			if err := cmdutil.MutuallyExclusive(
-				"specify only one of `--body` or `--body-file`",
-				bodyProvided,
-				bodyFileProvided,
-			); err != nil {
-				return err
-			}
-
 			if bodyProvided || bodyFileProvided {
 				opts.BodySet = true
 				if bodyFileProvided {
@@ -183,6 +166,10 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	cmd.Flags().BoolVar(&opts.AutoMergeDisable, "disable-auto", false, "Disable auto-merge for this pull request")
 	cmd.Flags().StringVar(&opts.MatchHeadCommit, "match-head-commit", "", "Commit `SHA` that the pull request head must match to allow merge")
 	cmd.Flags().StringVarP(&opts.AuthorEmail, "author-email", "A", "", "Email `text` for merge commit author")
+
+	cmd.MarkFlagsMutuallyExclusive("auto", "disable-auto", "admin")
+	cmd.MarkFlagsMutuallyExclusive("body", "body-file")
+
 	return cmd
 }
 

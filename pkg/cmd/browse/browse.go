@@ -93,16 +93,6 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 				opts.SelectorArg = args[0]
 			}
 
-			if err := cmdutil.MutuallyExclusive(
-				"specify only one of `--branch`, `--commit`, `--projects`, `--wiki`, or `--settings`",
-				opts.Branch != "",
-				opts.CommitFlag,
-				opts.WikiFlag,
-				opts.SettingsFlag,
-				opts.ProjectsFlag,
-			); err != nil {
-				return err
-			}
 			if cmd.Flags().Changed("repo") {
 				opts.GitClient = &remoteGitClient{opts.BaseRepo, opts.HttpClient}
 			}
@@ -121,6 +111,8 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.NoBrowserFlag, "no-browser", "n", false, "Print destination URL instead of opening the browser")
 	cmd.Flags().BoolVarP(&opts.CommitFlag, "commit", "c", false, "Open the last commit")
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Select another branch by passing in the branch name")
+
+	cmd.MarkFlagsMutuallyExclusive("branch", "commit", "projects", "wiki", "settings")
 
 	return cmd
 }

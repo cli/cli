@@ -38,9 +38,6 @@ type CreateOptions struct {
 	Homepage           string
 	Team               string
 	Template           string
-	Public             bool
-	Private            bool
-	Internal           bool
 	Visibility         string
 	Push               bool
 	Clone              bool
@@ -55,6 +52,12 @@ type CreateOptions struct {
 	AddReadme          bool
 }
 
+const (
+	visibilityPublic   = "PUBLIC"
+	visibilityPrivate  = "PRIVATE"
+	visibilityInternal = "INTERNAL"
+)
+
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
@@ -64,8 +67,13 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		Prompter:   f.Prompter,
 	}
 
-	var enableIssues bool
-	var enableWiki bool
+	var (
+		enableIssues bool
+		enableWiki   bool
+		flagPublic   bool
+		flagPrivate  bool
+		flagInternal bool
+	)
 
 	cmd := &cobra.Command{
 		Use:   "create [<name>]",
@@ -105,23 +113,16 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				}
 				opts.Interactive = true
 			} else {
+				if flagPublic {
+					opts.Visibility = visibilityPublic
+				} else if flagPrivate {
+					opts.Visibility = visibilityPrivate
+				} else if flagInternal {
+					opts.Visibility = visibilityInternal
+				}
 				// exactly one visibility flag required
-				if !opts.Public && !opts.Private && !opts.Internal {
+				if opts.Visibility == "" {
 					return cmdutil.FlagErrorf("`--public`, `--private`, or `--internal` required when not running interactively")
-				}
-				err := cmdutil.MutuallyExclusive(
-					"expected exactly one of `--public`, `--private`, or `--internal`",
-					opts.Public, opts.Private, opts.Internal)
-				if err != nil {
-					return err
-				}
-
-				if opts.Public {
-					opts.Visibility = "PUBLIC"
-				} else if opts.Private {
-					opts.Visibility = "PRIVATE"
-				} else {
-					opts.Visibility = "INTERNAL"
 				}
 			}
 
@@ -173,9 +174,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Homepage, "homepage", "h", "", "Repository home page `URL`")
 	cmd.Flags().StringVarP(&opts.Team, "team", "t", "", "The `name` of the organization team to be granted access")
 	cmd.Flags().StringVarP(&opts.Template, "template", "p", "", "Make the new repository based on a template `repository`")
-	cmd.Flags().BoolVar(&opts.Public, "public", false, "Make the new repository public")
-	cmd.Flags().BoolVar(&opts.Private, "private", false, "Make the new repository private")
-	cmd.Flags().BoolVar(&opts.Internal, "internal", false, "Make the new repository internal")
+	cmd.Flags().BoolVar(&flagPublic, "public", false, "Make the new repository public")
+	cmd.Flags().BoolVar(&flagPrivate, "private", false, "Make the new repository private")
+	cmd.Flags().BoolVar(&flagInternal, "internal", false, "Make the new repository internal")
 	cmd.Flags().StringVarP(&opts.GitIgnoreTemplate, "gitignore", "g", "", "Specify a gitignore template for the repository")
 	cmd.Flags().StringVarP(&opts.LicenseTemplate, "license", "l", "", "Specify an Open Source License for the repository")
 	cmd.Flags().StringVarP(&opts.Source, "source", "s", "", "Specify path to local repository to use as source")
@@ -186,6 +187,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVar(&opts.DisableWiki, "disable-wiki", false, "Disable wiki in the new repository")
 	cmd.Flags().BoolVar(&opts.IncludeAllBranches, "include-all-branches", false, "Include all branches from template repository")
 	cmd.Flags().BoolVar(&opts.AddReadme, "add-readme", false, "Add a README file to the new repository")
+
+	cmd.MarkFlagsMutuallyExclusive("public", "private", "internal")
 
 	// deprecated flags
 	cmd.Flags().BoolP("confirm", "y", false, "Skip the confirmation prompt")

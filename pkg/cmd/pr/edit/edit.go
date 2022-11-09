@@ -72,13 +72,6 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			bodyProvided := flags.Changed("body")
 			bodyFileProvided := bodyFile != ""
 
-			if err := cmdutil.MutuallyExclusive(
-				"specify only one of `--body` or `--body-file`",
-				bodyProvided,
-				bodyFileProvided,
-			); err != nil {
-				return err
-			}
 			if bodyProvided || bodyFileProvided {
 				opts.Editable.Body.Edited = true
 				if bodyFileProvided {
@@ -144,6 +137,8 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringSliceVar(&opts.Editable.Projects.Add, "add-project", nil, "Add the pull request to projects by `name`")
 	cmd.Flags().StringSliceVar(&opts.Editable.Projects.Remove, "remove-project", nil, "Remove the pull request from projects by `name`")
 	cmd.Flags().StringVarP(&opts.Editable.Milestone.Value, "milestone", "m", "", "Edit the milestone the pull request belongs to by `name`")
+
+	cmd.MarkFlagsMutuallyExclusive("body", "body-file")
 
 	return cmd
 }

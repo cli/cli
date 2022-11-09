@@ -76,13 +76,6 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			$ gh auth login --hostname enterprise.internal
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if tokenStdin && opts.Web {
-				return cmdutil.FlagErrorf("specify only one of `--web` or `--with-token`")
-			}
-			if tokenStdin && len(opts.Scopes) > 0 {
-				return cmdutil.FlagErrorf("specify only one of `--scopes` or `--with-token`")
-			}
-
 			if tokenStdin {
 				defer opts.IO.In.Close()
 				token, err := io.ReadAll(opts.IO.In)
@@ -120,6 +113,9 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	cmd.Flags().BoolVar(&tokenStdin, "with-token", false, "Read token from standard input")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a browser to authenticate")
 	cmdutil.StringEnumFlag(cmd, &opts.GitProtocol, "git-protocol", "p", "", []string{"ssh", "https"}, "The protocol to use for git operations")
+
+	cmd.MarkFlagsMutuallyExclusive("scopes", "with-token")
+	cmd.MarkFlagsMutuallyExclusive("web", "with-token")
 
 	return cmd
 }

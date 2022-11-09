@@ -77,19 +77,6 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 				opts.TagName = args[0]
 			}
 
-			if err := cmdutil.MutuallyExclusive("specify only one of `--clobber` or `--skip-existing`", opts.OverwriteExisting, opts.SkipExisting); err != nil {
-				return err
-			}
-
-			if err := cmdutil.MutuallyExclusive("specify only one of `--dir` or `--output`", opts.Destination != ".", opts.OutputFile != ""); err != nil {
-				return err
-			}
-
-			// check archive type option validity
-			if err := checkArchiveTypeOption(opts); err != nil {
-				return err
-			}
-
 			opts.Concurrency = 5
 
 			if runF != nil {
@@ -102,30 +89,15 @@ func NewCmdDownload(f *cmdutil.Factory, runF func(*DownloadOptions) error) *cobr
 	cmd.Flags().StringVarP(&opts.OutputFile, "output", "O", "", "The `file` to write a single asset to (use \"-\" to write to standard output)")
 	cmd.Flags().StringVarP(&opts.Destination, "dir", "D", ".", "The `directory` to download files into")
 	cmd.Flags().StringArrayVarP(&opts.FilePatterns, "pattern", "p", nil, "Download only assets that match a glob pattern")
-	cmd.Flags().StringVarP(&opts.ArchiveType, "archive", "A", "", "Download the source code archive in the specified `format` (zip or tar.gz)")
+	cmdutil.StringEnumFlag(cmd, &opts.ArchiveType, "archive", "A", "", []string{"zip", "tar.gz"}, "Download the source code archive in the specified `format`")
 	cmd.Flags().BoolVar(&opts.OverwriteExisting, "clobber", false, "Overwrite existing files of the same name")
 	cmd.Flags().BoolVar(&opts.SkipExisting, "skip-existing", false, "Skip downloading when files of the same name exist")
 
+	cmd.MarkFlagsMutuallyExclusive("clobber", "skip-existing")
+	cmd.MarkFlagsMutuallyExclusive("dir", "output")
+	cmd.MarkFlagsMutuallyExclusive("pattern", "archive")
+
 	return cmd
-}
-
-func checkArchiveTypeOption(opts *DownloadOptions) error {
-	if len(opts.ArchiveType) == 0 {
-		return nil
-	}
-
-	if err := cmdutil.MutuallyExclusive(
-		"specify only one of '--pattern' or '--archive'",
-		true, // ArchiveType len > 0
-		len(opts.FilePatterns) > 0,
-	); err != nil {
-		return err
-	}
-
-	if opts.ArchiveType != "zip" && opts.ArchiveType != "tar.gz" {
-		return cmdutil.FlagErrorf("the value for `--archive` must be one of \"zip\" or \"tar.gz\"")
-	}
-	return nil
 }
 
 func downloadRun(opts *DownloadOptions) error {

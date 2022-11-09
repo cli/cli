@@ -99,18 +99,6 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			if err := cmdutil.MutuallyExclusive("specify only one of `--org`, `--env`, or `--user`", opts.OrgName != "", opts.EnvName != "", opts.UserSecrets); err != nil {
-				return err
-			}
-
-			if err := cmdutil.MutuallyExclusive("specify only one of `--body` or `--env-file`", opts.Body != "", opts.EnvFile != ""); err != nil {
-				return err
-			}
-
-			if err := cmdutil.MutuallyExclusive("specify only one of `--env-file` or `--no-store`", opts.EnvFile != "", opts.DoNotStore); err != nil {
-				return err
-			}
-
 			if len(args) == 0 {
 				if !opts.DoNotStore && opts.EnvFile == "" {
 					return cmdutil.FlagErrorf("must pass name argument")
@@ -154,6 +142,10 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	cmd.Flags().BoolVar(&opts.DoNotStore, "no-store", false, "Print the encrypted, base64-encoded value instead of storing it on Github")
 	cmd.Flags().StringVarP(&opts.EnvFile, "env-file", "f", "", "Load secret names and values from a dotenv-formatted `file`")
 	cmdutil.StringEnumFlag(cmd, &opts.Application, "app", "a", "", []string{shared.Actions, shared.Codespaces, shared.Dependabot}, "Set the application for a secret")
+
+	cmd.MarkFlagsMutuallyExclusive("org", "env", "user")
+	cmd.MarkFlagsMutuallyExclusive("body", "env-file")
+	cmd.MarkFlagsMutuallyExclusive("env-file", "no-store")
 
 	return cmd
 }

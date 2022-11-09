@@ -132,14 +132,6 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 				}
 			}
 
-			if opts.Web && opts.Log {
-				return cmdutil.FlagErrorf("specify only one of --web or --log")
-			}
-
-			if opts.Log && opts.LogFailed {
-				return cmdutil.FlagErrorf("specify only one of --log or --log-failed")
-			}
-
 			if runF != nil {
 				return runF(opts)
 			}
@@ -154,6 +146,8 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.LogFailed, "log-failed", false, "View the log for any failed steps in a run or specific job")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open run in the browser")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.SingleRunFields)
+
+	cmd.MarkFlagsMutuallyExclusive("web", "log", "log-failed")
 
 	return cmd
 }

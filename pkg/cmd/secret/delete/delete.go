@@ -49,10 +49,6 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			if err := cmdutil.MutuallyExclusive("specify only one of `--org`, `--env`, or `--user`", opts.OrgName != "", opts.EnvName != "", opts.UserSecrets); err != nil {
-				return err
-			}
-
 			opts.SecretName = args[0]
 
 			if runF != nil {
@@ -69,6 +65,8 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Delete a secret for an environment")
 	cmd.Flags().BoolVarP(&opts.UserSecrets, "user", "u", false, "Delete a secret for your user")
 	cmdutil.StringEnumFlag(cmd, &opts.Application, "app", "a", "", []string{shared.Actions, shared.Codespaces, shared.Dependabot}, "Delete a secret for a specific application")
+
+	cmd.MarkFlagsMutuallyExclusive("org", "env", "user")
 
 	return cmd
 }

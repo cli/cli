@@ -58,11 +58,6 @@ func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("invalid limit: %v", opts.Query.Limit)
 			}
 
-			if opts.Query.Query != "" &&
-				(c.Flags().Changed("order") || c.Flags().Changed("sort")) {
-				return cmdutil.FlagErrorf("cannot specify `--order` or `--sort` with `--search`")
-			}
-
 			if runF != nil {
 				return runF(&opts)
 			}
@@ -75,6 +70,9 @@ func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Query.Query, "search", "S", "", "Search label names and descriptions")
 	cmdutil.StringEnumFlag(cmd, &opts.Query.Order, "order", "", defaultOrder, []string{"asc", "desc"}, "Order of labels returned")
 	cmdutil.StringEnumFlag(cmd, &opts.Query.Sort, "sort", "", defaultSort, []string{"created", "name"}, "Sort fetched labels")
+
+	cmd.MarkFlagsMutuallyExclusive("order", "search")
+	cmd.MarkFlagsMutuallyExclusive("sort", "search")
 
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, labelFields)
 

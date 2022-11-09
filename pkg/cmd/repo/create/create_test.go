@@ -44,9 +44,9 @@ func TestNewCmdCreate(t *testing.T) {
 			name: "new repo from remote",
 			cli:  "NEWREPO --public --clone",
 			wantsOpts: CreateOptions{
-				Name:   "NEWREPO",
-				Public: true,
-				Clone:  true},
+				Name:       "NEWREPO",
+				Visibility: "PUBLIC",
+				Clone:      true},
 		},
 		{
 			name:     "no visibility",
@@ -66,25 +66,25 @@ func TestNewCmdCreate(t *testing.T) {
 			name: "new remote from local",
 			cli:  "--source=/path/to/repo --private",
 			wantsOpts: CreateOptions{
-				Private: true,
-				Source:  "/path/to/repo"},
+				Visibility: "PRIVATE",
+				Source:     "/path/to/repo"},
 		},
 		{
 			name: "new remote from local with remote",
 			cli:  "--source=/path/to/repo --public --remote upstream",
 			wantsOpts: CreateOptions{
-				Public: true,
-				Source: "/path/to/repo",
-				Remote: "upstream",
+				Visibility: "PUBLIC",
+				Source:     "/path/to/repo",
+				Remote:     "upstream",
 			},
 		},
 		{
 			name: "new remote from local with push",
 			cli:  "--source=/path/to/repo --push --public",
 			wantsOpts: CreateOptions{
-				Public: true,
-				Source: "/path/to/repo",
-				Push:   true,
+				Visibility: "PUBLIC",
+				Source:     "/path/to/repo",
+				Push:       true,
 			},
 		},
 		{
@@ -114,7 +114,7 @@ func TestNewCmdCreate(t *testing.T) {
 			cli:  "template-repo --template https://github.com/OWNER/REPO --public --include-all-branches",
 			wantsOpts: CreateOptions{
 				Name:               "template-repo",
-				Public:             true,
+				Visibility:         "PUBLIC",
 				Template:           "https://github.com/OWNER/REPO",
 				IncludeAllBranches: true,
 			},
@@ -163,9 +163,7 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.wantsOpts.Interactive, opts.Interactive)
 			assert.Equal(t, tt.wantsOpts.Source, opts.Source)
 			assert.Equal(t, tt.wantsOpts.Name, opts.Name)
-			assert.Equal(t, tt.wantsOpts.Public, opts.Public)
-			assert.Equal(t, tt.wantsOpts.Internal, opts.Internal)
-			assert.Equal(t, tt.wantsOpts.Private, opts.Private)
+			assert.Equal(t, tt.wantsOpts.Visibility, opts.Visibility)
 			assert.Equal(t, tt.wantsOpts.Clone, opts.Clone)
 		})
 	}

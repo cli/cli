@@ -79,16 +79,7 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 				opts.SelectorArg = args[0]
 			}
 
-			bodyProvided := cmd.Flags().Changed("body")
 			bodyFileProvided := bodyFile != ""
-
-			if err := cmdutil.MutuallyExclusive(
-				"specify only one of `--body` or `--body-file`",
-				bodyProvided,
-				bodyFileProvided,
-			); err != nil {
-				return err
-			}
 			if bodyFileProvided {
 				b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
 				if err != nil {
@@ -117,15 +108,15 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 				}
 			}
 
-			if found == 0 && opts.Body == "" {
-				if !opts.IO.CanPrompt() {
-					return cmdutil.FlagErrorf("--approve, --request-changes, or --comment required when not running interactively")
+			if found == 0 {
+				if opts.Body == "" {
+					if !opts.IO.CanPrompt() {
+						return cmdutil.FlagErrorf("--approve, --request-changes, or --comment required when not running interactively")
+					}
+					opts.InteractiveMode = true
+				} else {
+					return cmdutil.FlagErrorf("--body unsupported without --approve, --request-changes, or --comment")
 				}
-				opts.InteractiveMode = true
-			} else if found == 0 && opts.Body != "" {
-				return cmdutil.FlagErrorf("--body unsupported without --approve, --request-changes, or --comment")
-			} else if found > 1 {
-				return cmdutil.FlagErrorf("need exactly one of --approve, --request-changes, or --comment")
 			}
 
 			if runF != nil {
@@ -140,6 +131,9 @@ func NewCmdReview(f *cmdutil.Factory, runF func(*ReviewOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&flagComment, "comment", "c", false, "Comment on a pull request")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Specify the body of a review")
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
+
+	cmd.MarkFlagsMutuallyExclusive("body", "body-file")
+	cmd.MarkFlagsMutuallyExclusive("approve", "request-changes", "comment")
 
 	return cmd
 }

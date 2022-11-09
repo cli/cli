@@ -61,16 +61,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("invalid limit: %v", opts.Limit)
 			}
 
-			if err := cmdutil.MutuallyExclusive("specify only one of `--public`, `--private`, or `--visibility`", flagPublic, flagPrivate, opts.Visibility != ""); err != nil {
-				return err
-			}
-			if opts.Source && opts.Fork {
-				return cmdutil.FlagErrorf("specify only one of `--source` or `--fork`")
-			}
-			if opts.Archived && opts.NonArchived {
-				return cmdutil.FlagErrorf("specify only one of `--archived` or `--no-archived`")
-			}
-
 			if flagPrivate {
 				opts.Visibility = "private"
 			} else if flagPublic {
@@ -102,6 +92,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&flagPublic, "public", false, "Show only public repositories")
 	_ = cmd.Flags().MarkDeprecated("public", "use `--visibility=public` instead")
 	_ = cmd.Flags().MarkDeprecated("private", "use `--visibility=private` instead")
+
+	cmd.MarkFlagsMutuallyExclusive("public", "private", "visibility")
+	cmd.MarkFlagsMutuallyExclusive("source", "fork")
+	cmd.MarkFlagsMutuallyExclusive("archived", "no-archived")
 
 	return cmd
 }

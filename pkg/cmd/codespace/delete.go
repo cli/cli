@@ -54,9 +54,6 @@ func newDeleteCmd(app *App) *cobra.Command {
 		`),
 		Args: noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if opts.deleteAll && opts.repoFilter != "" {
-				return cmdutil.FlagErrorf("both `--all` and `--repo` is not supported")
-			}
 			if opts.orgName != "" && opts.codespaceName != "" && opts.userName == "" {
 				return cmdutil.FlagErrorf("using `--org` with `--codespace` requires `--user`")
 			}
@@ -71,6 +68,8 @@ func newDeleteCmd(app *App) *cobra.Command {
 	deleteCmd.Flags().Uint16Var(&opts.keepDays, "days", 0, "Delete codespaces older than `N` days")
 	deleteCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "The `login` handle of the organization (admin-only)")
 	deleteCmd.Flags().StringVarP(&opts.userName, "user", "u", "", "The `username` to delete codespaces for (used with --org)")
+
+	deleteCmd.MarkFlagsMutuallyExclusive("all", "repo")
 
 	return deleteCmd
 }

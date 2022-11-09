@@ -83,10 +83,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("invalid value for --limit: %v", opts.LimitResults)
 			}
 
-			if cmd.Flags().Changed("author") && cmd.Flags().Changed("app") {
-				return cmdutil.FlagErrorf("specify only `--author` or `--app`")
-			}
-
 			if cmd.Flags().Changed("app") {
 				opts.Author = fmt.Sprintf("app/%s", appAuthor)
 			}
@@ -111,6 +107,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmdutil.NilBoolFlag(cmd, &opts.Draft, "draft", "d", "Filter by draft state")
 
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
+
+	cmd.MarkFlagsMutuallyExclusive("author", "app")
 
 	return cmd
 }

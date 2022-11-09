@@ -41,19 +41,6 @@ func IsUserCancellation(err error) bool {
 	return errors.Is(err, CancelError) || errors.Is(err, terminal.InterruptErr)
 }
 
-func MutuallyExclusive(message string, conditions ...bool) error {
-	numTrue := 0
-	for _, ok := range conditions {
-		if ok {
-			numTrue++
-		}
-	}
-	if numTrue > 1 {
-		return FlagErrorf("%s", message)
-	}
-	return nil
-}
-
 type NoResultsError struct {
 	message string
 }

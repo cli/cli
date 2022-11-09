@@ -185,23 +185,6 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 				return cmdutil.FlagErrorf("the `--paginate` option is not supported for non-GET requests")
 			}
 
-			if err := cmdutil.MutuallyExclusive(
-				"the `--paginate` option is not supported with `--input`",
-				opts.Paginate,
-				opts.RequestInputFile != "",
-			); err != nil {
-				return err
-			}
-
-			if err := cmdutil.MutuallyExclusive(
-				"only one of `--template`, `--jq`, or `--silent` may be used",
-				opts.Silent,
-				opts.FilterOutput != "",
-				opts.Template != "",
-			); err != nil {
-				return err
-			}
-
 			if runF != nil {
 				return runF(&opts)
 			}
@@ -222,6 +205,10 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format JSON output using a Go template; see \"gh help formatting\"")
 	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
 	cmd.Flags().DurationVar(&opts.CacheTTL, "cache", 0, "Cache the response, e.g. \"3600s\", \"60m\", \"1h\"")
+
+	cmd.MarkFlagsMutuallyExclusive("paginate", "input")
+	cmd.MarkFlagsMutuallyExclusive("template", "jq", "silent")
+
 	return cmd
 }
 

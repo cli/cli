@@ -63,9 +63,6 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 			if opts.Query.Limit < 1 || opts.Query.Limit > shared.SearchMaxResults {
 				return cmdutil.FlagErrorf("`--limit` must be between 1 and 1000")
 			}
-			if c.Flags().Changed("author") && c.Flags().Changed("app") {
-				return cmdutil.FlagErrorf("specify only `--author` or `--app`")
-			}
 			if c.Flags().Changed("app") {
 				opts.Query.Qualifiers.Author = fmt.Sprintf("app/%s", appAuthor)
 			}
@@ -183,6 +180,8 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 	cmd.Flags().StringVar(&requestedReviewer, "review-requested", "", "Filter on `user` or team requested to review")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.ReviewedBy, "reviewed-by", "", "Filter on `user` who reviewed")
 	cmdutil.StringEnumFlag(cmd, &opts.Query.Qualifiers.Status, "checks", "", "", []string{"pending", "success", "failure"}, "Filter based on status of the checks")
+
+	cmd.MarkFlagsMutuallyExclusive("author", "app")
 
 	return cmd
 }

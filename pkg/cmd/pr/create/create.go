@@ -137,16 +137,6 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("`--recover` only supported when running interactively")
 			}
 
-			if opts.IsDraft && opts.WebMode {
-				return errors.New("the `--draft` flag is not supported with `--web`")
-			}
-			if len(opts.Reviewers) > 0 && opts.WebMode {
-				return errors.New("the `--reviewer` flag is not supported with `--web`")
-			}
-			if cmd.Flags().Changed("no-maintainer-edit") && opts.WebMode {
-				return errors.New("the `--no-maintainer-edit` flag is not supported with `--web`")
-			}
-
 			opts.BodyProvided = cmd.Flags().Changed("body")
 			if bodyFile != "" {
 				b, err := cmdutil.ReadFile(bodyFile, opts.IO.In)
@@ -184,6 +174,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVarP(&opts.Milestone, "milestone", "m", "", "Add the pull request to a milestone by `name`")
 	fl.Bool("no-maintainer-edit", false, "Disable maintainer's ability to modify pull request")
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
+
+	cmd.MarkFlagsMutuallyExclusive("draft", "web")
+	cmd.MarkFlagsMutuallyExclusive("reviewer", "web")
+	cmd.MarkFlagsMutuallyExclusive("no-maintainer-edit", "web")
 
 	return cmd
 }

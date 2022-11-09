@@ -82,10 +82,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("invalid limit: %v", opts.LimitResults)
 			}
 
-			if cmd.Flags().Changed("author") && cmd.Flags().Changed("app") {
-				return cmdutil.FlagErrorf("specify only `--author` or `--app`")
-			}
-
 			if cmd.Flags().Changed("app") {
 				opts.Author = fmt.Sprintf("app/%s", appAuthor)
 			}
@@ -108,6 +104,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Filter by milestone number or title")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search issues with `query`")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.IssueFields)
+
+	cmd.MarkFlagsMutuallyExclusive("author", "app")
 
 	return cmd
 }

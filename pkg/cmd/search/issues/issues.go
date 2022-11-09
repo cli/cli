@@ -61,9 +61,6 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 			if opts.Query.Limit < 1 || opts.Query.Limit > shared.SearchMaxResults {
 				return cmdutil.FlagErrorf("`--limit` must be between 1 and 1000")
 			}
-			if c.Flags().Changed("author") && c.Flags().Changed("app") {
-				return cmdutil.FlagErrorf("specify only `--author` or `--app`")
-			}
 			if c.Flags().Changed("app") {
 				opts.Query.Qualifiers.Author = fmt.Sprintf("app/%s", appAuthor)
 			}
@@ -161,6 +158,8 @@ func NewCmdIssues(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *c
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Team, "team-mentions", "", "Filter based on team mentions")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Updated, "updated", "", "Filter on last updated at `date`")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.User, "owner", "", "Filter on repository owner")
+
+	cmd.MarkFlagsMutuallyExclusive("author", "app")
 
 	return cmd
 }
