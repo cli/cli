@@ -41,6 +41,11 @@ func NewCmdIssue(f *cmdutil.Factory) *cobra.Command {
 
 	cmdutil.EnableRepoOverride(cmd, f)
 
+	cmd.AddGroup(&cobra.Group{
+		ID:    "general",
+		Title: "General commands",
+	})
+
 	cmd.AddCommand(cmdClose.NewCmdClose(f, nil))
 	cmd.AddCommand(cmdCreate.NewCmdCreate(f, nil))
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
