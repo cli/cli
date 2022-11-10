@@ -2,7 +2,6 @@ package clone
 
 import (
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/git"
@@ -142,47 +141,47 @@ func Test_RepoClone(t *testing.T) {
 		{
 			name: "shorthand",
 			args: "OWNER/REPO",
-			want: `git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://github.com/OWNER/REPO.git`,
+			want: `git clone https://github.com/OWNER/REPO.git`,
 		},
 		{
 			name: "shorthand with directory",
 			args: "OWNER/REPO target_directory",
-			want: `git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://github.com/OWNER/REPO.git target_directory`,
+			want: `git clone https://github.com/OWNER/REPO.git target_directory`,
 		},
 		{
 			name: "clone arguments",
 			args: "OWNER/REPO -- -o upstream --depth 1",
-			want: `git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone -o upstream --depth 1 https://github.com/OWNER/REPO.git`,
+			want: `git clone -o upstream --depth 1 https://github.com/OWNER/REPO.git`,
 		},
 		{
 			name: "clone arguments with directory",
 			args: "OWNER/REPO target_directory -- -o upstream --depth 1",
-			want: `git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone -o upstream --depth 1 https://github.com/OWNER/REPO.git target_directory`,
+			want: `git clone -o upstream --depth 1 https://github.com/OWNER/REPO.git target_directory`,
 		},
 		{
 			name: "HTTPS URL",
 			args: "https://github.com/OWNER/REPO",
-			want: `git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://github.com/OWNER/REPO.git`,
+			want: `git clone https://github.com/OWNER/REPO.git`,
 		},
 		{
 			name: "SSH URL",
 			args: "git@github.com:OWNER/REPO.git",
-			want: `git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone git@github.com:OWNER/REPO.git`,
+			want: `git clone git@github.com:OWNER/REPO.git`,
 		},
 		{
 			name: "Non-canonical capitalization",
 			args: "Owner/Repo",
-			want: `git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://github.com/OWNER/REPO.git`,
+			want: `git clone https://github.com/OWNER/REPO.git`,
 		},
 		{
 			name: "clone wiki",
 			args: "Owner/Repo.wiki",
-			want: `git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://github.com/OWNER/REPO.wiki.git`,
+			want: `git clone https://github.com/OWNER/REPO.wiki.git`,
 		},
 		{
 			name: "wiki URL",
 			args: "https://github.com/owner/repo.wiki",
-			want: `git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://github.com/OWNER/REPO.wiki.git`,
+			want: `git clone https://github.com/OWNER/REPO.wiki.git`,
 		},
 	}
 	for _, tt := range tests {
@@ -205,9 +204,7 @@ func Test_RepoClone(t *testing.T) {
 
 			cs, restore := run.Stub()
 			defer restore(t)
-			cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone`, 0, "", func(s []string) {
-				assert.Equal(t, tt.want, strings.Join(s, " "))
-			})
+			cs.Register(tt.want, 0, "")
 
 			output, err := runCloneCommand(httpClient, tt.args)
 			if err != nil {
@@ -247,8 +244,8 @@ func Test_RepoClone_hasParent(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://github.com/OWNER/REPO.git`, 0, "")
-	cs.Register(`git -C REPO -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential remote add -t trunk -f upstream https://github.com/hubot/ORIG.git`, 0, "")
+	cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
+	cs.Register(`git -C REPO remote add -t trunk -f upstream https://github.com/hubot/ORIG.git`, 0, "")
 
 	_, err := runCloneCommand(httpClient, "OWNER/REPO")
 	if err != nil {
@@ -283,8 +280,8 @@ func Test_RepoClone_hasParent_upstreamRemoteName(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://github.com/OWNER/REPO.git`, 0, "")
-	cs.Register(`git -C REPO -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential remote add -t trunk -f test https://github.com/hubot/ORIG.git`, 0, "")
+	cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
+	cs.Register(`git -C REPO remote add -t trunk -f test https://github.com/hubot/ORIG.git`, 0, "")
 
 	_, err := runCloneCommand(httpClient, "OWNER/REPO --upstream-remote-name test")
 	if err != nil {
@@ -316,7 +313,7 @@ func Test_RepoClone_withoutUsername(t *testing.T) {
 
 	cs, restore := run.Stub()
 	defer restore(t)
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential clone https://github\.com/OWNER/REPO\.git`, 0, "")
+	cs.Register(`git clone https://github\.com/OWNER/REPO\.git`, 0, "")
 
 	output, err := runCloneCommand(httpClient, "REPO")
 	if err != nil {

@@ -469,7 +469,7 @@ func Test_developRun(t *testing.T) {
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 0, "")
 				cs.Register(`git checkout my-branch`, 0, "")
-				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential pull --ff-only origin my-branch`, 0, "")
+				cs.Register(`git pull --ff-only origin my-branch`, 0, "")
 			},
 			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
 		},
@@ -517,9 +517,9 @@ func Test_developRun(t *testing.T) {
 			},
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git rev-parse --verify refs/heads/my-branch`, 1, "")
-				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
+				cs.Register(`git fetch origin \+refs/heads/my-branch:refs/remotes/origin/my-branch`, 0, "")
 				cs.Register(`git checkout -b my-branch --track origin/my-branch`, 0, "")
-				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential pull --ff-only origin my-branch`, 0, "")
+				cs.Register(`git pull --ff-only origin my-branch`, 0, "")
 			},
 			expectedOut: "github.com/OWNER/REPO/tree/my-branch\n",
 		},

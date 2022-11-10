@@ -564,7 +564,7 @@ func createFromLocal(opts *CreateOptions) error {
 
 func sourceInit(gitClient *git.Client, io *iostreams.IOStreams, remoteURL, baseRemote string) error {
 	cs := io.ColorScheme()
-	remoteAdd, err := gitClient.Command(context.Background(), "remote", "add", baseRemote, remoteURL)
+	remoteAdd, err := gitClient.AuthenticatedCommand(context.Background(), "remote", "add", baseRemote, remoteURL)
 	if err != nil {
 		return err
 	}

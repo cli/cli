@@ -642,7 +642,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential pull --ff-only`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, `pr merge --merge --delete-branch`)
 	if err != nil {
@@ -692,7 +692,7 @@ func TestPrMerge_deleteBranch_nonDefault(t *testing.T) {
 	cs.Register(`git checkout fruit`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential pull --ff-only`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, `pr merge --merge --delete-branch`)
 	if err != nil {
@@ -742,7 +742,7 @@ func TestPrMerge_deleteBranch_checkoutNewBranch(t *testing.T) {
 	cs.Register(`git checkout -b fruit --track origin/fruit`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential pull --ff-only`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
 
 	output, err := runCommand(http, "blueberries", true, `pr merge --merge --delete-branch`)
 	if err != nil {
@@ -1027,7 +1027,7 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential pull --ff-only`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
 
 	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 	as := prompt.NewAskStubber(t)
@@ -1231,7 +1231,7 @@ func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
 	cs.Register(`git checkout main`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential pull --ff-only`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
 
 	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 	as := prompt.NewAskStubber(t)

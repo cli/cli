@@ -93,12 +93,12 @@ func Test_checkoutRun(t *testing.T) {
 				"origin": "OWNER/REPO",
 			},
 			runStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential fetch origin refs/pull/123/head:feature`, 0, "")
+				cs.Register(`git fetch origin refs/pull/123/head:feature`, 0, "")
 				cs.Register(`git config branch\.feature\.merge`, 1, "")
-				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential checkout feature`, 0, "")
-				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential config branch\.feature\.remote origin`, 0, "")
-				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential config branch\.feature\.pushRemote origin`, 0, "")
-				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential config branch\.feature\.merge refs/pull/123/head`, 0, "")
+				cs.Register(`git checkout feature`, 0, "")
+				cs.Register(`git config branch\.feature\.remote origin`, 0, "")
+				cs.Register(`git config branch\.feature\.pushRemote origin`, 0, "")
+				cs.Register(`git config branch\.feature\.merge refs/pull/123/head`, 0, "")
 			},
 		},
 		{
@@ -123,8 +123,8 @@ func Test_checkoutRun(t *testing.T) {
 			},
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git show-ref --verify -- refs/heads/foobar`, 1, "")
-				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential fetch origin \+refs/heads/feature:refs/remotes/origin/feature`, 0, "")
-				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential checkout -b foobar --track origin/feature`, 0, "")
+				cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature`, 0, "")
+				cs.Register(`git checkout -b foobar --track origin/feature`, 0, "")
 			},
 		},
 		{
@@ -150,11 +150,11 @@ func Test_checkoutRun(t *testing.T) {
 			},
 			runStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config branch\.foobar\.merge`, 1, "")
-				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential fetch origin refs/pull/123/head:foobar`, 0, "")
-				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential checkout foobar`, 0, "")
-				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential config branch\.foobar\.remote https://github.com/hubot/REPO.git`, 0, "")
-				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential config branch\.foobar\.pushRemote https://github.com/hubot/REPO.git`, 0, "")
-				cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential config branch\.foobar\.merge refs/heads/feature`, 0, "")
+				cs.Register(`git fetch origin refs/pull/123/head:foobar`, 0, "")
+				cs.Register(`git checkout foobar`, 0, "")
+				cs.Register(`git config branch\.foobar\.remote https://github.com/hubot/REPO.git`, 0, "")
+				cs.Register(`git config branch\.foobar\.pushRemote https://github.com/hubot/REPO.git`, 0, "")
+				cs.Register(`git config branch\.foobar\.merge refs/heads/feature`, 0, "")
 			},
 		},
 	}
@@ -275,9 +275,9 @@ func TestPRCheckout_sameRepo(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential fetch origin \+refs/heads/feature:refs/remotes/origin/feature`, 0, "")
+	cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature`, 0, "")
 	cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential checkout -b feature --track origin/feature`, 0, "")
+	cs.Register(`git checkout -b feature --track origin/feature`, 0, "")
 
 	output, err := runCommand(http, nil, "master", `123`)
 	assert.NoError(t, err)
@@ -295,10 +295,10 @@ func TestPRCheckout_existingBranch(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential fetch origin \+refs/heads/feature:refs/remotes/origin/feature`, 0, "")
+	cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature`, 0, "")
 	cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential checkout feature`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential merge --ff-only refs/remotes/origin/feature`, 0, "")
+	cs.Register(`git checkout feature`, 0, "")
+	cs.Register(`git merge --ff-only refs/remotes/origin/feature`, 0, "")
 
 	output, err := runCommand(http, nil, "master", `123`)
 	assert.NoError(t, err)
@@ -328,9 +328,9 @@ func TestPRCheckout_differentRepo_remoteExists(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential fetch robot-fork \+refs/heads/feature:refs/remotes/robot-fork/feature`, 0, "")
+	cs.Register(`git fetch robot-fork \+refs/heads/feature:refs/remotes/robot-fork/feature`, 0, "")
 	cs.Register(`git show-ref --verify -- refs/heads/feature`, 1, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential checkout -b feature --track robot-fork/feature`, 0, "")
+	cs.Register(`git checkout -b feature --track robot-fork/feature`, 0, "")
 
 	output, err := runCommand(http, remotes, "master", `123`)
 	assert.NoError(t, err)
@@ -349,12 +349,12 @@ func TestPRCheckout_differentRepo(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential fetch origin refs/pull/123/head:feature`, 0, "")
+	cs.Register(`git fetch origin refs/pull/123/head:feature`, 0, "")
 	cs.Register(`git config branch\.feature\.merge`, 1, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential checkout feature`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential config branch\.feature\.remote origin`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential config branch\.feature\.pushRemote origin`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential config branch\.feature\.merge refs/pull/123/head`, 0, "")
+	cs.Register(`git checkout feature`, 0, "")
+	cs.Register(`git config branch\.feature\.remote origin`, 0, "")
+	cs.Register(`git config branch\.feature\.pushRemote origin`, 0, "")
+	cs.Register(`git config branch\.feature\.merge refs/pull/123/head`, 0, "")
 
 	output, err := runCommand(http, nil, "master", `123`)
 	assert.NoError(t, err)
@@ -372,9 +372,9 @@ func TestPRCheckout_differentRepo_existingBranch(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential fetch origin refs/pull/123/head:feature`, 0, "")
+	cs.Register(`git fetch origin refs/pull/123/head:feature`, 0, "")
 	cs.Register(`git config branch\.feature\.merge`, 0, "refs/heads/feature\n")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential checkout feature`, 0, "")
+	cs.Register(`git checkout feature`, 0, "")
 
 	output, err := runCommand(http, nil, "master", `123`)
 	assert.NoError(t, err)
@@ -392,9 +392,9 @@ func TestPRCheckout_detachedHead(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential fetch origin refs/pull/123/head:feature`, 0, "")
+	cs.Register(`git fetch origin refs/pull/123/head:feature`, 0, "")
 	cs.Register(`git config branch\.feature\.merge`, 0, "refs/heads/feature\n")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential checkout feature`, 0, "")
+	cs.Register(`git checkout feature`, 0, "")
 
 	output, err := runCommand(http, nil, "", `123`)
 	assert.NoError(t, err)
@@ -412,9 +412,9 @@ func TestPRCheckout_differentRepo_currentBranch(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential fetch origin refs/pull/123/head`, 0, "")
+	cs.Register(`git fetch origin refs/pull/123/head`, 0, "")
 	cs.Register(`git config branch\.feature\.merge`, 0, "refs/heads/feature\n")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential merge --ff-only FETCH_HEAD`, 0, "")
+	cs.Register(`git merge --ff-only FETCH_HEAD`, 0, "")
 
 	output, err := runCommand(http, nil, "feature", `123`)
 	assert.NoError(t, err)
@@ -449,12 +449,12 @@ func TestPRCheckout_maintainerCanModify(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential fetch origin refs/pull/123/head:feature`, 0, "")
+	cs.Register(`git fetch origin refs/pull/123/head:feature`, 0, "")
 	cs.Register(`git config branch\.feature\.merge`, 1, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential checkout feature`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential config branch\.feature\.remote https://github\.com/hubot/REPO\.git`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential config branch\.feature\.pushRemote https://github\.com/hubot/REPO\.git`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential config branch\.feature\.merge refs/heads/feature`, 0, "")
+	cs.Register(`git checkout feature`, 0, "")
+	cs.Register(`git config branch\.feature\.remote https://github\.com/hubot/REPO\.git`, 0, "")
+	cs.Register(`git config branch\.feature\.pushRemote https://github\.com/hubot/REPO\.git`, 0, "")
+	cs.Register(`git config branch\.feature\.merge refs/heads/feature`, 0, "")
 
 	output, err := runCommand(http, nil, "master", `123`)
 	assert.NoError(t, err)
@@ -471,12 +471,12 @@ func TestPRCheckout_recurseSubmodules(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential fetch origin \+refs/heads/feature:refs/remotes/origin/feature`, 0, "")
+	cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature`, 0, "")
 	cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential checkout feature`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential merge --ff-only refs/remotes/origin/feature`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential submodule sync --recursive`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential submodule update --init --recursive`, 0, "")
+	cs.Register(`git checkout feature`, 0, "")
+	cs.Register(`git merge --ff-only refs/remotes/origin/feature`, 0, "")
+	cs.Register(`git submodule sync --recursive`, 0, "")
+	cs.Register(`git submodule update --init --recursive`, 0, "")
 
 	output, err := runCommand(http, nil, "master", `123 --recurse-submodules`)
 	assert.NoError(t, err)
@@ -493,10 +493,10 @@ func TestPRCheckout_force(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential fetch origin \+refs/heads/feature:refs/remotes/origin/feature`, 0, "")
+	cs.Register(`git fetch origin \+refs/heads/feature:refs/remotes/origin/feature`, 0, "")
 	cs.Register(`git show-ref --verify -- refs/heads/feature`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential checkout feature`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential reset --hard refs/remotes/origin/feature`, 0, "")
+	cs.Register(`git checkout feature`, 0, "")
+	cs.Register(`git reset --hard refs/remotes/origin/feature`, 0, "")
 
 	output, err := runCommand(http, nil, "master", `123 --force`)
 
@@ -515,8 +515,8 @@ func TestPRCheckout_detach(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential checkout --detach FETCH_HEAD`, 0, "")
-	cs.Register(`git -c credential.helper= -c credential.helper=!"some/path/gh" auth git-credential fetch origin refs/pull/123/head`, 0, "")
+	cs.Register(`git checkout --detach FETCH_HEAD`, 0, "")
+	cs.Register(`git fetch origin refs/pull/123/head`, 0, "")
 
 	output, err := runCommand(http, nil, "", `123 --detach`)
 	assert.NoError(t, err)
