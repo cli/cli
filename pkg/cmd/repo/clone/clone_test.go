@@ -141,47 +141,47 @@ func Test_RepoClone(t *testing.T) {
 		{
 			name: "shorthand",
 			args: "OWNER/REPO",
-			want: `git clone https://github.com/OWNER/REPO.git`,
+			want: "git clone https://github.com/OWNER/REPO.git",
 		},
 		{
 			name: "shorthand with directory",
 			args: "OWNER/REPO target_directory",
-			want: `git clone https://github.com/OWNER/REPO.git target_directory`,
+			want: "git clone https://github.com/OWNER/REPO.git target_directory",
 		},
 		{
 			name: "clone arguments",
 			args: "OWNER/REPO -- -o upstream --depth 1",
-			want: `git clone -o upstream --depth 1 https://github.com/OWNER/REPO.git`,
+			want: "git clone -o upstream --depth 1 https://github.com/OWNER/REPO.git",
 		},
 		{
 			name: "clone arguments with directory",
 			args: "OWNER/REPO target_directory -- -o upstream --depth 1",
-			want: `git clone -o upstream --depth 1 https://github.com/OWNER/REPO.git target_directory`,
+			want: "git clone -o upstream --depth 1 https://github.com/OWNER/REPO.git target_directory",
 		},
 		{
 			name: "HTTPS URL",
 			args: "https://github.com/OWNER/REPO",
-			want: `git clone https://github.com/OWNER/REPO.git`,
+			want: "git clone https://github.com/OWNER/REPO.git",
 		},
 		{
 			name: "SSH URL",
 			args: "git@github.com:OWNER/REPO.git",
-			want: `git clone git@github.com:OWNER/REPO.git`,
+			want: "git clone git@github.com:OWNER/REPO.git",
 		},
 		{
 			name: "Non-canonical capitalization",
 			args: "Owner/Repo",
-			want: `git clone https://github.com/OWNER/REPO.git`,
+			want: "git clone https://github.com/OWNER/REPO.git",
 		},
 		{
 			name: "clone wiki",
 			args: "Owner/Repo.wiki",
-			want: `git clone https://github.com/OWNER/REPO.wiki.git`,
+			want: "git clone https://github.com/OWNER/REPO.wiki.git",
 		},
 		{
 			name: "wiki URL",
 			args: "https://github.com/owner/repo.wiki",
-			want: `git clone https://github.com/OWNER/REPO.wiki.git`,
+			want: "git clone https://github.com/OWNER/REPO.wiki.git",
 		},
 	}
 	for _, tt := range tests {

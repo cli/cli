@@ -62,32 +62,32 @@ func Test_GistClone(t *testing.T) {
 		{
 			name: "shorthand",
 			args: "GIST",
-			want: `git clone https://gist.github.com/GIST.git`,
+			want: "git clone https://gist.github.com/GIST.git",
 		},
 		{
 			name: "shorthand with directory",
 			args: "GIST target_directory",
-			want: `git clone https://gist.github.com/GIST.git target_directory`,
+			want: "git clone https://gist.github.com/GIST.git target_directory",
 		},
 		{
 			name: "clone arguments",
 			args: "GIST -- -o upstream --depth 1",
-			want: `git clone -o upstream --depth 1 https://gist.github.com/GIST.git`,
+			want: "git clone -o upstream --depth 1 https://gist.github.com/GIST.git",
 		},
 		{
 			name: "clone arguments with directory",
 			args: "GIST target_directory -- -o upstream --depth 1",
-			want: `git clone -o upstream --depth 1 https://gist.github.com/GIST.git target_directory`,
+			want: "git clone -o upstream --depth 1 https://gist.github.com/GIST.git target_directory",
 		},
 		{
 			name: "HTTPS URL",
 			args: "https://gist.github.com/OWNER/GIST",
-			want: `git clone https://gist.github.com/OWNER/GIST`,
+			want: "git clone https://gist.github.com/OWNER/GIST",
 		},
 		{
 			name: "SSH URL",
 			args: "git@gist.github.com:GIST.git",
-			want: `git clone git@gist.github.com:GIST.git`,
+			want: "git clone git@gist.github.com:GIST.git",
 		},
 	}
 	for _, tt := range tests {
