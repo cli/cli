@@ -10,6 +10,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -113,12 +114,17 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 
 	promptForRepoAndBranch := userInputs.Repository == ""
 	if promptForRepoAndBranch {
+		currentRepo, err := a.baseRepo()
+		if err != nil {
+			return err
+		}
 		repoQuestions := []*survey.Question{
 			{
 				Name: "repository",
 				Prompt: &survey.Input{
 					Message: "Repository:",
 					Help:    "Search for repos by name. To search within an org or user, or to see private repos, enter at least ':user/'.",
+					Default: ghrepo.FullName(currentRepo),
 					Suggest: func(toComplete string) []string {
 						return getRepoSuggestions(ctx, a.apiClient, toComplete)
 					},

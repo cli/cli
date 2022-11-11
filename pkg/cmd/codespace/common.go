@@ -16,6 +16,7 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
@@ -33,9 +34,10 @@ type App struct {
 	errLogger  *log.Logger
 	executable executable
 	browser    browser.Browser
+	baseRepo   func() (ghrepo.Interface, error)
 }
 
-func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browser browser.Browser) *App {
+func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browser browser.Browser, baseRepo func() (ghrepo.Interface, error)) *App {
 	errLogger := log.New(io.ErrOut, "", 0)
 
 	return &App{
@@ -44,6 +46,7 @@ func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browse
 		errLogger:  errLogger,
 		executable: exe,
 		browser:    browser,
+		baseRepo:   baseRepo,
 	}
 }
 
