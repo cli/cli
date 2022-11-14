@@ -80,7 +80,7 @@ func listRepos(client *http.Client, hostname string, limit int, owner string, fi
 	query := fmt.Sprintf(`query RepositoryList(%s) {
 		%s {
 			login
-			repositories(first: $perPage, after: $endCursor, privacy: $privacy, isFork: $fork, affiliations: OWNER, orderBy: { field: PUSHED_AT, direction: DESC }) {
+			repositories(first: $perPage, after: $endCursor, privacy: $privacy, isFork: $fork, ownerAffiliations: OWNER, orderBy: { field: PUSHED_AT, direction: DESC }) {
 				nodes{%s}
 				totalCount
 				pageInfo{hasNextPage,endCursor}
