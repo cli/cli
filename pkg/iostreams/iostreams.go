@@ -341,7 +341,7 @@ func (s *IOStreams) SetAlternateScreenBufferEnabled(enabled bool) {
 }
 
 func (s *IOStreams) RefreshScreen() {
-	if s.stdoutIsTTY {
+	if s.IsStdoutTTY() {
 		// Move cursor to 0,0
 		fmt.Fprint(s.Out, "\x1b[0;0H")
 		// Clear from cursor to bottom of screen
@@ -406,13 +406,16 @@ func System() *IOStreams {
 		term:         &terminal,
 	}
 
-	stdoutIsTTY := io.IsStdoutTTY()
+	io.stdoutIsTTY = io.IsStdoutTTY()
+	io.stderrIsTTY = io.IsStderrTTY()
+	io.stdoutTTYOverride = true
+	io.stderrTTYOverride = true
 
-	if stdoutIsTTY && io.IsStderrTTY() {
+	if io.stdoutIsTTY && io.stderrIsTTY {
 		io.progressIndicatorEnabled = true
 	}
 
-	if stdoutIsTTY && hasAlternateScreenBuffer(terminal.IsTrueColorSupported()) {
+	if io.stdoutIsTTY && hasAlternateScreenBuffer(terminal.IsTrueColorSupported()) {
 		io.alternateScreenBufferEnabled = true
 	}
 
