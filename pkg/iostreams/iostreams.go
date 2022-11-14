@@ -406,14 +406,14 @@ func System() *IOStreams {
 		term:         &terminal,
 	}
 
-	io.stdoutIsTTY = io.IsStdoutTTY()
-	io.stderrIsTTY = io.IsStderrTTY()
+	stdoutIsTTY := io.IsStdoutTTY()
+	stderrIsTTY := io.IsStderrTTY()
 
-	if io.stdoutIsTTY && io.stderrIsTTY {
+	if stdoutIsTTY && stderrIsTTY {
 		io.progressIndicatorEnabled = true
 	}
 
-	if io.stdoutIsTTY && hasAlternateScreenBuffer(terminal.IsTrueColorSupported()) {
+	if stdoutIsTTY && hasAlternateScreenBuffer(terminal.IsTrueColorSupported()) {
 		io.alternateScreenBufferEnabled = true
 	}
 
