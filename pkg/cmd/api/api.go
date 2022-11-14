@@ -467,35 +467,78 @@ func printHeaders(w io.Writer, headers http.Header, colorize bool) {
 	}
 }
 
+var nestedKeyRE = regexp.MustCompile(`(.+?)\[([^]]+)\]`)
+
 func parseFields(opts *ApiOptions) (map[string]interface{}, error) {
 	params := make(map[string]interface{})
+	parseField := func(f string, isMagic bool) error {
+		key := f
+		idx := strings.IndexRune(f, '=')
+		if idx >= 0 {
+			key = f[0:idx]
+		}
+		isArray := strings.HasSuffix(key, "[]")
+		if isArray {
+			key = strings.TrimSuffix(key, "[]")
+		}
+		dest := params
+		for {
+			m := nestedKeyRE.FindStringSubmatch(key)
+			if m == nil {
+				break
+			}
+			matchKey := m[1]
+			subKey := m[2]
+			existing, found := dest[matchKey]
+			if found {
+				// FIXME: avoid panic
+				dest = existing.(map[string]interface{})
+			} else {
+				newDest := map[string]interface{}{}
+				dest[matchKey] = newDest
+				dest = newDest
+			}
+			key = subKey
+		}
+		if idx == -1 {
+			if isArray {
+				dest[key] = []interface{}{}
+				return nil
+			}
+			return fmt.Errorf("field %q requires a value separated by an '=' sign", f)
+		}
+		var value interface{} = f[idx+1:]
+		if isMagic {
+			var err error
+			value, err = magicFieldValue(value.(string), opts)
+			if err != nil {
+				return fmt.Errorf("error parsing %q value: %w", key, err)
+			}
+		}
+		if isArray {
+			existing, found := params[key]
+			if found {
+				// FIXME: avoid panic
+				dest[key] = append(existing.([]interface{}), value)
+			} else {
+				dest[key] = []interface{}{value}
+			}
+		} else {
+			dest[key] = value
+		}
+		return nil
+	}
 	for _, f := range opts.RawFields {
-		key, value, err := parseField(f)
-		if err != nil {
+		if err := parseField(f, false); err != nil {
 			return params, err
 		}
-		params[key] = value
 	}
 	for _, f := range opts.MagicFields {
-		key, strValue, err := parseField(f)
-		if err != nil {
+		if err := parseField(f, true); err != nil {
 			return params, err
 		}
-		value, err := magicFieldValue(strValue, opts)
-		if err != nil {
-			return params, fmt.Errorf("error parsing %q value: %w", key, err)
-		}
-		params[key] = value
 	}
 	return params, nil
-}
-
-func parseField(f string) (string, string, error) {
-	idx := strings.IndexRune(f, '=')
-	if idx == -1 {
-		return f, "", fmt.Errorf("field %q requires a value separated by an '=' sign", f)
-	}
-	return f[0:idx], f[idx+1:], nil
 }
 
 func magicFieldValue(v string, opts *ApiOptions) (interface{}, error) {

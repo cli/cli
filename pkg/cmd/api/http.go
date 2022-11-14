@@ -35,6 +35,7 @@ func httpRequest(client *http.Client, hostname string, method string, p string, 
 			for key, value := range pp {
 				switch vv := value.(type) {
 				case []byte:
+					// TODO: handle deeply nested values too
 					pp[key] = string(vv)
 				}
 			}

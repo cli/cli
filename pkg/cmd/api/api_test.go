@@ -953,6 +953,54 @@ func Test_parseFields(t *testing.T) {
 	assert.Equal(t, expect, params)
 }
 
+func Test_parseFields_nested(t *testing.T) {
+	ios, stdin, _, _ := iostreams.Test()
+	fmt.Fprint(stdin, "pasted contents")
+
+	opts := ApiOptions{
+		IO: ios,
+		RawFields: []string{
+			"branch[name]=patch-1",
+			"robots[]=Hubot",
+			"robots[]=Dependabot",
+			"empty[]",
+		},
+		MagicFields: []string{
+			"branch[protections]=true",
+			"ids[]=123",
+			"ids[]=456",
+		},
+	}
+
+	params, err := parseFields(&opts)
+	if err != nil {
+		t.Fatalf("parseFields error: %v", err)
+	}
+
+	jsonData, err := json.MarshalIndent(params, "", "\t")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, strings.TrimSuffix(heredoc.Doc(`
+		{
+			"branch": {
+				"name": "patch-1",
+				"protections": true
+			},
+			"empty": [],
+			"ids": [
+				123,
+				456
+			],
+			"robots": [
+				"Hubot",
+				"Dependabot"
+			]
+		}
+	`), "\n"), string(jsonData))
+}
+
 func Test_magicFieldValue(t *testing.T) {
 	f, err := os.CreateTemp(t.TempDir(), "gh-test")
 	if err != nil {
