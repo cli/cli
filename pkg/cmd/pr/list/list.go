@@ -5,15 +5,16 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
@@ -36,6 +37,8 @@ type ListOptions struct {
 	Assignee   string
 	Search     string
 	Draft      *bool
+
+	Now func() time.Time
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -43,6 +46,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
+		Now:        time.Now,
 	}
 
 	var appAuthor string
@@ -120,6 +124,7 @@ var defaultFields = []string{
 	"headRepositoryOwner",
 	"isCrossRepository",
 	"isDraft",
+	"createdAt",
 }
 
 func listRun(opts *ListOptions) error {
@@ -161,7 +166,7 @@ func listRun(opts *ListOptions) error {
 		}
 
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 		}
 		return opts.Browser.Browse(openURL)
 	}
@@ -169,6 +174,9 @@ func listRun(opts *ListOptions) error {
 	listResult, err := listPullRequests(httpClient, baseRepo, filters, opts.LimitResults)
 	if err != nil {
 		return err
+	}
+	if len(listResult.PullRequests) == 0 && opts.Exporter == nil {
+		return shared.ListNoResults(ghrepo.FullName(baseRepo), "pull request", !filters.IsDefault())
 	}
 
 	err = opts.IO.StartPager()
@@ -184,26 +192,30 @@ func listRun(opts *ListOptions) error {
 	if listResult.SearchCapped {
 		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
 	}
-	if len(listResult.PullRequests) == 0 {
-		return shared.ListNoResults(ghrepo.FullName(baseRepo), "pull request", !filters.IsDefault())
-	}
 	if opts.IO.IsStdoutTTY() {
 		title := shared.ListHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, !filters.IsDefault())
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
 	cs := opts.IO.ColorScheme()
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	table := utils.NewTablePrinter(opts.IO)
 	for _, pr := range listResult.PullRequests {
 		prNum := strconv.Itoa(pr.Number)
 		if table.IsTTY() {
 			prNum = "#" + prNum
 		}
+
 		table.AddField(prNum, nil, cs.ColorFromString(shared.ColorForPRState(pr)))
-		table.AddField(text.ReplaceExcessiveWhitespace(pr.Title), nil, nil)
+		table.AddField(text.RemoveExcessiveWhitespace(pr.Title), nil, nil)
 		table.AddField(pr.HeadLabel(), nil, cs.Cyan)
 		if !table.IsTTY() {
 			table.AddField(prStateWithDraft(&pr), nil, nil)
+		}
+		if table.IsTTY() {
+			table.AddField(text.FuzzyAgo(opts.Now(), pr.CreatedAt), nil, cs.Gray)
+		} else {
+			table.AddField(pr.CreatedAt.String(), nil, nil)
 		}
 		table.EndRow()
 	}

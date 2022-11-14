@@ -305,6 +305,28 @@ func Test_repoCreate(t *testing.T) {
 			wantRepo: "https://github.com/snacks-inc/crisps",
 		},
 		{
+			name:     "create with README",
+			hostname: "github.com",
+			input: repoCreateInput{
+				Name:       "crisps",
+				InitReadme: true,
+			},
+			stubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("POST", "user/repos"),
+					httpmock.RESTPayload(201, `{"name":"crisps", "owner":{"login": "snacks-inc"}, "html_url":"the://URL"}`, func(payload map[string]interface{}) {
+						assert.Equal(t, map[string]interface{}{
+							"name":       "crisps",
+							"private":    false,
+							"has_issues": false,
+							"has_wiki":   false,
+							"auto_init":  true,
+						}, payload)
+					}))
+			},
+			wantRepo: "https://github.com/snacks-inc/crisps",
+		},
+		{
 			name:     "create with license and gitignore on Enterprise",
 			hostname: "example.com",
 			input: repoCreateInput{

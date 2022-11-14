@@ -7,12 +7,13 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
-	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	ghAuth "github.com/cli/go-gh/pkg/auth"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +21,8 @@ type LoginOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
-	Prompter   prompter.Prompter
+	GitClient  *git.Client
+	Prompter   shared.Prompt
 
 	MainExecutable string
 
@@ -38,6 +40,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Prompter:   f.Prompter,
 	}
 
@@ -60,7 +63,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			This method is most suitable for "headless" use of gh such as in automation. See
 			%[1]sgh help environment%[1]s for more info.
 
-			To use gh in GitHub Actions, add %[1]sGH_TOKEN: ${{secrets.GITHUB_TOKEN}}%[1]s to "env".
+			To use gh in GitHub Actions, add %[1]sGH_TOKEN: ${{ github.token }}%[1]s to "env".
 		`, "`"),
 		Example: heredoc.Doc(`
 			# start interactive setup
@@ -100,7 +103,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			}
 
 			if opts.Hostname == "" && (!opts.Interactive || opts.Web) {
-				opts.Hostname = ghinstance.Default()
+				opts.Hostname, _ = ghAuth.DefaultHost()
 			}
 
 			opts.MainExecutable = f.Executable()
@@ -183,17 +186,16 @@ func loginRun(opts *LoginOptions) error {
 		Executable:  opts.MainExecutable,
 		GitProtocol: opts.GitProtocol,
 		Prompter:    opts.Prompter,
+		GitClient:   opts.GitClient,
 	})
 }
 
 func promptForHostname(opts *LoginOptions) (string, error) {
+	options := []string{"GitHub.com", "GitHub Enterprise Server"}
 	hostType, err := opts.Prompter.Select(
 		"What account do you want to log into?",
-		"",
-		[]string{
-			"GitHub.com",
-			"GitHub Enterprise Server",
-		})
+		options[0],
+		options)
 	if err != nil {
 		return "", err
 	}

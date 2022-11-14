@@ -18,10 +18,10 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -164,7 +164,7 @@ func createRun(opts *CreateOptions) error {
 	fmt.Fprintf(errOut, "%s %s\n", cs.SuccessIconWithColor(cs.Green), completionMessage)
 
 	if opts.WebMode {
-		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(gist.HTMLURL))
+		fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(gist.HTMLURL))
 
 		return opts.Browser.Browse(gist.HTMLURL)
 	}

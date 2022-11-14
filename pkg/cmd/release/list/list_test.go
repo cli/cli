@@ -103,10 +103,11 @@ func Test_listRun(t *testing.T) {
 				LimitResults: 30,
 			},
 			wantStdout: heredoc.Doc(`
-				v1.1.0                 Draft        (v1.1.0)        about 1 day ago
-				The big 1.0            Latest       (v1.0.0)        about 1 day ago
-				1.0 release candidate  Pre-release  (v1.0.0-pre.2)  about 1 day ago
-				New features                        (v0.9.2)        about 1 day ago
+				TITLE                  TYPE         TAG NAME      PUBLISHED
+				v1.1.0                 Draft        v1.1.0        about 1 day ago
+				The big 1.0            Latest       v1.0.0        about 1 day ago
+				1.0 release candidate  Pre-release  v1.0.0-pre.2  about 1 day ago
+				New features                        v0.9.2        about 1 day ago
 			`),
 			wantStderr: ``,
 		},

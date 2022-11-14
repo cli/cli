@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -233,7 +234,8 @@ func (m *templateManager) fetch() error {
 	dir := m.rootDir
 	if dir == "" {
 		var err error
-		dir, err = git.ToplevelDir()
+		gitClient := &git.Client{}
+		dir, err = gitClient.ToplevelDir(context.Background())
 		if err != nil {
 			return nil // abort silently
 		}

@@ -3,12 +3,12 @@ package login
 import (
 	"bytes"
 	"net/http"
-	"os"
 	"regexp"
 	"runtime"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
@@ -27,28 +27,36 @@ func stubHomeDir(t *testing.T, dir string) {
 	case "plan9":
 		homeEnv = "home"
 	}
-	oldHomeDir := os.Getenv(homeEnv)
-	os.Setenv(homeEnv, dir)
-	t.Cleanup(func() {
-		os.Setenv(homeEnv, oldHomeDir)
-	})
+	t.Setenv(homeEnv, dir)
 }
 
 func Test_NewCmdLogin(t *testing.T) {
 	tests := []struct {
-		name     string
-		cli      string
-		stdin    string
-		stdinTTY bool
-		wants    LoginOptions
-		wantsErr bool
+		name        string
+		cli         string
+		stdin       string
+		stdinTTY    bool
+		defaultHost string
+		wants       LoginOptions
+		wantsErr    bool
 	}{
 		{
-			name:  "nontty, with-token",
-			stdin: "abc123\n",
-			cli:   "--with-token",
+			name:        "nontty, with-token",
+			stdin:       "abc123\n",
+			cli:         "--with-token",
+			defaultHost: "github.com",
 			wants: LoginOptions{
 				Hostname: "github.com",
+				Token:    "abc123",
+			},
+		},
+		{
+			name:        "nontty, Enterprise host",
+			stdin:       "abc123\n",
+			cli:         "--with-token",
+			defaultHost: "git.example.com",
+			wants: LoginOptions{
+				Hostname: "git.example.com",
 				Token:    "abc123",
 			},
 		},
@@ -168,6 +176,8 @@ func Test_NewCmdLogin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("GH_HOST", tt.defaultHost)
+
 			ios, stdin, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
 				IOStreams: ios,
@@ -587,6 +597,8 @@ func Test_loginRun_Survey(t *testing.T) {
 				tt.prompterStubs(pm)
 			}
 			tt.opts.Prompter = pm
+
+			tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
 
 			rs, restoreRun := run.Stub()
 			defer restoreRun(t)

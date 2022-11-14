@@ -117,27 +117,42 @@ type User struct {
 }
 
 type Issue struct {
-	Assignees         []User           `json:"assignees"`
-	Author            User             `json:"user"`
-	AuthorAssociation string           `json:"author_association"`
-	Body              string           `json:"body"`
-	ClosedAt          time.Time        `json:"closed_at"`
-	CommentsCount     int              `json:"comments"`
-	CreatedAt         time.Time        `json:"created_at"`
-	ID                string           `json:"node_id"`
-	Labels            []Label          `json:"labels"`
-	IsLocked          bool             `json:"locked"`
-	Number            int              `json:"number"`
-	PullRequestLinks  PullRequestLinks `json:"pull_request"`
-	RepositoryURL     string           `json:"repository_url"`
-	State             string           `json:"state"`
-	Title             string           `json:"title"`
-	URL               string           `json:"html_url"`
-	UpdatedAt         time.Time        `json:"updated_at"`
+	Assignees         []User      `json:"assignees"`
+	Author            User        `json:"user"`
+	AuthorAssociation string      `json:"author_association"`
+	Body              string      `json:"body"`
+	ClosedAt          time.Time   `json:"closed_at"`
+	CommentsCount     int         `json:"comments"`
+	CreatedAt         time.Time   `json:"created_at"`
+	ID                string      `json:"node_id"`
+	Labels            []Label     `json:"labels"`
+	IsLocked          bool        `json:"locked"`
+	Number            int         `json:"number"`
+	PullRequest       PullRequest `json:"pull_request"`
+	RepositoryURL     string      `json:"repository_url"`
+	// StateInternal should not be used directly. Use State() instead.
+	StateInternal string    `json:"state"`
+	StateReason   string    `json:"state_reason"`
+	Title         string    `json:"title"`
+	URL           string    `json:"html_url"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
-type PullRequestLinks struct {
-	URL string `json:"html_url"`
+type PullRequest struct {
+	URL      string    `json:"html_url"`
+	MergedAt time.Time `json:"merged_at"`
+}
+
+// the state of an issue or a pull request,
+// may be either open or closed.
+// for a pull request, the "merged" state is
+// inferred from a value for merged_at and
+// which we take return instead of the "closed" state.
+func (issue Issue) State() string {
+	if !issue.PullRequest.MergedAt.IsZero() {
+		return "merged"
+	}
+	return issue.StateInternal
 }
 
 type Label struct {
@@ -174,7 +189,7 @@ func (repo Repository) ExportData(fields []string) map[string]interface{} {
 }
 
 func (issue Issue) IsPullRequest() bool {
-	return issue.PullRequestLinks.URL != ""
+	return issue.PullRequest.URL != ""
 }
 
 func (issue Issue) ExportData(fields []string) map[string]interface{} {
@@ -213,10 +228,14 @@ func (issue Issue) ExportData(fields []string) map[string]interface{} {
 			data[f] = labels
 		case "repository":
 			comp := strings.Split(issue.RepositoryURL, "/")
+			name := comp[len(comp)-1]
 			nameWithOwner := strings.Join(comp[len(comp)-2:], "/")
 			data[f] = map[string]interface{}{
+				"name":          name,
 				"nameWithOwner": nameWithOwner,
 			}
+		case "state":
+			data[f] = issue.State()
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()

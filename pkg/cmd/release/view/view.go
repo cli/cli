@@ -9,6 +9,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -97,7 +98,7 @@ func viewRun(opts *ViewOptions) error {
 
 	if opts.WebMode {
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(release.URL))
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(release.URL))
 		}
 		return opts.Browser.Browse(release.URL)
 	}
@@ -136,12 +137,14 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 		fmt.Fprintf(w, "%s • ", iofmt.Yellow("Pre-release"))
 	}
 	if release.IsDraft {
-		fmt.Fprintf(w, "%s\n", iofmt.Gray(fmt.Sprintf("%s created this %s", release.Author.Login, utils.FuzzyAgo(time.Since(release.CreatedAt)))))
+		fmt.Fprintf(w, "%s\n", iofmt.Gray(fmt.Sprintf("%s created this %s", release.Author.Login, text.FuzzyAgo(time.Now(), release.CreatedAt))))
 	} else {
-		fmt.Fprintf(w, "%s\n", iofmt.Gray(fmt.Sprintf("%s released this %s", release.Author.Login, utils.FuzzyAgo(time.Since(*release.PublishedAt)))))
+		fmt.Fprintf(w, "%s\n", iofmt.Gray(fmt.Sprintf("%s released this %s", release.Author.Login, text.FuzzyAgo(time.Now(), *release.PublishedAt))))
 	}
 
-	renderedDescription, err := markdown.Render(release.Body, markdown.WithIO(io))
+	renderedDescription, err := markdown.Render(release.Body,
+		markdown.WithTheme(io.TerminalTheme()),
+		markdown.WithWrap(io.TerminalWidth()))
 	if err != nil {
 		return err
 	}
@@ -149,6 +152,7 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 
 	if len(release.Assets) > 0 {
 		fmt.Fprintf(w, "%s\n", iofmt.Bold("Assets"))
+		//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 		table := utils.NewTablePrinter(io)
 		for _, a := range release.Assets {
 			table.AddField(a.Name, nil, nil)
@@ -182,6 +186,9 @@ func renderReleasePlain(w io.Writer, release *shared.Release) error {
 	}
 	fmt.Fprint(w, "--\n")
 	fmt.Fprint(w, release.Body)
+	if !strings.HasSuffix(release.Body, "\n") {
+		fmt.Fprintf(w, "\n")
+	}
 	return nil
 }
 

@@ -133,9 +133,6 @@ func TestDisableRun(t *testing.T) {
 			tty: true,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/a workflow"),
-					httpmock.StatusStringResponse(404, "not found"))
-				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
 					httpmock.JSONResponse(shared.WorkflowsPayload{
 						Workflows: []shared.Workflow{
@@ -157,9 +154,6 @@ func TestDisableRun(t *testing.T) {
 			},
 			tty: true,
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/another workflow"),
-					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
 					httpmock.JSONResponse(shared.WorkflowsPayload{
@@ -217,9 +211,6 @@ func TestDisableRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/a workflow"),
-					httpmock.StatusStringResponse(404, "not found"))
-				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
 					httpmock.JSONResponse(shared.WorkflowsPayload{
 						Workflows: []shared.Workflow{
@@ -242,7 +233,7 @@ func TestDisableRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/another workflow"),
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/another%20workflow"),
 					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),

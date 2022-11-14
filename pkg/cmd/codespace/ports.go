@@ -103,6 +103,7 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, exporter cmdu
 	}
 
 	cs := a.io.ColorScheme()
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(a.io)
 
 	if tp.IsTTY() {

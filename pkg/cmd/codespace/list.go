@@ -7,6 +7,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
@@ -85,6 +86,7 @@ func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Expo
 		return cmdutil.NewNoResultsError("no codespaces found")
 	}
 
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(a.io)
 	if tp.IsTTY() {
 		tp.AddField("NAME", nil, nil)
@@ -144,7 +146,7 @@ func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Expo
 			if err != nil {
 				return fmt.Errorf("error parsing date %q: %w", c.CreatedAt, err)
 			}
-			tp.AddField(utils.FuzzyAgoAbbr(time.Now(), ct), nil, cs.Gray)
+			tp.AddField(text.FuzzyAgoAbbr(time.Now(), ct), nil, cs.Gray)
 		} else {
 			tp.AddField(c.CreatedAt, nil, nil)
 		}

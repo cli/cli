@@ -1,25 +1,28 @@
 package checks
 
 import (
+	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
 const defaultInterval time.Duration = 10 * time.Second
 
 type ChecksOptions struct {
-	IO      *iostreams.IOStreams
-	Browser browser.Browser
+	HttpClient func() (*http.Client, error)
+	IO         *iostreams.IOStreams
+	Browser    browser.Browser
 
 	Finder shared.PRFinder
 
@@ -27,14 +30,16 @@ type ChecksOptions struct {
 	WebMode     bool
 	Interval    time.Duration
 	Watch       bool
+	Required    bool
 }
 
 func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Command {
 	var interval int
 	opts := &ChecksOptions{
-		IO:       f.IOStreams,
-		Browser:  f.Browser,
-		Interval: defaultInterval,
+		HttpClient: f.HttpClient,
+		IO:         f.IOStreams,
+		Browser:    f.Browser,
+		Interval:   defaultInterval,
 	}
 
 	cmd := &cobra.Command{
@@ -82,6 +87,7 @@ func NewCmdChecks(f *cmdutil.Factory, runF func(*ChecksOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to show details about checks")
 	cmd.Flags().BoolVarP(&opts.Watch, "watch", "", false, "Watch checks until they finish")
 	cmd.Flags().IntVarP(&interval, "interval", "i", 10, "Refresh interval in seconds when using `--watch` flag")
+	cmd.Flags().BoolVar(&opts.Required, "required", false, "Only show checks that are required")
 
 	return cmd
 }
@@ -100,7 +106,7 @@ func checksRunWebMode(opts *ChecksOptions) error {
 	openURL := ghrepo.GenerateRepoURL(baseRepo, "pull/%d/checks", pr.Number)
 
 	if isTerminal {
-		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 	}
 
 	return opts.Browser.Browse(openURL)
@@ -111,10 +117,33 @@ func checksRun(opts *ChecksOptions) error {
 		return checksRunWebMode(opts)
 	}
 
+	findOptions := shared.FindOptions{
+		Selector: opts.SelectorArg,
+		Fields:   []string{"number", "headRefName"},
+	}
+
+	var pr *api.PullRequest
+	pr, repo, findErr := opts.Finder.Find(findOptions)
+	if findErr != nil {
+		return findErr
+	}
+
+	client, clientErr := opts.HttpClient()
+	if clientErr != nil {
+		return clientErr
+	}
+
+	var checks []check
+	var counts checkCounts
+	var err error
+
+	checks, counts, err = populateStatusChecks(client, repo, pr, opts.Required)
+	if err != nil {
+		return err
+	}
+
 	if opts.Watch {
-		if err := opts.IO.EnableVirtualTerminalProcessing(); err != nil {
-			return err
-		}
+		opts.IO.StartAlternateScreenBuffer()
 	} else {
 		// Only start pager in non-watch mode
 		if err := opts.IO.StartPager(); err == nil {
@@ -124,32 +153,8 @@ func checksRun(opts *ChecksOptions) error {
 		}
 	}
 
-	var checks []check
-	var counts checkCounts
-
-	if opts.Watch {
-		opts.IO.StartAlternateScreenBuffer()
-	}
-
 	// Do not return err until we can StopAlternateScreenBuffer()
-	var err error
 	for {
-		findOptions := shared.FindOptions{
-			Selector: opts.SelectorArg,
-			Fields:   []string{"number", "headRefName", "statusCheckRollup"},
-		}
-
-		var pr *api.PullRequest
-		pr, _, err = opts.Finder.Find(findOptions)
-		if err != nil {
-			break
-		}
-
-		checks, counts, err = aggregateChecks(pr)
-		if err != nil {
-			break
-		}
-
 		if counts.Pending != 0 && opts.Watch {
 			opts.IO.RefreshScreen()
 			cs := opts.IO.ColorScheme()
@@ -167,6 +172,11 @@ func checksRun(opts *ChecksOptions) error {
 		}
 
 		time.Sleep(opts.Interval)
+
+		checks, counts, err = populateStatusChecks(client, repo, pr, opts.Required)
+		if err != nil {
+			break
+		}
 	}
 
 	opts.IO.StopAlternateScreenBuffer()
@@ -188,4 +198,60 @@ func checksRun(opts *ChecksOptions) error {
 	}
 
 	return nil
+}
+
+func populateStatusChecks(client *http.Client, repo ghrepo.Interface, pr *api.PullRequest, requiredChecks bool) ([]check, checkCounts, error) {
+	apiClient := api.NewClientFromHTTP(client)
+
+	type response struct {
+		Node *api.PullRequest
+	}
+
+	query := fmt.Sprintf(`
+	query PullRequestStatusChecks($id: ID!, $endCursor: String) {
+		node(id: $id) {
+			...on PullRequest {
+				%s
+			}
+		}
+	}`, api.RequiredStatusCheckRollupGraphQL("$id", "$endCursor"))
+
+	variables := map[string]interface{}{
+		"id": pr.ID,
+	}
+
+	statusCheckRollup := api.CheckContexts{}
+
+	for {
+		var resp response
+		err := apiClient.GraphQL(repo.RepoHost(), query, variables, &resp)
+		if err != nil {
+			return nil, checkCounts{}, err
+		}
+
+		if len(resp.Node.StatusCheckRollup.Nodes) == 0 {
+			return nil, checkCounts{}, errors.New("no commit found on the pull request")
+		}
+
+		result := resp.Node.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts
+		statusCheckRollup.Nodes = append(
+			statusCheckRollup.Nodes,
+			result.Nodes...,
+		)
+
+		if !result.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = result.PageInfo.EndCursor
+	}
+
+	if len(statusCheckRollup.Nodes) == 0 {
+		return nil, checkCounts{}, fmt.Errorf("no checks reported on the '%s' branch", pr.HeadRefName)
+	}
+
+	checks, counts := aggregateChecks(statusCheckRollup.Nodes, requiredChecks)
+	if len(checks) == 0 && requiredChecks {
+		return checks, counts, fmt.Errorf("no required checks reported on the '%s' branch", pr.HeadRefName)
+	}
+	return checks, counts, nil
 }

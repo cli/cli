@@ -1,6 +1,7 @@
 package create
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,27 +13,33 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/context"
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
+
+type iprompter interface {
+	Select(string, string, []string) (int, error)
+}
 
 type CreateOptions struct {
 	// This struct stores user input and factory functions
 	HttpClient func() (*http.Client, error)
+	GitClient  *git.Client
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
-	Remotes    func() (context.Remotes, error)
+	Remotes    func() (ghContext.Remotes, error)
 	Branch     func() (string, error)
 	Browser    browser.Browser
+	Prompter   iprompter
 	Finder     shared.PRFinder
 
 	TitleProvided bool
@@ -63,26 +70,29 @@ type CreateOptions struct {
 type CreateContext struct {
 	// This struct stores contextual data about the creation process and is for building up enough
 	// data to create a pull request
-	RepoContext        *context.ResolvedRemotes
+	RepoContext        *ghContext.ResolvedRemotes
 	BaseRepo           *api.Repository
 	HeadRepo           ghrepo.Interface
 	BaseTrackingBranch string
 	BaseBranch         string
 	HeadBranch         string
 	HeadBranchLabel    string
-	HeadRemote         *context.Remote
+	HeadRemote         *ghContext.Remote
 	IsPushEnabled      bool
 	Client             *api.Client
+	GitClient          *git.Client
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Config:     f.Config,
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
 		Browser:    f.Browser,
+		Prompter:   f.Prompter,
 	}
 
 	var bodyFile string
@@ -206,7 +216,7 @@ func createRun(opts *CreateOptions) (err error) {
 		if err != nil {
 			return
 		}
-		if !utils.ValidURL(openURL) {
+		if !shared.ValidURL(openURL) {
 			err = fmt.Errorf("cannot open in browser: maximum URL length exceeded")
 			return
 		}
@@ -307,7 +317,7 @@ func createRun(opts *CreateOptions) (err error) {
 		return
 	}
 
-	allowPreview := !state.HasMetadata() && utils.ValidURL(openURL)
+	allowPreview := !state.HasMetadata() && shared.ValidURL(openURL)
 	allowMetadata := ctx.BaseRepo.ViewerCanTriage()
 	action, err := shared.ConfirmPRSubmission(allowPreview, allowMetadata, state.Draft)
 	if err != nil {
@@ -363,21 +373,22 @@ func createRun(opts *CreateOptions) (err error) {
 func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState) error {
 	baseRef := ctx.BaseTrackingBranch
 	headRef := ctx.HeadBranch
+	gitClient := ctx.GitClient
 
-	commits, err := git.Commits(baseRef, headRef)
+	commits, err := gitClient.Commits(context.Background(), baseRef, headRef)
 	if err != nil {
 		return err
 	}
 
 	if len(commits) == 1 {
 		state.Title = commits[0].Title
-		body, err := git.CommitBody(commits[0].Sha)
+		body, err := gitClient.CommitBody(context.Background(), commits[0].Sha)
 		if err != nil {
 			return err
 		}
 		state.Body = body
 	} else {
-		state.Title = utils.Humanize(headRef)
+		state.Title = humanize(headRef)
 
 		var body strings.Builder
 		for i := len(commits) - 1; i >= 0; i-- {
@@ -389,11 +400,11 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState) e
 	return nil
 }
 
-func determineTrackingBranch(remotes context.Remotes, headBranch string) *git.TrackingRef {
+func determineTrackingBranch(gitClient *git.Client, remotes ghContext.Remotes, headBranch string) *git.TrackingRef {
 	refsForLookup := []string{"HEAD"}
 	var trackingRefs []git.TrackingRef
 
-	headBranchConfig := git.ReadBranchConfig(headBranch)
+	headBranchConfig := gitClient.ReadBranchConfig(context.Background(), headBranch)
 	if headBranchConfig.RemoteName != "" {
 		tr := git.TrackingRef{
 			RemoteName: headBranchConfig.RemoteName,
@@ -412,7 +423,7 @@ func determineTrackingBranch(remotes context.Remotes, headBranch string) *git.Tr
 		refsForLookup = append(refsForLookup, tr.String())
 	}
 
-	resolvedRefs, _ := git.ShowRefs(refsForLookup...)
+	resolvedRefs, _ := gitClient.ShowRefs(context.Background(), refsForLookup)
 	if len(resolvedRefs) > 1 {
 		for _, r := range resolvedRefs[1:] {
 			if r.Hash != resolvedRefs[0].Hash {
@@ -469,18 +480,23 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	}
 	client := api.NewClientFromHTTP(httpClient)
 
+	// TODO: consider obtaining remotes from GitClient instead
 	remotes, err := opts.Remotes()
 	if err != nil {
-		return nil, err
+		// When a repo override value is given, ignore errors when fetching git remotes
+		// to support using this command outside of git repos.
+		if opts.RepoOverride == "" {
+			return nil, err
+		}
 	}
 
-	repoContext, err := context.ResolveRemotesToRepos(remotes, client, opts.RepoOverride)
+	repoContext, err := ghContext.ResolveRemotesToRepos(remotes, client, opts.RepoOverride)
 	if err != nil {
 		return nil, err
 	}
 
 	var baseRepo *api.Repository
-	if br, err := repoContext.BaseRepo(opts.IO); err == nil {
+	if br, err := repoContext.BaseRepo(opts.IO, opts.Prompter); err == nil {
 		if r, ok := br.(*api.Repository); ok {
 			baseRepo = r
 		} else {
@@ -509,16 +525,17 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		headBranch = headBranch[idx+1:]
 	}
 
-	if ucc, err := git.UncommittedChangeCount(); err == nil && ucc > 0 {
-		fmt.Fprintf(opts.IO.ErrOut, "Warning: %s\n", utils.Pluralize(ucc, "uncommitted change"))
+	gitClient := opts.GitClient
+	if ucc, err := gitClient.UncommittedChangeCount(context.Background()); err == nil && ucc > 0 {
+		fmt.Fprintf(opts.IO.ErrOut, "Warning: %s\n", text.Pluralize(ucc, "uncommitted change"))
 	}
 
 	var headRepo ghrepo.Interface
-	var headRemote *context.Remote
+	var headRemote *ghContext.Remote
 
 	if isPushEnabled {
 		// determine whether the head branch is already pushed to a remote
-		if pushedTo := determineTrackingBranch(remotes, headBranch); pushedTo != nil {
+		if pushedTo := determineTrackingBranch(gitClient, remotes, headBranch); pushedTo != nil {
 			isPushEnabled = false
 			if r, err := remotes.FindByName(pushedTo.RemoteName); err == nil {
 				headRepo = r
@@ -619,6 +636,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		IsPushEnabled:      isPushEnabled,
 		RepoContext:        repoContext,
 		Client:             client,
+		GitClient:          gitClient,
 	}, nil
 
 }
@@ -661,7 +679,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 
 func previewPR(opts CreateOptions, openURL string) error {
 	if opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 	}
 	return opts.Browser.Browse(openURL)
 
@@ -707,11 +725,12 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 		headRepoURL := ghrepo.FormatRemoteURL(headRepo, cloneProtocol)
 
 		// TODO: prevent clashes with another remote of a same name
-		gitRemote, err := git.AddRemote("fork", headRepoURL)
+		gitClient := ctx.GitClient
+		gitRemote, err := gitClient.AddRemote(context.Background(), "fork", headRepoURL, []string{})
 		if err != nil {
 			return fmt.Errorf("error adding remote: %w", err)
 		}
-		headRemote = &context.Remote{
+		headRemote = &ghContext.Remote{
 			Remote: gitRemote,
 			Repo:   headRepo,
 		}
@@ -723,16 +742,16 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 			pushTries := 0
 			maxPushTries := 3
 			for {
-				r := NewRegexpWriter(opts.IO.ErrOut, gitPushRegexp, "")
-				defer r.Flush()
-				cmdErr := r
-				cmdOut := opts.IO.Out
-				if err := git.Push(headRemote.Name, fmt.Sprintf("HEAD:%s", ctx.HeadBranch), cmdOut, cmdErr); err != nil {
+				w := NewRegexpWriter(opts.IO.ErrOut, gitPushRegexp, "")
+				defer w.Flush()
+				gitClient := ctx.GitClient
+				ref := fmt.Sprintf("HEAD:%s", ctx.HeadBranch)
+				if err := gitClient.Push(context.Background(), headRemote.Name, ref, git.WithStderr(w)); err != nil {
 					if didForkRepo && pushTries < maxPushTries {
 						pushTries++
 						// first wait 2 seconds after forking, then 4s, then 6s
 						waitSeconds := 2 * pushTries
-						fmt.Fprintf(opts.IO.ErrOut, "waiting %s before retrying...\n", utils.Pluralize(waitSeconds, "second"))
+						fmt.Fprintf(opts.IO.ErrOut, "waiting %s before retrying...\n", text.Pluralize(waitSeconds, "second"))
 						time.Sleep(time.Duration(waitSeconds) * time.Second)
 						continue
 					}
@@ -762,6 +781,18 @@ func generateCompareURL(ctx CreateContext, state shared.IssueMetadataState) (str
 		return "", err
 	}
 	return url, nil
+}
+
+// Humanize returns a copy of the string s that replaces all instance of '-' and '_' with spaces.
+func humanize(s string) string {
+	replace := "_-"
+	h := func(r rune) rune {
+		if strings.ContainsRune(replace, r) {
+			return ' '
+		}
+		return r
+	}
+	return strings.Map(h, s)
 }
 
 var gitPushRegexp = regexp.MustCompile("^remote: (Create a pull request.*by visiting|[[:space:]]*https://.*/pull/new/).*\n?$")

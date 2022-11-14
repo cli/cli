@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/cli/cli/v2/git"
@@ -245,9 +245,7 @@ func Test_OverrideBaseRepo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.envOverride != "" {
-				old := os.Getenv("GH_REPO")
-				os.Setenv("GH_REPO", tt.envOverride)
-				defer os.Setenv("GH_REPO", old)
+				t.Setenv("GH_REPO", tt.envOverride)
 			}
 			f := New("1")
 			rr := &remoteResolver{
@@ -324,13 +322,7 @@ func Test_ioStreams_pager(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.env != nil {
 				for k, v := range tt.env {
-					old := os.Getenv(k)
-					os.Setenv(k, v)
-					if k == "GH_PAGER" {
-						defer os.Unsetenv(k)
-					} else {
-						defer os.Setenv(k, old)
-					}
+					t.Setenv(k, v)
 				}
 			}
 			f := New("1")
@@ -390,80 +382,6 @@ func Test_ioStreams_prompt(t *testing.T) {
 	}
 }
 
-func Test_browserLauncher(t *testing.T) {
-	tests := []struct {
-		name        string
-		env         map[string]string
-		config      config.Config
-		wantBrowser string
-	}{
-		{
-			name: "GH_BROWSER set",
-			env: map[string]string{
-				"GH_BROWSER": "GH_BROWSER",
-			},
-			wantBrowser: "GH_BROWSER",
-		},
-		{
-			name:        "config browser set",
-			config:      config.NewFromString("browser: CONFIG_BROWSER"),
-			wantBrowser: "CONFIG_BROWSER",
-		},
-		{
-			name: "BROWSER set",
-			env: map[string]string{
-				"BROWSER": "BROWSER",
-			},
-			wantBrowser: "BROWSER",
-		},
-		{
-			name: "GH_BROWSER and config browser set",
-			env: map[string]string{
-				"GH_BROWSER": "GH_BROWSER",
-			},
-			config:      config.NewFromString("browser: CONFIG_BROWSER"),
-			wantBrowser: "GH_BROWSER",
-		},
-		{
-			name: "config browser and BROWSER set",
-			env: map[string]string{
-				"BROWSER": "BROWSER",
-			},
-			config:      config.NewFromString("browser: CONFIG_BROWSER"),
-			wantBrowser: "CONFIG_BROWSER",
-		},
-		{
-			name: "GH_BROWSER and BROWSER set",
-			env: map[string]string{
-				"BROWSER":    "BROWSER",
-				"GH_BROWSER": "GH_BROWSER",
-			},
-			wantBrowser: "GH_BROWSER",
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.env != nil {
-				for k, v := range tt.env {
-					old := os.Getenv(k)
-					os.Setenv(k, v)
-					defer os.Setenv(k, old)
-				}
-			}
-			f := New("1")
-			f.Config = func() (config.Config, error) {
-				if tt.config == nil {
-					return config.NewBlankConfig(), nil
-				} else {
-					return tt.config, nil
-				}
-			}
-			browser := browserLauncher(f)
-			assert.Equal(t, tt.wantBrowser, browser)
-		})
-	}
-}
-
 func TestSSOURL(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -514,6 +432,44 @@ func TestSSOURL(t *testing.T) {
 			assert.Equal(t, 204, res.StatusCode)
 			assert.Equal(t, tt.wantStderr, stderr.String())
 			assert.Equal(t, tt.wantSSO, SSOURL())
+		})
+	}
+}
+
+func TestNewGitClient(t *testing.T) {
+	tests := []struct {
+		name          string
+		config        config.Config
+		executable    string
+		wantAuthHosts []string
+		wantGhPath    string
+	}{
+		{
+			name:          "creates git client",
+			config:        defaultConfig(),
+			executable:    filepath.Join("path", "to", "gh"),
+			wantAuthHosts: []string{"nonsense.com"},
+			wantGhPath:    filepath.Join("path", "to", "gh"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := New("1")
+			f.Config = func() (config.Config, error) {
+				if tt.config == nil {
+					return config.NewBlankConfig(), nil
+				} else {
+					return tt.config, nil
+				}
+			}
+			f.ExecutableName = tt.executable
+			ios, _, _, _ := iostreams.Test()
+			f.IOStreams = ios
+			c := newGitClient(f)
+			assert.Equal(t, tt.wantGhPath, c.GhPath)
+			assert.Equal(t, ios.In, c.Stdin)
+			assert.Equal(t, ios.Out, c.Stdout)
+			assert.Equal(t, ios.ErrOut, c.Stderr)
 		})
 	}
 }

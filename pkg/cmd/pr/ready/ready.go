@@ -19,6 +19,7 @@ type ReadyOptions struct {
 	Finder shared.PRFinder
 
 	SelectorArg string
+	Undo        bool
 }
 
 func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Command {
@@ -35,6 +36,8 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 
 			Without an argument, the pull request that belongs to the current branch
 			is marked as ready.
+
+			If supported by your plan, convert to draft with --undo
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -55,6 +58,7 @@ func NewCmdReady(f *cmdutil.Factory, runF func(*ReadyOptions) error) *cobra.Comm
 		},
 	}
 
+	cmd.Flags().BoolVar(&opts.Undo, "undo", false, `Convert a pull request to "draft"`)
 	return cmd
 }
 
@@ -73,9 +77,6 @@ func readyRun(opts *ReadyOptions) error {
 	if !pr.IsOpen() {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is closed. Only draft pull requests can be marked as \"ready for review\"\n", cs.FailureIcon(), pr.Number)
 		return cmdutil.SilentError
-	} else if !pr.IsDraft {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is already \"ready for review\"\n", cs.WarningIcon(), pr.Number)
-		return nil
 	}
 
 	httpClient, err := opts.HttpClient()
@@ -84,12 +85,30 @@ func readyRun(opts *ReadyOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	err = api.PullRequestReady(apiClient, baseRepo, pr)
-	if err != nil {
-		return fmt.Errorf("API call failed: %w", err)
-	}
+	if opts.Undo { // convert to draft
+		if pr.IsDraft {
+			fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is already \"in draft\"\n", cs.WarningIcon(), pr.Number)
+			return nil
+		}
+		err = api.ConvertPullRequestToDraft(apiClient, baseRepo, pr)
+		if err != nil {
+			return fmt.Errorf("API call failed: %w", err)
+		}
 
-	fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is marked as \"ready for review\"\n", cs.SuccessIconWithColor(cs.Green), pr.Number)
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is converted to \"draft\"\n", cs.SuccessIconWithColor(cs.Green), pr.Number)
+	} else { // mark as ready for review
+		if !pr.IsDraft {
+			fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is already \"ready for review\"\n", cs.WarningIcon(), pr.Number)
+			return nil
+		}
+
+		err = api.PullRequestReady(apiClient, baseRepo, pr)
+		if err != nil {
+			return fmt.Errorf("API call failed: %w", err)
+		}
+
+		fmt.Fprintf(opts.IO.ErrOut, "%s Pull request #%d is marked as \"ready for review\"\n", cs.SuccessIconWithColor(cs.Green), pr.Number)
+	}
 
 	return nil
 }

@@ -11,9 +11,9 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 )
 
@@ -31,7 +31,7 @@ type ListOptions struct {
 	Fork        bool
 	Source      bool
 	Language    string
-	Topic       string
+	Topic       []string
 	Archived    bool
 	NonArchived bool
 
@@ -92,7 +92,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.Source, "source", false, "Show only non-forks")
 	cmd.Flags().BoolVar(&opts.Fork, "fork", false, "Show only forks")
 	cmd.Flags().StringVarP(&opts.Language, "language", "l", "", "Filter by primary coding language")
-	cmd.Flags().StringVar(&opts.Topic, "topic", "", "Filter by topic")
+	cmd.Flags().StringSliceVarP(&opts.Topic, "topic", "", nil, "Filter by topic")
 	cmdutil.StringEnumFlag(cmd, &opts.Visibility, "visibility", "", "", []string{"public", "private", "internal"}, "Filter by repository visibility")
 	cmd.Flags().BoolVar(&opts.Archived, "archived", false, "Show only archived repositories")
 	cmd.Flags().BoolVar(&opts.NonArchived, "no-archived", false, "Omit archived repositories")
@@ -164,8 +164,8 @@ func listRun(opts *ListOptions) error {
 	}
 
 	cs := opts.IO.ColorScheme()
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(opts.IO)
-	now := opts.Now()
 
 	for _, repo := range listResult.Repositories {
 		info := repoInfo(repo)
@@ -181,10 +181,10 @@ func listRun(opts *ListOptions) error {
 		}
 
 		tp.AddField(repo.NameWithOwner, nil, cs.Bold)
-		tp.AddField(text.ReplaceExcessiveWhitespace(repo.Description), nil, nil)
+		tp.AddField(text.RemoveExcessiveWhitespace(repo.Description), nil, nil)
 		tp.AddField(info, nil, infoColor)
 		if tp.IsTTY() {
-			tp.AddField(utils.FuzzyAgoAbbr(now, *t), nil, cs.Gray)
+			tp.AddField(text.FuzzyAgoAbbr(opts.Now(), *t), nil, cs.Gray)
 		} else {
 			tp.AddField(t.Format(time.RFC3339), nil, nil)
 		}
@@ -195,7 +195,7 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
 	}
 	if opts.IO.IsStdoutTTY() {
-		hasFilters := filter.Visibility != "" || filter.Fork || filter.Source || filter.Language != "" || filter.Topic != ""
+		hasFilters := filter.Visibility != "" || filter.Fork || filter.Source || filter.Language != "" || len(filter.Topic) > 0
 		title := listHeader(listResult.Owner, len(listResult.Repositories), listResult.TotalCount, hasFilters)
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}

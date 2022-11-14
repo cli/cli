@@ -6,12 +6,15 @@ import (
 	cmdComment "github.com/cli/cli/v2/pkg/cmd/issue/comment"
 	cmdCreate "github.com/cli/cli/v2/pkg/cmd/issue/create"
 	cmdDelete "github.com/cli/cli/v2/pkg/cmd/issue/delete"
+	cmdDevelop "github.com/cli/cli/v2/pkg/cmd/issue/develop"
 	cmdEdit "github.com/cli/cli/v2/pkg/cmd/issue/edit"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/issue/list"
 	cmdLock "github.com/cli/cli/v2/pkg/cmd/issue/lock"
+	cmdPin "github.com/cli/cli/v2/pkg/cmd/issue/pin"
 	cmdReopen "github.com/cli/cli/v2/pkg/cmd/issue/reopen"
 	cmdStatus "github.com/cli/cli/v2/pkg/cmd/issue/status"
 	cmdTransfer "github.com/cli/cli/v2/pkg/cmd/issue/transfer"
+	cmdUnpin "github.com/cli/cli/v2/pkg/cmd/issue/unpin"
 	cmdView "github.com/cli/cli/v2/pkg/cmd/issue/view"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -51,6 +54,9 @@ func NewCmdIssue(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(cmdDelete.NewCmdDelete(f, nil))
 	cmd.AddCommand(cmdEdit.NewCmdEdit(f, nil))
 	cmd.AddCommand(cmdTransfer.NewCmdTransfer(f, nil))
+	cmd.AddCommand(cmdDevelop.NewCmdDevelop(f, nil))
+	cmd.AddCommand(cmdPin.NewCmdPin(f, nil))
+	cmd.AddCommand(cmdUnpin.NewCmdUnpin(f, nil))
 
 	return cmd
 }

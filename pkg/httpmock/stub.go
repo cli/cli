@@ -29,7 +29,7 @@ func REST(method, p string) Matcher {
 		if !strings.EqualFold(req.Method, method) {
 			return false
 		}
-		return req.URL.Path == "/"+p
+		return req.URL.EscapedPath() == "/"+p
 	}
 }
 

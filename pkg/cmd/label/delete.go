@@ -3,21 +3,23 @@ package label
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/spf13/cobra"
 )
+
+type iprompter interface {
+	ConfirmDeletion(string) error
+}
 
 type deleteOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
+	Prompter   iprompter
 
 	Name      string
 	Confirmed bool
@@ -27,6 +29,7 @@ func newCmdDelete(f *cmdutil.Factory, runF func(*deleteOptions) error) *cobra.Co
 	opts := deleteOptions{
 		HttpClient: f.HttpClient,
 		IO:         f.IOStreams,
+		Prompter:   f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -66,20 +69,8 @@ func deleteRun(opts *deleteOptions) error {
 	}
 
 	if !opts.Confirmed {
-		var valid string
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		err := prompt.SurveyAskOne(
-			&survey.Input{Message: fmt.Sprintf("Type %s to confirm deletion:", opts.Name)},
-			&valid,
-			survey.WithValidator(
-				func(val interface{}) error {
-					if str := val.(string); !strings.EqualFold(str, opts.Name) {
-						return fmt.Errorf("You entered %s", str)
-					}
-					return nil
-				}))
-		if err != nil {
-			return fmt.Errorf("could not prompt: %w", err)
+		if err := opts.Prompter.ConfirmDeletion(opts.Name); err != nil {
+			return err
 		}
 	}
 

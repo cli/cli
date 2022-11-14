@@ -36,6 +36,7 @@ type mergePayload struct {
 	commitBody      string
 	setCommitBody   bool
 	expectedHeadOid string
+	authorEmail     string
 }
 
 // TODO: drop after githubv4 gets updated
@@ -60,6 +61,10 @@ func mergePullRequest(client *http.Client, payload mergePayload) error {
 		input.MergeMethod = &m
 	}
 
+	if payload.authorEmail != "" {
+		authorEmail := githubv4.String(payload.authorEmail)
+		input.AuthorEmail = &authorEmail
+	}
 	if payload.commitSubject != "" {
 		commitHeadline := githubv4.String(payload.commitSubject)
 		input.CommitHeadline = &commitHeadline

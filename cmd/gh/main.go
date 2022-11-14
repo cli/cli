@@ -20,15 +20,16 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/internal/update"
 	"github.com/cli/cli/v2/pkg/cmd/alias/expand"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmd/root"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 	"github.com/cli/safeexec"
+	"github.com/mattn/go-isatty"
 	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
 )
@@ -63,12 +64,9 @@ func mainRun() exitCode {
 
 	cmdFactory := factory.New(buildVersion)
 	stderr := cmdFactory.IOStreams.ErrOut
-
-	if spec := os.Getenv("GH_FORCE_TTY"); spec != "" {
-		cmdFactory.IOStreams.ForceTerminal(spec)
-	}
 	if !cmdFactory.IOStreams.ColorEnabled() {
 		surveyCore.DisableColor = true
+		ansi.DisableColors(true)
 	} else {
 		// override survey's poor choice of color
 		surveyCore.TemplateFuncsWithColor["color"] = func(style string) string {
@@ -313,7 +311,7 @@ func authHelp() string {
 		return heredoc.Doc(`
 			gh: To use GitHub CLI in a GitHub Actions workflow, set the GH_TOKEN environment variable. Example:
 			  env:
-			    GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+			    GH_TOKEN: ${{ github.token }}
 		`)
 	}
 
@@ -336,7 +334,11 @@ func shouldCheckForUpdate() bool {
 	if os.Getenv("CODESPACES") != "" {
 		return false
 	}
-	return updaterEnabled != "" && !isCI() && utils.IsTerminal(os.Stdout) && utils.IsTerminal(os.Stderr)
+	return updaterEnabled != "" && !isCI() && isTerminal(os.Stdout) && isTerminal(os.Stderr)
+}
+
+func isTerminal(f *os.File) bool {
+	return isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
 }
 
 // based on https://github.com/watson/ci-info/blob/HEAD/index.js

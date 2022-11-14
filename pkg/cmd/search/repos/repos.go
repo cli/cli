@@ -7,11 +7,11 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/search/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/search"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
@@ -20,6 +20,7 @@ type ReposOptions struct {
 	Browser  browser.Browser
 	Exporter cmdutil.Exporter
 	IO       *iostreams.IOStreams
+	Now      time.Time
 	Query    search.Query
 	Searcher search.Searcher
 	WebMode  bool
@@ -127,7 +128,7 @@ func reposRun(opts *ReposOptions) error {
 	if opts.WebMode {
 		url := opts.Searcher.URL(opts.Query)
 		if io.IsStdoutTTY() {
-			fmt.Fprintf(io.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(url))
+			fmt.Fprintf(io.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(url))
 		}
 		return opts.Browser.Browse(url)
 	}
@@ -137,6 +138,9 @@ func reposRun(opts *ReposOptions) error {
 	if err != nil {
 		return err
 	}
+	if len(result.Items) == 0 && opts.Exporter == nil {
+		return cmdutil.NewNoResultsError("no repositories matched your search")
+	}
 	if err := io.StartPager(); err == nil {
 		defer io.StopPager()
 	} else {
@@ -145,14 +149,16 @@ func reposRun(opts *ReposOptions) error {
 	if opts.Exporter != nil {
 		return opts.Exporter.Write(io, result.Items)
 	}
-	if len(result.Items) == 0 {
-		return cmdutil.NewNoResultsError("no repositories matched your search")
-	}
-	return displayResults(io, result)
+
+	return displayResults(io, opts.Now, result)
 }
 
-func displayResults(io *iostreams.IOStreams, results search.RepositoriesResult) error {
+func displayResults(io *iostreams.IOStreams, now time.Time, results search.RepositoriesResult) error {
+	if now.IsZero() {
+		now = time.Now()
+	}
 	cs := io.ColorScheme()
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(io)
 	for _, repo := range results.Items {
 		tags := []string{visibilityLabel(repo)}
@@ -169,16 +175,15 @@ func displayResults(io *iostreams.IOStreams, results search.RepositoriesResult) 
 		}
 		tp.AddField(repo.FullName, nil, cs.Bold)
 		description := repo.Description
-		tp.AddField(text.ReplaceExcessiveWhitespace(description), nil, nil)
+		tp.AddField(text.RemoveExcessiveWhitespace(description), nil, nil)
 		tp.AddField(info, nil, infoColor)
 		if tp.IsTTY() {
-			tp.AddField(utils.FuzzyAgoAbbr(time.Now(), repo.UpdatedAt), nil, cs.Gray)
+			tp.AddField(text.FuzzyAgoAbbr(now, repo.UpdatedAt), nil, cs.Gray)
 		} else {
 			tp.AddField(repo.UpdatedAt.Format(time.RFC3339), nil, nil)
 		}
 		tp.EndRow()
 	}
-
 	if io.IsStdoutTTY() {
 		header := fmt.Sprintf("Showing %d of %d repositories\n\n", len(results.Items), results.Total)
 		fmt.Fprintf(io.Out, "\n%s", header)

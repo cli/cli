@@ -3,6 +3,8 @@ package api
 import (
 	"fmt"
 	"strings"
+
+	"github.com/cli/cli/v2/pkg/set"
 )
 
 func squeeze(r rune) rune {
@@ -21,6 +23,7 @@ func shortenQuery(q string) string {
 var issueComments = shortenQuery(`
 	comments(first: 100) {
 		nodes {
+			id,
 			author{login},
 			authorAssociation,
 			body,
@@ -28,7 +31,9 @@ var issueComments = shortenQuery(`
 			includesCreatedEdit,
 			isMinimized,
 			minimizedReason,
-			reactionGroups{content,users{totalCount}}
+			reactionGroups{content,users{totalCount}},
+			url,
+			viewerDidAuthor
 		},
 		pageInfo{hasNextPage,endCursor},
 		totalCount
@@ -162,6 +167,45 @@ func StatusCheckRollupGraphQL(after string) string {
 	}`), afterClause)
 }
 
+func RequiredStatusCheckRollupGraphQL(prID, after string) string {
+	var afterClause string
+	if after != "" {
+		afterClause = ",after:" + after
+	}
+	return fmt.Sprintf(shortenQuery(`
+	statusCheckRollup: commits(last: 1) {
+		nodes {
+			commit {
+				statusCheckRollup {
+					contexts(first:100%[1]s) {
+						nodes {
+							__typename
+							...on StatusContext {
+								context,
+								state,
+								targetUrl,
+								createdAt,
+								isRequired(pullRequestId: %[2]s)
+							},
+							...on CheckRun {
+								name,
+								checkSuite{workflowRun{workflow{name}}},
+								status,
+								conclusion,
+								startedAt,
+								completedAt,
+								detailsUrl,
+								isRequired(pullRequestId: %[2]s)
+							}
+						},
+						pageInfo{hasNextPage,endCursor}
+					}
+				}
+			}
+		}
+	}`), afterClause, prID)
+}
+
 var IssueFields = []string{
 	"assignees",
 	"author",
@@ -190,6 +234,7 @@ var PullRequestFields = append(IssueFields,
 	"deletions",
 	"files",
 	"headRefName",
+	"headRefOid",
 	"headRepository",
 	"headRepositoryOwner",
 	"isCrossRepository",
@@ -208,9 +253,8 @@ var PullRequestFields = append(IssueFields,
 	"statusCheckRollup",
 )
 
-// PullRequestGraphQL constructs a GraphQL query fragment for a set of pull request fields. Since GitHub
-// pull requests are also technically issues, this function can be used to query issues as well.
-func PullRequestGraphQL(fields []string) string {
+// IssueGraphQL constructs a GraphQL query fragment for a set of issue fields.
+func IssueGraphQL(fields []string) string {
 	var q []string
 	for _, field := range fields {
 		switch field {
@@ -263,6 +307,16 @@ func PullRequestGraphQL(fields []string) string {
 		}
 	}
 	return strings.Join(q, ",")
+}
+
+// PullRequestGraphQL constructs a GraphQL query fragment for a set of pull request fields.
+// It will try to sanitize the fields to just those available on pull request.
+func PullRequestGraphQL(fields []string) string {
+	invalidFields := []string{"isPinned", "stateReason"}
+	s := set.NewStringSet()
+	s.AddValues(fields)
+	s.RemoveValues(invalidFields)
+	return IssueGraphQL(s.ToSlice())
 }
 
 var RepositoryFields = []string{

@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -67,19 +68,7 @@ type PullRequest struct {
 		Nodes      []PullRequestCommit
 	}
 	StatusCheckRollup struct {
-		Nodes []struct {
-			Commit struct {
-				StatusCheckRollup struct {
-					Contexts struct {
-						Nodes    []CheckContext
-						PageInfo struct {
-							HasNextPage bool
-							EndCursor   string
-						}
-					}
-				}
-			}
-		}
+		Nodes []StatusCheckRollupNode
 	}
 
 	Assignees      Assignees
@@ -93,9 +82,30 @@ type PullRequest struct {
 	ReviewRequests ReviewRequests
 }
 
+type StatusCheckRollupNode struct {
+	Commit StatusCheckRollupCommit
+}
+
+type StatusCheckRollupCommit struct {
+	StatusCheckRollup CommitStatusCheckRollup
+}
+
+type CommitStatusCheckRollup struct {
+	Contexts CheckContexts
+}
+
+type CheckContexts struct {
+	Nodes    []CheckContext
+	PageInfo struct {
+		HasNextPage bool
+		EndCursor   string
+	}
+}
+
 type CheckContext struct {
 	TypeName   string `json:"__typename"`
 	Name       string `json:"name"`
+	IsRequired bool   `json:"isRequired"`
 	CheckSuite struct {
 		WorkflowRun struct {
 			Workflow struct {
@@ -204,6 +214,10 @@ func (pr PullRequest) Identifier() string {
 	return pr.ID
 }
 
+func (pr PullRequest) CurrentUserComments() []Comment {
+	return pr.Comments.CurrentUserComments()
+}
+
 func (pr PullRequest) IsOpen() bool {
 	return pr.State == "OPEN"
 }
@@ -259,6 +273,7 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 		}
 		summary.Total++
 	}
+
 	return
 }
 
@@ -446,7 +461,25 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 	return client.Mutate(repo.RepoHost(), "PullRequestReadyForReview", &mutation, variables)
 }
 
+func ConvertPullRequestToDraft(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+	var mutation struct {
+		ConvertPullRequestToDraft struct {
+			PullRequest struct {
+				ID githubv4.ID
+			}
+		} `graphql:"convertPullRequestToDraft(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": githubv4.ConvertPullRequestToDraftInput{
+			PullRequestID: pr.ID,
+		},
+	}
+
+	return client.Mutate(repo.RepoHost(), "ConvertPullRequestToDraft", &mutation, variables)
+}
+
 func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) error {
-	path := fmt.Sprintf("repos/%s/%s/git/refs/heads/%s", repo.RepoOwner(), repo.RepoName(), branch)
+	path := fmt.Sprintf("repos/%s/%s/git/refs/heads/%s", repo.RepoOwner(), repo.RepoName(), url.PathEscape(branch))
 	return client.REST(repo.RepoHost(), "DELETE", path, nil, nil)
 }

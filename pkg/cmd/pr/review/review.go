@@ -205,9 +205,11 @@ func reviewRun(opts *ReviewOptions) error {
 }
 
 func reviewSurvey(opts *ReviewOptions, editorCommand string) (*api.PullRequestReviewInput, error) {
+	options := []string{"Comment", "Approve", "Request Changes"}
 	reviewType, err := opts.Prompter.Select(
-		"What kind of review do you want to give?", "",
-		[]string{"Comment", "Approve", "Request Changes"})
+		"What kind of review do you want to give?",
+		options[0],
+		options)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +242,9 @@ func reviewSurvey(opts *ReviewOptions, editorCommand string) (*api.PullRequestRe
 	}
 
 	if len(body) > 0 {
-		renderedBody, err := markdown.Render(body, markdown.WithIO(opts.IO))
+		renderedBody, err := markdown.Render(body,
+			markdown.WithTheme(opts.IO.TerminalTheme()),
+			markdown.WithWrap(opts.IO.TerminalWidth()))
 		if err != nil {
 			return nil, err
 		}

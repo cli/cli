@@ -4,10 +4,9 @@ import (
 	"fmt"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/text"
-	"github.com/cli/cli/v2/utils"
 )
 
 func StateTitleWithColor(cs *iostreams.ColorScheme, pr api.PullRequest) string {
@@ -39,6 +38,9 @@ func ColorForIssueState(issue api.Issue) string {
 	case "OPEN":
 		return "green"
 	case "CLOSED":
+		if issue.StateReason == "NOT_PLANNED" {
+			return "gray"
+		}
 		return "magenta"
 	default:
 		return ""
@@ -66,8 +68,26 @@ func ListHeader(repoName string, itemName string, matchCount int, totalMatchCoun
 		if totalMatchCount == 1 {
 			matchVerb = "matches"
 		}
-		return fmt.Sprintf("Showing %d of %s in %s that %s your search", matchCount, utils.Pluralize(totalMatchCount, itemName), repoName, matchVerb)
+		return fmt.Sprintf("Showing %d of %s in %s that %s your search", matchCount, text.Pluralize(totalMatchCount, itemName), repoName, matchVerb)
 	}
 
-	return fmt.Sprintf("Showing %d of %s in %s", matchCount, utils.Pluralize(totalMatchCount, fmt.Sprintf("open %s", itemName)), repoName)
+	return fmt.Sprintf("Showing %d of %s in %s", matchCount, text.Pluralize(totalMatchCount, fmt.Sprintf("open %s", itemName)), repoName)
+}
+
+func PrCheckStatusSummaryWithColor(cs *iostreams.ColorScheme, checks api.PullRequestChecksStatus) string {
+	var summary = cs.Gray("No checks")
+	if checks.Total > 0 {
+		if checks.Failing > 0 {
+			if checks.Failing == checks.Total {
+				summary = cs.Red("× All checks failing")
+			} else {
+				summary = cs.Redf("× %d/%d checks failing", checks.Failing, checks.Total)
+			}
+		} else if checks.Pending > 0 {
+			summary = cs.Yellow("- Checks pending")
+		} else if checks.Passing == checks.Total {
+			summary = cs.Green("✓ Checks passing")
+		}
+	}
+	return summary
 }

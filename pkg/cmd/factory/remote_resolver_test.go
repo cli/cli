@@ -2,7 +2,6 @@ package factory
 
 import (
 	"net/url"
-	"os"
 	"testing"
 
 	"github.com/cli/cli/v2/git"
@@ -17,11 +16,6 @@ func (it identityTranslator) Translate(u *url.URL) *url.URL {
 }
 
 func Test_remoteResolver(t *testing.T) {
-	orig_GH_HOST := os.Getenv("GH_HOST")
-	t.Cleanup(func() {
-		os.Setenv("GH_HOST", orig_GH_HOST)
-	})
-
 	tests := []struct {
 		name     string
 		remotes  func() (git.RemoteSet, error)

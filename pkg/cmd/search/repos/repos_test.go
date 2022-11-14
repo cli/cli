@@ -149,6 +149,8 @@ func TestNewCmdRepos(t *testing.T) {
 }
 
 func TestReposRun(t *testing.T) {
+	var now = time.Date(2022, 2, 28, 12, 30, 0, 0, time.UTC)
+	var updatedAt = time.Date(2021, 2, 28, 12, 30, 0, 0, time.UTC)
 	var query = search.Query{
 		Keywords: []string{"cli"},
 		Kind:     "repositories",
@@ -158,7 +160,6 @@ func TestReposRun(t *testing.T) {
 			Topic: []string{"golang"},
 		},
 	}
-	var updatedAt = time.Date(2021, 2, 28, 12, 30, 0, 0, time.UTC)
 	tests := []struct {
 		errMsg     string
 		name       string
@@ -270,6 +271,7 @@ func TestReposRun(t *testing.T) {
 		ios.SetStdoutTTY(tt.tty)
 		ios.SetStderrTTY(tt.tty)
 		tt.opts.IO = ios
+		tt.opts.Now = now
 		t.Run(tt.name, func(t *testing.T) {
 			err := reposRun(tt.opts)
 			if tt.wantErr {

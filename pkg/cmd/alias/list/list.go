@@ -54,6 +54,7 @@ func listRun(opts *ListOptions) error {
 		return cmdutil.NewNoResultsError("no aliases configured")
 	}
 
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(opts.IO)
 	keys := []string{}
 	for alias := range aliasMap {

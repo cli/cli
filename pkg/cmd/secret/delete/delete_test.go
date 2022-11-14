@@ -73,6 +73,15 @@ func TestNewCmdDelete(t *testing.T) {
 				Application: "Dependabot",
 			},
 		},
+		{
+			name: "Codespaces org",
+			cli:  "cool --app codespaces --org UmbrellaCorporation",
+			wants: DeleteOptions{
+				SecretName:  "cool",
+				OrgName:     "UmbrellaCorporation",
+				Application: "Codespaces",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -218,6 +227,14 @@ func Test_removeRun_org(t *testing.T) {
 				OrgName:     "UmbrellaCorporation",
 			},
 			wantPath: "orgs/UmbrellaCorporation/dependabot/secrets/tVirus",
+		},
+		{
+			name: "Codespaces org",
+			opts: &DeleteOptions{
+				Application: "codespaces",
+				OrgName:     "UmbrellaCorporation",
+			},
+			wantPath: "orgs/UmbrellaCorporation/codespaces/secrets/tVirus",
 		},
 	}
 

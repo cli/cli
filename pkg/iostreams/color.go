@@ -2,7 +2,6 @@ package iostreams
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -24,30 +23,6 @@ var (
 		return fmt.Sprintf("\x1b[%d;5;%dm%s\x1b[m", 38, 242, t)
 	}
 )
-
-func EnvColorDisabled() bool {
-	return os.Getenv("NO_COLOR") != "" || os.Getenv("CLICOLOR") == "0"
-}
-
-func EnvColorForced() bool {
-	return os.Getenv("CLICOLOR_FORCE") != "" && os.Getenv("CLICOLOR_FORCE") != "0"
-}
-
-func Is256ColorSupported() bool {
-	return IsTrueColorSupported() ||
-		strings.Contains(os.Getenv("TERM"), "256") ||
-		strings.Contains(os.Getenv("COLORTERM"), "256")
-}
-
-func IsTrueColorSupported() bool {
-	term := os.Getenv("TERM")
-	colorterm := os.Getenv("COLORTERM")
-
-	return strings.Contains(term, "24bit") ||
-		strings.Contains(term, "truecolor") ||
-		strings.Contains(colorterm, "24bit") ||
-		strings.Contains(colorterm, "truecolor")
-}
 
 func NewColorScheme(enabled, is256enabled bool, trueColor bool) *ColorScheme {
 	return &ColorScheme{

@@ -46,7 +46,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			List secrets on one of the following levels:
 			- repository (default): available to Actions runs or Dependabot in a repository
 			- environment: available to Actions runs for a deployment environment in a repository
-			- organization: available to Actions runs or Dependabot within an organization
+			- organization: available to Actions runs, Dependabot, or Codespaces within an organization
 			- user: available to Codespaces for your user
 		`),
 		Aliases: []string{"ls"},
@@ -146,6 +146,7 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
 
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(opts.IO)
 	for _, secret := range secrets {
 		tp.AddField(secret.Name, nil, nil)

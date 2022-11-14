@@ -10,8 +10,8 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -150,7 +150,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		return fmt.Errorf("error checking codespace ownership: %w", err)
 	} else if billableOwner != nil && billableOwner.Type == "Organization" {
 		cs := a.io.ColorScheme()
-		fmt.Fprintln(a.io.Out, cs.Blue("  ✓ Codespaces usage for this repository is paid for by "+billableOwner.Login))
+		fmt.Fprintln(a.io.ErrOut, cs.Blue("  ✓ Codespaces usage for this repository is paid for by "+billableOwner.Login))
 	}
 
 	if promptForRepoAndBranch {
@@ -192,12 +192,12 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		if len(devcontainers) > 0 {
 
 			// if there is only one devcontainer.json file and it is one of the default paths we can auto-select it
-			if len(devcontainers) == 1 && utils.StringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
+			if len(devcontainers) == 1 && stringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
 				devContainerPath = devcontainers[0].Path
 			} else {
 				promptOptions := []string{}
 
-				if !utils.StringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
+				if !stringInSlice(devcontainers[0].Path, DEFAULT_DEVCONTAINER_DEFINITIONS) {
 					promptOptions = []string{DEVCONTAINER_PROMPT_DEFAULT}
 				}
 
@@ -225,7 +225,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		}
 	}
 
-	machine, err := getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, userInputs.Location)
+	machine, err := getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, userInputs.Location, devContainerPath)
 	if err != nil {
 		return fmt.Errorf("error getting machine type: %w", err)
 	}
@@ -284,7 +284,7 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 	var (
 		isInteractive = a.io.CanPrompt()
 		cs            = a.io.ColorScheme()
-		displayURL    = utils.DisplayURL(allowPermissionsURL)
+		displayURL    = text.DisplayURL(allowPermissionsURL)
 	)
 
 	fmt.Fprintf(a.io.ErrOut, "You must authorize or deny additional permissions requested by this codespace before continuing.\n")
@@ -411,8 +411,8 @@ func (a *App) showStatus(ctx context.Context, codespace *api.Codespace) error {
 }
 
 // getMachineName prompts the user to select the machine type, or validates the machine if non-empty.
-func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machine, branch, location string) (string, error) {
-	machines, err := apiClient.GetCodespacesMachines(ctx, repoID, branch, location)
+func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machine, branch, location string, devcontainerPath string) (string, error) {
+	machines, err := apiClient.GetCodespacesMachines(ctx, repoID, branch, location, devcontainerPath)
 	if err != nil {
 		return "", fmt.Errorf("error requesting machine instance types: %w", err)
 	}
@@ -497,4 +497,13 @@ func buildDisplayName(displayName string, prebuildAvailability string) string {
 	default:
 		return displayName
 	}
+}
+
+func stringInSlice(a string, slice []string) bool {
+	for _, b := range slice {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }

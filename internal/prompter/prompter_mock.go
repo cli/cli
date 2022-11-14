@@ -23,6 +23,9 @@ var _ Prompter = &PrompterMock{}
 // 			ConfirmFunc: func(s string, b bool) (bool, error) {
 // 				panic("mock out the Confirm method")
 // 			},
+// 			ConfirmDeletionFunc: func(s string) error {
+// 				panic("mock out the ConfirmDeletion method")
+// 			},
 // 			InputFunc: func(s1 string, s2 string) (string, error) {
 // 				panic("mock out the Input method")
 // 			},
@@ -54,6 +57,9 @@ type PrompterMock struct {
 	// ConfirmFunc mocks the Confirm method.
 	ConfirmFunc func(s string, b bool) (bool, error)
 
+	// ConfirmDeletionFunc mocks the ConfirmDeletion method.
+	ConfirmDeletionFunc func(s string) error
+
 	// InputFunc mocks the Input method.
 	InputFunc func(s1 string, s2 string) (string, error)
 
@@ -83,6 +89,11 @@ type PrompterMock struct {
 			S string
 			// B is the b argument value.
 			B bool
+		}
+		// ConfirmDeletion holds details about calls to the ConfirmDeletion method.
+		ConfirmDeletion []struct {
+			// S is the s argument value.
+			S string
 		}
 		// Input holds details about calls to the Input method.
 		Input []struct {
@@ -127,14 +138,15 @@ type PrompterMock struct {
 			Strings []string
 		}
 	}
-	lockAuthToken      sync.RWMutex
-	lockConfirm        sync.RWMutex
-	lockInput          sync.RWMutex
-	lockInputHostname  sync.RWMutex
-	lockMarkdownEditor sync.RWMutex
-	lockMultiSelect    sync.RWMutex
-	lockPassword       sync.RWMutex
-	lockSelect         sync.RWMutex
+	lockAuthToken       sync.RWMutex
+	lockConfirm         sync.RWMutex
+	lockConfirmDeletion sync.RWMutex
+	lockInput           sync.RWMutex
+	lockInputHostname   sync.RWMutex
+	lockMarkdownEditor  sync.RWMutex
+	lockMultiSelect     sync.RWMutex
+	lockPassword        sync.RWMutex
+	lockSelect          sync.RWMutex
 }
 
 // AuthToken calls AuthTokenFunc.
@@ -195,6 +207,37 @@ func (mock *PrompterMock) ConfirmCalls() []struct {
 	mock.lockConfirm.RLock()
 	calls = mock.calls.Confirm
 	mock.lockConfirm.RUnlock()
+	return calls
+}
+
+// ConfirmDeletion calls ConfirmDeletionFunc.
+func (mock *PrompterMock) ConfirmDeletion(s string) error {
+	if mock.ConfirmDeletionFunc == nil {
+		panic("PrompterMock.ConfirmDeletionFunc: method is nil but Prompter.ConfirmDeletion was just called")
+	}
+	callInfo := struct {
+		S string
+	}{
+		S: s,
+	}
+	mock.lockConfirmDeletion.Lock()
+	mock.calls.ConfirmDeletion = append(mock.calls.ConfirmDeletion, callInfo)
+	mock.lockConfirmDeletion.Unlock()
+	return mock.ConfirmDeletionFunc(s)
+}
+
+// ConfirmDeletionCalls gets all the calls that were made to ConfirmDeletion.
+// Check the length with:
+//     len(mockedPrompter.ConfirmDeletionCalls())
+func (mock *PrompterMock) ConfirmDeletionCalls() []struct {
+	S string
+} {
+	var calls []struct {
+		S string
+	}
+	mock.lockConfirmDeletion.RLock()
+	calls = mock.calls.ConfirmDeletion
+	mock.lockConfirmDeletion.RUnlock()
 	return calls
 }
 

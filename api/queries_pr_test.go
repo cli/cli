@@ -11,36 +11,44 @@ import (
 
 func TestBranchDeleteRemote(t *testing.T) {
 	var tests = []struct {
-		name           string
-		responseStatus int
-		responseBody   string
-		expectError    bool
+		name        string
+		branch      string
+		httpStubs   func(*httpmock.Registry)
+		expectError bool
 	}{
 		{
-			name:           "success",
-			responseStatus: 204,
-			responseBody:   "",
-			expectError:    false,
+			name:   "success",
+			branch: "owner/branch#123",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/owner%2Fbranch%23123"),
+					httpmock.StatusStringResponse(204, ""))
+			},
+			expectError: false,
 		},
 		{
-			name:           "error",
-			responseStatus: 500,
-			responseBody:   `{"message": "oh no"}`,
-			expectError:    true,
+			name:   "error",
+			branch: "my-branch",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/my-branch"),
+					httpmock.StatusStringResponse(500, `{"message": "oh no"}`))
+			},
+			expectError: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			http := &httpmock.Registry{}
-			http.Register(
-				httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/branch"),
-				httpmock.StatusStringResponse(tt.responseStatus, tt.responseBody))
+			if tt.httpStubs != nil {
+				tt.httpStubs(http)
+			}
 
 			client := newTestClient(http)
 			repo, _ := ghrepo.FromFullName("OWNER/REPO")
 
-			err := BranchDeleteRemote(client, repo, "branch")
+			err := BranchDeleteRemote(client, repo, tt.branch)
 			if (err != nil) != tt.expectError {
 				t.Fatalf("unexpected result: %v", err)
 			}

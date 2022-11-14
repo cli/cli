@@ -3,9 +3,9 @@ package prompter
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/surveyext"
 )
@@ -19,31 +19,45 @@ type Prompter interface {
 	Password(string) (string, error)
 	AuthToken() (string, error)
 	Confirm(string, bool) (bool, error)
+	ConfirmDeletion(string) error
 	MarkdownEditor(string, string, bool) (string, error)
 }
 
-func New(editorCmd string, stdin io.Reader, stdout, stderr io.Writer) Prompter {
+type fileWriter interface {
+	io.Writer
+	Fd() uintptr
+}
+
+type fileReader interface {
+	io.Reader
+	Fd() uintptr
+}
+
+func New(editorCmd string, stdin fileReader, stdout fileWriter, stderr io.Writer) Prompter {
 	return &surveyPrompter{
 		editorCmd: editorCmd,
-		stdin:     stdin.(terminal.FileReader),
-		stdout:    stdout.(terminal.FileWriter),
+		stdin:     stdin,
+		stdout:    stdout,
 		stderr:    stderr,
 	}
 }
 
 type surveyPrompter struct {
 	editorCmd string
-	stdin     terminal.FileReader
-	stdout    terminal.FileWriter
+	stdin     fileReader
+	stdout    fileWriter
 	stderr    io.Writer
 }
 
 func (p *surveyPrompter) Select(message, defaultValue string, options []string) (result int, err error) {
 	q := &survey.Select{
 		Message:  message,
-		Default:  defaultValue,
 		Options:  options,
 		PageSize: 20,
+	}
+
+	if defaultValue != "" {
+		q.Default = defaultValue
 	}
 
 	err = p.ask(q, &result)
@@ -54,9 +68,12 @@ func (p *surveyPrompter) Select(message, defaultValue string, options []string) 
 func (p *surveyPrompter) MultiSelect(message, defaultValue string, options []string) (result int, err error) {
 	q := &survey.MultiSelect{
 		Message:  message,
-		Default:  defaultValue,
 		Options:  options,
 		PageSize: 20,
+	}
+
+	if defaultValue != "" {
+		q.Default = defaultValue
 	}
 
 	err = p.ask(q, &result)
@@ -80,6 +97,22 @@ func (p *surveyPrompter) Input(prompt, defaultValue string) (result string, err 
 	}, &result)
 
 	return
+}
+
+func (p *surveyPrompter) ConfirmDeletion(requiredValue string) error {
+	var result string
+	return p.ask(
+		&survey.Input{
+			Message: fmt.Sprintf("Type %s to confirm deletion:", requiredValue),
+		},
+		&result,
+		survey.WithValidator(
+			func(val interface{}) error {
+				if str := val.(string); !strings.EqualFold(str, requiredValue) {
+					return fmt.Errorf("You entered %s", str)
+				}
+				return nil
+			}))
 }
 
 func (p *surveyPrompter) InputHostname() (result string, err error) {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -76,7 +77,17 @@ func getTags(httpClient *http.Client, repo ghrepo.Interface, limit int) ([]tag, 
 	return tags, err
 }
 
-func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, params map[string]interface{}) (*releaseNotes, error) {
+func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagName, target, previousTagName string) (*releaseNotes, error) {
+	params := map[string]interface{}{
+		"tag_name": tagName,
+	}
+	if target != "" {
+		params["target_commitish"] = target
+	}
+	if previousTagName != "" {
+		params["previous_tag_name"] = previousTagName
+	}
+
 	bodyBytes, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
@@ -115,6 +126,31 @@ func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, params
 	var rn releaseNotes
 	err = json.Unmarshal(b, &rn)
 	return &rn, err
+}
+
+func publishedReleaseExists(httpClient *http.Client, repo ghrepo.Interface, tagName string) (bool, error) {
+	path := fmt.Sprintf("repos/%s/%s/releases/tags/%s", repo.RepoOwner(), repo.RepoName(), url.PathEscape(tagName))
+	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
+	req, err := http.NewRequest("HEAD", url, nil)
+	if err != nil {
+		return false, err
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return false, err
+	}
+	if resp.Body != nil {
+		defer resp.Body.Close()
+	}
+
+	if resp.StatusCode == 200 {
+		return true, nil
+	} else if resp.StatusCode == 404 {
+		return false, nil
+	} else {
+		return false, api.HandleHTTPError(resp)
+	}
 }
 
 func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[string]interface{}) (*shared.Release, error) {
