@@ -408,8 +408,6 @@ func System() *IOStreams {
 
 	io.stdoutIsTTY = io.IsStdoutTTY()
 	io.stderrIsTTY = io.IsStderrTTY()
-	io.stdoutTTYOverride = true
-	io.stderrTTYOverride = true
 
 	if io.stdoutIsTTY && io.stderrIsTTY {
 		io.progressIndicatorEnabled = true
