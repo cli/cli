@@ -60,7 +60,7 @@ nfpms:
   - license: MIT
     maintainer: GitHub
     homepage: https://github.com/cli/cli
-    bindir: /usr/bin
+    bindir: /usr
     dependencies:
       - git
     description: GitHub’s official command line tool.
