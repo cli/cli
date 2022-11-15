@@ -423,7 +423,7 @@ func determineTrackingBranch(gitClient *git.Client, remotes ghContext.Remotes, h
 		refsForLookup = append(refsForLookup, tr.String())
 	}
 
-	resolvedRefs, _ := gitClient.ShowRefs(context.Background(), refsForLookup...)
+	resolvedRefs, _ := gitClient.ShowRefs(context.Background(), refsForLookup)
 	if len(resolvedRefs) > 1 {
 		for _, r := range resolvedRefs[1:] {
 			if r.Hash != resolvedRefs[0].Hash {
@@ -480,9 +480,14 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	}
 	client := api.NewClientFromHTTP(httpClient)
 
+	// TODO: consider obtaining remotes from GitClient instead
 	remotes, err := opts.Remotes()
 	if err != nil {
-		return nil, err
+		// When a repo override value is given, ignore errors when fetching git remotes
+		// to support using this command outside of git repos.
+		if opts.RepoOverride == "" {
+			return nil, err
+		}
 	}
 
 	repoContext, err := ghContext.ResolveRemotesToRepos(remotes, client, opts.RepoOverride)

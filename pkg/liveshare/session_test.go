@@ -400,26 +400,45 @@ func TestSessionHeartbeat(t *testing.T) {
 }
 
 func TestRebuild(t *testing.T) {
-	requestCount := 0
-	getSharedServers := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
-		requestCount++
-		return true, nil
-	}
-	testServer, session, err := makeMockSession(
-		livesharetest.WithService("IEnvironmentConfigurationService.rebuildContainer", getSharedServers),
-	)
-	if err != nil {
-		t.Fatalf("creating mock session: %v", err)
-	}
-	defer testServer.Close()
-
-	err = session.RebuildContainer(context.Background())
-	if err != nil {
-		t.Fatalf("rebuilding codespace via mock session: %v", err)
+	tests := []struct {
+		fullRebuild bool
+		rpcService  string
+	}{
+		{
+			fullRebuild: false,
+			rpcService:  "IEnvironmentConfigurationService.incrementalRebuildContainer",
+		},
+		{
+			fullRebuild: true,
+			rpcService:  "IEnvironmentConfigurationService.rebuildContainer",
+		},
 	}
 
-	if requestCount == 0 {
-		t.Fatalf("no requests were made")
+	for _, tt := range tests {
+		t.Logf("RPC service: %s", tt.rpcService)
+		t.Logf("full rebuild: %t", tt.fullRebuild)
+
+		requestCount := 0
+		rebuildContainer := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
+			requestCount++
+			return true, nil
+		}
+		testServer, session, err := makeMockSession(
+			livesharetest.WithService(tt.rpcService, rebuildContainer),
+		)
+		if err != nil {
+			t.Errorf("creating mock session: %v", err)
+		}
+		defer testServer.Close()
+
+		err = session.RebuildContainer(context.Background(), tt.fullRebuild)
+		if err != nil {
+			t.Errorf("rebuilding codespace via mock session: %v", err)
+		}
+
+		if requestCount == 0 {
+			t.Errorf("no requests were made")
+		}
 	}
 }
 

@@ -245,7 +245,6 @@ func developRunList(opts *DevelopOptions) (err error) {
 }
 
 func checkoutBranch(opts *DevelopOptions, baseRepo ghrepo.Interface, checkoutBranch string) (err error) {
-
 	remotes, err := opts.Remotes()
 	if err != nil {
 		return err
@@ -261,18 +260,11 @@ func checkoutBranch(opts *DevelopOptions, baseRepo ghrepo.Interface, checkoutBra
 			return err
 		}
 	} else {
-		gitFetch, err := opts.GitClient.Command(ctx.Background(), "fetch", "origin", fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/origin/%[1]s", checkoutBranch))
-
+		err := opts.GitClient.Fetch(ctx.Background(), "origin", fmt.Sprintf("+refs/heads/%[1]s:refs/remotes/origin/%[1]s", checkoutBranch))
 		if err != nil {
 			return err
 		}
 
-		gitFetch.Stdout = opts.IO.Out
-		gitFetch.Stderr = opts.IO.ErrOut
-		err = gitFetch.Run()
-		if err != nil {
-			return err
-		}
 		if err := opts.GitClient.CheckoutNewBranch(ctx.Background(), baseRemote.Name, checkoutBranch); err != nil {
 			return err
 		}

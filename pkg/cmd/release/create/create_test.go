@@ -260,6 +260,46 @@ func Test_NewCmdCreate(t *testing.T) {
 				NotesStartTag: "v1.1.0",
 			},
 		},
+		{
+			name:  "latest",
+			args:  "--latest v1.1.0",
+			isTTY: false,
+			want: CreateOptions{
+				TagName:       "v1.1.0",
+				Target:        "",
+				Name:          "",
+				Body:          "",
+				BodyProvided:  false,
+				Draft:         false,
+				Prerelease:    false,
+				IsLatest:      boolPtr(true),
+				RepoOverride:  "",
+				Concurrency:   5,
+				Assets:        []*shared.AssetForUpload(nil),
+				GenerateNotes: false,
+				NotesStartTag: "",
+			},
+		},
+		{
+			name:  "not latest",
+			args:  "--latest=false v1.1.0",
+			isTTY: false,
+			want: CreateOptions{
+				TagName:       "v1.1.0",
+				Target:        "",
+				Name:          "",
+				Body:          "",
+				BodyProvided:  false,
+				Draft:         false,
+				Prerelease:    false,
+				IsLatest:      boolPtr(false),
+				RepoOverride:  "",
+				Concurrency:   5,
+				Assets:        []*shared.AssetForUpload(nil),
+				GenerateNotes: false,
+				NotesStartTag: "",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -312,6 +352,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.want.DiscussionCategory, opts.DiscussionCategory)
 			assert.Equal(t, tt.want.GenerateNotes, opts.GenerateNotes)
 			assert.Equal(t, tt.want.NotesStartTag, opts.NotesStartTag)
+			assert.Equal(t, tt.want.IsLatest, opts.IsLatest)
 
 			require.Equal(t, len(tt.want.Assets), len(opts.Assets))
 			for i := range tt.want.Assets {
@@ -445,6 +486,35 @@ func Test_createRun(t *testing.T) {
 			wantStderr: ``,
 		},
 		{
+			name:  "with latest",
+			isTTY: false,
+			opts: CreateOptions{
+				TagName:       "v1.2.3",
+				Name:          "",
+				Body:          "",
+				Target:        "",
+				IsLatest:      boolPtr(true),
+				BodyProvided:  true,
+				GenerateNotes: false,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`, func(params map[string]interface{}) {
+					assert.Equal(t, map[string]interface{}{
+						"tag_name":    "v1.2.3",
+						"draft":       false,
+						"prerelease":  false,
+						"make_latest": "true",
+					}, params)
+				}))
+			},
+			wantStdout: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+			wantErr:    "",
+		},
+		{
 			name:  "with generate notes",
 			isTTY: true,
 			opts: CreateOptions{
@@ -573,6 +643,7 @@ func Test_createRun(t *testing.T) {
 				Concurrency: 1,
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(404, ``))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
 					"url": "https://api.github.com/releases/123",
 					"upload_url": "https://api.github.com/assets/upload",
@@ -609,6 +680,33 @@ func Test_createRun(t *testing.T) {
 			wantStderr: ``,
 		},
 		{
+			name:  "upload files but release already exists",
+			isTTY: true,
+			opts: CreateOptions{
+				TagName:      "v1.2.3",
+				Name:         "",
+				Body:         "",
+				BodyProvided: true,
+				Draft:        false,
+				Target:       "",
+				Assets: []*shared.AssetForUpload{
+					{
+						Name: "ball.tgz",
+						Open: func() (io.ReadCloser, error) {
+							return io.NopCloser(bytes.NewBufferString(`TARBALL`)), nil
+						},
+					},
+				},
+				Concurrency: 1,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(200, ``))
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+			wantErr:    `a release with the same tag name already exists: v1.2.3`,
+		},
+		{
 			name:  "upload files and create discussion",
 			isTTY: true,
 			opts: CreateOptions{
@@ -630,6 +728,7 @@ func Test_createRun(t *testing.T) {
 				Concurrency:        1,
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("HEAD", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StatusStringResponse(404, ``))
 				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.RESTPayload(201, `{
 					"url": "https://api.github.com/releases/123",
 					"upload_url": "https://api.github.com/assets/upload",
@@ -1100,4 +1199,8 @@ func Test_createRun_interactive(t *testing.T) {
 			assert.Equal(t, "", stderr.String())
 		})
 	}
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
