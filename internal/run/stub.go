@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	gitAuthRE = `-c credential.helper= -c credential.helper=!"[a-zA-Z/]*" auth git-credential `
+	gitAuthRE = `-c credential.helper= -c credential.helper=!"[^"]+" auth git-credential `
 )
 
 type T interface {
@@ -124,7 +124,7 @@ func (s *commandStub) Output() ([]byte, error) {
 
 // Inject git authentication string for specific git commands.
 func addGitAuthentication(s string) string {
-	pattern := regexp.MustCompile(`( fetch | pull | push | clone | remote add | submodule )`)
+	pattern := regexp.MustCompile(`( fetch | pull | push | clone | remote add.+-f | submodule )`)
 	loc := pattern.FindStringIndex(s)
 	if loc == nil {
 		return s
