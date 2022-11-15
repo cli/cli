@@ -894,7 +894,10 @@ func Test_createRun(t *testing.T) {
 				return branch, nil
 			}
 			opts.Finder = shared.NewMockFinder(branch, nil, nil)
-			opts.GitClient = &git.Client{GitPath: "some/path/git"}
+			opts.GitClient = &git.Client{
+				GhPath:  "some/path/gh",
+				GitPath: "some/path/git",
+			}
 			cleanSetup := func() {}
 			if tt.setup != nil {
 				cleanSetup = tt.setup(&opts, t)
@@ -1011,7 +1014,10 @@ func Test_determineTrackingBranch(t *testing.T) {
 
 			tt.cmdStubs(cs)
 
-			gitClient := &git.Client{GitPath: "some/path/git"}
+			gitClient := &git.Client{
+				GhPath:  "some/path/gh",
+				GitPath: "some/path/git",
+			}
 			ref := determineTrackingBranch(gitClient, tt.remotes, "feature")
 			tt.assert(ref, t)
 		})

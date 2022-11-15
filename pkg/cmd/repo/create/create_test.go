@@ -493,7 +493,10 @@ func Test_createRun(t *testing.T) {
 			return config.NewBlankConfig(), nil
 		}
 
-		tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
+		tt.opts.GitClient = &git.Client{
+			GhPath:  "some/path/gh",
+			GitPath: "some/path/git",
+		}
 
 		ios, _, stdout, stderr := iostreams.Test()
 		ios.SetStdinTTY(tt.tty)
