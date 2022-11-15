@@ -134,7 +134,11 @@ func (r Run) Title() string {
 // WorkflowName returns the human-readable name of the workflow that this run belongs to.
 // TODO: consider lazy-loading the underlying API data to avoid extra API calls unless necessary
 func (r Run) WorkflowName() string {
-	return r.workflowName
+	if r.workflowName != "" {
+		return r.workflowName
+	}
+
+	return r.Name
 }
 
 func (r *Run) ExportData(fields []string) map[string]interface{} {
