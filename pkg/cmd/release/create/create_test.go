@@ -60,6 +60,7 @@ func Test_NewCmdCreate(t *testing.T) {
 				RepoOverride: "",
 				Concurrency:  5,
 				Assets:       []*shared.AssetForUpload(nil),
+				VerifyTag:    false,
 			},
 		},
 		{
@@ -83,6 +84,7 @@ func Test_NewCmdCreate(t *testing.T) {
 				RepoOverride: "",
 				Concurrency:  5,
 				Assets:       []*shared.AssetForUpload(nil),
+				VerifyTag:    false,
 			},
 		},
 		{
@@ -300,6 +302,25 @@ func Test_NewCmdCreate(t *testing.T) {
 				NotesStartTag: "",
 			},
 		},
+		{
+			name:  "with verify-tag",
+			args:  "v1.1.0 --verify-tag",
+			isTTY: true,
+			want: CreateOptions{
+				TagName:       "v1.1.0",
+				Target:        "",
+				Name:          "",
+				Body:          "",
+				BodyProvided:  false,
+				Draft:         false,
+				Prerelease:    false,
+				RepoOverride:  "",
+				Concurrency:   5,
+				Assets:        []*shared.AssetForUpload(nil),
+				GenerateNotes: false,
+				VerifyTag:     true,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -353,6 +374,7 @@ func Test_NewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.want.GenerateNotes, opts.GenerateNotes)
 			assert.Equal(t, tt.want.NotesStartTag, opts.NotesStartTag)
 			assert.Equal(t, tt.want.IsLatest, opts.IsLatest)
+			assert.Equal(t, tt.want.VerifyTag, opts.VerifyTag)
 
 			require.Equal(t, len(tt.want.Assets), len(opts.Assets))
 			for i := range tt.want.Assets {
@@ -1124,6 +1146,56 @@ func Test_createRun_interactive(t *testing.T) {
 				"tag_name":   "v1.2.3",
 			},
 			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+		},
+		{
+			name: "create a release when remote tag exists and verify-tag flag is set",
+			opts: &CreateOptions{
+				TagName:   "v1.2.3",
+				VerifyTag: true,
+			},
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Title (optional)").AnswerWith("")
+				as.StubPrompt("Release notes").
+					AssertOptions([]string{"Write my own", "Write using generated notes as template", "Write using git tag message as template", "Leave blank"}).
+					AnswerWith("Leave blank")
+				as.StubPrompt("Is this a prerelease?").AnswerWith(false)
+				as.StubPrompt("Submit?").AnswerWith("Publish release")
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git tag --list`, 0, "tag exists")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.GraphQL("RepositoryFindRef"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": "tag id"}}}}`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases/generate-notes"),
+					httpmock.StatusStringResponse(200, `{
+						"name": "generated name",
+						"body": "generated body"
+					}`))
+				reg.Register(httpmock.REST("POST", "repos/OWNER/REPO/releases"), httpmock.StatusStringResponse(201, `{
+					"url": "https://api.github.com/releases/123",
+					"upload_url": "https://api.github.com/assets/upload",
+					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
+				}`))
+			},
+			wantParams: map[string]interface{}{
+				"draft":      false,
+				"prerelease": false,
+				"tag_name":   "v1.2.3",
+			},
+			wantOut: "https://github.com/OWNER/REPO/releases/tag/v1.2.3\n",
+		},
+		{
+			name: "error when remote tag does not exist and verify-tag flag is set",
+			opts: &CreateOptions{
+				TagName:   "v1.2.3",
+				VerifyTag: true,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.GraphQL("RepositoryFindRef"),
+					httpmock.StringResponse(`{"data":{"repository":{"ref": {"id": ""}}}}`))
+			},
+			wantErr: "tag v1.2.3 doesn't exist in the repo OWNER/REPO, aborting due to --verify-tag flag",
 		},
 	}
 	for _, tt := range tests {

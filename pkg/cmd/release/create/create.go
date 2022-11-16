@@ -53,6 +53,7 @@ type CreateOptions struct {
 	DiscussionCategory string
 	GenerateNotes      bool
 	NotesStartTag      string
+	VerifyTag          bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -78,7 +79,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			display label for an asset, append text starting with %[1]s#%[1]s after the file name.
 
 			If a matching git tag does not yet exist, one will automatically get created
-			from the latest state of the default branch. Use %[1]s--target%[1]s to override this.
+			from the latest state of the default branch.
+			Use %[1]s--target%[1]s to point to a different branch or commit for the automatic tag creation.
+			Use %[1]s--verify-tag%[1]s to abort the release if the tag doesn't already exist.
 			To fetch the new tag locally after the release, do %[1]sgit fetch --tags origin%[1]s.
 
 			To create a release from an annotated git tag, first create one locally with
@@ -166,6 +169,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate title and notes for the release")
 	cmd.Flags().StringVar(&opts.NotesStartTag, "notes-start-tag", "", "Tag to use as the starting point for generating release notes")
 	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Mark this release as \"Latest\" (default: automatic based on date and version)")
+	cmd.Flags().BoolVarP(&opts.VerifyTag, "verify-tag", "", false, "Abort the release if the tag doesn't already exist")
 
 	return cmd
 }
@@ -224,6 +228,18 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
+	var remoteTagPresent bool
+	if opts.VerifyTag && !existingTag {
+		remoteTagPresent, err = remoteTagExists(httpClient, baseRepo, opts.TagName)
+		if err != nil {
+			return err
+		}
+		if !remoteTagPresent {
+			return fmt.Errorf("tag %s doesn't exist in the repo %s, aborting due to --verify-tag flag",
+				opts.TagName, ghrepo.FullName(baseRepo))
+		}
+	}
+
 	var tagDescription string
 	if opts.RepoOverride == "" {
 		tagDescription, _ = gitTagInfo(opts.GitClient, opts.TagName)
@@ -235,7 +251,7 @@ func createRun(opts *CreateOptions) error {
 		// of local tag status.
 		// If a remote tag with the same name as specified exists already
 		// then a new tag will not be created so ignore local tag status.
-		if tagDescription != "" && !existingTag && opts.Target == "" {
+		if tagDescription != "" && !existingTag && opts.Target == "" && !remoteTagPresent {
 			remoteExists, err := remoteTagExists(httpClient, baseRepo, opts.TagName)
 			if err != nil {
 				return err
