@@ -166,6 +166,12 @@ func TestSelectSSHKeys(t *testing.T) {
 			wantKeyPair:      &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
 			wantShouldAddArg: true,
 		},
+		{
+			sshArgs:          []string{"-k"},
+			sshDirFiles:      []string{"id_ed25519", "id_ed25519.pub"},
+			wantKeyPair:      &ssh.KeyPair{PrivateKeyPath: automaticPrivateKeyName, PublicKeyPath: automaticPrivateKeyName + ".pub"},
+			wantShouldAddArg: true,
+		},
 
 		// Auto key exists tests
 		{
