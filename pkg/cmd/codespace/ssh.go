@@ -37,14 +37,15 @@ const automaticPrivateKeyName = "codespaces.auto"
 var errKeyFileNotFound = errors.New("SSH key file does not exist")
 
 type sshOptions struct {
-	codespace  string
-	profile    string
-	serverPort int
-	debug      bool
-	debugFile  string
-	stdio      bool
-	config     bool
-	scpArgs    []string // scp arguments, for 'cs cp' (nil for 'cs ssh')
+	codespace            string
+	profile              string
+	serverPort           int
+	debug                bool
+	debugFile            string
+	stdio                bool
+	config               bool
+	useCodespacesKeypair bool
+	scpArgs              []string // scp arguments, for 'cs cp' (nil for 'cs ssh')
 }
 
 func newSSHCmd(app *App) *cobra.Command {
@@ -127,6 +128,7 @@ func newSSHCmd(app *App) *cobra.Command {
 	sshCmd.Flags().BoolVarP(&opts.debug, "debug", "d", false, "Log debug data to a file")
 	sshCmd.Flags().StringVarP(&opts.debugFile, "debug-file", "", "", "Path of the file log to")
 	sshCmd.Flags().BoolVarP(&opts.config, "config", "", false, "Write OpenSSH configuration to stdout")
+	sshCmd.Flags().BoolVarP(&opts.useCodespacesKeypair, "codespaces-keys", "k", false, fmt.Sprintf("Always use a codespaces generated SSH keypair (%s)", automaticPrivateKeyName))
 	sshCmd.Flags().BoolVar(&opts.stdio, "stdio", false, "Proxy sshd connection to stdio")
 	if err := sshCmd.Flags().MarkHidden("stdio"); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
@@ -241,7 +243,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 // Precedence rules:
 // 1. Key which is specified by -i
 // 2. Automatic key, if it already exists
-// 3. First valid keypair in ssh config (according to ssh -G)
+// 3. (If useCodespacesKeypair is not provided) First valid keypair in ssh config (according to ssh -G)
 // 4. Automatic key, newly created
 func selectSSHKeys(
 	ctx context.Context,
@@ -250,6 +252,7 @@ func selectSSHKeys(
 	opts sshOptions,
 ) (*ssh.KeyPair, bool, error) {
 	customConfigPath := ""
+	generateKeys := opts.useCodespacesKeypair
 	for i := 0; i < len(args); i += 1 {
 		arg := args[i]
 
@@ -276,13 +279,21 @@ func selectSSHKeys(
 		return autoKeyPair, true, nil
 	}
 
-	keyPair, err := firstConfiguredKeyPair(ctx, customConfigPath, opts.profile)
-	if err != nil {
-		if !errors.Is(err, errKeyFileNotFound) {
-			return nil, false, fmt.Errorf("checking configured keys: %w", err)
-		}
+	var keyPair *ssh.KeyPair
+	var err error
 
-		// no valid key in ssh config, generate one
+	if !generateKeys {
+		keyPair, err = firstConfiguredKeyPair(ctx, customConfigPath, opts.profile)
+		if err != nil {
+			if !errors.Is(err, errKeyFileNotFound) {
+				return nil, false, fmt.Errorf("checking configured keys: %w", err)
+			}
+			generateKeys = true
+		}
+	}
+
+	// user wants to force generate keys or no valid key in ssh config, generate one
+	if generateKeys {
 		keyPair, err = generateAutomaticSSHKeys(sshContext)
 		if err != nil {
 			return nil, false, fmt.Errorf("generating automatic keypair: %w", err)
