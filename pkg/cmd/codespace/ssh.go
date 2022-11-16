@@ -60,7 +60,7 @@ func newSSHCmd(app *App) *cobra.Command {
 			
 			The 'ssh' command will create a public/private ssh key pair to  
 			authenticate with the codespace inside the ~/.ssh directory if no valid existing
-			keypair is found. To guarantee the use of the public/private ssh key pair,
+			key pair is found. To guarantee the use of the public/private ssh key pair,
 			the '--codespaces-keypair' option will use the generated key pair or create a 
 			new key pair if one does not exist. 
 
