@@ -228,9 +228,8 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
-	var remoteTagPresent bool
 	if opts.VerifyTag && !existingTag {
-		remoteTagPresent, err = remoteTagExists(httpClient, baseRepo, opts.TagName)
+		remoteTagPresent, err := remoteTagExists(httpClient, baseRepo, opts.TagName)
 		if err != nil {
 			return err
 		}
@@ -251,7 +250,7 @@ func createRun(opts *CreateOptions) error {
 		// of local tag status.
 		// If a remote tag with the same name as specified exists already
 		// then a new tag will not be created so ignore local tag status.
-		if tagDescription != "" && !existingTag && opts.Target == "" && !remoteTagPresent {
+		if tagDescription != "" && !existingTag && opts.Target == "" && !opts.VerifyTag {
 			remoteExists, err := remoteTagExists(httpClient, baseRepo, opts.TagName)
 			if err != nil {
 				return err
