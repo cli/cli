@@ -190,7 +190,7 @@ jobs:
           DISCUSSION_CATEGORY: General
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Bump homebrew-core formula
-        uses: mislav/bump-homebrew-formula-action@v1
+        uses: mislav/bump-homebrew-formula-action@v2
         if: "!contains(github.ref, '-')" # skip prereleases
         with:
           formula-name: gh
