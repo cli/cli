@@ -296,7 +296,7 @@ func selectSSHKeys(
 	}
 
 	// user wants to force generate keys or no valid key in ssh config, generate one
-	if generateKeys {
+	if generateKeys || keyPair == nil {
 		keyPair, err = generateAutomaticSSHKeys(sshContext)
 		if err != nil {
 			return nil, false, fmt.Errorf("generating automatic keypair: %w", err)
