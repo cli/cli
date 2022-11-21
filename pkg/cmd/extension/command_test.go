@@ -323,7 +323,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY:      true,
-			wantStdout: "✓ Successfully upgraded extension hello\n",
+			wantStdout: "",
 		},
 		{
 			name: "upgrade an extension dry run",
@@ -343,7 +343,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY:      true,
-			wantStdout: "✓ Would have upgraded extension hello\n",
+			wantStdout: "",
 		},
 		{
 			name: "upgrade an extension notty",
@@ -410,7 +410,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY:      true,
-			wantStdout: "✓ Successfully upgraded extension hello\n",
+			wantStdout: "",
 		},
 		{
 			name: "upgrade an extension full name",
@@ -426,7 +426,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY:      true,
-			wantStdout: "✓ Successfully upgraded extension hello\n",
+			wantStdout: "",
 		},
 		{
 			name: "upgrade all",

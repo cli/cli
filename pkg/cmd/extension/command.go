@@ -380,9 +380,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						}
 						if errors.Is(err, upToDateError) {
 							fmt.Fprintf(io.Out, "%s Extension already up to date\n", cs.SuccessIcon())
-						} else if name != "" {
-							fmt.Fprintf(io.Out, "%s %s upgraded extension %s\n", cs.SuccessIcon(), successStr, name)
-						} else {
+						} else if name == "" {
 							fmt.Fprintf(io.Out, "%s %s upgraded extensions\n", cs.SuccessIcon(), successStr)
 						}
 					}
