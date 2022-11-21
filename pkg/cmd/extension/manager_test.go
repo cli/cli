@@ -369,7 +369,7 @@ func TestManager_UpgradeExtension_GitExtension(t *testing.T) {
 	ext.latestVersion = "new version"
 	err = m.upgradeExtension(ext, false)
 	assert.NoError(t, err)
-	assert.Equal(t, "upgraded from old vers to new vers\n", stdout.String())
+	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
 	gc.AssertExpectations(t)
 	gcOne.AssertExpectations(t)
@@ -395,7 +395,7 @@ func TestManager_UpgradeExtension_GitExtension_DryRun(t *testing.T) {
 	ext.latestVersion = "new version"
 	err = m.upgradeExtension(ext, false)
 	assert.NoError(t, err)
-	assert.Equal(t, "would have upgraded from old vers to new vers\n", stdout.String())
+	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
 	gc.AssertExpectations(t)
 	gcOne.AssertExpectations(t)
@@ -422,7 +422,7 @@ func TestManager_UpgradeExtension_GitExtension_Force(t *testing.T) {
 	ext.latestVersion = "new version"
 	err = m.upgradeExtension(ext, true)
 	assert.NoError(t, err)
-	assert.Equal(t, "upgraded from old vers to new vers\n", stdout.String())
+	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
 	gc.AssertExpectations(t)
 	gcOne.AssertExpectations(t)
@@ -566,7 +566,7 @@ func TestManager_UpgradeExtension_BinaryExtension(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "FAKE UPGRADED BINARY", string(fakeBin))
 
-	assert.Equal(t, "upgraded from v1.0.1 to v1.0.2\n", stdout.String())
+	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
 }
 
@@ -631,7 +631,7 @@ func TestManager_UpgradeExtension_BinaryExtension_Pinned_Force(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "FAKE UPGRADED BINARY", string(fakeBin))
 
-	assert.Equal(t, "upgraded from v1.0.1 to v1.0.2\n", stdout.String())
+	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
 }
 
@@ -684,7 +684,7 @@ func TestManager_UpgradeExtension_BinaryExtension_DryRun(t *testing.T) {
 		Host:  "example.com",
 		Tag:   "v1.0.1",
 	}, bm)
-	assert.Equal(t, "would have upgraded from v1.0.1 to v1.0.2\n", stdout.String())
+	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "", stderr.String())
 }
 

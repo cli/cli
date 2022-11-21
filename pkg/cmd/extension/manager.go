@@ -535,6 +535,13 @@ func (m *Manager) upgradeExtensions(exts []Extension, force bool) error {
 			fmt.Fprintf(m.io.Out, "%s\n", err)
 			continue
 		}
+		currentVersion := displayExtensionVersion(&f, f.currentVersion)
+		latestVersion := displayExtensionVersion(&f, f.latestVersion)
+		if m.dryRunMode {
+			fmt.Fprintf(m.io.Out, "would have upgraded from %s to %s\n", currentVersion, latestVersion)
+		} else {
+			fmt.Fprintf(m.io.Out, "upgraded from %s to %s\n", currentVersion, latestVersion)
+		}
 	}
 	if failed {
 		return errors.New("some extensions failed to upgrade")
@@ -569,15 +576,6 @@ func (m *Manager) upgradeExtension(ext Extension, force bool) error {
 			return m.installBin(repo, "")
 		}
 		err = m.upgradeGitExtension(ext, force)
-	}
-	if err == nil {
-		currentVersion := displayExtensionVersion(&ext, ext.currentVersion)
-		latestVersion := displayExtensionVersion(&ext, ext.latestVersion)
-		var str string
-		if m.dryRunMode {
-			str = "would have "
-		}
-		fmt.Fprintf(m.io.Out, "%supgraded from %s to %s\n", str, currentVersion, latestVersion)
 	}
 	return err
 }
