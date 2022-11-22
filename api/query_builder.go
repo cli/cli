@@ -75,11 +75,13 @@ var prReviewRequests = shortenQuery(`
 var prReviews = shortenQuery(`
 	reviews(first: 100) {
 		nodes {
+			id,
 			author{login},
 			authorAssociation,
 			submittedAt,
 			body,
 			state,
+			commit{oid},
 			reactionGroups{content,users{totalCount}}
 		}
 		pageInfo{hasNextPage,endCursor}
