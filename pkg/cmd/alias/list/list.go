@@ -1,7 +1,6 @@
 package list
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -9,6 +8,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 type ListOptions struct {
@@ -59,10 +59,11 @@ func listRun(opts *ListOptions) error {
 		aliasMap[key] = strings.ReplaceAll(value, "\n", " ")
 	}
 
-	aliasBytes, err := json.MarshalIndent(aliasMap, "", "  ")
+	aliasBytes, err := yaml.Marshal(aliasMap)
 	if err != nil {
 		return err
 	}
+
 	opts.IO.Out.Write(aliasBytes)
 	return nil
 }

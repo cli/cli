@@ -38,7 +38,7 @@ func TestAliasList(t *testing.T) {
 				  gc: "!gh gist create \"$@\" | pbcopy"
 			`),
 			isTTY:      true,
-			wantStdout: "{\n  \"co\": \"pr checkout\",\n  \"gc\": \"!gh gist create \\\"$@\\\" | pbcopy\"\n}",
+			wantStdout: "co: pr checkout\ngc: '!gh gist create \"$@\" | pbcopy'\n",
 			wantStderr: "",
 		},
 	}
