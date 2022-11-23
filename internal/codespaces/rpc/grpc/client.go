@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/cli/cli/v2/internal/codespaces/grpc/jupyter"
+	"github.com/cli/cli/v2/internal/codespaces/rpc/grpc/jupyter"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"golang.org/x/crypto/ssh"
 	"google.golang.org/grpc"
