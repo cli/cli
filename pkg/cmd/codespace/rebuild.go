@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/spf13/cobra"
 )
 
@@ -51,7 +52,7 @@ func (a *App) Rebuild(ctx context.Context, codespaceName string, full bool) (err
 	}
 	defer safeClose(session, &err)
 
-	err = session.RebuildContainer(ctx, full)
+	err = rpc.RebuildContainer(ctx, session, full)
 	if err != nil {
 		return fmt.Errorf("rebuilding codespace via session: %w", err)
 	}

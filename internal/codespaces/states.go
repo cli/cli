@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/liveshare"
 )
@@ -60,7 +61,7 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 
 	progress.StartProgressIndicatorWithLabel("Fetching SSH Details")
 	defer progress.StopProgressIndicator()
-	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
+	remoteSSHServerPort, sshUser, err := rpc.StartSSHServer(ctx, session)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}

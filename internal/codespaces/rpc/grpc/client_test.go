@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	grpctest "github.com/cli/cli/v2/internal/codespaces/grpc/test"
+	grpctest "github.com/cli/cli/v2/internal/codespaces/rpc/grpc/test"
 )
 
 func startServer(t *testing.T) {
