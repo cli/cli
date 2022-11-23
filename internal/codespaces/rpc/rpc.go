@@ -35,12 +35,16 @@ func StartSSHServerWithOptions(ctx context.Context, session *liveshare.Session, 
 
 func StartJupyterServer(ctx context.Context, session *liveshare.Session) (int, string, error) {
 	client, err := connectToGRPCServer(ctx, session, "")
+	if err != nil {
+		return 0, "", err
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, grpc.RequestTimeout)
 	defer cancel()
 
 	serverPort, serverUrl, err := client.StartJupyterServer(ctx)
 	if err != nil {
-		return 0, "", fmt.Errorf("failed to start JupyterLab server: %w", err)
+		return 0, "", err
 	}
 
 	return serverPort, serverUrl, nil
