@@ -13,6 +13,7 @@ type editOptions struct {
 	codespaceName string
 	displayName   string
 	machine       string
+	repo          string
 }
 
 func newEditCmd(app *App) *cobra.Command {
@@ -32,6 +33,7 @@ func newEditCmd(app *App) *cobra.Command {
 	}
 
 	editCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "Name of the codespace")
+	editCmd.Flags().StringVarP(&opts.repo, "repo", "r", "", "Filter codespace selection by repository name (user/repo)")
 	editCmd.Flags().StringVarP(&opts.displayName, "display-name", "d", "", "Set the display name")
 	editCmd.Flags().StringVar(&opts.displayName, "displayName", "", "display name")
 	if err := editCmd.Flags().MarkDeprecated("displayName", "use `--display-name` instead"); err != nil {
@@ -47,7 +49,7 @@ func (a *App) Edit(ctx context.Context, opts editOptions) error {
 	codespaceName := opts.codespaceName
 
 	if codespaceName == "" {
-		selectedCodespace, err := chooseCodespace(ctx, a.apiClient)
+		selectedCodespace, err := chooseCodespace(ctx, a.apiClient, chooseCodespaceFilterOptions{Repo: opts.repo})
 		if err != nil {
 			if err == errNoCodespaces {
 				return err

@@ -111,8 +111,13 @@ type apiClient interface {
 
 var errNoCodespaces = errors.New("you have no codespaces")
 
-func chooseCodespace(ctx context.Context, apiClient apiClient) (*api.Codespace, error) {
-	codespaces, err := apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{})
+type chooseCodespaceFilterOptions struct {
+	Repo string
+}
+
+func chooseCodespace(ctx context.Context, apiClient apiClient, filterOptions chooseCodespaceFilterOptions) (*api.Codespace, error) {
+	// TODO: gracefully handle no codespaces returned from here now that the filter is added
+	codespaces, err := apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{RepoName: filterOptions.Repo})
 	if err != nil {
 		return nil, fmt.Errorf("error getting codespaces: %w", err)
 	}
@@ -163,22 +168,33 @@ func formatCodespacesForSelect(codespaces []*api.Codespace, includeOwner bool) [
 	return names
 }
 
+type getOrChooseCodespaceFilterOptions struct {
+	chooseCodespaceFilterOptions
+
+	CodespaceName string
+}
+
+func addGetOrChooseCodespaceCommandArgs(cmd *cobra.Command, opts *getOrChooseCodespaceFilterOptions) {
+	cmd.Flags().StringVarP(&opts.CodespaceName, "codespace", "c", "", "Name of the codespace")
+	cmd.Flags().StringVarP(&opts.Repo, "repo", "r", "", "Filter codespace selection by repository name (user/repo)")
+}
+
 // getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
 // It then fetches the codespace record with full connection details.
 // TODO(josebalius): accept a progress indicator or *App and show progress when fetching.
-func getOrChooseCodespace(ctx context.Context, apiClient apiClient, codespaceName string) (codespace *api.Codespace, err error) {
-	if codespaceName == "" {
-		codespace, err = chooseCodespace(ctx, apiClient)
+func getOrChooseCodespace(ctx context.Context, apiClient apiClient, filterOptions getOrChooseCodespaceFilterOptions) (codespace *api.Codespace, err error) {
+	if filterOptions.CodespaceName != "" {
+		codespace, err = apiClient.GetCodespace(ctx, filterOptions.CodespaceName, true)
+		if err != nil {
+			return nil, fmt.Errorf("getting full codespace details: %w", err)
+		}
+	} else {
+		codespace, err = chooseCodespace(ctx, apiClient, filterOptions.chooseCodespaceFilterOptions)
 		if err != nil {
 			if err == errNoCodespaces {
 				return nil, err
 			}
 			return nil, fmt.Errorf("choosing codespace: %w", err)
-		}
-	} else {
-		codespace, err = apiClient.GetCodespace(ctx, codespaceName, true)
-		if err != nil {
-			return nil, fmt.Errorf("getting full codespace details: %w", err)
 		}
 	}
 

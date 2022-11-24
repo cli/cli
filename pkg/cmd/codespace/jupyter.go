@@ -12,28 +12,29 @@ import (
 )
 
 func newJupyterCmd(app *App) *cobra.Command {
-	var codespace string
+	var filterOptions getOrChooseCodespaceFilterOptions
 
 	jupyterCmd := &cobra.Command{
 		Use:   "jupyter",
 		Short: "Open a codespace in JupyterLab",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.Jupyter(cmd.Context(), codespace)
+			return app.Jupyter(cmd.Context(), filterOptions)
 		},
 	}
 
-	jupyterCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
+	jupyterCmd.Flags().StringVarP(&filterOptions.CodespaceName, "codespace", "c", "", "Name of the codespace")
+	jupyterCmd.Flags().StringVarP(&filterOptions.Repo, "repo", "r", "", "Filter codespace selection by repository name (user/repo)")
 
 	return jupyterCmd
 }
 
-func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
+func (a *App) Jupyter(ctx context.Context, filterOptions getOrChooseCodespaceFilterOptions) (err error) {
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, filterOptions)
 	if err != nil {
 		return err
 	}

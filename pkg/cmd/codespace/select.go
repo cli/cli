@@ -10,10 +10,13 @@ import (
 
 type selectOptions struct {
 	filePath string
+	repo     string
 }
 
 func newSelectCmd(app *App) *cobra.Command {
-	opts := selectOptions{}
+	var (
+		opts selectOptions
+	)
 
 	selectCmd := &cobra.Command{
 		Use:    "select",
@@ -21,10 +24,11 @@ func newSelectCmd(app *App) *cobra.Command {
 		Hidden: true,
 		Args:   noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.Select(cmd.Context(), "", opts)
+			return app.Select(cmd.Context(), opts)
 		},
 	}
 
+	selectCmd.Flags().StringVarP(&opts.repo, "repo", "r", "", "Filter codespace selection by repository name (user/repo)")
 	selectCmd.Flags().StringVarP(&opts.filePath, "file", "f", "", "Output file path")
 	return selectCmd
 }
@@ -47,8 +51,8 @@ func newSelectCmd(app *App) *cobra.Command {
 // ```shell
 // 		gh codespace select --file /tmp/selected_codespace.txt
 // ```
-func (a *App) Select(ctx context.Context, name string, opts selectOptions) (err error) {
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, name)
+func (a *App) Select(ctx context.Context, opts selectOptions) (err error) {
+	codespace, err := chooseCodespace(ctx, a.apiClient, chooseCodespaceFilterOptions{Repo: opts.repo})
 	if err != nil {
 		return err
 	}

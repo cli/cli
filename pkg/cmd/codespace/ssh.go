@@ -37,14 +37,14 @@ const automaticPrivateKeyName = "codespaces.auto"
 var errKeyFileNotFound = errors.New("SSH key file does not exist")
 
 type sshOptions struct {
-	codespace  string
-	profile    string
-	serverPort int
-	debug      bool
-	debugFile  string
-	stdio      bool
-	config     bool
-	scpArgs    []string // scp arguments, for 'cs cp' (nil for 'cs ssh')
+	filterOptions getOrChooseCodespaceFilterOptions
+	profile       string
+	serverPort    int
+	debug         bool
+	debugFile     string
+	stdio         bool
+	config        bool
+	scpArgs       []string // scp arguments, for 'cs cp' (nil for 'cs ssh')
 }
 
 func newSSHCmd(app *App) *cobra.Command {
@@ -88,7 +88,7 @@ func newSSHCmd(app *App) *cobra.Command {
 		`),
 		PreRunE: func(c *cobra.Command, args []string) error {
 			if opts.stdio {
-				if opts.codespace == "" {
+				if opts.filterOptions.CodespaceName == "" {
 					return errors.New("`--stdio` requires explicit `--codespace`")
 				}
 				if opts.config {
@@ -123,7 +123,8 @@ func newSSHCmd(app *App) *cobra.Command {
 
 	sshCmd.Flags().StringVarP(&opts.profile, "profile", "", "", "Name of the SSH profile to use")
 	sshCmd.Flags().IntVarP(&opts.serverPort, "server-port", "", 0, "SSH server port number (0 => pick unused)")
-	sshCmd.Flags().StringVarP(&opts.codespace, "codespace", "c", "", "Name of the codespace")
+	sshCmd.Flags().StringVarP(&opts.filterOptions.CodespaceName, "codespace", "c", "", "Name of the codespace")
+	sshCmd.Flags().StringVarP(&opts.filterOptions.Repo, "repo", "r", "", "Filter codespace selection by repository name (user/repo)")
 	sshCmd.Flags().BoolVarP(&opts.debug, "debug", "d", false, "Log debug data to a file")
 	sshCmd.Flags().StringVarP(&opts.debugFile, "debug-file", "", "", "Path of the file log to")
 	sshCmd.Flags().BoolVarP(&opts.config, "config", "", false, "Write OpenSSH configuration to stdout")
@@ -161,7 +162,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		args = append([]string{"-i", keyPair.PrivateKeyPath}, args...)
 	}
 
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
+	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.filterOptions)
 	if err != nil {
 		return err
 	}
@@ -467,13 +468,13 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 	defer cancel()
 
 	var csList []*api.Codespace
-	if opts.codespace == "" {
+	if opts.filterOptions.CodespaceName == "" {
 		a.StartProgressIndicatorWithLabel("Fetching codespaces")
 		csList, err = a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{})
 		a.StopProgressIndicator()
 	} else {
 		var codespace *api.Codespace
-		codespace, err = getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
+		codespace, err = getOrChooseCodespace(ctx, a.apiClient, opts.filterOptions)
 		csList = []*api.Codespace{codespace}
 	}
 	if err != nil {
@@ -490,7 +491,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 	var wg sync.WaitGroup
 	var status error
 	for _, cs := range csList {
-		if cs.State != "Available" && opts.codespace == "" {
+		if cs.State != "Available" && opts.filterOptions.CodespaceName == "" {
 			fmt.Fprintf(os.Stderr, "skipping unavailable codespace %s: %s\n", cs.Name, cs.State)
 			status = cmdutil.SilentError
 			continue
@@ -645,7 +646,10 @@ func newCpCmd(app *App) *cobra.Command {
 	// We don't expose all sshOptions.
 	cpCmd.Flags().BoolVarP(&opts.recursive, "recursive", "r", false, "Recursively copy directories")
 	cpCmd.Flags().BoolVarP(&opts.expand, "expand", "e", false, "Expand remote file names on remote shell")
-	cpCmd.Flags().StringVarP(&opts.codespace, "codespace", "c", "", "Name of the codespace")
+	cpCmd.Flags().StringVarP(&opts.filterOptions.CodespaceName, "codespace", "c", "", "Name of the codespace")
+
+	// Note: `-r` is not supported here as it collides with `--recursive` above
+	cpCmd.Flags().StringVarP(&opts.filterOptions.Repo, "repo", "", "", "Filter codespace selection by repository name (user/repo)")
 	cpCmd.Flags().StringVarP(&opts.profile, "profile", "p", "", "Name of the SSH profile to use")
 	return cpCmd
 }
