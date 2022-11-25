@@ -19,13 +19,16 @@ func newCodeCmd(app *App) *cobra.Command {
 		Use:   "code",
 		Short: "Open a codespace in Visual Studio Code",
 		Args:  noArgsConstraint,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return validateGetOrChooseCodespaceCommandArgs(filterOptions)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.VSCode(cmd.Context(), filterOptions, useInsiders, useWeb)
 		},
 	}
 
-	codeCmd.Flags().StringVarP(&filterOptions.CodespaceName, "codespace", "c", "", "Name of the codespace")
-	codeCmd.Flags().StringVarP(&filterOptions.Repo, "repo", "r", "", "Filter codespace selection by repository name (user/repo)")
+	addGetOrChooseCodespaceCommandArgs(codeCmd, &filterOptions)
+
 	codeCmd.Flags().BoolVar(&useInsiders, "insiders", false, "Use the insiders version of Visual Studio Code")
 	codeCmd.Flags().BoolVarP(&useWeb, "web", "w", false, "Use the web version of Visual Studio Code")
 

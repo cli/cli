@@ -179,6 +179,16 @@ func addGetOrChooseCodespaceCommandArgs(cmd *cobra.Command, opts *getOrChooseCod
 	cmd.Flags().StringVarP(&opts.Repo, "repo", "r", "", "Filter codespace selection by repository name (user/repo)")
 }
 
+var errInvalidGetOrChooseCodespaceCommandArgs = errors.New("--codespace and --repo should not both be used together")
+
+func validateGetOrChooseCodespaceCommandArgs(opts getOrChooseCodespaceFilterOptions) error {
+	if opts.CodespaceName != "" && opts.Repo != "" {
+		return errInvalidGetOrChooseCodespaceCommandArgs
+	}
+
+	return nil
+}
+
 // getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
 // It then fetches the codespace record with full connection details.
 // TODO(josebalius): accept a progress indicator or *App and show progress when fetching.
