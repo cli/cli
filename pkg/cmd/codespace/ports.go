@@ -44,8 +44,7 @@ func newPortsCmd(app *App) *cobra.Command {
 		},
 	}
 
-	portsCmd.PersistentFlags().StringVarP(&filterOptions.CodespaceName, "codespace", "c", "", "Name of the codespace")
-	portsCmd.Flags().StringVarP(&filterOptions.Repo, "repo", "r", "", "Filter codespace selection by repository name (user/repo)")
+	addGetOrChooseCodespaceCommandArgs(portsCmd, &filterOptions)
 
 	cmdutil.AddJSONFlags(portsCmd, &exporter, portFields)
 

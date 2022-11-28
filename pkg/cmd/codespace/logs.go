@@ -25,8 +25,8 @@ func newLogsCmd(app *App) *cobra.Command {
 		},
 	}
 
-	logsCmd.Flags().StringVarP(&filterOptions.CodespaceName, "codespace", "c", "", "Name of the codespace")
-	logsCmd.Flags().StringVarP(&filterOptions.Repo, "repo", "r", "", "Filter codespace selection by repository name (user/repo)")
+	addGetOrChooseCodespaceCommandArgs(logs, &filterOptions)
+
 	logsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Tail and follow the logs")
 
 	return logsCmd

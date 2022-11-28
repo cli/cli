@@ -123,8 +123,7 @@ func newSSHCmd(app *App) *cobra.Command {
 
 	sshCmd.Flags().StringVarP(&opts.profile, "profile", "", "", "Name of the SSH profile to use")
 	sshCmd.Flags().IntVarP(&opts.serverPort, "server-port", "", 0, "SSH server port number (0 => pick unused)")
-	sshCmd.Flags().StringVarP(&opts.filterOptions.CodespaceName, "codespace", "c", "", "Name of the codespace")
-	sshCmd.Flags().StringVarP(&opts.filterOptions.Repo, "repo", "r", "", "Filter codespace selection by repository name (user/repo)")
+	addGetOrChooseCodespaceCommandArgs(sshCmd, &opts.filterOptions)
 	sshCmd.Flags().BoolVarP(&opts.debug, "debug", "d", false, "Log debug data to a file")
 	sshCmd.Flags().StringVarP(&opts.debugFile, "debug-file", "", "", "Path of the file log to")
 	sshCmd.Flags().BoolVarP(&opts.config, "config", "", false, "Write OpenSSH configuration to stdout")
@@ -637,6 +636,9 @@ func newCpCmd(app *App) *cobra.Command {
 			$ gh codespace cp -e 'remote:/workspaces/myproj/go.{mod,sum}' ./gofiles/
 			$ gh codespace cp -e -- -F ~/.ssh/codespaces_config 'remote:~/*.go' ./gofiles/
 		`),
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return validateGetOrChooseCodespaceCommandArgs(opts.filterOptions)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.Copy(cmd.Context(), args, opts)
 		},
@@ -649,6 +651,7 @@ func newCpCmd(app *App) *cobra.Command {
 	cpCmd.Flags().StringVarP(&opts.filterOptions.CodespaceName, "codespace", "c", "", "Name of the codespace")
 
 	// Note: `-r` is not supported here as it collides with `--recursive` above
+	// TODO: if we just add `recursive` after this, can we use addGetOrChooseCodespaceCommandArgs?
 	cpCmd.Flags().StringVarP(&opts.filterOptions.Repo, "repo", "", "", "Filter codespace selection by repository name (user/repo)")
 	cpCmd.Flags().StringVarP(&opts.profile, "profile", "p", "", "Name of the SSH profile to use")
 	return cpCmd

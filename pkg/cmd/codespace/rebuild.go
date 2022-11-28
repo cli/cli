@@ -26,8 +26,8 @@ dev container. A full rebuild also removes cached Docker images.`,
 		},
 	}
 
-	rebuildCmd.Flags().StringVarP(&filterOptions.CodespaceName, "codespace", "c", "", "name of the codespace")
-	rebuildCmd.Flags().StringVarP(&filterOptions.Repo, "repo", "r", "", "Filter codespace selection by repository name (user/repo)")
+	addGetOrChooseCodespaceCommandArgs(rebuildCmd, &filterOptions)
+
 	rebuildCmd.Flags().BoolVar(&fullRebuild, "full", false, "perform a full rebuild")
 
 	return rebuildCmd

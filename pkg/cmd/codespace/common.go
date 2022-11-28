@@ -190,8 +190,8 @@ func addGetOrChooseCodespaceCommandArgs(cmd *cobra.Command, opts *getOrChooseCod
 
 	existingPreRun := cmd.PersistentPreRunE
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		if opts.CodespaceName != "" && opts.Repo != "" {
-			return errInvalidGetOrChooseCodespaceCommandArgs
+		if err := validateGetOrChooseCodespaceCommandArgs(*opts); err != nil {
+			return err
 		}
 
 		if existingPreRun != nil {
@@ -200,6 +200,14 @@ func addGetOrChooseCodespaceCommandArgs(cmd *cobra.Command, opts *getOrChooseCod
 
 		return nil
 	}
+}
+
+func validateGetOrChooseCodespaceCommandArgs(opts getOrChooseCodespaceFilterOptions) error {
+	if opts.CodespaceName != "" && opts.Repo != "" {
+		return errInvalidGetOrChooseCodespaceCommandArgs
+	}
+
+	return nil
 }
 
 // getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.

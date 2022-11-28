@@ -23,8 +23,7 @@ func newJupyterCmd(app *App) *cobra.Command {
 		},
 	}
 
-	jupyterCmd.Flags().StringVarP(&filterOptions.CodespaceName, "codespace", "c", "", "Name of the codespace")
-	jupyterCmd.Flags().StringVarP(&filterOptions.Repo, "repo", "r", "", "Filter codespace selection by repository name (user/repo)")
+	addGetOrChooseCodespaceCommandArgs(jupyterCmd, &filterOptions)
 
 	return jupyterCmd
 }

@@ -10,7 +10,7 @@ import (
 )
 
 type editOptions struct {
-	codespaceName string
+	filterOptions getOrChooseCodespaceFilterOptions
 	displayName   string
 	machine       string
 	repo          string
@@ -32,8 +32,7 @@ func newEditCmd(app *App) *cobra.Command {
 		},
 	}
 
-	editCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "Name of the codespace")
-	editCmd.Flags().StringVarP(&opts.repo, "repo", "r", "", "Filter codespace selection by repository name (user/repo)")
+	addGetOrChooseCodespaceCommandArgs(editCmd, &opts.filterOptions)
 	editCmd.Flags().StringVarP(&opts.displayName, "display-name", "d", "", "Set the display name")
 	editCmd.Flags().StringVar(&opts.displayName, "displayName", "", "display name")
 	if err := editCmd.Flags().MarkDeprecated("displayName", "use `--display-name` instead"); err != nil {
@@ -46,10 +45,11 @@ func newEditCmd(app *App) *cobra.Command {
 
 // Edits a codespace
 func (a *App) Edit(ctx context.Context, opts editOptions) error {
-	codespaceName := opts.codespaceName
+	codespaceName := opts.filterOptions.CodespaceName
 
+	// This only needs the name, so skip the API call if it is provided
 	if codespaceName == "" {
-		selectedCodespace, err := chooseCodespace(ctx, a.apiClient, chooseCodespaceFilterOptions{Repo: opts.repo})
+		selectedCodespace, err := chooseCodespace(ctx, a.apiClient, opts.filterOptions.chooseCodespaceFilterOptions)
 		if err != nil {
 			if err == errNoCodespaces {
 				return err
