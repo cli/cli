@@ -12,6 +12,7 @@ import (
 
 type stopOptions struct {
 	codespaceName string
+	repoName      string
 	orgName       string
 	userName      string
 }
@@ -31,6 +32,7 @@ func newStopCmd(app *App) *cobra.Command {
 		},
 	}
 	stopCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "Name of the codespace")
+	stopCmd.Flags().StringVarP(&opts.repoName, "repo", "r", "", "The repository name used to filter codespace selection (user/repo)")
 	stopCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "The `login` handle of the organization (admin-only)")
 	stopCmd.Flags().StringVarP(&opts.userName, "user", "u", "", "The `username` to stop codespace for (used with --org)")
 
@@ -43,7 +45,11 @@ func (a *App) StopCodespace(ctx context.Context, opts *stopOptions) error {
 
 	if codespaceName == "" {
 		a.StartProgressIndicatorWithLabel("Fetching codespaces")
-		codespaces, err := a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{OrgName: opts.orgName, UserName: ownerName})
+		codespaces, err := a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{
+			RepoName: opts.repoName,
+			OrgName:  opts.orgName,
+			UserName: ownerName,
+		})
 		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to list codespaces: %w", err)
