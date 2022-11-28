@@ -1,6 +1,7 @@
 package upload
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -80,7 +81,7 @@ func uploadRun(opts *UploadOptions) error {
 		return err
 	}
 
-	release, err := shared.FetchRelease(httpClient, baseRepo, opts.TagName)
+	release, err := shared.FetchRelease(context.Background(), httpClient, baseRepo, opts.TagName)
 	if err != nil {
 		return err
 	}

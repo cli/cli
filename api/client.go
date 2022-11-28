@@ -88,6 +88,18 @@ func (c Client) Query(hostname, name string, query interface{}, variables map[st
 	return handleResponse(gqlClient.Query(name, query, variables))
 }
 
+// QueryWithContext performs a GraphQL query based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
+// GraphQLError will be returned, but the receiver will also be partially populated.
+func (c Client) QueryWithContext(ctx context.Context, hostname, name string, query interface{}, variables map[string]interface{}) error {
+	opts := clientOptions(hostname, c.http.Transport)
+	opts.Headers[graphqlFeatures] = features
+	gqlClient, err := gh.GQLClient(&opts)
+	if err != nil {
+		return err
+	}
+	return handleResponse(gqlClient.QueryWithContext(ctx, name, query, variables))
+}
+
 // REST performs a REST request and parses the response.
 func (c Client) REST(hostname string, method string, p string, body io.Reader, data interface{}) error {
 	opts := clientOptions(hostname, c.http.Transport)
