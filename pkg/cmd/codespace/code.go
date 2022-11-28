@@ -19,9 +19,6 @@ func newCodeCmd(app *App) *cobra.Command {
 		Use:   "code",
 		Short: "Open a codespace in Visual Studio Code",
 		Args:  noArgsConstraint,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return validateGetOrChooseCodespaceCommandArgs(filterOptions)
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.VSCode(cmd.Context(), filterOptions, useInsiders, useWeb)
 		},

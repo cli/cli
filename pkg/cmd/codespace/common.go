@@ -174,19 +174,26 @@ type getOrChooseCodespaceFilterOptions struct {
 	CodespaceName string
 }
 
+var errInvalidGetOrChooseCodespaceCommandArgs = errors.New("invalid arguments: --codespace and --repo should not both be used together")
+
+// addGetOrChooseCodespaceCommandArgs adds command arguments for building getOrChooseCodespaceFilterOptions
+// to be passed into getOrChooseCodespace. It also adds pre-run validations on those arguments.
 func addGetOrChooseCodespaceCommandArgs(cmd *cobra.Command, opts *getOrChooseCodespaceFilterOptions) {
 	cmd.Flags().StringVarP(&opts.CodespaceName, "codespace", "c", "", "Name of the codespace")
 	cmd.Flags().StringVarP(&opts.Repo, "repo", "r", "", "Filter codespace selection by repository name (user/repo)")
-}
 
-var errInvalidGetOrChooseCodespaceCommandArgs = errors.New("--codespace and --repo should not both be used together")
+	existingPreRun := cmd.PersistentPreRunE
+	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		if opts.CodespaceName != "" && opts.Repo != "" {
+			return errInvalidGetOrChooseCodespaceCommandArgs
+		}
 
-func validateGetOrChooseCodespaceCommandArgs(opts getOrChooseCodespaceFilterOptions) error {
-	if opts.CodespaceName != "" && opts.Repo != "" {
-		return errInvalidGetOrChooseCodespaceCommandArgs
+		if existingPreRun != nil {
+			return existingPreRun(cmd, args)
+		}
+
+		return nil
 	}
-
-	return nil
 }
 
 // getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
