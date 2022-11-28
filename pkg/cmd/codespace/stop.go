@@ -67,7 +67,8 @@ func (a *App) StopCodespace(ctx context.Context, opts *stopOptions) error {
 		}
 
 		includeOwner := opts.orgName != ""
-		codespace, err := chooseCodespaceFromList(ctx, runningCodespaces, includeOwner)
+		skipPromptForSingleOption := opts.repoName != ""
+		codespace, err := chooseCodespaceFromList(ctx, runningCodespaces, includeOwner, skipPromptForSingleOption)
 		if err != nil {
 			return fmt.Errorf("failed to choose codespace: %w", err)
 		}

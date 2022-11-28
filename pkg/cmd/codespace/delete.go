@@ -88,7 +88,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 
 		if !opts.deleteAll && opts.repoFilter == "" {
 			includeUsername := opts.orgName != ""
-			c, err := chooseCodespaceFromList(ctx, codespaces, includeUsername)
+			c, err := chooseCodespaceFromList(ctx, codespaces, includeUsername, false)
 			if err != nil {
 				return fmt.Errorf("error choosing codespace: %w", err)
 			}

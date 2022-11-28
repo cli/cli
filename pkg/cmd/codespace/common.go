@@ -121,14 +121,20 @@ func chooseCodespace(ctx context.Context, apiClient apiClient, filterOptions cho
 	if err != nil {
 		return nil, fmt.Errorf("error getting codespaces: %w", err)
 	}
-	return chooseCodespaceFromList(ctx, codespaces, false)
+
+	skipPromptForSingleOption := filterOptions.Repo != ""
+	return chooseCodespaceFromList(ctx, codespaces, false, skipPromptForSingleOption)
 }
 
 // chooseCodespaceFromList returns the codespace that the user has interactively selected from the list, or
 // an error if there are no codespaces.
-func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace, includeOwner bool) (*api.Codespace, error) {
+func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace, includeOwner bool, skipPromptForSingleOption bool) (*api.Codespace, error) {
 	if len(codespaces) == 0 {
 		return nil, errNoCodespaces
+	}
+
+	if skipPromptForSingleOption && len(codespaces) == 1 {
+		return codespaces[0], nil
 	}
 
 	sortedCodespaces := codespaces
