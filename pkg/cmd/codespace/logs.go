@@ -25,7 +25,7 @@ func newLogsCmd(app *App) *cobra.Command {
 		},
 	}
 
-	addGetOrChooseCodespaceCommandArgs(logs, &filterOptions)
+	addGetOrChooseCodespaceCommandArgs(logsCmd, &filterOptions)
 
 	logsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Tail and follow the logs")
 
