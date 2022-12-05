@@ -138,7 +138,7 @@ func Test_statusRun(t *testing.T) {
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
 			},
 			wantErrOut: regexp.MustCompile(`joel.miller: authentication failed.*Logged in to github.com as.*tess`),
-			wantErr:    "HTTP 400 (https://joel.miller/api/v3/)",
+			wantErr:    "SilentError",
 		},
 		{
 			name: "all good",
