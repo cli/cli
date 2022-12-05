@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,7 +19,6 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/markdown"
 	"github.com/cli/cli/v2/utils"
-	"github.com/gobwas/glob"
 	"github.com/spf13/cobra"
 	"golang.org/x/mod/semver"
 )
@@ -87,15 +88,15 @@ func viewRun(opts *ViewOptions) error {
 	} else if r != nil {
 		return viewRunRange(r, opts)
 	} else {
-		fmt.Printf("default")
 		return viewRunDefault(opts)
 	}
 }
 
 var (
-	ErrNoWebMode       = errors.New("web mode unavailable when specifying range")
-	ErrInvalidPattern  = errors.New("tag range indicator should start with 'v' or '*'")
-	ErrInvalidInterval = errors.New("tags interval cannot include asterisks")
+	ErrExporterNotSupported = errors.New("exporter is not supported when specifying range")
+	ErrInvalidPattern       = errors.New("invalid pattern")
+	ErrInvalidInterval      = errors.New("tags interval cannot include asterisks")
+	ErrNoWebMode            = errors.New("web mode unavailable when specifying range")
 )
 
 type ErrInvalidSemver struct {
@@ -106,9 +107,12 @@ func (err *ErrInvalidSemver) Error() string {
 	return fmt.Sprintf("invalid semantic version: '%s'", err.Semver)
 }
 
-func viewRunRange(r Range, opts *ViewOptions) error {
+func viewRunRange(i *interval, opts *ViewOptions) error {
 	if opts.WebMode {
 		return ErrNoWebMode
+	}
+	if opts.Exporter != nil {
+		return ErrExporterNotSupported
 	}
 
 	httpClient, err := opts.HttpClient()
@@ -126,16 +130,11 @@ func viewRunRange(r Range, opts *ViewOptions) error {
 		return err
 	}
 
-	var releases []*shared.Release
+	var releases []internal.Release
 
 	for _, rel := range fetched {
-		if r.Match(rel.TagName) {
-			release, err := shared.FetchRelease(httpClient, baseRepo, rel.TagName)
-			if err != nil {
-				return err
-			}
-
-			releases = append(releases, release)
+		if i.match(rel.TagName) {
+			releases = append(releases, rel)
 		}
 	}
 
@@ -146,16 +145,12 @@ func viewRunRange(r Range, opts *ViewOptions) error {
 	defer opts.IO.StopPager()
 
 	for _, release := range releases {
-		if opts.Exporter != nil {
-			return opts.Exporter.Write(opts.IO, release)
-		}
-
 		if opts.IO.IsStdoutTTY() {
-			if err := renderReleaseTTY(opts.IO, release); err != nil {
+			if err := renderInternalReleaseTTY(opts.IO, &release); err != nil {
 				return err
 			}
 		} else {
-			if err := renderReleasePlain(opts.IO.Out, release); err != nil {
+			if err := renderInternalReleasePlain(opts.IO.Out, &release); err != nil {
 				return err
 			}
 		}
@@ -207,11 +202,11 @@ func viewRunDefault(opts *ViewOptions) error {
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		if err := renderReleaseTTY(opts.IO, release); err != nil {
+		if err := renderSharedReleaseTTY(opts.IO, release); err != nil {
 			return err
 		}
 	} else {
-		if err := renderReleasePlain(opts.IO.Out, release); err != nil {
+		if err := renderSharedReleasePlain(opts.IO.Out, release); err != nil {
 			return err
 		}
 	}
@@ -219,7 +214,7 @@ func viewRunDefault(opts *ViewOptions) error {
 	return nil
 }
 
-func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
+func renderSharedReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 	iofmt := io.ColorScheme()
 	w := io.Out
 
@@ -263,7 +258,25 @@ func renderReleaseTTY(io *iostreams.IOStreams, release *shared.Release) error {
 	return nil
 }
 
-func renderReleasePlain(w io.Writer, release *shared.Release) error {
+func renderInternalReleaseTTY(io *iostreams.IOStreams, release *internal.Release) error {
+	iofmt := io.ColorScheme()
+	w := io.Out
+
+	fmt.Fprintf(w, "%s\n", iofmt.Bold(release.TagName))
+	if release.IsDraft {
+		fmt.Fprintf(w, "%s • ", iofmt.Red("Draft"))
+	} else if release.IsPrerelease {
+		fmt.Fprintf(w, "%s • ", iofmt.Yellow("Pre-release"))
+	}
+	if release.IsDraft {
+		fmt.Fprintf(w, "%s\n", iofmt.Gray(fmt.Sprintf("created %s", text.FuzzyAgo(time.Now(), release.CreatedAt))))
+	} else {
+		fmt.Fprintf(w, "%s\n", iofmt.Gray(fmt.Sprintf("released %s", text.FuzzyAgo(time.Now(), release.PublishedAt))))
+	}
+	return nil
+}
+
+func renderSharedReleasePlain(w io.Writer, release *shared.Release) error {
 	fmt.Fprintf(w, "title:\t%s\n", release.Name)
 	fmt.Fprintf(w, "tag:\t%s\n", release.TagName)
 	fmt.Fprintf(w, "draft:\t%v\n", release.IsDraft)
@@ -281,6 +294,18 @@ func renderReleasePlain(w io.Writer, release *shared.Release) error {
 	fmt.Fprint(w, release.Body)
 	if !strings.HasSuffix(release.Body, "\n") {
 		fmt.Fprintf(w, "\n")
+	}
+	return nil
+}
+
+func renderInternalReleasePlain(w io.Writer, release *internal.Release) error {
+	fmt.Fprintf(w, "title:\t%s\n", release.Name)
+	fmt.Fprintf(w, "tag:\t%s\n", release.TagName)
+	fmt.Fprintf(w, "draft:\t%v\n", release.IsDraft)
+	fmt.Fprintf(w, "prerelease:\t%v\n", release.IsPrerelease)
+	fmt.Fprintf(w, "created:\t%s\n", release.CreatedAt.Format(time.RFC3339))
+	if !release.IsDraft {
+		fmt.Fprintf(w, "published:\t%s\n", release.PublishedAt.Format(time.RFC3339))
 	}
 	return nil
 }
@@ -311,25 +336,12 @@ func floatToString(f float64, p uint8) string {
 	return fs[:idx+int(p)+1]
 }
 
-func matchTag(pattern, tag string) (bool, error) {
-	g, err := glob.Compile(pattern)
-	if err != nil {
-		return false, err
-	}
-
-	return g.Match(tag), nil
-}
-
-type Range interface {
-	Match(string) bool
-}
-
-type Interval struct {
+type interval struct {
 	start string
 	end   string
 }
 
-func NewInterval(start, end string) (*Interval, error) {
+func newInterval(start, end string) (*interval, error) {
 	if !semver.IsValid(start) {
 		return nil, &ErrInvalidSemver{Semver: start}
 	} else if !semver.IsValid(semver.Canonical(end)) {
@@ -338,19 +350,66 @@ func NewInterval(start, end string) (*Interval, error) {
 
 	// protecting myself from stupid errors
 	if semver.Compare(start, end) == 1 {
-		return &Interval{
+		return &interval{
 			start: end,
 			end:   start,
 		}, nil
 	}
 
-	return &Interval{
+	return &interval{
 		start: start,
 		end:   end,
 	}, nil
 }
 
-func (i Interval) Match(tag string) bool {
+func buildInterval(tag string) (*interval, error) {
+	if strings.Count(tag, "*") != 1 || !strings.HasPrefix(tag, "v") {
+		return nil, ErrInvalidPattern
+	}
+
+	parts := strings.Split(strings.ReplaceAll(tag, "v", ""), ".")
+
+	if len(parts) != 3 {
+		return nil, ErrInvalidPattern
+	}
+
+	type field struct {
+		val      int
+		asterisk bool
+	}
+
+	var (
+		version [3]field
+		err     error
+	)
+	for i := 0; i < len(parts); i++ {
+		if parts[i] == "*" {
+			version[i].asterisk = true
+			break
+		}
+
+		version[i].val, err = strconv.Atoi(parts[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var end [3]int
+	if version[0].asterisk {
+		version[0].val = 0
+		end[0] = math.MaxInt
+	} else if version[1].asterisk {
+		end[0] = version[0].val + 1
+	} else if version[2].asterisk {
+		end[1] = version[1].val + 1
+	}
+
+	return newInterval(
+		fmt.Sprintf("v%d.%d.%d", version[0].val, version[1].val, version[2].val),
+		fmt.Sprintf("v%d.%d.%d", end[0], end[1], end[2]))
+}
+
+func (i interval) match(tag string) bool {
 	if semver.Compare(i.start, tag) > 0 || semver.Compare(i.end, tag) < 0 {
 		return false
 	} else {
@@ -358,52 +417,21 @@ func (i Interval) Match(tag string) bool {
 	}
 }
 
-type Glob struct {
-	glob glob.Glob
-}
-
-func NewGlob(pattern string) (*Glob, error) {
-	if len(pattern) == 0 {
-		return nil, nil
-	}
-
-	if pattern[0] != 'v' && pattern[0] != '*' {
-		return nil, ErrInvalidPattern
-	}
-
-	g, err := glob.Compile(pattern)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Glob{
-		glob: g,
-	}, nil
-}
-
-func (g *Glob) Match(tag string) bool {
-	return g.glob.Match(tag)
-}
-
-func isRange(tag string) (Range, error) {
+func isRange(tag string) (*interval, error) {
 	tagRange := strings.Split(tag, "..")
 
-	if len(tagRange) == 1 {
-		// range can be defined by glob with asterisk
-		if !strings.Contains(tag, "*") {
-			return nil, nil
-		}
-		if i, err := NewGlob(tag); err != nil {
-			return nil, nil
+	if len(tagRange) == 1 && strings.Contains(tag, "*") {
+		if i, err := buildInterval(tag); err != nil {
+			return nil, err
 		} else {
-			return i, err
+			return i, nil
 		}
 	} else if len(tagRange) == 2 {
 		// intervals can not accept asterisks
 		if strings.Contains(tag, "*") {
 			return nil, ErrInvalidInterval
 		}
-		if i, err := NewInterval(tagRange[0], tagRange[1]); err != nil {
+		if i, err := newInterval(tagRange[0], tagRange[1]); err != nil {
 			return nil, err
 		} else {
 			return i, nil

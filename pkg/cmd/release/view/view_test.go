@@ -80,7 +80,7 @@ func Test_NewCmdView(t *testing.T) {
 			},
 		},
 		{
-			name:  "glob",
+			name:  "with asterisk",
 			args:  "v1.2.*",
 			isTTY: true,
 			want: ViewOptions{
@@ -88,7 +88,7 @@ func Test_NewCmdView(t *testing.T) {
 			},
 		},
 		{
-			name:  "glob limit",
+			name:  "with asterisk limit",
 			args:  "-L 10 v1.2.*",
 			isTTY: true,
 			want: ViewOptions{
@@ -97,7 +97,7 @@ func Test_NewCmdView(t *testing.T) {
 			},
 		},
 		{
-			name:  "glob web mode",
+			name:  "with asterisk web mode",
 			args:  "-w v1.2.*",
 			isTTY: true,
 			want: ViewOptions{
@@ -370,214 +370,76 @@ func Test_humanFileSize(t *testing.T) {
 
 func Test_isRange(t *testing.T) {
 	tests := []struct {
-		name    string
-		tag     string
-		wantNil bool
+		name      string
+		tag       string
+		wantError bool
 	}{
 		{
-			name:    "semver basic",
-			tag:     "v1.1.0",
-			wantNil: true,
-		}, {
-			name:    "semver basic without v",
-			tag:     "1.1.0",
-			wantNil: true,
+			name:      "tag range asterisk",
+			tag:       "*",
+			wantError: true,
 		},
 		{
-			name:    "semver with sufix",
-			tag:     "v1.1.0-rc.1",
-			wantNil: true,
+			name:      "tag range asterisk prefix",
+			tag:       "v*.1.0",
+			wantError: false,
 		},
 		{
-			name:    "semver with sufix without v",
-			tag:     "1.1.0-rc.1",
-			wantNil: true,
+			name:      "tag range asterisk prefix without v",
+			tag:       "*.1.0",
+			wantError: true,
 		},
 		{
-			name:    "tag with bad prefix",
-			tag:     "x1.1.0",
-			wantNil: true,
+			name:      "tag range asterisk interfix",
+			tag:       "v1.*.0",
+			wantError: false,
 		},
 		{
-			name:    "tag with bad interfix",
-			tag:     "v1.x.0",
-			wantNil: true,
+			name:      "tag range asterisk interfix without v",
+			tag:       "1.*.0",
+			wantError: true,
 		},
 		{
-			name:    "tag with bad interfix without v",
-			tag:     "1.x.0",
-			wantNil: true,
+			name:      "tag range asterisk sufix",
+			tag:       "v1.1.*",
+			wantError: false,
 		},
 		{
-			name:    "tag with bad sufix",
-			tag:     "v1.0.x",
-			wantNil: true,
+			name:      "tag range asterisk sufix without v",
+			tag:       "1.1.*",
+			wantError: true,
 		},
 		{
-			name:    "tag with bad sufix without v",
-			tag:     "1.0.x",
-			wantNil: true,
+			name:      "tag range dots",
+			tag:       "v1.1.0..v1.1.2",
+			wantError: false,
 		},
 		{
-			name:    "tag range asterisk",
-			tag:     "*",
-			wantNil: false,
+			name:      "tag range dots 1st wtihout v",
+			tag:       "1.1.0..v1.1.2",
+			wantError: true,
 		},
 		{
-			name:    "tag range asterisk prefix",
-			tag:     "v*.1.0",
-			wantNil: false,
+			name:      "tag range dots 2nd without v",
+			tag:       "v1.1.0..1.1.2",
+			wantError: true,
 		},
 		{
-			name:    "tag range asterisk prefix without v",
-			tag:     "*.1.0",
-			wantNil: false,
+			name:      "tag range dots with asterisk right",
+			tag:       "1.*.0..1.1.2",
+			wantError: true,
 		},
 		{
-			name:    "tag range asterisk interfix",
-			tag:     "v1.*.0",
-			wantNil: false,
-		},
-		{
-			name:    "tag range asterisk interfix without v",
-			tag:     "1.*.0",
-			wantNil: true,
-		},
-		{
-			name:    "tag range asterisk sufix",
-			tag:     "v1.1.*",
-			wantNil: false,
-		},
-		{
-			name:    "tag range asterisk sufix without v",
-			tag:     "1.1.*",
-			wantNil: true,
-		},
-		{
-			name:    "tag range dots",
-			tag:     "v1.1.0..v1.1.2",
-			wantNil: false,
-		},
-		{
-			name:    "tag range dots 1st wtihout v",
-			tag:     "1.1.0..v1.1.2",
-			wantNil: true,
-		},
-		{
-			name:    "tag range dots 2nd without v",
-			tag:     "v1.1.0..1.1.2",
-			wantNil: true,
-		},
-		{
-			name:    "tag range dots with asterisk right",
-			tag:     "1.*.0..1.1.2",
-			wantNil: true,
-		},
-		{
-			name:    "tag range dots with asterisk left",
-			tag:     "1.1.0..1.1.*",
-			wantNil: true,
+			name:      "tag range dots with asterisk left",
+			tag:       "1.1.0..1.1.*",
+			wantError: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got, err := isRange(tt.tag); (got != nil) == tt.wantNil {
-				t.Errorf("isRange() = %v, want nil=%v (%v)", got, tt.wantNil, err)
-			}
-		})
-	}
-}
-
-func Test_matchTag(t *testing.T) {
-	tests := []struct {
-		name    string
-		tag     string
-		pattern string
-		want    bool
-	}{
-		{
-			name:    "semver glob patch",
-			tag:     "v1.1.0",
-			pattern: "v1.1.*",
-			want:    true,
-		},
-		{
-			name:    "semver glob minor",
-			tag:     "v1.1.0",
-			pattern: "v1.*.0",
-			want:    true,
-		},
-		{
-			name:    "semver glob major",
-			tag:     "v1.1.0",
-			pattern: "v*.1.0",
-			want:    true,
-		},
-		{
-			name:    "semver glob prefix",
-			tag:     "v1.1.0",
-			pattern: "v*.0",
-			want:    true,
-		},
-		{
-			name:    "semver glob prefix without v",
-			tag:     "v1.1.0",
-			pattern: "*.0",
-			want:    true,
-		},
-		{
-			name:    "semver glob interfix",
-			tag:     "v1.1.0",
-			pattern: "v1*0",
-			want:    true,
-		},
-		{
-			name:    "semver glob sufix",
-			tag:     "v1.1.0",
-			pattern: "v1.*",
-			want:    true,
-		},
-		{
-			name:    "semver glob sufix beta",
-			tag:     "v1.1.0-beta",
-			pattern: "v1.1.*",
-			want:    true,
-		},
-		{
-			name:    "semver glob",
-			tag:     "v1.1.0",
-			pattern: "v*",
-			want:    true,
-		},
-		{
-			name:    "semver glob without v",
-			tag:     "v1.1.0",
-			pattern: "*",
-			want:    true,
-		},
-		{
-			name:    "semver exact",
-			tag:     "v1.1.0",
-			pattern: "v1.1.0",
-			want:    true,
-		},
-		{
-			name:    "semver patch not matching",
-			tag:     "v1.1.1",
-			pattern: "v1.1.0",
-			want:    false,
-		},
-		{
-			name:    "semver glob patch not maching",
-			tag:     "v1.1.2",
-			pattern: "v1.*.0",
-			want:    false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got, _ := matchTag(tt.pattern, tt.tag); got != tt.want {
-				t.Errorf("matchTag() = %v, want %v", got, tt.want)
+			ret, err := isRange(tt.tag)
+			if (err != nil) != tt.wantError {
+				t.Errorf("isRange(%s) = %v | want error == %v (%v)", tt.tag, ret, tt.wantError, err)
 			}
 		})
 	}
