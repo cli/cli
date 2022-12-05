@@ -38,6 +38,7 @@ type CreateOptions struct {
 	BodyProvided bool
 	Draft        bool
 	Prerelease   bool
+	IsLatest     *bool
 
 	Assets []*shared.AssetForUpload
 
@@ -52,6 +53,7 @@ type CreateOptions struct {
 	DiscussionCategory string
 	GenerateNotes      bool
 	NotesStartTag      string
+	VerifyTag          bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -77,7 +79,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			display label for an asset, append text starting with %[1]s#%[1]s after the file name.
 
 			If a matching git tag does not yet exist, one will automatically get created
-			from the latest state of the default branch. Use %[1]s--target%[1]s to override this.
+			from the latest state of the default branch.
+			Use %[1]s--target%[1]s to point to a different branch or commit for the automatic tag creation.
+			Use %[1]s--verify-tag%[1]s to abort the release if the tag doesn't already exist.
 			To fetch the new tag locally after the release, do %[1]sgit fetch --tags origin%[1]s.
 
 			To create a release from an annotated git tag, first create one locally with
@@ -164,6 +168,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion in the specified category")
 	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate title and notes for the release")
 	cmd.Flags().StringVar(&opts.NotesStartTag, "notes-start-tag", "", "Tag to use as the starting point for generating release notes")
+	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Mark this release as \"Latest\" (default: automatic based on date and version)")
+	cmd.Flags().BoolVarP(&opts.VerifyTag, "verify-tag", "", false, "Abort in case the git tag doesn't already exist in the remote repository")
 
 	return cmd
 }
@@ -222,6 +228,17 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
+	if opts.VerifyTag && !existingTag {
+		remoteTagPresent, err := remoteTagExists(httpClient, baseRepo, opts.TagName)
+		if err != nil {
+			return err
+		}
+		if !remoteTagPresent {
+			return fmt.Errorf("tag %s doesn't exist in the repo %s, aborting due to --verify-tag flag",
+				opts.TagName, ghrepo.FullName(baseRepo))
+		}
+	}
+
 	var tagDescription string
 	if opts.RepoOverride == "" {
 		tagDescription, _ = gitTagInfo(opts.GitClient, opts.TagName)
@@ -233,7 +250,7 @@ func createRun(opts *CreateOptions) error {
 		// of local tag status.
 		// If a remote tag with the same name as specified exists already
 		// then a new tag will not be created so ignore local tag status.
-		if tagDescription != "" && !existingTag && opts.Target == "" {
+		if tagDescription != "" && !existingTag && opts.Target == "" && !opts.VerifyTag {
 			remoteExists, err := remoteTagExists(httpClient, baseRepo, opts.TagName)
 			if err != nil {
 				return err
@@ -409,6 +426,10 @@ func createRun(opts *CreateOptions) error {
 	if opts.Target != "" {
 		params["target_commitish"] = opts.Target
 	}
+	if opts.IsLatest != nil {
+		// valid values: true/false/legacy
+		params["make_latest"] = fmt.Sprintf("%v", *opts.IsLatest)
+	}
 	if opts.DiscussionCategory != "" {
 		params["discussion_category_name"] = opts.DiscussionCategory
 	}
@@ -435,8 +456,16 @@ func createRun(opts *CreateOptions) error {
 
 	hasAssets := len(opts.Assets) > 0
 
-	// Avoid publishing the release until all assets have finished uploading
-	if hasAssets {
+	if hasAssets && !opts.Draft {
+		// Check for an existing release
+		if opts.TagName != "" {
+			if ok, err := publishedReleaseExists(httpClient, baseRepo, opts.TagName); err != nil {
+				return fmt.Errorf("error checking for existing release: %w", err)
+			} else if ok {
+				return fmt.Errorf("a release with the same tag name already exists: %s", opts.TagName)
+			}
+		}
+		// Save the release initially as draft and publish it after all assets have finished uploading
 		params["draft"] = true
 	}
 

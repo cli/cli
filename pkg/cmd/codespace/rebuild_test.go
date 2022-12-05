@@ -15,7 +15,7 @@ func TestAlreadyRebuildingCodespace(t *testing.T) {
 	}
 	app := testingRebuildApp(*rebuildingCodespace)
 
-	err := app.Rebuild(context.Background(), "rebuildingCodespace")
+	err := app.Rebuild(context.Background(), "rebuildingCodespace", false)
 	if err != nil {
 		t.Errorf("rebuilding a codespace that was already rebuilding: %v", err)
 	}

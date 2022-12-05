@@ -271,8 +271,11 @@ func runCommand(rt http.RoundTripper, pm *prompter.PrompterMock, branch string, 
 				},
 			}, nil
 		},
-		GitClient: &git.Client{GitPath: "some/path/git"},
-		Prompter:  pm,
+		GitClient: &git.Client{
+			GhPath:  "some/path/gh",
+			GitPath: "some/path/git",
+		},
+		Prompter: pm,
 	}
 
 	cmd := NewCmdMerge(factory, nil)

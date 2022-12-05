@@ -123,9 +123,14 @@ func (s *Session) StartJupyterServer(ctx context.Context) (int, string, error) {
 	return port, response.ServerUrl, nil
 }
 
-func (s *Session) RebuildContainer(ctx context.Context) error {
+func (s *Session) RebuildContainer(ctx context.Context, full bool) error {
+	rpcMethod := "IEnvironmentConfigurationService.incrementalRebuildContainer"
+	if full {
+		rpcMethod = "IEnvironmentConfigurationService.rebuildContainer"
+	}
+
 	var rebuildSuccess bool
-	err := s.rpc.do(ctx, "IEnvironmentConfigurationService.rebuildContainer", nil, &rebuildSuccess)
+	err := s.rpc.do(ctx, rpcMethod, nil, &rebuildSuccess)
 	if err != nil {
 		return fmt.Errorf("invoking rebuild RPC: %w", err)
 	}

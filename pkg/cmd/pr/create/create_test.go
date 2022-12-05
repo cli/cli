@@ -2,6 +2,7 @@ package create
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -18,7 +19,6 @@ import (
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
-	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -845,7 +845,7 @@ func Test_createRun(t *testing.T) {
 			setup: func(opts *CreateOptions, t *testing.T) func() {
 				tmpfile, err := os.CreateTemp(t.TempDir(), "testrecover*")
 				assert.NoError(t, err)
-				state := prShared.IssueMetadataState{
+				state := shared.IssueMetadataState{
 					Title:     "recovered title",
 					Body:      "recovered body",
 					Reviewers: []string{"jillValentine"},
@@ -876,6 +876,31 @@ func Test_createRun(t *testing.T) {
 				return func() {}
 			},
 			wantErr: "cannot open in browser: maximum URL length exceeded",
+		},
+		{
+			name: "no local git repo",
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.Title = "My PR"
+				opts.TitleProvided = true
+				opts.Body = ""
+				opts.BodyProvided = true
+				opts.HeadBranch = "feature"
+				opts.RepoOverride = "OWNER/REPO"
+				opts.Remotes = func() (context.Remotes, error) {
+					return nil, errors.New("not a git repository")
+				}
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.StringResponse(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }
+					`))
+			},
+			expectedOut: "https://github.com/OWNER/REPO/pull/12\n",
 		},
 	}
 	for _, tt := range tests {
@@ -935,7 +960,10 @@ func Test_createRun(t *testing.T) {
 				return branch, nil
 			}
 			opts.Finder = shared.NewMockFinder(branch, nil, nil)
-			opts.GitClient = &git.Client{GitPath: "some/path/git"}
+			opts.GitClient = &git.Client{
+				GhPath:  "some/path/gh",
+				GitPath: "some/path/git",
+			}
 			cleanSetup := func() {}
 			if tt.setup != nil {
 				cleanSetup = tt.setup(&opts, t)
@@ -1052,7 +1080,10 @@ func Test_determineTrackingBranch(t *testing.T) {
 
 			tt.cmdStubs(cs)
 
-			gitClient := &git.Client{GitPath: "some/path/git"}
+			gitClient := &git.Client{
+				GhPath:  "some/path/gh",
+				GitPath: "some/path/git",
+			}
 			ref := determineTrackingBranch(gitClient, tt.remotes, "feature")
 			tt.assert(ref, t)
 		})
@@ -1063,7 +1094,7 @@ func Test_generateCompareURL(t *testing.T) {
 	tests := []struct {
 		name    string
 		ctx     CreateContext
-		state   prShared.IssueMetadataState
+		state   shared.IssueMetadataState
 		want    string
 		wantErr bool
 	}{
@@ -1084,7 +1115,7 @@ func Test_generateCompareURL(t *testing.T) {
 				BaseBranch:      "a",
 				HeadBranchLabel: "b",
 			},
-			state: prShared.IssueMetadataState{
+			state: shared.IssueMetadataState{
 				Labels: []string{"one", "two three"},
 			},
 			want:    "https://github.com/OWNER/REPO/compare/a...b?body=&expand=1&labels=one%2Ctwo+three",

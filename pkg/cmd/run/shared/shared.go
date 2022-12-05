@@ -55,11 +55,14 @@ var RunFields = []string{
 	"status",
 	"conclusion",
 	"event",
+	"number",
 	"databaseId",
 	"workflowDatabaseId",
 	"workflowName",
 	"url",
 }
+
+var SingleRunFields = append(RunFields, "jobs")
 
 type Run struct {
 	Name           string    `json:"name"` // the semantics of this field are unclear
@@ -73,6 +76,7 @@ type Run struct {
 	ID             int64
 	workflowName   string // cache column
 	WorkflowID     int64  `json:"workflow_id"`
+	Number         int64  `json:"run_number"`
 	Attempts       uint8  `json:"run_attempt"`
 	HeadBranch     string `json:"head_branch"`
 	JobsURL        string `json:"jobs_url"`
@@ -80,6 +84,7 @@ type Run struct {
 	HeadSha        string `json:"head_sha"`
 	URL            string `json:"html_url"`
 	HeadRepository Repo   `json:"head_repository"`
+	Jobs           []Job  `json:"-"` // populated by GetJobs
 }
 
 func (r *Run) StartedTime() time.Time {
@@ -149,6 +154,34 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 			data[f] = r.WorkflowID
 		case "workflowName":
 			data[f] = r.WorkflowName()
+		case "jobs":
+			jobs := make([]interface{}, 0, len(r.Jobs))
+			for _, j := range r.Jobs {
+				steps := make([]interface{}, 0, len(j.Steps))
+				for _, s := range j.Steps {
+					steps = append(steps, map[string]interface{}{
+						"name":       s.Name,
+						"status":     s.Status,
+						"conclusion": s.Conclusion,
+						"number":     s.Number,
+					})
+				}
+				var completedAt *time.Time
+				if !j.CompletedAt.IsZero() {
+					completedAt = &j.CompletedAt
+				}
+				jobs = append(jobs, map[string]interface{}{
+					"databaseId":  j.ID,
+					"status":      j.Status,
+					"conclusion":  j.Conclusion,
+					"name":        j.Name,
+					"steps":       steps,
+					"startedAt":   j.StartedAt,
+					"completedAt": completedAt,
+					"url":         j.URL,
+				})
+				data[f] = jobs
+			}
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()
@@ -284,6 +317,7 @@ func GetRuns(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, lim
 		perPage = 100
 	}
 	path += fmt.Sprintf("?per_page=%d", perPage)
+	path += "&exclude_pull_requests=true" // significantly reduces payload size
 
 	if opts != nil {
 		if opts.Branch != "" {
@@ -362,11 +396,15 @@ type JobsPayload struct {
 	Jobs []Job
 }
 
-func GetJobs(client *api.Client, repo ghrepo.Interface, run Run) ([]Job, error) {
+func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run) ([]Job, error) {
+	if run.Jobs != nil {
+		return run.Jobs, nil
+	}
 	var result JobsPayload
 	if err := client.REST(repo.RepoHost(), "GET", run.JobsURL, nil, &result); err != nil {
 		return nil, err
 	}
+	run.Jobs = result.Jobs
 	return result.Jobs, nil
 }
 
@@ -414,7 +452,7 @@ func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 func GetRun(client *api.Client, repo ghrepo.Interface, runID string) (*Run, error) {
 	var result Run
 
-	path := fmt.Sprintf("repos/%s/actions/runs/%s", ghrepo.FullName(repo), runID)
+	path := fmt.Sprintf("repos/%s/actions/runs/%s?exclude_pull_requests=true", ghrepo.FullName(repo), runID)
 
 	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
 	if err != nil {

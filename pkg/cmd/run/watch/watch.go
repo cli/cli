@@ -206,7 +206,7 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 		return nil, fmt.Errorf("failed to get run: %w", err)
 	}
 
-	jobs, err := shared.GetJobs(client, repo, *run)
+	jobs, err := shared.GetJobs(client, repo, run)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get jobs: %w", err)
 	}
