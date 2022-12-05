@@ -97,7 +97,12 @@ func statusRun(opts *StatusOptions) error {
 			statusInfo[hostname] = append(statusInfo[hostname], fmt.Sprintf(x, ys...))
 		}
 
-		if err := shared.HasMinimumScopes(httpClient, hostname, token); err != nil {
+		scopesHeader, err := shared.GetScopes(httpClient, hostname, token)
+		if err != nil {
+			return err
+		}
+
+		if err := shared.HeaderHasMinimumScopes(scopesHeader); err != nil {
 			var missingScopes *shared.MissingScopesError
 			if errors.As(err, &missingScopes) {
 				addMsg("%s %s: the token in %s is %s", cs.Red("X"), hostname, tokenSource, err)
@@ -124,11 +129,6 @@ func statusRun(opts *StatusOptions) error {
 				addMsg("%s %s: api call failed: %s", cs.Red("X"), hostname, err)
 			}
 
-			scopes, err := shared.GetScopes(httpClient, hostname, token)
-			if err != nil {
-				addMsg("%s %s: api call failed: %s", cs.Red("X"), hostname, err)
-			}
-
 			addMsg("%s Logged in to %s as %s (%s)", cs.SuccessIcon(), hostname, cs.Bold(username), tokenSource)
 			proto, _ := cfg.GetOrDefault(hostname, "git_protocol")
 			if proto != "" {
@@ -141,8 +141,8 @@ func statusRun(opts *StatusOptions) error {
 			}
 			addMsg("%s Token: %s", cs.SuccessIcon(), tokenDisplay)
 
-			if scopes != "" {
-				addMsg("%s Token Scopes: %s", cs.SuccessIcon(), scopes)
+			if scopesHeader != "" {
+				addMsg("%s Token Scopes: %s", cs.SuccessIcon(), scopesHeader)
 			} else {
 				addMsg("%s Token Scopes: None found", cs.Red("X"))
 			}
