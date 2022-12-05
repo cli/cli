@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
@@ -16,7 +15,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/pkg/surveyext"
 	"github.com/spf13/cobra"
 )
@@ -31,6 +29,7 @@ type MergeOptions struct {
 	IO         *iostreams.IOStreams
 	Branch     func() (string, error)
 	Remotes    func() (ghContext.Remotes, error)
+	Prompter   shared.Prompt
 
 	Finder shared.PRFinder
 
@@ -65,6 +64,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 		GitClient:  f.GitClient,
 		Branch:     f.Branch,
 		Remotes:    f.Remotes,
+		Prompter:   f.Prompter,
 	}
 
 	var (
@@ -309,7 +309,7 @@ func (m *mergeContext) merge() error {
 				return err
 			}
 
-			payload.method, err = mergeMethodSurvey(r)
+			payload.method, err = mergeMethodSurvey(m.opts.Prompter, r)
 			if err != nil {
 				return err
 			}
@@ -321,7 +321,7 @@ func (m *mergeContext) merge() error {
 
 			allowEditMsg := payload.method != PullRequestMergeMethodRebase
 			for {
-				action, err := confirmSurvey(allowEditMsg)
+				action, err := confirmSurvey(m.opts.Prompter, allowEditMsg)
 				if err != nil {
 					return fmt.Errorf("unable to confirm: %w", err)
 				}
@@ -375,16 +375,12 @@ func (m *mergeContext) deleteLocalBranch() error {
 	}
 
 	if m.merged {
-		// prompt for delete
 		if m.opts.IO.CanPrompt() && !m.opts.IsDeleteBranchIndicated {
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err := prompt.SurveyAskOne(&survey.Confirm{
-				Message: fmt.Sprintf("Pull request #%d was already merged. Delete the branch locally?", m.pr.Number),
-				Default: false,
-			}, &m.deleteBranch)
+			confirmed, err := m.opts.Prompter.Confirm(fmt.Sprintf("Pull request #%d was already merged. Delete the branch locally?", m.pr.Number), false)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
+			m.deleteBranch = confirmed
 		} else {
 			_ = m.warnf(fmt.Sprintf("%s Pull request #%d was already merged\n", m.cs.WarningIcon(), m.pr.Number))
 		}
@@ -550,7 +546,7 @@ func mergeRun(opts *MergeOptions) error {
 	return nil
 }
 
-func mergeMethodSurvey(baseRepo *api.Repository) (PullRequestMergeMethod, error) {
+func mergeMethodSurvey(p shared.Prompt, baseRepo *api.Repository) (PullRequestMergeMethod, error) {
 	type mergeOption struct {
 		title  string
 		method PullRequestMergeMethod
@@ -575,14 +571,8 @@ func mergeMethodSurvey(baseRepo *api.Repository) (PullRequestMergeMethod, error)
 		surveyOpts = append(surveyOpts, v.title)
 	}
 
-	mergeQuestion := &survey.Select{
-		Message: "What merge method would you like to use?",
-		Options: surveyOpts,
-	}
+	result, err := p.Select("What merge method would you like to use?", "", surveyOpts)
 
-	var result int
-	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-	err := prompt.SurveyAskOne(mergeQuestion, &result)
 	return mergeOpts[result].method, err
 }
 
@@ -595,20 +585,13 @@ func deleteBranchSurvey(opts *MergeOptions, crossRepoPR, localBranchExists bool)
 			message = "Delete the branch on GitHub?"
 		}
 
-		var result bool
-		submit := &survey.Confirm{
-			Message: message,
-			Default: false,
-		}
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		err := prompt.SurveyAskOne(submit, &result)
-		return result, err
+		return opts.Prompter.Confirm(message, false)
 	}
 
 	return opts.DeleteBranch, nil
 }
 
-func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
+func confirmSurvey(p shared.Prompt, allowEditMsg bool) (shared.Action, error) {
 	const (
 		submitLabel            = "Submit"
 		editCommitSubjectLabel = "Edit commit subject"
@@ -622,18 +605,12 @@ func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 	}
 	options = append(options, cancelLabel)
 
-	var result string
-	submit := &survey.Select{
-		Message: "What's next?",
-		Options: options,
-	}
-	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-	err := prompt.SurveyAskOne(submit, &result)
+	selected, err := p.Select("What's next?", "", options)
 	if err != nil {
 		return shared.CancelAction, fmt.Errorf("could not prompt: %w", err)
 	}
 
-	switch result {
+	switch options[selected] {
 	case submitLabel:
 		return shared.SubmitAction, nil
 	case editCommitSubjectLabel:
