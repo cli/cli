@@ -178,13 +178,8 @@ func (mf *MetadataFetcher) RepoMetadataFetch(input api.RepoMetadataInput) (*api.
 	return metadataResult, err
 }
 
-func (mf *MetadataFetcher) currentUserID() (string, error) {
-	return api.CurrentUserID(mf.APIClient, mf.Repo.RepoHost())
-}
-
 type RepoMetadataFetcher interface {
 	RepoMetadataFetch(api.RepoMetadataInput) (*api.RepoMetadataResult, error)
-	currentUserID() (string, error)
 }
 
 func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher RepoMetadataFetcher, state *IssueMetadataState) error {
@@ -219,10 +214,6 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 		return fmt.Errorf("could not prompt: %w", err)
 	}
 
-	currentUserID, err := fetcher.currentUserID()
-	if err != nil {
-		return err
-	}
 	metadataInput := api.RepoMetadataInput{
 		Reviewers:  isChosen("Reviewers"),
 		Assignees:  isChosen("Assignees"),
@@ -237,7 +228,7 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 
 	var reviewers []string
 	for _, u := range metadataResult.AssignableUsers {
-		if u.ID != currentUserID {
+		if u.Login != metadataResult.CurrentLogin {
 			reviewers = append(reviewers, u.DisplayName())
 		}
 	}

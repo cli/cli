@@ -18,10 +18,6 @@ func (mf *metadataFetcher) RepoMetadataFetch(input api.RepoMetadataInput) (*api.
 	return mf.metadataResult, nil
 }
 
-func (mf *metadataFetcher) currentUserID() (string, error) {
-	return "1", nil
-}
-
 func TestMetadataSurvey_selectAll(t *testing.T) {
 	ios, _, stdout, stderr := iostreams.Test()
 
@@ -30,8 +26,8 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 	fetcher := &metadataFetcher{
 		metadataResult: &api.RepoMetadataResult{
 			AssignableUsers: []api.RepoAssignee{
-				{ID: "1", Login: "hubot"},
-				{ID: "2", Login: "monalisa"},
+				{Login: "hubot"},
+				{Login: "monalisa"},
 			},
 			Labels: []api.RepoLabel{
 				{Name: "help wanted"},
