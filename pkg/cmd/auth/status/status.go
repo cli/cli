@@ -99,59 +99,62 @@ func statusRun(opts *StatusOptions) error {
 
 		scopesHeader, err := shared.GetScopes(httpClient, hostname, token)
 		if err != nil {
-			failed = true
 			addMsg("%s %s: api call failed: %s", cs.Red("X"), hostname, err)
-		} else {
-			if err := shared.HeaderHasMinimumScopes(scopesHeader); err != nil {
-				var missingScopes *shared.MissingScopesError
-				if errors.As(err, &missingScopes) {
-					addMsg("%s %s: the token in %s is %s", cs.Red("X"), hostname, tokenSource, err)
-					if tokenIsWriteable {
-						addMsg("- To request missing scopes, run: %s %s\n",
-							cs.Bold("gh auth refresh -h"),
-							cs.Bold(hostname))
-					}
-				} else {
-					addMsg("%s %s: authentication failed", cs.Red("X"), hostname)
-					addMsg("- The %s token in %s is no longer valid.", cs.Bold(hostname), tokenSource)
-					if tokenIsWriteable {
-						addMsg("- To re-authenticate, run: %s %s",
-							cs.Bold("gh auth login -h"), cs.Bold(hostname))
-						addMsg("- To forget about this host, run: %s %s",
-							cs.Bold("gh auth logout -h"), cs.Bold(hostname))
-					}
+			addMsg("")
+			failed = true
+			continue
+		}
+
+		if err := shared.HeaderHasMinimumScopes(scopesHeader); err != nil {
+			var missingScopes *shared.MissingScopesError
+			if errors.As(err, &missingScopes) {
+				addMsg("%s %s: the token in %s is %s", cs.Red("X"), hostname, tokenSource, err)
+				if tokenIsWriteable {
+					addMsg("- To request missing scopes, run: %s %s\n",
+						cs.Bold("gh auth refresh -h"),
+						cs.Bold(hostname))
 				}
-				failed = true
 			} else {
-				apiClient := api.NewClientFromHTTP(httpClient)
-				username, err := api.CurrentLoginName(apiClient, hostname)
-				if err != nil {
-					addMsg("%s %s: api call failed: %s", cs.Red("X"), hostname, err)
-				}
-
-				addMsg("%s Logged in to %s as %s (%s)", cs.SuccessIcon(), hostname, cs.Bold(username), tokenSource)
-				proto, _ := cfg.GetOrDefault(hostname, "git_protocol")
-				if proto != "" {
-					addMsg("%s Git operations for %s configured to use %s protocol.",
-						cs.SuccessIcon(), hostname, cs.Bold(proto))
-				}
-				tokenDisplay := "*******************"
-				if opts.ShowToken {
-					tokenDisplay = token
-				}
-				addMsg("%s Token: %s", cs.SuccessIcon(), tokenDisplay)
-
-				if scopesHeader != "" {
-					addMsg("%s Token Scopes: %s", cs.SuccessIcon(), scopesHeader)
-				} else {
-					addMsg("%s Token Scopes: None found", cs.Red("X"))
+				addMsg("%s %s: authentication failed", cs.Red("X"), hostname)
+				addMsg("- The %s token in %s is no longer valid.", cs.Bold(hostname), tokenSource)
+				if tokenIsWriteable {
+					addMsg("- To re-authenticate, run: %s %s",
+						cs.Bold("gh auth login -h"), cs.Bold(hostname))
+					addMsg("- To forget about this host, run: %s %s",
+						cs.Bold("gh auth logout -h"), cs.Bold(hostname))
 				}
 			}
-			addMsg("")
+			failed = true
+		} else {
+			apiClient := api.NewClientFromHTTP(httpClient)
+			username, err := api.CurrentLoginName(apiClient, hostname)
+			if err != nil {
+				addMsg("%s %s: api call failed: %s", cs.Red("X"), hostname, err)
+				failed = true
+			}
 
-			// NB we could take this opportunity to add or fix the "user" key in the hosts config. I chose
-			// not to since I wanted this command to be read-only.
+			addMsg("%s Logged in to %s as %s (%s)", cs.SuccessIcon(), hostname, cs.Bold(username), tokenSource)
+			proto, _ := cfg.GetOrDefault(hostname, "git_protocol")
+			if proto != "" {
+				addMsg("%s Git operations for %s configured to use %s protocol.",
+					cs.SuccessIcon(), hostname, cs.Bold(proto))
+			}
+			tokenDisplay := "*******************"
+			if opts.ShowToken {
+				tokenDisplay = token
+			}
+			addMsg("%s Token: %s", cs.SuccessIcon(), tokenDisplay)
+
+			if scopesHeader != "" {
+				addMsg("%s Token Scopes: %s", cs.SuccessIcon(), scopesHeader)
+			} else {
+				addMsg("%s Token Scopes: None found", cs.Red("X"))
+			}
 		}
+		addMsg("")
+
+		// NB we could take this opportunity to add or fix the "user" key in the hosts config. I chose
+		// not to since I wanted this command to be read-only.
 	}
 
 	if !isHostnameFound {

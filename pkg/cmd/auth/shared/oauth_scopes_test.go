@@ -55,7 +55,6 @@ func Test_HasMinimumScopes(t *testing.T) {
 			assert.Equal(t, gotAuthorization, "token ATOKEN")
 		})
 	}
-
 }
 
 func Test_HeaderHasMinimumScopes(t *testing.T) {
@@ -106,5 +105,4 @@ func Test_HeaderHasMinimumScopes(t *testing.T) {
 			}
 		})
 	}
-
 }

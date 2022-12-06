@@ -185,7 +185,6 @@ func Test_statusRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
-
 			},
 			wantErrOut: regexp.MustCompile(`(?s)Token: \*{19}.*Token: \*{19}`),
 		},
@@ -249,6 +248,7 @@ func Test_statusRun(t *testing.T) {
 			}
 
 			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
@@ -276,8 +276,6 @@ func Test_statusRun(t *testing.T) {
 
 			assert.Equal(t, "", mainBuf.String())
 			assert.Equal(t, "", hostsBuf.String())
-
-			defer reg.Verify(t)
 		})
 	}
 }
