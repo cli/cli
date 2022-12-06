@@ -32,5 +32,5 @@ func testingRebuildApp(mockCodespace api.Codespace) *App {
 	}
 
 	ios, _, _, _ := iostreams.Test()
-	return NewApp(ios, nil, apiMock, nil)
+	return NewApp(ios, nil, apiMock, nil, nil)
 }

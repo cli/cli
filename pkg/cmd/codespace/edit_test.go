@@ -88,7 +88,7 @@ func TestEdit(t *testing.T) {
 			}
 
 			ios, _, stdout, stderr := iostreams.Test()
-			a := NewApp(ios, nil, apiMock, nil)
+			a := NewApp(ios, nil, apiMock, nil, nil)
 
 			var err error
 			if tt.cliArgs == nil {
