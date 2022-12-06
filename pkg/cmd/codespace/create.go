@@ -114,9 +114,9 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 
 	promptForRepoAndBranch := userInputs.Repository == ""
 	if promptForRepoAndBranch {
-		currentRepo, err := a.baseRepo()
-		if err != nil {
-			return err
+		var defaultRepo string
+		if currentRepo, err := a.baseRepo(); err == nil {
+			defaultRepo = ghrepo.FullName(currentRepo)
 		}
 		repoQuestions := []*survey.Question{
 			{
@@ -124,7 +124,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 				Prompt: &survey.Input{
 					Message: "Repository:",
 					Help:    "Search for repos by name. To search within an org or user, or to see private repos, enter at least ':user/'.",
-					Default: ghrepo.FullName(currentRepo),
+					Default: defaultRepo,
 					Suggest: func(toComplete string) []string {
 						return getRepoSuggestions(ctx, a.apiClient, toComplete)
 					},
