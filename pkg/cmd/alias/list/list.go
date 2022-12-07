@@ -1,7 +1,6 @@
 package list
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/MakeNowJust/heredoc"
@@ -24,8 +23,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List your aliases",
+		Use:     "list",
+		Short:   "List your aliases",
+		Aliases: []string{"ls"},
 		Long: heredoc.Doc(`
 			This command prints out all of the aliases gh is configured to use.
 		`),
@@ -47,21 +47,15 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	aliasCfg, err := cfg.Aliases()
-	if err != nil {
-		return fmt.Errorf("couldn't read aliases config: %w", err)
-	}
-
-	if aliasCfg.Empty() {
-		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.ErrOut, "no aliases configured\n")
-		}
-		return nil
-	}
-
-	tp := utils.NewTablePrinter(opts.IO)
+	aliasCfg := cfg.Aliases()
 
 	aliasMap := aliasCfg.All()
+	if len(aliasMap) == 0 {
+		return cmdutil.NewNoResultsError("no aliases configured")
+	}
+
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
+	tp := utils.NewTablePrinter(opts.IO)
 	keys := []string{}
 	for alias := range aliasMap {
 		keys = append(keys, alias)

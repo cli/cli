@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -11,32 +12,114 @@ import (
 )
 
 func Test_runAdd(t *testing.T) {
-	io, stdin, stdout, stderr := iostreams.Test()
-	io.SetStdinTTY(false)
-	io.SetStdoutTTY(true)
-	io.SetStderrTTY(true)
+	tests := []struct {
+		name       string
+		stdin      string
+		httpStubs  func(*httpmock.Registry)
+		wantStdout string
+		wantStderr string
+		wantErrMsg string
+		opts       AddOptions
+	}{
+		{
+			name:  "valid key",
+			stdin: "-----BEGIN PGP PUBLIC KEY BLOCK-----",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("POST", "user/gpg_keys"),
+					httpmock.StatusStringResponse(200, ``))
+			},
+			wantStdout: "✓ GPG key added to your account\n",
+			wantStderr: "",
+			wantErrMsg: "",
+			opts:       AddOptions{KeyFile: "-"},
+		},
+		{
+			name:  "binary format fails",
+			stdin: "gCAAAAA7H7MHTZWFLJKD3vP4F7v",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("POST", "user/gpg_keys"),
+					httpmock.StatusStringResponse(422, `{
+						"message": "Validation Failed",
+						"errors": [{
+							"resource": "GpgKey",
+							"code": "custom",
+							"message": "We got an error doing that."
+						}],
+						"documentation_url": "https://docs.github.com/v3/users/gpg_keys"
+					}`),
+				)
+			},
+			wantStdout: "",
+			wantStderr: heredoc.Doc(`
+				X Error: the GPG key you are trying to upload might not be in ASCII-armored format.
+				Find your GPG key ID with:    gpg --list-keys
+				Then add it to your account:  gpg --armor --export <ID> | gh gpg-key add -
+			`),
+			wantErrMsg: "SilentError",
+			opts:       AddOptions{KeyFile: "-"},
+		},
+		{
+			name:  "duplicate key",
+			stdin: "-----BEGIN PGP PUBLIC KEY BLOCK-----",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("POST", "user/gpg_keys"),
+					httpmock.WithHeader(httpmock.StatusStringResponse(422, `{
+						"message": "Validation Failed",
+						"errors": [{
+							"resource": "GpgKey",
+							"code": "custom",
+							"field": "key_id",
+							"message": "key_id already exists"
+						}, {
+							"resource": "GpgKey",
+							"code": "custom",
+							"field": "public_key",
+							"message": "public_key already exists"
+						}],
+						"documentation_url": "https://docs.github.com/v3/users/gpg_keys"
+					}`), "Content-type", "application/json"),
+				)
+			},
+			wantStdout: "",
+			wantStderr: "X Error: the key already exists in your account\n",
+			wantErrMsg: "SilentError",
+			opts:       AddOptions{KeyFile: "-"},
+		},
+	}
 
-	stdin.WriteString("PUBKEY")
+	for _, tt := range tests {
+		ios, stdin, stdout, stderr := iostreams.Test()
+		ios.SetStdinTTY(true)
+		ios.SetStdoutTTY(true)
+		ios.SetStderrTTY(true)
+		stdin.WriteString(tt.stdin)
 
-	tr := httpmock.Registry{}
-	defer tr.Verify(t)
+		reg := &httpmock.Registry{}
 
-	tr.Register(
-		httpmock.REST("POST", "user/gpg_keys"),
-		httpmock.StringResponse(`{}`))
-
-	err := runAdd(&AddOptions{
-		IO: io,
-		Config: func() (config.Config, error) {
+		tt.opts.IO = ios
+		tt.opts.HTTPClient = func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		}
+		if tt.httpStubs != nil {
+			tt.httpStubs(reg)
+		}
+		tt.opts.Config = func() (config.Config, error) {
 			return config.NewBlankConfig(), nil
-		},
-		HTTPClient: func() (*http.Client, error) {
-			return &http.Client{Transport: &tr}, nil
-		},
-		KeyFile: "-",
-	})
-	assert.NoError(t, err)
+		}
 
-	assert.Equal(t, "", stdout.String())
-	assert.Equal(t, "✓ GPG key added to your account\n", stderr.String())
+		t.Run(tt.name, func(t *testing.T) {
+			defer reg.Verify(t)
+			err := runAdd(&tt.opts)
+			if tt.wantErrMsg != "" {
+				assert.Equal(t, tt.wantErrMsg, err.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.wantStdout, stdout.String())
+			assert.Equal(t, tt.wantStderr, stderr.String())
+		})
+	}
 }

@@ -22,6 +22,10 @@ func IsEnterprise(h string) bool {
 	return normalizedHostName != defaultHostname && normalizedHostName != localhost
 }
 
+func isGarage(h string) bool {
+	return strings.EqualFold(h, "garage.github.com")
+}
+
 // NormalizeHostname returns the canonical host name of a GitHub instance
 func NormalizeHostname(h string) string {
 	hostname := strings.ToLower(h)
@@ -36,12 +40,7 @@ func NormalizeHostname(h string) string {
 	return hostname
 }
 
-func HostnameValidator(v interface{}) error {
-	hostname, valid := v.(string)
-	if !valid {
-		return errors.New("hostname is not a string")
-	}
-
+func HostnameValidator(hostname string) error {
 	if len(strings.TrimSpace(hostname)) < 1 {
 		return errors.New("a value is required")
 	}
@@ -52,6 +51,9 @@ func HostnameValidator(v interface{}) error {
 }
 
 func GraphQLEndpoint(hostname string) string {
+	if isGarage(hostname) {
+		return fmt.Sprintf("https://%s/api/graphql", hostname)
+	}
 	if IsEnterprise(hostname) {
 		return fmt.Sprintf("https://%s/api/graphql", hostname)
 	}
@@ -62,6 +64,9 @@ func GraphQLEndpoint(hostname string) string {
 }
 
 func RESTPrefix(hostname string) string {
+	if isGarage(hostname) {
+		return fmt.Sprintf("https://%s/api/v3/", hostname)
+	}
 	if IsEnterprise(hostname) {
 		return fmt.Sprintf("https://%s/api/v3/", hostname)
 	}
@@ -82,6 +87,9 @@ func GistPrefix(hostname string) string {
 }
 
 func GistHost(hostname string) string {
+	if isGarage(hostname) {
+		return fmt.Sprintf("%s/gist/", hostname)
+	}
 	if IsEnterprise(hostname) {
 		return fmt.Sprintf("%s/gist/", hostname)
 	}

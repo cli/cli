@@ -49,8 +49,9 @@ func TestListRun(t *testing.T) {
 			},
 			isTTY: true,
 			wantStdout: heredoc.Doc(`
-				Mac            ssh-rsa AAAABbBB123  1d
-				hubot@Windows  ssh-rsa EEEEEEEK247  1d
+				TITLE          ID    KEY                  ADDED
+				Mac            1234  ssh-rsa AAAABbBB123  1d
+				hubot@Windows  5678  ssh-rsa EEEEEEEK247  1d
 			`),
 			wantStderr: "",
 		},
@@ -82,13 +83,13 @@ func TestListRun(t *testing.T) {
 			},
 			isTTY: false,
 			wantStdout: heredoc.Doc(`
-				Mac	ssh-rsa AAAABbBB123	2020-08-31T15:44:24+02:00
-				hubot@Windows	ssh-rsa EEEEEEEK247	2020-08-31T15:44:24+02:00
+				Mac	ssh-rsa AAAABbBB123	2020-08-31T15:44:24+02:00	1234
+				hubot@Windows	ssh-rsa EEEEEEEK247	2020-08-31T15:44:24+02:00	5678
 			`),
 			wantStderr: "",
 		},
 		{
-			name: "no keys",
+			name: "no keys tty",
 			opts: ListOptions{
 				HTTPClient: func() (*http.Client, error) {
 					reg := &httpmock.Registry{}
@@ -100,20 +101,38 @@ func TestListRun(t *testing.T) {
 				},
 			},
 			wantStdout: "",
-			wantStderr: "No SSH keys present in GitHub account.\n",
+			wantStderr: "",
 			wantErr:    true,
+			isTTY:      true,
+		},
+		{
+			name: "no keys non-tty",
+			opts: ListOptions{
+				HTTPClient: func() (*http.Client, error) {
+					reg := &httpmock.Registry{}
+					reg.Register(
+						httpmock.REST("GET", "user/keys"),
+						httpmock.StringResponse(`[]`),
+					)
+					return &http.Client{Transport: reg}, nil
+				},
+			},
+			wantStdout: "",
+			wantStderr: "",
+			wantErr:    true,
+			isTTY:      false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			opts := tt.opts
-			opts.IO = io
+			opts.IO = ios
 			opts.Config = func() (config.Config, error) { return config.NewBlankConfig(), nil }
 
 			err := listRun(&opts)

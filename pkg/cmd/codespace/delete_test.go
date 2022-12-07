@@ -15,7 +15,6 @@ import (
 )
 
 func TestDelete(t *testing.T) {
-	user := &api.User{Login: "hubot"}
 	now, _ := time.Parse(time.RFC3339, "2021-09-22T00:00:00Z")
 	daysAgo := func(n int) string {
 		return now.Add(time.Hour * -time.Duration(24*n)).Format(time.RFC3339)
@@ -152,14 +151,62 @@ func TestDelete(t *testing.T) {
 			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-c4f3"},
 			wantStdout:  "",
 		},
+		{
+			name: "deletion for org codespace by admin succeeds",
+			opts: deleteOptions{
+				deleteAll:     true,
+				orgName:       "bookish",
+				userName:      "monalisa",
+				codespaceName: "monalisa-spoonknife-123",
+			},
+			codespaces: []*api.Codespace{
+				{
+					Name:  "monalisa-spoonknife-123",
+					Owner: api.User{Login: "monalisa"},
+				},
+				{
+					Name:  "monalisa-spoonknife-123",
+					Owner: api.User{Login: "monalisa2"},
+				},
+				{
+					Name:  "dont-delete-abc",
+					Owner: api.User{Login: "monalisa"},
+				},
+			},
+			wantDeleted: []string{"monalisa-spoonknife-123"},
+			wantStdout:  "",
+		},
+		{
+			name: "deletion for org codespace by admin fails for codespace not found",
+			opts: deleteOptions{
+				deleteAll:     true,
+				orgName:       "bookish",
+				userName:      "johnDoe",
+				codespaceName: "monalisa-spoonknife-123",
+			},
+			codespaces: []*api.Codespace{
+				{
+					Name:  "monalisa-spoonknife-123",
+					Owner: api.User{Login: "monalisa"},
+				},
+				{
+					Name:  "monalisa-spoonknife-123",
+					Owner: api.User{Login: "monalisa2"},
+				},
+				{
+					Name:  "dont-delete-abc",
+					Owner: api.User{Login: "monalisa"},
+				},
+			},
+			wantDeleted: []string{},
+			wantStdout:  "",
+			wantErr:     true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			apiMock := &apiClientMock{
-				GetUserFunc: func(_ context.Context) (*api.User, error) {
-					return user, nil
-				},
-				DeleteCodespaceFunc: func(_ context.Context, name string) error {
+				DeleteCodespaceFunc: func(_ context.Context, name string, orgName string, userName string) error {
 					if tt.deleteErr != nil {
 						return tt.deleteErr
 					}
@@ -167,12 +214,23 @@ func TestDelete(t *testing.T) {
 				},
 			}
 			if tt.opts.codespaceName == "" {
-				apiMock.ListCodespacesFunc = func(_ context.Context, num int) ([]*api.Codespace, error) {
+				apiMock.ListCodespacesFunc = func(_ context.Context, _ api.ListCodespacesOptions) ([]*api.Codespace, error) {
 					return tt.codespaces, nil
 				}
 			} else {
-				apiMock.GetCodespaceFunc = func(_ context.Context, name string, includeConnection bool) (*api.Codespace, error) {
-					return tt.codespaces[0], nil
+				if tt.opts.orgName != "" {
+					apiMock.GetOrgMemberCodespaceFunc = func(_ context.Context, orgName string, userName string, name string) (*api.Codespace, error) {
+						for _, codespace := range tt.codespaces {
+							if codespace.Name == name && codespace.Owner.Login == userName {
+								return codespace, nil
+							}
+						}
+						return nil, fmt.Errorf("codespace not found for user %s with name %s", userName, name)
+					}
+				} else {
+					apiMock.GetCodespaceFunc = func(_ context.Context, name string, includeConnection bool) (*api.Codespace, error) {
+						return tt.codespaces[0], nil
+					}
 				}
 			}
 			opts := tt.opts
@@ -187,10 +245,10 @@ func TestDelete(t *testing.T) {
 				},
 			}
 
-			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdinTTY(true)
-			io.SetStdoutTTY(true)
-			app := NewApp(io, nil, apiMock)
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdinTTY(true)
+			ios.SetStdoutTTY(true)
+			app := NewApp(ios, nil, apiMock, nil)
 			err := app.Delete(context.Background(), opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("delete() error = %v, wantErr %v", err, tt.wantErr)

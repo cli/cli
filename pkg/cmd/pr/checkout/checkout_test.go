@@ -3,7 +3,7 @@ package checkout
 import (
 	"bytes"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -162,9 +162,8 @@ func Test_checkoutRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			opts := tt.opts
 
-			io, _, stdout, stderr := iostreams.Test()
-			opts.IO = io
-
+			ios, _, stdout, stderr := iostreams.Test()
+			opts.IO = ios
 			httpReg := &httpmock.Registry{}
 			defer httpReg.Verify(t)
 			if tt.httpStubs != nil {
@@ -198,6 +197,11 @@ func Test_checkoutRun(t *testing.T) {
 				return remotes, nil
 			}
 
+			opts.GitClient = &git.Client{
+				GhPath:  "some/path/gh",
+				GitPath: "some/path/git",
+			}
+
 			err := checkoutRun(opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("want error: %v, got: %v", tt.wantErr, err)
@@ -211,10 +215,10 @@ func Test_checkoutRun(t *testing.T) {
 /** LEGACY TESTS **/
 
 func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, cli string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
+	ios, _, stdout, stderr := iostreams.Test()
 
 	factory := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
@@ -235,6 +239,10 @@ func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, cl
 		Branch: func() (string, error) {
 			return branch, nil
 		},
+		GitClient: &git.Client{
+			GhPath:  "some/path/gh",
+			GitPath: "some/path/git",
+		},
 	}
 
 	cmd := NewCmdCheckout(factory, nil)
@@ -246,8 +254,8 @@ func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, cl
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{

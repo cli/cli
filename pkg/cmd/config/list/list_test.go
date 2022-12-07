@@ -36,7 +36,7 @@ func TestNewCmdConfigList(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &cmdutil.Factory{
 				Config: func() (config.Config, error) {
-					return config.ConfigStub{}, nil
+					return config.NewBlankConfig(), nil
 				},
 			}
 
@@ -71,21 +71,23 @@ func Test_listRun(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   *ListOptions
-		config  config.ConfigStub
+		config  config.Config
 		stdout  string
 		wantErr bool
 	}{
 		{
 			name: "list",
-			config: config.ConfigStub{
-				"HOST:git_protocol":     "ssh",
-				"HOST:editor":           "/usr/bin/vim",
-				"HOST:prompt":           "disabled",
-				"HOST:pager":            "less",
-				"HOST:http_unix_socket": "",
-				"HOST:browser":          "brave",
-			},
-			input: &ListOptions{Hostname: "HOST"}, // ConfigStub gives empty DefaultHost
+			config: func() config.Config {
+				cfg := config.NewBlankConfig()
+				cfg.Set("HOST", "git_protocol", "ssh")
+				cfg.Set("HOST", "editor", "/usr/bin/vim")
+				cfg.Set("HOST", "prompt", "disabled")
+				cfg.Set("HOST", "pager", "less")
+				cfg.Set("HOST", "http_unix_socket", "")
+				cfg.Set("HOST", "browser", "brave")
+				return cfg
+			}(),
+			input: &ListOptions{Hostname: "HOST"},
 			stdout: `git_protocol=ssh
 editor=/usr/bin/vim
 prompt=disabled
@@ -97,8 +99,8 @@ browser=brave
 	}
 
 	for _, tt := range tests {
-		io, _, stdout, _ := iostreams.Test()
-		tt.input.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		tt.input.IO = ios
 		tt.input.Config = func() (config.Config, error) {
 			return tt.config, nil
 		}

@@ -1,27 +1,24 @@
 package factory
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"net/url"
-	"os"
+	"path/filepath"
 	"testing"
 
-	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_BaseRepo(t *testing.T) {
-	orig_GH_HOST := os.Getenv("GH_HOST")
-	t.Cleanup(func() {
-		os.Setenv("GH_HOST", orig_GH_HOST)
-	})
-
 	tests := []struct {
 		name       string
 		remotes    git.RemoteSet
-		config     config.Config
 		override   string
 		wantsErr   bool
 		wantsName  string
@@ -33,7 +30,6 @@ func Test_BaseRepo(t *testing.T) {
 			remotes: git.RemoteSet{
 				git.NewRemote("origin", "https://nonsense.com/owner/repo.git"),
 			},
-			config:     defaultConfig(),
 			wantsName:  "repo",
 			wantsOwner: "owner",
 			wantsHost:  "nonsense.com",
@@ -43,7 +39,6 @@ func Test_BaseRepo(t *testing.T) {
 			remotes: git.RemoteSet{
 				git.NewRemote("origin", "https://test.com/owner/repo.git"),
 			},
-			config:   defaultConfig(),
 			wantsErr: true,
 		},
 		{
@@ -51,7 +46,6 @@ func Test_BaseRepo(t *testing.T) {
 			remotes: git.RemoteSet{
 				git.NewRemote("origin", "https://test.com/owner/repo.git"),
 			},
-			config:     defaultConfig(),
 			override:   "test.com",
 			wantsName:  "repo",
 			wantsOwner: "owner",
@@ -62,7 +56,6 @@ func Test_BaseRepo(t *testing.T) {
 			remotes: git.RemoteSet{
 				git.NewRemote("origin", "https://nonsense.com/owner/repo.git"),
 			},
-			config:   defaultConfig(),
 			override: "test.com",
 			wantsErr: true,
 		},
@@ -70,18 +63,30 @@ func Test_BaseRepo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.override != "" {
-				os.Setenv("GH_HOST", tt.override)
-			} else {
-				os.Unsetenv("GH_HOST")
-			}
 			f := New("1")
 			rr := &remoteResolver{
 				readRemotes: func() (git.RemoteSet, error) {
 					return tt.remotes, nil
 				},
 				getConfig: func() (config.Config, error) {
-					return tt.config, nil
+					cfg := &config.ConfigMock{}
+					cfg.HostsFunc = func() []string {
+						hosts := []string{"nonsense.com"}
+						if tt.override != "" {
+							hosts = append([]string{tt.override}, hosts...)
+						}
+						return hosts
+					}
+					cfg.DefaultHostFunc = func() (string, string) {
+						if tt.override != "" {
+							return tt.override, "GH_HOST"
+						}
+						return "nonsense.com", "hosts"
+					}
+					cfg.AuthTokenFunc = func(string) (string, string) {
+						return "", ""
+					}
+					return cfg, nil
 				},
 			}
 			f.Remotes = rr.Resolver()
@@ -101,15 +106,10 @@ func Test_BaseRepo(t *testing.T) {
 
 func Test_SmartBaseRepo(t *testing.T) {
 	pu, _ := url.Parse("https://test.com/newowner/newrepo.git")
-	orig_GH_HOST := os.Getenv("GH_HOST")
-	t.Cleanup(func() {
-		os.Setenv("GH_HOST", orig_GH_HOST)
-	})
 
 	tests := []struct {
 		name       string
 		remotes    git.RemoteSet
-		config     config.Config
 		override   string
 		wantsErr   bool
 		wantsName  string
@@ -121,7 +121,6 @@ func Test_SmartBaseRepo(t *testing.T) {
 			remotes: git.RemoteSet{
 				git.NewRemote("origin", "https://test.com/owner/repo.git"),
 			},
-			config:     defaultConfig(),
 			override:   "test.com",
 			wantsName:  "repo",
 			wantsOwner: "owner",
@@ -135,7 +134,6 @@ func Test_SmartBaseRepo(t *testing.T) {
 					FetchURL: pu,
 					PushURL:  pu},
 			},
-			config:     defaultConfig(),
 			override:   "test.com",
 			wantsName:  "newrepo",
 			wantsOwner: "newowner",
@@ -149,7 +147,6 @@ func Test_SmartBaseRepo(t *testing.T) {
 					FetchURL: pu,
 					PushURL:  pu},
 			},
-			config:     defaultConfig(),
 			override:   "test.com",
 			wantsName:  "test",
 			wantsOwner: "johnny",
@@ -160,7 +157,6 @@ func Test_SmartBaseRepo(t *testing.T) {
 			remotes: git.RemoteSet{
 				git.NewRemote("origin", "https://example.com/owner/repo.git"),
 			},
-			config:   defaultConfig(),
 			override: "test.com",
 			wantsErr: true,
 		},
@@ -168,20 +164,30 @@ func Test_SmartBaseRepo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.override != "" {
-				os.Setenv("GH_HOST", tt.override)
-			} else {
-				os.Unsetenv("GH_HOST")
-			}
 			f := New("1")
 			rr := &remoteResolver{
 				readRemotes: func() (git.RemoteSet, error) {
 					return tt.remotes, nil
 				},
 				getConfig: func() (config.Config, error) {
-					return tt.config, nil
+					cfg := &config.ConfigMock{}
+					cfg.HostsFunc = func() []string {
+						hosts := []string{"nonsense.com"}
+						if tt.override != "" {
+							hosts = append([]string{tt.override}, hosts...)
+						}
+						return hosts
+					}
+					cfg.DefaultHostFunc = func() (string, string) {
+						if tt.override != "" {
+							return tt.override, "GH_HOST"
+						}
+						return "nonsense.com", "hosts"
+					}
+					return cfg, nil
 				},
 			}
+			f.HttpClient = func() (*http.Client, error) { return nil, nil }
 			f.Remotes = rr.Resolver()
 			f.BaseRepo = SmartBaseRepoFunc(f)
 			repo, err := f.BaseRepo()
@@ -199,11 +205,6 @@ func Test_SmartBaseRepo(t *testing.T) {
 
 // Defined in pkg/cmdutil/repo_override.go but test it along with other BaseRepo functions
 func Test_OverrideBaseRepo(t *testing.T) {
-	orig_GH_HOST := os.Getenv("GH_REPO")
-	t.Cleanup(func() {
-		os.Setenv("GH_REPO", orig_GH_HOST)
-	})
-
 	tests := []struct {
 		name        string
 		remotes     git.RemoteSet
@@ -244,9 +245,7 @@ func Test_OverrideBaseRepo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.envOverride != "" {
-				os.Setenv("GH_REPO", tt.envOverride)
-			} else {
-				os.Unsetenv("GH_REPO")
+				t.Setenv("GH_REPO", tt.envOverride)
 			}
 			f := New("1")
 			rr := &remoteResolver{
@@ -323,13 +322,7 @@ func Test_ioStreams_pager(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.env != nil {
 				for k, v := range tt.env {
-					old := os.Getenv(k)
-					os.Setenv(k, v)
-					if k == "GH_PAGER" {
-						defer os.Unsetenv(k)
-					} else {
-						defer os.Setenv(k, old)
-					}
+					t.Setenv(k, v)
 				}
 			}
 			f := New("1")
@@ -351,6 +344,7 @@ func Test_ioStreams_prompt(t *testing.T) {
 		name           string
 		config         config.Config
 		promptDisabled bool
+		env            map[string]string
 	}{
 		{
 			name:           "default config",
@@ -361,9 +355,19 @@ func Test_ioStreams_prompt(t *testing.T) {
 			config:         disablePromptConfig(),
 			promptDisabled: true,
 		},
+		{
+			name:           "prompt disabled via GH_PROMPT_DISABLED env var",
+			env:            map[string]string{"GH_PROMPT_DISABLED": "1"},
+			promptDisabled: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.env != nil {
+				for k, v := range tt.env {
+					t.Setenv(k, v)
+				}
+			}
 			f := New("1")
 			f.Config = func() (config.Config, error) {
 				if tt.config == nil {
@@ -378,66 +382,78 @@ func Test_ioStreams_prompt(t *testing.T) {
 	}
 }
 
-func Test_browserLauncher(t *testing.T) {
+func TestSSOURL(t *testing.T) {
 	tests := []struct {
-		name        string
-		env         map[string]string
-		config      config.Config
-		wantBrowser string
+		name       string
+		host       string
+		sso        string
+		wantStderr string
+		wantSSO    string
 	}{
 		{
-			name: "GH_BROWSER set",
-			env: map[string]string{
-				"GH_BROWSER": "GH_BROWSER",
-			},
-			wantBrowser: "GH_BROWSER",
+			name:       "SSO challenge in response header",
+			host:       "github.com",
+			sso:        "required; url=https://github.com/login/sso?return_to=xyz&param=123abc; another",
+			wantStderr: "",
+			wantSSO:    "https://github.com/login/sso?return_to=xyz&param=123abc",
 		},
+	}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if sso := r.URL.Query().Get("sso"); sso != "" {
+			w.Header().Set("X-GitHub-SSO", sso)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := New("1")
+			f.Config = func() (config.Config, error) {
+				return config.NewBlankConfig(), nil
+			}
+			ios, _, _, stderr := iostreams.Test()
+			f.IOStreams = ios
+			client, err := httpClientFunc(f, "v1.2.3")()
+			require.NoError(t, err)
+			req, err := http.NewRequest("GET", ts.URL, nil)
+			if tt.sso != "" {
+				q := req.URL.Query()
+				q.Set("sso", tt.sso)
+				req.URL.RawQuery = q.Encode()
+			}
+			req.Host = tt.host
+			require.NoError(t, err)
+
+			res, err := client.Do(req)
+			require.NoError(t, err)
+
+			assert.Equal(t, 204, res.StatusCode)
+			assert.Equal(t, tt.wantStderr, stderr.String())
+			assert.Equal(t, tt.wantSSO, SSOURL())
+		})
+	}
+}
+
+func TestNewGitClient(t *testing.T) {
+	tests := []struct {
+		name          string
+		config        config.Config
+		executable    string
+		wantAuthHosts []string
+		wantGhPath    string
+	}{
 		{
-			name:        "config browser set",
-			config:      config.NewFromString("browser: CONFIG_BROWSER"),
-			wantBrowser: "CONFIG_BROWSER",
-		},
-		{
-			name: "BROWSER set",
-			env: map[string]string{
-				"BROWSER": "BROWSER",
-			},
-			wantBrowser: "BROWSER",
-		},
-		{
-			name: "GH_BROWSER and config browser set",
-			env: map[string]string{
-				"GH_BROWSER": "GH_BROWSER",
-			},
-			config:      config.NewFromString("browser: CONFIG_BROWSER"),
-			wantBrowser: "GH_BROWSER",
-		},
-		{
-			name: "config browser and BROWSER set",
-			env: map[string]string{
-				"BROWSER": "BROWSER",
-			},
-			config:      config.NewFromString("browser: CONFIG_BROWSER"),
-			wantBrowser: "CONFIG_BROWSER",
-		},
-		{
-			name: "GH_BROWSER and BROWSER set",
-			env: map[string]string{
-				"BROWSER":    "BROWSER",
-				"GH_BROWSER": "GH_BROWSER",
-			},
-			wantBrowser: "GH_BROWSER",
+			name:          "creates git client",
+			config:        defaultConfig(),
+			executable:    filepath.Join("path", "to", "gh"),
+			wantAuthHosts: []string{"nonsense.com"},
+			wantGhPath:    filepath.Join("path", "to", "gh"),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.env != nil {
-				for k, v := range tt.env {
-					old := os.Getenv(k)
-					os.Setenv(k, v)
-					defer os.Setenv(k, old)
-				}
-			}
 			f := New("1")
 			f.Config = func() (config.Config, error) {
 				if tt.config == nil {
@@ -446,18 +462,22 @@ func Test_browserLauncher(t *testing.T) {
 					return tt.config, nil
 				}
 			}
-			browser := browserLauncher(f)
-			assert.Equal(t, tt.wantBrowser, browser)
+			f.ExecutableName = tt.executable
+			ios, _, _, _ := iostreams.Test()
+			f.IOStreams = ios
+			c := newGitClient(f)
+			assert.Equal(t, tt.wantGhPath, c.GhPath)
+			assert.Equal(t, ios.In, c.Stdin)
+			assert.Equal(t, ios.Out, c.Stdout)
+			assert.Equal(t, ios.ErrOut, c.Stderr)
 		})
 	}
 }
 
-func defaultConfig() config.Config {
-	return config.InheritEnv(config.NewFromString(heredoc.Doc(`
-    hosts:
-      nonsense.com:
-        oauth_token: BLAH
-		`)))
+func defaultConfig() *config.ConfigMock {
+	cfg := config.NewFromString("")
+	cfg.Set("nonsense.com", "oauth_token", "BLAH")
+	return cfg
 }
 
 func pagerConfig() config.Config {

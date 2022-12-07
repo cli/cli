@@ -2,7 +2,7 @@ package delete
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -31,6 +31,7 @@ func Test_NewCmdDelete(t *testing.T) {
 			want: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: false,
+				CleanupTag:  false,
 			},
 		},
 		{
@@ -40,6 +41,17 @@ func Test_NewCmdDelete(t *testing.T) {
 			want: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: true,
+				CleanupTag:  false,
+			},
+		},
+		{
+			name:  "cleanup tag",
+			args:  "v1.2.3 --cleanup-tag",
+			isTTY: true,
+			want: DeleteOptions{
+				TagName:     "v1.2.3",
+				SkipConfirm: false,
+				CleanupTag:  true,
 			},
 		},
 		{
@@ -51,13 +63,13 @@ func Test_NewCmdDelete(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			var opts *DeleteOptions
@@ -72,8 +84,8 @@ func Test_NewCmdDelete(t *testing.T) {
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {
@@ -85,6 +97,7 @@ func Test_NewCmdDelete(t *testing.T) {
 
 			assert.Equal(t, tt.want.TagName, opts.TagName)
 			assert.Equal(t, tt.want.SkipConfirm, opts.SkipConfirm)
+			assert.Equal(t, tt.want.CleanupTag, opts.CleanupTag)
 		})
 	}
 }
@@ -104,6 +117,7 @@ func Test_deleteRun(t *testing.T) {
 			opts: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: true,
+				CleanupTag:  false,
 			},
 			wantStdout: ``,
 			wantStderr: heredoc.Doc(`
@@ -117,6 +131,31 @@ func Test_deleteRun(t *testing.T) {
 			opts: DeleteOptions{
 				TagName:     "v1.2.3",
 				SkipConfirm: false,
+				CleanupTag:  false,
+			},
+			wantStdout: ``,
+			wantStderr: ``,
+		},
+		{
+			name:  "cleanup-tag & skipping confirmation",
+			isTTY: true,
+			opts: DeleteOptions{
+				TagName:     "v1.2.3",
+				SkipConfirm: true,
+				CleanupTag:  true,
+			},
+			wantStdout: ``,
+			wantStderr: heredoc.Doc(`
+				✓ Deleted release and tag v1.2.3
+			`),
+		},
+		{
+			name:  "cleanup-tag",
+			isTTY: false,
+			opts: DeleteOptions{
+				TagName:     "v1.2.3",
+				SkipConfirm: false,
+				CleanupTag:  true,
 			},
 			wantStdout: ``,
 			wantStderr: ``,
@@ -124,10 +163,10 @@ func Test_deleteRun(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			fakeHTTP := &httpmock.Registry{}
 			fakeHTTP.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StringResponse(`{
@@ -135,9 +174,11 @@ func Test_deleteRun(t *testing.T) {
 				"draft": false,
 				"url": "https://api.github.com/repos/OWNER/REPO/releases/23456"
 			}`))
-			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/releases/23456"), httpmock.StatusStringResponse(204, ""))
 
-			tt.opts.IO = io
+			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/releases/23456"), httpmock.StatusStringResponse(204, ""))
+			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/tags/v1.2.3"), httpmock.StatusStringResponse(204, ""))
+
+			tt.opts.IO = ios
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}

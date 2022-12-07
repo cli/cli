@@ -196,6 +196,7 @@ func Test_repoCreate(t *testing.T) {
 				TemplateRepositoryID: "TPLID",
 				HasIssuesEnabled:     true,
 				HasWikiEnabled:       true,
+				IncludeAllBranches:   false,
 			},
 			stubs: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
@@ -218,11 +219,12 @@ func Test_repoCreate(t *testing.T) {
 						}`,
 						func(inputs map[string]interface{}) {
 							assert.Equal(t, map[string]interface{}{
-								"name":         "gen-project",
-								"description":  "my generated project",
-								"visibility":   "PRIVATE",
-								"ownerId":      "USERID",
-								"repositoryId": "TPLID",
+								"name":               "gen-project",
+								"description":        "my generated project",
+								"visibility":         "PRIVATE",
+								"ownerId":            "USERID",
+								"repositoryId":       "TPLID",
+								"includeAllBranches": false,
 							}, inputs)
 						}),
 				)
@@ -240,6 +242,7 @@ func Test_repoCreate(t *testing.T) {
 				TemplateRepositoryID: "TPLID",
 				HasIssuesEnabled:     true,
 				HasWikiEnabled:       true,
+				IncludeAllBranches:   false,
 			},
 			stubs: func(t *testing.T, r *httpmock.Registry) {
 				r.Register(
@@ -262,11 +265,12 @@ func Test_repoCreate(t *testing.T) {
 						}`,
 						func(inputs map[string]interface{}) {
 							assert.Equal(t, map[string]interface{}{
-								"name":         "gen-project",
-								"description":  "my generated project",
-								"visibility":   "INTERNAL",
-								"ownerId":      "ORGID",
-								"repositoryId": "TPLID",
+								"name":               "gen-project",
+								"description":        "my generated project",
+								"visibility":         "INTERNAL",
+								"ownerId":            "ORGID",
+								"repositoryId":       "TPLID",
+								"includeAllBranches": false,
 							}, inputs)
 						}),
 				)
@@ -295,6 +299,28 @@ func Test_repoCreate(t *testing.T) {
 							"license_template":   "lgpl-3.0",
 							"has_issues":         true,
 							"has_wiki":           true,
+						}, payload)
+					}))
+			},
+			wantRepo: "https://github.com/snacks-inc/crisps",
+		},
+		{
+			name:     "create with README",
+			hostname: "github.com",
+			input: repoCreateInput{
+				Name:       "crisps",
+				InitReadme: true,
+			},
+			stubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("POST", "user/repos"),
+					httpmock.RESTPayload(201, `{"name":"crisps", "owner":{"login": "snacks-inc"}, "html_url":"the://URL"}`, func(payload map[string]interface{}) {
+						assert.Equal(t, map[string]interface{}{
+							"name":       "crisps",
+							"private":    false,
+							"has_issues": false,
+							"has_wiki":   false,
+							"auto_init":  true,
 						}, payload)
 					}))
 			},

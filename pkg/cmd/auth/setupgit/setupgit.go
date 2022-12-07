@@ -34,6 +34,7 @@ func NewCmdSetupGit(f *cmdutil.Factory, runF func(*SetupGitOptions) error) *cobr
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.gitConfigure = &shared.GitCredentialFlow{
 				Executable: f.Executable(),
+				GitClient:  f.GitClient,
 			}
 
 			if runF != nil {
@@ -54,10 +55,7 @@ func setupGitRun(opts *SetupGitOptions) error {
 		return err
 	}
 
-	hostnames, err := cfg.Hosts()
-	if err != nil {
-		return err
-	}
+	hostnames := cfg.Hosts()
 
 	stderr := opts.IO.ErrOut
 	cs := opts.IO.ColorScheme()

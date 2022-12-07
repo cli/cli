@@ -1,10 +1,8 @@
 package api
 
 import (
-	"context"
 	"time"
 
-	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -17,7 +15,18 @@ type Comments struct {
 	}
 }
 
+func (cs Comments) CurrentUserComments() []Comment {
+	var comments []Comment
+	for _, c := range cs.Nodes {
+		if c.ViewerDidAuthor {
+			comments = append(comments, c)
+		}
+	}
+	return comments
+}
+
 type Comment struct {
+	ID                  string         `json:"id"`
 	Author              Author         `json:"author"`
 	AuthorAssociation   string         `json:"authorAssociation"`
 	Body                string         `json:"body"`
@@ -26,11 +35,18 @@ type Comment struct {
 	IsMinimized         bool           `json:"isMinimized"`
 	MinimizedReason     string         `json:"minimizedReason"`
 	ReactionGroups      ReactionGroups `json:"reactionGroups"`
+	URL                 string         `json:"url,omitempty"`
+	ViewerDidAuthor     bool           `json:"viewerDidAuthor"`
 }
 
 type CommentCreateInput struct {
 	Body      string
 	SubjectId string
+}
+
+type CommentUpdateInput struct {
+	Body      string
+	CommentId string
 }
 
 func CommentCreate(client *Client, repoHost string, params CommentCreateInput) (string, error) {
@@ -47,17 +63,44 @@ func CommentCreate(client *Client, repoHost string, params CommentCreateInput) (
 	variables := map[string]interface{}{
 		"input": githubv4.AddCommentInput{
 			Body:      githubv4.String(params.Body),
-			SubjectID: graphql.ID(params.SubjectId),
+			SubjectID: githubv4.ID(params.SubjectId),
 		},
 	}
 
-	gql := graphQLClient(client.http, repoHost)
-	err := gql.MutateNamed(context.Background(), "CommentCreate", &mutation, variables)
+	err := client.Mutate(repoHost, "CommentCreate", &mutation, variables)
 	if err != nil {
 		return "", err
 	}
 
 	return mutation.AddComment.CommentEdge.Node.URL, nil
+}
+
+func CommentUpdate(client *Client, repoHost string, params CommentUpdateInput) (string, error) {
+	var mutation struct {
+		UpdateIssueComment struct {
+			IssueComment struct {
+				URL string
+			}
+		} `graphql:"updateIssueComment(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": githubv4.UpdateIssueCommentInput{
+			Body: githubv4.String(params.Body),
+			ID:   githubv4.ID(params.CommentId),
+		},
+	}
+
+	err := client.Mutate(repoHost, "CommentUpdate", &mutation, variables)
+	if err != nil {
+		return "", err
+	}
+
+	return mutation.UpdateIssueComment.IssueComment.URL, nil
+}
+
+func (c Comment) Identifier() string {
+	return c.ID
 }
 
 func (c Comment) AuthorLogin() string {
@@ -89,7 +132,7 @@ func (c Comment) IsHidden() bool {
 }
 
 func (c Comment) Link() string {
-	return ""
+	return c.URL
 }
 
 func (c Comment) Reactions() ReactionGroups {

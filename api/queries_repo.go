@@ -2,8 +2,8 @@ package api
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,7 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cli/cli/v2/internal/ghinstance"
+
 	"github.com/cli/cli/v2/internal/ghrepo"
+	ghAPI "github.com/cli/go-gh/pkg/api"
 	"github.com/shurcooL/githubv4"
 )
 
@@ -44,6 +47,7 @@ type Repository struct {
 	MergeCommitAllowed      bool
 	SquashMergeAllowed      bool
 	RebaseMergeAllowed      bool
+	AutoMergeAllowed        bool
 
 	ForkCount      int
 	StargazerCount int
@@ -66,6 +70,7 @@ type Repository struct {
 	IsArchived                    bool
 	IsEmpty                       bool
 	IsFork                        bool
+	ForkingAllowed                bool
 	IsInOrganization              bool
 	IsMirror                      bool
 	IsPrivate                     bool
@@ -79,6 +84,7 @@ type Repository struct {
 	ViewerPermission              string
 	ViewerPossibleCommitEmails    []string
 	ViewerSubscription            string
+	Visibility                    string
 
 	RepositoryTopics struct {
 		Nodes []struct {
@@ -249,11 +255,13 @@ func FetchRepository(client *Client, repo ghrepo.Interface, fields []string) (*R
 	// The GraphQL API should have returned an error in case of a missing repository, but this isn't
 	// guaranteed to happen when an authentication token with insufficient permissions is being used.
 	if result.Repository == nil {
-		return nil, GraphQLErrorResponse{
-			Errors: []GraphQLError{{
-				Type:    "NOT_FOUND",
-				Message: fmt.Sprintf("Could not resolve to a Repository with the name '%s/%s'.", repo.RepoOwner(), repo.RepoName()),
-			}},
+		return nil, GraphQLError{
+			GQLError: ghAPI.GQLError{
+				Errors: []ghAPI.GQLErrorItem{{
+					Type:    "NOT_FOUND",
+					Message: fmt.Sprintf("Could not resolve to a Repository with the name '%s/%s'.", repo.RepoOwner(), repo.RepoName()),
+				}},
+			},
 		}
 	}
 
@@ -300,11 +308,13 @@ func GitHubRepo(client *Client, repo ghrepo.Interface) (*Repository, error) {
 	// The GraphQL API should have returned an error in case of a missing repository, but this isn't
 	// guaranteed to happen when an authentication token with insufficient permissions is being used.
 	if result.Repository == nil {
-		return nil, GraphQLErrorResponse{
-			Errors: []GraphQLError{{
-				Type:    "NOT_FOUND",
-				Message: fmt.Sprintf("Could not resolve to a Repository with the name '%s/%s'.", repo.RepoOwner(), repo.RepoName()),
-			}},
+		return nil, GraphQLError{
+			GQLError: ghAPI.GQLError{
+				Errors: []ghAPI.GQLErrorItem{{
+					Type:    "NOT_FOUND",
+					Message: fmt.Sprintf("Could not resolve to a Repository with the name '%s/%s'.", repo.RepoOwner(), repo.RepoName()),
+				}},
+			},
 		}
 	}
 
@@ -354,8 +364,7 @@ func RepoParent(client *Client, repo ghrepo.Interface) (ghrepo.Interface, error)
 		"name":  githubv4.String(repo.RepoName()),
 	}
 
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.QueryNamed(context.Background(), "RepositoryFindParent", &query, variables)
+	err := client.Query(repo.RepoHost(), "RepositoryFindParent", &query, variables)
 	if err != nil {
 		return nil, err
 	}
@@ -414,8 +423,8 @@ func RepoNetwork(client *Client, repos []ghrepo.Interface) (RepoNetworkResult, e
 		%s
 	}
 	`, strings.Join(queries, "")), nil, &graphqlResult)
-	graphqlError, isGraphQLError := err.(*GraphQLErrorResponse)
-	if isGraphQLError {
+	var graphqlError GraphQLError
+	if errors.As(err, &graphqlError) {
 		// If the only errors are that certain repositories are not found,
 		// continue processing this response instead of returning an error
 		tolerated := true
@@ -492,12 +501,15 @@ type repositoryV3 struct {
 }
 
 // ForkRepo forks the repository on GitHub and returns the new repository
-func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, error) {
+func ForkRepo(client *Client, repo ghrepo.Interface, org, newName string) (*Repository, error) {
 	path := fmt.Sprintf("repos/%s/forks", ghrepo.FullName(repo))
 
 	params := map[string]interface{}{}
 	if org != "" {
 		params["organization"] = org
+	}
+	if newName != "" {
+		params["name"] = newName
 	}
 
 	body := &bytes.Buffer{}
@@ -508,6 +520,45 @@ func ForkRepo(client *Client, repo ghrepo.Interface, org string) (*Repository, e
 
 	result := repositoryV3{}
 	err := client.REST(repo.RepoHost(), "POST", path, body, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	newRepo := &Repository{
+		ID:        result.NodeID,
+		Name:      result.Name,
+		CreatedAt: result.CreatedAt,
+		Owner: RepositoryOwner{
+			Login: result.Owner.Login,
+		},
+		ViewerPermission: "WRITE",
+		hostname:         repo.RepoHost(),
+	}
+
+	// The GitHub API will happily return a HTTP 200 when attempting to fork own repo even though no forking
+	// actually took place. Ensure that we raise an error instead.
+	if ghrepo.IsSame(repo, newRepo) {
+		return newRepo, fmt.Errorf("%s cannot be forked", ghrepo.FullName(repo))
+	}
+
+	return newRepo, nil
+}
+
+// RenameRepo renames the repository on GitHub and returns the renamed repository
+func RenameRepo(client *Client, repo ghrepo.Interface, newRepoName string) (*Repository, error) {
+	input := map[string]string{"name": newRepoName}
+	body := &bytes.Buffer{}
+	enc := json.NewEncoder(body)
+	if err := enc.Encode(input); err != nil {
+		return nil, err
+	}
+
+	path := fmt.Sprintf("%srepos/%s",
+		ghinstance.RESTPrefix(repo.RepoHost()),
+		ghrepo.FullName(repo))
+
+	result := repositoryV3{}
+	err := client.REST(repo.RepoHost(), "PATCH", path, body, &result)
 	if err != nil {
 		return nil, err
 	}
@@ -537,8 +588,7 @@ func LastCommit(client *Client, repo ghrepo.Interface) (*Commit, error) {
 	variables := map[string]interface{}{
 		"owner": githubv4.String(repo.RepoOwner()), "repo": githubv4.String(repo.RepoName()),
 	}
-	gql := graphQLClient(client.http, repo.RepoHost())
-	if err := gql.QueryNamed(context.Background(), "LastCommit", &responseData, variables); err != nil {
+	if err := client.Query(repo.RepoHost(), "LastCommit", &responseData, variables); err != nil {
 		return nil, err
 	}
 	return &responseData.Repository.DefaultBranchRef.Target.Commit, nil
@@ -943,12 +993,10 @@ func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) 
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	gql := graphQLClient(client.http, repo.RepoHost())
-
 	var projects []RepoProject
 	for {
 		var query responseData
-		err := gql.QueryNamed(context.Background(), "RepositoryProjectList", &query, variables)
+		err := client.Query(repo.RepoHost(), "RepositoryProjectList", &query, variables)
 		if err != nil {
 			return nil, err
 		}
@@ -1014,12 +1062,10 @@ func RepoAssignableUsers(client *Client, repo ghrepo.Interface) ([]RepoAssignee,
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	gql := graphQLClient(client.http, repo.RepoHost())
-
 	var users []RepoAssignee
 	for {
 		var query responseData
-		err := gql.QueryNamed(context.Background(), "RepositoryAssignableUsers", &query, variables)
+		err := client.Query(repo.RepoHost(), "RepositoryAssignableUsers", &query, variables)
 		if err != nil {
 			return nil, err
 		}
@@ -1059,12 +1105,10 @@ func RepoLabels(client *Client, repo ghrepo.Interface) ([]RepoLabel, error) {
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	gql := graphQLClient(client.http, repo.RepoHost())
-
 	var labels []RepoLabel
 	for {
 		var query responseData
-		err := gql.QueryNamed(context.Background(), "RepositoryLabelList", &query, variables)
+		err := client.Query(repo.RepoHost(), "RepositoryLabelList", &query, variables)
 		if err != nil {
 			return nil, err
 		}
@@ -1117,12 +1161,10 @@ func RepoMilestones(client *Client, repo ghrepo.Interface, state string) ([]Repo
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	gql := graphQLClient(client.http, repo.RepoHost())
-
 	var milestones []RepoMilestone
 	for {
 		var query responseData
-		err := gql.QueryNamed(context.Background(), "RepositoryMilestoneList", &query, variables)
+		err := client.Query(repo.RepoHost(), "RepositoryMilestoneList", &query, variables)
 		if err != nil {
 			return nil, err
 		}
@@ -1135,46 +1177,6 @@ func RepoMilestones(client *Client, repo ghrepo.Interface, state string) ([]Repo
 	}
 
 	return milestones, nil
-}
-
-func MilestoneByTitle(client *Client, repo ghrepo.Interface, state, title string) (*RepoMilestone, error) {
-	milestones, err := RepoMilestones(client, repo, state)
-	if err != nil {
-		return nil, err
-	}
-
-	for i := range milestones {
-		if strings.EqualFold(milestones[i].Title, title) {
-			return &milestones[i], nil
-		}
-	}
-	return nil, fmt.Errorf("no milestone found with title %q", title)
-}
-
-func MilestoneByNumber(client *Client, repo ghrepo.Interface, number int32) (*RepoMilestone, error) {
-	var query struct {
-		Repository struct {
-			Milestone *RepoMilestone `graphql:"milestone(number: $number)"`
-		} `graphql:"repository(owner: $owner, name: $name)"`
-	}
-
-	variables := map[string]interface{}{
-		"owner":  githubv4.String(repo.RepoOwner()),
-		"name":   githubv4.String(repo.RepoName()),
-		"number": githubv4.Int(number),
-	}
-
-	gql := graphQLClient(client.http, repo.RepoHost())
-
-	err := gql.QueryNamed(context.Background(), "RepositoryMilestoneByNumber", &query, variables)
-	if err != nil {
-		return nil, err
-	}
-	if query.Repository.Milestone == nil {
-		return nil, fmt.Errorf("no milestone found with number '%d'", number)
-	}
-
-	return query.Repository.Milestone, nil
 }
 
 func ProjectNamesToPaths(client *Client, repo ghrepo.Interface, projectNames []string) ([]string, error) {

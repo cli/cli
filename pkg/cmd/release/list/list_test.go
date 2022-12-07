@@ -3,7 +3,7 @@ package list
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -31,19 +31,28 @@ func Test_NewCmdList(t *testing.T) {
 			args:  "",
 			isTTY: true,
 			want: ListOptions{
-				LimitResults: 30,
+				LimitResults:  30,
+				ExcludeDrafts: false,
+			},
+		},
+		{
+			name: "exclude drafts",
+			args: "--exclude-drafts",
+			want: ListOptions{
+				LimitResults:  30,
+				ExcludeDrafts: true,
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			var opts *ListOptions
@@ -58,8 +67,8 @@ func Test_NewCmdList(t *testing.T) {
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {
@@ -70,6 +79,7 @@ func Test_NewCmdList(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.want.LimitResults, opts.LimitResults)
+			assert.Equal(t, tt.want.ExcludeDrafts, opts.ExcludeDrafts)
 		})
 	}
 }
@@ -93,10 +103,11 @@ func Test_listRun(t *testing.T) {
 				LimitResults: 30,
 			},
 			wantStdout: heredoc.Doc(`
-				v1.1.0                 Draft        (v1.1.0)        about 1 day ago
-				The big 1.0            Latest       (v1.0.0)        about 1 day ago
-				1.0 release candidate  Pre-release  (v1.0.0-pre.2)  about 1 day ago
-				New features                        (v0.9.2)        about 1 day ago
+				TITLE                  TYPE         TAG NAME      PUBLISHED
+				v1.1.0                 Draft        v1.1.0        about 1 day ago
+				The big 1.0            Latest       v1.0.0        about 1 day ago
+				1.0 release candidate  Pre-release  v1.0.0-pre.2  about 1 day ago
+				New features                        v0.9.2        about 1 day ago
 			`),
 			wantStderr: ``,
 		},
@@ -117,10 +128,10 @@ func Test_listRun(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			createdAt := frozenTime
 			if tt.isTTY {
@@ -134,6 +145,7 @@ func Test_listRun(t *testing.T) {
 					{
 						"name": "",
 						"tagName": "v1.1.0",
+						"isLatest": false,
 						"isDraft": true,
 						"isPrerelease": false,
 						"createdAt": "%[1]s",
@@ -142,6 +154,7 @@ func Test_listRun(t *testing.T) {
 					{
 						"name": "The big 1.0",
 						"tagName": "v1.0.0",
+						"isLatest": true,
 						"isDraft": false,
 						"isPrerelease": false,
 						"createdAt": "%[1]s",
@@ -150,6 +163,7 @@ func Test_listRun(t *testing.T) {
 					{
 						"name": "1.0 release candidate",
 						"tagName": "v1.0.0-pre.2",
+						"isLatest": false,
 						"isDraft": false,
 						"isPrerelease": true,
 						"createdAt": "%[1]s",
@@ -158,6 +172,7 @@ func Test_listRun(t *testing.T) {
 					{
 						"name": "New features",
 						"tagName": "v0.9.2",
+						"isLatest": false,
 						"isDraft": false,
 						"isPrerelease": false,
 						"createdAt": "%[1]s",
@@ -166,7 +181,7 @@ func Test_listRun(t *testing.T) {
 				]
 			} } } }`, createdAt.Format(time.RFC3339))))
 
-			tt.opts.IO = io
+			tt.opts.IO = ios
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}

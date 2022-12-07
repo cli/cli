@@ -11,25 +11,36 @@ on:
       - go.mod
       - go.sum
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Set up Go 1.16
-        uses: actions/setup-go@v2
+      - name: Set up Go 1.18
+        uses: actions/setup-go@v3
         with:
-          go-version: 1.16
+          go-version: 1.18
 
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+
+      - name: Restore Go modules cache
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: go-${{ runner.os }}-${{ hashFiles('go.mod') }}
+          restore-keys: |
+            go-${{ runner.os }}-
 
       - name: Verify dependencies
         run: |
           go mod verify
           go mod download
 
-          LINT_VERSION=1.39.0
+          LINT_VERSION=1.46.0
           curl -fsSL https://github.com/golangci/golangci-lint/releases/download/v${LINT_VERSION}/golangci-lint-${LINT_VERSION}-linux-amd64.tar.gz | \
             tar xz --strip-components 1 --wildcards \*/golangci-lint
           mkdir -p bin && mv golangci-lint bin/

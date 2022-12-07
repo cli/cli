@@ -3,7 +3,7 @@ package view
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -56,13 +56,13 @@ func Test_NewCmdView(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			var opts *ViewOptions
@@ -77,8 +77,8 @@ func Test_NewCmdView(t *testing.T) {
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {
@@ -100,18 +100,20 @@ func Test_viewRun(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name       string
-		isTTY      bool
-		releasedAt time.Time
-		opts       ViewOptions
-		wantErr    string
-		wantStdout string
-		wantStderr string
+		name        string
+		isTTY       bool
+		releaseBody string
+		releasedAt  time.Time
+		opts        ViewOptions
+		wantErr     string
+		wantStdout  string
+		wantStderr  string
 	}{
 		{
-			name:       "view specific release",
-			isTTY:      true,
-			releasedAt: oneHourAgo,
+			name:        "view specific release",
+			isTTY:       true,
+			releaseBody: `* Fixed bugs\n`,
+			releasedAt:  oneHourAgo,
 			opts: ViewOptions{
 				TagName: "v1.2.3",
 			},
@@ -132,9 +134,10 @@ func Test_viewRun(t *testing.T) {
 			wantStderr: ``,
 		},
 		{
-			name:       "view latest release",
-			isTTY:      true,
-			releasedAt: oneHourAgo,
+			name:        "view latest release",
+			isTTY:       true,
+			releaseBody: `* Fixed bugs\n`,
+			releasedAt:  oneHourAgo,
 			opts: ViewOptions{
 				TagName: "",
 			},
@@ -155,9 +158,34 @@ func Test_viewRun(t *testing.T) {
 			wantStderr: ``,
 		},
 		{
-			name:       "view machine-readable",
-			isTTY:      false,
-			releasedAt: frozenTime,
+			name:        "view machine-readable",
+			isTTY:       false,
+			releaseBody: `* Fixed bugs\n`,
+			releasedAt:  frozenTime,
+			opts: ViewOptions{
+				TagName: "v1.2.3",
+			},
+			wantStdout: heredoc.Doc(`
+				title:	
+				tag:	v1.2.3
+				draft:	false
+				prerelease:	false
+				author:	MonaLisa
+				created:	2020-08-31T15:44:24+02:00
+				published:	2020-08-31T15:44:24+02:00
+				url:	https://github.com/OWNER/REPO/releases/tags/v1.2.3
+				asset:	windows.zip
+				asset:	linux.tgz
+				--
+				* Fixed bugs
+			`),
+			wantStderr: ``,
+		},
+		{
+			name:        "view machine-readable but body has no ending newline",
+			isTTY:       false,
+			releaseBody: `* Fixed bugs`,
+			releasedAt:  frozenTime,
 			opts: ViewOptions{
 				TagName: "v1.2.3",
 			},
@@ -180,10 +208,10 @@ func Test_viewRun(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			path := "repos/OWNER/REPO/releases/tags/v1.2.3"
 			if tt.opts.TagName == "" {
@@ -195,7 +223,7 @@ func Test_viewRun(t *testing.T) {
 				"tag_name": "v1.2.3",
 				"draft": false,
 				"author": { "login": "MonaLisa" },
-				"body": "* Fixed bugs\n",
+				"body": "%[2]s",
 				"created_at": "%[1]s",
 				"published_at": "%[1]s",
 				"html_url": "https://github.com/OWNER/REPO/releases/tags/v1.2.3",
@@ -203,9 +231,9 @@ func Test_viewRun(t *testing.T) {
 					{ "name": "windows.zip", "size": 12 },
 					{ "name": "linux.tgz", "size": 34 }
 				]
-			}`, tt.releasedAt.Format(time.RFC3339))))
+			}`, tt.releasedAt.Format(time.RFC3339), tt.releaseBody)))
 
-			tt.opts.IO = io
+			tt.opts.IO = ios
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}

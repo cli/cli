@@ -10,19 +10,24 @@ on:
   schedule:
     - cron: "0 0 * * 0"
 
+permissions:
+  actions: read  # for github/codeql-action/init to get workflow details
+  contents: read  # for actions/checkout to fetch code
+  security-events: write  # for github/codeql-action/analyze to upload SARIF results
+
 jobs:
   CodeQL-Build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v1
+        uses: github/codeql-action/init@v2
         with:
           languages: go
           queries: security-and-quality
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v1
+        uses: github/codeql-action/analyze@v2

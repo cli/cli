@@ -6,12 +6,9 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/pkg/githubtemplate"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
-	"github.com/cli/cli/v2/pkg/surveyext"
 )
 
 type Action int
@@ -23,19 +20,40 @@ const (
 	MetadataAction
 	EditCommitMessageAction
 	EditCommitSubjectAction
+	SubmitDraftAction
 
 	noMilestone = "(none)"
+
+	submitLabel      = "Submit"
+	submitDraftLabel = "Submit as draft"
+	previewLabel     = "Continue in browser"
+	metadataLabel    = "Add metadata"
+	cancelLabel      = "Cancel"
 )
 
-func ConfirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
-	const (
-		submitLabel   = "Submit"
-		previewLabel  = "Continue in browser"
-		metadataLabel = "Add metadata"
-		cancelLabel   = "Cancel"
-	)
+type Prompt interface {
+	Input(string, string) (string, error)
+	Select(string, string, []string) (int, error)
+	MarkdownEditor(string, string, bool) (string, error)
+	Confirm(string, bool) (bool, error)
+}
 
-	options := []string{submitLabel}
+func ConfirmIssueSubmission(p Prompt, allowPreview bool, allowMetadata bool) (Action, error) {
+	return confirmSubmission(p, allowPreview, allowMetadata, false, false)
+}
+
+func ConfirmPRSubmission(p Prompt, allowPreview, allowMetadata, isDraft bool) (Action, error) {
+	return confirmSubmission(p, allowPreview, allowMetadata, true, isDraft)
+}
+
+func confirmSubmission(p Prompt, allowPreview, allowMetadata, allowDraft, isDraft bool) (Action, error) {
+	var options []string
+	if !isDraft {
+		options = append(options, submitLabel)
+	}
+	if allowDraft {
+		options = append(options, submitDraftLabel)
+	}
 	if allowPreview {
 		options = append(options, previewLabel)
 	}
@@ -44,27 +62,16 @@ func ConfirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
 	}
 	options = append(options, cancelLabel)
 
-	confirmAnswers := struct {
-		Confirmation int
-	}{}
-	confirmQs := []*survey.Question{
-		{
-			Name: "confirmation",
-			Prompt: &survey.Select{
-				Message: "What's next?",
-				Options: options,
-			},
-		},
-	}
-
-	err := prompt.SurveyAsk(confirmQs, &confirmAnswers)
+	result, err := p.Select("What's next?", "", options)
 	if err != nil {
 		return -1, fmt.Errorf("could not prompt: %w", err)
 	}
 
-	switch options[confirmAnswers.Confirmation] {
+	switch options[result] {
 	case submitLabel:
 		return SubmitAction, nil
+	case submitDraftLabel:
+		return SubmitDraftAction, nil
 	case previewLabel:
 		return PreviewAction, nil
 	case metadataLabel:
@@ -72,11 +79,11 @@ func ConfirmSubmission(allowPreview bool, allowMetadata bool) (Action, error) {
 	case cancelLabel:
 		return CancelAction, nil
 	default:
-		return -1, fmt.Errorf("invalid index: %d", confirmAnswers.Confirmation)
+		return -1, fmt.Errorf("invalid index: %d", result)
 	}
 }
 
-func BodySurvey(state *IssueMetadataState, templateContent, editorCommand string) error {
+func BodySurvey(p Prompt, state *IssueMetadataState, templateContent string) error {
 	if templateContent != "" {
 		if state.Body != "" {
 			// prevent excessive newlines between default body and template
@@ -86,60 +93,31 @@ func BodySurvey(state *IssueMetadataState, templateContent, editorCommand string
 		state.Body += templateContent
 	}
 
-	preBody := state.Body
-
-	// TODO should just be an AskOne but ran into problems with the stubber
-	qs := []*survey.Question{
-		{
-			Name: "Body",
-			Prompt: &surveyext.GhEditor{
-				BlankAllowed:  true,
-				EditorCommand: editorCommand,
-				Editor: &survey.Editor{
-					Message:       "Body",
-					FileName:      "*.md",
-					Default:       state.Body,
-					HideDefault:   true,
-					AppendDefault: true,
-				},
-			},
-		},
-	}
-
-	err := prompt.SurveyAsk(qs, state)
+	result, err := p.MarkdownEditor("Body", state.Body, true)
 	if err != nil {
 		return err
 	}
 
-	if preBody != state.Body {
+	if state.Body != result {
 		state.MarkDirty()
 	}
+
+	state.Body = result
 
 	return nil
 }
 
-func TitleSurvey(state *IssueMetadataState) error {
-	preTitle := state.Title
-
-	// TODO should just be an AskOne but ran into problems with the stubber
-	qs := []*survey.Question{
-		{
-			Name: "Title",
-			Prompt: &survey.Input{
-				Message: "Title",
-				Default: state.Title,
-			},
-		},
-	}
-
-	err := prompt.SurveyAsk(qs, state)
+func TitleSurvey(p Prompt, state *IssueMetadataState) error {
+	result, err := p.Input("Title", state.Title)
 	if err != nil {
 		return err
 	}
 
-	if preTitle != state.Title {
+	if result != state.Title {
 		state.MarkDirty()
 	}
+
+	state.Title = result
 
 	return nil
 }
@@ -181,6 +159,7 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 	}
 	extraFieldsOptions = append(extraFieldsOptions, "Assignees", "Labels", "Projects", "Milestone")
 
+	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 	err := prompt.SurveyAsk([]*survey.Question{
 		{
 			Name: "metadata",
@@ -311,7 +290,8 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 		Milestone string
 	}{}
 
-	err = prompt.SurveyAsk(mqs, &values, survey.WithKeepFilter(true))
+	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
+	err = prompt.SurveyAsk(mqs, &values)
 	if err != nil {
 		return fmt.Errorf("could not prompt: %w", err)
 	}
@@ -347,19 +327,4 @@ func MetadataSurvey(io *iostreams.IOStreams, baseRepo ghrepo.Interface, fetcher 
 	}
 
 	return nil
-}
-
-func FindTemplates(dir, path string) ([]string, string) {
-	if dir == "" {
-		rootDir, err := git.ToplevelDir()
-		if err != nil {
-			return []string{}, ""
-		}
-		dir = rootDir
-	}
-
-	templateFiles := githubtemplate.FindNonLegacy(dir, path)
-	legacyTemplate := githubtemplate.FindLegacy(dir, path)
-
-	return templateFiles, legacyTemplate
 }

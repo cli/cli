@@ -2,7 +2,7 @@ package ready
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -51,13 +51,13 @@ func Test_NewCmdReady(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			var opts *ReadyOptions
@@ -72,8 +72,8 @@ func Test_NewCmdReady(t *testing.T) {
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {
@@ -89,13 +89,13 @@ func Test_NewCmdReady(t *testing.T) {
 }
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(isTTY)
-	io.SetStdinTTY(isTTY)
-	io.SetStderrTTY(isTTY)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(isTTY)
+	ios.SetStdinTTY(isTTY)
+	ios.SetStderrTTY(isTTY)
 
 	factory := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
@@ -110,8 +110,8 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
@@ -160,6 +160,48 @@ func TestPRReady_alreadyReady(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "! Pull request #123 is already \"ready for review\"\n", output.Stderr())
+}
+
+func TestPRReadyUndo(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	shared.RunCommandFinder("123", &api.PullRequest{
+		ID:      "THE-ID",
+		Number:  123,
+		State:   "OPEN",
+		IsDraft: false,
+	}, ghrepo.New("OWNER", "REPO"))
+
+	http.Register(
+		httpmock.GraphQL(`mutation ConvertPullRequestToDraft\b`),
+		httpmock.GraphQLMutation(`{"id": "THE-ID"}`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, inputs["pullRequestId"], "THE-ID")
+			}),
+	)
+
+	output, err := runCommand(http, true, "123 --undo")
+	assert.NoError(t, err)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "✓ Pull request #123 is converted to \"draft\"\n", output.Stderr())
+}
+
+func TestPRReadyUndo_alreadyDraft(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	shared.RunCommandFinder("123", &api.PullRequest{
+		ID:      "THE-ID",
+		Number:  123,
+		State:   "OPEN",
+		IsDraft: true,
+	}, ghrepo.New("OWNER", "REPO"))
+
+	output, err := runCommand(http, true, "123 --undo")
+	assert.NoError(t, err)
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "! Pull request #123 is already \"in draft\"\n", output.Stderr())
 }
 
 func TestPRReady_closed(t *testing.T) {

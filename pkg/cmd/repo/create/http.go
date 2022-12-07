@@ -23,6 +23,8 @@ type repoCreateInput struct {
 	HasWikiEnabled       bool
 	GitIgnoreTemplate    string
 	LicenseTemplate      string
+	IncludeAllBranches   bool
+	InitReadme           bool
 }
 
 // createRepositoryInputV3 is the payload for the repo create REST API
@@ -37,6 +39,7 @@ type createRepositoryInputV3 struct {
 	HasWikiEnabled    bool   `json:"has_wiki"`
 	GitIgnoreTemplate string `json:"gitignore_template,omitempty"`
 	LicenseTemplate   string `json:"license_template,omitempty"`
+	InitReadme        bool   `json:"auto_init,omitempty"`
 }
 
 // createRepositoryInput is the payload for the repo create GraphQL mutation
@@ -53,11 +56,12 @@ type createRepositoryInput struct {
 
 // cloneTemplateRepositoryInput is the payload for creating a repo from a template using GraphQL
 type cloneTemplateRepositoryInput struct {
-	Name         string `json:"name"`
-	Visibility   string `json:"visibility"`
-	Description  string `json:"description,omitempty"`
-	OwnerID      string `json:"ownerId"`
-	RepositoryID string `json:"repositoryId"`
+	Name               string `json:"name"`
+	Visibility         string `json:"visibility"`
+	Description        string `json:"description,omitempty"`
+	OwnerID            string `json:"ownerId"`
+	RepositoryID       string `json:"repositoryId"`
+	IncludeAllBranches bool   `json:"includeAllBranches"`
 }
 
 // repoCreate creates a new GitHub repository
@@ -104,11 +108,12 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 
 		variables := map[string]interface{}{
 			"input": cloneTemplateRepositoryInput{
-				Name:         input.Name,
-				Description:  input.Description,
-				Visibility:   strings.ToUpper(input.Visibility),
-				OwnerID:      ownerID,
-				RepositoryID: input.TemplateRepositoryID,
+				Name:               input.Name,
+				Description:        input.Description,
+				Visibility:         strings.ToUpper(input.Visibility),
+				OwnerID:            ownerID,
+				RepositoryID:       input.TemplateRepositoryID,
+				IncludeAllBranches: input.IncludeAllBranches,
 			},
 		}
 
@@ -131,7 +136,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 		return api.InitRepoHostname(&response.CloneTemplateRepository.Repository, hostname), nil
 	}
 
-	if input.GitIgnoreTemplate != "" || input.LicenseTemplate != "" {
+	if input.GitIgnoreTemplate != "" || input.LicenseTemplate != "" || input.InitReadme {
 		inputv3 := createRepositoryInputV3{
 			Name:              input.Name,
 			HomepageURL:       input.HomepageURL,
@@ -142,6 +147,7 @@ func repoCreate(client *http.Client, hostname string, input repoCreateInput) (*a
 			HasWikiEnabled:    input.HasWikiEnabled,
 			GitIgnoreTemplate: input.GitIgnoreTemplate,
 			LicenseTemplate:   input.LicenseTemplate,
+			InitReadme:        input.InitReadme,
 		}
 
 		path := "user/repos"

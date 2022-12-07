@@ -2,13 +2,14 @@ package browse
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -126,8 +127,8 @@ func TestNewCmdBrowse(t *testing.T) {
 			argv, err := shlex.Split(tt.cli)
 			assert.NoError(t, err)
 			cmd.SetArgs(argv)
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 			_, err = cmd.ExecuteC()
 
 			if tt.wantsErr {
@@ -148,15 +149,6 @@ func TestNewCmdBrowse(t *testing.T) {
 	}
 }
 
-func setGitDir(t *testing.T, dir string) {
-	// taken from git_test.go
-	old_GIT_DIR := os.Getenv("GIT_DIR")
-	os.Setenv("GIT_DIR", dir)
-	t.Cleanup(func() {
-		os.Setenv("GIT_DIR", old_GIT_DIR)
-	})
-}
-
 type testGitClient struct{}
 
 func (gc *testGitClient) LastCommit() (*git.Commit, error) {
@@ -165,7 +157,7 @@ func (gc *testGitClient) LastCommit() (*git.Commit, error) {
 
 func Test_runBrowse(t *testing.T) {
 	s := string(os.PathSeparator)
-	setGitDir(t, "../../../git/fixtures/simple.git")
+	t.Setenv("GIT_DIR", "../../../git/fixtures/simple.git")
 	tests := []struct {
 		name          string
 		opts          BrowseOptions
@@ -217,6 +209,14 @@ func Test_runBrowse(t *testing.T) {
 			name: "issue argument",
 			opts: BrowseOptions{
 				SelectorArg: "217",
+			},
+			baseRepo:    ghrepo.New("kevin", "MinTy"),
+			expectedURL: "https://github.com/kevin/MinTy/issues/217",
+		},
+		{
+			name: "issue with hashtag argument",
+			opts: BrowseOptions{
+				SelectorArg: "#217",
 			},
 			baseRepo:    ghrepo.New("kevin", "MinTy"),
 			expectedURL: "https://github.com/kevin/MinTy/issues/217",
@@ -414,12 +414,41 @@ func Test_runBrowse(t *testing.T) {
 			expectedURL: "https://github.com/bchadwic/test/blob/branch/with%20spaces%3F/%3F=hello%20world/%20%2A?plain=1#L23-L44",
 			wantsErr:    false,
 		},
+		{
+			name: "commit hash in selector arg",
+			opts: BrowseOptions{
+				SelectorArg: "77507cd94ccafcf568f8560cfecde965fcfa63e7",
+			},
+			baseRepo:    ghrepo.New("bchadwic", "test"),
+			expectedURL: "https://github.com/bchadwic/test/commit/77507cd94ccafcf568f8560cfecde965fcfa63e7",
+			wantsErr:    false,
+		},
+		{
+			name: "short commit hash in selector arg",
+			opts: BrowseOptions{
+				SelectorArg: "6e3689d5",
+			},
+			baseRepo:    ghrepo.New("bchadwic", "test"),
+			expectedURL: "https://github.com/bchadwic/test/commit/6e3689d5",
+			wantsErr:    false,
+		},
+
+		{
+			name: "commit hash with extension",
+			opts: BrowseOptions{
+				SelectorArg: "77507cd94ccafcf568f8560cfecde965fcfa63e7.txt",
+				Branch:      "trunk",
+			},
+			baseRepo:    ghrepo.New("bchadwic", "test"),
+			expectedURL: "https://github.com/bchadwic/test/tree/trunk/77507cd94ccafcf568f8560cfecde965fcfa63e7.txt",
+			wantsErr:    false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, stdout, stderr := iostreams.Test()
-			browser := cmdutil.TestBrowser{}
+			ios, _, stdout, stderr := iostreams.Test()
+			browser := browser.Stub{}
 
 			reg := httpmock.Registry{}
 			defer reg.Verify(t)
@@ -428,7 +457,7 @@ func Test_runBrowse(t *testing.T) {
 			}
 
 			opts := tt.opts
-			opts.IO = io
+			opts.IO = ios
 			opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return tt.baseRepo, nil
 			}
@@ -437,7 +466,7 @@ func Test_runBrowse(t *testing.T) {
 			}
 			opts.Browser = &browser
 			if opts.PathFromRepoRoot == nil {
-				opts.PathFromRepoRoot = git.PathFromRepoRoot
+				opts.PathFromRepoRoot = func() string { return "" }
 			}
 
 			err := runBrowse(&opts)

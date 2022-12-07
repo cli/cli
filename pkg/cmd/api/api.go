@@ -3,17 +3,14 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -21,10 +18,12 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/export"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/jsoncolor"
+	"github.com/cli/go-gh/pkg/jq"
+	"github.com/cli/go-gh/pkg/template"
 	"github.com/spf13/cobra"
 )
 
@@ -71,15 +70,17 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			The endpoint argument should either be a path of a GitHub API v3 endpoint, or
 			"graphql" to access the GitHub API v4.
 
-			Placeholder values "{owner}", "{repo}", and "{branch}" in the endpoint argument will
-			get replaced with values from the repository of the current directory. Note that in
-			some shells, for example PowerShell, you may need to enclose any value that contains
-			"{...}" in quotes to prevent the shell from applying special meaning to curly braces.
+			Placeholder values "{owner}", "{repo}", and "{branch}" in the endpoint
+			argument will get replaced with values from the repository of the current
+			directory or the repository specified in the GH_REPO environment variable.
+			Note that in some shells, for example PowerShell, you may need to enclose
+			any value that contains "{...}" in quotes to prevent the shell from
+			applying special meaning to curly braces.
 
 			The default HTTP request method is "GET" normally and "POST" if any parameters
 			were added. Override the method with %[1]s--method%[1]s.
 
-			Pass one or more %[1]s-f/--raw-field%[1]s values in "key=value" format to add static string 
+			Pass one or more %[1]s-f/--raw-field%[1]s values in "key=value" format to add static string
 			parameters to the request payload. To add non-string or otherwise dynamic values, see
 			%[1]s--field%[1]s below. Note that adding request parameters will automatically switch the
 			request method to POST. To send the parameters as a GET query string instead, use
@@ -167,6 +168,9 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			`),
 		},
 		Args: cobra.ExactArgs(1),
+		PreRun: func(c *cobra.Command, args []string) {
+			opts.BaseRepo = cmdutil.OverrideBaseRepoFunc(f, "")
+		},
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.RequestPath = args[0]
 			opts.RequestMethodPassed = c.Flags().Changed("method")
@@ -210,12 +214,12 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a typed parameter in `key=value` format")
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in `key=value` format")
 	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add a HTTP request header in `key:value` format")
-	cmd.Flags().StringSliceVarP(&opts.Previews, "preview", "p", nil, "Opt into GitHub API previews")
-	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response headers in the output")
+	cmd.Flags().StringSliceVarP(&opts.Previews, "preview", "p", nil, "GitHub API preview `names` to request (without the \"-preview\" suffix)")
+	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response status line and headers in the output")
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request (use \"-\" to read from standard input)")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
-	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format the response using a Go template")
+	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format JSON output using a Go template; see \"gh help formatting\"")
 	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
 	cmd.Flags().DurationVar(&opts.CacheTTL, "cache", 0, "Cache the response, e.g. \"3600s\", \"60m\", \"1h\"")
 	return cmd
@@ -266,18 +270,21 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 	if opts.CacheTTL > 0 {
-		httpClient = api.NewCachedClient(httpClient, opts.CacheTTL)
+		httpClient = api.NewCachedHTTPClient(httpClient, opts.CacheTTL)
 	}
 
-	headersOutputStream := opts.IO.Out
-	if opts.Silent {
-		opts.IO.Out = ioutil.Discard
-	} else {
-		err := opts.IO.StartPager()
-		if err != nil {
-			return err
+	if !opts.Silent {
+		if err := opts.IO.StartPager(); err == nil {
+			defer opts.IO.StopPager()
+		} else {
+			fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 		}
-		defer opts.IO.StopPager()
+	}
+
+	var bodyWriter io.Writer = opts.IO.Out
+	var headersWriter io.Writer = opts.IO.Out
+	if opts.Silent {
+		bodyWriter = io.Discard
 	}
 
 	cfg, err := opts.Config()
@@ -285,16 +292,17 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
 	if opts.Hostname != "" {
 		host = opts.Hostname
 	}
 
-	template := export.NewTemplate(opts.IO, opts.Template)
+	tmpl := template.New(bodyWriter, opts.IO.TerminalWidth(), opts.IO.ColorEnabled())
+	err = tmpl.Parse(opts.Template)
+	if err != nil {
+		return err
+	}
 
 	hasNextPage := true
 	for hasNextPage {
@@ -303,7 +311,7 @@ func apiRun(opts *ApiOptions) error {
 			return err
 		}
 
-		endCursor, err := processResponse(resp, opts, headersOutputStream, &template)
+		endCursor, err := processResponse(resp, opts, bodyWriter, headersWriter, &tmpl)
 		if err != nil {
 			return err
 		}
@@ -327,14 +335,14 @@ func apiRun(opts *ApiOptions) error {
 		}
 	}
 
-	return template.End()
+	return tmpl.Flush()
 }
 
-func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream io.Writer, template *export.Template) (endCursor string, err error) {
+func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersWriter io.Writer, template *template.Template) (endCursor string, err error) {
 	if opts.ShowResponseHeaders {
-		fmt.Fprintln(headersOutputStream, resp.Proto, resp.Status)
-		printHeaders(headersOutputStream, resp.Header, opts.IO.ColorEnabled())
-		fmt.Fprint(headersOutputStream, "\r\n")
+		fmt.Fprintln(headersWriter, resp.Proto, resp.Status)
+		printHeaders(headersWriter, resp.Header, opts.IO.ColorEnabled())
+		fmt.Fprint(headersWriter, "\r\n")
 	}
 
 	if resp.StatusCode == 204 {
@@ -360,29 +368,24 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 		responseBody = io.TeeReader(responseBody, bodyCopy)
 	}
 
-	if opts.FilterOutput != "" {
+	if opts.FilterOutput != "" && serverError == "" {
 		// TODO: reuse parsed query across pagination invocations
-		err = export.FilterJSON(opts.IO.Out, responseBody, opts.FilterOutput)
+		err = jq.Evaluate(responseBody, bodyWriter, opts.FilterOutput)
 		if err != nil {
 			return
 		}
-	} else if opts.Template != "" {
-		// TODO: reuse parsed template across pagination invocations
+	} else if opts.Template != "" && serverError == "" {
 		err = template.Execute(responseBody)
 		if err != nil {
 			return
 		}
 	} else if isJSON && opts.IO.ColorEnabled() {
-		err = jsoncolor.Write(opts.IO.Out, responseBody, "  ")
+		err = jsoncolor.Write(bodyWriter, responseBody, "  ")
 	} else {
-		_, err = io.Copy(opts.IO.Out, responseBody)
+		_, err = io.Copy(bodyWriter, responseBody)
 	}
 	if err != nil {
-		if errors.Is(err, syscall.EPIPE) {
-			err = nil
-		} else {
-			return
-		}
+		return
 	}
 
 	if serverError == "" && resp.StatusCode > 299 {
@@ -392,6 +395,9 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 		fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", serverError)
 		if msg := api.ScopesSuggestion(resp); msg != "" {
 			fmt.Fprintf(opts.IO.ErrOut, "gh: %s\n", msg)
+		}
+		if u := factory.SSOURL(); u != "" {
+			fmt.Fprintf(opts.IO.ErrOut, "Authorize in your web browser: %s\n", u)
 		}
 		err = cmdutil.SilentError
 		return
@@ -533,7 +539,7 @@ func openUserFile(fn string, stdin io.ReadCloser) (io.ReadCloser, int64, error) 
 
 func parseErrorResponse(r io.Reader, statusCode int) (io.Reader, string, error) {
 	bodyCopy := &bytes.Buffer{}
-	b, err := ioutil.ReadAll(io.TeeReader(r, bodyCopy))
+	b, err := io.ReadAll(io.TeeReader(r, bodyCopy))
 	if err != nil {
 		return r, "", err
 	}

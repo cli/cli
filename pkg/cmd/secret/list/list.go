@@ -29,6 +29,7 @@ type ListOptions struct {
 	OrgName     string
 	EnvName     string
 	UserSecrets bool
+	Application string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -43,12 +44,13 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Short: "List secrets",
 		Long: heredoc.Doc(`
 			List secrets on one of the following levels:
-			- repository (default): available to Actions runs in a repository
+			- repository (default): available to Actions runs or Dependabot in a repository
 			- environment: available to Actions runs for a deployment environment in a repository
-			- organization: available to Actions runs within an organization
+			- organization: available to Actions runs, Dependabot, or Codespaces within an organization
 			- user: available to Codespaces for your user
 		`),
-		Args: cobra.NoArgs,
+		Aliases: []string{"ls"},
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
@@ -68,6 +70,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "List secrets for an organization")
 	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "List secrets for an environment")
 	cmd.Flags().BoolVarP(&opts.UserSecrets, "user", "u", false, "List a secret for your user")
+	cmdutil.StringEnumFlag(cmd, &opts.Application, "app", "a", "", []string{shared.Actions, shared.Codespaces, shared.Dependabot}, "List secrets for a specific application")
 
 	return cmd
 }
@@ -89,15 +92,29 @@ func listRun(opts *ListOptions) error {
 		}
 	}
 
+	secretEntity, err := shared.GetSecretEntity(orgName, envName, opts.UserSecrets)
+	if err != nil {
+		return err
+	}
+
+	secretApp, err := shared.GetSecretApp(opts.Application, secretEntity)
+	if err != nil {
+		return err
+	}
+
+	if !shared.IsSupportedSecretEntity(secretApp, secretEntity) {
+		return fmt.Errorf("%s secrets are not supported for %s", secretEntity, secretApp)
+	}
+
 	var secrets []*Secret
 	showSelectedRepoInfo := opts.IO.IsStdoutTTY()
-	if orgName == "" && !opts.UserSecrets {
-		if envName == "" {
-			secrets, err = getRepoSecrets(client, baseRepo)
-		} else {
-			secrets, err = getEnvSecrets(client, baseRepo, envName)
-		}
-	} else {
+
+	switch secretEntity {
+	case shared.Repository:
+		secrets, err = getRepoSecrets(client, baseRepo, secretApp)
+	case shared.Environment:
+		secrets, err = getEnvSecrets(client, baseRepo, envName)
+	case shared.Organization, shared.User:
 		var cfg config.Config
 		var host string
 
@@ -106,15 +123,12 @@ func listRun(opts *ListOptions) error {
 			return err
 		}
 
-		host, err = cfg.DefaultHost()
-		if err != nil {
-			return err
-		}
+		host, _ = cfg.DefaultHost()
 
-		if opts.UserSecrets {
+		if secretEntity == shared.User {
 			secrets, err = getUserSecrets(client, host, showSelectedRepoInfo)
 		} else {
-			secrets, err = getOrgSecrets(client, host, orgName, showSelectedRepoInfo)
+			secrets, err = getOrgSecrets(client, host, orgName, showSelectedRepoInfo, secretApp)
 		}
 	}
 
@@ -122,6 +136,17 @@ func listRun(opts *ListOptions) error {
 		return fmt.Errorf("failed to get secrets: %w", err)
 	}
 
+	if len(secrets) == 0 {
+		return cmdutil.NewNoResultsError("no secrets found")
+	}
+
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+	}
+
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(opts.IO)
 	for _, secret := range secrets {
 		tp.AddField(secret.Name, nil, nil)
@@ -172,8 +197,8 @@ func fmtVisibility(s Secret) string {
 	return ""
 }
 
-func getOrgSecrets(client httpClient, host, orgName string, showSelectedRepoInfo bool) ([]*Secret, error) {
-	secrets, err := getSecrets(client, host, fmt.Sprintf("orgs/%s/actions/secrets", orgName))
+func getOrgSecrets(client httpClient, host, orgName string, showSelectedRepoInfo bool, app shared.App) ([]*Secret, error) {
+	secrets, err := getSecrets(client, host, fmt.Sprintf("orgs/%s/%s/secrets", orgName, app))
 	if err != nil {
 		return nil, err
 	}
@@ -208,9 +233,9 @@ func getEnvSecrets(client httpClient, repo ghrepo.Interface, envName string) ([]
 	return getSecrets(client, repo.RepoHost(), path)
 }
 
-func getRepoSecrets(client httpClient, repo ghrepo.Interface) ([]*Secret, error) {
-	return getSecrets(client, repo.RepoHost(), fmt.Sprintf("repos/%s/actions/secrets",
-		ghrepo.FullName(repo)))
+func getRepoSecrets(client httpClient, repo ghrepo.Interface, app shared.App) ([]*Secret, error) {
+	return getSecrets(client, repo.RepoHost(), fmt.Sprintf("repos/%s/%s/secrets",
+		ghrepo.FullName(repo), app))
 }
 
 type secretsPayload struct {

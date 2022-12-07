@@ -2,6 +2,7 @@ package create
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -13,13 +14,12 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/pkg/surveyext"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/spf13/cobra"
 )
 
@@ -27,6 +27,7 @@ type CreateOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
+	GitClient  *git.Client
 	BaseRepo   func() (ghrepo.Interface, error)
 	Edit       func(string, string, string, io.Reader, io.Writer, io.Writer) (string, error)
 
@@ -37,6 +38,7 @@ type CreateOptions struct {
 	BodyProvided bool
 	Draft        bool
 	Prerelease   bool
+	IsLatest     *bool
 
 	Assets []*shared.AssetForUpload
 
@@ -50,12 +52,15 @@ type CreateOptions struct {
 	Concurrency        int
 	DiscussionCategory string
 	GenerateNotes      bool
+	NotesStartTag      string
+	VerifyTag          bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Config:     f.Config,
 		Edit:       surveyext.Edit,
 	}
@@ -74,7 +79,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			display label for an asset, append text starting with %[1]s#%[1]s after the file name.
 
 			If a matching git tag does not yet exist, one will automatically get created
-			from the latest state of the default branch. Use %[1]s--target%[1]s to override this.
+			from the latest state of the default branch.
+			Use %[1]s--target%[1]s to point to a different branch or commit for the automatic tag creation.
+			Use %[1]s--verify-tag%[1]s to abort the release if the tag doesn't already exist.
 			To fetch the new tag locally after the release, do %[1]sgit fetch --tags origin%[1]s.
 
 			To create a release from an annotated git tag, first create one locally with
@@ -109,6 +116,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			Create a release and start a discussion
 			$ gh release create v1.2.3 --discussion-category "General"
 		`),
+		Aliases: []string{"new"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if cmd.Flags().Changed("discussion-category") && opts.Draft {
 				return errors.New("discussions for draft releases not supported")
@@ -157,8 +165,11 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Name, "title", "t", "", "Release title")
 	cmd.Flags().StringVarP(&opts.Body, "notes", "n", "", "Release notes")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
-	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion of the specified category")
+	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion in the specified category")
 	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate title and notes for the release")
+	cmd.Flags().StringVar(&opts.NotesStartTag, "notes-start-tag", "", "Tag to use as the starting point for generating release notes")
+	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Mark this release as \"Latest\" (default: automatic based on date and version)")
+	cmd.Flags().BoolVarP(&opts.VerifyTag, "verify-tag", "", false, "Abort in case the git tag doesn't already exist in the remote repository")
 
 	return cmd
 }
@@ -174,6 +185,7 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
+	var existingTag bool
 	if opts.TagName == "" {
 		tags, err := getTags(httpClient, baseRepo, 5)
 		if err != nil {
@@ -193,11 +205,13 @@ func createRun(opts *CreateOptions) error {
 				Options: options,
 				Default: options[0],
 			}
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err := prompt.SurveyAskOne(q, &tag)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
 			if tag != createNewTagOption {
+				existingTag = true
 				opts.TagName = tag
 			}
 		}
@@ -206,9 +220,44 @@ func createRun(opts *CreateOptions) error {
 			q := &survey.Input{
 				Message: "Tag name",
 			}
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err := prompt.SurveyAskOne(q, &opts.TagName)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
+			}
+		}
+	}
+
+	if opts.VerifyTag && !existingTag {
+		remoteTagPresent, err := remoteTagExists(httpClient, baseRepo, opts.TagName)
+		if err != nil {
+			return err
+		}
+		if !remoteTagPresent {
+			return fmt.Errorf("tag %s doesn't exist in the repo %s, aborting due to --verify-tag flag",
+				opts.TagName, ghrepo.FullName(baseRepo))
+		}
+	}
+
+	var tagDescription string
+	if opts.RepoOverride == "" {
+		tagDescription, _ = gitTagInfo(opts.GitClient, opts.TagName)
+		// If there is a local tag with the same name as specified
+		// the user may not want to create a new tag on the remote
+		// as the local one might be annotated or signed.
+		// If the user specifies the target take that as explicit instruction
+		// to create the tag on the remote pointing to the target regardless
+		// of local tag status.
+		// If a remote tag with the same name as specified exists already
+		// then a new tag will not be created so ignore local tag status.
+		if tagDescription != "" && !existingTag && opts.Target == "" && !opts.VerifyTag {
+			remoteExists, err := remoteTagExists(httpClient, baseRepo, opts.TagName)
+			if err != nil {
+				return err
+			}
+			if !remoteExists {
+				return fmt.Errorf("tag %s exists locally but has not been pushed to %s, please push it before continuing or specify the `--target` flag to create a new tag",
+					opts.TagName, ghrepo.FullName(baseRepo))
 			}
 		}
 	}
@@ -220,23 +269,15 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		var generatedNotes *releaseNotes
-		var tagDescription string
 		var generatedChangelog string
 
-		params := map[string]interface{}{
-			"tag_name": opts.TagName,
-		}
-		if opts.Target != "" {
-			params["target_commitish"] = opts.Target
-		}
-		generatedNotes, err = generateReleaseNotes(httpClient, baseRepo, params)
+		generatedNotes, err = generateReleaseNotes(httpClient, baseRepo, opts.TagName, opts.Target, opts.NotesStartTag)
 		if err != nil && !errors.Is(err, notImplementedError) {
 			return err
 		}
 
-		if opts.RepoOverride == "" && generatedNotes == nil {
+		if opts.RepoOverride == "" {
 			headRef := opts.TagName
-			tagDescription, _ = gitTagInfo(opts.TagName)
 			if tagDescription == "" {
 				if opts.Target != "" {
 					// TODO: use the remote-tracking version of the branch ref
@@ -245,9 +286,14 @@ func createRun(opts *CreateOptions) error {
 					headRef = "HEAD"
 				}
 			}
-			if prevTag, err := detectPreviousTag(headRef); err == nil {
-				commits, _ := changelogForRange(fmt.Sprintf("%s..%s", prevTag, headRef))
-				generatedChangelog = generateChangelog(commits)
+			if generatedNotes == nil {
+				if opts.NotesStartTag != "" {
+					commits, _ := changelogForRange(opts.GitClient, fmt.Sprintf("%s..%s", opts.NotesStartTag, headRef))
+					generatedChangelog = generateChangelog(commits)
+				} else if prevTag, err := detectPreviousTag(opts.GitClient, headRef); err == nil {
+					commits, _ := changelogForRange(opts.GitClient, fmt.Sprintf("%s..%s", prevTag, headRef))
+					generatedChangelog = generateChangelog(commits)
+				}
 			}
 		}
 
@@ -283,6 +329,7 @@ func createRun(opts *CreateOptions) error {
 				},
 			},
 		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 		err = prompt.SurveyAsk(qs, opts)
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
@@ -347,6 +394,7 @@ func createRun(opts *CreateOptions) error {
 			},
 		}
 
+		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 		err = prompt.SurveyAsk(qs, opts)
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
@@ -364,13 +412,6 @@ func createRun(opts *CreateOptions) error {
 		}
 	}
 
-	if opts.Draft && len(opts.DiscussionCategory) > 0 {
-		return fmt.Errorf(
-			"%s Discussions not supported with draft releases",
-			opts.IO.ColorScheme().FailureIcon(),
-		)
-	}
-
 	params := map[string]interface{}{
 		"tag_name":   opts.TagName,
 		"draft":      opts.Draft,
@@ -385,17 +426,46 @@ func createRun(opts *CreateOptions) error {
 	if opts.Target != "" {
 		params["target_commitish"] = opts.Target
 	}
+	if opts.IsLatest != nil {
+		// valid values: true/false/legacy
+		params["make_latest"] = fmt.Sprintf("%v", *opts.IsLatest)
+	}
 	if opts.DiscussionCategory != "" {
 		params["discussion_category_name"] = opts.DiscussionCategory
 	}
 	if opts.GenerateNotes {
-		params["generate_release_notes"] = true
+		if opts.NotesStartTag != "" {
+			generatedNotes, err := generateReleaseNotes(httpClient, baseRepo, opts.TagName, opts.Target, opts.NotesStartTag)
+			if err != nil && !errors.Is(err, notImplementedError) {
+				return err
+			}
+			if generatedNotes != nil {
+				if opts.Body == "" {
+					params["body"] = generatedNotes.Body
+				} else {
+					params["body"] = fmt.Sprintf("%s\n%s", opts.Body, generatedNotes.Body)
+				}
+				if opts.Name == "" {
+					params["name"] = generatedNotes.Name
+				}
+			}
+		} else {
+			params["generate_release_notes"] = true
+		}
 	}
 
 	hasAssets := len(opts.Assets) > 0
 
-	// Avoid publishing the release until all assets have finished uploading
-	if hasAssets {
+	if hasAssets && !opts.Draft {
+		// Check for an existing release
+		if opts.TagName != "" {
+			if ok, err := publishedReleaseExists(httpClient, baseRepo, opts.TagName); err != nil {
+				return fmt.Errorf("error checking for existing release: %w", err)
+			} else if ok {
+				return fmt.Errorf("a release with the same tag name already exists: %s", opts.TagName)
+			}
+		}
+		// Save the release initially as draft and publish it after all assets have finished uploading
 		params["draft"] = true
 	}
 
@@ -418,7 +488,7 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		if !opts.Draft {
-			rel, err := publishRelease(httpClient, newRelease.APIURL)
+			rel, err := publishRelease(httpClient, newRelease.APIURL, opts.DiscussionCategory)
 			if err != nil {
 				return err
 			}
@@ -431,21 +501,21 @@ func createRun(opts *CreateOptions) error {
 	return nil
 }
 
-func gitTagInfo(tagName string) (string, error) {
-	cmd, err := git.GitCommand("tag", "--list", tagName, "--format=%(contents:subject)%0a%0a%(contents:body)")
+func gitTagInfo(client *git.Client, tagName string) (string, error) {
+	cmd, err := client.Command(context.Background(), "tag", "--list", tagName, "--format=%(contents:subject)%0a%0a%(contents:body)")
 	if err != nil {
 		return "", err
 	}
-	b, err := run.PrepareCmd(cmd).Output()
+	b, err := cmd.Output()
 	return string(b), err
 }
 
-func detectPreviousTag(headRef string) (string, error) {
-	cmd, err := git.GitCommand("describe", "--tags", "--abbrev=0", fmt.Sprintf("%s^", headRef))
+func detectPreviousTag(client *git.Client, headRef string) (string, error) {
+	cmd, err := client.Command(context.Background(), "describe", "--tags", "--abbrev=0", fmt.Sprintf("%s^", headRef))
 	if err != nil {
 		return "", err
 	}
-	b, err := run.PrepareCmd(cmd).Output()
+	b, err := cmd.Output()
 	return strings.TrimSpace(string(b)), err
 }
 
@@ -454,12 +524,12 @@ type logEntry struct {
 	Body    string
 }
 
-func changelogForRange(refRange string) ([]logEntry, error) {
-	cmd, err := git.GitCommand("-c", "log.ShowSignature=false", "log", "--first-parent", "--reverse", "--pretty=format:%B%x00", refRange)
+func changelogForRange(client *git.Client, refRange string) ([]logEntry, error) {
+	cmd, err := client.Command(context.Background(), "-c", "log.ShowSignature=false", "log", "--first-parent", "--reverse", "--pretty=format:%B%x00", refRange)
 	if err != nil {
 		return nil, err
 	}
-	b, err := run.PrepareCmd(cmd).Output()
+	b, err := cmd.Output()
 	if err != nil {
 		return nil, err
 	}

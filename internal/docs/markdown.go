@@ -85,6 +85,7 @@ func GenMarkdown(cmd *cobra.Command, w io.Writer) error {
 
 // GenMarkdownCustom creates custom markdown output.
 func GenMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string) string) error {
+	fmt.Fprint(w, "{% raw %}")
 	fmt.Fprintf(w, "## %s\n\n", cmd.CommandPath())
 
 	hasLong := cmd.Long != ""
@@ -112,6 +113,7 @@ func GenMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string)
 	if err := printOptions(w, cmd); err != nil {
 		return err
 	}
+	fmt.Fprint(w, "{% endraw %}\n")
 
 	if len(cmd.Example) > 0 {
 		fmt.Fprint(w, "### Examples\n\n{% highlight bash %}{% raw %}\n")
@@ -190,7 +192,7 @@ func GenMarkdownTree(cmd *cobra.Command, dir string) error {
 	return GenMarkdownTreeCustom(cmd, dir, emptyStr, identity)
 }
 
-// GenMarkdownTreeCustom is the the same as GenMarkdownTree, but
+// GenMarkdownTreeCustom is the same as GenMarkdownTree, but
 // with custom filePrepender and linkHandler.
 func GenMarkdownTreeCustom(cmd *cobra.Command, dir string, filePrepender, linkHandler func(string) string) error {
 	for _, c := range cmd.Commands() {

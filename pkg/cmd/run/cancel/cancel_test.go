@@ -2,12 +2,13 @@ package cancel
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
+	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -46,12 +47,12 @@ func TestNewCmdCancel(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			argv, err := shlex.Split(tt.cli)
@@ -65,8 +66,8 @@ func TestNewCmdCancel(t *testing.T) {
 
 			cmd.SetArgs(argv)
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
@@ -82,8 +83,8 @@ func TestNewCmdCancel(t *testing.T) {
 }
 
 func TestRunCancel(t *testing.T) {
-	inProgressRun := shared.TestRun("more runs", 1234, shared.InProgress, "")
-	completedRun := shared.TestRun("more runs", 4567, shared.Completed, shared.Failure)
+	inProgressRun := shared.TestRun(1234, shared.InProgress, "")
+	completedRun := shared.TestRun(4567, shared.Completed, shared.Failure)
 	tests := []struct {
 		name      string
 		httpStubs func(*httpmock.Registry)
@@ -103,6 +104,9 @@ func TestRunCancel(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/1234"),
 					httpmock.JSONResponse(inProgressRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/1234/cancel"),
 					httpmock.StatusStringResponse(202, "{}"))
@@ -134,6 +138,9 @@ func TestRunCancel(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/4567"),
 					httpmock.JSONResponse(completedRun))
 				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/4567/cancel"),
 					httpmock.StatusStringResponse(409, ""),
 				)
@@ -154,6 +161,13 @@ func TestRunCancel(t *testing.T) {
 							completedRun,
 						},
 					}))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
+					}))
 			},
 		},
 		{
@@ -170,10 +184,18 @@ func TestRunCancel(t *testing.T) {
 						},
 					}))
 				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(workflowShared.WorkflowsPayload{
+						Workflows: []workflowShared.Workflow{
+							shared.TestWorkflow,
+						},
+					}))
+				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/1234/cancel"),
 					httpmock.StatusStringResponse(202, "{}"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(0)
 			},
 			wantOut: "✓ Request to cancel workflow submitted.\n",
@@ -187,14 +209,15 @@ func TestRunCancel(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdoutTTY(true)
-		io.SetStdinTTY(true)
-		tt.opts.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdoutTTY(true)
+		ios.SetStdinTTY(true)
+		tt.opts.IO = ios
 		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("OWNER/REPO")
 		}
 
+		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 		as, teardown := prompt.InitAskStubber()
 		defer teardown()
 		if tt.askStubs != nil {

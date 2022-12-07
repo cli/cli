@@ -3,12 +3,13 @@ package comment
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -21,7 +22,7 @@ import (
 
 func TestNewCmdComment(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "my-body.md")
-	err := ioutil.WriteFile(tmpFile, []byte("a body from file"), 0600)
+	err := os.WriteFile(tmpFile, []byte("a body from file"), 0600)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -162,18 +163,18 @@ func TestNewCmdComment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, _, _ := iostreams.Test()
-			io.SetStdoutTTY(true)
-			io.SetStdinTTY(true)
-			io.SetStderrTTY(true)
+			ios, stdin, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			ios.SetStdinTTY(true)
+			ios.SetStderrTTY(true)
 
 			if tt.stdin != "" {
 				_, _ = stdin.WriteString(tt.stdin)
 			}
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
-				Browser:   &cmdutil.TestBrowser{},
+				IOStreams: ios,
+				Browser:   &browser.Stub{},
 			}
 
 			argv, err := shlex.Split(tt.input)
@@ -220,13 +221,29 @@ func Test_commentRun(t *testing.T) {
 				InputType:   0,
 				Body:        "",
 
-				InteractiveEditSurvey: func() (string, error) { return "comment body", nil },
+				InteractiveEditSurvey: func(string) (string, error) { return "comment body", nil },
 				ConfirmSubmitSurvey:   func() (bool, error) { return true, nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockCommentCreate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
+		},
+		{
+			name: "interactive editor with edit last",
+			input: &shared.CommentableOptions{
+				Interactive: true,
+				InputType:   0,
+				Body:        "",
+				EditLast:    true,
+
+				InteractiveEditSurvey: func(string) (string, error) { return "comment body", nil },
+				ConfirmSubmitSurvey:   func() (bool, error) { return true, nil },
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockCommentUpdate(t, reg)
+			},
+			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-111\n",
 		},
 		{
 			name: "non-interactive web",
@@ -240,18 +257,45 @@ func Test_commentRun(t *testing.T) {
 			stderr: "Opening github.com/OWNER/REPO/pull/123 in your browser.\n",
 		},
 		{
+			name: "non-interactive web with edit last",
+			input: &shared.CommentableOptions{
+				Interactive: false,
+				InputType:   shared.InputTypeWeb,
+				Body:        "",
+				EditLast:    true,
+
+				OpenInBrowser: func(string) error { return nil },
+			},
+			stderr: "Opening github.com/OWNER/REPO/pull/123 in your browser.\n",
+		},
+		{
 			name: "non-interactive editor",
 			input: &shared.CommentableOptions{
 				Interactive: false,
 				InputType:   shared.InputTypeEditor,
 				Body:        "",
 
-				EditSurvey: func() (string, error) { return "comment body", nil },
+				EditSurvey: func(string) (string, error) { return "comment body", nil },
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockCommentCreate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
+		},
+		{
+			name: "non-interactive editor with edit last",
+			input: &shared.CommentableOptions{
+				Interactive: false,
+				InputType:   shared.InputTypeEditor,
+				Body:        "",
+				EditLast:    true,
+
+				EditSurvey: func(string) (string, error) { return "comment body", nil },
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockCommentUpdate(t, reg)
+			},
+			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-111\n",
 		},
 		{
 			name: "non-interactive inline",
@@ -265,12 +309,25 @@ func Test_commentRun(t *testing.T) {
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-456\n",
 		},
+		{
+			name: "non-interactive inline with edit last",
+			input: &shared.CommentableOptions{
+				Interactive: false,
+				InputType:   shared.InputTypeInline,
+				Body:        "comment body",
+				EditLast:    true,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockCommentUpdate(t, reg)
+			},
+			stdout: "https://github.com/OWNER/REPO/pull/123#issuecomment-111\n",
+		},
 	}
 	for _, tt := range tests {
-		io, _, stdout, stderr := iostreams.Test()
-		io.SetStdoutTTY(true)
-		io.SetStdinTTY(true)
-		io.SetStderrTTY(true)
+		ios, _, stdout, stderr := iostreams.Test()
+		ios.SetStdoutTTY(true)
+		ios.SetStdinTTY(true)
+		ios.SetStderrTTY(true)
 
 		reg := &httpmock.Registry{}
 		defer reg.Verify(t)
@@ -280,12 +337,16 @@ func Test_commentRun(t *testing.T) {
 
 		httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
 
-		tt.input.IO = io
+		tt.input.IO = ios
 		tt.input.HttpClient = httpClient
 		tt.input.RetrieveCommentable = func() (shared.Commentable, ghrepo.Interface, error) {
 			return &api.PullRequest{
 				Number: 123,
 				URL:    "https://github.com/OWNER/REPO/pull/123",
+				Comments: api.Comments{Nodes: []api.Comment{
+					{ID: "id1", Author: api.Author{Login: "octocat"}, URL: "https://github.com/OWNER/REPO/pull/123#issuecomment-111", ViewerDidAuthor: true},
+					{ID: "id2", Author: api.Author{Login: "monalisa"}, URL: "https://github.com/OWNER/REPO/pull/123#issuecomment-222"},
+				}},
 			}, ghrepo.New("OWNER", "REPO"), nil
 		}
 
@@ -306,6 +367,20 @@ func mockCommentCreate(t *testing.T, reg *httpmock.Registry) {
 			"url": "https://github.com/OWNER/REPO/pull/123#issuecomment-456"
 		} } } } }`,
 			func(inputs map[string]interface{}) {
+				assert.Equal(t, "comment body", inputs["body"])
+			}),
+	)
+}
+
+func mockCommentUpdate(t *testing.T, reg *httpmock.Registry) {
+	reg.Register(
+		httpmock.GraphQL(`mutation CommentUpdate\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "updateIssueComment": { "issueComment": {
+			"url": "https://github.com/OWNER/REPO/pull/123#issuecomment-111"
+		} } } }`,
+			func(inputs map[string]interface{}) {
+				assert.Equal(t, "id1", inputs["id"])
 				assert.Equal(t, "comment body", inputs["body"])
 			}),
 	)

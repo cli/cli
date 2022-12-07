@@ -2,7 +2,7 @@ package set
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -18,19 +18,19 @@ import (
 )
 
 func runCommand(cfg config.Config, isTTY bool, cli string, in string) (*test.CmdOut, error) {
-	io, stdin, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(isTTY)
-	io.SetStdinTTY(isTTY)
-	io.SetStderrTTY(isTTY)
+	ios, stdin, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(isTTY)
+	ios.SetStdinTTY(isTTY)
+	ios.SetStderrTTY(isTTY)
 	stdin.WriteString(in)
 
 	factory := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		Config: func() (config.Config, error) {
 			return cfg, nil
 		},
 		ExtensionManager: &extensions.ExtensionManagerMock{
-			ListFunc: func(bool) []extensions.Extension {
+			ListFunc: func() []extensions.Extension {
 				return []extensions.Extension{}
 			},
 		},
@@ -59,8 +59,8 @@ func runCommand(cfg config.Config, isTTY bool, cli string, in string) (*test.Cmd
 	rootCmd.SetArgs(argv)
 
 	rootCmd.SetIn(stdin)
-	rootCmd.SetOut(ioutil.Discard)
-	rootCmd.SetErr(ioutil.Discard)
+	rootCmd.SetOut(io.Discard)
+	rootCmd.SetErr(io.Discard)
 
 	_, err = rootCmd.ExecuteC()
 	return &test.CmdOut{
@@ -70,8 +70,6 @@ func runCommand(cfg config.Config, isTTY bool, cli string, in string) (*test.Cmd
 }
 
 func TestAliasSet_gh_command(t *testing.T) {
-	defer config.StubWriteConfig(ioutil.Discard, ioutil.Discard)()
-
 	cfg := config.NewFromString(``)
 
 	_, err := runCommand(cfg, true, "pr 'pr status'", "")
@@ -79,8 +77,7 @@ func TestAliasSet_gh_command(t *testing.T) {
 }
 
 func TestAliasSet_empty_aliases(t *testing.T) {
-	mainBuf := bytes.Buffer{}
-	defer config.StubWriteConfig(&mainBuf, ioutil.Discard)()
+	readConfigs := config.StubWriteConfig(t)
 
 	cfg := config.NewFromString(heredoc.Doc(`
 		aliases:
@@ -92,6 +89,9 @@ func TestAliasSet_empty_aliases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
+
+	mainBuf := bytes.Buffer{}
+	readConfigs(&mainBuf, io.Discard)
 
 	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), "Added alias")
@@ -106,8 +106,7 @@ editor: vim
 }
 
 func TestAliasSet_existing_alias(t *testing.T) {
-	mainBuf := bytes.Buffer{}
-	defer config.StubWriteConfig(&mainBuf, ioutil.Discard)()
+	_ = config.StubWriteConfig(t)
 
 	cfg := config.NewFromString(heredoc.Doc(`
 		aliases:
@@ -122,13 +121,15 @@ func TestAliasSet_existing_alias(t *testing.T) {
 }
 
 func TestAliasSet_space_args(t *testing.T) {
-	mainBuf := bytes.Buffer{}
-	defer config.StubWriteConfig(&mainBuf, ioutil.Discard)()
+	readConfigs := config.StubWriteConfig(t)
 
 	cfg := config.NewFromString(``)
 
 	output, err := runCommand(cfg, true, `il 'issue list -l "cool story"'`, "")
 	require.NoError(t, err)
+
+	mainBuf := bytes.Buffer{}
+	readConfigs(&mainBuf, io.Discard)
 
 	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), `Adding alias for.*il.*issue list -l "cool story"`)
@@ -138,6 +139,8 @@ func TestAliasSet_space_args(t *testing.T) {
 }
 
 func TestAliasSet_arg_processing(t *testing.T) {
+	readConfigs := config.StubWriteConfig(t)
+
 	cases := []struct {
 		Cmd                string
 		ExpectedOutputLine string
@@ -158,15 +161,15 @@ func TestAliasSet_arg_processing(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Cmd, func(t *testing.T) {
-			mainBuf := bytes.Buffer{}
-			defer config.StubWriteConfig(&mainBuf, ioutil.Discard)()
-
 			cfg := config.NewFromString(``)
 
 			output, err := runCommand(cfg, true, c.Cmd, "")
 			if err != nil {
 				t.Fatalf("got unexpected error running %s: %s", c.Cmd, err)
 			}
+
+			mainBuf := bytes.Buffer{}
+			readConfigs(&mainBuf, io.Discard)
 
 			//nolint:staticcheck // prefer exact matchers over ExpectLines
 			test.ExpectLines(t, output.Stderr(), c.ExpectedOutputLine)
@@ -177,8 +180,7 @@ func TestAliasSet_arg_processing(t *testing.T) {
 }
 
 func TestAliasSet_init_alias_cfg(t *testing.T) {
-	mainBuf := bytes.Buffer{}
-	defer config.StubWriteConfig(&mainBuf, ioutil.Discard)()
+	readConfigs := config.StubWriteConfig(t)
 
 	cfg := config.NewFromString(heredoc.Doc(`
 		editor: vim
@@ -186,6 +188,9 @@ func TestAliasSet_init_alias_cfg(t *testing.T) {
 
 	output, err := runCommand(cfg, true, "diff 'pr diff'", "")
 	require.NoError(t, err)
+
+	mainBuf := bytes.Buffer{}
+	readConfigs(&mainBuf, io.Discard)
 
 	expected := `editor: vim
 aliases:
@@ -198,8 +203,7 @@ aliases:
 }
 
 func TestAliasSet_existing_aliases(t *testing.T) {
-	mainBuf := bytes.Buffer{}
-	defer config.StubWriteConfig(&mainBuf, ioutil.Discard)()
+	readConfigs := config.StubWriteConfig(t)
 
 	cfg := config.NewFromString(heredoc.Doc(`
 		aliases:
@@ -208,6 +212,9 @@ func TestAliasSet_existing_aliases(t *testing.T) {
 
 	output, err := runCommand(cfg, true, "view 'pr view'", "")
 	require.NoError(t, err)
+
+	mainBuf := bytes.Buffer{}
+	readConfigs(&mainBuf, io.Discard)
 
 	expected := `aliases:
     foo: bar
@@ -221,8 +228,6 @@ func TestAliasSet_existing_aliases(t *testing.T) {
 }
 
 func TestAliasSet_invalid_command(t *testing.T) {
-	defer config.StubWriteConfig(ioutil.Discard, ioutil.Discard)()
-
 	cfg := config.NewFromString(``)
 
 	_, err := runCommand(cfg, true, "co 'pe checkout'", "")
@@ -230,8 +235,7 @@ func TestAliasSet_invalid_command(t *testing.T) {
 }
 
 func TestShellAlias_flag(t *testing.T) {
-	mainBuf := bytes.Buffer{}
-	defer config.StubWriteConfig(&mainBuf, ioutil.Discard)()
+	readConfigs := config.StubWriteConfig(t)
 
 	cfg := config.NewFromString(``)
 
@@ -239,6 +243,9 @@ func TestShellAlias_flag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
+
+	mainBuf := bytes.Buffer{}
+	readConfigs(&mainBuf, io.Discard)
 
 	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), "Adding alias for.*igrep")
@@ -250,13 +257,15 @@ func TestShellAlias_flag(t *testing.T) {
 }
 
 func TestShellAlias_bang(t *testing.T) {
-	mainBuf := bytes.Buffer{}
-	defer config.StubWriteConfig(&mainBuf, ioutil.Discard)()
+	readConfigs := config.StubWriteConfig(t)
 
 	cfg := config.NewFromString(``)
 
 	output, err := runCommand(cfg, true, "igrep '!gh issue list | grep'", "")
 	require.NoError(t, err)
+
+	mainBuf := bytes.Buffer{}
+	readConfigs(&mainBuf, io.Discard)
 
 	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), "Adding alias for.*igrep")
@@ -268,8 +277,7 @@ func TestShellAlias_bang(t *testing.T) {
 }
 
 func TestShellAlias_from_stdin(t *testing.T) {
-	mainBuf := bytes.Buffer{}
-	defer config.StubWriteConfig(&mainBuf, ioutil.Discard)()
+	readConfigs := config.StubWriteConfig(t)
 
 	cfg := config.NewFromString(``)
 
@@ -281,6 +289,9 @@ func TestShellAlias_from_stdin(t *testing.T) {
     }'`)
 
 	require.NoError(t, err)
+
+	mainBuf := bytes.Buffer{}
+	readConfigs(&mainBuf, io.Discard)
 
 	//nolint:staticcheck // prefer exact matchers over ExpectLines
 	test.ExpectLines(t, output.Stderr(), "Adding alias for.*users")
@@ -326,16 +337,15 @@ func TestShellAlias_getExpansion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, _, _ := iostreams.Test()
-
-			io.SetStdinTTY(false)
+			ios, stdin, _, _ := iostreams.Test()
+			ios.SetStdinTTY(false)
 
 			_, err := stdin.WriteString(tt.stdin)
 			assert.NoError(t, err)
 
 			expansion, err := getExpansion(&SetOptions{
 				Expansion: tt.expansionArg,
-				IO:        io,
+				IO:        ios,
 			})
 			assert.NoError(t, err)
 

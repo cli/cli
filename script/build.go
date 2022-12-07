@@ -25,7 +25,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -215,7 +215,7 @@ func cmdOutput(args ...string) (string, error) {
 		return "", err
 	}
 	cmd := exec.Command(exe, args[1:]...)
-	cmd.Stderr = ioutil.Discard
+	cmd.Stderr = io.Discard
 	out, err := cmd.Output()
 	return strings.TrimSuffix(string(out), "\n"), err
 }

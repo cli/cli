@@ -2,7 +2,7 @@ package enable
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -54,12 +54,12 @@ func TestNewCmdEnable(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			argv, err := shlex.Split(tt.cli)
@@ -72,8 +72,8 @@ func TestNewCmdEnable(t *testing.T) {
 			})
 			cmd.SetArgs(argv)
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantsErr {
@@ -121,7 +121,7 @@ func TestEnableRun(t *testing.T) {
 					httpmock.StatusStringResponse(204, "{}"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(0)
+				as.StubPrompt("Select a workflow").AnswerWith("a disabled workflow (disabled.yml)")
 			},
 			wantOut: "✓ Enabled a disabled workflow\n",
 		},
@@ -132,9 +132,6 @@ func TestEnableRun(t *testing.T) {
 			},
 			tty: true,
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/terrible workflow"),
-					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
 					httpmock.JSONResponse(shared.WorkflowsPayload{
@@ -159,9 +156,6 @@ func TestEnableRun(t *testing.T) {
 			tty: true,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/a disabled workflow"),
-					httpmock.StatusStringResponse(404, "not found"))
-				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
 					httpmock.JSONResponse(shared.WorkflowsPayload{
 						Workflows: []shared.Workflow{
@@ -176,9 +170,32 @@ func TestEnableRun(t *testing.T) {
 					httpmock.StatusStringResponse(204, "{}"))
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(1)
+				as.StubPrompt("Which workflow do you mean?").AnswerWith("a disabled workflow (anotherDisabled.yml)")
 			},
 			wantOut: "✓ Enabled a disabled workflow\n",
+		},
+		{
+			name: "tty name arg inactivity workflow",
+			opts: &EnableOptions{
+				Selector: "a disabled inactivity workflow",
+			},
+			tty: true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(shared.WorkflowsPayload{
+						Workflows: []shared.Workflow{
+							shared.AWorkflow,
+							shared.DisabledInactivityWorkflow,
+							shared.UniqueDisabledWorkflow,
+							shared.AnotherWorkflow,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("PUT", "repos/OWNER/REPO/actions/workflows/1206/enable"),
+					httpmock.StatusStringResponse(204, "{}"))
+			},
+			wantOut: "✓ Enabled a disabled inactivity workflow\n",
 		},
 		{
 			name: "tty ID arg",
@@ -193,9 +210,6 @@ func TestEnableRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("PUT", "repos/OWNER/REPO/actions/workflows/456/enable"),
 					httpmock.StatusStringResponse(204, "{}"))
-			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne(0)
 			},
 			wantOut: "✓ Enabled a disabled workflow\n",
 		},
@@ -220,9 +234,6 @@ func TestEnableRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/terrible workflow"),
-					httpmock.StatusStringResponse(404, "not found"))
-				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
 					httpmock.JSONResponse(shared.WorkflowsPayload{
 						Workflows: []shared.Workflow{
@@ -239,14 +250,32 @@ func TestEnableRun(t *testing.T) {
 			},
 		},
 		{
+			name: "nontty name arg inactivity workflow",
+			opts: &EnableOptions{
+				Selector: "a disabled inactivity workflow",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
+					httpmock.JSONResponse(shared.WorkflowsPayload{
+						Workflows: []shared.Workflow{
+							shared.AWorkflow,
+							shared.DisabledInactivityWorkflow,
+							shared.UniqueDisabledWorkflow,
+							shared.AnotherWorkflow,
+						},
+					}))
+				reg.Register(
+					httpmock.REST("PUT", "repos/OWNER/REPO/actions/workflows/1206/enable"),
+					httpmock.StatusStringResponse(204, "{}"))
+			},
+		},
+		{
 			name: "nontty name arg nonunique",
 			opts: &EnableOptions{
 				Selector: "a disabled workflow",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/a disabled workflow"),
-					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
 					httpmock.JSONResponse(shared.WorkflowsPayload{
@@ -271,21 +300,21 @@ func TestEnableRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdoutTTY(tt.tty)
-		io.SetStdinTTY(tt.tty)
-		tt.opts.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdoutTTY(tt.tty)
+		ios.SetStdinTTY(tt.tty)
+		tt.opts.IO = ios
 		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("OWNER/REPO")
 		}
 
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
-		}
-
 		t.Run(tt.name, func(t *testing.T) {
+			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
+			as := prompt.NewAskStubber(t)
+			if tt.askStubs != nil {
+				tt.askStubs(as)
+			}
+
 			err := runEnable(tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
