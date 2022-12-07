@@ -391,6 +391,9 @@ func Test_downloadRun(t *testing.T) {
 }
 
 func Test_downloadRun_cloberAndSkip(t *testing.T) {
+	oldAssetContents := "older copy to be clobbered"
+	oldZipballContents := "older zipball to be clobbered"
+
 	tests := []struct {
 		name            string
 		opts            DownloadOptions
@@ -407,7 +410,9 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 				Destination:  "tmp/packages",
 				Concurrency:  2,
 			},
-			wantErr: "already exists (use `--clobber` to overwrite file or `--skip-existing` to skip file)",
+			wantErr:         "already exists (use `--clobber` to overwrite file or `--skip-existing` to skip file)",
+			wantFileSize:    int64(len(oldAssetContents)),
+			wantArchiveSize: int64(len(oldZipballContents)),
 		},
 		{
 			name: "clobber",
@@ -421,7 +426,8 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "assets/3456"), httpmock.StringResponse("somedata"))
 			},
-			wantFileSize: 8,
+			wantFileSize:    8,
+			wantArchiveSize: int64(len(oldZipballContents)),
 		},
 		{
 			name: "clobber archive",
@@ -440,6 +446,7 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 					),
 				)
 			},
+			wantFileSize:    int64(len(oldAssetContents)),
 			wantArchiveSize: 8,
 		},
 		{
@@ -451,6 +458,8 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 				Concurrency:  2,
 				SkipExisting: true,
 			},
+			wantFileSize:    int64(len(oldAssetContents)),
+			wantArchiveSize: int64(len(oldZipballContents)),
 		},
 		{
 			name: "skip archive",
@@ -469,6 +478,8 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 					),
 				)
 			},
+			wantFileSize:    int64(len(oldAssetContents)),
+			wantArchiveSize: int64(len(oldZipballContents)),
 		},
 	}
 	for _, tt := range tests {
@@ -481,8 +492,12 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 			archive := filepath.Join(dest, "zipball.zip")
 			f1, err := os.Create(file)
 			assert.NoError(t, err)
+			_, err = f1.WriteString(oldAssetContents)
+			assert.NoError(t, err)
 			f1.Close()
 			f2, err := os.Create(archive)
+			assert.NoError(t, err)
+			_, err = f2.WriteString(oldZipballContents)
 			assert.NoError(t, err)
 			f2.Close()
 
@@ -523,8 +538,8 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 			assert.NoError(t, err)
 			as, err := os.Stat(archive)
 			assert.NoError(t, err)
-			assert.Equal(t, fs.Size(), tt.wantFileSize)
-			assert.Equal(t, as.Size(), tt.wantArchiveSize)
+			assert.Equal(t, tt.wantFileSize, fs.Size())
+			assert.Equal(t, tt.wantArchiveSize, as.Size())
 		})
 	}
 }
