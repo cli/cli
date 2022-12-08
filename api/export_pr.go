@@ -11,6 +11,18 @@ func (issue *Issue) ExportData(fields []string) map[string]interface{} {
 
 	for _, f := range fields {
 		switch f {
+		case "author":
+			author := map[string]interface{}{
+				"is_bot": issue.Author.IsBot(),
+			}
+			if issue.Author.IsBot() {
+				author["login"] = "app/" + issue.Author.Login
+			} else {
+				author["login"] = issue.Author.Login
+				author["name"] = issue.Author.Name
+				author["id"] = issue.Author.ID
+			}
+			data[f] = author
 		case "comments":
 			data[f] = issue.Comments.Nodes
 		case "assignees":
