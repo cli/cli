@@ -57,6 +57,10 @@ var IssueFields = []string{
 	"url",
 }
 
+var PRFields = append(IssueFields,
+	"isDraft",
+)
+
 type RepositoriesResult struct {
 	IncompleteResults bool         `json:"incomplete_results"`
 	Items             []Repository `json:"items"`
@@ -136,6 +140,10 @@ type Issue struct {
 	Title         string    `json:"title"`
 	URL           string    `json:"html_url"`
 	UpdatedAt     time.Time `json:"updated_at"`
+
+	// this is really a PR field, and doesn't appear in issue results, but it's
+	// not inside the pull_request object
+	IsDraft *bool `json:"draft,omitempty"`
 }
 
 type PullRequest struct {
