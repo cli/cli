@@ -261,7 +261,7 @@ func IssueGraphQL(fields []string) string {
 	for _, field := range fields {
 		switch field {
 		case "author":
-			q = append(q, `author{login}`)
+			q = append(q, `author{login,...on User{id,name}}`)
 		case "mergedBy":
 			q = append(q, `mergedBy{login}`)
 		case "headRepositoryOwner":
