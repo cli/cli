@@ -363,7 +363,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					}
 					cs := io.ColorScheme()
 					err := m.Upgrade(name, flagForce)
-					if err != nil && !errors.Is(err, upToDateError) {
+					if err != nil {
 						if name != "" {
 							fmt.Fprintf(io.ErrOut, "%s Failed upgrading extension %s: %s\n", cs.FailureIcon(), name, err)
 						} else if errors.Is(err, noExtensionsInstalledError) {
@@ -378,13 +378,11 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						if flagDryRun {
 							successStr = "Would have"
 						}
-						if errors.Is(err, upToDateError) {
-							fmt.Fprintf(io.Out, "%s Extension already up to date\n", cs.SuccessIcon())
-						} else if name != "" {
-							fmt.Fprintf(io.Out, "%s %s upgraded extension %s\n", cs.SuccessIcon(), successStr, name)
-						} else {
-							fmt.Fprintf(io.Out, "%s %s upgraded extensions\n", cs.SuccessIcon(), successStr)
+						extensionStr := "extension"
+						if name == "" {
+							extensionStr = "extensions"
 						}
+						fmt.Fprintf(io.Out, "%s %s upgraded %s\n", cs.SuccessIcon(), successStr, extensionStr)
 					}
 					return nil
 				},
