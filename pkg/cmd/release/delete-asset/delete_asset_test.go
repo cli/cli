@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -98,13 +99,32 @@ func Test_NewCmdDeleteAsset(t *testing.T) {
 
 func Test_deleteAssetRun(t *testing.T) {
 	tests := []struct {
-		name       string
-		isTTY      bool
-		opts       DeleteAssetOptions
-		wantErr    string
-		wantStdout string
-		wantStderr string
+		name          string
+		isTTY         bool
+		opts          DeleteAssetOptions
+		prompterStubs func(*prompter.PrompterMock)
+		wantErr       string
+		wantStdout    string
+		wantStderr    string
 	}{
+		{
+			name:  "interactive confirm",
+			isTTY: true,
+			opts: DeleteAssetOptions{
+				TagName:   "v1.2.3",
+				AssetName: "test-asset",
+			},
+			prompterStubs: func(pm *prompter.PrompterMock) {
+				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
+					if p == "Delete asset test-asset in release v1.2.3 in OWNER/REPO?" {
+						return true, nil
+					}
+					return false, prompter.NoSuchPromptErr(p)
+				}
+			},
+			wantStdout: ``,
+			wantStderr: "✓ Deleted asset test-asset from release v1.2.3\n",
+		},
 		{
 			name:  "skipping confirmation",
 			isTTY: true,
@@ -150,7 +170,13 @@ func Test_deleteAssetRun(t *testing.T) {
 			}`))
 			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/releases/assets/1"), httpmock.StatusStringResponse(204, ""))
 
+			pm := &prompter.PrompterMock{}
+			if tt.prompterStubs != nil {
+				tt.prompterStubs(pm)
+			}
+
 			tt.opts.IO = ios
+			tt.opts.Prompter = pm
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}

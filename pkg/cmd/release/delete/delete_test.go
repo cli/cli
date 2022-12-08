@@ -8,6 +8,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -104,13 +105,31 @@ func Test_NewCmdDelete(t *testing.T) {
 
 func Test_deleteRun(t *testing.T) {
 	tests := []struct {
-		name       string
-		isTTY      bool
-		opts       DeleteOptions
-		wantErr    string
-		wantStdout string
-		wantStderr string
+		name          string
+		isTTY         bool
+		opts          DeleteOptions
+		prompterStubs func(*prompter.PrompterMock)
+		wantErr       string
+		wantStdout    string
+		wantStderr    string
 	}{
+		{
+			name:  "interactive confirm",
+			isTTY: true,
+			opts: DeleteOptions{
+				TagName: "v1.2.3",
+			},
+			wantStdout: "",
+			wantStderr: "✓ Deleted release v1.2.3\n! Note that the v1.2.3 git tag still remains in the repository\n",
+			prompterStubs: func(pm *prompter.PrompterMock) {
+				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
+					if p == "Delete release v1.2.3 in OWNER/REPO?" {
+						return true, nil
+					}
+					return false, prompter.NoSuchPromptErr(p)
+				}
+			},
+		},
 		{
 			name:  "skipping confirmation",
 			isTTY: true,
@@ -168,6 +187,11 @@ func Test_deleteRun(t *testing.T) {
 			ios.SetStdinTTY(tt.isTTY)
 			ios.SetStderrTTY(tt.isTTY)
 
+			pm := &prompter.PrompterMock{}
+			if tt.prompterStubs != nil {
+				tt.prompterStubs(pm)
+			}
+
 			fakeHTTP := &httpmock.Registry{}
 			fakeHTTP.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StringResponse(`{
 				"tag_name": "v1.2.3",
@@ -179,6 +203,7 @@ func Test_deleteRun(t *testing.T) {
 			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/tags/v1.2.3"), httpmock.StatusStringResponse(204, ""))
 
 			tt.opts.IO = ios
+			tt.opts.Prompter = pm
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: fakeHTTP}, nil
 			}
