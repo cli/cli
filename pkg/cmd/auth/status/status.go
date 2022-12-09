@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -147,6 +148,10 @@ func statusRun(opts *StatusOptions) error {
 
 			if scopesHeader != "" {
 				addMsg("%s Token Scopes: %s", cs.SuccessIcon(), scopesHeader)
+			} else if strings.HasPrefix(token, "ghs_") {
+				addMsg("%s Cannot determine scopes for server-to-server token.", cs.WarningIcon())
+			} else if strings.HasPrefix(token, "github_pat_") {
+				addMsg("%s Cannot determine scopes for fine-grained token.", cs.WarningIcon())
 			} else {
 				addMsg("%s Token Scopes: None found", cs.Red("X"))
 			}

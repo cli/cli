@@ -167,6 +167,42 @@ func Test_statusRun(t *testing.T) {
 			wantErrOut: regexp.MustCompile(`(?s)Logged in to github.com as.*tess.*Token Scopes: repo, read:org.*Logged in to joel.miller as.*tess.*X Token Scopes: None found`),
 		},
 		{
+			name: "server-to-server token",
+			opts: &StatusOptions{},
+			cfgStubs: func(c *config.ConfigMock) {
+				c.Set("github.com", "oauth_token", "ghs_xxx")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				// mocks for HeaderHasMinimumScopes api requests to github.com
+				reg.Register(
+					httpmock.REST("GET", ""),
+					httpmock.ScopesResponder(""))
+				// mock for CurrentLoginName
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
+			},
+			wantErrOut: regexp.MustCompile(`(?s)Logged in to github.com as.*tess.*! Cannot determine scopes for server-to-server token.`),
+		},
+		{
+			name: "PAT V2 token",
+			opts: &StatusOptions{},
+			cfgStubs: func(c *config.ConfigMock) {
+				c.Set("github.com", "oauth_token", "github_pat_xxx")
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				// mocks for HeaderHasMinimumScopes api requests to github.com
+				reg.Register(
+					httpmock.REST("GET", ""),
+					httpmock.ScopesResponder(""))
+				// mock for CurrentLoginName
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"tess"}}}`))
+			},
+			wantErrOut: regexp.MustCompile(`(?s)Logged in to github.com as.*tess.*! Cannot determine scopes for fine-grained token.`),
+		},
+		{
 			name: "hide token",
 			opts: &StatusOptions{},
 			cfgStubs: func(c *config.ConfigMock) {
