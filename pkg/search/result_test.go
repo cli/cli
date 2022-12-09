@@ -47,6 +47,7 @@ func TestRepositoryExportData(t *testing.T) {
 
 func TestIssueExportData(t *testing.T) {
 	var updatedAt = time.Date(2021, 2, 28, 12, 30, 0, 0, time.UTC)
+	trueValue := true
 	tests := []struct {
 		name   string
 		fields []string
@@ -87,6 +88,18 @@ func TestIssueExportData(t *testing.T) {
 				StateInternal: "closed",
 			},
 			output: `{"isPullRequest":true,"state":"merged"}`,
+		},
+		{
+			name:   "isDraft when pull request",
+			fields: []string{"isDraft", "state"},
+			issue: Issue{
+				PullRequest: PullRequest{
+					URL: "a-url",
+				},
+				StateInternal: "open",
+				IsDraft:       &trueValue,
+			},
+			output: `{"isDraft":true,"state":"open"}`,
 		},
 	}
 	for _, tt := range tests {
