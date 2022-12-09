@@ -57,7 +57,7 @@ var IssueFields = []string{
 	"url",
 }
 
-var PRFields = append(IssueFields,
+var PullRequestFields = append(IssueFields,
 	"isDraft",
 )
 
@@ -121,29 +121,28 @@ type User struct {
 }
 
 type Issue struct {
-	Assignees         []User      `json:"assignees"`
-	Author            User        `json:"user"`
-	AuthorAssociation string      `json:"author_association"`
-	Body              string      `json:"body"`
-	ClosedAt          time.Time   `json:"closed_at"`
-	CommentsCount     int         `json:"comments"`
-	CreatedAt         time.Time   `json:"created_at"`
-	ID                string      `json:"node_id"`
-	Labels            []Label     `json:"labels"`
-	IsLocked          bool        `json:"locked"`
-	Number            int         `json:"number"`
-	PullRequest       PullRequest `json:"pull_request"`
-	RepositoryURL     string      `json:"repository_url"`
+	Assignees         []User    `json:"assignees"`
+	Author            User      `json:"user"`
+	AuthorAssociation string    `json:"author_association"`
+	Body              string    `json:"body"`
+	ClosedAt          time.Time `json:"closed_at"`
+	CommentsCount     int       `json:"comments"`
+	CreatedAt         time.Time `json:"created_at"`
+	ID                string    `json:"node_id"`
+	Labels            []Label   `json:"labels"`
+	// This is a PullRequest field which does not appear in issue results,
+	// but lives outside the PullRequest object.
+	IsDraft       *bool       `json:"draft,omitempty"`
+	IsLocked      bool        `json:"locked"`
+	Number        int         `json:"number"`
+	PullRequest   PullRequest `json:"pull_request"`
+	RepositoryURL string      `json:"repository_url"`
 	// StateInternal should not be used directly. Use State() instead.
 	StateInternal string    `json:"state"`
 	StateReason   string    `json:"state_reason"`
 	Title         string    `json:"title"`
 	URL           string    `json:"html_url"`
 	UpdatedAt     time.Time `json:"updated_at"`
-
-	// this is really a PR field, and doesn't appear in issue results, but it's
-	// not inside the pull_request object
-	IsDraft *bool `json:"draft,omitempty"`
 }
 
 type PullRequest struct {
