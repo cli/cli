@@ -39,13 +39,17 @@ func newSelectCmd(app *App) *cobra.Command {
 // With `stdout` output:
 //
 // ```shell
-// 		gh codespace select
+//
+//	gh codespace select
+//
 // ```
 //
 // With `into-a-file` output:
 //
 // ```shell
-// 		gh codespace select --file /tmp/selected_codespace.txt
+//
+//	gh codespace select --file /tmp/selected_codespace.txt
+//
 // ```
 func (a *App) Select(ctx context.Context, name string, opts selectOptions) (err error) {
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, name)
