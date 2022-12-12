@@ -67,7 +67,8 @@ For more information, see [Linux & BSD installation](./docs/install_linux.md).
 | ------------------- | --------------------|
 | `winget install --id GitHub.cli` | `winget upgrade --id GitHub.cli` |
 
-Note: The WinGet installer modifes your PATH.  If using Windows Terminal, you will need to **open a new _window_** for changes to take affect.  Opening a new tab will not be sufficient.
+> **Note:**  
+> The Windows installer modifes your PATH. When using Windows Terminal, you will need to **open a new window** for the changes to take affect. (Simply opening a new tab will _not_ be sufficient.)
 
 #### scoop
 
