@@ -3,7 +3,6 @@ package codespace
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -103,7 +102,7 @@ func TestGenerateAutomaticSSHKeys(t *testing.T) {
 		}
 
 		// Check that no unexpected files are present
-		allExistingFiles, err := ioutil.ReadDir(dir)
+		allExistingFiles, err := os.ReadDir(dir)
 		if err != nil {
 			t.Errorf("Failed to list files in test directory: %v", err)
 		}
