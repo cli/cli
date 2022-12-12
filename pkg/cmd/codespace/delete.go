@@ -68,7 +68,7 @@ func newDeleteCmd(app *App) *cobra.Command {
 	deleteCmd.Flags().BoolVar(&opts.deleteAll, "all", false, "Delete all codespaces")
 	deleteCmd.Flags().StringVarP(&opts.repoFilter, "repo", "R", "", "Delete codespaces for a `repository`")
 	if err := addDeprecatedRepoShorthand(deleteCmd, &opts.repoFilter); err != nil {
-		fmt.Fprint(app.io.ErrOut, "%v\n", err)
+		fmt.Fprintf(app.io.ErrOut, "%v\n", err)
 	}
 
 	deleteCmd.Flags().BoolVarP(&opts.skipConfirm, "force", "f", false, "Skip confirmation for codespaces that contain unsaved changes")

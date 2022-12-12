@@ -83,7 +83,7 @@ func newCreateCmd(app *App) *cobra.Command {
 
 	createCmd.Flags().StringVarP(&opts.repo, "repo", "R", "", "repository name with owner: user/repo")
 	if err := addDeprecatedRepoShorthand(createCmd, &opts.repo); err != nil {
-		fmt.Fprint(app.io.ErrOut, "%v\n", err)
+		fmt.Fprintf(app.io.ErrOut, "%v\n", err)
 	}
 
 	createCmd.Flags().StringVarP(&opts.branch, "branch", "b", "", "repository branch")
