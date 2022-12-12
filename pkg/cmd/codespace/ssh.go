@@ -648,11 +648,9 @@ func newCpCmd(app *App) *cobra.Command {
 	// We don't expose all sshOptions.
 	cpCmd.Flags().BoolVarP(&opts.recursive, "recursive", "r", false, "Recursively copy directories")
 	cpCmd.Flags().BoolVarP(&opts.expand, "expand", "e", false, "Expand remote file names on remote shell")
-	cpCmd.Flags().StringVarP(&opts.filterOptions.CodespaceName, "codespace", "c", "", "Name of the codespace")
 
-	// Note: `-r` is not supported here as it collides with `--recursive` above
-	// TODO: if we just add `recursive` after this, can we use addGetOrChooseCodespaceCommandArgs?
-	cpCmd.Flags().StringVarP(&opts.filterOptions.Repo, "repo", "", "", "Filter codespace selection by repository name (user/repo)")
+	addGetOrChooseCodespaceCommandArgs(cpCmd, &opts.filterOptions)
+
 	cpCmd.Flags().StringVarP(&opts.profile, "profile", "p", "", "Name of the SSH profile to use")
 	return cpCmd
 }
