@@ -13,43 +13,43 @@ var _ Config = &ConfigMock{}
 
 // ConfigMock is a mock implementation of Config.
 //
-// 	func TestSomethingThatUsesConfig(t *testing.T) {
+//	func TestSomethingThatUsesConfig(t *testing.T) {
 //
-// 		// make and configure a mocked Config
-// 		mockedConfig := &ConfigMock{
-// 			AliasesFunc: func() *AliasConfig {
-// 				panic("mock out the Aliases method")
-// 			},
-// 			AuthTokenFunc: func(s string) (string, string) {
-// 				panic("mock out the AuthToken method")
-// 			},
-// 			DefaultHostFunc: func() (string, string) {
-// 				panic("mock out the DefaultHost method")
-// 			},
-// 			GetFunc: func(s1 string, s2 string) (string, error) {
-// 				panic("mock out the Get method")
-// 			},
-// 			GetOrDefaultFunc: func(s1 string, s2 string) (string, error) {
-// 				panic("mock out the GetOrDefault method")
-// 			},
-// 			HostsFunc: func() []string {
-// 				panic("mock out the Hosts method")
-// 			},
-// 			SetFunc: func(s1 string, s2 string, s3 string)  {
-// 				panic("mock out the Set method")
-// 			},
-// 			UnsetHostFunc: func(s string)  {
-// 				panic("mock out the UnsetHost method")
-// 			},
-// 			WriteFunc: func() error {
-// 				panic("mock out the Write method")
-// 			},
-// 		}
+//		// make and configure a mocked Config
+//		mockedConfig := &ConfigMock{
+//			AliasesFunc: func() *AliasConfig {
+//				panic("mock out the Aliases method")
+//			},
+//			AuthTokenFunc: func(s string) (string, string) {
+//				panic("mock out the AuthToken method")
+//			},
+//			DefaultHostFunc: func() (string, string) {
+//				panic("mock out the DefaultHost method")
+//			},
+//			GetFunc: func(s1 string, s2 string) (string, error) {
+//				panic("mock out the Get method")
+//			},
+//			GetOrDefaultFunc: func(s1 string, s2 string) (string, error) {
+//				panic("mock out the GetOrDefault method")
+//			},
+//			HostsFunc: func() []string {
+//				panic("mock out the Hosts method")
+//			},
+//			SetFunc: func(s1 string, s2 string, s3 string)  {
+//				panic("mock out the Set method")
+//			},
+//			UnsetHostFunc: func(s string)  {
+//				panic("mock out the UnsetHost method")
+//			},
+//			WriteFunc: func() error {
+//				panic("mock out the Write method")
+//			},
+//		}
 //
-// 		// use mockedConfig in code that requires Config
-// 		// and then make assertions.
+//		// use mockedConfig in code that requires Config
+//		// and then make assertions.
 //
-// 	}
+//	}
 type ConfigMock struct {
 	// AliasesFunc mocks the Aliases method.
 	AliasesFunc func() *AliasConfig
@@ -152,7 +152,8 @@ func (mock *ConfigMock) Aliases() *AliasConfig {
 
 // AliasesCalls gets all the calls that were made to Aliases.
 // Check the length with:
-//     len(mockedConfig.AliasesCalls())
+//
+//	len(mockedConfig.AliasesCalls())
 func (mock *ConfigMock) AliasesCalls() []struct {
 } {
 	var calls []struct {
@@ -181,7 +182,8 @@ func (mock *ConfigMock) AuthToken(s string) (string, string) {
 
 // AuthTokenCalls gets all the calls that were made to AuthToken.
 // Check the length with:
-//     len(mockedConfig.AuthTokenCalls())
+//
+//	len(mockedConfig.AuthTokenCalls())
 func (mock *ConfigMock) AuthTokenCalls() []struct {
 	S string
 } {
@@ -209,7 +211,8 @@ func (mock *ConfigMock) DefaultHost() (string, string) {
 
 // DefaultHostCalls gets all the calls that were made to DefaultHost.
 // Check the length with:
-//     len(mockedConfig.DefaultHostCalls())
+//
+//	len(mockedConfig.DefaultHostCalls())
 func (mock *ConfigMock) DefaultHostCalls() []struct {
 } {
 	var calls []struct {
@@ -240,7 +243,8 @@ func (mock *ConfigMock) Get(s1 string, s2 string) (string, error) {
 
 // GetCalls gets all the calls that were made to Get.
 // Check the length with:
-//     len(mockedConfig.GetCalls())
+//
+//	len(mockedConfig.GetCalls())
 func (mock *ConfigMock) GetCalls() []struct {
 	S1 string
 	S2 string
@@ -275,7 +279,8 @@ func (mock *ConfigMock) GetOrDefault(s1 string, s2 string) (string, error) {
 
 // GetOrDefaultCalls gets all the calls that were made to GetOrDefault.
 // Check the length with:
-//     len(mockedConfig.GetOrDefaultCalls())
+//
+//	len(mockedConfig.GetOrDefaultCalls())
 func (mock *ConfigMock) GetOrDefaultCalls() []struct {
 	S1 string
 	S2 string
@@ -305,7 +310,8 @@ func (mock *ConfigMock) Hosts() []string {
 
 // HostsCalls gets all the calls that were made to Hosts.
 // Check the length with:
-//     len(mockedConfig.HostsCalls())
+//
+//	len(mockedConfig.HostsCalls())
 func (mock *ConfigMock) HostsCalls() []struct {
 } {
 	var calls []struct {
@@ -338,7 +344,8 @@ func (mock *ConfigMock) Set(s1 string, s2 string, s3 string) {
 
 // SetCalls gets all the calls that were made to Set.
 // Check the length with:
-//     len(mockedConfig.SetCalls())
+//
+//	len(mockedConfig.SetCalls())
 func (mock *ConfigMock) SetCalls() []struct {
 	S1 string
 	S2 string
@@ -373,7 +380,8 @@ func (mock *ConfigMock) UnsetHost(s string) {
 
 // UnsetHostCalls gets all the calls that were made to UnsetHost.
 // Check the length with:
-//     len(mockedConfig.UnsetHostCalls())
+//
+//	len(mockedConfig.UnsetHostCalls())
 func (mock *ConfigMock) UnsetHostCalls() []struct {
 	S string
 } {
@@ -401,7 +409,8 @@ func (mock *ConfigMock) Write() error {
 
 // WriteCalls gets all the calls that were made to Write.
 // Check the length with:
-//     len(mockedConfig.WriteCalls())
+//
+//	len(mockedConfig.WriteCalls())
 func (mock *ConfigMock) WriteCalls() []struct {
 } {
 	var calls []struct {
