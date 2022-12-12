@@ -11,7 +11,7 @@ require (
 	github.com/charmbracelet/lipgloss v0.5.0
 	github.com/cli/go-gh v1.0.0
 	github.com/cli/oauth v0.9.0
-	github.com/cli/safeexec v1.0.0
+	github.com/cli/safeexec v1.0.1
 	github.com/cpuguy83/go-md2man/v2 v2.0.2
 	github.com/creack/pty v1.1.18
 	github.com/gabriel-vasile/mimetype v1.4.1
