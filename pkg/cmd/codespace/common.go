@@ -186,7 +186,7 @@ var errInvalidGetOrChooseCodespaceCommandArgs = errors.New("invalid arguments: -
 // to be passed into getOrChooseCodespace. It also adds pre-run validations on those arguments.
 func addGetOrChooseCodespaceCommandArgs(cmd *cobra.Command, opts *getOrChooseCodespaceFilterOptions) {
 	cmd.Flags().StringVarP(&opts.CodespaceName, "codespace", "c", "", "Name of the codespace")
-	cmd.Flags().StringVarP(&opts.Repo, "repo", "r", "", "Filter codespace selection by repository name (user/repo)")
+	cmd.Flags().StringVarP(&opts.Repo, "repo", "R", "", "Filter codespace selection by repository name (user/repo)")
 
 	existingPreRun := cmd.PersistentPreRunE
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
