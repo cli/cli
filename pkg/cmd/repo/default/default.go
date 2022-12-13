@@ -62,12 +62,8 @@ func NewCmdDefault(f *cmdutil.Factory, runF func(*DefaultOptions) error) *cobra.
 			}
 
 			c := &git.Client{}
-			inGitDir, err := c.InGitDirectory(ctx.Background())
-			if err != nil {
-				return err
-			}
 
-			if !inGitDir {
+			if !c.InGitDirectory(ctx.Background()) {
 				return errors.New("must be run from inside a git repository")
 			}
 
@@ -204,7 +200,8 @@ func displayRemoteRepoName(remote *context.Remote) string {
 }
 
 func setDefaultRepo(remote *context.Remote, resolution string) error {
-	return git.SetRemoteResolution(remote.Name, resolution)
+	c := &git.Client{}
+	return c.SetRemoteResolution(ctx.Background(), remote.Name, resolution)
 }
 
 func unsetDefaultRepo(remote *context.Remote) error {

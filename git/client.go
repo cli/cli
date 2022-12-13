@@ -489,22 +489,21 @@ func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBra
 	return remote, nil
 }
 
-func (c *Client) InGitDirectory(ctx context.Context) (bool, error) {
+func (c *Client) InGitDirectory(ctx context.Context) bool {
 	showCmd, err := c.Command(ctx, "rev-parse", "--is-inside-work-tree")
 	if err != nil {
-		return false, err
+		return false
 	}
 	out, err := showCmd.Output()
 	if err != nil {
-		return false, err
+		return false
 	}
 
 	split := strings.Split(string(out), "\n")
 	if len(split) > 0 {
-		return split[0] == "true", nil
+		return split[0] == "true"
 	}
-
-	return false, nil
+	return false
 }
 
 func (c *Client) UnsetRemoteResolution(ctx context.Context, name string) error {
