@@ -44,13 +44,30 @@ func NewCmdDefault(f *cmdutil.Factory, runF func(*DefaultOptions) error) *cobra.
 	cmd := &cobra.Command{
 		Use:   "default [<repository>]",
 		Short: "Configure default repository",
-		Long: heredoc.Docf(`
+		Long: heredoc.Doc(`
 			Set default repository for current directory.
 
-			The default repository is used as the target
-			repository for various commands such as %[1]spr%[1]s, %[1]sissue%[1]s,
-			and %[1]srepo%[1]s.
-		`, "`"),
+			gh uses the default repository for things like:
+
+			 - viewing, creating, and setting the default base for  pull requests
+			 - viewing and creating issues
+			 - viewing and creating releases
+			 - working with Actions
+			 - adding secrets
+		`),
+		Example: heredoc.Doc(`
+			Interactively select a default repository:
+
+			$ gh repo default
+
+			Set a repository explicitly:
+
+			$ gh repo default owner/repo
+
+			View the current default repository:
+
+			$ gh repo default --view
+		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
