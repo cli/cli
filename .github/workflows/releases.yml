@@ -41,7 +41,7 @@ jobs:
         env:
           CERT_CONTENTS: ${{ secrets.WINDOWS_CERT_PFX }}
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v3
+        uses: goreleaser/goreleaser-action@v4
         with:
           version: "~1.13.1"
           args: release --release-notes=CHANGELOG.md
