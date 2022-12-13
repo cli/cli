@@ -289,7 +289,8 @@ func (c codespace) running() bool {
 // which instructs the user to use -R instead.
 func addDeprecatedRepoShorthand(cmd *cobra.Command, target *string) error {
 	cmd.Flags().StringVarP(target, "repo-deprecated", "r", "", "(Deprecated) Shorthand for --repo")
-	if err := cmd.PersistentFlags().MarkHidden("repo-deprecated"); err != nil {
+
+	if err := cmd.Flags().MarkHidden("repo-deprecated"); err != nil {
 		return fmt.Errorf("error marking `-r` shorthand as hidden: %w", err)
 	}
 
