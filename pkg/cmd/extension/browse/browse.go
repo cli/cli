@@ -421,7 +421,49 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	outerFlex.AddItem(innerFlex, 0, 1, true)
 	outerFlex.AddItem(help, 1, -1, false)
 
-	app.SetRoot(outerFlex, true)
+	// TODO better name
+	helpBig := tview.NewTextView()
+	helpBig.SetDynamicColors(true)
+	helpBig.SetBorderPadding(0, 0, 2, 0)
+	helpBig.SetText(heredoc.Doc(`
+		[::b]Application[-:-:-]
+
+		?: toggle help
+		q: quit
+
+		[::b]Navigation[-:-:-]
+
+		↓, j: scroll list of extensions down by 1
+		↑, k: scroll list of extensions up by 1
+
+		shift+j, space:                                   scroll list of extensions down by 25
+		shift+k, ctrl+space (mac), shift+space (windows): scroll list of extensions up by 25
+
+		[::b]Extension Management[-:-:-]
+
+		i: install highlighted extension
+		r: remove highlighted extension
+		w: open highlighted extension in web browser
+
+		[::b]Filtering[-:-:-]
+
+		/:      focus filter
+		enter:  finish filtering and go back to list
+		escape: clear filter and reset list
+
+		[::b]Readmes[-:-:-]
+
+		page down: scroll readme pane down
+		page up:   scroll readme pane up
+
+		(On a mac, page down and page up are fn+down arrow and fn+up arrow)
+	`))
+
+	pages := tview.NewPages()
+	pages.AddPage("main", outerFlex, true, true)
+	pages.AddPage("help", helpBig, true, false)
+
+	app.SetRoot(pages, true)
 
 	// Force fetching of initial readme by loading it just prior to the first
 	// draw. The callback is removed immediately after draw.
@@ -437,6 +479,8 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 
 	helpActive := false
 
+	// TODO filter should not be activated when helpActive is true
+
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if filter.HasFocus() {
 			return event
@@ -445,52 +489,16 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		switch event.Rune() {
 		case '?':
 			if helpActive {
+				pages.SwitchToPage("main")
 				helpActive = false
-				app.SetRoot(outerFlex, true)
 				return nil
 			}
 			helpActive = true
-			helpBig := tview.NewTextView()
-			helpBig.SetDynamicColors(true)
-			helpBig.SetBorderPadding(0, 0, 2, 0)
-			helpBig.SetText(heredoc.Doc(`
-				[::b]Application[-:-:-]
-
-				?: toggle help
-				q: quit
-
-				[::b]Navigation[-:-:-]
-
-				↓, j: scroll list of extensions down by 1
-				↑, k: scroll list of extensions up by 1
-
-				shift+j, space:                                   scroll list of extensions down by 25
-				shift+k, ctrl+space (mac), shift+space (windows): scroll list of extensions up by 25
-
-				[::b]Extension Management[-:-:-]
-
-				i: install highlighted extension
-				r: remove highlighted extension
-				w: open highlighted extension in web browser
-
-				[::b]Filtering[-:-:-]
-
-				/:      focus filter
-				enter:  finish filtering and go back to list
-				escape: clear filter and reset list
-
-				[::b]Readmes[-:-:-]
-
-				page down: scroll readme pane down
-				page up:   scroll readme pane up
-
-				(On a mac, page down and page up are fn+down arrow and fn+up arrow)
-			`))
-			app.SetRoot(helpBig, true)
+			pages.SwitchToPage("help")
 		case 'q':
 			if helpActive {
 				helpActive = false
-				app.SetRoot(outerFlex, true)
+				pages.SwitchToPage("main")
 				return nil
 			}
 			app.Stop()
