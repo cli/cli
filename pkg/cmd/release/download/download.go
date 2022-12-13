@@ -370,7 +370,7 @@ func (w destinationWriter) Copy(name string, r io.Reader) error {
 		}
 	}
 
-	f, err := os.OpenFile(fp, os.O_WRONLY|os.O_CREATE, 0644)
+	f, err := os.OpenFile(fp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
