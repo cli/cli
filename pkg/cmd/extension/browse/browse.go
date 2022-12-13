@@ -425,6 +425,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	helpBig := tview.NewTextView()
 	helpBig.SetDynamicColors(true)
 	helpBig.SetBorderPadding(0, 0, 2, 0)
+	// TODO clean this text up
 	helpBig.SetText(heredoc.Doc(`
 		[::b]Application[-:-:-]
 
@@ -503,14 +504,23 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 			}
 			app.Stop()
 		case 'k':
+			if helpActive {
+				return nil
+			}
 			extList.ScrollUp()
 			readme.SetText("...fetching readme...")
 			go loadSelectedReadme()
 		case 'j':
+			if helpActive {
+				return nil
+			}
 			extList.ScrollDown()
 			readme.SetText("...fetching readme...")
 			go loadSelectedReadme()
 		case 'w':
+			if helpActive {
+				return nil
+			}
 			ee, ix := extList.FindSelected()
 			if ix < 0 {
 				opts.Logger.Println("failed to find selected entry")
@@ -521,10 +531,19 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 				opts.Logger.Println(fmt.Errorf("could not open browser for '%s': %w", ee.URL, err))
 			}
 		case 'i':
+			if helpActive {
+				return nil
+			}
 			extList.InstallSelected()
 		case 'r':
+			if helpActive {
+				return nil
+			}
 			extList.RemoveSelected()
 		case ' ':
+			if helpActive {
+				return nil
+			}
 			// The shift check works on windows and not linux/mac:
 			if event.Modifiers()&tcell.ModShift != 0 {
 				extList.PageUp()
@@ -533,43 +552,67 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 			}
 			go loadSelectedReadme()
 		case '/':
+			if helpActive {
+				return nil
+			}
 			app.SetFocus(filter)
 			return nil
 		}
 		switch event.Key() {
 		case tcell.KeyUp:
+			if helpActive {
+				return nil
+			}
 			extList.ScrollUp()
 			go loadSelectedReadme()
 			return nil
 		case tcell.KeyDown:
+			if helpActive {
+				return nil
+			}
 			extList.ScrollDown()
 			go loadSelectedReadme()
 			return nil
 		case tcell.KeyEscape:
 			if helpActive {
 				helpActive = false
-				app.SetRoot(outerFlex, true)
+				pages.SwitchToPage("main")
 				return nil
 			}
 			filter.SetText("")
 			extList.Reset()
 		case tcell.KeyCtrlSpace:
+			if helpActive {
+				return nil
+			}
 			// The ctrl check works on linux/mac and not windows:
 			extList.PageUp()
 			go loadSelectedReadme()
 		case tcell.KeyCtrlJ:
+			if helpActive {
+				return nil
+			}
 			extList.PageDown()
 			go loadSelectedReadme()
 		case tcell.KeyCtrlK:
+			if helpActive {
+				return nil
+			}
 			extList.PageUp()
 			go loadSelectedReadme()
 		case tcell.KeyPgUp:
+			if helpActive {
+				return nil
+			}
 			row, col := readme.GetScrollOffset()
 			if row > 0 {
 				readme.ScrollTo(row-2, col)
 			}
 			return nil
 		case tcell.KeyPgDn:
+			if helpActive {
+				return nil
+			}
 			row, col := readme.GetScrollOffset()
 			readme.ScrollTo(row+2, col)
 			return nil
