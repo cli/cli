@@ -26,6 +26,7 @@ type Issue struct {
 	Title          string
 	URL            string
 	State          string
+	StateReason    string
 	Closed         bool
 	Body           string
 	CreatedAt      time.Time
@@ -38,6 +39,7 @@ type Issue struct {
 	ProjectCards   ProjectCards
 	Milestone      *Milestone
 	ReactionGroups ReactionGroups
+	IsPinned       bool
 }
 
 func (i Issue) IsPullRequest() bool {
@@ -110,10 +112,13 @@ type Owner struct {
 }
 
 type Author struct {
-	// adding these breaks generated GraphQL requests
-	//ID    string `json:"id,omitempty"`
-	//Name  string `json:"name,omitempty"`
+	ID    string `json:"id,omitempty"`
+	Name  string `json:"name,omitempty"`
 	Login string `json:"login"`
+}
+
+func (author *Author) IsBot() bool {
+	return author.ID == ""
 }
 
 // IssueCreate creates an issue in a GitHub repository
@@ -175,7 +180,7 @@ func IssueStatus(client *Client, repo ghrepo.Interface, options IssueStatusOptio
 		}
 	}
 
-	fragments := fmt.Sprintf("fragment issue on Issue{%s}", PullRequestGraphQL(options.Fields))
+	fragments := fmt.Sprintf("fragment issue on Issue{%s}", IssueGraphQL(options.Fields))
 	query := fragments + `
 	query IssueStatus($owner: String!, $repo: String!, $viewer: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
@@ -241,4 +246,8 @@ func (i Issue) Link() string {
 
 func (i Issue) Identifier() string {
 	return i.ID
+}
+
+func (i Issue) CurrentUserComments() []Comment {
+	return i.Comments.CurrentUserComments()
 }

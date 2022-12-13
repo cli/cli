@@ -44,10 +44,6 @@ func TestAliasList(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// TODO: change underlying config implementation so Write is not
-			// automatically called when editing aliases in-memory
-			defer config.StubWriteConfig(io.Discard, io.Discard)()
-
 			cfg := config.NewFromString(tt.config)
 
 			ios, _, stdout, stderr := iostreams.Test()

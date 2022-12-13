@@ -133,9 +133,6 @@ func TestEnableRun(t *testing.T) {
 			tty: true,
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/terrible workflow"),
-					httpmock.StatusStringResponse(404, "not found"))
-				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
 					httpmock.JSONResponse(shared.WorkflowsPayload{
 						Workflows: []shared.Workflow{
@@ -158,9 +155,6 @@ func TestEnableRun(t *testing.T) {
 			},
 			tty: true,
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/a disabled workflow"),
-					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
 					httpmock.JSONResponse(shared.WorkflowsPayload{
@@ -187,9 +181,6 @@ func TestEnableRun(t *testing.T) {
 			},
 			tty: true,
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/a disabled inactivity workflow"),
-					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
 					httpmock.JSONResponse(shared.WorkflowsPayload{
@@ -243,9 +234,6 @@ func TestEnableRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/terrible workflow"),
-					httpmock.StatusStringResponse(404, "not found"))
-				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
 					httpmock.JSONResponse(shared.WorkflowsPayload{
 						Workflows: []shared.Workflow{
@@ -268,9 +256,6 @@ func TestEnableRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/a disabled inactivity workflow"),
-					httpmock.StatusStringResponse(404, "not found"))
-				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
 					httpmock.JSONResponse(shared.WorkflowsPayload{
 						Workflows: []shared.Workflow{
@@ -291,9 +276,6 @@ func TestEnableRun(t *testing.T) {
 				Selector: "a disabled workflow",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/a disabled workflow"),
-					httpmock.StatusStringResponse(404, "not found"))
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows"),
 					httpmock.JSONResponse(shared.WorkflowsPayload{
@@ -327,6 +309,7 @@ func TestEnableRun(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
+			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
 			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
 				tt.askStubs(as)

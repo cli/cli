@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -21,18 +24,22 @@ import (
 type DiffOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
+	Browser    browser.Browser
 
 	Finder shared.PRFinder
 
 	SelectorArg string
 	UseColor    bool
 	Patch       bool
+	NameOnly    bool
+	BrowserMode bool
 }
 
 func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Command {
 	opts := &DiffOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		Browser:    f.Browser,
 	}
 
 	var colorFlag string
@@ -44,7 +51,9 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 			View changes in a pull request. 
 
 			Without an argument, the pull request that belongs to the current branch
-			is selected.			
+			is selected.
+			
+			With '--web', open the pull request diff in a web browser instead.
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -78,6 +87,8 @@ func NewCmdDiff(f *cmdutil.Factory, runF func(*DiffOptions) error) *cobra.Comman
 
 	cmdutil.StringEnumFlag(cmd, &colorFlag, "color", "", "auto", []string{"always", "never", "auto"}, "Use color in diff output")
 	cmd.Flags().BoolVar(&opts.Patch, "patch", false, "Display diff in patch format")
+	cmd.Flags().BoolVar(&opts.NameOnly, "name-only", false, "Display only names of changed files")
+	cmd.Flags().BoolVarP(&opts.BrowserMode, "web", "w", false, "Open the pull request diff in the browser")
 
 	return cmd
 }
@@ -87,14 +98,31 @@ func diffRun(opts *DiffOptions) error {
 		Selector: opts.SelectorArg,
 		Fields:   []string{"number"},
 	}
+
+	if opts.BrowserMode {
+		findOptions.Fields = []string{"url"}
+	}
+
 	pr, baseRepo, err := opts.Finder.Find(findOptions)
 	if err != nil {
 		return err
 	}
 
+	if opts.BrowserMode {
+		openUrl := fmt.Sprintf("%s/files", pr.URL)
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openUrl))
+		}
+		return opts.Browser.Browse(openUrl)
+	}
+
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return err
+	}
+
+	if opts.NameOnly {
+		opts.Patch = false
 	}
 
 	diff, err := fetchDiff(httpClient, baseRepo, pr.Number, opts.Patch)
@@ -107,6 +135,10 @@ func diffRun(opts *DiffOptions) error {
 		defer opts.IO.StopPager()
 	} else {
 		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+	}
+
+	if opts.NameOnly {
+		return changedFilesNames(opts.IO.Out, diff)
 	}
 
 	if !opts.UseColor {
@@ -226,4 +258,23 @@ func isAdditionLine(l []byte) bool {
 
 func isRemovalLine(l []byte) bool {
 	return len(l) > 0 && l[0] == '-'
+}
+
+func changedFilesNames(w io.Writer, r io.Reader) error {
+	diff, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+
+	pattern := regexp.MustCompile(`(?:^|\n)diff\s--git.*\sb/(.*)`)
+	matches := pattern.FindAllStringSubmatch(string(diff), -1)
+
+	for _, val := range matches {
+		name := strings.TrimSpace(val[1])
+		if _, err := w.Write([]byte(name + "\n")); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

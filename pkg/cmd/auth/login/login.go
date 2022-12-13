@@ -1,20 +1,19 @@
 package login
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
+	ghAuth "github.com/cli/go-gh/pkg/auth"
 	"github.com/spf13/cobra"
 )
 
@@ -22,6 +21,8 @@ type LoginOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
+	GitClient  *git.Client
+	Prompter   shared.Prompt
 
 	MainExecutable string
 
@@ -39,6 +40,8 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
+		Prompter:   f.Prompter,
 	}
 
 	var tokenStdin bool
@@ -60,7 +63,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			This method is most suitable for "headless" use of gh such as in automation. See
 			%[1]sgh help environment%[1]s for more info.
 
-			To use gh in GitHub Actions, add %[1]sGH_TOKEN: ${{secrets.GITHUB_TOKEN}}%[1]s to "env".
+			To use gh in GitHub Actions, add %[1]sGH_TOKEN: ${{ github.token }}%[1]s to "env".
 		`, "`"),
 		Example: heredoc.Doc(`
 			# start interactive setup
@@ -100,7 +103,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			}
 
 			if opts.Hostname == "" && (!opts.Interactive || opts.Web) {
-				opts.Hostname = ghinstance.Default()
+				opts.Hostname, _ = ghAuth.DefaultHost()
 			}
 
 			opts.MainExecutable = f.Executable()
@@ -130,20 +133,16 @@ func loginRun(opts *LoginOptions) error {
 	hostname := opts.Hostname
 	if opts.Interactive && hostname == "" {
 		var err error
-		hostname, err = promptForHostname()
+		hostname, err = promptForHostname(opts)
 		if err != nil {
 			return err
 		}
 	}
 
-	if err := cfg.CheckWriteable(hostname, "oauth_token"); err != nil {
-		var roErr *config.ReadOnlyEnvError
-		if errors.As(err, &roErr) {
-			fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", roErr.Variable)
-			fmt.Fprint(opts.IO.ErrOut, "To have GitHub CLI store credentials instead, first clear the value from the environment.\n")
-			return cmdutil.SilentError
-		}
-		return err
+	if src, writeable := shared.AuthTokenWriteable(cfg, hostname); !writeable {
+		fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", src)
+		fmt.Fprint(opts.IO.ErrOut, "To have GitHub CLI store credentials instead, first clear the value from the environment.\n")
+		return cmdutil.SilentError
 	}
 
 	httpClient, err := opts.HttpClient()
@@ -152,30 +151,23 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	if opts.Token != "" {
-		err := cfg.Set(hostname, "oauth_token", opts.Token)
-		if err != nil {
-			return err
-		}
+		cfg.Set(hostname, "oauth_token", opts.Token)
 
 		if err := shared.HasMinimumScopes(httpClient, hostname, opts.Token); err != nil {
 			return fmt.Errorf("error validating token: %w", err)
 		}
-
-		return cfg.WriteHosts()
+		if opts.GitProtocol != "" {
+			cfg.Set(hostname, "git_protocol", opts.GitProtocol)
+		}
+		return cfg.Write()
 	}
 
-	existingToken, _ := cfg.Get(hostname, "oauth_token")
+	existingToken, _ := cfg.AuthToken(hostname)
 	if existingToken != "" && opts.Interactive {
 		if err := shared.HasMinimumScopes(httpClient, hostname, existingToken); err == nil {
-			var keepGoing bool
-			err = prompt.SurveyAskOne(&survey.Confirm{
-				Message: fmt.Sprintf(
-					"You're already logged into %s. Do you want to re-authenticate?",
-					hostname),
-				Default: false,
-			}, &keepGoing)
+			keepGoing, err := opts.Prompter.Confirm(fmt.Sprintf("You're already logged into %s. Do you want to re-authenticate?", hostname), false)
 			if err != nil {
-				return fmt.Errorf("could not prompt: %w", err)
+				return err
 			}
 			if !keepGoing {
 				return nil
@@ -193,34 +185,27 @@ func loginRun(opts *LoginOptions) error {
 		Scopes:      opts.Scopes,
 		Executable:  opts.MainExecutable,
 		GitProtocol: opts.GitProtocol,
+		Prompter:    opts.Prompter,
+		GitClient:   opts.GitClient,
 	})
 }
 
-func promptForHostname() (string, error) {
-	var hostType int
-	err := prompt.SurveyAskOne(&survey.Select{
-		Message: "What account do you want to log into?",
-		Options: []string{
-			"GitHub.com",
-			"GitHub Enterprise Server",
-		},
-	}, &hostType)
-
+func promptForHostname(opts *LoginOptions) (string, error) {
+	options := []string{"GitHub.com", "GitHub Enterprise Server"}
+	hostType, err := opts.Prompter.Select(
+		"What account do you want to log into?",
+		options[0],
+		options)
 	if err != nil {
-		return "", fmt.Errorf("could not prompt: %w", err)
+		return "", err
 	}
 
 	isEnterprise := hostType == 1
 
 	hostname := ghinstance.Default()
 	if isEnterprise {
-		err := prompt.SurveyAskOne(&survey.Input{
-			Message: "GHE hostname:",
-		}, &hostname, survey.WithValidator(ghinstance.HostnameValidator))
-		if err != nil {
-			return "", fmt.Errorf("could not prompt: %w", err)
-		}
+		hostname, err = opts.Prompter.InputHostname()
 	}
 
-	return hostname, nil
+	return hostname, err
 }

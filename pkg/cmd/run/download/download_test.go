@@ -69,6 +69,29 @@ func Test_NewCmdDownload(t *testing.T) {
 				DestinationDir: ".",
 			},
 		},
+		{
+			name:  "repo level with patterns",
+			args:  "-p o*e -p tw*",
+			isTTY: true,
+			want: DownloadOptions{
+				RunID:          "",
+				DoPrompt:       false,
+				FilePatterns:   []string{"o*e", "tw*"},
+				DestinationDir: ".",
+			},
+		},
+		{
+			name:  "repo level with names and patterns",
+			args:  "-p o*e -p tw* -n three -n four",
+			isTTY: true,
+			want: DownloadOptions{
+				RunID:          "",
+				DoPrompt:       false,
+				Names:          []string{"three", "four"},
+				FilePatterns:   []string{"o*e", "tw*"},
+				DestinationDir: ".",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -112,6 +135,7 @@ func Test_NewCmdDownload(t *testing.T) {
 
 			assert.Equal(t, tt.want.RunID, opts.RunID)
 			assert.Equal(t, tt.want.Names, opts.Names)
+			assert.Equal(t, tt.want.FilePatterns, opts.FilePatterns)
 			assert.Equal(t, tt.want.DestinationDir, opts.DestinationDir)
 			assert.Equal(t, tt.want.DoPrompt, opts.DoPrompt)
 		})
@@ -179,7 +203,7 @@ func Test_runDownload(t *testing.T) {
 			wantErr: "no valid artifacts found to download",
 		},
 		{
-			name: "no matches",
+			name: "no name matches",
 			opts: DownloadOptions{
 				RunID:          "2345",
 				DestinationDir: ".",
@@ -199,7 +223,30 @@ func Test_runDownload(t *testing.T) {
 					},
 				}, nil)
 			},
-			wantErr: "no artifact matches any of the names provided",
+			wantErr: "no artifact matches any of the names or patterns provided",
+		},
+		{
+			name: "no pattern matches",
+			opts: DownloadOptions{
+				RunID:          "2345",
+				DestinationDir: ".",
+				FilePatterns:   []string{"artifiction-*"},
+			},
+			mockAPI: func(p *mockPlatform) {
+				p.On("List", "2345").Return([]shared.Artifact{
+					{
+						Name:        "artifact-1",
+						DownloadURL: "http://download.com/artifact1.zip",
+						Expired:     false,
+					},
+					{
+						Name:        "artifact-2",
+						DownloadURL: "http://download.com/artifact2.zip",
+						Expired:     false,
+					},
+				}, nil)
+			},
+			wantErr: "no artifact matches any of the names or patterns provided",
 		},
 		{
 			name: "prompt to select artifact",

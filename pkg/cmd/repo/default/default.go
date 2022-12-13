@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 
+	ctx "context"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -59,7 +61,13 @@ func NewCmdDefault(f *cmdutil.Factory, runF func(*DefaultOptions) error) *cobra.
 				return cmdutil.FlagErrorf("repository required when not running interactively")
 			}
 
-			if !git.IsGitDirectory() {
+			c := &git.Client{}
+			inGitDir, err := c.InGitDirectory(ctx.Background())
+			if err != nil {
+				return err
+			}
+
+			if !inGitDir {
 				return errors.New("must be run from inside a git repository")
 			}
 
@@ -200,5 +208,6 @@ func setDefaultRepo(remote *context.Remote, resolution string) error {
 }
 
 func unsetDefaultRepo(remote *context.Remote) error {
-	return git.UnsetRemoteResolution(remote.Name)
+	c := &git.Client{}
+	return c.UnsetRemoteResolution(ctx.Background(), remote.Name)
 }

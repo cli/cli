@@ -8,9 +8,12 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cli/cli/v2/api"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/set"
 )
 
 // IssueFromArgWithFields loads an issue or pull request with the specified fields. If some of the fields
@@ -60,11 +63,42 @@ func issueMetadataFromURL(s string) (int, ghrepo.Interface) {
 	return issueNumber, repo
 }
 
+// Returns the issue number and repo if the issue URL is provided.
+// If only the issue number is provided, returns the number and nil repo.
+func IssueNumberAndRepoFromArg(arg string) (int, ghrepo.Interface, error) {
+	issueNumber, baseRepo := issueMetadataFromURL(arg)
+
+	if issueNumber == 0 {
+		var err error
+		issueNumber, err = strconv.Atoi(strings.TrimPrefix(arg, "#"))
+		if err != nil {
+			return 0, nil, fmt.Errorf("invalid issue format: %q", arg)
+		}
+	}
+
+	return issueNumber, baseRepo, nil
+}
+
 type PartialLoadError struct {
 	error
 }
 
 func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, fields []string) (*api.Issue, error) {
+	fieldSet := set.NewStringSet()
+	fieldSet.AddValues(fields)
+	if fieldSet.Contains("stateReason") {
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		detector := fd.NewDetector(cachedClient, repo.RepoHost())
+		features, err := detector.IssueFeatures()
+		if err != nil {
+			return nil, err
+		}
+		if !features.StateReason {
+			fieldSet.Remove("stateReason")
+		}
+	}
+	fields = fieldSet.ToSlice()
+
 	type response struct {
 		Repository struct {
 			HasIssuesEnabled bool
@@ -79,10 +113,10 @@ func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 			issue: issueOrPullRequest(number: $number) {
 				__typename
 				...on Issue{%[1]s}
-				...on PullRequest{%[1]s}
+				...on PullRequest{%[2]s}
 			}
 		}
-	}`, api.PullRequestGraphQL(fields))
+	}`, api.IssueGraphQL(fields), api.PullRequestGraphQL(fields))
 
 	variables := map[string]interface{}{
 		"owner":  repo.RepoOwner(),
@@ -93,7 +127,7 @@ func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 	var resp response
 	client := api.NewClientFromHTTP(httpClient)
 	if err := client.GraphQL(repo.RepoHost(), query, variables, &resp); err != nil {
-		var gerr *api.GraphQLErrorResponse
+		var gerr api.GraphQLError
 		if errors.As(err, &gerr) {
 			if gerr.Match("NOT_FOUND", "repository.issue") && !resp.Repository.HasIssuesEnabled {
 				return nil, fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))

@@ -12,6 +12,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
 )
@@ -45,33 +46,64 @@ type Level string
 
 var RunFields = []string{
 	"name",
+	"displayTitle",
 	"headBranch",
 	"headSha",
 	"createdAt",
 	"updatedAt",
+	"startedAt",
 	"status",
 	"conclusion",
 	"event",
+	"number",
 	"databaseId",
 	"workflowDatabaseId",
+	"workflowName",
 	"url",
 }
 
+var SingleRunFields = append(RunFields, "jobs")
+
 type Run struct {
-	Name           string
+	Name           string    `json:"name"` // the semantics of this field are unclear
+	DisplayTitle   string    `json:"display_title"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+	StartedAt      time.Time `json:"run_started_at"`
 	Status         Status
 	Conclusion     Conclusion
 	Event          string
 	ID             int64
+	workflowName   string // cache column
 	WorkflowID     int64  `json:"workflow_id"`
+	Number         int64  `json:"run_number"`
+	Attempts       uint8  `json:"run_attempt"`
 	HeadBranch     string `json:"head_branch"`
 	JobsURL        string `json:"jobs_url"`
 	HeadCommit     Commit `json:"head_commit"`
 	HeadSha        string `json:"head_sha"`
 	URL            string `json:"html_url"`
 	HeadRepository Repo   `json:"head_repository"`
+	Jobs           []Job  `json:"-"` // populated by GetJobs
+}
+
+func (r *Run) StartedTime() time.Time {
+	if r.StartedAt.IsZero() {
+		return r.CreatedAt
+	}
+	return r.StartedAt
+}
+
+func (r *Run) Duration(now time.Time) time.Duration {
+	endTime := r.UpdatedAt
+	if r.Status != Completed {
+		endTime = now
+	}
+	d := endTime.Sub(r.StartedTime())
+	if d < 0 {
+		return 0
+	}
+	return d.Round(time.Second)
 }
 
 type Repo struct {
@@ -85,13 +117,24 @@ type Commit struct {
 	Message string
 }
 
-func (r Run) CommitMsg() string {
+// Title is the display title for a run, falling back to the commit subject if unavailable
+func (r Run) Title() string {
+	if r.DisplayTitle != "" {
+		return r.DisplayTitle
+	}
+
 	commitLines := strings.Split(r.HeadCommit.Message, "\n")
 	if len(commitLines) > 0 {
 		return commitLines[0]
 	} else {
 		return r.HeadSha[0:8]
 	}
+}
+
+// WorkflowName returns the human-readable name of the workflow that this run belongs to.
+// TODO: consider lazy-loading the underlying API data to avoid extra API calls unless necessary
+func (r Run) WorkflowName() string {
+	return r.workflowName
 }
 
 func (r *Run) ExportData(fields []string) map[string]interface{} {
@@ -109,6 +152,36 @@ func (r *Run) ExportData(fields []string) map[string]interface{} {
 			data[f] = r.ID
 		case "workflowDatabaseId":
 			data[f] = r.WorkflowID
+		case "workflowName":
+			data[f] = r.WorkflowName()
+		case "jobs":
+			jobs := make([]interface{}, 0, len(r.Jobs))
+			for _, j := range r.Jobs {
+				steps := make([]interface{}, 0, len(j.Steps))
+				for _, s := range j.Steps {
+					steps = append(steps, map[string]interface{}{
+						"name":       s.Name,
+						"status":     s.Status,
+						"conclusion": s.Conclusion,
+						"number":     s.Number,
+					})
+				}
+				var completedAt *time.Time
+				if !j.CompletedAt.IsZero() {
+					completedAt = &j.CompletedAt
+				}
+				jobs = append(jobs, map[string]interface{}{
+					"databaseId":  j.ID,
+					"status":      j.Status,
+					"conclusion":  j.Conclusion,
+					"name":        j.Name,
+					"steps":       steps,
+					"startedAt":   j.StartedAt,
+					"completedAt": completedAt,
+					"url":         j.URL,
+				})
+				data[f] = jobs
+			}
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()
@@ -206,18 +279,22 @@ type RunsPayload struct {
 }
 
 type FilterOptions struct {
-	Branch string
-	Actor  string
+	Branch     string
+	Actor      string
+	WorkflowID int64
+	// avoid loading workflow name separately and use the provided one
+	WorkflowName string
 }
 
+// GetRunsWithFilter fetches 50 runs from the API and filters them in-memory
 func GetRunsWithFilter(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, limit int, f func(Run) bool) ([]Run, error) {
-	path := fmt.Sprintf("repos/%s/actions/runs", ghrepo.FullName(repo))
-	runs, err := getRuns(client, repo, path, opts, 50)
+	runs, err := GetRuns(client, repo, opts, 50)
 	if err != nil {
 		return nil, err
 	}
-	filtered := []Run{}
-	for _, run := range runs {
+
+	var filtered []Run
+	for _, run := range runs.WorkflowRuns {
 		if f(run) {
 			filtered = append(filtered, run)
 		}
@@ -229,81 +306,105 @@ func GetRunsWithFilter(client *api.Client, repo ghrepo.Interface, opts *FilterOp
 	return filtered, nil
 }
 
-func GetRunsByWorkflow(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, limit int, workflowID int64) ([]Run, error) {
-	path := fmt.Sprintf("repos/%s/actions/workflows/%d/runs", ghrepo.FullName(repo), workflowID)
-	return getRuns(client, repo, path, opts, limit)
-}
-
-func GetRuns(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, limit int) ([]Run, error) {
+func GetRuns(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, limit int) (*RunsPayload, error) {
 	path := fmt.Sprintf("repos/%s/actions/runs", ghrepo.FullName(repo))
-	return getRuns(client, repo, path, opts, limit)
-}
+	if opts != nil && opts.WorkflowID > 0 {
+		path = fmt.Sprintf("repos/%s/actions/workflows/%d/runs", ghrepo.FullName(repo), opts.WorkflowID)
+	}
 
-func getRuns(client *api.Client, repo ghrepo.Interface, path string, opts *FilterOptions, limit int) ([]Run, error) {
 	perPage := limit
-	page := 1
 	if limit > 100 {
 		perPage = 100
 	}
+	path += fmt.Sprintf("?per_page=%d", perPage)
+	path += "&exclude_pull_requests=true" // significantly reduces payload size
 
-	runs := []Run{}
-
-	for len(runs) < limit {
-		var result RunsPayload
-
-		parsed, err := url.Parse(path)
-		if err != nil {
-			return nil, err
+	if opts != nil {
+		if opts.Branch != "" {
+			path += fmt.Sprintf("&branch=%s", url.QueryEscape(opts.Branch))
 		}
-		query := parsed.Query()
-		query.Set("per_page", fmt.Sprintf("%d", perPage))
-		query.Set("page", fmt.Sprintf("%d", page))
-		if opts != nil {
-			if opts.Branch != "" {
-				query.Set("branch", opts.Branch)
-			}
-			if opts.Actor != "" {
-				query.Set("actor", opts.Actor)
-			}
+		if opts.Actor != "" {
+			path += fmt.Sprintf("&actor=%s", url.QueryEscape(opts.Actor))
 		}
-		parsed.RawQuery = query.Encode()
-		pagedPath := parsed.String()
-
-		err = client.REST(repo.RepoHost(), "GET", pagedPath, nil, &result)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(result.WorkflowRuns) == 0 {
-			break
-		}
-
-		for _, run := range result.WorkflowRuns {
-			runs = append(runs, run)
-			if len(runs) == limit {
-				break
-			}
-		}
-
-		if len(result.WorkflowRuns) < perPage {
-			break
-		}
-
-		page++
 	}
 
-	return runs, nil
+	var result *RunsPayload
+
+pagination:
+	for path != "" {
+		var response RunsPayload
+		var err error
+		path, err = client.RESTWithNext(repo.RepoHost(), "GET", path, nil, &response)
+		if err != nil {
+			return nil, err
+		}
+
+		if result == nil {
+			result = &response
+			if len(result.WorkflowRuns) == limit {
+				break pagination
+			}
+		} else {
+			for _, run := range response.WorkflowRuns {
+				result.WorkflowRuns = append(result.WorkflowRuns, run)
+				if len(result.WorkflowRuns) == limit {
+					break pagination
+				}
+			}
+		}
+	}
+
+	if opts != nil && opts.WorkflowName != "" {
+		for i := range result.WorkflowRuns {
+			result.WorkflowRuns[i].workflowName = opts.WorkflowName
+		}
+	} else if len(result.WorkflowRuns) > 0 {
+		if err := preloadWorkflowNames(client, repo, result.WorkflowRuns); err != nil {
+			return result, err
+		}
+	}
+
+	return result, nil
+}
+
+func preloadWorkflowNames(client *api.Client, repo ghrepo.Interface, runs []Run) error {
+	workflows, err := workflowShared.GetWorkflows(client, repo, 0)
+	if err != nil {
+		return err
+	}
+
+	workflowMap := map[int64]string{}
+	for _, wf := range workflows {
+		workflowMap[wf.ID] = wf.Name
+	}
+
+	for i, run := range runs {
+		if _, ok := workflowMap[run.WorkflowID]; !ok {
+			// Look up workflow by ID because it may have been deleted
+			workflow, err := workflowShared.GetWorkflow(client, repo, run.WorkflowID)
+			if err != nil {
+				return err
+			}
+			workflowMap[run.WorkflowID] = workflow.Name
+		}
+		runs[i].workflowName = workflowMap[run.WorkflowID]
+	}
+	return nil
 }
 
 type JobsPayload struct {
 	Jobs []Job
 }
 
-func GetJobs(client *api.Client, repo ghrepo.Interface, run Run) ([]Job, error) {
+func GetJobs(client *api.Client, repo ghrepo.Interface, run *Run) ([]Job, error) {
+	if run.Jobs != nil {
+		return run.Jobs, nil
+	}
 	var result JobsPayload
 	if err := client.REST(repo.RepoHost(), "GET", run.JobsURL, nil, &result); err != nil {
 		return nil, err
 	}
+	run.Jobs = result.Jobs
 	return result.Jobs, nil
 }
 
@@ -329,11 +430,12 @@ func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 		symbol, _ := Symbol(cs, run.Status, run.Conclusion)
 		candidates = append(candidates,
 			// TODO truncate commit message, long ones look terrible
-			fmt.Sprintf("%s %s, %s (%s) %s", symbol, run.CommitMsg(), run.Name, run.HeadBranch, preciseAgo(now, run.CreatedAt)))
+			fmt.Sprintf("%s %s, %s (%s) %s", symbol, run.Title(), run.WorkflowName(), run.HeadBranch, preciseAgo(now, run.StartedTime())))
 	}
 
 	// TODO consider custom filter so it's fuzzier. right now matches start anywhere in string but
 	// become contiguous
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err := prompt.SurveyAskOne(&survey.Select{
 		Message:  "Select a workflow run",
 		Options:  candidates,
@@ -350,11 +452,19 @@ func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 func GetRun(client *api.Client, repo ghrepo.Interface, runID string) (*Run, error) {
 	var result Run
 
-	path := fmt.Sprintf("repos/%s/actions/runs/%s", ghrepo.FullName(repo), runID)
+	path := fmt.Sprintf("repos/%s/actions/runs/%s?exclude_pull_requests=true", ghrepo.FullName(repo), runID)
 
 	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
 	if err != nil {
 		return nil, err
+	}
+
+	// Set name to workflow name
+	workflow, err := workflowShared.GetWorkflow(client, repo, result.WorkflowID)
+	if err != nil {
+		return nil, err
+	} else {
+		result.workflowName = workflow.Name
 	}
 
 	return &result, nil

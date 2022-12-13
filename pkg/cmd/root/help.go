@@ -3,34 +3,35 @@ package root
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
-func rootUsageFunc(command *cobra.Command) error {
-	command.Printf("Usage:  %s", command.UseLine())
+func rootUsageFunc(w io.Writer, command *cobra.Command) error {
+	fmt.Fprintf(w, "Usage:  %s", command.UseLine())
 
 	subcommands := command.Commands()
 	if len(subcommands) > 0 {
-		command.Print("\n\nAvailable commands:\n")
+		fmt.Fprint(w, "\n\nAvailable commands:\n")
 		for _, c := range subcommands {
 			if c.Hidden {
 				continue
 			}
-			command.Printf("  %s\n", c.Name())
+			fmt.Fprintf(w, "  %s\n", c.Name())
 		}
 		return nil
 	}
 
 	flagUsages := command.LocalFlags().FlagUsages()
 	if flagUsages != "" {
-		command.Println("\n\nFlags:")
-		command.Print(text.Indent(dedent(flagUsages), "  "))
+		fmt.Fprintln(w, "\n\nFlags:")
+		fmt.Fprint(w, text.Indent(dedent(flagUsages), "  "))
 	}
 	return nil
 }
@@ -52,8 +53,8 @@ func HasFailed() bool {
 // Display helpful error message in case subcommand name was mistyped.
 // This matches Cobra's behavior for root command, which Cobra
 // confusingly doesn't apply to nested commands.
-func nestedSuggestFunc(command *cobra.Command, arg string) {
-	command.Printf("unknown command %q for %q\n", arg, command.CommandPath())
+func nestedSuggestFunc(w io.Writer, command *cobra.Command, arg string) {
+	fmt.Fprintf(w, "unknown command %q for %q\n", arg, command.CommandPath())
 
 	var candidates []string
 	if arg == "help" {
@@ -66,14 +67,14 @@ func nestedSuggestFunc(command *cobra.Command, arg string) {
 	}
 
 	if len(candidates) > 0 {
-		command.Print("\nDid you mean this?\n")
+		fmt.Fprint(w, "\nDid you mean this?\n")
 		for _, c := range candidates {
-			command.Printf("\t%s\n", c)
+			fmt.Fprintf(w, "\t%s\n", c)
 		}
 	}
 
-	command.Print("\n")
-	_ = rootUsageFunc(command)
+	fmt.Fprint(w, "\n")
+	_ = rootUsageFunc(w, command)
 }
 
 func isRootCmd(command *cobra.Command) bool {
@@ -81,10 +82,21 @@ func isRootCmd(command *cobra.Command) bool {
 }
 
 func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
+	if isRootCmd(command) {
+		if versionVal, err := command.Flags().GetBool("version"); err == nil && versionVal {
+			fmt.Fprint(f.IOStreams.Out, command.Annotations["versionInfo"])
+			return
+		} else if err != nil {
+			fmt.Fprintln(f.IOStreams.ErrOut, err)
+			hasFailed = true
+			return
+		}
+	}
+
 	cs := f.IOStreams.ColorScheme()
 
 	if isRootCmd(command.Parent()) && len(args) >= 2 && args[1] != "--help" && args[1] != "-h" {
-		nestedSuggestFunc(command, args[1])
+		nestedSuggestFunc(f.IOStreams.ErrOut, command, args[1])
 		hasFailed = true
 		return
 	}
@@ -190,7 +202,7 @@ Read the manual at https://cli.github.com/manual`})
 		helpEntries = append(helpEntries, helpEntry{"FEEDBACK", command.Annotations["help:feedback"]})
 	}
 
-	out := command.OutOrStdout()
+	out := f.IOStreams.Out
 	for _, e := range helpEntries {
 		if e.Title != "" {
 			// If there is a title, add indentation to each line in the body

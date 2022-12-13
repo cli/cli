@@ -103,6 +103,7 @@ func (a *App) ListPorts(ctx context.Context, codespaceName string, exporter cmdu
 	}
 
 	cs := a.io.ColorScheme()
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(a.io)
 
 	if tp.IsTTY() {
@@ -130,7 +131,7 @@ type portInfo struct {
 }
 
 func (pi *portInfo) BrowseURL() string {
-	return fmt.Sprintf("https://%s-%d.githubpreview.dev", pi.codespace.Name, pi.Port.SourcePort)
+	return fmt.Sprintf("https://%s-%d.preview.app.github.dev", pi.codespace.Name, pi.Port.SourcePort)
 }
 
 func (pi *portInfo) Label() string {
@@ -167,7 +168,7 @@ func (pi *portInfo) ExportData(fields []string) map[string]interface{} {
 		case "browseUrl":
 			data[f] = pi.BrowseURL()
 		default:
-			panic("unkown field: " + f)
+			panic("unknown field: " + f)
 		}
 	}
 

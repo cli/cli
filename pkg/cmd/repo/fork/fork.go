@@ -1,6 +1,7 @@
 package fork
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -9,15 +10,14 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/context"
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/run"
+	"github.com/cli/cli/v2/pkg/cmd/repo/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -26,10 +26,11 @@ const defaultRemoteName = "origin"
 
 type ForkOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitClient  *git.Client
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
-	Remotes    func() (context.Remotes, error)
+	Remotes    func() (ghContext.Remotes, error)
 	Since      func(time.Time) time.Duration
 
 	GitArgs      []string
@@ -52,6 +53,7 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 	opts := &ForkOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Config:     f.Config,
 		BaseRepo:   f.BaseRepo,
 		Remotes:    f.Remotes,
@@ -138,7 +140,7 @@ func forkRun(opts *ForkOptions) error {
 	} else {
 		repoArg := opts.Repository
 
-		if utils.IsURL(repoArg) {
+		if isURL(repoArg) {
 			parsedURL, err := url.Parse(repoArg)
 			if err != nil {
 				return fmt.Errorf("did not understand argument: %w", err)
@@ -179,7 +181,7 @@ func forkRun(opts *ForkOptions) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	opts.IO.StartProgressIndicator()
-	forkedRepo, err := api.ForkRepo(apiClient, repoToFork, opts.Organization)
+	forkedRepo, err := api.ForkRepo(apiClient, repoToFork, opts.Organization, opts.ForkName)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to fork: %w", err)
@@ -206,8 +208,8 @@ func forkRun(opts *ForkOptions) error {
 		}
 	}
 
-	// Rename the forked repo if ForkName is specified in opts.
-	if opts.ForkName != "" {
+	// Rename the new repo if necessary
+	if opts.ForkName != "" && !strings.EqualFold(forkedRepo.RepoName(), shared.NormalizeRepoName(opts.ForkName)) {
 		forkedRepo, err = api.RenameRepo(apiClient, forkedRepo, opts.ForkName)
 		if err != nil {
 			return fmt.Errorf("could not rename fork: %w", err)
@@ -225,10 +227,10 @@ func forkRun(opts *ForkOptions) error {
 	if err != nil {
 		return err
 	}
-	protocol, err := cfg.Get(repoToFork.RepoHost(), "git_protocol")
-	if err != nil {
-		return err
-	}
+	protocol, _ := cfg.Get(repoToFork.RepoHost(), "git_protocol")
+
+	gitClient := opts.GitClient
+	ctx := context.Background()
 
 	if inParent {
 		remotes, err := opts.Remotes()
@@ -248,7 +250,7 @@ func forkRun(opts *ForkOptions) error {
 				if scheme != "" {
 					protocol = scheme
 				} else {
-					protocol = cfg.Default("git_protocol")
+					protocol = "https"
 				}
 			}
 		}
@@ -262,11 +264,13 @@ func forkRun(opts *ForkOptions) error {
 
 		remoteDesired := opts.Remote
 		if opts.PromptRemote {
+			//nolint:staticcheck // SA1019: prompt.Confirm is deprecated: use Prompter
 			err = prompt.Confirm("Would you like to add a remote for the fork?", &remoteDesired)
 			if err != nil {
 				return fmt.Errorf("failed to prompt: %w", err)
 			}
 		}
+
 		if remoteDesired {
 			remoteName := opts.RemoteName
 			remotes, err := opts.Remotes()
@@ -277,11 +281,11 @@ func forkRun(opts *ForkOptions) error {
 			if _, err := remotes.FindByName(remoteName); err == nil {
 				if opts.Rename {
 					renameTarget := "upstream"
-					renameCmd, err := git.GitCommand("remote", "rename", remoteName, renameTarget)
+					renameCmd, err := gitClient.Command(ctx, "remote", "rename", remoteName, renameTarget)
 					if err != nil {
 						return err
 					}
-					err = run.PrepareCmd(renameCmd).Run()
+					_, err = renameCmd.Output()
 					if err != nil {
 						return err
 					}
@@ -292,7 +296,7 @@ func forkRun(opts *ForkOptions) error {
 
 			forkedRepoCloneURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
 
-			_, err = git.AddRemote(remoteName, forkedRepoCloneURL)
+			_, err = gitClient.AddRemote(ctx, remoteName, forkedRepoCloneURL, []string{})
 			if err != nil {
 				return fmt.Errorf("failed to add remote: %w", err)
 			}
@@ -304,6 +308,7 @@ func forkRun(opts *ForkOptions) error {
 	} else {
 		cloneDesired := opts.Clone
 		if opts.PromptClone {
+			//nolint:staticcheck // SA1019: prompt.Confirm is deprecated: use Prompter
 			err = prompt.Confirm("Would you like to clone the fork?", &cloneDesired)
 			if err != nil {
 				return fmt.Errorf("failed to prompt: %w", err)
@@ -311,13 +316,13 @@ func forkRun(opts *ForkOptions) error {
 		}
 		if cloneDesired {
 			forkedRepoURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
-			cloneDir, err := git.RunClone(forkedRepoURL, opts.GitArgs)
+			cloneDir, err := gitClient.Clone(ctx, forkedRepoURL, opts.GitArgs)
 			if err != nil {
 				return fmt.Errorf("failed to clone fork: %w", err)
 			}
 
 			upstreamURL := ghrepo.FormatRemoteURL(repoToFork, protocol)
-			err = git.AddUpstreamRemote(upstreamURL, cloneDir, []string{})
+			_, err = gitClient.AddRemote(ctx, "upstream", upstreamURL, []string{}, git.WithRepoDir(cloneDir))
 			if err != nil {
 				return err
 			}
@@ -329,4 +334,8 @@ func forkRun(opts *ForkOptions) error {
 	}
 
 	return nil
+}
+
+func isURL(s string) bool {
+	return strings.HasPrefix(s, "http:/") || strings.HasPrefix(s, "https:/")
 }

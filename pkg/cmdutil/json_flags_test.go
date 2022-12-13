@@ -1,7 +1,6 @@
 package cmdutil
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"testing"
@@ -179,10 +178,7 @@ func Test_exportFormat_Write(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := &bytes.Buffer{}
-			io := &iostreams.IOStreams{
-				Out: w,
-			}
+			io, _, w, _ := iostreams.Test()
 			if err := tt.exporter.Write(io, tt.args.data); (err != nil) != tt.wantErr {
 				t.Errorf("exportFormat.Write() error = %v, wantErr %v", err, tt.wantErr)
 				return

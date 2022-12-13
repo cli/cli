@@ -31,7 +31,7 @@ builds:
   - <<: *build_defaults
     id: windows
     goos: [windows]
-    goarch: [386, amd64]
+    goarch: [386, amd64, arm64]
     hooks:
       post:
         - ./script/sign-windows-executable.sh '{{ .Path }}'
@@ -60,7 +60,7 @@ nfpms:
   - license: MIT
     maintainer: GitHub
     homepage: https://github.com/cli/cli
-    bindir: /usr/bin
+    bindir: /usr
     dependencies:
       - git
     description: GitHub’s official command line tool.

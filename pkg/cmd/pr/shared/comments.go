@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/markdown"
-	"github.com/cli/cli/v2/pkg/text"
-	"github.com/cli/cli/v2/utils"
 )
 
 type Comment interface {
+	Identifier() string
 	AuthorLogin() string
 	Association() string
 	Content() string
@@ -62,7 +62,7 @@ func CommentList(io *iostreams.IOStreams, comments api.Comments, reviews api.Pul
 	hiddenCount := totalCount - retrievedCount
 
 	if preview && hiddenCount > 0 {
-		fmt.Fprint(&b, cs.Gray(fmt.Sprintf("———————— Not showing %s ————————", utils.Pluralize(hiddenCount, "comment"))))
+		fmt.Fprint(&b, cs.Gray(fmt.Sprintf("———————— Not showing %s ————————", text.Pluralize(hiddenCount, "comment"))))
 		fmt.Fprintf(&b, "\n\n\n")
 	}
 
@@ -102,7 +102,7 @@ func formatComment(io *iostreams.IOStreams, comment Comment, newest bool) (strin
 	if comment.Association() != "NONE" {
 		fmt.Fprint(&b, cs.Boldf(" (%s)", text.Title(comment.Association())))
 	}
-	fmt.Fprint(&b, cs.Boldf(" • %s", utils.FuzzyAgoAbbr(time.Now(), comment.Created())))
+	fmt.Fprint(&b, cs.Boldf(" • %s", text.FuzzyAgoAbbr(time.Now(), comment.Created())))
 	if comment.IsEdited() {
 		fmt.Fprint(&b, cs.Bold(" • Edited"))
 	}
@@ -124,7 +124,9 @@ func formatComment(io *iostreams.IOStreams, comment Comment, newest bool) (strin
 	if comment.Content() == "" {
 		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No body provided"))
 	} else {
-		md, err = markdown.Render(comment.Content(), markdown.WithIO(io))
+		md, err = markdown.Render(comment.Content(),
+			markdown.WithTheme(io.TerminalTheme()),
+			markdown.WithWrap(io.TerminalWidth()))
 		if err != nil {
 			return "", err
 		}

@@ -64,10 +64,7 @@ func deleteRun(opts *DeleteOptions) error {
 		return err
 	}
 
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
 	apiClient := api.NewClientFromHTTP(client)
 	if err := deleteGist(apiClient, host, gistID); err != nil {

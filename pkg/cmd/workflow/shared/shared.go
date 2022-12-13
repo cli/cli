@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -104,6 +105,7 @@ func SelectWorkflow(workflows []Workflow, promptMsg string, states []WorkflowSta
 
 	var selected int
 
+	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 	err := prompt.SurveyAskOne(&survey.Select{
 		Message:  promptMsg,
 		Options:  candidates,
@@ -116,32 +118,38 @@ func SelectWorkflow(workflows []Workflow, promptMsg string, states []WorkflowSta
 	return &filtered[selected], nil
 }
 
+// FindWorkflow looks up a workflow either by numeric database ID, file name, or its Name field
 func FindWorkflow(client *api.Client, repo ghrepo.Interface, workflowSelector string, states []WorkflowState) ([]Workflow, error) {
 	if workflowSelector == "" {
 		return nil, errors.New("empty workflow selector")
 	}
 
-	workflow, err := getWorkflowByID(client, repo, workflowSelector)
-	if err == nil {
-		return []Workflow{*workflow}, nil
-	} else {
-		var httpErr api.HTTPError
-		if !errors.As(err, &httpErr) || httpErr.StatusCode != 404 {
+	if _, err := strconv.Atoi(workflowSelector); err == nil || isWorkflowFile(workflowSelector) {
+		workflow, err := getWorkflowByID(client, repo, workflowSelector)
+		if err != nil {
 			return nil, err
 		}
+		return []Workflow{*workflow}, nil
 	}
 
 	return getWorkflowsByName(client, repo, workflowSelector, states)
 }
 
+func GetWorkflow(client *api.Client, repo ghrepo.Interface, workflowID int64) (*Workflow, error) {
+	return getWorkflowByID(client, repo, strconv.FormatInt(workflowID, 10))
+}
+
+func isWorkflowFile(f string) bool {
+	name := strings.ToLower(f)
+	return strings.HasSuffix(name, ".yml") || strings.HasSuffix(name, ".yaml")
+}
+
+// ID can be either a numeric database ID or the workflow file name
 func getWorkflowByID(client *api.Client, repo ghrepo.Interface, ID string) (*Workflow, error) {
 	var workflow Workflow
 
-	err := client.REST(repo.RepoHost(), "GET",
-		fmt.Sprintf("repos/%s/actions/workflows/%s", ghrepo.FullName(repo), ID),
-		nil, &workflow)
-
-	if err != nil {
+	path := fmt.Sprintf("repos/%s/actions/workflows/%s", ghrepo.FullName(repo), url.PathEscape(ID))
+	if err := client.REST(repo.RepoHost(), "GET", path, nil, &workflow); err != nil {
 		return nil, err
 	}
 
@@ -153,24 +161,17 @@ func getWorkflowsByName(client *api.Client, repo ghrepo.Interface, name string, 
 	if err != nil {
 		return nil, fmt.Errorf("couldn't fetch workflows for %s: %w", ghrepo.FullName(repo), err)
 	}
-	filtered := []Workflow{}
 
+	var filtered []Workflow
 	for _, workflow := range workflows {
-		desiredState := false
-		for _, state := range states {
-			if workflow.State == state {
-				desiredState = true
-				break
-			}
-		}
-
-		if !desiredState {
+		if !strings.EqualFold(workflow.Name, name) {
 			continue
 		}
-
-		// TODO consider fuzzy or prefix match
-		if strings.EqualFold(workflow.Name, name) {
-			filtered = append(filtered, workflow)
+		for _, state := range states {
+			if workflow.State == state {
+				filtered = append(filtered, workflow)
+				break
+			}
 		}
 	}
 

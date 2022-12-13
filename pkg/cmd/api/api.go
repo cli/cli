@@ -20,9 +20,10 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/export"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/jsoncolor"
+	"github.com/cli/go-gh/pkg/jq"
+	"github.com/cli/go-gh/pkg/template"
 	"github.com/spf13/cobra"
 )
 
@@ -214,11 +215,11 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in `key=value` format")
 	cmd.Flags().StringArrayVarP(&opts.RequestHeaders, "header", "H", nil, "Add a HTTP request header in `key:value` format")
 	cmd.Flags().StringSliceVarP(&opts.Previews, "preview", "p", nil, "GitHub API preview `names` to request (without the \"-preview\" suffix)")
-	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response headers in the output")
+	cmd.Flags().BoolVarP(&opts.ShowResponseHeaders, "include", "i", false, "Include HTTP response status line and headers in the output")
 	cmd.Flags().BoolVar(&opts.Paginate, "paginate", false, "Make additional HTTP requests to fetch all pages of results")
 	cmd.Flags().StringVar(&opts.RequestInputFile, "input", "", "The `file` to use as body for the HTTP request (use \"-\" to read from standard input)")
 	cmd.Flags().BoolVar(&opts.Silent, "silent", false, "Do not print the response body")
-	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format the response using a Go template")
+	cmd.Flags().StringVarP(&opts.Template, "template", "t", "", "Format JSON output using a Go template; see \"gh help formatting\"")
 	cmd.Flags().StringVarP(&opts.FilterOutput, "jq", "q", "", "Query to select values from the response using jq syntax")
 	cmd.Flags().DurationVar(&opts.CacheTTL, "cache", 0, "Cache the response, e.g. \"3600s\", \"60m\", \"1h\"")
 	return cmd
@@ -269,13 +270,10 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 	if opts.CacheTTL > 0 {
-		httpClient = api.NewCachedClient(httpClient, opts.CacheTTL)
+		httpClient = api.NewCachedHTTPClient(httpClient, opts.CacheTTL)
 	}
 
-	headersOutputStream := opts.IO.Out
-	if opts.Silent {
-		opts.IO.Out = io.Discard
-	} else {
+	if !opts.Silent {
 		if err := opts.IO.StartPager(); err == nil {
 			defer opts.IO.StopPager()
 		} else {
@@ -283,21 +281,28 @@ func apiRun(opts *ApiOptions) error {
 		}
 	}
 
+	var bodyWriter io.Writer = opts.IO.Out
+	var headersWriter io.Writer = opts.IO.Out
+	if opts.Silent {
+		bodyWriter = io.Discard
+	}
+
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
 	}
 
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
 	if opts.Hostname != "" {
 		host = opts.Hostname
 	}
 
-	template := export.NewTemplate(opts.IO, opts.Template)
+	tmpl := template.New(bodyWriter, opts.IO.TerminalWidth(), opts.IO.ColorEnabled())
+	err = tmpl.Parse(opts.Template)
+	if err != nil {
+		return err
+	}
 
 	hasNextPage := true
 	for hasNextPage {
@@ -306,7 +311,7 @@ func apiRun(opts *ApiOptions) error {
 			return err
 		}
 
-		endCursor, err := processResponse(resp, opts, headersOutputStream, &template)
+		endCursor, err := processResponse(resp, opts, bodyWriter, headersWriter, &tmpl)
 		if err != nil {
 			return err
 		}
@@ -330,14 +335,14 @@ func apiRun(opts *ApiOptions) error {
 		}
 	}
 
-	return template.End()
+	return tmpl.Flush()
 }
 
-func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream io.Writer, template *export.Template) (endCursor string, err error) {
+func processResponse(resp *http.Response, opts *ApiOptions, bodyWriter, headersWriter io.Writer, template *template.Template) (endCursor string, err error) {
 	if opts.ShowResponseHeaders {
-		fmt.Fprintln(headersOutputStream, resp.Proto, resp.Status)
-		printHeaders(headersOutputStream, resp.Header, opts.IO.ColorEnabled())
-		fmt.Fprint(headersOutputStream, "\r\n")
+		fmt.Fprintln(headersWriter, resp.Proto, resp.Status)
+		printHeaders(headersWriter, resp.Header, opts.IO.ColorEnabled())
+		fmt.Fprint(headersWriter, "\r\n")
 	}
 
 	if resp.StatusCode == 204 {
@@ -365,20 +370,19 @@ func processResponse(resp *http.Response, opts *ApiOptions, headersOutputStream 
 
 	if opts.FilterOutput != "" && serverError == "" {
 		// TODO: reuse parsed query across pagination invocations
-		err = export.FilterJSON(opts.IO.Out, responseBody, opts.FilterOutput)
+		err = jq.Evaluate(responseBody, bodyWriter, opts.FilterOutput)
 		if err != nil {
 			return
 		}
 	} else if opts.Template != "" && serverError == "" {
-		// TODO: reuse parsed template across pagination invocations
 		err = template.Execute(responseBody)
 		if err != nil {
 			return
 		}
 	} else if isJSON && opts.IO.ColorEnabled() {
-		err = jsoncolor.Write(opts.IO.Out, responseBody, "  ")
+		err = jsoncolor.Write(bodyWriter, responseBody, "  ")
 	} else {
-		_, err = io.Copy(opts.IO.Out, responseBody)
+		_, err = io.Copy(bodyWriter, responseBody)
 	}
 	if err != nil {
 		return

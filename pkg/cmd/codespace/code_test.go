@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
@@ -62,7 +62,7 @@ func TestApp_VSCode(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := &cmdutil.TestBrowser{}
+			b := &browser.Stub{}
 			ios, _, stdout, stderr := iostreams.Test()
 			a := &App{
 				browser:   b,
@@ -101,7 +101,6 @@ func testingCodeApp() *App {
 }
 
 func testCodeApiMock() *apiClientMock {
-	user := &api.User{Login: "monalisa"}
 	testingCodespace := &api.Codespace{
 		Name:   "monalisa-cli-cli-abcdef",
 		WebURL: "https://monalisa-cli-cli-abcdef.github.dev",
@@ -117,12 +116,6 @@ func testCodeApiMock() *apiClientMock {
 				return disabledCodespace, nil
 			}
 			return testingCodespace, nil
-		},
-		GetUserFunc: func(_ context.Context) (*api.User, error) {
-			return user, nil
-		},
-		AuthorizedKeysFunc: func(_ context.Context, _ string) ([]byte, error) {
-			return []byte{}, nil
 		},
 	}
 }

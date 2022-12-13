@@ -1,16 +1,19 @@
 package label
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 type cloneOptions struct {
@@ -82,7 +85,7 @@ func cloneRun(opts *cloneOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
-	successCount, totalCount, err := cloneLabels(httpClient, opts.SourceRepo, baseRepo, opts.Force)
+	successCount, totalCount, err := cloneLabels(httpClient, baseRepo, opts)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -91,9 +94,10 @@ func cloneRun(opts *cloneOptions) error {
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
 		pluralize := func(num int) string {
-			return utils.Pluralize(num, "label")
+			return text.Pluralize(num, "label")
 		}
 
+		successCount := int(successCount)
 		switch {
 		case successCount == totalCount:
 			fmt.Fprintf(opts.IO.Out, "%s Cloned %s from %s to %s\n", cs.SuccessIcon(), pluralize(successCount), ghrepo.FullName(opts.SourceRepo), ghrepo.FullName(baseRepo))
@@ -105,32 +109,52 @@ func cloneRun(opts *cloneOptions) error {
 	return nil
 }
 
-func cloneLabels(client *http.Client, source, destination ghrepo.Interface, force bool) (successCount, totalCount int, err error) {
+func cloneLabels(client *http.Client, destination ghrepo.Interface, opts *cloneOptions) (successCount uint32, totalCount int, err error) {
 	successCount = 0
-	labels, totalCount, err := listLabels(client, source, listQueryOptions{Limit: -1})
+	labels, totalCount, err := listLabels(client, opts.SourceRepo, listQueryOptions{Limit: -1})
 	if err != nil {
 		return
 	}
 
-	createOpts := createOptions{
-		Force: force,
+	workers := 10
+	toCreate := make(chan createOptions)
+
+	wg, ctx := errgroup.WithContext(context.Background())
+	for i := 0; i < workers; i++ {
+		wg.Go(func() error {
+			for {
+				select {
+				case <-ctx.Done():
+					return nil
+				case l, ok := <-toCreate:
+					if !ok {
+						return nil
+					}
+					err := createLabel(client, destination, &l)
+					if err != nil {
+						if !errors.Is(err, errLabelAlreadyExists) {
+							return err
+						}
+					} else {
+						atomic.AddUint32(&successCount, 1)
+					}
+				}
+			}
+		})
 	}
 
 	for _, label := range labels {
-		createOpts.Name = label.Name
-		createOpts.Description = label.Description
-		createOpts.Color = label.Color
-
-		createErr := createLabel(client, destination, &createOpts)
-		if createErr != nil {
-			if !errors.Is(createErr, errLabelAlreadyExists) {
-				err = createErr
-				return
-			}
-		} else {
-			successCount++
+		createOpts := createOptions{
+			Name:        label.Name,
+			Description: label.Description,
+			Color:       label.Color,
+			Force:       opts.Force,
 		}
+		toCreate <- createOpts
 	}
+
+	close(toCreate)
+	err = wg.Wait()
 
 	return
 }

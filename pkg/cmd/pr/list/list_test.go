@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -24,7 +26,7 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 	ios.SetStdinTTY(isTTY)
 	ios.SetStderrTTY(isTTY)
 
-	browser := &cmdutil.TestBrowser{}
+	browser := &browser.Stub{}
 	factory := &cmdutil.Factory{
 		IOStreams: ios,
 		Browser:   browser,
@@ -36,7 +38,14 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 		},
 	}
 
-	cmd := NewCmdList(factory, nil)
+	fakeNow := func() time.Time {
+		return time.Date(2022, time.August, 24, 23, 50, 0, 0, time.UTC)
+	}
+
+	cmd := NewCmdList(factory, func(opts *ListOptions) error {
+		opts.Now = fakeNow
+		return listRun(opts)
+	})
 
 	argv, err := shlex.Split(cli)
 	if err != nil {
@@ -75,9 +84,9 @@ func TestPRList(t *testing.T) {
 
 		Showing 3 of 3 open pull requests in OWNER/REPO
 
-		#32  New feature            feature
-		#29  Fixed bad bug          hubot:bug-fix
-		#28  Improve documentation  docs
+		#32  New feature            feature        about 3 hours ago
+		#29  Fixed bad bug          hubot:bug-fix  about 1 month ago
+		#28  Improve documentation  docs           about 2 years ago
 	`), output.String())
 	assert.Equal(t, ``, output.Stderr())
 }
@@ -95,9 +104,9 @@ func TestPRList_nontty(t *testing.T) {
 
 	assert.Equal(t, "", output.Stderr())
 
-	assert.Equal(t, `32	New feature	feature	DRAFT
-29	Fixed bad bug	hubot:bug-fix	OPEN
-28	Improve documentation	docs	MERGED
+	assert.Equal(t, `32	New feature	feature	DRAFT	2022-08-24 20:01:12 +0000 UTC
+29	Fixed bad bug	hubot:bug-fix	OPEN	2022-07-20 19:01:12 +0000 UTC
+28	Improve documentation	docs	MERGED	2020-01-26 19:01:12 +0000 UTC
 `, output.String())
 }
 

@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -31,6 +30,7 @@ type PullRequestReviews struct {
 }
 
 type PullRequestReview struct {
+	ID                  string         `json:"id"`
 	Author              Author         `json:"author"`
 	AuthorAssociation   string         `json:"authorAssociation"`
 	Body                string         `json:"body"`
@@ -39,6 +39,7 @@ type PullRequestReview struct {
 	ReactionGroups      ReactionGroups `json:"reactionGroups"`
 	State               string         `json:"state"`
 	URL                 string         `json:"url,omitempty"`
+	Commit              Commit         `json:"commit"`
 }
 
 func AddReview(client *Client, repo ghrepo.Interface, pr *PullRequest, input *PullRequestReviewInput) error {
@@ -65,8 +66,11 @@ func AddReview(client *Client, repo ghrepo.Interface, pr *PullRequest, input *Pu
 		},
 	}
 
-	gql := graphQLClient(client.http, repo.RepoHost())
-	return gql.MutateNamed(context.Background(), "PullRequestReviewAdd", &mutation, variables)
+	return client.Mutate(repo.RepoHost(), "PullRequestReviewAdd", &mutation, variables)
+}
+
+func (prr PullRequestReview) Identifier() string {
+	return prr.ID
 }
 
 func (prr PullRequestReview) AuthorLogin() string {

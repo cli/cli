@@ -29,16 +29,16 @@ func TestQueryString(t *testing.T) {
 					In:               []string{"description", "readme"},
 					Language:         "language",
 					License:          []string{"license"},
-					Org:              "org",
 					Pushed:           "updated",
 					Size:             "5",
 					Stars:            "6",
 					Topic:            []string{"topic"},
 					Topics:           "7",
+					User:             "user",
 					Is:               []string{"public"},
 				},
 			},
-			out: "some keywords archived:true created:created followers:1 fork:true forks:2 good-first-issues:3 help-wanted-issues:4 in:description in:readme is:public language:language license:license org:org pushed:updated size:5 stars:6 topic:topic topics:7",
+			out: "some keywords archived:true created:created followers:1 fork:true forks:2 good-first-issues:3 help-wanted-issues:4 in:description in:readme is:public language:language license:license pushed:updated size:5 stars:6 topic:topic topics:7 user:user",
 		},
 		{
 			name: "quotes keywords",
@@ -81,15 +81,15 @@ func TestQualifiersMap(t *testing.T) {
 				GoodFirstIssues:  "3",
 				HelpWantedIssues: "4",
 				In:               []string{"readme"},
+				Is:               []string{"public"},
 				Language:         "language",
 				License:          []string{"license"},
-				Org:              "org",
 				Pushed:           "updated",
 				Size:             "5",
 				Stars:            "6",
 				Topic:            []string{"topic"},
 				Topics:           "7",
-				Is:               []string{"public"},
+				User:             "user",
 			},
 			out: map[string][]string{
 				"archived":           {"true"},
@@ -103,33 +103,87 @@ func TestQualifiersMap(t *testing.T) {
 				"is":                 {"public"},
 				"language":           {"language"},
 				"license":            {"license"},
-				"org":                {"org"},
 				"pushed":             {"updated"},
 				"size":               {"5"},
 				"stars":              {"6"},
 				"topic":              {"topic"},
 				"topics":             {"7"},
+				"user":               {"user"},
 			},
 		},
 		{
 			name: "excludes unset qualifiers from map",
 			qualifiers: Qualifiers{
-				Org:    "org",
 				Pushed: "updated",
 				Size:   "5",
 				Stars:  "6",
+				User:   "user",
 			},
 			out: map[string][]string{
-				"org":    {"org"},
 				"pushed": {"updated"},
 				"size":   {"5"},
 				"stars":  {"6"},
+				"user":   {"user"},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.out, tt.qualifiers.Map())
+		})
+	}
+}
+
+func TestCamelToKebab(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		out  string
+	}{
+		{
+			name: "single lowercase word",
+			in:   "test",
+			out:  "test",
+		},
+		{
+			name: "multiple mixed words",
+			in:   "testTestTest",
+			out:  "test-test-test",
+		},
+		{
+			name: "multiple uppercase words",
+			in:   "TestTest",
+			out:  "test-test",
+		},
+		{
+			name: "multiple lowercase words",
+			in:   "testtest",
+			out:  "testtest",
+		},
+		{
+			name: "multiple mixed words with number",
+			in:   "test2Test",
+			out:  "test2-test",
+		},
+		{
+			name: "multiple lowercase words with number",
+			in:   "test2test",
+			out:  "test2test",
+		},
+		{
+			name: "multiple lowercase words with dash",
+			in:   "test-test",
+			out:  "test-test",
+		},
+		{
+			name: "multiple uppercase words with dash",
+			in:   "Test-Test",
+			out:  "test--test",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.out, camelToKebab(tt.in))
 		})
 	}
 }

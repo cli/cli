@@ -1,8 +1,8 @@
 package api
 
-import (
-	"context"
-)
+type Organization struct {
+	Login string
+}
 
 func CurrentLoginName(client *Client, hostname string) (string, error) {
 	var query struct {
@@ -10,9 +10,28 @@ func CurrentLoginName(client *Client, hostname string) (string, error) {
 			Login string
 		}
 	}
-	gql := graphQLClient(client.http, hostname)
-	err := gql.QueryNamed(context.Background(), "UserCurrent", &query, nil)
+	err := client.Query(hostname, "UserCurrent", &query, nil)
 	return query.Viewer.Login, err
+}
+
+func CurrentLoginNameAndOrgs(client *Client, hostname string) (string, []string, error) {
+	var query struct {
+		Viewer struct {
+			Login         string
+			Organizations struct {
+				Nodes []Organization
+			} `graphql:"organizations(first: 100)"`
+		}
+	}
+	err := client.Query(hostname, "UserCurrent", &query, nil)
+	if err != nil {
+		return "", nil, err
+	}
+	orgNames := []string{}
+	for _, org := range query.Viewer.Organizations.Nodes {
+		orgNames = append(orgNames, org.Login)
+	}
+	return query.Viewer.Login, orgNames, err
 }
 
 func CurrentUserID(client *Client, hostname string) (string, error) {
@@ -21,7 +40,6 @@ func CurrentUserID(client *Client, hostname string) (string, error) {
 			ID string
 		}
 	}
-	gql := graphQLClient(client.http, hostname)
-	err := gql.QueryNamed(context.Background(), "UserCurrent", &query, nil)
+	err := client.Query(hostname, "UserCurrent", &query, nil)
 	return query.Viewer.ID, err
 }

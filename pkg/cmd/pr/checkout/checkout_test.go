@@ -197,6 +197,11 @@ func Test_checkoutRun(t *testing.T) {
 				return remotes, nil
 			}
 
+			opts.GitClient = &git.Client{
+				GhPath:  "some/path/gh",
+				GitPath: "some/path/git",
+			}
+
 			err := checkoutRun(opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("want error: %v, got: %v", tt.wantErr, err)
@@ -233,6 +238,10 @@ func runCommand(rt http.RoundTripper, remotes context.Remotes, branch string, cl
 		},
 		Branch: func() (string, error) {
 			return branch, nil
+		},
+		GitClient: &git.Client{
+			GhPath:  "some/path/gh",
+			GitPath: "some/path/git",
 		},
 	}
 

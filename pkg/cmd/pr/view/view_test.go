@@ -7,9 +7,11 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"regexp"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -118,7 +120,7 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 	ios.SetStdinTTY(isTTY)
 	ios.SetStderrTTY(isTTY)
 
-	browser := &cmdutil.TestBrowser{}
+	browser := &browser.Stub{}
 	factory := &cmdutil.Factory{
 		IOStreams: ios,
 		Browser:   browser,
@@ -351,7 +353,8 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are from a fork #12`,
-				`Open.*nobody wants to merge 12 commits into master from blueberries.+100.-10`,
+				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
@@ -364,7 +367,8 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are from a fork #12`,
-				`Open.*nobody wants to merge 12 commits into master from blueberries.+100.-10`,
+				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10`,
 				`Reviewers:.*1 \(.*Requested.*\)\n`,
 				`Assignees:.*marseilles, monaco\n`,
 				`Labels:.*one, two, three, four, five\n`,
@@ -396,7 +400,8 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are from a fork #12`,
-				`Closed.*nobody wants to merge 12 commits into master from blueberries.+100.-10`,
+				`Closed.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
@@ -409,7 +414,8 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are from a fork #12`,
-				`Merged.*nobody wants to merge 12 commits into master from blueberries.+100.-10`,
+				`Merged.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
@@ -422,7 +428,78 @@ func TestPRView_Preview(t *testing.T) {
 			},
 			expectedOutputs: []string{
 				`Blueberries are from a fork #12`,
-				`Draft.*nobody wants to merge 12 commits into master from blueberries.+100.-10`,
+				`Draft.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
+			},
+		},
+		"Open PR with all checks passing": {
+			branch: "master",
+			args:   "12",
+			fixtures: map[string]string{
+				"PullRequestByNumber": "./fixtures/prViewPreviewWithAllChecksPassing.json",
+			},
+			expectedOutputs: []string{
+				`Blueberries are from a fork #12`,
+				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10 • ✓ Checks passing`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
+			},
+		},
+		"Open PR with all checks failing": {
+			branch: "master",
+			args:   "12",
+			fixtures: map[string]string{
+				"PullRequestByNumber": "./fixtures/prViewPreviewWithAllChecksFailing.json",
+			},
+			expectedOutputs: []string{
+				`Blueberries are from a fork #12`,
+				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10 • × All checks failing`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
+			},
+		},
+		"Open PR with some checks failing": {
+			branch: "master",
+			args:   "12",
+			fixtures: map[string]string{
+				"PullRequestByNumber": "./fixtures/prViewPreviewWithSomeChecksFailing.json",
+			},
+			expectedOutputs: []string{
+				`Blueberries are from a fork #12`,
+				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10 • × 1/2 checks failing`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
+			},
+		},
+		"Open PR with some checks pending": {
+			branch: "master",
+			args:   "12",
+			fixtures: map[string]string{
+				"PullRequestByNumber": "./fixtures/prViewPreviewWithSomeChecksPending.json",
+			},
+			expectedOutputs: []string{
+				`Blueberries are from a fork #12`,
+				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10 • - Checks pending`,
+				`blueberries taste good`,
+				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
+			},
+		},
+		"Open PR with no checks": {
+			branch: "master",
+			args:   "12",
+			fixtures: map[string]string{
+				"PullRequestByNumber": "./fixtures/prViewPreviewWithNoChecks.json",
+			},
+			expectedOutputs: []string{
+				`Blueberries are from a fork #12`,
+				`Open.*nobody wants to merge 12 commits into master from blueberries . about X years ago`,
+				`.+100.-10 • No checks`,
 				`blueberries taste good`,
 				`View this pull request on GitHub: https://github.com/OWNER/REPO/pull/12`,
 			},
@@ -445,8 +522,12 @@ func TestPRView_Preview(t *testing.T) {
 
 			assert.Equal(t, "", output.Stderr())
 
+			out := output.String()
+			timeRE := regexp.MustCompile(`\d+ years`)
+			out = timeRE.ReplaceAllString(out, "X years")
+
 			//nolint:staticcheck // prefer exact matchers over ExpectLines
-			test.ExpectLines(t, output.String(), tc.expectedOutputs...)
+			test.ExpectLines(t, out, tc.expectedOutputs...)
 		})
 	}
 }

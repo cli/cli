@@ -57,6 +57,10 @@ var IssueFields = []string{
 	"url",
 }
 
+var PullRequestFields = append(IssueFields,
+	"isDraft",
+)
+
 type RepositoriesResult struct {
 	IncompleteResults bool         `json:"incomplete_results"`
 	Items             []Repository `json:"items"`
@@ -116,28 +120,53 @@ type User struct {
 	URL        string `json:"html_url"`
 }
 
-type Issue struct {
-	Assignees         []User           `json:"assignees"`
-	Author            User             `json:"user"`
-	AuthorAssociation string           `json:"author_association"`
-	Body              string           `json:"body"`
-	ClosedAt          time.Time        `json:"closed_at"`
-	CommentsCount     int              `json:"comments"`
-	CreatedAt         time.Time        `json:"created_at"`
-	ID                string           `json:"node_id"`
-	Labels            []Label          `json:"labels"`
-	IsLocked          bool             `json:"locked"`
-	Number            int              `json:"number"`
-	PullRequestLinks  PullRequestLinks `json:"pull_request"`
-	RepositoryURL     string           `json:"repository_url"`
-	State             string           `json:"state"`
-	Title             string           `json:"title"`
-	URL               string           `json:"html_url"`
-	UpdatedAt         time.Time        `json:"updated_at"`
+func (u *User) IsBot() bool {
+	// copied from api/queries_issue.go
+	// would ideally be shared, but it would require coordinating a "user"
+	// abstraction in a bunch of places.
+	return u.ID == ""
 }
 
-type PullRequestLinks struct {
-	URL string `json:"html_url"`
+type Issue struct {
+	Assignees         []User    `json:"assignees"`
+	Author            User      `json:"user"`
+	AuthorAssociation string    `json:"author_association"`
+	Body              string    `json:"body"`
+	ClosedAt          time.Time `json:"closed_at"`
+	CommentsCount     int       `json:"comments"`
+	CreatedAt         time.Time `json:"created_at"`
+	ID                string    `json:"node_id"`
+	Labels            []Label   `json:"labels"`
+	// This is a PullRequest field which does not appear in issue results,
+	// but lives outside the PullRequest object.
+	IsDraft       *bool       `json:"draft,omitempty"`
+	IsLocked      bool        `json:"locked"`
+	Number        int         `json:"number"`
+	PullRequest   PullRequest `json:"pull_request"`
+	RepositoryURL string      `json:"repository_url"`
+	// StateInternal should not be used directly. Use State() instead.
+	StateInternal string    `json:"state"`
+	StateReason   string    `json:"state_reason"`
+	Title         string    `json:"title"`
+	URL           string    `json:"html_url"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+type PullRequest struct {
+	URL      string    `json:"html_url"`
+	MergedAt time.Time `json:"merged_at"`
+}
+
+// the state of an issue or a pull request,
+// may be either open or closed.
+// for a pull request, the "merged" state is
+// inferred from a value for merged_at and
+// which we take return instead of the "closed" state.
+func (issue Issue) State() string {
+	if !issue.PullRequest.MergedAt.IsZero() {
+		return "merged"
+	}
+	return issue.StateInternal
 }
 
 type Label struct {
@@ -174,7 +203,7 @@ func (repo Repository) ExportData(fields []string) map[string]interface{} {
 }
 
 func (issue Issue) IsPullRequest() bool {
-	return issue.PullRequestLinks.URL != ""
+	return issue.PullRequest.URL != ""
 }
 
 func (issue Issue) ExportData(fields []string) map[string]interface{} {
@@ -185,18 +214,30 @@ func (issue Issue) ExportData(fields []string) map[string]interface{} {
 		case "assignees":
 			assignees := make([]interface{}, 0, len(issue.Assignees))
 			for _, assignee := range issue.Assignees {
+				isBot := assignee.IsBot()
+				login := assignee.Login
+				if isBot {
+					login = "app/" + login
+				}
 				assignees = append(assignees, map[string]interface{}{
-					"id":    assignee.ID,
-					"login": assignee.Login,
-					"type":  assignee.Type,
+					"id":     assignee.ID,
+					"login":  login,
+					"type":   assignee.Type,
+					"is_bot": isBot,
 				})
 			}
 			data[f] = assignees
 		case "author":
+			isBot := issue.Author.IsBot()
+			login := issue.Author.Login
+			if isBot {
+				login = "app/" + login
+			}
 			data[f] = map[string]interface{}{
-				"id":    issue.Author.ID,
-				"login": issue.Author.Login,
-				"type":  issue.Author.Type,
+				"id":     issue.Author.ID,
+				"login":  login,
+				"type":   issue.Author.Type,
+				"is_bot": isBot,
 			}
 		case "isPullRequest":
 			data[f] = issue.IsPullRequest()
@@ -213,10 +254,14 @@ func (issue Issue) ExportData(fields []string) map[string]interface{} {
 			data[f] = labels
 		case "repository":
 			comp := strings.Split(issue.RepositoryURL, "/")
+			name := comp[len(comp)-1]
 			nameWithOwner := strings.Join(comp[len(comp)-2:], "/")
 			data[f] = map[string]interface{}{
+				"name":          name,
 				"nameWithOwner": nameWithOwner,
 			}
+		case "state":
+			data[f] = issue.State()
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()

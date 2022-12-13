@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/liveshare"
-	"github.com/cli/cli/v2/pkg/text"
 )
 
 // PostCreateStateStatus is a string value representing the different statuses a state can have.

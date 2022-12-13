@@ -2,22 +2,21 @@ package checks
 
 import (
 	"bytes"
-	"encoding/json"
-	"io"
-	"os"
+	"net/http"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdChecks(t *testing.T) {
@@ -63,6 +62,14 @@ func TestNewCmdChecks(t *testing.T) {
 			cli:        "--interval 5",
 			wantsError: "cannot use `--interval` flag without `--watch` flag",
 		},
+		{
+			name: "required flag",
+			cli:  "--required",
+			wants: ChecksOptions{
+				Required: true,
+				Interval: time.Duration(10000000000),
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -94,120 +101,222 @@ func TestNewCmdChecks(t *testing.T) {
 			assert.Equal(t, tt.wants.SelectorArg, gotOpts.SelectorArg)
 			assert.Equal(t, tt.wants.Watch, gotOpts.Watch)
 			assert.Equal(t, tt.wants.Interval, gotOpts.Interval)
+			assert.Equal(t, tt.wants.Required, gotOpts.Required)
 		})
 	}
 }
 
 func Test_checksRun(t *testing.T) {
 	tests := []struct {
-		name    string
-		fixture string
-		prJSON  string
-		nontty  bool
-		wantOut string
-		wantErr string
+		name      string
+		tty       bool
+		watch     bool
+		required  bool
+		httpStubs func(*httpmock.Registry)
+		wantOut   string
+		wantErr   string
 	}{
 		{
-			name:    "no commits",
-			prJSON:  `{ "number": 123 }`,
+			name: "no commits",
+			tty:  true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.StringResponse(`{"data":{"node":{}}}`),
+				)
+			},
 			wantOut: "",
 			wantErr: "no commit found on the pull request",
 		},
 		{
-			name:    "no checks",
-			prJSON:  `{ "number": 123, "statusCheckRollup": { "nodes": [{"commit": {"oid": "abc"}}]}, "headRefName": "master" }`,
+			name: "no checks",
+			tty:  true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.StringResponse(`{"data":{"node":{"statusCheckRollup":{"nodes":[{"commit":{"oid": "abc"}}]}}}}`),
+				)
+			},
 			wantOut: "",
-			wantErr: "no checks reported on the 'master' branch",
+			wantErr: "no checks reported on the 'trunk' branch",
 		},
 		{
-			name:    "some failing",
-			fixture: "./fixtures/someFailing.json",
+			name: "some failing",
+			tty:  true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/someFailing.json"),
+				)
+			},
 			wantOut: "Some checks were not successful\n1 failing, 1 successful, 0 skipped, and 1 pending checks\n\nX  sad tests   1m26s  sweet link\n✓  cool tests  1m26s  sweet link\n*  slow tests  1m26s  sweet link\n",
 			wantErr: "SilentError",
 		},
 		{
-			name:    "some pending",
-			fixture: "./fixtures/somePending.json",
+			name: "some pending",
+			tty:  true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/somePending.json"),
+				)
+			},
 			wantOut: "Some checks are still pending\n0 failing, 2 successful, 0 skipped, and 1 pending checks\n\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n*  slow tests  1m26s  sweet link\n",
 			wantErr: "SilentError",
 		},
 		{
-			name:    "all passing",
-			fixture: "./fixtures/allPassing.json",
+			name: "all passing",
+			tty:  true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/allPassing.json"),
+				)
+			},
 			wantOut: "All checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link\n✓  cool tests     1m26s  sweet link\n✓  rad tests      1m26s  sweet link\n",
 			wantErr: "",
 		},
 		{
-			name:    "with statuses",
-			fixture: "./fixtures/withStatuses.json",
+			name:  "watch all passing",
+			tty:   true,
+			watch: true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/allPassing.json"),
+				)
+			},
+			wantOut: "\x1b[?1049hAll checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link\n✓  cool tests     1m26s  sweet link\n✓  rad tests      1m26s  sweet link\n\x1b[?1049lAll checks were successful\n0 failing, 3 successful, 0 skipped, and 0 pending checks\n\n✓  awesome tests  1m26s  sweet link\n✓  cool tests     1m26s  sweet link\n✓  rad tests      1m26s  sweet link\n",
+			wantErr: "",
+		},
+		{
+			name: "with statuses",
+			tty:  true,
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/withStatuses.json"),
+				)
+			},
 			wantOut: "Some checks were not successful\n1 failing, 2 successful, 0 skipped, and 0 pending checks\n\nX  a status           sweet link\n✓  cool tests  1m26s  sweet link\n✓  rad tests   1m26s  sweet link\n",
 			wantErr: "SilentError",
 		},
 		{
-			name:    "no checks",
-			nontty:  true,
-			prJSON:  `{ "number": 123, "statusCheckRollup": { "nodes": [{"commit": {"oid": "abc"}}]}, "headRefName": "master" }`,
+			name: "no checks",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.StringResponse(`{"data":{"node":{"statusCheckRollup":{"nodes":[{"commit":{"oid": "abc"}}]}}}}`),
+				)
+			},
 			wantOut: "",
-			wantErr: "no checks reported on the 'master' branch",
+			wantErr: "no checks reported on the 'trunk' branch",
 		},
 		{
-			name:    "some failing",
-			nontty:  true,
-			fixture: "./fixtures/someFailing.json",
+			name: "some failing",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/someFailing.json"),
+				)
+			},
 			wantOut: "sad tests\tfail\t1m26s\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nslow tests\tpending\t1m26s\tsweet link\n",
 			wantErr: "SilentError",
 		},
 		{
-			name:    "some pending",
-			nontty:  true,
-			fixture: "./fixtures/somePending.json",
+			name: "some pending",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/somePending.json"),
+				)
+			},
 			wantOut: "cool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\nslow tests\tpending\t1m26s\tsweet link\n",
 			wantErr: "SilentError",
 		},
 		{
-			name:    "all passing",
-			nontty:  true,
-			fixture: "./fixtures/allPassing.json",
+			name: "all passing",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/allPassing.json"),
+				)
+			},
 			wantOut: "awesome tests\tpass\t1m26s\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\n",
 			wantErr: "",
 		},
 		{
-			name:    "with statuses",
-			nontty:  true,
-			fixture: "./fixtures/withStatuses.json",
+			name: "with statuses",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/withStatuses.json"),
+				)
+			},
 			wantOut: "a status\tfail\t0\tsweet link\ncool tests\tpass\t1m26s\tsweet link\nrad tests\tpass\t1m26s\tsweet link\n",
 			wantErr: "SilentError",
 		},
 		{
-			name:    "some skipped",
-			fixture: "./fixtures/someSkipping.json",
+			name: "some skipped",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/someSkipping.json"),
+				)
+			},
+			tty:     true,
 			wantOut: "All checks were successful\n0 failing, 1 successful, 2 skipped, and 0 pending checks\n\n✓  cool tests  1m26s  sweet link\n-  rad tests   1m26s  sweet link\n-  skip tests  1m26s  sweet link\n",
 			wantErr: "",
+		},
+		{
+			name: "only required",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/onlyRequired.json"),
+				)
+			},
+			tty:      true,
+			wantOut:  "All checks were successful\n0 failing, 1 successful, 0 skipped, and 0 pending checks\n\n✓  cool tests  1m26s  sweet link\n",
+			wantErr:  "",
+			required: true,
+		},
+		{
+			name: "no required checks",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestStatusChecks\b`),
+					httpmock.FileResponse("./fixtures/someSkipping.json"),
+				)
+			},
+			wantOut:  "",
+			wantErr:  "no required checks reported on the 'trunk' branch",
+			required: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, stdout, _ := iostreams.Test()
-			ios.SetStdoutTTY(!tt.nontty)
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetAlternateScreenBufferEnabled(tt.tty)
 
-			var response *api.PullRequest
-			var jsonReader io.Reader
-			if tt.fixture != "" {
-				ff, err := os.Open(tt.fixture)
-				require.NoError(t, err)
-				defer ff.Close()
-				jsonReader = ff
-			} else {
-				jsonReader = bytes.NewBufferString(tt.prJSON)
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
 			}
-			dec := json.NewDecoder(jsonReader)
-			require.NoError(t, dec.Decode(&response))
 
+			response := &api.PullRequest{Number: 123, HeadRefName: "trunk"}
 			opts := &ChecksOptions{
+				HttpClient: func() (*http.Client, error) {
+					return &http.Client{Transport: reg}, nil
+				},
 				IO:          ios,
 				SelectorArg: "123",
 				Finder:      shared.NewMockFinder("123", response, ghrepo.New("OWNER", "REPO")),
+				Watch:       tt.watch,
+				Required:    tt.required,
 			}
 
 			err := checksRun(opts)
@@ -247,7 +356,7 @@ func TestChecksRun_web(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			browser := &cmdutil.TestBrowser{}
+			browser := &browser.Stub{}
 
 			ios, _, stdout, stderr := iostreams.Test()
 			ios.SetStdoutTTY(tc.isTTY)

@@ -2,16 +2,15 @@
 package context
 
 import (
+	"context"
 	"errors"
 	"sort"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 )
 
 // cap the number of git remotes looked up, since the user might have an
@@ -60,7 +59,11 @@ type ResolvedRemotes struct {
 	apiClient    *api.Client
 }
 
-func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, error) {
+type iprompter interface {
+	Select(string, string, []string) (int, error)
+}
+
+func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams, p iprompter) (ghrepo.Interface, error) {
 	if r.baseOverride != nil {
 		return r.baseOverride, nil
 	}
@@ -102,13 +105,11 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, e
 		// hide the spinner in case a command started the progress indicator before base repo was fully
 		// resolved, e.g. in `gh issue view`
 		io.StopProgressIndicator()
-		err := prompt.SurveyAskOne(&survey.Select{
-			Message: "Which should be the base repository (used for e.g. querying issues) for this directory?",
-			Options: repoNames,
-		}, &baseName)
+		selected, err := p.Select("Which should be the base repository (used for e.g. querying issues) for this directory?", "", repoNames)
 		if err != nil {
 			return nil, err
 		}
+		baseName = repoNames[selected]
 	}
 
 	// determine corresponding git remote
@@ -122,7 +123,8 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, e
 	}
 
 	// cache the result to git config
-	err = git.SetRemoteResolution(remote.Name, resolution)
+	c := &git.Client{}
+	err = c.SetRemoteResolution(context.Background(), remote.Name, resolution)
 	return selectedRepo, err
 }
 

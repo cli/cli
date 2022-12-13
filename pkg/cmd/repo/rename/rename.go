@@ -1,13 +1,14 @@
 package rename
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/context"
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -19,10 +20,11 @@ import (
 
 type RenameOptions struct {
 	HttpClient      func() (*http.Client, error)
+	GitClient       *git.Client
 	IO              *iostreams.IOStreams
 	Config          func() (config.Config, error)
 	BaseRepo        func() (ghrepo.Interface, error)
-	Remotes         func() (context.Remotes, error)
+	Remotes         func() (ghContext.Remotes, error)
 	DoConfirm       bool
 	HasRepoOverride bool
 	newRepoSelector string
@@ -32,6 +34,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 	opts := &RenameOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Remotes:    f.Remotes,
 		Config:     f.Config,
 	}
@@ -89,6 +92,7 @@ func renameRun(opts *RenameOptions) error {
 	}
 
 	if newRepoName == "" {
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(
 			&survey.Input{
 				Message: fmt.Sprintf("Rename %s to: ", ghrepo.FullName(currRepo)),
@@ -106,6 +110,7 @@ func renameRun(opts *RenameOptions) error {
 			Message: fmt.Sprintf("Rename %s to %s?", ghrepo.FullName(currRepo), newRepoName),
 			Default: false,
 		}
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 		err = prompt.SurveyAskOne(p, &confirmed)
 		if err != nil {
 			return fmt.Errorf("failed to prompt: %w", err)
@@ -143,7 +148,7 @@ func renameRun(opts *RenameOptions) error {
 	return nil
 }
 
-func updateRemote(repo ghrepo.Interface, renamed ghrepo.Interface, opts *RenameOptions) (*context.Remote, error) {
+func updateRemote(repo ghrepo.Interface, renamed ghrepo.Interface, opts *RenameOptions) (*ghContext.Remote, error) {
 	cfg, err := opts.Config()
 	if err != nil {
 		return nil, err
@@ -165,6 +170,7 @@ func updateRemote(repo ghrepo.Interface, renamed ghrepo.Interface, opts *RenameO
 	}
 
 	remoteURL := ghrepo.FormatRemoteURL(renamed, protocol)
-	err = git.UpdateRemoteURL(remote.Name, remoteURL)
+	err = opts.GitClient.UpdateRemoteURL(context.Background(), remote.Name, remoteURL)
+
 	return remote, err
 }

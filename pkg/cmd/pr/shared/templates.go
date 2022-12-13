@@ -4,26 +4,22 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
-	"github.com/AlecAivazis/survey/v2"
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	fd "github.com/cli/cli/v2/internal/featuredetection"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/githubtemplate"
-	"github.com/cli/cli/v2/pkg/prompt"
-	graphql "github.com/cli/shurcooL-graphql"
 	"github.com/shurcooL/githubv4"
 )
 
 type issueTemplate struct {
-	// I would have un-exported these fields, except `cli/shurcool-graphql` then cannot unmarshal them :/
 	Gname string `graphql:"name"`
 	Gbody string `graphql:"body"`
 }
 
 type pullRequestTemplate struct {
-	// I would have un-exported these fields, except `cli/shurcool-graphql` then cannot unmarshal them :/
 	Gname string `graphql:"filename"`
 	Gbody string `graphql:"body"`
 }
@@ -64,9 +60,9 @@ func listIssueTemplates(httpClient *http.Client, repo ghrepo.Interface) ([]Templ
 		"name":  githubv4.String(repo.RepoName()),
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
+	gql := api.NewClientFromHTTP(httpClient)
 
-	err := gql.QueryNamed(context.Background(), "IssueTemplates", &query, variables)
+	err := gql.Query(repo.RepoHost(), "IssueTemplates", &query, variables)
 	if err != nil {
 		return nil, err
 	}
@@ -92,9 +88,9 @@ func listPullRequestTemplates(httpClient *http.Client, repo ghrepo.Interface) ([
 		"name":  githubv4.String(repo.RepoName()),
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
+	gql := api.NewClientFromHTTP(httpClient)
 
-	err := gql.QueryNamed(context.Background(), "PullRequestTemplates", &query, variables)
+	err := gql.Query(repo.RepoHost(), "PullRequestTemplates", &query, variables)
 	if err != nil {
 		return nil, err
 	}
@@ -114,6 +110,10 @@ type Template interface {
 	Body() []byte
 }
 
+type iprompter interface {
+	Select(string, string, []string) (int, error)
+}
+
 type templateManager struct {
 	repo       ghrepo.Interface
 	rootDir    string
@@ -121,6 +121,7 @@ type templateManager struct {
 	isPR       bool
 	httpClient *http.Client
 	detector   fd.Detector
+	prompter   iprompter
 
 	templates      []Template
 	legacyTemplate Template
@@ -129,14 +130,16 @@ type templateManager struct {
 	fetchError error
 }
 
-func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, dir string, allowFS bool, isPR bool) *templateManager {
+func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, p iprompter, dir string, allowFS bool, isPR bool) *templateManager {
+	cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
 	return &templateManager{
 		repo:       repo,
 		rootDir:    dir,
 		allowFS:    allowFS,
 		isPR:       isPR,
 		httpClient: httpClient,
-		detector:   fd.NewDetector(httpClient, repo.RepoHost()),
+		prompter:   p,
+		detector:   fd.NewDetector(cachedClient, repo.RepoHost()),
 	}
 }
 
@@ -185,11 +188,7 @@ func (m *templateManager) Choose() (Template, error) {
 		blankOption = "Open a blank pull request"
 	}
 
-	var selectedOption int
-	err := prompt.SurveyAskOne(&survey.Select{
-		Message: "Choose a template",
-		Options: append(names, blankOption),
-	}, &selectedOption)
+	selectedOption, err := m.prompter.Select("Choose a template", "", append(names, blankOption))
 	if err != nil {
 		return nil, fmt.Errorf("could not prompt: %w", err)
 	}
@@ -234,7 +233,8 @@ func (m *templateManager) fetch() error {
 	dir := m.rootDir
 	if dir == "" {
 		var err error
-		dir, err = git.ToplevelDir()
+		gitClient := &git.Client{}
+		dir, err = gitClient.ToplevelDir(context.Background())
 		if err != nil {
 			return nil // abort silently
 		}

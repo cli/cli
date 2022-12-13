@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/liveshare"
 )
@@ -38,17 +39,24 @@ type logger interface {
 func ConnectToLiveshare(ctx context.Context, progress progressIndicator, sessionLogger logger, apiClient apiClient, codespace *api.Codespace) (sess *liveshare.Session, err error) {
 	if codespace.State != api.CodespaceStateAvailable {
 		progress.StartProgressIndicatorWithLabel("Starting codespace")
+		defer progress.StopProgressIndicator()
 		if err := apiClient.StartCodespace(ctx, codespace.Name); err != nil {
 			return nil, fmt.Errorf("error starting codespace: %w", err)
 		}
 	}
+	expBackoff := backoff.NewExponentialBackOff()
+
+	expBackoff.Multiplier = 1.1
+	expBackoff.MaxInterval = 10 * time.Second
+	expBackoff.MaxElapsedTime = 5 * time.Minute
 
 	for retries := 0; !connectionReady(codespace); retries++ {
 		if retries > 1 {
-			time.Sleep(1 * time.Second)
+			duration := expBackoff.NextBackOff()
+			time.Sleep(duration)
 		}
 
-		if retries == 30 {
+		if expBackoff.GetElapsedTime() >= expBackoff.MaxElapsedTime {
 			return nil, errors.New("timed out while waiting for the codespace to start")
 		}
 

@@ -5,18 +5,23 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/stretchr/testify/assert"
 )
 
+func newTestClient(reg *httpmock.Registry) *Client {
+	client := &http.Client{}
+	httpmock.ReplaceTripper(client, reg)
+	return NewClientFromHTTP(client)
+}
+
 func TestGraphQL(t *testing.T) {
 	http := &httpmock.Registry{}
-	client := NewClient(
-		ReplaceTripper(http),
-		AddHeader("Authorization", "token OTOKEN"),
-	)
+	client := newTestClient(http)
 
 	vars := map[string]interface{}{"name": "Mona"}
 	response := struct {
@@ -37,16 +42,15 @@ func TestGraphQL(t *testing.T) {
 	req := http.Requests[0]
 	reqBody, _ := io.ReadAll(req.Body)
 	assert.Equal(t, `{"query":"QUERY","variables":{"name":"Mona"}}`, string(reqBody))
-	assert.Equal(t, "token OTOKEN", req.Header.Get("Authorization"))
 }
 
 func TestGraphQLError(t *testing.T) {
-	http := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(http))
+	reg := &httpmock.Registry{}
+	client := newTestClient(reg)
 
 	response := struct{}{}
 
-	http.Register(
+	reg.Register(
 		httpmock.GraphQL(""),
 		httpmock.StringResponse(`
 			{ "errors": [
@@ -73,10 +77,7 @@ func TestGraphQLError(t *testing.T) {
 
 func TestRESTGetDelete(t *testing.T) {
 	http := &httpmock.Registry{}
-
-	client := NewClient(
-		ReplaceTripper(http),
-	)
+	client := newTestClient(http)
 
 	http.Register(
 		httpmock.REST("DELETE", "applications/CLIENTID/grant"),
@@ -90,7 +91,7 @@ func TestRESTGetDelete(t *testing.T) {
 
 func TestRESTWithFullURL(t *testing.T) {
 	http := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(http))
+	client := newTestClient(http)
 
 	http.Register(
 		httpmock.REST("GET", "api/v3/user/repos"),
@@ -110,7 +111,7 @@ func TestRESTWithFullURL(t *testing.T) {
 
 func TestRESTError(t *testing.T) {
 	fakehttp := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(fakehttp))
+	client := newTestClient(fakehttp)
 
 	fakehttp.Register(httpmock.MatchAny, func(req *http.Request) (*http.Response, error) {
 		return &http.Response{
@@ -134,7 +135,6 @@ func TestRESTError(t *testing.T) {
 	}
 	if httpErr.Error() != "HTTP 422: OH NO (https://api.github.com/repos/branch)" {
 		t.Errorf("got %q", httpErr.Error())
-
 	}
 }
 
@@ -222,4 +222,37 @@ func TestHTTPError_ScopesSuggestion(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHTTPHeaders(t *testing.T) {
+	var gotReq *http.Request
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotReq = r
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	ios, _, _, stderr := iostreams.Test()
+	httpClient, err := NewHTTPClient(HTTPClientOptions{
+		AppVersion:        "v1.2.3",
+		Config:            tinyConfig{ts.URL[7:] + ":oauth_token": "MYTOKEN"},
+		Log:               ios.ErrOut,
+		SkipAcceptHeaders: false,
+	})
+	assert.NoError(t, err)
+	client := NewClientFromHTTP(httpClient)
+
+	err = client.REST(ts.URL, "GET", ts.URL+"/user/repos", nil, nil)
+	assert.NoError(t, err)
+
+	wantHeader := map[string]string{
+		"Accept":        "application/vnd.github.merge-info-preview+json, application/vnd.github.nebula-preview",
+		"Authorization": "token MYTOKEN",
+		"Content-Type":  "application/json; charset=utf-8",
+		"User-Agent":    "GitHub CLI v1.2.3",
+	}
+	for name, value := range wantHeader {
+		assert.Equal(t, value, gotReq.Header.Get(name), name)
+	}
+	assert.Equal(t, "", stderr.String())
 }

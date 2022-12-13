@@ -1,6 +1,6 @@
 # Installation from source
 
-1. Verify that you have Go 1.18+ installed
+1. Verify that you have Go 1.19+ installed
 
    ```sh
    $ go version
@@ -19,7 +19,7 @@
 
    #### Unix-like systems
    ```sh
-   # installs to '/usr/local' by default; sudo may be required
+   # installs to '/usr/local' by default; sudo may be required, or sudo -E for configured go environments
    $ make install
 
    # or, install to a different location

@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -132,14 +132,14 @@ type authArgs struct {
 
 func Test_refreshRun(t *testing.T) {
 	tests := []struct {
-		name         string
-		opts         *RefreshOptions
-		askStubs     func(*prompt.AskStubber)
-		cfgHosts     []string
-		oldScopes    string
-		wantErr      string
-		nontty       bool
-		wantAuthArgs authArgs
+		name          string
+		opts          *RefreshOptions
+		prompterStubs func(*prompter.PrompterMock)
+		cfgHosts      []string
+		oldScopes     string
+		wantErr       string
+		nontty        bool
+		wantAuthArgs  authArgs
 	}{
 		{
 			name:    "no hosts configured",
@@ -193,8 +193,10 @@ func Test_refreshRun(t *testing.T) {
 			opts: &RefreshOptions{
 				Hostname: "",
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("What account do you want to refresh auth for?").AnswerWith("github.com")
+			prompterStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(_, _ string, opts []string) (int, error) {
+					return prompter.IndexFor(opts, "github.com")
+				}
 			},
 			wantAuthArgs: authArgs{
 				hostname: "github.com",
@@ -238,19 +240,19 @@ func Test_refreshRun(t *testing.T) {
 				return nil
 			}
 
-			ios, _, _, _ := iostreams.Test()
-
-			ios.SetStdinTTY(!tt.nontty)
-			ios.SetStdoutTTY(!tt.nontty)
-
-			tt.opts.IO = ios
-			cfg := config.NewBlankConfig()
+			_ = config.StubWriteConfig(t)
+			cfg := config.NewFromString("")
+			for _, hostname := range tt.cfgHosts {
+				cfg.Set(hostname, "oauth_token", "abc123")
+			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil
 			}
-			for _, hostname := range tt.cfgHosts {
-				_ = cfg.Set(hostname, "oauth_token", "abc123")
-			}
+
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(!tt.nontty)
+			ios.SetStdoutTTY(!tt.nontty)
+			tt.opts.IO = ios
 
 			httpReg := &httpmock.Registry{}
 			httpReg.Register(
@@ -270,16 +272,13 @@ func Test_refreshRun(t *testing.T) {
 					}, nil
 				},
 			)
-			tt.opts.httpClient = &http.Client{Transport: httpReg}
+			tt.opts.HttpClient = &http.Client{Transport: httpReg}
 
-			mainBuf := bytes.Buffer{}
-			hostsBuf := bytes.Buffer{}
-			defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
-
-			as := prompt.NewAskStubber(t)
-			if tt.askStubs != nil {
-				tt.askStubs(as)
+			pm := &prompter.PrompterMock{}
+			if tt.prompterStubs != nil {
+				tt.prompterStubs(pm)
 			}
+			tt.opts.Prompter = pm
 
 			err := refreshRun(tt.opts)
 			if tt.wantErr != "" {

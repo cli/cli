@@ -5,10 +5,13 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	runShared "github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -22,7 +25,7 @@ type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
-	Browser    cmdutil.Browser
+	Browser    browser.Browser
 
 	Selector string
 	Ref      string
@@ -30,6 +33,8 @@ type ViewOptions struct {
 	Prompt   bool
 	Raw      bool
 	YAML     bool
+
+	now time.Time
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -37,6 +42,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
+		now:        time.Now(),
 	}
 
 	cmd := &cobra.Command{
@@ -118,7 +124,7 @@ func runView(opts *ViewOptions) error {
 			address = ghrepo.GenerateRepoURL(repo, "actions/workflows/%s", url.QueryEscape(workflow.Base()))
 		}
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(address))
+			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(address))
 		}
 		return opts.Browser.Browse(address)
 	}
@@ -165,7 +171,10 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, repo ghrepo.Inte
 		fmt.Fprintf(out, "ID: %s", cs.Cyanf("%d", workflow.ID))
 
 		codeBlock := fmt.Sprintf("```yaml\n%s\n```", yaml)
-		rendered, err := markdown.Render(codeBlock, markdown.WithIO(opts.IO), markdown.WithoutIndentation(), markdown.WithWrap(0))
+		rendered, err := markdown.Render(codeBlock,
+			markdown.WithTheme(opts.IO.TerminalTheme()),
+			markdown.WithoutIndentation(),
+			markdown.WithWrap(0))
 		if err != nil {
 			return err
 		}
@@ -186,13 +195,17 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, repo ghrepo.Inte
 }
 
 func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interface, workflow *shared.Workflow) error {
-	wr, err := getWorkflowRuns(client, repo, workflow)
+	wr, err := runShared.GetRuns(client, repo, &runShared.FilterOptions{
+		WorkflowID:   workflow.ID,
+		WorkflowName: workflow.Name,
+	}, 5)
 	if err != nil {
 		return fmt.Errorf("failed to get runs: %w", err)
 	}
 
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(opts.IO)
 
 	// Header
@@ -201,13 +214,13 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interfa
 	fmt.Fprintf(out, "ID: %s\n\n", cs.Cyanf("%d", workflow.ID))
 
 	// Runs
-	fmt.Fprintf(out, "Total runs %d\n", wr.Total)
+	fmt.Fprintf(out, "Total runs %d\n", wr.TotalCount)
 
-	if wr.Total != 0 {
+	if wr.TotalCount != 0 {
 		fmt.Fprintln(out, "Recent runs")
 	}
 
-	for _, run := range wr.Runs {
+	for _, run := range wr.WorkflowRuns {
 		if opts.Raw {
 			tp.AddField(string(run.Status), nil, nil)
 			tp.AddField(string(run.Conclusion), nil, nil)
@@ -216,18 +229,14 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interfa
 			tp.AddField(symbol, nil, symbolColor)
 		}
 
-		tp.AddField(run.CommitMsg(), nil, cs.Bold)
+		tp.AddField(run.Title(), nil, cs.Bold)
 
-		tp.AddField(run.Name, nil, nil)
+		tp.AddField(run.WorkflowName(), nil, nil)
 		tp.AddField(run.HeadBranch, nil, cs.Bold)
 		tp.AddField(string(run.Event), nil, nil)
 
 		if opts.Raw {
-			elapsed := run.UpdatedAt.Sub(run.CreatedAt)
-			if elapsed < 0 {
-				elapsed = 0
-			}
-			tp.AddField(elapsed.String(), nil, nil)
+			tp.AddField(run.Duration(opts.now).String(), nil, nil)
 		}
 
 		tp.AddField(fmt.Sprintf("%d", run.ID), nil, cs.Cyan)
@@ -243,7 +252,7 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interfa
 	fmt.Fprintln(out)
 
 	// Footer
-	if wr.Total != 0 {
+	if wr.TotalCount != 0 {
 		fmt.Fprintf(out, "To see more runs for this workflow, try: gh run list --workflow %s\n", filename)
 	}
 	fmt.Fprintf(out, "To see the YAML for this workflow, try: gh workflow view %s --yaml\n", filename)

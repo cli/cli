@@ -1,18 +1,19 @@
 package watch
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"net/http"
-	"runtime"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -86,7 +87,6 @@ func watchRun(opts *WatchOptions) error {
 		return fmt.Errorf("failed to determine base repo: %w", err)
 	}
 
-	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
 
 	runID := opts.RunID
@@ -121,7 +121,7 @@ func watchRun(opts *WatchOptions) error {
 	}
 
 	if run.Status == shared.Completed {
-		fmt.Fprintf(out, "Run %s (%s) has already completed with '%s'\n", cs.Bold(run.Name), cs.Cyanf("%d", run.ID), run.Conclusion)
+		fmt.Fprintf(opts.IO.Out, "Run %s (%s) has already completed with '%s'\n", cs.Bold(run.WorkflowName()), cs.Cyanf("%d", run.ID), run.Conclusion)
 		if opts.ExitStatus && run.Conclusion != shared.Success {
 			return cmdutil.SilentError
 		}
@@ -134,11 +134,6 @@ func watchRun(opts *WatchOptions) error {
 		prNumber = fmt.Sprintf(" #%d", number)
 	}
 
-	if err := opts.IO.EnableVirtualTerminalProcessing(); err == nil {
-		// clear entire screen
-		fmt.Fprintf(out, "\x1b[2J")
-	}
-
 	annotationCache := map[int64][]shared.Annotation{}
 
 	duration, err := time.ParseDuration(fmt.Sprintf("%ds", opts.Interval))
@@ -146,20 +141,52 @@ func watchRun(opts *WatchOptions) error {
 		return fmt.Errorf("could not parse interval: %w", err)
 	}
 
+	out := &bytes.Buffer{}
+	opts.IO.StartAlternateScreenBuffer()
 	for run.Status != shared.Completed {
-		run, err = renderRun(*opts, client, repo, run, prNumber, annotationCache)
+		// Write to a temporary buffer to reduce total number of fetches
+		run, err = renderRun(out, *opts, client, repo, run, prNumber, annotationCache)
 		if err != nil {
-			return err
+			break
 		}
+
+		if run.Status == shared.Completed {
+			break
+		}
+
+		// If not completed, refresh the screen buffer and write the temporary buffer to stdout
+		opts.IO.RefreshScreen()
+
+		fmt.Fprintln(opts.IO.Out, cs.Boldf("Refreshing run status every %d seconds. Press Ctrl+C to quit.", opts.Interval))
+		fmt.Fprintln(opts.IO.Out)
+
+		_, err = io.Copy(opts.IO.Out, out)
+		out.Reset()
+
+		if err != nil {
+			break
+		}
+
 		time.Sleep(duration)
+	}
+	opts.IO.StopAlternateScreenBuffer()
+
+	if err != nil {
+		return nil
+	}
+
+	// Write the last temporary buffer one last time
+	_, err = io.Copy(opts.IO.Out, out)
+	if err != nil {
+		return err
 	}
 
 	symbol, symbolColor := shared.Symbol(cs, run.Status, run.Conclusion)
 	id := cs.Cyanf("%d", run.ID)
 
 	if opts.IO.IsStdoutTTY() {
-		fmt.Fprintln(out)
-		fmt.Fprintf(out, "%s Run %s (%s) completed with '%s'\n", symbolColor(symbol), cs.Bold(run.Name), id, run.Conclusion)
+		fmt.Fprintln(opts.IO.Out)
+		fmt.Fprintf(opts.IO.Out, "%s Run %s (%s) completed with '%s'\n", symbolColor(symbol), cs.Bold(run.WorkflowName()), id, run.Conclusion)
 	}
 
 	if opts.ExitStatus && run.Conclusion != shared.Success {
@@ -169,8 +196,7 @@ func watchRun(opts *WatchOptions) error {
 	return nil
 }
 
-func renderRun(opts WatchOptions, client *api.Client, repo ghrepo.Interface, run *shared.Run, prNumber string, annotationCache map[int64][]shared.Annotation) (*shared.Run, error) {
-	out := opts.IO.Out
+func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo.Interface, run *shared.Run, prNumber string, annotationCache map[int64][]shared.Annotation) (*shared.Run, error) {
 	cs := opts.IO.ColorScheme()
 
 	var err error
@@ -180,9 +206,7 @@ func renderRun(opts WatchOptions, client *api.Client, repo ghrepo.Interface, run
 		return nil, fmt.Errorf("failed to get run: %w", err)
 	}
 
-	ago := opts.Now().Sub(run.CreatedAt)
-
-	jobs, err := shared.GetJobs(client, repo, *run)
+	jobs, err := shared.GetJobs(client, repo, run)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get jobs: %w", err)
 	}
@@ -212,19 +236,7 @@ func renderRun(opts WatchOptions, client *api.Client, repo ghrepo.Interface, run
 		return nil, fmt.Errorf("failed to get annotations: %w", annotationErr)
 	}
 
-	if runtime.GOOS == "windows" {
-		// Just clear whole screen; I wasn't able to get the nicer cursor movement thing working
-		fmt.Fprintf(opts.IO.Out, "\x1b[2J")
-	} else {
-		// Move cursor to 0,0
-		fmt.Fprint(opts.IO.Out, "\x1b[0;0H")
-		// Clear from cursor to bottom of screen
-		fmt.Fprint(opts.IO.Out, "\x1b[J")
-	}
-
-	fmt.Fprintln(out, cs.Boldf("Refreshing run status every %d seconds. Press Ctrl+C to quit.", opts.Interval))
-	fmt.Fprintln(out)
-	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, utils.FuzzyAgo(ago), prNumber))
+	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, text.FuzzyAgo(opts.Now(), run.StartedTime()), prNumber))
 	fmt.Fprintln(out)
 
 	if len(jobs) == 0 {

@@ -24,21 +24,12 @@ type checkCounts struct {
 	Skipping int
 }
 
-func aggregateChecks(pr *api.PullRequest) ([]check, checkCounts, error) {
-	checks := []check{}
-	counts := checkCounts{}
-
-	if len(pr.StatusCheckRollup.Nodes) == 0 {
-		return checks, counts, fmt.Errorf("no commit found on the pull request")
-	}
-
-	rollup := pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
-	if len(rollup) == 0 {
-		return checks, counts, fmt.Errorf("no checks reported on the '%s' branch", pr.HeadRefName)
-	}
-
-	checkContexts := pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
+func aggregateChecks(checkContexts []api.CheckContext, requiredChecks bool) (checks []check, counts checkCounts) {
 	for _, c := range eliminateDuplicates(checkContexts) {
+		if requiredChecks && !c.IsRequired {
+			continue
+		}
+
 		state := c.State
 		if state == "" {
 			if c.Status == "COMPLETED" {
@@ -82,28 +73,31 @@ func aggregateChecks(pr *api.PullRequest) ([]check, checkCounts, error) {
 
 		checks = append(checks, item)
 	}
-
-	return checks, counts, nil
+	return
 }
 
+// eliminateDuplicates filters a set of checks to only the most recent ones if the set includes repeated runs
 func eliminateDuplicates(checkContexts []api.CheckContext) []api.CheckContext {
-	// To return the most recent check, sort in descending order by StartedAt.
 	sort.Slice(checkContexts, func(i, j int) bool { return checkContexts[i].StartedAt.After(checkContexts[j].StartedAt) })
 
-	m := make(map[string]struct{})
+	mapChecks := make(map[string]struct{})
+	mapContexts := make(map[string]struct{})
 	unique := make([]api.CheckContext, 0, len(checkContexts))
 
-	// Eliminate duplicates using Name or Context.
 	for _, ctx := range checkContexts {
-		key := ctx.Name
-		if key == "" {
-			key = ctx.Context
-		}
-		if _, ok := m[key]; ok {
-			continue
+		if ctx.Context != "" {
+			if _, exists := mapContexts[ctx.Context]; exists {
+				continue
+			}
+			mapContexts[ctx.Context] = struct{}{}
+		} else {
+			key := fmt.Sprintf("%s/%s", ctx.Name, ctx.CheckSuite.WorkflowRun.Workflow.Name)
+			if _, exists := mapChecks[key]; exists {
+				continue
+			}
+			mapChecks[key] = struct{}{}
 		}
 		unique = append(unique, ctx)
-		m[key] = struct{}{}
 	}
 
 	return unique

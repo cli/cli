@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -76,17 +77,26 @@ func runAdd(opts *AddOptions) error {
 		return err
 	}
 
-	hostname, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	hostname, _ := cfg.DefaultHost()
 
 	err = gpgKeyUpload(httpClient, hostname, keyReader)
 	if err != nil {
-		if errors.Is(err, scopesError) {
-			cs := opts.IO.ColorScheme()
+		cs := opts.IO.ColorScheme()
+		if errors.Is(err, errScopesMissing) {
 			fmt.Fprint(opts.IO.ErrOut, "Error: insufficient OAuth scopes to list GPG keys\n")
 			fmt.Fprintf(opts.IO.ErrOut, "Run the following to grant scopes: %s\n", cs.Bold("gh auth refresh -s write:gpg_key"))
+			return cmdutil.SilentError
+		}
+		if errors.Is(err, errDuplicateKey) {
+			fmt.Fprintf(opts.IO.ErrOut, "%s Error: the key already exists in your account\n", cs.FailureIcon())
+			return cmdutil.SilentError
+		}
+		if errors.Is(err, errWrongFormat) {
+			fmt.Fprint(opts.IO.ErrOut, heredoc.Docf(`
+				%s Error: the GPG key you are trying to upload might not be in ASCII-armored format.
+				Find your GPG key ID with:    %s
+				Then add it to your account:  %s
+			`, cs.FailureIcon(), cs.Bold("gpg --list-keys"), cs.Bold("gpg --armor --export <ID> | gh gpg-key add -")))
 			return cmdutil.SilentError
 		}
 		return err
@@ -94,7 +104,7 @@ func runAdd(opts *AddOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.ErrOut, "%s GPG key added to your account\n", cs.SuccessIcon())
+		fmt.Fprintf(opts.IO.Out, "%s GPG key added to your account\n", cs.SuccessIcon())
 	}
 	return nil
 }

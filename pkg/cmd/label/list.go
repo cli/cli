@@ -5,21 +5,18 @@ import (
 	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
-type browser interface {
-	Browse(string) error
-}
-
 type listOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
-	Browser    browser
+	Browser    browser.Browser
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 
@@ -76,8 +73,8 @@ func newCmdList(f *cmdutil.Factory, runF func(*listOptions) error) *cobra.Comman
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "List labels in the web browser")
 	cmd.Flags().IntVarP(&opts.Query.Limit, "limit", "L", 30, "Maximum number of labels to fetch")
 	cmd.Flags().StringVarP(&opts.Query.Query, "search", "S", "", "Search label names and descriptions")
-	cmdutil.StringEnumFlag(cmd, &opts.Query.Order, "order", "", "asc", []string{"asc", "desc"}, "Order of labels returned")
-	cmdutil.StringEnumFlag(cmd, &opts.Query.Sort, "sort", "", "created", []string{"created", "name"}, "Sort fetched labels")
+	cmdutil.StringEnumFlag(cmd, &opts.Query.Order, "order", "", defaultOrder, []string{"asc", "desc"}, "Order of labels returned")
+	cmdutil.StringEnumFlag(cmd, &opts.Query.Sort, "sort", "", defaultSort, []string{"created", "name"}, "Sort fetched labels")
 
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, labelFields)
 
@@ -99,7 +96,7 @@ func listRun(opts *listOptions) error {
 		labelListURL := ghrepo.GenerateRepoURL(baseRepo, "labels")
 
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(labelListURL))
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(labelListURL))
 		}
 
 		return opts.Browser.Browse(labelListURL)
@@ -137,6 +134,7 @@ func listRun(opts *listOptions) error {
 
 func printLabels(io *iostreams.IOStreams, labels []label) error {
 	cs := io.ColorScheme()
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	table := utils.NewTablePrinter(io)
 
 	for _, label := range labels {
@@ -151,5 +149,5 @@ func printLabels(io *iostreams.IOStreams, labels []label) error {
 }
 
 func listHeader(repoName string, count int, totalCount int) string {
-	return fmt.Sprintf("Showing %d of %s in %s", count, utils.Pluralize(totalCount, "label"), repoName)
+	return fmt.Sprintf("Showing %d of %s in %s", count, text.Pluralize(totalCount, "label"), repoName)
 }

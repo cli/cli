@@ -1,12 +1,14 @@
 package clone
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -15,6 +17,7 @@ import (
 
 type CloneOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitClient  *git.Client
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 
@@ -27,6 +30,7 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 	opts := &CloneOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Config:     f.Config,
 	}
 
@@ -75,10 +79,7 @@ func cloneRun(opts *CloneOptions) error {
 		if err != nil {
 			return err
 		}
-		hostname, err := cfg.DefaultHost()
-		if err != nil {
-			return err
-		}
+		hostname, _ := cfg.DefaultHost()
 		protocol, err := cfg.GetOrDefault(hostname, "git_protocol")
 		if err != nil {
 			return err
@@ -86,7 +87,7 @@ func cloneRun(opts *CloneOptions) error {
 		gistURL = formatRemoteURL(hostname, gistURL, protocol)
 	}
 
-	_, err := git.RunClone(gistURL, opts.GitArgs)
+	_, err := opts.GitClient.Clone(context.Background(), gistURL, opts.GitArgs)
 	if err != nil {
 		return err
 	}
@@ -95,9 +96,15 @@ func cloneRun(opts *CloneOptions) error {
 }
 
 func formatRemoteURL(hostname string, gistID string, protocol string) string {
+	if ghinstance.IsEnterprise(hostname) {
+		if protocol == "ssh" {
+			return fmt.Sprintf("git@%s:gist/%s.git", hostname, gistID)
+		}
+		return fmt.Sprintf("https://%s/gist/%s.git", hostname, gistID)
+	}
+
 	if protocol == "ssh" {
 		return fmt.Sprintf("git@gist.%s:%s.git", hostname, gistID)
 	}
-
 	return fmt.Sprintf("https://gist.%s/%s.git", hostname, gistID)
 }

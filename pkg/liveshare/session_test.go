@@ -103,7 +103,7 @@ func TestServerStartSharing(t *testing.T) {
 
 	done := make(chan error)
 	go func() {
-		streamID, err := session.startSharing(ctx, serverProtocol, serverPort)
+		streamID, err := session.StartSharing(ctx, serverProtocol, serverPort)
 		if err != nil {
 			done <- fmt.Errorf("error sharing server: %w", err)
 		}
@@ -247,10 +247,10 @@ func TestInvalidHostKey(t *testing.T) {
 func TestKeepAliveNonBlocking(t *testing.T) {
 	session := &Session{keepAliveReason: make(chan string, 1)}
 	for i := 0; i < 2; i++ {
-		session.keepAlive("io")
+		session.KeepAlive("io")
 	}
 
-	// if keepAlive blocks, we'll never reach this and timeout the test
+	// if KeepAlive blocks, we'll never reach this and timeout the test
 	// timing out
 }
 
@@ -367,10 +367,10 @@ func TestSessionHeartbeat(t *testing.T) {
 
 	go session.heartbeat(ctx, 50*time.Millisecond)
 	go func() {
-		session.keepAlive("input")
+		session.KeepAlive("input")
 		wg.Wait()
 		wg.Add(1)
-		session.keepAlive("input")
+		session.KeepAlive("input")
 		wg.Wait()
 		done <- struct{}{}
 	}()
@@ -380,7 +380,7 @@ func TestSessionHeartbeat(t *testing.T) {
 		t.Errorf("error from server: %v", err)
 	case <-done:
 		activityCount := strings.Count(logger.String(), "input")
-		// by design keepAlive can drop requests, and therefore there is zero guarantee
+		// by design KeepAlive can drop requests, and therefore there is zero guarantee
 		// that we actually get two requests if the network happened to be slow (rarely)
 		// during testing.
 		if activityCount != 1 && activityCount != 2 {
@@ -396,6 +396,49 @@ func TestSessionHeartbeat(t *testing.T) {
 			t.Errorf("unexpected number of requests, expected: 2, got: %d", requests)
 		}
 		return
+	}
+}
+
+func TestRebuild(t *testing.T) {
+	tests := []struct {
+		fullRebuild bool
+		rpcService  string
+	}{
+		{
+			fullRebuild: false,
+			rpcService:  "IEnvironmentConfigurationService.incrementalRebuildContainer",
+		},
+		{
+			fullRebuild: true,
+			rpcService:  "IEnvironmentConfigurationService.rebuildContainer",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Logf("RPC service: %s", tt.rpcService)
+		t.Logf("full rebuild: %t", tt.fullRebuild)
+
+		requestCount := 0
+		rebuildContainer := func(conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
+			requestCount++
+			return true, nil
+		}
+		testServer, session, err := makeMockSession(
+			livesharetest.WithService(tt.rpcService, rebuildContainer),
+		)
+		if err != nil {
+			t.Errorf("creating mock session: %v", err)
+		}
+		defer testServer.Close()
+
+		err = session.RebuildContainer(context.Background(), tt.fullRebuild)
+		if err != nil {
+			t.Errorf("rebuilding codespace via mock session: %v", err)
+		}
+
+		if requestCount == 0 {
+			t.Errorf("no requests were made")
+		}
 	}
 }
 

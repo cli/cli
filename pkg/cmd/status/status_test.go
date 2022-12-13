@@ -2,7 +2,7 @@ package status
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -19,8 +19,8 @@ import (
 
 type testHostConfig string
 
-func (c testHostConfig) DefaultHost() (string, error) {
-	return string(c), nil
+func (c testHostConfig) DefaultHost() (string, string) {
+	return string(c), ""
 }
 
 func TestNewCmdStatus(t *testing.T) {
@@ -247,7 +247,7 @@ func TestStatusRun(t *testing.T) {
 						return &http.Response{
 							Request:    req,
 							StatusCode: 403,
-							Body:       ioutil.NopCloser(strings.NewReader(`{"message": "You don't have permission to access this resource."}`)),
+							Body:       io.NopCloser(strings.NewReader(`{"message": "You don't have permission to access this resource."}`)),
 							Header: http.Header{
 								"Content-Type": []string{"application/json"},
 								"X-Github-Sso": []string{"required; url=http://click.me/auth"},

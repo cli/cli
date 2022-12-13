@@ -6,19 +6,21 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/prompt"
-
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	ghAuth "github.com/cli/go-gh/pkg/auth"
 	"github.com/spf13/cobra"
 )
+
+type iprompter interface {
+	ConfirmDeletion(string) error
+}
 
 type DeleteOptions struct {
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
+	Prompter   iprompter
 	IO         *iostreams.IOStreams
 	RepoArg    string
 	Confirmed  bool
@@ -29,6 +31,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		BaseRepo:   f.BaseRepo,
+		Prompter:   f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -77,7 +80,8 @@ func deleteRun(opts *DeleteOptions) error {
 	} else {
 		repoSelector := opts.RepoArg
 		if !strings.Contains(repoSelector, "/") {
-			currentUser, err := api.CurrentLoginName(apiClient, ghinstance.Default())
+			defaultHost, _ := ghAuth.DefaultHost()
+			currentUser, err := api.CurrentLoginName(apiClient, defaultHost)
 			if err != nil {
 				return err
 			}
@@ -91,19 +95,8 @@ func deleteRun(opts *DeleteOptions) error {
 	fullName := ghrepo.FullName(toDelete)
 
 	if !opts.Confirmed {
-		var valid string
-		err := prompt.SurveyAskOne(
-			&survey.Input{Message: fmt.Sprintf("Type %s to confirm deletion:", fullName)},
-			&valid,
-			survey.WithValidator(
-				func(val interface{}) error {
-					if str := val.(string); !strings.EqualFold(str, fullName) {
-						return fmt.Errorf("You entered %s", str)
-					}
-					return nil
-				}))
-		if err != nil {
-			return fmt.Errorf("could not prompt: %w", err)
+		if err := opts.Prompter.ConfirmDeletion(fullName); err != nil {
+			return err
 		}
 	}
 
