@@ -9,7 +9,6 @@ import (
 
 	ctx "context"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/context"
@@ -17,14 +16,18 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/spf13/cobra"
 )
+
+type iprompter interface {
+	Select(string, string, []string) (int, error)
+}
 
 type DefaultOptions struct {
 	IO         *iostreams.IOStreams
 	Remotes    func() (context.Remotes, error)
 	HttpClient func() (*http.Client, error)
+	Prompter   iprompter
 
 	Repo     ghrepo.Interface
 	ViewMode bool
@@ -35,6 +38,7 @@ func NewCmdDefault(f *cmdutil.Factory, runF func(*DefaultOptions) error) *cobra.
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Remotes:    f.Remotes,
+		Prompter:   f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -129,13 +133,21 @@ func defaultRun(opts *DefaultOptions) error {
 			return fmt.Errorf("%s does not correspond to any git remotes", ghrepo.FullName(opts.Repo))
 		}
 	}
+	cs := opts.IO.ColorScheme()
+
+	hintMsg := cs.Gray("(hint: for gh to see more remote repositories, add them with `git remote`)")
 
 	if selectedRepo == nil {
 		if len(knownRepos) == 1 {
 			selectedRepo = knownRepos[0]
+
+			fmt.Fprintf(opts.IO.Out, "Found only one known remote repo, %s on %s.\n",
+				cs.Bold(ghrepo.FullName(selectedRepo)),
+				cs.Bold(selectedRepo.RepoHost()))
+			fmt.Fprintln(opts.IO.Out, hintMsg)
+			fmt.Fprintln(opts.IO.Out)
 		} else {
 			var repoNames []string
-			var selectedName string
 			current := ""
 			if currentDefaultRepo != nil {
 				current = ghrepo.FullName(currentDefaultRepo)
@@ -145,14 +157,25 @@ func defaultRun(opts *DefaultOptions) error {
 				repoNames = append(repoNames, ghrepo.FullName(knownRepo))
 			}
 
-			err := prompt.SurveyAskOne(&survey.Select{
-				Message: "Which should be the default repository (used for e.g. querying issues) for this directory?",
-				Options: repoNames,
-				Default: current,
-			}, &selectedName)
+			defaultExplainer := heredoc.Doc(`
+				gh uses the default repository for things like:
+				
+				 - viewing, creating, and setting the default base for  pull requests
+				 - viewing and creating issues
+				 - viewing and creating releases
+				 - working with Actions
+				 - adding secrets
+			`)
+
+			fmt.Fprintln(opts.IO.Out, defaultExplainer)
+			fmt.Fprintln(opts.IO.Out, hintMsg)
+			fmt.Fprintln(opts.IO.Out)
+
+			selected, err := opts.Prompter.Select("Which repository should be the default?", current, repoNames)
 			if err != nil {
-				return err
+				return fmt.Errorf("could not prompt: %w", err)
 			}
+			selectedName := repoNames[selected]
 
 			owner, repo, _ := strings.Cut(selectedName, "/")
 			selectedRepo = ghrepo.New(owner, repo)

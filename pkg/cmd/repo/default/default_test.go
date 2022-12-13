@@ -8,11 +8,11 @@ import (
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -115,16 +115,16 @@ func TestDefaultRun(t *testing.T) {
 	repo3, _ := ghrepo.FromFullName("OWNER3/REPO3")
 
 	tests := []struct {
-		name       string
-		tty        bool
-		opts       DefaultOptions
-		remotes    []*context.Remote
-		httpStubs  func(*httpmock.Registry)
-		gitStubs   func(*run.CommandStubber)
-		askStubs   func(*prompt.AskStubber)
-		wantStdout string
-		wantErr    bool
-		errMsg     string
+		name          string
+		tty           bool
+		opts          DefaultOptions
+		remotes       []*context.Remote
+		httpStubs     func(*httpmock.Registry)
+		gitStubs      func(*run.CommandStubber)
+		prompterStubs func(*prompter.PrompterMock)
+		wantStdout    string
+		wantErr       bool
+		errMsg        string
 	}{
 		{
 			name: "view mode no current default",
@@ -318,12 +318,18 @@ func TestDefaultRun(t *testing.T) {
 			gitStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --add remote.upstream.gh-resolved base`, 0, "")
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				as.StubPrompt("Which should be the default repository (used for e.g. querying issues) for this directory?").
-					AssertOptions([]string{"OWNER/REPO", "OWNER2/REPO2"}).
-					AnswerWith("OWNER2/REPO2")
+			prompterStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(p, d string, opts []string) (int, error) {
+					switch p {
+					case "Which repository should be the default?":
+						prompter.AssertOptions(t, []string{"OWNER/REPO", "OWNER2/REPO2"}, opts)
+						return prompter.IndexFor(opts, "OWNER2/REPO2")
+					default:
+						return -1, prompter.NoSuchPromptErr(p)
+					}
+				}
 			},
-			wantStdout: "✓ Set OWNER2/REPO2 as the default repository for the current directory\n",
+			wantStdout: "gh uses the default repository for things like:\n\n - viewing, creating, and setting the default base for  pull requests\n - viewing and creating issues\n - viewing and creating releases\n - working with Actions\n - adding secrets\n\n(hint: for gh to see more remote repositories, add them with `git remote`)\n\n✓ Set OWNER2/REPO2 as the default repository for the current directory\n",
 		},
 		{
 			name: "interactive mode only one known host",
@@ -348,7 +354,7 @@ func TestDefaultRun(t *testing.T) {
 			gitStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --add remote.upstream.gh-resolved base`, 0, "")
 			},
-			wantStdout: "✓ Set OWNER2/REPO2 as the default repository for the current directory\n",
+			wantStdout: "Found only one known remote repo, OWNER2/REPO2 on github.com.\n(hint: for gh to see more remote repositories, add them with `git remote`)\n\n✓ Set OWNER2/REPO2 as the default repository for the current directory\n",
 		},
 	}
 
@@ -371,10 +377,12 @@ func TestDefaultRun(t *testing.T) {
 			return tt.remotes, nil
 		}
 
-		as := prompt.NewAskStubber(t)
-		if tt.askStubs != nil {
-			tt.askStubs(as)
+		pm := &prompter.PrompterMock{}
+		if tt.prompterStubs != nil {
+			tt.prompterStubs(pm)
 		}
+
+		tt.opts.Prompter = pm
 
 		t.Run(tt.name, func(t *testing.T) {
 			cs, teardown := run.Stub()
