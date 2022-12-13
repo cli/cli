@@ -393,6 +393,8 @@ func Test_downloadRun(t *testing.T) {
 func Test_downloadRun_cloberAndSkip(t *testing.T) {
 	oldAssetContents := "older copy to be clobbered"
 	oldZipballContents := "older zipball to be clobbered"
+	// this should be shorter than oldAssetContents and oldZipballContents
+	newContents := "somedata"
 
 	tests := []struct {
 		name            string
@@ -424,9 +426,9 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 				OverwriteExisting: true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(httpmock.REST("GET", "assets/3456"), httpmock.StringResponse("somedata"))
+				reg.Register(httpmock.REST("GET", "assets/3456"), httpmock.StringResponse(newContents))
 			},
-			wantFileSize:    8,
+			wantFileSize:    int64(len(newContents)),
 			wantArchiveSize: int64(len(oldZipballContents)),
 		},
 		{
@@ -442,12 +444,12 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/zipball/v1.2.3"),
 					httpmock.WithHeader(
-						httpmock.StringResponse("somedata"), "content-disposition", "attachment; filename=zipball.zip",
+						httpmock.StringResponse(newContents), "content-disposition", "attachment; filename=zipball.zip",
 					),
 				)
 			},
 			wantFileSize:    int64(len(oldAssetContents)),
-			wantArchiveSize: 8,
+			wantArchiveSize: int64(len(newContents)),
 		},
 		{
 			name: "skip",
@@ -474,7 +476,7 @@ func Test_downloadRun_cloberAndSkip(t *testing.T) {
 				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/zipball/v1.2.3"),
 					httpmock.WithHeader(
-						httpmock.StringResponse("somedata"), "content-disposition", "attachment; filename=zipball.zip",
+						httpmock.StringResponse(newContents), "content-disposition", "attachment; filename=zipball.zip",
 					),
 				)
 			},
