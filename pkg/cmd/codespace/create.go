@@ -81,7 +81,11 @@ func newCreateCmd(app *App) *cobra.Command {
 		},
 	}
 
-	createCmd.Flags().StringVarP(&opts.repo, "repo", "r", "", "repository name with owner: user/repo")
+	createCmd.Flags().StringVarP(&opts.repo, "repo", "R", "", "repository name with owner: user/repo")
+	if err := addDeprecatedRepoShorthand(createCmd, &opts.repo); err != nil {
+		fmt.Fprintf(app.io.ErrOut, "%v\n", err)
+	}
+
 	createCmd.Flags().StringVarP(&opts.branch, "branch", "b", "", "repository branch")
 	createCmd.Flags().StringVarP(&opts.location, "location", "l", "", "location: {EastUs|SouthEastAsia|WestEurope|WestUs2} (determined automatically if not provided)")
 	createCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "hardware specifications for the VM")
