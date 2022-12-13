@@ -41,6 +41,19 @@ func TestAliasList(t *testing.T) {
 			wantStdout: "co: pr checkout\ngc: '!gh gist create \"$@\" | pbcopy'\n",
 			wantStderr: "",
 		},
+		{
+			name: "multiline",
+			config: heredoc.Doc(`
+				aliases:
+				  one: "foo\nbar\n"
+				  two: |-
+				    !chicken
+				    coop
+			`),
+			isTTY:      true,
+			wantStdout: "one: |\n    foo\n    bar\ntwo: |-\n    !chicken\n    coop\n",
+			wantStderr: "",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

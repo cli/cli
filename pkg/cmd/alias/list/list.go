@@ -1,8 +1,6 @@
 package list
 
 import (
-	"strings"
-
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -55,15 +53,6 @@ func listRun(opts *ListOptions) error {
 		return cmdutil.NewNoResultsError("no aliases configured")
 	}
 
-	for key, value := range aliasMap {
-		aliasMap[key] = strings.ReplaceAll(value, "\n", " ")
-	}
-
-	aliasBytes, err := yaml.Marshal(aliasMap)
-	if err != nil {
-		return err
-	}
-
-	opts.IO.Out.Write(aliasBytes)
-	return nil
+	enc := yaml.NewEncoder(opts.IO.Out)
+	return enc.Encode(aliasMap)
 }
