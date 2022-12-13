@@ -14,7 +14,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*shared.CommentableOptions) err
 		HttpClient:            f.HttpClient,
 		EditSurvey:            shared.CommentableEditSurvey(f.Config, f.IOStreams),
 		InteractiveEditSurvey: shared.CommentableInteractiveEditSurvey(f.Config, f.IOStreams),
-		ConfirmSubmitSurvey:   shared.CommentableConfirmSubmitSurvey,
+		ConfirmSubmitSurvey:   shared.CommentableConfirmSubmitSurvey(f.Prompter),
 		OpenInBrowser:         f.Browser.Browse,
 	}
 

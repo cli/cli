@@ -8,8 +8,8 @@ import (
 
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/httpmock"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -32,6 +32,15 @@ func TestTemplateManager_hasAPI(t *testing.T) {
 			]
 		}}}`))
 
+	pm := &prompter.PrompterMock{}
+	pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+		if p == "Choose a template" {
+			return prompter.IndexFor(opts, "Feature request")
+		} else {
+			return -1, prompter.NoSuchPromptErr(p)
+		}
+	}
+
 	m := templateManager{
 		repo:       ghrepo.NewWithHost("OWNER", "REPO", "example.com"),
 		rootDir:    rootDir,
@@ -39,6 +48,7 @@ func TestTemplateManager_hasAPI(t *testing.T) {
 		isPR:       false,
 		httpClient: httpClient,
 		detector:   &fd.EnabledDetectorMock{},
+		prompter:   pm,
 	}
 
 	hasTemplates, err := m.HasTemplates()
@@ -46,12 +56,6 @@ func TestTemplateManager_hasAPI(t *testing.T) {
 	assert.True(t, hasTemplates)
 
 	assert.Equal(t, "LEGACY", string(m.LegacyBody()))
-
-	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-	as := prompt.NewAskStubber(t)
-	as.StubPrompt("Choose a template").
-		AssertOptions([]string{"Bug report", "Feature request", "Open a blank issue"}).
-		AnswerWith("Feature request")
 
 	tpl, err := m.Choose()
 
@@ -79,6 +83,14 @@ func TestTemplateManager_hasAPI_PullRequest(t *testing.T) {
 			]
 		}}}`))
 
+	pm := &prompter.PrompterMock{}
+	pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+		if p == "Choose a template" {
+			return prompter.IndexFor(opts, "bug_pr.md")
+		} else {
+			return -1, prompter.NoSuchPromptErr(p)
+		}
+	}
 	m := templateManager{
 		repo:       ghrepo.NewWithHost("OWNER", "REPO", "example.com"),
 		rootDir:    rootDir,
@@ -86,6 +98,7 @@ func TestTemplateManager_hasAPI_PullRequest(t *testing.T) {
 		isPR:       true,
 		httpClient: httpClient,
 		detector:   &fd.EnabledDetectorMock{},
+		prompter:   pm,
 	}
 
 	hasTemplates, err := m.HasTemplates()
@@ -93,12 +106,6 @@ func TestTemplateManager_hasAPI_PullRequest(t *testing.T) {
 	assert.True(t, hasTemplates)
 
 	assert.Equal(t, "LEGACY", string(m.LegacyBody()))
-
-	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-	as := prompt.NewAskStubber(t)
-	as.StubPrompt("Choose a template").
-		AssertOptions([]string{"bug_pr.md", "feature_pr.md", "Open a blank pull request"}).
-		AnswerWith("bug_pr.md")
 
 	tpl, err := m.Choose()
 

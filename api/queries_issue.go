@@ -112,10 +112,13 @@ type Owner struct {
 }
 
 type Author struct {
-	// adding these breaks generated GraphQL requests
-	//ID    string `json:"id,omitempty"`
-	//Name  string `json:"name,omitempty"`
+	ID    string `json:"id,omitempty"`
+	Name  string `json:"name,omitempty"`
 	Login string `json:"login"`
+}
+
+func (author *Author) IsBot() bool {
+	return author.ID == ""
 }
 
 // IssueCreate creates an issue in a GitHub repository
