@@ -32,7 +32,7 @@ func newStopCmd(app *App) *cobra.Command {
 		},
 	}
 	stopCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "Name of the codespace")
-	stopCmd.Flags().StringVarP(&opts.repoName, "repo", "r", "", "The repository name used to filter codespace selection (user/repo)")
+	stopCmd.Flags().StringVarP(&opts.repoName, "repo", "R", "", "The repository name used to filter codespace selection (user/repo)")
 	stopCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "The `login` handle of the organization (admin-only)")
 	stopCmd.Flags().StringVarP(&opts.userName, "user", "u", "", "The `username` to stop codespace for (used with --org)")
 

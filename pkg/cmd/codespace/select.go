@@ -28,7 +28,7 @@ func newSelectCmd(app *App) *cobra.Command {
 		},
 	}
 
-	selectCmd.Flags().StringVarP(&opts.repo, "repo", "r", "", "Filter codespace selection by repository name (user/repo)")
+	selectCmd.Flags().StringVarP(&opts.repo, "repo", "R", "", "Filter codespace selection by repository name (user/repo)")
 	selectCmd.Flags().StringVarP(&opts.filePath, "file", "f", "", "Output file path")
 	return selectCmd
 }
