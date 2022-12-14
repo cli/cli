@@ -755,12 +755,12 @@ func Test_createRun(t *testing.T) {
 					"upload_url": "https://api.github.com/assets/upload",
 					"html_url": "https://github.com/OWNER/REPO/releases/tag/v1.2.3"
 				}`))
-				reg.Register(httpmock.REST("POST", "assets/upload"), httpmock.StatusStringResponse(500, `{}`))
+				reg.Register(httpmock.REST("POST", "assets/upload"), httpmock.StatusStringResponse(422, `{}`))
 				reg.Register(httpmock.REST("DELETE", "releases/123"), httpmock.StatusStringResponse(204, ``))
 			},
 			wantStdout: ``,
 			wantStderr: ``,
-			wantErr:    `HTTP 500 (https://api.github.com/assets/upload?label=&name=ball.tgz)`,
+			wantErr:    `HTTP 422 (https://api.github.com/assets/upload?label=&name=ball.tgz)`,
 		},
 		{
 			name:  "clean up draft after publishing fails",
