@@ -26,16 +26,17 @@ import (
 const pagingOffset = 24
 
 type ExtBrowseOpts struct {
-	Cmd      *cobra.Command
-	Browser  ibrowser
-	IO       *iostreams.IOStreams
-	Searcher search.Searcher
-	Em       extensions.ExtensionManager
-	Client   *http.Client
-	Logger   *log.Logger
-	Cfg      config.Config
-	Rg       *readmeGetter
-	Debug    bool
+	Cmd          *cobra.Command
+	Browser      ibrowser
+	IO           *iostreams.IOStreams
+	Searcher     search.Searcher
+	Em           extensions.ExtensionManager
+	Client       *http.Client
+	Logger       *log.Logger
+	Cfg          config.Config
+	Rg           *readmeGetter
+	Debug        bool
+	SingleColumn bool
 }
 
 type ibrowser interface {
@@ -49,7 +50,7 @@ type uiRegistry struct {
 	App       *tview.Application
 	Outerflex *tview.Flex
 	List      *tview.List
-	Readme    *tview.TextView
+	Pages     *tview.Pages
 }
 
 type extEntry struct {
@@ -97,6 +98,12 @@ func newExtList(opts ExtBrowseOpts, ui uiRegistry, extEntries []extEntry) *extLi
 	ui.List.SetSelectedBackgroundColor(tcell.ColorWhite)
 	ui.List.SetWrapAround(false)
 	ui.List.SetBorderPadding(1, 1, 1, 1)
+	if opts.SingleColumn {
+		ui.List.SetSelectedFunc(func(ix int, _, _ string, _ rune) {
+
+			// TODO switch to readme page
+		})
+	}
 
 	el := &extList{
 		ui:         ui,
@@ -109,6 +116,7 @@ func newExtList(opts ExtBrowseOpts, ui uiRegistry, extEntries []extEntry) *extLi
 	return el
 }
 
+// TODO use pages for this
 func (el *extList) createModal() *tview.Modal {
 	m := tview.NewModal()
 	m.SetBackgroundColor(tcell.ColorPurple)
@@ -368,10 +376,13 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	help := tview.NewTextView()
 	help.SetText("?: help  q: quit")
 
+	pages := tview.NewPages()
+
 	ui := uiRegistry{
 		App:       app,
 		Outerflex: outerFlex,
 		List:      list,
+		Pages:     pages,
 	}
 
 	extList := newExtList(opts, ui, extEntries)
@@ -413,7 +424,9 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 
 	innerFlex.SetDirection(tview.FlexColumn)
 	innerFlex.AddItem(list, 0, 1, true)
-	innerFlex.AddItem(readme, 0, 1, false)
+	if !opts.SingleColumn {
+		innerFlex.AddItem(readme, 0, 1, false)
+	}
 
 	outerFlex.SetDirection(tview.FlexRow)
 	outerFlex.AddItem(header, 1, -1, false)
@@ -460,9 +473,12 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		(On a mac, page down and page up are fn+down arrow and fn+up arrow)
 	`))
 
-	pages := tview.NewPages()
 	pages.AddPage("main", outerFlex, true, true)
 	pages.AddPage("help", helpBig, true, false)
+
+	if opts.SingleColumn {
+		pages.AddPage("readme", readme, true, false)
+	}
 
 	app.SetRoot(pages, true)
 

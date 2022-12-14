@@ -410,6 +410,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 		},
 		func() *cobra.Command {
 			var debug bool
+			var singleColumn bool
 			cmd := &cobra.Command{
 				Use:   "browse",
 				Short: "Enter a UI for browsing, adding, and removing extensions",
@@ -460,20 +461,22 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					searcher := search.NewSearcher(api.NewCachedHTTPClient(client, time.Hour*24), host)
 
 					opts := browse.ExtBrowseOpts{
-						Cmd:      cmd,
-						IO:       io,
-						Browser:  browser,
-						Searcher: searcher,
-						Em:       m,
-						Client:   client,
-						Cfg:      cfg,
-						Debug:    debug,
+						Cmd:          cmd,
+						IO:           io,
+						Browser:      browser,
+						Searcher:     searcher,
+						Em:           m,
+						Client:       client,
+						Cfg:          cfg,
+						Debug:        debug,
+						SingleColumn: singleColumn,
 					}
 
 					return browse.ExtBrowse(opts)
 				},
 			}
 			cmd.Flags().BoolVar(&debug, "debug", false, "log to /tmp/extBrowse-*")
+			cmd.Flags().BoolVarP(&singleColumn, "single-column", "s", false, "Render TUI with only one column of text")
 			return cmd
 		}(),
 		&cobra.Command{
