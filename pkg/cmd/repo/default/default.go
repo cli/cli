@@ -19,6 +19,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func explainer() string {
+	return heredoc.Doc(`
+		This command sets the default remote repository to use when querying the
+		GitHub API for a locally cloned repository.
+
+		gh uses the default repository for things like:
+
+		 - viewing, creating, and setting the default base for  pull requests
+		 - viewing and creating issues
+		 - viewing and creating releases
+		 - working with Actions
+		 - adding secrets`)
+}
+
 type iprompter interface {
 	Select(string, string, []string) (int, error)
 }
@@ -44,29 +58,20 @@ func NewCmdDefault(f *cmdutil.Factory, runF func(*DefaultOptions) error) *cobra.
 	cmd := &cobra.Command{
 		Use:   "default [<repository>]",
 		Short: "Configure default repository",
-		Long: heredoc.Doc(`
-			Set default repository for current directory.
-
-			gh uses the default repository for things like:
-
-			 - viewing, creating, and setting the default base for  pull requests
-			 - viewing and creating issues
-			 - viewing and creating releases
-			 - working with Actions
-			 - adding secrets
-		`),
+		Long:  explainer(),
 		Example: heredoc.Doc(`
 			Interactively select a default repository:
-
 			$ gh repo default
 
 			Set a repository explicitly:
-
 			$ gh repo default owner/repo
 
 			View the current default repository:
-
 			$ gh repo default --view
+
+			Show more repository options in the interactive picker:
+			$ git remote add newrepo https://github.com/owner/repo
+			$ gh repo default
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -152,8 +157,6 @@ func defaultRun(opts *DefaultOptions) error {
 	}
 	cs := opts.IO.ColorScheme()
 
-	hintMsg := cs.Gray("(hint: for gh to see more remote repositories, add them with `git remote`)")
-
 	if selectedRepo == nil {
 		if len(knownRepos) == 1 {
 			selectedRepo = knownRepos[0]
@@ -161,8 +164,6 @@ func defaultRun(opts *DefaultOptions) error {
 			fmt.Fprintf(opts.IO.Out, "Found only one known remote repo, %s on %s.\n",
 				cs.Bold(ghrepo.FullName(selectedRepo)),
 				cs.Bold(selectedRepo.RepoHost()))
-			fmt.Fprintln(opts.IO.Out, hintMsg)
-			fmt.Fprintln(opts.IO.Out)
 		} else {
 			var repoNames []string
 			current := ""
@@ -174,18 +175,7 @@ func defaultRun(opts *DefaultOptions) error {
 				repoNames = append(repoNames, ghrepo.FullName(knownRepo))
 			}
 
-			defaultExplainer := heredoc.Doc(`
-				gh uses the default repository for things like:
-				
-				 - viewing, creating, and setting the default base for  pull requests
-				 - viewing and creating issues
-				 - viewing and creating releases
-				 - working with Actions
-				 - adding secrets
-			`)
-
-			fmt.Fprintln(opts.IO.Out, defaultExplainer)
-			fmt.Fprintln(opts.IO.Out, hintMsg)
+			fmt.Fprintln(opts.IO.Out, explainer())
 			fmt.Fprintln(opts.IO.Out)
 
 			selected, err := opts.Prompter.Select("Which repository should be the default?", current, repoNames)
