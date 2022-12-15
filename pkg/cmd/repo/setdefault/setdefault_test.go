@@ -377,6 +377,8 @@ func TestDefaultRun(t *testing.T) {
 			return tt.remotes, nil
 		}
 
+		tt.opts.GitClient = &git.Client{}
+
 		pm := &prompter.PrompterMock{}
 		if tt.prompterStubs != nil {
 			tt.prompterStubs(pm)

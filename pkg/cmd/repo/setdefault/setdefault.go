@@ -42,6 +42,7 @@ type SetDefaultOptions struct {
 	Remotes    func() (context.Remotes, error)
 	HttpClient func() (*http.Client, error)
 	Prompter   iprompter
+	GitClient  *git.Client
 
 	Repo     ghrepo.Interface
 	ViewMode bool
@@ -53,6 +54,7 @@ func NewCmdSetDefault(f *cmdutil.Factory, runF func(*SetDefaultOptions) error) *
 		HttpClient: f.HttpClient,
 		Remotes:    f.Remotes,
 		Prompter:   f.Prompter,
+		GitClient:  f.GitClient,
 	}
 
 	cmd := &cobra.Command{
@@ -198,13 +200,13 @@ func setDefaultRun(opts *SetDefaultOptions) error {
 	}
 
 	if currentDefaultRepo != nil {
-		if err := unsetDefaultRepo(currentDefaultRepo); err != nil {
+		if err := opts.GitClient.UnsetRemoteResolution(
+			ctx.Background(), currentDefaultRepo.Name); err != nil {
 			return err
 		}
 	}
-
-	err = setDefaultRepo(selectedRemote, resolution)
-	if err != nil {
+	if err = opts.GitClient.SetRemoteResolution(
+		ctx.Background(), selectedRemote.Name, resolution); err != nil {
 		return err
 	}
 
@@ -227,14 +229,4 @@ func displayRemoteRepoName(remote *context.Remote) string {
 	}
 
 	return ghrepo.FullName(repo)
-}
-
-func setDefaultRepo(remote *context.Remote, resolution string) error {
-	c := &git.Client{}
-	return c.SetRemoteResolution(ctx.Background(), remote.Name, resolution)
-}
-
-func unsetDefaultRepo(remote *context.Remote) error {
-	c := &git.Client{}
-	return c.UnsetRemoteResolution(ctx.Background(), remote.Name)
 }
