@@ -22,15 +22,15 @@ import (
 func explainer() string {
 	return heredoc.Doc(`
 		This command sets the default remote repository to use when querying the
-		GitHub API for a locally cloned repository.
+		GitHub API for the locally cloned repository.
 
 		gh uses the default repository for things like:
 
-		 - viewing, creating, and setting the default base for  pull requests
+		 - viewing and creating pull requests
 		 - viewing and creating issues
 		 - viewing and creating releases
 		 - working with Actions
-		 - adding secrets`)
+		 - adding repository and environment secrets`)
 }
 
 type iprompter interface {
