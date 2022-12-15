@@ -288,12 +288,15 @@ func Test_createRun(t *testing.T) {
 				opts.BodyProvided = true
 				opts.Title = "my title"
 				opts.Body = "my body"
-				opts.Projects = []string{"roadmap2"}
+				opts.Projects = []string{"RoadmapV2"}
 				return func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				reg.StubRepoInfoResponse("OWNER", "REPO", "master")
+				// reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 				reg.StubRepoResponse("OWNER", "REPO")
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryProjectList\b`),
 					httpmock.StringResponse(`{ "data": { "repository": { "projects": { "nodes": [],	"pageInfo": { "hasNextPage": false } } } } }`))
@@ -301,11 +304,24 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQL(`query OrganizationProjectList\b`),
 					httpmock.StringResponse(`{ "data": { "organization": { "projects": { "nodes": [], "pageInfo": { "hasNextPage": false } } } } }`))
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryProjectListV2\b`),
-					httpmock.StringResponse(`{ "data": { "repository": { "projectsV2": { "nodes": [],	"pageInfo": { "hasNextPage": false } } } } }`))
+					httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+					httpmock.StringResponse(`
+				{ "data": { "repository": { "projectsV2": {
+					"nodes": [
+						{ "title": "CleanupV2", "id": "CLEANUPV2ID" },
+						{ "title": "RoadmapV2", "id": "ROADMAPV2ID" }
+					],
+					"pageInfo": { "hasNextPage": false }
+				} } } }
+				`))
 				reg.Register(
-					httpmock.GraphQL(`query OrganizationProjectListV2\b`),
-					httpmock.StringResponse(`{ "data": { "organization": { "projectsV2": { "nodes": [], "pageInfo": { "hasNextPage": false } } } } }`))
+					httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+					httpmock.StringResponse(`
+				{ "data": { "organization": { "projectsV2": {
+					"nodes": [],
+					"pageInfo": { "hasNextPage": false }
+				} } } }
+				`))
 				reg.Register(
 					httpmock.GraphQL(`mutation PullRequestCreate\b`),
 					httpmock.GraphQLMutation(`
@@ -776,16 +792,6 @@ func Test_createRun(t *testing.T) {
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
 					httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryProjectList\b`),
-					httpmock.StringResponse(`
-			{ "data": { "repository": { "projects": {
-				"nodes": [
-					{ "name": "Cleanup", "id": "CLEANUPID", "resourcePath": "/OWNER/REPO/projects/1" }
-				],
-				"pageInfo": { "hasNextPage": false }
-			} } } }
-			`))
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryProjectList\b`),
 					httpmock.StringResponse(`

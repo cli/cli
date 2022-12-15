@@ -815,7 +815,7 @@ func TestIssueCreate_projectsV2(t *testing.T) {
 			assert.Equal(t, 2, len(inputs))
 		}))
 
-	output, err := runCommand(http, true, `-t TITLE -b BODY -p roadmapv2`)
+	output, err := runCommand(http, true, `-t TITLE -b BODY -p roadmapv2`, nil)
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
