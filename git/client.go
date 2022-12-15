@@ -507,11 +507,16 @@ func (c *Client) InGitDirectory(ctx context.Context) bool {
 }
 
 func (c *Client) UnsetRemoteResolution(ctx context.Context, name string) error {
-	unsetCmd, err := c.Command(ctx, "config", "--unset", fmt.Sprintf("remote.%s.gh-resolved", name))
+	args := []string{"config", "--unset", fmt.Sprintf("remote.%s.gh-resolved", name)}
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return err
 	}
-	return unsetCmd.Run()
+	_, err = cmd.Output()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func resolveGitPath() (string, error) {
