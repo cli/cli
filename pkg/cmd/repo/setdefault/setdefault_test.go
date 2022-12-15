@@ -17,12 +17,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewCmdDefault(t *testing.T) {
+func TestNewCmdSetDefault(t *testing.T) {
 	tests := []struct {
 		name     string
 		gitStubs func(*run.CommandStubber)
 		input    string
-		output   DefaultOptions
+		output   SetDefaultOptions
 		wantErr  bool
 		errMsg   string
 	}{
@@ -32,7 +32,7 @@ func TestNewCmdDefault(t *testing.T) {
 				cs.Register(`git rev-parse --is-inside-work-tree`, 0, "true")
 			},
 			input:  "",
-			output: DefaultOptions{},
+			output: SetDefaultOptions{},
 		},
 		{
 			name: "repo argument",
@@ -40,7 +40,7 @@ func TestNewCmdDefault(t *testing.T) {
 				cs.Register(`git rev-parse --is-inside-work-tree`, 0, "true")
 			},
 			input:  "cli/cli",
-			output: DefaultOptions{Repo: ghrepo.New("cli", "cli")},
+			output: SetDefaultOptions{Repo: ghrepo.New("cli", "cli")},
 		},
 		{
 			name:     "invalid repo argument",
@@ -55,7 +55,7 @@ func TestNewCmdDefault(t *testing.T) {
 				cs.Register(`git rev-parse --is-inside-work-tree`, 0, "true")
 			},
 			input:  "--view",
-			output: DefaultOptions{ViewMode: true},
+			output: SetDefaultOptions{ViewMode: true},
 		},
 		{
 			name: "run from non-git directory",
@@ -77,8 +77,8 @@ func TestNewCmdDefault(t *testing.T) {
 			IOStreams: io,
 		}
 
-		var gotOpts *DefaultOptions
-		cmd := NewCmdDefault(f, func(opts *DefaultOptions) error {
+		var gotOpts *SetDefaultOptions
+		cmd := NewCmdSetDefault(f, func(opts *SetDefaultOptions) error {
 			gotOpts = opts
 			return nil
 		})
@@ -117,7 +117,7 @@ func TestDefaultRun(t *testing.T) {
 	tests := []struct {
 		name          string
 		tty           bool
-		opts          DefaultOptions
+		opts          SetDefaultOptions
 		remotes       []*context.Remote
 		httpStubs     func(*httpmock.Registry)
 		gitStubs      func(*run.CommandStubber)
@@ -128,7 +128,7 @@ func TestDefaultRun(t *testing.T) {
 	}{
 		{
 			name: "view mode no current default",
-			opts: DefaultOptions{ViewMode: true},
+			opts: SetDefaultOptions{ViewMode: true},
 			remotes: []*context.Remote{
 				{
 					Remote: &git.Remote{Name: "origin"},
@@ -139,7 +139,7 @@ func TestDefaultRun(t *testing.T) {
 		},
 		{
 			name: "view mode with base resolved current default",
-			opts: DefaultOptions{ViewMode: true},
+			opts: SetDefaultOptions{ViewMode: true},
 			remotes: []*context.Remote{
 				{
 					Remote: &git.Remote{Name: "origin", Resolved: "base"},
@@ -150,7 +150,7 @@ func TestDefaultRun(t *testing.T) {
 		},
 		{
 			name: "view mode with non-base resolved current default",
-			opts: DefaultOptions{ViewMode: true},
+			opts: SetDefaultOptions{ViewMode: true},
 			remotes: []*context.Remote{
 				{
 					Remote: &git.Remote{Name: "origin", Resolved: "PARENT/REPO"},
@@ -162,7 +162,7 @@ func TestDefaultRun(t *testing.T) {
 		{
 			name: "tty non-interactive mode no current default",
 			tty:  true,
-			opts: DefaultOptions{Repo: repo2},
+			opts: SetDefaultOptions{Repo: repo2},
 			remotes: []*context.Remote{
 				{
 					Remote: &git.Remote{Name: "origin"},
@@ -187,7 +187,7 @@ func TestDefaultRun(t *testing.T) {
 		{
 			name: "tty non-interactive mode set non-base default",
 			tty:  true,
-			opts: DefaultOptions{Repo: repo2},
+			opts: SetDefaultOptions{Repo: repo2},
 			remotes: []*context.Remote{
 				{
 					Remote: &git.Remote{Name: "origin"},
@@ -211,7 +211,7 @@ func TestDefaultRun(t *testing.T) {
 		},
 		{
 			name: "non-tty non-interactive mode no current default",
-			opts: DefaultOptions{Repo: repo2},
+			opts: SetDefaultOptions{Repo: repo2},
 			remotes: []*context.Remote{
 				{
 					Remote: &git.Remote{Name: "origin"},
@@ -236,7 +236,7 @@ func TestDefaultRun(t *testing.T) {
 		{
 			name: "non-interactive mode with current default",
 			tty:  true,
-			opts: DefaultOptions{Repo: repo2},
+			opts: SetDefaultOptions{Repo: repo2},
 			remotes: []*context.Remote{
 				{
 					Remote: &git.Remote{Name: "origin", Resolved: "base"},
@@ -261,7 +261,7 @@ func TestDefaultRun(t *testing.T) {
 		},
 		{
 			name: "non-interactive mode no known hosts",
-			opts: DefaultOptions{Repo: repo2},
+			opts: SetDefaultOptions{Repo: repo2},
 			remotes: []*context.Remote{
 				{
 					Remote: &git.Remote{Name: "origin"},
@@ -279,7 +279,7 @@ func TestDefaultRun(t *testing.T) {
 		},
 		{
 			name: "non-interactive mode no matching remotes",
-			opts: DefaultOptions{Repo: repo2},
+			opts: SetDefaultOptions{Repo: repo2},
 			remotes: []*context.Remote{
 				{
 					Remote: &git.Remote{Name: "origin"},
@@ -298,7 +298,7 @@ func TestDefaultRun(t *testing.T) {
 		{
 			name: "interactive mode",
 			tty:  true,
-			opts: DefaultOptions{},
+			opts: SetDefaultOptions{},
 			remotes: []*context.Remote{
 				{
 					Remote: &git.Remote{Name: "origin"},
@@ -329,12 +329,12 @@ func TestDefaultRun(t *testing.T) {
 					}
 				}
 			},
-			wantStdout: "gh uses the default repository for things like:\n\n - viewing, creating, and setting the default base for  pull requests\n - viewing and creating issues\n - viewing and creating releases\n - working with Actions\n - adding secrets\n\n(hint: for gh to see more remote repositories, add them with `git remote`)\n\n✓ Set OWNER2/REPO2 as the default repository for the current directory\n",
+			wantStdout: "This command sets the default remote repository to use when querying the\nGitHub API for a locally cloned repository.\n\ngh uses the default repository for things like:\n\n - viewing, creating, and setting the default base for  pull requests\n - viewing and creating issues\n - viewing and creating releases\n - working with Actions\n - adding secrets\n\n✓ Set OWNER2/REPO2 as the default repository for the current directory\n",
 		},
 		{
 			name: "interactive mode only one known host",
 			tty:  true,
-			opts: DefaultOptions{},
+			opts: SetDefaultOptions{},
 			remotes: []*context.Remote{
 				{
 					Remote: &git.Remote{Name: "origin"},
@@ -354,7 +354,7 @@ func TestDefaultRun(t *testing.T) {
 			gitStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --add remote.upstream.gh-resolved base`, 0, "")
 			},
-			wantStdout: "Found only one known remote repo, OWNER2/REPO2 on github.com.\n(hint: for gh to see more remote repositories, add them with `git remote`)\n\n✓ Set OWNER2/REPO2 as the default repository for the current directory\n",
+			wantStdout: "Found only one known remote repo, OWNER2/REPO2 on github.com.\n✓ Set OWNER2/REPO2 as the default repository for the current directory\n",
 		},
 	}
 
@@ -391,7 +391,7 @@ func TestDefaultRun(t *testing.T) {
 				tt.gitStubs(cs)
 			}
 			defer reg.Verify(t)
-			err := defaultRun(&tt.opts)
+			err := setDefaultRun(&tt.opts)
 			if tt.wantErr {
 				assert.EqualError(t, err, tt.errMsg)
 				return

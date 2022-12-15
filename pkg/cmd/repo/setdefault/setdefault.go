@@ -37,7 +37,7 @@ type iprompter interface {
 	Select(string, string, []string) (int, error)
 }
 
-type DefaultOptions struct {
+type SetDefaultOptions struct {
 	IO         *iostreams.IOStreams
 	Remotes    func() (context.Remotes, error)
 	HttpClient func() (*http.Client, error)
@@ -47,8 +47,8 @@ type DefaultOptions struct {
 	ViewMode bool
 }
 
-func NewCmdDefault(f *cmdutil.Factory, runF func(*DefaultOptions) error) *cobra.Command {
-	opts := &DefaultOptions{
+func NewCmdSetDefault(f *cmdutil.Factory, runF func(*SetDefaultOptions) error) *cobra.Command {
+	opts := &SetDefaultOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Remotes:    f.Remotes,
@@ -56,8 +56,8 @@ func NewCmdDefault(f *cmdutil.Factory, runF func(*DefaultOptions) error) *cobra.
 	}
 
 	cmd := &cobra.Command{
-		Use:   "default [<repository>]",
-		Short: "Configure default repository",
+		Use:   "set-default [<repository>]",
+		Short: "Configure default repository for this directory",
 		Long:  explainer(),
 		Example: heredoc.Doc(`
 			Interactively select a default repository:
@@ -97,7 +97,7 @@ func NewCmdDefault(f *cmdutil.Factory, runF func(*DefaultOptions) error) *cobra.
 				return runF(opts)
 			}
 
-			return defaultRun(opts)
+			return setDefaultRun(opts)
 		},
 	}
 
@@ -106,7 +106,7 @@ func NewCmdDefault(f *cmdutil.Factory, runF func(*DefaultOptions) error) *cobra.
 	return cmd
 }
 
-func defaultRun(opts *DefaultOptions) error {
+func setDefaultRun(opts *SetDefaultOptions) error {
 	remotes, err := opts.Remotes()
 	if err != nil {
 		return err
