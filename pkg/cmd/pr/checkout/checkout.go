@@ -242,8 +242,13 @@ func localBranchExists(client *git.Client, b string) bool {
 
 func executeCmds(client *git.Client, cmdQueue [][]string) error {
 	for _, args := range cmdQueue {
-		// TODO: Use AuthenticatedCommand
-		cmd, err := client.Command(context.Background(), args...)
+		var err error
+		var cmd *git.Command
+		if args[0] == "fetch" || args[0] == "submodule" {
+			cmd, err = client.AuthenticatedCommand(context.Background(), args...)
+		} else {
+			cmd, err = client.Command(context.Background(), args...)
+		}
 		if err != nil {
 			return err
 		}

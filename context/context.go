@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
@@ -85,36 +86,18 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams, p iprompter) (ghrepo
 		return r.remotes[0], nil
 	}
 
-	// from here on, consult the API
-	if r.network == nil {
-		err := resolveNetwork(r)
-		if err != nil {
-			return nil, err
-		}
+	repos, err := r.NetworkRepos()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(repos) == 0 {
+		return r.remotes[0], nil
 	}
 
 	var repoNames []string
-	repoMap := map[string]*api.Repository{}
-	add := func(r *api.Repository) {
-		fn := ghrepo.FullName(r)
-		if _, ok := repoMap[fn]; !ok {
-			repoMap[fn] = r
-			repoNames = append(repoNames, fn)
-		}
-	}
-
-	for _, repo := range r.network.Repositories {
-		if repo == nil {
-			continue
-		}
-		if repo.Parent != nil {
-			add(repo.Parent)
-		}
-		add(repo)
-	}
-
-	if len(repoNames) == 0 {
-		return r.remotes[0], nil
+	for _, r := range repos {
+		repoNames = append(repoNames, ghrepo.FullName(r))
 	}
 
 	baseName := repoNames[0]
@@ -130,7 +113,8 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams, p iprompter) (ghrepo
 	}
 
 	// determine corresponding git remote
-	selectedRepo := repoMap[baseName]
+	owner, repo, _ := strings.Cut(baseName, "/")
+	selectedRepo := ghrepo.New(owner, repo)
 	resolution := "base"
 	remote, _ := r.RemoteForRepo(selectedRepo)
 	if remote == nil {
@@ -140,7 +124,7 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams, p iprompter) (ghrepo
 
 	// cache the result to git config
 	c := &git.Client{}
-	err := c.SetRemoteResolution(context.Background(), remote.Name, resolution)
+	err = c.SetRemoteResolution(context.Background(), remote.Name, resolution)
 	return selectedRepo, err
 }
 
@@ -159,6 +143,38 @@ func (r *ResolvedRemotes) HeadRepos() ([]*api.Repository, error) {
 		}
 	}
 	return results, nil
+}
+
+func (r *ResolvedRemotes) NetworkRepos() ([]*api.Repository, error) {
+	if r.network == nil {
+		err := resolveNetwork(r)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var repos []*api.Repository
+	repoMap := map[string]bool{}
+
+	add := func(r *api.Repository) {
+		fn := ghrepo.FullName(r)
+		if _, ok := repoMap[fn]; !ok {
+			repoMap[fn] = true
+			repos = append(repos, r)
+		}
+	}
+
+	for _, repo := range r.network.Repositories {
+		if repo == nil {
+			continue
+		}
+		if repo.Parent != nil {
+			add(repo.Parent)
+		}
+		add(repo)
+	}
+
+	return repos, nil
 }
 
 // RemoteForRepo finds the git remote that points to a repository
