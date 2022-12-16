@@ -11,11 +11,11 @@
 package lock
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -25,6 +25,13 @@ import (
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
+
+type iprompter interface {
+	Confirm(string, bool) (bool, error)
+}
+
+// TODO cmd tests
+// TODO run tests
 
 // reasons contains all possible lock reasons allowed by GitHub.
 //
@@ -84,6 +91,7 @@ type LockOptions struct {
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Prompter   iprompter
 
 	Fields      []string
 	ParentCmd   string
@@ -92,7 +100,6 @@ type LockOptions struct {
 }
 
 func (opts *LockOptions) setCommonOptions(f *cmdutil.Factory, cmd *cobra.Command, args []string) {
-
 	opts.IO = f.IOStreams
 	opts.HttpClient = f.HttpClient
 	opts.Config = f.Config
@@ -107,9 +114,10 @@ func (opts *LockOptions) setCommonOptions(f *cmdutil.Factory, cmd *cobra.Command
 
 }
 
-func NewCmdLock(f *cmdutil.Factory, parentName string) *cobra.Command {
-
+func NewCmdLock(f *cmdutil.Factory, parentName string, runF func(string, *LockOptions) error) *cobra.Command {
 	opts := &LockOptions{ParentCmd: parentName}
+
+	opts.Prompter = f.Prompter
 
 	c := alias[opts.ParentCmd]
 	short := fmt.Sprintf("Lock %s conversation", strings.ToLower(c.FullName))
@@ -119,21 +127,28 @@ func NewCmdLock(f *cmdutil.Factory, parentName string) *cobra.Command {
 		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-
 			opts.setCommonOptions(f, cmd, args)
 
 			reasonProvided := cmd.Flags().Changed("message")
 			if reasonProvided {
 				_, ok := reasonsMap[opts.Reason]
 				if !ok {
-					cs := opts.IO.ColorScheme()
+					if opts.IO.IsStdoutTTY() {
+						cs := opts.IO.ColorScheme()
 
-					return cmdutil.FlagErrorf("%s Invalid reason: %v\nAborting lock.  See help for options.",
-						cs.FailureIconWithColor(cs.Red), opts.Reason)
+						return cmdutil.FlagErrorf("%s Invalid reason: %v\nAborting lock.  See help for options.",
+							cs.FailureIconWithColor(cs.Red), opts.Reason)
+
+					} else {
+						return fmt.Errorf("invalid reason %s", opts.Reason)
+					}
 				}
 			}
 
-			return padlock(Lock, opts)
+			if runF != nil {
+				return runF(Lock, opts)
+			}
+			return lock(Lock, opts)
 		},
 	}
 
@@ -143,8 +158,7 @@ func NewCmdLock(f *cmdutil.Factory, parentName string) *cobra.Command {
 	return cmd
 }
 
-func NewCmdUnlock(f *cmdutil.Factory, parentName string) *cobra.Command {
-
+func NewCmdUnlock(f *cmdutil.Factory, parentName string, runF func(string, *LockOptions) error) *cobra.Command {
 	opts := &LockOptions{ParentCmd: parentName}
 
 	c := alias[opts.ParentCmd]
@@ -158,7 +172,10 @@ func NewCmdUnlock(f *cmdutil.Factory, parentName string) *cobra.Command {
 
 			opts.setCommonOptions(f, cmd, args)
 
-			return padlock(Unlock, opts)
+			if runF != nil {
+				return runF(Unlock, opts)
+			}
+			return lock(Unlock, opts)
 		},
 	}
 
@@ -182,13 +199,12 @@ func reason(reason string) string {
 //
 // Example output: "Locked as RESOLVED: Issue #31 (Title of issue)"
 func status(state string, lockable *api.Issue, opts *LockOptions) string {
-
 	return fmt.Sprintf("%sed%s: %s #%d (%s)",
 		state, reason(opts.Reason), alias[opts.ParentCmd].FullName, lockable.Number, lockable.Title)
 }
 
-// padlock will lock or unlock a conversation.
-func padlock(state string, opts *LockOptions) error {
+// lock will lock or unlock a conversation.
+func lock(state string, opts *LockOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	httpClient, err := opts.HttpClient()
@@ -243,14 +259,15 @@ func padlock(state string, opts *LockOptions) error {
 		return err
 	}
 
-	fmt.Fprint(opts.IO.ErrOut, successMsg)
+	if opts.IO.IsStdoutTTY() {
+		fmt.Fprint(opts.IO.ErrOut, successMsg)
+	}
 
 	return nil
 }
 
 // lockLockable will lock an issue or pull request
 func lockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *api.Issue, opts *LockOptions) error {
-
 	var mutation struct {
 		LockLockable struct {
 			LockedRecord struct {
@@ -298,17 +315,16 @@ func unlockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *ap
 // lockable item that is already locked; it will just ignore that request.  You
 // need to first unlock then lock with a new reason.
 func relockLockable(httpClient *http.Client, repo ghrepo.Interface, lockable *api.Issue, opts *LockOptions) (bool, error) {
-
-	var relocked bool
-	shouldRelock := &survey.Confirm{
-		Message: fmt.Sprintf("%s #%d already locked%s.  Unlock and lock again%s?",
-			alias[opts.ParentCmd].FullName, lockable.Number, reason(lockable.ActiveLockReason), reason(opts.Reason)),
-		Default: true,
+	if !opts.IO.CanPrompt() {
+		return false, errors.New("already locked")
 	}
 
-	err := survey.AskOne(shouldRelock, &relocked)
+	prompt := fmt.Sprintf("%s #%d already locked%s.  Unlock and lock again%s?",
+		alias[opts.ParentCmd].FullName, lockable.Number, reason(lockable.ActiveLockReason), reason(opts.Reason))
+
+	relocked, err := opts.Prompter.Confirm(prompt, true)
 	if err != nil {
-		return relocked, err
+		return false, err
 	} else if !relocked {
 		return relocked, nil
 	}
