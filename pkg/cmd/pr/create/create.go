@@ -485,7 +485,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	}
 
 	var baseRepo *api.Repository
-	if br, err := repoContext.BaseRepo(opts.IO, opts.Prompter); err == nil {
+	if br, err := repoContext.BaseRepo(opts.IO); err == nil {
 		if r, ok := br.(*api.Repository); ok {
 			baseRepo = r
 		} else {
@@ -497,7 +497,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 			}
 		}
 	} else {
-		return nil, fmt.Errorf("could not determine base repository: %w", err)
+		return nil, err
 	}
 
 	isPushEnabled := false

@@ -2,13 +2,11 @@
 package context
 
 import (
-	"context"
 	"errors"
+	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
@@ -59,11 +57,7 @@ type ResolvedRemotes struct {
 	apiClient    *api.Client
 }
 
-type iprompter interface {
-	Select(string, string, []string) (int, error)
-}
-
-func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams, p iprompter) (ghrepo.Interface, error) {
+func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, error) {
 	if r.baseOverride != nil {
 		return r.baseOverride, nil
 	}
@@ -95,37 +89,16 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams, p iprompter) (ghrepo
 		return r.remotes[0], nil
 	}
 
-	var repoNames []string
-	for _, r := range repos {
-		repoNames = append(repoNames, ghrepo.FullName(r))
-	}
+	cs := io.ColorScheme()
 
-	baseName := repoNames[0]
-	if len(repoNames) > 1 {
-		// hide the spinner in case a command started the progress indicator before base repo was fully
-		// resolved, e.g. in `gh issue view`
-		io.StopProgressIndicator()
-		selected, err := p.Select("Which should be the base repository (used for e.g. querying issues) for this directory?", "", repoNames)
-		if err != nil {
-			return nil, err
-		}
-		baseName = repoNames[selected]
-	}
+	fmt.Fprintf(io.ErrOut,
+		"%s No default remote repository has been set for this directory.\n",
+		cs.FailureIcon())
 
-	// determine corresponding git remote
-	owner, repo, _ := strings.Cut(baseName, "/")
-	selectedRepo := ghrepo.New(owner, repo)
-	resolution := "base"
-	remote, _ := r.RemoteForRepo(selectedRepo)
-	if remote == nil {
-		remote = r.remotes[0]
-		resolution = ghrepo.FullName(selectedRepo)
-	}
+	fmt.Fprintln(io.Out)
 
-	// cache the result to git config
-	c := &git.Client{}
-	err = c.SetRemoteResolution(context.Background(), remote.Name, resolution)
-	return selectedRepo, err
+	return nil, errors.New(
+		"please run `gh repo set-default` to select a default remote repository.")
 }
 
 func (r *ResolvedRemotes) HeadRepos() ([]*api.Repository, error) {

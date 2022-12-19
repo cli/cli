@@ -44,8 +44,9 @@ type SetDefaultOptions struct {
 	Prompter   iprompter
 	GitClient  *git.Client
 
-	Repo     ghrepo.Interface
-	ViewMode bool
+	Repo      ghrepo.Interface
+	ViewMode  bool
+	UnsetMode bool
 }
 
 func NewCmdSetDefault(f *cmdutil.Factory, runF func(*SetDefaultOptions) error) *cobra.Command {
@@ -63,17 +64,17 @@ func NewCmdSetDefault(f *cmdutil.Factory, runF func(*SetDefaultOptions) error) *
 		Long:  explainer(),
 		Example: heredoc.Doc(`
 			Interactively select a default repository:
-			$ gh repo default
+			$ gh repo set-default
 
 			Set a repository explicitly:
-			$ gh repo default owner/repo
+			$ gh repo set-default owner/repo
 
 			View the current default repository:
-			$ gh repo default --view
+			$ gh repo set-default --view
 
 			Show more repository options in the interactive picker:
 			$ git remote add newrepo https://github.com/owner/repo
-			$ gh repo default
+			$ gh repo set-default
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -104,6 +105,7 @@ func NewCmdSetDefault(f *cmdutil.Factory, runF func(*SetDefaultOptions) error) *
 	}
 
 	cmd.Flags().BoolVarP(&opts.ViewMode, "view", "v", false, "view the current default repository")
+	cmd.Flags().BoolVarP(&opts.UnsetMode, "unset", "u", false, "unset the current default repository")
 
 	return cmd
 }
@@ -118,10 +120,32 @@ func setDefaultRun(opts *SetDefaultOptions) error {
 
 	if opts.ViewMode {
 		if currentDefaultRepo == nil {
-			fmt.Fprintln(opts.IO.Out, "no default repo has been set; use `gh repo default` to select one")
+			fmt.Fprintln(opts.IO.Out, "no default repository has been set; use `gh repo set-default` to select one")
 		} else {
 			fmt.Fprintln(opts.IO.Out, displayRemoteRepoName(currentDefaultRepo))
 		}
+		return nil
+	}
+
+	cs := opts.IO.ColorScheme()
+
+	if opts.UnsetMode {
+		var msg string
+		if currentDefaultRepo != nil {
+			if err := opts.GitClient.UnsetRemoteResolution(
+				ctx.Background(), currentDefaultRepo.Name); err != nil {
+				return err
+			}
+			msg = fmt.Sprintf("%s Unset %s as default repository",
+				cs.SuccessIcon(), ghrepo.FullName(currentDefaultRepo))
+		} else {
+			msg = "no default repository has been set"
+		}
+
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprintln(opts.IO.Out, msg)
+		}
+
 		return nil
 	}
 
@@ -157,7 +181,6 @@ func setDefaultRun(opts *SetDefaultOptions) error {
 			return fmt.Errorf("%s does not correspond to any git remotes", ghrepo.FullName(opts.Repo))
 		}
 	}
-	cs := opts.IO.ColorScheme()
 
 	if selectedRepo == nil {
 		if len(knownRepos) == 1 {
