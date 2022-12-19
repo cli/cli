@@ -164,10 +164,12 @@ func TestCreateCodespaces_displayName(t *testing.T) {
 		client:    &http.Client{},
 	}
 
-	// retentionPeriod := 0
+	retentionPeriod := 0
 	codespace, err := api.CreateCodespace(context.Background(), &CreateCodespaceParams{
-		RepositoryID: 1,
-		DisplayName:  "clucky cuckoo",
+		RepositoryID:           1,
+		IdleTimeoutMinutes:     10,
+		RetentionPeriodMinutes: &retentionPeriod,
+		DisplayName:            "clucky cuckoo",
 	})
 	if err != nil {
 		t.Fatal(err)
