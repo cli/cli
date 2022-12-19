@@ -1,6 +1,7 @@
 package deleteasset
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -66,7 +67,7 @@ func deleteAssetRun(opts *DeleteAssetOptions) error {
 		return err
 	}
 
-	release, err := shared.FetchRelease(httpClient, baseRepo, opts.TagName)
+	release, err := shared.FetchRelease(context.Background(), httpClient, baseRepo, opts.TagName)
 	if err != nil {
 		return err
 	}

@@ -13,6 +13,7 @@ import (
 	gardenCmd "github.com/cli/cli/v2/pkg/cmd/repo/garden"
 	repoListCmd "github.com/cli/cli/v2/pkg/cmd/repo/list"
 	repoRenameCmd "github.com/cli/cli/v2/pkg/cmd/repo/rename"
+	repoDefaultCmd "github.com/cli/cli/v2/pkg/cmd/repo/setdefault"
 	repoSyncCmd "github.com/cli/cli/v2/pkg/cmd/repo/sync"
 	repoViewCmd "github.com/cli/cli/v2/pkg/cmd/repo/view"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -52,6 +53,7 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(repoRenameCmd.NewCmdRename(f, nil))
 	cmd.AddCommand(repoDeleteCmd.NewCmdDelete(f, nil))
 	cmd.AddCommand(repoArchiveCmd.NewCmdArchive(f, nil))
+	cmd.AddCommand(repoDefaultCmd.NewCmdSetDefault(f, nil))
 
 	return cmd
 }
