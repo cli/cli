@@ -3,16 +3,21 @@ package lock
 import (
 	"bytes"
 	"io"
+	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
+	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test_NewCmdLock(t *testing.T) {
+	// TODO parent name stuff?
 	cases := []struct {
 		name    string
 		args    string
@@ -101,6 +106,7 @@ func Test_NewCmdLock(t *testing.T) {
 }
 
 func Test_NewCmdUnlock(t *testing.T) {
+	// TODO parent name stuff?
 	cases := []struct {
 		name    string
 		args    string
@@ -159,7 +165,66 @@ func Test_NewCmdUnlock(t *testing.T) {
 }
 
 func Test_runLock(t *testing.T) {
-	// TODO
+	cases := []struct {
+		name        string
+		opts        LockOptions
+		promptStubs func(*testing.T, *prompter.PrompterMock)
+		httpStubs   func(*testing.T, *httpmock.Registry)
+		wantOut     string
+		wantErrOut  string
+		wantErr     string
+		tty         bool
+		state       string
+	}{
+		{
+			name: "lock an issue",
+			// TODO
+		},
+		// TODO
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			reg.StubRepoInfoResponse("OWNER", "REPO", "trunk")
+			defer reg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(t, reg)
+			}
+
+			pm := &prompter.PrompterMock{}
+			if tt.promptStubs != nil {
+				tt.promptStubs(t, pm)
+			}
+
+			ios, _, stdout, stderr := iostreams.Test()
+			// TODO do i need to bother with this
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStderrTTY(tt.tty)
+
+			opts := LockOptions{
+				Prompter: pm,
+				IO:       ios,
+				HttpClient: func() (*http.Client, error) {
+					return &http.Client{Transport: reg}, nil
+				},
+			}
+
+			err := lockRun(tt.state, &opts)
+			output := &test.CmdOut{
+				OutBuf: stdout,
+				ErrBuf: stderr,
+			}
+			if tt.wantErr != "" {
+				assert.EqualError(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantOut, output.String())
+				assert.Equal(t, tt.wantErrOut, output.Stderr())
+			}
+		})
+	}
 }
 
 func TestReasons(t *testing.T) {

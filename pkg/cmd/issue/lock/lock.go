@@ -148,7 +148,7 @@ func NewCmdLock(f *cmdutil.Factory, parentName string, runF func(string, *LockOp
 			if runF != nil {
 				return runF(Lock, opts)
 			}
-			return runLock(Lock, opts)
+			return lockRun(Lock, opts)
 		},
 	}
 
@@ -174,7 +174,7 @@ func NewCmdUnlock(f *cmdutil.Factory, parentName string, runF func(string, *Lock
 			if runF != nil {
 				return runF(Unlock, opts)
 			}
-			return runLock(Unlock, opts)
+			return lockRun(Unlock, opts)
 		},
 	}
 
@@ -202,8 +202,8 @@ func status(state string, lockable *api.Issue, opts *LockOptions) string {
 		state, reason(opts.Reason), alias[opts.ParentCmd].FullName, lockable.Number, lockable.Title)
 }
 
-// runLock will lock or unlock a conversation.
-func runLock(state string, opts *LockOptions) error {
+// lockRun will lock or unlock a conversation.
+func lockRun(state string, opts *LockOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	httpClient, err := opts.HttpClient()
