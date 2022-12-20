@@ -41,24 +41,24 @@ func NewCmdIssue(f *cmdutil.Factory) *cobra.Command {
 
 	cmdutil.EnableRepoOverride(cmd, f)
 
-	cmd.AddGroup(&cobra.Group{
-		ID:    "general",
-		Title: "General commands",
-	})
+	cmdutil.AddGroup(cmd, "General commands",
+		cmdCreate.NewCmdCreate(f, nil),
+		cmdList.NewCmdList(f, nil),
+		cmdStatus.NewCmdStatus(f, nil),
+	)
 
-	cmd.AddCommand(cmdClose.NewCmdClose(f, nil))
-	cmd.AddCommand(cmdCreate.NewCmdCreate(f, nil))
-	cmd.AddCommand(cmdList.NewCmdList(f, nil))
-	cmd.AddCommand(cmdReopen.NewCmdReopen(f, nil))
-	cmd.AddCommand(cmdStatus.NewCmdStatus(f, nil))
-	cmd.AddCommand(cmdView.NewCmdView(f, nil))
-	cmd.AddCommand(cmdComment.NewCmdComment(f, nil))
-	cmd.AddCommand(cmdDelete.NewCmdDelete(f, nil))
-	cmd.AddCommand(cmdEdit.NewCmdEdit(f, nil))
-	cmd.AddCommand(cmdTransfer.NewCmdTransfer(f, nil))
-	cmd.AddCommand(cmdDevelop.NewCmdDevelop(f, nil))
-	cmd.AddCommand(cmdPin.NewCmdPin(f, nil))
-	cmd.AddCommand(cmdUnpin.NewCmdUnpin(f, nil))
+	cmdutil.AddGroup(cmd, "Targeted commands",
+		cmdClose.NewCmdClose(f, nil),
+		cmdReopen.NewCmdReopen(f, nil),
+		cmdView.NewCmdView(f, nil),
+		cmdComment.NewCmdComment(f, nil),
+		cmdDelete.NewCmdDelete(f, nil),
+		cmdEdit.NewCmdEdit(f, nil),
+		cmdTransfer.NewCmdTransfer(f, nil),
+		cmdDevelop.NewCmdDevelop(f, nil),
+		cmdPin.NewCmdPin(f, nil),
+		cmdUnpin.NewCmdUnpin(f, nil),
+	)
 
 	return cmd
 }

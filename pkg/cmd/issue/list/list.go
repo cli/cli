@@ -73,7 +73,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			$ gh issue list --search "error no:assignee sort:created-asc"
 		`),
 		Aliases: []string{"ls"},
-		GroupID: "general",
 		Args:    cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
