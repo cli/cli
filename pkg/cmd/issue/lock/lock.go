@@ -28,10 +28,8 @@ import (
 
 type iprompter interface {
 	Confirm(string, bool) (bool, error)
+	Select(string, string, []string) (int, error)
 }
-
-// TODO cmd tests
-// TODO run tests
 
 // reasons contains all possible lock reasons allowed by GitHub.
 //
@@ -97,6 +95,7 @@ type LockOptions struct {
 	ParentCmd   string
 	Reason      string
 	SelectorArg string
+	Interactive bool
 }
 
 func (opts *LockOptions) setCommonOptions(f *cmdutil.Factory, cmd *cobra.Command, args []string) {
@@ -111,13 +110,13 @@ func (opts *LockOptions) setCommonOptions(f *cmdutil.Factory, cmd *cobra.Command
 
 	opts.Fields = []string{
 		"activeLockReason", "id", "locked", "number", "title", "url"}
-
 }
 
 func NewCmdLock(f *cmdutil.Factory, parentName string, runF func(string, *LockOptions) error) *cobra.Command {
-	opts := &LockOptions{ParentCmd: parentName}
-
-	opts.Prompter = f.Prompter
+	opts := &LockOptions{
+		ParentCmd: parentName,
+		Prompter:  f.Prompter,
+	}
 
 	c := alias[opts.ParentCmd]
 	short := fmt.Sprintf("Lock %s conversation", strings.ToLower(c.FullName))
@@ -129,32 +128,33 @@ func NewCmdLock(f *cmdutil.Factory, parentName string, runF func(string, *LockOp
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.setCommonOptions(f, cmd, args)
 
-			reasonProvided := cmd.Flags().Changed("message")
+			reasonProvided := cmd.Flags().Changed("reason")
 			if reasonProvided {
 				_, ok := reasonsMap[opts.Reason]
 				if !ok {
 					if opts.IO.IsStdoutTTY() {
 						cs := opts.IO.ColorScheme()
 
-						return cmdutil.FlagErrorf("%s Invalid reason: %v\nAborting lock.  See help for options.",
+						return cmdutil.FlagErrorf("%s Invalid reason: %v\n",
 							cs.FailureIconWithColor(cs.Red), opts.Reason)
-
 					} else {
 						return fmt.Errorf("invalid reason %s", opts.Reason)
 					}
 				}
+			} else if opts.IO.CanPrompt() {
+				opts.Interactive = true
 			}
 
 			if runF != nil {
 				return runF(Lock, opts)
 			}
-			return lock(Lock, opts)
+			return runLock(Lock, opts)
 		},
 	}
 
-	msg := fmt.Sprintf("Optional reason for locking conversation.  Must be one of the following: %v.", reasonsString)
+	msg := fmt.Sprintf("Optional reason for locking conversation (%v).", reasonsString)
 
-	cmd.Flags().StringVarP(&opts.Reason, "message", "m", "", msg)
+	cmd.Flags().StringVarP(&opts.Reason, "reason", "r", "", msg)
 	return cmd
 }
 
@@ -169,13 +169,12 @@ func NewCmdUnlock(f *cmdutil.Factory, parentName string, runF func(string, *Lock
 		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-
 			opts.setCommonOptions(f, cmd, args)
 
 			if runF != nil {
 				return runF(Unlock, opts)
 			}
-			return lock(Unlock, opts)
+			return runLock(Unlock, opts)
 		},
 	}
 
@@ -203,8 +202,8 @@ func status(state string, lockable *api.Issue, opts *LockOptions) string {
 		state, reason(opts.Reason), alias[opts.ParentCmd].FullName, lockable.Number, lockable.Title)
 }
 
-// lock will lock or unlock a conversation.
-func lock(state string, opts *LockOptions) error {
+// runLock will lock or unlock a conversation.
+func runLock(state string, opts *LockOptions) error {
 	cs := opts.IO.ColorScheme()
 
 	httpClient, err := opts.HttpClient()
@@ -227,6 +226,17 @@ func lock(state string, opts *LockOptions) error {
 			currentType.FullName, issuePr.Number,
 			strings.ToLower(correctType.FullName), issuePr.Number,
 			correctType.Name, strings.ToLower(state), issuePr.Number)
+	}
+
+	if opts.Interactive {
+		options := []string{"None", "Off topic", "Resolved", "Spam", "Too heated"}
+		selected, err := opts.Prompter.Select("Lock reason?", "", options)
+		if err != nil {
+			return err
+		}
+		if selected > 0 {
+			opts.Reason = reasons[selected-1]
+		}
 	}
 
 	successMsg := fmt.Sprintf("%s %s\n",
