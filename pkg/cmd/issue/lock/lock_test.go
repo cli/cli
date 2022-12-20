@@ -297,6 +297,8 @@ func Test_runLock(t *testing.T) {
 		// TODO lock with explicit nontty
 		// TODO relock
 		// TODO unlock nontty
+
+		// TODO all of the above but with pull requests
 	}
 
 	for _, tt := range cases {
@@ -313,7 +315,6 @@ func Test_runLock(t *testing.T) {
 			}
 
 			ios, _, stdout, stderr := iostreams.Test()
-			// TODO do i need to bother with this
 			ios.SetStdoutTTY(tt.tty)
 			ios.SetStdinTTY(tt.tty)
 			ios.SetStderrTTY(tt.tty)
