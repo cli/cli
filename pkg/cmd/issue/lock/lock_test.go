@@ -179,7 +179,7 @@ func Test_runLock(t *testing.T) {
 	}{
 		{
 			name:  "lock an issue nontty",
-			state: "Lock",
+			state: Lock,
 			opts: LockOptions{
 				SelectorArg: "451",
 				ParentCmd:   "issue",
@@ -209,7 +209,7 @@ func Test_runLock(t *testing.T) {
 				SelectorArg: "451",
 				ParentCmd:   "issue",
 			},
-			state: "Lock",
+			state: Lock,
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.GraphQL(`query IssueByNumber\b`),
@@ -241,7 +241,7 @@ func Test_runLock(t *testing.T) {
 		{
 			name:  "lock an issue with explicit reason",
 			tty:   true,
-			state: "Lock",
+			state: Lock,
 			opts: LockOptions{
 				SelectorArg: "451",
 				ParentCmd:   "issue",
@@ -267,9 +267,9 @@ func Test_runLock(t *testing.T) {
 			wantOut: "✓ Locked as OFF_TOPIC: Issue #451 (traverse the library)\n",
 		},
 		{
-			name:  "unlock issue",
+			name:  "unlock issue tty",
 			tty:   true,
-			state: "Unlock",
+			state: Unlock,
 			opts: LockOptions{
 				SelectorArg: "451",
 				ParentCmd:   "issue",
@@ -294,11 +294,59 @@ func Test_runLock(t *testing.T) {
 			},
 			wantOut: "✓ Unlocked: Issue #451 (traverse the library)\n",
 		},
-		// TODO lock with explicit nontty
-		// TODO relock
-		// TODO unlock nontty
+		{
+			name:  "unlock issue nontty",
+			state: Lock,
+			// TODO
+		},
+		{
+			name:  "lock issue with explicit nontty",
+			state: Lock,
+			// TODO
+		},
+		{
+			name:  "relock issue tty",
+			state: Lock,
+			// TODO
+		},
+		{
+			name:  "relock issue nontty",
+			state: Lock,
+			// TODO
+		},
 
-		// TODO all of the above but with pull requests
+		{
+			name: "lock pr nontty",
+			// TODO
+		},
+		{
+			name: "lock pr tty",
+			// TODO
+		},
+		{
+			name: "lock pr with explicit reason",
+			// TODO
+		},
+		{
+			name: "lock pr with explicit nontty",
+			// TODO
+		},
+		{
+			name: "unlock pr tty",
+			// TODO
+		},
+		{
+			name: "unlock pr nontty",
+			// TODO
+		},
+		{
+			name: "relock pr tty",
+			// TODO
+		},
+		{
+			name: "relock pr nontty",
+			// TODO
+		},
 	}
 
 	for _, tt := range cases {
