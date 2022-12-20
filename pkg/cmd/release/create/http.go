@@ -225,3 +225,28 @@ func publishRelease(httpClient *http.Client, releaseURL string, discussionCatego
 	err = json.Unmarshal(b, &release)
 	return &release, err
 }
+
+func deleteRelease(httpClient *http.Client, release *shared.Release) error {
+	req, err := http.NewRequest("DELETE", release.APIURL, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	if resp.Body != nil {
+		defer resp.Body.Close()
+	}
+
+	success := resp.StatusCode >= 200 && resp.StatusCode < 300
+	if !success {
+		return api.HandleHTTPError(resp)
+	}
+
+	if resp.StatusCode != 204 {
+		_, _ = io.Copy(io.Discard, resp.Body)
+	}
+	return nil
+}

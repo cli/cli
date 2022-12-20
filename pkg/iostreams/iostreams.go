@@ -341,7 +341,7 @@ func (s *IOStreams) SetAlternateScreenBufferEnabled(enabled bool) {
 }
 
 func (s *IOStreams) RefreshScreen() {
-	if s.stdoutIsTTY {
+	if s.IsStdoutTTY() {
 		// Move cursor to 0,0
 		fmt.Fprint(s.Out, "\x1b[0;0H")
 		// Clear from cursor to bottom of screen
@@ -407,8 +407,9 @@ func System() *IOStreams {
 	}
 
 	stdoutIsTTY := io.IsStdoutTTY()
+	stderrIsTTY := io.IsStderrTTY()
 
-	if stdoutIsTTY && io.IsStderrTTY() {
+	if stdoutIsTTY && stderrIsTTY {
 		io.progressIndicatorEnabled = true
 	}
 

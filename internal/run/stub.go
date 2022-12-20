@@ -8,6 +8,10 @@ import (
 	"strings"
 )
 
+const (
+	gitAuthRE = `-c credential.helper= -c credential.helper=!"[^"]+" auth git-credential `
+)
+
 type T interface {
 	Helper()
 	Errorf(string, ...interface{})
@@ -71,6 +75,9 @@ func (cs *CommandStubber) Register(pattern string, exitStatus int, output string
 	if len(pattern) < 1 {
 		panic("cannot use empty regexp pattern")
 	}
+	if strings.HasPrefix(pattern, "git") {
+		pattern = addGitAuthentication(pattern)
+	}
 	cs.stubs = append(cs.stubs, &commandStub{
 		pattern:    regexp.MustCompile(pattern),
 		exitStatus: exitStatus,
@@ -113,4 +120,14 @@ func (s *commandStub) Output() ([]byte, error) {
 		return []byte(nil), fmt.Errorf("%s exited with status %d", s.pattern, s.exitStatus)
 	}
 	return []byte(s.stdout), nil
+}
+
+// Inject git authentication string for specific git commands.
+func addGitAuthentication(s string) string {
+	pattern := regexp.MustCompile(`( fetch | pull | push | clone | remote add.+-f | submodule )`)
+	loc := pattern.FindStringIndex(s)
+	if loc == nil {
+		return s
+	}
+	return s[:loc[0]+1] + gitAuthRE + s[loc[0]+1:]
 }

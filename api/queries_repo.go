@@ -643,6 +643,7 @@ func RepoFindForks(client *Client, repo ghrepo.Interface, limit int) ([]*Reposit
 }
 
 type RepoMetadataResult struct {
+	CurrentLogin    string
 	AssignableUsers []RepoAssignee
 	Labels          []RepoLabel
 	Projects        []RepoProject
@@ -817,6 +818,17 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 			}
 			result.Teams = teams
 			errc <- nil
+		}()
+	}
+	if input.Reviewers {
+		count++
+		go func() {
+			login, err := CurrentLoginName(client, repo.RepoHost())
+			if err != nil {
+				err = fmt.Errorf("error fetching current login: %w", err)
+			}
+			result.CurrentLogin = login
+			errc <- err
 		}()
 	}
 	if input.Labels {

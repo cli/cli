@@ -69,7 +69,7 @@ func SmartBaseRepoFunc(f *cmdutil.Factory) func() (ghrepo.Interface, error) {
 		if err != nil {
 			return nil, err
 		}
-		baseRepo, err := repoContext.BaseRepo(f.IOStreams, f.Prompter)
+		baseRepo, err := repoContext.BaseRepo(f.IOStreams)
 		if err != nil {
 			return nil, err
 		}
@@ -156,7 +156,7 @@ func branchFunc(f *cmdutil.Factory) func() (string, error) {
 }
 
 func extensionManager(f *cmdutil.Factory) *extension.Manager {
-	em := extension.NewManager(f.IOStreams)
+	em := extension.NewManager(f.IOStreams, f.GitClient)
 
 	cfg, err := f.Config()
 	if err != nil {
