@@ -18,7 +18,6 @@ import (
 )
 
 func Test_NewCmdLock(t *testing.T) {
-	// TODO parent name stuff?
 	cases := []struct {
 		name    string
 		args    string
@@ -107,7 +106,6 @@ func Test_NewCmdLock(t *testing.T) {
 }
 
 func Test_NewCmdUnlock(t *testing.T) {
-	// TODO parent name stuff?
 	cases := []struct {
 		name    string
 		args    string
@@ -228,6 +226,8 @@ func Test_runLock(t *testing.T) {
 			promptStubs: func(t *testing.T, pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(p, d string, opts []string) (int, error) {
 					if p == "Lock reason?" {
+						assert.Equal(t, []string{"None", "Off topic", "Resolved", "Spam", "Too heated"}, opts)
+
 						return prompter.IndexFor(opts, "Too heated")
 					}
 
@@ -343,12 +343,66 @@ func Test_runLock(t *testing.T) {
 		{
 			name:  "relock issue tty",
 			state: Lock,
-			// TODO
+			opts: LockOptions{
+				SelectorArg: "451",
+				ParentCmd:   "issue",
+				Reason:      "off_topic",
+			},
+			tty: true,
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+							"number": 451,
+							"locked": true,
+							"title": "traverse the library",
+							"__typename": "Issue" }}}}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation UnlockLockable\b`),
+					httpmock.StringResponse(`
+						{ "data": {
+						    "unlockLockable": {
+						      "unlockedRecord": {
+						        "locked": false }}}}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation LockLockable\b`),
+					httpmock.StringResponse(`
+						{ "data": {
+						    "lockLockable": {
+						      "lockedRecord": {
+						        "locked": true }}}}`))
+			},
+			promptStubs: func(t *testing.T, pm *prompter.PrompterMock) {
+				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
+					if p == "Issue #451 already locked. Unlock and lock again as OFF_TOPIC?" {
+						return true, nil
+					}
+
+					return false, prompter.NoSuchPromptErr(p)
+				}
+			},
+			wantOut: "✓ Locked as OFF_TOPIC: Issue #451 (traverse the library)\n",
 		},
 		{
 			name:  "relock issue nontty",
 			state: Lock,
-			// TODO
+			opts: LockOptions{
+				SelectorArg: "451",
+				ParentCmd:   "issue",
+				Reason:      "off_topic",
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+							"number": 451,
+							"locked": true,
+							"title": "traverse the library",
+							"__typename": "Issue" }}}}`))
+			},
+			wantErr: "already locked",
 		},
 
 		{
@@ -515,12 +569,68 @@ func Test_runLock(t *testing.T) {
 			wantOut: "✓ Unlocked: Pull request #451 (traverse the library)\n",
 		},
 		{
-			name: "relock pr tty",
-			// TODO
+			name:  "relock pr tty",
+			state: Lock,
+			opts: LockOptions{
+				SelectorArg: "451",
+				ParentCmd:   "pr",
+				Reason:      "off_topic",
+			},
+			tty: true,
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+							"number": 451,
+							"locked": true,
+							"title": "traverse the library",
+							"__typename": "PullRequest" }}}}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation UnlockLockable\b`),
+					httpmock.StringResponse(`
+						{ "data": {
+						    "unlockLockable": {
+						      "unlockedRecord": {
+						        "locked": false }}}}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation LockLockable\b`),
+					httpmock.StringResponse(`
+						{ "data": {
+						    "lockLockable": {
+						      "lockedRecord": {
+						        "locked": true }}}}`))
+			},
+			promptStubs: func(t *testing.T, pm *prompter.PrompterMock) {
+				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
+					if p == "Pull request #451 already locked. Unlock and lock again as OFF_TOPIC?" {
+						return true, nil
+					}
+
+					return false, prompter.NoSuchPromptErr(p)
+				}
+			},
+			wantOut: "✓ Locked as OFF_TOPIC: Pull request #451 (traverse the library)\n",
 		},
 		{
-			name: "relock pr nontty",
-			// TODO
+			name:  "relock pr nontty",
+			state: Lock,
+			opts: LockOptions{
+				SelectorArg: "451",
+				ParentCmd:   "pr",
+				Reason:      "off_topic",
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+							"number": 451,
+							"locked": true,
+							"title": "traverse the library",
+							"__typename": "PullRequest" }}}}`))
+			},
+			wantErr: "already locked",
 		},
 	}
 
