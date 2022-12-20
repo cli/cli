@@ -2,11 +2,13 @@ package lock
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -177,16 +179,76 @@ func Test_runLock(t *testing.T) {
 		state       string
 	}{
 		{
-			name: "lock an issue",
+			name:  "lock an issue",
+			state: "Lock",
+			opts: LockOptions{
+				SelectorArg: "451",
+				ParentCmd:   "issue",
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+							"number": 451,
+							"url": "https://github.com/OWNER/REPO/issues/451",
+							"__typename": "Issue" }}}}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation LockLockable\b`),
+					httpmock.StringResponse(`
+						{ "data": {
+						    "lockLockable": {
+						      "lockedRecord": {
+						        "locked": true }}}}`))
+			},
+		},
+		{
+			name: "lock an issue tty",
+			tty:  true,
+			opts: LockOptions{
+				Interactive: true,
+				SelectorArg: "451",
+				ParentCmd:   "issue",
+			},
+			state: "Lock",
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`
+						{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+							"number": 451,
+							"url": "https://github.com/OWNER/REPO/issues/451",
+							"__typename": "Issue" }}}}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation LockLockable\b`),
+					httpmock.StringResponse(`
+						{ "data": {
+						    "lockLockable": {
+						      "lockedRecord": {
+						        "locked": true }}}}`))
+			},
+			promptStubs: func(t *testing.T, pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(p, d string, opts []string) (int, error) {
+					if p == "Lock reason?" {
+						return prompter.IndexFor(opts, "Too heated")
+					}
+
+					return -1, prompter.NoSuchPromptErr(p)
+				}
+			},
+			wantOut: "✓ Locked as TOO_HEATED: Issue #451 ()\n",
+			// TODO lock tty
+			// TODO lock with explicit reason
+			// TODO relock
+			// TODO unlock
+
 			// TODO
 		},
-		// TODO
 	}
 
 	for _, tt := range cases {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
-			reg.StubRepoInfoResponse("OWNER", "REPO", "trunk")
 			defer reg.Verify(t)
 			if tt.httpStubs != nil {
 				tt.httpStubs(t, reg)
@@ -203,19 +265,21 @@ func Test_runLock(t *testing.T) {
 			ios.SetStdinTTY(tt.tty)
 			ios.SetStderrTTY(tt.tty)
 
-			opts := LockOptions{
-				Prompter: pm,
-				IO:       ios,
-				HttpClient: func() (*http.Client, error) {
-					return &http.Client{Transport: reg}, nil
-				},
+			tt.opts.Prompter = pm
+			tt.opts.IO = ios
+			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
+				return ghrepo.FromFullName("OWNER/REPO")
+			}
+			tt.opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
 			}
 
-			err := lockRun(tt.state, &opts)
+			err := lockRun(tt.state, &tt.opts)
 			output := &test.CmdOut{
 				OutBuf: stdout,
 				ErrBuf: stderr,
 			}
+			fmt.Printf("DBG %#v\n", reg)
 			if tt.wantErr != "" {
 				assert.EqualError(t, err, tt.wantErr)
 			} else {

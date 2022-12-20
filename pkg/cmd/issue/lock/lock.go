@@ -84,6 +84,12 @@ const (
 	Unlock = "Unlock"
 )
 
+func fields() []string {
+	return []string{
+		"activeLockReason", "id", "locked", "number", "title", "url",
+	}
+}
+
 type LockOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
@@ -91,7 +97,6 @@ type LockOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	Prompter   iprompter
 
-	Fields      []string
 	ParentCmd   string
 	Reason      string
 	SelectorArg string
@@ -108,8 +113,6 @@ func (opts *LockOptions) setCommonOptions(f *cmdutil.Factory, cmd *cobra.Command
 
 	opts.SelectorArg = args[0]
 
-	opts.Fields = []string{
-		"activeLockReason", "id", "locked", "number", "title", "url"}
 }
 
 func NewCmdLock(f *cmdutil.Factory, parentName string, runF func(string, *LockOptions) error) *cobra.Command {
@@ -211,7 +214,7 @@ func lockRun(state string, opts *LockOptions) error {
 		return err
 	}
 
-	issuePr, baseRepo, err := issueShared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, opts.Fields)
+	issuePr, baseRepo, err := issueShared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, fields())
 
 	parent := alias[opts.ParentCmd]
 
@@ -263,6 +266,8 @@ func lockRun(state string, opts *LockOptions) error {
 			successMsg = fmt.Sprintf("%s #%d already unlocked.  Nothing changed.\n",
 				parent.FullName, issuePr.Number)
 		}
+	default:
+		panic("bad state")
 	}
 
 	if err != nil {
@@ -270,7 +275,7 @@ func lockRun(state string, opts *LockOptions) error {
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		fmt.Fprint(opts.IO.ErrOut, successMsg)
+		fmt.Fprint(opts.IO.Out, successMsg)
 	}
 
 	return nil
