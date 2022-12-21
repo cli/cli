@@ -15,23 +15,26 @@ import (
 
 func NewCmdRelease(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "release <command>",
-		Short: "Manage releases",
-		Annotations: map[string]string{
-			"IsCore": "true",
-		},
+		Use:     "release <command>",
+		Short:   "Manage releases",
+		GroupID: "core",
 	}
 
 	cmdutil.EnableRepoOverride(cmd, f)
 
-	cmd.AddCommand(cmdCreate.NewCmdCreate(f, nil))
-	cmd.AddCommand(cmdDelete.NewCmdDelete(f, nil))
-	cmd.AddCommand(cmdDeleteAsset.NewCmdDeleteAsset(f, nil))
-	cmd.AddCommand(cmdDownload.NewCmdDownload(f, nil))
-	cmd.AddCommand(cmdList.NewCmdList(f, nil))
-	cmd.AddCommand(cmdUpdate.NewCmdEdit(f, nil))
-	cmd.AddCommand(cmdView.NewCmdView(f, nil))
-	cmd.AddCommand(cmdUpload.NewCmdUpload(f, nil))
+	cmdutil.AddGroup(cmd, "General commands",
+		cmdList.NewCmdList(f, nil),
+		cmdCreate.NewCmdCreate(f, nil),
+	)
+
+	cmdutil.AddGroup(cmd, "Targeted commands",
+		cmdView.NewCmdView(f, nil),
+		cmdUpdate.NewCmdEdit(f, nil),
+		cmdUpload.NewCmdUpload(f, nil),
+		cmdDownload.NewCmdDownload(f, nil),
+		cmdDelete.NewCmdDelete(f, nil),
+		cmdDeleteAsset.NewCmdDeleteAsset(f, nil),
+	)
 
 	return cmd
 }
