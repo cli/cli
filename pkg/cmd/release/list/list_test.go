@@ -31,16 +31,27 @@ func Test_NewCmdList(t *testing.T) {
 			args:  "",
 			isTTY: true,
 			want: ListOptions{
-				LimitResults:  30,
-				ExcludeDrafts: false,
+				LimitResults:       30,
+				ExcludeDrafts:      false,
+				ExcludePreReleases: false,
 			},
 		},
 		{
 			name: "exclude drafts",
 			args: "--exclude-drafts",
 			want: ListOptions{
-				LimitResults:  30,
-				ExcludeDrafts: true,
+				LimitResults:       30,
+				ExcludeDrafts:      true,
+				ExcludePreReleases: false,
+			},
+		},
+		{
+			name: "exclude pre-releases",
+			args: "--exclude-pre-releases",
+			want: ListOptions{
+				LimitResults:       30,
+				ExcludeDrafts:      false,
+				ExcludePreReleases: true,
 			},
 		},
 	}
@@ -80,6 +91,7 @@ func Test_NewCmdList(t *testing.T) {
 
 			assert.Equal(t, tt.want.LimitResults, opts.LimitResults)
 			assert.Equal(t, tt.want.ExcludeDrafts, opts.ExcludeDrafts)
+			assert.Equal(t, tt.want.ExcludePreReleases, opts.ExcludePreReleases)
 		})
 	}
 }

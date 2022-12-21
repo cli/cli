@@ -1,6 +1,6 @@
 module github.com/cli/cli/v2
 
-go 1.18
+go 1.19
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.6
@@ -9,9 +9,9 @@ require (
 	github.com/cenkalti/backoff/v4 v4.1.3
 	github.com/charmbracelet/glamour v0.5.1-0.20220727184942-e70ff2d969da
 	github.com/charmbracelet/lipgloss v0.5.0
-	github.com/cli/go-gh v0.1.3-0.20221102170023-e3ec45fb1d1b
+	github.com/cli/go-gh v1.0.0
 	github.com/cli/oauth v0.9.0
-	github.com/cli/safeexec v1.0.0
+	github.com/cli/safeexec v1.0.1
 	github.com/cpuguy83/go-md2man/v2 v2.0.2
 	github.com/creack/pty v1.1.18
 	github.com/gabriel-vasile/mimetype v1.4.1
@@ -36,7 +36,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.5
 	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/sync v0.1.0
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	golang.org/x/text v0.3.8
 	google.golang.org/grpc v1.49.0

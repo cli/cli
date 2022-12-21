@@ -58,6 +58,7 @@ type EditOptions struct {
 
 type EditRepositoryInput struct {
 	AllowForking        *bool   `json:"allow_forking,omitempty"`
+	AllowUpdateBranch   *bool   `json:"allow_update_branch,omitempty"`
 	DefaultBranch       *string `json:"default_branch,omitempty"`
 	DeleteBranchOnMerge *bool   `json:"delete_branch_on_merge,omitempty"`
 	Description         *string `json:"description,omitempty"`
@@ -151,6 +152,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableAutoMerge, "enable-auto-merge", "", "Enable auto-merge functionality")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.DeleteBranchOnMerge, "delete-branch-on-merge", "", "Delete head branch when pull requests are merged")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.AllowForking, "allow-forking", "", "Allow forking of an organization repository")
+	cmdutil.NilBoolFlag(cmd, &opts.Edits.AllowUpdateBranch, "allow-update-branch", "", "Allow a pull request head branch that is behind its base branch to be updated")
 	cmd.Flags().StringSliceVar(&opts.AddTopics, "add-topic", nil, "Add repository topic")
 	cmd.Flags().StringSliceVar(&opts.RemoveTopics, "remove-topic", nil, "Remove repository topic")
 

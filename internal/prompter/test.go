@@ -1,6 +1,11 @@
 package prompter
 
-import "fmt"
+import (
+	"fmt"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 // Test helpers
 
@@ -11,6 +16,10 @@ func IndexFor(options []string, answer string) (int, error) {
 		}
 	}
 	return -1, NoSuchAnswerErr(answer)
+}
+
+func AssertOptions(t *testing.T, expected, actual []string) {
+	assert.Equal(t, expected, actual)
 }
 
 func NoSuchAnswerErr(answer string) error {

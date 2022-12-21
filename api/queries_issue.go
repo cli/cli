@@ -20,30 +20,38 @@ type IssuesAndTotalCount struct {
 }
 
 type Issue struct {
-	Typename       string `json:"__typename"`
-	ID             string
-	Number         int
-	Title          string
-	URL            string
-	State          string
-	StateReason    string
-	Closed         bool
-	Body           string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	ClosedAt       *time.Time
-	Comments       Comments
-	Author         Author
-	Assignees      Assignees
-	Labels         Labels
-	ProjectCards   ProjectCards
-	Milestone      *Milestone
-	ReactionGroups ReactionGroups
-	IsPinned       bool
+	Typename         string `json:"__typename"`
+	ID               string
+	Number           int
+	Title            string
+	URL              string
+	State            string
+	StateReason      string
+	Closed           bool
+	Body             string
+	ActiveLockReason string
+	Locked           bool
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	ClosedAt         *time.Time
+	Comments         Comments
+	Author           Author
+	Assignees        Assignees
+	Labels           Labels
+	ProjectCards     ProjectCards
+	Milestone        *Milestone
+	ReactionGroups   ReactionGroups
+	IsPinned         bool
 }
 
+// return values for Issue.Typename
+const (
+	TypeIssue       string = "Issue"
+	TypePullRequest string = "PullRequest"
+)
+
 func (i Issue) IsPullRequest() bool {
-	return i.Typename == "PullRequest"
+	return i.Typename == TypePullRequest
 }
 
 type Assignees struct {
@@ -112,10 +120,13 @@ type Owner struct {
 }
 
 type Author struct {
-	// adding these breaks generated GraphQL requests
-	//ID    string `json:"id,omitempty"`
-	//Name  string `json:"name,omitempty"`
+	ID    string `json:"id,omitempty"`
+	Name  string `json:"name,omitempty"`
 	Login string `json:"login"`
+}
+
+func (author *Author) IsBot() bool {
+	return author.ID == ""
 }
 
 // IssueCreate creates an issue in a GitHub repository

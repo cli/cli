@@ -317,16 +317,6 @@ func (c *Client) DeleteLocalBranch(ctx context.Context, branch string) error {
 	return nil
 }
 
-func (c *Client) HasLocalBranch(ctx context.Context, branch string) bool {
-	args := []string{"rev-parse", "--verify", "refs/heads/" + branch}
-	cmd, err := c.Command(ctx, args...)
-	if err != nil {
-		return false
-	}
-	_, err = cmd.Output()
-	return err == nil
-}
-
 func (c *Client) CheckoutBranch(ctx context.Context, branch string) error {
 	args := []string{"checkout", branch}
 	cmd, err := c.Command(ctx, args...)
@@ -354,14 +344,14 @@ func (c *Client) CheckoutNewBranch(ctx context.Context, remoteName, branch strin
 	return nil
 }
 
+func (c *Client) HasLocalBranch(ctx context.Context, branch string) bool {
+	_, err := c.revParse(ctx, "--verify", "refs/heads/"+branch)
+	return err == nil
+}
+
 // ToplevelDir returns the top-level directory path of the current repository.
 func (c *Client) ToplevelDir(ctx context.Context) (string, error) {
-	args := []string{"rev-parse", "--show-toplevel"}
-	cmd, err := c.Command(ctx, args...)
-	if err != nil {
-		return "", err
-	}
-	out, err := cmd.Output()
+	out, err := c.revParse(ctx, "--show-toplevel")
 	if err != nil {
 		return "", err
 	}
@@ -369,12 +359,7 @@ func (c *Client) ToplevelDir(ctx context.Context) (string, error) {
 }
 
 func (c *Client) GitDir(ctx context.Context) (string, error) {
-	args := []string{"rev-parse", "--git-dir"}
-	cmd, err := c.Command(ctx, args...)
-	if err != nil {
-		return "", err
-	}
-	out, err := cmd.Output()
+	out, err := c.revParse(ctx, "--git-dir")
 	if err != nil {
 		return "", err
 	}
@@ -383,12 +368,7 @@ func (c *Client) GitDir(ctx context.Context) (string, error) {
 
 // Show current directory relative to the top-level directory of repository.
 func (c *Client) PathFromRoot(ctx context.Context) string {
-	args := []string{"rev-parse", "--show-prefix"}
-	cmd, err := c.Command(ctx, args...)
-	if err != nil {
-		return ""
-	}
-	out, err := cmd.Output()
+	out, err := c.revParse(ctx, "--show-prefix")
 	if err != nil {
 		return ""
 	}
@@ -398,12 +378,20 @@ func (c *Client) PathFromRoot(ctx context.Context) string {
 	return ""
 }
 
+func (c *Client) revParse(ctx context.Context, args ...string) ([]byte, error) {
+	args = append([]string{"rev-parse"}, args...)
+	cmd, err := c.Command(ctx, args...)
+	if err != nil {
+		return nil, err
+	}
+	return cmd.Output()
+}
+
 // Below are commands that make network calls and need authentication credentials supplied from gh.
 
 func (c *Client) Fetch(ctx context.Context, remote string, refspec string, mods ...CommandModifier) error {
 	args := []string{"fetch", remote, refspec}
-	// TODO: Use AuthenticatedCommand
-	cmd, err := c.Command(ctx, args...)
+	cmd, err := c.AuthenticatedCommand(ctx, args...)
 	if err != nil {
 		return err
 	}
@@ -418,8 +406,7 @@ func (c *Client) Pull(ctx context.Context, remote, branch string, mods ...Comman
 	if remote != "" && branch != "" {
 		args = append(args, remote, branch)
 	}
-	// TODO: Use AuthenticatedCommand
-	cmd, err := c.Command(ctx, args...)
+	cmd, err := c.AuthenticatedCommand(ctx, args...)
 	if err != nil {
 		return err
 	}
@@ -431,8 +418,7 @@ func (c *Client) Pull(ctx context.Context, remote, branch string, mods ...Comman
 
 func (c *Client) Push(ctx context.Context, remote string, ref string, mods ...CommandModifier) error {
 	args := []string{"push", "--set-upstream", remote, ref}
-	// TODO: Use AuthenticatedCommand
-	cmd, err := c.Command(ctx, args...)
+	cmd, err := c.AuthenticatedCommand(ctx, args...)
 	if err != nil {
 		return err
 	}
@@ -453,8 +439,7 @@ func (c *Client) Clone(ctx context.Context, cloneURL string, args []string, mods
 		target = path.Base(strings.TrimSuffix(cloneURL, ".git"))
 	}
 	cloneArgs = append([]string{"clone"}, cloneArgs...)
-	// TODO: Use AuthenticatedCommand
-	cmd, err := c.Command(ctx, cloneArgs...)
+	cmd, err := c.AuthenticatedCommand(ctx, cloneArgs...)
 	if err != nil {
 		return "", err
 	}
@@ -474,8 +459,7 @@ func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBra
 		args = append(args, "-t", branch)
 	}
 	args = append(args, "-f", name, urlStr)
-	// TODO: Use AuthenticatedCommand
-	cmd, err := c.Command(ctx, args...)
+	cmd, err := c.AuthenticatedCommand(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -503,6 +487,36 @@ func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBra
 		PushURL:  urlParsed,
 	}
 	return remote, nil
+}
+
+func (c *Client) InGitDirectory(ctx context.Context) bool {
+	showCmd, err := c.Command(ctx, "rev-parse", "--is-inside-work-tree")
+	if err != nil {
+		return false
+	}
+	out, err := showCmd.Output()
+	if err != nil {
+		return false
+	}
+
+	split := strings.Split(string(out), "\n")
+	if len(split) > 0 {
+		return split[0] == "true"
+	}
+	return false
+}
+
+func (c *Client) UnsetRemoteResolution(ctx context.Context, name string) error {
+	args := []string{"config", "--unset", fmt.Sprintf("remote.%s.gh-resolved", name)}
+	cmd, err := c.Command(ctx, args...)
+	if err != nil {
+		return err
+	}
+	_, err = cmd.Output()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func resolveGitPath() (string, error) {

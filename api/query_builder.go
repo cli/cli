@@ -75,11 +75,13 @@ var prReviewRequests = shortenQuery(`
 var prReviews = shortenQuery(`
 	reviews(first: 100) {
 		nodes {
+			id,
 			author{login},
 			authorAssociation,
 			submittedAt,
 			body,
 			state,
+			commit{oid},
 			reactionGroups{content,users{totalCount}}
 		}
 		pageInfo{hasNextPage,endCursor}
@@ -259,7 +261,7 @@ func IssueGraphQL(fields []string) string {
 	for _, field := range fields {
 		switch field {
 		case "author":
-			q = append(q, `author{login}`)
+			q = append(q, `author{login,...on User{id,name}}`)
 		case "mergedBy":
 			q = append(q, `mergedBy{login}`)
 		case "headRepositoryOwner":
