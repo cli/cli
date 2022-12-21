@@ -2,6 +2,7 @@ package pr
 
 import (
 	"github.com/MakeNowJust/heredoc"
+	cmdLock "github.com/cli/cli/v2/pkg/cmd/issue/lock"
 	cmdCheckout "github.com/cli/cli/v2/pkg/cmd/pr/checkout"
 	cmdChecks "github.com/cli/cli/v2/pkg/cmd/pr/checks"
 	cmdClose "github.com/cli/cli/v2/pkg/cmd/pr/close"
@@ -48,11 +49,13 @@ func NewCmdPR(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(cmdCreate.NewCmdCreate(f, nil))
 	cmd.AddCommand(cmdDiff.NewCmdDiff(f, nil))
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
+	cmd.AddCommand(cmdLock.NewCmdLock(f, cmd.Name(), nil))
 	cmd.AddCommand(cmdMerge.NewCmdMerge(f, nil))
 	cmd.AddCommand(cmdReady.NewCmdReady(f, nil))
 	cmd.AddCommand(cmdReopen.NewCmdReopen(f, nil))
 	cmd.AddCommand(cmdReview.NewCmdReview(f, nil))
 	cmd.AddCommand(cmdStatus.NewCmdStatus(f, nil))
+	cmd.AddCommand(cmdLock.NewCmdUnlock(f, cmd.Name(), nil))
 	cmd.AddCommand(cmdView.NewCmdView(f, nil))
 	cmd.AddCommand(cmdChecks.NewCmdChecks(f, nil))
 	cmd.AddCommand(cmdComment.NewCmdComment(f, nil))
