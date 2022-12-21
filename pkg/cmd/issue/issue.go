@@ -51,15 +51,15 @@ func NewCmdIssue(f *cmdutil.Factory) *cobra.Command {
 	cmdutil.AddGroup(cmd, "Targeted commands",
 		cmdView.NewCmdView(f, nil),
 		cmdComment.NewCmdComment(f, nil),
-		cmdEdit.NewCmdEdit(f, nil),
 		cmdClose.NewCmdClose(f, nil),
 		cmdReopen.NewCmdReopen(f, nil),
+		cmdEdit.NewCmdEdit(f, nil),
 		cmdDevelop.NewCmdDevelop(f, nil),
-		cmdTransfer.NewCmdTransfer(f, nil),
 		cmdLock.NewCmdLock(f, cmd.Name(), nil),
 		cmdLock.NewCmdUnlock(f, cmd.Name(), nil),
 		cmdPin.NewCmdPin(f, nil),
 		cmdUnpin.NewCmdUnpin(f, nil),
+		cmdTransfer.NewCmdTransfer(f, nil),
 		cmdDelete.NewCmdDelete(f, nil),
 	)
 

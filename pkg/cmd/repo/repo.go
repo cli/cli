@@ -40,20 +40,25 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 		GroupID: "core",
 	}
 
-	cmd.AddCommand(repoViewCmd.NewCmdView(f, nil))
-	cmd.AddCommand(repoForkCmd.NewCmdFork(f, nil))
-	cmd.AddCommand(repoCloneCmd.NewCmdClone(f, nil))
-	cmd.AddCommand(repoCreateCmd.NewCmdCreate(f, nil))
-	cmd.AddCommand(repoEditCmd.NewCmdEdit(f, nil))
-	cmd.AddCommand(repoListCmd.NewCmdList(f, nil))
-	cmd.AddCommand(repoSyncCmd.NewCmdSync(f, nil))
-	cmd.AddCommand(creditsCmd.NewCmdRepoCredits(f, nil))
-	cmd.AddCommand(gardenCmd.NewCmdGarden(f, nil))
-	cmd.AddCommand(deployKeyCmd.NewCmdDeployKey(f))
-	cmd.AddCommand(repoRenameCmd.NewCmdRename(f, nil))
-	cmd.AddCommand(repoDeleteCmd.NewCmdDelete(f, nil))
-	cmd.AddCommand(repoArchiveCmd.NewCmdArchive(f, nil))
-	cmd.AddCommand(repoDefaultCmd.NewCmdSetDefault(f, nil))
+	cmdutil.AddGroup(cmd, "General commands",
+		repoListCmd.NewCmdList(f, nil),
+		repoCreateCmd.NewCmdCreate(f, nil),
+	)
+
+	cmdutil.AddGroup(cmd, "Targeted commands",
+		repoViewCmd.NewCmdView(f, nil),
+		repoCloneCmd.NewCmdClone(f, nil),
+		repoForkCmd.NewCmdFork(f, nil),
+		repoDefaultCmd.NewCmdSetDefault(f, nil),
+		repoSyncCmd.NewCmdSync(f, nil),
+		repoEditCmd.NewCmdEdit(f, nil),
+		deployKeyCmd.NewCmdDeployKey(f),
+		repoRenameCmd.NewCmdRename(f, nil),
+		repoArchiveCmd.NewCmdArchive(f, nil),
+		repoDeleteCmd.NewCmdDelete(f, nil),
+		creditsCmd.NewCmdRepoCredits(f, nil),
+		gardenCmd.NewCmdGarden(f, nil),
+	)
 
 	return cmd
 }

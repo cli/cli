@@ -44,22 +44,27 @@ func NewCmdPR(f *cmdutil.Factory) *cobra.Command {
 
 	cmdutil.EnableRepoOverride(cmd, f)
 
-	cmd.AddCommand(cmdCheckout.NewCmdCheckout(f, nil))
-	cmd.AddCommand(cmdClose.NewCmdClose(f, nil))
-	cmd.AddCommand(cmdCreate.NewCmdCreate(f, nil))
-	cmd.AddCommand(cmdDiff.NewCmdDiff(f, nil))
-	cmd.AddCommand(cmdList.NewCmdList(f, nil))
-	cmd.AddCommand(cmdLock.NewCmdLock(f, cmd.Name(), nil))
-	cmd.AddCommand(cmdMerge.NewCmdMerge(f, nil))
-	cmd.AddCommand(cmdReady.NewCmdReady(f, nil))
-	cmd.AddCommand(cmdReopen.NewCmdReopen(f, nil))
-	cmd.AddCommand(cmdReview.NewCmdReview(f, nil))
-	cmd.AddCommand(cmdStatus.NewCmdStatus(f, nil))
-	cmd.AddCommand(cmdLock.NewCmdUnlock(f, cmd.Name(), nil))
-	cmd.AddCommand(cmdView.NewCmdView(f, nil))
-	cmd.AddCommand(cmdChecks.NewCmdChecks(f, nil))
-	cmd.AddCommand(cmdComment.NewCmdComment(f, nil))
-	cmd.AddCommand(cmdEdit.NewCmdEdit(f, nil))
+	cmdutil.AddGroup(cmd, "General commands",
+		cmdList.NewCmdList(f, nil),
+		cmdCreate.NewCmdCreate(f, nil),
+		cmdStatus.NewCmdStatus(f, nil),
+	)
+
+	cmdutil.AddGroup(cmd, "Targeted commands",
+		cmdView.NewCmdView(f, nil),
+		cmdDiff.NewCmdDiff(f, nil),
+		cmdCheckout.NewCmdCheckout(f, nil),
+		cmdChecks.NewCmdChecks(f, nil),
+		cmdReview.NewCmdReview(f, nil),
+		cmdMerge.NewCmdMerge(f, nil),
+		cmdReady.NewCmdReady(f, nil),
+		cmdComment.NewCmdComment(f, nil),
+		cmdClose.NewCmdClose(f, nil),
+		cmdReopen.NewCmdReopen(f, nil),
+		cmdEdit.NewCmdEdit(f, nil),
+		cmdLock.NewCmdLock(f, cmd.Name(), nil),
+		cmdLock.NewCmdUnlock(f, cmd.Name(), nil),
+	)
 
 	return cmd
 }
