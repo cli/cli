@@ -9,6 +9,7 @@ import (
 	cmdDevelop "github.com/cli/cli/v2/pkg/cmd/issue/develop"
 	cmdEdit "github.com/cli/cli/v2/pkg/cmd/issue/edit"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/issue/list"
+	cmdLock "github.com/cli/cli/v2/pkg/cmd/issue/lock"
 	cmdPin "github.com/cli/cli/v2/pkg/cmd/issue/pin"
 	cmdReopen "github.com/cli/cli/v2/pkg/cmd/issue/reopen"
 	cmdStatus "github.com/cli/cli/v2/pkg/cmd/issue/status"
@@ -42,22 +43,24 @@ func NewCmdIssue(f *cmdutil.Factory) *cobra.Command {
 	cmdutil.EnableRepoOverride(cmd, f)
 
 	cmdutil.AddGroup(cmd, "General commands",
-		cmdCreate.NewCmdCreate(f, nil),
 		cmdList.NewCmdList(f, nil),
+		cmdCreate.NewCmdCreate(f, nil),
 		cmdStatus.NewCmdStatus(f, nil),
 	)
 
 	cmdutil.AddGroup(cmd, "Targeted commands",
-		cmdClose.NewCmdClose(f, nil),
-		cmdReopen.NewCmdReopen(f, nil),
 		cmdView.NewCmdView(f, nil),
 		cmdComment.NewCmdComment(f, nil),
-		cmdDelete.NewCmdDelete(f, nil),
 		cmdEdit.NewCmdEdit(f, nil),
-		cmdTransfer.NewCmdTransfer(f, nil),
+		cmdClose.NewCmdClose(f, nil),
+		cmdReopen.NewCmdReopen(f, nil),
 		cmdDevelop.NewCmdDevelop(f, nil),
+		cmdTransfer.NewCmdTransfer(f, nil),
+		cmdLock.NewCmdLock(f, cmd.Name(), nil),
+		cmdLock.NewCmdUnlock(f, cmd.Name(), nil),
 		cmdPin.NewCmdPin(f, nil),
 		cmdUnpin.NewCmdUnpin(f, nil),
+		cmdDelete.NewCmdDelete(f, nil),
 	)
 
 	return cmd
