@@ -246,7 +246,10 @@ func apiRun(opts *ApiOptions) error {
 	}
 	method := opts.RequestMethod
 	requestHeaders := opts.RequestHeaders
-	var requestBody interface{} = params
+	var requestBody interface{}
+	if len(params) > 0 {
+		requestBody = params
+	}
 
 	if !opts.RequestMethodPassed && (len(params) > 0 || opts.RequestInputFile != "") {
 		method = "POST"

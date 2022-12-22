@@ -671,6 +671,7 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 			return config.NewBlankConfig(), nil
 		},
 
+		RawFields:     []string{"foo=bar"},
 		RequestMethod: "POST",
 		RequestPath:   "graphql",
 		Paginate:      true,
@@ -796,6 +797,36 @@ func Test_apiRun_paginated_template(t *testing.T) {
 	endCursor, hasCursor := requestData.Variables["endCursor"].(string)
 	assert.Equal(t, true, hasCursor)
 	assert.Equal(t, "PAGE1_END", endCursor)
+}
+
+func Test_apiRun_DELETE(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	var gotRequest *http.Request
+	err := apiRun(&ApiOptions{
+		IO: ios,
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+		HttpClient: func() (*http.Client, error) {
+			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+				gotRequest = req
+				return &http.Response{StatusCode: 204, Request: req}, nil
+			}
+			return &http.Client{Transport: tr}, nil
+		},
+		MagicFields:         []string(nil),
+		RawFields:           []string(nil),
+		RequestMethod:       "DELETE",
+		RequestMethodPassed: true,
+	})
+	if err != nil {
+		t.Fatalf("got error %v", err)
+	}
+
+	if gotRequest.Body != nil {
+		t.Errorf("expected nil request body, got %T", gotRequest.Body)
+	}
 }
 
 func Test_apiRun_inputFile(t *testing.T) {
