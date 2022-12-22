@@ -85,6 +85,7 @@ func Test_listRun(t *testing.T) {
 				cfg.Set("HOST", "pager", "less")
 				cfg.Set("HOST", "http_unix_socket", "")
 				cfg.Set("HOST", "browser", "brave")
+				cfg.Set("HOST", "delete_branch_after_merge", "true")
 				return cfg
 			}(),
 			input: &ListOptions{Hostname: "HOST"},
@@ -94,6 +95,7 @@ prompt=disabled
 pager=less
 http_unix_socket=
 browser=brave
+delete_branch_after_merge=true
 `,
 		},
 	}

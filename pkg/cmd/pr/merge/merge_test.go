@@ -1354,7 +1354,7 @@ func TestPRMergeTTY_withDeleteBranchConfigTrue(t *testing.T) {
 	}
 
 	mockCfgFunc := func() (config.Config, error) {
-		c := config.NewBlankConfig() 
+		c := config.NewBlankConfig()
 		c.SetFunc("", "delete_branch_after_merge", "true")
 		return c, nil
 	}
@@ -1426,7 +1426,7 @@ func TestPRMergeTTY_withDeleteBranchConfigFalse(t *testing.T) {
 	}
 
 	mockCfgFunc := func() (config.Config, error) {
-		c := config.NewBlankConfig() 
+		c := config.NewBlankConfig()
 		c.SetFunc("", "delete_branch_after_merge", "false")
 		return c, nil
 	}

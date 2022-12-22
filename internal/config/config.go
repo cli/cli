@@ -197,8 +197,8 @@ var configOptions = []ConfigOption{
 		DefaultValue: "",
 	},
 	{
-		Key: "delete_branch_after_merge",
-		Description: "Delete the local branch after merging a PR",
+		Key:          "delete_branch_after_merge",
+		Description:  "Delete the local branch after merging a PR",
 		DefaultValue: "",
 	},
 }
