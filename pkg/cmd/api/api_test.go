@@ -765,6 +765,7 @@ func Test_apiRun_paginated_template(t *testing.T) {
 
 		RequestMethod: "POST",
 		RequestPath:   "graphql",
+		RawFields:     []string{"foo=bar"},
 		Paginate:      true,
 		// test that templates executed per page properly render a table.
 		Template: `{{range .data.nodes}}{{tablerow .page .caption}}{{end}}`,
