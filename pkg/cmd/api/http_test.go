@@ -213,7 +213,7 @@ func Test_httpRequest(t *testing.T) {
 				method: "POST",
 				p:      "graphql",
 				params: map[string]interface{}{
-					"a": []byte("b"),
+					"a": "b",
 				},
 				headers: []string{},
 			},

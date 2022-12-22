@@ -946,7 +946,7 @@ func Test_parseFields(t *testing.T) {
 		"destroyer": "false",
 		"helper":    "true",
 		"location":  "@work",
-		"input":     []byte("pasted contents"),
+		"input":     "pasted contents",
 		"enabled":   true,
 		"victories": 123,
 	}
@@ -963,6 +963,8 @@ func Test_parseFields_nested(t *testing.T) {
 			"branch[name]=patch-1",
 			"robots[]=Hubot",
 			"robots[]=Dependabot",
+			"labels[][name]=bug",
+			"labels[][name]=feature",
 			"empty[]",
 		},
 		MagicFields: []string{
@@ -992,6 +994,14 @@ func Test_parseFields_nested(t *testing.T) {
 			"ids": [
 				123,
 				456
+			],
+			"labels": [
+				{
+					"name": "bug"
+				},
+				{
+					"name": "feature"
+				}
 			],
 			"robots": [
 				"Hubot",
@@ -1080,7 +1090,7 @@ func Test_magicFieldValue(t *testing.T) {
 				v:    "@" + f.Name(),
 				opts: &ApiOptions{IO: ios},
 			},
-			want:    []byte("file contents"),
+			want:    "file contents",
 			wantErr: false,
 		},
 		{

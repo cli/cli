@@ -81,7 +81,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			were added. Override the method with %[1]s--method%[1]s.
 
 			Pass one or more %[1]s-f/--raw-field%[1]s values in "key=value" format to add static string
-			parameters to the request payload. To add non-string or otherwise dynamic values, see
+			parameters to the request payload. To add non-string or placeholder-determined values, see
 			%[1]s--field%[1]s below. Note that adding request parameters will automatically switch the
 			request method to POST. To send the parameters as a GET query string instead, use
 			%[1]s--method GET%[1]s.
@@ -98,9 +98,15 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			For GraphQL requests, all fields other than "query" and "operationName" are
 			interpreted as GraphQL variables.
 
-			Raw request body may be passed from the outside via a file specified by %[1]s--input%[1]s.
-			Pass "-" to read from standard input. In this mode, parameters specified via
-			%[1]s--field%[1]s flags are serialized into URL query parameters.
+			To pass nested parameters in the request payload, use "key[subkey]=value" syntax when
+			declaring fields. To pass nested values as arrays, declare multiple fields with the
+			syntax "key[]=value1", "key[]=value2". To pass an empty array, use "key[]" without a
+			value.
+
+			To pass pre-constructed JSON or payloads in other formats, a request body may be read
+			from file specified by %[1]s--input%[1]s. Use "-" to read from standard input. When passing the
+			request body this way, any parameters specified via field flags are added to the query
+			string of the endpoint URL.
 
 			In %[1]s--paginate%[1]s mode, all pages of results will sequentially be requested until
 			there are no more pages of results. For GraphQL requests, this requires that the
@@ -113,6 +119,9 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 
 			# post an issue comment
 			$ gh api repos/{owner}/{repo}/issues/123/comments -f body='Hi from CLI'
+
+			# post nested parameter read from a file
+			$ gh api gists -F 'files[myfile.txt][content]=@myfile.txt'
 
 			# add parameters to a GET request
 			$ gh api -X GET search/issues -f q='repo:cli/cli is:open remote'
@@ -467,64 +476,117 @@ func printHeaders(w io.Writer, headers http.Header, colorize bool) {
 	}
 }
 
-var nestedKeyRE = regexp.MustCompile(`(.+?)\[([^]]+)\]`)
+const (
+	keyStart     = '['
+	keyEnd       = ']'
+	keySeparator = '='
+)
 
 func parseFields(opts *ApiOptions) (map[string]interface{}, error) {
 	params := make(map[string]interface{})
 	parseField := func(f string, isMagic bool) error {
+		var valueIndex int
+		var keystack []string
+		keyStartAt := 0
+	parseLoop:
+		for i, r := range f {
+			switch r {
+			case keyStart:
+				if keyStartAt == 0 {
+					keystack = append(keystack, f[0:i])
+				}
+				keyStartAt = i + 1
+			case keyEnd:
+				keystack = append(keystack, f[keyStartAt:i])
+			case keySeparator:
+				if keyStartAt == 0 {
+					keystack = append(keystack, f[0:i])
+				}
+				valueIndex = i + 1
+				break parseLoop
+			}
+		}
+
+		if len(keystack) == 0 {
+			return fmt.Errorf("invalid key: %q", f)
+		}
+
 		key := f
-		idx := strings.IndexRune(f, '=')
-		if idx >= 0 {
-			key = f[0:idx]
-		}
-		isArray := strings.HasSuffix(key, "[]")
-		if isArray {
-			key = strings.TrimSuffix(key, "[]")
-		}
-		dest := params
-		for {
-			m := nestedKeyRE.FindStringSubmatch(key)
-			if m == nil {
-				break
+		var value interface{} = nil
+		if valueIndex == 0 {
+			if keystack[len(keystack)-1] != "" {
+				return fmt.Errorf("field %q requires a value separated by an '=' sign", key)
 			}
-			matchKey := m[1]
-			subKey := m[2]
-			existing, found := dest[matchKey]
-			if found {
-				// FIXME: avoid panic
-				dest = existing.(map[string]interface{})
-			} else {
-				newDest := map[string]interface{}{}
-				dest[matchKey] = newDest
-				dest = newDest
-			}
-			key = subKey
+		} else {
+			key = f[0 : valueIndex-1]
+			value = f[valueIndex:]
 		}
-		if idx == -1 {
-			if isArray {
-				dest[key] = []interface{}{}
-				return nil
-			}
-			return fmt.Errorf("field %q requires a value separated by an '=' sign", f)
-		}
-		var value interface{} = f[idx+1:]
-		if isMagic {
+
+		if isMagic && value != nil {
 			var err error
 			value, err = magicFieldValue(value.(string), opts)
 			if err != nil {
 				return fmt.Errorf("error parsing %q value: %w", key, err)
 			}
 		}
+
+		destMap := params
+		isArray := false
+		var subkey string
+		for _, k := range keystack {
+			if k == "" {
+				isArray = true
+				continue
+			}
+			if subkey != "" {
+				if isArray {
+					if v, exists := destMap[subkey]; exists {
+						if existSlice, ok := v.([]interface{}); ok {
+							newMap := make(map[string]interface{})
+							destMap[subkey] = append(existSlice, newMap)
+							destMap = newMap
+						} else {
+							return fmt.Errorf("expected array type under %q, got %T", subkey, v)
+						}
+					} else {
+						newMap := make(map[string]interface{})
+						destMap[subkey] = []interface{}{newMap}
+						destMap = newMap
+					}
+					isArray = false
+				} else {
+					if v, exists := destMap[subkey]; exists {
+						if existMap, ok := v.(map[string]interface{}); ok {
+							destMap = existMap
+						} else {
+							return fmt.Errorf("expected map type under %q, got %T", subkey, v)
+						}
+					} else {
+						newMap := make(map[string]interface{})
+						destMap[subkey] = newMap
+						destMap = newMap
+					}
+				}
+			}
+			subkey = k
+		}
+
 		if isArray {
-			existing, found := params[key]
-			if found {
-				// FIXME: avoid panic
-				dest[key] = append(existing.([]interface{}), value)
+			if value == nil {
+				destMap[subkey] = []interface{}{}
 			} else {
-				dest[key] = []interface{}{value}
+				if v, exists := destMap[subkey]; exists {
+					if existSlice, ok := v.([]interface{}); ok {
+						destMap[subkey] = append(existSlice, value)
+					} else {
+						return fmt.Errorf("expected array type under %q, got %T", subkey, v)
+					}
+				} else {
+					destMap[subkey] = []interface{}{value}
+				}
 			}
 		} else {
-			dest[key] = value
+			destMap[subkey] = value
 		}
 		return nil
 	}
@@ -543,7 +605,11 @@ func parseFields(opts *ApiOptions) (map[string]interface{}, error) {
 
 func magicFieldValue(v string, opts *ApiOptions) (interface{}, error) {
 	if strings.HasPrefix(v, "@") {
-		return opts.IO.ReadUserFile(v[1:])
+		b, err := opts.IO.ReadUserFile(v[1:])
+		if err != nil {
+			return "", err
+		}
+		return string(b), nil
 	}
 
 	if n, err := strconv.Atoi(v); err == nil {
