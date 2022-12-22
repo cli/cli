@@ -34,7 +34,8 @@ builds:
     goarch: [386, amd64, arm64]
     hooks:
       post:
-        - ./script/sign-windows-executable.sh '{{ .Path }}'
+        - cmd: ./script/sign-windows-executable.sh '{{ .Path }}'
+          output: false
 
 archives:
   - id: nix
