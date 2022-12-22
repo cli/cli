@@ -26,6 +26,8 @@ aliases:
 http_unix_socket:
 # What web browser gh should use when opening URLs. If blank, will refer to environment.
 browser:
+# Delete the local branch after merging the PR
+delete_branch_after_merge:
 `
 	return NewFromString(defaultStr)
 }

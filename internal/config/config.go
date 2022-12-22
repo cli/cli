@@ -17,11 +17,11 @@ const (
 //
 //go:generate moq -rm -out config_mock.go . Config
 type Config interface {
-	AuthToken(string) (string, string)
-	Get(string, string) (string, error)
-	GetOrDefault(string, string) (string, error)
-	Set(string, string, string)
-	UnsetHost(string)
+	AuthToken(hostname string) (string, string)
+	Get(hostname string, key string) (string, error)
+	GetOrDefault(hostname string, key string) (string, error)
+	Set(hostname string, key string, value string)
+	UnsetHost(hostname string)
 	Hosts() []string
 	DefaultHost() (string, string)
 	Aliases() *AliasConfig
@@ -194,6 +194,11 @@ var configOptions = []ConfigOption{
 	{
 		Key:          "browser",
 		Description:  "the web browser to use for opening URLs",
+		DefaultValue: "",
+	},
+	{
+		Key: "delete_branch_after_merge",
+		Description: "Delete the local branch after merging a PR",
 		DefaultValue: "",
 	},
 }

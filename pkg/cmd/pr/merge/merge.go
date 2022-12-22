@@ -30,6 +30,7 @@ type MergeOptions struct {
 	Branch     func() (string, error)
 	Remotes    func() (ghContext.Remotes, error)
 	Prompter   shared.Prompt
+	Config     func() (config.Config, error)
 
 	Finder shared.PRFinder
 
@@ -65,6 +66,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 		Branch:     f.Branch,
 		Remotes:    f.Remotes,
 		Prompter:   f.Prompter,
+		Config:     f.Config,
 	}
 
 	var (
@@ -577,18 +579,27 @@ func mergeMethodSurvey(p shared.Prompt, baseRepo *api.Repository) (PullRequestMe
 }
 
 func deleteBranchSurvey(opts *MergeOptions, crossRepoPR, localBranchExists bool) (bool, error) {
-	if !crossRepoPR && !opts.IsDeleteBranchIndicated {
+	cfg, err := opts.Config()
+	if err != nil {
+		return false, err
+	}
+
+	deleteBranchAfterMergeConfig, _ := cfg.Get("", "delete_branch_after_merge")
+	if deleteBranchAfterMergeConfig == "false" {
+		return false, nil
+	}
+
+	if !crossRepoPR && !opts.IsDeleteBranchIndicated && deleteBranchAfterMergeConfig == "" {
 		var message string
 		if opts.CanDeleteLocalBranch && localBranchExists {
 			message = "Delete the branch locally and on GitHub?"
 		} else {
 			message = "Delete the branch on GitHub?"
 		}
-
 		return opts.Prompter.Confirm(message, false)
 	}
 
-	return opts.DeleteBranch, nil
+	return opts.DeleteBranch || deleteBranchAfterMergeConfig == "true", nil
 }
 
 func confirmSurvey(p shared.Prompt, allowEditMsg bool) (shared.Action, error) {
