@@ -71,10 +71,10 @@ func parseFields(opts *ApiOptions) (map[string]interface{}, error) {
 			if subkey != "" {
 				var err error
 				if isArray {
-					destMap, err = addSubslice(destMap, subkey, k)
+					destMap, err = addParamsSlice(destMap, subkey, k)
 					isArray = false
 				} else {
-					destMap, err = addStructure(destMap, subkey, k)
+					destMap, err = addParamsMap(destMap, subkey)
 				}
 				if err != nil {
 					return err
@@ -115,39 +115,39 @@ func parseFields(opts *ApiOptions) (map[string]interface{}, error) {
 	return params, nil
 }
 
-func addStructure(destMap map[string]interface{}, subkey, k string) (map[string]interface{}, error) {
-	if v, exists := destMap[subkey]; exists {
+func addParamsMap(m map[string]interface{}, key string) (map[string]interface{}, error) {
+	if v, exists := m[key]; exists {
 		if existMap, ok := v.(map[string]interface{}); ok {
 			return existMap, nil
 		} else {
-			return nil, fmt.Errorf("expected map type under %q, got %T", subkey, v)
+			return nil, fmt.Errorf("expected map type under %q, got %T", key, v)
 		}
 	}
 	newMap := make(map[string]interface{})
-	destMap[subkey] = newMap
+	m[key] = newMap
 	return newMap, nil
 }
 
-func addSubslice(destMap map[string]interface{}, subkey, k string) (map[string]interface{}, error) {
-	if v, exists := destMap[subkey]; exists {
+func addParamsSlice(m map[string]interface{}, prevkey, newkey string) (map[string]interface{}, error) {
+	if v, exists := m[prevkey]; exists {
 		if existSlice, ok := v.([]interface{}); ok {
 			if len(existSlice) > 0 {
 				lastItem := existSlice[len(existSlice)-1]
 				if lastMap, ok := lastItem.(map[string]interface{}); ok {
-					if _, keyExists := lastMap[k]; !keyExists {
+					if _, keyExists := lastMap[newkey]; !keyExists {
 						return lastMap, nil
 					}
 				}
 			}
 			newMap := make(map[string]interface{})
-			destMap[subkey] = append(existSlice, newMap)
+			m[prevkey] = append(existSlice, newMap)
 			return newMap, nil
 		} else {
-			return nil, fmt.Errorf("expected array type under %q, got %T", subkey, v)
+			return nil, fmt.Errorf("expected array type under %q, got %T", prevkey, v)
 		}
 	}
 	newMap := make(map[string]interface{})
-	destMap[subkey] = []interface{}{newMap}
+	m[prevkey] = []interface{}{newMap}
 	return newMap, nil
 }
 
