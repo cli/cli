@@ -16,6 +16,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
@@ -52,6 +53,7 @@ type EditOptions struct {
 	RemoveTopics    []string
 	InteractiveMode bool
 	Detector        fd.Detector
+	Prompter prompter.Prompter
 	// Cache of current repo topics to avoid retrieving them
 	// in multiple flows.
 	topicsCache []string
@@ -79,6 +81,7 @@ type EditRepositoryInput struct {
 func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobra.Command {
 	opts := &EditOptions{
 		IO: f.IOStreams,
+		Prompter: f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -127,6 +130,19 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 
 			if cmd.Flags().NFlag() == 0 {
 				opts.InteractiveMode = true
+			}
+
+			if cmd.Flags().Changed("visibility") {
+				if *opts.Edits.Visibility == "private" {
+					confirmed, err := confirmChangeVisibilityPrivate(opts)
+					if err != nil {
+						return err
+					}
+
+					if !confirmed {
+						return nil
+					}
+				}
 			}
 
 			if opts.InteractiveMode && !opts.IO.CanPrompt() {
@@ -413,6 +429,17 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			if err != nil {
 				return err
 			}
+
+			if *opts.Edits.Visibility == "private" {
+				confirmed, err := confirmChangeVisibilityPrivate(opts)
+				if err != nil {
+					return err
+				}
+
+				if !confirmed {
+					opts.Edits.Visibility = &r.Visibility
+				}
+			}
 		case optionMergeOptions:
 			var defaultMergeOptions []string
 			var selectedMergeOptions []string
@@ -565,4 +592,8 @@ func isIncluded(value string, opts []string) bool {
 		}
 	}
 	return false
+}
+
+func confirmChangeVisibilityPrivate(opts *EditOptions) (bool, error) {
+	return opts.Prompter.Confirm("Are you sure you want to make this repository private? You will lose all the stars.", false)
 }
