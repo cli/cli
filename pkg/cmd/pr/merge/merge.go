@@ -30,6 +30,7 @@ type MergeOptions struct {
 	Branch     func() (string, error)
 	Remotes    func() (ghContext.Remotes, error)
 	Prompter   shared.Prompt
+	Config     func() (config.Config, error)
 
 	Finder shared.PRFinder
 
@@ -65,6 +66,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 		Branch:     f.Branch,
 		Remotes:    f.Remotes,
 		Prompter:   f.Prompter,
+		Config:     f.Config,
 	}
 
 	var (
