@@ -11,18 +11,6 @@ func (issue *Issue) ExportData(fields []string) map[string]interface{} {
 
 	for _, f := range fields {
 		switch f {
-		case "author":
-			author := map[string]interface{}{
-				"is_bot": issue.Author.IsBot(),
-			}
-			if issue.Author.IsBot() {
-				author["login"] = "app/" + issue.Author.Login
-			} else {
-				author["login"] = issue.Author.Login
-				author["name"] = issue.Author.Name
-				author["id"] = issue.Author.ID
-			}
-			data[f] = author
 		case "comments":
 			data[f] = issue.Comments.Nodes
 		case "assignees":
@@ -46,18 +34,6 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 
 	for _, f := range fields {
 		switch f {
-		case "author":
-			author := map[string]interface{}{
-				"is_bot": pr.Author.IsBot(),
-			}
-			if pr.Author.IsBot() {
-				author["login"] = "app/" + pr.Author.Login
-			} else {
-				author["login"] = pr.Author.Login
-				author["name"] = pr.Author.Name
-				author["id"] = pr.Author.ID
-			}
-			data[f] = author
 		case "headRepository":
 			data[f] = pr.HeadRepository
 		case "statusCheckRollup":

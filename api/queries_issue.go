@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -120,13 +121,35 @@ type Owner struct {
 }
 
 type Author struct {
-	ID    string `json:"id,omitempty"`
-	Name  string `json:"name,omitempty"`
-	Login string `json:"login"`
+	ID    string
+	Name  string
+	Login string
 }
 
-func (author *Author) IsBot() bool {
-	return author.ID == ""
+func (author Author) MarshalJSON() ([]byte, error) {
+	if author.ID == "" {
+		return json.Marshal(map[string]interface{}{
+			"is_bot": true,
+			"login":  "app/" + author.Login,
+		})
+	}
+	return json.Marshal(map[string]interface{}{
+		"is_bot": false,
+		"login":  author.Login,
+		"id":     author.ID,
+		"name":   author.Name,
+	})
+}
+
+type CommentAuthor struct {
+	Login string `json:"login"`
+	// Unfortunately, there is no easy way to add "id" and "name" fields to this struct because it's being
+	// used in both shurcool-graphql type queries and string-based queries where the response gets parsed
+	// by an ordinary JSON decoder that doesn't understand "graphql" directives via struct tags.
+	//	User  *struct {
+	//		ID   string
+	//		Name string
+	//	} `graphql:"... on User"`
 }
 
 // IssueCreate creates an issue in a GitHub repository
