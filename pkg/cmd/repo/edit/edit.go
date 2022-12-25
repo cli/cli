@@ -419,7 +419,9 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 				return err
 			}
 		case optionVisibility:
-			opts.Edits.Visibility = &r.Visibility
+			opts.Edits.Visibility = new(string)
+			*opts.Edits.Visibility = r.Visibility
+
 			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err = prompt.SurveyAskOne(&survey.Select{
 				Message: "Visibility",
