@@ -595,7 +595,11 @@ func isIncluded(value string, opts []string) bool {
 }
 
 func confirmChangeVisibilityPrivate(opts *EditOptions) (bool, error) {
-	return opts.Prompter.Confirm("This is a potentially destructive action. " +
-	"You will permanently lost all stars and watchers of this repository. " +
-	"Are you sure you want to change this repository to private?", false)
+	_, err := fmt.Fprintf(opts.IO.ErrOut, "WARNING: This is a potentially destructive action.\n" +
+"You will permanently lost all stars and watchers of this repository.\n")
+	if err != nil {
+		return false, err
+	}
+
+	return opts.Prompter.Confirm("Are you sure you want to change this repository to private?", false)
 }
