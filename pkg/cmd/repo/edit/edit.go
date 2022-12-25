@@ -53,7 +53,7 @@ type EditOptions struct {
 	RemoveTopics    []string
 	InteractiveMode bool
 	Detector        fd.Detector
-	Prompter prompter.Prompter
+	Prompter        prompter.Prompter
 	// Cache of current repo topics to avoid retrieving them
 	// in multiple flows.
 	topicsCache []string
@@ -80,7 +80,7 @@ type EditRepositoryInput struct {
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobra.Command {
 	opts := &EditOptions{
-		IO: f.IOStreams,
+		IO:       f.IOStreams,
 		Prompter: f.Prompter,
 	}
 
@@ -594,9 +594,12 @@ func isIncluded(value string, opts []string) bool {
 	return false
 }
 
+// confirmChangeVisibilityPrivate displays warning message and
+// show confirmation prompt when user chose to change repository's
+// visibility to private.
 func confirmChangeVisibilityPrivate(opts *EditOptions) (bool, error) {
-	_, err := fmt.Fprintf(opts.IO.ErrOut, "WARNING: This is a potentially destructive action.\n" +
-"You will permanently lost all stars and watchers of this repository.\n")
+	_, err := fmt.Fprintf(opts.IO.ErrOut, "WARNING: This is a potentially destructive action.\n"+
+		"You will permanently lost all stars and watchers of this repository.\n")
 	if err != nil {
 		return false, err
 	}
