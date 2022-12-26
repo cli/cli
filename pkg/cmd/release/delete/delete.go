@@ -1,24 +1,28 @@
 package delete
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/spf13/cobra"
 )
+
+type iprompter interface {
+	Confirm(string, bool) (bool, error)
+}
 
 type DeleteOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
+	Prompter   iprompter
 
 	TagName     string
 	SkipConfirm bool
@@ -29,6 +33,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	opts := &DeleteOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		Prompter:   f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -65,18 +70,14 @@ func deleteRun(opts *DeleteOptions) error {
 		return err
 	}
 
-	release, err := shared.FetchRelease(httpClient, baseRepo, opts.TagName)
+	release, err := shared.FetchRelease(context.Background(), httpClient, baseRepo, opts.TagName)
 	if err != nil {
 		return err
 	}
 
 	if !opts.SkipConfirm && opts.IO.CanPrompt() {
-		var confirmed bool
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		err := prompt.SurveyAskOne(&survey.Confirm{
-			Message: fmt.Sprintf("Delete release %s in %s?", release.TagName, ghrepo.FullName(baseRepo)),
-			Default: true,
-		}, &confirmed)
+		confirmed, err := opts.Prompter.Confirm(
+			fmt.Sprintf("Delete release %s in %s?", release.TagName, ghrepo.FullName(baseRepo)), true)
 		if err != nil {
 			return err
 		}

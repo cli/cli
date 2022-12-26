@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -20,30 +21,38 @@ type IssuesAndTotalCount struct {
 }
 
 type Issue struct {
-	Typename       string `json:"__typename"`
-	ID             string
-	Number         int
-	Title          string
-	URL            string
-	State          string
-	StateReason    string
-	Closed         bool
-	Body           string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	ClosedAt       *time.Time
-	Comments       Comments
-	Author         Author
-	Assignees      Assignees
-	Labels         Labels
-	ProjectCards   ProjectCards
-	Milestone      *Milestone
-	ReactionGroups ReactionGroups
-	IsPinned       bool
+	Typename         string `json:"__typename"`
+	ID               string
+	Number           int
+	Title            string
+	URL              string
+	State            string
+	StateReason      string
+	Closed           bool
+	Body             string
+	ActiveLockReason string
+	Locked           bool
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	ClosedAt         *time.Time
+	Comments         Comments
+	Author           Author
+	Assignees        Assignees
+	Labels           Labels
+	ProjectCards     ProjectCards
+	Milestone        *Milestone
+	ReactionGroups   ReactionGroups
+	IsPinned         bool
 }
 
+// return values for Issue.Typename
+const (
+	TypeIssue       string = "Issue"
+	TypePullRequest string = "PullRequest"
+)
+
 func (i Issue) IsPullRequest() bool {
-	return i.Typename == "PullRequest"
+	return i.Typename == TypePullRequest
 }
 
 type Assignees struct {
@@ -112,10 +121,35 @@ type Owner struct {
 }
 
 type Author struct {
-	// adding these breaks generated GraphQL requests
-	//ID    string `json:"id,omitempty"`
-	//Name  string `json:"name,omitempty"`
+	ID    string
+	Name  string
+	Login string
+}
+
+func (author Author) MarshalJSON() ([]byte, error) {
+	if author.ID == "" {
+		return json.Marshal(map[string]interface{}{
+			"is_bot": true,
+			"login":  "app/" + author.Login,
+		})
+	}
+	return json.Marshal(map[string]interface{}{
+		"is_bot": false,
+		"login":  author.Login,
+		"id":     author.ID,
+		"name":   author.Name,
+	})
+}
+
+type CommentAuthor struct {
 	Login string `json:"login"`
+	// Unfortunately, there is no easy way to add "id" and "name" fields to this struct because it's being
+	// used in both shurcool-graphql type queries and string-based queries where the response gets parsed
+	// by an ordinary JSON decoder that doesn't understand "graphql" directives via struct tags.
+	//	User  *struct {
+	//		ID   string
+	//		Name string
+	//	} `graphql:"... on User"`
 }
 
 // IssueCreate creates an issue in a GitHub repository

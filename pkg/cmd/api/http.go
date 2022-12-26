@@ -32,12 +32,6 @@ func httpRequest(client *http.Client, hostname string, method string, p string, 
 		if strings.EqualFold(method, "GET") {
 			requestURL = addQuery(requestURL, pp)
 		} else {
-			for key, value := range pp {
-				switch vv := value.(type) {
-				case []byte:
-					pp[key] = string(vv)
-				}
-			}
 			if isGraphQL {
 				pp = groupGraphQLVariables(pp)
 			}

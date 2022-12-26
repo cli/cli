@@ -257,3 +257,9 @@ func listLicenseTemplates(httpClient *http.Client, hostname string) ([]api.Licen
 	}
 	return licenseTemplates, nil
 }
+
+// Returns the current username and any orgs that user is a member of.
+func userAndOrgs(httpClient *http.Client, hostname string) (string, []string, error) {
+	client := api.NewClientFromHTTP(httpClient)
+	return api.CurrentLoginNameAndOrgs(client, hostname)
+}

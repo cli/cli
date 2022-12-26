@@ -33,7 +33,7 @@ func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.I
 		var err error
 		baseRepo, err = baseRepoFn()
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not determine base repo: %w", err)
+			return nil, nil, err
 		}
 	}
 
