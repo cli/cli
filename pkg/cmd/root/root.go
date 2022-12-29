@@ -43,17 +43,12 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 		Short: "GitHub CLI",
 		Long:  `Work seamlessly with GitHub from the command line.`,
 
-		SilenceErrors: true,
-		SilenceUsage:  true,
 		Example: heredoc.Doc(`
 			$ gh issue create
 			$ gh repo clone cli/cli
 			$ gh pr checkout 321
 		`),
 		Annotations: map[string]string{
-			"help:feedback": heredoc.Doc(`
-				Open an issue using 'gh issue create -R github.com/cli/cli'
-			`),
 			"versionInfo": versionCmd.Format(version, buildDate),
 		},
 	}
@@ -61,15 +56,33 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	// cmd.SetOut(f.IOStreams.Out)    // can't use due to https://github.com/spf13/cobra/issues/1708
 	// cmd.SetErr(f.IOStreams.ErrOut) // just let it default to os.Stderr instead
 
-	cmd.Flags().Bool("version", false, "Show gh version")
 	cmd.PersistentFlags().Bool("help", false, "Show help for command")
-	cmd.SetHelpFunc(func(c *cobra.Command, args []string) {
-		rootHelpFunc(f, c, args)
+
+	// override Cobra's default behaviors unless an opt-out has been set
+	if os.Getenv("GH_COBRA") == "" {
+		cmd.SilenceErrors = true
+		cmd.SilenceUsage = true
+
+		// this --version flag is checked in rootHelpFunc
+		cmd.Flags().Bool("version", false, "Show gh version")
+
+		cmd.SetHelpFunc(func(c *cobra.Command, args []string) {
+			rootHelpFunc(f, c, args)
+		})
+		cmd.SetUsageFunc(func(c *cobra.Command) error {
+			return rootUsageFunc(f.IOStreams.ErrOut, c)
+		})
+		cmd.SetFlagErrorFunc(rootFlagErrorFunc)
+	}
+
+	cmd.AddGroup(&cobra.Group{
+		ID:    "core",
+		Title: "Core commands",
 	})
-	cmd.SetUsageFunc(func(c *cobra.Command) error {
-		return rootUsageFunc(f.IOStreams.ErrOut, c)
+	cmd.AddGroup(&cobra.Group{
+		ID:    "actions",
+		Title: "GitHub Actions commands",
 	})
-	cmd.SetFlagErrorFunc(rootFlagErrorFunc)
 
 	// Child commands
 	cmd.AddCommand(versionCmd.NewCmdVersion(f, version, buildDate))
@@ -158,7 +171,7 @@ func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
 	cmd := codespaceCmd.NewRootCmd(app)
 	cmd.Use = "codespace"
 	cmd.Aliases = []string{"cs"}
-	cmd.Annotations = map[string]string{"IsCore": "true"}
+	cmd.GroupID = "core"
 	return cmd
 }
 

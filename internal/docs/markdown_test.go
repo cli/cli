@@ -10,9 +10,11 @@ import (
 )
 
 func TestGenMdDoc(t *testing.T) {
+	linkHandler := func(s string) string { return s }
+
 	// We generate on subcommand so we have both subcommands and parents.
 	buf := new(bytes.Buffer)
-	if err := GenMarkdown(echoCmd, buf); err != nil {
+	if err := genMarkdownCustom(echoCmd, buf, linkHandler); err != nil {
 		t.Fatal(err)
 	}
 	output := buf.String()
@@ -28,9 +30,11 @@ func TestGenMdDoc(t *testing.T) {
 }
 
 func TestGenMdDocWithNoLongOrSynopsis(t *testing.T) {
+	linkHandler := func(s string) string { return s }
+
 	// We generate on subcommand so we have both subcommands and parents.
 	buf := new(bytes.Buffer)
-	if err := GenMarkdown(dummyCmd, buf); err != nil {
+	if err := genMarkdownCustom(dummyCmd, buf, linkHandler); err != nil {
 		t.Fatal(err)
 	}
 	output := buf.String()
@@ -42,6 +46,8 @@ func TestGenMdDocWithNoLongOrSynopsis(t *testing.T) {
 }
 
 func TestGenMdNoHiddenParents(t *testing.T) {
+	linkHandler := func(s string) string { return s }
+
 	// We generate on subcommand so we have both subcommands and parents.
 	for _, name := range []string{"rootflag", "strtwo"} {
 		f := rootCmd.PersistentFlags().Lookup(name)
@@ -49,7 +55,7 @@ func TestGenMdNoHiddenParents(t *testing.T) {
 		defer func() { f.Hidden = false }()
 	}
 	buf := new(bytes.Buffer)
-	if err := GenMarkdown(echoCmd, buf); err != nil {
+	if err := genMarkdownCustom(echoCmd, buf, linkHandler); err != nil {
 		t.Fatal(err)
 	}
 	output := buf.String()
@@ -72,7 +78,7 @@ func TestGenMdTree(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpdir)
 
-	if err := GenMarkdownTree(c, tmpdir); err != nil {
+	if err := GenMarkdownTreeCustom(c, tmpdir, func(s string) string { return s }, func(s string) string { return s }); err != nil {
 		t.Fatalf("GenMarkdownTree failed: %v", err)
 	}
 
@@ -88,9 +94,11 @@ func BenchmarkGenMarkdownToFile(b *testing.B) {
 	}
 	defer file.Close()
 
+	linkHandler := func(s string) string { return s }
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if err := GenMarkdown(rootCmd, file); err != nil {
+		if err := genMarkdownCustom(rootCmd, file, linkHandler); err != nil {
 			b.Fatal(err)
 		}
 	}

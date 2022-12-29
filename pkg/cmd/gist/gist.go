@@ -18,13 +18,13 @@ func NewCmdGist(f *cmdutil.Factory) *cobra.Command {
 		Short: "Manage gists",
 		Long:  `Work with GitHub gists.`,
 		Annotations: map[string]string{
-			"IsCore": "true",
 			"help:arguments": heredoc.Doc(`
 				A gist can be supplied as argument in either of the following formats:
 				- by ID, e.g. 5b0e0062eb8e9654adad7bb1d81cc75f
 				- by URL, e.g. "https://gist.github.com/OWNER/5b0e0062eb8e9654adad7bb1d81cc75f"
 			`),
 		},
+		GroupID: "core",
 	}
 
 	cmd.AddCommand(gistCloneCmd.NewCmdClone(f, nil))

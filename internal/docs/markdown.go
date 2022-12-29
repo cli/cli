@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cli/cli/v2/pkg/cmd/root"
 	"github.com/spf13/cobra"
+	"github.com/spf13/cobra/doc"
 	"github.com/spf13/pflag"
 )
 
@@ -78,13 +80,8 @@ func printFlagsHTML(w io.Writer, fs *pflag.FlagSet) error {
 	return tpl.Execute(w, flags)
 }
 
-// GenMarkdown creates markdown output.
-func GenMarkdown(cmd *cobra.Command, w io.Writer) error {
-	return GenMarkdownCustom(cmd, w, func(s string) string { return s })
-}
-
-// GenMarkdownCustom creates custom markdown output.
-func GenMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string) string) error {
+// genMarkdownCustom creates custom markdown output.
+func genMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string) string) error {
 	fmt.Fprint(w, "{% raw %}")
 	fmt.Fprintf(w, "## %s\n\n", cmd.CommandPath())
 
@@ -99,11 +96,8 @@ func GenMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string)
 		fmt.Fprintf(w, "%s\n\n", cmd.Long)
 	}
 
-	for _, g := range subcommandGroups(cmd) {
-		if len(g.Commands) == 0 {
-			continue
-		}
-		fmt.Fprintf(w, "### %s\n\n", g.Name)
+	for _, g := range root.GroupedCommands(cmd) {
+		fmt.Fprintf(w, "### %s\n\n", g.Title)
 		for _, subcmd := range g.Commands {
 			fmt.Fprintf(w, "* [%s](%s)\n", subcmd.CommandPath(), linkHandler(cmdManualPath(subcmd)))
 		}
@@ -130,71 +124,13 @@ func GenMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string)
 	return nil
 }
 
-type commandGroup struct {
-	Name     string
-	Commands []*cobra.Command
-}
-
-// subcommandGroups lists child commands of a Cobra command split into groups.
-// TODO: have rootHelpFunc use this instead of repeating the same logic.
-func subcommandGroups(c *cobra.Command) []commandGroup {
-	var rest []*cobra.Command
-	var core []*cobra.Command
-	var actions []*cobra.Command
-
-	for _, subcmd := range c.Commands() {
-		if !subcmd.IsAvailableCommand() {
-			continue
-		}
-		if _, ok := subcmd.Annotations["IsCore"]; ok {
-			core = append(core, subcmd)
-		} else if _, ok := subcmd.Annotations["IsActions"]; ok {
-			actions = append(actions, subcmd)
-		} else {
-			rest = append(rest, subcmd)
-		}
-	}
-
-	if len(core) > 0 {
-		return []commandGroup{
-			{
-				Name:     "Core commands",
-				Commands: core,
-			},
-			{
-				Name:     "Actions commands",
-				Commands: actions,
-			},
-			{
-				Name:     "Additional commands",
-				Commands: rest,
-			},
-		}
-	}
-
-	return []commandGroup{
-		{
-			Name:     "Commands",
-			Commands: rest,
-		},
-	}
-}
-
-// GenMarkdownTree will generate a markdown page for this command and all
-// descendants in the directory given. The header may be nil.
-// This function may not work correctly if your command names have `-` in them.
-// If you have `cmd` with two subcmds, `sub` and `sub-third`,
-// and `sub` has a subcommand called `third`, it is undefined which
-// help output will be in the file `cmd-sub-third.1`.
-func GenMarkdownTree(cmd *cobra.Command, dir string) error {
-	identity := func(s string) string { return s }
-	emptyStr := func(s string) string { return "" }
-	return GenMarkdownTreeCustom(cmd, dir, emptyStr, identity)
-}
-
 // GenMarkdownTreeCustom is the same as GenMarkdownTree, but
 // with custom filePrepender and linkHandler.
 func GenMarkdownTreeCustom(cmd *cobra.Command, dir string, filePrepender, linkHandler func(string) string) error {
+	if os.Getenv("GH_COBRA") != "" {
+		return doc.GenMarkdownTreeCustom(cmd, dir, filePrepender, linkHandler)
+	}
+
 	for _, c := range cmd.Commands() {
 		_, forceGeneration := c.Annotations["markdown:generate"]
 		if c.Hidden && !forceGeneration {
@@ -216,7 +152,7 @@ func GenMarkdownTreeCustom(cmd *cobra.Command, dir string, filePrepender, linkHa
 	if _, err := io.WriteString(f, filePrepender(filename)); err != nil {
 		return err
 	}
-	if err := GenMarkdownCustom(cmd, f, linkHandler); err != nil {
+	if err := genMarkdownCustom(cmd, f, linkHandler); err != nil {
 		return err
 	}
 	return nil

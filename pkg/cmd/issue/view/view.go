@@ -153,6 +153,8 @@ func findIssue(client *http.Client, baseRepoFn func() (ghrepo.Interface, error),
 	}
 
 	if fieldSet.Contains("comments") {
+		// FIXME: this re-fetches the comments connection even though the initial set of 100 were
+		// fetched in the previous request.
 		err = preloadIssueComments(client, repo, issue)
 	}
 	return issue, err
