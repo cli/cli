@@ -85,7 +85,7 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, e
 		return nil, err
 	}
 
-	if len(repos) == 0 {
+	if len(repos) <= 1 && len(r.remotes) > 0 {
 		return r.remotes[0], nil
 	}
 
