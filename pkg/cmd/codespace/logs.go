@@ -6,7 +6,6 @@ import (
 	"net"
 
 	"github.com/cli/cli/v2/internal/codespaces"
-	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
 )
@@ -57,7 +56,13 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 	localPort := listen.Addr().(*net.TCPAddr).Port
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	remoteSSHServerPort, sshUser, err := rpc.StartSSHServer(ctx, session)
+	invoker, err := codespaces.CreateRPCInvoker(ctx, session, "")
+	if err != nil {
+		return err
+	}
+	defer safeClose(invoker, &err)
+
+	remoteSSHServerPort, sshUser, err := invoker.StartSSHServer(ctx)
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)

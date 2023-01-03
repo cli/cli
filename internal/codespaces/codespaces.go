@@ -8,6 +8,7 @@ import (
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/cli/cli/v2/pkg/liveshare"
 )
 
@@ -78,4 +79,17 @@ func ConnectToLiveshare(ctx context.Context, progress progressIndicator, session
 		HostPublicKeys: codespace.Connection.HostPublicKeys,
 		Logger:         sessionLogger,
 	})
+}
+
+// Helper function to connect to the internal RPC server and return an RPC invoker for it
+func CreateRPCInvoker(ctx context.Context, session *liveshare.Session, token string) (*rpc.Invoker, error) {
+	ctx, cancel := context.WithTimeout(ctx, rpc.ConnectionTimeout)
+	defer cancel()
+
+	invoker, err := rpc.Connect(ctx, session, token)
+	if err != nil {
+		return nil, fmt.Errorf("error connecting to internal server: %w", err)
+	}
+
+	return invoker, nil
 }
