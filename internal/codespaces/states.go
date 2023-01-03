@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/liveshare"
 )
@@ -60,11 +59,17 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 	localPort := listen.Addr().(*net.TCPAddr).Port
 
 	progress.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	defer progress.StopProgressIndicator()
-	remoteSSHServerPort, sshUser, err := rpc.StartSSHServer(ctx, session)
+	invoker, err := CreateRPCInvoker(ctx, session, "")
+	if err != nil {
+		return err
+	}
+	defer safeClose(invoker, &err)
+
+	remoteSSHServerPort, sshUser, err := invoker.StartSSHServer(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}
+	progress.StopProgressIndicator()
 
 	progress.StartProgressIndicatorWithLabel("Fetching status")
 	tunnelClosed := make(chan error, 1) // buffered to avoid sender stuckness
@@ -124,4 +129,10 @@ func getPostCreateOutput(ctx context.Context, tunnelPort int, user string) ([]Po
 	}
 
 	return output.Steps, nil
+}
+
+func safeClose(closer io.Closer, err *error) {
+	if closeErr := closer.Close(); *err == nil {
+		*err = closeErr
+	}
 }
