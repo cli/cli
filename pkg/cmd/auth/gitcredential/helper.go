@@ -54,7 +54,12 @@ func NewCmdCredential(f *cmdutil.Factory, runF func(*CredentialOptions) error) *
 func helperRun(opts *CredentialOptions) error {
 	if opts.Operation == "store" {
 		// We pretend to implement the "store" operation, but do nothing since we already have a cached token.
-		return cmdutil.SilentError
+		return nil
+	}
+
+	if opts.Operation == "erase" {
+		// We pretend to implement the "erase" operation, but do nothing since we don't want git to cause user to be logged out.
+		return nil
 	}
 
 	if opts.Operation != "get" {
