@@ -62,6 +62,10 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, e
 		return r.baseOverride, nil
 	}
 
+	if len(r.remotes) == 0 {
+		return nil, errors.New("no git remotes")
+	}
+
 	// if any of the remotes already has a resolution, respect that
 	for _, r := range r.remotes {
 		if r.Resolved == "base" {
@@ -85,8 +89,10 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, e
 		return nil, err
 	}
 
-	if len(repos) <= 1 && len(r.remotes) > 0 {
+	if len(repos) == 0 {
 		return r.remotes[0], nil
+	} else if len(repos) == 1 {
+		return repos[0], nil
 	}
 
 	cs := io.ColorScheme()
