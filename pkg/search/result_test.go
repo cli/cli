@@ -11,6 +11,43 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestCommitExportData(t *testing.T) {
+	var authoredAt = time.Date(2021, 2, 27, 11, 30, 0, 0, time.UTC)
+	var committedAt = time.Date(2021, 2, 28, 12, 30, 0, 0, time.UTC)
+
+	tests := []struct {
+		name   string
+		fields []string
+		commit Commit
+		output string
+	}{
+		{
+			name:   "exports requested fields",
+			fields: []string{"author", "commit", "committer", "sha"},
+			commit: Commit{
+				Author:    User{Login: "foo"},
+				Committer: User{Login: "bar", ID: "123"},
+				Info: CommitInfo{
+					Author:    CommitUser{Date: authoredAt, Name: "Foo"},
+					Committer: CommitUser{Date: committedAt, Name: "Bar"},
+					Message:   "test message",
+				},
+				Sha: "8dd03144ffdc6c0d",
+			},
+			output: `{"author":{"id":"","is_bot":true,"login":"app/foo","type":""},"commit":{"author":{"date":"2021-02-27T11:30:00Z","email":"","name":"Foo"},"comment_count":0,"committer":{"date":"2021-02-28T12:30:00Z","email":"","name":"Bar"},"message":"test message","tree":{"sha":""}},"committer":{"id":"123","is_bot":false,"login":"bar","type":""},"sha":"8dd03144ffdc6c0d"}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			exported := tt.commit.ExportData(tt.fields)
+			buf := bytes.Buffer{}
+			enc := json.NewEncoder(&buf)
+			require.NoError(t, enc.Encode(exported))
+			assert.Equal(t, tt.output, strings.TrimSpace(buf.String()))
+		})
+	}
+}
+
 func TestRepositoryExportData(t *testing.T) {
 	var createdAt = time.Date(2021, 2, 28, 12, 30, 0, 0, time.UTC)
 	tests := []struct {

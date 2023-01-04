@@ -20,6 +20,8 @@ func TestQueryString(t *testing.T) {
 				Keywords: []string{"some", "keywords"},
 				Qualifiers: Qualifiers{
 					Archived:         &trueBool,
+					AuthorEmail:      "foo@example.com",
+					CommitterDate:    "2021-02-28",
 					Created:          "created",
 					Followers:        "1",
 					Fork:             "true",
@@ -38,7 +40,7 @@ func TestQueryString(t *testing.T) {
 					Is:               []string{"public"},
 				},
 			},
-			out: "some keywords archived:true created:created followers:1 fork:true forks:2 good-first-issues:3 help-wanted-issues:4 in:description in:readme is:public language:language license:license pushed:updated size:5 stars:6 topic:topic topics:7 user:user",
+			out: "some keywords archived:true author-email:foo@example.com committer-date:2021-02-28 created:created followers:1 fork:true forks:2 good-first-issues:3 help-wanted-issues:4 in:description in:readme is:public language:language license:license pushed:updated size:5 stars:6 topic:topic topics:7 user:user",
 		},
 		{
 			name: "quotes keywords",
@@ -74,6 +76,8 @@ func TestQualifiersMap(t *testing.T) {
 			name: "changes qualifiers to map",
 			qualifiers: Qualifiers{
 				Archived:         &trueBool,
+				AuthorEmail:      "foo@example.com",
+				CommitterDate:    "2021-02-28",
 				Created:          "created",
 				Followers:        "1",
 				Fork:             "true",
@@ -93,6 +97,8 @@ func TestQualifiersMap(t *testing.T) {
 			},
 			out: map[string][]string{
 				"archived":           {"true"},
+				"author-email":       {"foo@example.com"},
+				"committer-date":     {"2021-02-28"},
 				"created":            {"created"},
 				"followers":          {"1"},
 				"fork":               {"true"},

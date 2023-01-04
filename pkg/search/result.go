@@ -6,6 +6,17 @@ import (
 	"time"
 )
 
+var CommitFields = []string{
+	"author",
+	"commit",
+	"committer",
+	"sha",
+	"id",
+	"parents",
+	"repository",
+	"url",
+}
+
 var RepositoryFields = []string{
 	"createdAt",
 	"defaultBranch",
@@ -61,6 +72,12 @@ var PullRequestFields = append(IssueFields,
 	"isDraft",
 )
 
+type CommitsResult struct {
+	IncompleteResults bool     `json:"incomplete_results"`
+	Items             []Commit `json:"items"`
+	Total             int      `json:"total_count"`
+}
+
 type RepositoriesResult struct {
 	IncompleteResults bool         `json:"incomplete_results"`
 	Items             []Repository `json:"items"`
@@ -71,6 +88,51 @@ type IssuesResult struct {
 	IncompleteResults bool    `json:"incomplete_results"`
 	Items             []Issue `json:"items"`
 	Total             int     `json:"total_count"`
+}
+
+type Commit struct {
+	Author    User       `json:"author"`
+	Committer User       `json:"committer"`
+	ID        string     `json:"node_id"`
+	Info      CommitInfo `json:"commit"`
+	Parents   []Parent   `json:"parents"`
+	Repo      CommitRepo `json:"repository"`
+	Sha       string     `json:"sha"`
+	URL       string     `json:"html_url"`
+}
+
+type CommitInfo struct {
+	Author       CommitUser `json:"author"`
+	CommentCount int        `json:"comment_count"`
+	Committer    CommitUser `json:"committer"`
+	Message      string     `json:"message"`
+	Tree         Tree       `json:"tree"`
+}
+
+type CommitUser struct {
+	Date  time.Time `json:"date"`
+	Email string    `json:"email"`
+	Name  string    `json:"name"`
+}
+
+type CommitRepo struct {
+	Description string `json:"description"`
+	FullName    string `json:"full_name"`
+	ID          string `json:"node_id"`
+	IsFork      bool   `json:"fork"`
+	IsPrivate   bool   `json:"private"`
+	Name        string `json:"name"`
+	Owner       User   `json:"owner"`
+	URL         string `json:"html_url"`
+}
+
+type Tree struct {
+	Sha string `json:"sha"`
+}
+
+type Parent struct {
+	Sha string `json:"sha"`
+	URL string `json:"html_url"`
 }
 
 type Repository struct {
@@ -174,6 +236,86 @@ type Label struct {
 	Description string `json:"description"`
 	ID          string `json:"node_id"`
 	Name        string `json:"name"`
+}
+
+func (commit Commit) ExportData(fields []string) map[string]interface{} {
+	v := reflect.ValueOf(commit)
+	data := map[string]interface{}{}
+	for _, f := range fields {
+		switch f {
+		case "author":
+			isBot := commit.Author.IsBot()
+			login := commit.Author.Login
+			if isBot {
+				login = "app/" + login
+			}
+			data[f] = map[string]interface{}{
+				"id":     commit.Author.ID,
+				"login":  login,
+				"type":   commit.Author.Type,
+				"is_bot": isBot,
+			}
+		case "commit":
+			info := commit.Info
+			data[f] = map[string]interface{}{
+				"author": map[string]interface{}{
+					"date":  info.Author.Date,
+					"email": info.Author.Email,
+					"name":  info.Author.Name,
+				},
+				"committer": map[string]interface{}{
+					"date":  info.Committer.Date,
+					"email": info.Committer.Email,
+					"name":  info.Committer.Name,
+				},
+				"comment_count": info.CommentCount,
+				"message":       info.Message,
+				"tree":          map[string]interface{}{"sha": info.Tree.Sha},
+			}
+		case "committer":
+			isBot := commit.Committer.IsBot()
+			login := commit.Committer.Login
+			if isBot {
+				login = "app/" + login
+			}
+			data[f] = map[string]interface{}{
+				"id":     commit.Committer.ID,
+				"login":  login,
+				"type":   commit.Committer.Type,
+				"is_bot": isBot,
+			}
+		case "parents":
+			parents := make([]interface{}, 0, len(commit.Parents))
+			for _, parent := range commit.Parents {
+				parents = append(parents, map[string]interface{}{
+					"sha": parent.Sha,
+					"url": parent.URL,
+				})
+			}
+			data[f] = parents
+		case "repository":
+			repo := commit.Repo
+			data[f] = map[string]interface{}{
+				"description": repo.Description,
+				"fullName":    repo.FullName,
+				"name":        repo.Name,
+				"id":          repo.ID,
+				"isFork":      repo.IsFork,
+				"isPrivate":   repo.IsPrivate,
+				"owner": map[string]interface{}{
+					"id":    repo.Owner.ID,
+					"login": repo.Owner.Login,
+					"type":  repo.Owner.Type,
+					"url":   repo.Owner.URL,
+				},
+				"url": repo.URL,
+			}
+		default:
+			sf := fieldByName(v, f)
+			data[f] = sf.Interface()
+		}
+	}
+	return data
 }
 
 func (repo Repository) ExportData(fields []string) map[string]interface{} {
