@@ -19,6 +19,18 @@ type ChannelID struct {
 	name, condition string
 }
 
+// Interface to allow the mocking of the liveshare session
+type LiveshareSession interface {
+	Close() error
+	GetSharedServers(context.Context) ([]*Port, error)
+	KeepAlive(string)
+	OpenStreamingChannel(context.Context, ChannelID) (ssh.Channel, error)
+	StartSharing(context.Context, string, int) (ChannelID, error)
+	StartSSHServer(context.Context) (int, string, error)
+	StartSSHServerWithOptions(context.Context, StartSSHServerOptions) (int, string, error)
+	RebuildContainer(context.Context, bool) error
+}
+
 // A Session represents the session between a connected Live Share client and server.
 type Session struct {
 	ssh *sshSession

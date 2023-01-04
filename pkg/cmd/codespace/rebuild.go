@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/spf13/cobra"
 )
 
@@ -52,7 +52,7 @@ func (a *App) Rebuild(ctx context.Context, codespaceName string, full bool) (err
 	}
 	defer safeClose(session, &err)
 
-	invoker, err := codespaces.CreateRPCInvoker(ctx, session, "")
+	invoker, err := rpc.CreateInvoker(ctx, session, "")
 	if err != nil {
 		return err
 	}

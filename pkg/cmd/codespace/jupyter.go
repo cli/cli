@@ -6,7 +6,7 @@ import (
 	"net"
 	"strings"
 
-	"github.com/cli/cli/v2/internal/codespaces"
+	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
 )
@@ -45,7 +45,7 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	defer safeClose(session, &err)
 
 	a.StartProgressIndicatorWithLabel("Starting JupyterLab on codespace")
-	invoker, err := codespaces.CreateRPCInvoker(ctx, session, "")
+	invoker, err := rpc.CreateInvoker(ctx, session, "")
 	if err != nil {
 		return err
 	}

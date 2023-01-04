@@ -20,6 +20,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/liveshare"
@@ -173,7 +174,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	defer safeClose(session, &err)
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	invoker, err := codespaces.CreateRPCInvoker(ctx, session, "")
+	invoker, err := rpc.CreateInvoker(ctx, session, "")
 	if err != nil {
 		return err
 	}
@@ -514,7 +515,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 			} else {
 				defer safeClose(session, &err)
 
-				invoker, err := codespaces.CreateRPCInvoker(ctx, session, "")
+				invoker, err := rpc.CreateInvoker(ctx, session, "")
 				if err != nil {
 					result.err = fmt.Errorf("error connecting to codespace: %w", err)
 				} else {
