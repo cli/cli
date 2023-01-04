@@ -121,6 +121,7 @@ func TestDefaultRun(t *testing.T) {
 	repo1, _ := ghrepo.FromFullName("OWNER/REPO")
 	repo2, _ := ghrepo.FromFullName("OWNER2/REPO2")
 	repo3, _ := ghrepo.FromFullName("OWNER3/REPO3")
+	repo4, _ := ghrepo.FromFullName("OWNER-foo/REPO")
 
 	tests := []struct {
 		name          string
@@ -129,11 +130,49 @@ func TestDefaultRun(t *testing.T) {
 		remotes       []*context.Remote
 		httpStubs     func(*httpmock.Registry)
 		gitStubs      func(*run.CommandStubber)
-		prompterStubs func(*prompter.PrompterMock)
+		prompterStubs func(*testing.T, *prompter.PrompterMock)
 		wantStdout    string
 		wantErr       bool
 		errMsg        string
 	}{
+		{
+			name: "re-set with same base after rename",
+			tty:  true,
+			opts: SetDefaultOptions{},
+			remotes: []*context.Remote{
+				{
+					Remote: &git.Remote{Name: "origin", Resolved: "OWNER/REPO"},
+					Repo:   repo4,
+				},
+				{
+					Remote: &git.Remote{Name: "fork"},
+					Repo:   repo2,
+				},
+			},
+			prompterStubs: func(t *testing.T, pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(p, d string, opts []string) (int, error) {
+					switch p {
+					case "Which repository should be the default?":
+						prompter.AssertOptions(t, []string{"OWNER/REPO", "OWNER2/REPO2"}, opts)
+						assert.Equal(t, "OWNER/REPO", d)
+						return prompter.IndexFor(opts, d)
+					default:
+						return -1, prompter.NoSuchPromptErr(p)
+					}
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryNetwork\b`),
+					httpmock.StringResponse(`{"data":{"repo_000":{"name":"REPO","owner":{"login":"OWNER"}},"repo_001":{"name":"REPO2","owner":{"login":"OWNER2"}}}}`),
+				)
+			},
+			gitStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --unset remote.origin.gh-resolved`, 0, "")
+				cs.Register(`git config --add remote.origin.gh-resolved OWNER/REPO`, 0, "")
+			},
+			wantStdout: "This command sets the default remote repository to use when querying the\nGitHub API for the locally cloned repository.\n\ngh uses the default repository for things like:\n\n - viewing and creating pull requests\n - viewing and creating issues\n - viewing and creating releases\n - working with Actions\n - adding repository and environment secrets\n\n✓ Set OWNER/REPO as the default repository for the current directory\n",
+		},
 		{
 			name: "unset mode with base resolved current default",
 			tty:  true,
@@ -353,7 +392,7 @@ func TestDefaultRun(t *testing.T) {
 			gitStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --add remote.upstream.gh-resolved base`, 0, "")
 			},
-			prompterStubs: func(pm *prompter.PrompterMock) {
+			prompterStubs: func(t *testing.T, pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(p, d string, opts []string) (int, error) {
 					switch p {
 					case "Which repository should be the default?":
@@ -416,7 +455,7 @@ func TestDefaultRun(t *testing.T) {
 
 		pm := &prompter.PrompterMock{}
 		if tt.prompterStubs != nil {
-			tt.prompterStubs(pm)
+			tt.prompterStubs(t, pm)
 		}
 
 		tt.opts.Prompter = pm
