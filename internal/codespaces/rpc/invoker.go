@@ -12,7 +12,6 @@ import (
 
 	"github.com/cli/cli/v2/internal/codespaces/rpc/jupyter"
 	"github.com/cli/cli/v2/pkg/liveshare"
-	"golang.org/x/crypto/ssh"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
@@ -28,35 +27,45 @@ const (
 	codespacesInternalSessionName = "CodespacesInternal"
 )
 
-type liveshareSession interface {
+type Invoker interface {
 	Close() error
-	GetSharedServers(context.Context) ([]*liveshare.Port, error)
-	KeepAlive(string)
-	OpenStreamingChannel(context.Context, liveshare.ChannelID) (ssh.Channel, error)
-	StartSharing(context.Context, string, int) (liveshare.ChannelID, error)
-	StartSSHServer(context.Context) (int, string, error)
-	StartSSHServerWithOptions(context.Context, liveshare.StartSSHServerOptions) (int, string, error)
-	RebuildContainer(context.Context, bool) error
+	StartJupyterServer(ctx context.Context) (int, string, error)
+	RebuildContainer(ctx context.Context, full bool) error
+	StartSSHServer(ctx context.Context) (int, string, error)
+	StartSSHServerWithOptions(ctx context.Context, options liveshare.StartSSHServerOptions) (int, string, error)
 }
 
-type Invoker struct {
+type invoker struct {
 	conn          *grpc.ClientConn
 	token         string
-	session       liveshareSession
+	session       liveshare.LiveshareSession
 	listener      net.Listener
 	jupyterClient jupyter.JupyterServerHostClient
 	cancelPF      context.CancelFunc
 }
 
-// Finds a free port to listen on and creates a new gRPC client that connects to that port
-func Connect(ctx context.Context, session liveshareSession, token string) (*Invoker, error) {
+// Connects to the internal RPC server and returns a new invoker for it
+func CreateInvoker(ctx context.Context, session liveshare.LiveshareSession, token string) (Invoker, error) {
+	ctx, cancel := context.WithTimeout(ctx, ConnectionTimeout)
+	defer cancel()
+
+	invoker, err := connect(ctx, session, token)
+	if err != nil {
+		return nil, fmt.Errorf("error connecting to internal server: %w", err)
+	}
+
+	return invoker, nil
+}
+
+// Finds a free port to listen on and creates a new RPC invoker that connects to that port
+func connect(ctx context.Context, session liveshare.LiveshareSession, token string) (Invoker, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", 0))
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen to local port over tcp: %w", err)
 	}
 	localAddress := fmt.Sprintf("127.0.0.1:%d", listener.Addr().(*net.TCPAddr).Port)
 
-	invoker := &Invoker{
+	invoker := &invoker{
 		token:    token,
 		session:  session,
 		listener: listener,
@@ -113,12 +122,12 @@ func Connect(ctx context.Context, session liveshareSession, token string) (*Invo
 }
 
 // Closes the gRPC connection
-func (g *Invoker) Close() error {
-	g.cancelPF()
+func (i *invoker) Close() error {
+	i.cancelPF()
 
 	// Closing the local listener effectively closes the gRPC connection
-	if err := g.listener.Close(); err != nil {
-		g.conn.Close() // If we fail to close the listener, explicitly close the gRPC connection and ignore any error
+	if err := i.listener.Close(); err != nil {
+		i.conn.Close() // If we fail to close the listener, explicitly close the gRPC connection and ignore any error
 		return fmt.Errorf("failed to close local tcp port listener: %w", err)
 	}
 
@@ -126,17 +135,17 @@ func (g *Invoker) Close() error {
 }
 
 // Appends the authentication token to the gRPC context
-func (g *Invoker) appendMetadata(ctx context.Context) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, "Authorization", "Bearer "+g.token)
+func (i *invoker) appendMetadata(ctx context.Context) context.Context {
+	return metadata.AppendToOutgoingContext(ctx, "Authorization", "Bearer "+i.token)
 }
 
 // Starts a remote JupyterLab server to allow the user to connect to the codespace via JupyterLab in their browser
-func (g *Invoker) StartJupyterServer(ctx context.Context) (port int, serverUrl string, err error) {
-	ctx = g.appendMetadata(ctx)
+func (i *invoker) StartJupyterServer(ctx context.Context) (port int, serverUrl string, err error) {
+	ctx = i.appendMetadata(ctx)
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 
-	response, err := g.jupyterClient.GetRunningServer(ctx, &jupyter.GetRunningServerRequest{})
+	response, err := i.jupyterClient.GetRunningServer(ctx, &jupyter.GetRunningServerRequest{})
 	if err != nil {
 		return 0, "", fmt.Errorf("failed to invoke JupyterLab RPC: %w", err)
 	}
@@ -154,16 +163,16 @@ func (g *Invoker) StartJupyterServer(ctx context.Context) (port int, serverUrl s
 }
 
 // Rebuilds the container using cached layers by default or from scratch if full is true
-func (g *Invoker) RebuildContainer(ctx context.Context, full bool) error {
-	return g.session.RebuildContainer(ctx, full)
+func (i *invoker) RebuildContainer(ctx context.Context, full bool) error {
+	return i.session.RebuildContainer(ctx, full)
 }
 
 // Starts a remote SSH server to allow the user to connect to the codespace via SSH
-func (g *Invoker) StartSSHServer(ctx context.Context) (int, string, error) {
-	return g.session.StartSSHServer(ctx)
+func (i *invoker) StartSSHServer(ctx context.Context) (int, string, error) {
+	return i.session.StartSSHServer(ctx)
 }
 
 // Starts a remote SSH server to allow the user to connect to the codespace via SSH
-func (g *Invoker) StartSSHServerWithOptions(ctx context.Context, options liveshare.StartSSHServerOptions) (int, string, error) {
-	return g.session.StartSSHServerWithOptions(ctx, options)
+func (i *invoker) StartSSHServerWithOptions(ctx context.Context, options liveshare.StartSSHServerOptions) (int, string, error) {
+	return i.session.StartSSHServerWithOptions(ctx, options)
 }

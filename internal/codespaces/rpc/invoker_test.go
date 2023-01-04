@@ -32,10 +32,10 @@ func startServer(t *testing.T) {
 	})
 }
 
-func connect(t *testing.T) (invoker *Invoker) {
+func createTestInvoker(t *testing.T) Invoker {
 	t.Helper()
 
-	invoker, err := Connect(context.Background(), &rpctest.Session{}, "token")
+	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{}, "token") //connect(context.Background(), &rpctest.Session{}, "token")
 	if err != nil {
 		t.Fatalf("error connecting to internal server: %v", err)
 	}
@@ -50,8 +50,7 @@ func connect(t *testing.T) (invoker *Invoker) {
 // Test that the RPC invoker returns the correct port and URL when the JupyterLab server starts successfully
 func TestStartJupyterServerSuccess(t *testing.T) {
 	startServer(t)
-	invoker := connect(t)
-
+	invoker := createTestInvoker(t)
 	port, url, err := invoker.StartJupyterServer(context.Background())
 	if err != nil {
 		t.Fatalf("expected %v, got %v", nil, err)
@@ -67,7 +66,7 @@ func TestStartJupyterServerSuccess(t *testing.T) {
 // Test that the RPC invoker returns an error when the JupyterLab server fails to start
 func TestStartJupyterServerFailure(t *testing.T) {
 	startServer(t)
-	invoker := connect(t)
+	invoker := createTestInvoker(t)
 	rpctest.JupyterMessage = "error message"
 	rpctest.JupyterResult = false
 	errorMessage := fmt.Sprintf("failed to start JupyterLab: %s", rpctest.JupyterMessage)

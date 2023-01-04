@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/liveshare"
 )
@@ -59,7 +60,7 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 	localPort := listen.Addr().(*net.TCPAddr).Port
 
 	progress.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	invoker, err := CreateRPCInvoker(ctx, session, "")
+	invoker, err := rpc.CreateInvoker(ctx, session, "")
 	if err != nil {
 		return err
 	}
