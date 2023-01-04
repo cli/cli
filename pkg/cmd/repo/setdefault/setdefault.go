@@ -193,7 +193,13 @@ func setDefaultRun(opts *SetDefaultOptions) error {
 			var repoNames []string
 			current := ""
 			if currentDefaultRepo != nil {
-				current = ghrepo.FullName(currentDefaultRepo)
+				// this gnarly hack covers the case where a repository has had its name
+				// or owner changed since the remotes file was originally written. See #6808
+				if currentDefaultRepo.Remote != nil {
+					if currentDefaultRepo.Remote.Resolved != "base" {
+						current = currentDefaultRepo.Remote.Resolved
+					}
+				}
 			}
 
 			for _, knownRepo := range knownRepos {
