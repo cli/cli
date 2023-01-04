@@ -1,71 +1,61 @@
 package api
 
-type Item struct {
-	ID string
+import (
+	"fmt"
+	"net/http"
+	"strings"
+
+	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/ghrepo"
+)
+
+// UpdateProjectV2Items uses the addProjectV2ItemById and the deleteProjectV2Item mutations
+// to add and delete items from projects. The addProjectItems and deleteProjectItems arguments are
+// mappings between a project and an item. This function can be used across multiple projects
+// and items. Note that the deleteProjectV2Item mutation requires the item id from the project not
+// the global id.
+func UpdateProjectV2Items(client *Client, repo ghrepo.Interface, addProjectItems, deleteProjectItems map[string]string) error {
+	l := len(addProjectItems) + len(deleteProjectItems)
+	if l == 0 {
+		return nil
+	}
+	inputs := make([]string, l)
+	mutations := make([]string, l)
+	variables := make(map[string]interface{}, l)
+	var i int
+
+	for project, item := range addProjectItems {
+		inputs = append(inputs, fmt.Sprintf("$input_%03d: AddProjectV2ItemByIdInput!", i))
+		mutations = append(mutations, fmt.Sprintf("add_%03d: addProjectV2ItemById(input: $input_%03d) { item { id } }", i, i))
+		variables[fmt.Sprintf("input_%03d", i)] = map[string]interface{}{"contentId": item, "projectId": project}
+		i++
+	}
+
+	for project, item := range deleteProjectItems {
+		inputs = append(inputs, fmt.Sprintf("$input_%03d: DeleteProjectV2ItemInput!", i))
+		mutations = append(mutations, fmt.Sprintf("delete_%03d: deleteProjectV2Item(input: $input_%03d) { deletedItemId }", i, i))
+		variables[fmt.Sprintf("input_%03d", i)] = map[string]interface{}{"itemId": item, "projectId": project}
+		i++
+	}
+
+	query := fmt.Sprintf(`mutation UpdateProjectV2Items(%s) {%s}`, strings.Join(inputs, " "), strings.Join(mutations, " "))
+
+	return client.GraphQL(repo.RepoHost(), query, variables, nil)
 }
 
-// AddProjectV2ItemById adds an item (e.g. issue or pull request) to a project V2
-func AddProjectV2ItemById(client *Client, repo *Repository, params map[string]interface{}) (*Item, error) {
-	query := `
-	mutation AddProjectV2ItemById($input: AddProjectV2ItemByIdInput!) {
-		addProjectV2ItemById(input: $input) {
-			item {
-				id
-			}
-		}
-	}`
-
-	inputParams := map[string]interface{}{
-		"contentId": params["contentId"],
-		"projectId": params["projectId"],
-	}
-
-	variables := map[string]interface{}{
-		"input": inputParams,
-	}
-
-	result := struct {
-		AddItem struct {
-			Item Item
-		}
-	}{}
-
-	err := client.GraphQL(repo.RepoHost(), query, variables, &result)
+// If auth token has "projects" scope that means that the host supports
+// projectsV2 and also that the auth token has correct permissions to
+// manipute them.
+func HasProjectsV2Scope(client *http.Client, host string) bool {
+	apiEndpoint := ghinstance.RESTPrefix(host)
+	res, err := client.Head(apiEndpoint)
 	if err != nil {
-		return nil, err
+		return false
 	}
-
-	return &result.AddItem.Item, nil
-}
-
-// DeleteProjectV2Item removes an item (e.g. issue or pull request) from a project V2
-func DeleteProjectV2Item(client *Client, repo *Repository, params map[string]interface{}) (*Item, error) {
-	query := `
-	mutation DeleteProjectV2Item($input: DeleteProjectV2ItemInput!) {
-		deleteProjectV2Item(input: $input) {
-			deletedItemId
-		}
-	}`
-
-	inputParams := map[string]interface{}{
-		"itemId":    params["itemId"],
-		"projectId": params["projectId"],
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		return false
 	}
-
-	variables := map[string]interface{}{
-		"input": inputParams,
-	}
-
-	result := struct {
-		RemoveItem struct {
-			Item Item
-		}
-	}{}
-
-	err := client.GraphQL(repo.RepoHost(), query, variables, &result)
-	if err != nil {
-		return nil, err
-	}
-
-	return &result.RemoveItem.Item, nil
+	scopes := res.Header.Get("X-Oauth-Scopes")
+	return strings.Contains(scopes, "project")
 }

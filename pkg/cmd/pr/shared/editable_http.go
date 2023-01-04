@@ -9,7 +9,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func UpdateIssue(httpClient *http.Client, repo ghrepo.Interface, id string, projectV2Items []*api.ProjectV2Item, isPR bool, options Editable) error {
+func UpdateIssue(httpClient *http.Client, repo ghrepo.Interface, id string, isPR bool, options Editable) error {
 	var wg errgroup.Group
 
 	// Labels are updated through discrete mutations to avoid having to replace the entire list of labels
@@ -35,15 +35,32 @@ func UpdateIssue(httpClient *http.Client, repo ghrepo.Interface, id string, proj
 		}
 	}
 
-	if dirtyExcludingLabels(options) {
+	// updateIssue mutation does not support ProjectsV2 so do them in a seperate request.
+	if options.Projects.Edited {
 		wg.Go(func() error {
-			return replaceIssueFields(httpClient, repo, id, isPR, options)
+			apiClient := api.NewClientFromHTTP(httpClient)
+			addIds, removeIds, err := options.ProjectV2Ids()
+			if err != nil {
+				return err
+			}
+			if addIds == nil && removeIds == nil {
+				return nil
+			}
+			toAdd := make(map[string]string, len(*addIds))
+			toRemove := make(map[string]string, len(*removeIds))
+			for _, p := range *addIds {
+				toAdd[p] = id
+			}
+			for _, p := range *removeIds {
+				toRemove[p] = options.Projects.ProjectItems[p]
+			}
+			return api.UpdateProjectV2Items(apiClient, repo, toAdd, toRemove)
 		})
 	}
 
-	if options.Projects.Edited {
+	if dirtyExcludingLabels(options) {
 		wg.Go(func() error {
-			return linkIssueToProjectsV2(httpClient, repo, id, projectV2Items, options)
+			return replaceIssueFields(httpClient, repo, id, isPR, options)
 		})
 	}
 
@@ -91,45 +108,6 @@ func replaceIssueFields(httpClient *http.Client, repo ghrepo.Interface, id strin
 		MilestoneID: ghId(milestoneId),
 	}
 	return updateIssue(httpClient, repo, params)
-}
-
-func linkIssueToProjectsV2(httpClient *http.Client, baseRepo ghrepo.Interface, id string, projectV2Items []*api.ProjectV2Item, options Editable) error {
-	apiClient := api.NewClientFromHTTP(httpClient)
-	repo, err := api.GitHubRepo(apiClient, baseRepo)
-	if err != nil {
-		return err
-	}
-
-	projectsV2ToAdd, projectsV2ToRemove, err := options.ProjectV2Ids()
-	if err != nil {
-		return err
-	}
-
-	for _, p := range *projectsV2ToAdd {
-		params := map[string]interface{}{
-			"contentId": id,
-			"projectId": p,
-		}
-		_, err := api.AddProjectV2ItemById(apiClient, repo, params)
-		if err != nil {
-			return err
-		}
-	}
-
-	for _, itemId := range projectV2Items {
-		for _, projectId := range *projectsV2ToRemove {
-			params := map[string]interface{}{
-				"itemId":    itemId.ID,
-				"projectId": projectId,
-			}
-			_, err := api.DeleteProjectV2Item(apiClient, repo, params)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }
 
 func dirtyExcludingLabels(e Editable) bool {

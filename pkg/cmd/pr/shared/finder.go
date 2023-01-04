@@ -154,6 +154,12 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 		}
 	}
 
+	if fields.Contains("projectItems") {
+    if !api.HasProjectsV2Scope(httpClient, f.repo.RepoHost()) {
+      fields.Remove("projectItems")
+    }
+	}
+
 	var pr *api.PullRequest
 	if f.prNumber > 0 {
 		if numberFieldOnly {

@@ -248,6 +248,8 @@ func createRun(opts *CreateOptions) (err error) {
 				Repo:      baseRepo,
 				State:     &tb,
 			}
+			//TODO: Add projects scope to default scopes and add good error messaging when scope is missing
+			//TODO: handle GHES versions that do not support projectsV2
 			err = prShared.MetadataSurvey(opts.IO, baseRepo, fetcher, &tb)
 			if err != nil {
 				return
@@ -285,6 +287,7 @@ func createRun(opts *CreateOptions) (err error) {
 			params["issueTemplate"] = templateNameForSubmit
 		}
 
+		//TODO: Add projects scope to default scopes and add good error messaging when scope is missing
 		err = prShared.AddMetadataToIssueParams(apiClient, baseRepo, params, &tb)
 		if err != nil {
 			return
@@ -296,37 +299,12 @@ func createRun(opts *CreateOptions) (err error) {
 			return
 		}
 
-		projectV2Ids, ok := params["projectV2Ids"].([]string)
-		if ok {
-			err = addIssueToProjectsV2(apiClient, repo, newIssue, projectV2Ids)
-			if err != nil {
-				fmt.Fprintln(opts.IO.ErrOut, "Failed to add issue with ID", newIssue.ID, "to projectsV2:", err)
-				return
-			}
-		}
-
 		fmt.Fprintln(opts.IO.Out, newIssue.URL)
 	} else {
 		panic("Unreachable state")
 	}
 
 	return
-}
-
-func addIssueToProjectsV2(client *api.Client, repo *api.Repository, issue *api.Issue, projectV2Ids []string) error {
-	for _, projectId := range projectV2Ids {
-		addItemParams := map[string]interface{}{
-			"contentId": issue.ID,
-			"projectId": projectId,
-		}
-
-		_, err := api.AddProjectV2ItemById(client, repo, addItemParams)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func generatePreviewURL(apiClient *api.Client, baseRepo ghrepo.Interface, tb shared.IssueMetadataState) (string, error) {

@@ -160,9 +160,12 @@ func editRun(opts *EditOptions) error {
 	editable.Body.Default = issue.Body
 	editable.Assignees.Default = issue.Assignees.Logins()
 	editable.Labels.Default = issue.Labels.Names()
-	defaultProjectNames := issue.ProjectCards.ProjectNames()
-	defaultProjectNames = append(defaultProjectNames, issue.ProjectItems.ProjectTitles()...)
-	editable.Projects.Default = defaultProjectNames
+	editable.Projects.Default = append(issue.ProjectCards.ProjectNames(), issue.ProjectItems.ProjectTitles()...)
+	projectItems := map[string]string{}
+	for _, n := range issue.ProjectItems.Nodes {
+		projectItems[n.Project.ID] = n.ID
+	}
+	editable.Projects.ProjectItems = projectItems
 	if issue.Milestone != nil {
 		editable.Milestone.Default = issue.Milestone.Title
 	}
@@ -194,7 +197,7 @@ func editRun(opts *EditOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
-	err = prShared.UpdateIssue(httpClient, repo, issue.ID, issue.ProjectItems.Nodes, issue.IsPullRequest(), editable)
+	err = prShared.UpdateIssue(httpClient, repo, issue.ID, issue.IsPullRequest(), editable)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err

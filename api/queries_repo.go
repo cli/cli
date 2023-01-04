@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	ghAPI "github.com/cli/go-gh/pkg/api"
@@ -707,9 +709,9 @@ func (m *RepoMetadataResult) LabelsToIDs(names []string) ([]string, error) {
 	return ids, nil
 }
 
-// ProjectsToIDs returns a pair of arrays:
-// - the first element contains IDs of projects V1
-// - the second element contains IDs of projects V2
+// ProjectsToIDs returns two arrays:
+// - the first contains IDs of projects V1
+// - the second contains IDs of projects V2
 // - if neither project V1 or project V2 can be found with a given name, then an error is returned
 func (m *RepoMetadataResult) ProjectsToIDs(names []string) ([]string, []string, error) {
 	var ids []string
@@ -755,14 +757,28 @@ func (m *RepoMetadataResult) projectV2TitleToID(projectTitle string) (string, bo
 func ProjectsToPaths(projects []RepoProject, projectsV2 []RepoProjectV2, names []string) ([]string, error) {
 	var paths []string
 	for _, projectName := range names {
-		// do not include projectsV2 in query params as they are not supported
-		if isProjectV2(projectName, projectsV2) {
-			continue
-		}
-
 		found := false
 		for _, p := range projects {
 			if strings.EqualFold(projectName, p.Name) {
+				// format of ResourcePath: /OWNER/REPO/projects/PROJECT_NUMBER or /orgs/ORG/projects/PROJECT_NUMBER
+				// required format of path: OWNER/REPO/PROJECT_NUMBER or ORG/PROJECT_NUMBER
+				var path string
+				pathParts := strings.Split(p.ResourcePath, "/")
+				if pathParts[1] == "orgs" {
+					path = fmt.Sprintf("%s/%s", pathParts[2], pathParts[4])
+				} else {
+					path = fmt.Sprintf("%s/%s/%s", pathParts[1], pathParts[2], pathParts[4])
+				}
+				paths = append(paths, path)
+				found = true
+				break
+			}
+		}
+		if found {
+			continue
+		}
+		for _, p := range projectsV2 {
+			if strings.EqualFold(projectName, p.Title) {
 				// format of ResourcePath: /OWNER/REPO/projects/PROJECT_NUMBER or /orgs/ORG/projects/PROJECT_NUMBER
 				// required format of path: OWNER/REPO/PROJECT_NUMBER or ORG/PROJECT_NUMBER
 				var path string
@@ -782,16 +798,6 @@ func ProjectsToPaths(projects []RepoProject, projectsV2 []RepoProjectV2, names [
 		}
 	}
 	return paths, nil
-}
-
-func isProjectV2(projectName string, projectsV2 []RepoProjectV2) bool {
-	for _, p := range projectsV2 {
-		if strings.EqualFold(projectName, p.Title) {
-			return true
-		}
-	}
-
-	return false
 }
 
 func (m *RepoMetadataResult) MilestoneToID(title string) (string, error) {
@@ -888,12 +894,23 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 	if input.Projects {
 		count++
 		go func() {
-			projects, projectsV2, err := RepoAndOrgProjects(client, repo)
+			projects, err := RepoAndOrgProjects(client, repo)
 			if err != nil {
 				errc <- err
 				return
 			}
 			result.Projects = projects
+			errc <- nil
+		}()
+	}
+	if input.Projects {
+		count++
+		go func() {
+			projectsV2, err := RepoAndOrgProjectsV2(client, repo)
+			if err != nil {
+				errc <- err
+				return
+			}
 			result.ProjectsV2 = projectsV2
 			errc <- nil
 		}()
@@ -1037,7 +1054,7 @@ type RepoProjectV2 struct {
 	Closed       bool   `json:"closed"`
 }
 
-// RepoProjects fetches all open projects for a repository
+// RepoProjects fetches all open projects for a repository.
 func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) {
 	type responseData struct {
 		Repository struct {
@@ -1075,7 +1092,7 @@ func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) 
 	return projects, nil
 }
 
-// RepoProjectsV2 fetches all open projectsV2 for a repository
+// RepoProjectsV2 fetches all open projectsV2 for a repository.
 func RepoProjectsV2(client *Client, repo ghrepo.Interface) ([]RepoProjectV2, error) {
 	type responseData struct {
 		Repository struct {
@@ -1118,32 +1135,46 @@ func RepoProjectsV2(client *Client, repo ghrepo.Interface) ([]RepoProjectV2, err
 	return projectsV2, nil
 }
 
-// RepoAndOrgProjects fetches all open projects for a repository and its org
-func RepoAndOrgProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, []RepoProjectV2, error) {
+// RepoAndOrgProjects fetches all open projects for a repository and its organization.
+func RepoAndOrgProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) {
 	projects, err := RepoProjects(client, repo)
 	if err != nil {
-		return projects, nil, fmt.Errorf("error fetching projects: %w", err)
+		return nil, fmt.Errorf("error fetching projects: %w", err)
 	}
 
 	orgProjects, err := OrganizationProjects(client, repo)
-	// TODO: better detection of non-org repos
+	// TODO: Better detection of non-org repos.
 	if err != nil && !strings.Contains(err.Error(), "Could not resolve to an Organization") {
-		return projects, nil, fmt.Errorf("error fetching organization projects: %w", err)
+		return nil, fmt.Errorf("error fetching organization projects: %w", err)
 	}
+
 	projects = append(projects, orgProjects...)
 
+	return projects, nil
+}
+
+// RepoAndOrgProjectsV2 fetches all open projectsV2 for a repository and its organization.
+// Note: If the auth token does not have sufficient scopes or projectsV2 is not supported
+// on the host then those errors are swallowed and nil is returned.
+func RepoAndOrgProjectsV2(client *Client, repo ghrepo.Interface) ([]RepoProjectV2, error) {
 	projectsV2, err := RepoProjectsV2(client, repo)
 	if err != nil {
-		return projects, projectsV2, fmt.Errorf("error fetching projectsV2: %w", err)
+		if !strings.Contains(err.Error(), "Your token has not been granted the required scopes to execute this query") ||
+			!strings.Contains(err.Error(), "Field 'ProjectsV2' doesn't exist on type 'Repository'") {
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("error fetching projectsV2: %w", err)
 	}
 
 	orgProjectsV2, err := OrganizationProjectsV2(client, repo)
 	if err != nil && !strings.Contains(err.Error(), "Could not resolve to an Organization") {
-		return projects, projectsV2, fmt.Errorf("error fetching organization projectsV2: %w", err)
+		return nil, fmt.Errorf("error fetching organization projectsV2: %w", err)
 	}
+
 	projectsV2 = append(projectsV2, orgProjectsV2...)
 
-	return projects, projectsV2, nil
+	return projectsV2, nil
 }
 
 type RepoAssignee struct {
@@ -1298,11 +1329,26 @@ func RepoMilestones(client *Client, repo ghrepo.Interface, state string) ([]Repo
 }
 
 func ProjectNamesToPaths(client *Client, repo ghrepo.Interface, projectNames []string) ([]string, error) {
-	var paths []string
-	projects, projectsV2, err := RepoAndOrgProjects(client, repo)
-	if err != nil {
-		return paths, err
+	g, _ := errgroup.WithContext(context.Background())
+	var projects []RepoProject
+	var projectsV2 []RepoProjectV2
+
+	g.Go(func() error {
+		var err error
+		projects, err = RepoAndOrgProjects(client, repo)
+		return err
+	})
+
+	g.Go(func() error {
+		var err error
+		projectsV2, err = RepoAndOrgProjectsV2(client, repo)
+		return err
+	})
+
+	if err := g.Wait(); err != nil {
+		return nil, err
 	}
+
 	return ProjectsToPaths(projects, projectsV2, projectNames)
 }
 

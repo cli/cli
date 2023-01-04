@@ -379,6 +379,19 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		}
 	}
 
+	// projectsV2 are added in yet another mutation
+	projectV2Ids, ok := params["projectV2Ids"].([]string)
+	if ok {
+		projectItems := make(map[string]string, len(projectV2Ids))
+		for _, p := range projectV2Ids {
+			projectItems[p] = pr.ID
+		}
+		err = UpdateProjectV2Items(client, repo, projectItems, nil)
+		if err != nil {
+			return pr, err
+		}
+	}
+
 	return pr, nil
 }
 

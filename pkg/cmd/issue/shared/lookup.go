@@ -97,6 +97,11 @@ func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 			fieldSet.Remove("stateReason")
 		}
 	}
+	if fieldSet.Contains("projectItems") {
+		if !api.HasProjectsV2Scope(httpClient, repo.RepoHost()) {
+			fieldSet.Remove("projectItems")
+		}
+	}
 	fields = fieldSet.ToSlice()
 
 	type response struct {

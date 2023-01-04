@@ -166,9 +166,12 @@ func editRun(opts *EditOptions) error {
 	editable.Reviewers.Default = pr.ReviewRequests.Logins()
 	editable.Assignees.Default = pr.Assignees.Logins()
 	editable.Labels.Default = pr.Labels.Names()
-	defaultProjectNames := pr.ProjectCards.ProjectNames()
-	defaultProjectNames = append(defaultProjectNames, pr.ProjectItems.ProjectTitles()...)
-	editable.Projects.Default = defaultProjectNames
+	editable.Projects.Default = append(pr.ProjectCards.ProjectNames(), pr.ProjectItems.ProjectTitles()...)
+	projectItems := map[string]string{}
+	for _, n := range pr.ProjectItems.Nodes {
+		projectItems[n.Project.ID] = n.ID
+	}
+	editable.Projects.ProjectItems = projectItems
 	if pr.Milestone != nil {
 		editable.Milestone.Default = pr.Milestone.Title
 	}
@@ -205,7 +208,7 @@ func editRun(opts *EditOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
-	err = updatePullRequest(httpClient, repo, pr, editable)
+	err = updatePullRequest(httpClient, repo, pr.ID, editable)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -216,14 +219,14 @@ func editRun(opts *EditOptions) error {
 	return nil
 }
 
-func updatePullRequest(httpClient *http.Client, repo ghrepo.Interface, pr *api.PullRequest, editable shared.Editable) error {
+func updatePullRequest(httpClient *http.Client, repo ghrepo.Interface, id string, editable shared.Editable) error {
 	var wg errgroup.Group
 	wg.Go(func() error {
-		return shared.UpdateIssue(httpClient, repo, pr.ID, pr.ProjectItems.Nodes, true, editable)
+		return shared.UpdateIssue(httpClient, repo, id, true, editable)
 	})
 	if editable.Reviewers.Edited {
 		wg.Go(func() error {
-			return updatePullRequestReviews(httpClient, repo, pr.ID, editable)
+			return updatePullRequestReviews(httpClient, repo, id, editable)
 		})
 	}
 	return wg.Wait()

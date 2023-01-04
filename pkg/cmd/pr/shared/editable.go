@@ -18,7 +18,7 @@ type Editable struct {
 	Reviewers EditableSlice
 	Assignees EditableSlice
 	Labels    EditableSlice
-	Projects  EditableSlice
+	Projects  EditableProjects
 	Milestone EditableString
 	Metadata  api.RepoMetadataResult
 }
@@ -38,6 +38,13 @@ type EditableSlice struct {
 	Options []string
 	Edited  bool
 	Allowed bool
+}
+
+// ProjectsV2 mutations require a mapping of an item ID to a project ID.
+// Keep that map along with standard EditableSlice data.
+type EditableProjects struct {
+	EditableSlice
+	ProjectItems map[string]string
 }
 
 func (e Editable) Dirty() bool {
@@ -120,7 +127,7 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 	return &a, err
 }
 
-// ProjectIds returns a slice containing IDs of old projects (v1) that the issue or a PR has to be linked tos
+// ProjectIds returns a slice containing IDs of projects v1 that the issue or a PR has to be linked to.
 func (e Editable) ProjectIds() (*[]string, error) {
 	if !e.Projects.Edited {
 		return nil, nil
@@ -136,48 +143,47 @@ func (e Editable) ProjectIds() (*[]string, error) {
 	return &p, err
 }
 
-// ProjectV2Ids returns a pair of slices, where the first contains IDs of projectV2 the issue or a PR should be added to,
-// and the second contains IDs of projectV2 from which the issue or a PR should be removed
+// ProjectV2Ids returns a pair of slices.
+// The first is the projects the item should be added to.
+// The second is the projects the items should be removed from.
 func (e Editable) ProjectV2Ids() (*[]string, *[]string, error) {
 	if !e.Projects.Edited {
 		return nil, nil, nil
 	}
 
-	// we add projects which are present in current selection, but which the entity was not linked to
-	addedProjectsV2TitlesSet := set.NewStringSet()
-	addedProjectsV2TitlesSet.AddValues(e.Projects.Value)
-	addedProjectsV2TitlesSet.AddValues(e.Projects.Add)
-	addedProjectsV2TitlesSet.RemoveValues(e.Projects.Default)
-	addedProjectsV2TitlesSet.RemoveValues(e.Projects.Remove)
-	addedProjectsV2Titles := addedProjectsV2TitlesSet.ToSlice()
+	// titles of projects to add
+	addTitles := set.NewStringSet()
+	addTitles.AddValues(e.Projects.Value)
+	addTitles.AddValues(e.Projects.Add)
+	addTitles.RemoveValues(e.Projects.Default)
+	addTitles.RemoveValues(e.Projects.Remove)
 
-	// we remove projects which the entity was linked to, but which are not present in the current seleciton
-	removedProjecsV2TitlesSet := set.NewStringSet()
-	removedProjecsV2TitlesSet.AddValues(e.Projects.Default)
-	removedProjecsV2TitlesSet.AddValues(e.Projects.Remove)
-	removedProjecsV2TitlesSet.RemoveValues(e.Projects.Value)
-	removedProjecsV2TitlesSet.RemoveValues(e.Projects.Add)
-	removedProjecsV2Titles := removedProjecsV2TitlesSet.ToSlice()
+	// titles of projects to remove
+	removeTitles := set.NewStringSet()
+	removeTitles.AddValues(e.Projects.Default)
+	removeTitles.AddValues(e.Projects.Remove)
+	removeTitles.RemoveValues(e.Projects.Value)
+	removeTitles.RemoveValues(e.Projects.Add)
 
-	var addedProjectsV2Ids []string
-	var removedProjectsV2Ids []string
+	var addIds []string
+	var removeIds []string
 	var err error
 
-	if len(addedProjectsV2Titles) > 0 {
-		_, addedProjectsV2Ids, err = e.Metadata.ProjectsToIDs(addedProjectsV2Titles)
+	if addTitles.Len() > 0 {
+		_, addIds, err = e.Metadata.ProjectsToIDs(addTitles.ToSlice())
 		if err != nil {
-			return &addedProjectsV2Ids, &removedProjectsV2Ids, err
+			return nil, nil, err
 		}
 	}
 
-	if len(removedProjecsV2Titles) > 0 {
-		_, removedProjectsV2Ids, err = e.Metadata.ProjectsToIDs(removedProjecsV2Titles)
+	if removeTitles.Len() > 0 {
+		_, removeIds, err = e.Metadata.ProjectsToIDs(removeTitles.ToSlice())
 		if err != nil {
-			return &addedProjectsV2Ids, &removedProjectsV2Ids, err
+			return nil, nil, err
 		}
 	}
 
-	return &addedProjectsV2Ids, &removedProjectsV2Ids, nil
+	return &addIds, &removeIds, nil
 }
 
 func (e Editable) MilestoneId() (*string, error) {

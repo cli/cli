@@ -103,6 +103,7 @@ type ProjectInfo struct {
 type ProjectV2Item struct {
 	ID      string `json:"id"`
 	Project struct {
+		ID    string `json:"id"`
 		Title string `json:"title"`
 	}
 }
@@ -188,7 +189,8 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 		"repositoryId": repo.ID,
 	}
 	for key, val := range params {
-		if key != "projectV2Ids" {
+		switch key {
+		case "assigneeIds", "body", "issueTemplate", "labelIds", "milestoneId", "projectIds", "repositoryId", "title":
 			inputParams[key] = val
 		}
 	}
@@ -206,8 +208,23 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 	if err != nil {
 		return nil, err
 	}
+	issue := &result.CreateIssue.Issue
 
-	return &result.CreateIssue.Issue, nil
+	// projectV2 parameters aren't supported in the `createIssue` mutation,
+	// so add them after the issue has been created.
+	projectV2Ids, ok := params["projectV2Ids"].([]string)
+	if ok {
+		projectItems := make(map[string]string, len(projectV2Ids))
+		for _, p := range projectV2Ids {
+			projectItems[p] = issue.ID
+		}
+		err = UpdateProjectV2Items(client, repo, projectItems, nil)
+		if err != nil {
+			return issue, err
+		}
+	}
+
+	return issue, nil
 }
 
 type IssueStatusOptions struct {
