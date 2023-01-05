@@ -68,6 +68,7 @@ type createOptions struct {
 	devContainerPath  string
 	idleTimeout       time.Duration
 	retentionPeriod   NullableDuration
+	displayName       string
 }
 
 func newCreateCmd(app *App) *cobra.Command {
@@ -82,7 +83,11 @@ func newCreateCmd(app *App) *cobra.Command {
 		},
 	}
 
-	createCmd.Flags().StringVarP(&opts.repo, "repo", "r", "", "repository name with owner: user/repo")
+	createCmd.Flags().StringVarP(&opts.repo, "repo", "R", "", "repository name with owner: user/repo")
+	if err := addDeprecatedRepoShorthand(createCmd, &opts.repo); err != nil {
+		fmt.Fprintf(app.io.ErrOut, "%v\n", err)
+	}
+
 	createCmd.Flags().StringVarP(&opts.branch, "branch", "b", "", "repository branch")
 	createCmd.Flags().StringVarP(&opts.location, "location", "l", "", "location: {EastUs|SouthEastAsia|WestEurope|WestUs2} (determined automatically if not provided)")
 	createCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "hardware specifications for the VM")
@@ -91,6 +96,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 0, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
 	createCmd.Flags().Var(&opts.retentionPeriod, "retention-period", "allowed time after shutting down before the codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
 	createCmd.Flags().StringVar(&opts.devContainerPath, "devcontainer-path", "", "path to the devcontainer.json file to use when creating codespace")
+	createCmd.Flags().StringVarP(&opts.displayName, "display-name", "d", "", "display name for the codespace")
 
 	return createCmd
 }
@@ -250,6 +256,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		RetentionPeriodMinutes: opts.retentionPeriod.Minutes(),
 		DevContainerPath:       devContainerPath,
 		PermissionsOptOut:      opts.permissionsOptOut,
+		DisplayName:            opts.displayName,
 	}
 
 	a.StartProgressIndicatorWithLabel("Creating codespace")

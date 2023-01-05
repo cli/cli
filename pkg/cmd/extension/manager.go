@@ -516,7 +516,7 @@ func (m *Manager) Upgrade(name string, force bool) error {
 		if err != nil {
 			return err
 		}
-		return m.upgradeExtension(f, force)
+		return m.upgradeExtensions([]Extension{f}, force)
 	}
 	return fmt.Errorf("no extension matched %q", name)
 }

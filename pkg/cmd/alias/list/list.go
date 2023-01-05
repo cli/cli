@@ -1,14 +1,12 @@
 package list
 
 import (
-	"sort"
-
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 type ListOptions struct {
@@ -50,23 +48,11 @@ func listRun(opts *ListOptions) error {
 	aliasCfg := cfg.Aliases()
 
 	aliasMap := aliasCfg.All()
+
 	if len(aliasMap) == 0 {
 		return cmdutil.NewNoResultsError("no aliases configured")
 	}
 
-	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
-	tp := utils.NewTablePrinter(opts.IO)
-	keys := []string{}
-	for alias := range aliasMap {
-		keys = append(keys, alias)
-	}
-	sort.Strings(keys)
-
-	for _, alias := range keys {
-		tp.AddField(alias+":", nil, nil)
-		tp.AddField(aliasMap[alias], nil, nil)
-		tp.EndRow()
-	}
-
-	return tp.Render()
+	enc := yaml.NewEncoder(opts.IO.Out)
+	return enc.Encode(aliasMap)
 }

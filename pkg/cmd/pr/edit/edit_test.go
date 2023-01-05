@@ -534,13 +534,18 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry, skipReviewers bool) 
 		reg.Register(
 			httpmock.GraphQL(`query OrganizationTeamList\b`),
 			httpmock.StringResponse(`
-		{ "data": { "organization": { "teams": {
-			"nodes": [
-				{ "slug": "external", "id": "EXTERNALID" },
-				{ "slug": "core", "id": "COREID" }
-			],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
+      { "data": { "organization": { "teams": {
+        "nodes": [
+          { "slug": "external", "id": "EXTERNALID" },
+          { "slug": "core", "id": "COREID" }
+        ],
+        "pageInfo": { "hasNextPage": false }
+      } } } }
+		`))
+		reg.Register(
+			httpmock.GraphQL(`query UserCurrent\b`),
+			httpmock.StringResponse(`
+		  { "data": { "viewer": { "login": "monalisa" } } }
 		`))
 	}
 }

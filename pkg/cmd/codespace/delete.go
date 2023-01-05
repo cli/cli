@@ -66,7 +66,11 @@ func newDeleteCmd(app *App) *cobra.Command {
 
 	deleteCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "Name of the codespace")
 	deleteCmd.Flags().BoolVar(&opts.deleteAll, "all", false, "Delete all codespaces")
-	deleteCmd.Flags().StringVarP(&opts.repoFilter, "repo", "r", "", "Delete codespaces for a `repository`")
+	deleteCmd.Flags().StringVarP(&opts.repoFilter, "repo", "R", "", "Delete codespaces for a `repository`")
+	if err := addDeprecatedRepoShorthand(deleteCmd, &opts.repoFilter); err != nil {
+		fmt.Fprintf(app.io.ErrOut, "%v\n", err)
+	}
+
 	deleteCmd.Flags().BoolVarP(&opts.skipConfirm, "force", "f", false, "Skip confirmation for codespaces that contain unsaved changes")
 	deleteCmd.Flags().Uint16Var(&opts.keepDays, "days", 0, "Delete codespaces older than `N` days")
 	deleteCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "The `login` handle of the organization (admin-only)")

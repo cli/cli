@@ -323,7 +323,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY:      true,
-			wantStdout: "✓ Successfully upgraded extension hello\n",
+			wantStdout: "✓ Successfully upgraded extension\n",
 		},
 		{
 			name: "upgrade an extension dry run",
@@ -343,7 +343,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY:      true,
-			wantStdout: "✓ Would have upgraded extension hello\n",
+			wantStdout: "✓ Would have upgraded extension\n",
 		},
 		{
 			name: "upgrade an extension notty",
@@ -365,7 +365,9 @@ func TestNewCmdExtension(t *testing.T) {
 			args: []string{"upgrade", "hello"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
 				em.UpgradeFunc = func(name string, force bool) error {
-					return upToDateError
+					// An already up to date extension returns the same response
+					// as an one that has been upgraded.
+					return nil
 				}
 				return func(t *testing.T) {
 					calls := em.UpgradeCalls()
@@ -374,8 +376,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY:      true,
-			wantStdout: "✓ Extension already up to date\n",
-			wantStderr: "",
+			wantStdout: "✓ Successfully upgraded extension\n",
 		},
 		{
 			name: "upgrade extension error",
@@ -410,7 +411,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY:      true,
-			wantStdout: "✓ Successfully upgraded extension hello\n",
+			wantStdout: "✓ Successfully upgraded extension\n",
 		},
 		{
 			name: "upgrade an extension full name",
@@ -426,7 +427,7 @@ func TestNewCmdExtension(t *testing.T) {
 				}
 			},
 			isTTY:      true,
-			wantStdout: "✓ Successfully upgraded extension hello\n",
+			wantStdout: "✓ Successfully upgraded extension\n",
 		},
 		{
 			name: "upgrade all",

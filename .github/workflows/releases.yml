@@ -11,16 +11,16 @@ permissions:
 
 jobs:
   goreleaser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Set up Go 1.18
+      - name: Set up Go 1.19
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18
+          go-version: 1.19
       - name: Generate changelog
         id: changelog
         run: |
@@ -41,9 +41,9 @@ jobs:
         env:
           CERT_CONTENTS: ${{ secrets.WINDOWS_CERT_PFX }}
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v3
+        uses: goreleaser/goreleaser-action@v4
         with:
-          version: v1.12.3
+          version: "~1.13.1"
           args: release --release-notes=CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}

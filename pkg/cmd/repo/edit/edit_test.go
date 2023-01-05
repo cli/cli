@@ -128,6 +128,23 @@ func Test_editRun(t *testing.T) {
 					}))
 			},
 		},
+		{
+			name: "allow update branch",
+			opts: EditOptions{
+				Repository: ghrepo.NewWithHost("OWNER", "REPO", "github.com"),
+				Edits: EditRepositoryInput{
+					AllowUpdateBranch: bp(true),
+				},
+			},
+			httpStubs: func(t *testing.T, r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.RESTPayload(200, `{}`, func(payload map[string]interface{}) {
+						assert.Equal(t, 1, len(payload))
+						assert.Equal(t, true, payload["allow_update_branch"])
+					}))
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -338,4 +355,8 @@ func Test_editRun_interactive(t *testing.T) {
 
 func sp(v string) *string {
 	return &v
+}
+
+func bp(b bool) *bool {
+	return &b
 }

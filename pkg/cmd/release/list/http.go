@@ -19,7 +19,7 @@ type Release struct {
 	PublishedAt  time.Time
 }
 
-func fetchReleases(httpClient *http.Client, repo ghrepo.Interface, limit int, excludeDrafts bool) ([]Release, error) {
+func fetchReleases(httpClient *http.Client, repo ghrepo.Interface, limit int, excludeDrafts bool, excludePreReleases bool) ([]Release, error) {
 	type responseData struct {
 		Repository struct {
 			Releases struct {
@@ -57,6 +57,9 @@ loop:
 
 		for _, r := range query.Repository.Releases.Nodes {
 			if excludeDrafts && r.IsDraft {
+				continue
+			}
+			if excludePreReleases && r.IsPrerelease {
 				continue
 			}
 			releases = append(releases, r)

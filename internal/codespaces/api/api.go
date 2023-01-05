@@ -702,6 +702,7 @@ type CreateCodespaceParams struct {
 	VSCSTarget             string
 	VSCSTargetURL          string
 	PermissionsOptOut      bool
+	DisplayName            string
 }
 
 // CreateCodespace creates a codespace with the given parameters and returns a non-nil error if it
@@ -752,6 +753,7 @@ type startCreateRequest struct {
 	VSCSTarget             string `json:"vscs_target,omitempty"`
 	VSCSTargetURL          string `json:"vscs_target_url,omitempty"`
 	PermissionsOptOut      bool   `json:"multi_repo_permissions_opt_out"`
+	DisplayName            string `json:"display_name"`
 }
 
 var errProvisioningInProgress = errors.New("provisioning in progress")
@@ -785,6 +787,7 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 		VSCSTarget:             params.VSCSTarget,
 		VSCSTargetURL:          params.VSCSTargetURL,
 		PermissionsOptOut:      params.PermissionsOptOut,
+		DisplayName:            params.DisplayName,
 	})
 
 	if err != nil {

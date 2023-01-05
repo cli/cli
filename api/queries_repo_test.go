@@ -110,6 +110,11 @@ func Test_RepoMetadata(t *testing.T) {
 			"pageInfo": { "hasNextPage": false }
 		} } } }
 		`))
+	http.Register(
+		httpmock.GraphQL(`query UserCurrent\b`),
+		httpmock.StringResponse(`
+		  { "data": { "viewer": { "login": "monalisa" } } }
+		`))
 
 	result, err := RepoMetadata(client, repo, input)
 	if err != nil {
@@ -159,6 +164,11 @@ func Test_RepoMetadata(t *testing.T) {
 	}
 	if milestoneID != expectedMilestoneID {
 		t.Errorf("expected milestone %v, got %v", expectedMilestoneID, milestoneID)
+	}
+
+	expectedCurrentLogin := "monalisa"
+	if result.CurrentLogin != expectedCurrentLogin {
+		t.Errorf("expected current user %v, got %v", expectedCurrentLogin, result.CurrentLogin)
 	}
 }
 

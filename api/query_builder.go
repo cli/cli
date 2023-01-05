@@ -24,7 +24,7 @@ var issueComments = shortenQuery(`
 	comments(first: 100) {
 		nodes {
 			id,
-			author{login},
+			author{login,...on User{id,name}},
 			authorAssociation,
 			body,
 			createdAt,
@@ -43,7 +43,7 @@ var issueComments = shortenQuery(`
 var issueCommentLast = shortenQuery(`
 	comments(last: 1) {
 		nodes {
-			author{login},
+			author{login,...on User{id,name}},
 			authorAssociation,
 			body,
 			createdAt,
@@ -261,7 +261,7 @@ func IssueGraphQL(fields []string) string {
 	for _, field := range fields {
 		switch field {
 		case "author":
-			q = append(q, `author{login}`)
+			q = append(q, `author{login,...on User{id,name}}`)
 		case "mergedBy":
 			q = append(q, `mergedBy{login}`)
 		case "headRepositoryOwner":

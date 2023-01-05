@@ -14,6 +14,7 @@ const (
 )
 
 // This interface describes interacting with some persistent configuration for gh.
+//
 //go:generate moq -rm -out config_mock.go . Config
 type Config interface {
 	AuthToken(string) (string, string)

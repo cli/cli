@@ -14,11 +14,9 @@ import (
 
 func NewCmdAuth(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "auth <command>",
-		Short: "Authenticate gh and git with GitHub",
-		Annotations: map[string]string{
-			"IsCore": "true",
-		},
+		Use:     "auth <command>",
+		Short:   "Authenticate gh and git with GitHub",
+		GroupID: "core",
 	}
 
 	cmdutil.DisableAuthCheck(cmd)

@@ -57,6 +57,10 @@ var IssueFields = []string{
 	"url",
 }
 
+var PullRequestFields = append(IssueFields,
+	"isDraft",
+)
+
 type RepositoriesResult struct {
 	IncompleteResults bool         `json:"incomplete_results"`
 	Items             []Repository `json:"items"`
@@ -116,20 +120,30 @@ type User struct {
 	URL        string `json:"html_url"`
 }
 
+func (u *User) IsBot() bool {
+	// copied from api/queries_issue.go
+	// would ideally be shared, but it would require coordinating a "user"
+	// abstraction in a bunch of places.
+	return u.ID == ""
+}
+
 type Issue struct {
-	Assignees         []User      `json:"assignees"`
-	Author            User        `json:"user"`
-	AuthorAssociation string      `json:"author_association"`
-	Body              string      `json:"body"`
-	ClosedAt          time.Time   `json:"closed_at"`
-	CommentsCount     int         `json:"comments"`
-	CreatedAt         time.Time   `json:"created_at"`
-	ID                string      `json:"node_id"`
-	Labels            []Label     `json:"labels"`
-	IsLocked          bool        `json:"locked"`
-	Number            int         `json:"number"`
-	PullRequest       PullRequest `json:"pull_request"`
-	RepositoryURL     string      `json:"repository_url"`
+	Assignees         []User    `json:"assignees"`
+	Author            User      `json:"user"`
+	AuthorAssociation string    `json:"author_association"`
+	Body              string    `json:"body"`
+	ClosedAt          time.Time `json:"closed_at"`
+	CommentsCount     int       `json:"comments"`
+	CreatedAt         time.Time `json:"created_at"`
+	ID                string    `json:"node_id"`
+	Labels            []Label   `json:"labels"`
+	// This is a PullRequest field which does not appear in issue results,
+	// but lives outside the PullRequest object.
+	IsDraft       *bool       `json:"draft,omitempty"`
+	IsLocked      bool        `json:"locked"`
+	Number        int         `json:"number"`
+	PullRequest   PullRequest `json:"pull_request"`
+	RepositoryURL string      `json:"repository_url"`
 	// StateInternal should not be used directly. Use State() instead.
 	StateInternal string    `json:"state"`
 	StateReason   string    `json:"state_reason"`
@@ -200,18 +214,30 @@ func (issue Issue) ExportData(fields []string) map[string]interface{} {
 		case "assignees":
 			assignees := make([]interface{}, 0, len(issue.Assignees))
 			for _, assignee := range issue.Assignees {
+				isBot := assignee.IsBot()
+				login := assignee.Login
+				if isBot {
+					login = "app/" + login
+				}
 				assignees = append(assignees, map[string]interface{}{
-					"id":    assignee.ID,
-					"login": assignee.Login,
-					"type":  assignee.Type,
+					"id":     assignee.ID,
+					"login":  login,
+					"type":   assignee.Type,
+					"is_bot": isBot,
 				})
 			}
 			data[f] = assignees
 		case "author":
+			isBot := issue.Author.IsBot()
+			login := issue.Author.Login
+			if isBot {
+				login = "app/" + login
+			}
 			data[f] = map[string]interface{}{
-				"id":    issue.Author.ID,
-				"login": issue.Author.Login,
-				"type":  issue.Author.Type,
+				"id":     issue.Author.ID,
+				"login":  login,
+				"type":   issue.Author.Type,
+				"is_bot": isBot,
 			}
 		case "isPullRequest":
 			data[f] = issue.IsPullRequest()

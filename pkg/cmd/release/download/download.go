@@ -1,6 +1,7 @@
 package download
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -142,14 +143,16 @@ func downloadRun(opts *DownloadOptions) error {
 	opts.IO.StartProgressIndicator()
 	defer opts.IO.StopProgressIndicator()
 
+	ctx := context.Background()
+
 	var release *shared.Release
 	if opts.TagName == "" {
-		release, err = shared.FetchLatestRelease(httpClient, baseRepo)
+		release, err = shared.FetchLatestRelease(ctx, httpClient, baseRepo)
 		if err != nil {
 			return err
 		}
 	} else {
-		release, err = shared.FetchRelease(httpClient, baseRepo, opts.TagName)
+		release, err = shared.FetchRelease(ctx, httpClient, baseRepo, opts.TagName)
 		if err != nil {
 			return err
 		}
@@ -370,7 +373,7 @@ func (w destinationWriter) Copy(name string, r io.Reader) error {
 		}
 	}
 
-	f, err := os.OpenFile(fp, os.O_WRONLY|os.O_CREATE, 0644)
+	f, err := os.OpenFile(fp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}

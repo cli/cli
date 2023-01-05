@@ -66,7 +66,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 func listRun(opts *ListOptions) error {
 	repo, err := opts.BaseRepo()
 	if err != nil {
-		return fmt.Errorf("could not determine base repo: %w", err)
+		return err
 	}
 
 	httpClient, err := opts.HttpClient()

@@ -287,3 +287,19 @@ func (c codespace) hasUnsavedChanges() bool {
 func (c codespace) running() bool {
 	return c.State == api.CodespaceStateAvailable
 }
+
+// addDeprecatedRepoShorthand adds a -r parameter (deprecated shorthand for --repo)
+// which instructs the user to use -R instead.
+func addDeprecatedRepoShorthand(cmd *cobra.Command, target *string) error {
+	cmd.Flags().StringVarP(target, "repo-deprecated", "r", "", "(Deprecated) Shorthand for --repo")
+
+	if err := cmd.Flags().MarkHidden("repo-deprecated"); err != nil {
+		return fmt.Errorf("error marking `-r` shorthand as hidden: %w", err)
+	}
+
+	if err := cmd.Flags().MarkShorthandDeprecated("repo-deprecated", "use `-R` instead"); err != nil {
+		return fmt.Errorf("error marking `-r` shorthand as deprecated: %w", err)
+	}
+
+	return nil
+}

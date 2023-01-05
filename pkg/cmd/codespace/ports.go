@@ -131,7 +131,7 @@ type portInfo struct {
 }
 
 func (pi *portInfo) BrowseURL() string {
-	return fmt.Sprintf("https://%s-%d.githubpreview.dev", pi.codespace.Name, pi.Port.SourcePort)
+	return fmt.Sprintf("https://%s-%d.preview.app.github.dev", pi.codespace.Name, pi.Port.SourcePort)
 }
 
 func (pi *portInfo) Label() string {

@@ -122,7 +122,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 	}
 
 	// Output flags
-	cmdutil.AddJSONFlags(cmd, &opts.Exporter, search.IssueFields)
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, search.PullRequestFields)
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the search query in the web browser")
 
 	// Query parameter flags
