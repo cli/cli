@@ -133,14 +133,14 @@ func TestDelete(t *testing.T) {
 				{
 					Name: "hubot-robawt-abc",
 					GitStatus: api.CodespaceGitStatus{
-						HasUncommitedChanges: true,
+						HasUncommittedChanges: true,
 					},
 				},
 				{
 					Name: "monalisa-spoonknife-c4f3",
 					GitStatus: api.CodespaceGitStatus{
-						HasUnpushedChanges:   false,
-						HasUncommitedChanges: false,
+						HasUnpushedChanges:    false,
+						HasUncommittedChanges: false,
 					},
 				},
 			},

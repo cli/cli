@@ -277,7 +277,7 @@ func (c codespace) branchWithGitStatus() string {
 // hasUnsavedChanges returns whether the environment has
 // unsaved changes.
 func (c codespace) hasUnsavedChanges() bool {
-	return c.GitStatus.HasUncommitedChanges || c.GitStatus.HasUnpushedChanges
+	return c.GitStatus.HasUncommittedChanges || c.GitStatus.HasUnpushedChanges
 }
 
 // running returns whether the codespace environment is running.
