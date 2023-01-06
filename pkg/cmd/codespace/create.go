@@ -120,15 +120,13 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 
 	promptForRepoAndBranch := userInputs.Repository == ""
 	if promptForRepoAndBranch {
-		remotes, err := a.remotes()
-		if err != nil {
-			return err
-		}
-
-		defaultRemote, _ := remotes.ResolvedRemote()
 		var defaultRepo string
-		if defaultRemote != nil {
-			defaultRepo = ghrepo.FullName(defaultRemote)
+		remotes, _ := a.remotes()
+		if remotes != nil {
+			defaultRemote, _ := remotes.ResolvedRemote()
+			if defaultRemote != nil {
+				defaultRepo = ghrepo.FullName(defaultRemote)
+			}
 		}
 
 		repoQuestions := []*survey.Question{
