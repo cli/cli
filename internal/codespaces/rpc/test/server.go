@@ -6,7 +6,7 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/cli/cli/v2/internal/codespaces/grpc/jupyter"
+	"github.com/cli/cli/v2/internal/codespaces/rpc/jupyter"
 	"google.golang.org/grpc"
 )
 
