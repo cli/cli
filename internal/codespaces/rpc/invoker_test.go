@@ -35,7 +35,7 @@ func startServer(t *testing.T) {
 func createTestInvoker(t *testing.T) Invoker {
 	t.Helper()
 
-	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{}, "token") //connect(context.Background(), &rpctest.Session{}, "token")
+	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
 	if err != nil {
 		t.Fatalf("error connecting to internal server: %v", err)
 	}

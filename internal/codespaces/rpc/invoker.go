@@ -37,7 +37,6 @@ type Invoker interface {
 
 type invoker struct {
 	conn          *grpc.ClientConn
-	token         string
 	session       liveshare.LiveshareSession
 	listener      net.Listener
 	jupyterClient jupyter.JupyterServerHostClient
@@ -45,11 +44,11 @@ type invoker struct {
 }
 
 // Connects to the internal RPC server and returns a new invoker for it
-func CreateInvoker(ctx context.Context, session liveshare.LiveshareSession, token string) (Invoker, error) {
+func CreateInvoker(ctx context.Context, session liveshare.LiveshareSession) (Invoker, error) {
 	ctx, cancel := context.WithTimeout(ctx, ConnectionTimeout)
 	defer cancel()
 
-	invoker, err := connect(ctx, session, token)
+	invoker, err := connect(ctx, session)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to internal server: %w", err)
 	}
@@ -58,7 +57,7 @@ func CreateInvoker(ctx context.Context, session liveshare.LiveshareSession, toke
 }
 
 // Finds a free port to listen on and creates a new RPC invoker that connects to that port
-func connect(ctx context.Context, session liveshare.LiveshareSession, token string) (Invoker, error) {
+func connect(ctx context.Context, session liveshare.LiveshareSession) (Invoker, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", 0))
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen to local port over tcp: %w", err)
@@ -66,7 +65,6 @@ func connect(ctx context.Context, session liveshare.LiveshareSession, token stri
 	localAddress := fmt.Sprintf("127.0.0.1:%d", listener.Addr().(*net.TCPAddr).Port)
 
 	invoker := &invoker{
-		token:    token,
 		session:  session,
 		listener: listener,
 	}
@@ -136,7 +134,7 @@ func (i *invoker) Close() error {
 
 // Appends the authentication token to the gRPC context
 func (i *invoker) appendMetadata(ctx context.Context) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, "Authorization", "Bearer "+i.token)
+	return metadata.AppendToOutgoingContext(ctx, "Authorization", "Bearer token")
 }
 
 // Starts a remote JupyterLab server to allow the user to connect to the codespace via JupyterLab in their browser

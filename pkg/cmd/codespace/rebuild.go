@@ -52,7 +52,7 @@ func (a *App) Rebuild(ctx context.Context, codespaceName string, full bool) (err
 	}
 	defer safeClose(session, &err)
 
-	invoker, err := rpc.CreateInvoker(ctx, session, "")
+	invoker, err := rpc.CreateInvoker(ctx, session)
 	if err != nil {
 		return err
 	}

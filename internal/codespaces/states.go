@@ -60,7 +60,7 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 	localPort := listen.Addr().(*net.TCPAddr).Port
 
 	progress.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	invoker, err := rpc.CreateInvoker(ctx, session, "")
+	invoker, err := rpc.CreateInvoker(ctx, session)
 	if err != nil {
 		return err
 	}
