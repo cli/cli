@@ -45,7 +45,7 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	defer safeClose(session, &err)
 
 	a.StartProgressIndicatorWithLabel("Starting JupyterLab on codespace")
-	invoker, err := rpc.CreateInvoker(ctx, session, "")
+	invoker, err := rpc.CreateInvoker(ctx, session)
 	if err != nil {
 		return err
 	}

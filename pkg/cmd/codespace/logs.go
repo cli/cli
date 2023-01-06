@@ -57,7 +57,7 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 	localPort := listen.Addr().(*net.TCPAddr).Port
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	invoker, err := rpc.CreateInvoker(ctx, session, "")
+	invoker, err := rpc.CreateInvoker(ctx, session)
 	if err != nil {
 		return err
 	}

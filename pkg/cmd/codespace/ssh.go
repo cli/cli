@@ -174,7 +174,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	defer safeClose(session, &err)
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	invoker, err := rpc.CreateInvoker(ctx, session, "")
+	invoker, err := rpc.CreateInvoker(ctx, session)
 	if err != nil {
 		return err
 	}
@@ -515,7 +515,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 			} else {
 				defer safeClose(session, &err)
 
-				invoker, err := rpc.CreateInvoker(ctx, session, "")
+				invoker, err := rpc.CreateInvoker(ctx, session)
 				if err != nil {
 					result.err = fmt.Errorf("error connecting to codespace: %w", err)
 				} else {
