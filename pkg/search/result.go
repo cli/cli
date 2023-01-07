@@ -182,6 +182,20 @@ type User struct {
 	URL        string `json:"html_url"`
 }
 
+func (u *User) ExportData() map[string]interface{} {
+	isBot := u.IsBot()
+	login := u.Login
+	if isBot {
+		login = "app/" + login
+	}
+	return map[string]interface{}{
+		"id":     u.ID,
+		"login":  login,
+		"type":   u.Type,
+		"is_bot": isBot,
+	}
+}
+
 func (u *User) IsBot() bool {
 	// copied from api/queries_issue.go
 	// would ideally be shared, but it would require coordinating a "user"
@@ -244,17 +258,7 @@ func (commit Commit) ExportData(fields []string) map[string]interface{} {
 	for _, f := range fields {
 		switch f {
 		case "author":
-			isBot := commit.Author.IsBot()
-			login := commit.Author.Login
-			if isBot {
-				login = "app/" + login
-			}
-			data[f] = map[string]interface{}{
-				"id":     commit.Author.ID,
-				"login":  login,
-				"type":   commit.Author.Type,
-				"is_bot": isBot,
-			}
+			data[f] = commit.Author.ExportData()
 		case "commit":
 			info := commit.Info
 			data[f] = map[string]interface{}{
@@ -273,17 +277,7 @@ func (commit Commit) ExportData(fields []string) map[string]interface{} {
 				"tree":          map[string]interface{}{"sha": info.Tree.Sha},
 			}
 		case "committer":
-			isBot := commit.Committer.IsBot()
-			login := commit.Committer.Login
-			if isBot {
-				login = "app/" + login
-			}
-			data[f] = map[string]interface{}{
-				"id":     commit.Committer.ID,
-				"login":  login,
-				"type":   commit.Committer.Type,
-				"is_bot": isBot,
-			}
+			data[f] = commit.Committer.ExportData()
 		case "parents":
 			parents := make([]interface{}, 0, len(commit.Parents))
 			for _, parent := range commit.Parents {
@@ -302,13 +296,8 @@ func (commit Commit) ExportData(fields []string) map[string]interface{} {
 				"id":          repo.ID,
 				"isFork":      repo.IsFork,
 				"isPrivate":   repo.IsPrivate,
-				"owner": map[string]interface{}{
-					"id":    repo.Owner.ID,
-					"login": repo.Owner.Login,
-					"type":  repo.Owner.Type,
-					"url":   repo.Owner.URL,
-				},
-				"url": repo.URL,
+				"owner":       repo.Owner.ExportData(),
+				"url":         repo.URL,
 			}
 		default:
 			sf := fieldByName(v, f)
@@ -330,12 +319,7 @@ func (repo Repository) ExportData(fields []string) map[string]interface{} {
 				"url":  repo.License.URL,
 			}
 		case "owner":
-			data[f] = map[string]interface{}{
-				"id":    repo.Owner.ID,
-				"login": repo.Owner.Login,
-				"type":  repo.Owner.Type,
-				"url":   repo.Owner.URL,
-			}
+			data[f] = repo.Owner.ExportData()
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()
@@ -356,31 +340,11 @@ func (issue Issue) ExportData(fields []string) map[string]interface{} {
 		case "assignees":
 			assignees := make([]interface{}, 0, len(issue.Assignees))
 			for _, assignee := range issue.Assignees {
-				isBot := assignee.IsBot()
-				login := assignee.Login
-				if isBot {
-					login = "app/" + login
-				}
-				assignees = append(assignees, map[string]interface{}{
-					"id":     assignee.ID,
-					"login":  login,
-					"type":   assignee.Type,
-					"is_bot": isBot,
-				})
+				assignees = append(assignees, assignee.ExportData())
 			}
 			data[f] = assignees
 		case "author":
-			isBot := issue.Author.IsBot()
-			login := issue.Author.Login
-			if isBot {
-				login = "app/" + login
-			}
-			data[f] = map[string]interface{}{
-				"id":     issue.Author.ID,
-				"login":  login,
-				"type":   issue.Author.Type,
-				"is_bot": isBot,
-			}
+			data[f] = issue.Author.ExportData()
 		case "isPullRequest":
 			data[f] = issue.IsPullRequest()
 		case "labels":
