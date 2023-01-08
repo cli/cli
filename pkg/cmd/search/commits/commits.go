@@ -184,10 +184,3 @@ func displayResults(io *iostreams.IOStreams, now time.Time, results search.Commi
 	return tp.Render()
 
 }
-
-func visibilityLabel(repo search.CommitRepo) string {
-	if repo.IsPrivate {
-		return "private"
-	}
-	return "public"
-}
