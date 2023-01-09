@@ -81,3 +81,35 @@ func TestStartJupyterServerFailure(t *testing.T) {
 		t.Fatalf("expected %s, got %s", "", url)
 	}
 }
+
+// Test that the RPC invoker doesn't throw an error when requesting an incremental rebuild
+func TestRebuildContainerIncremental(t *testing.T) {
+	startServer(t)
+	invoker := createTestInvoker(t)
+	err := invoker.RebuildContainer(context.Background(), false)
+	if err != nil {
+		t.Fatalf("expected %v, got %v", nil, err)
+	}
+}
+
+// Test that the RPC invoker doesn't throw an error when requesting a full rebuild
+func TestRebuildContainerFull(t *testing.T) {
+	startServer(t)
+	invoker := createTestInvoker(t)
+	err := invoker.RebuildContainer(context.Background(), true)
+	if err != nil {
+		t.Fatalf("expected %v, got %v", nil, err)
+	}
+}
+
+// Test that the RPC invoker throws an error when the rebuild fails
+func TestRebuildContainerFailure(t *testing.T) {
+	startServer(t)
+	invoker := createTestInvoker(t)
+	rpctest.RebuildContainer = false
+	errorMessage := "couldn't rebuild codespace"
+	err := invoker.RebuildContainer(context.Background(), true)
+	if err.Error() != errorMessage {
+		t.Fatalf("expected %v, got %v", errorMessage, err)
+	}
+}
