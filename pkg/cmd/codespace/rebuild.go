@@ -60,7 +60,7 @@ func (a *App) Rebuild(ctx context.Context, codespaceName string, full bool) (err
 
 	err = invoker.RebuildContainer(ctx, full)
 	if err != nil {
-		return fmt.Errorf("rebuilding codespace via session: %w", err)
+		return err
 	}
 
 	fmt.Fprintf(a.io.Out, "%s is rebuilding\n", codespace.Name)

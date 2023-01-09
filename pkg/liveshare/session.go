@@ -28,7 +28,6 @@ type LiveshareSession interface {
 	StartSharing(context.Context, string, int) (ChannelID, error)
 	StartSSHServer(context.Context) (int, string, error)
 	StartSSHServerWithOptions(context.Context, StartSSHServerOptions) (int, string, error)
-	RebuildContainer(context.Context, bool) error
 }
 
 // A Session represents the session between a connected Live Share client and server.
@@ -107,25 +106,6 @@ func (s *Session) StartSSHServerWithOptions(ctx context.Context, options StartSS
 	}
 
 	return port, response.User, nil
-}
-
-func (s *Session) RebuildContainer(ctx context.Context, full bool) error {
-	rpcMethod := "IEnvironmentConfigurationService.incrementalRebuildContainer"
-	if full {
-		rpcMethod = "IEnvironmentConfigurationService.rebuildContainer"
-	}
-
-	var rebuildSuccess bool
-	err := s.rpc.do(ctx, rpcMethod, nil, &rebuildSuccess)
-	if err != nil {
-		return fmt.Errorf("invoking rebuild RPC: %w", err)
-	}
-
-	if !rebuildSuccess {
-		return fmt.Errorf("couldn't rebuild codespace")
-	}
-
-	return nil
 }
 
 // heartbeat runs until context cancellation, periodically checking whether there is a
