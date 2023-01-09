@@ -19,3 +19,23 @@ func CurrentUserID(client *Client, hostname string) (string, error) {
 	err := client.Query(hostname, "UserCurrent", &query, nil)
 	return query.Viewer.ID, err
 }
+
+func CurrentUserEmail(client *Client, hostname string) (string, error) {
+	var query struct {
+		Viewer struct {
+			Email string
+		}
+	}
+	err := client.Query(hostname, "UserCurrent", &query, nil)
+	return query.Viewer.Email, err
+}
+
+func CurrentProfileName(client *Client, hostname string) (string, error) {
+	var query struct {
+		Viewer struct {
+			Name string
+		}
+	}
+	err := client.Query(hostname, "UserCurrent", &query, nil)
+	return query.Viewer.Name, err
+}
