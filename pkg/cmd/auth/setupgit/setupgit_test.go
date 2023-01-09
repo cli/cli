@@ -17,6 +17,8 @@ func (gf *mockGitConfigurer) Setup(hostname, username, authToken string) error {
 	return gf.setupErr
 }
 
+// TODO: add test cases for new feature with httpmock
+
 func Test_setupGitRun(t *testing.T) {
 	tests := []struct {
 		name           string
