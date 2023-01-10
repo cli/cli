@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -91,6 +92,11 @@ func statusRun(opts *StatusOptions) error {
 		isHostnameFound = true
 
 		token, tokenSource := cfg.AuthToken(hostname)
+		if tokenSource == "oauth_token" {
+			// The go-gh function TokenForHost returns this value as source for tokens read from the
+			// config file, but we want the file path instead. This attempts to reconstruct it.
+			tokenSource = filepath.Join(config.ConfigDir(), "hosts.yml")
+		}
 		_, tokenIsWriteable := shared.AuthTokenWriteable(cfg, hostname)
 
 		statusInfo[hostname] = []string{}
@@ -100,8 +106,14 @@ func statusRun(opts *StatusOptions) error {
 
 		scopesHeader, err := shared.GetScopes(httpClient, hostname, token)
 		if err != nil {
-			addMsg("%s %s: api call failed: %s", cs.Red("X"), hostname, err)
-			addMsg("")
+			addMsg("%s %s: authentication failed", cs.Red("X"), hostname)
+			addMsg("- The %s token in %s is no longer valid.", cs.Bold(hostname), tokenSource)
+			if tokenIsWriteable {
+				addMsg("- To re-authenticate, run: %s %s",
+					cs.Bold("gh auth login -h"), cs.Bold(hostname))
+				addMsg("- To forget about this host, run: %s %s",
+					cs.Bold("gh auth logout -h"), cs.Bold(hostname))
+			}
 			failed = true
 			continue
 		}
@@ -111,18 +123,9 @@ func statusRun(opts *StatusOptions) error {
 			if errors.As(err, &missingScopes) {
 				addMsg("%s %s: the token in %s is %s", cs.Red("X"), hostname, tokenSource, err)
 				if tokenIsWriteable {
-					addMsg("- To request missing scopes, run: %s %s\n",
+					addMsg("- To request missing scopes, run: %s %s",
 						cs.Bold("gh auth refresh -h"),
 						cs.Bold(hostname))
-				}
-			} else {
-				addMsg("%s %s: authentication failed", cs.Red("X"), hostname)
-				addMsg("- The %s token in %s is no longer valid.", cs.Bold(hostname), tokenSource)
-				if tokenIsWriteable {
-					addMsg("- To re-authenticate, run: %s %s",
-						cs.Bold("gh auth login -h"), cs.Bold(hostname))
-					addMsg("- To forget about this host, run: %s %s",
-						cs.Bold("gh auth logout -h"), cs.Bold(hostname))
 				}
 			}
 			failed = true
@@ -140,26 +143,14 @@ func statusRun(opts *StatusOptions) error {
 				addMsg("%s Git operations for %s configured to use %s protocol.",
 					cs.SuccessIcon(), hostname, cs.Bold(proto))
 			}
-			tokenDisplay := "*******************"
-			if opts.ShowToken {
-				tokenDisplay = token
-			}
-			addMsg("%s Token: %s", cs.SuccessIcon(), tokenDisplay)
+			addMsg("%s Token: %s", cs.SuccessIcon(), displayToken(token, opts.ShowToken))
 
 			if scopesHeader != "" {
-				addMsg("%s Token Scopes: %s", cs.SuccessIcon(), scopesHeader)
-			} else if strings.HasPrefix(token, "ghs_") {
-				addMsg("%s Cannot determine scopes for server-to-server token.", cs.WarningIcon())
-			} else if strings.HasPrefix(token, "github_pat_") {
-				addMsg("%s Cannot determine scopes for fine-grained token.", cs.WarningIcon())
-			} else {
-				addMsg("%s Token Scopes: None found", cs.Red("X"))
+				addMsg("%s Token scopes: %s", cs.SuccessIcon(), scopesHeader)
+			} else if expectScopes(token) {
+				addMsg("%s Token scopes: none", cs.Red("X"))
 			}
 		}
-		addMsg("")
-
-		// NB we could take this opportunity to add or fix the "user" key in the hosts config. I chose
-		// not to since I wanted this command to be read-only.
 	}
 
 	if !isHostnameFound {
@@ -168,11 +159,16 @@ func statusRun(opts *StatusOptions) error {
 		return cmdutil.SilentError
 	}
 
+	prevEntry := false
 	for _, hostname := range hostnames {
 		lines, ok := statusInfo[hostname]
 		if !ok {
 			continue
 		}
+		if prevEntry {
+			fmt.Fprint(stderr, "\n")
+		}
+		prevEntry = true
 		fmt.Fprintf(stderr, "%s\n", cs.Bold(hostname))
 		for _, line := range lines {
 			fmt.Fprintf(stderr, "  %s\n", line)
@@ -184,4 +180,21 @@ func statusRun(opts *StatusOptions) error {
 	}
 
 	return nil
+}
+
+func displayToken(token string, printRaw bool) string {
+	if printRaw {
+		return token
+	}
+
+	if idx := strings.LastIndexByte(token, '_'); idx > -1 {
+		prefix := token[0 : idx+1]
+		return prefix + strings.Repeat("*", len(token)-len(prefix))
+	}
+
+	return strings.Repeat("*", len(token))
+}
+
+func expectScopes(token string) bool {
+	return strings.HasPrefix(token, "ghp_") || strings.HasPrefix(token, "gho_")
 }
