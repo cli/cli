@@ -714,6 +714,36 @@ func TestNewCmdExtension(t *testing.T) {
 			`),
 		},
 		{
+			name: "create extension tty with argument commit fails",
+			args: []string{"create", "test"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.CreateFunc = func(name string, tmplType extensions.ExtTemplateType) error {
+					return ErrInitialCommitFailed
+				}
+				return func(t *testing.T) {
+					calls := em.CreateCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "gh-test", calls[0].Name)
+				}
+			},
+			isTTY: true,
+			wantStdout: heredoc.Doc(`
+				✓ Created directory gh-test
+				✓ Initialized git repository
+				X Made initial commit
+				✓ Set up extension scaffolding
+
+				gh-test is ready for development!
+
+				Next Steps
+				- run 'cd gh-test; gh extension install .; gh test' to see your new extension in action
+				- run 'gh repo create' to share your extension with others
+
+				For more information on writing extensions:
+				https://docs.github.com/github-cli/github-cli/creating-github-cli-extensions
+			`),
+		},
+		{
 			name: "create extension notty",
 			args: []string{"create", "gh-test"},
 			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
