@@ -564,9 +564,18 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					} else {
 						fullName = "gh-" + extName
 					}
+
+					cs := io.ColorScheme()
+
+					commitIcon := cs.SuccessIcon()
 					if err := m.Create(fullName, tmplType); err != nil {
-						return err
+						if errors.Is(err, ErrInitialCommitFailed) {
+							commitIcon = cs.FailureIcon()
+						} else {
+							return err
+						}
 					}
+
 					if !io.IsStdoutTTY() {
 						return nil
 					}
@@ -577,7 +586,6 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						"- run 'cd %[1]s; gh extension install .; gh %[2]s' to see your new extension in action",
 						fullName, extName)
 
-					cs := io.ColorScheme()
 					if tmplType == extensions.GoBinTemplateType {
 						goBinChecks = heredoc.Docf(`
 						%[1]s Downloaded Go dependencies
@@ -596,7 +604,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					out := heredoc.Docf(`
 						%[1]s Created directory %[2]s
 						%[1]s Initialized git repository
-						%[1]s Made initial commit
+						%[7]s Made initial commit
 						%[1]s Set up extension scaffolding
 						%[6]s
 						%[2]s is ready for development!
@@ -607,7 +615,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 						For more information on writing extensions:
 						%[3]s
-					`, cs.SuccessIcon(), fullName, link, cs.Bold("Next Steps"), steps, goBinChecks)
+					`, cs.SuccessIcon(), fullName, link, cs.Bold("Next Steps"), steps, goBinChecks, commitIcon)
 					fmt.Fprint(io.Out, out)
 					return nil
 				},
