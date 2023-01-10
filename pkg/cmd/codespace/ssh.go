@@ -148,7 +148,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 
 	sshContext := ssh.Context{}
-	startSSHOptions := liveshare.StartSSHServerOptions{}
+	startSSHOptions := rpc.StartSSHServerOptions{}
 
 	keyPair, shouldAddArg, err := selectSSHKeys(ctx, sshContext, args, opts)
 	if err != nil {

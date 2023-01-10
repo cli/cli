@@ -7,11 +7,14 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces/rpc/codespace"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/jupyter"
+	"github.com/cli/cli/v2/internal/codespaces/rpc/ssh"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -28,12 +31,16 @@ const (
 	codespacesInternalSessionName = "CodespacesInternal"
 )
 
+type StartSSHServerOptions struct {
+	UserPublicKeyFile string
+}
+
 type Invoker interface {
 	Close() error
 	StartJupyterServer(ctx context.Context) (int, string, error)
 	RebuildContainer(ctx context.Context, full bool) error
 	StartSSHServer(ctx context.Context) (int, string, error)
-	StartSSHServerWithOptions(ctx context.Context, options liveshare.StartSSHServerOptions) (int, string, error)
+	StartSSHServerWithOptions(ctx context.Context, options StartSSHServerOptions) (int, string, error)
 }
 
 type invoker struct {
@@ -42,6 +49,7 @@ type invoker struct {
 	listener        net.Listener
 	jupyterClient   jupyter.JupyterServerHostClient
 	codespaceClient codespace.CodespaceHostClient
+	sshClient       ssh.SshServerHostClient
 	cancelPF        context.CancelFunc
 }
 
@@ -118,6 +126,7 @@ func connect(ctx context.Context, session liveshare.LiveshareSession) (Invoker, 
 	invoker.conn = conn
 	invoker.jupyterClient = jupyter.NewJupyterServerHostClient(conn)
 	invoker.codespaceClient = codespace.NewCodespaceHostClient(conn)
+	invoker.sshClient = ssh.NewSshServerHostClient(conn)
 
 	return invoker, nil
 }
@@ -185,10 +194,38 @@ func (i *invoker) RebuildContainer(ctx context.Context, full bool) error {
 
 // Starts a remote SSH server to allow the user to connect to the codespace via SSH
 func (i *invoker) StartSSHServer(ctx context.Context) (int, string, error) {
-	return i.session.StartSSHServer(ctx)
+	return i.StartSSHServerWithOptions(ctx, StartSSHServerOptions{})
 }
 
 // Starts a remote SSH server to allow the user to connect to the codespace via SSH
-func (i *invoker) StartSSHServerWithOptions(ctx context.Context, options liveshare.StartSSHServerOptions) (int, string, error) {
-	return i.session.StartSSHServerWithOptions(ctx, options)
+func (i *invoker) StartSSHServerWithOptions(ctx context.Context, options StartSSHServerOptions) (int, string, error) {
+	ctx = i.appendMetadata(ctx)
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+
+	userPublicKey := ""
+	if options.UserPublicKeyFile != "" {
+		publicKeyBytes, err := os.ReadFile(options.UserPublicKeyFile)
+		if err != nil {
+			return 0, "", fmt.Errorf("failed to read public key file: %w", err)
+		}
+
+		userPublicKey = strings.TrimSpace(string(publicKeyBytes))
+	}
+
+	response, err := i.sshClient.StartRemoteServerAsync(ctx, &ssh.StartRemoteServerRequest{UserPublicKey: userPublicKey})
+	if err != nil {
+		return 0, "", fmt.Errorf("failed to invoke SSH RPC: %w", err)
+	}
+
+	if !response.Result {
+		return 0, "", fmt.Errorf("failed to start SSH server: %s", response.Message)
+	}
+
+	port, err := strconv.Atoi(response.ServerPort)
+	if err != nil {
+		return 0, "", fmt.Errorf("failed to parse SSH server port: %w", err)
+	}
+
+	return port, response.User, nil
 }

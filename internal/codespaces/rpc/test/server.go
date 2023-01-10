@@ -8,6 +8,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/codespaces/rpc/codespace"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/jupyter"
+	"github.com/cli/cli/v2/internal/codespaces/rpc/ssh"
 	"google.golang.org/grpc"
 )
 
@@ -28,9 +29,18 @@ var (
 	RebuildContainer = true
 )
 
+// Mock responses for the `StartRemoteServerAsync` RPC method
+var (
+	SshServerPort = 1234
+	SshUser       = "test"
+	SshMessage    = ""
+	SshResult     = true
+)
+
 type server struct {
 	jupyter.UnimplementedJupyterServerHostServer
 	codespace.CodespaceHostServer
+	ssh.SshServerHostServer
 }
 
 func (s *server) GetRunningServer(ctx context.Context, in *jupyter.GetRunningServerRequest) (*jupyter.GetRunningServerResponse, error) {
@@ -48,6 +58,15 @@ func (s *server) RebuildContainerAsync(ctx context.Context, in *codespace.Rebuil
 	}, nil
 }
 
+func (s *server) StartRemoteServerAsync(ctx context.Context, in *ssh.StartRemoteServerRequest) (*ssh.StartRemoteServerResponse, error) {
+	return &ssh.StartRemoteServerResponse{
+		ServerPort: strconv.Itoa(SshServerPort),
+		User:       SshUser,
+		Message:    SshMessage,
+		Result:     SshResult,
+	}, nil
+}
+
 // Starts the mock gRPC server listening on port 50051
 func StartServer(ctx context.Context) error {
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", ServerPort))
@@ -59,6 +78,7 @@ func StartServer(ctx context.Context) error {
 	s := grpc.NewServer()
 	jupyter.RegisterJupyterServerHostServer(s, &server{})
 	codespace.RegisterCodespaceHostServer(s, &server{})
+	ssh.RegisterSshServerHostServer(s, &server{})
 
 	ch := make(chan error, 1)
 	go func() {
