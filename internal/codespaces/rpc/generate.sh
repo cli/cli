@@ -23,5 +23,6 @@ function generate {
 
 generate jupyter/jupyter_server_host_service.v1.proto
 generate codespace/codespace_host_service.v1.proto
+generate ssh/ssh_server_host_service.v1.proto
 
 echo 'Done!'

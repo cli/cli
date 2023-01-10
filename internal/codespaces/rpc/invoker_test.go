@@ -113,3 +113,38 @@ func TestRebuildContainerFailure(t *testing.T) {
 		t.Fatalf("expected %v, got %v", errorMessage, err)
 	}
 }
+
+// Test that the RPC invoker returns the correct port and user when the SSH server starts successfully
+func TestStartSSHServerSuccess(t *testing.T) {
+	startServer(t)
+	invoker := createTestInvoker(t)
+	port, user, err := invoker.StartSSHServer(context.Background())
+	if err != nil {
+		t.Fatalf("expected %v, got %v", nil, err)
+	}
+	if port != rpctest.SshServerPort {
+		t.Fatalf("expected %d, got %d", rpctest.SshServerPort, port)
+	}
+	if user != rpctest.SshUser {
+		t.Fatalf("expected %s, got %s", rpctest.SshUser, user)
+	}
+}
+
+// Test that the RPC invoker returns an error when the SSH server fails to start
+func TestStartSSHServerFailure(t *testing.T) {
+	startServer(t)
+	invoker := createTestInvoker(t)
+	rpctest.SshMessage = "error message"
+	rpctest.SshResult = false
+	errorMessage := fmt.Sprintf("failed to start SSH server: %s", rpctest.SshMessage)
+	port, user, err := invoker.StartSSHServer(context.Background())
+	if err.Error() != errorMessage {
+		t.Fatalf("expected %v, got %v", errorMessage, err)
+	}
+	if port != 0 {
+		t.Fatalf("expected %d, got %d", 0, port)
+	}
+	if user != "" {
+		t.Fatalf("expected %s, got %s", "", user)
+	}
+}
