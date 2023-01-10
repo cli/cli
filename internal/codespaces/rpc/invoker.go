@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cli/cli/v2/internal/codespaces/rpc/codespace"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/jupyter"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"google.golang.org/grpc"
@@ -36,11 +37,12 @@ type Invoker interface {
 }
 
 type invoker struct {
-	conn          *grpc.ClientConn
-	session       liveshare.LiveshareSession
-	listener      net.Listener
-	jupyterClient jupyter.JupyterServerHostClient
-	cancelPF      context.CancelFunc
+	conn            *grpc.ClientConn
+	session         liveshare.LiveshareSession
+	listener        net.Listener
+	jupyterClient   jupyter.JupyterServerHostClient
+	codespaceClient codespace.CodespaceHostClient
+	cancelPF        context.CancelFunc
 }
 
 // Connects to the internal RPC server and returns a new invoker for it
@@ -115,6 +117,7 @@ func connect(ctx context.Context, session liveshare.LiveshareSession) (Invoker, 
 
 	invoker.conn = conn
 	invoker.jupyterClient = jupyter.NewJupyterServerHostClient(conn)
+	invoker.codespaceClient = codespace.NewCodespaceHostClient(conn)
 
 	return invoker, nil
 }
@@ -162,7 +165,22 @@ func (i *invoker) StartJupyterServer(ctx context.Context) (port int, serverUrl s
 
 // Rebuilds the container using cached layers by default or from scratch if full is true
 func (i *invoker) RebuildContainer(ctx context.Context, full bool) error {
-	return i.session.RebuildContainer(ctx, full)
+	ctx = i.appendMetadata(ctx)
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+
+	// If full is true, we want to pass false to the RPC call to indicate that we want to do a full rebuild
+	incremental := !full
+	response, err := i.codespaceClient.RebuildContainerAsync(ctx, &codespace.RebuildContainerRequest{Incremental: &incremental})
+	if err != nil {
+		return fmt.Errorf("failed to invoke rebuild RPC: %w", err)
+	}
+
+	if !response.RebuildContainer {
+		return fmt.Errorf("couldn't rebuild codespace")
+	}
+
+	return nil
 }
 
 // Starts a remote SSH server to allow the user to connect to the codespace via SSH

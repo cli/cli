@@ -6,6 +6,7 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/cli/cli/v2/internal/codespaces/rpc/codespace"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/jupyter"
 	"google.golang.org/grpc"
 )
@@ -14,6 +15,7 @@ const (
 	ServerPort = 50051
 )
 
+// Mock responses for the `GetRunningServer` RPC method
 var (
 	JupyterPort      = 1234
 	JupyterServerUrl = "http://localhost:1234?token=1234"
@@ -21,8 +23,14 @@ var (
 	JupyterResult    = true
 )
 
+// Mock responses for the `RebuildContainerAsync` RPC method
+var (
+	RebuildContainer = true
+)
+
 type server struct {
 	jupyter.UnimplementedJupyterServerHostServer
+	codespace.CodespaceHostServer
 }
 
 func (s *server) GetRunningServer(ctx context.Context, in *jupyter.GetRunningServerRequest) (*jupyter.GetRunningServerResponse, error) {
@@ -31,6 +39,12 @@ func (s *server) GetRunningServer(ctx context.Context, in *jupyter.GetRunningSer
 		ServerUrl: JupyterServerUrl,
 		Message:   JupyterMessage,
 		Result:    JupyterResult,
+	}, nil
+}
+
+func (s *server) RebuildContainerAsync(ctx context.Context, in *codespace.RebuildContainerRequest) (*codespace.RebuildContainerResponse, error) {
+	return &codespace.RebuildContainerResponse{
+		RebuildContainer: RebuildContainer,
 	}, nil
 }
 
@@ -44,6 +58,7 @@ func StartServer(ctx context.Context) error {
 
 	s := grpc.NewServer()
 	jupyter.RegisterJupyterServerHostServer(s, &server{})
+	codespace.RegisterCodespaceHostServer(s, &server{})
 
 	ch := make(chan error, 1)
 	go func() {
