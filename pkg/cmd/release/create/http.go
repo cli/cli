@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -127,6 +128,31 @@ func generateReleaseNotes(httpClient *http.Client, repo ghrepo.Interface, tagNam
 	return &rn, err
 }
 
+func publishedReleaseExists(httpClient *http.Client, repo ghrepo.Interface, tagName string) (bool, error) {
+	path := fmt.Sprintf("repos/%s/%s/releases/tags/%s", repo.RepoOwner(), repo.RepoName(), url.PathEscape(tagName))
+	url := ghinstance.RESTPrefix(repo.RepoHost()) + path
+	req, err := http.NewRequest("HEAD", url, nil)
+	if err != nil {
+		return false, err
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return false, err
+	}
+	if resp.Body != nil {
+		defer resp.Body.Close()
+	}
+
+	if resp.StatusCode == 200 {
+		return true, nil
+	} else if resp.StatusCode == 404 {
+		return false, nil
+	} else {
+		return false, api.HandleHTTPError(resp)
+	}
+}
+
 func createRelease(httpClient *http.Client, repo ghrepo.Interface, params map[string]interface{}) (*shared.Release, error) {
 	bodyBytes, err := json.Marshal(params)
 	if err != nil {
@@ -198,4 +224,29 @@ func publishRelease(httpClient *http.Client, releaseURL string, discussionCatego
 	var release shared.Release
 	err = json.Unmarshal(b, &release)
 	return &release, err
+}
+
+func deleteRelease(httpClient *http.Client, release *shared.Release) error {
+	req, err := http.NewRequest("DELETE", release.APIURL, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	if resp.Body != nil {
+		defer resp.Body.Close()
+	}
+
+	success := resp.StatusCode >= 200 && resp.StatusCode < 300
+	if !success {
+		return api.HandleHTTPError(resp)
+	}
+
+	if resp.StatusCode != 204 {
+		_, _ = io.Copy(io.Discard, resp.Body)
+	}
+	return nil
 }

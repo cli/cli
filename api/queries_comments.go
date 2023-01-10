@@ -27,7 +27,7 @@ func (cs Comments) CurrentUserComments() []Comment {
 
 type Comment struct {
 	ID                  string         `json:"id"`
-	Author              Author         `json:"author"`
+	Author              CommentAuthor  `json:"author"`
 	AuthorAssociation   string         `json:"authorAssociation"`
 	Body                string         `json:"body"`
 	CreatedAt           time.Time      `json:"createdAt"`

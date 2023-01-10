@@ -153,7 +153,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.Log, "log", false, "View full log for either a run or specific job")
 	cmd.Flags().BoolVar(&opts.LogFailed, "log-failed", false, "View the log for any failed steps in a run or specific job")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open run in the browser")
-	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.RunFields)
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.SingleRunFields)
 
 	return cmd
 }
@@ -212,18 +212,19 @@ func runView(opts *ViewOptions) error {
 		return fmt.Errorf("failed to get run: %w", err)
 	}
 
-	if opts.Prompt {
+	if shouldFetchJobs(opts) {
 		opts.IO.StartProgressIndicator()
-		jobs, err = shared.GetJobs(client, repo, *run)
+		jobs, err = shared.GetJobs(client, repo, run)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
 		}
-		if len(jobs) > 1 {
-			selectedJob, err = promptForJob(cs, jobs)
-			if err != nil {
-				return err
-			}
+	}
+
+	if opts.Prompt && len(jobs) > 1 {
+		selectedJob, err = promptForJob(cs, jobs)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -251,7 +252,7 @@ func runView(opts *ViewOptions) error {
 
 	if selectedJob == nil && len(jobs) == 0 {
 		opts.IO.StartProgressIndicator()
-		jobs, err = shared.GetJobs(client, repo, *run)
+		jobs, err = shared.GetJobs(client, repo, run)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get jobs: %w", err)
@@ -388,6 +389,20 @@ func runView(opts *ViewOptions) error {
 	}
 
 	return nil
+}
+
+func shouldFetchJobs(opts *ViewOptions) bool {
+	if opts.Prompt {
+		return true
+	}
+	if opts.Exporter != nil {
+		for _, f := range opts.Exporter.Fields() {
+			if f == "jobs" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func getLog(httpClient *http.Client, logURL string) (io.ReadCloser, error) {

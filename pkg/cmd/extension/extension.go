@@ -49,8 +49,7 @@ func (e *Extension) IsPinned() bool {
 }
 
 func (e *Extension) UpdateAvailable() bool {
-	if e.isPinned ||
-		e.isLocal ||
+	if e.isLocal ||
 		e.currentVersion == "" ||
 		e.latestVersion == "" ||
 		e.currentVersion == e.latestVersion {

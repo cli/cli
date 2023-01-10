@@ -34,7 +34,8 @@ builds:
     goarch: [386, amd64, arm64]
     hooks:
       post:
-        - ./script/sign-windows-executable.sh '{{ .Path }}'
+        - cmd: ./script/sign-windows-executable.sh '{{ .Path }}'
+          output: false
 
 archives:
   - id: nix
@@ -60,7 +61,7 @@ nfpms:
   - license: MIT
     maintainer: GitHub
     homepage: https://github.com/cli/cli
-    bindir: /usr/bin
+    bindir: /usr
     dependencies:
       - git
     description: GitHub’s official command line tool.

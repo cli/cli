@@ -19,6 +19,18 @@ type ChannelID struct {
 	name, condition string
 }
 
+// Interface to allow the mocking of the liveshare session
+type LiveshareSession interface {
+	Close() error
+	GetSharedServers(context.Context) ([]*Port, error)
+	KeepAlive(string)
+	OpenStreamingChannel(context.Context, ChannelID) (ssh.Channel, error)
+	StartSharing(context.Context, string, int) (ChannelID, error)
+	StartSSHServer(context.Context) (int, string, error)
+	StartSSHServerWithOptions(context.Context, StartSSHServerOptions) (int, string, error)
+	RebuildContainer(context.Context, bool) error
+}
+
 // A Session represents the session between a connected Live Share client and server.
 type Session struct {
 	ssh *sshSession
@@ -97,35 +109,14 @@ func (s *Session) StartSSHServerWithOptions(ctx context.Context, options StartSS
 	return port, response.User, nil
 }
 
-// StartJupyterServer starts a Juypyter server in the container and returns
-// the port on which it listens and the server URL.
-func (s *Session) StartJupyterServer(ctx context.Context) (int, string, error) {
-	var response struct {
-		Result    bool   `json:"result"`
-		Message   string `json:"message"`
-		Port      string `json:"port"`
-		ServerUrl string `json:"serverUrl"`
+func (s *Session) RebuildContainer(ctx context.Context, full bool) error {
+	rpcMethod := "IEnvironmentConfigurationService.incrementalRebuildContainer"
+	if full {
+		rpcMethod = "IEnvironmentConfigurationService.rebuildContainer"
 	}
 
-	if err := s.rpc.do(ctx, "IJupyterServerHostService.getRunningServer", []string{}, &response); err != nil {
-		return 0, "", fmt.Errorf("failed to invoke JupyterLab RPC: %w", err)
-	}
-
-	if !response.Result {
-		return 0, "", fmt.Errorf("failed to start JupyterLab: %s", response.Message)
-	}
-
-	port, err := strconv.Atoi(response.Port)
-	if err != nil {
-		return 0, "", fmt.Errorf("failed to parse JupyterLab port: %w", err)
-	}
-
-	return port, response.ServerUrl, nil
-}
-
-func (s *Session) RebuildContainer(ctx context.Context) error {
 	var rebuildSuccess bool
-	err := s.rpc.do(ctx, "IEnvironmentConfigurationService.rebuildContainer", nil, &rebuildSuccess)
+	err := s.rpc.do(ctx, rpcMethod, nil, &rebuildSuccess)
 	if err != nil {
 		return fmt.Errorf("invoking rebuild RPC: %w", err)
 	}

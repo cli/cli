@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
@@ -18,10 +17,15 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/pkg/surveyext"
 	"github.com/spf13/cobra"
 )
+
+type iprompter interface {
+	Select(string, string, []string) (int, error)
+	Input(string, string) (string, error)
+	Confirm(string, bool) (bool, error)
+}
 
 type CreateOptions struct {
 	IO         *iostreams.IOStreams
@@ -30,6 +34,7 @@ type CreateOptions struct {
 	GitClient  *git.Client
 	BaseRepo   func() (ghrepo.Interface, error)
 	Edit       func(string, string, string, io.Reader, io.Writer, io.Writer) (string, error)
+	Prompter   iprompter
 
 	TagName      string
 	Target       string
@@ -38,6 +43,7 @@ type CreateOptions struct {
 	BodyProvided bool
 	Draft        bool
 	Prerelease   bool
+	IsLatest     *bool
 
 	Assets []*shared.AssetForUpload
 
@@ -52,6 +58,7 @@ type CreateOptions struct {
 	DiscussionCategory string
 	GenerateNotes      bool
 	NotesStartTag      string
+	VerifyTag          bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -60,6 +67,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		HttpClient: f.HttpClient,
 		GitClient:  f.GitClient,
 		Config:     f.Config,
+		Prompter:   f.Prompter,
 		Edit:       surveyext.Edit,
 	}
 
@@ -77,7 +85,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			display label for an asset, append text starting with %[1]s#%[1]s after the file name.
 
 			If a matching git tag does not yet exist, one will automatically get created
-			from the latest state of the default branch. Use %[1]s--target%[1]s to override this.
+			from the latest state of the default branch.
+			Use %[1]s--target%[1]s to point to a different branch or commit for the automatic tag creation.
+			Use %[1]s--verify-tag%[1]s to abort the release if the tag doesn't already exist.
 			To fetch the new tag locally after the release, do %[1]sgit fetch --tags origin%[1]s.
 
 			To create a release from an annotated git tag, first create one locally with
@@ -164,6 +174,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.DiscussionCategory, "discussion-category", "", "", "Start a discussion in the specified category")
 	cmd.Flags().BoolVarP(&opts.GenerateNotes, "generate-notes", "", false, "Automatically generate title and notes for the release")
 	cmd.Flags().StringVar(&opts.NotesStartTag, "notes-start-tag", "", "Tag to use as the starting point for generating release notes")
+	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Mark this release as \"Latest\" (default: automatic based on date and version)")
+	cmd.Flags().BoolVarP(&opts.VerifyTag, "verify-tag", "", false, "Abort in case the git tag doesn't already exist in the remote repository")
 
 	return cmd
 }
@@ -193,17 +205,11 @@ func createRun(opts *CreateOptions) error {
 			}
 			createNewTagOption := "Create a new tag"
 			options = append(options, createNewTagOption)
-			var tag string
-			q := &survey.Select{
-				Message: "Choose a tag",
-				Options: options,
-				Default: options[0],
-			}
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err := prompt.SurveyAskOne(q, &tag)
+			selected, err := opts.Prompter.Select("Choose a tag", options[0], options)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
+			tag := options[selected]
 			if tag != createNewTagOption {
 				existingTag = true
 				opts.TagName = tag
@@ -211,14 +217,21 @@ func createRun(opts *CreateOptions) error {
 		}
 
 		if opts.TagName == "" {
-			q := &survey.Input{
-				Message: "Tag name",
-			}
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err := prompt.SurveyAskOne(q, &opts.TagName)
+			opts.TagName, err = opts.Prompter.Input("Tag name", "")
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
+		}
+	}
+
+	if opts.VerifyTag && !existingTag {
+		remoteTagPresent, err := remoteTagExists(httpClient, baseRepo, opts.TagName)
+		if err != nil {
+			return err
+		}
+		if !remoteTagPresent {
+			return fmt.Errorf("tag %s doesn't exist in the repo %s, aborting due to --verify-tag flag",
+				opts.TagName, ghrepo.FullName(baseRepo))
 		}
 	}
 
@@ -233,7 +246,7 @@ func createRun(opts *CreateOptions) error {
 		// of local tag status.
 		// If a remote tag with the same name as specified exists already
 		// then a new tag will not be created so ignore local tag status.
-		if tagDescription != "" && !existingTag && opts.Target == "" {
+		if tagDescription != "" && !existingTag && opts.Target == "" && !opts.VerifyTag {
 			remoteExists, err := remoteTagExists(httpClient, baseRepo, opts.TagName)
 			if err != nil {
 				return err
@@ -296,27 +309,17 @@ func createRun(opts *CreateOptions) error {
 		if defaultName == "" && generatedNotes != nil {
 			defaultName = generatedNotes.Name
 		}
-		qs := []*survey.Question{
-			{
-				Name: "name",
-				Prompt: &survey.Input{
-					Message: "Title (optional)",
-					Default: defaultName,
-				},
-			},
-			{
-				Name: "releaseNotesAction",
-				Prompt: &survey.Select{
-					Message: "Release notes",
-					Options: editorOptions,
-				},
-			},
-		}
-		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
-		err = prompt.SurveyAsk(qs, opts)
+
+		opts.Name, err = opts.Prompter.Input("Title (optional)", defaultName)
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
+
+		selected, err := opts.Prompter.Select("Release notes", "", editorOptions)
+		if err != nil {
+			return fmt.Errorf("could not prompt: %w", err)
+		}
+		opts.ReleaseNotesAction = editorOptions[selected]
 
 		var openEditor bool
 		var editorContents string
@@ -355,33 +358,18 @@ func createRun(opts *CreateOptions) error {
 			defaultSubmit = saveAsDraft
 		}
 
-		qs = []*survey.Question{
-			{
-				Name: "prerelease",
-				Prompt: &survey.Confirm{
-					Message: "Is this a prerelease?",
-					Default: opts.Prerelease,
-				},
-			},
-			{
-				Name: "submitAction",
-				Prompt: &survey.Select{
-					Message: "Submit?",
-					Options: []string{
-						publishRelease,
-						saveAsDraft,
-						"Cancel",
-					},
-					Default: defaultSubmit,
-				},
-			},
+		opts.Prerelease, err = opts.Prompter.Confirm("Is this a prerelease?", opts.Prerelease)
+		if err != nil {
+			return err
 		}
 
-		//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
-		err = prompt.SurveyAsk(qs, opts)
+		options := []string{publishRelease, saveAsDraft, "Cancel"}
+		selected, err = opts.Prompter.Select("Submit?", defaultSubmit, options)
 		if err != nil {
 			return fmt.Errorf("could not prompt: %w", err)
 		}
+
+		opts.SubmitAction = options[selected]
 
 		switch opts.SubmitAction {
 		case "Publish release":
@@ -409,6 +397,10 @@ func createRun(opts *CreateOptions) error {
 	if opts.Target != "" {
 		params["target_commitish"] = opts.Target
 	}
+	if opts.IsLatest != nil {
+		// valid values: true/false/legacy
+		params["make_latest"] = fmt.Sprintf("%v", *opts.IsLatest)
+	}
 	if opts.DiscussionCategory != "" {
 		params["discussion_category_name"] = opts.DiscussionCategory
 	}
@@ -434,14 +426,34 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	hasAssets := len(opts.Assets) > 0
+	draftWhileUploading := false
 
-	// Avoid publishing the release until all assets have finished uploading
-	if hasAssets {
+	if hasAssets && !opts.Draft {
+		// Check for an existing release
+		if opts.TagName != "" {
+			if ok, err := publishedReleaseExists(httpClient, baseRepo, opts.TagName); err != nil {
+				return fmt.Errorf("error checking for existing release: %w", err)
+			} else if ok {
+				return fmt.Errorf("a release with the same tag name already exists: %s", opts.TagName)
+			}
+		}
+		// Save the release initially as draft and publish it after all assets have finished uploading
+		draftWhileUploading = true
 		params["draft"] = true
 	}
 
 	newRelease, err := createRelease(httpClient, baseRepo, params)
 	if err != nil {
+		return err
+	}
+
+	cleanupDraftRelease := func(err error) error {
+		if !draftWhileUploading {
+			return err
+		}
+		if cleanupErr := deleteRelease(httpClient, newRelease); cleanupErr != nil {
+			return fmt.Errorf("%w\ncleaning up draft failed: %v", err, cleanupErr)
+		}
 		return err
 	}
 
@@ -455,13 +467,13 @@ func createRun(opts *CreateOptions) error {
 		err = shared.ConcurrentUpload(httpClient, uploadURL, opts.Concurrency, opts.Assets)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
-			return err
+			return cleanupDraftRelease(err)
 		}
 
-		if !opts.Draft {
+		if draftWhileUploading {
 			rel, err := publishRelease(httpClient, newRelease.APIURL, opts.DiscussionCategory)
 			if err != nil {
-				return err
+				return cleanupDraftRelease(err)
 			}
 			newRelease = rel
 		}

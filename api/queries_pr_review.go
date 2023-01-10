@@ -39,6 +39,7 @@ type PullRequestReview struct {
 	ReactionGroups      ReactionGroups `json:"reactionGroups"`
 	State               string         `json:"state"`
 	URL                 string         `json:"url,omitempty"`
+	Commit              Commit         `json:"commit"`
 }
 
 func AddReview(client *Client, repo ghrepo.Interface, pr *PullRequest, input *PullRequestReviewInput) error {

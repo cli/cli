@@ -121,6 +121,7 @@ var HelpTopics = map[string]map[string]string{
 			- %[1]stimeago <time>%[1]s: renders a timestamp as relative to now
 			- %[1]stimefmt <format> <time>%[1]s: formats a timestamp using Go's Time.Format function
 			- %[1]struncate <length> <input>%[1]s: ensures input fits within length
+			- %[1]shyperlink <url> <text>%[1]s: renders a terminal hyperlink
 
 			To learn more about Go templates, see: <https://golang.org/pkg/text/template/>.
 		`, "`"),
@@ -166,6 +167,10 @@ var HelpTopics = map[string]map[string]string{
 			monalisa
 			codercat
 			cli-maintainer
+
+
+			# using the --template flag with the hyperlink helper
+			gh issue list --json title,url --template '{{range .}}{{hyperlink .url .title}}{{"\n"}}{{end}}'
 
 
 			# adding the --template flag and modifying the display format

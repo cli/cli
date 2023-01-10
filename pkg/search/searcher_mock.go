@@ -13,25 +13,25 @@ var _ Searcher = &SearcherMock{}
 
 // SearcherMock is a mock implementation of Searcher.
 //
-// 	func TestSomethingThatUsesSearcher(t *testing.T) {
+//	func TestSomethingThatUsesSearcher(t *testing.T) {
 //
-// 		// make and configure a mocked Searcher
-// 		mockedSearcher := &SearcherMock{
-// 			IssuesFunc: func(query Query) (IssuesResult, error) {
-// 				panic("mock out the Issues method")
-// 			},
-// 			RepositoriesFunc: func(query Query) (RepositoriesResult, error) {
-// 				panic("mock out the Repositories method")
-// 			},
-// 			URLFunc: func(query Query) string {
-// 				panic("mock out the URL method")
-// 			},
-// 		}
+//		// make and configure a mocked Searcher
+//		mockedSearcher := &SearcherMock{
+//			IssuesFunc: func(query Query) (IssuesResult, error) {
+//				panic("mock out the Issues method")
+//			},
+//			RepositoriesFunc: func(query Query) (RepositoriesResult, error) {
+//				panic("mock out the Repositories method")
+//			},
+//			URLFunc: func(query Query) string {
+//				panic("mock out the URL method")
+//			},
+//		}
 //
-// 		// use mockedSearcher in code that requires Searcher
-// 		// and then make assertions.
+//		// use mockedSearcher in code that requires Searcher
+//		// and then make assertions.
 //
-// 	}
+//	}
 type SearcherMock struct {
 	// IssuesFunc mocks the Issues method.
 	IssuesFunc func(query Query) (IssuesResult, error)
@@ -83,7 +83,8 @@ func (mock *SearcherMock) Issues(query Query) (IssuesResult, error) {
 
 // IssuesCalls gets all the calls that were made to Issues.
 // Check the length with:
-//     len(mockedSearcher.IssuesCalls())
+//
+//	len(mockedSearcher.IssuesCalls())
 func (mock *SearcherMock) IssuesCalls() []struct {
 	Query Query
 } {
@@ -114,7 +115,8 @@ func (mock *SearcherMock) Repositories(query Query) (RepositoriesResult, error) 
 
 // RepositoriesCalls gets all the calls that were made to Repositories.
 // Check the length with:
-//     len(mockedSearcher.RepositoriesCalls())
+//
+//	len(mockedSearcher.RepositoriesCalls())
 func (mock *SearcherMock) RepositoriesCalls() []struct {
 	Query Query
 } {
@@ -145,7 +147,8 @@ func (mock *SearcherMock) URL(query Query) string {
 
 // URLCalls gets all the calls that were made to URL.
 // Check the length with:
-//     len(mockedSearcher.URLCalls())
+//
+//	len(mockedSearcher.URLCalls())
 func (mock *SearcherMock) URLCalls() []struct {
 	Query Query
 } {

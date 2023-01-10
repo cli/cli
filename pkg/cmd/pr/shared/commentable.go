@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -201,14 +200,10 @@ func updateComment(commentable Commentable, opts *CommentableOptions) error {
 	return nil
 }
 
-func CommentableConfirmSubmitSurvey() (bool, error) {
-	var confirm bool
-	submit := &survey.Confirm{
-		Message: "Submit?",
-		Default: true,
+func CommentableConfirmSubmitSurvey(p Prompt) func() (bool, error) {
+	return func() (bool, error) {
+		return p.Confirm("Submit?", true)
 	}
-	err := survey.AskOne(submit, &confirm)
-	return confirm, err
 }
 
 func CommentableInteractiveEditSurvey(cf func() (config.Config, error), io *iostreams.IOStreams) func(string) (string, error) {

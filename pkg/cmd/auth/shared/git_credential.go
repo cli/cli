@@ -180,7 +180,7 @@ func isGitMissing(err error) bool {
 }
 
 func shellQuote(s string) string {
-	if strings.ContainsAny(s, " $") {
+	if strings.ContainsAny(s, " $\\") {
 		return "'" + s + "'"
 	}
 	return s

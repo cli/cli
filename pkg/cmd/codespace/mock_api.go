@@ -12,58 +12,58 @@ import (
 
 // apiClientMock is a mock implementation of apiClient.
 //
-// 	func TestSomethingThatUsesapiClient(t *testing.T) {
+//	func TestSomethingThatUsesapiClient(t *testing.T) {
 //
-// 		// make and configure a mocked apiClient
-// 		mockedapiClient := &apiClientMock{
-// 			CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
-// 				panic("mock out the CreateCodespace method")
-// 			},
-// 			DeleteCodespaceFunc: func(ctx context.Context, name string, orgName string, userName string) error {
-// 				panic("mock out the DeleteCodespace method")
-// 			},
-// 			EditCodespaceFunc: func(ctx context.Context, codespaceName string, params *api.EditCodespaceParams) (*api.Codespace, error) {
-// 				panic("mock out the EditCodespace method")
-// 			},
-// 			GetCodespaceFunc: func(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error) {
-// 				panic("mock out the GetCodespace method")
-// 			},
-// 			GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
-// 				panic("mock out the GetCodespaceBillableOwner method")
-// 			},
-// 			GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
-// 				panic("mock out the GetCodespaceRepoSuggestions method")
-// 			},
-// 			GetCodespaceRepositoryContentsFunc: func(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error) {
-// 				panic("mock out the GetCodespaceRepositoryContents method")
-// 			},
-// 			GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch string, location string, devcontainerPath string) ([]*api.Machine, error) {
-// 				panic("mock out the GetCodespacesMachines method")
-// 			},
-// 			GetOrgMemberCodespaceFunc: func(ctx context.Context, orgName string, userName string, codespaceName string) (*api.Codespace, error) {
-// 				panic("mock out the GetOrgMemberCodespace method")
-// 			},
-// 			GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
-// 				panic("mock out the GetRepository method")
-// 			},
-// 			ListCodespacesFunc: func(ctx context.Context, opts api.ListCodespacesOptions) ([]*api.Codespace, error) {
-// 				panic("mock out the ListCodespaces method")
-// 			},
-// 			ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
-// 				panic("mock out the ListDevContainers method")
-// 			},
-// 			StartCodespaceFunc: func(ctx context.Context, name string) error {
-// 				panic("mock out the StartCodespace method")
-// 			},
-// 			StopCodespaceFunc: func(ctx context.Context, name string, orgName string, userName string) error {
-// 				panic("mock out the StopCodespace method")
-// 			},
-// 		}
+//		// make and configure a mocked apiClient
+//		mockedapiClient := &apiClientMock{
+//			CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+//				panic("mock out the CreateCodespace method")
+//			},
+//			DeleteCodespaceFunc: func(ctx context.Context, name string, orgName string, userName string) error {
+//				panic("mock out the DeleteCodespace method")
+//			},
+//			EditCodespaceFunc: func(ctx context.Context, codespaceName string, params *api.EditCodespaceParams) (*api.Codespace, error) {
+//				panic("mock out the EditCodespace method")
+//			},
+//			GetCodespaceFunc: func(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error) {
+//				panic("mock out the GetCodespace method")
+//			},
+//			GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+//				panic("mock out the GetCodespaceBillableOwner method")
+//			},
+//			GetCodespaceRepoSuggestionsFunc: func(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error) {
+//				panic("mock out the GetCodespaceRepoSuggestions method")
+//			},
+//			GetCodespaceRepositoryContentsFunc: func(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error) {
+//				panic("mock out the GetCodespaceRepositoryContents method")
+//			},
+//			GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch string, location string, devcontainerPath string) ([]*api.Machine, error) {
+//				panic("mock out the GetCodespacesMachines method")
+//			},
+//			GetOrgMemberCodespaceFunc: func(ctx context.Context, orgName string, userName string, codespaceName string) (*api.Codespace, error) {
+//				panic("mock out the GetOrgMemberCodespace method")
+//			},
+//			GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+//				panic("mock out the GetRepository method")
+//			},
+//			ListCodespacesFunc: func(ctx context.Context, opts api.ListCodespacesOptions) ([]*api.Codespace, error) {
+//				panic("mock out the ListCodespaces method")
+//			},
+//			ListDevContainersFunc: func(ctx context.Context, repoID int, branch string, limit int) ([]api.DevContainerEntry, error) {
+//				panic("mock out the ListDevContainers method")
+//			},
+//			StartCodespaceFunc: func(ctx context.Context, name string) error {
+//				panic("mock out the StartCodespace method")
+//			},
+//			StopCodespaceFunc: func(ctx context.Context, name string, orgName string, userName string) error {
+//				panic("mock out the StopCodespace method")
+//			},
+//		}
 //
-// 		// use mockedapiClient in code that requires apiClient
-// 		// and then make assertions.
+//		// use mockedapiClient in code that requires apiClient
+//		// and then make assertions.
 //
-// 	}
+//	}
 type apiClientMock struct {
 	// CreateCodespaceFunc mocks the CreateCodespace method.
 	CreateCodespaceFunc func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
@@ -274,7 +274,8 @@ func (mock *apiClientMock) CreateCodespace(ctx context.Context, params *api.Crea
 
 // CreateCodespaceCalls gets all the calls that were made to CreateCodespace.
 // Check the length with:
-//     len(mockedapiClient.CreateCodespaceCalls())
+//
+//	len(mockedapiClient.CreateCodespaceCalls())
 func (mock *apiClientMock) CreateCodespaceCalls() []struct {
 	Ctx    context.Context
 	Params *api.CreateCodespaceParams
@@ -313,7 +314,8 @@ func (mock *apiClientMock) DeleteCodespace(ctx context.Context, name string, org
 
 // DeleteCodespaceCalls gets all the calls that were made to DeleteCodespace.
 // Check the length with:
-//     len(mockedapiClient.DeleteCodespaceCalls())
+//
+//	len(mockedapiClient.DeleteCodespaceCalls())
 func (mock *apiClientMock) DeleteCodespaceCalls() []struct {
 	Ctx      context.Context
 	Name     string
@@ -354,7 +356,8 @@ func (mock *apiClientMock) EditCodespace(ctx context.Context, codespaceName stri
 
 // EditCodespaceCalls gets all the calls that were made to EditCodespace.
 // Check the length with:
-//     len(mockedapiClient.EditCodespaceCalls())
+//
+//	len(mockedapiClient.EditCodespaceCalls())
 func (mock *apiClientMock) EditCodespaceCalls() []struct {
 	Ctx           context.Context
 	CodespaceName string
@@ -393,7 +396,8 @@ func (mock *apiClientMock) GetCodespace(ctx context.Context, name string, includ
 
 // GetCodespaceCalls gets all the calls that were made to GetCodespace.
 // Check the length with:
-//     len(mockedapiClient.GetCodespaceCalls())
+//
+//	len(mockedapiClient.GetCodespaceCalls())
 func (mock *apiClientMock) GetCodespaceCalls() []struct {
 	Ctx               context.Context
 	Name              string
@@ -430,7 +434,8 @@ func (mock *apiClientMock) GetCodespaceBillableOwner(ctx context.Context, nwo st
 
 // GetCodespaceBillableOwnerCalls gets all the calls that were made to GetCodespaceBillableOwner.
 // Check the length with:
-//     len(mockedapiClient.GetCodespaceBillableOwnerCalls())
+//
+//	len(mockedapiClient.GetCodespaceBillableOwnerCalls())
 func (mock *apiClientMock) GetCodespaceBillableOwnerCalls() []struct {
 	Ctx context.Context
 	Nwo string
@@ -467,7 +472,8 @@ func (mock *apiClientMock) GetCodespaceRepoSuggestions(ctx context.Context, part
 
 // GetCodespaceRepoSuggestionsCalls gets all the calls that were made to GetCodespaceRepoSuggestions.
 // Check the length with:
-//     len(mockedapiClient.GetCodespaceRepoSuggestionsCalls())
+//
+//	len(mockedapiClient.GetCodespaceRepoSuggestionsCalls())
 func (mock *apiClientMock) GetCodespaceRepoSuggestionsCalls() []struct {
 	Ctx           context.Context
 	PartialSearch string
@@ -506,7 +512,8 @@ func (mock *apiClientMock) GetCodespaceRepositoryContents(ctx context.Context, c
 
 // GetCodespaceRepositoryContentsCalls gets all the calls that were made to GetCodespaceRepositoryContents.
 // Check the length with:
-//     len(mockedapiClient.GetCodespaceRepositoryContentsCalls())
+//
+//	len(mockedapiClient.GetCodespaceRepositoryContentsCalls())
 func (mock *apiClientMock) GetCodespaceRepositoryContentsCalls() []struct {
 	Ctx       context.Context
 	Codespace *api.Codespace
@@ -549,7 +556,8 @@ func (mock *apiClientMock) GetCodespacesMachines(ctx context.Context, repoID int
 
 // GetCodespacesMachinesCalls gets all the calls that were made to GetCodespacesMachines.
 // Check the length with:
-//     len(mockedapiClient.GetCodespacesMachinesCalls())
+//
+//	len(mockedapiClient.GetCodespacesMachinesCalls())
 func (mock *apiClientMock) GetCodespacesMachinesCalls() []struct {
 	Ctx              context.Context
 	RepoID           int
@@ -594,7 +602,8 @@ func (mock *apiClientMock) GetOrgMemberCodespace(ctx context.Context, orgName st
 
 // GetOrgMemberCodespaceCalls gets all the calls that were made to GetOrgMemberCodespace.
 // Check the length with:
-//     len(mockedapiClient.GetOrgMemberCodespaceCalls())
+//
+//	len(mockedapiClient.GetOrgMemberCodespaceCalls())
 func (mock *apiClientMock) GetOrgMemberCodespaceCalls() []struct {
 	Ctx           context.Context
 	OrgName       string
@@ -633,7 +642,8 @@ func (mock *apiClientMock) GetRepository(ctx context.Context, nwo string) (*api.
 
 // GetRepositoryCalls gets all the calls that were made to GetRepository.
 // Check the length with:
-//     len(mockedapiClient.GetRepositoryCalls())
+//
+//	len(mockedapiClient.GetRepositoryCalls())
 func (mock *apiClientMock) GetRepositoryCalls() []struct {
 	Ctx context.Context
 	Nwo string
@@ -668,7 +678,8 @@ func (mock *apiClientMock) ListCodespaces(ctx context.Context, opts api.ListCode
 
 // ListCodespacesCalls gets all the calls that were made to ListCodespaces.
 // Check the length with:
-//     len(mockedapiClient.ListCodespacesCalls())
+//
+//	len(mockedapiClient.ListCodespacesCalls())
 func (mock *apiClientMock) ListCodespacesCalls() []struct {
 	Ctx  context.Context
 	Opts api.ListCodespacesOptions
@@ -707,7 +718,8 @@ func (mock *apiClientMock) ListDevContainers(ctx context.Context, repoID int, br
 
 // ListDevContainersCalls gets all the calls that were made to ListDevContainers.
 // Check the length with:
-//     len(mockedapiClient.ListDevContainersCalls())
+//
+//	len(mockedapiClient.ListDevContainersCalls())
 func (mock *apiClientMock) ListDevContainersCalls() []struct {
 	Ctx    context.Context
 	RepoID int
@@ -746,7 +758,8 @@ func (mock *apiClientMock) StartCodespace(ctx context.Context, name string) erro
 
 // StartCodespaceCalls gets all the calls that were made to StartCodespace.
 // Check the length with:
-//     len(mockedapiClient.StartCodespaceCalls())
+//
+//	len(mockedapiClient.StartCodespaceCalls())
 func (mock *apiClientMock) StartCodespaceCalls() []struct {
 	Ctx  context.Context
 	Name string
@@ -785,7 +798,8 @@ func (mock *apiClientMock) StopCodespace(ctx context.Context, name string, orgNa
 
 // StopCodespaceCalls gets all the calls that were made to StopCodespace.
 // Check the length with:
-//     len(mockedapiClient.StopCodespaceCalls())
+//
+//	len(mockedapiClient.StopCodespaceCalls())
 func (mock *apiClientMock) StopCodespaceCalls() []struct {
 	Ctx      context.Context
 	Name     string

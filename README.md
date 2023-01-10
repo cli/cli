@@ -67,6 +67,9 @@ For more information, see [Linux & BSD installation](./docs/install_linux.md).
 | ------------------- | --------------------|
 | `winget install --id GitHub.cli` | `winget upgrade --id GitHub.cli` |
 
+> **Note**  
+> The Windows installer modifes your PATH. When using Windows Terminal, you will need to **open a new window** for the changes to take affect. (Simply opening a new tab will _not_ be sufficient.)
+
 #### scoop
 
 | Install:           | Upgrade:           |
@@ -82,6 +85,16 @@ For more information, see [Linux & BSD installation](./docs/install_linux.md).
 #### Signed MSI
 
 MSI installers are available for download on the [releases page][].
+
+### Codespaces
+
+To add GitHub CLI to your codespace, add the following to your [devcontainer file](https://docs.github.com/en/codespaces/setting-up-your-project-for-codespaces/adding-features-to-a-devcontainer-file):
+
+```json
+"features": {
+  "ghcr.io/devcontainers/features/github-cli:1": {}
+}
+```
 
 ### GitHub Actions
 

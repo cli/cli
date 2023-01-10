@@ -187,11 +187,11 @@ type Codespace struct {
 }
 
 type CodespaceGitStatus struct {
-	Ahead                int    `json:"ahead"`
-	Behind               int    `json:"behind"`
-	Ref                  string `json:"ref"`
-	HasUnpushedChanges   bool   `json:"has_unpushed_changes"`
-	HasUncommitedChanges bool   `json:"has_uncommited_changes"`
+	Ahead                 int    `json:"ahead"`
+	Behind                int    `json:"behind"`
+	Ref                   string `json:"ref"`
+	HasUnpushedChanges    bool   `json:"has_unpushed_changes"`
+	HasUncommittedChanges bool   `json:"has_uncommitted_changes"`
 }
 
 type CodespaceMachine struct {
@@ -250,9 +250,9 @@ func (c *Codespace) ExportData(fields []string) map[string]interface{} {
 			data[f] = c.Machine.Name
 		case "gitStatus":
 			data[f] = map[string]interface{}{
-				"ref":                  c.GitStatus.Ref,
-				"hasUnpushedChanges":   c.GitStatus.HasUnpushedChanges,
-				"hasUncommitedChanges": c.GitStatus.HasUncommitedChanges,
+				"ref":                   c.GitStatus.Ref,
+				"hasUnpushedChanges":    c.GitStatus.HasUnpushedChanges,
+				"hasUncommittedChanges": c.GitStatus.HasUncommittedChanges,
 			}
 		case "vscsTarget":
 			if c.VSCSTarget != "" && c.VSCSTarget != VSCSTargetProduction {
@@ -702,6 +702,7 @@ type CreateCodespaceParams struct {
 	VSCSTarget             string
 	VSCSTargetURL          string
 	PermissionsOptOut      bool
+	DisplayName            string
 }
 
 // CreateCodespace creates a codespace with the given parameters and returns a non-nil error if it
@@ -752,6 +753,7 @@ type startCreateRequest struct {
 	VSCSTarget             string `json:"vscs_target,omitempty"`
 	VSCSTargetURL          string `json:"vscs_target_url,omitempty"`
 	PermissionsOptOut      bool   `json:"multi_repo_permissions_opt_out"`
+	DisplayName            string `json:"display_name"`
 }
 
 var errProvisioningInProgress = errors.New("provisioning in progress")
@@ -785,6 +787,7 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 		VSCSTarget:             params.VSCSTarget,
 		VSCSTargetURL:          params.VSCSTargetURL,
 		PermissionsOptOut:      params.PermissionsOptOut,
+		DisplayName:            params.DisplayName,
 	})
 
 	if err != nil {

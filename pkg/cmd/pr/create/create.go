@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
@@ -22,13 +21,8 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/spf13/cobra"
 )
-
-type iprompter interface {
-	Select(string, string, []string) (int, error)
-}
 
 type CreateOptions struct {
 	// This struct stores user input and factory functions
@@ -39,7 +33,7 @@ type CreateOptions struct {
 	Remotes    func() (ghContext.Remotes, error)
 	Branch     func() (string, error)
 	Browser    browser.Browser
-	Prompter   iprompter
+	Prompter   shared.Prompt
 	Finder     shared.PRFinder
 
 	TitleProvided bool
@@ -276,15 +270,10 @@ func createRun(opts *CreateOptions) (err error) {
 	}
 
 	if !opts.TitleProvided {
-		err = shared.TitleSurvey(state)
+		err = shared.TitleSurvey(opts.Prompter, state)
 		if err != nil {
 			return
 		}
-	}
-
-	editorCommand, err := cmdutil.DetermineEditor(opts.Config)
-	if err != nil {
-		return
 	}
 
 	defer shared.PreserveInput(opts.IO, state, &err)()
@@ -292,7 +281,7 @@ func createRun(opts *CreateOptions) (err error) {
 	if !opts.BodyProvided {
 		templateContent := ""
 		if opts.RecoverFile == "" {
-			tpl := shared.NewTemplateManager(client.HTTP(), ctx.BaseRepo, opts.RootDirOverride, opts.RepoOverride == "", true)
+			tpl := shared.NewTemplateManager(client.HTTP(), ctx.BaseRepo, opts.Prompter, opts.RootDirOverride, opts.RepoOverride == "", true)
 			var template shared.Template
 			template, err = tpl.Choose()
 			if err != nil {
@@ -306,7 +295,7 @@ func createRun(opts *CreateOptions) (err error) {
 			}
 		}
 
-		err = shared.BodySurvey(state, templateContent, editorCommand)
+		err = shared.BodySurvey(opts.Prompter, state, templateContent)
 		if err != nil {
 			return
 		}
@@ -319,7 +308,7 @@ func createRun(opts *CreateOptions) (err error) {
 
 	allowPreview := !state.HasMetadata() && shared.ValidURL(openURL)
 	allowMetadata := ctx.BaseRepo.ViewerCanTriage()
-	action, err := shared.ConfirmPRSubmission(allowPreview, allowMetadata, state.Draft)
+	action, err := shared.ConfirmPRSubmission(opts.Prompter, allowPreview, allowMetadata, state.Draft)
 	if err != nil {
 		return fmt.Errorf("unable to confirm: %w", err)
 	}
@@ -336,7 +325,7 @@ func createRun(opts *CreateOptions) (err error) {
 			return
 		}
 
-		action, err = shared.ConfirmPRSubmission(!state.HasMetadata(), false, state.Draft)
+		action, err = shared.ConfirmPRSubmission(opts.Prompter, !state.HasMetadata(), false, state.Draft)
 		if err != nil {
 			return
 		}
@@ -423,7 +412,7 @@ func determineTrackingBranch(gitClient *git.Client, remotes ghContext.Remotes, h
 		refsForLookup = append(refsForLookup, tr.String())
 	}
 
-	resolvedRefs, _ := gitClient.ShowRefs(context.Background(), refsForLookup...)
+	resolvedRefs, _ := gitClient.ShowRefs(context.Background(), refsForLookup)
 	if len(resolvedRefs) > 1 {
 		for _, r := range resolvedRefs[1:] {
 			if r.Hash != resolvedRefs[0].Hash {
@@ -480,9 +469,14 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	}
 	client := api.NewClientFromHTTP(httpClient)
 
+	// TODO: consider obtaining remotes from GitClient instead
 	remotes, err := opts.Remotes()
 	if err != nil {
-		return nil, err
+		// When a repo override value is given, ignore errors when fetching git remotes
+		// to support using this command outside of git repos.
+		if opts.RepoOverride == "" {
+			return nil, err
+		}
 	}
 
 	repoContext, err := ghContext.ResolveRemotesToRepos(remotes, client, opts.RepoOverride)
@@ -491,7 +485,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	}
 
 	var baseRepo *api.Repository
-	if br, err := repoContext.BaseRepo(opts.IO, opts.Prompter); err == nil {
+	if br, err := repoContext.BaseRepo(opts.IO); err == nil {
 		if r, ok := br.(*api.Repository); ok {
 			baseRepo = r
 		} else {
@@ -503,7 +497,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 			}
 		}
 	} else {
-		return nil, fmt.Errorf("could not determine base repository: %w", err)
+		return nil, err
 	}
 
 	isPushEnabled := false
@@ -577,12 +571,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		pushOptions = append(pushOptions, "Skip pushing the branch")
 		pushOptions = append(pushOptions, "Cancel")
 
-		var selectedOption int
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		err = prompt.SurveyAskOne(&survey.Select{
-			Message: fmt.Sprintf("Where should we push the '%s' branch?", headBranch),
-			Options: pushOptions,
-		}, &selectedOption)
+		selectedOption, err := opts.Prompter.Select(fmt.Sprintf("Where should we push the '%s' branch?", headBranch), "", pushOptions)
 		if err != nil {
 			return nil, err
 		}
