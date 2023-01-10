@@ -585,7 +585,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						`, cs.SuccessIcon(), fullName)
 						steps = heredoc.Docf(`
 						- run 'cd %[1]s; gh extension install .; gh %[2]s' to see your new extension in action
-						- use 'go build && gh %[2]s' to see changes in your code as you develop`, fullName, extName)
+						- run 'go build && gh %[2]s' to see changes in your code as you develop`, fullName, extName)
 					} else if tmplType == extensions.OtherBinTemplateType {
 						steps = heredoc.Docf(`
 						- run 'cd %[1]s; gh extension install .' to install your extension locally
@@ -596,13 +596,14 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					out := heredoc.Docf(`
 						%[1]s Created directory %[2]s
 						%[1]s Initialized git repository
+						%[1]s Made initial commit
 						%[1]s Set up extension scaffolding
 						%[6]s
 						%[2]s is ready for development!
 
 						%[4]s
 						%[5]s
-						- commit and use 'gh repo create' to share your extension with others
+						- run 'gh repo create' to share your extension with others
 
 						For more information on writing extensions:
 						%[3]s
