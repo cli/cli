@@ -86,13 +86,7 @@ func checkoutRun(opts *CheckoutOptions) error {
 	if headRemote != nil {
 		cmdQueue = append(cmdQueue, cmdsForExistingRemote(headRemote, pr, opts)...)
 	} else {
-		httpClient, err := opts.HttpClient()
-		if err != nil {
-			return err
-		}
-		apiClient := api.NewClientFromHTTP(httpClient)
-
-		defaultBranch, err := api.RepoDefaultBranch(apiClient, baseRepo)
+		defaultBranch, err := getDefaultBranch(baseRepo, opts)
 		if err != nil {
 			return err
 		}
@@ -154,6 +148,16 @@ func findRemote(pr *api.PullRequest, baseRepo ghrepo.Interface, opts *CheckoutOp
 	}
 
 	return headRemote, baseURLOrName, protocol, nil
+}
+
+func getDefaultBranch(repo ghrepo.Interface, opts *CheckoutOptions) (string, error) {
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return "", err
+	}
+
+	apiClient := api.NewClientFromHTTP(httpClient)
+	return api.RepoDefaultBranch(apiClient, repo)
 }
 
 func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts *CheckoutOptions) [][]string {
