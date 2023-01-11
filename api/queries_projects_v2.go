@@ -9,6 +9,11 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
+const (
+	projectScope = "project"
+	scopesHeader = "X-Oauth-Scopes"
+)
+
 // UpdateProjectV2Items uses the addProjectV2ItemById and the deleteProjectV2Item mutations
 // to add and delete items from projects. The addProjectItems and deleteProjectItems arguments are
 // mappings between a project and an item. This function can be used across multiple projects
@@ -19,8 +24,8 @@ func UpdateProjectV2Items(client *Client, repo ghrepo.Interface, addProjectItems
 	if l == 0 {
 		return nil
 	}
-	inputs := make([]string, l)
-	mutations := make([]string, l)
+	inputs := make([]string, 0, l)
+	mutations := make([]string, 0, l)
 	variables := make(map[string]interface{}, l)
 	var i int
 
@@ -43,7 +48,7 @@ func UpdateProjectV2Items(client *Client, repo ghrepo.Interface, addProjectItems
 	return client.GraphQL(repo.RepoHost(), query, variables, nil)
 }
 
-// If auth token has "projects" scope that means that the host supports
+// If auth token has project scope that means that the host supports
 // projectsV2 and also that the auth token has correct permissions to
 // manipute them.
 func HasProjectsV2Scope(client *http.Client, host string) bool {
@@ -56,6 +61,6 @@ func HasProjectsV2Scope(client *http.Client, host string) bool {
 	if res.StatusCode != 200 {
 		return false
 	}
-	scopes := res.Header.Get("X-Oauth-Scopes")
-	return strings.Contains(scopes, "project")
+	scopes := res.Header.Get(scopesHeader)
+	return strings.Contains(scopes, projectScope)
 }

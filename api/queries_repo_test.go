@@ -198,16 +198,17 @@ func Test_RepoMetadata(t *testing.T) {
 }
 
 func Test_ProjectsToPaths(t *testing.T) {
-	expectedProjectPaths := []string{"OWNER/REPO/PROJECT_NUMBER", "ORG/PROJECT_NUMBER"}
+	expectedProjectPaths := []string{"OWNER/REPO/PROJECT_NUMBER", "ORG/PROJECT_NUMBER", "OWNER/REPO/PROJECT_NUMBER_2"}
 	projects := []RepoProject{
 		{ID: "id1", Name: "My Project", ResourcePath: "/OWNER/REPO/projects/PROJECT_NUMBER"},
 		{ID: "id2", Name: "Org Project", ResourcePath: "/orgs/ORG/projects/PROJECT_NUMBER"},
 		{ID: "id3", Name: "Project", ResourcePath: "/orgs/ORG/projects/PROJECT_NUMBER_2"},
 	}
 	projectsV2 := []RepoProjectV2{
-		{ID: "id4", Title: "My Project V2", ResourcePath: "/OWNER/REPO/projects/PROJECT_NUMBER_3"},
+		{ID: "id4", Title: "My Project V2", ResourcePath: "/OWNER/REPO/projects/PROJECT_NUMBER_2"},
+		{ID: "id5", Title: "Org Project V2", ResourcePath: "/orgs/ORG/projects/PROJECT_NUMBER_3"},
 	}
-	projectNames := []string{"My Project", "Org Project"}
+	projectNames := []string{"My Project", "Org Project", "My Project V2"}
 
 	projectPaths, err := ProjectsToPaths(projects, projectsV2, projectNames)
 	if err != nil {
@@ -272,7 +273,7 @@ func Test_ProjectNamesToPaths(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expectedProjectPaths := []string{"ORG/1", "OWNER/REPO/2"}
+	expectedProjectPaths := []string{"ORG/1", "OWNER/REPO/2", "ORG/2", "OWNER/REPO/4"}
 	if !sliceEqual(projectPaths, expectedProjectPaths) {
 		t.Errorf("expected projects paths %v, got %v", expectedProjectPaths, projectPaths)
 	}

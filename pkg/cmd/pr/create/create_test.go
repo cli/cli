@@ -292,7 +292,6 @@ func Test_createRun(t *testing.T) {
 				return func() {}
 			},
 			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
-				// reg.StubRepoInfoResponse("OWNER", "REPO", "master")
 				reg.StubRepoResponse("OWNER", "REPO")
 				reg.Register(
 					httpmock.GraphQL(`query UserCurrent\b`),
@@ -338,15 +337,18 @@ func Test_createRun(t *testing.T) {
 						assert.Equal(t, false, input["draft"].(bool))
 					}))
 				reg.Register(
-					httpmock.GraphQL(`mutation AddProjectV2ItemById\b`),
-					httpmock.GraphQLMutation(`
-						{ "data": { "addProjectV2ItemById": { "item": {
+					httpmock.GraphQL(`mutation UpdateProjectV2Items\b`),
+					httpmock.GraphQLQuery(`
+						{ "data": { "add_000": { "item": {
 							"id": "1"
 						} } } }
-						`, func(input map[string]interface{}) {
-						assert.Equal(t, "PullRequest#1", input["contentId"])
-						assert.Equal(t, "ROADMAPV2ID", input["projectId"])
-						assert.Equal(t, 2, len(input))
+						`, func(mutations string, inputs map[string]interface{}) {
+						variables, err := json.Marshal(inputs)
+						assert.NoError(t, err)
+						expectedMutations := "mutation UpdateProjectV2Items($input_000: AddProjectV2ItemByIdInput!) {add_000: addProjectV2ItemById(input: $input_000) { item { id } }}"
+						expectedVariables := `{"input_000":{"contentId":"PullRequest#1","projectId":"ROADMAPV2ID"}}`
+						assert.Equal(t, expectedMutations, mutations)
+						assert.Equal(t, expectedVariables, string(variables))
 					}))
 			},
 			cmdStubs: func(cs *run.CommandStubber) {

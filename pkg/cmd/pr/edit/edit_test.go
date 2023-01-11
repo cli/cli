@@ -216,9 +216,11 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: shared.Editable{
-					Projects: shared.EditableSlice{
-						Add:    []string{"Cleanup", "Roadmap"},
-						Edited: true,
+					Projects: shared.EditableProjects{
+						EditableSlice: shared.EditableSlice{
+							Add:    []string{"Cleanup", "Roadmap"},
+							Edited: true,
+						},
 					},
 				},
 			},
@@ -230,9 +232,11 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: shared.Editable{
-					Projects: shared.EditableSlice{
-						Remove: []string{"Cleanup", "Roadmap"},
-						Edited: true,
+					Projects: shared.EditableProjects{
+						EditableSlice: shared.EditableSlice{
+							Remove: []string{"Cleanup", "Roadmap"},
+							Edited: true,
+						},
 					},
 				},
 			},
@@ -311,18 +315,6 @@ func Test_editRun(t *testing.T) {
 				SelectorArg: "123",
 				Finder: shared.NewMockFinder("123", &api.PullRequest{
 					URL: "https://github.com/OWNER/REPO/pull/123",
-					ProjectItems: api.ProjectItems{
-						Nodes: []*api.ProjectV2Item{
-							{
-								ID: "1",
-								Project: struct {
-									Title string "json:\"title\""
-								}{
-									Title: "CleanupV2",
-								},
-							},
-						},
-					},
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
 				Editable: shared.Editable{
@@ -353,10 +345,12 @@ func Test_editRun(t *testing.T) {
 						Remove: []string{"docs"},
 						Edited: true,
 					},
-					Projects: shared.EditableSlice{
-						Add:    []string{"Cleanup", "RoadmapV2"},
-						Remove: []string{"Roadmap"},
-						Edited: true,
+					Projects: shared.EditableProjects{
+						EditableSlice: shared.EditableSlice{
+							Add:    []string{"Cleanup", "RoadmapV2"},
+							Remove: []string{"CleanupV2", "Roadmap"},
+							Edited: true,
+						},
 					},
 					Milestone: shared.EditableString{
 						Value:  "GA",
@@ -380,18 +374,6 @@ func Test_editRun(t *testing.T) {
 				SelectorArg: "123",
 				Finder: shared.NewMockFinder("123", &api.PullRequest{
 					URL: "https://github.com/OWNER/REPO/pull/123",
-					ProjectItems: api.ProjectItems{
-						Nodes: []*api.ProjectV2Item{
-							{
-								ID: "1",
-								Project: struct {
-									Title string "json:\"title\""
-								}{
-									Title: "TriageV2",
-								},
-							},
-						},
-					},
 				}, ghrepo.New("OWNER", "REPO")),
 				Interactive: false,
 				Editable: shared.Editable{
@@ -417,11 +399,12 @@ func Test_editRun(t *testing.T) {
 						Remove: []string{"docs"},
 						Edited: true,
 					},
-					Projects: shared.EditableSlice{
-						Value:  []string{"Cleanup", "RoadmapV2"},
-						Remove: []string{"RoadmapV2"},
-						Add:    []string{"CleanupV2"},
-						Edited: true,
+					Projects: shared.EditableProjects{
+						EditableSlice: shared.EditableSlice{
+							Add:    []string{"Cleanup", "RoadmapV2"},
+							Remove: []string{"CleanupV2", "Roadmap"},
+							Edited: true,
+						},
 					},
 					Milestone: shared.EditableString{
 						Value:  "GA",
@@ -454,6 +437,8 @@ func Test_editRun(t *testing.T) {
 				mockRepoMetadata(t, reg, false)
 				mockPullRequestUpdate(t, reg)
 				mockPullRequestReviewersUpdate(t, reg)
+				mockPullRequestUpdateLabels(t, reg)
+				mockProjectV2ItemUpdate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -472,6 +457,8 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockRepoMetadata(t, reg, true)
 				mockPullRequestUpdate(t, reg)
+				mockPullRequestUpdateLabels(t, reg)
+				mockProjectV2ItemUpdate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -492,6 +479,7 @@ func Test_editRun(t *testing.T) {
 		tt.input.HttpClient = httpClient
 
 		t.Run(tt.name, func(t *testing.T) {
+			fmt.Println(tt.name)
 			err := editRun(tt.input)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.stdout, stdout.String())
@@ -501,7 +489,6 @@ func Test_editRun(t *testing.T) {
 }
 
 func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry, skipReviewers bool) {
-	reg.StubRepoInfoResponse("OWNER", "REPO", "main")
 	reg.Register(
 		httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
 		httpmock.StringResponse(`
@@ -628,15 +615,9 @@ func mockPullRequestUpdateLabels(t *testing.T, reg *httpmock.Registry) {
 
 func mockProjectV2ItemUpdate(t *testing.T, reg *httpmock.Registry) {
 	reg.Register(
-		httpmock.GraphQL(`mutation AddProjectV2ItemById\b`),
+		httpmock.GraphQL(`mutation UpdateProjectV2Items\b`),
 		httpmock.GraphQLMutation(`
-		{ "data": { "addProjectV2ItemById": { "__typename": "" } } }`,
-			func(inputs map[string]interface{}) {}),
-	)
-	reg.Register(
-		httpmock.GraphQL(`mutation DeleteProjectV2Item\b`),
-		httpmock.GraphQLMutation(`
-		{ "data": { "deleteProjectV2Item": { "__typename": "" } } }`,
+		{ "data": { "add_000": { "item": { "id": "1" } }, "delete_001": { "item": { "id": "2" } } } }`,
 			func(inputs map[string]interface{}) {}),
 	)
 }
@@ -672,7 +653,11 @@ func (s testSurveyor) EditFields(e *shared.Editable, _ string) error {
 	}
 	e.Assignees.Value = []string{"monalisa", "hubot"}
 	e.Labels.Value = []string{"feature", "TODO", "bug"}
-	e.Projects.Value = []string{"Cleanup", "Roadmap"}
+	e.Labels.Add = []string{"feature", "TODO", "bug"}
+	e.Labels.Remove = []string{"docs"}
+	e.Projects.Value = []string{"Cleanup", "RoadmapV2"}
+	e.Projects.Add = []string{"Cleanup", "RoadmapV2"}
+	e.Projects.Remove = []string{"CleanupV2", "Roadmap"}
 	e.Milestone.Value = "GA"
 	return nil
 }

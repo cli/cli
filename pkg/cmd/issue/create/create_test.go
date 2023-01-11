@@ -659,12 +659,8 @@ func TestIssueCreate_metadata(t *testing.T) {
 			assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
 			assert.Equal(t, []interface{}{"ROADMAPID"}, inputs["projectIds"])
 			assert.Equal(t, "BIGONEID", inputs["milestoneId"])
-			if v, ok := inputs["userIds"]; ok {
-				t.Errorf("did not expect userIds: %v", v)
-			}
-			if v, ok := inputs["teamIds"]; ok {
-				t.Errorf("did not expect teamIds: %v", v)
-			}
+			assert.NotContains(t, inputs, "userIds")
+			assert.NotContains(t, inputs, "teamIds")
 			assert.NotContains(t, inputs, "projectV2Ids")
 		}))
 
@@ -804,15 +800,18 @@ func TestIssueCreate_projectsV2(t *testing.T) {
 			assert.NotContains(t, inputs, "projectV2Ids")
 		}))
 	http.Register(
-		httpmock.GraphQL(`mutation AddProjectV2ItemById\b`),
-		httpmock.GraphQLMutation(`
-			{ "data": { "addProjectV2ItemById": { "item": {
+		httpmock.GraphQL(`mutation UpdateProjectV2Items\b`),
+		httpmock.GraphQLQuery(`
+			{ "data": { "add_000": { "item": {
 				"id": "1"
 			} } } }
-	`, func(inputs map[string]interface{}) {
-			assert.Equal(t, "Issue#1", inputs["contentId"])
-			assert.Equal(t, "ROADMAPV2ID", inputs["projectId"])
-			assert.Equal(t, 2, len(inputs))
+	`, func(mutations string, inputs map[string]interface{}) {
+			variables, err := json.Marshal(inputs)
+			assert.NoError(t, err)
+			expectedMutations := "mutation UpdateProjectV2Items($input_000: AddProjectV2ItemByIdInput!) {add_000: addProjectV2ItemById(input: $input_000) { item { id } }}"
+			expectedVariables := `{"input_000":{"contentId":"Issue#1","projectId":"ROADMAPV2ID"}}`
+			assert.Equal(t, expectedMutations, mutations)
+			assert.Equal(t, expectedVariables, string(variables))
 		}))
 
 	output, err := runCommand(http, true, `-t TITLE -b BODY -p roadmapv2`, nil)
