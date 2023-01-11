@@ -76,27 +76,9 @@ func checkoutRun(opts *CheckoutOptions) error {
 		return err
 	}
 
-	cfg, err := opts.Config()
+	headRemote, baseURLOrName, protocol, err := findRemote(pr, baseRepo, opts)
 	if err != nil {
 		return err
-	}
-	protocol, _ := cfg.GetOrDefault(baseRepo.RepoHost(), "git_protocol")
-
-	remotes, err := opts.Remotes()
-	if err != nil {
-		return err
-	}
-	baseRemote, _ := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
-	baseURLOrName := ghrepo.FormatRemoteURL(baseRepo, protocol)
-	if baseRemote != nil {
-		baseURLOrName = baseRemote.Name
-	}
-
-	headRemote := baseRemote
-	if pr.HeadRepository == nil {
-		headRemote = nil
-	} else if pr.IsCrossRepository {
-		headRemote, _ = remotes.FindByRepo(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
 	}
 
 	var cmdQueue [][]string
@@ -145,6 +127,33 @@ func findPR(opts *CheckoutOptions) (*api.PullRequest, ghrepo.Interface, error) {
 	}
 
 	return pr, baseRepo, err
+}
+
+func findRemote(pr *api.PullRequest, baseRepo ghrepo.Interface, opts *CheckoutOptions) (*cliContext.Remote, string, string, error) {
+	cfg, err := opts.Config()
+	if err != nil {
+		return nil, "", "", err
+	}
+	protocol, _ := cfg.GetOrDefault(baseRepo.RepoHost(), "git_protocol")
+
+	remotes, err := opts.Remotes()
+	if err != nil {
+		return nil, "", "", err
+	}
+	baseRemote, _ := remotes.FindByRepo(baseRepo.RepoOwner(), baseRepo.RepoName())
+	baseURLOrName := ghrepo.FormatRemoteURL(baseRepo, protocol)
+	if baseRemote != nil {
+		baseURLOrName = baseRemote.Name
+	}
+
+	headRemote := baseRemote
+	if pr.HeadRepository == nil {
+		headRemote = nil
+	} else if pr.IsCrossRepository {
+		headRemote, _ = remotes.FindByRepo(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
+	}
+
+	return headRemote, baseURLOrName, protocol, nil
 }
 
 func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts *CheckoutOptions) [][]string {
