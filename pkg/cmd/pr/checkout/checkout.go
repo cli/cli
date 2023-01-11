@@ -71,11 +71,7 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 }
 
 func checkoutRun(opts *CheckoutOptions) error {
-	findOptions := shared.FindOptions{
-		Selector: opts.SelectorArg,
-		Fields:   []string{"number", "headRefName", "headRepository", "headRepositoryOwner", "isCrossRepository", "maintainerCanModify"},
-	}
-	pr, baseRepo, err := opts.Finder.Find(findOptions)
+	pr, baseRepo, err := findPR(opts)
 	if err != nil {
 		return err
 	}
@@ -101,10 +97,6 @@ func checkoutRun(opts *CheckoutOptions) error {
 		headRemote = nil
 	} else if pr.IsCrossRepository {
 		headRemote, _ = remotes.FindByRepo(pr.HeadRepositoryOwner.Login, pr.HeadRepository.Name)
-	}
-
-	if strings.HasPrefix(pr.HeadRefName, "-") {
-		return fmt.Errorf("invalid branch name: %q", pr.HeadRefName)
 	}
 
 	var cmdQueue [][]string
@@ -136,6 +128,23 @@ func checkoutRun(opts *CheckoutOptions) error {
 	}
 
 	return nil
+}
+
+func findPR(opts *CheckoutOptions) (*api.PullRequest, ghrepo.Interface, error) {
+	findOptions := shared.FindOptions{
+		Selector: opts.SelectorArg,
+		Fields:   []string{"number", "headRefName", "headRepository", "headRepositoryOwner", "isCrossRepository", "maintainerCanModify"},
+	}
+	pr, baseRepo, err := opts.Finder.Find(findOptions)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if strings.HasPrefix(pr.HeadRefName, "-") {
+		return nil, nil, fmt.Errorf("invalid branch name: %q", pr.HeadRefName)
+	}
+
+	return pr, baseRepo, err
 }
 
 func cmdsForExistingRemote(remote *cliContext.Remote, pr *api.PullRequest, opts *CheckoutOptions) [][]string {
