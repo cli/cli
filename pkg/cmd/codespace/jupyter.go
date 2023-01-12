@@ -28,6 +28,20 @@ func newJupyterCmd(app *App) *cobra.Command {
 	return jupyterCmd
 }
 
+func startJupyterServer(a *App, ctx context.Context, session *liveshare.Session) (port int, url string, err error) {
+	a.StartProgressIndicatorWithLabel("Starting JupyterLab on codespace")
+	defer a.StopProgressIndicator()
+
+	invoker, err := rpc.CreateInvoker(ctx, session)
+	if err != nil {
+		return
+	}
+	defer safeClose(session, &err)
+
+	port, url, err = invoker.StartJupyterServer(ctx)
+	return
+}
+
 func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
@@ -44,18 +58,10 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	}
 	defer safeClose(session, &err)
 
-	a.StartProgressIndicatorWithLabel("Starting JupyterLab on codespace")
-	invoker, err := rpc.CreateInvoker(ctx, session)
+	serverPort, serverUrl, err := startJupyterServer(a, ctx, session)
 	if err != nil {
 		return err
 	}
-	defer safeClose(invoker, &err)
-
-	serverPort, serverUrl, err := invoker.StartJupyterServer(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to start JupyterLab server: %w", err)
-	}
-	a.StopProgressIndicator()
 
 	// Pass 0 to pick a random port
 	listen, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", 0))
