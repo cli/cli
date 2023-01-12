@@ -248,8 +248,6 @@ func createRun(opts *CreateOptions) (err error) {
 				Repo:      baseRepo,
 				State:     &tb,
 			}
-			//TODO: Add projects scope to default scopes and add good error messaging when scope is missing
-			//TODO: handle GHES versions that do not support projectsV2
 			err = prShared.MetadataSurvey(opts.IO, baseRepo, fetcher, &tb)
 			if err != nil {
 				return
@@ -287,7 +285,6 @@ func createRun(opts *CreateOptions) (err error) {
 			params["issueTemplate"] = templateNameForSubmit
 		}
 
-		//TODO: Add projects scope to default scopes and add good error messaging when scope is missing
 		err = prShared.AddMetadataToIssueParams(apiClient, baseRepo, params, &tb)
 		if err != nil {
 			return
