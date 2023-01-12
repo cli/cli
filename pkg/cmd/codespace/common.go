@@ -56,6 +56,13 @@ func (a *App) StopProgressIndicator() {
 	a.io.StopProgressIndicator()
 }
 
+func (a *App) RunWithProgress(label string, f func() error) error {
+	a.StartProgressIndicatorWithLabel(label)
+	defer a.StopProgressIndicator()
+
+	return f()
+}
+
 // Connects to a codespace using Live Share and returns that session
 func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App, debug bool, debugFile string) (session *liveshare.Session, err error) {
 	liveshareLogger := noopLogger()
