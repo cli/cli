@@ -28,20 +28,6 @@ func newJupyterCmd(app *App) *cobra.Command {
 	return jupyterCmd
 }
 
-func startJupyterServer(a *App, ctx context.Context, session *liveshare.Session) (port int, url string, err error) {
-	a.StartProgressIndicatorWithLabel("Starting JupyterLab on codespace")
-	defer a.StopProgressIndicator()
-
-	invoker, err := rpc.CreateInvoker(ctx, session)
-	if err != nil {
-		return
-	}
-	defer safeClose(session, &err)
-
-	port, url, err = invoker.StartJupyterServer(ctx)
-	return
-}
-
 func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
@@ -58,7 +44,17 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	}
 	defer safeClose(session, &err)
 
-	serverPort, serverUrl, err := startJupyterServer(a, ctx, session)
+	serverPort, serverUrl := 0, ""
+	err = a.RunWithProgress("Starting JupyterLab on codespace", func() error {
+		invoker, err := rpc.CreateInvoker(ctx, session)
+		if err != nil {
+			return err
+		}
+		defer safeClose(invoker, &err)
+
+		serverPort, serverUrl, err = invoker.StartJupyterServer(ctx)
+		return err
+	})
 	if err != nil {
 		return err
 	}
