@@ -92,7 +92,7 @@ To add GitHub CLI to your codespace, add the following to your [devcontainer fil
 
 ```json
 "features": {
-  "github-cli": "latest"
+  "ghcr.io/devcontainers/features/github-cli:1": {}
 }
 ```
 

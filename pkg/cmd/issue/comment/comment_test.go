@@ -324,8 +324,8 @@ func Test_commentRun(t *testing.T) {
 				ID:  "ISSUE-ID",
 				URL: "https://github.com/OWNER/REPO/issues/123",
 				Comments: api.Comments{Nodes: []api.Comment{
-					{ID: "id1", Author: api.Author{Login: "octocat"}, URL: "https://github.com/OWNER/REPO/issues/123#issuecomment-111", ViewerDidAuthor: true},
-					{ID: "id2", Author: api.Author{Login: "monalisa"}, URL: "https://github.com/OWNER/REPO/issues/123#issuecomment-222"},
+					{ID: "id1", Author: api.CommentAuthor{Login: "octocat"}, URL: "https://github.com/OWNER/REPO/issues/123#issuecomment-111", ViewerDidAuthor: true},
+					{ID: "id2", Author: api.CommentAuthor{Login: "monalisa"}, URL: "https://github.com/OWNER/REPO/issues/123#issuecomment-222"},
 				}},
 			}, ghrepo.New("OWNER", "REPO"), nil
 		}

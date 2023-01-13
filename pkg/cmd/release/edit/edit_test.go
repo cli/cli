@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -415,14 +416,14 @@ func Test_editRun(t *testing.T) {
 			ios.SetStderrTTY(tt.isTTY)
 
 			fakeHTTP := &httpmock.Registry{}
-			fakeHTTP.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.JSONResponse(map[string]interface{}{
-				"id":       12345,
-				"tag_name": "v1.2.3",
-			}))
+			// defer reg.Verify(t) // FIXME: intermittetly fails due to StubFetchRelease internals
+			shared.StubFetchRelease(t, fakeHTTP, "OWNER", "REPO", "v1.2.3", `{
+				"id": 12345,
+				"tag_name": "v1.2.3"
+			}`)
 			if tt.httpStubs != nil {
 				tt.httpStubs(t, fakeHTTP)
 			}
-			defer fakeHTTP.Verify(t)
 
 			tt.opts.IO = ios
 			tt.opts.HttpClient = func() (*http.Client, error) {

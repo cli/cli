@@ -24,7 +24,7 @@ var issueComments = shortenQuery(`
 	comments(first: 100) {
 		nodes {
 			id,
-			author{login},
+			author{login,...on User{id,name}},
 			authorAssociation,
 			body,
 			createdAt,
@@ -43,7 +43,7 @@ var issueComments = shortenQuery(`
 var issueCommentLast = shortenQuery(`
 	comments(last: 1) {
 		nodes {
-			author{login},
+			author{login,...on User{id,name}},
 			authorAssociation,
 			body,
 			createdAt,

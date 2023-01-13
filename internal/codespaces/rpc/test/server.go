@@ -6,7 +6,9 @@ import (
 	"net"
 	"strconv"
 
-	"github.com/cli/cli/v2/internal/codespaces/grpc/jupyter"
+	"github.com/cli/cli/v2/internal/codespaces/rpc/codespace"
+	"github.com/cli/cli/v2/internal/codespaces/rpc/jupyter"
+	"github.com/cli/cli/v2/internal/codespaces/rpc/ssh"
 	"google.golang.org/grpc"
 )
 
@@ -14,6 +16,7 @@ const (
 	ServerPort = 50051
 )
 
+// Mock responses for the `GetRunningServer` RPC method
 var (
 	JupyterPort      = 1234
 	JupyterServerUrl = "http://localhost:1234?token=1234"
@@ -21,8 +24,23 @@ var (
 	JupyterResult    = true
 )
 
+// Mock responses for the `RebuildContainerAsync` RPC method
+var (
+	RebuildContainer = true
+)
+
+// Mock responses for the `StartRemoteServerAsync` RPC method
+var (
+	SshServerPort = 1234
+	SshUser       = "test"
+	SshMessage    = ""
+	SshResult     = true
+)
+
 type server struct {
 	jupyter.UnimplementedJupyterServerHostServer
+	codespace.CodespaceHostServer
+	ssh.SshServerHostServer
 }
 
 func (s *server) GetRunningServer(ctx context.Context, in *jupyter.GetRunningServerRequest) (*jupyter.GetRunningServerResponse, error) {
@@ -31,6 +49,21 @@ func (s *server) GetRunningServer(ctx context.Context, in *jupyter.GetRunningSer
 		ServerUrl: JupyterServerUrl,
 		Message:   JupyterMessage,
 		Result:    JupyterResult,
+	}, nil
+}
+
+func (s *server) RebuildContainerAsync(ctx context.Context, in *codespace.RebuildContainerRequest) (*codespace.RebuildContainerResponse, error) {
+	return &codespace.RebuildContainerResponse{
+		RebuildContainer: RebuildContainer,
+	}, nil
+}
+
+func (s *server) StartRemoteServerAsync(ctx context.Context, in *ssh.StartRemoteServerRequest) (*ssh.StartRemoteServerResponse, error) {
+	return &ssh.StartRemoteServerResponse{
+		ServerPort: strconv.Itoa(SshServerPort),
+		User:       SshUser,
+		Message:    SshMessage,
+		Result:     SshResult,
 	}, nil
 }
 
@@ -44,6 +77,8 @@ func StartServer(ctx context.Context) error {
 
 	s := grpc.NewServer()
 	jupyter.RegisterJupyterServerHostServer(s, &server{})
+	codespace.RegisterCodespaceHostServer(s, &server{})
+	ssh.RegisterSshServerHostServer(s, &server{})
 
 	ch := make(chan error, 1)
 	go func() {

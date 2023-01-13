@@ -489,6 +489,36 @@ func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBra
 	return remote, nil
 }
 
+func (c *Client) InGitDirectory(ctx context.Context) bool {
+	showCmd, err := c.Command(ctx, "rev-parse", "--is-inside-work-tree")
+	if err != nil {
+		return false
+	}
+	out, err := showCmd.Output()
+	if err != nil {
+		return false
+	}
+
+	split := strings.Split(string(out), "\n")
+	if len(split) > 0 {
+		return split[0] == "true"
+	}
+	return false
+}
+
+func (c *Client) UnsetRemoteResolution(ctx context.Context, name string) error {
+	args := []string{"config", "--unset", fmt.Sprintf("remote.%s.gh-resolved", name)}
+	cmd, err := c.Command(ctx, args...)
+	if err != nil {
+		return err
+	}
+	_, err = cmd.Output()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func resolveGitPath() (string, error) {
 	path, err := safeexec.LookPath("git")
 	if err != nil {

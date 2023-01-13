@@ -3,9 +3,6 @@ package liveshare
 import (
 	"context"
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/opentracing/opentracing-go"
@@ -19,6 +16,15 @@ type ChannelID struct {
 	name, condition string
 }
 
+// Interface to allow the mocking of the liveshare session
+type LiveshareSession interface {
+	Close() error
+	GetSharedServers(context.Context) ([]*Port, error)
+	KeepAlive(string)
+	OpenStreamingChannel(context.Context, ChannelID) (ssh.Channel, error)
+	StartSharing(context.Context, string, int) (ChannelID, error)
+}
+
 // A Session represents the session between a connected Live Share client and server.
 type Session struct {
 	ssh *sshSession
@@ -27,10 +33,6 @@ type Session struct {
 	clientName      string
 	keepAliveReason chan string
 	logger          logger
-}
-
-type StartSSHServerOptions struct {
-	UserPublicKeyFile string
 }
 
 // Close should be called by users to clean up RPC and SSH resources whenever the session
@@ -50,96 +52,6 @@ func (s *Session) Close() error {
 // server and returns a callback function to deregister the handler
 func (s *Session) registerRequestHandler(requestType string, h handler) func() {
 	return s.rpc.register(requestType, h)
-}
-
-// StartSSHServer starts an SSH server in the container, installing sshd if necessary, applies specified
-// options, and returns the port on which it listens and the user name clients should provide.
-func (s *Session) StartSSHServer(ctx context.Context) (int, string, error) {
-	return s.StartSSHServerWithOptions(ctx, StartSSHServerOptions{})
-}
-
-// StartSSHServerWithOptions starts an SSH server in the container, installing sshd if necessary, applies specified
-// options, and returns the port on which it listens and the user name clients should provide.
-func (s *Session) StartSSHServerWithOptions(ctx context.Context, options StartSSHServerOptions) (int, string, error) {
-	var params struct {
-		UserPublicKey string `json:"userPublicKey"`
-	}
-
-	var response struct {
-		Result     bool   `json:"result"`
-		ServerPort string `json:"serverPort"`
-		User       string `json:"user"`
-		Message    string `json:"message"`
-	}
-
-	if options.UserPublicKeyFile != "" {
-		publicKeyBytes, err := os.ReadFile(options.UserPublicKeyFile)
-		if err != nil {
-			return 0, "", fmt.Errorf("failed to read public key file: %w", err)
-		}
-
-		params.UserPublicKey = strings.TrimSpace(string(publicKeyBytes))
-	}
-
-	if err := s.rpc.do(ctx, "ISshServerHostService.startRemoteServerWithOptions", params, &response); err != nil {
-		return 0, "", err
-	}
-
-	if !response.Result {
-		return 0, "", fmt.Errorf("failed to start server: %s", response.Message)
-	}
-
-	port, err := strconv.Atoi(response.ServerPort)
-	if err != nil {
-		return 0, "", fmt.Errorf("failed to parse port: %w", err)
-	}
-
-	return port, response.User, nil
-}
-
-// StartJupyterServer starts a Juypyter server in the container and returns
-// the port on which it listens and the server URL.
-func (s *Session) StartJupyterServer(ctx context.Context) (int, string, error) {
-	var response struct {
-		Result    bool   `json:"result"`
-		Message   string `json:"message"`
-		Port      string `json:"port"`
-		ServerUrl string `json:"serverUrl"`
-	}
-
-	if err := s.rpc.do(ctx, "IJupyterServerHostService.getRunningServer", []string{}, &response); err != nil {
-		return 0, "", fmt.Errorf("failed to invoke JupyterLab RPC: %w", err)
-	}
-
-	if !response.Result {
-		return 0, "", fmt.Errorf("failed to start JupyterLab: %s", response.Message)
-	}
-
-	port, err := strconv.Atoi(response.Port)
-	if err != nil {
-		return 0, "", fmt.Errorf("failed to parse JupyterLab port: %w", err)
-	}
-
-	return port, response.ServerUrl, nil
-}
-
-func (s *Session) RebuildContainer(ctx context.Context, full bool) error {
-	rpcMethod := "IEnvironmentConfigurationService.incrementalRebuildContainer"
-	if full {
-		rpcMethod = "IEnvironmentConfigurationService.rebuildContainer"
-	}
-
-	var rebuildSuccess bool
-	err := s.rpc.do(ctx, rpcMethod, nil, &rebuildSuccess)
-	if err != nil {
-		return fmt.Errorf("invoking rebuild RPC: %w", err)
-	}
-
-	if !rebuildSuccess {
-		return fmt.Errorf("couldn't rebuild codespace")
-	}
-
-	return nil
 }
 
 // heartbeat runs until context cancellation, periodically checking whether there is a

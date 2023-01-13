@@ -98,7 +98,7 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 	if f.repo == nil {
 		repo, err := f.baseRepoFn()
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not determine base repo: %w", err)
+			return nil, nil, err
 		}
 		f.repo = repo
 	}
