@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
@@ -32,6 +33,8 @@ type CheckoutOptions struct {
 	Force             bool
 	Detach            bool
 	BranchName        string
+	Worktree          bool
+	WorktreePath      string
 }
 
 type repo struct {
@@ -85,6 +88,8 @@ func NewCmdCheckout(f *cmdutil.Factory, runF func(*CheckoutOptions) error) *cobr
 	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Reset the existing local branch to the latest state of the pull request")
 	cmd.Flags().BoolVarP(&opts.Detach, "detach", "", false, "Checkout PR with a detached HEAD")
 	cmd.Flags().StringVarP(&opts.BranchName, "branch", "b", "", "Local branch name to use (default: the name of the head branch)")
+	cmd.Flags().BoolVarP(&opts.Worktree, "worktree", "w", false, "Create a new worktree to checkout pull request")
+	cmd.Flags().StringVarP(&opts.WorktreePath, "worktree-path", "p", "", "Location to create new worktree (default: ../{current_dir_name}_pr{N})")
 
 	return cmd
 }
@@ -93,6 +98,11 @@ func checkoutRun(opts *CheckoutOptions) error {
 	var cmdQueue cmds
 
 	pr, baseRepo, err := findPR(opts)
+	if err != nil {
+		return err
+	}
+
+	err = setWorktreePath(pr, opts)
 	if err != nil {
 		return err
 	}
@@ -106,14 +116,39 @@ func checkoutRun(opts *CheckoutOptions) error {
 
 	if opts.RecurseSubmodules {
 		cmdQueue = append(cmdQueue,
-			[]string{"submodule", "sync", "--recursive"},
-			[]string{"submodule", "update", "--init", "--recursive"},
+			[]string{"-C", opts.WorktreePath, "submodule", "sync", "--recursive"},
+			[]string{"-C", opts.WorktreePath, "submodule", "update", "--init", "--recursive"},
 		)
 	}
 
 	err = executeCmds(opts.GitClient, cmdQueue)
 
 	return err
+}
+
+func setWorktreePath(pr *api.PullRequest, opts *CheckoutOptions) error {
+	if opts.WorktreePath != "" {
+		return nil
+	}
+
+	if !opts.Worktree {
+		opts.WorktreePath = "."
+		return nil
+	}
+
+	repoDirName, err := opts.GitClient.ToplevelDir(context.Background())
+	if err != nil {
+		return err
+	}
+	repoDirName = filepath.Base(repoDirName)
+
+	opts.WorktreePath = filepath.Join(
+		opts.GitClient.RepoDir,
+		"..",
+		fmt.Sprintf("%s_pr%d", repoDirName, pr.Number),
+	)
+
+	return nil
 }
 
 func findPR(opts *CheckoutOptions) (*api.PullRequest, *repo, error) {
@@ -165,13 +200,18 @@ func cmdsForCheckoutBranch(pr *api.PullRequest, baseRepo *repo, opts *CheckoutOp
 		}
 	}
 
-	cmds = append(cmds, []string{"checkout", localBranch})
+	if !opts.Worktree {
+		cmds = append(cmds, []string{"checkout", localBranch})
+	} else {
+		cmds = append(cmds, []string{"worktree", "add", opts.WorktreePath, localBranch})
+		cmds = append(cmds, []string{"-C", opts.WorktreePath, "fetch"})
+	}
 
 	if opts.Force {
-		cmds = append(cmds, []string{"reset", "--hard", "FETCH_HEAD"})
+		cmds = append(cmds, []string{"-C", opts.WorktreePath, "reset", "--hard", "FETCH_HEAD"})
 	} else {
 		// TODO: check if non-fast-forward and suggest to use `--force`
-		cmds = append(cmds, []string{"merge", "--ff-only", "FETCH_HEAD"})
+		cmds = append(cmds, []string{"-C", opts.WorktreePath, "merge", "--ff-only", "FETCH_HEAD"})
 	}
 
 	return cmds, nil
