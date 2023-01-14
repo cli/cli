@@ -7,6 +7,10 @@ assignees: ''
 
 ---
 
+<!--
+If you are reporting a bug in an unofficial package of the GitHub CLI, please ensure you have the latest version and check whether the bug is related to the package you have. The bug reporting methods for some unofficial packages are documented here: https://github.com/cli/cli/blob/trunk/docs/install_linux.md#unofficial-community-supported-methods
+-->
+
 ### Describe the bug
 
 A clear and concise description of what the bug is. Include version by typing `gh --version`.

@@ -1,5 +1,8 @@
 blank_issues_enabled: true
 contact_links:
+  - name: Report an issue with an unofficial package of GitHub CLI
+    about: Please report through the packager's issue trackers.
+    url: https://github.com/cli/cli/blob/trunk/docs/install_linux.md#unofficial-community-supported-methods
   - name: Ask a question on how to use GitHub CLI
     about: For general-purpose questions and answers, see the Discussions section.
     url: https://github.com/cli/cli/discussions

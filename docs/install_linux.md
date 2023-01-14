@@ -54,6 +54,8 @@ Upgrade:
 sudo dnf update gh
 ```
 
+Bugs from the community repository's package can be reported [on RedHat's bug tracker](https://bugzilla.redhat.com/enter_bug.cgi?component=gh)
+
 ### Amazon Linux 2 (yum)
 
 Install using our package repository for immediate access to latest releases:
@@ -96,11 +98,13 @@ sudo zypper update gh
 
 ## Unofficial, community-supported methods
 
-The GitHub CLI team does not maintain the following packages or repositories and thus we are unable to provide support for those installation methods.
+The GitHub CLI team does not maintain the following packages or repositories and thus we are unable to provide support for those installation methods. When installing a third-party package, please keep the package version and potential changes in mind if you find issues.
 
 ### Snap (do not use)
 
 There are [so many issues with Snap](https://github.com/casperdcl/cli/issues/7) as a runtime mechanism for apps like GitHub CLI that our team suggests _never installing gh as a snap_.
+
+Snap-related bugs can be filed [through the snap package's issue tracker.](https://github.com/casperdcl/cli/issues/new/choose)
 
 ### Arch Linux
 
