@@ -1,0 +1,8 @@
+# Sources for GitHub CLI
+Types: deb
+URIs: https://cli.github.com/packages
+Suites: stable
+Components: main
+Signed-By: /usr/share/keyrings/githubcli-archive-keyring.gpg
+# To disable automatic updates, uncomment the next line.
+# Enabled: no

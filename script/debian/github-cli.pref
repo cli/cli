@@ -1,0 +1,9 @@
+# Never prefer packages from the github CLI source
+Package: *
+Pin: origin "cli.github.com"
+Pin-Priority: 1
+
+# Ensure that we always get gh from the official repository
+Package: gh
+Pin: origin "cli.github.com"
+Pin-Priority: 1000
