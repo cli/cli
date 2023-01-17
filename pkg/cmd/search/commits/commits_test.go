@@ -145,9 +145,9 @@ func TestNewCmdCommits(t *testing.T) {
 }
 
 func TestCommitsRun(t *testing.T) {
-	var now = time.Date(2022, 2, 28, 12, 30, 0, 0, time.UTC)
-	var author = search.CommitUser{Date: time.Date(2021, 2, 27, 11, 30, 0, 0, time.UTC)}
-	var committer = search.CommitUser{Date: time.Date(2021, 2, 28, 12, 30, 0, 0, time.UTC)}
+	var now = time.Date(2023, 1, 17, 12, 30, 0, 0, time.UTC)
+	var author = search.CommitUser{Date: time.Date(2022, 12, 27, 11, 30, 0, 0, time.UTC)}
+	var committer = search.CommitUser{Date: time.Date(2022, 12, 28, 12, 30, 0, 0, time.UTC)}
 	var query = search.Query{
 		Keywords:   []string{"cli"},
 		Kind:       "commits",
@@ -173,19 +173,22 @@ func TestCommitsRun(t *testing.T) {
 							IncompleteResults: false,
 							Items: []search.Commit{
 								{
-									Info: search.CommitInfo{Author: author, Committer: committer, Message: "hello"},
-									Repo: search.CommitRepo{FullName: "test/cli"},
-									Sha:  "aaaaaaaa",
+									Author: search.User{Login: "monalisa"},
+									Info:   search.CommitInfo{Author: author, Committer: committer, Message: "hello"},
+									Repo:   search.Repository{FullName: "test/cli"},
+									Sha:    "aaaaaaaa",
 								},
 								{
-									Info: search.CommitInfo{Author: author, Committer: committer, Message: "hi"},
-									Repo: search.CommitRepo{FullName: "test/cliing", IsPrivate: true},
-									Sha:  "bbbbbbbb",
+									Author: search.User{Login: "johnnytest"},
+									Info:   search.CommitInfo{Author: author, Committer: committer, Message: "hi"},
+									Repo:   search.Repository{FullName: "test/cliing", IsPrivate: true},
+									Sha:    "bbbbbbbb",
 								},
 								{
-									Info: search.CommitInfo{Author: author, Committer: committer, Message: "greetings"},
-									Repo: search.CommitRepo{FullName: "cli/cli"},
-									Sha:  "cccccccc",
+									Author: search.User{Login: "hubot"},
+									Info:   search.CommitInfo{Author: author, Committer: committer, Message: "greetings"},
+									Repo:   search.Repository{FullName: "cli/cli"},
+									Sha:    "cccccccc",
 								},
 							},
 							Total: 300,
@@ -194,7 +197,7 @@ func TestCommitsRun(t *testing.T) {
 				},
 			},
 			tty:        true,
-			wantStdout: "\nShowing 3 of 300 commits\n\ntest/cli     aaaaaaaa  hello      public   Feb 27, 2021  Feb 28, 2021\ntest/cliing  bbbbbbbb  hi         private  Feb 27, 2021  Feb 28, 2021\ncli/cli      cccccccc  greetings  public   Feb 27, 2021  Feb 28, 2021\n",
+			wantStdout: "\nShowing 3 of 300 commits\n\ntest/cli     aaaaaaaa  hello      monalisa    about 21 days ago\ntest/cliing  bbbbbbbb  hi         johnnytest  about 21 days ago\ncli/cli      cccccccc  greetings  hubot       about 21 days ago\n",
 		},
 		{
 			name: "displays results notty",
@@ -206,19 +209,22 @@ func TestCommitsRun(t *testing.T) {
 							IncompleteResults: false,
 							Items: []search.Commit{
 								{
-									Info: search.CommitInfo{Author: author, Committer: committer, Message: "hello"},
-									Repo: search.CommitRepo{FullName: "test/cli"},
-									Sha:  "aaaaaaaa",
+									Author: search.User{Login: "monalisa"},
+									Info:   search.CommitInfo{Author: author, Committer: committer, Message: "hello"},
+									Repo:   search.Repository{FullName: "test/cli"},
+									Sha:    "aaaaaaaa",
 								},
 								{
-									Info: search.CommitInfo{Author: author, Committer: committer, Message: "hi"},
-									Repo: search.CommitRepo{FullName: "test/cliing", IsPrivate: true},
-									Sha:  "bbbbbbbb",
+									Author: search.User{Login: "johnnytest"},
+									Info:   search.CommitInfo{Author: author, Committer: committer, Message: "hi"},
+									Repo:   search.Repository{FullName: "test/cliing", IsPrivate: true},
+									Sha:    "bbbbbbbb",
 								},
 								{
-									Info: search.CommitInfo{Author: author, Committer: committer, Message: "greetings"},
-									Repo: search.CommitRepo{FullName: "cli/cli"},
-									Sha:  "cccccccc",
+									Author: search.User{Login: "hubot"},
+									Info:   search.CommitInfo{Author: author, Committer: committer, Message: "greetings"},
+									Repo:   search.Repository{FullName: "cli/cli"},
+									Sha:    "cccccccc",
 								},
 							},
 							Total: 300,
@@ -226,7 +232,7 @@ func TestCommitsRun(t *testing.T) {
 					},
 				},
 			},
-			wantStdout: "test/cli\taaaaaaaa\thello\tpublic\t2021-02-27T11:30:00Z\t2021-02-28T12:30:00Z\ntest/cliing\tbbbbbbbb\thi\tprivate\t2021-02-27T11:30:00Z\t2021-02-28T12:30:00Z\ncli/cli\tcccccccc\tgreetings\tpublic\t2021-02-27T11:30:00Z\t2021-02-28T12:30:00Z\n",
+			wantStdout: "test/cli\taaaaaaaa\thello\tmonalisa\t2022-12-27T11:30:00Z\ntest/cliing\tbbbbbbbb\thi\tjohnnytest\t2022-12-27T11:30:00Z\ncli/cli\tcccccccc\tgreetings\thubot\t2022-12-27T11:30:00Z\n",
 		},
 		{
 			name: "displays no results",
@@ -296,7 +302,7 @@ func TestCommitsRun(t *testing.T) {
 				assert.EqualError(t, err, tt.errMsg)
 				return
 			} else if err != nil {
-				t.Fatalf("reposRun unexpected error: %v", err)
+				t.Fatalf("commitsRun unexpected error: %v", err)
 			}
 			assert.Equal(t, tt.wantStdout, stdout.String())
 			assert.Equal(t, tt.wantStderr, stderr.String())

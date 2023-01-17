@@ -96,7 +96,7 @@ type Commit struct {
 	ID        string     `json:"node_id"`
 	Info      CommitInfo `json:"commit"`
 	Parents   []Parent   `json:"parents"`
-	Repo      CommitRepo `json:"repository"`
+	Repo      Repository `json:"repository"`
 	Sha       string     `json:"sha"`
 	URL       string     `json:"html_url"`
 }
@@ -113,17 +113,6 @@ type CommitUser struct {
 	Date  time.Time `json:"date"`
 	Email string    `json:"email"`
 	Name  string    `json:"name"`
-}
-
-type CommitRepo struct {
-	Description string `json:"description"`
-	FullName    string `json:"full_name"`
-	ID          string `json:"node_id"`
-	IsFork      bool   `json:"fork"`
-	IsPrivate   bool   `json:"private"`
-	Name        string `json:"name"`
-	Owner       User   `json:"owner"`
-	URL         string `json:"html_url"`
 }
 
 type Tree struct {
@@ -182,27 +171,6 @@ type User struct {
 	URL        string `json:"html_url"`
 }
 
-func (u *User) ExportData() map[string]interface{} {
-	isBot := u.IsBot()
-	login := u.Login
-	if isBot {
-		login = "app/" + login
-	}
-	return map[string]interface{}{
-		"id":     u.ID,
-		"login":  login,
-		"type":   u.Type,
-		"is_bot": isBot,
-	}
-}
-
-func (u *User) IsBot() bool {
-	// copied from api/queries_issue.go
-	// would ideally be shared, but it would require coordinating a "user"
-	// abstraction in a bunch of places.
-	return u.ID == ""
-}
-
 type Issue struct {
 	Assignees         []User    `json:"assignees"`
 	Author            User      `json:"user"`
@@ -233,23 +201,33 @@ type PullRequest struct {
 	MergedAt time.Time `json:"merged_at"`
 }
 
-// the state of an issue or a pull request,
-// may be either open or closed.
-// for a pull request, the "merged" state is
-// inferred from a value for merged_at and
-// which we take return instead of the "closed" state.
-func (issue Issue) State() string {
-	if !issue.PullRequest.MergedAt.IsZero() {
-		return "merged"
-	}
-	return issue.StateInternal
-}
-
 type Label struct {
 	Color       string `json:"color"`
 	Description string `json:"description"`
 	ID          string `json:"node_id"`
 	Name        string `json:"name"`
+}
+
+func (u User) IsBot() bool {
+	// copied from api/queries_issue.go
+	// would ideally be shared, but it would require coordinating a "user"
+	// abstraction in a bunch of places.
+	return u.ID == ""
+}
+
+func (u User) ExportData() map[string]interface{} {
+	isBot := u.IsBot()
+	login := u.Login
+	if isBot {
+		login = "app/" + login
+	}
+	return map[string]interface{}{
+		"id":     u.ID,
+		"login":  login,
+		"type":   u.Type,
+		"url":    u.URL,
+		"is_bot": isBot,
+	}
 }
 
 func (commit Commit) ExportData(fields []string) map[string]interface{} {
@@ -326,6 +304,16 @@ func (repo Repository) ExportData(fields []string) map[string]interface{} {
 		}
 	}
 	return data
+}
+
+// The state of an issue or a pull request, may be either open or closed.
+// For a pull request, the "merged" state is inferred from a value for merged_at and
+// which we take return instead of the "closed" state.
+func (issue Issue) State() string {
+	if !issue.PullRequest.MergedAt.IsZero() {
+		return "merged"
+	}
+	return issue.StateInternal
 }
 
 func (issue Issue) IsPullRequest() bool {

@@ -24,11 +24,12 @@ func (t *TablePrinter) HeaderRow(columns ...string) {
 	t.EndRow()
 }
 
-func (tp *TablePrinter) AddTimeField(t time.Time, c func(string) string) {
+// In tty mode display the fuzzy time difference between now and t.
+// In nontty mode just display t with the time.RFC3339 format.
+func (tp *TablePrinter) AddTimeField(now, t time.Time, c func(string) string) {
 	tf := t.Format(time.RFC3339)
 	if tp.isTTY {
-		// TODO: use a static time.Now
-		tf = text.FuzzyAgo(time.Now(), t)
+		tf = text.FuzzyAgo(now, t)
 	}
 	tp.AddField(tf, tableprinter.WithColor(c))
 }
