@@ -235,10 +235,7 @@ func (i *invoker) StartSSHServerWithOptions(ctx context.Context, options StartSS
 	return port, response.User, nil
 }
 
-// heartbeat runs until context cancellation, periodically checking whether there is a
-// reason to keep the connection alive, and if so, notifying the Live Share host to do so.
-// Heartbeat ensures it does not send more than one request every "interval" to ratelimit
-// how many KeepAlives we send at a time.
+// Periodically check whether there is a reason to keep the connection alive, and if so, notify the codespace to do so
 func (i *invoker) heartbeat(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
