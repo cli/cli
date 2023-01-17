@@ -29,6 +29,8 @@ const (
 const (
 	codespacesInternalPort        = 16634
 	codespacesInternalSessionName = "CodespacesInternal"
+	clientName                    = "gh"
+	connectedEventName            = "connected"
 )
 
 type StartSSHServerOptions struct {
@@ -127,6 +129,9 @@ func connect(ctx context.Context, session liveshare.LiveshareSession) (Invoker, 
 	invoker.jupyterClient = jupyter.NewJupyterServerHostClient(conn)
 	invoker.codespaceClient = codespace.NewCodespaceHostClient(conn)
 	invoker.sshClient = ssh.NewSshServerHostClient(conn)
+
+	// Start the activity heatbeats
+	go invoker.heartbeat(pfctx, 1*time.Minute)
 
 	return invoker, nil
 }
@@ -228,4 +233,39 @@ func (i *invoker) StartSSHServerWithOptions(ctx context.Context, options StartSS
 	}
 
 	return port, response.User, nil
+}
+
+// heartbeat runs until context cancellation, periodically checking whether there is a
+// reason to keep the connection alive, and if so, notifying the Live Share host to do so.
+// Heartbeat ensures it does not send more than one request every "interval" to ratelimit
+// how many KeepAlives we send at a time.
+func (i *invoker) heartbeat(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	// Send initial connection heartbeat
+	i.notifyCodespaceOfClientActivity(ctx, connectedEventName)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			reason := <-i.session.GetKeepAliveReason()
+			i.notifyCodespaceOfClientActivity(ctx, reason)
+		}
+	}
+}
+
+func (i *invoker) notifyCodespaceOfClientActivity(ctx context.Context, activity string) error {
+	ctx = i.appendMetadata(ctx)
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+
+	_, err := i.codespaceClient.NotifyCodespaceOfClientActivity(ctx, &codespace.NotifyCodespaceOfClientActivityRequest{ClientId: clientName, ClientActivities: []string{activity}})
+	if err != nil {
+		return fmt.Errorf("failed to invoke notify RPC: %w", err)
+	}
+
+	return nil
 }
