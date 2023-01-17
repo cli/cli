@@ -29,6 +29,14 @@ var (
 	RebuildContainer = true
 )
 
+// Mock responses for the `NotifyCodespaceOfClientActivity` RPC method
+// NotifyMessage is used to store the activity that was sent to the server
+var (
+	NotifyMessage          = ""
+	NotifyResult           = true
+	NotifyReceivedActivity = ""
+)
+
 // Mock responses for the `StartRemoteServerAsync` RPC method
 var (
 	SshServerPort = 1234
@@ -55,6 +63,18 @@ func (s *server) GetRunningServer(ctx context.Context, in *jupyter.GetRunningSer
 func (s *server) RebuildContainerAsync(ctx context.Context, in *codespace.RebuildContainerRequest) (*codespace.RebuildContainerResponse, error) {
 	return &codespace.RebuildContainerResponse{
 		RebuildContainer: RebuildContainer,
+	}, nil
+}
+
+func (s *server) NotifyCodespaceOfClientActivity(ctx context.Context, in *codespace.NotifyCodespaceOfClientActivityRequest) (*codespace.NotifyCodespaceOfClientActivityResponse, error) {
+	// If there is at least one client activity, set NotifyReceivedActivity to the first one (should be "connected")
+	if len(in.GetClientActivities()) > 0 {
+		NotifyReceivedActivity = in.GetClientActivities()[0]
+	}
+
+	return &codespace.NotifyCodespaceOfClientActivityResponse{
+		Message: NotifyMessage,
+		Result:  NotifyResult,
 	}, nil
 }
 
