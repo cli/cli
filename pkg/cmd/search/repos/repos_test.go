@@ -188,7 +188,7 @@ func TestReposRun(t *testing.T) {
 				},
 			},
 			tty:        true,
-			wantStdout: "\nShowing 3 of 300 repositories\n\ntest/cli     of course  private, archived  Feb 28, 2021\ntest/cliing  wow        public, fork       Feb 28, 2021\ncli/cli      so much    internal           Feb 28, 2021\n",
+			wantStdout: "\nShowing 3 of 300 repositories\n\nNAME         DESCRIPTION  VISIBILITY         UPDATED\ntest/cli     of course    private, archived  about 1 year ago\ntest/cliing  wow          public, fork       about 1 year ago\ncli/cli      so much      internal           about 1 year ago\n",
 		},
 		{
 			name: "displays results notty",
