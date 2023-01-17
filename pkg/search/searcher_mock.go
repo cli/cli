@@ -17,6 +17,9 @@ var _ Searcher = &SearcherMock{}
 //
 //		// make and configure a mocked Searcher
 //		mockedSearcher := &SearcherMock{
+//			CommitsFunc: func(query Query) (CommitsResult, error) {
+//				panic("mock out the Commits method")
+//			},
 //			IssuesFunc: func(query Query) (IssuesResult, error) {
 //				panic("mock out the Issues method")
 //			},
@@ -33,6 +36,9 @@ var _ Searcher = &SearcherMock{}
 //
 //	}
 type SearcherMock struct {
+	// CommitsFunc mocks the Commits method.
+	CommitsFunc func(query Query) (CommitsResult, error)
+
 	// IssuesFunc mocks the Issues method.
 	IssuesFunc func(query Query) (IssuesResult, error)
 
@@ -44,6 +50,11 @@ type SearcherMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
+		// Commits holds details about calls to the Commits method.
+		Commits []struct {
+			// Query is the query argument value.
+			Query Query
+		}
 		// Issues holds details about calls to the Issues method.
 		Issues []struct {
 			// Query is the query argument value.
@@ -60,9 +71,42 @@ type SearcherMock struct {
 			Query Query
 		}
 	}
+	lockCommits      sync.RWMutex
 	lockIssues       sync.RWMutex
 	lockRepositories sync.RWMutex
 	lockURL          sync.RWMutex
+}
+
+// Commits calls CommitsFunc.
+func (mock *SearcherMock) Commits(query Query) (CommitsResult, error) {
+	if mock.CommitsFunc == nil {
+		panic("SearcherMock.CommitsFunc: method is nil but Searcher.Commits was just called")
+	}
+	callInfo := struct {
+		Query Query
+	}{
+		Query: query,
+	}
+	mock.lockCommits.Lock()
+	mock.calls.Commits = append(mock.calls.Commits, callInfo)
+	mock.lockCommits.Unlock()
+	return mock.CommitsFunc(query)
+}
+
+// CommitsCalls gets all the calls that were made to Commits.
+// Check the length with:
+//
+//	len(mockedSearcher.CommitsCalls())
+func (mock *SearcherMock) CommitsCalls() []struct {
+	Query Query
+} {
+	var calls []struct {
+		Query Query
+	}
+	mock.lockCommits.RLock()
+	calls = mock.calls.Commits
+	mock.lockCommits.RUnlock()
+	return calls
 }
 
 // Issues calls IssuesFunc.
