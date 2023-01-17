@@ -240,8 +240,8 @@ func (i *invoker) heartbeat(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	// Send initial connection heartbeat
-	i.notifyCodespaceOfClientActivity(ctx, connectedEventName)
+	// Send initial connection heartbeat (no need to throw if we fail to get a response from the server)
+	_ = i.notifyCodespaceOfClientActivity(ctx, connectedEventName)
 
 	for {
 		select {
@@ -249,7 +249,7 @@ func (i *invoker) heartbeat(ctx context.Context, interval time.Duration) {
 			return
 		case <-ticker.C:
 			reason := <-i.session.GetKeepAliveReason()
-			i.notifyCodespaceOfClientActivity(ctx, reason)
+			_ = i.notifyCodespaceOfClientActivity(ctx, reason)
 		}
 	}
 }
