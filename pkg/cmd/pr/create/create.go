@@ -172,6 +172,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
 	fl.BoolVarP(&opts.Autofill, "fill", "f", false, "Do not prompt for title/body and just use commit info")
 	fl.StringSliceVarP(&opts.Reviewers, "reviewer", "r", nil, "Request reviews from people or teams by their `handle`")
+	cmd.RegisterFlagCompletionFunc("reviewer", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		results, _ := getAssignableReviewers(opts)
+		return results, cobra.ShellCompDirectiveNoFileComp
+	})
 	fl.StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`. Use \"@me\" to self-assign.")
 	fl.StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
 	fl.StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the pull request to projects by `name`")
@@ -469,34 +473,16 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	}
 	client := api.NewClientFromHTTP(httpClient)
 
-	// TODO: consider obtaining remotes from GitClient instead
-	remotes, err := opts.Remotes()
+	remotes, err := getRemotes(opts)
 	if err != nil {
-		// When a repo override value is given, ignore errors when fetching git remotes
-		// to support using this command outside of git repos.
-		if opts.RepoOverride == "" {
-			return nil, err
-		}
+		return nil, err
 	}
-
 	repoContext, err := ghContext.ResolveRemotesToRepos(remotes, client, opts.RepoOverride)
 	if err != nil {
 		return nil, err
 	}
-
-	var baseRepo *api.Repository
-	if br, err := repoContext.BaseRepo(opts.IO); err == nil {
-		if r, ok := br.(*api.Repository); ok {
-			baseRepo = r
-		} else {
-			// TODO: if RepoNetwork is going to be requested anyway in `repoContext.HeadRepos()`,
-			// consider piggybacking on that result instead of performing a separate lookup
-			baseRepo, err = api.GitHubRepo(client, br)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
+	baseRepo, err := getBaseRepo(opts, client, repoContext)
+	if err != nil {
 		return nil, err
 	}
 
@@ -623,6 +609,38 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		GitClient:          gitClient,
 	}, nil
 
+}
+
+func getRemotes(opts *CreateOptions) (ghContext.Remotes, error) {
+	// TODO: consider obtaining remotes from GitClient instead
+	remotes, err := opts.Remotes()
+	if err != nil {
+		// When a repo override value is given, ignore errors when fetching git remotes
+		// to support using this command outside of git repos.
+		if opts.RepoOverride == "" {
+			return nil, err
+		}
+	}
+	return remotes, nil
+}
+
+func getBaseRepo(opts *CreateOptions, client *api.Client, repoContext *ghContext.ResolvedRemotes) (*api.Repository, error) {
+	var baseRepo *api.Repository
+	if br, err := repoContext.BaseRepo(opts.IO); err == nil {
+		if r, ok := br.(*api.Repository); ok {
+			baseRepo = r
+		} else {
+			// TODO: if RepoNetwork is going to be requested anyway in `repoContext.HeadRepos()`,
+			// consider piggybacking on that result instead of performing a separate lookup
+			baseRepo, err = api.GitHubRepo(client, br)
+			if err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		return nil, err
+	}
+	return baseRepo, nil
 }
 
 func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState) error {
@@ -777,6 +795,45 @@ func humanize(s string) string {
 		return r
 	}
 	return strings.Map(h, s)
+}
+
+// getAssignableReviewers returns a list of user logins that can be added as reviewers
+func getAssignableReviewers(opts *CreateOptions) ([]string, error) {
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return nil, err
+	}
+	client := api.NewClientFromHTTP(httpClient)
+
+	remotes, err := getRemotes(opts)
+	if err != nil {
+		return nil, err
+	}
+	repoContext, err := ghContext.ResolveRemotesToRepos(remotes, client, opts.RepoOverride)
+	if err != nil {
+		return nil, err
+	}
+	baseRepo, err := getBaseRepo(opts, client, repoContext)
+	if err != nil {
+		return nil, err
+	}
+
+	metadata, err := api.RepoMetadata(client, baseRepo, api.RepoMetadataInput{
+		Reviewers: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	results := []string{}
+
+	currentUser, _ := api.CurrentLoginName(client, baseRepo.RepoHost())
+
+	for _, user := range metadata.AssignableUsers {
+		if user.Login != currentUser {
+			results = append(results, user.Login)
+		}
+	}
+	return results, nil
 }
 
 var gitPushRegexp = regexp.MustCompile("^remote: (Create a pull request.*by visiting|[[:space:]]*https://.*/pull/new/).*\n?$")
