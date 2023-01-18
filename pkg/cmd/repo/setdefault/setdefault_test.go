@@ -29,7 +29,7 @@ func TestNewCmdSetDefault(t *testing.T) {
 		{
 			name: "no argument",
 			gitStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --is-inside-work-tree`, 0, "true")
+				cs.Register(`git rev-parse --git-dir`, 0, ".git")
 			},
 			input:  "",
 			output: SetDefaultOptions{},
@@ -37,7 +37,7 @@ func TestNewCmdSetDefault(t *testing.T) {
 		{
 			name: "repo argument",
 			gitStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --is-inside-work-tree`, 0, "true")
+				cs.Register(`git rev-parse --git-dir`, 0, ".git")
 			},
 			input:  "cli/cli",
 			output: SetDefaultOptions{Repo: ghrepo.New("cli", "cli")},
@@ -52,7 +52,7 @@ func TestNewCmdSetDefault(t *testing.T) {
 		{
 			name: "view flag",
 			gitStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --is-inside-work-tree`, 0, "true")
+				cs.Register(`git rev-parse --git-dir`, 0, ".git")
 			},
 			input:  "--view",
 			output: SetDefaultOptions{ViewMode: true},
@@ -60,7 +60,7 @@ func TestNewCmdSetDefault(t *testing.T) {
 		{
 			name: "unset flag",
 			gitStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --is-inside-work-tree`, 0, "true")
+				cs.Register(`git rev-parse --git-dir`, 0, ".git")
 			},
 			input:  "--unset",
 			output: SetDefaultOptions{UnsetMode: true},
@@ -68,7 +68,7 @@ func TestNewCmdSetDefault(t *testing.T) {
 		{
 			name: "run from non-git directory",
 			gitStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --is-inside-work-tree`, 1, "")
+				cs.Register(`git rev-parse --git-dir`, 128, "")
 			},
 			input:   "",
 			wantErr: true,
@@ -83,6 +83,7 @@ func TestNewCmdSetDefault(t *testing.T) {
 		io.SetStderrTTY(true)
 		f := &cmdutil.Factory{
 			IOStreams: io,
+			GitClient: &git.Client{GitPath: "/fake/path/to/git"},
 		}
 
 		var gotOpts *SetDefaultOptions
