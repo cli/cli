@@ -197,7 +197,7 @@ func TestCommitsRun(t *testing.T) {
 				},
 			},
 			tty:        true,
-			wantStdout: "\nShowing 3 of 300 commits\n\ntest/cli     aaaaaaaa  hello      monalisa    about 21 days ago\ntest/cliing  bbbbbbbb  hi         johnnytest  about 21 days ago\ncli/cli      cccccccc  greetings  hubot       about 21 days ago\n",
+			wantStdout: "\nShowing 3 of 300 commits\n\nREPO         SHA       MESSAGE    AUTHOR      CREATED\ntest/cli     aaaaaaaa  hello      monalisa    about 21 days ago\ntest/cliing  bbbbbbbb  hi         johnnytest  about 21 days ago\ncli/cli      cccccccc  greetings  hubot       about 21 days ago\n",
 		},
 		{
 			name: "displays results notty",

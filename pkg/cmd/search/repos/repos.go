@@ -7,12 +7,12 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/search/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/search"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -158,8 +158,8 @@ func displayResults(io *iostreams.IOStreams, now time.Time, results search.Repos
 		now = time.Now()
 	}
 	cs := io.ColorScheme()
-	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
-	tp := utils.NewTablePrinter(io)
+	tp := tableprinter.New(io)
+	tp.HeaderRow("Name", "Description", "Visibility", "Updated")
 	for _, repo := range results.Items {
 		tags := []string{visibilityLabel(repo)}
 		if repo.IsFork {
@@ -173,15 +173,10 @@ func displayResults(io *iostreams.IOStreams, now time.Time, results search.Repos
 		if repo.IsPrivate {
 			infoColor = cs.Yellow
 		}
-		tp.AddField(repo.FullName, nil, cs.Bold)
-		description := repo.Description
-		tp.AddField(text.RemoveExcessiveWhitespace(description), nil, nil)
-		tp.AddField(info, nil, infoColor)
-		if tp.IsTTY() {
-			tp.AddField(text.FuzzyAgoAbbr(now, repo.UpdatedAt), nil, cs.Gray)
-		} else {
-			tp.AddField(repo.UpdatedAt.Format(time.RFC3339), nil, nil)
-		}
+		tp.AddField(repo.FullName, tableprinter.WithColor(cs.Bold))
+		tp.AddField(text.RemoveExcessiveWhitespace(repo.Description))
+		tp.AddField(info, tableprinter.WithColor(infoColor))
+		tp.AddTimeField(now, repo.UpdatedAt, cs.Gray)
 		tp.EndRow()
 	}
 	if io.IsStdoutTTY() {
