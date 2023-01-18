@@ -24,8 +24,8 @@ func (*Session) GetSharedServers(context.Context) ([]*liveshare.Port, error) {
 func (s *Session) KeepAlive(reason string) {
 }
 
-func (s *Session) GetKeepAliveReason() chan string {
-	return make(chan string)
+func (s *Session) GetKeepAliveReason() string {
+	return ""
 }
 
 func (s *Session) StartSharing(ctx context.Context, sessionName string, port int) (liveshare.ChannelID, error) {

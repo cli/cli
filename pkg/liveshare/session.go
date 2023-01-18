@@ -22,7 +22,7 @@ type LiveshareSession interface {
 	KeepAlive(string)
 	OpenStreamingChannel(context.Context, ChannelID) (ssh.Channel, error)
 	StartSharing(context.Context, string, int) (ChannelID, error)
-	GetKeepAliveReason() chan string
+	GetKeepAliveReason() string
 }
 
 // A Session represents the session between a connected Live Share client and server.
@@ -47,8 +47,9 @@ func (s *Session) Close() error {
 	return nil
 }
 
-func (s *Session) GetKeepAliveReason() chan string {
-	return s.keepAliveReason
+// Fetches the keep alive reason from the channel and returns it.
+func (s *Session) GetKeepAliveReason() string {
+	return <-s.keepAliveReason
 }
 
 // registerRequestHandler registers a handler for the given request type with the RPC

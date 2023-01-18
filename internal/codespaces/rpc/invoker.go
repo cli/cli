@@ -248,7 +248,7 @@ func (i *invoker) heartbeat(ctx context.Context, interval time.Duration) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			reason := <-i.session.GetKeepAliveReason()
+			reason := i.session.GetKeepAliveReason()
 			_ = i.notifyCodespaceOfClientActivity(ctx, reason)
 		}
 	}
