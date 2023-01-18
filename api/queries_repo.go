@@ -1102,7 +1102,7 @@ func RepoProjectsV2(client *Client, repo ghrepo.Interface) ([]RepoProjectV2, err
 					HasNextPage bool
 					EndCursor   string
 				}
-			} `graphql:"projectsV2(first: 100, orderBy: {field: TITLE, direction: ASC}, after: $endCursor)"`
+			} `graphql:"projectsV2(first: 100, orderBy: {field: TITLE, direction: ASC}, after: $endCursor, query: $query)"`
 		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
@@ -1110,6 +1110,7 @@ func RepoProjectsV2(client *Client, repo ghrepo.Interface) ([]RepoProjectV2, err
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"name":      githubv4.String(repo.RepoName()),
 		"endCursor": (*githubv4.String)(nil),
+		"query":     githubv4.String("is:open"),
 	}
 
 	var projectsV2 []RepoProjectV2
@@ -1120,11 +1121,7 @@ func RepoProjectsV2(client *Client, repo ghrepo.Interface) ([]RepoProjectV2, err
 			return nil, err
 		}
 
-		for _, p := range query.Repository.ProjectsV2.Nodes {
-			if !p.Closed {
-				projectsV2 = append(projectsV2, p)
-			}
-		}
+		projectsV2 = append(projectsV2, query.Repository.ProjectsV2.Nodes...)
 
 		if !query.Repository.ProjectsV2.PageInfo.HasNextPage {
 			break

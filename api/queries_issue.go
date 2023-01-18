@@ -192,6 +192,9 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 		switch key {
 		case "assigneeIds", "body", "issueTemplate", "labelIds", "milestoneId", "projectIds", "repositoryId", "title":
 			inputParams[key] = val
+		case "projectV2Ids":
+		default:
+			return nil, fmt.Errorf("invalid IssueCreate mutation parameter %s", key)
 		}
 	}
 	variables := map[string]interface{}{

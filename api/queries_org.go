@@ -42,7 +42,7 @@ func OrganizationProjects(client *Client, repo ghrepo.Interface) ([]RepoProject,
 	return projects, nil
 }
 
-// OrganizationProjectsV2 fetches all open projectsV2 for an organization
+// OrganizationProjectsV2 fetches all open projectsV2 for an organization.
 func OrganizationProjectsV2(client *Client, repo ghrepo.Interface) ([]RepoProjectV2, error) {
 	type responseData struct {
 		Organization struct {
@@ -52,13 +52,14 @@ func OrganizationProjectsV2(client *Client, repo ghrepo.Interface) ([]RepoProjec
 					HasNextPage bool
 					EndCursor   string
 				}
-			} `graphql:"projectsV2(first: 100, orderBy: {field: TITLE, direction: ASC}, after: $endCursor)"`
+			} `graphql:"projectsV2(first: 100, orderBy: {field: TITLE, direction: ASC}, after: $endCursor, query: $query)"`
 		} `graphql:"organization(login: $owner)"`
 	}
 
 	variables := map[string]interface{}{
 		"owner":     githubv4.String(repo.RepoOwner()),
 		"endCursor": (*githubv4.String)(nil),
+		"query":     githubv4.String("is:open"),
 	}
 
 	var projectsV2 []RepoProjectV2
@@ -69,11 +70,7 @@ func OrganizationProjectsV2(client *Client, repo ghrepo.Interface) ([]RepoProjec
 			return nil, err
 		}
 
-		for _, p := range query.Organization.ProjectsV2.Nodes {
-			if !p.Closed {
-				projectsV2 = append(projectsV2, p)
-			}
-		}
+		projectsV2 = append(projectsV2, query.Organization.ProjectsV2.Nodes...)
 
 		if !query.Organization.ProjectsV2.PageInfo.HasNextPage {
 			break
