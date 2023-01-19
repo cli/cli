@@ -263,7 +263,7 @@ func IssueGraphQL(fields []string) string {
 		case "author":
 			q = append(q, `author{login,...on User{id,name}}`)
 		case "mergedBy":
-			q = append(q, `mergedBy{login}`)
+			q = append(q, `mergedBy{login,...on User{id,name}}`)
 		case "headRepositoryOwner":
 			q = append(q, `headRepositoryOwner{id,login,...on User{name}}`)
 		case "headRepository":
