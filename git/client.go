@@ -20,6 +20,10 @@ import (
 
 var remoteRE = regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
 
+type errWithExitCode interface {
+	ExitCode() int
+}
+
 type Client struct {
 	GhPath  string
 	RepoDir string
@@ -489,21 +493,16 @@ func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBra
 	return remote, nil
 }
 
-func (c *Client) InGitDirectory(ctx context.Context) bool {
-	showCmd, err := c.Command(ctx, "rev-parse", "--is-inside-work-tree")
+func (c *Client) IsLocalGitRepo(ctx context.Context) (bool, error) {
+	_, err := c.GitDir(ctx)
 	if err != nil {
-		return false
+		var execError errWithExitCode
+		if errors.As(err, &execError) && execError.ExitCode() == 128 {
+			return false, nil
+		}
+		return false, err
 	}
-	out, err := showCmd.Output()
-	if err != nil {
-		return false
-	}
-
-	split := strings.Split(string(out), "\n")
-	if len(split) > 0 {
-		return split[0] == "true"
-	}
-	return false
+	return true, nil
 }
 
 func (c *Client) UnsetRemoteResolution(ctx context.Context, name string) error {
