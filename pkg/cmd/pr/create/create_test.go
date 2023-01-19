@@ -281,6 +281,94 @@ func Test_createRun(t *testing.T) {
 			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
 		},
 		{
+			name: "project v2",
+			tty:  true,
+			setup: func(opts *CreateOptions, t *testing.T) func() {
+				opts.TitleProvided = true
+				opts.BodyProvided = true
+				opts.Title = "my title"
+				opts.Body = "my body"
+				opts.Projects = []string{"RoadmapV2"}
+				return func() {}
+			},
+			httpStubs: func(reg *httpmock.Registry, t *testing.T) {
+				reg.StubRepoResponse("OWNER", "REPO")
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data": {"viewer": {"login": "OWNER"} } }`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryProjectList\b`),
+					httpmock.StringResponse(`{ "data": { "repository": { "projects": { "nodes": [],	"pageInfo": { "hasNextPage": false } } } } }`))
+				reg.Register(
+					httpmock.GraphQL(`query OrganizationProjectList\b`),
+					httpmock.StringResponse(`{ "data": { "organization": { "projects": { "nodes": [], "pageInfo": { "hasNextPage": false } } } } }`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+					httpmock.StringResponse(`
+				{ "data": { "repository": { "projectsV2": {
+					"nodes": [
+						{ "title": "CleanupV2", "id": "CLEANUPV2ID" },
+						{ "title": "RoadmapV2", "id": "ROADMAPV2ID" }
+					],
+					"pageInfo": { "hasNextPage": false }
+				} } } }
+				`))
+				reg.Register(
+					httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+					httpmock.StringResponse(`
+				{ "data": { "organization": { "projectsV2": {
+					"nodes": [],
+					"pageInfo": { "hasNextPage": false }
+				} } } }
+				`))
+				reg.Register(
+					httpmock.GraphQL(`mutation PullRequestCreate\b`),
+					httpmock.GraphQLMutation(`
+						{ "data": { "createPullRequest": { "pullRequest": {
+							"id": "PullRequest#1",
+							"URL": "https://github.com/OWNER/REPO/pull/12"
+						} } } }
+						`, func(input map[string]interface{}) {
+						assert.Equal(t, "REPOID", input["repositoryId"].(string))
+						assert.Equal(t, "my title", input["title"].(string))
+						assert.Equal(t, "my body", input["body"].(string))
+						assert.Equal(t, "master", input["baseRefName"].(string))
+						assert.Equal(t, "feature", input["headRefName"].(string))
+						assert.Equal(t, false, input["draft"].(bool))
+					}))
+				reg.Register(
+					httpmock.GraphQL(`mutation UpdateProjectV2Items\b`),
+					httpmock.GraphQLQuery(`
+						{ "data": { "add_000": { "item": {
+							"id": "1"
+						} } } }
+						`, func(mutations string, inputs map[string]interface{}) {
+						variables, err := json.Marshal(inputs)
+						assert.NoError(t, err)
+						expectedMutations := "mutation UpdateProjectV2Items($input_000: AddProjectV2ItemByIdInput!) {add_000: addProjectV2ItemById(input: $input_000) { item { id } }}"
+						expectedVariables := `{"input_000":{"contentId":"PullRequest#1","projectId":"ROADMAPV2ID"}}`
+						assert.Equal(t, expectedMutations, mutations)
+						assert.Equal(t, expectedVariables, string(variables))
+					}))
+			},
+			cmdStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
+				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
+				cs.Register(`git push --set-upstream origin HEAD:feature`, 0, "")
+			},
+			promptStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+					if p == "Where should we push the 'feature' branch?" {
+						return 0, nil
+					} else {
+						return -1, prompter.NoSuchPromptErr(p)
+					}
+				}
+			},
+			expectedOut:    "https://github.com/OWNER/REPO/pull/12\n",
+			expectedErrOut: "\nCreating pull request for feature into master in OWNER/REPO\n\n",
+		},
+		{
 			name: "no maintainer modify",
 			tty:  true,
 			setup: func(opts *CreateOptions, t *testing.T) func() {
@@ -576,9 +664,28 @@ func Test_createRun(t *testing.T) {
 				} } } }
 				`))
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+					httpmock.StringResponse(`
+				{ "data": { "repository": { "projectsV2": {
+					"nodes": [
+						{ "title": "CleanupV2", "id": "CLEANUPV2ID" },
+						{ "title": "RoadmapV2", "id": "ROADMAPV2ID" }
+					],
+					"pageInfo": { "hasNextPage": false }
+				} } } }			
+				`))
+				reg.Register(
 					httpmock.GraphQL(`query OrganizationProjectList\b`),
 					httpmock.StringResponse(`
 				{ "data": { "organization": { "projects": {
+					"nodes": [],
+					"pageInfo": { "hasNextPage": false }
+				} } } }
+				`))
+				reg.Register(
+					httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+					httpmock.StringResponse(`
+				{ "data": { "organization": { "projectsV2": {
 					"nodes": [],
 					"pageInfo": { "hasNextPage": false }
 				} } } }
@@ -698,11 +805,31 @@ func Test_createRun(t *testing.T) {
 			} } } }
 			`))
 				reg.Register(
+					httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+					httpmock.StringResponse(`
+			{ "data": { "repository": { "projectsV2": {
+				"nodes": [
+					{ "title": "CleanupV2", "id": "CLEANUPV2ID", "resourcePath": "/OWNER/REPO/projects/2" }
+				],
+				"pageInfo": { "hasNextPage": false }
+			} } } }
+			`))
+				reg.Register(
 					httpmock.GraphQL(`query OrganizationProjectList\b`),
 					httpmock.StringResponse(`
 			{ "data": { "organization": { "projects": {
 				"nodes": [
 					{ "name": "Triage", "id": "TRIAGEID", "resourcePath": "/orgs/ORG/projects/1"  }
+				],
+				"pageInfo": { "hasNextPage": false }
+			} } } }
+			`))
+				reg.Register(
+					httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+					httpmock.StringResponse(`
+			{ "data": { "organization": { "projectsV2": {
+				"nodes": [
+					{ "title": "TriageV2", "id": "TRIAGEV2ID", "resourcePath": "/orgs/ORG/projects/2"  }
 				],
 				"pageInfo": { "hasNextPage": false }
 			} } } }

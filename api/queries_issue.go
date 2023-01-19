@@ -40,6 +40,7 @@ type Issue struct {
 	Assignees        Assignees
 	Labels           Labels
 	ProjectCards     ProjectCards
+	ProjectItems     ProjectItems
 	Milestone        *Milestone
 	ReactionGroups   ReactionGroups
 	IsPinned         bool
@@ -86,6 +87,10 @@ type ProjectCards struct {
 	TotalCount int
 }
 
+type ProjectItems struct {
+	Nodes []*ProjectV2Item
+}
+
 type ProjectInfo struct {
 	Project struct {
 		Name string `json:"name"`
@@ -95,12 +100,28 @@ type ProjectInfo struct {
 	} `json:"column"`
 }
 
+type ProjectV2Item struct {
+	ID      string `json:"id"`
+	Project struct {
+		ID    string `json:"id"`
+		Title string `json:"title"`
+	}
+}
+
 func (p ProjectCards) ProjectNames() []string {
 	names := make([]string, len(p.Nodes))
 	for i, c := range p.Nodes {
 		names[i] = c.Project.Name
 	}
 	return names
+}
+
+func (p ProjectItems) ProjectTitles() []string {
+	titles := make([]string, len(p.Nodes))
+	for i, c := range p.Nodes {
+		titles[i] = c.Project.Title
+	}
+	return titles
 }
 
 type Milestone struct {
@@ -158,6 +179,7 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 	mutation IssueCreate($input: CreateIssueInput!) {
 		createIssue(input: $input) {
 			issue {
+				id
 				url
 			}
 		}
@@ -167,7 +189,13 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 		"repositoryId": repo.ID,
 	}
 	for key, val := range params {
-		inputParams[key] = val
+		switch key {
+		case "assigneeIds", "body", "issueTemplate", "labelIds", "milestoneId", "projectIds", "repositoryId", "title":
+			inputParams[key] = val
+		case "projectV2Ids":
+		default:
+			return nil, fmt.Errorf("invalid IssueCreate mutation parameter %s", key)
+		}
 	}
 	variables := map[string]interface{}{
 		"input": inputParams,
@@ -183,8 +211,23 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 	if err != nil {
 		return nil, err
 	}
+	issue := &result.CreateIssue.Issue
 
-	return &result.CreateIssue.Issue, nil
+	// projectV2 parameters aren't supported in the `createIssue` mutation,
+	// so add them after the issue has been created.
+	projectV2Ids, ok := params["projectV2Ids"].([]string)
+	if ok {
+		projectItems := make(map[string]string, len(projectV2Ids))
+		for _, p := range projectV2Ids {
+			projectItems[p] = issue.ID
+		}
+		err = UpdateProjectV2Items(client, repo, projectItems, nil)
+		if err != nil {
+			return issue, err
+		}
+	}
+
+	return issue, nil
 }
 
 type IssueStatusOptions struct {

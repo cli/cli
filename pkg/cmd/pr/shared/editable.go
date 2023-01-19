@@ -18,7 +18,7 @@ type Editable struct {
 	Reviewers EditableSlice
 	Assignees EditableSlice
 	Labels    EditableSlice
-	Projects  EditableSlice
+	Projects  EditableProjects
 	Milestone EditableString
 	Metadata  api.RepoMetadataResult
 }
@@ -38,6 +38,13 @@ type EditableSlice struct {
 	Options []string
 	Edited  bool
 	Allowed bool
+}
+
+// ProjectsV2 mutations require a mapping of an item ID to a project ID.
+// Keep that map along with standard EditableSlice data.
+type EditableProjects struct {
+	EditableSlice
+	ProjectItems map[string]string
 }
 
 func (e Editable) Dirty() bool {
@@ -120,6 +127,7 @@ func (e Editable) AssigneeIds(client *api.Client, repo ghrepo.Interface) (*[]str
 	return &a, err
 }
 
+// ProjectIds returns a slice containing IDs of projects v1 that the issue or a PR has to be linked to.
 func (e Editable) ProjectIds() (*[]string, error) {
 	if !e.Projects.Edited {
 		return nil, nil
@@ -131,8 +139,51 @@ func (e Editable) ProjectIds() (*[]string, error) {
 		s.RemoveValues(e.Projects.Remove)
 		e.Projects.Value = s.ToSlice()
 	}
-	p, err := e.Metadata.ProjectsToIDs(e.Projects.Value)
+	p, _, err := e.Metadata.ProjectsToIDs(e.Projects.Value)
 	return &p, err
+}
+
+// ProjectV2Ids returns a pair of slices.
+// The first is the projects the item should be added to.
+// The second is the projects the items should be removed from.
+func (e Editable) ProjectV2Ids() (*[]string, *[]string, error) {
+	if !e.Projects.Edited {
+		return nil, nil, nil
+	}
+
+	// titles of projects to add
+	addTitles := set.NewStringSet()
+	addTitles.AddValues(e.Projects.Value)
+	addTitles.AddValues(e.Projects.Add)
+	addTitles.RemoveValues(e.Projects.Default)
+	addTitles.RemoveValues(e.Projects.Remove)
+
+	// titles of projects to remove
+	removeTitles := set.NewStringSet()
+	removeTitles.AddValues(e.Projects.Default)
+	removeTitles.AddValues(e.Projects.Remove)
+	removeTitles.RemoveValues(e.Projects.Value)
+	removeTitles.RemoveValues(e.Projects.Add)
+
+	var addIds []string
+	var removeIds []string
+	var err error
+
+	if addTitles.Len() > 0 {
+		_, addIds, err = e.Metadata.ProjectsToIDs(addTitles.ToSlice())
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	if removeTitles.Len() > 0 {
+		_, removeIds, err = e.Metadata.ProjectsToIDs(removeTitles.ToSlice())
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return &addIds, &removeIds, nil
 }
 
 func (e Editable) MilestoneId() (*string, error) {
@@ -285,8 +336,11 @@ func FetchOptions(client *api.Client, repo ghrepo.Interface, editable *Editable)
 		labels = append(labels, l.Name)
 	}
 	var projects []string
-	for _, l := range metadata.Projects {
-		projects = append(projects, l.Name)
+	for _, p := range metadata.Projects {
+		projects = append(projects, p.Name)
+	}
+	for _, p := range metadata.ProjectsV2 {
+		projects = append(projects, p.Title)
 	}
 	milestones := []string{noMilestone}
 	for _, m := range metadata.Milestones {
