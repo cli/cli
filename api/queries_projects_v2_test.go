@@ -1,7 +1,7 @@
 package api
 
 import (
-	"net/http"
+	"errors"
 	"strings"
 	"testing"
 	"unicode"
@@ -80,41 +80,39 @@ func TestUpdateProjectV2Items(t *testing.T) {
 	}
 }
 
-func TestHasProjectsV2Scope(t *testing.T) {
+func TestProjectsV2ItemsForIssue(t *testing.T) {
 	var tests = []struct {
-		name      string
-		httpStubs func(*httpmock.Registry)
-		expect    bool
+		name        string
+		httpStubs   func(*httpmock.Registry)
+		expectItems ProjectItems
+		expectError bool
 	}{
 		{
-			name: "has project scope",
+			name: "retrieves project items for issue",
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("HEAD", ""),
-					httpmock.ScopesResponder("repo, read:org, project"),
+					httpmock.GraphQL(`query IssueProjectItems\b`),
+					httpmock.GraphQLQuery(`{"data":{"repository":{"issue":{"projectItems":{"nodes": [{"id":"projectItem1"},{"id":"projectItem2"}]}}}}}`,
+						func(query string, inputs map[string]interface{}) {}),
 				)
 			},
-			expect: true,
+			expectItems: ProjectItems{
+				Nodes: []*ProjectV2Item{
+					{ID: "projectItem1"},
+					{ID: "projectItem2"},
+				},
+			},
 		},
 		{
-			name: "has read:project scope",
+			name: "fails to retrieve project items for issue",
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.REST("HEAD", ""),
-					httpmock.ScopesResponder("repo, read:org, read:project"),
+					httpmock.GraphQL(`query IssueProjectItems\b`),
+					httpmock.GraphQLQuery(`{"data":{}, "errors": [{"message": "some gql error"}]}`,
+						func(query string, inputs map[string]interface{}) {}),
 				)
 			},
-			expect: true,
-		},
-		{
-			name: "does not have project scope",
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.REST("HEAD", ""),
-					httpmock.ScopesResponder("repo, read:org"),
-				)
-			},
-			expect: false,
+			expectError: true,
 		},
 	}
 
@@ -125,9 +123,119 @@ func TestHasProjectsV2Scope(t *testing.T) {
 			if tt.httpStubs != nil {
 				tt.httpStubs(reg)
 			}
-			client := &http.Client{Transport: reg}
-			actual := HasProjectsV2Scope(client, "github.com")
-			assert.Equal(t, tt.expect, actual)
+			client := newTestClient(reg)
+			repo, _ := ghrepo.FromFullName("OWNER/REPO")
+			issue := &Issue{Number: 1}
+			err := ProjectsV2ItemsForIssue(client, repo, issue)
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.expectItems, issue.ProjectItems)
+		})
+	}
+}
+
+func TestProjectsV2ItemsForPullRequest(t *testing.T) {
+	var tests = []struct {
+		name        string
+		httpStubs   func(*httpmock.Registry)
+		expectItems ProjectItems
+		expectError bool
+	}{
+		{
+			name: "retrieves project items for pull request",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestProjectItems\b`),
+					httpmock.GraphQLQuery(`{"data":{"repository":{"pullRequest":{"projectItems":{"nodes": [{"id":"projectItem3"},{"id":"projectItem4"}]}}}}}`,
+						func(query string, inputs map[string]interface{}) {}),
+				)
+			},
+			expectItems: ProjectItems{
+				Nodes: []*ProjectV2Item{
+					{ID: "projectItem3"},
+					{ID: "projectItem4"},
+				},
+			},
+		},
+		{
+			name: "fails to retrieve project items for pull request",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query PullRequestProjectItems\b`),
+					httpmock.GraphQLQuery(`{"data":{}, "errors": [{"message": "some gql error"}]}`,
+						func(query string, inputs map[string]interface{}) {}),
+				)
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
+			}
+			client := newTestClient(reg)
+			repo, _ := ghrepo.FromFullName("OWNER/REPO")
+			pr := &PullRequest{Number: 1}
+			err := ProjectsV2ItemsForPullRequest(client, repo, pr)
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.expectItems, pr.ProjectItems)
+		})
+	}
+}
+
+func TestProjectsV2IgnorableError(t *testing.T) {
+	var tests = []struct {
+		name      string
+		errMsg    string
+		expectOut bool
+	}{
+		{
+			name:      "read scope error",
+			errMsg:    "field requires one of the following scopes: ['read:project']",
+			expectOut: true,
+		},
+		{
+			name:      "repository projectsV2 field error",
+			errMsg:    "Field 'ProjectsV2' doesn't exist on type 'Repository'",
+			expectOut: true,
+		},
+		{
+			name:      "organization projectsV2 field error",
+			errMsg:    "Field 'ProjectsV2' doesn't exist on type 'Organization'",
+			expectOut: true,
+		},
+		{
+			name:      "issue projectItems field error",
+			errMsg:    "Field 'ProjectItems' doesn't exist on type 'Issue'",
+			expectOut: true,
+		},
+		{
+			name:      "pullRequest projectItems field error",
+			errMsg:    "Field 'ProjectItems' doesn't exist on type 'PullRequest'",
+			expectOut: true,
+		},
+		{
+			name:      "other error",
+			errMsg:    "some other graphql error message",
+			expectOut: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := errors.New(tt.errMsg)
+			out := ProjectsV2IgnorableError(err)
+			assert.Equal(t, tt.expectOut, out)
 		})
 	}
 }

@@ -2,16 +2,18 @@ package api
 
 import (
 	"fmt"
-	"net/http"
 	"strings"
 
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/shurcooL/githubv4"
 )
 
 const (
-	projectScope = "project"
-	scopesHeader = "X-Oauth-Scopes"
+	errorProjectsV2ReadScope         = "field requires one of the following scopes: ['read:project']"
+	errorProjectsV2RepositoryField   = "Field 'ProjectsV2' doesn't exist on type 'Repository'"
+	errorProjectsV2OrganizationField = "Field 'ProjectsV2' doesn't exist on type 'Organization'"
+	errorProjectsV2IssueField        = "Field 'ProjectItems' doesn't exist on type 'Issue'"
+	errorProjectsV2PullRequestField  = "Field 'ProjectItems' doesn't exist on type 'PullRequest'"
 )
 
 // UpdateProjectV2Items uses the addProjectV2ItemById and the deleteProjectV2Item mutations
@@ -48,19 +50,95 @@ func UpdateProjectV2Items(client *Client, repo ghrepo.Interface, addProjectItems
 	return client.GraphQL(repo.RepoHost(), query, variables, nil)
 }
 
-// If auth token has project scope that means that the host supports
-// projectsV2 and also that the auth token has correct permissions to
-// manipute them.
-func HasProjectsV2Scope(client *http.Client, host string) bool {
-	apiEndpoint := ghinstance.RESTPrefix(host)
-	res, err := client.Head(apiEndpoint)
-	if err != nil {
-		return false
+// ProjectsV2ItemsForIssue fetches all ProjectItems for an issue.
+func ProjectsV2ItemsForIssue(client *Client, repo ghrepo.Interface, issue *Issue) error {
+	type response struct {
+		Repository struct {
+			Issue struct {
+				ProjectItems struct {
+					Nodes    []*ProjectV2Item
+					PageInfo struct {
+						HasNextPage bool
+						EndCursor   string
+					}
+				} `graphql:"projectItems(first: 100, after: $endCursor)"`
+			} `graphql:"issue(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		return false
+	variables := map[string]interface{}{
+		"owner":     githubv4.String(repo.RepoOwner()),
+		"name":      githubv4.String(repo.RepoName()),
+		"number":    githubv4.Int(issue.Number),
+		"endCursor": (*githubv4.String)(nil),
 	}
-	scopes := res.Header.Get(scopesHeader)
-	return strings.Contains(scopes, projectScope)
+	var items ProjectItems
+	for {
+		var query response
+		err := client.Query(repo.RepoHost(), "IssueProjectItems", &query, variables)
+		if err != nil {
+			return err
+		}
+		items.Nodes = append(items.Nodes, query.Repository.Issue.ProjectItems.Nodes...)
+		if !query.Repository.Issue.ProjectItems.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Repository.Issue.ProjectItems.PageInfo.EndCursor)
+	}
+	issue.ProjectItems = items
+	return nil
+}
+
+// ProjectsV2ItemsForPullRequest fetches all ProjectItems for a pull request.
+func ProjectsV2ItemsForPullRequest(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+	type response struct {
+		Repository struct {
+			PullRequest struct {
+				ProjectItems struct {
+					Nodes    []*ProjectV2Item
+					PageInfo struct {
+						HasNextPage bool
+						EndCursor   string
+					}
+				} `graphql:"projectItems(first: 100, after: $endCursor)"`
+			} `graphql:"pullRequest(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+	variables := map[string]interface{}{
+		"owner":     githubv4.String(repo.RepoOwner()),
+		"name":      githubv4.String(repo.RepoName()),
+		"number":    githubv4.Int(pr.Number),
+		"endCursor": (*githubv4.String)(nil),
+	}
+	var items ProjectItems
+	for {
+		var query response
+		err := client.Query(repo.RepoHost(), "PullRequestProjectItems", &query, variables)
+		if err != nil {
+			return err
+		}
+		items.Nodes = append(items.Nodes, query.Repository.PullRequest.ProjectItems.Nodes...)
+		if !query.Repository.PullRequest.ProjectItems.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Repository.PullRequest.ProjectItems.PageInfo.EndCursor)
+	}
+	pr.ProjectItems = items
+	return nil
+}
+
+// When querying ProjectsV2 fields we generally dont want to show the user
+// scope errors and field does not exist errors. ProjectsV2IgnorableError
+// checks against known error strings to see if an error can be safely ignored.
+// Due to the fact that the GQLClient can return multiple types of errors
+// this uses brittle string comparison to check against the known error strings.
+func ProjectsV2IgnorableError(err error) bool {
+	msg := err.Error()
+	if strings.Contains(msg, errorProjectsV2ReadScope) ||
+		strings.Contains(msg, errorProjectsV2RepositoryField) ||
+		strings.Contains(msg, errorProjectsV2OrganizationField) ||
+		strings.Contains(msg, errorProjectsV2IssueField) ||
+		strings.Contains(msg, errorProjectsV2PullRequestField) {
+		return true
+	}
+	return false
 }

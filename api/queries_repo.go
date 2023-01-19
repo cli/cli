@@ -1156,8 +1156,7 @@ func RepoAndOrgProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, e
 func RepoAndOrgProjectsV2(client *Client, repo ghrepo.Interface) ([]RepoProjectV2, error) {
 	projectsV2, err := RepoProjectsV2(client, repo)
 	if err != nil {
-		if !strings.Contains(err.Error(), "Your token has not been granted the required scopes to execute this query") ||
-			!strings.Contains(err.Error(), "Field 'ProjectsV2' doesn't exist on type 'Repository'") {
+		if ProjectsV2IgnorableError(err) {
 			return nil, nil
 		}
 

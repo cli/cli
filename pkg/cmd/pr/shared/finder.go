@@ -139,7 +139,7 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 	fields := set.NewStringSet()
 	fields.AddValues(opts.Fields)
 	numberFieldOnly := fields.Len() == 1 && fields.Contains("number")
-	fields.Add("id") // for additional preload queries below
+	fields.AddValues([]string{"id", "number"}) // for additional preload queries below
 
 	if fields.Contains("isInMergeQueue") || fields.Contains("isMergeQueueEnabled") {
 		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
@@ -154,10 +154,10 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 		}
 	}
 
+	var getProjectItems bool
 	if fields.Contains("projectItems") {
-		if !api.HasProjectsV2Scope(httpClient, f.repo.RepoHost()) {
-			fields.Remove("projectItems")
-		}
+		getProjectItems = true
+		fields.Remove("projectItems")
 	}
 
 	var pr *api.PullRequest
@@ -188,6 +188,16 @@ func (f *finder) Find(opts FindOptions) (*api.PullRequest, ghrepo.Interface, err
 	if fields.Contains("statusCheckRollup") {
 		g.Go(func() error {
 			return preloadPrChecks(httpClient, f.repo, pr)
+		})
+	}
+	if getProjectItems {
+		g.Go(func() error {
+			apiClient := api.NewClientFromHTTP(httpClient)
+			err := api.ProjectsV2ItemsForPullRequest(apiClient, f.repo, pr)
+			if err != nil && !api.ProjectsV2IgnorableError(err) {
+				return err
+			}
+			return nil
 		})
 	}
 

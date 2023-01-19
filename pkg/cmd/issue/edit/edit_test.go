@@ -303,6 +303,7 @@ func Test_editRun(t *testing.T) {
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockIssueGet(t, reg)
+				mockIssueProjectItemsGet(t, reg)
 				mockRepoMetadata(t, reg)
 				mockIssueUpdate(t, reg)
 				mockIssueUpdateLabels(t, reg)
@@ -340,6 +341,7 @@ func Test_editRun(t *testing.T) {
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockIssueGet(t, reg)
+				mockIssueProjectItemsGet(t, reg)
 				mockRepoMetadata(t, reg)
 				mockIssueUpdate(t, reg)
 				mockIssueUpdateLabels(t, reg)
@@ -390,7 +392,16 @@ func mockIssueGet(_ *testing.T, reg *httpmock.Registry) {
 					"nodes": [
 						{ "project": { "name": "Roadmap" } }
 					], "totalCount": 1
-				},
+				}
+			} } } }`),
+	)
+}
+
+func mockIssueProjectItemsGet(_ *testing.T, reg *httpmock.Registry) {
+	reg.Register(
+		httpmock.GraphQL(`query IssueProjectItems\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "issue": {
 				"projectItems": {
 					"nodes": [
 						{ "id": "ITEMID", "project": { "title": "CleanupV2" } }
