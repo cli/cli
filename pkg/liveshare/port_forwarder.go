@@ -196,7 +196,8 @@ func (fwd *PortForwarder) handleConnection(ctx context.Context, id ChannelID, co
 		_, err := io.Copy(w, r)
 		errs <- err
 
-		w.CloseWrite()
+		// Ignore errors here, we call the full Close() later and catch that error
+		_ = w.CloseWrite()
 	}
 
 	var (
