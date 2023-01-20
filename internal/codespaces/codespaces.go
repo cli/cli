@@ -71,7 +71,6 @@ func ConnectToLiveshare(ctx context.Context, progress progressIndicator, session
 	defer progress.StopProgressIndicator()
 
 	return liveshare.Connect(ctx, liveshare.Options{
-		ClientName:     "gh",
 		SessionID:      codespace.Connection.SessionID,
 		SessionToken:   codespace.Connection.SessionToken,
 		RelaySAS:       codespace.Connection.RelaySAS,

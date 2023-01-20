@@ -35,16 +35,27 @@ func startServer(t *testing.T) {
 func createTestInvoker(t *testing.T) Invoker {
 	t.Helper()
 
+	// Clear the stored client activity
+	rpctest.NotifyReceivedActivity = ""
+
 	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
 	if err != nil {
 		t.Fatalf("error connecting to internal server: %v", err)
 	}
 
 	t.Cleanup(func() {
+		testNotifyCodespaceOfClientActivity(t)
 		invoker.Close()
 	})
 
 	return invoker
+}
+
+// Test that the RPC invoker notifies the codespace of client activity on connection
+func testNotifyCodespaceOfClientActivity(t *testing.T) {
+	if rpctest.NotifyReceivedActivity != connectedEventName {
+		t.Fatalf("expected %s, got %s", connectedEventName, rpctest.NotifyMessage)
+	}
 }
 
 // Test that the RPC invoker returns the correct port and URL when the JupyterLab server starts successfully

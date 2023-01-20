@@ -3,7 +3,6 @@ package liveshare
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/opentracing/opentracing-go"
 	"golang.org/x/crypto/ssh"
@@ -23,6 +22,7 @@ type LiveshareSession interface {
 	KeepAlive(string)
 	OpenStreamingChannel(context.Context, ChannelID) (ssh.Channel, error)
 	StartSharing(context.Context, string, int) (ChannelID, error)
+	GetKeepAliveReason() string
 }
 
 // A Session represents the session between a connected Live Share client and server.
@@ -30,7 +30,6 @@ type Session struct {
 	ssh *sshSession
 	rpc *rpcClient
 
-	clientName      string
 	keepAliveReason chan string
 	logger          logger
 }
@@ -48,40 +47,15 @@ func (s *Session) Close() error {
 	return nil
 }
 
+// Fetches the keep alive reason from the channel and returns it.
+func (s *Session) GetKeepAliveReason() string {
+	return <-s.keepAliveReason
+}
+
 // registerRequestHandler registers a handler for the given request type with the RPC
 // server and returns a callback function to deregister the handler
 func (s *Session) registerRequestHandler(requestType string, h handler) func() {
 	return s.rpc.register(requestType, h)
-}
-
-// heartbeat runs until context cancellation, periodically checking whether there is a
-// reason to keep the connection alive, and if so, notifying the Live Share host to do so.
-// Heartbeat ensures it does not send more than one request every "interval" to ratelimit
-// how many KeepAlives we send at a time.
-func (s *Session) heartbeat(ctx context.Context, interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			s.logger.Println("Heartbeat tick")
-			reason := <-s.keepAliveReason
-			s.logger.Println("Keep alive reason: " + reason)
-			if err := s.notifyHostOfActivity(ctx, reason); err != nil {
-				s.logger.Printf("Failed to notify host of activity: %s\n", err)
-			}
-		}
-	}
-}
-
-// notifyHostOfActivity notifies the Live Share host of client activity.
-func (s *Session) notifyHostOfActivity(ctx context.Context, activity string) error {
-	activities := []string{activity}
-	params := []interface{}{s.clientName, activities}
-	return s.rpc.do(ctx, "ICodespaceHostService.notifyCodespaceOfClientActivity", params, nil)
 }
 
 // KeepAlive accepts a reason that is retained if there is no active reason

@@ -145,6 +145,7 @@ func editRun(opts *EditOptions) error {
 	}
 	if opts.Interactive || editable.Projects.Edited {
 		lookupFields = append(lookupFields, "projectCards")
+		lookupFields = append(lookupFields, "projectItems")
 	}
 	if opts.Interactive || editable.Milestone.Edited {
 		lookupFields = append(lookupFields, "milestone")
@@ -159,7 +160,12 @@ func editRun(opts *EditOptions) error {
 	editable.Body.Default = issue.Body
 	editable.Assignees.Default = issue.Assignees.Logins()
 	editable.Labels.Default = issue.Labels.Names()
-	editable.Projects.Default = issue.ProjectCards.ProjectNames()
+	editable.Projects.Default = append(issue.ProjectCards.ProjectNames(), issue.ProjectItems.ProjectTitles()...)
+	projectItems := map[string]string{}
+	for _, n := range issue.ProjectItems.Nodes {
+		projectItems[n.Project.ID] = n.ID
+	}
+	editable.Projects.ProjectItems = projectItems
 	if issue.Milestone != nil {
 		editable.Milestone.Default = issue.Milestone.Title
 	}

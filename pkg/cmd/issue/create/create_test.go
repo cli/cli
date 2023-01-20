@@ -217,6 +217,24 @@ func Test_createRun(t *testing.T) {
 						],
 						"pageInfo": { "hasNextPage": false }
 					} } } }`))
+				r.Register(
+					httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "projectsV2": {
+						"nodes": [
+							{ "title": "CleanupV2", "id": "CLEANUPV2ID", "resourcePath": "/OWNER/REPO/projects/2" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }`))
+				r.Register(
+					httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+					httpmock.StringResponse(`
+					{ "data": { "organization": { "projectsV2": {
+						"nodes": [
+							{ "title": "Triage", "id": "TRIAGEID", "resourcePath": "/orgs/ORG/projects/2"  }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }`))
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?body=&projects=OWNER%2FREPO%2F1",
 			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
@@ -613,6 +631,22 @@ func TestIssueCreate_metadata(t *testing.T) {
 		}
 		`))
 	http.Register(
+		httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projectsV2": {
+			"nodes": [],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+		httpmock.StringResponse(`
+		{	"data": { "organization": { "projectsV2": {
+			"nodes": [],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
 		httpmock.GraphQL(`mutation IssueCreate\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "createIssue": { "issue": {
@@ -625,12 +659,9 @@ func TestIssueCreate_metadata(t *testing.T) {
 			assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
 			assert.Equal(t, []interface{}{"ROADMAPID"}, inputs["projectIds"])
 			assert.Equal(t, "BIGONEID", inputs["milestoneId"])
-			if v, ok := inputs["userIds"]; ok {
-				t.Errorf("did not expect userIds: %v", v)
-			}
-			if v, ok := inputs["teamIds"]; ok {
-				t.Errorf("did not expect teamIds: %v", v)
-			}
+			assert.NotContains(t, inputs, "userIds")
+			assert.NotContains(t, inputs, "teamIds")
+			assert.NotContains(t, inputs, "projectV2Ids")
 		}))
 
 	output, err := runCommand(http, true, `-t TITLE -b BODY -a monalisa -l bug -l todo -p roadmap -m 'big one.oh'`, nil)
@@ -706,6 +737,84 @@ func TestIssueCreate_AtMeAssignee(t *testing.T) {
 		}))
 
 	output, err := runCommand(http, true, `-a @me -a someoneelse -t hello -b "cash rules everything around me"`, nil)
+	if err != nil {
+		t.Errorf("error running command `issue create`: %v", err)
+	}
+
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/12\n", output.String())
+}
+
+func TestIssueCreate_projectsV2(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.StubRepoInfoResponse("OWNER", "REPO", "main")
+	http.Register(
+		httpmock.GraphQL(`query RepositoryProjectList\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projects": {
+			"nodes": [],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query OrganizationProjectList\b`),
+		httpmock.StringResponse(`
+		{	"data": { "organization": { "projects": {
+			"nodes": [],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projectsV2": {
+			"nodes": [
+				{ "title": "CleanupV2", "id": "CLEANUPV2ID" },
+				{ "title": "RoadmapV2", "id": "ROADMAPV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "organization": { "projectsV2": {
+			"nodes": [
+				{ "title": "TriageV2", "id": "TriageV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`mutation IssueCreate\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "createIssue": { "issue": {
+			"id": "Issue#1",
+			"URL": "https://github.com/OWNER/REPO/issues/12"
+		} } } }
+	`, func(inputs map[string]interface{}) {
+			assert.Equal(t, "TITLE", inputs["title"])
+			assert.Equal(t, "BODY", inputs["body"])
+			assert.Nil(t, inputs["projectIds"])
+			assert.NotContains(t, inputs, "projectV2Ids")
+		}))
+	http.Register(
+		httpmock.GraphQL(`mutation UpdateProjectV2Items\b`),
+		httpmock.GraphQLQuery(`
+			{ "data": { "add_000": { "item": {
+				"id": "1"
+			} } } }
+	`, func(mutations string, inputs map[string]interface{}) {
+			variables, err := json.Marshal(inputs)
+			assert.NoError(t, err)
+			expectedMutations := "mutation UpdateProjectV2Items($input_000: AddProjectV2ItemByIdInput!) {add_000: addProjectV2ItemById(input: $input_000) { item { id } }}"
+			expectedVariables := `{"input_000":{"contentId":"Issue#1","projectId":"ROADMAPV2ID"}}`
+			assert.Equal(t, expectedMutations, mutations)
+			assert.Equal(t, expectedVariables, string(variables))
+		}))
+
+	output, err := runCommand(http, true, `-t TITLE -b BODY -p roadmapv2`, nil)
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}

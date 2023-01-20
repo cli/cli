@@ -22,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CodespaceHostClient interface {
+	NotifyCodespaceOfClientActivity(ctx context.Context, in *NotifyCodespaceOfClientActivityRequest, opts ...grpc.CallOption) (*NotifyCodespaceOfClientActivityResponse, error)
 	RebuildContainerAsync(ctx context.Context, in *RebuildContainerRequest, opts ...grpc.CallOption) (*RebuildContainerResponse, error)
 }
 
@@ -31,6 +32,15 @@ type codespaceHostClient struct {
 
 func NewCodespaceHostClient(cc grpc.ClientConnInterface) CodespaceHostClient {
 	return &codespaceHostClient{cc}
+}
+
+func (c *codespaceHostClient) NotifyCodespaceOfClientActivity(ctx context.Context, in *NotifyCodespaceOfClientActivityRequest, opts ...grpc.CallOption) (*NotifyCodespaceOfClientActivityResponse, error) {
+	out := new(NotifyCodespaceOfClientActivityResponse)
+	err := c.cc.Invoke(ctx, "/Codespaces.Grpc.CodespaceHostService.v1.CodespaceHost/NotifyCodespaceOfClientActivity", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *codespaceHostClient) RebuildContainerAsync(ctx context.Context, in *RebuildContainerRequest, opts ...grpc.CallOption) (*RebuildContainerResponse, error) {
@@ -46,6 +56,7 @@ func (c *codespaceHostClient) RebuildContainerAsync(ctx context.Context, in *Reb
 // All implementations must embed UnimplementedCodespaceHostServer
 // for forward compatibility
 type CodespaceHostServer interface {
+	NotifyCodespaceOfClientActivity(context.Context, *NotifyCodespaceOfClientActivityRequest) (*NotifyCodespaceOfClientActivityResponse, error)
 	RebuildContainerAsync(context.Context, *RebuildContainerRequest) (*RebuildContainerResponse, error)
 	mustEmbedUnimplementedCodespaceHostServer()
 }
@@ -54,6 +65,9 @@ type CodespaceHostServer interface {
 type UnimplementedCodespaceHostServer struct {
 }
 
+func (UnimplementedCodespaceHostServer) NotifyCodespaceOfClientActivity(context.Context, *NotifyCodespaceOfClientActivityRequest) (*NotifyCodespaceOfClientActivityResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NotifyCodespaceOfClientActivity not implemented")
+}
 func (UnimplementedCodespaceHostServer) RebuildContainerAsync(context.Context, *RebuildContainerRequest) (*RebuildContainerResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RebuildContainerAsync not implemented")
 }
@@ -68,6 +82,24 @@ type UnsafeCodespaceHostServer interface {
 
 func RegisterCodespaceHostServer(s grpc.ServiceRegistrar, srv CodespaceHostServer) {
 	s.RegisterService(&CodespaceHost_ServiceDesc, srv)
+}
+
+func _CodespaceHost_NotifyCodespaceOfClientActivity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NotifyCodespaceOfClientActivityRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CodespaceHostServer).NotifyCodespaceOfClientActivity(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/Codespaces.Grpc.CodespaceHostService.v1.CodespaceHost/NotifyCodespaceOfClientActivity",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CodespaceHostServer).NotifyCodespaceOfClientActivity(ctx, req.(*NotifyCodespaceOfClientActivityRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _CodespaceHost_RebuildContainerAsync_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -95,6 +127,10 @@ var CodespaceHost_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "Codespaces.Grpc.CodespaceHostService.v1.CodespaceHost",
 	HandlerType: (*CodespaceHostServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "NotifyCodespaceOfClientActivity",
+			Handler:    _CodespaceHost_NotifyCodespaceOfClientActivity_Handler,
+		},
 		{
 			MethodName: "RebuildContainerAsync",
 			Handler:    _CodespaceHost_RebuildContainerAsync_Handler,

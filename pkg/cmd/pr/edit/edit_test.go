@@ -216,9 +216,11 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: shared.Editable{
-					Projects: shared.EditableSlice{
-						Add:    []string{"Cleanup", "Roadmap"},
-						Edited: true,
+					Projects: shared.EditableProjects{
+						EditableSlice: shared.EditableSlice{
+							Add:    []string{"Cleanup", "Roadmap"},
+							Edited: true,
+						},
 					},
 				},
 			},
@@ -230,9 +232,11 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: shared.Editable{
-					Projects: shared.EditableSlice{
-						Remove: []string{"Cleanup", "Roadmap"},
-						Edited: true,
+					Projects: shared.EditableProjects{
+						EditableSlice: shared.EditableSlice{
+							Remove: []string{"Cleanup", "Roadmap"},
+							Edited: true,
+						},
 					},
 				},
 			},
@@ -341,10 +345,12 @@ func Test_editRun(t *testing.T) {
 						Remove: []string{"docs"},
 						Edited: true,
 					},
-					Projects: shared.EditableSlice{
-						Add:    []string{"Cleanup", "Roadmap"},
-						Remove: []string{"Features"},
-						Edited: true,
+					Projects: shared.EditableProjects{
+						EditableSlice: shared.EditableSlice{
+							Add:    []string{"Cleanup", "RoadmapV2"},
+							Remove: []string{"CleanupV2", "Roadmap"},
+							Edited: true,
+						},
 					},
 					Milestone: shared.EditableString{
 						Value:  "GA",
@@ -358,6 +364,7 @@ func Test_editRun(t *testing.T) {
 				mockPullRequestUpdate(t, reg)
 				mockPullRequestReviewersUpdate(t, reg)
 				mockPullRequestUpdateLabels(t, reg)
+				mockProjectV2ItemUpdate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -392,10 +399,12 @@ func Test_editRun(t *testing.T) {
 						Remove: []string{"docs"},
 						Edited: true,
 					},
-					Projects: shared.EditableSlice{
-						Value:  []string{"Cleanup", "Roadmap"},
-						Remove: []string{"Features"},
-						Edited: true,
+					Projects: shared.EditableProjects{
+						EditableSlice: shared.EditableSlice{
+							Add:    []string{"Cleanup", "RoadmapV2"},
+							Remove: []string{"CleanupV2", "Roadmap"},
+							Edited: true,
+						},
 					},
 					Milestone: shared.EditableString{
 						Value:  "GA",
@@ -408,6 +417,7 @@ func Test_editRun(t *testing.T) {
 				mockRepoMetadata(t, reg, true)
 				mockPullRequestUpdate(t, reg)
 				mockPullRequestUpdateLabels(t, reg)
+				mockProjectV2ItemUpdate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -427,6 +437,8 @@ func Test_editRun(t *testing.T) {
 				mockRepoMetadata(t, reg, false)
 				mockPullRequestUpdate(t, reg)
 				mockPullRequestReviewersUpdate(t, reg)
+				mockPullRequestUpdateLabels(t, reg)
+				mockProjectV2ItemUpdate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -445,6 +457,8 @@ func Test_editRun(t *testing.T) {
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockRepoMetadata(t, reg, true)
 				mockPullRequestUpdate(t, reg)
+				mockPullRequestUpdateLabels(t, reg)
+				mockProjectV2ItemUpdate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/pull/123\n",
 		},
@@ -465,6 +479,7 @@ func Test_editRun(t *testing.T) {
 		tt.input.HttpClient = httpClient
 
 		t.Run(tt.name, func(t *testing.T) {
+			fmt.Println(tt.name)
 			err := editRun(tt.input)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.stdout, stdout.String())
@@ -530,6 +545,27 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry, skipReviewers bool) 
 			"pageInfo": { "hasNextPage": false }
 		} } } }
 		`))
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projectsV2": {
+			"nodes": [
+				{ "title": "CleanupV2", "id": "CLEANUPV2ID" },
+				{ "title": "RoadmapV2", "id": "ROADMAPV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	reg.Register(
+		httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "organization": { "projectsV2": {
+			"nodes": [
+				{ "title": "TriageV2", "id": "TRIAGEV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
 	if !skipReviewers {
 		reg.Register(
 			httpmock.GraphQL(`query OrganizationTeamList\b`),
@@ -577,6 +613,15 @@ func mockPullRequestUpdateLabels(t *testing.T, reg *httpmock.Registry) {
 	)
 }
 
+func mockProjectV2ItemUpdate(t *testing.T, reg *httpmock.Registry) {
+	reg.Register(
+		httpmock.GraphQL(`mutation UpdateProjectV2Items\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "add_000": { "item": { "id": "1" } }, "delete_001": { "item": { "id": "2" } } } }`,
+			func(inputs map[string]interface{}) {}),
+	)
+}
+
 type testFetcher struct{}
 type testSurveyor struct {
 	skipReviewers bool
@@ -608,7 +653,11 @@ func (s testSurveyor) EditFields(e *shared.Editable, _ string) error {
 	}
 	e.Assignees.Value = []string{"monalisa", "hubot"}
 	e.Labels.Value = []string{"feature", "TODO", "bug"}
-	e.Projects.Value = []string{"Cleanup", "Roadmap"}
+	e.Labels.Add = []string{"feature", "TODO", "bug"}
+	e.Labels.Remove = []string{"docs"}
+	e.Projects.Value = []string{"Cleanup", "RoadmapV2"}
+	e.Projects.Add = []string{"Cleanup", "RoadmapV2"}
+	e.Projects.Remove = []string{"CleanupV2", "Roadmap"}
 	e.Milestone.Value = "GA"
 	return nil
 }

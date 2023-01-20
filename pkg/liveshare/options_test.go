@@ -41,7 +41,6 @@ func checkBadOptions(t *testing.T, opts Options) {
 
 func TestOptionsURI(t *testing.T) {
 	opts := Options{
-		ClientName:    "liveshare-client",
 		SessionID:     "sess-id",
 		SessionToken:  "sess-token",
 		RelaySAS:      "sas",
