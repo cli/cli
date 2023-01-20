@@ -68,7 +68,7 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 				return runF(opts)
 			}
 
-			return watchRun(opts)
+			return WatchRun(opts)
 		},
 	}
 	cmd.Flags().BoolVar(&opts.ExitStatus, "exit-status", false, "Exit with non-zero status if run fails")
@@ -77,7 +77,7 @@ func NewCmdWatch(f *cmdutil.Factory, runF func(*WatchOptions) error) *cobra.Comm
 	return cmd
 }
 
-func watchRun(opts *WatchOptions) error {
+func WatchRun(opts *WatchOptions) error {
 	c, err := opts.HttpClient()
 	if err != nil {
 		return fmt.Errorf("failed to create http client: %w", err)

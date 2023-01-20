@@ -10,11 +10,15 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	runShared "github.com/cli/cli/v2/pkg/cmd/run/shared"
+	"github.com/cli/cli/v2/pkg/cmd/run/watch"
 	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
+
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -36,6 +40,7 @@ type RunOptions struct {
 	RawFields   []string
 
 	Prompt bool
+	Watch  bool
 }
 
 type iprompter interface {
@@ -132,6 +137,7 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 	cmd.Flags().StringArrayVarP(&opts.MagicFields, "field", "F", nil, "Add a string parameter in `key=value` format, respecting @ syntax")
 	cmd.Flags().StringArrayVarP(&opts.RawFields, "raw-field", "f", nil, "Add a string parameter in `key=value` format")
 	cmd.Flags().BoolVar(&opts.JSON, "json", false, "Read workflow inputs as JSON via STDIN")
+	cmd.Flags().BoolVar(&opts.Watch, "watch", false, "Immediately follow the workflow after starting")
 
 	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "ref")
 
@@ -293,6 +299,29 @@ func runRun(opts *RunOptions) error {
 		}
 	}
 
+	// When `--watch` is given, we want to immediately watch the newly-created
+	// run, which is done by its ID. Unfortunately the dispatch API call does not
+	// return this ID (#4001).
+	//
+	// So we rely on a heuristic: Capture a list of existing run IDs before calling
+	// dispatch, then call the same API a few times hoping a new ID appears, using
+	// it if so. Issue: #3559.
+	existingRunIds := map[int64]bool{}
+	if opts.Watch {
+		var filterOptions = runShared.FilterOptions{
+			WorkflowID: workflow.ID,
+		}
+		runsNow, err := runShared.GetRunsWithFilter(client, repo, &filterOptions, 10, func(run runShared.Run) bool {
+			return run.Status != runShared.Completed
+		})
+		if err != nil {
+			return fmt.Errorf("unable to fetch existing runs for --watch: %w", err)
+		}
+		for _, existingRun := range runsNow {
+			existingRunIds[existingRun.ID] = true
+		}
+	}
+
 	path := fmt.Sprintf("repos/%s/actions/workflows/%d/dispatches",
 		ghrepo.FullName(repo), workflow.ID)
 
@@ -316,11 +345,53 @@ func runRun(opts *RunOptions) error {
 		cs := opts.IO.ColorScheme()
 		fmt.Fprintf(out, "%s Created workflow_dispatch event for %s at %s\n",
 			cs.SuccessIcon(), cs.Cyan(workflow.Base()), cs.Bold(ref))
+		if !opts.Watch {
+			fmt.Fprintln(out)
+			fmt.Fprintf(out, "To see runs for this workflow, try: %s\n",
+				cs.Boldf("gh run list --workflow=%s", workflow.Base()))
+		}
+	}
 
-		fmt.Fprintln(out)
+	if opts.Watch {
+		var runId int64
+		var filterOptions = runShared.FilterOptions{
+			WorkflowID: workflow.ID,
+		}
+		attemptsRemaining := 3
 
-		fmt.Fprintf(out, "To see runs for this workflow, try: %s\n",
-			cs.Boldf("gh run list --workflow=%s", workflow.Base()))
+		for attemptsRemaining > 0 && runId == 0 {
+			newRuns, err := runShared.GetRunsWithFilter(client, repo, &filterOptions, 10, func(run runShared.Run) bool {
+				return run.Status != runShared.Completed && !existingRunIds[run.ID]
+			})
+			if err != nil {
+				return fmt.Errorf("unable to fetch new runs for --watch: %w", err)
+			}
+			if len(newRuns) > 0 {
+				runId = newRuns[0].ID
+			}
+			attemptsRemaining -= 1
+			time.Sleep(1 * time.Second)
+		}
+
+		if runId == 0 {
+			return fmt.Errorf("--watch failed: could not find new run")
+		}
+
+		runIdStr := fmt.Sprint(runId)
+		if opts.IO.IsStdoutTTY() {
+			cs := opts.IO.ColorScheme()
+			fmt.Fprintf(opts.IO.Out, "%s --watch: Found run ID %s\n", cs.SuccessIcon(), cs.Bold(runIdStr))
+		}
+
+		watchOpts := &watch.WatchOptions{
+			IO:         opts.IO,
+			HttpClient: opts.HttpClient,
+			BaseRepo:   opts.BaseRepo,
+			RunID:      runIdStr,
+			Interval:   3,
+			Now:        time.Now,
+		}
+		watch.WatchRun(watchOpts)
 	}
 
 	return nil
