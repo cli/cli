@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net"
 	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
@@ -53,11 +52,10 @@ func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiCl
 	}()
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
-	listen, err := net.Listen("tcp", "127.0.0.1:0") // arbitrary port
+	listen, localPort, err := ListenTCP(0)
 	if err != nil {
 		return err
 	}
-	localPort := listen.Addr().(*net.TCPAddr).Port
 
 	progress.StartProgressIndicatorWithLabel("Fetching SSH Details")
 	invoker, err := rpc.CreateInvoker(ctx, session)
