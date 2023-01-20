@@ -154,7 +154,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 
 	if err != nil {
 		return fmt.Errorf("error checking codespace ownership: %w", err)
-	} else if billableOwner != nil && billableOwner.Type == "Organization" {
+	} else if billableOwner != nil && (billableOwner.Type == "Organization" || billableOwner.Type == "User") {
 		cs := a.io.ColorScheme()
 		fmt.Fprintln(a.io.ErrOut, cs.Blue("  ✓ Codespaces usage for this repository is paid for by "+billableOwner.Login))
 	}
