@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -353,6 +354,20 @@ func Test_NewCmdApi(t *testing.T) {
 			assert.Equal(t, tt.wants.FilterOutput, opts.FilterOutput)
 		})
 	}
+}
+
+func Test_NewCmdApi_WindowsAbsPath(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.SkipNow()
+	}
+
+	cmd := NewCmdApi(&cmdutil.Factory{}, func(opts *ApiOptions) error {
+		return nil
+	})
+
+	cmd.SetArgs([]string{"/users/repos"})
+	_, err := cmd.ExecuteC()
+	assert.EqualError(t, err, "a Windows-style absolute path was passed. drop the leading slash or escape it")
 }
 
 func Test_apiRun(t *testing.T) {
