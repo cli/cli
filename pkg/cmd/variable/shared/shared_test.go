@@ -107,21 +107,21 @@ func TestGetVariableApp(t *testing.T) {
 			want: Actions,
 		},
 		{
-			name:   "Defaults to error for repository",
-			app:    "",
-			entity: Repository,
+			name:    "Defaults to error for repository",
+			app:     "",
+			entity:  Repository,
 			wantErr: true,
 		},
 		{
-			name:   "Defaults to error for organization",
-			app:    "",
-			entity: Organization,
+			name:    "Defaults to error for organization",
+			app:     "",
+			entity:  Organization,
 			wantErr: true,
 		},
 		{
-			name:   "Defaults to error for environment",
-			app:    "",
-			entity: Environment,
+			name:    "Defaults to error for environment",
+			app:     "",
+			entity:  Environment,
 			wantErr: true,
 		},
 		{
@@ -365,7 +365,88 @@ func Test_getVariables_pagination(t *testing.T) {
 	assert.Equal(t, fmt.Sprintf("https://api.github.com/path/to?page=%d&per_page=%d", page, perPage), requests[0].URL.String())
 }
 
+func Test_getVarFromRow(t *testing.T) {
+	tests := []struct {
+		name    string
+		row     string
+		want    VariablePayload
+		org     bool
+		update  bool
+		wantErr bool
+	}{
+		{
+			name: "basic row",
+			row:  "VAR_NAME,var_val",
+			want: VariablePayload{Name: "VAR_NAME", Value: "var_val"},
+		},
+		{
+			name:    "org expect error",
+			row:     "ORG_VAR",
+			org:     true,
+			wantErr: true,
+		},
+		{
+			name: "org basic create",
+			row:  "ORG_VAR,var_val,all",
+			org:  true,
+			want: VariablePayload{Name: "ORG_VAR", Value: "var_val", Visibility: "all"},
+		},
+		{
+			name: "org create private visibility",
+			row:  "ORG_VAR,var_val,private",
+			org:  true,
+			want: VariablePayload{Name: "ORG_VAR", Value: "var_val", Visibility: "private"},
+		},
+		{
+			name:   "org update val and visibility",
+			row:    "ORG_VAR,var_val,,all",
+			org:    true,
+			update: true,
+			want:   VariablePayload{Name: "ORG_VAR", Value: "var_val", Visibility: "all"},
+		},
+		{
+			name:   "org update name, val and visibility",
+			row:    "ORG_VAR,var_val,ORG_VAR_2,selected,private-repo,public-repo",
+			org:    true,
+			update: true,
+			want:   VariablePayload{Name: "ORG_VAR_2", Value: "var_val", Visibility: "selected", Repositories: []int64{1, 2}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+
+			apiClient := api.NewClientFromHTTP(&http.Client{Transport: reg})
+			opts := &PostPatchOptions{
+				HttpClient: func() (*http.Client, error) {
+					return &http.Client{Transport: reg}, nil
+				},
+				Config: func() (config.Config, error) {
+					return config.NewBlankConfig(), nil
+				},
+				BaseRepo: func() (ghrepo.Interface, error) {
+					return ghrepo.FromFullName("owner/repo")
+				},
+			}
+			if strings.Contains(tt.row, "selected") {
+				reg.Register(httpmock.GraphQL(`query MapRepositoryNames\b`),
+					httpmock.StringResponse(`{"data":{"private-repo":{"databaseId":1},"public-repo":{"databaseId":2}}}`))
+			}
+			if tt.org {
+				opts.OrgName = "someOrg"
+			}
+			val, err := getVarFromRow(opts, apiClient, "someHost", strings.Split(tt.row, ","), tt.update)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, val, tt.want)
+			}
+		})
+	}
+}
+
 func fakeRandom() io.Reader {
 	return bytes.NewReader(bytes.Repeat([]byte{5}, 32))
 }
-
