@@ -70,11 +70,11 @@ func CreateInvoker(ctx context.Context, session liveshare.LiveshareSession) (Inv
 
 // Finds a free port to listen on and creates a new RPC invoker that connects to that port
 func connect(ctx context.Context, session liveshare.LiveshareSession) (Invoker, error) {
-	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", 0))
+	listener, err := listenTCP()
 	if err != nil {
-		return nil, fmt.Errorf("failed to listen to local port over tcp: %w", err)
+		return nil, err
 	}
-	localAddress := fmt.Sprintf("127.0.0.1:%d", listener.Addr().(*net.TCPAddr).Port)
+	localAddress := listener.Addr().String()
 
 	invoker := &invoker{
 		session:  session,
@@ -233,6 +233,19 @@ func (i *invoker) StartSSHServerWithOptions(ctx context.Context, options StartSS
 	}
 
 	return port, response.User, nil
+}
+
+func listenTCP() (*net.TCPListener, error) {
+	addr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, fmt.Errorf("failed to build tcp address: %w", err)
+	}
+	listener, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to listen to local port over tcp: %w", err)
+	}
+
+	return listener, nil
 }
 
 // Periodically check whether there is a reason to keep the connection alive, and if so, notify the codespace to do so
