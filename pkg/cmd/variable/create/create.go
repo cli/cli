@@ -29,10 +29,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*shared.PostPatchOptions) error)
 			- environment: available to Actions runs for a deployment environment in a repository
 			- organization: available to Actions runs within an organization
 
-			Organization can optionally be restricted to only be available to
+			Organization variable can optionally be restricted to only be available to
 			specific repositories.
-
-			Variable values are locally value before being sent to GitHub.
 		`),
 		Example: heredoc.Doc(`
 			# Add variable value for the current repository in an interactive prompt
@@ -107,10 +105,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*shared.PostPatchOptions) error)
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Create `organization` variable")
 	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Create deployment `environment` variable")
 	cmdutil.StringEnumFlag(cmd, &opts.Visibility, "visibility", "v", shared.Private, []string{shared.All, shared.Private, shared.Selected}, "Create visibility for an organization variable")
-	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of `repositories` that can access an organization")
+	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of `repositories` that can access an organization variable")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "The value for the variable (reads from standard input if not specified)")
 	cmd.Flags().StringVarP(&opts.CsvFile, "csv-file", "f", "", "Load variable names and values from a csv-formatted `file`")
-	cmdutil.StringEnumFlag(cmd, &opts.Application, "app", "a", shared.Actions, []string{shared.Actions}, "Create the application for a variable")
 
 	return cmd
 }
@@ -150,7 +147,7 @@ func createRun(opts *shared.PostPatchOptions) error {
 		return err
 	}
 
-	variableApp, err := shared.GetVariableApp(opts.Application, variableEntity)
+	variableApp := shared.App(shared.Actions)
 	if err != nil || variableApp == shared.Unknown {
 		return err
 	}

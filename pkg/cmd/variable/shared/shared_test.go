@@ -93,64 +93,6 @@ func TestGetVariableEntity(t *testing.T) {
 	}
 }
 
-func TestGetVariableApp(t *testing.T) {
-	tests := []struct {
-		name    string
-		app     string
-		entity  VariableEntity
-		want    App
-		wantErr bool
-	}{
-		{
-			name: "Actions",
-			app:  "actions",
-			want: Actions,
-		},
-		{
-			name:   "Defaults to error for repository",
-			app:    "",
-			entity: Repository,
-			wantErr: true,
-		},
-		{
-			name:   "Defaults to error for organization",
-			app:    "",
-			entity: Organization,
-			wantErr: true,
-		},
-		{
-			name:   "Defaults to error for environment",
-			app:    "",
-			entity: Environment,
-			wantErr: true,
-		},
-		{
-			name:    "Unknown for invalid apps",
-			app:     "invalid",
-			want:    Unknown,
-			wantErr: true,
-		},
-		{
-			name: "case insensitive",
-			app:  "ACTIONS",
-			want: Actions,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			app, err := GetVariableApp(tt.app, tt.entity)
-			if tt.wantErr {
-				assert.Error(t, err)
-				return
-			} else {
-				assert.NoError(t, err)
-			}
-			assert.Equal(t, tt.want, app)
-		})
-	}
-}
-
 func TestIsSupportedVariableEntity(t *testing.T) {
 	tests := []struct {
 		name                string

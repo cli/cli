@@ -179,18 +179,9 @@ func Test_updateRun_repo(t *testing.T) {
 		{
 			name: "Actions",
 			opts: &shared.PostPatchOptions{
-				Application: "actions",
 			},
 			wantApp: "actions",
 			wantErr: false,
-		},
-		{
-			name: "defaults to unknown",
-			opts: &shared.PostPatchOptions{
-				Application: "",
-			},
-			wantApp: "unknown",
-			wantErr: true,
 		},
 	}
 
@@ -215,7 +206,6 @@ func Test_updateRun_repo(t *testing.T) {
 				VariableName:   "cool_variable",
 				Body:           "a variable",
 				RandomOverride: fakeRandom,
-				Application:    tt.opts.Application,
 			}
 
 			err := updateRun(opts)
@@ -259,7 +249,6 @@ func Test_updateRun_env(t *testing.T) {
 		VariableName:   "cool_variable",
 		Body:           "a variable",
 		RandomOverride: fakeRandom,
-		Application:    "actions",
 	}
 
 	err := updateRun(opts)
@@ -288,7 +277,6 @@ func Test_updateRun_org(t *testing.T) {
 			opts: &shared.PostPatchOptions{
 				OrgName:     "UmbrellaCorporation",
 				Visibility:  shared.All,
-				Application: "actions",
 			},
 			wantApp: "actions",
 		},
@@ -298,7 +286,6 @@ func Test_updateRun_org(t *testing.T) {
 				OrgName:         "UmbrellaCorporation",
 				Visibility:      shared.Selected,
 				RepositoryNames: []string{"birkin", "UmbrellaCorporation/wesker"},
-				Application:     "actions",
 			},
 			wantRepositories: []int64{1, 2},
 			wantApp:          "actions",

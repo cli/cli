@@ -31,8 +31,6 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*shared.PostPatchOptions) error)
 
 			Organization variables can optionally be restricted to only be available to
 			specific repositories.
-
-			Variable values are locally value before being sent to GitHub.
 		`),
 		Example: heredoc.Doc(`
 			# Add variable value for the current repository in an interactive prompt
@@ -110,7 +108,6 @@ func NewCmdUpdate(f *cmdutil.Factory, runF func(*shared.PostPatchOptions) error)
 	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of `repositories` that can access an organization variable")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "The value for the variable (reads from standard input if not specified)")
 	cmd.Flags().StringVarP(&opts.CsvFile, "csv-file", "f", "", "Update names and values from a csv-formatted `file`")
-	cmdutil.StringEnumFlag(cmd, &opts.Application, "app", "a", shared.Actions, []string{shared.Actions}, "Update the application for a variable")
 
 	return cmd
 }
@@ -151,7 +148,7 @@ func updateRun(opts *shared.PostPatchOptions) error {
 		return err
 	}
 
-	variableApp, err := shared.GetVariableApp(opts.Application, variableEntity)
+	variableApp := shared.App(shared.Actions)
 	if err != nil || variableApp == shared.Unknown {
 		return err
 	}

@@ -65,7 +65,6 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	}
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Delete a variable for an organization")
 	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Delete a variable for an environment")
-	cmdutil.StringEnumFlag(cmd, &opts.Application, "app", "a", shared.Actions, []string{shared.Actions}, "Delete a variable for a specific application")
 
 	return cmd
 }
@@ -85,7 +84,7 @@ func removeRun(opts *DeleteOptions) error {
 		return err
 	}
 
-	variableApp, err := shared.GetVariableApp(opts.Application, variableEntity)
+	variableApp := shared.App(shared.Actions)
 	if err != nil || variableApp == shared.Unknown {
 		return err
 	}

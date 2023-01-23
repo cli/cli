@@ -86,7 +86,6 @@ type PostPatchOptions struct {
 	Visibility      string
 	RepositoryNames []string
 	CsvFile         string
-	Application     string
 	Prompter        iprompter
 }
 
@@ -98,7 +97,6 @@ type ListOptions struct {
 
 	OrgName     string
 	EnvName     string
-	Application string
 	Page        int
 	PerPage     int
 	Name        string
@@ -149,15 +147,6 @@ func GetVariableEntity(orgName, envName string) (VariableEntity, error) {
 		return Environment, nil
 	}
 	return Repository, nil
-}
-
-func GetVariableApp(app string, entity VariableEntity) (App, error) {
-	switch strings.ToLower(app) {
-	case Actions:
-		return Actions, nil
-	default:
-		return Unknown, fmt.Errorf("invalid application: %s", app)
-	}
 }
 
 func IsSupportedVariableEntity(app App, entity VariableEntity) bool {
@@ -357,7 +346,6 @@ func getBody(opts *PostPatchOptions, client *api.Client, host string, isUpdate b
 				BaseRepo:    opts.BaseRepo,
 				OrgName:     opts.OrgName,
 				EnvName:     opts.EnvName,
-				Application: opts.Application,
 				Page:        0,
 				PerPage:     0,
 				Name:        opts.VariableName,
@@ -430,7 +418,7 @@ func GetVariablesForList(opts *ListOptions, getSelectedRepoInfo bool) ([]*Variab
 		return nil, err
 	}
 
-	variableApp, err := GetVariableApp(opts.Application, variableEntity)
+	variableApp := App(Actions)
 	if err != nil || variableApp == Unknown {
 		return nil, err
 	}

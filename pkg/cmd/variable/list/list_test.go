@@ -90,7 +90,7 @@ func Test_listRun(t *testing.T) {
 		{
 			name: "repo tty",
 			tty:  true,
-			opts: &shared.ListOptions{ Application: "actions" },
+			opts: &shared.ListOptions{ },
 			wantOut: []string{
 				"VARIABLE_ONE.*Updated 1988-10-11",
 				"VARIABLE_TWO.*Updated 2020-12-04",
@@ -100,7 +100,7 @@ func Test_listRun(t *testing.T) {
 		{
 			name: "repo not tty",
 			tty:  false,
-			opts: &shared.ListOptions{ Application: "actions" },
+			opts: &shared.ListOptions{ },
 			wantOut: []string{
 				"VARIABLE_ONE\tone\t1988-10-11",
 				"VARIABLE_TWO\ttwo\t2020-12-04",
@@ -112,7 +112,6 @@ func Test_listRun(t *testing.T) {
 			tty:  true,
 			opts: &shared.ListOptions{
 				OrgName: "UmbrellaCorporation",
-				Application: "actions",
 			},
 			wantOut: []string{
 				"VARIABLE_ONE.*Updated 1988-10-11.*Visible to all repositories",
@@ -125,7 +124,6 @@ func Test_listRun(t *testing.T) {
 			tty:  false,
 			opts: &shared.ListOptions{
 				OrgName: "UmbrellaCorporation",
-				Application: "actions",
 			},
 			wantOut: []string{
 				"VARIABLE_ONE\torg1\t1988-10-11\tALL",
@@ -138,7 +136,6 @@ func Test_listRun(t *testing.T) {
 			tty:  true,
 			opts: &shared.ListOptions{
 				EnvName: "Development",
-				Application: "actions",
 			},
 			wantOut: []string{
 				"VARIABLE_ONE.*Updated 1988-10-11",
@@ -151,7 +148,6 @@ func Test_listRun(t *testing.T) {
 			tty:  false,
 			opts: &shared.ListOptions{
 				EnvName: "Development",
-				Application: "actions",
 			},
 			wantOut: []string{
 				"VARIABLE_ONE\tone\t1988-10-11",

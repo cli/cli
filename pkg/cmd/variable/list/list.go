@@ -51,7 +51,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*shared.ListOptions) error) *cobra
 	cmd.Flags().IntVar(&opts.Page, "page", 1, "Page Number")
 	cmd.Flags().IntVar(&opts.PerPage, "perpage", 10, "Maximum variable count")
 	cmd.Flags().StringVarP(&opts.Name, "name", "n", "", "Name of a particular variable")
-	cmdutil.StringEnumFlag(cmd, &opts.Application, "app", "a", shared.Actions, []string{shared.Actions}, "List variables for a specific application")
 
 	return cmd
 }
