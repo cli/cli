@@ -37,7 +37,7 @@ func postEnvVariable(client *api.Client, repo ghrepo.Interface, envName string, 
 		Name:  variableName,
 		Value: Value,
 	}
-	path := fmt.Sprintf(`repos/%s/environments/%s/variables`, ghrepo.FullName(repo), envName)
+	path := fmt.Sprintf(`repositories/%s/environments/%s/variables`, ghrepo.FullName(repo), envName)
 	return postVariable(client, repo.RepoHost(), path, payload)
 }
 
@@ -46,6 +46,6 @@ func postRepoVariable(client *api.Client, repo ghrepo.Interface, variableName, V
 		Name:  variableName,
 		Value: Value,
 	}
-	path := fmt.Sprintf(`repos/%s/%s/variables`, ghrepo.FullName(repo), app)
+	path := fmt.Sprintf(`repositories/%s/%s/variables`, ghrepo.FullName(repo), app)
 	return postVariable(client, repo.RepoHost(), path, payload)
 }
