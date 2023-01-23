@@ -184,7 +184,8 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 			"hasIssuesEnabled",
 			"hasProjectsEnabled",
 			"hasWikiEnabled",
-			"hasDiscussionsEnabled",
+			// TODO: GitHub Enterprise Server does not support has_discussions yet
+			// "hasDiscussionsEnabled",
 			"homepageUrl",
 			"isInOrganization",
 			"isTemplate",
@@ -279,7 +280,8 @@ func interactiveChoice(r *api.Repository) ([]string, error) {
 		optionIssues,
 		optionMergeOptions,
 		optionProjects,
-		optionDiscussions,
+		// TODO: GitHub Enterprise Server does not support has_discussions yet
+		// optionDiscussions,
 		optionTemplateRepo,
 		optionTopics,
 		optionVisibility,
