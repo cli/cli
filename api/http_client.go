@@ -1,9 +1,11 @@
 package api
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -12,6 +14,8 @@ import (
 	"github.com/cli/go-gh"
 	ghAPI "github.com/cli/go-gh/pkg/api"
 )
+
+var jsonTypeRE = regexp.MustCompile(`[/+]json($|;)`)
 
 type tokenGetter interface {
 	AuthToken(string) (string, string)
@@ -64,6 +68,8 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		client.Transport = AddAuthTokenHeader(client.Transport, opts.Config)
 	}
 
+	client.Transport = SanitizeASCIIControlCharacters(client.Transport)
+
 	return client, nil
 }
 
@@ -113,6 +119,33 @@ func ExtractHeader(name string, dest *string) func(http.RoundTripper) http.Round
 			return res, err
 		}}
 	}
+}
+
+// GitHub servers return non-printable characters as their unicode code point values.
+// The values of \u0000 to \u001F represent C0 ASCII control characters and
+// the values of \u0080 to \u009F represent C1 ASCII control characters. These control
+// characters will be interpreted by the terminal, this behaviour can be used maliciously
+// as an attack vector, especially the control character \u001B. This function escapes
+// all non-printable characters between \u0000 and \u00FF so that the terminal will
+// not interpret them.
+func SanitizeASCIIControlCharacters(rt http.RoundTripper) http.RoundTripper {
+	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+		res, err := rt.RoundTrip(req)
+		if err != nil ||
+			!jsonTypeRE.MatchString(res.Header.Get("Content-Type")) ||
+			res.ContentLength == 0 {
+			return res, err
+		}
+		body, err := io.ReadAll(res.Body)
+		res.Body.Close()
+		if err != nil {
+			return res, err
+		}
+		sanitized := bytes.ReplaceAll(body, []byte(`\u00`), []byte(`\\u00`))
+		res.Body = io.NopCloser(bytes.NewReader(sanitized))
+		res.ContentLength = int64(len(sanitized))
+		return res, err
+	}}
 }
 
 type funcTripper struct {
