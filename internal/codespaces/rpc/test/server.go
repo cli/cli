@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	ServerPort = 50051
+	ServerPort = 16634
 )
 
 // Mock responses for the `GetRunningServer` RPC method
@@ -87,14 +87,7 @@ func (s *server) StartRemoteServerAsync(ctx context.Context, in *ssh.StartRemote
 	}, nil
 }
 
-// Starts the mock gRPC server listening on port 50051
-func StartServer(ctx context.Context) error {
-	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", ServerPort))
-	if err != nil {
-		return fmt.Errorf("failed to listen: %v", err)
-	}
-	defer listener.Close()
-
+func StartServer(ctx context.Context, listener net.Listener) (err error) {
 	s := grpc.NewServer()
 	jupyter.RegisterJupyterServerHostServer(s, &server{})
 	codespace.RegisterCodespaceHostServer(s, &server{})
@@ -110,7 +103,7 @@ func StartServer(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		s.Stop()
-		return ctx.Err()
+		return nil
 	case err := <-ch:
 		return err
 	}

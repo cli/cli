@@ -3,32 +3,43 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
+	"net"
 	"testing"
+	"time"
 
 	rpctest "github.com/cli/cli/v2/internal/codespaces/rpc/test"
 )
 
 func startServer(t *testing.T) {
 	t.Helper()
-	if os.Getenv("GITHUB_ACTIONS") == "true" {
-		t.Skip("fails intermittently in CI: https://github.com/cli/cli/issues/5663")
-	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", rpctest.ServerPort))
+	if err != nil {
+		t.Fatalf("failed to listen: %v", err)
+	}
+
+	errChan := make(chan error)
+
 	// Start the gRPC server in the background
 	go func() {
-		err := rpctest.StartServer(ctx)
-		if err != nil && err != context.Canceled {
-			log.Println(fmt.Errorf("error starting test server: %v", err))
-		}
+		errChan <- rpctest.StartServer(ctx, listener)
 	}()
 
 	// Stop the gRPC server when the test is done
 	t.Cleanup(func() {
 		cancel()
+
+		select {
+		case err := <-errChan:
+			if err != nil {
+				t.Fatalf("error from test server: %v", err)
+			}
+		case <-time.After(time.Second * 1):
+			t.Fatal("timed out closing test server")
+		}
+
 	})
 }
 
