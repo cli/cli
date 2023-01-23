@@ -40,6 +40,8 @@ func startServer(t *testing.T) {
 			t.Fatal("timed out closing test server")
 		}
 
+		// This should already be closed by rpctest.StartServer, but just in case...
+		listener.Close()
 	})
 }
 
