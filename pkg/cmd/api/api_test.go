@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -353,6 +354,20 @@ func Test_NewCmdApi(t *testing.T) {
 			assert.Equal(t, tt.wants.FilterOutput, opts.FilterOutput)
 		})
 	}
+}
+
+func Test_NewCmdApi_WindowsAbsPath(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.SkipNow()
+	}
+
+	cmd := NewCmdApi(&cmdutil.Factory{}, func(opts *ApiOptions) error {
+		return nil
+	})
+
+	cmd.SetArgs([]string{`C:\users\repos`})
+	_, err := cmd.ExecuteC()
+	assert.EqualError(t, err, `invalid API endpoint: "C:\users\repos". Your shell might be rewriting URL paths as filesystem paths. To avoid this, omit the leading slash from the endpoint argument`)
 }
 
 func Test_apiRun(t *testing.T) {
