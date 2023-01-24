@@ -365,7 +365,7 @@ func Test_NewCmdApi_WindowsAbsPath(t *testing.T) {
 		return nil
 	})
 
-	cmd.SetArgs([]string{"C:\\users\\repos"})
+	cmd.SetArgs([]string{`C:\users\repos`})
 	_, err := cmd.ExecuteC()
 	assert.EqualError(t, err, "a Windows-style absolute path was passed. drop the leading slash or escape it")
 }
