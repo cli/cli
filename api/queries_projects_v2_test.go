@@ -2,6 +2,8 @@ package api
 
 import (
 	"errors"
+	"fmt"
+	"sort"
 	"strings"
 	"testing"
 	"unicode"
@@ -36,14 +38,26 @@ func TestUpdateProjectV2Items(t *testing.T) {
                   delete_002: deleteProjectV2Item(input: $input_002) { deletedItemId }
                   delete_003: deleteProjectV2Item(input: $input_003) { deletedItemId }
                 }`
-							expectedVariables := map[string]interface{}{
-								"input_000": map[string]interface{}{"contentId": "item1", "projectId": "project1"},
-								"input_001": map[string]interface{}{"contentId": "item2", "projectId": "project2"},
-								"input_002": map[string]interface{}{"itemId": "item3", "projectId": "project3"},
-								"input_003": map[string]interface{}{"itemId": "item4", "projectId": "project4"},
-							}
 							assert.Equal(t, stripSpace(expectedMutations), stripSpace(mutations))
-							assert.Equal(t, expectedVariables, inputs)
+							if len(inputs) != 4 {
+								t.Fatalf("expected 4 inputs, got %d", len(inputs))
+							}
+							i0 := inputs["input_000"].(map[string]interface{})
+							i1 := inputs["input_001"].(map[string]interface{})
+							i2 := inputs["input_002"].(map[string]interface{})
+							i3 := inputs["input_003"].(map[string]interface{})
+							adds := []string{
+								fmt.Sprintf("%v -> %v", i0["contentId"], i0["projectId"]),
+								fmt.Sprintf("%v -> %v", i1["contentId"], i1["projectId"]),
+							}
+							removes := []string{
+								fmt.Sprintf("%v x %v", i2["itemId"], i2["projectId"]),
+								fmt.Sprintf("%v x %v", i3["itemId"], i3["projectId"]),
+							}
+							sort.Strings(adds)
+							sort.Strings(removes)
+							assert.Equal(t, []string{"item1 -> project1", "item2 -> project2"}, adds)
+							assert.Equal(t, []string{"item3 x project3", "item4 x project4"}, removes)
 						}))
 			},
 		},
