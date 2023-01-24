@@ -367,7 +367,7 @@ func Test_NewCmdApi_WindowsAbsPath(t *testing.T) {
 
 	cmd.SetArgs([]string{`C:\users\repos`})
 	_, err := cmd.ExecuteC()
-	assert.EqualError(t, err, "a Windows-style absolute path was passed. drop the leading slash or escape it")
+	assert.EqualError(t, err, `invalid API endpoint: "C:\users\repos". Your shell might be rewriting URL paths as filesystem paths. To avoid this, omit the leading slash from the endpoint argument`)
 }
 
 func Test_apiRun(t *testing.T) {
