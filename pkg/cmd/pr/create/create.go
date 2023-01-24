@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -173,16 +172,20 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
 	fl.BoolVarP(&opts.Autofill, "fill", "f", false, "Do not prompt for title/body and just use commit info")
 	fl.StringSliceVarP(&opts.Reviewers, "reviewer", "r", nil, "Request reviews from people or teams by their `handle`")
-	_ = cmd.RegisterFlagCompletionFunc("reviewer", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		results, _ := requestableReviewersForCompletion(opts)
-		return results, cobra.ShellCompDirectiveNoFileComp
-	})
 	fl.StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`. Use \"@me\" to self-assign.")
 	fl.StringSliceVarP(&opts.Labels, "label", "l", nil, "Add labels by `name`")
 	fl.StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the pull request to projects by `name`")
 	fl.StringVarP(&opts.Milestone, "milestone", "m", "", "Add the pull request to a milestone by `name`")
 	fl.Bool("no-maintainer-edit", false, "Disable maintainer's ability to modify pull request")
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
+
+	_ = cmd.RegisterFlagCompletionFunc("reviewer", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		results, err := requestableReviewersForCompletion(opts)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		return results, cobra.ShellCompDirectiveNoFileComp
+	})
 
 	return cmd
 }
@@ -796,13 +799,12 @@ func requestableReviewersForCompletion(opts *CreateOptions) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	client := api.NewClientFromHTTP(httpClient)
 
 	remotes, err := getRemotes(opts)
 	if err != nil {
 		return nil, err
 	}
-	repoContext, err := ghContext.ResolveRemotesToRepos(remotes, client, opts.RepoOverride)
+	repoContext, err := ghContext.ResolveRemotesToRepos(remotes, api.NewClientFromHTTP(httpClient), opts.RepoOverride)
 	if err != nil {
 		return nil, err
 	}
@@ -811,28 +813,7 @@ func requestableReviewersForCompletion(opts *CreateOptions) ([]string, error) {
 		return nil, err
 	}
 
-	metadata, err := api.RepoMetadata(client, baseRepo, api.RepoMetadataInput{Reviewers: true})
-	if err != nil {
-		return nil, err
-	}
-
-	results := []string{}
-	for _, user := range metadata.AssignableUsers {
-		if strings.EqualFold(user.Login, metadata.CurrentLogin) {
-			continue
-		}
-		if user.Name != "" {
-			results = append(results, fmt.Sprintf("%s\t%s", user.Login, user.Name))
-		} else {
-			results = append(results, user.Login)
-		}
-	}
-	for _, team := range metadata.Teams {
-		results = append(results, fmt.Sprintf("%s/%s", baseRepo.RepoOwner(), team.Slug))
-	}
-
-	sort.Strings(results)
-	return results, nil
+	return shared.RequestableReviewersForCompletion(httpClient, baseRepo)
 }
 
 var gitPushRegexp = regexp.MustCompile("^remote: (Create a pull request.*by visiting|[[:space:]]*https://.*/pull/new/).*\n?$")
