@@ -50,6 +50,9 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 			Without an argument, the pull request that belongs to the current branch
 			is selected.
+
+			Editing a pull request's projects requires authorization with the "project" scope.
+			To authorize, run "gh auth refresh -s project".
 		`),
 		Example: heredoc.Doc(`
 			$ gh pr edit 23 --title "I found a bug" --body "Nothing works"
