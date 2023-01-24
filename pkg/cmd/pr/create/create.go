@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -813,26 +814,29 @@ func getAssignableReviewers(opts *CreateOptions) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	baseRepo, err := getBaseRepo(opts, client, repoContext)
+	baseRepo, err := repoContext.BaseRepo(opts.IO)
 	if err != nil {
 		return nil, err
 	}
 
-	metadata, err := api.RepoMetadata(client, baseRepo, api.RepoMetadataInput{
-		Reviewers: true,
-	})
+	metadata, err := api.RepoMetadata(client, baseRepo, api.RepoMetadataInput{Reviewers: true})
 	if err != nil {
 		return nil, err
 	}
+
 	results := []string{}
-
-	currentUser, _ := api.CurrentLoginName(client, baseRepo.RepoHost())
-
 	for _, user := range metadata.AssignableUsers {
-		if user.Login != currentUser {
+		if strings.EqualFold(user.Login, metadata.CurrentLogin) {
+			continue
+		}
+		if user.Name != "" {
+			results = append(results, fmt.Sprintf("%s\t%s", user.Login, user.Name))
+		} else {
 			results = append(results, user.Login)
 		}
 	}
+
+	sort.Strings(results)
 	return results, nil
 }
 
