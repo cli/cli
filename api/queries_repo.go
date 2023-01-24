@@ -45,6 +45,7 @@ type Repository struct {
 	IsSecurityPolicyEnabled bool
 	HasIssuesEnabled        bool
 	HasProjectsEnabled      bool
+	HasDiscussionsEnabled   bool
 	HasWikiEnabled          bool
 	MergeCommitAllowed      bool
 	SquashMergeAllowed      bool
