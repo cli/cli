@@ -348,6 +348,7 @@ var RepositoryFields = []string{
 	"hasIssuesEnabled",
 	"hasProjectsEnabled",
 	"hasWikiEnabled",
+	"hasDiscussionsEnabled",
 	"mergeCommitAllowed",
 	"squashMergeAllowed",
 	"rebaseMergeAllowed",
