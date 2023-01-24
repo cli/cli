@@ -29,12 +29,12 @@ func TestNewCmdDelete(t *testing.T) {
 			input:  "OWNER/REPO --confirm",
 			output: DeleteOptions{RepoArg: "OWNER/REPO", Confirmed: true},
 		},
-        {
-            name:   "yes flag",
-            tty:    true,
-            input:  "OWNER/REPO --yes",
-            output: DeleteOptions{RepoArg: "OWNER/REPO", Confirmed: true},
-        },
+		{
+			name:   "yes flag",
+			tty:    true,
+			input:  "OWNER/REPO --yes",
+			output: DeleteOptions{RepoArg: "OWNER/REPO", Confirmed: true},
+		},
 		{
 			name:    "no confirmation notty",
 			input:   "OWNER/REPO",
