@@ -173,8 +173,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
 	fl.BoolVarP(&opts.Autofill, "fill", "f", false, "Do not prompt for title/body and just use commit info")
 	fl.StringSliceVarP(&opts.Reviewers, "reviewer", "r", nil, "Request reviews from people or teams by their `handle`")
-	cmd.RegisterFlagCompletionFunc("reviewer", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		results, _ := getAssignableReviewers(opts)
+	_ = cmd.RegisterFlagCompletionFunc("reviewer", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		results, _ := requestableReviewersForCompletion(opts)
 		return results, cobra.ShellCompDirectiveNoFileComp
 	})
 	fl.StringSliceVarP(&opts.Assignees, "assignee", "a", nil, "Assign people by their `login`. Use \"@me\" to self-assign.")
@@ -482,8 +482,20 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	if err != nil {
 		return nil, err
 	}
-	baseRepo, err := getBaseRepo(opts, client, repoContext)
-	if err != nil {
+
+	var baseRepo *api.Repository
+	if br, err := repoContext.BaseRepo(opts.IO); err == nil {
+		if r, ok := br.(*api.Repository); ok {
+			baseRepo = r
+		} else {
+			// TODO: if RepoNetwork is going to be requested anyway in `repoContext.HeadRepos()`,
+			// consider piggybacking on that result instead of performing a separate lookup
+			baseRepo, err = api.GitHubRepo(client, br)
+			if err != nil {
+				return nil, err
+			}
+		}
+	} else {
 		return nil, err
 	}
 
@@ -623,25 +635,6 @@ func getRemotes(opts *CreateOptions) (ghContext.Remotes, error) {
 		}
 	}
 	return remotes, nil
-}
-
-func getBaseRepo(opts *CreateOptions, client *api.Client, repoContext *ghContext.ResolvedRemotes) (*api.Repository, error) {
-	var baseRepo *api.Repository
-	if br, err := repoContext.BaseRepo(opts.IO); err == nil {
-		if r, ok := br.(*api.Repository); ok {
-			baseRepo = r
-		} else {
-			// TODO: if RepoNetwork is going to be requested anyway in `repoContext.HeadRepos()`,
-			// consider piggybacking on that result instead of performing a separate lookup
-			baseRepo, err = api.GitHubRepo(client, br)
-			if err != nil {
-				return nil, err
-			}
-		}
-	} else {
-		return nil, err
-	}
-	return baseRepo, nil
 }
 
 func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState) error {
@@ -798,8 +791,7 @@ func humanize(s string) string {
 	return strings.Map(h, s)
 }
 
-// getAssignableReviewers returns a list of user logins that can be added as reviewers
-func getAssignableReviewers(opts *CreateOptions) ([]string, error) {
+func requestableReviewersForCompletion(opts *CreateOptions) ([]string, error) {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
 		return nil, err
@@ -834,6 +826,9 @@ func getAssignableReviewers(opts *CreateOptions) ([]string, error) {
 		} else {
 			results = append(results, user.Login)
 		}
+	}
+	for _, team := range metadata.Teams {
+		results = append(results, fmt.Sprintf("%s/%s", baseRepo.RepoOwner(), team.Slug))
 	}
 
 	sort.Strings(results)
