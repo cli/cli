@@ -33,13 +33,9 @@ func newMockServer() *mockServer {
 	return server
 }
 
-func runTestServer(ctx context.Context, server *mockServer) error {
-	listener, err := net.Listen("tcp", "127.0.0.1:16634")
-	if err != nil {
-		return fmt.Errorf("failed to listen: %w", err)
-	}
-	defer listener.Close()
-
+// runTestGrpcServer serves grpc requests over the provided Listener using the mockServer for mocked callbacks.
+// It does not return until the Context is cancelled and the server fully shuts down.
+func runTestGrpcServer(ctx context.Context, listener net.Listener, server *mockServer) error {
 	s := grpc.NewServer()
 	jupyter.RegisterJupyterServerHostServer(s, server)
 	codespace.RegisterCodespaceHostServer(s, server)
@@ -58,10 +54,34 @@ func runTestServer(ctx context.Context, server *mockServer) error {
 	}
 }
 
-func waitAndReportError(t *testing.T, ch chan error) {
-	if err := <-ch; err != nil {
-		t.Fatalf("error reported from channel: %v", err)
+// createTestInvoker is the main test setup function. It returns an Invoker using the provided mockServer, as well as a shutdown function.
+// The Invoker does not need to be closed directly, that will be handled by the shutdown function.
+func createTestInvoker(t *testing.T, server *mockServer) (Invoker, func(), error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:16634")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to listen: %w", err)
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	ch := make(chan error)
+	go func() { ch <- runTestGrpcServer(ctx, listener, server) }()
+
+	close := func() {
+		cancel()
+		<-ch
+		listener.Close()
+	}
+
+	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
+	if err != nil {
+		close()
+		return nil, nil, fmt.Errorf("error connecting to internal server: %w", err)
+	}
+
+	return invoker, func() {
+		invoker.Close()
+		close()
+	}, nil
 }
 
 // Test that the RPC invoker notifies the codespace of client activity on connection
@@ -95,19 +115,11 @@ func TestStartJupyterServerSuccess(t *testing.T) {
 		return &resp, nil
 	}
 
-	ch := make(chan error)
-	defer waitAndReportError(t, ch)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go func() { ch <- runTestServer(ctx, server) }()
-
-	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
+	invoker, stop, err := createTestInvoker(t, server)
 	if err != nil {
 		t.Fatalf("error connecting to internal server: %v", err)
 	}
-	defer invoker.Close()
+	defer stop()
 
 	port, url, err := invoker.StartJupyterServer(context.Background())
 	if err != nil {
@@ -137,19 +149,11 @@ func TestStartJupyterServerFailure(t *testing.T) {
 		return &resp, nil
 	}
 
-	ch := make(chan error)
-	defer waitAndReportError(t, ch)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go func() { ch <- runTestServer(ctx, server) }()
-
-	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
+	invoker, stop, err := createTestInvoker(t, server)
 	if err != nil {
 		t.Fatalf("error connecting to internal server: %v", err)
 	}
-	defer invoker.Close()
+	defer stop()
 
 	errorMessage := fmt.Sprintf("failed to start JupyterLab: %s", resp.Message)
 	port, url, err := invoker.StartJupyterServer(context.Background())
@@ -177,19 +181,11 @@ func TestRebuildContainerIncremental(t *testing.T) {
 		return &resp, nil
 	}
 
-	ch := make(chan error)
-	defer waitAndReportError(t, ch)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go func() { ch <- runTestServer(ctx, server) }()
-
-	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
+	invoker, stop, err := createTestInvoker(t, server)
 	if err != nil {
 		t.Fatalf("error connecting to internal server: %v", err)
 	}
-	defer invoker.Close()
+	defer stop()
 
 	err = invoker.RebuildContainer(context.Background(), false)
 	if err != nil {
@@ -210,19 +206,11 @@ func TestRebuildContainerFull(t *testing.T) {
 		return &resp, nil
 	}
 
-	ch := make(chan error)
-	defer waitAndReportError(t, ch)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go func() { ch <- runTestServer(ctx, server) }()
-
-	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
+	invoker, stop, err := createTestInvoker(t, server)
 	if err != nil {
 		t.Fatalf("error connecting to internal server: %v", err)
 	}
-	defer invoker.Close()
+	defer stop()
 
 	err = invoker.RebuildContainer(context.Background(), true)
 	if err != nil {
@@ -243,19 +231,11 @@ func TestRebuildContainerFailure(t *testing.T) {
 		return &resp, nil
 	}
 
-	ch := make(chan error)
-	defer waitAndReportError(t, ch)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go func() { ch <- runTestServer(ctx, server) }()
-
-	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
+	invoker, stop, err := createTestInvoker(t, server)
 	if err != nil {
 		t.Fatalf("error connecting to internal server: %v", err)
 	}
-	defer invoker.Close()
+	defer stop()
 
 	errorMessage := "couldn't rebuild codespace"
 	err = invoker.RebuildContainer(context.Background(), true)
@@ -278,19 +258,11 @@ func TestStartSSHServerSuccess(t *testing.T) {
 		return &resp, nil
 	}
 
-	ch := make(chan error)
-	defer waitAndReportError(t, ch)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go func() { ch <- runTestServer(ctx, server) }()
-
-	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
+	invoker, stop, err := createTestInvoker(t, server)
 	if err != nil {
 		t.Fatalf("error connecting to internal server: %v", err)
 	}
-	defer invoker.Close()
+	defer stop()
 
 	port, user, err := invoker.StartSSHServer(context.Background())
 	if err != nil {
@@ -320,19 +292,11 @@ func TestStartSSHServerFailure(t *testing.T) {
 		return &resp, nil
 	}
 
-	ch := make(chan error)
-	defer waitAndReportError(t, ch)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go func() { ch <- runTestServer(ctx, server) }()
-
-	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
+	invoker, stop, err := createTestInvoker(t, server)
 	if err != nil {
 		t.Fatalf("error connecting to internal server: %v", err)
 	}
-	defer invoker.Close()
+	defer stop()
 
 	errorMessage := fmt.Sprintf("failed to start SSH server: %s", resp.Message)
 	port, user, err := invoker.StartSSHServer(context.Background())
