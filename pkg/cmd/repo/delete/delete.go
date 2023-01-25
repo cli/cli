@@ -48,13 +48,15 @@ To authorize, run "gh auth refresh -s delete_repo"`,
 			if len(args) > 0 {
 				opts.RepoArg = args[0]
 			}
+
 			if !opts.IO.CanPrompt() && !opts.Confirmed {
-				return cmdutil.FlagErrorf("--confirm required when not running interactively")
+				return cmdutil.FlagErrorf("--yes or --confirm required when not running interactively, --confirm will be deprecated in the future")
 			}
 
 			if runF != nil {
 				return runF(opts)
 			}
+
 			return deleteRun(opts)
 		},
 	}
