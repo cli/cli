@@ -23,7 +23,9 @@ function generate {
   protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative "$contract"
   echo "Generated protocol buffers for $contract"
 
-  cat "$contract" | grep -Eo "service .+ {" | awk '{print $2}' | xargs -n1 -I{} sh -c "moq -out $contract.mock.go $dir {}Server"
+  services=$(cat "$contract" | grep -Eo "service .+ {" | awk '{print $2 "Server"}')
+  moq -out $contract.mock.go $dir $services
+  echo "Generated mock protocols for $contract"
 }
 
 generate jupyter jupyter_server_host_service.v1.proto
