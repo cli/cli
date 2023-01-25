@@ -182,6 +182,14 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.Bool("no-maintainer-edit", false, "Disable maintainer's ability to modify pull request")
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
 
+	_ = cmd.RegisterFlagCompletionFunc("reviewer", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		results, err := requestableReviewersForCompletion(opts)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		return results, cobra.ShellCompDirectiveNoFileComp
+	})
+
 	return cmd
 }
 
@@ -472,16 +480,10 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	}
 	client := api.NewClientFromHTTP(httpClient)
 
-	// TODO: consider obtaining remotes from GitClient instead
-	remotes, err := opts.Remotes()
+	remotes, err := getRemotes(opts)
 	if err != nil {
-		// When a repo override value is given, ignore errors when fetching git remotes
-		// to support using this command outside of git repos.
-		if opts.RepoOverride == "" {
-			return nil, err
-		}
+		return nil, err
 	}
-
 	repoContext, err := ghContext.ResolveRemotesToRepos(remotes, client, opts.RepoOverride)
 	if err != nil {
 		return nil, err
@@ -626,6 +628,19 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		GitClient:          gitClient,
 	}, nil
 
+}
+
+func getRemotes(opts *CreateOptions) (ghContext.Remotes, error) {
+	// TODO: consider obtaining remotes from GitClient instead
+	remotes, err := opts.Remotes()
+	if err != nil {
+		// When a repo override value is given, ignore errors when fetching git remotes
+		// to support using this command outside of git repos.
+		if opts.RepoOverride == "" {
+			return nil, err
+		}
+	}
+	return remotes, nil
 }
 
 func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState) error {
@@ -780,6 +795,28 @@ func humanize(s string) string {
 		return r
 	}
 	return strings.Map(h, s)
+}
+
+func requestableReviewersForCompletion(opts *CreateOptions) ([]string, error) {
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return nil, err
+	}
+
+	remotes, err := getRemotes(opts)
+	if err != nil {
+		return nil, err
+	}
+	repoContext, err := ghContext.ResolveRemotesToRepos(remotes, api.NewClientFromHTTP(httpClient), opts.RepoOverride)
+	if err != nil {
+		return nil, err
+	}
+	baseRepo, err := repoContext.BaseRepo(opts.IO)
+	if err != nil {
+		return nil, err
+	}
+
+	return shared.RequestableReviewersForCompletion(httpClient, baseRepo)
 }
 
 var gitPushRegexp = regexp.MustCompile("^remote: (Create a pull request.*by visiting|[[:space:]]*https://.*/pull/new/).*\n?$")

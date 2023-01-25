@@ -148,6 +148,24 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd.Flags().StringSliceVar(&opts.Editable.Projects.Remove, "remove-project", nil, "Remove the pull request from projects by `name`")
 	cmd.Flags().StringVarP(&opts.Editable.Milestone.Value, "milestone", "m", "", "Edit the milestone the pull request belongs to by `name`")
 
+	for _, flagName := range []string{"add-reviewer", "remove-reviewer"} {
+		_ = cmd.RegisterFlagCompletionFunc(flagName, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			baseRepo, err := f.BaseRepo()
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+			httpClient, err := f.HttpClient()
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+			results, err := shared.RequestableReviewersForCompletion(httpClient, baseRepo)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveError
+			}
+			return results, cobra.ShellCompDirectiveNoFileComp
+		})
+	}
+
 	return cmd
 }
 
