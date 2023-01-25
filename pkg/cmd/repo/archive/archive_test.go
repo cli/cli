@@ -26,7 +26,7 @@ func TestNewCmdArchive(t *testing.T) {
 		{
 			name:    "no arguments no tty",
 			input:   "",
-			errMsg:  "--confirm required when not running interactively",
+			errMsg:  "--yes required when not running interactively",
 			wantErr: true,
 		},
 		{
