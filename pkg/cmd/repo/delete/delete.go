@@ -62,7 +62,7 @@ To authorize, run "gh auth refresh -s delete_repo"`,
 	}
 
 	cmd.Flags().BoolVar(&opts.Confirmed, "confirm", false, "confirm deletion without prompting")
-	cmd.Flags().MarkDeprecated("confirm", "confirm deletion without prompting")
+	_ = cmd.Flags().MarkDeprecated("confirm", "use `--yes` instead")
 	cmd.Flags().BoolVar(&opts.Confirmed, "yes", false, "confirm deletion without prompting")
 	return cmd
 }
