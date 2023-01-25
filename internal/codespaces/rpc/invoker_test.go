@@ -59,6 +59,12 @@ func runTestServer(ctx context.Context, server *mockServer) error {
 	}
 }
 
+func waitAndReportError(t *testing.T, wg *errgroup.Group) {
+	if err := wg.Wait(); err != nil {
+		t.Fatalf("error reported from errgroup: %v", err)
+	}
+}
+
 // Test that the RPC invoker notifies the codespace of client activity on connection
 func verifyNotifyCodespaceOfClientActivity(t *testing.T, server *mockServer) {
 	calls := server.CodespaceHostServerMock.NotifyCodespaceOfClientActivityCalls()
@@ -91,7 +97,7 @@ func TestStartJupyterServerSuccess(t *testing.T) {
 	}
 
 	var wg errgroup.Group
-	defer wg.Wait()
+	defer waitAndReportError(t, &wg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -133,7 +139,7 @@ func TestStartJupyterServerFailure(t *testing.T) {
 	}
 
 	var wg errgroup.Group
-	defer wg.Wait()
+	defer waitAndReportError(t, &wg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -173,7 +179,7 @@ func TestRebuildContainerIncremental(t *testing.T) {
 	}
 
 	var wg errgroup.Group
-	defer wg.Wait()
+	defer waitAndReportError(t, &wg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -206,7 +212,7 @@ func TestRebuildContainerFull(t *testing.T) {
 	}
 
 	var wg errgroup.Group
-	defer wg.Wait()
+	defer waitAndReportError(t, &wg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -239,7 +245,7 @@ func TestRebuildContainerFailure(t *testing.T) {
 	}
 
 	var wg errgroup.Group
-	defer wg.Wait()
+	defer waitAndReportError(t, &wg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -274,7 +280,7 @@ func TestStartSSHServerSuccess(t *testing.T) {
 	}
 
 	var wg errgroup.Group
-	defer wg.Wait()
+	defer waitAndReportError(t, &wg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -316,7 +322,7 @@ func TestStartSSHServerFailure(t *testing.T) {
 	}
 
 	var wg errgroup.Group
-	defer wg.Wait()
+	defer waitAndReportError(t, &wg)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
