@@ -3,84 +3,159 @@ package rpc
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
+	"net"
+	"strconv"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/codespaces/rpc/codespace"
+	"github.com/cli/cli/v2/internal/codespaces/rpc/jupyter"
+	"github.com/cli/cli/v2/internal/codespaces/rpc/ssh"
 	rpctest "github.com/cli/cli/v2/internal/codespaces/rpc/test"
+	"google.golang.org/grpc"
 )
 
-func startServer(t *testing.T) {
-	t.Helper()
-	if os.Getenv("GITHUB_ACTIONS") == "true" {
-		t.Skip("fails intermittently in CI: https://github.com/cli/cli/issues/5663")
+type mockServer struct {
+	jupyter.JupyterServerHostServerMock
+	codespace.CodespaceHostServerMock
+	ssh.SshServerHostServerMock
+}
+
+func newMockServer() *mockServer {
+	server := &mockServer{}
+
+	server.CodespaceHostServerMock.NotifyCodespaceOfClientActivityFunc = func(context.Context, *codespace.NotifyCodespaceOfClientActivityRequest) (*codespace.NotifyCodespaceOfClientActivityResponse, error) {
+		return &codespace.NotifyCodespaceOfClientActivityResponse{
+			Message: "",
+			Result:  true,
+		}, nil
+	}
+
+	return server
+}
+
+// runTestGrpcServer serves grpc requests over the provided Listener using the mockServer for mocked callbacks.
+// It does not return until the Context is cancelled and the server fully shuts down.
+func runTestGrpcServer(ctx context.Context, listener net.Listener, server *mockServer) error {
+	s := grpc.NewServer()
+	jupyter.RegisterJupyterServerHostServer(s, server)
+	codespace.RegisterCodespaceHostServer(s, server)
+	ssh.RegisterSshServerHostServer(s, server)
+
+	ch := make(chan error, 1)
+	go func() { ch <- s.Serve(listener) }()
+
+	select {
+	case <-ctx.Done():
+		s.Stop()
+		<-ch
+		return nil
+	case err := <-ch:
+		return err
+	}
+}
+
+// createTestInvoker is the main test setup function. It returns an Invoker using the provided mockServer, as well as a shutdown function.
+// The Invoker does not need to be closed directly, that will be handled by the shutdown function.
+func createTestInvoker(t *testing.T, server *mockServer) (Invoker, func(), error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:16634")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to listen: %w", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	ch := make(chan error)
+	go func() { ch <- runTestGrpcServer(ctx, listener, server) }()
 
-	// Start the gRPC server in the background
-	go func() {
-		err := rpctest.StartServer(ctx)
-		if err != nil && err != context.Canceled {
-			log.Println(fmt.Errorf("error starting test server: %v", err))
-		}
-	}()
-
-	// Stop the gRPC server when the test is done
-	t.Cleanup(func() {
+	close := func() {
 		cancel()
-	})
-}
-
-func createTestInvoker(t *testing.T) Invoker {
-	t.Helper()
-
-	// Clear the stored client activity
-	rpctest.NotifyReceivedActivity = ""
+		<-ch
+		listener.Close()
+	}
 
 	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
 	if err != nil {
-		t.Fatalf("error connecting to internal server: %v", err)
+		close()
+		return nil, nil, fmt.Errorf("error connecting to internal server: %w", err)
 	}
 
-	t.Cleanup(func() {
-		testNotifyCodespaceOfClientActivity(t)
+	return invoker, func() {
 		invoker.Close()
-	})
-
-	return invoker
+		close()
+	}, nil
 }
 
 // Test that the RPC invoker notifies the codespace of client activity on connection
-func testNotifyCodespaceOfClientActivity(t *testing.T) {
-	if rpctest.NotifyReceivedActivity != connectedEventName {
-		t.Fatalf("expected %s, got %s", connectedEventName, rpctest.NotifyMessage)
+func verifyNotifyCodespaceOfClientActivity(t *testing.T, server *mockServer) {
+	calls := server.CodespaceHostServerMock.NotifyCodespaceOfClientActivityCalls()
+	if len(calls) == 0 {
+		t.Fatalf("no client activity calls")
 	}
+
+	for _, call := range calls {
+		activities := call.NotifyCodespaceOfClientActivityRequest.GetClientActivities()
+		if activities[0] == connectedEventName {
+			return
+		}
+	}
+
+	t.Fatalf("no activity named %s", connectedEventName)
 }
 
 // Test that the RPC invoker returns the correct port and URL when the JupyterLab server starts successfully
 func TestStartJupyterServerSuccess(t *testing.T) {
-	startServer(t)
-	invoker := createTestInvoker(t)
+	resp := jupyter.GetRunningServerResponse{
+		Port:      strconv.Itoa(1234),
+		ServerUrl: "http://localhost:1234?token=1234",
+		Message:   "",
+		Result:    true,
+	}
+
+	server := newMockServer()
+	server.JupyterServerHostServerMock.GetRunningServerFunc = func(context.Context, *jupyter.GetRunningServerRequest) (*jupyter.GetRunningServerResponse, error) {
+		return &resp, nil
+	}
+
+	invoker, stop, err := createTestInvoker(t, server)
+	if err != nil {
+		t.Fatalf("error connecting to internal server: %v", err)
+	}
+	defer stop()
+
 	port, url, err := invoker.StartJupyterServer(context.Background())
 	if err != nil {
 		t.Fatalf("expected %v, got %v", nil, err)
 	}
-	if port != rpctest.JupyterPort {
-		t.Fatalf("expected %d, got %d", rpctest.JupyterPort, port)
+	if strconv.Itoa(port) != resp.Port {
+		t.Fatalf("expected %s, got %d", resp.Port, port)
 	}
-	if url != rpctest.JupyterServerUrl {
-		t.Fatalf("expected %s, got %s", rpctest.JupyterServerUrl, url)
+	if url != resp.ServerUrl {
+		t.Fatalf("expected %s, got %s", resp.ServerUrl, url)
 	}
+
+	verifyNotifyCodespaceOfClientActivity(t, server)
 }
 
 // Test that the RPC invoker returns an error when the JupyterLab server fails to start
 func TestStartJupyterServerFailure(t *testing.T) {
-	startServer(t)
-	invoker := createTestInvoker(t)
-	rpctest.JupyterMessage = "error message"
-	rpctest.JupyterResult = false
-	errorMessage := fmt.Sprintf("failed to start JupyterLab: %s", rpctest.JupyterMessage)
+	resp := jupyter.GetRunningServerResponse{
+		Port:      strconv.Itoa(1234),
+		ServerUrl: "http://localhost:1234?token=1234",
+		Message:   "error message",
+		Result:    false,
+	}
+
+	server := newMockServer()
+	server.JupyterServerHostServerMock.GetRunningServerFunc = func(context.Context, *jupyter.GetRunningServerRequest) (*jupyter.GetRunningServerResponse, error) {
+		return &resp, nil
+	}
+
+	invoker, stop, err := createTestInvoker(t, server)
+	if err != nil {
+		t.Fatalf("error connecting to internal server: %v", err)
+	}
+	defer stop()
+
+	errorMessage := fmt.Sprintf("failed to start JupyterLab: %s", resp.Message)
 	port, url, err := invoker.StartJupyterServer(context.Background())
 	if err.Error() != errorMessage {
 		t.Fatalf("expected %v, got %v", errorMessage, err)
@@ -91,35 +166,79 @@ func TestStartJupyterServerFailure(t *testing.T) {
 	if url != "" {
 		t.Fatalf("expected %s, got %s", "", url)
 	}
+
+	verifyNotifyCodespaceOfClientActivity(t, server)
 }
 
 // Test that the RPC invoker doesn't throw an error when requesting an incremental rebuild
 func TestRebuildContainerIncremental(t *testing.T) {
-	startServer(t)
-	invoker := createTestInvoker(t)
-	err := invoker.RebuildContainer(context.Background(), false)
+	resp := codespace.RebuildContainerResponse{
+		RebuildContainer: true,
+	}
+
+	server := newMockServer()
+	server.RebuildContainerAsyncFunc = func(context.Context, *codespace.RebuildContainerRequest) (*codespace.RebuildContainerResponse, error) {
+		return &resp, nil
+	}
+
+	invoker, stop, err := createTestInvoker(t, server)
+	if err != nil {
+		t.Fatalf("error connecting to internal server: %v", err)
+	}
+	defer stop()
+
+	err = invoker.RebuildContainer(context.Background(), false)
 	if err != nil {
 		t.Fatalf("expected %v, got %v", nil, err)
 	}
+
+	verifyNotifyCodespaceOfClientActivity(t, server)
 }
 
 // Test that the RPC invoker doesn't throw an error when requesting a full rebuild
 func TestRebuildContainerFull(t *testing.T) {
-	startServer(t)
-	invoker := createTestInvoker(t)
-	err := invoker.RebuildContainer(context.Background(), true)
+	resp := codespace.RebuildContainerResponse{
+		RebuildContainer: true,
+	}
+
+	server := newMockServer()
+	server.RebuildContainerAsyncFunc = func(context.Context, *codespace.RebuildContainerRequest) (*codespace.RebuildContainerResponse, error) {
+		return &resp, nil
+	}
+
+	invoker, stop, err := createTestInvoker(t, server)
+	if err != nil {
+		t.Fatalf("error connecting to internal server: %v", err)
+	}
+	defer stop()
+
+	err = invoker.RebuildContainer(context.Background(), true)
 	if err != nil {
 		t.Fatalf("expected %v, got %v", nil, err)
 	}
+
+	verifyNotifyCodespaceOfClientActivity(t, server)
 }
 
 // Test that the RPC invoker throws an error when the rebuild fails
 func TestRebuildContainerFailure(t *testing.T) {
-	startServer(t)
-	invoker := createTestInvoker(t)
-	rpctest.RebuildContainer = false
+	resp := codespace.RebuildContainerResponse{
+		RebuildContainer: false,
+	}
+
+	server := newMockServer()
+	server.RebuildContainerAsyncFunc = func(context.Context, *codespace.RebuildContainerRequest) (*codespace.RebuildContainerResponse, error) {
+		return &resp, nil
+	}
+
+	invoker, stop, err := createTestInvoker(t, server)
+	if err != nil {
+		t.Fatalf("error connecting to internal server: %v", err)
+	}
+	defer stop()
+
 	errorMessage := "couldn't rebuild codespace"
-	err := invoker.RebuildContainer(context.Background(), true)
+	err = invoker.RebuildContainer(context.Background(), true)
 	if err.Error() != errorMessage {
 		t.Fatalf("expected %v, got %v", errorMessage, err)
 	}
@@ -127,27 +246,59 @@ func TestRebuildContainerFailure(t *testing.T) {
 
 // Test that the RPC invoker returns the correct port and user when the SSH server starts successfully
 func TestStartSSHServerSuccess(t *testing.T) {
-	startServer(t)
-	invoker := createTestInvoker(t)
+	resp := ssh.StartRemoteServerResponse{
+		ServerPort: strconv.Itoa(1234),
+		User:       "test",
+		Message:    "",
+		Result:     true,
+	}
+
+	server := newMockServer()
+	server.StartRemoteServerAsyncFunc = func(context.Context, *ssh.StartRemoteServerRequest) (*ssh.StartRemoteServerResponse, error) {
+		return &resp, nil
+	}
+
+	invoker, stop, err := createTestInvoker(t, server)
+	if err != nil {
+		t.Fatalf("error connecting to internal server: %v", err)
+	}
+	defer stop()
+
 	port, user, err := invoker.StartSSHServer(context.Background())
 	if err != nil {
 		t.Fatalf("expected %v, got %v", nil, err)
 	}
-	if port != rpctest.SshServerPort {
-		t.Fatalf("expected %d, got %d", rpctest.SshServerPort, port)
+	if strconv.Itoa(port) != resp.ServerPort {
+		t.Fatalf("expected %s, got %d", resp.ServerPort, port)
 	}
-	if user != rpctest.SshUser {
-		t.Fatalf("expected %s, got %s", rpctest.SshUser, user)
+	if user != resp.User {
+		t.Fatalf("expected %s, got %s", resp.User, user)
 	}
+
+	verifyNotifyCodespaceOfClientActivity(t, server)
 }
 
 // Test that the RPC invoker returns an error when the SSH server fails to start
 func TestStartSSHServerFailure(t *testing.T) {
-	startServer(t)
-	invoker := createTestInvoker(t)
-	rpctest.SshMessage = "error message"
-	rpctest.SshResult = false
-	errorMessage := fmt.Sprintf("failed to start SSH server: %s", rpctest.SshMessage)
+	resp := ssh.StartRemoteServerResponse{
+		ServerPort: strconv.Itoa(1234),
+		User:       "test",
+		Message:    "error message",
+		Result:     false,
+	}
+
+	server := newMockServer()
+	server.StartRemoteServerAsyncFunc = func(context.Context, *ssh.StartRemoteServerRequest) (*ssh.StartRemoteServerResponse, error) {
+		return &resp, nil
+	}
+
+	invoker, stop, err := createTestInvoker(t, server)
+	if err != nil {
+		t.Fatalf("error connecting to internal server: %v", err)
+	}
+	defer stop()
+
+	errorMessage := fmt.Sprintf("failed to start SSH server: %s", resp.Message)
 	port, user, err := invoker.StartSSHServer(context.Background())
 	if err.Error() != errorMessage {
 		t.Fatalf("expected %v, got %v", errorMessage, err)
