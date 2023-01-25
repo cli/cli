@@ -50,7 +50,7 @@ To authorize, run "gh auth refresh -s delete_repo"`,
 			}
 
 			if !opts.IO.CanPrompt() && !opts.Confirmed {
-				return cmdutil.FlagErrorf("--yes or --confirm required when not running interactively")
+				return cmdutil.FlagErrorf("--yes required when not running interactively")
 			}
 
 			if runF != nil {
@@ -61,7 +61,8 @@ To authorize, run "gh auth refresh -s delete_repo"`,
 		},
 	}
 
-	cmd.Flags().BoolVar(&opts.Confirmed, "confirm", false, "[deprecated] confirm deletion without prompting")
+	cmd.Flags().BoolVar(&opts.Confirmed, "confirm", false, "confirm deletion without prompting")
+    cmd.Flags().MarkDeprecated("confirm", "confirm deletion without prompting")
 	cmd.Flags().BoolVar(&opts.Confirmed, "yes", false, "confirm deletion without prompting")
 	return cmd
 }
