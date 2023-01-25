@@ -2,17 +2,16 @@ package rpc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces/rpc/codespace"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/jupyter"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/ssh"
 	rpctest "github.com/cli/cli/v2/internal/codespaces/rpc/test"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
 
@@ -64,28 +63,6 @@ func runTestServer(ctx context.Context, server *mockServer) error {
 	}
 }
 
-func startTestServer(server *mockServer) func() {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	// Start the gRPC server
-	errChan := make(chan error)
-	go func() { errChan <- runTestServer(ctx, server) }()
-
-	return func() {
-		cancel()
-		waitWithTimeout(errChan, time.Second*1)
-	}
-}
-
-func waitWithTimeout(c chan error, t time.Duration) error {
-	select {
-	case err := <-c:
-		return err
-	case <-time.After(t):
-		return errors.New("timed out waiting for chan")
-	}
-}
-
 // Test that the RPC invoker notifies the codespace of client activity on connection
 func verifyNotifyCodespaceOfClientActivity(t *testing.T, server *mockServer) {
 	calls := server.CodespaceHostServerMock.NotifyCodespaceOfClientActivityCalls()
@@ -113,12 +90,17 @@ func TestStartJupyterServerSuccess(t *testing.T) {
 	}
 
 	server := newMockServer()
-	server.JupyterServerHostServerMock.GetRunningServerFunc = func(contextMoqParam context.Context, getRunningServerRequest *jupyter.GetRunningServerRequest) (*jupyter.GetRunningServerResponse, error) {
+	server.JupyterServerHostServerMock.GetRunningServerFunc = func(context.Context, *jupyter.GetRunningServerRequest) (*jupyter.GetRunningServerResponse, error) {
 		return &resp, nil
 	}
 
-	stopServer := startTestServer(server)
-	defer stopServer()
+	var wg errgroup.Group
+	defer wg.Wait()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	wg.Go(func() error { return runTestServer(ctx, server) })
 
 	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
 	if err != nil {
@@ -150,12 +132,17 @@ func TestStartJupyterServerFailure(t *testing.T) {
 	}
 
 	server := newMockServer()
-	server.JupyterServerHostServerMock.GetRunningServerFunc = func(contextMoqParam context.Context, getRunningServerRequest *jupyter.GetRunningServerRequest) (*jupyter.GetRunningServerResponse, error) {
+	server.JupyterServerHostServerMock.GetRunningServerFunc = func(context.Context, *jupyter.GetRunningServerRequest) (*jupyter.GetRunningServerResponse, error) {
 		return &resp, nil
 	}
 
-	stopServer := startTestServer(server)
-	defer stopServer()
+	var wg errgroup.Group
+	defer wg.Wait()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	wg.Go(func() error { return runTestServer(ctx, server) })
 
 	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
 	if err != nil {
@@ -185,12 +172,17 @@ func TestRebuildContainerIncremental(t *testing.T) {
 	}
 
 	server := newMockServer()
-	server.RebuildContainerAsyncFunc = func(contextMoqParam context.Context, rebuildContainerRequest *codespace.RebuildContainerRequest) (*codespace.RebuildContainerResponse, error) {
+	server.RebuildContainerAsyncFunc = func(context.Context, *codespace.RebuildContainerRequest) (*codespace.RebuildContainerResponse, error) {
 		return &resp, nil
 	}
 
-	stopServer := startTestServer(server)
-	defer stopServer()
+	var wg errgroup.Group
+	defer wg.Wait()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	wg.Go(func() error { return runTestServer(ctx, server) })
 
 	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
 	if err != nil {
@@ -213,12 +205,17 @@ func TestRebuildContainerFull(t *testing.T) {
 	}
 
 	server := newMockServer()
-	server.RebuildContainerAsyncFunc = func(contextMoqParam context.Context, rebuildContainerRequest *codespace.RebuildContainerRequest) (*codespace.RebuildContainerResponse, error) {
+	server.RebuildContainerAsyncFunc = func(context.Context, *codespace.RebuildContainerRequest) (*codespace.RebuildContainerResponse, error) {
 		return &resp, nil
 	}
 
-	stopServer := startTestServer(server)
-	defer stopServer()
+	var wg errgroup.Group
+	defer wg.Wait()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	wg.Go(func() error { return runTestServer(ctx, server) })
 
 	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
 	if err != nil {
@@ -241,12 +238,17 @@ func TestRebuildContainerFailure(t *testing.T) {
 	}
 
 	server := newMockServer()
-	server.RebuildContainerAsyncFunc = func(contextMoqParam context.Context, rebuildContainerRequest *codespace.RebuildContainerRequest) (*codespace.RebuildContainerResponse, error) {
+	server.RebuildContainerAsyncFunc = func(context.Context, *codespace.RebuildContainerRequest) (*codespace.RebuildContainerResponse, error) {
 		return &resp, nil
 	}
 
-	stopServer := startTestServer(server)
-	defer stopServer()
+	var wg errgroup.Group
+	defer wg.Wait()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	wg.Go(func() error { return runTestServer(ctx, server) })
 
 	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
 	if err != nil {
@@ -271,12 +273,17 @@ func TestStartSSHServerSuccess(t *testing.T) {
 	}
 
 	server := newMockServer()
-	server.StartRemoteServerAsyncFunc = func(contextMoqParam context.Context, startRemoteServerRequest *ssh.StartRemoteServerRequest) (*ssh.StartRemoteServerResponse, error) {
+	server.StartRemoteServerAsyncFunc = func(context.Context, *ssh.StartRemoteServerRequest) (*ssh.StartRemoteServerResponse, error) {
 		return &resp, nil
 	}
 
-	stopServer := startTestServer(server)
-	defer stopServer()
+	var wg errgroup.Group
+	defer wg.Wait()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	wg.Go(func() error { return runTestServer(ctx, server) })
 
 	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
 	if err != nil {
@@ -308,12 +315,17 @@ func TestStartSSHServerFailure(t *testing.T) {
 	}
 
 	server := newMockServer()
-	server.StartRemoteServerAsyncFunc = func(contextMoqParam context.Context, startRemoteServerRequest *ssh.StartRemoteServerRequest) (*ssh.StartRemoteServerResponse, error) {
+	server.StartRemoteServerAsyncFunc = func(context.Context, *ssh.StartRemoteServerRequest) (*ssh.StartRemoteServerResponse, error) {
 		return &resp, nil
 	}
 
-	stopServer := startTestServer(server)
-	defer stopServer()
+	var wg errgroup.Group
+	defer wg.Wait()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	wg.Go(func() error { return runTestServer(ctx, server) })
 
 	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
 	if err != nil {
