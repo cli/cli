@@ -15,10 +15,6 @@ import (
 	"google.golang.org/grpc"
 )
 
-const (
-	ServerPort = 16634
-)
-
 type mockServer struct {
 	jupyter.JupyterServerHostServerMock
 	codespace.CodespaceHostServerMock
@@ -28,7 +24,7 @@ type mockServer struct {
 func newMockServer() *mockServer {
 	server := &mockServer{}
 
-	server.CodespaceHostServerMock.NotifyCodespaceOfClientActivityFunc = func(contextMoqParam context.Context, notifyCodespaceOfClientActivityRequest *codespace.NotifyCodespaceOfClientActivityRequest) (*codespace.NotifyCodespaceOfClientActivityResponse, error) {
+	server.CodespaceHostServerMock.NotifyCodespaceOfClientActivityFunc = func(context.Context, *codespace.NotifyCodespaceOfClientActivityRequest) (*codespace.NotifyCodespaceOfClientActivityResponse, error) {
 		return &codespace.NotifyCodespaceOfClientActivityResponse{
 			Message: "",
 			Result:  true,
@@ -39,7 +35,7 @@ func newMockServer() *mockServer {
 }
 
 func runTestServer(ctx context.Context, server *mockServer) error {
-	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", ServerPort))
+	listener, err := net.Listen("tcp", "127.0.0.1:16634")
 	if err != nil {
 		return fmt.Errorf("failed to listen: %w", err)
 	}
