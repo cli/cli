@@ -19,7 +19,6 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
-	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
 )
 
@@ -57,20 +56,8 @@ func (a *App) StopProgressIndicator() {
 	a.io.StopProgressIndicator()
 }
 
-type liveshareSession interface {
-	Close() error
-	GetSharedServers(context.Context) ([]*liveshare.Port, error)
-	KeepAlive(string)
-	OpenStreamingChannel(context.Context, liveshare.ChannelID) (ssh.Channel, error)
-	StartJupyterServer(context.Context) (int, string, error)
-	StartSharing(context.Context, string, int) (liveshare.ChannelID, error)
-	StartSSHServer(context.Context) (int, string, error)
-	StartSSHServerWithOptions(context.Context, liveshare.StartSSHServerOptions) (int, string, error)
-	RebuildContainer(context.Context, bool) error
-}
-
 // Connects to a codespace using Live Share and returns that session
-func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App, debug bool, debugFile string) (session liveshareSession, err error) {
+func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App, debug bool, debugFile string) (session *liveshare.Session, err error) {
 	liveshareLogger := noopLogger()
 	if debug {
 		debugLogger, err := newFileLogger(debugFile)
@@ -277,7 +264,7 @@ func (c codespace) branchWithGitStatus() string {
 // hasUnsavedChanges returns whether the environment has
 // unsaved changes.
 func (c codespace) hasUnsavedChanges() bool {
-	return c.GitStatus.HasUncommitedChanges || c.GitStatus.HasUnpushedChanges
+	return c.GitStatus.HasUncommittedChanges || c.GitStatus.HasUnpushedChanges
 }
 
 // running returns whether the codespace environment is running.

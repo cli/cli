@@ -13,7 +13,19 @@ type Session struct {
 	channel ssh.Channel
 }
 
+func (*Session) Close() error {
+	panic("unimplemented")
+}
+
+func (*Session) GetSharedServers(context.Context) ([]*liveshare.Port, error) {
+	panic("unimplemented")
+}
+
 func (s *Session) KeepAlive(reason string) {
+}
+
+func (s *Session) GetKeepAliveReason() string {
+	return ""
 }
 
 func (s *Session) StartSharing(ctx context.Context, sessionName string, port int) (liveshare.ChannelID, error) {

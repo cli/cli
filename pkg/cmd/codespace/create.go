@@ -67,6 +67,7 @@ type createOptions struct {
 	devContainerPath  string
 	idleTimeout       time.Duration
 	retentionPeriod   NullableDuration
+	displayName       string
 }
 
 func newCreateCmd(app *App) *cobra.Command {
@@ -94,6 +95,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 0, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
 	createCmd.Flags().Var(&opts.retentionPeriod, "retention-period", "allowed time after shutting down before the codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
 	createCmd.Flags().StringVar(&opts.devContainerPath, "devcontainer-path", "", "path to the devcontainer.json file to use when creating codespace")
+	createCmd.Flags().StringVarP(&opts.displayName, "display-name", "d", "", "display name for the codespace")
 
 	return createCmd
 }
@@ -152,7 +154,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 
 	if err != nil {
 		return fmt.Errorf("error checking codespace ownership: %w", err)
-	} else if billableOwner != nil && billableOwner.Type == "Organization" {
+	} else if billableOwner != nil && (billableOwner.Type == "Organization" || billableOwner.Type == "User") {
 		cs := a.io.ColorScheme()
 		fmt.Fprintln(a.io.ErrOut, cs.Blue("  ✓ Codespaces usage for this repository is paid for by "+billableOwner.Login))
 	}
@@ -248,6 +250,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		RetentionPeriodMinutes: opts.retentionPeriod.Minutes(),
 		DevContainerPath:       devContainerPath,
 		PermissionsOptOut:      opts.permissionsOptOut,
+		DisplayName:            opts.displayName,
 	}
 
 	a.StartProgressIndicatorWithLabel("Creating codespace")

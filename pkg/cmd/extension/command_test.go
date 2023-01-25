@@ -605,13 +605,14 @@ func TestNewCmdExtension(t *testing.T) {
 			wantStdout: heredoc.Doc(`
 				✓ Created directory gh-test
 				✓ Initialized git repository
+				✓ Made initial commit
 				✓ Set up extension scaffolding
 
 				gh-test is ready for development!
 
 				Next Steps
 				- run 'cd gh-test; gh extension install .; gh test' to see your new extension in action
-				- commit and use 'gh repo create' to share your extension with others
+				- run 'gh repo create' to share your extension with others
 
 				For more information on writing extensions:
 				https://docs.github.com/github-cli/github-cli/creating-github-cli-extensions
@@ -634,6 +635,7 @@ func TestNewCmdExtension(t *testing.T) {
 			wantStdout: heredoc.Doc(`
 				✓ Created directory gh-test
 				✓ Initialized git repository
+				✓ Made initial commit
 				✓ Set up extension scaffolding
 				✓ Downloaded Go dependencies
 				✓ Built gh-test binary
@@ -642,8 +644,8 @@ func TestNewCmdExtension(t *testing.T) {
 
 				Next Steps
 				- run 'cd gh-test; gh extension install .; gh test' to see your new extension in action
-				- use 'go build && gh test' to see changes in your code as you develop
-				- commit and use 'gh repo create' to share your extension with others
+				- run 'go build && gh test' to see changes in your code as you develop
+				- run 'gh repo create' to share your extension with others
 
 				For more information on writing extensions:
 				https://docs.github.com/github-cli/github-cli/creating-github-cli-extensions
@@ -666,6 +668,7 @@ func TestNewCmdExtension(t *testing.T) {
 			wantStdout: heredoc.Doc(`
 				✓ Created directory gh-test
 				✓ Initialized git repository
+				✓ Made initial commit
 				✓ Set up extension scaffolding
 
 				gh-test is ready for development!
@@ -674,7 +677,7 @@ func TestNewCmdExtension(t *testing.T) {
 				- run 'cd gh-test; gh extension install .' to install your extension locally
 				- fill in script/build.sh with your compilation script for automated builds
 				- compile a gh-test binary locally and run 'gh test' to see changes
-				- commit and use 'gh repo create' to share your extension with others
+				- run 'gh repo create' to share your extension with others
 
 				For more information on writing extensions:
 				https://docs.github.com/github-cli/github-cli/creating-github-cli-extensions
@@ -697,13 +700,44 @@ func TestNewCmdExtension(t *testing.T) {
 			wantStdout: heredoc.Doc(`
 				✓ Created directory gh-test
 				✓ Initialized git repository
+				✓ Made initial commit
 				✓ Set up extension scaffolding
 
 				gh-test is ready for development!
 
 				Next Steps
 				- run 'cd gh-test; gh extension install .; gh test' to see your new extension in action
-				- commit and use 'gh repo create' to share your extension with others
+				- run 'gh repo create' to share your extension with others
+
+				For more information on writing extensions:
+				https://docs.github.com/github-cli/github-cli/creating-github-cli-extensions
+			`),
+		},
+		{
+			name: "create extension tty with argument commit fails",
+			args: []string{"create", "test"},
+			managerStubs: func(em *extensions.ExtensionManagerMock) func(*testing.T) {
+				em.CreateFunc = func(name string, tmplType extensions.ExtTemplateType) error {
+					return ErrInitialCommitFailed
+				}
+				return func(t *testing.T) {
+					calls := em.CreateCalls()
+					assert.Equal(t, 1, len(calls))
+					assert.Equal(t, "gh-test", calls[0].Name)
+				}
+			},
+			isTTY: true,
+			wantStdout: heredoc.Doc(`
+				✓ Created directory gh-test
+				✓ Initialized git repository
+				X Made initial commit
+				✓ Set up extension scaffolding
+
+				gh-test is ready for development!
+
+				Next Steps
+				- run 'cd gh-test; gh extension install .; gh test' to see your new extension in action
+				- run 'gh repo create' to share your extension with others
 
 				For more information on writing extensions:
 				https://docs.github.com/github-cli/github-cli/creating-github-cli-extensions

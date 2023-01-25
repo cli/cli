@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/search"
-	"github.com/cli/cli/v2/utils"
 )
 
 type EntityType int
@@ -95,43 +95,46 @@ func displayIssueResults(io *iostreams.IOStreams, now time.Time, et EntityType, 
 	if now.IsZero() {
 		now = time.Now()
 	}
+	isTTY := io.IsStdoutTTY()
 	cs := io.ColorScheme()
-	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
-	tp := utils.NewTablePrinter(io)
+	tp := tableprinter.New(io)
+	if et == Both {
+		tp.HeaderRow("Kind", "Repo", "ID", "Title", "Labels", "Updated")
+	} else {
+		tp.HeaderRow("Repo", "ID", "Title", "Labels", "Updated")
+	}
 	for _, issue := range results.Items {
 		if et == Both {
 			kind := "issue"
 			if issue.IsPullRequest() {
 				kind = "pr"
 			}
-			tp.AddField(kind, nil, nil)
+			tp.AddField(kind)
 		}
 		comp := strings.Split(issue.RepositoryURL, "/")
 		name := comp[len(comp)-2:]
-		tp.AddField(strings.Join(name, "/"), nil, nil)
+		tp.AddField(strings.Join(name, "/"))
 		issueNum := strconv.Itoa(issue.Number)
-		if tp.IsTTY() {
+		if isTTY {
 			issueNum = "#" + issueNum
 		}
 		if issue.IsPullRequest() {
-			tp.AddField(issueNum, nil, cs.ColorFromString(colorForPRState(issue.State())))
+			color := tableprinter.WithColor(cs.ColorFromString(colorForPRState(issue.State())))
+			tp.AddField(issueNum, color)
 		} else {
-			tp.AddField(issueNum, nil, cs.ColorFromString(colorForIssueState(issue.State(), issue.StateReason)))
+			color := tableprinter.WithColor(cs.ColorFromString(colorForIssueState(issue.State(), issue.StateReason)))
+			tp.AddField(issueNum, color)
 		}
-		if !tp.IsTTY() {
-			tp.AddField(issue.State(), nil, nil)
+		if !isTTY {
+			tp.AddField(issue.State())
 		}
-		tp.AddField(text.RemoveExcessiveWhitespace(issue.Title), nil, nil)
-		tp.AddField(listIssueLabels(&issue, cs, tp.IsTTY()), nil, nil)
-		if tp.IsTTY() {
-			tp.AddField(text.FuzzyAgo(now, issue.UpdatedAt), nil, cs.Gray)
-		} else {
-			tp.AddField(issue.UpdatedAt.String(), nil, nil)
-		}
+		tp.AddField(text.RemoveExcessiveWhitespace(issue.Title))
+		tp.AddField(listIssueLabels(&issue, cs, isTTY))
+		tp.AddTimeField(now, issue.UpdatedAt, cs.Gray)
 		tp.EndRow()
 	}
 
-	if io.IsStdoutTTY() {
+	if isTTY {
 		var header string
 		switch et {
 		case Both:

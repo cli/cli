@@ -7,9 +7,10 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -81,7 +82,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			were added. Override the method with %[1]s--method%[1]s.
 
 			Pass one or more %[1]s-f/--raw-field%[1]s values in "key=value" format to add static string
-			parameters to the request payload. To add non-string or otherwise dynamic values, see
+			parameters to the request payload. To add non-string or placeholder-determined values, see
 			%[1]s--field%[1]s below. Note that adding request parameters will automatically switch the
 			request method to POST. To send the parameters as a GET query string instead, use
 			%[1]s--method GET%[1]s.
@@ -98,9 +99,15 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 			For GraphQL requests, all fields other than "query" and "operationName" are
 			interpreted as GraphQL variables.
 
-			Raw request body may be passed from the outside via a file specified by %[1]s--input%[1]s.
-			Pass "-" to read from standard input. In this mode, parameters specified via
-			%[1]s--field%[1]s flags are serialized into URL query parameters.
+			To pass nested parameters in the request payload, use "key[subkey]=value" syntax when
+			declaring fields. To pass nested values as arrays, declare multiple fields with the
+			syntax "key[]=value1", "key[]=value2". To pass an empty array, use "key[]" without a
+			value.
+
+			To pass pre-constructed JSON or payloads in other formats, a request body may be read
+			from file specified by %[1]s--input%[1]s. Use "-" to read from standard input. When passing the
+			request body this way, any parameters specified via field flags are added to the query
+			string of the endpoint URL.
 
 			In %[1]s--paginate%[1]s mode, all pages of results will sequentially be requested until
 			there are no more pages of results. For GraphQL requests, this requires that the
@@ -113,6 +120,9 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 
 			# post an issue comment
 			$ gh api repos/{owner}/{repo}/issues/123/comments -f body='Hi from CLI'
+
+			# post nested parameter read from a file
+			$ gh api gists -F 'files[myfile.txt][content]=@myfile.txt'
 
 			# add parameters to a GET request
 			$ gh api -X GET search/issues -f q='repo:cli/cli is:open remote'
@@ -174,6 +184,10 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.RequestPath = args[0]
 			opts.RequestMethodPassed = c.Flags().Changed("method")
+
+			if runtime.GOOS == "windows" && filepath.IsAbs(opts.RequestPath) {
+				return fmt.Errorf(`invalid API endpoint: "%s". Your shell might be rewriting URL paths as filesystem paths. To avoid this, omit the leading slash from the endpoint argument`, opts.RequestPath)
+			}
 
 			if c.Flags().Changed("hostname") {
 				if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
@@ -238,7 +252,10 @@ func apiRun(opts *ApiOptions) error {
 	}
 	method := opts.RequestMethod
 	requestHeaders := opts.RequestHeaders
-	var requestBody interface{} = params
+	var requestBody interface{}
+	if len(params) > 0 {
+		requestBody = params
+	}
 
 	if !opts.RequestMethodPassed && (len(params) > 0 || opts.RequestInputFile != "") {
 		method = "POST"
@@ -464,58 +481,6 @@ func printHeaders(w io.Writer, headers http.Header, colorize bool) {
 	}
 	for _, name := range names {
 		fmt.Fprintf(w, "%s%s%s: %s\r\n", headerColor, name, headerColorReset, strings.Join(headers[name], ", "))
-	}
-}
-
-func parseFields(opts *ApiOptions) (map[string]interface{}, error) {
-	params := make(map[string]interface{})
-	for _, f := range opts.RawFields {
-		key, value, err := parseField(f)
-		if err != nil {
-			return params, err
-		}
-		params[key] = value
-	}
-	for _, f := range opts.MagicFields {
-		key, strValue, err := parseField(f)
-		if err != nil {
-			return params, err
-		}
-		value, err := magicFieldValue(strValue, opts)
-		if err != nil {
-			return params, fmt.Errorf("error parsing %q value: %w", key, err)
-		}
-		params[key] = value
-	}
-	return params, nil
-}
-
-func parseField(f string) (string, string, error) {
-	idx := strings.IndexRune(f, '=')
-	if idx == -1 {
-		return f, "", fmt.Errorf("field %q requires a value separated by an '=' sign", f)
-	}
-	return f[0:idx], f[idx+1:], nil
-}
-
-func magicFieldValue(v string, opts *ApiOptions) (interface{}, error) {
-	if strings.HasPrefix(v, "@") {
-		return opts.IO.ReadUserFile(v[1:])
-	}
-
-	if n, err := strconv.Atoi(v); err == nil {
-		return n, nil
-	}
-
-	switch v {
-	case "true":
-		return true, nil
-	case "false":
-		return false, nil
-	case "null":
-		return nil, nil
-	default:
-		return fillPlaceholders(v, opts)
 	}
 }
 

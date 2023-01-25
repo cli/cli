@@ -8,6 +8,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
+	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -156,18 +157,18 @@ func Test_deleteAssetRun(t *testing.T) {
 			ios.SetStderrTTY(tt.isTTY)
 
 			fakeHTTP := &httpmock.Registry{}
-			fakeHTTP.Register(httpmock.REST("GET", "repos/OWNER/REPO/releases/tags/v1.2.3"), httpmock.StringResponse(`{
+			shared.StubFetchRelease(t, fakeHTTP, "OWNER", "REPO", tt.opts.TagName, `{
 				"tag_name": "v1.2.3",
 				"draft": false,
 				"url": "https://api.github.com/repos/OWNER/REPO/releases/23456",
 				"assets": [
-          {
-            "url": "https://api.github.com/repos/OWNER/REPO/releases/assets/1",
-            "id": 1,
-            "name": "test-asset"
-          }
+					{
+						"url": "https://api.github.com/repos/OWNER/REPO/releases/assets/1",
+						"id": 1,
+						"name": "test-asset"
+					}
 				]
-			}`))
+			}`)
 			fakeHTTP.Register(httpmock.REST("DELETE", "repos/OWNER/REPO/releases/assets/1"), httpmock.StatusStringResponse(204, ""))
 
 			pm := &prompter.PrompterMock{}

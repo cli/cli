@@ -1,6 +1,7 @@
 package edit
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -95,7 +96,7 @@ func editRun(tag string, opts *EditOptions) error {
 		return err
 	}
 
-	release, err := shared.FetchRelease(httpClient, baseRepo, tag)
+	release, err := shared.FetchRelease(context.Background(), httpClient, baseRepo, tag)
 	if err != nil {
 		return err
 	}

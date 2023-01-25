@@ -3,6 +3,7 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/tableprinter"
@@ -107,7 +108,7 @@ func listRun(opts *ListOptions) error {
 		if rel.PublishedAt.IsZero() {
 			pubDate = rel.CreatedAt
 		}
-		table.AddTimeField(pubDate, iofmt.Gray)
+		table.AddTimeField(time.Now(), pubDate, iofmt.Gray)
 		table.EndRow()
 	}
 	err = table.Render()

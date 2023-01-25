@@ -178,7 +178,7 @@ func setRun(opts *SetOptions) error {
 	if orgName == "" && !opts.UserSecrets {
 		baseRepo, err = opts.BaseRepo()
 		if err != nil {
-			return fmt.Errorf("could not determine base repo: %w", err)
+			return err
 		}
 		host = baseRepo.RepoHost()
 	} else {

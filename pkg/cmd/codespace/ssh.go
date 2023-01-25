@@ -6,9 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log"
-	"net"
 	"os"
 	"os/exec"
 	"path"
@@ -20,6 +18,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/liveshare"
@@ -147,7 +146,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 
 	sshContext := ssh.Context{}
-	startSSHOptions := liveshare.StartSSHServerOptions{}
+	startSSHOptions := rpc.StartSSHServerOptions{}
 
 	keyPair, shouldAddArg, err := selectSSHKeys(ctx, sshContext, args, opts)
 	if err != nil {
@@ -173,7 +172,13 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	defer safeClose(session, &err)
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	remoteSSHServerPort, sshUser, err := session.StartSSHServerWithOptions(ctx, startSSHOptions)
+	invoker, err := rpc.CreateInvoker(ctx, session)
+	if err != nil {
+		return err
+	}
+	defer safeClose(invoker, &err)
+
+	remoteSSHServerPort, sshUser, err := invoker.StartSSHServerWithOptions(ctx, startSSHOptions)
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
@@ -181,7 +186,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 
 	if opts.stdio {
 		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
-		stdio := newReadWriteCloser(os.Stdin, os.Stdout)
+		stdio := liveshare.NewReadWriteHalfCloser(os.Stdin, os.Stdout)
 		err := fwd.Forward(ctx, stdio) // always non-nil
 		return fmt.Errorf("tunnel closed: %w", err)
 	}
@@ -192,12 +197,11 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	// Ensure local port is listening before client (Shell) connects.
 	// Unless the user specifies a server port, localSSHServerPort is 0
 	// and thus the client will pick a random port.
-	listen, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", localSSHServerPort))
+	listen, localSSHServerPort, err := codespaces.ListenTCP(localSSHServerPort)
 	if err != nil {
 		return err
 	}
 	defer listen.Close()
-	localSSHServerPort = listen.Addr().(*net.TCPAddr).Port
 
 	connectDestination := opts.profile
 	if connectDestination == "" {
@@ -508,11 +512,18 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 			} else {
 				defer safeClose(session, &err)
 
-				_, result.user, err = session.StartSSHServer(ctx)
+				invoker, err := rpc.CreateInvoker(ctx, session)
 				if err != nil {
-					result.err = fmt.Errorf("error getting ssh server details: %w", err)
+					result.err = fmt.Errorf("error connecting to codespace: %w", err)
 				} else {
-					result.codespace = cs
+					defer safeClose(invoker, &err)
+
+					_, result.user, err = invoker.StartSSHServer(ctx)
+					if err != nil {
+						result.err = fmt.Errorf("error getting ssh server details: %w", err)
+					} else {
+						result.codespace = cs
+					}
 				}
 			}
 
@@ -730,22 +741,4 @@ func (fl *fileLogger) Name() string {
 
 func (fl *fileLogger) Close() error {
 	return fl.f.Close()
-}
-
-type combinedReadWriteCloser struct {
-	io.ReadCloser
-	io.WriteCloser
-}
-
-func newReadWriteCloser(reader io.ReadCloser, writer io.WriteCloser) io.ReadWriteCloser {
-	return &combinedReadWriteCloser{reader, writer}
-}
-
-func (crwc *combinedReadWriteCloser) Close() error {
-	werr := crwc.WriteCloser.Close()
-	rerr := crwc.ReadCloser.Close()
-	if werr != nil {
-		return werr
-	}
-	return rerr
 }

@@ -426,6 +426,7 @@ func createRun(opts *CreateOptions) error {
 	}
 
 	hasAssets := len(opts.Assets) > 0
+	draftWhileUploading := false
 
 	if hasAssets && !opts.Draft {
 		// Check for an existing release
@@ -437,11 +438,22 @@ func createRun(opts *CreateOptions) error {
 			}
 		}
 		// Save the release initially as draft and publish it after all assets have finished uploading
+		draftWhileUploading = true
 		params["draft"] = true
 	}
 
 	newRelease, err := createRelease(httpClient, baseRepo, params)
 	if err != nil {
+		return err
+	}
+
+	cleanupDraftRelease := func(err error) error {
+		if !draftWhileUploading {
+			return err
+		}
+		if cleanupErr := deleteRelease(httpClient, newRelease); cleanupErr != nil {
+			return fmt.Errorf("%w\ncleaning up draft failed: %v", err, cleanupErr)
+		}
 		return err
 	}
 
@@ -455,13 +467,13 @@ func createRun(opts *CreateOptions) error {
 		err = shared.ConcurrentUpload(httpClient, uploadURL, opts.Concurrency, opts.Assets)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
-			return err
+			return cleanupDraftRelease(err)
 		}
 
-		if !opts.Draft {
+		if draftWhileUploading {
 			rel, err := publishRelease(httpClient, newRelease.APIURL, opts.DiscussionCategory)
 			if err != nil {
-				return err
+				return cleanupDraftRelease(err)
 			}
 			newRelease = rel
 		}

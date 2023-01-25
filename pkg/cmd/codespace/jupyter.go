@@ -6,7 +6,8 @@ import (
 	"net"
 	"strings"
 
-	"github.com/cli/cli/v2/internal/codespaces/grpc"
+	"github.com/cli/cli/v2/internal/codespaces"
+	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
 )
@@ -45,20 +46,20 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	defer safeClose(session, &err)
 
 	a.StartProgressIndicatorWithLabel("Starting JupyterLab on codespace")
-	client, err := connectToGRPCServer(ctx, session, codespace.Connection.SessionToken)
+	invoker, err := rpc.CreateInvoker(ctx, session)
 	if err != nil {
-		return fmt.Errorf("failed to connect to internal server: %w", err)
+		return err
 	}
-	defer safeClose(client, &err)
+	defer safeClose(invoker, &err)
 
-	serverPort, serverUrl, err := startJupyterServer(ctx, client)
+	serverPort, serverUrl, err := invoker.StartJupyterServer(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to start JupyterLab server: %w", err)
 	}
 	a.StopProgressIndicator()
 
 	// Pass 0 to pick a random port
-	listen, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", 0))
+	listen, _, err := codespaces.ListenTCP(0)
 	if err != nil {
 		return err
 	}
@@ -86,28 +87,4 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	case <-ctx.Done():
 		return nil // success
 	}
-}
-
-func connectToGRPCServer(ctx context.Context, session liveshareSession, token string) (*grpc.Client, error) {
-	ctx, cancel := context.WithTimeout(ctx, grpc.ConnectionTimeout)
-	defer cancel()
-
-	client, err := grpc.Connect(ctx, session, token)
-	if err != nil {
-		return nil, fmt.Errorf("error connecting to internal server: %w", err)
-	}
-
-	return client, nil
-}
-
-func startJupyterServer(ctx context.Context, client *grpc.Client) (int, string, error) {
-	ctx, cancel := context.WithTimeout(ctx, grpc.RequestTimeout)
-	defer cancel()
-
-	serverPort, serverUrl, err := client.StartJupyterServer(ctx)
-	if err != nil {
-		return 0, "", fmt.Errorf("failed to start JupyterLab server: %w", err)
-	}
-
-	return serverPort, serverUrl, nil
 }

@@ -20,6 +20,10 @@ import (
 
 var remoteRE = regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
 
+type errWithExitCode interface {
+	ExitCode() int
+}
+
 type Client struct {
 	GhPath  string
 	RepoDir string
@@ -487,6 +491,31 @@ func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBra
 		PushURL:  urlParsed,
 	}
 	return remote, nil
+}
+
+func (c *Client) IsLocalGitRepo(ctx context.Context) (bool, error) {
+	_, err := c.GitDir(ctx)
+	if err != nil {
+		var execError errWithExitCode
+		if errors.As(err, &execError) && execError.ExitCode() == 128 {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func (c *Client) UnsetRemoteResolution(ctx context.Context, name string) error {
+	args := []string{"config", "--unset", fmt.Sprintf("remote.%s.gh-resolved", name)}
+	cmd, err := c.Command(ctx, args...)
+	if err != nil {
+		return err
+	}
+	_, err = cmd.Output()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func resolveGitPath() (string, error) {
