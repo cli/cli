@@ -11,7 +11,6 @@ import (
 	"github.com/cli/cli/v2/internal/codespaces/rpc/jupyter"
 	"github.com/cli/cli/v2/internal/codespaces/rpc/ssh"
 	rpctest "github.com/cli/cli/v2/internal/codespaces/rpc/test"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
 
@@ -59,9 +58,9 @@ func runTestServer(ctx context.Context, server *mockServer) error {
 	}
 }
 
-func waitAndReportError(t *testing.T, wg *errgroup.Group) {
-	if err := wg.Wait(); err != nil {
-		t.Fatalf("error reported from errgroup: %v", err)
+func waitAndReportError(t *testing.T, ch chan error) {
+	if err := <-ch; err != nil {
+		t.Fatalf("error reported from channel: %v", err)
 	}
 }
 
@@ -96,13 +95,13 @@ func TestStartJupyterServerSuccess(t *testing.T) {
 		return &resp, nil
 	}
 
-	var wg errgroup.Group
-	defer waitAndReportError(t, &wg)
+	ch := make(chan error)
+	defer waitAndReportError(t, ch)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	wg.Go(func() error { return runTestServer(ctx, server) })
+	go func() { ch <- runTestServer(ctx, server) }()
 
 	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
 	if err != nil {
@@ -138,13 +137,13 @@ func TestStartJupyterServerFailure(t *testing.T) {
 		return &resp, nil
 	}
 
-	var wg errgroup.Group
-	defer waitAndReportError(t, &wg)
+	ch := make(chan error)
+	defer waitAndReportError(t, ch)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	wg.Go(func() error { return runTestServer(ctx, server) })
+	go func() { ch <- runTestServer(ctx, server) }()
 
 	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
 	if err != nil {
@@ -178,13 +177,13 @@ func TestRebuildContainerIncremental(t *testing.T) {
 		return &resp, nil
 	}
 
-	var wg errgroup.Group
-	defer waitAndReportError(t, &wg)
+	ch := make(chan error)
+	defer waitAndReportError(t, ch)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	wg.Go(func() error { return runTestServer(ctx, server) })
+	go func() { ch <- runTestServer(ctx, server) }()
 
 	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
 	if err != nil {
@@ -211,13 +210,13 @@ func TestRebuildContainerFull(t *testing.T) {
 		return &resp, nil
 	}
 
-	var wg errgroup.Group
-	defer waitAndReportError(t, &wg)
+	ch := make(chan error)
+	defer waitAndReportError(t, ch)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	wg.Go(func() error { return runTestServer(ctx, server) })
+	go func() { ch <- runTestServer(ctx, server) }()
 
 	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
 	if err != nil {
@@ -244,13 +243,13 @@ func TestRebuildContainerFailure(t *testing.T) {
 		return &resp, nil
 	}
 
-	var wg errgroup.Group
-	defer waitAndReportError(t, &wg)
+	ch := make(chan error)
+	defer waitAndReportError(t, ch)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	wg.Go(func() error { return runTestServer(ctx, server) })
+	go func() { ch <- runTestServer(ctx, server) }()
 
 	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
 	if err != nil {
@@ -279,13 +278,13 @@ func TestStartSSHServerSuccess(t *testing.T) {
 		return &resp, nil
 	}
 
-	var wg errgroup.Group
-	defer waitAndReportError(t, &wg)
+	ch := make(chan error)
+	defer waitAndReportError(t, ch)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	wg.Go(func() error { return runTestServer(ctx, server) })
+	go func() { ch <- runTestServer(ctx, server) }()
 
 	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
 	if err != nil {
@@ -321,13 +320,13 @@ func TestStartSSHServerFailure(t *testing.T) {
 		return &resp, nil
 	}
 
-	var wg errgroup.Group
-	defer waitAndReportError(t, &wg)
+	ch := make(chan error)
+	defer waitAndReportError(t, ch)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	wg.Go(func() error { return runTestServer(ctx, server) })
+	go func() { ch <- runTestServer(ctx, server) }()
 
 	invoker, err := CreateInvoker(context.Background(), &rpctest.Session{})
 	if err != nil {
