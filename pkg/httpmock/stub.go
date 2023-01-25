@@ -24,6 +24,10 @@ func MatchAny(*http.Request) bool {
 	return true
 }
 
+// REST returns a matcher to a request for the HTTP method and URL escaped path p.
+// For example, to match a GET request to `/api/v3/repos/octocat/hello-world/`
+// use REST("GET", "api/v3/repos/octocat/hello-world")
+// To match a GET request to `/user` use REST("GET", "user")
 func REST(method, p string) Matcher {
 	return func(req *http.Request) bool {
 		if !strings.EqualFold(req.Method, method) {
