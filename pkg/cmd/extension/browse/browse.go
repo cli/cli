@@ -114,9 +114,7 @@ func newExtList(opts ExtBrowseOpts, ui uiRegistry, extEntries []extEntry) *extLi
 	return el
 }
 
-// TODO use pages for this
 func (el *extList) createModal() *tview.Modal {
-	// TODO this should be put on a page and the page should be switched to and away from
 	m := tview.NewModal()
 	m.SetBackgroundColor(tcell.ColorPurple)
 	m.SetDoneFunc(func(_ int, _ string) {
@@ -451,11 +449,9 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	outerFlex.AddItem(innerFlex, 0, 1, true)
 	outerFlex.AddItem(help, 1, -1, false)
 
-	// TODO better name
 	helpBig := tview.NewTextView()
 	helpBig.SetDynamicColors(true)
 	helpBig.SetBorderPadding(0, 0, 2, 0)
-	// TODO clean this text up
 	helpBig.SetText(heredoc.Doc(`
 		[::b]Application[-:-:-]
 
