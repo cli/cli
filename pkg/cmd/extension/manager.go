@@ -350,7 +350,7 @@ func (m *Manager) Install(repo ghrepo.Interface, target string) error {
 		return errors.New("extension is not installable: missing executable")
 	}
 
-	return m.installGit(repo, target, m.io.Out, m.io.ErrOut)
+	return m.installGit(repo, target)
 }
 
 func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
@@ -453,7 +453,7 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	return nil
 }
 
-func (m *Manager) installGit(repo ghrepo.Interface, target string, stdout, stderr io.Writer) error {
+func (m *Manager) installGit(repo ghrepo.Interface, target string) error {
 	protocol, _ := m.config.GetOrDefault(repo.RepoHost(), "git_protocol")
 	cloneURL := ghrepo.FormatRemoteURL(repo, protocol)
 
