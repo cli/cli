@@ -127,6 +127,7 @@ func (el *extList) createModal() *tview.Modal {
 	return m
 }
 
+// TODO consolidate these two functions
 func (el *extList) InstallSelected() {
 	// TODO do not try to install if installed
 	ee, ix := el.FindSelected()
@@ -142,49 +143,58 @@ func (el *extList) InstallSelected() {
 
 	modal := el.createModal()
 	modal.SetText(fmt.Sprintf("Installing %s...", ee.FullName))
+	el.ui.CmdFlex.Clear()
 	el.ui.CmdFlex.AddItem(modal, 0, 1, true)
 	go func() {
 		el.app.QueueUpdateDraw(func() {
 			el.ui.Pages.SwitchToPage("command")
-			err = el.opts.Em.Install(repo, "")
-			if err != nil {
-				modal.SetText(fmt.Sprintf("Failed to install %s: %s", ee.FullName, err.Error()))
-			} else {
-				modal.SetText(fmt.Sprintf("Installed %s!", ee.FullName))
-				modal.AddButtons([]string{"ok"})
-				el.app.SetFocus(modal)
-				el.toggleInstalled(ix)
-			}
+			go func() {
+				el.app.QueueUpdateDraw(func() {
+					err = el.opts.Em.Install(repo, "")
+					if err != nil {
+						modal.SetText(fmt.Sprintf("Failed to install %s: %s", ee.FullName, err.Error()))
+					} else {
+						modal.SetText(fmt.Sprintf("Installed %s!", ee.FullName))
+						modal.AddButtons([]string{"ok"})
+						el.app.SetFocus(modal)
+						el.toggleInstalled(ix)
+					}
+				})
+			}()
 		})
 	}()
-	// TODO ideally this is not required
-	//el.app.ForceDraw()
 }
 
 func (el *extList) RemoveSelected() {
 	// TODO do not try and remove if not installed
 	ee, ix := el.FindSelected()
 	if ix < 0 {
-		el.opts.Logger.Println("failed to find selected extension")
+		el.opts.Logger.Println("failed to find selected entry")
 		return
 	}
 
 	modal := el.createModal()
-
 	modal.SetText(fmt.Sprintf("Removing %s...", ee.FullName))
-	el.ui.App.SetRoot(modal, true)
-	// I could eliminate this with a goroutine but it seems to be working fine
-	el.ui.App.ForceDraw()
-
-	err := el.opts.Em.Remove(strings.TrimPrefix(ee.Name, "gh-"))
-	if err != nil {
-		modal.SetText(fmt.Sprintf("Failed to remove %s: %s", ee.FullName, err.Error()))
-	} else {
-		modal.SetText(fmt.Sprintf("Removed %s.", ee.FullName))
-		modal.AddButtons([]string{"ok"})
-		el.ui.App.SetFocus(modal)
-	}
-	el.toggleInstalled(ix)
+	el.ui.CmdFlex.Clear()
+	el.ui.CmdFlex.AddItem(modal, 0, 1, true)
+	go func() {
+		el.app.QueueUpdateDraw(func() {
+			el.ui.Pages.SwitchToPage("command")
+			go func() {
+				el.app.QueueUpdateDraw(func() {
+					err := el.opts.Em.Remove(strings.TrimPrefix(ee.Name, "gh-"))
+					if err != nil {
+						modal.SetText(fmt.Sprintf("Failed to remove %s: %s", ee.FullName, err.Error()))
+					} else {
+						modal.SetText(fmt.Sprintf("Removed %s!", ee.FullName))
+						modal.AddButtons([]string{"ok"})
+						el.app.SetFocus(modal)
+						el.toggleInstalled(ix)
+					}
+				})
+			}()
+		})
+	}()
 }
 
 func (el *extList) toggleInstalled(ix int) {
@@ -508,6 +518,9 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		curPage, _ := pages.GetFrontPage()
 
 		if curPage != "main" {
+			if curPage == "command" {
+				return event
+			}
 			if event.Rune() == 'q' || event.Key() == tcell.KeyEscape {
 				pages.SwitchToPage("main")
 				return nil
