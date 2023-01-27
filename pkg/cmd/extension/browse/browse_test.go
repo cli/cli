@@ -274,11 +274,13 @@ func Test_extList(t *testing.T) {
 			},
 		},
 	}
+	cmdFlex := tview.NewFlex()
 	app := tview.NewApplication()
 	list := tview.NewList()
 	ui := uiRegistry{
-		List: list,
-		App:  app,
+		List:    list,
+		App:     app,
+		CmdFlex: cmdFlex,
 	}
 	extEntries := []extEntry{
 		{
