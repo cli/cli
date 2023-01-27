@@ -3,6 +3,7 @@ package extension
 import (
 	"errors"
 	"fmt"
+	gio "io"
 	"os"
 	"strings"
 	"time"
@@ -24,6 +25,7 @@ import (
 func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	m := f.ExtensionManager
 	io := f.IOStreams
+	gc := f.GitClient
 	prompter := f.Prompter
 	config := f.Config
 	browser := f.Browser
@@ -459,6 +461,8 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					}
 
 					searcher := search.NewSearcher(api.NewCachedHTTPClient(client, time.Hour*24), host)
+
+					gc.Stderr = gio.Discard
 
 					opts := browse.ExtBrowseOpts{
 						Cmd:          cmd,
