@@ -51,6 +51,7 @@ type uiRegistry struct {
 	Outerflex *tview.Flex
 	List      *tview.List
 	Pages     *tview.Pages
+	CmdFlex   *tview.Flex
 }
 
 type extEntry struct {
@@ -98,12 +99,9 @@ func newExtList(opts ExtBrowseOpts, ui uiRegistry, extEntries []extEntry) *extLi
 	ui.List.SetSelectedBackgroundColor(tcell.ColorWhite)
 	ui.List.SetWrapAround(false)
 	ui.List.SetBorderPadding(1, 1, 1, 1)
-	if opts.SingleColumn {
-		ui.List.SetSelectedFunc(func(ix int, _, _ string, _ rune) {
-
-			// TODO switch to readme page
-		})
-	}
+	ui.List.SetSelectedFunc(func(ix int, _, _ string, _ rune) {
+		ui.Pages.SwitchToPage("readme")
+	})
 
 	el := &extList{
 		ui:         ui,
@@ -118,10 +116,11 @@ func newExtList(opts ExtBrowseOpts, ui uiRegistry, extEntries []extEntry) *extLi
 
 // TODO use pages for this
 func (el *extList) createModal() *tview.Modal {
+	// TODO this should be put on a page and the page should be switched to and away from
 	m := tview.NewModal()
 	m.SetBackgroundColor(tcell.ColorPurple)
 	m.SetDoneFunc(func(_ int, _ string) {
-		el.ui.App.SetRoot(el.ui.Outerflex, true)
+		el.ui.Pages.SwitchToPage("main")
 		el.Refresh()
 	})
 
@@ -129,6 +128,7 @@ func (el *extList) createModal() *tview.Modal {
 }
 
 func (el *extList) InstallSelected() {
+	// TODO do not try to install if installed
 	ee, ix := el.FindSelected()
 	if ix < 0 {
 		el.opts.Logger.Println("failed to find selected entry")
@@ -141,24 +141,28 @@ func (el *extList) InstallSelected() {
 	}
 
 	modal := el.createModal()
-
 	modal.SetText(fmt.Sprintf("Installing %s...", ee.FullName))
-	el.ui.App.SetRoot(modal, true)
-	// I could eliminate this with a goroutine but it seems to be working fine
-	el.app.ForceDraw()
-	err = el.opts.Em.Install(repo, "")
-	if err != nil {
-		modal.SetText(fmt.Sprintf("Failed to install %s: %s", ee.FullName, err.Error()))
-	} else {
-		modal.SetText(fmt.Sprintf("Installed %s!", ee.FullName))
-		modal.AddButtons([]string{"ok"})
-		el.ui.App.SetFocus(modal)
-	}
-
-	el.toggleInstalled(ix)
+	el.ui.CmdFlex.AddItem(modal, 0, 1, true)
+	go func() {
+		el.app.QueueUpdateDraw(func() {
+			el.ui.Pages.SwitchToPage("command")
+			err = el.opts.Em.Install(repo, "")
+			if err != nil {
+				modal.SetText(fmt.Sprintf("Failed to install %s: %s", ee.FullName, err.Error()))
+			} else {
+				modal.SetText(fmt.Sprintf("Installed %s!", ee.FullName))
+				modal.AddButtons([]string{"ok"})
+				el.app.SetFocus(modal)
+				el.toggleInstalled(ix)
+			}
+		})
+	}()
+	// TODO ideally this is not required
+	//el.app.ForceDraw()
 }
 
 func (el *extList) RemoveSelected() {
+	// TODO do not try and remove if not installed
 	ee, ix := el.FindSelected()
 	if ix < 0 {
 		el.opts.Logger.Println("failed to find selected extension")
@@ -376,6 +380,8 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	help := tview.NewTextView()
 	help.SetText("?: help  q: quit")
 
+	cmdFlex := tview.NewFlex()
+
 	pages := tview.NewPages()
 
 	ui := uiRegistry{
@@ -383,6 +389,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		Outerflex: outerFlex,
 		List:      list,
 		Pages:     pages,
+		CmdFlex:   cmdFlex,
 	}
 
 	extList := newExtList(opts, ui, extEntries)
@@ -467,6 +474,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 
 		[::b]Readmes[-:-:-]
 
+		enter: open highlighted extension's readme full screen
 		page down: scroll readme pane down
 		page up:   scroll readme pane up
 
@@ -475,10 +483,8 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 
 	pages.AddPage("main", outerFlex, true, true)
 	pages.AddPage("help", helpBig, true, false)
-
-	if opts.SingleColumn {
-		pages.AddPage("readme", readme, true, false)
-	}
+	pages.AddPage("readme", readme, true, false)
+	pages.AddPage("command", cmdFlex, true, false)
 
 	app.SetRoot(pages, true)
 
@@ -493,8 +499,6 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		app.SetBeforeDrawFunc(nil)
 		app.SetAfterDrawFunc(nil)
 	})
-
-	// TODO filter should not be activated when helpActive is true
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		if filter.HasFocus() {
@@ -595,10 +599,6 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 
 		return event
 	})
-
-	// Without this redirection, the git client inside of the extension manager
-	// will dump git output to the terminal.
-	opts.IO.ErrOut = io.Discard
 
 	if err := app.Run(); err != nil {
 		return err
