@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
@@ -18,13 +17,6 @@ type SecretPayload struct {
 	Visibility     string  `json:"visibility,omitempty"`
 	Repositories   []int64 `json:"selected_repository_ids,omitempty"`
 	KeyID          string  `json:"key_id"`
-}
-
-// The Codespaces Secret API currently expects repositories IDs as strings
-type CodespacesSecretPayload struct {
-	EncryptedValue string   `json:"encrypted_value"`
-	Repositories   []string `json:"selected_repository_ids,omitempty"`
-	KeyID          string   `json:"key_id"`
 }
 
 type PubKey struct {
@@ -59,7 +51,7 @@ func getEnvPubKey(client *api.Client, repo ghrepo.Interface, envName string) (*P
 		ghrepo.FullName(repo), envName))
 }
 
-func putSecret(client *api.Client, host, path string, payload interface{}) error {
+func putSecret(client *api.Client, host, path string, payload SecretPayload) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to serialize: %w", err)
@@ -82,19 +74,11 @@ func putOrgSecret(client *api.Client, host string, pk *PubKey, orgName, visibili
 }
 
 func putUserSecret(client *api.Client, host string, pk *PubKey, key, eValue string, repositoryIDs []int64) error {
-	payload := CodespacesSecretPayload{
+	payload := SecretPayload{
 		EncryptedValue: eValue,
 		KeyID:          pk.ID,
+		Repositories:   repositoryIDs,
 	}
-
-	if len(repositoryIDs) > 0 {
-		repositoryStringIDs := make([]string, len(repositoryIDs))
-		for i, id := range repositoryIDs {
-			repositoryStringIDs[i] = strconv.FormatInt(id, 10)
-		}
-		payload.Repositories = repositoryStringIDs
-	}
-
 	path := fmt.Sprintf("user/codespaces/secrets/%s", key)
 	return putSecret(client, host, path, payload)
 }

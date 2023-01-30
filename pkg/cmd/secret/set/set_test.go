@@ -426,7 +426,7 @@ func Test_setRun_user(t *testing.T) {
 		name             string
 		opts             *SetOptions
 		wantVisibility   shared.Visibility
-		wantRepositories []string
+		wantRepositories []int64
 	}{
 		{
 			name: "all vis",
@@ -442,7 +442,7 @@ func Test_setRun_user(t *testing.T) {
 				Visibility:      shared.Selected,
 				RepositoryNames: []string{"cli/cli", "github/hub"},
 			},
-			wantRepositories: []string{"212613049", "401025"},
+			wantRepositories: []int64{212613049, 401025},
 		},
 	}
 
@@ -481,7 +481,7 @@ func Test_setRun_user(t *testing.T) {
 
 			data, err := io.ReadAll(reg.Requests[len(reg.Requests)-1].Body)
 			assert.NoError(t, err)
-			var payload CodespacesSecretPayload
+			var payload SecretPayload
 			err = json.Unmarshal(data, &payload)
 			assert.NoError(t, err)
 			assert.Equal(t, payload.KeyID, "123")
