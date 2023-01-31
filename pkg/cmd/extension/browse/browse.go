@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -86,11 +87,12 @@ func (e extEntry) Description() string {
 }
 
 type extList struct {
-	ui         uiRegistry
-	extEntries []extEntry
-	app        *tview.Application
-	filter     string
-	opts       ExtBrowseOpts
+	ui              uiRegistry
+	extEntries      []extEntry
+	app             *tview.Application
+	filter          string
+	opts            ExtBrowseOpts
+	QueueUpdateDraw func(func())
 }
 
 func newExtList(opts ExtBrowseOpts, ui uiRegistry, extEntries []extEntry) *extList {
@@ -108,6 +110,9 @@ func newExtList(opts ExtBrowseOpts, ui uiRegistry, extEntries []extEntry) *extLi
 		extEntries: extEntries,
 		app:        ui.App,
 		opts:       opts,
+		QueueUpdateDraw: func(f func()) {
+			ui.App.QueueUpdateDraw(f)
+		},
 	}
 
 	el.Reset()
@@ -143,11 +148,15 @@ func (el *extList) InstallSelected() {
 	modal.SetText(fmt.Sprintf("Installing %s...", ee.FullName))
 	el.ui.CmdFlex.Clear()
 	el.ui.CmdFlex.AddItem(modal, 0, 1, true)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
-		el.app.QueueUpdateDraw(func() {
+		el.QueueUpdateDraw(func() {
 			el.ui.Pages.SwitchToPage("command")
+			wg.Add(1)
+			wg.Done()
 			go func() {
-				el.app.QueueUpdateDraw(func() {
+				el.QueueUpdateDraw(func() {
 					err = el.opts.Em.Install(repo, "")
 					if err != nil {
 						modal.SetText(fmt.Sprintf("Failed to install %s: %s", ee.FullName, err.Error()))
@@ -155,12 +164,17 @@ func (el *extList) InstallSelected() {
 						modal.SetText(fmt.Sprintf("Installed %s!", ee.FullName))
 						modal.AddButtons([]string{"ok"})
 						el.app.SetFocus(modal)
-						el.toggleInstalled(ix)
 					}
+					wg.Done()
 				})
 			}()
 		})
 	}()
+
+	wg.Wait()
+	if err == nil {
+		el.toggleInstalled(ix)
+	}
 }
 
 func (el *extList) RemoveSelected() {
