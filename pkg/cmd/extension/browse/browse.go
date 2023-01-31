@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
@@ -92,8 +91,21 @@ type extList struct {
 	app             *tview.Application
 	filter          string
 	opts            ExtBrowseOpts
-	QueueUpdateDraw func(func())
+	QueueUpdateDraw func(func()) *tview.Application
+	WaitGroup       wGroup
 }
+
+type wGroup interface {
+	Add(int)
+	Done()
+	Wait()
+}
+
+type fakeGroup struct{}
+
+func (w *fakeGroup) Add(int) {}
+func (w *fakeGroup) Done()   {}
+func (w *fakeGroup) Wait()   {}
 
 func newExtList(opts ExtBrowseOpts, ui uiRegistry, extEntries []extEntry) *extList {
 	ui.List.SetTitleColor(tcell.ColorWhite)
@@ -106,13 +118,12 @@ func newExtList(opts ExtBrowseOpts, ui uiRegistry, extEntries []extEntry) *extLi
 	})
 
 	el := &extList{
-		ui:         ui,
-		extEntries: extEntries,
-		app:        ui.App,
-		opts:       opts,
-		QueueUpdateDraw: func(f func()) {
-			ui.App.QueueUpdateDraw(f)
-		},
+		ui:              ui,
+		extEntries:      extEntries,
+		app:             ui.App,
+		opts:            opts,
+		QueueUpdateDraw: ui.App.QueueUpdateDraw,
+		WaitGroup:       &fakeGroup{},
 	}
 
 	el.Reset()
@@ -130,26 +141,52 @@ func (el *extList) createModal() *tview.Modal {
 	return m
 }
 
-// TODO consolidate these two functions
-func (el *extList) InstallSelected() {
-	// TODO do not try to install if installed
+func (el *extList) toggleSelected(verb string) {
 	ee, ix := el.FindSelected()
 	if ix < 0 {
 		el.opts.Logger.Println("failed to find selected entry")
 		return
 	}
-	repo, err := ghrepo.FromFullName(ee.FullName)
-	if err != nil {
-		el.opts.Logger.Println(fmt.Errorf("failed to install '%s't: %w", ee.FullName, err))
+	modal := el.createModal()
+
+	if (ee.Installed && verb == "install") || (!ee.Installed && verb == "remove") {
 		return
 	}
 
-	modal := el.createModal()
-	modal.SetText(fmt.Sprintf("Installing %s...", ee.FullName))
+	var action func() error
+
+	if !ee.Installed {
+		modal.SetText(fmt.Sprintf("Installing %s...", ee.FullName))
+		action = func() error {
+			repo, err := ghrepo.FromFullName(ee.FullName)
+			if err != nil {
+				el.opts.Logger.Println(fmt.Errorf("failed to install '%s': %w", ee.FullName, err))
+				return err
+			}
+			err = el.opts.Em.Install(repo, "")
+			if err != nil {
+				return fmt.Errorf("failed to install %s: %w", ee.FullName, err)
+			}
+			return nil
+		}
+	} else {
+		modal.SetText(fmt.Sprintf("Removing %s...", ee.FullName))
+		action = func() error {
+			name := strings.TrimPrefix(ee.Name, "gh-")
+			err := el.opts.Em.Remove(name)
+			if err != nil {
+				return fmt.Errorf("failed to remove %s: %w", ee.FullName, err)
+			}
+			return nil
+		}
+	}
+
 	el.ui.CmdFlex.Clear()
 	el.ui.CmdFlex.AddItem(modal, 0, 1, true)
-	wg := sync.WaitGroup{}
+	var err error
+	wg := el.WaitGroup
 	wg.Add(1)
+
 	go func() {
 		el.QueueUpdateDraw(func() {
 			el.ui.Pages.SwitchToPage("command")
@@ -157,11 +194,15 @@ func (el *extList) InstallSelected() {
 			wg.Done()
 			go func() {
 				el.QueueUpdateDraw(func() {
-					err = el.opts.Em.Install(repo, "")
+					err = action()
 					if err != nil {
-						modal.SetText(fmt.Sprintf("Failed to install %s: %s", ee.FullName, err.Error()))
+						modal.SetText(err.Error())
 					} else {
-						modal.SetText(fmt.Sprintf("Installed %s!", ee.FullName))
+						modalText := fmt.Sprintf("Installed %s!", ee.FullName)
+						if verb == "remove" {
+							modalText = fmt.Sprintf("Removed %s!", ee.FullName)
+						}
+						modal.SetText(modalText)
 						modal.AddButtons([]string{"ok"})
 						el.app.SetFocus(modal)
 					}
@@ -171,42 +212,19 @@ func (el *extList) InstallSelected() {
 		})
 	}()
 
+	// TODO blocking the app's thread and deadlocking
 	wg.Wait()
 	if err == nil {
 		el.toggleInstalled(ix)
 	}
 }
 
-func (el *extList) RemoveSelected() {
-	// TODO do not try and remove if not installed
-	ee, ix := el.FindSelected()
-	if ix < 0 {
-		el.opts.Logger.Println("failed to find selected entry")
-		return
-	}
+func (el *extList) InstallSelected() {
+	el.toggleSelected("install")
+}
 
-	modal := el.createModal()
-	modal.SetText(fmt.Sprintf("Removing %s...", ee.FullName))
-	el.ui.CmdFlex.Clear()
-	el.ui.CmdFlex.AddItem(modal, 0, 1, true)
-	go func() {
-		el.app.QueueUpdateDraw(func() {
-			el.ui.Pages.SwitchToPage("command")
-			go func() {
-				el.app.QueueUpdateDraw(func() {
-					err := el.opts.Em.Remove(strings.TrimPrefix(ee.Name, "gh-"))
-					if err != nil {
-						modal.SetText(fmt.Sprintf("Failed to remove %s: %s", ee.FullName, err.Error()))
-					} else {
-						modal.SetText(fmt.Sprintf("Removed %s!", ee.FullName))
-						modal.AddButtons([]string{"ok"})
-						el.app.SetFocus(modal)
-						el.toggleInstalled(ix)
-					}
-				})
-			}()
-		})
-	}()
+func (el *extList) RemoveSelected() {
+	el.toggleSelected("remove")
 }
 
 func (el *extList) toggleInstalled(ix int) {
