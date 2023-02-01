@@ -202,10 +202,60 @@ func TestDelete(t *testing.T) {
 			wantStdout:  "",
 			wantErr:     true,
 		},
+		{
+			name: "deletion for org codespace by user succeeds",
+			opts: deleteOptions{
+				deleteAll: true,
+				orgName:   "bookish",
+			},
+			codespaces: []*api.Codespace{
+				{
+					Name:  "monalisa-spoonknife-123",
+					Owner: api.User{Login: "monalisa"},
+				},
+				{
+					Name:  "dont-delete-abc",
+					Owner: api.User{Login: "monalisa2"},
+				},
+				{
+					Name:  "monalisa-sporkknife-123",
+					Owner: api.User{Login: "monalisa"},
+				},
+			},
+			wantDeleted: []string{"monalisa-spoonknife-123", "monalisa-sporkknife-123"},
+			wantStdout:  "",
+		},
+		{
+			name: "deletion for org codespace by user fails for codespace not found",
+			opts: deleteOptions{
+				deleteAll: true,
+				orgName:   "bookish",
+			},
+			codespaces: []*api.Codespace{
+				{
+					Name:  "monalisa-spoonknife-123",
+					Owner: api.User{Login: "monalisa2"},
+				},
+				{
+					Name:  "monalisa-spoonknife-456",
+					Owner: api.User{Login: "monalisa2"},
+				},
+				{
+					Name:  "monalisa-spoonknife-789",
+					Owner: api.User{Login: "monalisa2"},
+				},
+			},
+			wantDeleted: []string{},
+			wantStdout:  "",
+			wantErr:     true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			apiMock := &apiClientMock{
+				GetUserFunc: func(_ context.Context) (*api.User, error) {
+					return &api.User{Login: "monalisa"}, nil
+				},
 				DeleteCodespaceFunc: func(_ context.Context, name string, orgName string, userName string) error {
 					if tt.deleteErr != nil {
 						return tt.deleteErr
@@ -214,8 +264,20 @@ func TestDelete(t *testing.T) {
 				},
 			}
 			if tt.opts.codespaceName == "" {
-				apiMock.ListCodespacesFunc = func(_ context.Context, _ api.ListCodespacesOptions) ([]*api.Codespace, error) {
-					return tt.codespaces, nil
+				if tt.opts.orgName != "" {
+					apiMock.ListCodespacesFunc = func(_ context.Context, _ api.ListCodespacesOptions) ([]*api.Codespace, error) {
+						var filteredCodespaces []*api.Codespace
+						for _, codespace := range tt.codespaces {
+							if codespace.Owner.Login == "monalisa" {
+								filteredCodespaces = append(filteredCodespaces, codespace)
+							}
+						}
+						return filteredCodespaces, nil
+					}
+				} else {
+					apiMock.ListCodespacesFunc = func(_ context.Context, _ api.ListCodespacesOptions) ([]*api.Codespace, error) {
+						return tt.codespaces, nil
+					}
 				}
 			} else {
 				if tt.opts.orgName != "" {
