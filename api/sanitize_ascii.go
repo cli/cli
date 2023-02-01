@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"net/http"
@@ -23,16 +24,16 @@ func AddASCIISanitizer(rt http.RoundTripper) http.RoundTripper {
 		if err != nil || !jsonTypeRE.MatchString(res.Header.Get("Content-Type")) {
 			return res, err
 		}
-		res.Body = &sanitizeASCIIReadCloser{rc: res.Body}
+		res.Body = &sanitizeASCIIReadCloser{ReadCloser: res.Body}
 		return res, err
 	}}
 }
 
 // sanitizeASCIIReadCloser implements the ReadCloser interface.
 type sanitizeASCIIReadCloser struct {
-	rc           io.ReadCloser
-	addBackslash bool
-	previousWin  []byte
+	io.ReadCloser
+	addBackslash   bool
+	previousWindow []byte
 }
 
 // Read uses a sliding window alogorithm to detect C0 and C1
@@ -43,10 +44,11 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 	var readErr error
 	var outIndex int
 	var bufIndex int
-	var win []byte
+	var bufLen int
+	var window []byte
 	buf := make([]byte, len(out))
 
-	bufLen, readErr := s.rc.Read(buf)
+	bufLen, readErr = s.ReadCloser.Read(buf)
 	if readErr != nil && !errors.Is(readErr, io.EOF) {
 		if bufLen > 0 {
 			// Do not sanitize if there was a read error that is not EOF.
@@ -55,20 +57,20 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 		return bufLen, readErr
 	}
 
-	if s.previousWin != nil {
-		buf = append(s.previousWin, buf...)
-		bufLen += len(s.previousWin)
+	if s.previousWindow != nil {
+		buf = append(s.previousWindow, buf...)
+		bufLen += len(s.previousWindow)
 	}
 
 	for {
 		remaining := min(6, (bufLen - bufIndex))
-		win = buf[bufIndex : bufIndex+remaining]
+		window = buf[bufIndex : bufIndex+remaining]
 		if remaining < 6 {
 			break
 		}
 
-		if win[0] == 92 && win[1] == 117 && win[2] == 48 && win[3] == 48 {
-			repl, _ := mapControlCharacterToCaret(win)
+		if bytes.HasPrefix(window, []byte(`\u00`)) {
+			repl, _ := mapControlCharacterToCaret(window)
 			if s.addBackslash {
 				repl = append([]byte{92}, repl...)
 			}
@@ -82,7 +84,7 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 			continue
 		}
 
-		if win[0] == 92 {
+		if window[0] == '\\' {
 			s.addBackslash = !s.addBackslash
 		} else {
 			s.addBackslash = false
@@ -96,20 +98,15 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 	if readErr != nil && errors.Is(readErr, io.EOF) {
 		remaining := bufLen - bufIndex
 		for j := 0; j < remaining; j++ {
-			out[outIndex] = win[j]
+			out[outIndex] = window[j]
 			outIndex++
 			bufIndex++
 		}
 	} else {
-		s.previousWin = win
+		s.previousWindow = window
 	}
 
 	return outIndex, readErr
-}
-
-// Close closes the wrapped ReadCloser.
-func (s *sanitizeASCIIReadCloser) Close() error {
-	return s.rc.Close()
 }
 
 // mapControlCharacterToCaret maps C0 control sequences to caret notation
