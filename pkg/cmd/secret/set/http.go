@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/cli/cli/v2/api"
@@ -17,6 +18,13 @@ type SecretPayload struct {
 	Visibility     string  `json:"visibility,omitempty"`
 	Repositories   []int64 `json:"selected_repository_ids,omitempty"`
 	KeyID          string  `json:"key_id"`
+}
+
+type DependabotSecretPayload struct {
+	EncryptedValue string   `json:"encrypted_value"`
+	Visibility     string   `json:"visibility,omitempty"`
+	Repositories   []string `json:"selected_repository_ids,omitempty"`
+	KeyID          string   `json:"key_id"`
 }
 
 type PubKey struct {
@@ -51,7 +59,7 @@ func getEnvPubKey(client *api.Client, repo ghrepo.Interface, envName string) (*P
 		ghrepo.FullName(repo), envName))
 }
 
-func putSecret(client *api.Client, host, path string, payload SecretPayload) error {
+func putSecret(client *api.Client, host, path string, payload interface{}) error {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to serialize: %w", err)
@@ -62,13 +70,30 @@ func putSecret(client *api.Client, host, path string, payload SecretPayload) err
 }
 
 func putOrgSecret(client *api.Client, host string, pk *PubKey, orgName, visibility, secretName, eValue string, repositoryIDs []int64, app shared.App) error {
+	path := fmt.Sprintf("orgs/%s/%s/secrets/%s", orgName, app, secretName)
+
+	if app == shared.Dependabot {
+		repos := make([]string, len(repositoryIDs))
+		for i, id := range repositoryIDs {
+			repos[i] = strconv.FormatInt(id, 10)
+		}
+
+		payload := DependabotSecretPayload{
+			EncryptedValue: eValue,
+			KeyID:          pk.ID,
+			Repositories:   repos,
+			Visibility:     visibility,
+		}
+
+		return putSecret(client, host, path, payload)
+	}
+
 	payload := SecretPayload{
 		EncryptedValue: eValue,
 		KeyID:          pk.ID,
 		Repositories:   repositoryIDs,
 		Visibility:     visibility,
 	}
-	path := fmt.Sprintf("orgs/%s/%s/secrets/%s", orgName, app, secretName)
 
 	return putSecret(client, host, path, payload)
 }
