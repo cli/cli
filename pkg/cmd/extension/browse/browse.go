@@ -419,7 +419,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 
 	help := tview.NewTextView()
 	help.SetDynamicColors(true)
-	help.SetText("[::b]?[-:-:-]: help [::b]j/k[-:-:-]: move [::b]i[-:-:-]: install [::b]r[-:-:-]: remove [::b]w[-:-:-]: web [::b]q[-:-:-]: quit")
+	help.SetText("[::b]?[-:-:-]: help [::b]j/k[-:-:-]: move [::b]i[-:-:-]: install [::b]r[-:-:-]: remove [::b]w[-:-:-]: web [::b]↵[-:-:-]: view readme [::b]q[-:-:-]: quit")
 
 	cmdFlex := tview.NewFlex()
 
