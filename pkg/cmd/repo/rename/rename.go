@@ -60,7 +60,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 
 			if len(args) == 1 && !confirm && !opts.HasRepoOverride {
 				if !opts.IO.CanPrompt() {
-					return cmdutil.FlagErrorf("--confirm required when passing a single argument")
+					return cmdutil.FlagErrorf("--yes required when passing a single argument")
 				}
 				opts.DoConfirm = true
 			}
@@ -68,12 +68,15 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 			if runf != nil {
 				return runf(opts)
 			}
+
 			return renameRun(opts)
 		},
 	}
 
 	cmdutil.EnableRepoOverride(cmd, f)
-	cmd.Flags().BoolVarP(&confirm, "confirm", "y", false, "skip confirmation prompt")
+	cmd.Flags().BoolVar(&confirm, "confirm", false, "Skip confirmation prompt")
+	_ = cmd.Flags().MarkDeprecated("confirm", "use `--yes` instead")
+	cmd.Flags().BoolVarP(&confirm, "yes", "y", false, "Skip the confirmation prompt")
 
 	return cmd
 }

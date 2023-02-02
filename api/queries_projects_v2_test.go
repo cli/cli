@@ -221,22 +221,22 @@ func TestProjectsV2IgnorableError(t *testing.T) {
 		},
 		{
 			name:      "repository projectsV2 field error",
-			errMsg:    "Field 'ProjectsV2' doesn't exist on type 'Repository'",
+			errMsg:    "Field 'projectsV2' doesn't exist on type 'Repository'",
 			expectOut: true,
 		},
 		{
 			name:      "organization projectsV2 field error",
-			errMsg:    "Field 'ProjectsV2' doesn't exist on type 'Organization'",
+			errMsg:    "Field 'projectsV2' doesn't exist on type 'Organization'",
 			expectOut: true,
 		},
 		{
 			name:      "issue projectItems field error",
-			errMsg:    "Field 'ProjectItems' doesn't exist on type 'Issue'",
+			errMsg:    "Field 'projectItems' doesn't exist on type 'Issue'",
 			expectOut: true,
 		},
 		{
 			name:      "pullRequest projectItems field error",
-			errMsg:    "Field 'ProjectItems' doesn't exist on type 'PullRequest'",
+			errMsg:    "Field 'projectItems' doesn't exist on type 'PullRequest'",
 			expectOut: true,
 		},
 		{

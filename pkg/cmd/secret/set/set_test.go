@@ -333,11 +333,12 @@ func Test_setRun_env(t *testing.T) {
 
 func Test_setRun_org(t *testing.T) {
 	tests := []struct {
-		name             string
-		opts             *SetOptions
-		wantVisibility   shared.Visibility
-		wantRepositories []int64
-		wantApp          string
+		name                       string
+		opts                       *SetOptions
+		wantVisibility             shared.Visibility
+		wantRepositories           []int64
+		wantDependabotRepositories []string
+		wantApp                    string
 	}{
 		{
 			name: "all vis",
@@ -362,9 +363,20 @@ func Test_setRun_org(t *testing.T) {
 			opts: &SetOptions{
 				OrgName:     "UmbrellaCorporation",
 				Visibility:  shared.All,
-				Application: "dependabot",
+				Application: shared.Dependabot,
 			},
 			wantApp: "dependabot",
+		},
+		{
+			name: "Dependabot selected visibility",
+			opts: &SetOptions{
+				OrgName:         "UmbrellaCorporation",
+				Visibility:      shared.Selected,
+				Application:     shared.Dependabot,
+				RepositoryNames: []string{"birkin", "UmbrellaCorporation/wesker"},
+			},
+			wantDependabotRepositories: []string{"1", "2"},
+			wantApp:                    "dependabot",
 		},
 	}
 
@@ -410,13 +422,24 @@ func Test_setRun_org(t *testing.T) {
 
 			data, err := io.ReadAll(reg.Requests[len(reg.Requests)-1].Body)
 			assert.NoError(t, err)
-			var payload SecretPayload
-			err = json.Unmarshal(data, &payload)
-			assert.NoError(t, err)
-			assert.Equal(t, payload.KeyID, "123")
-			assert.Equal(t, payload.EncryptedValue, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=")
-			assert.Equal(t, payload.Visibility, tt.opts.Visibility)
-			assert.ElementsMatch(t, payload.Repositories, tt.wantRepositories)
+
+			if tt.opts.Application == shared.Dependabot {
+				var payload DependabotSecretPayload
+				err = json.Unmarshal(data, &payload)
+				assert.NoError(t, err)
+				assert.Equal(t, payload.KeyID, "123")
+				assert.Equal(t, payload.EncryptedValue, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=")
+				assert.Equal(t, payload.Visibility, tt.opts.Visibility)
+				assert.ElementsMatch(t, payload.Repositories, tt.wantDependabotRepositories)
+			} else {
+				var payload SecretPayload
+				err = json.Unmarshal(data, &payload)
+				assert.NoError(t, err)
+				assert.Equal(t, payload.KeyID, "123")
+				assert.Equal(t, payload.EncryptedValue, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=")
+				assert.Equal(t, payload.Visibility, tt.opts.Visibility)
+				assert.ElementsMatch(t, payload.Repositories, tt.wantRepositories)
+			}
 		})
 	}
 }
@@ -426,7 +449,7 @@ func Test_setRun_user(t *testing.T) {
 		name             string
 		opts             *SetOptions
 		wantVisibility   shared.Visibility
-		wantRepositories []string
+		wantRepositories []int64
 	}{
 		{
 			name: "all vis",
@@ -442,7 +465,7 @@ func Test_setRun_user(t *testing.T) {
 				Visibility:      shared.Selected,
 				RepositoryNames: []string{"cli/cli", "github/hub"},
 			},
-			wantRepositories: []string{"212613049", "401025"},
+			wantRepositories: []int64{212613049, 401025},
 		},
 	}
 
@@ -481,7 +504,7 @@ func Test_setRun_user(t *testing.T) {
 
 			data, err := io.ReadAll(reg.Requests[len(reg.Requests)-1].Body)
 			assert.NoError(t, err)
-			var payload CodespacesSecretPayload
+			var payload SecretPayload
 			err = json.Unmarshal(data, &payload)
 			assert.NoError(t, err)
 			assert.Equal(t, payload.KeyID, "123")

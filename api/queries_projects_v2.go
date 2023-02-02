@@ -10,10 +10,10 @@ import (
 
 const (
 	errorProjectsV2ReadScope         = "field requires one of the following scopes: ['read:project']"
-	errorProjectsV2RepositoryField   = "Field 'ProjectsV2' doesn't exist on type 'Repository'"
-	errorProjectsV2OrganizationField = "Field 'ProjectsV2' doesn't exist on type 'Organization'"
-	errorProjectsV2IssueField        = "Field 'ProjectItems' doesn't exist on type 'Issue'"
-	errorProjectsV2PullRequestField  = "Field 'ProjectItems' doesn't exist on type 'PullRequest'"
+	errorProjectsV2RepositoryField   = "Field 'projectsV2' doesn't exist on type 'Repository'"
+	errorProjectsV2OrganizationField = "Field 'projectsV2' doesn't exist on type 'Organization'"
+	errorProjectsV2IssueField        = "Field 'projectItems' doesn't exist on type 'Issue'"
+	errorProjectsV2PullRequestField  = "Field 'projectItems' doesn't exist on type 'PullRequest'"
 )
 
 // UpdateProjectV2Items uses the addProjectV2ItemById and the deleteProjectV2Item mutations

@@ -130,6 +130,9 @@ func connect(ctx context.Context, session liveshare.LiveshareSession) (Invoker, 
 	invoker.codespaceClient = codespace.NewCodespaceHostClient(conn)
 	invoker.sshClient = ssh.NewSshServerHostClient(conn)
 
+	// Send initial connection heartbeat (no need to throw if we fail to get a response from the server)
+	_ = invoker.notifyCodespaceOfClientActivity(ctx, connectedEventName)
+
 	// Start the activity heatbeats
 	go invoker.heartbeat(pfctx, 1*time.Minute)
 
@@ -252,9 +255,6 @@ func listenTCP() (*net.TCPListener, error) {
 func (i *invoker) heartbeat(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-
-	// Send initial connection heartbeat (no need to throw if we fail to get a response from the server)
-	_ = i.notifyCodespaceOfClientActivity(ctx, connectedEventName)
 
 	for {
 		select {
