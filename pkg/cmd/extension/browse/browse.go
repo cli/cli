@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/charmbracelet/glamour"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
@@ -25,16 +26,17 @@ import (
 const pagingOffset = 24
 
 type ExtBrowseOpts struct {
-	Cmd      *cobra.Command
-	Browser  ibrowser
-	IO       *iostreams.IOStreams
-	Searcher search.Searcher
-	Em       extensions.ExtensionManager
-	Client   *http.Client
-	Logger   *log.Logger
-	Cfg      config.Config
-	Rg       *readmeGetter
-	Debug    bool
+	Cmd          *cobra.Command
+	Browser      ibrowser
+	IO           *iostreams.IOStreams
+	Searcher     search.Searcher
+	Em           extensions.ExtensionManager
+	Client       *http.Client
+	Logger       *log.Logger
+	Cfg          config.Config
+	Rg           *readmeGetter
+	Debug        bool
+	SingleColumn bool
 }
 
 type ibrowser interface {
@@ -48,7 +50,8 @@ type uiRegistry struct {
 	App       *tview.Application
 	Outerflex *tview.Flex
 	List      *tview.List
-	Readme    *tview.TextView
+	Pages     *tview.Pages
+	CmdFlex   *tview.Flex
 }
 
 type extEntry struct {
@@ -83,12 +86,26 @@ func (e extEntry) Description() string {
 }
 
 type extList struct {
-	ui         uiRegistry
-	extEntries []extEntry
-	app        *tview.Application
-	filter     string
-	opts       ExtBrowseOpts
+	ui              uiRegistry
+	extEntries      []extEntry
+	app             *tview.Application
+	filter          string
+	opts            ExtBrowseOpts
+	QueueUpdateDraw func(func()) *tview.Application
+	WaitGroup       wGroup
 }
+
+type wGroup interface {
+	Add(int)
+	Done()
+	Wait()
+}
+
+type fakeGroup struct{}
+
+func (w *fakeGroup) Add(int) {}
+func (w *fakeGroup) Done()   {}
+func (w *fakeGroup) Wait()   {}
 
 func newExtList(opts ExtBrowseOpts, ui uiRegistry, extEntries []extEntry) *extList {
 	ui.List.SetTitleColor(tcell.ColorWhite)
@@ -96,12 +113,17 @@ func newExtList(opts ExtBrowseOpts, ui uiRegistry, extEntries []extEntry) *extLi
 	ui.List.SetSelectedBackgroundColor(tcell.ColorWhite)
 	ui.List.SetWrapAround(false)
 	ui.List.SetBorderPadding(1, 1, 1, 1)
+	ui.List.SetSelectedFunc(func(ix int, _, _ string, _ rune) {
+		ui.Pages.SwitchToPage("readme")
+	})
 
 	el := &extList{
-		ui:         ui,
-		extEntries: extEntries,
-		app:        ui.App,
-		opts:       opts,
+		ui:              ui,
+		extEntries:      extEntries,
+		app:             ui.App,
+		opts:            opts,
+		QueueUpdateDraw: ui.App.QueueUpdateDraw,
+		WaitGroup:       &fakeGroup{},
 	}
 
 	el.Reset()
@@ -112,66 +134,97 @@ func (el *extList) createModal() *tview.Modal {
 	m := tview.NewModal()
 	m.SetBackgroundColor(tcell.ColorPurple)
 	m.SetDoneFunc(func(_ int, _ string) {
-		el.ui.App.SetRoot(el.ui.Outerflex, true)
+		el.ui.Pages.SwitchToPage("main")
 		el.Refresh()
 	})
 
 	return m
 }
 
-func (el *extList) InstallSelected() {
+func (el *extList) toggleSelected(verb string) {
 	ee, ix := el.FindSelected()
 	if ix < 0 {
 		el.opts.Logger.Println("failed to find selected entry")
 		return
 	}
-	repo, err := ghrepo.FromFullName(ee.FullName)
-	if err != nil {
-		el.opts.Logger.Println(fmt.Errorf("failed to install '%s't: %w", ee.FullName, err))
+	modal := el.createModal()
+
+	if (ee.Installed && verb == "install") || (!ee.Installed && verb == "remove") {
 		return
 	}
 
-	modal := el.createModal()
+	var action func() error
 
-	modal.SetText(fmt.Sprintf("Installing %s...", ee.FullName))
-	el.ui.App.SetRoot(modal, true)
-	// I could eliminate this with a goroutine but it seems to be working fine
-	el.app.ForceDraw()
-	err = el.opts.Em.Install(repo, "")
-	if err != nil {
-		modal.SetText(fmt.Sprintf("Failed to install %s: %s", ee.FullName, err.Error()))
+	if !ee.Installed {
+		modal.SetText(fmt.Sprintf("Installing %s...", ee.FullName))
+		action = func() error {
+			repo, err := ghrepo.FromFullName(ee.FullName)
+			if err != nil {
+				el.opts.Logger.Println(fmt.Errorf("failed to install '%s': %w", ee.FullName, err))
+				return err
+			}
+			err = el.opts.Em.Install(repo, "")
+			if err != nil {
+				return fmt.Errorf("failed to install %s: %w", ee.FullName, err)
+			}
+			return nil
+		}
 	} else {
-		modal.SetText(fmt.Sprintf("Installed %s!", ee.FullName))
-		modal.AddButtons([]string{"ok"})
-		el.ui.App.SetFocus(modal)
+		modal.SetText(fmt.Sprintf("Removing %s...", ee.FullName))
+		action = func() error {
+			name := strings.TrimPrefix(ee.Name, "gh-")
+			err := el.opts.Em.Remove(name)
+			if err != nil {
+				return fmt.Errorf("failed to remove %s: %w", ee.FullName, err)
+			}
+			return nil
+		}
 	}
 
-	el.toggleInstalled(ix)
+	el.ui.CmdFlex.Clear()
+	el.ui.CmdFlex.AddItem(modal, 0, 1, true)
+	var err error
+	wg := el.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		el.QueueUpdateDraw(func() {
+			el.ui.Pages.SwitchToPage("command")
+			wg.Add(1)
+			wg.Done()
+			go func() {
+				el.QueueUpdateDraw(func() {
+					err = action()
+					if err != nil {
+						modal.SetText(err.Error())
+					} else {
+						modalText := fmt.Sprintf("Installed %s!", ee.FullName)
+						if verb == "remove" {
+							modalText = fmt.Sprintf("Removed %s!", ee.FullName)
+						}
+						modal.SetText(modalText)
+						modal.AddButtons([]string{"ok"})
+						el.app.SetFocus(modal)
+					}
+					wg.Done()
+				})
+			}()
+		})
+	}()
+
+	// TODO blocking the app's thread and deadlocking
+	wg.Wait()
+	if err == nil {
+		el.toggleInstalled(ix)
+	}
+}
+
+func (el *extList) InstallSelected() {
+	el.toggleSelected("install")
 }
 
 func (el *extList) RemoveSelected() {
-	ee, ix := el.FindSelected()
-	if ix < 0 {
-		el.opts.Logger.Println("failed to find selected extension")
-		return
-	}
-
-	modal := el.createModal()
-
-	modal.SetText(fmt.Sprintf("Removing %s...", ee.FullName))
-	el.ui.App.SetRoot(modal, true)
-	// I could eliminate this with a goroutine but it seems to be working fine
-	el.ui.App.ForceDraw()
-
-	err := el.opts.Em.Remove(strings.TrimPrefix(ee.Name, "gh-"))
-	if err != nil {
-		modal.SetText(fmt.Sprintf("Failed to remove %s: %s", ee.FullName, err.Error()))
-	} else {
-		modal.SetText(fmt.Sprintf("Removed %s.", ee.FullName))
-		modal.AddButtons([]string{"ok"})
-		el.ui.App.SetFocus(modal)
-	}
-	el.toggleInstalled(ix)
+	el.toggleSelected("remove")
 }
 
 func (el *extList) toggleInstalled(ix int) {
@@ -365,14 +418,19 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	readme.SetBorder(true).SetBorderColor(tcell.ColorPurple)
 
 	help := tview.NewTextView()
-	help.SetText(
-		"/: filter  i/r: install/remove  w: open in browser  pgup/pgdn: scroll readme  q: quit")
-	help.SetTextAlign(tview.AlignCenter)
+	help.SetDynamicColors(true)
+	help.SetText("[::b]?[-:-:-]: help [::b]j/k[-:-:-]: move [::b]i[-:-:-]: install [::b]r[-:-:-]: remove [::b]w[-:-:-]: web [::b]↵[-:-:-]: view readme [::b]q[-:-:-]: quit")
+
+	cmdFlex := tview.NewFlex()
+
+	pages := tview.NewPages()
 
 	ui := uiRegistry{
 		App:       app,
 		Outerflex: outerFlex,
 		List:      list,
+		Pages:     pages,
+		CmdFlex:   cmdFlex,
 	}
 
 	extList := newExtList(opts, ui, extEntries)
@@ -414,7 +472,9 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 
 	innerFlex.SetDirection(tview.FlexColumn)
 	innerFlex.AddItem(list, 0, 1, true)
-	innerFlex.AddItem(readme, 0, 1, false)
+	if !opts.SingleColumn {
+		innerFlex.AddItem(readme, 0, 1, false)
+	}
 
 	outerFlex.SetDirection(tview.FlexRow)
 	outerFlex.AddItem(header, 1, -1, false)
@@ -422,7 +482,50 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	outerFlex.AddItem(innerFlex, 0, 1, true)
 	outerFlex.AddItem(help, 1, -1, false)
 
-	app.SetRoot(outerFlex, true)
+	helpBig := tview.NewTextView()
+	helpBig.SetDynamicColors(true)
+	helpBig.SetBorderPadding(0, 0, 2, 0)
+	helpBig.SetText(heredoc.Doc(`
+		[::b]Application[-:-:-]
+
+		?: toggle help
+		q: quit
+
+		[::b]Navigation[-:-:-]
+
+		↓, j: scroll list of extensions down by 1
+		↑, k: scroll list of extensions up by 1
+
+		shift+j, space:                                   scroll list of extensions down by 25
+		shift+k, ctrl+space (mac), shift+space (windows): scroll list of extensions up by 25
+
+		[::b]Extension Management[-:-:-]
+
+		i: install highlighted extension
+		r: remove highlighted extension
+		w: open highlighted extension in web browser
+
+		[::b]Filtering[-:-:-]
+
+		/:      focus filter
+		enter:  finish filtering and go back to list
+		escape: clear filter and reset list
+
+		[::b]Readmes[-:-:-]
+
+		enter: open highlighted extension's readme full screen
+		page down: scroll readme pane down
+		page up:   scroll readme pane up
+
+		(On a mac, page down and page up are fn+down arrow and fn+up arrow)
+	`))
+
+	pages.AddPage("main", outerFlex, true, true)
+	pages.AddPage("help", helpBig, true, false)
+	pages.AddPage("readme", readme, true, false)
+	pages.AddPage("command", cmdFlex, true, false)
+
+	app.SetRoot(pages, true)
 
 	// Force fetching of initial readme by loading it just prior to the first
 	// draw. The callback is removed immediately after draw.
@@ -441,7 +544,41 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 			return event
 		}
 
+		curPage, _ := pages.GetFrontPage()
+
+		if curPage != "main" {
+			if curPage == "command" {
+				return event
+			}
+			if event.Rune() == 'q' || event.Key() == tcell.KeyEscape {
+				pages.SwitchToPage("main")
+				return nil
+			}
+			switch curPage {
+			case "readme":
+				switch event.Key() {
+				case tcell.KeyPgUp:
+					row, col := readme.GetScrollOffset()
+					if row > 0 {
+						readme.ScrollTo(row-2, col)
+					}
+				case tcell.KeyPgDn:
+					row, col := readme.GetScrollOffset()
+					readme.ScrollTo(row+2, col)
+				}
+			case "help":
+				switch event.Rune() {
+				case '?':
+					pages.SwitchToPage("main")
+				}
+			}
+			return nil
+		}
+
 		switch event.Rune() {
+		case '?':
+			pages.SwitchToPage("help")
+			return nil
 		case 'q':
 			app.Stop()
 		case 'k':
@@ -491,7 +628,7 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 			filter.SetText("")
 			extList.Reset()
 		case tcell.KeyCtrlSpace:
-			// The ctrl check works on windows/mac and not windows:
+			// The ctrl check works on linux/mac and not windows:
 			extList.PageUp()
 			go loadSelectedReadme()
 		case tcell.KeyCtrlJ:
@@ -500,24 +637,10 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 		case tcell.KeyCtrlK:
 			extList.PageUp()
 			go loadSelectedReadme()
-		case tcell.KeyPgUp:
-			row, col := readme.GetScrollOffset()
-			if row > 0 {
-				readme.ScrollTo(row-2, col)
-			}
-			return nil
-		case tcell.KeyPgDn:
-			row, col := readme.GetScrollOffset()
-			readme.ScrollTo(row+2, col)
-			return nil
 		}
 
 		return event
 	})
-
-	// Without this redirection, the git client inside of the extension manager
-	// will dump git output to the terminal.
-	opts.IO.ErrOut = io.Discard
 
 	if err := app.Run(); err != nil {
 		return err
