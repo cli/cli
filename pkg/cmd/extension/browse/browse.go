@@ -418,7 +418,8 @@ func ExtBrowse(opts ExtBrowseOpts) error {
 	readme.SetBorder(true).SetBorderColor(tcell.ColorPurple)
 
 	help := tview.NewTextView()
-	help.SetText("?: help  q: quit")
+	help.SetDynamicColors(true)
+	help.SetText("[::b]?[-:-:-]: help [::b]j/k[-:-:-]: move [::b]i[-:-:-]: install [::b]r[-:-:-]: remove [::b]w[-:-:-]: web [::b]q[-:-:-]: quit")
 
 	cmdFlex := tview.NewFlex()
 
