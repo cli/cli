@@ -284,8 +284,8 @@ func Test_editRun(t *testing.T) {
 					},
 					Projects: prShared.EditableProjects{
 						EditableSlice: prShared.EditableSlice{
-							Add:    []string{"Cleanup", "RoadmapV2"},
-							Remove: []string{"Roadmap", "CleanupV2"},
+							Add:    []string{"Cleanup", "CleanupV2"},
+							Remove: []string{"Roadmap", "RoadmapV2"},
 							Edited: true,
 						},
 					},
@@ -332,7 +332,7 @@ func Test_editRun(t *testing.T) {
 					eo.Labels.Value = []string{"feature", "TODO", "bug"}
 					eo.Labels.Add = []string{"feature", "TODO", "bug"}
 					eo.Labels.Remove = []string{"docs"}
-					eo.Projects.Value = []string{"Cleanup", "RoadmapV2"}
+					eo.Projects.Value = []string{"Cleanup", "CleanupV2"}
 					eo.Milestone.Value = "GA"
 					return nil
 				},
@@ -404,7 +404,7 @@ func mockIssueProjectItemsGet(_ *testing.T, reg *httpmock.Registry) {
 			{ "data": { "repository": { "issue": {
 				"projectItems": {
 					"nodes": [
-						{ "id": "ITEMID", "project": { "title": "CleanupV2" } }
+						{ "id": "ITEMID", "project": { "title": "RoadmapV2" } }
 					]
 				}
 			} } } }`),

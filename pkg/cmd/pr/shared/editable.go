@@ -153,17 +153,20 @@ func (e Editable) ProjectV2Ids() (*[]string, *[]string, error) {
 
 	// titles of projects to add
 	addTitles := set.NewStringSet()
-	addTitles.AddValues(e.Projects.Value)
-	addTitles.AddValues(e.Projects.Add)
-	addTitles.RemoveValues(e.Projects.Default)
-	addTitles.RemoveValues(e.Projects.Remove)
-
 	// titles of projects to remove
 	removeTitles := set.NewStringSet()
-	removeTitles.AddValues(e.Projects.Default)
-	removeTitles.AddValues(e.Projects.Remove)
-	removeTitles.RemoveValues(e.Projects.Value)
-	removeTitles.RemoveValues(e.Projects.Add)
+
+	if len(e.Projects.Add) != 0 || len(e.Projects.Remove) != 0 {
+		// Projects were selected using flags.
+		addTitles.AddValues(e.Projects.Add)
+		removeTitles.AddValues(e.Projects.Remove)
+	} else {
+		// Projects were selected interactively.
+		addTitles.AddValues(e.Projects.Value)
+		addTitles.RemoveValues(e.Projects.Default)
+		removeTitles.AddValues(e.Projects.Default)
+		removeTitles.RemoveValues(e.Projects.Value)
+	}
 
 	var addIds []string
 	var removeIds []string
