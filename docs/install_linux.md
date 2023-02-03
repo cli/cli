@@ -236,3 +236,4 @@ sudo xbps-install github-cli
 [arch linux repo]: https://www.archlinux.org/packages/community/x86_64/github-cli
 [arch linux aur]: https://aur.archlinux.org/packages/github-cli-git
 [^1]: https://wiki.alpinelinux.org/wiki/Package_management#Repository_pinning
+
