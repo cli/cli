@@ -74,11 +74,8 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 			if s.addBackslash {
 				repl = append([]byte{92}, repl...)
 			}
-			l := len(repl)
-			for j := 0; j < l; j++ {
-				out[outIndex] = repl[j]
-				outIndex++
-			}
+			out = append(out[:outIndex], repl...)
+			outIndex += len(repl)
 			bufIndex += 6
 			s.addBackslash = false
 			continue
@@ -90,18 +87,16 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 			s.addBackslash = false
 		}
 
-		out[outIndex] = buf[bufIndex]
+		out = append(out[:outIndex], buf[bufIndex])
 		outIndex++
 		bufIndex++
 	}
 
 	if readErr != nil && errors.Is(readErr, io.EOF) {
-		remaining := bufLen - bufIndex
-		for j := 0; j < remaining; j++ {
-			out[outIndex] = window[j]
-			outIndex++
-			bufIndex++
-		}
+		out = append(out[:outIndex], window...)
+		l := len(window)
+		outIndex += l
+		bufIndex += l
 	} else {
 		s.previousWindow = window
 	}
