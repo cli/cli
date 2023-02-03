@@ -85,7 +85,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 	if nameFilter == "" {
 		a.StartProgressIndicatorWithLabel("Fetching codespaces")
 		userName := opts.userName
-		if userName == "" {
+		if userName == "" && opts.orgName != "" {
 			currentUser, err := a.apiClient.GetUser(ctx)
 			if err != nil {
 				return err
