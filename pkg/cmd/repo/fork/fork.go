@@ -2,6 +2,7 @@ package fork
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
@@ -44,6 +46,10 @@ type ForkOptions struct {
 	ForkName          string
 	Rename            bool
 	DefaultBranchOnly bool
+}
+
+type errWithExitCode interface {
+	ExitCode() int
 }
 
 // TODO warn about useless flags (--remote, --remote-name) when running from outside a repository
@@ -317,8 +323,33 @@ func forkRun(opts *ForkOptions) error {
 			}
 		}
 		if cloneDesired {
+			var cloneDir string
+			var err error
+
+			retryLimit := 3
+
 			forkedRepoURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
-			cloneDir, err := gitClient.Clone(ctx, forkedRepoURL, opts.GitArgs)
+
+			expBackoff := backoff.NewExponentialBackOff()
+
+			expBackoff.Multiplier = 1.1
+			expBackoff.MaxInterval = 10 * time.Second
+			expBackoff.MaxElapsedTime = 5 * time.Minute
+
+			for i := 0; i < retryLimit; i++ {
+				cloneDir, err = gitClient.Clone(ctx, forkedRepoURL, opts.GitArgs)
+				if err == nil {
+					break
+				}
+
+				var execError errWithExitCode
+				if !errors.As(err, &execError) || execError.ExitCode() != 128 {
+					break
+				}
+
+				duration := expBackoff.NextBackOff()
+				time.Sleep(duration)
+			}
 			if err != nil {
 				return fmt.Errorf("failed to clone fork: %w", err)
 			}
