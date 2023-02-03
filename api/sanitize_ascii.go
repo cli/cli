@@ -93,10 +93,8 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 	}
 
 	if readErr != nil && errors.Is(readErr, io.EOF) {
-		out = append(out[:outIndex], window...)
-		l := len(window)
-		outIndex += l
-		bufIndex += l
+		_ = append(out[:outIndex], window...)
+		outIndex += len(window)
 	} else {
 		s.previousWindow = window
 	}
