@@ -347,8 +347,8 @@ func Test_editRun(t *testing.T) {
 					},
 					Projects: shared.EditableProjects{
 						EditableSlice: shared.EditableSlice{
-							Add:    []string{"Cleanup", "RoadmapV2"},
-							Remove: []string{"CleanupV2", "Roadmap"},
+							Add:    []string{"Cleanup", "CleanupV2"},
+							Remove: []string{"Roadmap", "RoadmapV2"},
 							Edited: true,
 						},
 					},
@@ -401,8 +401,8 @@ func Test_editRun(t *testing.T) {
 					},
 					Projects: shared.EditableProjects{
 						EditableSlice: shared.EditableSlice{
-							Add:    []string{"Cleanup", "RoadmapV2"},
-							Remove: []string{"CleanupV2", "Roadmap"},
+							Add:    []string{"Cleanup", "CleanupV2"},
+							Remove: []string{"Roadmap", "RoadmapV2"},
 							Edited: true,
 						},
 					},
@@ -655,9 +655,7 @@ func (s testSurveyor) EditFields(e *shared.Editable, _ string) error {
 	e.Labels.Value = []string{"feature", "TODO", "bug"}
 	e.Labels.Add = []string{"feature", "TODO", "bug"}
 	e.Labels.Remove = []string{"docs"}
-	e.Projects.Value = []string{"Cleanup", "RoadmapV2"}
-	e.Projects.Add = []string{"Cleanup", "RoadmapV2"}
-	e.Projects.Remove = []string{"CleanupV2", "Roadmap"}
+	e.Projects.Value = []string{"Cleanup", "CleanupV2"}
 	e.Milestone.Value = "GA"
 	return nil
 }
