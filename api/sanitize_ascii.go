@@ -193,10 +193,3 @@ func mapControlCharacterToCaret(b []byte) ([]byte, bool) {
 	}
 	return b, false
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
