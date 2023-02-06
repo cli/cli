@@ -56,6 +56,7 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 		}
 		return bufLen, readErr
 	}
+	buf = buf[:bufLen]
 
 	if s.remainder != nil {
 		buf = append(s.remainder, buf...)
@@ -65,10 +66,11 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 
 	for outIndex < outLimit {
 		remaining := min(6, (bufLen - bufIndex))
-		window := buf[bufIndex : bufIndex+remaining]
 		if remaining < 6 {
 			break
 		}
+
+		window := buf[bufIndex : bufIndex+remaining]
 
 		if bytes.HasPrefix(window, []byte(`\u00`)) {
 			repl, _ := mapControlCharacterToCaret(window)
