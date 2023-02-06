@@ -32,8 +32,8 @@ func AddASCIISanitizer(rt http.RoundTripper) http.RoundTripper {
 // sanitizeASCIIReadCloser implements the ReadCloser interface.
 type sanitizeASCIIReadCloser struct {
 	io.ReadCloser
-	addBackslash   bool
-	previousWindow []byte
+	addBackslash bool
+	remainder    []byte
 }
 
 // Read uses a sliding window alogorithm to detect C0 and C1
@@ -45,8 +45,8 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 	var outIndex int
 	var bufIndex int
 	var bufLen int
-	var window []byte
-	buf := make([]byte, len(out))
+	outLimit := len(out)
+	buf := make([]byte, outLimit)
 
 	bufLen, readErr = s.ReadCloser.Read(buf)
 	if readErr != nil && !errors.Is(readErr, io.EOF) {
@@ -57,27 +57,35 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 		return bufLen, readErr
 	}
 
-	if s.previousWindow != nil {
-		buf = append(s.previousWindow, buf...)
-		bufLen += len(s.previousWindow)
+	if s.remainder != nil {
+		buf = append(s.remainder, buf...)
+		bufLen += len(s.remainder)
+		s.remainder = s.remainder[:0]
 	}
 
-	for {
+	for outIndex < outLimit {
 		remaining := min(6, (bufLen - bufIndex))
-		window = buf[bufIndex : bufIndex+remaining]
+		window := buf[bufIndex : bufIndex+remaining]
 		if remaining < 6 {
 			break
 		}
 
 		if bytes.HasPrefix(window, []byte(`\u00`)) {
 			repl, _ := mapControlCharacterToCaret(window)
+			window = window[:0]
 			if s.addBackslash {
 				repl = append([]byte{92}, repl...)
 			}
-			out = append(out[:outIndex], repl...)
-			outIndex += len(repl)
-			bufIndex += 6
 			s.addBackslash = false
+			for j := 0; j < len(repl); j++ {
+				if outIndex < outLimit {
+					out[outIndex] = repl[j]
+					outIndex++
+				} else {
+					s.remainder = append(s.remainder, repl[j])
+				}
+			}
+			bufIndex += 6
 			continue
 		}
 
@@ -87,16 +95,31 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 			s.addBackslash = false
 		}
 
-		out = append(out[:outIndex], buf[bufIndex])
+		out[outIndex] = buf[bufIndex]
 		outIndex++
 		bufIndex++
 	}
 
 	if readErr != nil && errors.Is(readErr, io.EOF) {
-		_ = append(out[:outIndex], window...)
-		outIndex += len(window)
+		remaining := bufLen - bufIndex
+		for j := 0; j < remaining; j++ {
+			if outIndex < outLimit {
+				out[outIndex] = buf[bufIndex]
+				outIndex++
+				bufIndex++
+			} else {
+				s.remainder = append(s.remainder, buf[bufIndex])
+				bufIndex++
+			}
+		}
 	} else {
-		s.previousWindow = window
+		if bufIndex < len(buf) {
+			s.remainder = append(s.remainder, buf[bufIndex:]...)
+		}
+	}
+
+	if len(s.remainder) != 0 {
+		readErr = nil
 	}
 
 	return outIndex, readErr
