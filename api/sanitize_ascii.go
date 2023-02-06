@@ -72,7 +72,6 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 
 		if bytes.HasPrefix(window, []byte(`\u00`)) {
 			repl, _ := mapControlCharacterToCaret(window)
-			window = window[:0]
 			if s.addBackslash {
 				repl = append([]byte{92}, repl...)
 			}
