@@ -1,12 +1,14 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"testing/iotest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,4 +49,14 @@ func TestHTTPClient_SanitizeASCIIControlCharacters(t *testing.T) {
 	assert.Equal(t, "10^P 11^Q 12^R 13^S 14^T 15^U 16^V 17^W 18^X 19^Y 1A^Z 1B^[ 1C^\\ 1D^] 1E^^ 1F^_", issue.Author.Name)
 	assert.Equal(t, "monalisa", issue.Author.Login)
 	assert.Equal(t, "Escaped ^[ \\^[ \\^[ \\\\^[", issue.ActiveLockReason)
+}
+
+func TestSanitizeASCIIReadCloser(t *testing.T) {
+	data := []byte(`"Assign},"L`)
+	var r io.Reader = bytes.NewReader(data)
+	r = &sanitizeASCIIReadCloser{ReadCloser: io.NopCloser(r)}
+	r = iotest.OneByteReader(r)
+	out, err := io.ReadAll(r)
+	require.NoError(t, err)
+	assert.Equal(t, data, out)
 }
