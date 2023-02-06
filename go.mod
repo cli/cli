@@ -81,3 +81,5 @@ require (
 )
 
 replace golang.org/x/crypto => github.com/cli/crypto v0.0.0-20210929142629-6be313f59b03
+
+replace github.com/henvic/httpretty v0.0.6 => github.com/mislav/httpretty v0.1.1-0.20230202151216-d31343e0d884
