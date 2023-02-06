@@ -32,8 +32,8 @@ func AddASCIISanitizer(rt http.RoundTripper) http.RoundTripper {
 // sanitizeASCIIReadCloser implements the ReadCloser interface.
 type sanitizeASCIIReadCloser struct {
 	io.ReadCloser
-	addBackslash bool
-	remainder    []byte
+	addEscape bool
+	remainder []byte
 }
 
 // Read uses a sliding window alogorithm to detect C0 and C1
@@ -41,14 +41,11 @@ type sanitizeASCIIReadCloser struct {
 // with equivelent inert characters. Characters that are not part
 // of a control sequence not modified.
 func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
-	var readErr error
-	var outIndex int
-	var bufIndex int
-	var bufLen int
-	outLimit := len(out)
-	buf := make([]byte, outLimit)
+	var bufIndex, outIndex int
+	outLen := len(out)
+	buf := make([]byte, outLen)
 
-	bufLen, readErr = s.ReadCloser.Read(buf)
+	bufLen, readErr := s.ReadCloser.Read(buf)
 	if readErr != nil && !errors.Is(readErr, io.EOF) {
 		if bufLen > 0 {
 			// Do not sanitize if there was a read error that is not EOF.
@@ -64,22 +61,17 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 		s.remainder = s.remainder[:0]
 	}
 
-	for outIndex < outLimit {
-		remaining := min(6, (bufLen - bufIndex))
-		if remaining < 6 {
-			break
-		}
-
-		window := buf[bufIndex : bufIndex+remaining]
+	for bufIndex < bufLen-6 && outIndex < outLen {
+		window := buf[bufIndex : bufIndex+6]
 
 		if bytes.HasPrefix(window, []byte(`\u00`)) {
 			repl, _ := mapControlCharacterToCaret(window)
-			if s.addBackslash {
-				repl = append([]byte{92}, repl...)
+			if s.addEscape {
+				repl = append([]byte{'\\'}, repl...)
+				s.addEscape = false
 			}
-			s.addBackslash = false
 			for j := 0; j < len(repl); j++ {
-				if outIndex < outLimit {
+				if outIndex < outLen {
 					out[outIndex] = repl[j]
 					outIndex++
 				} else {
@@ -91,9 +83,9 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 		}
 
 		if window[0] == '\\' {
-			s.addBackslash = !s.addBackslash
+			s.addEscape = !s.addEscape
 		} else {
-			s.addBackslash = false
+			s.addEscape = false
 		}
 
 		out[outIndex] = buf[bufIndex]
@@ -104,7 +96,7 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 	if readErr != nil && errors.Is(readErr, io.EOF) {
 		remaining := bufLen - bufIndex
 		for j := 0; j < remaining; j++ {
-			if outIndex < outLimit {
+			if outIndex < outLen {
 				out[outIndex] = buf[bufIndex]
 				outIndex++
 				bufIndex++
@@ -114,7 +106,7 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 			}
 		}
 	} else {
-		if bufIndex < len(buf) {
+		if bufIndex < bufLen {
 			s.remainder = append(s.remainder, buf[bufIndex:]...)
 		}
 	}
