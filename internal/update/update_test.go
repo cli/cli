@@ -1,13 +1,13 @@
 package update
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"testing"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/pkg/httpmock"
 )
 
@@ -75,7 +75,6 @@ func TestCheckForUpdate(t *testing.T) {
 			reg := &httpmock.Registry{}
 			httpClient := &http.Client{}
 			httpmock.ReplaceTripper(httpClient, reg)
-			client := api.NewClientFromHTTP(httpClient)
 
 			reg.Register(
 				httpmock.REST("GET", "repos/OWNER/REPO/releases/latest"),
@@ -85,7 +84,7 @@ func TestCheckForUpdate(t *testing.T) {
 				}`, s.LatestVersion, s.LatestURL)),
 			)
 
-			rel, err := CheckForUpdate(client, tempFilePath(), "OWNER/REPO", s.CurrentVersion)
+			rel, err := CheckForUpdate(context.TODO(), httpClient, tempFilePath(), "OWNER/REPO", s.CurrentVersion)
 			if err != nil {
 				t.Fatal(err)
 			}

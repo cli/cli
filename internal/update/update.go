@@ -1,7 +1,9 @@
 package update
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -9,8 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/go-gh"
+	"github.com/cli/go-gh/pkg/api"
 	"github.com/hashicorp/go-version"
 	"gopkg.in/yaml.v3"
 )
@@ -30,13 +33,13 @@ type StateEntry struct {
 }
 
 // CheckForUpdate checks whether this software has had a newer release on GitHub
-func CheckForUpdate(client *api.Client, stateFilePath, repo, currentVersion string) (*ReleaseInfo, error) {
+func CheckForUpdate(ctx context.Context, client *http.Client, stateFilePath, repo, currentVersion string) (*ReleaseInfo, error) {
 	stateEntry, _ := getStateEntry(stateFilePath)
 	if stateEntry != nil && time.Since(stateEntry.CheckedForUpdateAt).Hours() < 24 {
 		return nil, nil
 	}
 
-	releaseInfo, err := getLatestReleaseInfo(client, repo)
+	releaseInfo, err := getLatestReleaseInfo(ctx, client, repo)
 	if err != nil {
 		return nil, err
 	}
@@ -53,13 +56,21 @@ func CheckForUpdate(client *api.Client, stateFilePath, repo, currentVersion stri
 	return nil, nil
 }
 
-func getLatestReleaseInfo(client *api.Client, repo string) (*ReleaseInfo, error) {
-	var latestRelease ReleaseInfo
-	err := client.REST(ghinstance.Default(), "GET", fmt.Sprintf("repos/%s/releases/latest", repo), nil, &latestRelease)
+func getLatestReleaseInfo(ctx context.Context, client *http.Client, repo string) (*ReleaseInfo, error) {
+	restClient, err := gh.RESTClient(&api.ClientOptions{
+		AuthToken:          "",
+		Host:               ghinstance.Default(),
+		SkipDefaultHeaders: true,
+		Transport:          client.Transport,
+		LogIgnoreEnv:       true,
+	})
 	if err != nil {
 		return nil, err
 	}
-
+	var latestRelease ReleaseInfo
+	if err := restClient.DoWithContext(ctx, "GET", fmt.Sprintf("repos/%s/releases/latest", repo), nil, &latestRelease); err != nil {
+		return nil, err
+	}
 	return &latestRelease, nil
 }
 
