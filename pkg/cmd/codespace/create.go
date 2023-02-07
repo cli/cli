@@ -123,7 +123,11 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		var defaultRepo string
 		if remotes, _ := a.remotes(); remotes != nil {
 			if defaultRemote, _ := remotes.ResolvedRemote(); defaultRemote != nil {
+				// this is a remote explicitly chosen via `repo set-default`
 				defaultRepo = ghrepo.FullName(defaultRemote)
+			} else if len(remotes) > 0 {
+				// as a fallback, just pick the first remote
+				defaultRepo = ghrepo.FullName(remotes[0])
 			}
 		}
 
