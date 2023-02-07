@@ -197,7 +197,9 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 			"mergeCommitAllowed",
 			"rebaseMergeAllowed",
 			"repositoryTopics",
+			"stargazerCount",
 			"squashMergeAllowed",
+			"watchers",
 		}
 		if repoFeatures.VisibilityField {
 			fieldsToRetrieve = append(fieldsToRetrieve, "visibility")
@@ -408,25 +410,24 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 				return err
 			}
 		case optionVisibility:
-			opts.Edits.Visibility = new(string)
-			*opts.Edits.Visibility = r.Visibility
-
+			opts.Edits.Visibility = &r.Visibility
 			visibilityOptions := []string{"public", "private", "internal"}
 			selected, err := opts.Prompter.Select("Visibility", strings.ToLower(r.Visibility), visibilityOptions)
 			if err != nil {
 				return err
 			}
-			*opts.Edits.Visibility = visibilityOptions[selected]
-
-			if *opts.Edits.Visibility == "private" {
+			confirmed := true
+			if visibilityOptions[selected] == "private" &&
+				(r.StargazerCount > 0 || r.Watchers.TotalCount > 0) {
 				cs := opts.IO.ColorScheme()
 				fmt.Fprintf(opts.IO.ErrOut, "%s Changing the repository visibility to private will cause permanent loss of stars and watchers.\n", cs.WarningIcon())
-				confirmed, err := opts.Prompter.Confirm("Do you want to change visibility to private?", false)
+				confirmed, err = opts.Prompter.Confirm("Do you want to change visibility to private?", false)
 				if err != nil {
 					return err
-				} else if !confirmed {
-					*opts.Edits.Visibility = r.Visibility
 				}
+			}
+			if confirmed {
+				opts.Edits.Visibility = &visibilityOptions[selected]
 			}
 		case optionMergeOptions:
 			var defaultMergeOptions []string
