@@ -394,7 +394,10 @@ func (c *Client) revParse(ctx context.Context, args ...string) ([]byte, error) {
 // Below are commands that make network calls and need authentication credentials supplied from gh.
 
 func (c *Client) Fetch(ctx context.Context, remote string, refspec string, mods ...CommandModifier) error {
-	args := []string{"fetch", remote, refspec}
+	args := []string{"fetch", remote}
+	if refspec != "" {
+		args = append(args, refspec)
+	}
 	cmd, err := c.AuthenticatedCommand(ctx, args...)
 	if err != nil {
 		return err
@@ -462,8 +465,8 @@ func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBra
 	for _, branch := range trackingBranches {
 		args = append(args, "-t", branch)
 	}
-	args = append(args, "-f", name, urlStr)
-	cmd, err := c.AuthenticatedCommand(ctx, args...)
+	args = append(args, name, urlStr)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
