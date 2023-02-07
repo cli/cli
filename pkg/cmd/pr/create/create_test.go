@@ -451,7 +451,7 @@ func Test_createRun(t *testing.T) {
 			cmdStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git config --get-regexp.+branch\\\.feature\\\.`, 0, "")
 				cs.Register(`git show-ref --verify -- HEAD refs/remotes/origin/feature`, 0, "")
-				cs.Register(`git remote add -f fork https://github.com/monalisa/REPO.git`, 0, "")
+				cs.Register(`git remote add fork https://github.com/monalisa/REPO.git`, 0, "")
 				cs.Register(`git push --set-upstream fork HEAD:feature`, 0, "")
 			},
 			promptStubs: func(pm *prompter.PrompterMock) {
