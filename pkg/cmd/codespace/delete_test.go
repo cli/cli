@@ -266,7 +266,7 @@ func TestDelete(t *testing.T) {
 			ios, _, stdout, stderr := iostreams.Test()
 			ios.SetStdinTTY(true)
 			ios.SetStdoutTTY(true)
-			app := NewApp(ios, nil, apiMock, nil)
+			app := NewApp(ios, nil, apiMock, nil, nil)
 			err := app.Delete(context.Background(), opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("delete() error = %v, wantErr %v", err, tt.wantErr)

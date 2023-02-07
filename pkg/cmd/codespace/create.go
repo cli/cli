@@ -10,6 +10,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -119,12 +120,24 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 
 	promptForRepoAndBranch := userInputs.Repository == ""
 	if promptForRepoAndBranch {
+		var defaultRepo string
+		if remotes, _ := a.remotes(); remotes != nil {
+			if defaultRemote, _ := remotes.ResolvedRemote(); defaultRemote != nil {
+				// this is a remote explicitly chosen via `repo set-default`
+				defaultRepo = ghrepo.FullName(defaultRemote)
+			} else if len(remotes) > 0 {
+				// as a fallback, just pick the first remote
+				defaultRepo = ghrepo.FullName(remotes[0])
+			}
+		}
+
 		repoQuestions := []*survey.Question{
 			{
 				Name: "repository",
 				Prompt: &survey.Input{
 					Message: "Repository:",
 					Help:    "Search for repos by name. To search within an org or user, or to see private repos, enter at least ':user/'.",
+					Default: defaultRepo,
 					Suggest: func(toComplete string) []string {
 						return getRepoSuggestions(ctx, a.apiClient, toComplete)
 					},
