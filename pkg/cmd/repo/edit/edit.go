@@ -98,6 +98,8 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 			Edit repository settings.
 
 			To toggle a setting off, use the %[1]s--flag=false%[1]s syntax.
+
+			Note that changing repository visibility to private will cause loss of stars and watchers.
 		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
@@ -130,19 +132,6 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 
 			if cmd.Flags().NFlag() == 0 {
 				opts.InteractiveMode = true
-			}
-
-			if cmd.Flags().Changed("visibility") {
-				if *opts.Edits.Visibility == "private" {
-					confirmed, err := confirmChangeVisibilityPrivate(opts)
-					if err != nil {
-						return err
-					}
-
-					if !confirmed {
-						return nil
-					}
-				}
 			}
 
 			if opts.InteractiveMode && !opts.IO.CanPrompt() {
@@ -422,24 +411,21 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			opts.Edits.Visibility = new(string)
 			*opts.Edits.Visibility = r.Visibility
 
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Select{
-				Message: "Visibility",
-				Options: []string{"public", "private", "internal"},
-				Default: strings.ToLower(r.Visibility),
-			}, opts.Edits.Visibility)
+			visibilityOptions := []string{"public", "private", "internal"}
+			selected, err := opts.Prompter.Select("Visibility", strings.ToLower(r.Visibility), visibilityOptions)
 			if err != nil {
 				return err
 			}
+			*opts.Edits.Visibility = visibilityOptions[selected]
 
 			if *opts.Edits.Visibility == "private" {
-				confirmed, err := confirmChangeVisibilityPrivate(opts)
+				cs := opts.IO.ColorScheme()
+				fmt.Fprintf(opts.IO.ErrOut, "%s Changing the repository visibility to private will cause permanent lose of stars and watchers.\n", cs.WarningIcon())
+				confirmed, err := opts.Prompter.Confirm("Do you want to change visibility to private?", false)
 				if err != nil {
 					return err
-				}
-
-				if !confirmed {
-					opts.Edits.Visibility = &r.Visibility
+				} else if !confirmed {
+					*opts.Edits.Visibility = r.Visibility
 				}
 			}
 		case optionMergeOptions:
@@ -594,17 +580,4 @@ func isIncluded(value string, opts []string) bool {
 		}
 	}
 	return false
-}
-
-// confirmChangeVisibilityPrivate displays warning message and
-// show confirmation prompt when user chose to change repository's
-// visibility to private.
-func confirmChangeVisibilityPrivate(opts *EditOptions) (bool, error) {
-	_, err := fmt.Fprintf(opts.IO.ErrOut, "WARNING: This is a potentially destructive action.\n"+
-		"You will permanently lost all stars and watchers of this repository.\n")
-	if err != nil {
-		return false, err
-	}
-
-	return opts.Prompter.Confirm("Are you sure you want to change this repository to private?", false)
 }
