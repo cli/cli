@@ -329,6 +329,10 @@ func forkRun(opts *ForkOptions) error {
 				return err
 			}
 
+			if err := gitClient.Fetch(ctx, "upstream", "", git.WithRepoDir(cloneDir)); err != nil {
+				return err
+			}
+
 			if connectedToTerminal {
 				fmt.Fprintf(stderr, "%s Cloned fork\n", cs.SuccessIcon())
 			}
