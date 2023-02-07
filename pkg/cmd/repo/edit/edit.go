@@ -420,7 +420,7 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 
 			if *opts.Edits.Visibility == "private" {
 				cs := opts.IO.ColorScheme()
-				fmt.Fprintf(opts.IO.ErrOut, "%s Changing the repository visibility to private will cause permanent lose of stars and watchers.\n", cs.WarningIcon())
+				fmt.Fprintf(opts.IO.ErrOut, "%s Changing the repository visibility to private will cause permanent loss of stars and watchers.\n", cs.WarningIcon())
 				confirmed, err := opts.Prompter.Confirm("Do you want to change visibility to private?", false)
 				if err != nil {
 					return err
