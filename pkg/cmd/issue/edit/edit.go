@@ -45,6 +45,12 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "edit {<number> | <url>}",
 		Short: "Edit an issue",
+		Long: heredoc.Doc(`
+			Edit an issue.
+
+			Editing an issue's projects requires authorization with the "project" scope.
+			To authorize, run "gh auth refresh -s project".
+		`),
 		Example: heredoc.Doc(`
 			$ gh issue edit 23 --title "I found a bug" --body "Nothing works"
 			$ gh issue edit 23 --add-label "bug,help wanted" --remove-label "core"
@@ -145,6 +151,7 @@ func editRun(opts *EditOptions) error {
 	}
 	if opts.Interactive || editable.Projects.Edited {
 		lookupFields = append(lookupFields, "projectCards")
+		lookupFields = append(lookupFields, "projectItems")
 	}
 	if opts.Interactive || editable.Milestone.Edited {
 		lookupFields = append(lookupFields, "milestone")
@@ -159,7 +166,12 @@ func editRun(opts *EditOptions) error {
 	editable.Body.Default = issue.Body
 	editable.Assignees.Default = issue.Assignees.Logins()
 	editable.Labels.Default = issue.Labels.Names()
-	editable.Projects.Default = issue.ProjectCards.ProjectNames()
+	editable.Projects.Default = append(issue.ProjectCards.ProjectNames(), issue.ProjectItems.ProjectTitles()...)
+	projectItems := map[string]string{}
+	for _, n := range issue.ProjectItems.Nodes {
+		projectItems[n.Project.ID] = n.ID
+	}
+	editable.Projects.ProjectItems = projectItems
 	if issue.Milestone != nil {
 		editable.Milestone.Default = issue.Milestone.Title
 	}

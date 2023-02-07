@@ -35,7 +35,7 @@ func TestNewCmdRename(t *testing.T) {
 		},
 		{
 			name:  "one argument no tty confirmed",
-			input: "REPO --confirm",
+			input: "REPO --yes",
 			output: RenameOptions{
 				newRepoSelector: "REPO",
 			},
@@ -43,12 +43,12 @@ func TestNewCmdRename(t *testing.T) {
 		{
 			name:    "one argument no tty",
 			input:   "REPO",
-			errMsg:  "--confirm required when passing a single argument",
+			errMsg:  "--yes required when passing a single argument",
 			wantErr: true,
 		},
 		{
 			name:  "one argument tty confirmed",
-			input: "REPO --confirm",
+			input: "REPO --yes",
 			tty:   true,
 			output: RenameOptions{
 				newRepoSelector: "REPO",

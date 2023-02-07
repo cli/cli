@@ -58,8 +58,8 @@ func Test_codespace_displayName(t *testing.T) {
 			fields: fields{
 				Codespace: &api.Codespace{
 					GitStatus: api.CodespaceGitStatus{
-						Ref:                  "trunk",
-						HasUncommitedChanges: true,
+						Ref:                   "trunk",
+						HasUncommittedChanges: true,
 					},
 					Repository: api.Repository{
 						FullName: "cli/cli",
@@ -75,8 +75,8 @@ func Test_codespace_displayName(t *testing.T) {
 			fields: fields{
 				Codespace: &api.Codespace{
 					GitStatus: api.CodespaceGitStatus{
-						Ref:                  "trunk",
-						HasUncommitedChanges: true,
+						Ref:                   "trunk",
+						HasUncommittedChanges: true,
 					},
 					Repository: api.Repository{
 						FullName: "cli/cli",
@@ -92,8 +92,8 @@ func Test_codespace_displayName(t *testing.T) {
 			fields: fields{
 				Codespace: &api.Codespace{
 					GitStatus: api.CodespaceGitStatus{
-						Ref:                  "trunk",
-						HasUncommitedChanges: false,
+						Ref:                   "trunk",
+						HasUncommittedChanges: false,
 					},
 					Repository: api.Repository{
 						FullName: "cli/cli",
@@ -114,8 +114,8 @@ func Test_codespace_displayName(t *testing.T) {
 						Login: "jimmy",
 					},
 					GitStatus: api.CodespaceGitStatus{
-						Ref:                  "trunk",
-						HasUncommitedChanges: false,
+						Ref:                   "trunk",
+						HasUncommittedChanges: false,
 					},
 					Repository: api.Repository{
 						FullName: "cli/cli",
@@ -268,8 +268,8 @@ func Test_formatCodespacesForSelect(t *testing.T) {
 					},
 					{
 						GitStatus: api.CodespaceGitStatus{
-							Ref:                  "trunk",
-							HasUncommitedChanges: true,
+							Ref:                   "trunk",
+							HasUncommittedChanges: true,
 						},
 						Repository: api.Repository{
 							FullName: "cli/cli",

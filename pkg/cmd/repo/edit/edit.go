@@ -36,6 +36,7 @@ const (
 	optionIssues            = "Issues"
 	optionMergeOptions      = "Merge Options"
 	optionProjects          = "Projects"
+	optionDiscussions       = "Discussions"
 	optionTemplateRepo      = "Template Repository"
 	optionTopics            = "Topics"
 	optionVisibility        = "Visibility"
@@ -66,6 +67,7 @@ type EditRepositoryInput struct {
 	EnableIssues        *bool   `json:"has_issues,omitempty"`
 	EnableMergeCommit   *bool   `json:"allow_merge_commit,omitempty"`
 	EnableProjects      *bool   `json:"has_projects,omitempty"`
+	EnableDiscussions   *bool   `json:"has_discussions,omitempty"`
 	EnableRebaseMerge   *bool   `json:"allow_rebase_merge,omitempty"`
 	EnableSquashMerge   *bool   `json:"allow_squash_merge,omitempty"`
 	EnableWiki          *bool   `json:"has_wiki,omitempty"`
@@ -146,6 +148,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableIssues, "enable-issues", "", "Enable issues in the repository")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableProjects, "enable-projects", "", "Enable projects in the repository")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableWiki, "enable-wiki", "", "Enable wiki in the repository")
+	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableDiscussions, "enable-discussions", "", "Enable discussions in the repository")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableMergeCommit, "enable-merge-commit", "", "Enable merging pull requests via merge commit")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableSquashMerge, "enable-squash-merge", "", "Enable merging pull requests via squashed commit")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableRebaseMerge, "enable-rebase-merge", "", "Enable merging pull requests via rebase")
@@ -181,6 +184,8 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 			"hasIssuesEnabled",
 			"hasProjectsEnabled",
 			"hasWikiEnabled",
+			// TODO: GitHub Enterprise Server does not support has_discussions yet
+			// "hasDiscussionsEnabled",
 			"homepageUrl",
 			"isInOrganization",
 			"isTemplate",
@@ -275,6 +280,8 @@ func interactiveChoice(r *api.Repository) ([]string, error) {
 		optionIssues,
 		optionMergeOptions,
 		optionProjects,
+		// TODO: GitHub Enterprise Server does not support has_discussions yet
+		// optionDiscussions,
 		optionTemplateRepo,
 		optionTopics,
 		optionVisibility,
@@ -382,6 +389,16 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 				Message: "Enable Projects?",
 				Default: r.HasProjectsEnabled,
 			}, opts.Edits.EnableProjects)
+			if err != nil {
+				return err
+			}
+		case optionDiscussions:
+			opts.Edits.EnableDiscussions = &r.HasDiscussionsEnabled
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: "Enable Discussions?",
+				Default: r.HasDiscussionsEnabled,
+			}, opts.Edits.EnableDiscussions)
 			if err != nil {
 				return err
 			}

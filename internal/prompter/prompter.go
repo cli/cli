@@ -57,7 +57,14 @@ func (p *surveyPrompter) Select(message, defaultValue string, options []string) 
 	}
 
 	if defaultValue != "" {
-		q.Default = defaultValue
+		// in some situations, defaultValue ends up not being a valid option; do
+		// not set default in that case as it will make survey panic
+		for _, o := range options {
+			if o == defaultValue {
+				q.Default = defaultValue
+				break
+			}
+		}
 	}
 
 	err = p.ask(q, &result)

@@ -30,11 +30,17 @@ func TestNewCmdDelete(t *testing.T) {
 			output: DeleteOptions{RepoArg: "OWNER/REPO", Confirmed: true},
 		},
 		{
+			name:   "yes flag",
+			tty:    true,
+			input:  "OWNER/REPO --yes",
+			output: DeleteOptions{RepoArg: "OWNER/REPO", Confirmed: true},
+		},
+		{
 			name:    "no confirmation notty",
 			input:   "OWNER/REPO",
 			output:  DeleteOptions{RepoArg: "OWNER/REPO"},
 			wantErr: true,
-			errMsg:  "--confirm required when not running interactively",
+			errMsg:  "--yes required when not running interactively",
 		},
 		{
 			name:   "base repo resolution",

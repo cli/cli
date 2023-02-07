@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sync"
 	"testing"
 	"time"
 
@@ -274,11 +275,15 @@ func Test_extList(t *testing.T) {
 			},
 		},
 	}
+	cmdFlex := tview.NewFlex()
 	app := tview.NewApplication()
 	list := tview.NewList()
+	pages := tview.NewPages()
 	ui := uiRegistry{
-		List: list,
-		App:  app,
+		List:    list,
+		App:     app,
+		CmdFlex: cmdFlex,
+		Pages:   pages,
 	}
 	extEntries := []extEntry{
 		{
@@ -313,6 +318,13 @@ func Test_extList(t *testing.T) {
 
 	extList := newExtList(opts, ui, extEntries)
 
+	extList.QueueUpdateDraw = func(f func()) *tview.Application {
+		f()
+		return app
+	}
+
+	extList.WaitGroup = &sync.WaitGroup{}
+
 	extList.Filter("cool")
 	assert.Equal(t, 1, extList.ui.List.GetItemCount())
 
@@ -321,6 +333,8 @@ func Test_extList(t *testing.T) {
 
 	extList.InstallSelected()
 	assert.True(t, extList.extEntries[0].Installed)
+
+	// so I think the goroutines are causing a later failure because the toggleInstalled isn't seen.
 
 	extList.Refresh()
 	assert.Equal(t, 1, extList.ui.List.GetItemCount())

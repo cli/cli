@@ -187,11 +187,11 @@ type Codespace struct {
 }
 
 type CodespaceGitStatus struct {
-	Ahead                int    `json:"ahead"`
-	Behind               int    `json:"behind"`
-	Ref                  string `json:"ref"`
-	HasUnpushedChanges   bool   `json:"has_unpushed_changes"`
-	HasUncommitedChanges bool   `json:"has_uncommited_changes"`
+	Ahead                 int    `json:"ahead"`
+	Behind                int    `json:"behind"`
+	Ref                   string `json:"ref"`
+	HasUnpushedChanges    bool   `json:"has_unpushed_changes"`
+	HasUncommittedChanges bool   `json:"has_uncommitted_changes"`
 }
 
 type CodespaceMachine struct {
@@ -250,9 +250,9 @@ func (c *Codespace) ExportData(fields []string) map[string]interface{} {
 			data[f] = c.Machine.Name
 		case "gitStatus":
 			data[f] = map[string]interface{}{
-				"ref":                  c.GitStatus.Ref,
-				"hasUnpushedChanges":   c.GitStatus.HasUnpushedChanges,
-				"hasUncommitedChanges": c.GitStatus.HasUncommitedChanges,
+				"ref":                   c.GitStatus.Ref,
+				"hasUnpushedChanges":    c.GitStatus.HasUnpushedChanges,
+				"hasUncommittedChanges": c.GitStatus.HasUncommittedChanges,
 			}
 		case "vscsTarget":
 			if c.VSCSTarget != "" && c.VSCSTarget != VSCSTargetProduction {

@@ -37,14 +37,14 @@ func TestNewCmdDelete(t *testing.T) {
 		},
 		{
 			name:   "confirm argument",
-			input:  "test --confirm",
+			input:  "test --yes",
 			output: deleteOptions{Name: "test", Confirmed: true},
 		},
 		{
 			name:       "confirm no tty",
 			input:      "test",
 			wantErr:    true,
-			wantErrMsg: "--confirm required when not running interactively",
+			wantErrMsg: "--yes required when not running interactively",
 		},
 	}
 

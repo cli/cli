@@ -32,7 +32,7 @@ func TestNewCmdDelete(t *testing.T) {
 		{
 			name:   "confirm flag tty",
 			tty:    true,
-			input:  "123 --confirm",
+			input:  "123 --yes",
 			output: DeleteOptions{KeyID: "123", Confirmed: true},
 		},
 		{
@@ -45,11 +45,11 @@ func TestNewCmdDelete(t *testing.T) {
 			name:       "no tty",
 			input:      "123",
 			wantErr:    true,
-			wantErrMsg: "--confirm required when not running interactively",
+			wantErrMsg: "--yes required when not running interactively",
 		},
 		{
 			name:   "confirm flag no tty",
-			input:  "123 --confirm",
+			input:  "123 --yes",
 			output: DeleteOptions{KeyID: "123", Confirmed: true},
 		},
 		{
