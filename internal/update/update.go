@@ -2,7 +2,9 @@ package update
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,9 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cli/cli/v2/internal/ghinstance"
-	"github.com/cli/go-gh"
-	"github.com/cli/go-gh/pkg/api"
 	"github.com/hashicorp/go-version"
 	"gopkg.in/yaml.v3"
 )
@@ -57,18 +56,24 @@ func CheckForUpdate(ctx context.Context, client *http.Client, stateFilePath, rep
 }
 
 func getLatestReleaseInfo(ctx context.Context, client *http.Client, repo string) (*ReleaseInfo, error) {
-	restClient, err := gh.RESTClient(&api.ClientOptions{
-		AuthToken:          "",
-		Host:               ghinstance.Default(),
-		SkipDefaultHeaders: true,
-		Transport:          client.Transport,
-		LogIgnoreEnv:       true,
-	})
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo), nil)
 	if err != nil {
 		return nil, err
 	}
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_, _ = io.Copy(io.Discard, res.Body)
+		res.Body.Close()
+	}()
+	if res.StatusCode != 200 {
+		return nil, fmt.Errorf("unexpected HTTP %d", res.StatusCode)
+	}
+	dec := json.NewDecoder(res.Body)
 	var latestRelease ReleaseInfo
-	if err := restClient.DoWithContext(ctx, "GET", fmt.Sprintf("repos/%s/releases/latest", repo), nil, &latestRelease); err != nil {
+	if err := dec.Decode(&latestRelease); err != nil {
 		return nil, err
 	}
 	return &latestRelease, nil

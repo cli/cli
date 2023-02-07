@@ -65,7 +65,7 @@ func mainRun() exitCode {
 	defer updateCancel()
 	updateMessageChan := make(chan *update.ReleaseInfo)
 	go func() {
-		rel, err := checkForUpdate(updateCtx, buildVersion)
+		rel, err := checkForUpdate(updateCtx, cmdFactory, buildVersion)
 		if err != nil && hasDebug {
 			fmt.Fprintf(stderr, "warning: checking for update failed: %v", err)
 		}
@@ -357,14 +357,11 @@ func isCI() bool {
 		os.Getenv("RUN_ID") != "" // TaskCluster, dsari
 }
 
-func checkForUpdate(ctx context.Context, currentVersion string) (*update.ReleaseInfo, error) {
+func checkForUpdate(ctx context.Context, f *cmdutil.Factory, currentVersion string) (*update.ReleaseInfo, error) {
 	if !shouldCheckForUpdate() {
 		return nil, nil
 	}
-	httpClient, err := api.NewHTTPClient(api.HTTPClientOptions{
-		AppVersion: currentVersion,
-		Log:        os.Stderr,
-	})
+	httpClient, err := f.HttpClient()
 	if err != nil {
 		return nil, err
 	}
