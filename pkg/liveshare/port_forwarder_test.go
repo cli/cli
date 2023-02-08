@@ -71,6 +71,10 @@ func TestPortForwarderStart(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer listen.Close()
+	tcpListener, ok := listen.(*net.TCPListener)
+	if !ok {
+		t.Fatal("net.Listen did not return a TCPListener")
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -82,7 +86,7 @@ func TestPortForwarderStart(t *testing.T) {
 
 	done := make(chan error, 2)
 	go func() {
-		done <- NewPortForwarder(session, "ssh", port, false).ForwardToListener(ctx, listen)
+		done <- NewPortForwarder(session, "ssh", port, false).ForwardToListener(ctx, tcpListener)
 	}()
 
 	go func() {

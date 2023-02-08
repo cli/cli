@@ -29,6 +29,8 @@ const (
 const (
 	codespacesInternalPort        = 16634
 	codespacesInternalSessionName = "CodespacesInternal"
+	clientName                    = "gh"
+	connectedEventName            = "connected"
 )
 
 type StartSSHServerOptions struct {
@@ -68,11 +70,11 @@ func CreateInvoker(ctx context.Context, session liveshare.LiveshareSession) (Inv
 
 // Finds a free port to listen on and creates a new RPC invoker that connects to that port
 func connect(ctx context.Context, session liveshare.LiveshareSession) (Invoker, error) {
-	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", 0))
+	listener, err := listenTCP()
 	if err != nil {
-		return nil, fmt.Errorf("failed to listen to local port over tcp: %w", err)
+		return nil, err
 	}
-	localAddress := fmt.Sprintf("127.0.0.1:%d", listener.Addr().(*net.TCPAddr).Port)
+	localAddress := listener.Addr().String()
 
 	invoker := &invoker{
 		session:  session,
@@ -127,6 +129,12 @@ func connect(ctx context.Context, session liveshare.LiveshareSession) (Invoker, 
 	invoker.jupyterClient = jupyter.NewJupyterServerHostClient(conn)
 	invoker.codespaceClient = codespace.NewCodespaceHostClient(conn)
 	invoker.sshClient = ssh.NewSshServerHostClient(conn)
+
+	// Send initial connection heartbeat (no need to throw if we fail to get a response from the server)
+	_ = invoker.notifyCodespaceOfClientActivity(ctx, connectedEventName)
+
+	// Start the activity heatbeats
+	go invoker.heartbeat(pfctx, 1*time.Minute)
 
 	return invoker, nil
 }
@@ -228,4 +236,46 @@ func (i *invoker) StartSSHServerWithOptions(ctx context.Context, options StartSS
 	}
 
 	return port, response.User, nil
+}
+
+func listenTCP() (*net.TCPListener, error) {
+	addr, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, fmt.Errorf("failed to build tcp address: %w", err)
+	}
+	listener, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to listen to local port over tcp: %w", err)
+	}
+
+	return listener, nil
+}
+
+// Periodically check whether there is a reason to keep the connection alive, and if so, notify the codespace to do so
+func (i *invoker) heartbeat(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			reason := i.session.GetKeepAliveReason()
+			_ = i.notifyCodespaceOfClientActivity(ctx, reason)
+		}
+	}
+}
+
+func (i *invoker) notifyCodespaceOfClientActivity(ctx context.Context, activity string) error {
+	ctx = i.appendMetadata(ctx)
+	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
+	defer cancel()
+
+	_, err := i.codespaceClient.NotifyCodespaceOfClientActivity(ctx, &codespace.NotifyCodespaceOfClientActivityRequest{ClientId: clientName, ClientActivities: []string{activity}})
+	if err != nil {
+		return fmt.Errorf("failed to invoke notify RPC: %w", err)
+	}
+
+	return nil
 }

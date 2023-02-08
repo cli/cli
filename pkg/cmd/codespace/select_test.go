@@ -47,7 +47,7 @@ func TestApp_Select(t *testing.T) {
 			ios, _, stdout, stderr := iostreams.Test()
 			ios.SetStdinTTY(true)
 			ios.SetStdoutTTY(true)
-			a := NewApp(ios, nil, testSelectApiMock(), nil)
+			a := NewApp(ios, nil, testSelectApiMock(), nil, nil)
 
 			opts := selectOptions{}
 			if tt.outputToFile {

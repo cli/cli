@@ -263,7 +263,7 @@ func IssueGraphQL(fields []string) string {
 		case "author":
 			q = append(q, `author{login,...on User{id,name}}`)
 		case "mergedBy":
-			q = append(q, `mergedBy{login}`)
+			q = append(q, `mergedBy{login,...on User{id,name}}`)
 		case "headRepositoryOwner":
 			q = append(q, `headRepositoryOwner{id,login,...on User{name}}`)
 		case "headRepository":
@@ -274,6 +274,8 @@ func IssueGraphQL(fields []string) string {
 			q = append(q, `labels(first:100){nodes{id,name,description,color},totalCount}`)
 		case "projectCards":
 			q = append(q, `projectCards(first:100){nodes{project{name}column{name}},totalCount}`)
+		case "projectItems":
+			q = append(q, `projectItems(first:100){nodes{id, project{id,title}},totalCount}`)
 		case "milestone":
 			q = append(q, `milestone{number,title,description,dueOn}`)
 		case "reactionGroups":
@@ -346,6 +348,7 @@ var RepositoryFields = []string{
 	"hasIssuesEnabled",
 	"hasProjectsEnabled",
 	"hasWikiEnabled",
+	"hasDiscussionsEnabled",
 	"mergeCommitAllowed",
 	"squashMergeAllowed",
 	"rebaseMergeAllowed",

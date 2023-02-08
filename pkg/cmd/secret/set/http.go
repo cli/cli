@@ -20,9 +20,9 @@ type SecretPayload struct {
 	KeyID          string  `json:"key_id"`
 }
 
-// The Codespaces Secret API currently expects repositories IDs as strings
-type CodespacesSecretPayload struct {
+type DependabotSecretPayload struct {
 	EncryptedValue string   `json:"encrypted_value"`
+	Visibility     string   `json:"visibility,omitempty"`
 	Repositories   []string `json:"selected_repository_ids,omitempty"`
 	KeyID          string   `json:"key_id"`
 }
@@ -70,31 +70,40 @@ func putSecret(client *api.Client, host, path string, payload interface{}) error
 }
 
 func putOrgSecret(client *api.Client, host string, pk *PubKey, orgName, visibility, secretName, eValue string, repositoryIDs []int64, app shared.App) error {
+	path := fmt.Sprintf("orgs/%s/%s/secrets/%s", orgName, app, secretName)
+
+	if app == shared.Dependabot {
+		repos := make([]string, len(repositoryIDs))
+		for i, id := range repositoryIDs {
+			repos[i] = strconv.FormatInt(id, 10)
+		}
+
+		payload := DependabotSecretPayload{
+			EncryptedValue: eValue,
+			KeyID:          pk.ID,
+			Repositories:   repos,
+			Visibility:     visibility,
+		}
+
+		return putSecret(client, host, path, payload)
+	}
+
 	payload := SecretPayload{
 		EncryptedValue: eValue,
 		KeyID:          pk.ID,
 		Repositories:   repositoryIDs,
 		Visibility:     visibility,
 	}
-	path := fmt.Sprintf("orgs/%s/%s/secrets/%s", orgName, app, secretName)
 
 	return putSecret(client, host, path, payload)
 }
 
 func putUserSecret(client *api.Client, host string, pk *PubKey, key, eValue string, repositoryIDs []int64) error {
-	payload := CodespacesSecretPayload{
+	payload := SecretPayload{
 		EncryptedValue: eValue,
 		KeyID:          pk.ID,
+		Repositories:   repositoryIDs,
 	}
-
-	if len(repositoryIDs) > 0 {
-		repositoryStringIDs := make([]string, len(repositoryIDs))
-		for i, id := range repositoryIDs {
-			repositoryStringIDs[i] = strconv.FormatInt(id, 10)
-		}
-		payload.Repositories = repositoryStringIDs
-	}
-
 	path := fmt.Sprintf("user/codespaces/secrets/%s", key)
 	return putSecret(client, host, path, payload)
 }

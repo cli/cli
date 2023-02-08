@@ -29,7 +29,7 @@ func TestNewCmdSetDefault(t *testing.T) {
 		{
 			name: "no argument",
 			gitStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --is-inside-work-tree`, 0, "true")
+				cs.Register(`git rev-parse --git-dir`, 0, ".git")
 			},
 			input:  "",
 			output: SetDefaultOptions{},
@@ -37,7 +37,7 @@ func TestNewCmdSetDefault(t *testing.T) {
 		{
 			name: "repo argument",
 			gitStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --is-inside-work-tree`, 0, "true")
+				cs.Register(`git rev-parse --git-dir`, 0, ".git")
 			},
 			input:  "cli/cli",
 			output: SetDefaultOptions{Repo: ghrepo.New("cli", "cli")},
@@ -52,7 +52,7 @@ func TestNewCmdSetDefault(t *testing.T) {
 		{
 			name: "view flag",
 			gitStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --is-inside-work-tree`, 0, "true")
+				cs.Register(`git rev-parse --git-dir`, 0, ".git")
 			},
 			input:  "--view",
 			output: SetDefaultOptions{ViewMode: true},
@@ -60,7 +60,7 @@ func TestNewCmdSetDefault(t *testing.T) {
 		{
 			name: "unset flag",
 			gitStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --is-inside-work-tree`, 0, "true")
+				cs.Register(`git rev-parse --git-dir`, 0, ".git")
 			},
 			input:  "--unset",
 			output: SetDefaultOptions{UnsetMode: true},
@@ -68,7 +68,7 @@ func TestNewCmdSetDefault(t *testing.T) {
 		{
 			name: "run from non-git directory",
 			gitStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git rev-parse --is-inside-work-tree`, 1, "")
+				cs.Register(`git rev-parse --git-dir`, 128, "")
 			},
 			input:   "",
 			wantErr: true,
@@ -83,6 +83,7 @@ func TestNewCmdSetDefault(t *testing.T) {
 		io.SetStderrTTY(true)
 		f := &cmdutil.Factory{
 			IOStreams: io,
+			GitClient: &git.Client{GitPath: "/fake/path/to/git"},
 		}
 
 		var gotOpts *SetDefaultOptions
@@ -121,6 +122,9 @@ func TestDefaultRun(t *testing.T) {
 	repo1, _ := ghrepo.FromFullName("OWNER/REPO")
 	repo2, _ := ghrepo.FromFullName("OWNER2/REPO2")
 	repo3, _ := ghrepo.FromFullName("OWNER3/REPO3")
+	repo4, _ := ghrepo.FromFullName("OWNER4/REPO4")
+	repo5, _ := ghrepo.FromFullName("OWNER5/REPO5")
+	repo6, _ := ghrepo.FromFullName("OWNER6/REPO6")
 
 	tests := []struct {
 		name          string
@@ -390,6 +394,55 @@ func TestDefaultRun(t *testing.T) {
 				cs.Register(`git config --add remote.upstream.gh-resolved base`, 0, "")
 			},
 			wantStdout: "Found only one known remote repo, OWNER2/REPO2 on github.com.\n✓ Set OWNER2/REPO2 as the default repository for the current directory\n",
+		},
+		{
+			name: "interactive mode more than five remotes",
+			tty:  true,
+			opts: SetDefaultOptions{},
+			remotes: []*context.Remote{
+				{Remote: &git.Remote{Name: "origin"}, Repo: repo1},
+				{Remote: &git.Remote{Name: "upstream"}, Repo: repo2},
+				{Remote: &git.Remote{Name: "other1"}, Repo: repo3},
+				{Remote: &git.Remote{Name: "other2"}, Repo: repo4},
+				{Remote: &git.Remote{Name: "other3"}, Repo: repo5},
+				{Remote: &git.Remote{Name: "other4"}, Repo: repo6},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryNetwork\b`),
+					httpmock.GraphQLQuery(`{"data":{
+            "repo_000":{"name":"REPO","owner":{"login":"OWNER"}},
+            "repo_001":{"name":"REPO2","owner":{"login":"OWNER2"}},
+            "repo_002":{"name":"REPO3","owner":{"login":"OWNER3"}},
+            "repo_003":{"name":"REPO4","owner":{"login":"OWNER4"}},
+            "repo_004":{"name":"REPO5","owner":{"login":"OWNER5"}},
+            "repo_005":{"name":"REPO6","owner":{"login":"OWNER6"}}
+          }}`,
+						func(query string, inputs map[string]interface{}) {
+							assert.Contains(t, query, "repo_000")
+							assert.Contains(t, query, "repo_001")
+							assert.Contains(t, query, "repo_002")
+							assert.Contains(t, query, "repo_003")
+							assert.Contains(t, query, "repo_004")
+							assert.Contains(t, query, "repo_005")
+						}),
+				)
+			},
+			gitStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git config --add remote.upstream.gh-resolved base`, 0, "")
+			},
+			prompterStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(p, d string, opts []string) (int, error) {
+					switch p {
+					case "Which repository should be the default?":
+						prompter.AssertOptions(t, []string{"OWNER/REPO", "OWNER2/REPO2", "OWNER3/REPO3", "OWNER4/REPO4", "OWNER5/REPO5", "OWNER6/REPO6"}, opts)
+						return prompter.IndexFor(opts, "OWNER2/REPO2")
+					default:
+						return -1, prompter.NoSuchPromptErr(p)
+					}
+				}
+			},
+			wantStdout: "This command sets the default remote repository to use when querying the\nGitHub API for the locally cloned repository.\n\ngh uses the default repository for things like:\n\n - viewing and creating pull requests\n - viewing and creating issues\n - viewing and creating releases\n - working with Actions\n - adding repository and environment secrets\n\n✓ Set OWNER2/REPO2 as the default repository for the current directory\n",
 		},
 	}
 

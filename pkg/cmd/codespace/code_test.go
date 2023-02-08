@@ -97,7 +97,7 @@ func TestPendingOperationDisallowsCode(t *testing.T) {
 
 func testingCodeApp() *App {
 	ios, _, _, _ := iostreams.Test()
-	return NewApp(ios, nil, testCodeApiMock(), nil)
+	return NewApp(ios, nil, testCodeApiMock(), nil, nil)
 }
 
 func testCodeApiMock() *apiClientMock {

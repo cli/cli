@@ -245,7 +245,8 @@ func Test_RepoClone_hasParent(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
-	cs.Register(`git -C REPO remote add -t trunk -f upstream https://github.com/hubot/ORIG.git`, 0, "")
+	cs.Register(`git -C REPO remote add -t trunk upstream https://github.com/hubot/ORIG.git`, 0, "")
+	cs.Register(`git -C REPO fetch upstream`, 0, "")
 
 	_, err := runCloneCommand(httpClient, "OWNER/REPO")
 	if err != nil {
@@ -281,7 +282,8 @@ func Test_RepoClone_hasParent_upstreamRemoteName(t *testing.T) {
 	defer cmdTeardown(t)
 
 	cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
-	cs.Register(`git -C REPO remote add -t trunk -f test https://github.com/hubot/ORIG.git`, 0, "")
+	cs.Register(`git -C REPO remote add -t trunk test https://github.com/hubot/ORIG.git`, 0, "")
+	cs.Register(`git -C REPO fetch test`, 0, "")
 
 	_, err := runCloneCommand(httpClient, "OWNER/REPO --upstream-remote-name test")
 	if err != nil {

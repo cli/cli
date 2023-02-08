@@ -27,6 +27,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// ErrInitialCommitFailed indicates the initial commit when making a new extension failed.
+var ErrInitialCommitFailed = errors.New("initial commit failed")
+
 type Manager struct {
 	dataDir    func() string
 	lookPath   func(string) (string, error)
@@ -347,7 +350,7 @@ func (m *Manager) Install(repo ghrepo.Interface, target string) error {
 		return errors.New("extension is not installable: missing executable")
 	}
 
-	return m.installGit(repo, target, m.io.Out, m.io.ErrOut)
+	return m.installGit(repo, target)
 }
 
 func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
@@ -450,7 +453,7 @@ func (m *Manager) installBin(repo ghrepo.Interface, target string) error {
 	return nil
 }
 
-func (m *Manager) installGit(repo ghrepo.Interface, target string, stdout, stderr io.Writer) error {
+func (m *Manager) installGit(repo ghrepo.Interface, target string) error {
 	protocol, _ := m.config.GetOrDefault(repo.RepoHost(), "git_protocol")
 	cloneURL := ghrepo.FormatRemoteURL(repo, protocol)
 
@@ -654,8 +657,15 @@ func (m *Manager) Create(name string, tmplType extensions.ExtTemplateType) error
 	}
 
 	scopedClient := m.gitClient.ForRepo(name)
-	_, err := scopedClient.CommandOutput([]string{"add", name, "--chmod=+x"})
-	return err
+	if _, err := scopedClient.CommandOutput([]string{"add", name, "--chmod=+x"}); err != nil {
+		return err
+	}
+
+	if _, err := scopedClient.CommandOutput([]string{"commit", "-m", "initial commit"}); err != nil {
+		return ErrInitialCommitFailed
+	}
+
+	return nil
 }
 
 func (m *Manager) otherBinScaffolding(name string) error {
@@ -672,8 +682,15 @@ func (m *Manager) otherBinScaffolding(name string) error {
 		return err
 	}
 
-	_, err := scopedClient.CommandOutput([]string{"add", "."})
-	return err
+	if _, err := scopedClient.CommandOutput([]string{"add", "."}); err != nil {
+		return err
+	}
+
+	if _, err := scopedClient.CommandOutput([]string{"commit", "-m", "initial commit"}); err != nil {
+		return ErrInitialCommitFailed
+	}
+
+	return nil
 }
 
 func (m *Manager) goBinScaffolding(name string) error {
@@ -718,8 +735,15 @@ func (m *Manager) goBinScaffolding(name string) error {
 	}
 
 	scopedClient := m.gitClient.ForRepo(name)
-	_, err = scopedClient.CommandOutput([]string{"add", "."})
-	return err
+	if _, err := scopedClient.CommandOutput([]string{"add", "."}); err != nil {
+		return err
+	}
+
+	if _, err := scopedClient.CommandOutput([]string{"commit", "-m", "initial commit"}); err != nil {
+		return ErrInitialCommitFailed
+	}
+
+	return nil
 }
 
 func isSymlink(m os.FileMode) bool {
