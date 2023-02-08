@@ -56,7 +56,6 @@ type VariablePayload struct {
 	Repositories []int64 `json:"selected_repository_ids,omitempty"`
 }
 
-
 type repoNamesResult struct {
 	Ids []int64
 	Err error

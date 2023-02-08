@@ -33,8 +33,8 @@ func Test_getBodyPrompt(t *testing.T) {
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("owner/repo")
 		},
-		IO:             ios,
-		Body:           "a variable",
+		IO:   ios,
+		Body: "a variable",
 	}
 	httpClient, _ := opts.HttpClient()
 	apiClient := api.NewClientFromHTTP(httpClient)
@@ -164,9 +164,9 @@ func Test_getBody(t *testing.T) {
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.FromFullName("owner/repo")
 				},
-				IO:             ios,
-				VariableName:   "VARNAME",
-				Body:           "a variable",
+				IO:           ios,
+				VariableName: "VARNAME",
+				Body:         "a variable",
 			}
 			httpClient, _ := opts.HttpClient()
 			apiClient := api.NewClientFromHTTP(httpClient)
@@ -188,4 +188,3 @@ func (c testClient) Do(req *http.Request) (*http.Response, error) {
 func fakeRandom() io.Reader {
 	return bytes.NewReader(bytes.Repeat([]byte{5}, 32))
 }
-

@@ -177,9 +177,8 @@ func Test_createRun_repo(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "Actions",
-			opts: &shared.PostPatchOptions{
-			},
+			name:    "Actions",
+			opts:    &shared.PostPatchOptions{},
 			wantApp: "actions",
 			wantErr: false,
 		},
@@ -202,16 +201,16 @@ func Test_createRun_repo(t *testing.T) {
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.FromFullName("owner/repo")
 				},
-				IO:             ios,
-				VariableName:   "cool_variable",
-				Body:           "a variable",
+				IO:           ios,
+				VariableName: "cool_variable",
+				Body:         "a variable",
 			}
 
 			err := createRun(opts)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
-			} else{
+			} else {
 				assert.NoError(t, err)
 			}
 
@@ -243,10 +242,10 @@ func Test_createRun_env(t *testing.T) {
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("owner/repo")
 		},
-		EnvName:        "development",
-		IO:             ios,
-		VariableName:   "cool_variable",
-		Body:           "a variable",
+		EnvName:      "development",
+		IO:           ios,
+		VariableName: "cool_variable",
+		Body:         "a variable",
 	}
 
 	err := createRun(opts)
