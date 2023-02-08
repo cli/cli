@@ -4,6 +4,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	cmdCreate "github.com/cli/cli/v2/pkg/cmd/variable/create"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/variable/list"
+	cmdDelete "github.com/cli/cli/v2/pkg/cmd/variable/delete"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
@@ -21,6 +22,7 @@ func NewCmdVariable(f *cmdutil.Factory) *cobra.Command {
 	cmdutil.EnableRepoOverride(cmd, f)
 
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
-	cmd.AddCommand(cmdCreate.NewCmdCreate(f, nil))
+	cmd.AddCommand(cmdDelete.NewCmdDelete(f, nil))
+	cmd.AddCommand(cmdCreate.NewCmdCreate(f, nil)) 
 	return cmd
 }
