@@ -19,7 +19,7 @@ If anything feels off, or if you feel that some functionality is missing, please
 
 ### macOS
 
-`gh` is available via [Homebrew][], [MacPorts][], [Conda][], [Spack][], and as a downloadable binary from the [releases page][].
+`gh` is available via [Homebrew][], [MacPorts][], [Conda][], [Spack][] and as a downloadable binary from the [releases page][].
 
 #### Homebrew
 
