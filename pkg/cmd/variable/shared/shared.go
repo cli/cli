@@ -3,6 +3,7 @@ package shared
 import (
 	"bytes"
 	"errors"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -16,6 +17,8 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/internal/ghinstance"
+
 )
 
 type Visibility string
@@ -179,6 +182,19 @@ func MapRepoToID(client *api.Client, host string, repositories []ghrepo.Interfac
 	return result, nil
 }
 
+func getCurrentSelectedRepos(client httpClient, url string) string {
+	var selectedRepositories SelectedRepos
+	err := apiGet(client, url, &selectedRepositories)
+	if err != nil {
+		return ""
+	}
+	names := make([]string, 0)
+	for _, repo := range selectedRepositories.Repositories {
+		names = append(names, repo.Name)
+	}
+	return strings.Join(names, ",")
+}
+
 func MapRepoNamesToIDs(client *api.Client, host, defaultOwner string, repositoryNames []string) ([]int64, error) {
 	repos := make([]ghrepo.Interface, 0, len(repositoryNames))
 	for _, repositoryName := range repositoryNames {
@@ -314,4 +330,150 @@ func getBody(opts *PostPatchOptions, client *api.Client, host string, isUpdate b
 	}
 
 	return getVarFromRow(opts, client, host, strings.Split(opts.VariableName+","+string(bytes.TrimRight(body, "\r\n")), ","), isUpdate)
+}
+
+func GetVariablesForList(opts *ListOptions, getSelectedRepoInfo bool) ([]*Variable, error) {
+	client, err := opts.HttpClient()
+	if err != nil {
+		return nil, fmt.Errorf("could not create http client: %w", err)
+	}
+
+	orgName := opts.OrgName
+	envName := opts.EnvName
+
+	var baseRepo ghrepo.Interface
+	if orgName == "" {
+		baseRepo, err = opts.BaseRepo()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	variableEntity, err := GetVariableEntity(orgName, envName)
+	if err != nil {
+		return nil, err
+	}
+
+	variableApp := App(Actions)
+	if err != nil || variableApp == Unknown {
+		return nil, err
+	}
+
+	if !IsSupportedVariableEntity(variableApp, variableEntity) {
+		return nil, fmt.Errorf("%s variables are not supported for %s", variableEntity, variableApp)
+	}
+
+	var variables []*Variable
+
+	switch variableEntity {
+	case Repository:
+		variables, err = getRepoVariables(client, baseRepo, variableApp, opts.Page, opts.PerPage, opts.Name)
+	case Environment:
+		variables, err = getEnvVariables(client, baseRepo, envName, opts.Page, opts.PerPage, opts.Name)
+	case Organization:
+		var cfg config.Config
+		var host string
+
+		cfg, err = opts.Config()
+		if err != nil {
+			return nil, err
+		}
+
+		host, _ = cfg.DefaultHost()
+		variables, err = getOrgVariables(client, host, orgName, getSelectedRepoInfo, variableApp, opts.Page, opts.PerPage, opts.Name)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get variables: %w", err)
+	}
+	return variables, nil
+}
+
+func getOrgVariables(client httpClient, host, orgName string, getSelectedRepoInfo bool, app App, page, perPage int, name string) ([]*Variable, error) {
+	variables, err := getVariables(client, host, fmt.Sprintf(`orgs/%s/%s/variables`, orgName, app), page, perPage, name)
+	if err != nil {
+		return nil, err
+	}
+
+	if getSelectedRepoInfo {
+		err = getSelectedRepositoryInformation(client, variables)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return variables, nil
+}
+
+func getEnvVariables(client httpClient, repo ghrepo.Interface, envName string, page, perPage int, name string) ([]*Variable, error) {
+	path := fmt.Sprintf(`repositories/%s/environments/%s/variables`, ghrepo.FullName(repo), envName)
+	return getVariables(client, repo.RepoHost(), path, page, perPage, name)
+}
+
+func getRepoVariables(client httpClient, repo ghrepo.Interface, app App, page, perPage int, name string) ([]*Variable, error) {
+	return getVariables(client, repo.RepoHost(), fmt.Sprintf(`repositories/%s/%s/variables`,
+		ghrepo.FullName(repo), app), page, perPage, name)
+}
+
+func getVariables(client httpClient, host, path string, page, perPage int, name string) ([]*Variable, error) {
+	var url string
+	if name != "" {
+		url = fmt.Sprintf("%s%s/%s", ghinstance.RESTPrefix(host), path, name)
+		var payload Variable
+		err := apiGet(client, url, &payload)
+		if err != nil {
+			return nil, err
+		}
+		return []*Variable{&payload}, nil
+	} else {
+		url = fmt.Sprintf("%s%s?page=%d&per_page=%d", ghinstance.RESTPrefix(host), path, page, perPage)
+		var payload VariablesPayload
+		err := apiGet(client, url, &payload)
+		if err != nil {
+			return nil, err
+		}
+		return payload.Variables, nil
+	}
+}
+
+func apiGet(client httpClient, url string, data interface{}) error {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode > 299 {
+		return api.HandleHTTPError(resp)
+	}
+
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(data); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func getSelectedRepositoryInformation(client httpClient, variables []*Variable) error {
+	type responseData struct {
+		TotalCount int `json:"total_count"`
+	}
+
+	for _, variable := range variables {
+		if variable.SelectedReposURL == "" {
+			continue
+		}
+		var result responseData
+		if err := apiGet(client, variable.SelectedReposURL, &result); err != nil {
+			return fmt.Errorf("failed determining selected repositories for %s: %w", variable.Name, err)
+		}
+		variable.NumSelectedRepos = result.TotalCount
+	}
+
+	return nil
 }

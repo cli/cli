@@ -2,8 +2,10 @@ package shared
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/cli/cli/v2/api"
@@ -185,6 +187,29 @@ func (c testClient) Do(req *http.Request) (*http.Response, error) {
 	return c(req)
 }
 
+func Test_getVariables_pagination(t *testing.T) {
+	var requests []*http.Request
+	var client testClient = func(req *http.Request) (*http.Response, error) {
+		header := make(map[string][]string)
+		if len(requests) == 0 {
+			header["Link"] = []string{}
+		}
+		requests = append(requests, req)
+		return &http.Response{
+			Request: req,
+			Body:    io.NopCloser(strings.NewReader(`{"variables":[{},{}]}`)),
+			Header:  header,
+		}, nil
+	}
+	page, perPage := 2, 25
+	variables, err := getVariables(client, "github.com", "path/to", page, perPage, "")
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(requests))
+	assert.Equal(t, 2, len(variables))
+	assert.Equal(t, fmt.Sprintf("https://api.github.com/path/to?page=%d&per_page=%d", page, perPage), requests[0].URL.String())
+}
+
 func fakeRandom() io.Reader {
 	return bytes.NewReader(bytes.Repeat([]byte{5}, 32))
 }
+
