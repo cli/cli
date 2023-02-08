@@ -677,7 +677,8 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 128, "")
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 128, "")
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
-				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
+				cs.Register(`git -C REPO fetch upstream`, 0, "")
 			},
 		},
 		{
