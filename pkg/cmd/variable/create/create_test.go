@@ -205,7 +205,6 @@ func Test_createRun_repo(t *testing.T) {
 				IO:             ios,
 				VariableName:   "cool_variable",
 				Body:           "a variable",
-				RandomOverride: fakeRandom,
 			}
 
 			err := createRun(opts)
@@ -248,7 +247,6 @@ func Test_createRun_env(t *testing.T) {
 		IO:             ios,
 		VariableName:   "cool_variable",
 		Body:           "a variable",
-		RandomOverride: fakeRandom,
 	}
 
 	err := createRun(opts)
@@ -321,7 +319,6 @@ func Test_createRun_org(t *testing.T) {
 			tt.opts.IO = ios
 			tt.opts.VariableName = "org_variable"
 			tt.opts.Body = "a variable"
-			tt.opts.RandomOverride = fakeRandom
 
 			err := createRun(tt.opts)
 			assert.NoError(t, err)
