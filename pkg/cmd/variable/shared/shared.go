@@ -2,7 +2,6 @@ package shared
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -181,19 +180,6 @@ func MapRepoToID(client *api.Client, host string, repositories []ghrepo.Interfac
 	return result, nil
 }
 
-func getCurrentSelectedRepos(client httpClient, url string) string {
-	var selectedRepositories SelectedRepos
-	err := apiGet(client, url, &selectedRepositories)
-	if err != nil {
-		return ""
-	}
-	names := make([]string, 0)
-	for _, repo := range selectedRepositories.Repositories {
-		names = append(names, repo.Name)
-	}
-	return strings.Join(names, ",")
-}
-
 func MapRepoNamesToIDs(client *api.Client, host, defaultOwner string, repositoryNames []string) ([]int64, error) {
 	repos := make([]ghrepo.Interface, 0, len(repositoryNames))
 	for _, repositoryName := range repositoryNames {
@@ -289,15 +275,14 @@ func getBody(opts *PostPatchOptions, client *api.Client, host string, isUpdate b
 
 	values := make([]string, 0)
 	if opts.IO.CanPrompt() {
-		var currentVar Variable
 		values = append(values, opts.VariableName)
-		data, err := opts.Prompter.Input("Value", currentVar.Value)
+		data, err := opts.Prompter.Input("Value", "")
 		if err != nil {
 			return VariablePayload{}, err
 		}
 		values = append(values, data)
 		if isUpdate {
-			data, err = opts.Prompter.Input("New name", currentVar.Name)
+			data, err = opts.Prompter.Input("New name", "")
 			if err != nil {
 				return VariablePayload{}, err
 			}
@@ -305,14 +290,14 @@ func getBody(opts *PostPatchOptions, client *api.Client, host string, isUpdate b
 		}
 
 		if opts.OrgName != "" {
-			data, err = opts.Prompter.Input("Visibility", string(currentVar.Visibility))
+			data, err = opts.Prompter.Input("Visibility", "")
 			if err != nil {
 				return VariablePayload{}, err
 			}
 			values = append(values, data)
 
 			if data == Selected {
-				data, err = opts.Prompter.Input("Repos(comma separated)", getCurrentSelectedRepos(client.HTTP(), currentVar.SelectedReposURL))
+				data, err = opts.Prompter.Input("Repos(comma separated)", "")
 				if err != nil {
 					return VariablePayload{}, err
 				}
@@ -330,49 +315,4 @@ func getBody(opts *PostPatchOptions, client *api.Client, host string, isUpdate b
 	}
 
 	return getVarFromRow(opts, client, host, strings.Split(opts.VariableName+","+string(bytes.TrimRight(body, "\r\n")), ","), isUpdate)
-}
-
-
-func apiGet(client httpClient, url string, data interface{}) error {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return api.HandleHTTPError(resp)
-	}
-
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(data); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func getSelectedRepositoryInformation(client httpClient, variables []*Variable) error {
-	type responseData struct {
-		TotalCount int `json:"total_count"`
-	}
-
-	for _, variable := range variables {
-		if variable.SelectedReposURL == "" {
-			continue
-		}
-		var result responseData
-		if err := apiGet(client, variable.SelectedReposURL, &result); err != nil {
-			return fmt.Errorf("failed determining selected repositories for %s: %w", variable.Name, err)
-		}
-		variable.NumSelectedRepos = result.TotalCount
-	}
-
-	return nil
 }
