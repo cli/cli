@@ -35,6 +35,7 @@ type BrowseOptions struct {
 	Branch        string
 	CommitFlag    bool
 	ProjectsFlag  bool
+	ReleasesFlag  bool
 	SettingsFlag  bool
 	WikiFlag      bool
 	NoBrowserFlag bool
@@ -94,12 +95,13 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			}
 
 			if err := cmdutil.MutuallyExclusive(
-				"specify only one of `--branch`, `--commit`, `--projects`, `--wiki`, or `--settings`",
+				"specify only one of `--branch`, `--commit`, `--releases`, `--projects`, `--wiki`, or `--settings`",
 				opts.Branch != "",
 				opts.CommitFlag,
 				opts.WikiFlag,
 				opts.SettingsFlag,
 				opts.ProjectsFlag,
+				opts.ReleasesFlag,
 			); err != nil {
 				return err
 			}
@@ -116,6 +118,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 
 	cmdutil.EnableRepoOverride(cmd, f)
 	cmd.Flags().BoolVarP(&opts.ProjectsFlag, "projects", "p", false, "Open repository projects")
+	cmd.Flags().BoolVarP(&opts.ReleasesFlag, "releases", "r", false, "Open repository releases")
 	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Open repository wiki")
 	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Open repository settings")
 	cmd.Flags().BoolVarP(&opts.NoBrowserFlag, "no-browser", "n", false, "Print destination URL instead of opening the browser")
@@ -160,6 +163,8 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 	if opts.SelectorArg == "" {
 		if opts.ProjectsFlag {
 			return "projects", nil
+		} else if opts.ReleasesFlag {
+			return "releases", nil
 		} else if opts.SettingsFlag {
 			return "settings", nil
 		} else if opts.WikiFlag {
