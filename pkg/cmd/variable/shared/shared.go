@@ -69,8 +69,6 @@ type PostPatchOptions struct {
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	RandomOverride func() io.Reader
-
 	VariableName    string
 	OrgName         string
 	EnvName         string
