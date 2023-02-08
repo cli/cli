@@ -32,7 +32,7 @@ func Test_runAdd(t *testing.T) {
 			wantStdout: "✓ GPG key added to your account\n",
 			wantStderr: "",
 			wantErrMsg: "",
-			opts:       AddOptions{KeyFile: "-"},
+			opts:       AddOptions{KeyFile: "-", Title: "my spicy key"},
 		},
 		{
 			name:  "binary format fails",
