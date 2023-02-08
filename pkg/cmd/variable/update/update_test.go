@@ -1,4 +1,4 @@
-package create
+package update
 
 import (
 	"bytes"
@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewCmdCreate(t *testing.T) {
+func TestNewCmdUpdate(t *testing.T) {
 	tests := []struct {
 		name     string
 		cli      string
@@ -143,7 +143,7 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.NoError(t, err)
 
 			var gotOpts *shared.PostPatchOptions
-			cmd := NewCmdCreate(f, func(opts *shared.PostPatchOptions) error {
+			cmd := NewCmdUpdate(f, func(opts *shared.PostPatchOptions) error {
 				gotOpts = opts
 				return nil
 			})
@@ -169,7 +169,7 @@ func TestNewCmdCreate(t *testing.T) {
 	}
 }
 
-func Test_createRun_repo(t *testing.T) {
+func Test_updateRun_repo(t *testing.T) {
 	tests := []struct {
 		name    string
 		opts    *shared.PostPatchOptions
@@ -189,7 +189,7 @@ func Test_createRun_repo(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
 
-			reg.Register(httpmock.REST("POST", fmt.Sprintf("repositories/owner/repo/%s/variables", tt.wantApp)),
+			reg.Register(httpmock.REST("PATCH", fmt.Sprintf("repos/owner/repo/%s/variables/cool_variable", tt.wantApp)),
 				httpmock.StatusStringResponse(201, `{}`))
 
 			ios, _, _, _ := iostreams.Test()
@@ -208,11 +208,11 @@ func Test_createRun_repo(t *testing.T) {
 				RandomOverride: fakeRandom,
 			}
 
-			err := createRun(opts)
+			err := updateRun(opts)
 			if tt.wantErr {
 				assert.Error(t, err)
 				return
-			} else{
+			} else {
 				assert.NoError(t, err)
 			}
 
@@ -229,10 +229,10 @@ func Test_createRun_repo(t *testing.T) {
 	}
 }
 
-func Test_createRun_env(t *testing.T) {
+func Test_updateRun_env(t *testing.T) {
 	reg := &httpmock.Registry{}
 
-	reg.Register(httpmock.REST("POST", "repositories/owner/repo/environments/development/variables"), httpmock.StatusStringResponse(201, `{}`))
+	reg.Register(httpmock.REST("PATCH", "repos/owner/repo/environments/development/variables/cool_variable"), httpmock.StatusStringResponse(201, `{}`))
 
 	ios, _, _, _ := iostreams.Test()
 
@@ -251,7 +251,7 @@ func Test_createRun_env(t *testing.T) {
 		RandomOverride: fakeRandom,
 	}
 
-	err := createRun(opts)
+	err := updateRun(opts)
 	assert.NoError(t, err)
 
 	reg.Verify(t)
@@ -264,7 +264,7 @@ func Test_createRun_env(t *testing.T) {
 	assert.Equal(t, payload.Value, "a variable")
 }
 
-func Test_createRun_org(t *testing.T) {
+func Test_updateRun_org(t *testing.T) {
 	tests := []struct {
 		name             string
 		opts             *shared.PostPatchOptions
@@ -275,8 +275,8 @@ func Test_createRun_org(t *testing.T) {
 		{
 			name: "all vis",
 			opts: &shared.PostPatchOptions{
-				OrgName:    "UmbrellaCorporation",
-				Visibility: shared.All,
+				OrgName:     "UmbrellaCorporation",
+				Visibility:  shared.All,
 			},
 			wantApp: "actions",
 		},
@@ -298,8 +298,8 @@ func Test_createRun_org(t *testing.T) {
 
 			orgName := tt.opts.OrgName
 
-			reg.Register(httpmock.REST("POST",
-				fmt.Sprintf("orgs/%s/%s/variables", orgName, tt.wantApp)),
+			reg.Register(httpmock.REST("PATCH",
+				fmt.Sprintf("orgs/%s/%s/variables/cool_variable", orgName, tt.wantApp)),
 				httpmock.StatusStringResponse(201, `{}`))
 
 			if len(tt.opts.RepositoryNames) > 0 {
@@ -319,11 +319,11 @@ func Test_createRun_org(t *testing.T) {
 				return config.NewBlankConfig(), nil
 			}
 			tt.opts.IO = ios
-			tt.opts.VariableName = "org_variable"
+			tt.opts.VariableName = "cool_variable"
 			tt.opts.Body = "a variable"
 			tt.opts.RandomOverride = fakeRandom
 
-			err := createRun(tt.opts)
+			err := updateRun(tt.opts)
 			assert.NoError(t, err)
 
 			reg.Verify(t)
@@ -334,7 +334,6 @@ func Test_createRun_org(t *testing.T) {
 			err = json.Unmarshal(data, &payload)
 			assert.NoError(t, err)
 			assert.Equal(t, payload.Value, "a variable")
-			assert.Equal(t, payload.Name, tt.opts.VariableName)
 			assert.Equal(t, payload.Visibility, tt.opts.Visibility)
 			assert.ElementsMatch(t, payload.Repositories, tt.wantRepositories)
 		})

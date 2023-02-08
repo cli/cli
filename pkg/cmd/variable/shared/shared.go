@@ -2,23 +2,24 @@ package shared
 
 import (
 	"bytes"
-	"errors"
+	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/internal/ghinstance"
-
 )
 
 type Visibility string
@@ -57,6 +58,12 @@ type VariablePayload struct {
 	Value        string  `json:"value,omitempty"`
 	Visibility   string  `json:"visibility,omitempty"`
 	Repositories []int64 `json:"selected_repository_ids,omitempty"`
+	KeyID        string  `json:"key_id"`
+}
+
+type PubKey struct {
+	ID  string `json:"key_id"`
+	Key string
 }
 
 type repoNamesResult struct {
@@ -70,12 +77,15 @@ type PostPatchOptions struct {
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
+	RandomOverride func() io.Reader
+
 	VariableName    string
 	OrgName         string
 	EnvName         string
 	Body            string
 	Visibility      string
 	RepositoryNames []string
+	CsvFile         string
 	Prompter        iprompter
 }
 
@@ -85,11 +95,11 @@ type ListOptions struct {
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	OrgName string
-	EnvName string
-	Page    int
-	PerPage int
-	Name    string
+	OrgName     string
+	EnvName     string
+	Page        int
+	PerPage     int
+	Name        string
 }
 
 type Variable struct {
@@ -218,18 +228,56 @@ func MapRepoNamesToIDs(client *api.Client, host, defaultOwner string, repository
 }
 
 func GetRepoIds(client *api.Client, host, orgName string, repoNames []string) repoNamesResult {
-	if len(repoNames) == 0 {
-		return repoNamesResult{}
-	}
-	repositoryIDs, err := MapRepoNamesToIDs(client, host, orgName, repoNames)
-	return repoNamesResult{
-		Ids: repositoryIDs,
-		Err: err,
-	}
+	repoNamesC := make(chan repoNamesResult, 1)
+	go func() {
+		if len(repoNames) == 0 {
+			repoNamesC <- repoNamesResult{}
+			return
+		}
+		repositoryIDs, err := MapRepoNamesToIDs(client, host, orgName, repoNames)
+		repoNamesC <- repoNamesResult{
+			Ids: repositoryIDs,
+			Err: err,
+		}
+	}()
+	return <-repoNamesC
 }
 
 func GetVariablesFromOptions(opts *PostPatchOptions, client *api.Client, host string, isUpdate bool) (map[string]VariablePayload, error) {
 	variables := make(map[string]VariablePayload)
+	if opts.CsvFile != "" {
+		var r io.Reader
+		if opts.CsvFile == "-" {
+			defer opts.IO.In.Close()
+			r = opts.IO.In
+		} else {
+			f, err := os.Open(opts.CsvFile)
+			if err != nil {
+				return nil, fmt.Errorf("failed to open env file: %w", err)
+			}
+			defer f.Close()
+			r = f
+		}
+		csvReader := csv.NewReader(r)
+		csvReader.Comment = '#'
+		csvReader.FieldsPerRecord = -1
+		records, err := csvReader.ReadAll()
+		if err != nil {
+			return nil, fmt.Errorf("error parsing csv file: %w", err)
+		}
+		if len(records) == 0 {
+			return nil, fmt.Errorf("no variables found in file")
+		}
+		for _, row := range records {
+			variable, err := getVarFromRow(opts, client, host, row, isUpdate)
+			if err != nil {
+				return nil, err
+			}
+			variables[row[0]] = variable
+		}
+		return variables, nil
+	}
+
 	values, err := getBody(opts, client, host, isUpdate)
 	if err != nil {
 		return nil, fmt.Errorf("did not understand variable body: %w", err)
@@ -290,14 +338,30 @@ func getBody(opts *PostPatchOptions, client *api.Client, host string, isUpdate b
 
 	values := make([]string, 0)
 	if opts.IO.CanPrompt() {
+		var currentVar Variable
+		if isUpdate {
+			currentVariablePtr, err := GetVariablesForList(&ListOptions{HttpClient: opts.HttpClient,
+				IO:          opts.IO,
+				Config:      opts.Config,
+				BaseRepo:    opts.BaseRepo,
+				OrgName:     opts.OrgName,
+				EnvName:     opts.EnvName,
+				Page:        0,
+				PerPage:     0,
+				Name:        opts.VariableName,
+			}, true)
+			if err == nil && len(currentVariablePtr) > 0 {
+				currentVar = *currentVariablePtr[0]
+			}
+		}
 		values = append(values, opts.VariableName)
-		data, err := opts.Prompter.Input("Value", "")
+		data, err := opts.Prompter.Input("Value", currentVar.Value)
 		if err != nil {
 			return VariablePayload{}, err
 		}
 		values = append(values, data)
 		if isUpdate {
-			data, err = opts.Prompter.Input("New name", "")
+			data, err = opts.Prompter.Input("New name", currentVar.Name)
 			if err != nil {
 				return VariablePayload{}, err
 			}
@@ -305,14 +369,14 @@ func getBody(opts *PostPatchOptions, client *api.Client, host string, isUpdate b
 		}
 
 		if opts.OrgName != "" {
-			data, err = opts.Prompter.Input("Visibility", "")
+			data, err = opts.Prompter.Input("Visibility", string(currentVar.Visibility))
 			if err != nil {
 				return VariablePayload{}, err
 			}
 			values = append(values, data)
 
 			if data == Selected {
-				data, err = opts.Prompter.Input("Repos(comma separated)", "")
+				data, err = opts.Prompter.Input("Repos(comma separated)", getCurrentSelectedRepos(client.HTTP(), currentVar.SelectedReposURL))
 				if err != nil {
 					return VariablePayload{}, err
 				}

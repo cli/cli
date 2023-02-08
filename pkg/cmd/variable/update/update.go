@@ -1,4 +1,4 @@
-package create
+package update
 
 import (
 	"fmt"
@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func NewCmdCreate(f *cmdutil.Factory, runF func(*shared.PostPatchOptions) error) *cobra.Command {
+func NewCmdUpdate(f *cmdutil.Factory, runF func(*shared.PostPatchOptions) error) *cobra.Command {
 	opts := &shared.PostPatchOptions{
 		IO:         f.IOStreams,
 		Config:     f.Config,
@@ -21,38 +21,38 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*shared.PostPatchOptions) error)
 	}
 
 	cmd := &cobra.Command{
-		Use:   "create <variable-name>",
-		Short: "Create variables",
+		Use:   "update <variable-name>",
+		Short: "Update variables",
 		Long: heredoc.Doc(`
-			Create a value for a variable on one of the following levels:
+			Update a value for a variable on one of the following levels:
 			- repository (default): available to Actions runs in a repository
 			- environment: available to Actions runs for a deployment environment in a repository
 			- organization: available to Actions runs within an organization
 
-			Organization variable can optionally be restricted to only be available to
+			Organization variables can optionally be restricted to only be available to
 			specific repositories.
 		`),
 		Example: heredoc.Doc(`
 			# Add variable value for the current repository in an interactive prompt
-			$ gh variable create MYVARIABLE
+			$ gh variable update MYVARIABLE
 
 			# Read variable value from an environment variable
-			$ gh variable create MYVARIABLE --body "$ENV_VALUE"
+			$ gh variable update MYVARIABLE --body "$ENV_VALUE"
 
 			# Read variable value from a file
-			$ gh variable create MYVARIABLE < myfile.txt
+			$ gh variable update MYVARIABLE < myfile.txt
 
-			# Create variable for a deployment environment in the current repository
-			$ gh variable create MYVARIABLE --env myenvironment
+			# Update variable for a deployment environment in the current repository
+			$ gh variable update MYVARIABLE --env myenvironment
 
-			# Create organization-level variable visible to both public and private repositories
-			$ gh variable create MYVARIABLE --org myOrg --visibility all
+			# Update organization-level variable visible to both public and private repositories
+			$ gh variable update MYVARIABLE --org myOrg --visibility all
 
-			# Create organization-level variable visible to specific repositories
-			$ gh variable create MYVARIABLE --org myOrg --repos repo1,repo2,repo3
+			# Update organization-level variable visible to specific repositories
+			$ gh variable update MYVARIABLE --org myOrg --repos repo1,repo2,repo3
 
-			# Create multiple variables from the csv in the prescribed format
-			$ gh variable create -f file.csv
+			# Update multiple variables from the csv in the prescribed format
+			$ gh variable update -f file.csv
 
 		`),
 		Args: cobra.MaximumNArgs(1),
@@ -98,27 +98,27 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*shared.PostPatchOptions) error)
 				return runF(opts)
 			}
 
-			return createRun(opts)
+			return updateRun(opts)
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Create `organization` variable")
-	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Create deployment `environment` variable")
-	cmdutil.StringEnumFlag(cmd, &opts.Visibility, "visibility", "v", shared.Private, []string{shared.All, shared.Private, shared.Selected}, "Create visibility for an organization variable")
+	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Update `organization` variable")
+	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Update deployment `environment` variable")
+	cmdutil.StringEnumFlag(cmd, &opts.Visibility, "visibility", "v", shared.Private, []string{shared.All, shared.Private, shared.Selected}, "Update visibility for an organization variable")
 	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of `repositories` that can access an organization variable")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "The value for the variable (reads from standard input if not specified)")
-	cmd.Flags().StringVarP(&opts.CsvFile, "csv-file", "f", "", "Load variable names and values from a csv-formatted `file`")
+	cmd.Flags().StringVarP(&opts.CsvFile, "csv-file", "f", "", "Update names and values from a csv-formatted `file`")
 
 	return cmd
 }
 
-func createRun(opts *shared.PostPatchOptions) error {
-
+func updateRun(opts *shared.PostPatchOptions) error {
 	c, err := opts.HttpClient()
 	if err != nil {
-		return fmt.Errorf("could not create http client: %w", err)
+		return fmt.Errorf("could not update http client: %w", err)
 	}
 	client := api.NewClientFromHTTP(c)
+
 	orgName := opts.OrgName
 	envName := opts.EnvName
 
@@ -137,7 +137,8 @@ func createRun(opts *shared.PostPatchOptions) error {
 		}
 		host, _ = cfg.DefaultHost()
 	}
-	variables, err := shared.GetVariablesFromOptions(opts, client, host, false)
+
+	variables, err := shared.GetVariablesFromOptions(opts, client, host, true)
 	if err != nil {
 		return err
 	}
@@ -161,8 +162,9 @@ func createRun(opts *shared.PostPatchOptions) error {
 		return repoIdRes.Err
 	}
 
-	createc := make(chan createResult)
+	updatec := make(chan updateResult)
 	for variableKey, variable := range variables {
+
 		go func(variableKey string, variable shared.VariablePayload) {
 			var repoIds []int64
 			var visibility string
@@ -174,14 +176,14 @@ func createRun(opts *shared.PostPatchOptions) error {
 				visibility = variable.Visibility
 				repoIds = variable.Repositories
 			}
-			createc <- createVariable(opts, host, client, baseRepo, variableKey, variable.Value, visibility, repoIds, variableApp, variableEntity)
+			updatec <- updateVariable(opts, host, client, baseRepo, variableKey, variable.Name, variable.Value, visibility, repoIds, variableApp, variableEntity)
 		}(variableKey, variable)
 	}
 
 	err = nil
 	cs := opts.IO.ColorScheme()
 	for i := 0; i < len(variables); i++ {
-		result := <-createc
+		result := <-updatec
 		if result.err != nil {
 			err = multierror.Append(err, result.err)
 			continue
@@ -197,32 +199,32 @@ func createRun(opts *shared.PostPatchOptions) error {
 		if orgName == "" {
 			target = ghrepo.FullName(baseRepo)
 		}
-		fmt.Fprintf(opts.IO.Out, "%s Create %s variable %s for %s\n", cs.SuccessIcon(), variableApp.Title(), result.key, target)
+		fmt.Fprintf(opts.IO.Out, "%s Update %s variable %s for %s\n", cs.SuccessIcon(), variableApp.Title(), result.key, target)
 	}
 	return err
 }
 
-type createResult struct {
+type updateResult struct {
 	key   string
 	value string
 	err   error
 }
 
-func createVariable(opts *shared.PostPatchOptions, host string, client *api.Client, baseRepo ghrepo.Interface, variableKey, variableValue, visibility string, repositoryIDs []int64, app shared.App, entity shared.VariableEntity) (res createResult) {
+func updateVariable(opts *shared.PostPatchOptions, host string, client *api.Client, baseRepo ghrepo.Interface, variableKey, updatedVariableKey, variableValue, visibility string, repositoryIDs []int64, app shared.App, entity shared.VariableEntity) (res updateResult) {
 	orgName := opts.OrgName
 	envName := opts.EnvName
-	res.key = variableKey
+	res.key = updatedVariableKey
 	var err error
 	switch entity {
 	case shared.Organization:
-		err = postOrgVariable(client, host, orgName, visibility, variableKey, variableValue, repositoryIDs, app)
+		err = patchOrgVariable(client, host, orgName, visibility, variableKey, updatedVariableKey, variableValue, repositoryIDs, app)
 	case shared.Environment:
-		err = postEnvVariable(client, baseRepo, envName, variableKey, variableValue)
+		err = patchEnvVariable(client, baseRepo, envName, variableKey, updatedVariableKey, variableValue)
 	default:
-		err = postRepoVariable(client, baseRepo, variableKey, variableValue, app)
+		err = patchRepoVariable(client, baseRepo, variableKey, updatedVariableKey, variableValue, app)
 	}
 	if err != nil {
-		res.err = fmt.Errorf("failed to create variable %q: %w", variableKey, err)
+		res.err = fmt.Errorf("failed to update variable %q: %w", variableKey, err)
 		return
 	}
 	return

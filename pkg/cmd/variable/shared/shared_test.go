@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -35,8 +37,9 @@ func Test_getBodyPrompt(t *testing.T) {
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("owner/repo")
 		},
-		IO:   ios,
-		Body: "a variable",
+		IO:             ios,
+		Body:           "a variable",
+		RandomOverride: fakeRandom,
 	}
 	httpClient, _ := opts.HttpClient()
 	apiClient := api.NewClientFromHTTP(httpClient)
@@ -166,9 +169,10 @@ func Test_getBody(t *testing.T) {
 				BaseRepo: func() (ghrepo.Interface, error) {
 					return ghrepo.FromFullName("owner/repo")
 				},
-				IO:           ios,
-				VariableName: "VARNAME",
-				Body:         "a variable",
+				IO:             ios,
+				VariableName:   "VARNAME",
+				Body:           "a variable",
+				RandomOverride: fakeRandom,
 			}
 			httpClient, _ := opts.HttpClient()
 			apiClient := api.NewClientFromHTTP(httpClient)
@@ -177,6 +181,100 @@ func Test_getBody(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, tt.want, body.Value)
+		})
+	}
+}
+
+func Test_getVariablesFromOptions(t *testing.T) {
+	genFile := func(s string) string {
+		f, err := os.CreateTemp("", "gh-env.*")
+		if err != nil {
+			t.Fatal(err)
+			return ""
+		}
+		defer f.Close()
+		t.Cleanup(func() {
+			_ = os.Remove(f.Name())
+		})
+		_, err = f.WriteString(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f.Name()
+	}
+
+	tests := []struct {
+		name    string
+		opts    PostPatchOptions
+		isTTY   bool
+		stdin   string
+		want    map[string]string
+		wantErr bool
+	}{
+		{
+			name: "variable from arg",
+			opts: PostPatchOptions{
+				VariableName: "FOO",
+				Body:         "bar",
+				CsvFile:      "",
+			},
+			want: map[string]string{"FOO": "bar"},
+		},
+		{
+			name: "variables from stdin",
+			opts: PostPatchOptions{
+				Body:    "",
+				CsvFile: "-",
+			},
+			stdin: `FOO,bar`,
+			want:  map[string]string{"FOO": "bar"},
+		},
+		{
+			name: "variables from file",
+			opts: PostPatchOptions{
+				Body: "",
+				CsvFile: genFile(heredoc.Doc(`
+					FOO,bar
+					QUOTED,my value
+					#IGNORED, true
+				`)),
+			},
+			stdin: `FOO=bar`,
+			want: map[string]string{
+				"FOO":    "bar",
+				"QUOTED": "my value",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, stdin, _, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStdoutTTY(tt.isTTY)
+			stdin.WriteString(tt.stdin)
+			opts := tt.opts
+			opts.IO = ios
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+
+			apiClient := api.NewClientFromHTTP(&http.Client{Transport: reg})
+
+			gotVariables, err := GetVariablesFromOptions(&opts, apiClient, "owner/repo", false)
+			if err != nil {
+				if !tt.wantErr {
+					t.Fatalf("getVariablesFromOptions() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			} else if tt.wantErr {
+				t.Fatalf("getVariablesFromOptions() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if len(gotVariables) != len(tt.want) {
+				t.Fatalf("getVariablesFromOptions() = got %d variables, want %d", len(gotVariables), len(tt.want))
+			}
+			for k, v := range gotVariables {
+				if tt.want[k] != v.Value {
+					t.Errorf("getVariablesFromOptions() %s = got %q, want %q", k, v.Value, tt.want[k])
+				}
+			}
 		})
 	}
 }
