@@ -35,7 +35,6 @@ func Test_getBodyPrompt(t *testing.T) {
 		},
 		IO:             ios,
 		Body:           "a variable",
-		RandomOverride: fakeRandom,
 	}
 	httpClient, _ := opts.HttpClient()
 	apiClient := api.NewClientFromHTTP(httpClient)
@@ -168,7 +167,6 @@ func Test_getBody(t *testing.T) {
 				IO:             ios,
 				VariableName:   "VARNAME",
 				Body:           "a variable",
-				RandomOverride: fakeRandom,
 			}
 			httpClient, _ := opts.HttpClient()
 			apiClient := api.NewClientFromHTTP(httpClient)
