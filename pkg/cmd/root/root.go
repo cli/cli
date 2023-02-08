@@ -31,6 +31,7 @@ import (
 	releaseCmd "github.com/cli/cli/v2/pkg/cmd/release"
 	repoCmd "github.com/cli/cli/v2/pkg/cmd/repo"
 	creditsCmd "github.com/cli/cli/v2/pkg/cmd/repo/credits"
+	rulesetCmd "github.com/cli/cli/v2/pkg/cmd/ruleset"
 	runCmd "github.com/cli/cli/v2/pkg/cmd/run"
 	searchCmd "github.com/cli/cli/v2/pkg/cmd/search"
 	secretCmd "github.com/cli/cli/v2/pkg/cmd/secret"
@@ -152,6 +153,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory))
 	cmd.AddCommand(releaseCmd.NewCmdRelease(&repoResolvingCmdFactory))
 	cmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
+	cmd.AddCommand(rulesetCmd.NewCmdRuleset(&repoResolvingCmdFactory))
 	cmd.AddCommand(runCmd.NewCmdRun(&repoResolvingCmdFactory))
 	cmd.AddCommand(workflowCmd.NewCmdWorkflow(&repoResolvingCmdFactory))
 	cmd.AddCommand(labelCmd.NewCmdLabel(&repoResolvingCmdFactory))
