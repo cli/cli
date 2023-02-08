@@ -34,6 +34,7 @@ type ForkOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (ghContext.Remotes, error)
 	Since      func(time.Time) time.Duration
+	BackOff    backoff.BackOff
 
 	GitArgs           []string
 	Repository        string
@@ -323,33 +324,28 @@ func forkRun(opts *ForkOptions) error {
 			}
 		}
 		if cloneDesired {
-			var cloneDir string
-			var err error
-
-			retryLimit := 3
-
-			forkedRepoURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
-
-			expBackoff := backoff.NewExponentialBackOff()
-
-			expBackoff.Multiplier = 1.1
-			expBackoff.MaxInterval = 10 * time.Second
-			expBackoff.MaxElapsedTime = 5 * time.Minute
-
-			for i := 0; i < retryLimit; i++ {
-				cloneDir, err = gitClient.Clone(ctx, forkedRepoURL, opts.GitArgs)
-				if err == nil {
-					break
-				}
-
-				var execError errWithExitCode
-				if !errors.As(err, &execError) || execError.ExitCode() != 128 {
-					break
-				}
-
-				duration := expBackoff.NextBackOff()
-				time.Sleep(duration)
+			// Allow injecting alternative BackOff in tests.
+			if opts.BackOff == nil {
+				bo := backoff.NewExponentialBackOff()
+				bo.Multiplier = 1.1
+				bo.MaxInterval = 10 * time.Second
+				bo.MaxElapsedTime = 5 * time.Minute
+				opts.BackOff = bo
 			}
+
+			cloneDir, err := backoff.RetryWithData(func() (string, error) {
+				forkedRepoURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
+				dir, err := gitClient.Clone(ctx, forkedRepoURL, opts.GitArgs)
+				if err == nil {
+					return dir, err
+				}
+				var execError errWithExitCode
+				if errors.As(err, &execError) && execError.ExitCode() == 128 {
+					return "", err
+				}
+				return "", backoff.Permanent(err)
+			}, backoff.WithContext(backoff.WithMaxRetries(opts.BackOff, 3), ctx))
+
 			if err != nil {
 				return fmt.Errorf("failed to clone fork: %w", err)
 			}
