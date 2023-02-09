@@ -42,7 +42,6 @@ func Test_listRun(t *testing.T) {
 						},
 						{
 							"id": 5678,
-							"name": "peele and key",
 							"key_id": "1234567890ABCDEF",
 							"public_key": "xJMEWbarbarbar",
 							"emails": [{"email": "monalisa@github.com"}],
@@ -57,10 +56,10 @@ func Test_listRun(t *testing.T) {
 			}},
 			isTTY: true,
 			wantStdout: heredoc.Doc(`
-			TITLE          EMAIL           KEY ID          PUBLIC KEY      ADDED  EXPIRES
-			               johnny@test...  ABCDEF12345...  xJMEWfoofoofoo  1d     2099-01-01
-			peele and key  monalisa@gi...  1234567890A...  xJMEWbarbarbar  1d     Never
-		 `),
+				EMAIL                KEY ID            PUBLIC KEY      ADDED  EXPIRES
+				johnny@test.com      ABCDEF1234567890  xJMEWfoofoofoo  1d     2099-01-01
+				monalisa@github.com  1234567890ABCDEF  xJMEWbarbarbar  1d     Never
+			`),
 			wantStderr: "",
 		},
 		{
@@ -76,7 +75,6 @@ func Test_listRun(t *testing.T) {
 					httpmock.StringResponse(fmt.Sprintf(`[
 						{
 							"id": 1234,
-							"name": "very important key",
 							"key_id": "ABCDEF1234567890",
 							"public_key": "xJMEWfoofoofoo",
 							"emails": [{"email": "johnny@test.com"}],
@@ -100,8 +98,8 @@ func Test_listRun(t *testing.T) {
 			}},
 			isTTY: false,
 			wantStdout: heredoc.Doc(`
-				very important key	johnny@test.com	ABCDEF1234567890	xJMEWfoofoofoo	2020-06-11T15:44:24+01:00	2099-01-01T15:44:24+01:00
-					monalisa@github.com	1234567890ABCDEF	xJMEWbarbarbar	2021-01-11T15:44:24+01:00	0001-01-01T00:00:00Z
+				johnny@test.com	ABCDEF1234567890	xJMEWfoofoofoo	2020-06-11T15:44:24+01:00	2099-01-01T15:44:24+01:00
+				monalisa@github.com	1234567890ABCDEF	xJMEWbarbarbar	2021-01-11T15:44:24+01:00	0001-01-01T00:00:00Z
 			`),
 			wantStderr: "",
 		},

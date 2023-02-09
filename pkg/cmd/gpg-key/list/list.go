@@ -77,7 +77,6 @@ func listRun(opts *ListOptions) error {
 	now := time.Now()
 
 	if t.IsTTY() {
-		t.AddField("TITLE", nil, nil)
 		t.AddField("EMAIL", nil, nil)
 		t.AddField("KEY ID", nil, nil)
 		t.AddField("PUBLIC KEY", nil, nil)
@@ -87,7 +86,6 @@ func listRun(opts *ListOptions) error {
 	}
 
 	for _, gpgKey := range gpgKeys {
-		t.AddField(gpgKey.Title, nil, nil)
 		t.AddField(gpgKey.Emails.String(), nil, nil)
 		t.AddField(gpgKey.KeyID, nil, nil)
 		t.AddField(gpgKey.PublicKey, truncateMiddle, nil)

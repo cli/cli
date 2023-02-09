@@ -30,7 +30,6 @@ func (es emails) String() string {
 }
 
 type gpgKey struct {
-	Title     string    `json:"name"`
 	KeyID     string    `json:"key_id"`
 	PublicKey string    `json:"public_key"`
 	Emails    emails    `json:"emails"`
