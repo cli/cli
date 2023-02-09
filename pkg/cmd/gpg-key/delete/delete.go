@@ -38,7 +38,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			opts.KeyID = args[0]
 
 			if !opts.IO.CanPrompt() && !opts.Confirmed {
-				return cmdutil.FlagErrorf("--confirm required when not running interactively")
+				return cmdutil.FlagErrorf("--yes required when not running interactively")
 			}
 
 			if runF != nil {
@@ -48,7 +48,9 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Confirmed, "confirm", "y", false, "Skip the confirmation prompt")
+	cmd.Flags().BoolVar(&opts.Confirmed, "confirm", false, "Skip the confirmation prompt")
+	_ = cmd.Flags().MarkDeprecated("confirm", "use `--yes` instead")
+	cmd.Flags().BoolVarP(&opts.Confirmed, "yes", "y", false, "Skip the confirmation prompt")
 	return cmd
 }
 

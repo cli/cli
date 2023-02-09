@@ -83,11 +83,17 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 	var codespaces []*api.Codespace
 	nameFilter := opts.codespaceName
 	if nameFilter == "" {
-		var codespaces []*api.Codespace
-		err = a.RunWithProgress("Fetching codespaces", func() (err error) {
-			codespaces, err = a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{OrgName: opts.orgName, UserName: opts.userName})
-			return
-		})
+		a.StartProgressIndicatorWithLabel("Fetching codespaces")
+		userName := opts.userName
+		if userName == "" && opts.orgName != "" {
+			currentUser, err := a.apiClient.GetUser(ctx)
+			if err != nil {
+				return err
+			}
+			userName = currentUser.Login
+		}
+		codespaces, err = a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{OrgName: opts.orgName, UserName: userName})
+		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error getting codespaces: %w", err)
 		}

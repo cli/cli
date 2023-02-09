@@ -52,9 +52,8 @@ func tokenRun(opts *TokenOptions) error {
 		return err
 	}
 
-	key := "oauth_token"
-	val, err := cfg.GetOrDefault(hostname, key)
-	if err != nil {
+	val, _ := cfg.AuthToken(hostname)
+	if val == "" {
 		return fmt.Errorf("no oauth token")
 	}
 

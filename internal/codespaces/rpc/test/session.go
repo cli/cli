@@ -24,8 +24,12 @@ func (*Session) GetSharedServers(context.Context) ([]*liveshare.Port, error) {
 func (s *Session) KeepAlive(reason string) {
 }
 
+func (s *Session) GetKeepAliveReason() string {
+	return ""
+}
+
 func (s *Session) StartSharing(ctx context.Context, sessionName string, port int) (liveshare.ChannelID, error) {
-	conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", ServerPort))
+	conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		return liveshare.ChannelID{}, err
 	}

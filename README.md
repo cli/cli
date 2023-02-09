@@ -14,6 +14,8 @@ For [installation options see below](#installation), for usage instructions [see
 
 If anything feels off, or if you feel that some functionality is missing, please check out the [contributing page][contributing]. There you will find instructions for sharing your feedback, building the tool locally, and submitting pull requests to the project.
 
+If you are a hubber and are interested in shipping new commands for the CLI, check out our [doc on internal contributions][intake-doc].
+
 <!-- this anchor is linked to from elsewhere, so avoid renaming it -->
 ## Installation
 
@@ -128,3 +130,4 @@ tool. Check out our [more detailed explanation][gh-vs-hub] to learn more.
 [contributing]: ./.github/CONTRIBUTING.md
 [gh-vs-hub]: ./docs/gh-vs-hub.md
 [build from source]: ./docs/source.md
+[intake-doc]: ./docs/working-with-us.md

@@ -97,6 +97,13 @@ func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 			fieldSet.Remove("stateReason")
 		}
 	}
+
+	var getProjectItems bool
+	if fieldSet.Contains("projectItems") {
+		getProjectItems = true
+		fieldSet.Remove("projectItems")
+	}
+
 	fields = fieldSet.ToSlice()
 
 	type response struct {
@@ -149,6 +156,14 @@ func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 
 	if resp.Repository.Issue == nil {
 		return nil, errors.New("issue was not found but GraphQL reported no error")
+	}
+
+	if getProjectItems {
+		apiClient := api.NewClientFromHTTP(httpClient)
+		err := api.ProjectsV2ItemsForIssue(apiClient, repo, resp.Repository.Issue)
+		if err != nil && !api.ProjectsV2IgnorableError(err) {
+			return nil, err
+		}
 	}
 
 	return resp.Repository.Issue, nil

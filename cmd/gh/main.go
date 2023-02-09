@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -53,17 +54,24 @@ func main() {
 func mainRun() exitCode {
 	buildDate := build.Date
 	buildVersion := build.Version
-
-	updateMessageChan := make(chan *update.ReleaseInfo)
-	go func() {
-		rel, _ := checkForUpdate(buildVersion)
-		updateMessageChan <- rel
-	}()
-
 	hasDebug, _ := utils.IsDebugEnabled()
 
 	cmdFactory := factory.New(buildVersion)
 	stderr := cmdFactory.IOStreams.ErrOut
+
+	ctx := context.Background()
+
+	updateCtx, updateCancel := context.WithCancel(ctx)
+	defer updateCancel()
+	updateMessageChan := make(chan *update.ReleaseInfo)
+	go func() {
+		rel, err := checkForUpdate(updateCtx, cmdFactory, buildVersion)
+		if err != nil && hasDebug {
+			fmt.Fprintf(stderr, "warning: checking for update failed: %v", err)
+		}
+		updateMessageChan <- rel
+	}()
+
 	if !cmdFactory.IOStreams.ColorEnabled() {
 		surveyCore.DisableColor = true
 		ansi.DisableColors(true)
@@ -209,7 +217,7 @@ func mainRun() exitCode {
 
 	rootCmd.SetArgs(expandedArgs)
 
-	if cmd, err := rootCmd.ExecuteC(); err != nil {
+	if cmd, err := rootCmd.ExecuteContextC(ctx); err != nil {
 		var pagerPipeError *iostreams.ErrClosedPagerPipe
 		var noResultsError cmdutil.NoResultsError
 		if err == cmdutil.SilentError {
@@ -257,6 +265,7 @@ func mainRun() exitCode {
 		return exitError
 	}
 
+	updateCancel() // if the update checker hasn't completed by now, abort it
 	newRelease := <-updateMessageChan
 	if newRelease != nil {
 		isHomebrew := isUnderHomebrew(cmdFactory.Executable())
@@ -348,21 +357,17 @@ func isCI() bool {
 		os.Getenv("RUN_ID") != "" // TaskCluster, dsari
 }
 
-func checkForUpdate(currentVersion string) (*update.ReleaseInfo, error) {
+func checkForUpdate(ctx context.Context, f *cmdutil.Factory, currentVersion string) (*update.ReleaseInfo, error) {
 	if !shouldCheckForUpdate() {
 		return nil, nil
 	}
-	httpClient, err := api.NewHTTPClient(api.HTTPClientOptions{
-		AppVersion: currentVersion,
-		Log:        os.Stderr,
-	})
+	httpClient, err := f.HttpClient()
 	if err != nil {
 		return nil, err
 	}
-	client := api.NewClientFromHTTP(httpClient)
 	repo := updaterEnabled
 	stateFilePath := filepath.Join(config.StateDir(), "state.yml")
-	return update.CheckForUpdate(client, stateFilePath, repo, currentVersion)
+	return update.CheckForUpdate(ctx, httpClient, stateFilePath, repo, currentVersion)
 }
 
 func isRecentRelease(publishedAt time.Time) bool {

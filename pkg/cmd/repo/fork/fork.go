@@ -33,16 +33,17 @@ type ForkOptions struct {
 	Remotes    func() (ghContext.Remotes, error)
 	Since      func(time.Time) time.Duration
 
-	GitArgs      []string
-	Repository   string
-	Clone        bool
-	Remote       bool
-	PromptClone  bool
-	PromptRemote bool
-	RemoteName   string
-	Organization string
-	ForkName     string
-	Rename       bool
+	GitArgs           []string
+	Repository        string
+	Clone             bool
+	Remote            bool
+	PromptClone       bool
+	PromptRemote      bool
+	RemoteName        string
+	Organization      string
+	ForkName          string
+	Rename            bool
+	DefaultBranchOnly bool
 }
 
 // TODO warn about useless flags (--remote, --remote-name) when running from outside a repository
@@ -122,6 +123,7 @@ func NewCmdFork(f *cmdutil.Factory, runF func(*ForkOptions) error) *cobra.Comman
 	cmd.Flags().StringVar(&opts.RemoteName, "remote-name", defaultRemoteName, "Specify the name for the new remote")
 	cmd.Flags().StringVar(&opts.Organization, "org", "", "Create the fork in an organization")
 	cmd.Flags().StringVar(&opts.ForkName, "fork-name", "", "Rename the forked repository")
+	cmd.Flags().BoolVar(&opts.DefaultBranchOnly, "default-branch-only", false, "Only include the default branch in the fork")
 
 	return cmd
 }
@@ -181,7 +183,7 @@ func forkRun(opts *ForkOptions) error {
 	apiClient := api.NewClientFromHTTP(httpClient)
 
 	opts.IO.StartProgressIndicator()
-	forkedRepo, err := api.ForkRepo(apiClient, repoToFork, opts.Organization, opts.ForkName)
+	forkedRepo, err := api.ForkRepo(apiClient, repoToFork, opts.Organization, opts.ForkName, opts.DefaultBranchOnly)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to fork: %w", err)
@@ -324,6 +326,10 @@ func forkRun(opts *ForkOptions) error {
 			upstreamURL := ghrepo.FormatRemoteURL(repoToFork, protocol)
 			_, err = gitClient.AddRemote(ctx, "upstream", upstreamURL, []string{}, git.WithRepoDir(cloneDir))
 			if err != nil {
+				return err
+			}
+
+			if err := gitClient.Fetch(ctx, "upstream", "", git.WithRepoDir(cloneDir)); err != nil {
 				return err
 			}
 

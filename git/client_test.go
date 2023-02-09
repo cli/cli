@@ -1089,7 +1089,7 @@ func TestClientAddRemote(t *testing.T) {
 			url:         "URL",
 			dir:         "DIRECTORY",
 			branches:    []string{},
-			wantCmdArgs: `path/to/git -C DIRECTORY -c credential.helper= -c credential.helper=!"gh" auth git-credential remote add -f test URL`,
+			wantCmdArgs: `path/to/git -C DIRECTORY remote add test URL`,
 		},
 		{
 			title:       "fetch specific branches only",
@@ -1097,7 +1097,7 @@ func TestClientAddRemote(t *testing.T) {
 			url:         "URL",
 			dir:         "DIRECTORY",
 			branches:    []string{"trunk", "dev"},
-			wantCmdArgs: `path/to/git -C DIRECTORY -c credential.helper= -c credential.helper=!"gh" auth git-credential remote add -t trunk -t dev -f test URL`,
+			wantCmdArgs: `path/to/git -C DIRECTORY remote add -t trunk -t dev test URL`,
 		},
 	}
 	for _, tt := range tests {

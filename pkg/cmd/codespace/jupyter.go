@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/rpc"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
@@ -60,7 +61,7 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	}
 
 	// Pass 0 to pick a random port
-	listen, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", 0))
+	listen, _, err := codespaces.ListenTCP(0)
 	if err != nil {
 		return err
 	}

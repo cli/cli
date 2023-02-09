@@ -57,6 +57,7 @@ func TestApp_Create(t *testing.T) {
 				retentionPeriod: NullableDuration{durationPtr(48 * time.Hour)},
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
 		},
 		{
 			name: "create with explicit display name",
@@ -78,6 +79,7 @@ func TestApp_Create(t *testing.T) {
 				displayName: "funky flute",
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
 		},
 		{
 			name: "create codespace with default branch shows idle timeout notice if present",
@@ -111,6 +113,7 @@ func TestApp_Create(t *testing.T) {
 				devContainerPath: ".devcontainer/foobar/devcontainer.json",
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
 		},
 		{
 			name: "create codespace with devcontainer path results in selecting the correct machine type",
@@ -172,6 +175,7 @@ func TestApp_Create(t *testing.T) {
 				devContainerPath: ".devcontainer/foobar/devcontainer.json",
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
 		},
 		{
 			name: "create codespace with default branch with default devcontainer if no path provided and no devcontainer files exist in the repo",
@@ -205,7 +209,7 @@ func TestApp_Create(t *testing.T) {
 				idleTimeout: 30 * time.Minute,
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
-			wantStderr: "Notice: Idle timeout for this codespace is set to 10 minutes in compliance with your organization's policy\n",
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\nNotice: Idle timeout for this codespace is set to 10 minutes in compliance with your organization's policy\n",
 			isTTY:      true,
 		},
 		{
@@ -224,7 +228,8 @@ func TestApp_Create(t *testing.T) {
 				showStatus:  false,
 				idleTimeout: 30 * time.Minute,
 			},
-			wantErr: fmt.Errorf("error getting devcontainer.json paths: some error"),
+			wantErr:    fmt.Errorf("error getting devcontainer.json paths: some error"),
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
 		},
 		{
 			name: "create codespace with default branch does not show idle timeout notice if not conntected to terminal",
@@ -252,7 +257,7 @@ func TestApp_Create(t *testing.T) {
 				idleTimeout: 30 * time.Minute,
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
-			wantStderr: "",
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
 			isTTY:      false,
 		},
 		{
@@ -280,7 +285,8 @@ func TestApp_Create(t *testing.T) {
 				idleTimeout: 30 * time.Minute,
 			},
 			wantErr: cmdutil.SilentError,
-			wantStderr: `You must authorize or deny additional permissions requested by this codespace before continuing.
+			wantStderr: `  ✓ Codespaces usage for this repository is paid for by monalisa
+You must authorize or deny additional permissions requested by this codespace before continuing.
 Open this URL in your browser to review and authorize additional permissions: example.com/permissions
 Alternatively, you can run "create" with the "--default-permissions" option to continue without authorizing additional permissions.
 `,
@@ -304,7 +310,31 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 			wantErr: fmt.Errorf("error checking codespace ownership: some error"),
 		},
 		{
-			name: "mentions billable owner when org covers codepaces for a repository",
+			name: "mentions User as billable owner when org does not cover codepaces for a repository",
+			fields: fields{
+				apiClient: apiCreateDefaults(&apiClientMock{
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Type:  "User",
+							Login: "monalisa",
+						}, nil
+					},
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						return &api.Codespace{
+							Name: "monalisa-dotfiles-abcd1234",
+						}, nil
+					},
+				}),
+			},
+			opts: createOptions{
+				repo:   "monalisa/dotfiles",
+				branch: "main",
+			},
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
+			wantStdout: "monalisa-dotfiles-abcd1234\n",
+		},
+		{
+			name: "mentions Organization as billable owner when org covers codepaces for a repository",
 			fields: fields{
 				apiClient: apiCreateDefaults(&apiClientMock{
 					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
@@ -328,6 +358,28 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 				idleTimeout: 30 * time.Minute,
 			},
 			wantStderr: "  ✓ Codespaces usage for this repository is paid for by megacorp\n",
+			wantStdout: "megacorp-private-abcd1234\n",
+		},
+		{
+			name: "does not mention billable owner when not an expected type",
+			fields: fields{
+				apiClient: apiCreateDefaults(&apiClientMock{
+					GetCodespaceBillableOwnerFunc: func(ctx context.Context, nwo string) (*api.User, error) {
+						return &api.User{
+							Type:  "UnexpectedBillableOwnerType",
+							Login: "mega-owner",
+						}, nil
+					},
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						return &api.Codespace{
+							Name: "megacorp-private-abcd1234",
+						}, nil
+					},
+				}),
+			},
+			opts: createOptions{
+				repo: "megacorp/private",
+			},
 			wantStdout: "megacorp-private-abcd1234\n",
 		},
 	}
