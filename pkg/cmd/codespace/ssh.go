@@ -477,9 +477,10 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 
 	var csList []*api.Codespace
 	if opts.codespace == "" {
-		a.StartProgressIndicatorWithLabel("Fetching codespaces")
-		csList, err = a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{})
-		a.StopProgressIndicator()
+		err = a.RunWithProgress("Fetching codespaces", func() (err error) {
+			csList, err = a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{})
+			return err
+		})
 	} else {
 		var codespace *api.Codespace
 		codespace, err = getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
