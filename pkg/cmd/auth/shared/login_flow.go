@@ -42,7 +42,7 @@ type LoginOptions struct {
 
 func Login(opts *LoginOptions) error {
 	cfg := opts.Config
-	hostname := opts.Hostname
+	hostname := strings.ToLower(opts.Hostname)
 	httpClient := opts.HTTPClient
 	cs := opts.IO.ColorScheme()
 
