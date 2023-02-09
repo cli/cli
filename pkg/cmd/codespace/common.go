@@ -57,10 +57,7 @@ func (a *App) StopProgressIndicator() {
 }
 
 func (a *App) RunWithProgress(label string, f func() error) error {
-	a.StartProgressIndicatorWithLabel(label)
-	defer a.StopProgressIndicator()
-
-	return f()
+	return a.io.RunWithProgress(label, f)
 }
 
 // Connects to a codespace using Live Share and returns that session
