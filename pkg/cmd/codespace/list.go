@@ -62,9 +62,11 @@ func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Expo
 		return cmdutil.FlagErrorf("using `--org` or `--user` with `--repo` is not allowed")
 	}
 
-	a.StartProgressIndicatorWithLabel("Fetching codespaces")
-	codespaces, err := a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{Limit: opts.limit, RepoName: opts.repo, OrgName: opts.orgName, UserName: opts.userName})
-	a.StopProgressIndicator()
+	var codespaces []*api.Codespace
+	err := a.RunWithProgress("Fetching codespaces", func() (err error) {
+		codespaces, err = a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{Limit: opts.limit, RepoName: opts.repo, OrgName: opts.orgName, UserName: opts.userName})
+		return
+	})
 	if err != nil {
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}
