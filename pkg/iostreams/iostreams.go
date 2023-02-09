@@ -305,11 +305,11 @@ func (s *IOStreams) StopProgressIndicator() {
 	s.progressIndicator = nil
 }
 
-func (s *IOStreams) RunWithProgress(label string, f func() error) error {
+func (s *IOStreams) RunWithProgress(label string, run func() error) error {
 	s.StartProgressIndicatorWithLabel(label)
 	defer s.StopProgressIndicator()
 
-	return f()
+	return run()
 }
 
 func (s *IOStreams) StartAlternateScreenBuffer() {
