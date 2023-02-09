@@ -57,12 +57,13 @@ func (a *App) Edit(ctx context.Context, opts editOptions) error {
 		codespaceName = selectedCodespace.Name
 	}
 
-	a.StartProgressIndicatorWithLabel("Editing codespace")
-	_, err := a.apiClient.EditCodespace(ctx, codespaceName, &api.EditCodespaceParams{
-		DisplayName: opts.displayName,
-		Machine:     opts.machine,
+	err := a.RunWithProgress("Editing codespace", func() (err error) {
+		_, err = a.apiClient.EditCodespace(ctx, codespaceName, &api.EditCodespaceParams{
+			DisplayName: opts.displayName,
+			Machine:     opts.machine,
+		})
+		return
 	})
-	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error editing codespace: %w", err)
 	}
