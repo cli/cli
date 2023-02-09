@@ -138,6 +138,7 @@ func loginRun(opts *LoginOptions) error {
 			return err
 		}
 	}
+	hostname = ghinstance.NormalizeHostname(hostname)
 
 	if src, writeable := shared.AuthTokenWriteable(cfg, hostname); !writeable {
 		fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", src)
