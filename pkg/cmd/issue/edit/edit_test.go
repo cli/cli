@@ -489,6 +489,21 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
 			"pageInfo": { "hasNextPage": false }
 		} } } }
 		`))
+	reg.Register(
+		httpmock.GraphQL(`query UserCurrent\b`),
+		httpmock.StringResponse(`
+		  { "data": { "viewer": { "login": "monalisa" } } }
+		`))
+	reg.Register(
+		httpmock.GraphQL(`query UserProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "user": { "projectsV2": {
+			"nodes": [
+				{ "title": "MonalisaV2", "id": "MONALISAV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
 }
 
 func mockIssueUpdate(t *testing.T, reg *httpmock.Registry) {
