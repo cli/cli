@@ -25,7 +25,9 @@ func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 
 	payload := map[string]string{
 		"armored_public_key": string(keyBytes),
-		"name":               title,
+	}
+	if title != "" {
+		payload["name"] = title
 	}
 
 	payloadBytes, err := json.Marshal(payload)
