@@ -850,11 +850,6 @@ type RepoMetadataInput struct {
 // RepoMetadata pre-fetches the metadata for attaching to issues and pull requests
 func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput) (*RepoMetadataResult, error) {
 	var result RepoMetadataResult
-	var repoProjects []RepoProject
-	var orgProjects []RepoProject
-	var userProjectsV2 []ProjectV2
-	var repoProjectsV2 []ProjectV2
-	var orgProjectsV2 []ProjectV2
 
 	g, _ := errgroup.WithContext(context.Background())
 
@@ -921,12 +916,6 @@ func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
-
-	result.Projects = append(result.Projects, repoProjects...)
-	result.Projects = append(result.Projects, orgProjects...)
-	result.ProjectsV2 = append(result.ProjectsV2, userProjectsV2...)
-	result.ProjectsV2 = append(result.ProjectsV2, repoProjectsV2...)
-	result.ProjectsV2 = append(result.ProjectsV2, orgProjectsV2...)
 
 	return &result, nil
 }
