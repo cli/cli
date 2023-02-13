@@ -98,21 +98,6 @@ type apiClient interface {
 
 var errNoCodespaces = errors.New("you have no codespaces")
 
-type chooseCodespaceFilterOptions struct {
-	Repo string
-}
-
-func chooseCodespace(ctx context.Context, apiClient apiClient, filterOptions chooseCodespaceFilterOptions) (*api.Codespace, error) {
-	// TODO: gracefully handle no codespaces returned from here now that the filter is added
-	codespaces, err := apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{RepoName: filterOptions.Repo})
-	if err != nil {
-		return nil, fmt.Errorf("error getting codespaces: %w", err)
-	}
-
-	skipPromptForSingleOption := filterOptions.Repo != ""
-	return chooseCodespaceFromList(ctx, codespaces, false, skipPromptForSingleOption)
-}
-
 // chooseCodespaceFromList returns the codespace that the user has interactively selected from the list, or
 // an error if there are no codespaces.
 func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace, includeOwner bool, skipPromptForSingleOption bool) (*api.Codespace, error) {
@@ -159,71 +144,6 @@ func formatCodespacesForSelect(codespaces []*api.Codespace, includeOwner bool) [
 	}
 
 	return names
-}
-
-type getOrChooseCodespaceFilterOptions struct {
-	chooseCodespaceFilterOptions
-
-	CodespaceName string
-}
-
-var errInvalidGetOrChooseCodespaceCommandArgs = errors.New("invalid arguments: --codespace and --repo should not both be used together")
-
-// addGetOrChooseCodespaceCommandArgs adds command arguments for building getOrChooseCodespaceFilterOptions
-// to be passed into getOrChooseCodespace. It also adds pre-run validations on those arguments.
-func addGetOrChooseCodespaceCommandArgs(cmd *cobra.Command, opts *getOrChooseCodespaceFilterOptions) {
-	cmd.Flags().StringVarP(&opts.CodespaceName, "codespace", "c", "", "Name of the codespace")
-	cmd.Flags().StringVarP(&opts.Repo, "repo", "R", "", "Filter codespace selection by repository name (user/repo)")
-
-	existingPreRun := cmd.PersistentPreRunE
-	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		if err := validateGetOrChooseCodespaceCommandArgs(*opts); err != nil {
-			return err
-		}
-
-		if existingPreRun != nil {
-			return existingPreRun(cmd, args)
-		}
-
-		return nil
-	}
-}
-
-func validateGetOrChooseCodespaceCommandArgs(opts getOrChooseCodespaceFilterOptions) error {
-	if opts.CodespaceName != "" && opts.Repo != "" {
-		return errInvalidGetOrChooseCodespaceCommandArgs
-	}
-
-	return nil
-}
-
-// getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
-// It then fetches the codespace record with full connection details.
-// TODO(josebalius): accept a progress indicator or *App and show progress when fetching.
-func getOrChooseCodespace(ctx context.Context, apiClient apiClient, filterOptions getOrChooseCodespaceFilterOptions) (codespace *api.Codespace, err error) {
-	if filterOptions.CodespaceName != "" {
-		codespace, err = apiClient.GetCodespace(ctx, filterOptions.CodespaceName, true)
-		if err != nil {
-			return nil, fmt.Errorf("getting full codespace details: %w", err)
-		}
-	} else {
-		codespace, err = chooseCodespace(ctx, apiClient, filterOptions.chooseCodespaceFilterOptions)
-		if err != nil {
-			if err == errNoCodespaces {
-				return nil, err
-			}
-			return nil, fmt.Errorf("choosing codespace: %w", err)
-		}
-	}
-
-	if codespace.PendingOperation {
-		return nil, fmt.Errorf(
-			"codespace is disabled while it has a pending operation: %s",
-			codespace.PendingOperationDisabledReason,
-		)
-	}
-
-	return codespace, nil
 }
 
 func safeClose(closer io.Closer, err *error) {
