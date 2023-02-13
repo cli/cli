@@ -121,14 +121,9 @@ func Test_RepoMetadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`query UserCurrent\b`),
-		httpmock.StringResponse(`
-		  { "data": { "viewer": { "login": "monalisa" } } }
-		`))
-	http.Register(
 		httpmock.GraphQL(`query UserProjectV2List\b`),
 		httpmock.StringResponse(`
-		{ "data": { "user": { "projectsV2": {
+		{ "data": { "viewer": { "projectsV2": {
 			"nodes": [
 				{ "title": "MonalisaV2", "id": "MONALISAV2ID" }
 			],
@@ -283,14 +278,9 @@ func Test_ProjectNamesToPaths(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`query UserCurrent\b`),
-		httpmock.StringResponse(`
-		  { "data": { "viewer": { "login": "monalisa" } } }
-		`))
-	http.Register(
 		httpmock.GraphQL(`query UserProjectV2List\b`),
 		httpmock.StringResponse(`
-		{ "data": { "user": { "projectsV2": {
+		{ "data": { "viewer": { "projectsV2": {
 			"nodes": [
 				{ "title": "MonalisaV2", "id": "MONALISAV2ID", "resourcePath": "/users/MONALISA/projects/5"  }
 			],

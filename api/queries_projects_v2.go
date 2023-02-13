@@ -214,10 +214,10 @@ func RepoProjectsV2(client *Client, repo ghrepo.Interface) ([]ProjectV2, error) 
 	return projectsV2, nil
 }
 
-// UserProjectsV2 fetches all open projectsV2 for a user.
-func UserProjectsV2(client *Client, hostname, login string) ([]ProjectV2, error) {
+// CurrentUserProjectsV2 fetches all open projectsV2 for current user.
+func CurrentUserProjectsV2(client *Client, hostname string) ([]ProjectV2, error) {
 	type responseData struct {
-		User struct {
+		Viewer struct {
 			ProjectsV2 struct {
 				Nodes    []ProjectV2
 				PageInfo struct {
@@ -225,11 +225,10 @@ func UserProjectsV2(client *Client, hostname, login string) ([]ProjectV2, error)
 					EndCursor   string
 				}
 			} `graphql:"projectsV2(first: 100, orderBy: {field: TITLE, direction: ASC}, after: $endCursor, query: $query)"`
-		} `graphql:"user(login: $login)"`
+		} `graphql:"viewer"`
 	}
 
 	variables := map[string]interface{}{
-		"login":     githubv4.String(login),
 		"endCursor": (*githubv4.String)(nil),
 		"query":     githubv4.String("is:open"),
 	}
@@ -242,12 +241,12 @@ func UserProjectsV2(client *Client, hostname, login string) ([]ProjectV2, error)
 			return nil, err
 		}
 
-		projectsV2 = append(projectsV2, query.User.ProjectsV2.Nodes...)
+		projectsV2 = append(projectsV2, query.Viewer.ProjectsV2.Nodes...)
 
-		if !query.User.ProjectsV2.PageInfo.HasNextPage {
+		if !query.Viewer.ProjectsV2.PageInfo.HasNextPage {
 			break
 		}
-		variables["endCursor"] = githubv4.String(query.User.ProjectsV2.PageInfo.EndCursor)
+		variables["endCursor"] = githubv4.String(query.Viewer.ProjectsV2.PageInfo.EndCursor)
 	}
 
 	return projectsV2, nil

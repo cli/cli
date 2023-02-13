@@ -1260,12 +1260,7 @@ func relevantProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, []P
 	})
 	g.Go(func() error {
 		var err error
-		login, err := CurrentLoginName(client, repo.RepoHost())
-		if err != nil {
-			err = fmt.Errorf("error fetching current login: %w", err)
-			return err
-		}
-		userProjectsV2, err = UserProjectsV2(client, repo.RepoHost(), login)
+		userProjectsV2, err = CurrentUserProjectsV2(client, repo.RepoHost())
 		if err != nil && !ProjectsV2IgnorableError(err) {
 			err = fmt.Errorf("error fetching user projects: %w", err)
 			return err

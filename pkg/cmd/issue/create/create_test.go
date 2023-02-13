@@ -236,12 +236,9 @@ func Test_createRun(t *testing.T) {
 						"pageInfo": { "hasNextPage": false }
 					} } } }`))
 				r.Register(
-					httpmock.GraphQL(`query UserCurrent\b`),
-					httpmock.StringResponse(`{"data": {"viewer": {"login": "monalisa"} } }`))
-				r.Register(
 					httpmock.GraphQL(`query UserProjectV2List\b`),
 					httpmock.StringResponse(`
-					{ "data": { "user": { "projectsV2": {
+					{ "data": { "viewer": { "projectsV2": {
 						"nodes": [
 							{ "title": "Monalisa", "id": "MONALISAID", "resourcePath": "/users/MONALISA/projects/1"  }
 						],
@@ -659,12 +656,9 @@ func TestIssueCreate_metadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`query UserCurrent\b`),
-		httpmock.StringResponse(`{"data": {"viewer": {"login": "monalisa"} } }`))
-	http.Register(
 		httpmock.GraphQL(`query UserProjectV2List\b`),
 		httpmock.StringResponse(`
-		{	"data": { "user": { "projectsV2": {
+		{	"data": { "viewer": { "projectsV2": {
 			"nodes": [],
 			"pageInfo": { "hasNextPage": false }
 		} } } }
@@ -810,12 +804,9 @@ func TestIssueCreate_projectsV2(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
-		httpmock.GraphQL(`query UserCurrent\b`),
-		httpmock.StringResponse(`{"data": {"viewer": {"login": "monalisa"} } }`))
-	http.Register(
 		httpmock.GraphQL(`query UserProjectV2List\b`),
 		httpmock.StringResponse(`
-		{ "data": { "user": { "projectsV2": {
+		{ "data": { "viewer": { "projectsV2": {
 			"nodes": [
 				{ "title": "MonalisaV2", "id": "MONALISAV2ID" }
 			],

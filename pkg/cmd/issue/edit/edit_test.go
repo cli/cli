@@ -490,14 +490,9 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
 		} } } }
 		`))
 	reg.Register(
-		httpmock.GraphQL(`query UserCurrent\b`),
-		httpmock.StringResponse(`
-		  { "data": { "viewer": { "login": "monalisa" } } }
-		`))
-	reg.Register(
 		httpmock.GraphQL(`query UserProjectV2List\b`),
 		httpmock.StringResponse(`
-		{ "data": { "user": { "projectsV2": {
+		{ "data": { "viewer": { "projectsV2": {
 			"nodes": [
 				{ "title": "MonalisaV2", "id": "MONALISAV2ID" }
 			],
