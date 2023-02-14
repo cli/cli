@@ -3,6 +3,7 @@ package ruleset
 import (
 	"github.com/MakeNowJust/heredoc"
 	cmdCheck "github.com/cli/cli/v2/pkg/cmd/ruleset/check"
+	cmdList "github.com/cli/cli/v2/pkg/cmd/ruleset/list"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
@@ -19,8 +20,8 @@ func NewCmdRuleset(f *cmdutil.Factory) *cobra.Command {
 	}
 
 	cmdutil.EnableRepoOverride(cmd, f)
-	// cmd.AddCommand(cmdList.NewCmdList(f, nil)
-	// cmd.AddCommand(cmdList.NewCmdView(f, nil)
+	cmd.AddCommand(cmdList.NewCmdList(f, nil))
+	// cmd.AddCommand(cmdList.NewCmdView(f, nil))
 	cmd.AddCommand(cmdCheck.NewCmdCheck(f, nil))
 
 	return cmd
