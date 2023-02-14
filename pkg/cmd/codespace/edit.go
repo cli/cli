@@ -10,10 +10,10 @@ import (
 )
 
 type editOptions struct {
-	filterOptions getOrChooseCodespaceFilterOptions
-	displayName   string
-	machine       string
-	repo          string
+	selector    CodespaceSelector
+	displayName string
+	machine     string
+	repo        string
 }
 
 func newEditCmd(app *App) *cobra.Command {
@@ -32,7 +32,7 @@ func newEditCmd(app *App) *cobra.Command {
 		},
 	}
 
-	addGetOrChooseCodespaceCommandArgs(editCmd, &opts.filterOptions)
+	opts.selector = AddCodespaceSelector(editCmd, app)
 	editCmd.Flags().StringVarP(&opts.displayName, "display-name", "d", "", "Set the display name")
 	editCmd.Flags().StringVar(&opts.displayName, "displayName", "", "display name")
 	if err := editCmd.Flags().MarkDeprecated("displayName", "use `--display-name` instead"); err != nil {
@@ -45,22 +45,17 @@ func newEditCmd(app *App) *cobra.Command {
 
 // Edits a codespace
 func (a *App) Edit(ctx context.Context, opts editOptions) error {
-	codespaceName := opts.filterOptions.CodespaceName
-
-	// This only needs the name, so skip the API call if it is provided
-	if codespaceName == "" {
-		selectedCodespace, err := chooseCodespace(ctx, a.apiClient, opts.filterOptions.chooseCodespaceFilterOptions)
-		if err != nil {
-			if err == errNoCodespaces {
-				return err
-			}
-			return fmt.Errorf("error choosing codespace: %w", err)
+	codespaceName, err := opts.selector.SelectName(ctx)
+	if err != nil {
+		// TODO: is there a cleaner way to do this?
+		if err == errNoCodespaces || err == errNoFilteredCodespaces {
+			return err
 		}
-		codespaceName = selectedCodespace.Name
+		return fmt.Errorf("error choosing codespace: %w", err)
 	}
 
 	a.StartProgressIndicatorWithLabel("Editing codespace")
-	_, err := a.apiClient.EditCodespace(ctx, codespaceName, &api.EditCodespaceParams{
+	_, err = a.apiClient.EditCodespace(ctx, codespaceName, &api.EditCodespaceParams{
 		DisplayName: opts.displayName,
 		Machine:     opts.machine,
 	})

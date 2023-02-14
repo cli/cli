@@ -41,6 +41,8 @@ func newDeleteCmd(app *App) *cobra.Command {
 		prompter:      &surveyPrompter{},
 	}
 
+	var selector *codespaceSelector
+
 	deleteCmd := &cobra.Command{
 		Use:   "delete",
 		Short: "Delete codespaces",
@@ -54,6 +56,11 @@ func newDeleteCmd(app *App) *cobra.Command {
 		`),
 		Args: noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// TODO: ideally we would use the selector directly, but the logic here is too intertwined with other flags to do so elegantly
+			// After the admin subcommand is added (see https://github.com/cli/cli/pull/6944#issuecomment-1419553639) we can revisit this.
+			opts.codespaceName = selector.codespaceName
+			opts.repoFilter = selector.repoName
+
 			if opts.deleteAll && opts.repoFilter != "" {
 				return cmdutil.FlagErrorf("both `--all` and `--repo` is not supported")
 			}
@@ -64,13 +71,12 @@ func newDeleteCmd(app *App) *cobra.Command {
 		},
 	}
 
-	deleteCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "Name of the codespace")
-	deleteCmd.Flags().BoolVar(&opts.deleteAll, "all", false, "Delete all codespaces")
-	deleteCmd.Flags().StringVarP(&opts.repoFilter, "repo", "R", "", "Delete codespaces for a `repository`")
-	if err := addDeprecatedRepoShorthand(deleteCmd, &opts.repoFilter); err != nil {
+	selector = AddCodespaceSelector(deleteCmd, app)
+	if err := selector.AddDeprecatedRepoShorthand(deleteCmd); err != nil {
 		fmt.Fprintf(app.io.ErrOut, "%v\n", err)
 	}
 
+	deleteCmd.Flags().BoolVar(&opts.deleteAll, "all", false, "Delete all codespaces")
 	deleteCmd.Flags().BoolVarP(&opts.skipConfirm, "force", "f", false, "Skip confirmation for codespaces that contain unsaved changes")
 	deleteCmd.Flags().Uint16Var(&opts.keepDays, "days", 0, "Delete codespaces older than `N` days")
 	deleteCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "The `login` handle of the organization (admin-only)")

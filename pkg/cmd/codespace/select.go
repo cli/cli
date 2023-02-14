@@ -10,7 +10,7 @@ import (
 
 type selectOptions struct {
 	filePath string
-	repo     string
+	selector CodespaceSelector
 }
 
 func newSelectCmd(app *App) *cobra.Command {
@@ -28,7 +28,7 @@ func newSelectCmd(app *App) *cobra.Command {
 		},
 	}
 
-	selectCmd.Flags().StringVarP(&opts.repo, "repo", "R", "", "Filter codespace selection by repository name (user/repo)")
+	opts.selector = AddCodespaceSelector(selectCmd, app)
 	selectCmd.Flags().StringVarP(&opts.filePath, "file", "f", "", "Output file path")
 	return selectCmd
 }
@@ -43,16 +43,20 @@ func newSelectCmd(app *App) *cobra.Command {
 // With `stdout` output:
 //
 // ```shell
-// 		gh codespace select
+//
+//	gh codespace select
+//
 // ```
 //
 // With `into-a-file` output:
 //
 // ```shell
-// 		gh codespace select --file /tmp/selected_codespace.txt
+//
+//	gh codespace select --file /tmp/selected_codespace.txt
+//
 // ```
 func (a *App) Select(ctx context.Context, opts selectOptions) (err error) {
-	codespace, err := chooseCodespace(ctx, a.apiClient, chooseCodespaceFilterOptions{Repo: opts.repo})
+	codespace, err := opts.selector.Select(ctx)
 	if err != nil {
 		return err
 	}

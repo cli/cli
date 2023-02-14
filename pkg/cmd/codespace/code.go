@@ -10,9 +10,9 @@ import (
 
 func newCodeCmd(app *App) *cobra.Command {
 	var (
-		filterOptions getOrChooseCodespaceFilterOptions
-		useInsiders   bool
-		useWeb        bool
+		selector    CodespaceSelector
+		useInsiders bool
+		useWeb      bool
 	)
 
 	codeCmd := &cobra.Command{
@@ -20,11 +20,11 @@ func newCodeCmd(app *App) *cobra.Command {
 		Short: "Open a codespace in Visual Studio Code",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.VSCode(cmd.Context(), filterOptions, useInsiders, useWeb)
+			return app.VSCode(cmd.Context(), selector, useInsiders, useWeb)
 		},
 	}
 
-	addGetOrChooseCodespaceCommandArgs(codeCmd, &filterOptions)
+	selector = AddCodespaceSelector(codeCmd, app)
 
 	codeCmd.Flags().BoolVar(&useInsiders, "insiders", false, "Use the insiders version of Visual Studio Code")
 	codeCmd.Flags().BoolVarP(&useWeb, "web", "w", false, "Use the web version of Visual Studio Code")
@@ -33,8 +33,8 @@ func newCodeCmd(app *App) *cobra.Command {
 }
 
 // VSCode opens a codespace in the local VS VSCode application.
-func (a *App) VSCode(ctx context.Context, filterOptions getOrChooseCodespaceFilterOptions, useInsiders bool, useWeb bool) error {
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, filterOptions)
+func (a *App) VSCode(ctx context.Context, selector CodespaceSelector, useInsiders bool, useWeb bool) error {
+	codespace, err := selector.Select(ctx)
 	if err != nil {
 		return err
 	}
