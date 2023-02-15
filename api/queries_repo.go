@@ -850,8 +850,7 @@ type RepoMetadataInput struct {
 // RepoMetadata pre-fetches the metadata for attaching to issues and pull requests
 func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput) (*RepoMetadataResult, error) {
 	var result RepoMetadataResult
-
-	g, _ := errgroup.WithContext(context.Background())
+	var g errgroup.Group
 
 	if input.Assignees || input.Reviewers {
 		g.Go(func() error {
