@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -14,6 +16,7 @@ import (
 type ListOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
+	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	Organization string
@@ -23,6 +26,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	opts := &ListOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		Config:     f.Config,
 	}
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -49,8 +53,45 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	return cmd
 }
 
+type Ruleset struct {
+	// TODO
+}
+
 func listRun(opts *ListOptions) error {
-	fmt.Println(opts.Organization)
-	fmt.Println("LOL TODO")
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return err
+	}
+	client := api.NewClientFromHTTP(httpClient)
+
+	repoI, err := opts.BaseRepo()
+	if err != nil {
+		return err
+	}
+
+	cfg, err := opts.Config()
+	if err != nil {
+		return err
+	}
+
+	endpoint := fmt.Sprintf("repos/%s/%s/rulesets",
+		repoI.RepoOwner(), repoI.RepoName())
+	hostname := repoI.RepoHost()
+
+	if opts.Organization != "" {
+		endpoint = fmt.Sprintf("orgs/%s/rulesets", opts.Organization)
+		hostname, _ = cfg.DefaultHost()
+	}
+
+	//var response []Ruleset
+	var response interface{}
+
+	err = client.REST(hostname, "GET", endpoint, nil, &response)
+	if err != nil {
+		return fmt.Errorf("failed to call '%s': %w", endpoint, err)
+	}
+
+	fmt.Printf("DBG %#v\n", response)
+
 	return nil
 }
