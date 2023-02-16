@@ -28,8 +28,8 @@ type codespaceSelector struct {
 var errNoFilteredCodespaces = errors.New("you have no codespaces meeting the filter criteria")
 
 // AddCodespaceSelector add codespace filtering parameters to the give command and returns a CodespaceSelector which applies them
-func AddCodespaceSelector(cmd *cobra.Command, app *App) *codespaceSelector {
-	cs := &codespaceSelector{api: app.apiClient}
+func AddCodespaceSelector(cmd *cobra.Command, api apiClient) *codespaceSelector {
+	cs := &codespaceSelector{api: api}
 
 	cmd.Flags().StringVarP(&cs.codespaceName, "codespace", "c", "", "Name of the codespace")
 	cmd.Flags().StringVarP(&cs.repoName, "repo", "R", "", "Filter codespace selection by repository name (user/repo)")

@@ -24,7 +24,7 @@ func newCodeCmd(app *App) *cobra.Command {
 		},
 	}
 
-	selector = AddCodespaceSelector(codeCmd, app)
+	selector = AddCodespaceSelector(codeCmd, app.apiClient)
 
 	codeCmd.Flags().BoolVar(&useInsiders, "insiders", false, "Use the insiders version of Visual Studio Code")
 	codeCmd.Flags().BoolVarP(&useWeb, "web", "w", false, "Use the web version of Visual Studio Code")

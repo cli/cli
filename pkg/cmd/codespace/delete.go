@@ -71,7 +71,7 @@ func newDeleteCmd(app *App) *cobra.Command {
 		},
 	}
 
-	selector = AddCodespaceSelector(deleteCmd, app)
+	selector = AddCodespaceSelector(deleteCmd, app.apiClient)
 	if err := selector.AddDeprecatedRepoShorthand(deleteCmd); err != nil {
 		fmt.Fprintf(app.io.ErrOut, "%v\n", err)
 	}

@@ -23,7 +23,7 @@ func newJupyterCmd(app *App) *cobra.Command {
 		},
 	}
 
-	selector = AddCodespaceSelector(jupyterCmd, app)
+	selector = AddCodespaceSelector(jupyterCmd, app.apiClient)
 
 	return jupyterCmd
 }

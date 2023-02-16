@@ -28,7 +28,7 @@ func newSelectCmd(app *App) *cobra.Command {
 		},
 	}
 
-	opts.selector = AddCodespaceSelector(selectCmd, app)
+	opts.selector = AddCodespaceSelector(selectCmd, app.apiClient)
 	selectCmd.Flags().StringVarP(&opts.filePath, "file", "f", "", "Output file path")
 	return selectCmd
 }
