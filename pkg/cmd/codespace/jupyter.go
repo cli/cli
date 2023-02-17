@@ -12,7 +12,7 @@ import (
 )
 
 func newJupyterCmd(app *App) *cobra.Command {
-	var selector CodespaceSelector
+	var selector *CodespaceSelector
 
 	jupyterCmd := &cobra.Command{
 		Use:   "jupyter",
@@ -28,7 +28,7 @@ func newJupyterCmd(app *App) *cobra.Command {
 	return jupyterCmd
 }
 
-func (a *App) Jupyter(ctx context.Context, selector CodespaceSelector) (err error) {
+func (a *App) Jupyter(ctx context.Context, selector *CodespaceSelector) (err error) {
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

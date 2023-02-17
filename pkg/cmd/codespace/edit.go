@@ -2,6 +2,7 @@ package codespace
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
@@ -10,7 +11,7 @@ import (
 )
 
 type editOptions struct {
-	selector    CodespaceSelector
+	selector    *CodespaceSelector
 	displayName string
 	machine     string
 	repo        string
@@ -48,7 +49,7 @@ func (a *App) Edit(ctx context.Context, opts editOptions) error {
 	codespaceName, err := opts.selector.SelectName(ctx)
 	if err != nil {
 		// TODO: is there a cleaner way to do this?
-		if err == errNoCodespaces || err == errNoFilteredCodespaces {
+		if errors.Is(err, errNoCodespaces) || errors.Is(err, errNoFilteredCodespaces) {
 			return err
 		}
 		return fmt.Errorf("error choosing codespace: %w", err)

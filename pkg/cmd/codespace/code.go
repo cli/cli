@@ -10,7 +10,7 @@ import (
 
 func newCodeCmd(app *App) *cobra.Command {
 	var (
-		selector    CodespaceSelector
+		selector    *CodespaceSelector
 		useInsiders bool
 		useWeb      bool
 	)
@@ -33,7 +33,7 @@ func newCodeCmd(app *App) *cobra.Command {
 }
 
 // VSCode opens a codespace in the local VS VSCode application.
-func (a *App) VSCode(ctx context.Context, selector CodespaceSelector, useInsiders bool, useWeb bool) error {
+func (a *App) VSCode(ctx context.Context, selector *CodespaceSelector, useInsiders bool, useWeb bool) error {
 	codespace, err := selector.Select(ctx)
 	if err != nil {
 		return err

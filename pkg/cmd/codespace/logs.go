@@ -13,8 +13,8 @@ import (
 
 func newLogsCmd(app *App) *cobra.Command {
 	var (
-		filterOptions getOrChooseCodespaceFilterOptions
-		follow        bool
+		selector *CodespaceSelector
+		follow   bool
 	)
 
 	logsCmd := &cobra.Command{
@@ -22,23 +22,23 @@ func newLogsCmd(app *App) *cobra.Command {
 		Short: "Access codespace logs",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.Logs(cmd.Context(), filterOptions, follow)
+			return app.Logs(cmd.Context(), selector, follow)
 		},
 	}
 
-	addGetOrChooseCodespaceCommandArgs(logsCmd, &filterOptions)
+	selector = AddCodespaceSelector(logsCmd, app.apiClient)
 
 	logsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Tail and follow the logs")
 
 	return logsCmd
 }
 
-func (a *App) Logs(ctx context.Context, filterOptions getOrChooseCodespaceFilterOptions, follow bool) (err error) {
+func (a *App) Logs(ctx context.Context, selector *CodespaceSelector, follow bool) (err error) {
 	// Ensure all child tasks (port forwarding, remote exec) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, filterOptions)
+	codespace, err := selector.Select(ctx)
 	if err != nil {
 		return err
 	}

@@ -11,8 +11,8 @@ import (
 
 func newRebuildCmd(app *App) *cobra.Command {
 	var (
-		filterOptions getOrChooseCodespaceFilterOptions
-		fullRebuild   bool
+		selector    *CodespaceSelector
+		fullRebuild bool
 	)
 
 	rebuildCmd := &cobra.Command{
@@ -23,22 +23,22 @@ preserved. Your codespace will be rebuilt using your working directory's
 dev container. A full rebuild also removes cached Docker images.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.Rebuild(cmd.Context(), filterOptions, fullRebuild)
+			return app.Rebuild(cmd.Context(), selector, fullRebuild)
 		},
 	}
 
-	addGetOrChooseCodespaceCommandArgs(rebuildCmd, &filterOptions)
+	selector = AddCodespaceSelector(rebuildCmd, app.apiClient)
 
 	rebuildCmd.Flags().BoolVar(&fullRebuild, "full", false, "perform a full rebuild")
 
 	return rebuildCmd
 }
 
-func (a *App) Rebuild(ctx context.Context, filterOptions getOrChooseCodespaceFilterOptions, full bool) (err error) {
+func (a *App) Rebuild(ctx context.Context, selector *CodespaceSelector, full bool) (err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, filterOptions)
+	codespace, err := selector.Select(ctx)
 	if err != nil {
 		return err
 	}

@@ -10,7 +10,7 @@ import (
 
 type selectOptions struct {
 	filePath string
-	selector CodespaceSelector
+	selector *CodespaceSelector
 }
 
 func newSelectCmd(app *App) *cobra.Command {

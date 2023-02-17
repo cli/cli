@@ -10,15 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type CodespaceSelector interface {
-	// Select fetches a codespace from the API according to the criteria set at its creation, prompting the user if needed
-	Select(ctx context.Context) (codespace *api.Codespace, err error)
-
-	// SelectName fetches a codespace name in the same way as Select, but may avoid API calls
-	SelectName(ctx context.Context) (name string, err error)
-}
-
-type codespaceSelector struct {
+type CodespaceSelector struct {
 	api apiClient
 
 	repoName      string
@@ -28,8 +20,8 @@ type codespaceSelector struct {
 var errNoFilteredCodespaces = errors.New("you have no codespaces meeting the filter criteria")
 
 // AddCodespaceSelector add codespace filtering parameters to the give command and returns a CodespaceSelector which applies them
-func AddCodespaceSelector(cmd *cobra.Command, api apiClient) *codespaceSelector {
-	cs := &codespaceSelector{api: api}
+func AddCodespaceSelector(cmd *cobra.Command, api apiClient) *CodespaceSelector {
+	cs := &CodespaceSelector{api: api}
 
 	cmd.Flags().StringVarP(&cs.codespaceName, "codespace", "c", "", "Name of the codespace")
 	cmd.Flags().StringVarP(&cs.repoName, "repo", "R", "", "Filter codespace selection by repository name (user/repo)")
@@ -39,12 +31,7 @@ func AddCodespaceSelector(cmd *cobra.Command, api apiClient) *codespaceSelector 
 	return cs
 }
 
-// AddDeprecatedRepoShorthand wraps addDeprecatedRepoShorthand to set the selector's parameters
-func (cs *codespaceSelector) AddDeprecatedRepoShorthand(cmd *cobra.Command) error {
-	return addDeprecatedRepoShorthand(cmd, &cs.repoName)
-}
-
-func (cs *codespaceSelector) Select(ctx context.Context) (codespace *api.Codespace, err error) {
+func (cs *CodespaceSelector) Select(ctx context.Context) (codespace *api.Codespace, err error) {
 	if cs.codespaceName != "" {
 		codespace, err = cs.api.GetCodespace(ctx, cs.codespaceName, true)
 		if err != nil {
@@ -72,7 +59,7 @@ func (cs *codespaceSelector) Select(ctx context.Context) (codespace *api.Codespa
 	return codespace, nil
 }
 
-func (cs *codespaceSelector) SelectName(ctx context.Context) (string, error) {
+func (cs *CodespaceSelector) SelectName(ctx context.Context) (string, error) {
 	if cs.codespaceName != "" {
 		return cs.codespaceName, nil
 	}
@@ -90,7 +77,7 @@ func (cs *codespaceSelector) SelectName(ctx context.Context) (string, error) {
 	return codespace.Name, nil
 }
 
-func (cs *codespaceSelector) fetchCodespaces(ctx context.Context) (codespaces []*api.Codespace, err error) {
+func (cs *CodespaceSelector) fetchCodespaces(ctx context.Context) (codespaces []*api.Codespace, err error) {
 	codespaces, err = cs.api.ListCodespaces(ctx, api.ListCodespacesOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting codespaces: %w", err)
@@ -118,7 +105,7 @@ func (cs *codespaceSelector) fetchCodespaces(ctx context.Context) (codespaces []
 	return codespaces, err
 }
 
-func (cs *codespaceSelector) chooseCodespace(ctx context.Context, codespaces []*api.Codespace) (codespace *api.Codespace, err error) {
+func (cs *CodespaceSelector) chooseCodespace(ctx context.Context, codespaces []*api.Codespace) (codespace *api.Codespace, err error) {
 	skipPromptForSingleOption := cs.repoName != ""
 	codespace, err = chooseCodespaceFromList(ctx, codespaces, false, skipPromptForSingleOption)
 	if err != nil {

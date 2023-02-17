@@ -41,7 +41,7 @@ func newDeleteCmd(app *App) *cobra.Command {
 		prompter:      &surveyPrompter{},
 	}
 
-	var selector *codespaceSelector
+	var selector *CodespaceSelector
 
 	deleteCmd := &cobra.Command{
 		Use:   "delete",
@@ -72,7 +72,7 @@ func newDeleteCmd(app *App) *cobra.Command {
 	}
 
 	selector = AddCodespaceSelector(deleteCmd, app.apiClient)
-	if err := selector.AddDeprecatedRepoShorthand(deleteCmd); err != nil {
+	if err := addDeprecatedRepoShorthand(deleteCmd, &selector.repoName); err != nil {
 		fmt.Fprintf(app.io.ErrOut, "%v\n", err)
 	}
 
