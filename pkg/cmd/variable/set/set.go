@@ -150,7 +150,6 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 }
 
 func setRun(opts *SetOptions) error {
-
 	c, err := opts.HttpClient()
 	if err != nil {
 		return fmt.Errorf("could not set http client: %w", err)
@@ -465,7 +464,7 @@ func mapRepoToID(client *api.Client, host string, repositories []ghrepo.Interfac
 	return result, nil
 }
 
-func getCurrentSelectedRepos(client shared.HttpClient, url string) string {
+func getCurrentSelectedRepos(client *http.Client, url string) string {
 	var selectedRepositories shared.SelectedRepos
 	err := shared.ApiGet(client, url, &selectedRepositories)
 	if err != nil {

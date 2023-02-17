@@ -71,10 +71,6 @@ type SelectedRepos struct {
 	Repositories []*Repo
 }
 
-type HttpClient interface {
-	Do(*http.Request) (*http.Response, error)
-}
-
 func GetVariableEntity(orgName, envName string) (VariableEntity, error) {
 	orgSet := orgName != ""
 	envSet := envName != ""
@@ -147,7 +143,7 @@ func GetVariablesForList(opts *ListOptions, getSelectedRepoInfo bool) ([]*Variab
 	return variables, nil
 }
 
-func getOrgVariables(client HttpClient, host, orgName string, getSelectedRepoInfo bool, page, perPage int, name string) ([]*Variable, error) {
+func getOrgVariables(client *http.Client, host, orgName string, getSelectedRepoInfo bool, page, perPage int, name string) ([]*Variable, error) {
 	variables, err := getVariables(client, host, fmt.Sprintf(`orgs/%s/%s/variables`, orgName, "actions"), page, perPage, name)
 	if err != nil {
 		return nil, err
@@ -162,17 +158,17 @@ func getOrgVariables(client HttpClient, host, orgName string, getSelectedRepoInf
 	return variables, nil
 }
 
-func getEnvVariables(client HttpClient, repo ghrepo.Interface, envName string, page, perPage int, name string) ([]*Variable, error) {
+func getEnvVariables(client *http.Client, repo ghrepo.Interface, envName string, page, perPage int, name string) ([]*Variable, error) {
 	path := fmt.Sprintf(`repositories/%s/environments/%s/variables`, ghrepo.FullName(repo), envName)
 	return getVariables(client, repo.RepoHost(), path, page, perPage, name)
 }
 
-func getRepoVariables(client HttpClient, repo ghrepo.Interface, page, perPage int, name string) ([]*Variable, error) {
+func getRepoVariables(client *http.Client, repo ghrepo.Interface, page, perPage int, name string) ([]*Variable, error) {
 	return getVariables(client, repo.RepoHost(), fmt.Sprintf(`repositories/%s/%s/variables`,
 		ghrepo.FullName(repo), "actions"), page, perPage, name)
 }
 
-func getVariables(client HttpClient, host, path string, page, perPage int, name string) ([]*Variable, error) {
+func getVariables(client *http.Client, host, path string, page, perPage int, name string) ([]*Variable, error) {
 	var url string
 	if name != "" {
 		url = fmt.Sprintf("%s%s/%s", ghinstance.RESTPrefix(host), path, name)
@@ -193,7 +189,7 @@ func getVariables(client HttpClient, host, path string, page, perPage int, name 
 	}
 }
 
-func ApiGet(client HttpClient, url string, data interface{}) error {
+func ApiGet(client *http.Client, url string, data interface{}) error {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
@@ -218,7 +214,7 @@ func ApiGet(client HttpClient, url string, data interface{}) error {
 	return nil
 }
 
-func getSelectedRepositoryInformation(client HttpClient, variables []*Variable) error {
+func getSelectedRepositoryInformation(client *http.Client, variables []*Variable) error {
 	type responseData struct {
 		TotalCount int `json:"total_count"`
 	}
