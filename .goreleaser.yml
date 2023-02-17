@@ -70,3 +70,14 @@ nfpms:
     contents:
       - src: "./share/man/man1/gh*.1"
         dst: "/usr/share/man/man1"
+      - src: "./script/debian/github-cli.sources"
+        dst: "/etc/apt/sources.list.d/github-cli.sources"
+        type: config
+        packager: deb
+      - src: "./script/debian/github-cli.pref"
+        dst: "/etc/apt/preferences.d/github-cli.pref"
+        type: config
+        packager: deb
+      - src: "./script/debian/githubcli-archive-keyring.gpg"
+        dst: "/usr/share/keyrings/githubcli-archive-keyring.gpg"
+        packager: deb
