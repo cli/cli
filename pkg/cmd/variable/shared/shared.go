@@ -34,7 +34,7 @@ type VariablePayload struct {
 	Name         string  `json:"name,omitempty"`
 	Value        string  `json:"value,omitempty"`
 	Visibility   string  `json:"visibility,omitempty"`
-	Repositories []int64 `json:"selected_repository_ids,omitempty"`
+	Repositories []int64 `json:"selected_repository_ids"`
 	IsUpdate     bool    `json:"is_update"`
 }
 

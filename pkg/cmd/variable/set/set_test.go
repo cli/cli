@@ -192,7 +192,7 @@ func Test_setRun_repo(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
 
-			reg.Register(httpmock.REST("POST", fmt.Sprintf("repositories/owner/repo/%s/variables", tt.wantApp)),
+			reg.Register(httpmock.REST("POST", fmt.Sprintf("repos/owner/repo/%s/variables", tt.wantApp)),
 				httpmock.StatusStringResponse(201, `{}`))
 
 			ios, _, _, _ := iostreams.Test()
@@ -234,7 +234,9 @@ func Test_setRun_repo(t *testing.T) {
 func Test_setRun_env(t *testing.T) {
 	reg := &httpmock.Registry{}
 
-	reg.Register(httpmock.REST("POST", "repositories/owner/repo/environments/development/variables"), httpmock.StatusStringResponse(201, `{}`))
+	reg.Register(httpmock.REST("POST", "repositories/1/environments/development/variables"), httpmock.StatusStringResponse(201, `{}`))
+	reg.Register(httpmock.GraphQL(`query MapRepositoryNames\b`),
+		httpmock.StringResponse(`{"data":{"repo_0001":{"databaseId":1}}}`))
 
 	ios, _, _, _ := iostreams.Test()
 
@@ -257,7 +259,7 @@ func Test_setRun_env(t *testing.T) {
 
 	reg.Verify(t)
 
-	data, err := io.ReadAll(reg.Requests[0].Body)
+	data, err := io.ReadAll(reg.Requests[1].Body)
 	assert.NoError(t, err)
 	var payload shared.VariablePayload
 	err = json.Unmarshal(data, &payload)
@@ -581,12 +583,12 @@ func Test_getVariablesFromOptions(t *testing.T) {
 			} else {
 				host = "owner/repo"
 				if !tt.isUpdate {
-					reg.Register(httpmock.REST("GET", "repositories/owner/repo/actions/variables/FOO"),
+					reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/variables/FOO"),
 						httpmock.StatusStringResponse(404, "Not Found"))
 				} else {
 					current, err := json.Marshal(tt.currentVar)
 					if err != nil {
-						reg.Register(httpmock.REST("GET", "repositories/owner/repo/actions/variables/FOO"),
+						reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/variables/FOO"),
 							httpmock.StatusStringResponse(200, string(current)))
 					}
 				}

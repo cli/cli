@@ -167,14 +167,16 @@ func setRun(opts *SetOptions) error {
 			return err
 		}
 		host = baseRepo.RepoHost()
-		baseRepoIdRes := getRepoIds(client, host, baseRepo.RepoOwner(), []string{baseRepo.RepoName()})
-		if baseRepoIdRes.Err != nil {
-			return baseRepoIdRes.Err
+		if opts.EnvName != "" {
+			baseRepoIdRes := getRepoIds(client, host, baseRepo.RepoOwner(), []string{baseRepo.RepoName()})
+			if baseRepoIdRes.Err != nil {
+				return baseRepoIdRes.Err
+			}
+			if len(baseRepoIdRes.Ids) == 0 {
+				return fmt.Errorf("could not find base repository id %s", ghrepo.FullName(baseRepo))
+			}
+			opts.BaseRepoId = baseRepoIdRes.Ids[0]
 		}
-		if len(baseRepoIdRes.Ids) == 0 {
-			return fmt.Errorf("could not find base repository id %s", ghrepo.FullName(baseRepo))
-		}
-		opts.BaseRepoId = baseRepoIdRes.Ids[0]
 	} else {
 		cfg, err := opts.Config()
 		if err != nil {
@@ -204,7 +206,7 @@ func setRun(opts *SetOptions) error {
 	setc := make(chan setResult)
 	for variableKey, variable := range variables {
 		go func(variableKey string, variable shared.VariablePayload) {
-			var repoIds []int64
+			repoIds := []int64{}
 			var visibility string
 			visibility = opts.Visibility
 			//cmd line opt overrides file
@@ -212,7 +214,9 @@ func setRun(opts *SetOptions) error {
 				repoIds = repoIdRes.Ids
 			} else if variable.Visibility != "" {
 				visibility = variable.Visibility
-				repoIds = variable.Repositories
+				if len(variable.Repositories) > 0 {
+					repoIds = variable.Repositories
+				}
 			}
 			setc <- setVariable(opts, host, client, baseRepo, variableKey, variable.Value, visibility, repoIds, variableEntity, variable.IsUpdate)
 		}(variableKey, variable)
