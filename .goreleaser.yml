@@ -18,23 +18,23 @@ builds:
         - -s -w -X github.com/cli/cli/v2/internal/build.Version={{.Version}} -X github.com/cli/cli/v2/internal/build.Date={{time "2006-01-02"}}
     id: macos
     goos: [darwin]
-    goarch: [amd64]
+    goarch: [amd64, arm64]
 
-  - <<: *build_defaults
-    id: linux
-    goos: [linux]
-    goarch: [386, arm, amd64, arm64]
-    env:
-      - CGO_ENABLED=0
+  # - <<: *build_defaults
+  #   id: linux
+  #   goos: [linux]
+  #   goarch: [386, arm, amd64, arm64]
+  #   env:
+  #     - CGO_ENABLED=0
 
-  - <<: *build_defaults
-    id: windows
-    goos: [windows]
-    goarch: [386, amd64, arm64]
-    hooks:
-      post:
-        - cmd: ./script/sign-windows-executable.sh '{{ .Path }}'
-          output: false
+  # - <<: *build_defaults
+  #   id: windows
+  #   goos: [windows]
+  #   goarch: [386, amd64, arm64]
+  #   hooks:
+  #     post:
+  #       - cmd: ./script/sign-windows-executable.sh '{{ .Path }}'
+  #         output: false
 
 archives:
   - id: nix
@@ -56,17 +56,17 @@ archives:
     files:
       - LICENSE
 
-nfpms:
-  - license: MIT
-    maintainer: GitHub
-    homepage: https://github.com/cli/cli
-    bindir: /usr
-    dependencies:
-      - git
-    description: GitHub’s official command line tool.
-    formats:
-      - deb
-      - rpm
-    contents:
-      - src: "./share/man/man1/gh*.1"
-        dst: "/usr/share/man/man1"
+# nfpms:
+#   - license: MIT
+#     maintainer: GitHub
+#     homepage: https://github.com/cli/cli
+#     bindir: /usr
+#     dependencies:
+#       - git
+#     description: GitHub’s official command line tool.
+#     formats:
+#       - deb
+#       - rpm
+#     contents:
+#       - src: "./share/man/man1/gh*.1"
+#         dst: "/usr/share/man/man1"
