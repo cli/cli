@@ -1,13 +1,12 @@
 package set
 
 import (
+	"bytes"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
-	"regexp"
+	"os"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -19,6 +18,8 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/hashicorp/go-multierror"
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/nacl/box"
 )
@@ -29,14 +30,18 @@ type SetOptions struct {
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	RandomOverride io.Reader
+	RandomOverride func() io.Reader
 
 	SecretName      string
 	OrgName         string
 	EnvName         string
+	UserSecrets     bool
 	Body            string
+	DoNotStore      bool
 	Visibility      string
 	RepositoryNames []string
+	EnvFile         string
+	Application     string
 }
 
 func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command {
@@ -49,69 +54,85 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	cmd := &cobra.Command{
 		Use:   "set <secret-name>",
 		Short: "Create or update secrets",
-		Long:  "Locally encrypt a new or updated secret at either the repository, environment, or organization level and send it to GitHub for storage.",
+		Long: heredoc.Doc(`
+			Set a value for a secret on one of the following levels:
+			- repository (default): available to Actions runs or Dependabot in a repository
+			- environment: available to Actions runs for a deployment environment in a repository
+			- organization: available to Actions runs, Dependabot, or Codespaces within an organization
+			- user: available to Codespaces for your user
+
+			Organization and user secrets can optionally be restricted to only be available to
+			specific repositories.
+
+			Secret values are locally encrypted before being sent to GitHub.
+		`),
 		Example: heredoc.Doc(`
-			Paste secret in prompt
+			# Paste secret value for the current repository in an interactive prompt
 			$ gh secret set MYSECRET
 
-			Use environment variable as secret value
-			$ gh secret set MYSECRET  -b"${ENV_VALUE}"
+			# Read secret value from an environment variable
+			$ gh secret set MYSECRET --body "$ENV_VALUE"
 
-			Use file as secret value
-			$ gh secret set MYSECRET < file.json
+			# Read secret value from a file
+			$ gh secret set MYSECRET < myfile.txt
 
-			Set environment level secret
-			$ gh secret set MYSECRET -bval --env=anEnv
+			# Set secret for a deployment environment in the current repository
+			$ gh secret set MYSECRET --env myenvironment
 
-			Set organization level secret visible to entire organization
-			$ gh secret set MYSECRET -bval --org=anOrg --visibility=all
+			# Set organization-level secret visible to both public and private repositories
+			$ gh secret set MYSECRET --org myOrg --visibility all
 
-			Set organization level secret visible only to certain repositories
-			$ gh secret set MYSECRET -bval --org=anOrg --repos="repo1,repo2,repo3"
-`),
-		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) != 1 {
-				return &cmdutil.FlagError{Err: errors.New("must pass single secret name")}
-			}
-			return nil
-		},
+			# Set organization-level secret visible to specific repositories
+			$ gh secret set MYSECRET --org myOrg --repos repo1,repo2,repo3
+
+			# Set user-level secret for Codespaces
+			$ gh secret set MYSECRET --user
+
+			# Set repository-level secret for Dependabot
+			$ gh secret set MYSECRET --app dependabot
+
+			# Set multiple secrets imported from the ".env" file
+			$ gh secret set -f .env
+		`),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			if err := cmdutil.MutuallyExclusive("specify only one of `--org` or `--env`", opts.OrgName != "", opts.EnvName != ""); err != nil {
+			if err := cmdutil.MutuallyExclusive("specify only one of `--org`, `--env`, or `--user`", opts.OrgName != "", opts.EnvName != "", opts.UserSecrets); err != nil {
 				return err
 			}
 
-			opts.SecretName = args[0]
-
-			err := validSecretName(opts.SecretName)
-			if err != nil {
+			if err := cmdutil.MutuallyExclusive("specify only one of `--body` or `--env-file`", opts.Body != "", opts.EnvFile != ""); err != nil {
 				return err
+			}
+
+			if err := cmdutil.MutuallyExclusive("specify only one of `--env-file` or `--no-store`", opts.EnvFile != "", opts.DoNotStore); err != nil {
+				return err
+			}
+
+			if len(args) == 0 {
+				if !opts.DoNotStore && opts.EnvFile == "" {
+					return cmdutil.FlagErrorf("must pass name argument")
+				}
+			} else {
+				opts.SecretName = args[0]
 			}
 
 			if cmd.Flags().Changed("visibility") {
 				if opts.OrgName == "" {
-					return &cmdutil.FlagError{Err: errors.New(
-						"--visibility not supported for repository secrets; did you mean to pass --org?")}
+					return cmdutil.FlagErrorf("`--visibility` is only supported with `--org`")
 				}
 
-				if opts.Visibility != shared.All && opts.Visibility != shared.Private && opts.Visibility != shared.Selected {
-					return &cmdutil.FlagError{Err: errors.New(
-						"--visibility must be one of `all`, `private`, or `selected`")}
+				if opts.Visibility != shared.Selected && len(opts.RepositoryNames) > 0 {
+					return cmdutil.FlagErrorf("`--repos` is only supported with `--visibility=selected`")
 				}
 
-				if opts.Visibility != shared.Selected && cmd.Flags().Changed("repos") {
-					return &cmdutil.FlagError{Err: errors.New(
-						"--repos only supported when --visibility='selected'")}
-				}
-
-				if opts.Visibility == shared.Selected && !cmd.Flags().Changed("repos") {
-					return &cmdutil.FlagError{Err: errors.New(
-						"--repos flag required when --visibility='selected'")}
+				if opts.Visibility == shared.Selected && len(opts.RepositoryNames) == 0 {
+					return cmdutil.FlagErrorf("`--repos` list required with `--visibility=selected`")
 				}
 			} else {
-				if cmd.Flags().Changed("repos") {
+				if len(opts.RepositoryNames) > 0 {
 					opts.Visibility = shared.Selected
 				}
 			}
@@ -123,19 +144,24 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			return setRun(opts)
 		},
 	}
-	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Set a secret for an organization")
-	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Set a secret for an environment")
-	cmd.Flags().StringVarP(&opts.Visibility, "visibility", "v", "private", "Set visibility for an organization secret: `all`, `private`, or `selected`")
-	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of repository names for `selected` visibility")
-	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "A value for the secret. Reads from STDIN if not specified.")
+
+	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Set `organization` secret")
+	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Set deployment `environment` secret")
+	cmd.Flags().BoolVarP(&opts.UserSecrets, "user", "u", false, "Set a secret for your user")
+	cmdutil.StringEnumFlag(cmd, &opts.Visibility, "visibility", "v", shared.Private, []string{shared.All, shared.Private, shared.Selected}, "Set visibility for an organization secret")
+	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of `repositories` that can access an organization or user secret")
+	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "The value for the secret (reads from standard input if not specified)")
+	cmd.Flags().BoolVar(&opts.DoNotStore, "no-store", false, "Print the encrypted, base64-encoded value instead of storing it on Github")
+	cmd.Flags().StringVarP(&opts.EnvFile, "env-file", "f", "", "Load secret names and values from a dotenv-formatted `file`")
+	cmdutil.StringEnumFlag(cmd, &opts.Application, "app", "a", "", []string{shared.Actions, shared.Codespaces, shared.Dependabot}, "Set the application for a secret")
 
 	return cmd
 }
 
 func setRun(opts *SetOptions) error {
-	body, err := getBody(opts)
+	secrets, err := getSecretsFromOptions(opts)
 	if err != nil {
-		return fmt.Errorf("did not understand secret body: %w", err)
+		return err
 	}
 
 	c, err := opts.HttpClient()
@@ -147,107 +173,243 @@ func setRun(opts *SetOptions) error {
 	orgName := opts.OrgName
 	envName := opts.EnvName
 
+	var host string
 	var baseRepo ghrepo.Interface
-	if orgName == "" {
+	if orgName == "" && !opts.UserSecrets {
 		baseRepo, err = opts.BaseRepo()
 		if err != nil {
-			return fmt.Errorf("could not determine base repo: %w", err)
+			return err
 		}
+		host = baseRepo.RepoHost()
+	} else {
+		cfg, err := opts.Config()
+		if err != nil {
+			return err
+		}
+		host, _ = cfg.DefaultHost()
 	}
 
-	cfg, err := opts.Config()
+	secretEntity, err := shared.GetSecretEntity(orgName, envName, opts.UserSecrets)
 	if err != nil {
 		return err
 	}
 
-	host, err := cfg.DefaultHost()
+	secretApp, err := shared.GetSecretApp(opts.Application, secretEntity)
 	if err != nil {
 		return err
+	}
+
+	if !shared.IsSupportedSecretEntity(secretApp, secretEntity) {
+		return fmt.Errorf("%s secrets are not supported for %s", secretEntity, secretApp)
 	}
 
 	var pk *PubKey
-	if orgName != "" {
-		pk, err = getOrgPublicKey(client, host, orgName)
-	} else if envName != "" {
+	switch secretEntity {
+	case shared.Organization:
+		pk, err = getOrgPublicKey(client, host, orgName, secretApp)
+	case shared.Environment:
 		pk, err = getEnvPubKey(client, baseRepo, envName)
-	} else {
-		pk, err = getRepoPubKey(client, baseRepo)
+	case shared.User:
+		pk, err = getUserPublicKey(client, host)
+	default:
+		pk, err = getRepoPubKey(client, baseRepo, secretApp)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to fetch public key: %w", err)
 	}
 
-	eBody, err := box.SealAnonymous(nil, body, &pk.Raw, opts.RandomOverride)
+	type repoNamesResult struct {
+		ids []int64
+		err error
+	}
+	repoNamesC := make(chan repoNamesResult, 1)
+	go func() {
+		if len(opts.RepositoryNames) == 0 {
+			repoNamesC <- repoNamesResult{}
+			return
+		}
+		repositoryIDs, err := mapRepoNamesToIDs(client, host, opts.OrgName, opts.RepositoryNames)
+		repoNamesC <- repoNamesResult{
+			ids: repositoryIDs,
+			err: err,
+		}
+	}()
+
+	var repositoryIDs []int64
+	if result := <-repoNamesC; result.err == nil {
+		repositoryIDs = result.ids
+	} else {
+		return result.err
+	}
+
+	setc := make(chan setResult)
+	for secretKey, secret := range secrets {
+		key := secretKey
+		value := secret
+		go func() {
+			setc <- setSecret(opts, pk, host, client, baseRepo, key, value, repositoryIDs, secretApp, secretEntity)
+		}()
+	}
+
+	err = nil
+	cs := opts.IO.ColorScheme()
+	for i := 0; i < len(secrets); i++ {
+		result := <-setc
+		if result.err != nil {
+			err = multierror.Append(err, result.err)
+			continue
+		}
+		if result.encrypted != "" {
+			fmt.Fprintln(opts.IO.Out, result.encrypted)
+			continue
+		}
+		if !opts.IO.IsStdoutTTY() {
+			continue
+		}
+		target := orgName
+		if opts.UserSecrets {
+			target = "your user"
+		} else if orgName == "" {
+			target = ghrepo.FullName(baseRepo)
+		}
+		fmt.Fprintf(opts.IO.Out, "%s Set %s secret %s for %s\n", cs.SuccessIcon(), secretApp.Title(), result.key, target)
+	}
+	return err
+}
+
+type setResult struct {
+	key       string
+	encrypted string
+	err       error
+}
+
+func setSecret(opts *SetOptions, pk *PubKey, host string, client *api.Client, baseRepo ghrepo.Interface, secretKey string, secret []byte, repositoryIDs []int64, app shared.App, entity shared.SecretEntity) (res setResult) {
+	orgName := opts.OrgName
+	envName := opts.EnvName
+	res.key = secretKey
+
+	decodedPubKey, err := base64.StdEncoding.DecodeString(pk.Key)
 	if err != nil {
-		return fmt.Errorf("failed to encrypt body: %w", err)
+		res.err = fmt.Errorf("failed to decode public key: %w", err)
+		return
+	}
+	var peersPubKey [32]byte
+	copy(peersPubKey[:], decodedPubKey[0:32])
+
+	var rand io.Reader
+	if opts.RandomOverride != nil {
+		rand = opts.RandomOverride()
+	}
+	eBody, err := box.SealAnonymous(nil, secret[:], &peersPubKey, rand)
+	if err != nil {
+		res.err = fmt.Errorf("failed to encrypt body: %w", err)
+		return
 	}
 
 	encoded := base64.StdEncoding.EncodeToString(eBody)
+	if opts.DoNotStore {
+		res.encrypted = encoded
+		return
+	}
 
-	if orgName != "" {
-		err = putOrgSecret(client, host, pk, *opts, encoded)
-	} else if envName != "" {
-		err = putEnvSecret(client, pk, baseRepo, envName, opts.SecretName, encoded)
-	} else {
-		err = putRepoSecret(client, pk, baseRepo, opts.SecretName, encoded)
+	switch entity {
+	case shared.Organization:
+		err = putOrgSecret(client, host, pk, orgName, opts.Visibility, secretKey, encoded, repositoryIDs, app)
+	case shared.Environment:
+		err = putEnvSecret(client, pk, baseRepo, envName, secretKey, encoded)
+	case shared.User:
+		err = putUserSecret(client, host, pk, secretKey, encoded, repositoryIDs)
+	default:
+		err = putRepoSecret(client, pk, baseRepo, secretKey, encoded, app)
 	}
 	if err != nil {
-		return fmt.Errorf("failed to set secret: %w", err)
+		res.err = fmt.Errorf("failed to set secret %q: %w", secretKey, err)
+		return
 	}
-
-	if opts.IO.IsStdoutTTY() {
-		target := orgName
-		if orgName == "" {
-			target = ghrepo.FullName(baseRepo)
-		}
-		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.Out, "%s Set secret %s for %s\n", cs.SuccessIconWithColor(cs.Green), opts.SecretName, target)
-	}
-
-	return nil
+	return
 }
 
-func validSecretName(name string) error {
-	if name == "" {
-		return errors.New("secret name cannot be blank")
+func getSecretsFromOptions(opts *SetOptions) (map[string][]byte, error) {
+	secrets := make(map[string][]byte)
+
+	if opts.EnvFile != "" {
+		var r io.Reader
+		if opts.EnvFile == "-" {
+			defer opts.IO.In.Close()
+			r = opts.IO.In
+		} else {
+			f, err := os.Open(opts.EnvFile)
+			if err != nil {
+				return nil, fmt.Errorf("failed to open env file: %w", err)
+			}
+			defer f.Close()
+			r = f
+		}
+		envs, err := godotenv.Parse(r)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing env file: %w", err)
+		}
+		if len(envs) == 0 {
+			return nil, fmt.Errorf("no secrets found in file")
+		}
+		for key, value := range envs {
+			secrets[key] = []byte(value)
+		}
+		return secrets, nil
 	}
 
-	if strings.HasPrefix(name, "GITHUB_") {
-		return errors.New("secret name cannot begin with GITHUB_")
+	body, err := getBody(opts)
+	if err != nil {
+		return nil, fmt.Errorf("did not understand secret body: %w", err)
 	}
-
-	leadingNumber := regexp.MustCompile(`^[0-9]`)
-	if leadingNumber.MatchString(name) {
-		return errors.New("secret name cannot start with a number")
-	}
-
-	validChars := regexp.MustCompile(`^([0-9]|[a-z]|[A-Z]|_)+$`)
-	if !validChars.MatchString(name) {
-		return errors.New("secret name can only contain letters, numbers, and _")
-	}
-
-	return nil
+	secrets[opts.SecretName] = body
+	return secrets, nil
 }
 
 func getBody(opts *SetOptions) ([]byte, error) {
-	if opts.Body == "" {
-		if opts.IO.CanPrompt() {
-			err := prompt.SurveyAskOne(&survey.Password{
-				Message: "Paste your secret",
-			}, &opts.Body)
-			if err != nil {
-				return nil, err
-			}
-			fmt.Fprintln(opts.IO.Out)
-		} else {
-			body, err := ioutil.ReadAll(opts.IO.In)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read from STDIN: %w", err)
-			}
-
-			return body, nil
-		}
+	if opts.Body != "" {
+		return []byte(opts.Body), nil
 	}
 
-	return []byte(opts.Body), nil
+	if opts.IO.CanPrompt() {
+		var bodyInput string
+		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
+		err := prompt.SurveyAskOne(&survey.Password{
+			Message: "Paste your secret",
+		}, &bodyInput)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Fprintln(opts.IO.Out)
+		return []byte(bodyInput), nil
+	}
+
+	body, err := io.ReadAll(opts.IO.In)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read from standard input: %w", err)
+	}
+
+	return bytes.TrimRight(body, "\r\n"), nil
+}
+
+func mapRepoNamesToIDs(client *api.Client, host, defaultOwner string, repositoryNames []string) ([]int64, error) {
+	repos := make([]ghrepo.Interface, 0, len(repositoryNames))
+	for _, repositoryName := range repositoryNames {
+		var repo ghrepo.Interface
+		if strings.Contains(repositoryName, "/") || defaultOwner == "" {
+			var err error
+			repo, err = ghrepo.FromFullNameWithHost(repositoryName, host)
+			if err != nil {
+				return nil, fmt.Errorf("invalid repository name: %w", err)
+			}
+		} else {
+			repo = ghrepo.NewWithHost(defaultOwner, repositoryName, host)
+		}
+		repos = append(repos, repo)
+	}
+	repositoryIDs, err := mapRepoToID(client, host, repos)
+	if err != nil {
+		return nil, fmt.Errorf("failed to look up IDs for repositories %v: %w", repositoryNames, err)
+	}
+	return repositoryIDs, nil
 }

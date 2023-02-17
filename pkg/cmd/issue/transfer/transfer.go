@@ -1,19 +1,16 @@
 package transfer
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/shurcooL/githubv4"
-	"github.com/shurcooL/graphql"
 	"github.com/spf13/cobra"
 )
 
@@ -60,13 +57,15 @@ func transferRun(opts *TransferOptions) error {
 		return err
 	}
 
-	apiClient := api.NewClientFromHTTP(httpClient)
-	issue, _, err := shared.IssueFromArg(apiClient, opts.BaseRepo, opts.IssueSelector)
+	issue, baseRepo, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.IssueSelector, []string{"id", "number"})
 	if err != nil {
 		return err
 	}
+	if issue.IsPullRequest() {
+		return fmt.Errorf("issue #%d is a pull request and cannot be transferred", issue.Number)
+	}
 
-	destRepo, err := ghrepo.FromFullName(opts.DestRepoSelector)
+	destRepo, err := ghrepo.FromFullNameWithHost(opts.DestRepoSelector, baseRepo.RepoHost())
 	if err != nil {
 		return err
 	}
@@ -108,7 +107,7 @@ func issueTransfer(httpClient *http.Client, issueID string, destRepo ghrepo.Inte
 		},
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(destRepo.RepoHost()), httpClient)
-	err := gql.MutateNamed(context.Background(), "IssueTransfer", &mutation, variables)
+	gql := api.NewClientFromHTTP(httpClient)
+	err := gql.Mutate(destRepo.RepoHost(), "IssueTransfer", &mutation, variables)
 	return mutation.TransferIssue.Issue.URL, err
 }

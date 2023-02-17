@@ -1,10 +1,7 @@
 package comment
 
 import (
-	"net/http"
-
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	issueShared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -18,7 +15,7 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 		HttpClient:            f.HttpClient,
 		EditSurvey:            prShared.CommentableEditSurvey(f.Config, f.IOStreams),
 		InteractiveEditSurvey: prShared.CommentableInteractiveEditSurvey(f.Config, f.IOStreams),
-		ConfirmSubmitSurvey:   prShared.CommentableConfirmSubmitSurvey,
+		ConfirmSubmitSurvey:   prShared.CommentableConfirmSubmitSurvey(f.Prompter),
 		OpenInBrowser:         f.Browser.Browse,
 	}
 
@@ -26,13 +23,29 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 
 	cmd := &cobra.Command{
 		Use:   "comment {<number> | <url>}",
-		Short: "Create a new issue comment",
+		Short: "Add a comment to an issue",
+		Long: heredoc.Doc(`
+			Add a comment to a GitHub issue.
+
+			Without the body text supplied through flags, the command will interactively
+			prompt for the comment text.
+		`),
 		Example: heredoc.Doc(`
-			$ gh issue comment 22 --body "I was able to reproduce this issue, lets fix it."
+			$ gh issue comment 12 --body "Hi from GitHub CLI"
 		`),
 		Args: cobra.ExactArgs(1),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			opts.RetrieveCommentable = retrieveIssue(f.HttpClient, f.BaseRepo, args[0])
+			opts.RetrieveCommentable = func() (prShared.Commentable, ghrepo.Interface, error) {
+				httpClient, err := f.HttpClient()
+				if err != nil {
+					return nil, nil, err
+				}
+				fields := []string{"id", "url"}
+				if opts.EditLast {
+					fields = append(fields, "comments")
+				}
+				return issueShared.IssueFromArgWithFields(httpClient, f.BaseRepo, args[0], fields)
+			}
 			return prShared.CommentablePreRun(cmd, opts)
 		},
 		RunE: func(_ *cobra.Command, args []string) error {
@@ -51,29 +64,11 @@ func NewCmdComment(f *cmdutil.Factory, runF func(*prShared.CommentableOptions) e
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "Supply a body. Will prompt for one otherwise.")
+	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "The comment body `text`")
 	cmd.Flags().StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
-	cmd.Flags().BoolP("editor", "e", false, "Add body using editor")
-	cmd.Flags().BoolP("web", "w", false, "Add body in browser")
+	cmd.Flags().BoolP("editor", "e", false, "Skip prompts and open the text editor to write the body in")
+	cmd.Flags().BoolP("web", "w", false, "Open the web browser to write the comment")
+	cmd.Flags().BoolVar(&opts.EditLast, "edit-last", false, "Edit the last comment of the same author")
 
 	return cmd
-}
-
-func retrieveIssue(httpClient func() (*http.Client, error),
-	baseRepo func() (ghrepo.Interface, error),
-	selector string) func() (prShared.Commentable, ghrepo.Interface, error) {
-	return func() (prShared.Commentable, ghrepo.Interface, error) {
-		httpClient, err := httpClient()
-		if err != nil {
-			return nil, nil, err
-		}
-		apiClient := api.NewClientFromHTTP(httpClient)
-
-		issue, repo, err := issueShared.IssueFromArg(apiClient, baseRepo, selector)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		return issue, repo, nil
-	}
 }

@@ -1,6 +1,12 @@
 package shared
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/stretchr/testify/assert"
+)
 
 func Test_listHeader(t *testing.T) {
 	type args struct {
@@ -15,28 +21,6 @@ func Test_listHeader(t *testing.T) {
 		args args
 		want string
 	}{
-		{
-			name: "no results",
-			args: args{
-				repoName:        "REPO",
-				itemName:        "table",
-				matchCount:      0,
-				totalMatchCount: 0,
-				hasFilters:      false,
-			},
-			want: "There are no open tables in REPO",
-		},
-		{
-			name: "no matches after filters",
-			args: args{
-				repoName:        "REPO",
-				itemName:        "Luftballon",
-				matchCount:      0,
-				totalMatchCount: 0,
-				hasFilters:      true,
-			},
-			want: "No Luftballons match your search in REPO",
-		},
 		{
 			name: "one result",
 			args: args{
@@ -111,4 +95,74 @@ func Test_listHeader(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPrCheckStatusSummaryWithColor(t *testing.T) {
+	testCases := []struct {
+		Name string
+		args api.PullRequestChecksStatus
+		want string
+	}{
+		{
+			Name: "No Checks",
+			args: api.PullRequestChecksStatus{
+				Total:   0,
+				Failing: 0,
+				Passing: 0,
+				Pending: 0,
+			},
+			want: "No checks",
+		},
+		{
+			Name: "All Passing",
+			args: api.PullRequestChecksStatus{
+				Total:   3,
+				Failing: 0,
+				Passing: 3,
+				Pending: 0,
+			},
+			want: "✓ Checks passing",
+		},
+		{
+			Name: "Some pending",
+			args: api.PullRequestChecksStatus{
+				Total:   3,
+				Failing: 0,
+				Passing: 1,
+				Pending: 2,
+			},
+			want: "- Checks pending",
+		},
+		{
+			Name: "Sll failing",
+			args: api.PullRequestChecksStatus{
+				Total:   3,
+				Failing: 3,
+				Passing: 0,
+				Pending: 0,
+			},
+			want: "× All checks failing",
+		},
+		{
+			Name: "Some failing",
+			args: api.PullRequestChecksStatus{
+				Total:   3,
+				Failing: 2,
+				Passing: 1,
+				Pending: 0,
+			},
+			want: "× 2/3 checks failing",
+		},
+	}
+
+	ios, _, _, _ := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetAlternateScreenBufferEnabled(true)
+	cs := ios.ColorScheme()
+
+	for _, testCase := range testCases {
+		out := PrCheckStatusSummaryWithColor(cs, testCase.args)
+		assert.Equal(t, testCase.want, out)
+	}
+
 }

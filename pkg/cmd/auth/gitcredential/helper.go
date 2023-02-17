@@ -14,7 +14,8 @@ import (
 const tokenUser = "x-access-token"
 
 type config interface {
-	GetWithSource(string, string) (string, string, error)
+	AuthToken(string) (string, string)
+	Get(string, string) (string, error)
 }
 
 type CredentialOptions struct {
@@ -53,7 +54,12 @@ func NewCmdCredential(f *cmdutil.Factory, runF func(*CredentialOptions) error) *
 func helperRun(opts *CredentialOptions) error {
 	if opts.Operation == "store" {
 		// We pretend to implement the "store" operation, but do nothing since we already have a cached token.
-		return cmdutil.SilentError
+		return nil
+	}
+
+	if opts.Operation == "erase" {
+		// We pretend to implement the "erase" operation, but do nothing since we don't want git to cause user to be logged out.
+		return nil
 	}
 
 	if opts.Operation != "get" {
@@ -100,12 +106,21 @@ func helperRun(opts *CredentialOptions) error {
 		return err
 	}
 
+	lookupHost := wants["host"]
 	var gotUser string
-	gotToken, source, _ := cfg.GetWithSource(wants["host"], "oauth_token")
+	gotToken, source := cfg.AuthToken(lookupHost)
+	if gotToken == "" && strings.HasPrefix(lookupHost, "gist.") {
+		lookupHost = strings.TrimPrefix(lookupHost, "gist.")
+		gotToken, source = cfg.AuthToken(lookupHost)
+	}
+
 	if strings.HasSuffix(source, "_TOKEN") {
 		gotUser = tokenUser
 	} else {
-		gotUser, _, _ = cfg.GetWithSource(wants["host"], "user")
+		gotUser, _ = cfg.Get(lookupHost, "user")
+		if gotUser == "" {
+			gotUser = tokenUser
+		}
 	}
 
 	if gotUser == "" || gotToken == "" {

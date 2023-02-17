@@ -2,9 +2,9 @@ package clone
 
 import (
 	"net/http"
-	"strings"
 	"testing"
 
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -16,14 +16,18 @@ import (
 )
 
 func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) {
-	io, stdin, stdout, stderr := iostreams.Test()
+	ios, stdin, stdout, stderr := iostreams.Test()
 	fac := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		HttpClient: func() (*http.Client, error) {
 			return httpClient, nil
 		},
 		Config: func() (config.Config, error) {
 			return config.NewBlankConfig(), nil
+		},
+		GitClient: &git.Client{
+			GhPath:  "some/path/gh",
+			GitPath: "some/path/git",
 		},
 	}
 
@@ -33,7 +37,7 @@ func runCloneCommand(httpClient *http.Client, cli string) (*test.CmdOut, error) 
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(stdin)
-	cmd.SetOut(stdout)
+	cmd.SetOut(stderr)
 	cmd.SetErr(stderr)
 
 	if err != nil {
@@ -95,9 +99,7 @@ func Test_GistClone(t *testing.T) {
 
 			cs, restore := run.Stub()
 			defer restore(t)
-			cs.Register(`git clone`, 0, "", func(s []string) {
-				assert.Equal(t, tt.want, strings.Join(s, " "))
-			})
+			cs.Register(tt.want, 0, "")
 
 			output, err := runCloneCommand(httpClient, tt.args)
 			if err != nil {
@@ -114,5 +116,62 @@ func Test_GistClone_flagError(t *testing.T) {
 	_, err := runCloneCommand(nil, "--depth 1 GIST")
 	if err == nil || err.Error() != "unknown flag: --depth\nSeparate git clone flags with '--'." {
 		t.Errorf("unexpected error %v", err)
+	}
+}
+
+func Test_formatRemoteURL(t *testing.T) {
+	type args struct {
+		hostname string
+		gistID   string
+		protocol string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "github.com HTTPS",
+			args: args{
+				hostname: "github.com",
+				protocol: "https",
+				gistID:   "ID",
+			},
+			want: "https://gist.github.com/ID.git",
+		},
+		{
+			name: "github.com SSH",
+			args: args{
+				hostname: "github.com",
+				protocol: "ssh",
+				gistID:   "ID",
+			},
+			want: "git@gist.github.com:ID.git",
+		},
+		{
+			name: "Enterprise HTTPS",
+			args: args{
+				hostname: "acme.org",
+				protocol: "https",
+				gistID:   "ID",
+			},
+			want: "https://acme.org/gist/ID.git",
+		},
+		{
+			name: "Enterprise SSH",
+			args: args{
+				hostname: "acme.org",
+				protocol: "ssh",
+				gistID:   "ID",
+			},
+			want: "git@acme.org:gist/ID.git",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := formatRemoteURL(tt.args.hostname, tt.args.gistID, tt.args.protocol); got != tt.want {
+				t.Errorf("formatRemoteURL() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

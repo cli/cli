@@ -1,130 +1,186 @@
-package ghcs
+package codespace
 
-// This file defines functions common to the entire ghcs command set.
+// This file defines functions common to the entire codespace command set.
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"sort"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	clicontext "github.com/cli/cli/v2/context"
+	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
+	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
 
-type App struct {
-	apiClient apiClient
-	logger    *output.Logger
+type executable interface {
+	Executable() string
 }
 
-func NewApp(logger *output.Logger, apiClient apiClient) *App {
+type App struct {
+	io         *iostreams.IOStreams
+	apiClient  apiClient
+	errLogger  *log.Logger
+	executable executable
+	browser    browser.Browser
+	remotes    func() (clicontext.Remotes, error)
+}
+
+func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browser browser.Browser, remotes func() (clicontext.Remotes, error)) *App {
+	errLogger := log.New(io.ErrOut, "", 0)
+
 	return &App{
-		apiClient: apiClient,
-		logger:    logger,
+		io:         io,
+		apiClient:  apiClient,
+		errLogger:  errLogger,
+		executable: exe,
+		browser:    browser,
+		remotes:    remotes,
 	}
+}
+
+// StartProgressIndicatorWithLabel starts a progress indicator with a message.
+func (a *App) StartProgressIndicatorWithLabel(s string) {
+	a.io.StartProgressIndicatorWithLabel(s)
+}
+
+// StopProgressIndicator stops the progress indicator.
+func (a *App) StopProgressIndicator() {
+	a.io.StopProgressIndicator()
+}
+
+// Connects to a codespace using Live Share and returns that session
+func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App, debug bool, debugFile string) (session *liveshare.Session, err error) {
+	liveshareLogger := noopLogger()
+	if debug {
+		debugLogger, err := newFileLogger(debugFile)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't create file logger: %w", err)
+		}
+		defer safeClose(debugLogger, &err)
+
+		liveshareLogger = debugLogger.Logger
+		a.errLogger.Printf("Debug file located at: %s", debugLogger.Name())
+	}
+
+	session, err = codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to Live Share: %w", err)
+	}
+
+	return session, nil
 }
 
 //go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
 type apiClient interface {
 	GetUser(ctx context.Context) (*api.User, error)
-	GetCodespaceToken(ctx context.Context, user, name string) (string, error)
-	GetCodespace(ctx context.Context, token, user, name string) (*api.Codespace, error)
-	ListCodespaces(ctx context.Context) ([]*api.Codespace, error)
-	DeleteCodespace(ctx context.Context, user, name string) error
-	StartCodespace(ctx context.Context, token string, codespace *api.Codespace) error
+	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
+	GetOrgMemberCodespace(ctx context.Context, orgName string, userName string, codespaceName string) (*api.Codespace, error)
+	ListCodespaces(ctx context.Context, opts api.ListCodespacesOptions) ([]*api.Codespace, error)
+	DeleteCodespace(ctx context.Context, name string, orgName string, userName string) error
+	StartCodespace(ctx context.Context, name string) error
+	StopCodespace(ctx context.Context, name string, orgName string, userName string) error
 	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
+	EditCodespace(ctx context.Context, codespaceName string, params *api.EditCodespaceParams) (*api.Codespace, error)
 	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
-	AuthorizedKeys(ctx context.Context, user string) ([]byte, error)
-	GetCodespaceRegionLocation(ctx context.Context) (string, error)
-	GetCodespacesSKUs(ctx context.Context, user *api.User, repository *api.Repository, branch, location string) ([]*api.SKU, error)
+	GetCodespacesMachines(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error)
 	GetCodespaceRepositoryContents(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
+	ListDevContainers(ctx context.Context, repoID int, branch string, limit int) (devcontainers []api.DevContainerEntry, err error)
+	GetCodespaceRepoSuggestions(ctx context.Context, partialSearch string, params api.RepoSearchParameters) ([]string, error)
+	GetCodespaceBillableOwner(ctx context.Context, nwo string) (*api.User, error)
 }
 
 var errNoCodespaces = errors.New("you have no codespaces")
 
 func chooseCodespace(ctx context.Context, apiClient apiClient) (*api.Codespace, error) {
-	codespaces, err := apiClient.ListCodespaces(ctx)
+	codespaces, err := apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting codespaces: %w", err)
 	}
-	return chooseCodespaceFromList(ctx, codespaces)
+	return chooseCodespaceFromList(ctx, codespaces, false)
 }
 
-func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace) (*api.Codespace, error) {
+// chooseCodespaceFromList returns the codespace that the user has interactively selected from the list, or
+// an error if there are no codespaces.
+func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace, includeOwner bool) (*api.Codespace, error) {
 	if len(codespaces) == 0 {
 		return nil, errNoCodespaces
 	}
 
-	sort.Slice(codespaces, func(i, j int) bool {
-		return codespaces[i].CreatedAt > codespaces[j].CreatedAt
+	sortedCodespaces := codespaces
+	sort.Slice(sortedCodespaces, func(i, j int) bool {
+		return sortedCodespaces[i].CreatedAt > sortedCodespaces[j].CreatedAt
 	})
 
-	codespacesByName := make(map[string]*api.Codespace)
-	codespacesNames := make([]string, 0, len(codespaces))
-	for _, codespace := range codespaces {
-		codespacesByName[codespace.Name] = codespace
-		codespacesNames = append(codespacesNames, codespace.Name)
-	}
-
-	sshSurvey := []*survey.Question{
+	csSurvey := []*survey.Question{
 		{
 			Name: "codespace",
 			Prompt: &survey.Select{
 				Message: "Choose codespace:",
-				Options: codespacesNames,
-				Default: codespacesNames[0],
+				Options: formatCodespacesForSelect(sortedCodespaces, includeOwner),
 			},
 			Validate: survey.Required,
 		},
 	}
 
 	var answers struct {
-		Codespace string
+		Codespace int
 	}
-	if err := ask(sshSurvey, &answers); err != nil {
+	if err := ask(csSurvey, &answers); err != nil {
 		return nil, fmt.Errorf("error getting answers: %w", err)
 	}
 
-	codespace := codespacesByName[answers.Codespace]
-	return codespace, nil
+	return sortedCodespaces[answers.Codespace], nil
+}
+
+func formatCodespacesForSelect(codespaces []*api.Codespace, includeOwner bool) []string {
+	names := make([]string, len(codespaces))
+
+	for i, apiCodespace := range codespaces {
+		cs := codespace{apiCodespace}
+		names[i] = cs.displayName(includeOwner)
+	}
+
+	return names
 }
 
 // getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
-// It then fetches the codespace token and the codespace record.
-func getOrChooseCodespace(ctx context.Context, apiClient apiClient, user *api.User, codespaceName string) (codespace *api.Codespace, token string, err error) {
+// It then fetches the codespace record with full connection details.
+// TODO(josebalius): accept a progress indicator or *App and show progress when fetching.
+func getOrChooseCodespace(ctx context.Context, apiClient apiClient, codespaceName string) (codespace *api.Codespace, err error) {
 	if codespaceName == "" {
 		codespace, err = chooseCodespace(ctx, apiClient)
 		if err != nil {
 			if err == errNoCodespaces {
-				return nil, "", err
+				return nil, err
 			}
-			return nil, "", fmt.Errorf("choosing codespace: %w", err)
-		}
-		codespaceName = codespace.Name
-
-		token, err = apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
-		if err != nil {
-			return nil, "", fmt.Errorf("getting codespace token: %w", err)
+			return nil, fmt.Errorf("choosing codespace: %w", err)
 		}
 	} else {
-		token, err = apiClient.GetCodespaceToken(ctx, user.Login, codespaceName)
+		codespace, err = apiClient.GetCodespace(ctx, codespaceName, true)
 		if err != nil {
-			return nil, "", fmt.Errorf("getting codespace token for given codespace: %w", err)
-		}
-
-		codespace, err = apiClient.GetCodespace(ctx, token, user.Login, codespaceName)
-		if err != nil {
-			return nil, "", fmt.Errorf("getting full codespace details: %w", err)
+			return nil, fmt.Errorf("getting full codespace details: %w", err)
 		}
 	}
 
-	return codespace, token, nil
+	if codespace.PendingOperation {
+		return nil, fmt.Errorf(
+			"codespace is disabled while it has a pending operation: %s",
+			codespace.PendingOperationDisabledReason,
+		)
+	}
+
+	return codespace, nil
 }
 
 func safeClose(closer io.Closer, err *error) {
@@ -161,25 +217,77 @@ func ask(qs []*survey.Question, response interface{}) error {
 	return err
 }
 
-// checkAuthorizedKeys reports an error if the user has not registered any SSH keys;
-// see https://github.com/cli/cli/v2/issues/166#issuecomment-921769703.
-// The check is not required for security but it improves the error message.
-func checkAuthorizedKeys(ctx context.Context, client apiClient, user string) error {
-	keys, err := client.AuthorizedKeys(ctx, user)
-	if err != nil {
-		return fmt.Errorf("failed to read GitHub-authorized SSH keys for %s: %w", user, err)
-	}
-	if len(keys) == 0 {
-		return fmt.Errorf("user %s has no GitHub-authorized SSH keys", user)
-	}
-	return nil // success
-}
-
 var ErrTooManyArgs = errors.New("the command accepts no arguments")
 
 func noArgsConstraint(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		return ErrTooManyArgs
 	}
+	return nil
+}
+
+func noopLogger() *log.Logger {
+	return log.New(io.Discard, "", 0)
+}
+
+type codespace struct {
+	*api.Codespace
+}
+
+// displayName formats the codespace name for the interactive selector prompt.
+func (c codespace) displayName(includeOwner bool) string {
+	branch := c.branchWithGitStatus()
+	displayName := c.DisplayName
+
+	if displayName == "" {
+		displayName = c.Name
+	}
+
+	description := fmt.Sprintf("%s (%s): %s", c.Repository.FullName, branch, displayName)
+
+	if includeOwner {
+		description = fmt.Sprintf("%-15s %s", c.Owner.Login, description)
+	}
+
+	return description
+}
+
+// gitStatusDirty represents an unsaved changes status.
+const gitStatusDirty = "*"
+
+// branchWithGitStatus returns the branch with a star
+// if the branch is currently being worked on.
+func (c codespace) branchWithGitStatus() string {
+	if c.hasUnsavedChanges() {
+		return c.GitStatus.Ref + gitStatusDirty
+	}
+
+	return c.GitStatus.Ref
+}
+
+// hasUnsavedChanges returns whether the environment has
+// unsaved changes.
+func (c codespace) hasUnsavedChanges() bool {
+	return c.GitStatus.HasUncommittedChanges || c.GitStatus.HasUnpushedChanges
+}
+
+// running returns whether the codespace environment is running.
+func (c codespace) running() bool {
+	return c.State == api.CodespaceStateAvailable
+}
+
+// addDeprecatedRepoShorthand adds a -r parameter (deprecated shorthand for --repo)
+// which instructs the user to use -R instead.
+func addDeprecatedRepoShorthand(cmd *cobra.Command, target *string) error {
+	cmd.Flags().StringVarP(target, "repo-deprecated", "r", "", "(Deprecated) Shorthand for --repo")
+
+	if err := cmd.Flags().MarkHidden("repo-deprecated"); err != nil {
+		return fmt.Errorf("error marking `-r` shorthand as hidden: %w", err)
+	}
+
+	if err := cmd.Flags().MarkShorthandDeprecated("repo-deprecated", "use `-R` instead"); err != nil {
+		return fmt.Errorf("error marking `-r` shorthand as deprecated: %w", err)
+	}
+
 	return nil
 }

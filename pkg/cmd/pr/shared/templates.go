@@ -6,20 +6,21 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/ghinstance"
+	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/githubtemplate"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/shurcooL/githubv4"
-	"github.com/shurcooL/graphql"
 )
 
 type issueTemplate struct {
-	// I would have un-exported these fields, except `shurcool/graphql` then cannot unmarshal them :/
 	Gname string `graphql:"name"`
+	Gbody string `graphql:"body"`
+}
+
+type pullRequestTemplate struct {
+	Gname string `graphql:"filename"`
 	Gbody string `graphql:"body"`
 }
 
@@ -35,7 +36,19 @@ func (t *issueTemplate) Body() []byte {
 	return []byte(t.Gbody)
 }
 
-func listIssueTemplates(httpClient *http.Client, repo ghrepo.Interface) ([]issueTemplate, error) {
+func (t *pullRequestTemplate) Name() string {
+	return t.Gname
+}
+
+func (t *pullRequestTemplate) NameForSubmit() string {
+	return ""
+}
+
+func (t *pullRequestTemplate) Body() []byte {
+	return []byte(t.Gbody)
+}
+
+func listIssueTemplates(httpClient *http.Client, repo ghrepo.Interface) ([]Template, error) {
 	var query struct {
 		Repository struct {
 			IssueTemplates []issueTemplate
@@ -47,54 +60,48 @@ func listIssueTemplates(httpClient *http.Client, repo ghrepo.Interface) ([]issue
 		"name":  githubv4.String(repo.RepoName()),
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), httpClient)
+	gql := api.NewClientFromHTTP(httpClient)
 
-	err := gql.QueryNamed(context.Background(), "IssueTemplates", &query, variables)
+	err := gql.Query(repo.RepoHost(), "IssueTemplates", &query, variables)
 	if err != nil {
 		return nil, err
 	}
 
-	return query.Repository.IssueTemplates, nil
+	ts := query.Repository.IssueTemplates
+	templates := make([]Template, len(ts))
+	for i := range templates {
+		templates[i] = &ts[i]
+	}
+
+	return templates, nil
 }
 
-func hasIssueTemplateSupport(httpClient *http.Client, hostname string) (bool, error) {
-	if !ghinstance.IsEnterprise(hostname) {
-		return true, nil
-	}
-
-	var featureDetection struct {
+func listPullRequestTemplates(httpClient *http.Client, repo ghrepo.Interface) ([]Template, error) {
+	var query struct {
 		Repository struct {
-			Fields []struct {
-				Name string
-			} `graphql:"fields(includeDeprecated: true)"`
-		} `graphql:"Repository: __type(name: \"Repository\")"`
-		CreateIssueInput struct {
-			InputFields []struct {
-				Name string
-			}
-		} `graphql:"CreateIssueInput: __type(name: \"CreateIssueInput\")"`
+			PullRequestTemplates []pullRequestTemplate
+		} `graphql:"repository(owner: $owner, name: $name)"`
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(hostname), httpClient)
-	err := gql.QueryNamed(context.Background(), "IssueTemplates_fields", &featureDetection, nil)
+	variables := map[string]interface{}{
+		"owner": githubv4.String(repo.RepoOwner()),
+		"name":  githubv4.String(repo.RepoName()),
+	}
+
+	gql := api.NewClientFromHTTP(httpClient)
+
+	err := gql.Query(repo.RepoHost(), "PullRequestTemplates", &query, variables)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
-	var hasQuerySupport bool
-	var hasMutationSupport bool
-	for _, field := range featureDetection.Repository.Fields {
-		if field.Name == "issueTemplates" {
-			hasQuerySupport = true
-		}
-	}
-	for _, field := range featureDetection.CreateIssueInput.InputFields {
-		if field.Name == "issueTemplate" {
-			hasMutationSupport = true
-		}
+	ts := query.Repository.PullRequestTemplates
+	templates := make([]Template, len(ts))
+	for i := range templates {
+		templates[i] = &ts[i]
 	}
 
-	return hasQuerySupport && hasMutationSupport, nil
+	return templates, nil
 }
 
 type Template interface {
@@ -103,14 +110,19 @@ type Template interface {
 	Body() []byte
 }
 
+type iprompter interface {
+	Select(string, string, []string) (int, error)
+}
+
 type templateManager struct {
 	repo       ghrepo.Interface
 	rootDir    string
 	allowFS    bool
 	isPR       bool
 	httpClient *http.Client
+	detector   fd.Detector
+	prompter   iprompter
 
-	cachedClient   *http.Client
 	templates      []Template
 	legacyTemplate Template
 
@@ -118,24 +130,30 @@ type templateManager struct {
 	fetchError error
 }
 
-func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, dir string, allowFS bool, isPR bool) *templateManager {
+func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, p iprompter, dir string, allowFS bool, isPR bool) *templateManager {
+	cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
 	return &templateManager{
 		repo:       repo,
 		rootDir:    dir,
 		allowFS:    allowFS,
 		isPR:       isPR,
 		httpClient: httpClient,
+		prompter:   p,
+		detector:   fd.NewDetector(cachedClient, repo.RepoHost()),
 	}
 }
 
 func (m *templateManager) hasAPI() (bool, error) {
-	if m.isPR {
-		return false, nil
+	if !m.isPR {
+		return true, nil
 	}
-	if m.cachedClient == nil {
-		m.cachedClient = api.NewCachedClient(m.httpClient, time.Hour*24)
+
+	features, err := m.detector.RepositoryFeatures()
+	if err != nil {
+		return false, err
 	}
-	return hasIssueTemplateSupport(m.cachedClient, m.repo.RepoHost())
+
+	return features.PullRequestTemplateQuery, nil
 }
 
 func (m *templateManager) HasTemplates() (bool, error) {
@@ -170,11 +188,7 @@ func (m *templateManager) Choose() (Template, error) {
 		blankOption = "Open a blank pull request"
 	}
 
-	var selectedOption int
-	err := prompt.SurveyAskOne(&survey.Select{
-		Message: "Choose a template",
-		Options: append(names, blankOption),
-	}, &selectedOption)
+	selectedOption, err := m.prompter.Select("Choose a template", "", append(names, blankOption))
 	if err != nil {
 		return nil, fmt.Errorf("could not prompt: %w", err)
 	}
@@ -201,14 +215,15 @@ func (m *templateManager) fetch() error {
 	}
 
 	if hasAPI {
-		issueTemplates, err := listIssueTemplates(m.httpClient, m.repo)
+		lister := listIssueTemplates
+		if m.isPR {
+			lister = listPullRequestTemplates
+		}
+		templates, err := lister(m.httpClient, m.repo)
 		if err != nil {
 			return err
 		}
-		m.templates = make([]Template, len(issueTemplates))
-		for i := range issueTemplates {
-			m.templates[i] = &issueTemplates[i]
-		}
+		m.templates = templates
 	}
 
 	if !m.allowFS {
@@ -218,7 +233,8 @@ func (m *templateManager) fetch() error {
 	dir := m.rootDir
 	if dir == "" {
 		var err error
-		dir, err = git.ToplevelDir()
+		gitClient := &git.Client{}
+		dir, err = gitClient.ToplevelDir(context.Background())
 		if err != nil {
 			return nil // abort silently
 		}

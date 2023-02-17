@@ -5,8 +5,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	ghAuth "github.com/cli/go-gh/pkg/auth"
+	"github.com/cli/go-gh/pkg/repository"
 )
 
 // Interface describes an object that represents a GitHub repository
@@ -35,46 +36,25 @@ func FullName(r Interface) string {
 	return fmt.Sprintf("%s/%s", r.RepoOwner(), r.RepoName())
 }
 
-var defaultHostOverride string
-
 func defaultHost() string {
-	if defaultHostOverride != "" {
-		return defaultHostOverride
-	}
-	return ghinstance.Default()
-}
-
-// SetDefaultHost overrides the default GitHub hostname for FromFullName.
-// TODO: remove after FromFullName approach is revisited
-func SetDefaultHost(host string) {
-	defaultHostOverride = host
+	host, _ := ghAuth.DefaultHost()
+	return host
 }
 
 // FromFullName extracts the GitHub repository information from the following
 // formats: "OWNER/REPO", "HOST/OWNER/REPO", and a full URL.
 func FromFullName(nwo string) (Interface, error) {
-	if git.IsURL(nwo) {
-		u, err := git.ParseURL(nwo)
-		if err != nil {
-			return nil, err
-		}
-		return FromURL(u)
-	}
+	return FromFullNameWithHost(nwo, defaultHost())
+}
 
-	parts := strings.SplitN(nwo, "/", 4)
-	for _, p := range parts {
-		if len(p) == 0 {
-			return nil, fmt.Errorf(`expected the "[HOST/]OWNER/REPO" format, got %q`, nwo)
-		}
+// FromFullNameWithHost is like FromFullName that defaults to a specific host for values that don't
+// explicitly include a hostname.
+func FromFullNameWithHost(nwo, fallbackHost string) (Interface, error) {
+	repo, err := repository.ParseWithHost(nwo, fallbackHost)
+	if err != nil {
+		return nil, err
 	}
-	switch len(parts) {
-	case 3:
-		return NewWithHost(parts[1], parts[2], parts[0]), nil
-	case 2:
-		return NewWithHost(parts[0], parts[1], defaultHost()), nil
-	default:
-		return nil, fmt.Errorf(`expected the "[HOST/]OWNER/REPO" format, got %q`, nwo)
-	}
+	return NewWithHost(repo.Owner(), repo.Name(), repo.Host()), nil
 }
 
 // FromURL extracts the GitHub repository information from a git remote URL
@@ -103,9 +83,11 @@ func IsSame(a, b Interface) bool {
 }
 
 func GenerateRepoURL(repo Interface, p string, args ...interface{}) string {
-	baseURL := fmt.Sprintf("https://%s/%s/%s", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
+	baseURL := fmt.Sprintf("%s%s/%s", ghinstance.HostPrefix(repo.RepoHost()), repo.RepoOwner(), repo.RepoName())
 	if p != "" {
-		return baseURL + "/" + fmt.Sprintf(p, args...)
+		if path := fmt.Sprintf(p, args...); path != "" {
+			return baseURL + "/" + path
+		}
 	}
 	return baseURL
 }
@@ -116,7 +98,7 @@ func FormatRemoteURL(repo Interface, protocol string) string {
 		return fmt.Sprintf("git@%s:%s/%s.git", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
 	}
 
-	return fmt.Sprintf("https://%s/%s/%s.git", repo.RepoHost(), repo.RepoOwner(), repo.RepoName())
+	return fmt.Sprintf("%s%s/%s.git", ghinstance.HostPrefix(repo.RepoHost()), repo.RepoOwner(), repo.RepoName())
 }
 
 type ghRepo struct {

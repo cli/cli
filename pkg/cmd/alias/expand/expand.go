@@ -23,13 +23,10 @@ func ExpandAlias(cfg config.Config, args []string, findShFunc func() (string, er
 	}
 	expanded = args[1:]
 
-	aliases, err := cfg.Aliases()
-	if err != nil {
-		return
-	}
+	aliases := cfg.Aliases()
 
-	expansion, ok := aliases.Get(args[1])
-	if !ok {
+	expansion, getErr := aliases.Get(args[1])
+	if getErr != nil {
 		return
 	}
 

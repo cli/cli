@@ -8,6 +8,8 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -120,7 +122,7 @@ func Test_RepoView_Web(t *testing.T) {
 		reg := &httpmock.Registry{}
 		reg.StubRepoInfoResponse("OWNER", "REPO", "main")
 
-		browser := &cmdutil.TestBrowser{}
+		browser := &browser.Stub{}
 		opts := &ViewOptions{
 			Web: true,
 			HttpClient: func() (*http.Client, error) {
@@ -528,6 +530,9 @@ func Test_ViewRun_WithoutUsername(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		},
 		IO: io,
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
 	}
 
 	if err := viewRun(opts); err != nil {

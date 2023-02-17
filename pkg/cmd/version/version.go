@@ -14,7 +14,7 @@ func NewCmdVersion(f *cmdutil.Factory, version, buildDate string) *cobra.Command
 		Use:    "version",
 		Hidden: true,
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Fprint(f.IOStreams.Out, Format(version, buildDate))
+			fmt.Fprint(f.IOStreams.Out, cmd.Root().Annotations["versionInfo"])
 		},
 	}
 

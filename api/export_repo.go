@@ -4,7 +4,7 @@ import (
 	"reflect"
 )
 
-func (repo *Repository) ExportData(fields []string) *map[string]interface{} {
+func (repo *Repository) ExportData(fields []string) map[string]interface{} {
 	v := reflect.ValueOf(repo).Elem()
 	data := map[string]interface{}{}
 
@@ -38,7 +38,7 @@ func (repo *Repository) ExportData(fields []string) *map[string]interface{} {
 		}
 	}
 
-	return &data
+	return data
 }
 
 func miniRepoExport(r *Repository) map[string]interface{} {

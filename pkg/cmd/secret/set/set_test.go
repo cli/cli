@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/secret/shared"
@@ -91,6 +93,16 @@ func TestNewCmdSet(t *testing.T) {
 			},
 		},
 		{
+			name: "user with selected repos",
+			cli:  `-u -bs -r"monalisa/coolRepo,cli/cli,github/hub" cool_secret`,
+			wants: SetOptions{
+				SecretName:      "cool_secret",
+				Visibility:      shared.Selected,
+				RepositoryNames: []string{"monalisa/coolRepo", "cli/cli", "github/hub"},
+				Body:            "s",
+			},
+		},
+		{
 			name: "repo",
 			cli:  `cool_secret -b"a secret"`,
 			wants: SetOptions{
@@ -122,30 +134,59 @@ func TestNewCmdSet(t *testing.T) {
 			},
 		},
 		{
-			name:     "bad name prefix",
-			cli:      `GITHUB_SECRET -b"cool"`,
-			wantsErr: true,
+			name: "no store",
+			cli:  `cool_secret --no-store`,
+			wants: SetOptions{
+				SecretName: "cool_secret",
+				Visibility: shared.Private,
+				DoNotStore: true,
+			},
 		},
 		{
-			name:     "leading numbers in name",
-			cli:      `123_SECRET -b"cool"`,
-			wantsErr: true,
+			name: "Dependabot repo",
+			cli:  `cool_secret -b"a secret" --app Dependabot`,
+			wants: SetOptions{
+				SecretName:  "cool_secret",
+				Visibility:  shared.Private,
+				Body:        "a secret",
+				OrgName:     "",
+				Application: "Dependabot",
+			},
 		},
 		{
-			name:     "invalid characters in name",
-			cli:      `BAD-SECRET -b"cool"`,
-			wantsErr: true,
+			name: "Dependabot org",
+			cli:  "-ocoolOrg -bs -vselected -rcoolRepo cool_secret -aDependabot",
+			wants: SetOptions{
+				SecretName:      "cool_secret",
+				Visibility:      shared.Selected,
+				RepositoryNames: []string{"coolRepo"},
+				Body:            "s",
+				OrgName:         "coolOrg",
+				Application:     "Dependabot",
+			},
+		},
+		{
+			name: "Codespaces org",
+			cli:  `random_secret -ocoolOrg -b"random value" -vselected -r"coolRepo,cli/cli" -aCodespaces`,
+			wants: SetOptions{
+				SecretName:      "random_secret",
+				Visibility:      shared.Selected,
+				RepositoryNames: []string{"coolRepo", "cli/cli"},
+				Body:            "random value",
+				OrgName:         "coolOrg",
+				Application:     "Codespaces",
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			ios, _, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
-			io.SetStdinTTY(tt.stdinTTY)
+			ios.SetStdinTTY(tt.stdinTTY)
 
 			argv, err := shlex.Split(tt.cli)
 			assert.NoError(t, err)
@@ -172,48 +213,83 @@ func TestNewCmdSet(t *testing.T) {
 			assert.Equal(t, tt.wants.Visibility, gotOpts.Visibility)
 			assert.Equal(t, tt.wants.OrgName, gotOpts.OrgName)
 			assert.Equal(t, tt.wants.EnvName, gotOpts.EnvName)
+			assert.Equal(t, tt.wants.DoNotStore, gotOpts.DoNotStore)
 			assert.ElementsMatch(t, tt.wants.RepositoryNames, gotOpts.RepositoryNames)
+			assert.Equal(t, tt.wants.Application, gotOpts.Application)
 		})
 	}
 }
 
 func Test_setRun_repo(t *testing.T) {
-	reg := &httpmock.Registry{}
-
-	reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/secrets/public-key"),
-		httpmock.JSONResponse(PubKey{ID: "123", Key: "CDjXqf7AJBXWhMczcy+Fs7JlACEptgceysutztHaFQI="}))
-
-	reg.Register(httpmock.REST("PUT", "repos/owner/repo/actions/secrets/cool_secret"), httpmock.StatusStringResponse(201, `{}`))
-
-	io, _, _, _ := iostreams.Test()
-
-	opts := &SetOptions{
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
+	tests := []struct {
+		name    string
+		opts    *SetOptions
+		wantApp string
+	}{
+		{
+			name: "Actions",
+			opts: &SetOptions{
+				Application: "actions",
+			},
+			wantApp: "actions",
 		},
-		Config: func() (config.Config, error) { return config.NewBlankConfig(), nil },
-		BaseRepo: func() (ghrepo.Interface, error) {
-			return ghrepo.FromFullName("owner/repo")
+		{
+			name: "Dependabot",
+			opts: &SetOptions{
+				Application: "dependabot",
+			},
+			wantApp: "dependabot",
 		},
-		IO:         io,
-		SecretName: "cool_secret",
-		Body:       "a secret",
-		// Cribbed from https://github.com/golang/crypto/commit/becbf705a91575484002d598f87d74f0002801e7
-		RandomOverride: bytes.NewReader([]byte{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5}),
+		{
+			name: "defaults to Actions",
+			opts: &SetOptions{
+				Application: "",
+			},
+			wantApp: "actions",
+		},
 	}
 
-	err := setRun(opts)
-	assert.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
 
-	reg.Verify(t)
+			reg.Register(httpmock.REST("GET", fmt.Sprintf("repos/owner/repo/%s/secrets/public-key", tt.wantApp)),
+				httpmock.JSONResponse(PubKey{ID: "123", Key: "CDjXqf7AJBXWhMczcy+Fs7JlACEptgceysutztHaFQI="}))
 
-	data, err := ioutil.ReadAll(reg.Requests[1].Body)
-	assert.NoError(t, err)
-	var payload SecretPayload
-	err = json.Unmarshal(data, &payload)
-	assert.NoError(t, err)
-	assert.Equal(t, payload.KeyID, "123")
-	assert.Equal(t, payload.EncryptedValue, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=")
+			reg.Register(httpmock.REST("PUT", fmt.Sprintf("repos/owner/repo/%s/secrets/cool_secret", tt.wantApp)),
+				httpmock.StatusStringResponse(201, `{}`))
+
+			ios, _, _, _ := iostreams.Test()
+
+			opts := &SetOptions{
+				HttpClient: func() (*http.Client, error) {
+					return &http.Client{Transport: reg}, nil
+				},
+				Config: func() (config.Config, error) { return config.NewBlankConfig(), nil },
+				BaseRepo: func() (ghrepo.Interface, error) {
+					return ghrepo.FromFullName("owner/repo")
+				},
+				IO:             ios,
+				SecretName:     "cool_secret",
+				Body:           "a secret",
+				RandomOverride: fakeRandom,
+				Application:    tt.opts.Application,
+			}
+
+			err := setRun(opts)
+			assert.NoError(t, err)
+
+			reg.Verify(t)
+
+			data, err := io.ReadAll(reg.Requests[1].Body)
+			assert.NoError(t, err)
+			var payload SecretPayload
+			err = json.Unmarshal(data, &payload)
+			assert.NoError(t, err)
+			assert.Equal(t, payload.KeyID, "123")
+			assert.Equal(t, payload.EncryptedValue, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=")
+		})
+	}
 }
 
 func Test_setRun_env(t *testing.T) {
@@ -224,7 +300,7 @@ func Test_setRun_env(t *testing.T) {
 
 	reg.Register(httpmock.REST("PUT", "repos/owner/repo/environments/development/secrets/cool_secret"), httpmock.StatusStringResponse(201, `{}`))
 
-	io, _, _, _ := iostreams.Test()
+	ios, _, _, _ := iostreams.Test()
 
 	opts := &SetOptions{
 		HttpClient: func() (*http.Client, error) {
@@ -234,12 +310,11 @@ func Test_setRun_env(t *testing.T) {
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.FromFullName("owner/repo")
 		},
-		EnvName:    "development",
-		IO:         io,
-		SecretName: "cool_secret",
-		Body:       "a secret",
-		// Cribbed from https://github.com/golang/crypto/commit/becbf705a91575484002d598f87d74f0002801e7
-		RandomOverride: bytes.NewReader([]byte{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5}),
+		EnvName:        "development",
+		IO:             ios,
+		SecretName:     "cool_secret",
+		Body:           "a secret",
+		RandomOverride: fakeRandom,
 	}
 
 	err := setRun(opts)
@@ -247,7 +322,7 @@ func Test_setRun_env(t *testing.T) {
 
 	reg.Verify(t)
 
-	data, err := ioutil.ReadAll(reg.Requests[1].Body)
+	data, err := io.ReadAll(reg.Requests[1].Body)
 	assert.NoError(t, err)
 	var payload SecretPayload
 	err = json.Unmarshal(data, &payload)
@@ -258,10 +333,12 @@ func Test_setRun_env(t *testing.T) {
 
 func Test_setRun_org(t *testing.T) {
 	tests := []struct {
-		name             string
-		opts             *SetOptions
-		wantVisibility   shared.Visibility
-		wantRepositories []int
+		name                       string
+		opts                       *SetOptions
+		wantVisibility             shared.Visibility
+		wantRepositories           []int64
+		wantDependabotRepositories []string
+		wantApp                    string
 	}{
 		{
 			name: "all vis",
@@ -269,15 +346,37 @@ func Test_setRun_org(t *testing.T) {
 				OrgName:    "UmbrellaCorporation",
 				Visibility: shared.All,
 			},
+			wantApp: "actions",
 		},
 		{
 			name: "selected visibility",
 			opts: &SetOptions{
 				OrgName:         "UmbrellaCorporation",
 				Visibility:      shared.Selected,
-				RepositoryNames: []string{"birkin", "wesker"},
+				RepositoryNames: []string{"birkin", "UmbrellaCorporation/wesker"},
 			},
-			wantRepositories: []int{1, 2},
+			wantRepositories: []int64{1, 2},
+			wantApp:          "actions",
+		},
+		{
+			name: "Dependabot",
+			opts: &SetOptions{
+				OrgName:     "UmbrellaCorporation",
+				Visibility:  shared.All,
+				Application: shared.Dependabot,
+			},
+			wantApp: "dependabot",
+		},
+		{
+			name: "Dependabot selected visibility",
+			opts: &SetOptions{
+				OrgName:         "UmbrellaCorporation",
+				Visibility:      shared.Selected,
+				Application:     shared.Dependabot,
+				RepositoryNames: []string{"birkin", "UmbrellaCorporation/wesker"},
+			},
+			wantDependabotRepositories: []string{"1", "2"},
+			wantApp:                    "dependabot",
 		},
 	}
 
@@ -288,19 +387,19 @@ func Test_setRun_org(t *testing.T) {
 			orgName := tt.opts.OrgName
 
 			reg.Register(httpmock.REST("GET",
-				fmt.Sprintf("orgs/%s/actions/secrets/public-key", orgName)),
+				fmt.Sprintf("orgs/%s/%s/secrets/public-key", orgName, tt.wantApp)),
 				httpmock.JSONResponse(PubKey{ID: "123", Key: "CDjXqf7AJBXWhMczcy+Fs7JlACEptgceysutztHaFQI="}))
 
 			reg.Register(httpmock.REST("PUT",
-				fmt.Sprintf("orgs/%s/actions/secrets/cool_secret", orgName)),
+				fmt.Sprintf("orgs/%s/%s/secrets/cool_secret", orgName, tt.wantApp)),
 				httpmock.StatusStringResponse(201, `{}`))
 
 			if len(tt.opts.RepositoryNames) > 0 {
 				reg.Register(httpmock.GraphQL(`query MapRepositoryNames\b`),
-					httpmock.StringResponse(`{"data":{"birkin":{"databaseId":1},"wesker":{"databaseId":2}}}`))
+					httpmock.StringResponse(`{"data":{"repo_0001":{"databaseId":1},"repo_0002":{"databaseId":2}}}`))
 			}
 
-			io, _, _, _ := iostreams.Test()
+			ios, _, _, _ := iostreams.Test()
 
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("owner/repo")
@@ -311,28 +410,140 @@ func Test_setRun_org(t *testing.T) {
 			tt.opts.Config = func() (config.Config, error) {
 				return config.NewBlankConfig(), nil
 			}
-			tt.opts.IO = io
+			tt.opts.IO = ios
 			tt.opts.SecretName = "cool_secret"
 			tt.opts.Body = "a secret"
-			// Cribbed from https://github.com/golang/crypto/commit/becbf705a91575484002d598f87d74f0002801e7
-			tt.opts.RandomOverride = bytes.NewReader([]byte{5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5})
+			tt.opts.RandomOverride = fakeRandom
 
 			err := setRun(tt.opts)
 			assert.NoError(t, err)
 
 			reg.Verify(t)
 
-			data, err := ioutil.ReadAll(reg.Requests[len(reg.Requests)-1].Body)
+			data, err := io.ReadAll(reg.Requests[len(reg.Requests)-1].Body)
+			assert.NoError(t, err)
+
+			if tt.opts.Application == shared.Dependabot {
+				var payload DependabotSecretPayload
+				err = json.Unmarshal(data, &payload)
+				assert.NoError(t, err)
+				assert.Equal(t, payload.KeyID, "123")
+				assert.Equal(t, payload.EncryptedValue, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=")
+				assert.Equal(t, payload.Visibility, tt.opts.Visibility)
+				assert.ElementsMatch(t, payload.Repositories, tt.wantDependabotRepositories)
+			} else {
+				var payload SecretPayload
+				err = json.Unmarshal(data, &payload)
+				assert.NoError(t, err)
+				assert.Equal(t, payload.KeyID, "123")
+				assert.Equal(t, payload.EncryptedValue, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=")
+				assert.Equal(t, payload.Visibility, tt.opts.Visibility)
+				assert.ElementsMatch(t, payload.Repositories, tt.wantRepositories)
+			}
+		})
+	}
+}
+
+func Test_setRun_user(t *testing.T) {
+	tests := []struct {
+		name             string
+		opts             *SetOptions
+		wantVisibility   shared.Visibility
+		wantRepositories []int64
+	}{
+		{
+			name: "all vis",
+			opts: &SetOptions{
+				UserSecrets: true,
+				Visibility:  shared.All,
+			},
+		},
+		{
+			name: "selected visibility",
+			opts: &SetOptions{
+				UserSecrets:     true,
+				Visibility:      shared.Selected,
+				RepositoryNames: []string{"cli/cli", "github/hub"},
+			},
+			wantRepositories: []int64{212613049, 401025},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+
+			reg.Register(httpmock.REST("GET", "user/codespaces/secrets/public-key"),
+				httpmock.JSONResponse(PubKey{ID: "123", Key: "CDjXqf7AJBXWhMczcy+Fs7JlACEptgceysutztHaFQI="}))
+
+			reg.Register(httpmock.REST("PUT", "user/codespaces/secrets/cool_secret"),
+				httpmock.StatusStringResponse(201, `{}`))
+
+			if len(tt.opts.RepositoryNames) > 0 {
+				reg.Register(httpmock.GraphQL(`query MapRepositoryNames\b`),
+					httpmock.StringResponse(`{"data":{"repo_0001":{"databaseId":212613049},"repo_0002":{"databaseId":401025}}}`))
+			}
+
+			ios, _, _, _ := iostreams.Test()
+
+			tt.opts.HttpClient = func() (*http.Client, error) {
+				return &http.Client{Transport: reg}, nil
+			}
+			tt.opts.Config = func() (config.Config, error) {
+				return config.NewBlankConfig(), nil
+			}
+			tt.opts.IO = ios
+			tt.opts.SecretName = "cool_secret"
+			tt.opts.Body = "a secret"
+			tt.opts.RandomOverride = fakeRandom
+
+			err := setRun(tt.opts)
+			assert.NoError(t, err)
+
+			reg.Verify(t)
+
+			data, err := io.ReadAll(reg.Requests[len(reg.Requests)-1].Body)
 			assert.NoError(t, err)
 			var payload SecretPayload
 			err = json.Unmarshal(data, &payload)
 			assert.NoError(t, err)
 			assert.Equal(t, payload.KeyID, "123")
 			assert.Equal(t, payload.EncryptedValue, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=")
-			assert.Equal(t, payload.Visibility, tt.opts.Visibility)
 			assert.ElementsMatch(t, payload.Repositories, tt.wantRepositories)
 		})
 	}
+}
+
+func Test_setRun_shouldNotStore(t *testing.T) {
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+
+	reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/secrets/public-key"),
+		httpmock.JSONResponse(PubKey{ID: "123", Key: "CDjXqf7AJBXWhMczcy+Fs7JlACEptgceysutztHaFQI="}))
+
+	ios, _, stdout, stderr := iostreams.Test()
+
+	opts := &SetOptions{
+		HttpClient: func() (*http.Client, error) {
+			return &http.Client{Transport: reg}, nil
+		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+		BaseRepo: func() (ghrepo.Interface, error) {
+			return ghrepo.FromFullName("owner/repo")
+		},
+		IO:             ios,
+		Body:           "a secret",
+		DoNotStore:     true,
+		RandomOverride: fakeRandom,
+	}
+
+	err := setRun(opts)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "UKYUCbHd0DJemxa3AOcZ6XcsBwALG9d4bpB8ZT0gSV39vl3BHiGSgj8zJapDxgB2BwqNqRhpjC4=\n", stdout.String())
+	assert.Equal(t, "", stderr.String())
 }
 
 func Test_getBody(t *testing.T) {
@@ -352,42 +563,140 @@ func Test_getBody(t *testing.T) {
 			want:  "a secret",
 			stdin: "a secret",
 		},
+		{
+			name:  "from stdin with trailing newline character",
+			want:  "a secret",
+			stdin: "a secret\n",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, _, _ := iostreams.Test()
+			ios, stdin, _, _ := iostreams.Test()
 
-			io.SetStdinTTY(false)
+			ios.SetStdinTTY(false)
 
 			_, err := stdin.WriteString(tt.stdin)
 			assert.NoError(t, err)
 
 			body, err := getBody(&SetOptions{
 				Body: tt.bodyArg,
-				IO:   io,
+				IO:   ios,
 			})
 			assert.NoError(t, err)
 
-			assert.Equal(t, string(body), tt.want)
+			assert.Equal(t, tt.want, string(body))
 		})
 	}
 }
 
 func Test_getBodyPrompt(t *testing.T) {
-	io, _, _, _ := iostreams.Test()
+	ios, _, _, _ := iostreams.Test()
+	ios.SetStdinTTY(true)
+	ios.SetStdoutTTY(true)
 
-	io.SetStdinTTY(true)
-	io.SetStdoutTTY(true)
-
-	as, teardown := prompt.InitAskStubber()
-	defer teardown()
-
-	as.StubOne("cool secret")
+	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
+	as := prompt.NewAskStubber(t)
+	as.StubPrompt("Paste your secret").AnswerWith("cool secret")
 
 	body, err := getBody(&SetOptions{
-		IO: io,
+		IO: ios,
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, string(body), "cool secret")
+}
+
+func Test_getSecretsFromOptions(t *testing.T) {
+	genFile := func(s string) string {
+		f, err := os.CreateTemp("", "gh-env.*")
+		if err != nil {
+			t.Fatal(err)
+			return ""
+		}
+		defer f.Close()
+		t.Cleanup(func() {
+			_ = os.Remove(f.Name())
+		})
+		_, err = f.WriteString(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f.Name()
+	}
+
+	tests := []struct {
+		name    string
+		opts    SetOptions
+		isTTY   bool
+		stdin   string
+		want    map[string]string
+		wantErr bool
+	}{
+		{
+			name: "secret from arg",
+			opts: SetOptions{
+				SecretName: "FOO",
+				Body:       "bar",
+				EnvFile:    "",
+			},
+			want: map[string]string{"FOO": "bar"},
+		},
+		{
+			name: "secrets from stdin",
+			opts: SetOptions{
+				Body:    "",
+				EnvFile: "-",
+			},
+			stdin: `FOO=bar`,
+			want:  map[string]string{"FOO": "bar"},
+		},
+		{
+			name: "secrets from file",
+			opts: SetOptions{
+				Body: "",
+				EnvFile: genFile(heredoc.Doc(`
+					FOO=bar
+					QUOTED="my value"
+					#IGNORED=true
+					export SHELL=bash
+				`)),
+			},
+			stdin: `FOO=bar`,
+			want: map[string]string{
+				"FOO":    "bar",
+				"SHELL":  "bash",
+				"QUOTED": "my value",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, stdin, _, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStdoutTTY(tt.isTTY)
+			stdin.WriteString(tt.stdin)
+			opts := tt.opts
+			opts.IO = ios
+			gotSecrets, err := getSecretsFromOptions(&opts)
+			if err != nil {
+				if !tt.wantErr {
+					t.Fatalf("getSecretsFromOptions() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			} else if tt.wantErr {
+				t.Fatalf("getSecretsFromOptions() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if len(gotSecrets) != len(tt.want) {
+				t.Fatalf("getSecretsFromOptions() = got %d secrets, want %d", len(gotSecrets), len(tt.want))
+			}
+			for k, v := range gotSecrets {
+				if tt.want[k] != string(v) {
+					t.Errorf("getSecretsFromOptions() %s = got %q, want %q", k, string(v), tt.want[k])
+				}
+			}
+		})
+	}
+}
+
+func fakeRandom() io.Reader {
+	return bytes.NewReader(bytes.Repeat([]byte{5}, 32))
 }

@@ -3,8 +3,9 @@ package edit
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -20,14 +21,11 @@ import (
 )
 
 func Test_getFilesToAdd(t *testing.T) {
-	fileToAdd := filepath.Join(t.TempDir(), "gist-test.txt")
-	err := ioutil.WriteFile(fileToAdd, []byte("hello"), 0600)
+	filename := "gist-test.txt"
+
+	gf, err := getFilesToAdd(filename, []byte("hello"))
 	require.NoError(t, err)
 
-	gf, err := getFilesToAdd(fileToAdd)
-	require.NoError(t, err)
-
-	filename := filepath.Base(fileToAdd)
 	assert.Equal(t, map[string]*shared.GistFile{
 		filename: {
 			Filename: filename,
@@ -65,6 +63,23 @@ func TestNewCmdEdit(t *testing.T) {
 				AddFilename: "cool.md",
 			},
 		},
+		{
+			name: "add with source",
+			cli:  "123 --add cool.md -",
+			wants: EditOptions{
+				Selector:    "123",
+				AddFilename: "cool.md",
+				SourceFile:  "-",
+			},
+		},
+		{
+			name: "description",
+			cli:  `123 --desc "my new description"`,
+			wants: EditOptions{
+				Selector:    "123",
+				Description: "my new description",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -96,7 +111,7 @@ func TestNewCmdEdit(t *testing.T) {
 
 func Test_editRun(t *testing.T) {
 	fileToAdd := filepath.Join(t.TempDir(), "gist-test.txt")
-	err := ioutil.WriteFile(fileToAdd, []byte("hello"), 0600)
+	err := os.WriteFile(fileToAdd, []byte("hello"), 0600)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -106,6 +121,7 @@ func Test_editRun(t *testing.T) {
 		httpStubs  func(*httpmock.Registry)
 		askStubs   func(*prompt.AskStubber)
 		nontty     bool
+		stdin      string
 		wantErr    string
 		wantParams map[string]interface{}
 	}{
@@ -146,8 +162,8 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "multiple files, submit",
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne("unix.md")
-				as.StubOne("Submit")
+				as.StubPrompt("Edit which file?").AnswerWith("unix.md")
+				as.StubPrompt("What next?").AnswerWith("Submit")
 			},
 			gist: &shared.Gist{
 				ID:          "1234",
@@ -191,8 +207,8 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "multiple files, cancel",
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne("unix.md")
-				as.StubOne("Cancel")
+				as.StubPrompt("Edit which file?").AnswerWith("unix.md")
+				as.StubPrompt("What next?").AnswerWith("Cancel")
 			},
 			wantErr: "CancelError",
 			gist: &shared.Gist{
@@ -239,7 +255,7 @@ func Test_editRun(t *testing.T) {
 				},
 				Owner: &shared.GistOwner{Login: "octocat2"},
 			},
-			wantErr: "You do not own this gist.",
+			wantErr: "you do not own this gist",
 		},
 		{
 			name: "add file to existing gist",
@@ -262,6 +278,173 @@ func Test_editRun(t *testing.T) {
 				AddFilename: fileToAdd,
 			},
 		},
+		{
+			name: "change description",
+			opts: &EditOptions{
+				Description: "my new description",
+			},
+			gist: &shared.Gist{
+				ID:          "1234",
+				Description: "my old description",
+				Files: map[string]*shared.GistFile{
+					"sample.txt": {
+						Filename: "sample.txt",
+						Type:     "text/plain",
+					},
+				},
+				Owner: &shared.GistOwner{Login: "octocat"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "gists/1234"),
+					httpmock.StatusStringResponse(201, "{}"))
+			},
+			wantParams: map[string]interface{}{
+				"description": "my new description",
+				"updated_at":  "0001-01-01T00:00:00Z",
+				"public":      false,
+				"files": map[string]interface{}{
+					"sample.txt": map[string]interface{}{
+						"content":  "new file content",
+						"filename": "sample.txt",
+						"type":     "text/plain",
+					},
+				},
+			},
+		},
+		{
+			name: "add file to existing gist from source parameter",
+			gist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"sample.txt": {
+						Filename: "sample.txt",
+						Content:  "bwhiizzzbwhuiiizzzz",
+						Type:     "text/plain",
+					},
+				},
+				Owner: &shared.GistOwner{Login: "octocat"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "gists/1234"),
+					httpmock.StatusStringResponse(201, "{}"))
+			},
+			opts: &EditOptions{
+				AddFilename: "from_source.txt",
+				SourceFile:  fileToAdd,
+			},
+			wantParams: map[string]interface{}{
+				"description": "",
+				"updated_at":  "0001-01-01T00:00:00Z",
+				"public":      false,
+				"files": map[string]interface{}{
+					"from_source.txt": map[string]interface{}{
+						"content":  "hello",
+						"filename": "from_source.txt",
+					},
+				},
+			},
+		},
+		{
+			name: "add file to existing gist from stdin",
+			gist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"sample.txt": {
+						Filename: "sample.txt",
+						Content:  "bwhiizzzbwhuiiizzzz",
+						Type:     "text/plain",
+					},
+				},
+				Owner: &shared.GistOwner{Login: "octocat"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "gists/1234"),
+					httpmock.StatusStringResponse(201, "{}"))
+			},
+			opts: &EditOptions{
+				AddFilename: "from_source.txt",
+				SourceFile:  "-",
+			},
+			stdin: "data from stdin",
+			wantParams: map[string]interface{}{
+				"description": "",
+				"updated_at":  "0001-01-01T00:00:00Z",
+				"public":      false,
+				"files": map[string]interface{}{
+					"from_source.txt": map[string]interface{}{
+						"content":  "data from stdin",
+						"filename": "from_source.txt",
+					},
+				},
+			},
+		},
+		{
+			name: "edit gist using file from source parameter",
+			gist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"sample.txt": {
+						Filename: "sample.txt",
+						Content:  "bwhiizzzbwhuiiizzzz",
+						Type:     "text/plain",
+					},
+				},
+				Owner: &shared.GistOwner{Login: "octocat"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "gists/1234"),
+					httpmock.StatusStringResponse(201, "{}"))
+			},
+			opts: &EditOptions{
+				SourceFile: fileToAdd,
+			},
+			wantParams: map[string]interface{}{
+				"description": "",
+				"updated_at":  "0001-01-01T00:00:00Z",
+				"public":      false,
+				"files": map[string]interface{}{
+					"sample.txt": map[string]interface{}{
+						"content":  "hello",
+						"filename": "sample.txt",
+						"type":     "text/plain",
+					},
+				},
+			},
+		},
+		{
+			name: "edit gist using stdin",
+			gist: &shared.Gist{
+				ID: "1234",
+				Files: map[string]*shared.GistFile{
+					"sample.txt": {
+						Filename: "sample.txt",
+						Content:  "bwhiizzzbwhuiiizzzz",
+						Type:     "text/plain",
+					},
+				},
+				Owner: &shared.GistOwner{Login: "octocat"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "gists/1234"),
+					httpmock.StatusStringResponse(201, "{}"))
+			},
+			opts: &EditOptions{
+				SourceFile: "-",
+			},
+			stdin: "data from stdin",
+			wantParams: map[string]interface{}{
+				"description": "",
+				"updated_at":  "0001-01-01T00:00:00Z",
+				"public":      false,
+				"files": map[string]interface{}{
+					"sample.txt": map[string]interface{}{
+						"content":  "data from stdin",
+						"filename": "sample.txt",
+						"type":     "text/plain",
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -280,12 +463,6 @@ func Test_editRun(t *testing.T) {
 			tt.httpStubs(reg)
 		}
 
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
-		}
-
 		if tt.opts == nil {
 			tt.opts = &EditOptions{}
 		}
@@ -297,10 +474,11 @@ func Test_editRun(t *testing.T) {
 		tt.opts.HttpClient = func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
 		}
-		io, _, stdout, stderr := iostreams.Test()
-		io.SetStdoutTTY(!tt.nontty)
-		io.SetStdinTTY(!tt.nontty)
-		tt.opts.IO = io
+		ios, stdin, stdout, stderr := iostreams.Test()
+		stdin.WriteString(tt.stdin)
+		ios.SetStdoutTTY(!tt.nontty)
+		ios.SetStdinTTY(!tt.nontty)
+		tt.opts.IO = ios
 		tt.opts.Selector = "1234"
 
 		tt.opts.Config = func() (config.Config, error) {
@@ -308,6 +486,12 @@ func Test_editRun(t *testing.T) {
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
+			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
+			as := prompt.NewAskStubber(t)
+			if tt.askStubs != nil {
+				tt.askStubs(as)
+			}
+
 			err := editRun(tt.opts)
 			reg.Verify(t)
 			if tt.wantErr != "" {
@@ -317,7 +501,7 @@ func Test_editRun(t *testing.T) {
 			assert.NoError(t, err)
 
 			if tt.wantParams != nil {
-				bodyBytes, _ := ioutil.ReadAll(reg.Requests[2].Body)
+				bodyBytes, _ := io.ReadAll(reg.Requests[2].Body)
 				reqBody := make(map[string]interface{})
 				err = json.Unmarshal(bodyBytes, &reqBody)
 				if err != nil {

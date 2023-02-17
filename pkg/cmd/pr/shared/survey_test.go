@@ -19,7 +19,7 @@ func (mf *metadataFetcher) RepoMetadataFetch(input api.RepoMetadataInput) (*api.
 }
 
 func TestMetadataSurvey_selectAll(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
+	ios, _, stdout, stderr := iostreams.Test()
 
 	repo := ghrepo.New("OWNER", "REPO")
 
@@ -43,15 +43,18 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 		},
 	}
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, restoreAsk := prompt.InitAskStubber()
 	defer restoreAsk()
 
+	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "metadata",
 			Value: []string{"Labels", "Projects", "Assignees", "Reviewers", "Milestone"},
 		},
 	})
+	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "reviewers",
@@ -71,14 +74,14 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 		},
 		{
 			Name:  "milestone",
-			Value: []string{"(none)"},
+			Value: "(none)",
 		},
 	})
 
 	state := &IssueMetadataState{
 		Assignees: []string{"hubot"},
 	}
-	err := MetadataSurvey(io, repo, fetcher, state)
+	err := MetadataSurvey(ios, repo, fetcher, state)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())
@@ -92,7 +95,7 @@ func TestMetadataSurvey_selectAll(t *testing.T) {
 }
 
 func TestMetadataSurvey_keepExisting(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
+	ios, _, stdout, stderr := iostreams.Test()
 
 	repo := ghrepo.New("OWNER", "REPO")
 
@@ -109,15 +112,18 @@ func TestMetadataSurvey_keepExisting(t *testing.T) {
 		},
 	}
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, restoreAsk := prompt.InitAskStubber()
 	defer restoreAsk()
 
+	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "metadata",
 			Value: []string{"Labels", "Projects"},
 		},
 	})
+	//nolint:staticcheck // SA1019: as.Stub is deprecated: use StubPrompt
 	as.Stub([]*prompt.QuestionStub{
 		{
 			Name:  "labels",
@@ -132,7 +138,7 @@ func TestMetadataSurvey_keepExisting(t *testing.T) {
 	state := &IssueMetadataState{
 		Assignees: []string{"hubot"},
 	}
-	err := MetadataSurvey(io, repo, fetcher, state)
+	err := MetadataSurvey(ios, repo, fetcher, state)
 	assert.NoError(t, err)
 
 	assert.Equal(t, "", stdout.String())

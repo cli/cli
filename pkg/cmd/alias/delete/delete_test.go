@@ -2,7 +2,7 @@ package delete
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -15,6 +15,8 @@ import (
 )
 
 func TestAliasDelete(t *testing.T) {
+	_ = config.StubWriteConfig(t)
+
 	tests := []struct {
 		name       string
 		config     string
@@ -48,17 +50,15 @@ func TestAliasDelete(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer config.StubWriteConfig(ioutil.Discard, ioutil.Discard)()
-
 			cfg := config.NewFromString(tt.config)
 
-			io, _, stdout, stderr := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			factory := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 				Config: func() (config.Config, error) {
 					return cfg, nil
 				},
@@ -71,8 +71,8 @@ func TestAliasDelete(t *testing.T) {
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {

@@ -10,9 +10,30 @@ import (
 	"github.com/cli/cli/v2/pkg/httpmock"
 )
 
+func TestGitHubRepo_notFound(t *testing.T) {
+	httpReg := &httpmock.Registry{}
+	defer httpReg.Verify(t)
+
+	httpReg.Register(
+		httpmock.GraphQL(`query RepositoryInfo\b`),
+		httpmock.StringResponse(`{ "data": { "repository": null } }`))
+
+	client := newTestClient(httpReg)
+	repo, err := GitHubRepo(client, ghrepo.New("OWNER", "REPO"))
+	if err == nil {
+		t.Fatal("GitHubRepo did not return an error")
+	}
+	if wants := "GraphQL: Could not resolve to a Repository with the name 'OWNER/REPO'."; err.Error() != wants {
+		t.Errorf("GitHubRepo error: want %q, got %q", wants, err.Error())
+	}
+	if repo != nil {
+		t.Errorf("GitHubRepo: expected nil repo, got %v", repo)
+	}
+}
+
 func Test_RepoMetadata(t *testing.T) {
 	http := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(http))
+	client := newTestClient(http)
 
 	repo, _ := ghrepo.FromFullName("OWNER/REPO")
 	input := RepoMetadataInput{
@@ -69,11 +90,42 @@ func Test_RepoMetadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
+		httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projectsV2": {
+			"nodes": [
+				{ "title": "CleanupV2", "id": "CLEANUPV2ID" },
+				{ "title": "RoadmapV2", "id": "ROADMAPV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
 		httpmock.GraphQL(`query OrganizationProjectList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "organization": { "projects": {
 			"nodes": [
 				{ "name": "Triage", "id": "TRIAGEID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "organization": { "projectsV2": {
+			"nodes": [
+				{ "title": "TriageV2", "id": "TRIAGEV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query UserProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "viewer": { "projectsV2": {
+			"nodes": [
+				{ "title": "MonalisaV2", "id": "MONALISAV2ID" }
 			],
 			"pageInfo": { "hasNextPage": false }
 		} } } }
@@ -88,6 +140,11 @@ func Test_RepoMetadata(t *testing.T) {
 			],
 			"pageInfo": { "hasNextPage": false }
 		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query UserCurrent\b`),
+		httpmock.StringResponse(`
+		  { "data": { "viewer": { "login": "monalisa" } } }
 		`))
 
 	result, err := RepoMetadata(client, repo, input)
@@ -123,12 +180,16 @@ func Test_RepoMetadata(t *testing.T) {
 	}
 
 	expectedProjectIDs := []string{"TRIAGEID", "ROADMAPID"}
-	projectIDs, err := result.ProjectsToIDs([]string{"triage", "roadmap"})
+	expectedProjectV2IDs := []string{"TRIAGEV2ID", "ROADMAPV2ID", "MONALISAV2ID"}
+	projectIDs, projectV2IDs, err := result.ProjectsToIDs([]string{"triage", "roadmap", "triagev2", "roadmapv2", "monalisav2"})
 	if err != nil {
 		t.Errorf("error resolving projects: %v", err)
 	}
 	if !sliceEqual(projectIDs, expectedProjectIDs) {
 		t.Errorf("expected projects %v, got %v", expectedProjectIDs, projectIDs)
+	}
+	if !sliceEqual(projectV2IDs, expectedProjectV2IDs) {
+		t.Errorf("expected projectsV2 %v, got %v", expectedProjectV2IDs, projectV2IDs)
 	}
 
 	expectedMilestoneID := "BIGONEID"
@@ -139,18 +200,27 @@ func Test_RepoMetadata(t *testing.T) {
 	if milestoneID != expectedMilestoneID {
 		t.Errorf("expected milestone %v, got %v", expectedMilestoneID, milestoneID)
 	}
+
+	expectedCurrentLogin := "monalisa"
+	if result.CurrentLogin != expectedCurrentLogin {
+		t.Errorf("expected current user %v, got %v", expectedCurrentLogin, result.CurrentLogin)
+	}
 }
 
 func Test_ProjectsToPaths(t *testing.T) {
-	expectedProjectPaths := []string{"OWNER/REPO/PROJECT_NUMBER", "ORG/PROJECT_NUMBER"}
+	expectedProjectPaths := []string{"OWNER/REPO/PROJECT_NUMBER", "ORG/PROJECT_NUMBER", "OWNER/REPO/PROJECT_NUMBER_2"}
 	projects := []RepoProject{
 		{ID: "id1", Name: "My Project", ResourcePath: "/OWNER/REPO/projects/PROJECT_NUMBER"},
 		{ID: "id2", Name: "Org Project", ResourcePath: "/orgs/ORG/projects/PROJECT_NUMBER"},
 		{ID: "id3", Name: "Project", ResourcePath: "/orgs/ORG/projects/PROJECT_NUMBER_2"},
 	}
-	projectNames := []string{"My Project", "Org Project"}
+	projectsV2 := []ProjectV2{
+		{ID: "id4", Title: "My Project V2", ResourcePath: "/OWNER/REPO/projects/PROJECT_NUMBER_2"},
+		{ID: "id5", Title: "Org Project V2", ResourcePath: "/orgs/ORG/projects/PROJECT_NUMBER_3"},
+	}
+	projectNames := []string{"My Project", "Org Project", "My Project V2"}
 
-	projectPaths, err := ProjectsToPaths(projects, projectNames)
+	projectPaths, err := ProjectsToPaths(projects, projectsV2, projectNames)
 	if err != nil {
 		t.Errorf("error resolving projects: %v", err)
 	}
@@ -161,7 +231,7 @@ func Test_ProjectsToPaths(t *testing.T) {
 
 func Test_ProjectNamesToPaths(t *testing.T) {
 	http := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(http))
+	client := newTestClient(http)
 
 	repo, _ := ghrepo.FromFullName("OWNER/REPO")
 
@@ -179,20 +249,51 @@ func Test_ProjectNamesToPaths(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`query OrganizationProjectList\b`),
 		httpmock.StringResponse(`
-			{ "data": { "organization": { "projects": {
-				"nodes": [
-					{ "name": "Triage", "id": "TRIAGEID", "resourcePath": "/orgs/ORG/projects/1"  }
-				],
-				"pageInfo": { "hasNextPage": false }
-			} } } }
-			`))
+		{ "data": { "organization": { "projects": {
+			"nodes": [
+				{ "name": "Triage", "id": "TRIAGEID", "resourcePath": "/orgs/ORG/projects/1"  }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projectsV2": {
+			"nodes": [
+				{ "title": "CleanupV2", "id": "CLEANUPV2ID", "resourcePath": "/OWNER/REPO/projects/3" },
+				{ "title": "RoadmapV2", "id": "ROADMAPV2ID", "resourcePath": "/OWNER/REPO/projects/4" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "organization": { "projectsV2": {
+			"nodes": [
+				{ "title": "TriageV2", "id": "TRIAGEV2ID", "resourcePath": "/orgs/ORG/projects/2"  }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query UserProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "viewer": { "projectsV2": {
+			"nodes": [
+				{ "title": "MonalisaV2", "id": "MONALISAV2ID", "resourcePath": "/users/MONALISA/projects/5"  }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
 
-	projectPaths, err := ProjectNamesToPaths(client, repo, []string{"Triage", "Roadmap"})
+	projectPaths, err := ProjectNamesToPaths(client, repo, []string{"Triage", "Roadmap", "TriageV2", "RoadmapV2", "MonalisaV2"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expectedProjectPaths := []string{"ORG/1", "OWNER/REPO/2"}
+	expectedProjectPaths := []string{"ORG/1", "OWNER/REPO/2", "ORG/2", "OWNER/REPO/4", "MONALISA/5"}
 	if !sliceEqual(projectPaths, expectedProjectPaths) {
 		t.Errorf("expected projects paths %v, got %v", expectedProjectPaths, projectPaths)
 	}
@@ -200,7 +301,7 @@ func Test_ProjectNamesToPaths(t *testing.T) {
 
 func Test_RepoResolveMetadataIDs(t *testing.T) {
 	http := &httpmock.Registry{}
-	client := NewClient(ReplaceTripper(http))
+	client := newTestClient(http)
 
 	repo, _ := ghrepo.FromFullName("OWNER/REPO")
 	input := RepoResolveInput{
@@ -329,7 +430,7 @@ func Test_RepoMilestones(t *testing.T) {
 			query = buf.String()
 			return httpmock.StringResponse("{}")(req)
 		})
-		client := NewClient(ReplaceTripper(reg))
+		client := newTestClient(reg)
 
 		_, err := RepoMilestones(client, ghrepo.New("OWNER", "REPO"), tt.state)
 		if (err != nil) != tt.wantErr {
@@ -338,6 +439,31 @@ func Test_RepoMilestones(t *testing.T) {
 		}
 		if !strings.Contains(query, tt.want) {
 			t.Errorf("query does not contain %v", tt.want)
+		}
+	}
+}
+
+func TestDisplayName(t *testing.T) {
+	tests := []struct {
+		name     string
+		assignee RepoAssignee
+		want     string
+	}{
+		{
+			name:     "assignee with name",
+			assignee: RepoAssignee{"123", "octocat123", "Octavious Cath"},
+			want:     "octocat123 (Octavious Cath)",
+		},
+		{
+			name:     "assignee without name",
+			assignee: RepoAssignee{"123", "octocat123", ""},
+			want:     "octocat123",
+		},
+	}
+	for _, tt := range tests {
+		actual := tt.assignee.DisplayName()
+		if actual != tt.want {
+			t.Errorf("display name was %s wanted %s", actual, tt.want)
 		}
 	}
 }

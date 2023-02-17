@@ -1,6 +1,7 @@
 package run
 
 import (
+	cmdCancel "github.com/cli/cli/v2/pkg/cmd/run/cancel"
 	cmdDownload "github.com/cli/cli/v2/pkg/cmd/run/download"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/run/list"
 	cmdRerun "github.com/cli/cli/v2/pkg/cmd/run/rerun"
@@ -12,12 +13,10 @@ import (
 
 func NewCmdRun(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "run <command>",
-		Short: "View details about workflow runs",
-		Long:  "List, view, and watch recent workflow runs from GitHub Actions.",
-		Annotations: map[string]string{
-			"IsActions": "true",
-		},
+		Use:     "run <command>",
+		Short:   "View details about workflow runs",
+		Long:    "List, view, and watch recent workflow runs from GitHub Actions.",
+		GroupID: "actions",
 	}
 	cmdutil.EnableRepoOverride(cmd, f)
 
@@ -26,6 +25,7 @@ func NewCmdRun(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(cmdRerun.NewCmdRerun(f, nil))
 	cmd.AddCommand(cmdDownload.NewCmdDownload(f, nil))
 	cmd.AddCommand(cmdWatch.NewCmdWatch(f, nil))
+	cmd.AddCommand(cmdCancel.NewCmdCancel(f, nil))
 
 	return cmd
 }

@@ -1,14 +1,17 @@
 package view
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	runShared "github.com/cli/cli/v2/pkg/cmd/run/shared"
 	"github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -22,7 +25,7 @@ type ViewOptions struct {
 	HttpClient func() (*http.Client, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
-	Browser    cmdutil.Browser
+	Browser    browser.Browser
 
 	Selector string
 	Ref      string
@@ -30,6 +33,8 @@ type ViewOptions struct {
 	Prompt   bool
 	Raw      bool
 	YAML     bool
+
+	now time.Time
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
@@ -37,6 +42,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Browser:    f.Browser,
+		now:        time.Now(),
 	}
 
 	cmd := &cobra.Command{
@@ -59,13 +65,13 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			if len(args) > 0 {
 				opts.Selector = args[0]
 			} else if !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("workflow argument required when not running interactively")}
+				return cmdutil.FlagErrorf("workflow argument required when not running interactively")
 			} else {
 				opts.Prompt = true
 			}
 
 			if !opts.YAML && opts.Ref != "" {
-				return &cmdutil.FlagError{Err: errors.New("`--yaml` required when specifying `--ref`")}
+				return cmdutil.FlagErrorf("`--yaml` required when specifying `--ref`")
 			}
 
 			if runF != nil {
@@ -91,7 +97,7 @@ func runView(opts *ViewOptions) error {
 
 	repo, err := opts.BaseRepo()
 	if err != nil {
-		return fmt.Errorf("could not determine base repo: %w", err)
+		return err
 	}
 
 	var workflow *shared.Workflow
@@ -102,7 +108,7 @@ func runView(opts *ViewOptions) error {
 	}
 
 	if opts.Web {
-		var url string
+		var address string
 		if opts.YAML {
 			ref := opts.Ref
 			if ref == "" {
@@ -113,20 +119,27 @@ func runView(opts *ViewOptions) error {
 					return err
 				}
 			}
-			url = ghrepo.GenerateRepoURL(repo, "blob/%s/%s", ref, workflow.Path)
+			address = ghrepo.GenerateRepoURL(repo, "blob/%s/%s", url.QueryEscape(ref), url.QueryEscape(workflow.Path))
 		} else {
-			url = ghrepo.GenerateRepoURL(repo, "actions/workflows/%s", workflow.Base())
+			address = ghrepo.GenerateRepoURL(repo, "actions/workflows/%s", url.QueryEscape(workflow.Base()))
 		}
 		if opts.IO.IsStdoutTTY() {
-			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", utils.DisplayURL(url))
+			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(address))
 		}
-		return opts.Browser.Browse(url)
+		return opts.Browser.Browse(address)
+	}
+
+	opts.IO.DetectTerminalTheme()
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
 
 	if opts.YAML {
-		err = viewWorkflowContent(opts, client, workflow)
+		err = viewWorkflowContent(opts, client, repo, workflow, opts.Ref)
 	} else {
-		err = viewWorkflowInfo(opts, client, workflow)
+		err = viewWorkflowInfo(opts, client, repo, workflow)
 	}
 	if err != nil {
 		return err
@@ -135,19 +148,12 @@ func runView(opts *ViewOptions) error {
 	return nil
 }
 
-func viewWorkflowContent(opts *ViewOptions, client *api.Client, workflow *shared.Workflow) error {
-	repo, err := opts.BaseRepo()
-	if err != nil {
-		return fmt.Errorf("could not determine base repo: %w", err)
-	}
-
-	opts.IO.StartProgressIndicator()
-	yamlBytes, err := shared.GetWorkflowContent(client, repo, *workflow, opts.Ref)
-	opts.IO.StopProgressIndicator()
+func viewWorkflowContent(opts *ViewOptions, client *api.Client, repo ghrepo.Interface, workflow *shared.Workflow, ref string) error {
+	yamlBytes, err := shared.GetWorkflowContent(client, repo, *workflow, ref)
 	if err != nil {
 		if s, ok := err.(api.HTTPError); ok && s.StatusCode == 404 {
-			if opts.Ref != "" {
-				return fmt.Errorf("could not find workflow file %s on %s, try specifying a different ref", workflow.Base(), opts.Ref)
+			if ref != "" {
+				return fmt.Errorf("could not find workflow file %s on %s, try specifying a different ref", workflow.Base(), ref)
 			}
 			return fmt.Errorf("could not find workflow file %s, try specifying a branch or tag using `--ref`", workflow.Base())
 		}
@@ -155,13 +161,6 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, workflow *shared
 	}
 
 	yaml := string(yamlBytes)
-
-	theme := opts.IO.DetectTerminalTheme()
-	markdownStyle := markdown.GetStyle(theme)
-	if err := opts.IO.StartPager(); err != nil {
-		fmt.Fprintf(opts.IO.ErrOut, "starting pager failed: %v\n", err)
-	}
-	defer opts.IO.StopPager()
 
 	if !opts.Raw {
 		cs := opts.IO.ColorScheme()
@@ -172,11 +171,10 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, workflow *shared
 		fmt.Fprintf(out, "ID: %s", cs.Cyanf("%d", workflow.ID))
 
 		codeBlock := fmt.Sprintf("```yaml\n%s\n```", yaml)
-		rendered, err := markdown.RenderWithOpts(codeBlock, markdownStyle,
-			markdown.RenderOpts{
-				markdown.WithoutIndentation(),
-				markdown.WithoutWrap(),
-			})
+		rendered, err := markdown.Render(codeBlock,
+			markdown.WithTheme(opts.IO.TerminalTheme()),
+			markdown.WithoutIndentation(),
+			markdown.WithWrap(0))
 		if err != nil {
 			return err
 		}
@@ -196,21 +194,18 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, workflow *shared
 	return nil
 }
 
-func viewWorkflowInfo(opts *ViewOptions, client *api.Client, workflow *shared.Workflow) error {
-	repo, err := opts.BaseRepo()
-	if err != nil {
-		return fmt.Errorf("could not determine base repo: %w", err)
-	}
-
-	opts.IO.StartProgressIndicator()
-	wr, err := getWorkflowRuns(client, repo, workflow)
-	opts.IO.StopProgressIndicator()
+func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interface, workflow *shared.Workflow) error {
+	wr, err := runShared.GetRuns(client, repo, &runShared.FilterOptions{
+		WorkflowID:   workflow.ID,
+		WorkflowName: workflow.Name,
+	}, 5)
 	if err != nil {
 		return fmt.Errorf("failed to get runs: %w", err)
 	}
 
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(opts.IO)
 
 	// Header
@@ -219,13 +214,13 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, workflow *shared.Wo
 	fmt.Fprintf(out, "ID: %s\n\n", cs.Cyanf("%d", workflow.ID))
 
 	// Runs
-	fmt.Fprintf(out, "Total runs %d\n", wr.Total)
+	fmt.Fprintf(out, "Total runs %d\n", wr.TotalCount)
 
-	if wr.Total != 0 {
+	if wr.TotalCount != 0 {
 		fmt.Fprintln(out, "Recent runs")
 	}
 
-	for _, run := range wr.Runs {
+	for _, run := range wr.WorkflowRuns {
 		if opts.Raw {
 			tp.AddField(string(run.Status), nil, nil)
 			tp.AddField(string(run.Conclusion), nil, nil)
@@ -234,18 +229,14 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, workflow *shared.Wo
 			tp.AddField(symbol, nil, symbolColor)
 		}
 
-		tp.AddField(run.CommitMsg(), nil, cs.Bold)
+		tp.AddField(run.Title(), nil, cs.Bold)
 
-		tp.AddField(run.Name, nil, nil)
+		tp.AddField(run.WorkflowName(), nil, nil)
 		tp.AddField(run.HeadBranch, nil, cs.Bold)
 		tp.AddField(string(run.Event), nil, nil)
 
 		if opts.Raw {
-			elapsed := run.UpdatedAt.Sub(run.CreatedAt)
-			if elapsed < 0 {
-				elapsed = 0
-			}
-			tp.AddField(elapsed.String(), nil, nil)
+			tp.AddField(run.Duration(opts.now).String(), nil, nil)
 		}
 
 		tp.AddField(fmt.Sprintf("%d", run.ID), nil, cs.Cyan)
@@ -261,7 +252,7 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, workflow *shared.Wo
 	fmt.Fprintln(out)
 
 	// Footer
-	if wr.Total != 0 {
+	if wr.TotalCount != 0 {
 		fmt.Fprintf(out, "To see more runs for this workflow, try: gh run list --workflow %s\n", filename)
 	}
 	fmt.Fprintf(out, "To see the YAML for this workflow, try: gh workflow view %s --yaml\n", filename)

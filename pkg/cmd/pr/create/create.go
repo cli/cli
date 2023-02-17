@@ -1,6 +1,7 @@
 package create
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,33 +10,30 @@ import (
 	"strings"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/context"
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
-
-type browser interface {
-	Browse(string) error
-}
 
 type CreateOptions struct {
 	// This struct stores user input and factory functions
 	HttpClient func() (*http.Client, error)
+	GitClient  *git.Client
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
-	Remotes    func() (context.Remotes, error)
+	Remotes    func() (ghContext.Remotes, error)
 	Branch     func() (string, error)
-	Browser    browser
+	Browser    browser.Browser
+	Prompter   shared.Prompt
 	Finder     shared.PRFinder
 
 	TitleProvided bool
@@ -66,26 +64,29 @@ type CreateOptions struct {
 type CreateContext struct {
 	// This struct stores contextual data about the creation process and is for building up enough
 	// data to create a pull request
-	RepoContext        *context.ResolvedRemotes
+	RepoContext        *ghContext.ResolvedRemotes
 	BaseRepo           *api.Repository
 	HeadRepo           ghrepo.Interface
 	BaseTrackingBranch string
 	BaseBranch         string
 	HeadBranch         string
 	HeadBranchLabel    string
-	HeadRemote         *context.Remote
+	HeadRemote         *ghContext.Remote
 	IsPushEnabled      bool
 	Client             *api.Client
+	GitClient          *git.Client
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
 	opts := &CreateOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Config:     f.Config,
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
 		Browser:    f.Browser,
+		Prompter:   f.Prompter,
 	}
 
 	var bodyFile string
@@ -109,6 +110,9 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 
 			By default, users with write access to the base repository can push new commits to the
 			head branch of the pull request. Disable this with %[1]s--no-maintainer-edit%[1]s.
+
+			Adding a pull request to projects requires authorization with the "project" scope.
+			To authorize, run "gh auth refresh -s project".
 		`, "`"),
 		Example: heredoc.Doc(`
 			$ gh pr create --title "The bug is fixed" --body "Everything works again"
@@ -116,7 +120,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh pr create --project "Roadmap"
 			$ gh pr create --base develop --head monalisa:feature
 		`),
-		Args: cmdutil.NoArgsQuoteReminder,
+		Args:    cmdutil.NoArgsQuoteReminder,
+		Aliases: []string{"new"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Finder = shared.NewFinder(f)
 
@@ -126,11 +131,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			opts.MaintainerCanModify = !noMaintainerEdit
 
 			if !opts.IO.CanPrompt() && opts.RecoverFile != "" {
-				return &cmdutil.FlagError{Err: errors.New("`--recover` only supported when running interactively")}
-			}
-
-			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.TitleProvided && !opts.Autofill {
-				return &cmdutil.FlagError{Err: errors.New("`--title` or `--fill` required when not running interactively")}
+				return cmdutil.FlagErrorf("`--recover` only supported when running interactively")
 			}
 
 			if opts.IsDraft && opts.WebMode {
@@ -153,6 +154,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				opts.BodyProvided = true
 			}
 
+			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.Autofill && (!opts.TitleProvided || !opts.BodyProvided) {
+				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--fill`) when not running interactively")
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -164,7 +169,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.BoolVarP(&opts.IsDraft, "draft", "d", false, "Mark pull request as a draft")
 	fl.StringVarP(&opts.Title, "title", "t", "", "Title for the pull request")
 	fl.StringVarP(&opts.Body, "body", "b", "", "Body for the pull request")
-	fl.StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file`")
+	fl.StringVarP(&bodyFile, "body-file", "F", "", "Read body text from `file` (use \"-\" to read from standard input)")
 	fl.StringVarP(&opts.BaseBranch, "base", "B", "", "The `branch` into which you want your code merged")
 	fl.StringVarP(&opts.HeadBranch, "head", "H", "", "The `branch` that contains commits for your pull request (default: current branch)")
 	fl.BoolVarP(&opts.WebMode, "web", "w", false, "Open the web browser to create a pull request")
@@ -176,6 +181,14 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVarP(&opts.Milestone, "milestone", "m", "", "Add the pull request to a milestone by `name`")
 	fl.Bool("no-maintainer-edit", false, "Disable maintainer's ability to modify pull request")
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
+
+	_ = cmd.RegisterFlagCompletionFunc("reviewer", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		results, err := requestableReviewersForCompletion(opts)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		return results, cobra.ShellCompDirectiveNoFileComp
+	})
 
 	return cmd
 }
@@ -208,7 +221,7 @@ func createRun(opts *CreateOptions) (err error) {
 		if err != nil {
 			return
 		}
-		if !utils.ValidURL(openURL) {
+		if !shared.ValidURL(openURL) {
 			err = fmt.Errorf("cannot open in browser: maximum URL length exceeded")
 			return
 		}
@@ -268,15 +281,10 @@ func createRun(opts *CreateOptions) (err error) {
 	}
 
 	if !opts.TitleProvided {
-		err = shared.TitleSurvey(state)
+		err = shared.TitleSurvey(opts.Prompter, state)
 		if err != nil {
 			return
 		}
-	}
-
-	editorCommand, err := cmdutil.DetermineEditor(opts.Config)
-	if err != nil {
-		return
 	}
 
 	defer shared.PreserveInput(opts.IO, state, &err)()
@@ -284,7 +292,7 @@ func createRun(opts *CreateOptions) (err error) {
 	if !opts.BodyProvided {
 		templateContent := ""
 		if opts.RecoverFile == "" {
-			tpl := shared.NewTemplateManager(client.HTTP(), ctx.BaseRepo, opts.RootDirOverride, opts.RepoOverride == "", true)
+			tpl := shared.NewTemplateManager(client.HTTP(), ctx.BaseRepo, opts.Prompter, opts.RootDirOverride, opts.RepoOverride == "", true)
 			var template shared.Template
 			template, err = tpl.Choose()
 			if err != nil {
@@ -298,7 +306,7 @@ func createRun(opts *CreateOptions) (err error) {
 			}
 		}
 
-		err = shared.BodySurvey(state, templateContent, editorCommand)
+		err = shared.BodySurvey(opts.Prompter, state, templateContent)
 		if err != nil {
 			return
 		}
@@ -309,9 +317,9 @@ func createRun(opts *CreateOptions) (err error) {
 		return
 	}
 
-	allowPreview := !state.HasMetadata() && utils.ValidURL(openURL)
+	allowPreview := !state.HasMetadata() && shared.ValidURL(openURL)
 	allowMetadata := ctx.BaseRepo.ViewerCanTriage()
-	action, err := shared.ConfirmSubmission(allowPreview, allowMetadata)
+	action, err := shared.ConfirmPRSubmission(opts.Prompter, allowPreview, allowMetadata, state.Draft)
 	if err != nil {
 		return fmt.Errorf("unable to confirm: %w", err)
 	}
@@ -328,7 +336,7 @@ func createRun(opts *CreateOptions) (err error) {
 			return
 		}
 
-		action, err = shared.ConfirmSubmission(!state.HasMetadata(), false)
+		action, err = shared.ConfirmPRSubmission(opts.Prompter, !state.HasMetadata(), false, state.Draft)
 		if err != nil {
 			return
 		}
@@ -349,6 +357,11 @@ func createRun(opts *CreateOptions) (err error) {
 		return previewPR(*opts, openURL)
 	}
 
+	if action == shared.SubmitDraftAction {
+		state.Draft = true
+		return submitPR(*opts, *ctx, *state)
+	}
+
 	if action == shared.SubmitAction {
 		return submitPR(*opts, *ctx, *state)
 	}
@@ -360,21 +373,22 @@ func createRun(opts *CreateOptions) (err error) {
 func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState) error {
 	baseRef := ctx.BaseTrackingBranch
 	headRef := ctx.HeadBranch
+	gitClient := ctx.GitClient
 
-	commits, err := git.Commits(baseRef, headRef)
+	commits, err := gitClient.Commits(context.Background(), baseRef, headRef)
 	if err != nil {
 		return err
 	}
 
 	if len(commits) == 1 {
 		state.Title = commits[0].Title
-		body, err := git.CommitBody(commits[0].Sha)
+		body, err := gitClient.CommitBody(context.Background(), commits[0].Sha)
 		if err != nil {
 			return err
 		}
 		state.Body = body
 	} else {
-		state.Title = utils.Humanize(headRef)
+		state.Title = humanize(headRef)
 
 		var body strings.Builder
 		for i := len(commits) - 1; i >= 0; i-- {
@@ -386,11 +400,11 @@ func initDefaultTitleBody(ctx CreateContext, state *shared.IssueMetadataState) e
 	return nil
 }
 
-func determineTrackingBranch(remotes context.Remotes, headBranch string) *git.TrackingRef {
+func determineTrackingBranch(gitClient *git.Client, remotes ghContext.Remotes, headBranch string) *git.TrackingRef {
 	refsForLookup := []string{"HEAD"}
 	var trackingRefs []git.TrackingRef
 
-	headBranchConfig := git.ReadBranchConfig(headBranch)
+	headBranchConfig := gitClient.ReadBranchConfig(context.Background(), headBranch)
 	if headBranchConfig.RemoteName != "" {
 		tr := git.TrackingRef{
 			RemoteName: headBranchConfig.RemoteName,
@@ -409,7 +423,7 @@ func determineTrackingBranch(remotes context.Remotes, headBranch string) *git.Tr
 		refsForLookup = append(refsForLookup, tr.String())
 	}
 
-	resolvedRefs, _ := git.ShowRefs(refsForLookup...)
+	resolvedRefs, _ := gitClient.ShowRefs(context.Background(), refsForLookup)
 	if len(resolvedRefs) > 1 {
 		for _, r := range resolvedRefs[1:] {
 			if r.Hash != resolvedRefs[0].Hash {
@@ -466,12 +480,11 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 	}
 	client := api.NewClientFromHTTP(httpClient)
 
-	remotes, err := opts.Remotes()
+	remotes, err := getRemotes(opts)
 	if err != nil {
 		return nil, err
 	}
-
-	repoContext, err := context.ResolveRemotesToRepos(remotes, client, opts.RepoOverride)
+	repoContext, err := ghContext.ResolveRemotesToRepos(remotes, client, opts.RepoOverride)
 	if err != nil {
 		return nil, err
 	}
@@ -489,7 +502,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 			}
 		}
 	} else {
-		return nil, fmt.Errorf("could not determine base repository: %w", err)
+		return nil, err
 	}
 
 	isPushEnabled := false
@@ -506,16 +519,17 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		headBranch = headBranch[idx+1:]
 	}
 
-	if ucc, err := git.UncommittedChangeCount(); err == nil && ucc > 0 {
-		fmt.Fprintf(opts.IO.ErrOut, "Warning: %s\n", utils.Pluralize(ucc, "uncommitted change"))
+	gitClient := opts.GitClient
+	if ucc, err := gitClient.UncommittedChangeCount(context.Background()); err == nil && ucc > 0 {
+		fmt.Fprintf(opts.IO.ErrOut, "Warning: %s\n", text.Pluralize(ucc, "uncommitted change"))
 	}
 
 	var headRepo ghrepo.Interface
-	var headRemote *context.Remote
+	var headRemote *ghContext.Remote
 
 	if isPushEnabled {
 		// determine whether the head branch is already pushed to a remote
-		if pushedTo := determineTrackingBranch(remotes, headBranch); pushedTo != nil {
+		if pushedTo := determineTrackingBranch(gitClient, remotes, headBranch); pushedTo != nil {
 			isPushEnabled = false
 			if r, err := remotes.FindByName(pushedTo.RemoteName); err == nil {
 				headRepo = r
@@ -562,11 +576,7 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		pushOptions = append(pushOptions, "Skip pushing the branch")
 		pushOptions = append(pushOptions, "Cancel")
 
-		var selectedOption int
-		err = prompt.SurveyAskOne(&survey.Select{
-			Message: fmt.Sprintf("Where should we push the '%s' branch?", headBranch),
-			Options: pushOptions,
-		}, &selectedOption)
+		selectedOption, err := opts.Prompter.Select(fmt.Sprintf("Where should we push the '%s' branch?", headBranch), "", pushOptions)
 		if err != nil {
 			return nil, err
 		}
@@ -582,9 +592,6 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 			return nil, cmdutil.CancelError
 		} else {
 			// "Create a fork of ..."
-			if baseRepo.IsPrivate {
-				return nil, fmt.Errorf("cannot fork private repository %s", ghrepo.FullName(baseRepo))
-			}
 			headBranchLabel = fmt.Sprintf("%s:%s", currentLogin, headBranch)
 		}
 	}
@@ -618,8 +625,22 @@ func NewCreateContext(opts *CreateOptions) (*CreateContext, error) {
 		IsPushEnabled:      isPushEnabled,
 		RepoContext:        repoContext,
 		Client:             client,
+		GitClient:          gitClient,
 	}, nil
 
+}
+
+func getRemotes(opts *CreateOptions) (ghContext.Remotes, error) {
+	// TODO: consider obtaining remotes from GitClient instead
+	remotes, err := opts.Remotes()
+	if err != nil {
+		// When a repo override value is given, ignore errors when fetching git remotes
+		// to support using this command outside of git repos.
+		if opts.RepoOverride == "" {
+			return nil, err
+		}
+	}
+	return remotes, nil
 }
 
 func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataState) error {
@@ -660,7 +681,7 @@ func submitPR(opts CreateOptions, ctx CreateContext, state shared.IssueMetadataS
 
 func previewPR(opts CreateOptions, openURL string) error {
 	if opts.IO.IsStdinTTY() && opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+		fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 	}
 	return opts.Browser.Browse(openURL)
 
@@ -677,7 +698,7 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	// one by forking the base repository
 	if headRepo == nil && ctx.IsPushEnabled {
 		opts.IO.StartProgressIndicator()
-		headRepo, err = api.ForkRepo(client, ctx.BaseRepo, "")
+		headRepo, err = api.ForkRepo(client, ctx.BaseRepo, "", "", false)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("error forking repo: %w", err)
@@ -701,16 +722,17 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 		if err != nil {
 			return err
 		}
-		cloneProtocol, _ := cfg.Get(headRepo.RepoHost(), "git_protocol")
+		cloneProtocol, _ := cfg.GetOrDefault(headRepo.RepoHost(), "git_protocol")
 
 		headRepoURL := ghrepo.FormatRemoteURL(headRepo, cloneProtocol)
 
 		// TODO: prevent clashes with another remote of a same name
-		gitRemote, err := git.AddRemote("fork", headRepoURL)
+		gitClient := ctx.GitClient
+		gitRemote, err := gitClient.AddRemote(context.Background(), "fork", headRepoURL, []string{})
 		if err != nil {
 			return fmt.Errorf("error adding remote: %w", err)
 		}
-		headRemote = &context.Remote{
+		headRemote = &ghContext.Remote{
 			Remote: gitRemote,
 			Repo:   headRepo,
 		}
@@ -722,16 +744,16 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 			pushTries := 0
 			maxPushTries := 3
 			for {
-				r := NewRegexpWriter(opts.IO.ErrOut, gitPushRegexp, "")
-				defer r.Flush()
-				cmdErr := r
-				cmdOut := opts.IO.Out
-				if err := git.Push(headRemote.Name, fmt.Sprintf("HEAD:%s", ctx.HeadBranch), cmdOut, cmdErr); err != nil {
+				w := NewRegexpWriter(opts.IO.ErrOut, gitPushRegexp, "")
+				defer w.Flush()
+				gitClient := ctx.GitClient
+				ref := fmt.Sprintf("HEAD:%s", ctx.HeadBranch)
+				if err := gitClient.Push(context.Background(), headRemote.Name, ref, git.WithStderr(w)); err != nil {
 					if didForkRepo && pushTries < maxPushTries {
 						pushTries++
 						// first wait 2 seconds after forking, then 4s, then 6s
 						waitSeconds := 2 * pushTries
-						fmt.Fprintf(opts.IO.ErrOut, "waiting %s before retrying...\n", utils.Pluralize(waitSeconds, "second"))
+						fmt.Fprintf(opts.IO.ErrOut, "waiting %s before retrying...\n", text.Pluralize(waitSeconds, "second"))
 						time.Sleep(time.Duration(waitSeconds) * time.Second)
 						continue
 					}
@@ -755,12 +777,46 @@ func generateCompareURL(ctx CreateContext, state shared.IssueMetadataState) (str
 	u := ghrepo.GenerateRepoURL(
 		ctx.BaseRepo,
 		"compare/%s...%s?expand=1",
-		url.QueryEscape(ctx.BaseBranch), url.QueryEscape(ctx.HeadBranchLabel))
+		url.PathEscape(ctx.BaseBranch), url.PathEscape(ctx.HeadBranchLabel))
 	url, err := shared.WithPrAndIssueQueryParams(ctx.Client, ctx.BaseRepo, u, state)
 	if err != nil {
 		return "", err
 	}
 	return url, nil
+}
+
+// Humanize returns a copy of the string s that replaces all instance of '-' and '_' with spaces.
+func humanize(s string) string {
+	replace := "_-"
+	h := func(r rune) rune {
+		if strings.ContainsRune(replace, r) {
+			return ' '
+		}
+		return r
+	}
+	return strings.Map(h, s)
+}
+
+func requestableReviewersForCompletion(opts *CreateOptions) ([]string, error) {
+	httpClient, err := opts.HttpClient()
+	if err != nil {
+		return nil, err
+	}
+
+	remotes, err := getRemotes(opts)
+	if err != nil {
+		return nil, err
+	}
+	repoContext, err := ghContext.ResolveRemotesToRepos(remotes, api.NewClientFromHTTP(httpClient), opts.RepoOverride)
+	if err != nil {
+		return nil, err
+	}
+	baseRepo, err := repoContext.BaseRepo(opts.IO)
+	if err != nil {
+		return nil, err
+	}
+
+	return shared.RequestableReviewersForCompletion(httpClient, baseRepo)
 }
 
 var gitPushRegexp = regexp.MustCompile("^remote: (Create a pull request.*by visiting|[[:space:]]*https://.*/pull/new/).*\n?$")

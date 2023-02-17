@@ -8,8 +8,10 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/issue/shared"
+	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
 
@@ -20,6 +22,7 @@ type ReopenOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 
 	SelectorArg string
+	Comment     string
 }
 
 func NewCmdReopen(f *cmdutil.Factory, runF func(*ReopenOptions) error) *cobra.Command {
@@ -48,6 +51,8 @@ func NewCmdReopen(f *cmdutil.Factory, runF func(*ReopenOptions) error) *cobra.Co
 		},
 	}
 
+	cmd.Flags().StringVarP(&opts.Comment, "comment", "c", "", "Add a reopening comment")
+
 	return cmd
 }
 
@@ -58,9 +63,8 @@ func reopenRun(opts *ReopenOptions) error {
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
-	issue, baseRepo, err := shared.IssueFromArg(apiClient, opts.BaseRepo, opts.SelectorArg)
+	issue, baseRepo, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, []string{"id", "number", "title", "state"})
 	if err != nil {
 		return err
 	}
@@ -70,7 +74,23 @@ func reopenRun(opts *ReopenOptions) error {
 		return nil
 	}
 
-	err = api.IssueReopen(apiClient, baseRepo, *issue)
+	if opts.Comment != "" {
+		commentOpts := &prShared.CommentableOptions{
+			Body:       opts.Comment,
+			HttpClient: opts.HttpClient,
+			InputType:  prShared.InputTypeInline,
+			Quiet:      true,
+			RetrieveCommentable: func() (prShared.Commentable, ghrepo.Interface, error) {
+				return issue, baseRepo, nil
+			},
+		}
+		err := prShared.CommentableRun(commentOpts)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = apiReopen(httpClient, baseRepo, issue)
 	if err != nil {
 		return err
 	}
@@ -78,4 +98,27 @@ func reopenRun(opts *ReopenOptions) error {
 	fmt.Fprintf(opts.IO.ErrOut, "%s Reopened issue #%d (%s)\n", cs.SuccessIconWithColor(cs.Green), issue.Number, issue.Title)
 
 	return nil
+}
+
+func apiReopen(httpClient *http.Client, repo ghrepo.Interface, issue *api.Issue) error {
+	if issue.IsPullRequest() {
+		return api.PullRequestReopen(httpClient, repo, issue.ID)
+	}
+
+	var mutation struct {
+		ReopenIssue struct {
+			Issue struct {
+				ID githubv4.ID
+			}
+		} `graphql:"reopenIssue(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": githubv4.ReopenIssueInput{
+			IssueID: issue.ID,
+		},
+	}
+
+	gql := api.NewClientFromHTTP(httpClient)
+	return gql.Mutate(repo.RepoHost(), "IssueReopen", &mutation, variables)
 }

@@ -9,7 +9,7 @@ import (
 
 func RenderRunHeader(cs *iostreams.ColorScheme, run Run, ago, prNumber string) string {
 	title := fmt.Sprintf("%s %s%s",
-		cs.Bold(run.HeadBranch), run.Name, prNumber)
+		cs.Bold(run.HeadBranch), run.WorkflowName(), prNumber)
 	symbol, symbolColor := Symbol(cs, run.Status, run.Conclusion)
 	id := cs.Cyanf("%d", run.ID)
 

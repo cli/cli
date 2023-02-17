@@ -1,9 +1,8 @@
 package cmdutil
 
 import (
-	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -99,8 +98,8 @@ func TestAddJSONFlags(t *testing.T) {
 			var exporter Exporter
 			AddJSONFlags(cmd, &exporter, tt.fields)
 			cmd.SetArgs(tt.args)
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 			_, err := cmd.ExecuteC()
 			if tt.wantsError == "" {
 				require.NoError(t, err)
@@ -179,10 +178,7 @@ func Test_exportFormat_Write(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := &bytes.Buffer{}
-			io := &iostreams.IOStreams{
-				Out: w,
-			}
+			io, _, w, _ := iostreams.Test()
 			if err := tt.exporter.Write(io, tt.args.data); (err != nil) != tt.wantErr {
 				t.Errorf("exportFormat.Write() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -198,10 +194,10 @@ type exportableItem struct {
 	Name string
 }
 
-func (e *exportableItem) ExportData(fields []string) *map[string]interface{} {
+func (e *exportableItem) ExportData(fields []string) map[string]interface{} {
 	m := map[string]interface{}{}
 	for _, f := range fields {
 		m[f] = fmt.Sprintf("%s:%s", e.Name, f)
 	}
-	return &m
+	return m
 }

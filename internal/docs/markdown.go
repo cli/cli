@@ -1,86 +1,136 @@
 package docs
 
 import (
-	"bytes"
 	"fmt"
+	"html/template"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/cli/cli/v2/pkg/cmd/root"
 	"github.com/spf13/cobra"
+	"github.com/spf13/cobra/doc"
+	"github.com/spf13/pflag"
 )
 
-func printOptions(buf *bytes.Buffer, cmd *cobra.Command, name string) error {
+func printOptions(w io.Writer, cmd *cobra.Command) error {
 	flags := cmd.NonInheritedFlags()
-	flags.SetOutput(buf)
+	flags.SetOutput(w)
 	if flags.HasAvailableFlags() {
-		buf.WriteString("### Options\n\n```\n")
-		flags.PrintDefaults()
-		buf.WriteString("```\n\n")
+		fmt.Fprint(w, "### Options\n\n")
+		if err := printFlagsHTML(w, flags); err != nil {
+			return err
+		}
+		fmt.Fprint(w, "\n\n")
 	}
 
 	parentFlags := cmd.InheritedFlags()
-	parentFlags.SetOutput(buf)
-	if parentFlags.HasAvailableFlags() {
-		buf.WriteString("### Options inherited from parent commands\n\n```\n")
-		parentFlags.PrintDefaults()
-		buf.WriteString("```\n\n")
+	parentFlags.SetOutput(w)
+	if hasNonHelpFlags(parentFlags) {
+		fmt.Fprint(w, "### Options inherited from parent commands\n\n")
+		if err := printFlagsHTML(w, parentFlags); err != nil {
+			return err
+		}
+		fmt.Fprint(w, "\n\n")
 	}
 	return nil
 }
 
-// GenMarkdown creates markdown output.
-func GenMarkdown(cmd *cobra.Command, w io.Writer) error {
-	return GenMarkdownCustom(cmd, w, func(s string) string { return s })
+func hasNonHelpFlags(fs *pflag.FlagSet) (found bool) {
+	fs.VisitAll(func(f *pflag.Flag) {
+		if !f.Hidden && f.Name != "help" {
+			found = true
+		}
+	})
+	return
 }
 
-// GenMarkdownCustom creates custom markdown output.
-func GenMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string) string) error {
-	cmd.InitDefaultHelpCmd()
-	cmd.InitDefaultHelpFlag()
+type flagView struct {
+	Name      string
+	Varname   string
+	Shorthand string
+	Usage     string
+}
 
-	buf := new(bytes.Buffer)
-	name := cmd.CommandPath()
+var flagsTemplate = `
+<dl class="flags">{{ range . }}
+	<dt>{{ if .Shorthand }}<code>-{{.Shorthand}}</code>, {{ end -}}
+		<code>--{{.Name}}{{ if .Varname }} &lt;{{.Varname}}&gt;{{ end }}</code></dt>
+	<dd>{{.Usage}}</dd>
+{{ end }}</dl>
+`
 
-	buf.WriteString("## " + name + "\n\n")
-	buf.WriteString(cmd.Short + "\n\n")
-	if len(cmd.Long) > 0 {
-		buf.WriteString("### Synopsis\n\n")
-		buf.WriteString(cmd.Long + "\n\n")
+var tpl = template.Must(template.New("flags").Parse(flagsTemplate))
+
+func printFlagsHTML(w io.Writer, fs *pflag.FlagSet) error {
+	var flags []flagView
+	fs.VisitAll(func(f *pflag.Flag) {
+		if f.Hidden || f.Name == "help" {
+			return
+		}
+		varname, usage := pflag.UnquoteUsage(f)
+		flags = append(flags, flagView{
+			Name:      f.Name,
+			Varname:   varname,
+			Shorthand: f.Shorthand,
+			Usage:     usage,
+		})
+	})
+	return tpl.Execute(w, flags)
+}
+
+// genMarkdownCustom creates custom markdown output.
+func genMarkdownCustom(cmd *cobra.Command, w io.Writer, linkHandler func(string) string) error {
+	fmt.Fprint(w, "{% raw %}")
+	fmt.Fprintf(w, "## %s\n\n", cmd.CommandPath())
+
+	hasLong := cmd.Long != ""
+	if !hasLong {
+		fmt.Fprintf(w, "%s\n\n", cmd.Short)
 	}
-
 	if cmd.Runnable() {
-		buf.WriteString(fmt.Sprintf("```\n%s\n```\n\n", cmd.UseLine()))
+		fmt.Fprintf(w, "```\n%s\n```\n\n", cmd.UseLine())
+	}
+	if hasLong {
+		fmt.Fprintf(w, "%s\n\n", cmd.Long)
 	}
 
-	if len(cmd.Example) > 0 {
-		buf.WriteString("### Examples\n\n")
-		buf.WriteString(fmt.Sprintf("```\n%s\n```\n\n", cmd.Example))
+	for _, g := range root.GroupedCommands(cmd) {
+		fmt.Fprintf(w, "### %s\n\n", g.Title)
+		for _, subcmd := range g.Commands {
+			fmt.Fprintf(w, "* [%s](%s)\n", subcmd.CommandPath(), linkHandler(cmdManualPath(subcmd)))
+		}
+		fmt.Fprint(w, "\n\n")
 	}
 
-	if err := printOptions(buf, cmd, name); err != nil {
+	if err := printOptions(w, cmd); err != nil {
 		return err
 	}
-	_, err := buf.WriteTo(w)
-	return err
+	fmt.Fprint(w, "{% endraw %}\n")
+
+	if len(cmd.Example) > 0 {
+		fmt.Fprint(w, "### Examples\n\n{% highlight bash %}{% raw %}\n")
+		fmt.Fprint(w, cmd.Example)
+		fmt.Fprint(w, "{% endraw %}{% endhighlight %}\n\n")
+	}
+
+	if cmd.HasParent() {
+		p := cmd.Parent()
+		fmt.Fprint(w, "### See also\n\n")
+		fmt.Fprintf(w, "* [%s](%s)\n", p.CommandPath(), linkHandler(cmdManualPath(p)))
+	}
+
+	return nil
 }
 
-// GenMarkdownTree will generate a markdown page for this command and all
-// descendants in the directory given. The header may be nil.
-// This function may not work correctly if your command names have `-` in them.
-// If you have `cmd` with two subcmds, `sub` and `sub-third`,
-// and `sub` has a subcommand called `third`, it is undefined which
-// help output will be in the file `cmd-sub-third.1`.
-func GenMarkdownTree(cmd *cobra.Command, dir string) error {
-	identity := func(s string) string { return s }
-	emptyStr := func(s string) string { return "" }
-	return GenMarkdownTreeCustom(cmd, dir, emptyStr, identity)
-}
-
-// GenMarkdownTreeCustom is the the same as GenMarkdownTree, but
+// GenMarkdownTreeCustom is the same as GenMarkdownTree, but
 // with custom filePrepender and linkHandler.
 func GenMarkdownTreeCustom(cmd *cobra.Command, dir string, filePrepender, linkHandler func(string) string) error {
+	if os.Getenv("GH_COBRA") != "" {
+		return doc.GenMarkdownTreeCustom(cmd, dir, filePrepender, linkHandler)
+	}
+
 	for _, c := range cmd.Commands() {
 		_, forceGeneration := c.Annotations["markdown:generate"]
 		if c.Hidden && !forceGeneration {
@@ -92,12 +142,7 @@ func GenMarkdownTreeCustom(cmd *cobra.Command, dir string, filePrepender, linkHa
 		}
 	}
 
-	basename := strings.Replace(cmd.CommandPath(), " ", "_", -1) + ".md"
-	if basenameOverride, found := cmd.Annotations["markdown:basename"]; found {
-		basename = basenameOverride + ".md"
-	}
-
-	filename := filepath.Join(dir, basename)
+	filename := filepath.Join(dir, cmdManualPath(cmd))
 	f, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -107,8 +152,15 @@ func GenMarkdownTreeCustom(cmd *cobra.Command, dir string, filePrepender, linkHa
 	if _, err := io.WriteString(f, filePrepender(filename)); err != nil {
 		return err
 	}
-	if err := GenMarkdownCustom(cmd, f, linkHandler); err != nil {
+	if err := genMarkdownCustom(cmd, f, linkHandler); err != nil {
 		return err
 	}
 	return nil
+}
+
+func cmdManualPath(c *cobra.Command) string {
+	if basenameOverride, found := c.Annotations["markdown:basename"]; found {
+		return basenameOverride + ".md"
+	}
+	return strings.ReplaceAll(c.CommandPath(), " ", "_") + ".md"
 }

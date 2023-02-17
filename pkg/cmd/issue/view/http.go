@@ -1,22 +1,22 @@
 package view
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
-	"github.com/shurcooL/graphql"
 )
 
 func preloadIssueComments(client *http.Client, repo ghrepo.Interface, issue *api.Issue) error {
 	type response struct {
 		Node struct {
 			Issue struct {
-				Comments api.Comments `graphql:"comments(first: 100, after: $endCursor)"`
+				Comments *api.Comments `graphql:"comments(first: 100, after: $endCursor)"`
 			} `graphql:"...on Issue"`
+			PullRequest struct {
+				Comments *api.Comments `graphql:"comments(first: 100, after: $endCursor)"`
+			} `graphql:"...on PullRequest"`
 		} `graphql:"node(id: $id)"`
 	}
 
@@ -30,19 +30,24 @@ func preloadIssueComments(client *http.Client, repo ghrepo.Interface, issue *api
 		issue.Comments.Nodes = issue.Comments.Nodes[0:0]
 	}
 
-	gql := graphql.NewClient(ghinstance.GraphQLEndpoint(repo.RepoHost()), client)
+	gql := api.NewClientFromHTTP(client)
 	for {
 		var query response
-		err := gql.QueryNamed(context.Background(), "CommentsForIssue", &query, variables)
+		err := gql.Query(repo.RepoHost(), "CommentsForIssue", &query, variables)
 		if err != nil {
 			return err
 		}
 
-		issue.Comments.Nodes = append(issue.Comments.Nodes, query.Node.Issue.Comments.Nodes...)
-		if !query.Node.Issue.Comments.PageInfo.HasNextPage {
+		comments := query.Node.Issue.Comments
+		if comments == nil {
+			comments = query.Node.PullRequest.Comments
+		}
+
+		issue.Comments.Nodes = append(issue.Comments.Nodes, comments.Nodes...)
+		if !comments.PageInfo.HasNextPage {
 			break
 		}
-		variables["endCursor"] = githubv4.String(query.Node.Issue.Comments.PageInfo.EndCursor)
+		variables["endCursor"] = githubv4.String(comments.PageInfo.EndCursor)
 	}
 
 	issue.Comments.PageInfo.HasNextPage = false

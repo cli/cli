@@ -10,10 +10,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cli/cli/v2/pkg/export"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/jsoncolor"
 	"github.com/cli/cli/v2/pkg/set"
+	"github.com/cli/go-gh/pkg/jq"
+	"github.com/cli/go-gh/pkg/template"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -26,7 +27,7 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 	f := cmd.Flags()
 	f.StringSlice("json", nil, "Output JSON with the specified `fields`")
 	f.StringP("jq", "q", "", "Filter JSON output using a jq `expression`")
-	f.StringP("template", "t", "", "Format JSON output using a Go template")
+	f.StringP("template", "t", "", "Format JSON output using a Go template; see \"gh help formatting\"")
 
 	_ = cmd.RegisterFlagCompletionFunc("json", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var results []string
@@ -73,11 +74,14 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 	}
 
 	cmd.SetFlagErrorFunc(func(c *cobra.Command, e error) error {
-		if e.Error() == "flag needs an argument: --json" {
+		if c == cmd && e.Error() == "flag needs an argument: --json" {
 			sort.Strings(fields)
 			return JSONFlagError{fmt.Errorf("Specify one or more comma-separated fields for `--json`:\n  %s", strings.Join(fields, "\n  "))}
 		}
-		return c.Parent().FlagErrorFunc()(c, e)
+		if cmd.HasParent() {
+			return cmd.Parent().FlagErrorFunc()(c, e)
+		}
+		return e
 	})
 }
 
@@ -134,9 +138,16 @@ func (e *exportFormat) Write(ios *iostreams.IOStreams, data interface{}) error {
 
 	w := ios.Out
 	if e.filter != "" {
-		return export.FilterJSON(w, &buf, e.filter)
+		return jq.Evaluate(&buf, w, e.filter)
 	} else if e.template != "" {
-		return export.ExecuteTemplate(ios, &buf, e.template)
+		t := template.New(w, ios.TerminalWidth(), ios.ColorEnabled())
+		if err := t.Parse(e.template); err != nil {
+			return err
+		}
+		if err := t.Execute(&buf); err != nil {
+			return err
+		}
+		return t.Flush()
 	} else if ios.ColorEnabled() {
 		return jsoncolor.Write(w, &buf, "  ")
 	}
@@ -179,7 +190,7 @@ func (e *exportFormat) exportData(v reflect.Value) interface{} {
 }
 
 type exportable interface {
-	ExportData([]string) *map[string]interface{}
+	ExportData([]string) map[string]interface{}
 }
 
 var exportableType = reflect.TypeOf((*exportable)(nil)).Elem()

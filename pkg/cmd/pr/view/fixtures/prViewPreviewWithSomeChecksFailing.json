@@ -1,0 +1,74 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "number": 12,
+        "title": "Blueberries are from a fork",
+        "state": "OPEN",
+        "body": "**blueberries taste good**",
+        "url": "https://github.com/OWNER/REPO/pull/12",
+        "author": {
+          "login": "nobody"
+        },
+        "additions": 100,
+        "deletions": 10,
+        "assignees": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "labels": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "projectcards": {
+          "nodes": [],
+          "totalcount": 0
+        },
+        "milestone": {
+          "title": ""
+        },
+        "commits": {
+          "totalCount": 12
+        },
+        "baseRefName": "master",
+        "headRefName": "blueberries",
+        "headRepositoryOwner": {
+          "login": "hubot"
+        },
+        "isCrossRepository": true,
+        "isDraft": false,
+        "statusCheckRollup": {
+          "nodes": [
+            {
+              "commit": {
+                "oid": "abc",
+                "statusCheckRollup": {
+                  "contexts": {
+                    "nodes": [
+                      {
+                        "conclusion": "SUCCESS",
+                        "status": "COMPLETED",
+                        "name": "cool tests",
+                        "completedAt": "2020-08-27T19:00:12Z",
+                        "startedAt": "2020-08-27T18:58:46Z",
+                        "detailsUrl": "sweet link"
+                      },
+                      {
+                        "conclusion": "FAILURE",
+                        "status": "COMPLETED",
+                        "name": "sad tests",
+                        "completedAt": "2020-08-27T19:00:12Z",
+                        "startedAt": "2020-08-27T18:58:46Z",
+                        "detailsUrl": "sweet link"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

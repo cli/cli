@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"sort"
@@ -51,7 +51,7 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 		Long: heredoc.Doc(`
 			Create a workflow_dispatch event for a given workflow.
 
-			This command will trigger GitHub Actions to run a given workflow file.  The given workflow file must
+			This command will trigger GitHub Actions to run a given workflow file. The given workflow file must
 			support a workflow_dispatch 'on' trigger in order to be run in this way.
 
 			If the workflow file supports inputs, they can be specified in a few ways:
@@ -78,7 +78,7 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 		`),
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(opts.MagicFields)+len(opts.RawFields) > 0 && len(args) == 0 {
-				return cmdutil.FlagError{Err: fmt.Errorf("workflow argument required when passing -f or -F")}
+				return cmdutil.FlagErrorf("workflow argument required when passing -f or -F")
 			}
 			return nil
 		},
@@ -91,28 +91,28 @@ func NewCmdRun(f *cmdutil.Factory, runF func(*RunOptions) error) *cobra.Command 
 			if len(args) > 0 {
 				opts.Selector = args[0]
 			} else if !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("workflow ID, name, or filename required when not running interactively")}
+				return cmdutil.FlagErrorf("workflow ID, name, or filename required when not running interactively")
 			} else {
 				opts.Prompt = true
 			}
 
 			if opts.JSON && !opts.IO.IsStdinTTY() {
-				jsonIn, err := ioutil.ReadAll(opts.IO.In)
+				jsonIn, err := io.ReadAll(opts.IO.In)
 				if err != nil {
 					return errors.New("failed to read from STDIN")
 				}
 				opts.JSONInput = string(jsonIn)
 			} else if opts.JSON {
-				return cmdutil.FlagError{Err: errors.New("--json specified but nothing on STDIN")}
+				return cmdutil.FlagErrorf("--json specified but nothing on STDIN")
 			}
 
 			if opts.Selector == "" {
 				if opts.JSONInput != "" {
-					return &cmdutil.FlagError{Err: errors.New("workflow argument required when passing JSON")}
+					return cmdutil.FlagErrorf("workflow argument required when passing JSON")
 				}
 			} else {
 				if opts.JSON && inputFieldsPassed {
-					return &cmdutil.FlagError{Err: errors.New("only one of STDIN or -f/-F can be passed")}
+					return cmdutil.FlagErrorf("only one of STDIN or -f/-F can be passed")
 				}
 			}
 
@@ -230,6 +230,7 @@ func collectInputs(yamlContent []byte) (map[string]string, error) {
 	inputAnswer := InputAnswer{
 		providedInputs: providedInputs,
 	}
+	//nolint:staticcheck // SA1019: prompt.SurveyAsk is deprecated: use Prompter
 	err = prompt.SurveyAsk(qs, &inputAnswer)
 	if err != nil {
 		return nil, err
@@ -247,7 +248,7 @@ func runRun(opts *RunOptions) error {
 
 	repo, err := opts.BaseRepo()
 	if err != nil {
-		return fmt.Errorf("could not determine base repo: %w", err)
+		return err
 	}
 
 	ref := opts.Ref

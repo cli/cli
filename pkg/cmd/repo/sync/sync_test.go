@@ -2,7 +2,7 @@ package sync
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -66,11 +66,11 @@ func TestNewCmdSync(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 			argv, err := shlex.Split(tt.input)
 			assert.NoError(t, err)
@@ -262,10 +262,26 @@ func Test_SyncRun(t *testing.T) {
 			wantStdout: "✓ Synced the \"trunk\" branch from OWNER/REPO to local repository\n",
 		},
 		{
-			name: "sync remote fork with parent - tty",
+			name: "sync remote fork with parent with new api - tty",
 			tty:  true,
 			opts: &SyncOptions{
-				DestArg: "OWNER/REPO-FORK",
+				DestArg: "FORKOWNER/REPO-FORK",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
+				reg.Register(
+					httpmock.REST("POST", "repos/FORKOWNER/REPO-FORK/merge-upstream"),
+					httpmock.StatusStringResponse(200, `{"base_branch": "OWNER:trunk"}`))
+			},
+			wantStdout: "✓ Synced the \"FORKOWNER:trunk\" branch from \"OWNER:trunk\"\n",
+		},
+		{
+			name: "sync remote fork with parent using api fallback - tty",
+			tty:  true,
+			opts: &SyncOptions{
+				DestArg: "FORKOWNER/REPO-FORK",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -275,33 +291,30 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.GraphQL(`query RepositoryInfo\b`),
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
 				reg.Register(
+					httpmock.REST("POST", "repos/FORKOWNER/REPO-FORK/merge-upstream"),
+					httpmock.StatusStringResponse(404, `{}`))
+				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads/trunk"),
 					httpmock.StringResponse(`{"object":{"sha":"0xDEADBEEF"}}`))
 				reg.Register(
-					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads/trunk"),
+					httpmock.REST("PATCH", "repos/FORKOWNER/REPO-FORK/git/refs/heads/trunk"),
 					httpmock.StringResponse(`{}`))
 			},
-			wantStdout: "✓ Synced the \"trunk\" branch from OWNER/REPO to OWNER/REPO-FORK\n",
+			wantStdout: "✓ Synced the \"FORKOWNER:trunk\" branch from \"OWNER:trunk\"\n",
 		},
 		{
 			name: "sync remote fork with parent - notty",
 			tty:  false,
 			opts: &SyncOptions{
-				DestArg: "OWNER/REPO-FORK",
+				DestArg: "FORKOWNER/REPO-FORK",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryFindParent\b`),
-					httpmock.StringResponse(`{"data":{"repository":{"parent":{"name":"REPO","owner":{"login": "OWNER"}}}}}`))
 				reg.Register(
 					httpmock.GraphQL(`query RepositoryInfo\b`),
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
 				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads/trunk"),
-					httpmock.StringResponse(`{"object":{"sha":"0xDEADBEEF"}}`))
-				reg.Register(
-					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads/trunk"),
-					httpmock.StringResponse(`{}`))
+					httpmock.REST("POST", "repos/FORKOWNER/REPO-FORK/merge-upstream"),
+					httpmock.StatusStringResponse(200, `{"base_branch": "OWNER:trunk"}`))
 			},
 			wantStdout: "",
 		},
@@ -310,11 +323,15 @@ func Test_SyncRun(t *testing.T) {
 			tty:  true,
 			opts: &SyncOptions{
 				DestArg: "OWNER/REPO",
+				Branch:  "trunk",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/merge-upstream"),
+					httpmock.StatusStringResponse(422, `{"message": "Validation Failed"}`))
+				reg.Register(
 					httpmock.GraphQL(`query RepositoryFindParent\b`),
-					httpmock.StringResponse(`{"data":{"repository":{}}}`))
+					httpmock.StringResponse(`{"data":{"repository":{"parent":null}}}`))
 			},
 			wantErr: true,
 			errMsg:  "can't determine source repository for OWNER/REPO because repository is not fork",
@@ -325,19 +342,14 @@ func Test_SyncRun(t *testing.T) {
 			opts: &SyncOptions{
 				DestArg: "OWNER/REPO",
 				SrcArg:  "OWNER2/REPO2",
+				Branch:  "trunk",
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryInfo\b`),
-					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
-				reg.Register(
-					httpmock.REST("GET", "repos/OWNER2/REPO2/git/refs/heads/trunk"),
-					httpmock.StringResponse(`{"object":{"sha":"0xDEADBEEF"}}`))
-				reg.Register(
-					httpmock.REST("PATCH", "repos/OWNER/REPO/git/refs/heads/trunk"),
-					httpmock.StringResponse(`{}`))
+					httpmock.REST("POST", "repos/OWNER/REPO/merge-upstream"),
+					httpmock.StatusStringResponse(200, `{"base_branch": "OWNER2:trunk"}`))
 			},
-			wantStdout: "✓ Synced the \"trunk\" branch from OWNER2/REPO2 to OWNER/REPO\n",
+			wantStdout: "✓ Synced the \"OWNER:trunk\" branch from \"OWNER2:trunk\"\n",
 		},
 		{
 			name: "sync remote fork with parent and specified branch",
@@ -348,16 +360,10 @@ func Test_SyncRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryFindParent\b`),
-					httpmock.StringResponse(`{"data":{"repository":{"parent":{"name":"REPO","owner":{"login": "OWNER"}}}}}`))
-				reg.Register(
-					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads/test"),
-					httpmock.StringResponse(`{"object":{"sha":"0xDEADBEEF"}}`))
-				reg.Register(
-					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads/test"),
-					httpmock.StringResponse(`{}`))
+					httpmock.REST("POST", "repos/OWNER/REPO-FORK/merge-upstream"),
+					httpmock.StatusStringResponse(200, `{"base_branch": "OWNER:test"}`))
 			},
-			wantStdout: "✓ Synced the \"test\" branch from OWNER/REPO to OWNER/REPO-FORK\n",
+			wantStdout: "✓ Synced the \"OWNER:test\" branch from \"OWNER:test\"\n",
 		},
 		{
 			name: "sync remote fork with parent and force specified",
@@ -374,13 +380,16 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.GraphQL(`query RepositoryInfo\b`),
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
 				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO-FORK/merge-upstream"),
+					httpmock.StatusStringResponse(409, `{"message": "Merge conflict"}`))
+				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads/trunk"),
 					httpmock.StringResponse(`{"object":{"sha":"0xDEADBEEF"}}`))
 				reg.Register(
 					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads/trunk"),
 					httpmock.StringResponse(`{}`))
 			},
-			wantStdout: "✓ Synced the \"trunk\" branch from OWNER/REPO to OWNER/REPO-FORK\n",
+			wantStdout: "✓ Synced the \"OWNER:trunk\" branch from \"OWNER:trunk\"\n",
 		},
 		{
 			name: "sync remote fork with parent and not fast forward merge",
@@ -396,6 +405,9 @@ func Test_SyncRun(t *testing.T) {
 					httpmock.GraphQL(`query RepositoryInfo\b`),
 					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
 				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO-FORK/merge-upstream"),
+					httpmock.StatusStringResponse(409, `{"message": "Merge conflict"}`))
+				reg.Register(
 					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads/trunk"),
 					httpmock.StringResponse(`{"object":{"sha":"0xDEADBEEF"}}`))
 				reg.Register(
@@ -405,12 +417,45 @@ func Test_SyncRun(t *testing.T) {
 							StatusCode: 422,
 							Request:    req,
 							Header:     map[string][]string{"Content-Type": {"application/json"}},
-							Body:       ioutil.NopCloser(bytes.NewBufferString(`{"message":"Update is not a fast forward"}`)),
+							Body:       io.NopCloser(bytes.NewBufferString(`{"message":"Update is not a fast forward"}`)),
 						}, nil
 					})
 			},
 			wantErr: true,
 			errMsg:  "can't sync because there are diverging changes; use `--force` to overwrite the destination branch",
+		},
+		{
+			name: "sync remote fork with parent and no existing branch on fork",
+			tty:  true,
+			opts: &SyncOptions{
+				DestArg: "OWNER/REPO-FORK",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryFindParent\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"parent":{"name":"REPO","owner":{"login": "OWNER"}}}}}`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`{"data":{"repository":{"defaultBranchRef":{"name": "trunk"}}}}`))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO-FORK/merge-upstream"),
+					httpmock.StatusStringResponse(409, `{"message": "Merge conflict"}`))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/git/refs/heads/trunk"),
+					httpmock.StringResponse(`{"object":{"sha":"0xDEADBEEF"}}`))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO-FORK/git/refs/heads/trunk"),
+					func(req *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: 422,
+							Request:    req,
+							Header:     map[string][]string{"Content-Type": {"application/json"}},
+							Body:       io.NopCloser(bytes.NewBufferString(`{"message":"Reference does not exist"}`)),
+						}, nil
+					})
+			},
+			wantErr: true,
+			errMsg:  "trunk branch does not exist on OWNER/REPO-FORK repository",
 		},
 	}
 	for _, tt := range tests {
@@ -422,10 +467,10 @@ func Test_SyncRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdinTTY(tt.tty)
-		io.SetStdoutTTY(tt.tty)
-		tt.opts.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdinTTY(tt.tty)
+		ios.SetStdoutTTY(tt.tty)
+		tt.opts.IO = ios
 
 		repo1, _ := ghrepo.FromFullName("OWNER/REPO")
 		repo2, _ := ghrepo.FromFullName("OWNER2/REPO2")
@@ -454,11 +499,11 @@ func Test_SyncRun(t *testing.T) {
 			defer reg.Verify(t)
 			err := syncRun(tt.opts)
 			if tt.wantErr {
-				assert.Error(t, err)
-				assert.Equal(t, tt.errMsg, err.Error())
+				assert.EqualError(t, err, tt.errMsg)
 				return
+			} else if err != nil {
+				t.Fatalf("syncRun() unexpected error: %v", err)
 			}
-			assert.NoError(t, err)
 			assert.Equal(t, tt.wantStdout, stdout.String())
 		})
 	}

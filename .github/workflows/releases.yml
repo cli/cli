@@ -5,30 +5,52 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write  # publishing releases
+  repository-projects: write  # move cards between columns
+
 jobs:
   goreleaser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-      - name: Set up Go 1.16
-        uses: actions/setup-go@v2
+        uses: actions/checkout@v3
         with:
-          go-version: 1.16
+          fetch-depth: 0
+      - name: Set up Go 1.19
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
       - name: Generate changelog
+        id: changelog
         run: |
-          echo "GORELEASER_CURRENT_TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-          git fetch --unshallow
-          script/changelog | tee CHANGELOG.md
+          echo "::set-output name=tag-name::${GITHUB_REF#refs/tags/}"
+          gh api repos/$GITHUB_REPOSITORY/releases/generate-notes \
+            -f tag_name="${GITHUB_REF#refs/tags/}" \
+            -f target_commitish=trunk \
+            -q .body > CHANGELOG.md
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Install osslsigncode
+        run: sudo apt-get install -y osslsigncode
+      - name: Obtain signing cert
+        run: |
+          cert="$(mktemp -t cert.XXX)"
+          base64 -d <<<"$CERT_CONTENTS" > "$cert"
+          echo "CERT_FILE=$cert" >> $GITHUB_ENV
+        env:
+          CERT_CONTENTS: ${{ secrets.WINDOWS_CERT_PFX }}
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
+        uses: goreleaser/goreleaser-action@v4
         with:
-          version: v0.174.1
+          version: "~1.13.1"
           args: release --release-notes=CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          GORELEASER_CURRENT_TAG: ${{steps.changelog.outputs.tag-name}}
+          CERT_PASSWORD: ${{secrets.WINDOWS_CERT_PASSWORD}}
       - name: Checkout documentation site
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: github/cli.github.com
           path: site
@@ -55,16 +77,15 @@ jobs:
             api-write --silent projects/columns/cards/$card/moves -f position=top -F column_id=$DONE_COLUMN
           done
           echo "moved ${#cards[@]} cards to the Done column"
-      
       - name: Install packaging dependencies
         run: sudo apt-get install -y rpm reprepro
       - name: Set up GPG
         run: |
-          gpg --import --no-tty --batch --yes < script/pubkey.asc
+          echo "${{secrets.GPG_PUBKEY}}" | base64 -d | gpg --import --no-tty --batch --yes
           echo "${{secrets.GPG_KEY}}" | base64 -d | gpg --import --no-tty --batch --yes
           echo "allow-preset-passphrase" > ~/.gnupg/gpg-agent.conf
           gpg-connect-agent RELOADAGENT /bye
-          echo "${{secrets.GPG_PASSPHRASE}}" | /usr/lib/gnupg2/gpg-preset-passphrase --preset 867DAD5051270B843EF54F6186FA10E3A1D22DC5
+          echo "${{secrets.GPG_PASSPHRASE}}" | /usr/lib/gnupg2/gpg-preset-passphrase --preset "${{secrets.GPG_KEYGRIP}}"
       - name: Sign RPMs
         run: |
           cp script/rpmmacros ~/.rpmmacros
@@ -80,6 +101,9 @@ jobs:
           popd
       - name: Run reprepro
         env:
+          # We are no longer adding to the distribution list.
+          # All apt distributions should use "stable" according to our install documentation.
+          # In the future we will remove legacy distributions listed here.
           RELEASES: "cosmic eoan disco groovy focal stable oldstable testing sid unstable buster bullseye stretch jessie bionic trusty precise xenial hirsute impish kali-rolling"
         run: |
           mkdir -p upload
@@ -113,7 +137,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Download gh.exe
         id: download_exe
         shell: bash
@@ -123,34 +147,33 @@ jobs:
           unzip -o *.zip && rm -v *.zip
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-      - name: Install go-msi
-        run: choco install -y "go-msi"
       - name: Prepare PATH
-        shell: bash
-        run: |
-          echo "$WIX\\bin" >> $GITHUB_PATH
-          echo "C:\\Program Files\\go-msi" >> $GITHUB_PATH
+        id: setupmsbuild
+        uses: microsoft/setup-msbuild@v1.3.1
       - name: Build MSI
         id: buildmsi
         shell: bash
         env:
           ZIP_FILE: ${{ steps.download_exe.outputs.zip }}
+          MSBUILD_PATH: ${{ steps.setupmsbuild.outputs.msbuildPath }}
         run: |
-          mkdir -p build
-          msi="$(basename "$ZIP_FILE" ".zip").msi"
-          printf "::set-output name=msi::%s\n" "$msi"
-          go-msi make --msi "$PWD/$msi" --out "$PWD/build" --version "${GITHUB_REF#refs/tags/}"
+          name="$(basename "$ZIP_FILE" ".zip")"
+          version="$(echo -e ${GITHUB_REF#refs/tags/v} | sed s/-.*$//)"
+          "${MSBUILD_PATH}\MSBuild.exe" ./build/windows/gh.wixproj -p:SourceDir="$PWD" -p:OutputPath="$PWD" -p:OutputName="$name" -p:ProductVersion="$version"
       - name: Obtain signing cert
         id: obtain_cert
+        shell: bash
+        run: |
+          base64 -d <<<"$CERT_CONTENTS" > ./cert.pfx
+          printf "::set-output name=cert-file::%s\n" ".\\cert.pfx"
         env:
-          DESKTOP_CERT_TOKEN: ${{ secrets.DESKTOP_CERT_TOKEN }}
-        run: .\script\setup-windows-certificate.ps1
+          CERT_CONTENTS: ${{ secrets.WINDOWS_CERT_PFX }}
       - name: Sign MSI
         env:
           CERT_FILE: ${{ steps.obtain_cert.outputs.cert-file }}
           EXE_FILE: ${{ steps.buildmsi.outputs.msi }}
-          GITHUB_CERT_PASSWORD: ${{ secrets.GITHUB_CERT_PASSWORD }}
-        run: .\script\sign.ps1 -Certificate $env:CERT_FILE -Executable $env:EXE_FILE
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: .\script\signtool sign /d "GitHub CLI" /f $env:CERT_FILE /p $env:CERT_PASSWORD /fd sha256 /tr http://timestamp.digicert.com /v $env:EXE_FILE
       - name: Upload MSI
         shell: bash
         run: |
@@ -167,14 +190,14 @@ jobs:
           DISCUSSION_CATEGORY: General
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Bump homebrew-core formula
-        uses: mislav/bump-homebrew-formula-action@v1
+        uses: mislav/bump-homebrew-formula-action@v2
         if: "!contains(github.ref, '-')" # skip prereleases
         with:
           formula-name: gh
         env:
           COMMITTER_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
       - name: Checkout scoop bucket
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: cli/scoop-gh
           path: scoop-gh
@@ -197,18 +220,3 @@ jobs:
           GIT_AUTHOR_NAME: cli automation
           GIT_COMMITTER_EMAIL: noreply@github.com
           GIT_AUTHOR_EMAIL: noreply@github.com
-      - name: Bump Winget manifest
-        shell: pwsh
-        env:
-          WINGETCREATE_VERSION: v0.2.0.29-preview
-          GITHUB_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
-        run: |
-          $tagname = $env:GITHUB_REF.Replace("refs/tags/", "")
-          $version = $tagname.Replace("v", "")
-          $url = "https://github.com/cli/cli/releases/download/${tagname}/gh_${version}_windows_amd64.msi"
-          iwr https://github.com/microsoft/winget-create/releases/download/${env:WINGETCREATE_VERSION}/wingetcreate.exe -OutFile wingetcreate.exe
-
-          .\wingetcreate.exe update GitHub.cli --url $url --version $version
-          if ($version -notmatch "-") {
-            .\wingetcreate.exe submit .\manifests\g\GitHub\cli\${version}\ --token $env:GITHUB_TOKEN
-          }

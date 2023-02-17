@@ -10,6 +10,7 @@ type stringSet struct {
 func NewStringSet() *stringSet {
 	s := &stringSet{}
 	s.m = make(map[string]struct{})
+	s.v = []string{}
 	return s
 }
 
@@ -66,4 +67,18 @@ func (s *stringSet) Len() int {
 
 func (s *stringSet) ToSlice() []string {
 	return s.v
+}
+
+func (s1 *stringSet) Equal(s2 *stringSet) bool {
+	if s1.Len() != s2.Len() {
+		return false
+	}
+	isEqual := true
+	for _, v := range s1.v {
+		if !s2.Contains(v) {
+			isEqual = false
+			break
+		}
+	}
+	return isEqual
 }

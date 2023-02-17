@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmd/gist/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -79,11 +78,11 @@ func TestNewCmdView(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdoutTTY(tt.tty)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.tty)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			argv, err := shlex.Split(tt.cli)
@@ -356,9 +355,9 @@ func Test_viewRun(t *testing.T) {
 				)),
 			)
 
-			as, surveyteardown := prompt.InitAskStubber()
-			defer surveyteardown()
-			as.StubOne(0)
+			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
+			as := prompt.NewAskStubber(t)
+			as.StubPrompt("Select a gist").AnswerDefault()
 		}
 
 		if tt.opts == nil {
@@ -373,9 +372,9 @@ func Test_viewRun(t *testing.T) {
 			return config.NewBlankConfig(), nil
 		}
 
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdoutTTY(true)
-		tt.opts.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdoutTTY(true)
+		tt.opts.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := viewRun(tt.opts)
@@ -393,16 +392,18 @@ func Test_viewRun(t *testing.T) {
 
 func Test_promptGists(t *testing.T) {
 	tests := []struct {
-		name      string
-		gistIndex int
-		response  string
-		wantOut   string
-		gist      *shared.Gist
-		wantErr   bool
+		name     string
+		askStubs func(as *prompt.AskStubber)
+		response string
+		wantOut  string
+		gist     *shared.Gist
+		wantErr  bool
 	}{
 		{
-			name:      "multiple files, select first gist",
-			gistIndex: 0,
+			name: "multiple files, select first gist",
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Select a gist").AnswerWith("cool.txt  about 6 hours ago")
+			},
 			response: `{ "data": { "viewer": { "gists": { "nodes": [
 							{
 								"name": "gistid1",
@@ -422,8 +423,10 @@ func Test_promptGists(t *testing.T) {
 			wantOut: "gistid1",
 		},
 		{
-			name:      "multiple files, select second gist",
-			gistIndex: 1,
+			name: "multiple files, select second gist",
+			askStubs: func(as *prompt.AskStubber) {
+				as.StubPrompt("Select a gist").AnswerWith("gistfile0.txt  about 6 hours ago")
+			},
 			response: `{ "data": { "viewer": { "gists": { "nodes": [
 							{
 								"name": "gistid1",
@@ -449,7 +452,7 @@ func Test_promptGists(t *testing.T) {
 		},
 	}
 
-	io, _, _, _ := iostreams.Test()
+	ios, _, _, _ := iostreams.Test()
 
 	for _, tt := range tests {
 		reg := &httpmock.Registry{}
@@ -466,12 +469,14 @@ func Test_promptGists(t *testing.T) {
 		)
 		client := &http.Client{Transport: reg}
 
-		as, surveyteardown := prompt.InitAskStubber()
-		defer surveyteardown()
-		as.StubOne(tt.gistIndex)
-
 		t.Run(tt.name, func(t *testing.T) {
-			gistID, err := promptGists(client, ghinstance.Default(), io.ColorScheme())
+			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
+			as := prompt.NewAskStubber(t)
+			if tt.askStubs != nil {
+				tt.askStubs(as)
+			}
+
+			gistID, err := promptGists(client, "github.com", ios.ColorScheme())
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantOut, gistID)
 			reg.Verify(t)

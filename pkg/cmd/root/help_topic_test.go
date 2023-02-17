@@ -61,11 +61,11 @@ func TestNewHelpTopic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, stdout, stderr := iostreams.Test()
+			ios, _, _, stderr := iostreams.Test()
 
-			cmd := NewHelpTopic(tt.topic)
+			cmd := NewHelpTopic(ios, tt.topic)
 			cmd.SetArgs(append(tt.args, tt.flags...))
-			cmd.SetOut(stdout)
+			cmd.SetOut(stderr)
 			cmd.SetErr(stderr)
 
 			_, err := cmd.ExecuteC()

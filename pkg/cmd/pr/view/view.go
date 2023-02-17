@@ -1,29 +1,26 @@
 package view
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/markdown"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
-type browser interface {
-	Browse(string) error
-}
-
 type ViewOptions struct {
 	IO      *iostreams.IOStreams
-	Browser browser
+	Browser browser.Browser
 
 	Finder   shared.PRFinder
 	Exporter cmdutil.Exporter
@@ -31,12 +28,15 @@ type ViewOptions struct {
 	SelectorArg string
 	BrowserMode bool
 	Comments    bool
+
+	Now func() time.Time
 }
 
 func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Command {
 	opts := &ViewOptions{
 		IO:      f.IOStreams,
 		Browser: f.Browser,
+		Now:     time.Now,
 	}
 
 	cmd := &cobra.Command{
@@ -55,7 +55,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 			opts.Finder = shared.NewFinder(f)
 
 			if repoOverride, _ := cmd.Flags().GetString("repo"); repoOverride != "" && len(args) == 0 {
-				return &cmdutil.FlagError{Err: errors.New("argument required when using the --repo flag")}
+				return cmdutil.FlagErrorf("argument required when using the --repo flag")
 			}
 
 			if len(args) > 0 {
@@ -81,7 +81,7 @@ var defaultFields = []string{
 	"isDraft", "maintainerCanModify", "mergeable", "additions", "deletions", "commitsCount",
 	"baseRefName", "headRefName", "headRepositoryOwner", "headRepository", "isCrossRepository",
 	"reviewRequests", "reviews", "assignees", "labels", "projectCards", "milestone",
-	"comments", "reactionGroups",
+	"comments", "reactionGroups", "createdAt", "statusCheckRollup",
 }
 
 func viewRun(opts *ViewOptions) error {
@@ -99,23 +99,22 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	connectedToTerminal := opts.IO.IsStdoutTTY() && opts.IO.IsStderrTTY()
+	connectedToTerminal := opts.IO.IsStdoutTTY()
 
 	if opts.BrowserMode {
 		openURL := pr.URL
 		if connectedToTerminal {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 		}
 		return opts.Browser.Browse(openURL)
 	}
 
 	opts.IO.DetectTerminalTheme()
-
-	err = opts.IO.StartPager()
-	if err != nil {
-		return err
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
-	defer opts.IO.StopPager()
 
 	if opts.Exporter != nil {
 		return opts.Exporter.Write(opts.IO, pr)
@@ -172,15 +171,29 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 	// Header (Title and State)
 	fmt.Fprintf(out, "%s #%d\n", cs.Bold(pr.Title), pr.Number)
 	fmt.Fprintf(out,
-		"%s • %s wants to merge %s into %s from %s • %s %s \n",
+		"%s • %s wants to merge %s into %s from %s • %s\n",
 		shared.StateTitleWithColor(cs, *pr),
 		pr.Author.Login,
-		utils.Pluralize(pr.Commits.TotalCount, "commit"),
+		text.Pluralize(pr.Commits.TotalCount, "commit"),
 		pr.BaseRefName,
 		pr.HeadRefName,
+		text.FuzzyAgo(opts.Now(), pr.CreatedAt),
+	)
+
+	// added/removed
+	fmt.Fprintf(out,
+		"%s %s",
 		cs.Green("+"+strconv.Itoa(pr.Additions)),
 		cs.Red("-"+strconv.Itoa(pr.Deletions)),
 	)
+
+	// checks
+	checks := pr.ChecksStatus()
+	if summary := shared.PrCheckStatusSummaryWithColor(cs, checks); summary != "" {
+		fmt.Fprintf(out, " • %s\n", summary)
+	} else {
+		fmt.Fprintln(out)
+	}
 
 	// Reactions
 	if reactions := shared.ReactionGroupList(pr.ReactionGroups); reactions != "" {
@@ -216,8 +229,9 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 	if pr.Body == "" {
 		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
 	} else {
-		style := markdown.GetStyle(opts.IO.TerminalTheme())
-		md, err = markdown.Render(pr.Body, style)
+		md, err = markdown.Render(pr.Body,
+			markdown.WithTheme(opts.IO.TerminalTheme()),
+			markdown.WithWrap(opts.IO.TerminalWidth()))
 		if err != nil {
 			return err
 		}
@@ -256,26 +270,23 @@ type reviewerState struct {
 
 // formattedReviewerState formats a reviewerState with state color
 func formattedReviewerState(cs *iostreams.ColorScheme, reviewer *reviewerState) string {
-	state := reviewer.State
-	if state == dismissedReviewState {
+	var displayState string
+	switch reviewer.State {
+	case requestedReviewState:
+		displayState = cs.Yellow("Requested")
+	case approvedReviewState:
+		displayState = cs.Green("Approved")
+	case changesRequestedReviewState:
+		displayState = cs.Red("Changes requested")
+	case commentedReviewState, dismissedReviewState:
 		// Show "DISMISSED" review as "COMMENTED", since "dismissed" only makes
 		// sense when displayed in an events timeline but not in the final tally.
-		state = commentedReviewState
-	}
-
-	var colorFunc func(string) string
-	switch state {
-	case requestedReviewState:
-		colorFunc = cs.Yellow
-	case approvedReviewState:
-		colorFunc = cs.Green
-	case changesRequestedReviewState:
-		colorFunc = cs.Red
+		displayState = "Commented"
 	default:
-		colorFunc = func(str string) string { return str } // Do nothing
+		displayState = text.Title(reviewer.State)
 	}
 
-	return fmt.Sprintf("%s (%s)", reviewer.Name, colorFunc(strings.ReplaceAll(strings.Title(strings.ToLower(state)), "_", " ")))
+	return fmt.Sprintf("%s (%s)", reviewer.Name, displayState)
 }
 
 // prReviewerList generates a reviewer list with their last state

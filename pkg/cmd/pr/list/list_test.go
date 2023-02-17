@@ -2,12 +2,14 @@ package list
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -19,14 +21,14 @@ import (
 )
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(isTTY)
-	io.SetStdinTTY(isTTY)
-	io.SetStderrTTY(isTTY)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(isTTY)
+	ios.SetStdinTTY(isTTY)
+	ios.SetStderrTTY(isTTY)
 
-	browser := &cmdutil.TestBrowser{}
+	browser := &browser.Stub{}
 	factory := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		Browser:   browser,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
@@ -36,7 +38,14 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 		},
 	}
 
-	cmd := NewCmdList(factory, nil)
+	fakeNow := func() time.Time {
+		return time.Date(2022, time.August, 24, 23, 50, 0, 0, time.UTC)
+	}
+
+	cmd := NewCmdList(factory, func(opts *ListOptions) error {
+		opts.Now = fakeNow
+		return listRun(opts)
+	})
 
 	argv, err := shlex.Split(cli)
 	if err != nil {
@@ -45,8 +54,8 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
@@ -75,9 +84,9 @@ func TestPRList(t *testing.T) {
 
 		Showing 3 of 3 open pull requests in OWNER/REPO
 
-		#32  New feature            feature
-		#29  Fixed bad bug          hubot:bug-fix
-		#28  Improve documentation  docs
+		#32  New feature            feature        about 3 hours ago
+		#29  Fixed bad bug          hubot:bug-fix  about 1 month ago
+		#28  Improve documentation  docs           about 2 years ago
 	`), output.String())
 	assert.Equal(t, ``, output.Stderr())
 }
@@ -95,9 +104,9 @@ func TestPRList_nontty(t *testing.T) {
 
 	assert.Equal(t, "", output.Stderr())
 
-	assert.Equal(t, `32	New feature	feature	DRAFT
-29	Fixed bad bug	hubot:bug-fix	OPEN
-28	Improve documentation	docs	MERGED
+	assert.Equal(t, `32	New feature	feature	DRAFT	2022-08-24 20:01:12 +0000 UTC
+29	Fixed bad bug	hubot:bug-fix	OPEN	2022-07-20 19:01:12 +0000 UTC
+28	Improve documentation	docs	MERGED	2020-01-26 19:01:12 +0000 UTC
 `, output.String())
 }
 
@@ -112,15 +121,10 @@ func TestPRList_filtering(t *testing.T) {
 		}))
 
 	output, err := runCommand(http, true, `-s all`)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Error(t, err)
 
+	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
-	assert.Equal(t, `
-No pull requests match your search in OWNER/REPO
-
-`, output.String())
 }
 
 func TestPRList_filteringRemoveDuplicate(t *testing.T) {
@@ -155,9 +159,21 @@ func TestPRList_filteringClosed(t *testing.T) {
 		}))
 
 	_, err := runCommand(http, true, `-s closed`)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Error(t, err)
+}
+
+func TestPRList_filteringHeadBranch(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query PullRequestList\b`),
+		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
+			assert.Equal(t, interface{}("bug-fix"), params["headBranch"])
+		}))
+
+	_, err := runCommand(http, true, `-H bug-fix`)
+	assert.Error(t, err)
 }
 
 func TestPRList_filteringAssignee(t *testing.T) {
@@ -167,13 +183,11 @@ func TestPRList_filteringAssignee(t *testing.T) {
 	http.Register(
 		httpmock.GraphQL(`query PullRequestSearch\b`),
 		httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
-			assert.Equal(t, `repo:OWNER/REPO is:pr is:merged assignee:hubot label:"needs tests" base:develop`, params["q"].(string))
+			assert.Equal(t, `assignee:hubot base:develop is:merged label:"needs tests" repo:OWNER/REPO type:pr`, params["q"].(string))
 		}))
 
 	_, err := runCommand(http, true, `-s merged -l "needs tests" -a hubot -B develop`)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.Error(t, err)
 }
 
 func TestPRList_filteringDraft(t *testing.T) {
@@ -185,12 +199,12 @@ func TestPRList_filteringDraft(t *testing.T) {
 		{
 			name:          "draft",
 			cli:           "--draft",
-			expectedQuery: `repo:OWNER/REPO is:pr is:open draft:true`,
+			expectedQuery: `draft:true repo:OWNER/REPO state:open type:pr`,
 		},
 		{
 			name:          "non-draft",
 			cli:           "--draft=false",
-			expectedQuery: `repo:OWNER/REPO is:pr is:open draft:false`,
+			expectedQuery: `draft:false repo:OWNER/REPO state:open type:pr`,
 		},
 	}
 
@@ -206,9 +220,52 @@ func TestPRList_filteringDraft(t *testing.T) {
 				}))
 
 			_, err := runCommand(http, true, test.cli)
-			if err != nil {
-				t.Fatal(err)
-			}
+			assert.Error(t, err)
+		})
+	}
+}
+
+func TestPRList_filteringAuthor(t *testing.T) {
+	tests := []struct {
+		name          string
+		cli           string
+		expectedQuery string
+	}{
+		{
+			name:          "author @me",
+			cli:           `--author "@me"`,
+			expectedQuery: `author:@me repo:OWNER/REPO state:open type:pr`,
+		},
+		{
+			name:          "author user",
+			cli:           `--author "monalisa"`,
+			expectedQuery: `author:monalisa repo:OWNER/REPO state:open type:pr`,
+		},
+		{
+			name:          "app author",
+			cli:           `--author "app/dependabot"`,
+			expectedQuery: `author:app/dependabot repo:OWNER/REPO state:open type:pr`,
+		},
+		{
+			name:          "app author with app option",
+			cli:           `--app "dependabot"`,
+			expectedQuery: `author:app/dependabot repo:OWNER/REPO state:open type:pr`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			http := initFakeHTTP()
+			defer http.Verify(t)
+
+			http.Register(
+				httpmock.GraphQL(`query PullRequestSearch\b`),
+				httpmock.GraphQLQuery(`{}`, func(_ string, params map[string]interface{}) {
+					assert.Equal(t, test.expectedQuery, params["q"].(string))
+				}))
+
+			_, err := runCommand(http, true, test.cli)
+			assert.Error(t, err)
 		})
 	}
 }
@@ -229,17 +286,17 @@ func TestPRList_web(t *testing.T) {
 		{
 			name:               "filters",
 			cli:                "-a peter -l bug -l docs -L 10 -s merged -B trunk",
-			expectedBrowserURL: "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Amerged+assignee%3Apeter+label%3Abug+label%3Adocs+base%3Atrunk",
+			expectedBrowserURL: "https://github.com/OWNER/REPO/pulls?q=assignee%3Apeter+base%3Atrunk+is%3Amerged+label%3Abug+label%3Adocs+type%3Apr",
 		},
 		{
 			name:               "draft",
 			cli:                "--draft=true",
-			expectedBrowserURL: "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Aopen+draft%3Atrue",
+			expectedBrowserURL: "https://github.com/OWNER/REPO/pulls?q=draft%3Atrue+state%3Aopen+type%3Apr",
 		},
 		{
 			name:               "non-draft",
 			cli:                "--draft=0",
-			expectedBrowserURL: "https://github.com/OWNER/REPO/pulls?q=is%3Apr+is%3Aopen+draft%3Afalse",
+			expectedBrowserURL: "https://github.com/OWNER/REPO/pulls?q=draft%3Afalse+state%3Aopen+type%3Apr",
 		},
 	}
 

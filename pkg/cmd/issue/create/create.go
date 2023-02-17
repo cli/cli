@@ -1,32 +1,29 @@
 package create
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
-
-type browser interface {
-	Browse(string) error
-}
 
 type CreateOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
-	Browser    browser
+	Browser    browser.Browser
+	Prompter   prShared.Prompt
 
 	RootDirOverride string
 
@@ -50,6 +47,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
 		Browser:    f.Browser,
+		Prompter:   f.Prompter,
 	}
 
 	var bodyFile string
@@ -57,6 +55,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a new issue",
+		Long: heredoc.Doc(`
+			Create an issue on GitHub.
+
+			Adding an issue to projects requires authorization with the "project" scope.
+			To authorize, run "gh auth refresh -s project".
+		`),
 		Example: heredoc.Doc(`
 			$ gh issue create --title "I found a bug" --body "Nothing works"
 			$ gh issue create --label "bug,help wanted"
@@ -65,7 +69,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			$ gh issue create --assignee "@me"
 			$ gh issue create --project "Roadmap"
 		`),
-		Args: cmdutil.NoArgsQuoteReminder,
+		Args:    cmdutil.NoArgsQuoteReminder,
+		Aliases: []string{"new"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
@@ -83,13 +88,13 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 
 			if !opts.IO.CanPrompt() && opts.RecoverFile != "" {
-				return &cmdutil.FlagError{Err: errors.New("`--recover` only supported when running interactively")}
+				return cmdutil.FlagErrorf("`--recover` only supported when running interactively")
 			}
 
 			opts.Interactive = !(titleProvided && bodyProvided)
 
 			if opts.Interactive && !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("must provide title and body when not running interactively")}
+				return cmdutil.FlagErrorf("must provide `--title` and `--body` when not running interactively")
 			}
 
 			if runF != nil {
@@ -155,7 +160,7 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 	}
 
-	tpl := shared.NewTemplateManager(httpClient, baseRepo, opts.RootDirOverride, !opts.HasRepoOverride, false)
+	tpl := shared.NewTemplateManager(httpClient, baseRepo, opts.Prompter, opts.RootDirOverride, !opts.HasRepoOverride, false)
 
 	if opts.WebMode {
 		var openURL string
@@ -164,7 +169,7 @@ func createRun(opts *CreateOptions) (err error) {
 			if err != nil {
 				return
 			}
-			if !utils.ValidURL(openURL) {
+			if !prShared.ValidURL(openURL) {
 				err = fmt.Errorf("cannot open in browser: maximum URL length exceeded")
 				return
 			}
@@ -174,7 +179,7 @@ func createRun(opts *CreateOptions) (err error) {
 			openURL = ghrepo.GenerateRepoURL(baseRepo, "issues/new")
 		}
 		if isTerminal {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 		}
 		return opts.Browser.Browse(openURL)
 	}
@@ -197,16 +202,10 @@ func createRun(opts *CreateOptions) (err error) {
 	var openURL string
 
 	if opts.Interactive {
-		var editorCommand string
-		editorCommand, err = cmdutil.DetermineEditor(opts.Config)
-		if err != nil {
-			return
-		}
-
 		defer prShared.PreserveInput(opts.IO, &tb, &err)()
 
 		if opts.Title == "" {
-			err = prShared.TitleSurvey(&tb)
+			err = prShared.TitleSurvey(opts.Prompter, &tb)
 			if err != nil {
 				return
 			}
@@ -230,7 +229,7 @@ func createRun(opts *CreateOptions) (err error) {
 				}
 			}
 
-			err = prShared.BodySurvey(&tb, templateContent, editorCommand)
+			err = prShared.BodySurvey(opts.Prompter, &tb, templateContent)
 			if err != nil {
 				return
 			}
@@ -241,8 +240,8 @@ func createRun(opts *CreateOptions) (err error) {
 			return
 		}
 
-		allowPreview := !tb.HasMetadata() && utils.ValidURL(openURL)
-		action, err = prShared.ConfirmSubmission(allowPreview, repo.ViewerCanTriage())
+		allowPreview := !tb.HasMetadata() && prShared.ValidURL(openURL)
+		action, err = prShared.ConfirmIssueSubmission(opts.Prompter, allowPreview, repo.ViewerCanTriage())
 		if err != nil {
 			err = fmt.Errorf("unable to confirm: %w", err)
 			return
@@ -260,7 +259,7 @@ func createRun(opts *CreateOptions) (err error) {
 				return
 			}
 
-			action, err = prShared.ConfirmSubmission(!tb.HasMetadata(), false)
+			action, err = prShared.ConfirmIssueSubmission(opts.Prompter, !tb.HasMetadata(), false)
 			if err != nil {
 				return
 			}
@@ -280,7 +279,7 @@ func createRun(opts *CreateOptions) (err error) {
 
 	if action == prShared.PreviewAction {
 		if isTerminal {
-			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", utils.DisplayURL(openURL))
+			fmt.Fprintf(opts.IO.ErrOut, "Opening %s in your browser.\n", text.DisplayURL(openURL))
 		}
 		return opts.Browser.Browse(openURL)
 	} else if action == prShared.SubmitAction {

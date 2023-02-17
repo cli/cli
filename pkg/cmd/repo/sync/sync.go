@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"regexp"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -14,6 +14,11 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
+)
+
+const (
+	notFastForwardErrorMessage     = "Update is not a fast forward"
+	branchDoesNotExistErrorMessage = "Reference does not exist"
 )
 
 type SyncOptions struct {
@@ -34,7 +39,7 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		BaseRepo:   f.BaseRepo,
 		Remotes:    f.Remotes,
-		Git:        &gitExecuter{io: f.IOStreams},
+		Git:        &gitExecuter{client: f.GitClient},
 	}
 
 	cmd := &cobra.Command{
@@ -43,7 +48,7 @@ func NewCmdSync(f *cmdutil.Factory, runF func(*SyncOptions) error) *cobra.Comman
 		Long: heredoc.Docf(`
 			Sync destination repository from source repository. Syncing uses the main branch
 			of the source repository to update the matching branch on the destination
-			repository so they are equal. A fast forward update will be used execept when the
+			repository so they are equal. A fast forward update will be used except when the
 			%[1]s--force%[1]s flag is specified, then the two branches will
 			by synced using a hard reset.
 
@@ -177,38 +182,19 @@ func syncRemoteRepo(opts *SyncOptions) error {
 		return err
 	}
 
-	if opts.SrcArg == "" {
-		opts.IO.StartProgressIndicator()
-		srcRepo, err = api.RepoParent(apiClient, destRepo)
-		opts.IO.StopProgressIndicator()
-		if err != nil {
-			return err
-		}
-		if srcRepo == nil {
-			return fmt.Errorf("can't determine source repository for %s because repository is not fork", ghrepo.FullName(destRepo))
-		}
-	} else {
+	if opts.SrcArg != "" {
 		srcRepo, err = ghrepo.FromFullName(opts.SrcArg)
 		if err != nil {
 			return err
 		}
 	}
 
-	if destRepo.RepoHost() != srcRepo.RepoHost() {
+	if srcRepo != nil && destRepo.RepoHost() != srcRepo.RepoHost() {
 		return fmt.Errorf("can't sync repositories from different hosts")
 	}
 
-	if opts.Branch == "" {
-		opts.IO.StartProgressIndicator()
-		opts.Branch, err = api.RepoDefaultBranch(apiClient, srcRepo)
-		opts.IO.StopProgressIndicator()
-		if err != nil {
-			return err
-		}
-	}
-
 	opts.IO.StartProgressIndicator()
-	err = executeRemoteRepoSync(apiClient, destRepo, srcRepo, opts)
+	baseBranchLabel, err := executeRemoteRepoSync(apiClient, destRepo, srcRepo, opts)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		if errors.Is(err, divergingError) {
@@ -219,11 +205,15 @@ func syncRemoteRepo(opts *SyncOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.Out, "%s Synced the \"%s\" branch from %s to %s\n",
+		branchName := opts.Branch
+		if idx := strings.Index(baseBranchLabel, ":"); idx >= 0 {
+			branchName = baseBranchLabel[idx+1:]
+		}
+		fmt.Fprintf(opts.IO.Out, "%s Synced the \"%s:%s\" branch from \"%s\"\n",
 			cs.SuccessIcon(),
-			opts.Branch,
-			ghrepo.FullName(srcRepo),
-			ghrepo.FullName(destRepo))
+			destRepo.RepoOwner(),
+			branchName,
+			baseBranchLabel)
 	}
 
 	return nil
@@ -294,20 +284,54 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 	return nil
 }
 
-func executeRemoteRepoSync(client *api.Client, destRepo, srcRepo ghrepo.Interface, opts *SyncOptions) error {
-	commit, err := latestCommit(client, srcRepo, opts.Branch)
+func executeRemoteRepoSync(client *api.Client, destRepo, srcRepo ghrepo.Interface, opts *SyncOptions) (string, error) {
+	branchName := opts.Branch
+	if branchName == "" {
+		var err error
+		branchName, err = api.RepoDefaultBranch(client, destRepo)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	var apiErr upstreamMergeErr
+	if baseBranch, err := triggerUpstreamMerge(client, destRepo, branchName); err == nil {
+		return baseBranch, nil
+	} else if !errors.As(err, &apiErr) {
+		return "", err
+	}
+
+	if srcRepo == nil {
+		var err error
+		srcRepo, err = api.RepoParent(client, destRepo)
+		if err != nil {
+			return "", err
+		}
+		if srcRepo == nil {
+			return "", fmt.Errorf("can't determine source repository for %s because repository is not fork", ghrepo.FullName(destRepo))
+		}
+	}
+
+	commit, err := latestCommit(client, srcRepo, branchName)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// This is not a great way to detect the error returned by the API
 	// Unfortunately API returns 422 for multiple reasons
-	notFastForwardErrorMessage := regexp.MustCompile(`^Update is not a fast forward$`)
-	err = syncFork(client, destRepo, opts.Branch, commit.Object.SHA, opts.Force)
+	err = syncFork(client, destRepo, branchName, commit.Object.SHA, opts.Force)
 	var httpErr api.HTTPError
-	if err != nil && errors.As(err, &httpErr) && notFastForwardErrorMessage.MatchString(httpErr.Message) {
-		return divergingError
+	if err != nil {
+		if errors.As(err, &httpErr) {
+			switch httpErr.Message {
+			case notFastForwardErrorMessage:
+				return "", divergingError
+			case branchDoesNotExistErrorMessage:
+				return "", fmt.Errorf("%s branch does not exist on %s repository", branchName, ghrepo.FullName(destRepo))
+			}
+		}
+		return "", err
 	}
 
-	return err
+	return fmt.Sprintf("%s:%s", srcRepo.RepoOwner(), branchName), nil
 }

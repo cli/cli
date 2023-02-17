@@ -7,14 +7,15 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/text"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/cli/cli/v2/utils"
 )
 
-func PrintIssues(io *iostreams.IOStreams, prefix string, totalCount int, issues []api.Issue) {
+func PrintIssues(io *iostreams.IOStreams, now time.Time, prefix string, totalCount int, issues []api.Issue) {
 	cs := io.ColorScheme()
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	table := utils.NewTablePrinter(io)
 	for _, issue := range issues {
 		issueNum := strconv.Itoa(issue.Number)
@@ -22,16 +23,14 @@ func PrintIssues(io *iostreams.IOStreams, prefix string, totalCount int, issues 
 			issueNum = "#" + issueNum
 		}
 		issueNum = prefix + issueNum
-		now := time.Now()
-		ago := now.Sub(issue.UpdatedAt)
-		table.AddField(issueNum, nil, cs.ColorFromString(prShared.ColorForState(issue.State)))
+		table.AddField(issueNum, nil, cs.ColorFromString(prShared.ColorForIssueState(issue)))
 		if !table.IsTTY() {
 			table.AddField(issue.State, nil, nil)
 		}
-		table.AddField(text.ReplaceExcessiveWhitespace(issue.Title), nil, nil)
+		table.AddField(text.RemoveExcessiveWhitespace(issue.Title), nil, nil)
 		table.AddField(issueLabelList(&issue, cs, table.IsTTY()), nil, nil)
 		if table.IsTTY() {
-			table.AddField(utils.FuzzyAgo(ago), nil, cs.Gray)
+			table.AddField(text.FuzzyAgo(now, issue.UpdatedAt), nil, cs.Gray)
 		} else {
 			table.AddField(issue.UpdatedAt.String(), nil, nil)
 		}

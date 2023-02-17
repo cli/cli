@@ -2,16 +2,17 @@ package shared
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
+	"github.com/cli/cli/v2/pkg/ssh"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,9 +22,8 @@ func (c tinyConfig) Get(host, key string) (string, error) {
 	return c[fmt.Sprintf("%s:%s", host, key)], nil
 }
 
-func (c tinyConfig) Set(host string, key string, value string) error {
+func (c tinyConfig) Set(host string, key string, value string) {
 	c[fmt.Sprintf("%s:%s", host, key)] = value
-	return nil
 }
 
 func (c tinyConfig) Write() error {
@@ -32,7 +32,7 @@ func (c tinyConfig) Write() error {
 
 func TestLogin_ssh(t *testing.T) {
 	dir := t.TempDir()
-	io, _, stdout, stderr := iostreams.Test()
+	ios, _, stdout, stderr := iostreams.Test()
 
 	tr := httpmock.Registry{}
 	defer tr.Verify(t)
@@ -47,14 +47,28 @@ func TestLogin_ssh(t *testing.T) {
 		httpmock.REST("POST", "api/v3/user/keys"),
 		httpmock.StringResponse(`{}`))
 
-	ask, askRestore := prompt.InitAskStubber()
-	defer askRestore()
-
-	ask.StubOne("SSH")    // preferred protocol
-	ask.StubOne(true)     // generate a new key
-	ask.StubOne("monkey") // enter a passphrase
-	ask.StubOne(1)        // paste a token
-	ask.StubOne("ATOKEN") // token
+	pm := &prompter.PrompterMock{}
+	pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
+		switch prompt {
+		case "What is your preferred protocol for Git operations?":
+			return prompter.IndexFor(opts, "SSH")
+		case "How would you like to authenticate GitHub CLI?":
+			return prompter.IndexFor(opts, "Paste an authentication token")
+		}
+		return -1, prompter.NoSuchPromptErr(prompt)
+	}
+	pm.PasswordFunc = func(_ string) (string, error) {
+		return "monkey", nil
+	}
+	pm.ConfirmFunc = func(prompt string, _ bool) (bool, error) {
+		return true, nil
+	}
+	pm.AuthTokenFunc = func() (string, error) {
+		return "ATOKEN", nil
+	}
+	pm.InputFunc = func(_, _ string) (string, error) {
+		return "Test Key", nil
+	}
 
 	rs, runRestore := run.Stub()
 	defer runRestore(t)
@@ -69,20 +83,21 @@ func TestLogin_ssh(t *testing.T) {
 		}
 		assert.Equal(t, expected, args)
 		// simulate that the public key file has been generated
-		_ = ioutil.WriteFile(keyFile+".pub", []byte("PUBKEY"), 0600)
+		_ = os.WriteFile(keyFile+".pub", []byte("PUBKEY"), 0600)
 	})
 
 	cfg := tinyConfig{}
 
 	err := Login(&LoginOptions{
-		IO:          io,
+		IO:          ios,
 		Config:      &cfg,
+		Prompter:    pm,
 		HTTPClient:  &http.Client{Transport: &tr},
 		Hostname:    "example.com",
 		Interactive: true,
-		sshContext: sshContext{
-			configDir: dir,
-			keygenExe: "ssh-keygen",
+		sshContext: ssh.Context{
+			ConfigDir: dir,
+			KeygenExe: "ssh-keygen",
 		},
 	})
 	assert.NoError(t, err)

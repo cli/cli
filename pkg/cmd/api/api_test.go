@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -17,8 +18,8 @@ import (
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/export"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/go-gh/pkg/template"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -355,6 +356,20 @@ func Test_NewCmdApi(t *testing.T) {
 	}
 }
 
+func Test_NewCmdApi_WindowsAbsPath(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.SkipNow()
+	}
+
+	cmd := NewCmdApi(&cmdutil.Factory{}, func(opts *ApiOptions) error {
+		return nil
+	})
+
+	cmd.SetArgs([]string{`C:\users\repos`})
+	_, err := cmd.ExecuteC()
+	assert.EqualError(t, err, `invalid API endpoint: "C:\users\repos". Your shell might be rewriting URL paths as filesystem paths. To avoid this, omit the leading slash from the endpoint argument`)
+}
+
 func Test_apiRun(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -368,7 +383,7 @@ func Test_apiRun(t *testing.T) {
 			name: "success",
 			httpResponse: &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBufferString(`bam!`)),
+				Body:       io.NopCloser(bytes.NewBufferString(`bam!`)),
 			},
 			err:    nil,
 			stdout: `bam!`,
@@ -383,7 +398,7 @@ func Test_apiRun(t *testing.T) {
 				Proto:      "HTTP/1.1",
 				Status:     "200 Okey-dokey",
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBufferString(`body`)),
+				Body:       io.NopCloser(bytes.NewBufferString(`body`)),
 				Header:     http.Header{"Content-Type": []string{"text/plain"}},
 			},
 			err:    nil,
@@ -404,7 +419,7 @@ func Test_apiRun(t *testing.T) {
 			name: "REST error",
 			httpResponse: &http.Response{
 				StatusCode: 400,
-				Body:       ioutil.NopCloser(bytes.NewBufferString(`{"message": "THIS IS FINE"}`)),
+				Body:       io.NopCloser(bytes.NewBufferString(`{"message": "THIS IS FINE"}`)),
 				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
 			},
 			err:    cmdutil.SilentError,
@@ -415,7 +430,7 @@ func Test_apiRun(t *testing.T) {
 			name: "REST string errors",
 			httpResponse: &http.Response{
 				StatusCode: 400,
-				Body:       ioutil.NopCloser(bytes.NewBufferString(`{"errors": ["ALSO", "FINE"]}`)),
+				Body:       io.NopCloser(bytes.NewBufferString(`{"errors": ["ALSO", "FINE"]}`)),
 				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
 			},
 			err:    cmdutil.SilentError,
@@ -429,7 +444,7 @@ func Test_apiRun(t *testing.T) {
 			},
 			httpResponse: &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBufferString(`{"errors": [{"message":"AGAIN"}, {"message":"FINE"}]}`)),
+				Body:       io.NopCloser(bytes.NewBufferString(`{"errors": [{"message":"AGAIN"}, {"message":"FINE"}]}`)),
 				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
 			},
 			err:    cmdutil.SilentError,
@@ -440,7 +455,7 @@ func Test_apiRun(t *testing.T) {
 			name: "failure",
 			httpResponse: &http.Response{
 				StatusCode: 502,
-				Body:       ioutil.NopCloser(bytes.NewBufferString(`gateway timeout`)),
+				Body:       io.NopCloser(bytes.NewBufferString(`gateway timeout`)),
 			},
 			err:    cmdutil.SilentError,
 			stdout: `gateway timeout`,
@@ -453,7 +468,7 @@ func Test_apiRun(t *testing.T) {
 			},
 			httpResponse: &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBufferString(`body`)),
+				Body:       io.NopCloser(bytes.NewBufferString(`body`)),
 			},
 			err:    nil,
 			stdout: ``,
@@ -469,7 +484,7 @@ func Test_apiRun(t *testing.T) {
 				Proto:      "HTTP/1.1",
 				Status:     "200 Okey-dokey",
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBufferString(`body`)),
+				Body:       io.NopCloser(bytes.NewBufferString(`body`)),
 				Header:     http.Header{"Content-Type": []string{"text/plain"}},
 			},
 			err:    nil,
@@ -483,12 +498,26 @@ func Test_apiRun(t *testing.T) {
 			},
 			httpResponse: &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBufferString(`{"status":"not a cat"}`)),
+				Body:       io.NopCloser(bytes.NewBufferString(`{"status":"not a cat"}`)),
 				Header:     http.Header{"Content-Type": []string{"application/json"}},
 			},
 			err:    nil,
 			stdout: "not a cat",
 			stderr: ``,
+		},
+		{
+			name: "output template when REST error",
+			options: ApiOptions{
+				Template: `{{.status}}`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 400,
+				Body:       io.NopCloser(bytes.NewBufferString(`{"message": "THIS IS FINE"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: `{"message": "THIS IS FINE"}`,
+			stderr: "gh: THIS IS FINE (HTTP 400)\n",
 		},
 		{
 			name: "jq filter",
@@ -497,20 +526,34 @@ func Test_apiRun(t *testing.T) {
 			},
 			httpResponse: &http.Response{
 				StatusCode: 200,
-				Body:       ioutil.NopCloser(bytes.NewBufferString(`[{"name":"Mona"},{"name":"Hubot"}]`)),
+				Body:       io.NopCloser(bytes.NewBufferString(`[{"name":"Mona"},{"name":"Hubot"}]`)),
 				Header:     http.Header{"Content-Type": []string{"application/json"}},
 			},
 			err:    nil,
 			stdout: "Mona\nHubot\n",
 			stderr: ``,
 		},
+		{
+			name: "jq filter when REST error",
+			options: ApiOptions{
+				FilterOutput: `.[].name`,
+			},
+			httpResponse: &http.Response{
+				StatusCode: 400,
+				Body:       io.NopCloser(bytes.NewBufferString(`{"message": "THIS IS FINE"}`)),
+				Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+			},
+			err:    cmdutil.SilentError,
+			stdout: `{"message": "THIS IS FINE"}`,
+			stderr: "gh: THIS IS FINE (HTTP 400)\n",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, stdout, stderr := iostreams.Test()
+			ios, _, stdout, stderr := iostreams.Test()
 
-			tt.options.IO = io
+			tt.options.IO = ios
 			tt.options.Config = func() (config.Config, error) { return config.NewBlankConfig(), nil }
 			tt.options.HttpClient = func() (*http.Client, error) {
 				var tr roundTripper = func(req *http.Request) (*http.Response, error) {
@@ -537,33 +580,33 @@ func Test_apiRun(t *testing.T) {
 }
 
 func Test_apiRun_paginationREST(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
+	ios, _, stdout, stderr := iostreams.Test()
 
 	requestCount := 0
 	responses := []*http.Response{
 		{
 			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(`{"page":1}`)),
+			Body:       io.NopCloser(bytes.NewBufferString(`{"page":1}`)),
 			Header: http.Header{
 				"Link": []string{`<https://api.github.com/repositories/1227/issues?page=2>; rel="next", <https://api.github.com/repositories/1227/issues?page=3>; rel="last"`},
 			},
 		},
 		{
 			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(`{"page":2}`)),
+			Body:       io.NopCloser(bytes.NewBufferString(`{"page":2}`)),
 			Header: http.Header{
 				"Link": []string{`<https://api.github.com/repositories/1227/issues?page=3>; rel="next", <https://api.github.com/repositories/1227/issues?page=3>; rel="last"`},
 			},
 		},
 		{
 			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewBufferString(`{"page":3}`)),
+			Body:       io.NopCloser(bytes.NewBufferString(`{"page":3}`)),
 			Header:     http.Header{},
 		},
 	}
 
 	options := ApiOptions{
-		IO: io,
+		IO: ios,
 		HttpClient: func() (*http.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				resp := responses[requestCount]
@@ -577,8 +620,11 @@ func Test_apiRun_paginationREST(t *testing.T) {
 			return config.NewBlankConfig(), nil
 		},
 
-		RequestPath: "issues",
-		Paginate:    true,
+		RequestMethod:       "GET",
+		RequestMethodPassed: true,
+		RequestPath:         "issues",
+		Paginate:            true,
+		RawFields:           []string{"per_page=50", "page=1"},
 	}
 
 	err := apiRun(&options)
@@ -587,20 +633,20 @@ func Test_apiRun_paginationREST(t *testing.T) {
 	assert.Equal(t, `{"page":1}{"page":2}{"page":3}`, stdout.String(), "stdout")
 	assert.Equal(t, "", stderr.String(), "stderr")
 
-	assert.Equal(t, "https://api.github.com/issues?per_page=100", responses[0].Request.URL.String())
+	assert.Equal(t, "https://api.github.com/issues?page=1&per_page=50", responses[0].Request.URL.String())
 	assert.Equal(t, "https://api.github.com/repositories/1227/issues?page=2", responses[1].Request.URL.String())
 	assert.Equal(t, "https://api.github.com/repositories/1227/issues?page=3", responses[2].Request.URL.String())
 }
 
 func Test_apiRun_paginationGraphQL(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
+	ios, _, stdout, stderr := iostreams.Test()
 
 	requestCount := 0
 	responses := []*http.Response{
 		{
 			StatusCode: 200,
 			Header:     http.Header{"Content-Type": []string{`application/json`}},
-			Body: ioutil.NopCloser(bytes.NewBufferString(`{
+			Body: io.NopCloser(bytes.NewBufferString(`{
 				"data": {
 					"nodes": ["page one"],
 					"pageInfo": {
@@ -613,7 +659,7 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 		{
 			StatusCode: 200,
 			Header:     http.Header{"Content-Type": []string{`application/json`}},
-			Body: ioutil.NopCloser(bytes.NewBufferString(`{
+			Body: io.NopCloser(bytes.NewBufferString(`{
 				"data": {
 					"nodes": ["page two"],
 					"pageInfo": {
@@ -626,7 +672,7 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 	}
 
 	options := ApiOptions{
-		IO: io,
+		IO: ios,
 		HttpClient: func() (*http.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				resp := responses[requestCount]
@@ -640,6 +686,7 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 			return config.NewBlankConfig(), nil
 		},
 
+		RawFields:     []string{"foo=bar"},
 		RequestMethod: "POST",
 		RequestPath:   "graphql",
 		Paginate:      true,
@@ -656,14 +703,14 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 		Variables map[string]interface{}
 	}
 
-	bb, err := ioutil.ReadAll(responses[0].Request.Body)
+	bb, err := io.ReadAll(responses[0].Request.Body)
 	require.NoError(t, err)
 	err = json.Unmarshal(bb, &requestData)
 	require.NoError(t, err)
 	_, hasCursor := requestData.Variables["endCursor"].(string)
 	assert.Equal(t, false, hasCursor)
 
-	bb, err = ioutil.ReadAll(responses[1].Request.Body)
+	bb, err = io.ReadAll(responses[1].Request.Body)
 	require.NoError(t, err)
 	err = json.Unmarshal(bb, &requestData)
 	require.NoError(t, err)
@@ -673,15 +720,15 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 }
 
 func Test_apiRun_paginated_template(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(true)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
 
 	requestCount := 0
 	responses := []*http.Response{
 		{
 			StatusCode: 200,
 			Header:     http.Header{"Content-Type": []string{`application/json`}},
-			Body: ioutil.NopCloser(bytes.NewBufferString(`{
+			Body: io.NopCloser(bytes.NewBufferString(`{
 				"data": {
 					"nodes": [
 						{
@@ -699,7 +746,7 @@ func Test_apiRun_paginated_template(t *testing.T) {
 		{
 			StatusCode: 200,
 			Header:     http.Header{"Content-Type": []string{`application/json`}},
-			Body: ioutil.NopCloser(bytes.NewBufferString(`{
+			Body: io.NopCloser(bytes.NewBufferString(`{
 				"data": {
 					"nodes": [
 						{
@@ -717,7 +764,7 @@ func Test_apiRun_paginated_template(t *testing.T) {
 	}
 
 	options := ApiOptions{
-		IO: io,
+		IO: ios,
 		HttpClient: func() (*http.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				resp := responses[requestCount]
@@ -733,6 +780,7 @@ func Test_apiRun_paginated_template(t *testing.T) {
 
 		RequestMethod: "POST",
 		RequestPath:   "graphql",
+		RawFields:     []string{"foo=bar"},
 		Paginate:      true,
 		// test that templates executed per page properly render a table.
 		Template: `{{range .data.nodes}}{{tablerow .page .caption}}{{end}}`,
@@ -751,20 +799,50 @@ func Test_apiRun_paginated_template(t *testing.T) {
 		Variables map[string]interface{}
 	}
 
-	bb, err := ioutil.ReadAll(responses[0].Request.Body)
+	bb, err := io.ReadAll(responses[0].Request.Body)
 	require.NoError(t, err)
 	err = json.Unmarshal(bb, &requestData)
 	require.NoError(t, err)
 	_, hasCursor := requestData.Variables["endCursor"].(string)
 	assert.Equal(t, false, hasCursor)
 
-	bb, err = ioutil.ReadAll(responses[1].Request.Body)
+	bb, err = io.ReadAll(responses[1].Request.Body)
 	require.NoError(t, err)
 	err = json.Unmarshal(bb, &requestData)
 	require.NoError(t, err)
 	endCursor, hasCursor := requestData.Variables["endCursor"].(string)
 	assert.Equal(t, true, hasCursor)
 	assert.Equal(t, "PAGE1_END", endCursor)
+}
+
+func Test_apiRun_DELETE(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	var gotRequest *http.Request
+	err := apiRun(&ApiOptions{
+		IO: ios,
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+		HttpClient: func() (*http.Client, error) {
+			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+				gotRequest = req
+				return &http.Response{StatusCode: 204, Request: req}, nil
+			}
+			return &http.Client{Transport: tr}, nil
+		},
+		MagicFields:         []string(nil),
+		RawFields:           []string(nil),
+		RequestMethod:       "DELETE",
+		RequestMethodPassed: true,
+	})
+	if err != nil {
+		t.Fatalf("got error %v", err)
+	}
+
+	if gotRequest.Body != nil {
+		t.Errorf("expected nil request body, got %T", gotRequest.Body)
+	}
 }
 
 func Test_apiRun_inputFile(t *testing.T) {
@@ -794,14 +872,14 @@ func Test_apiRun_inputFile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, _, _ := iostreams.Test()
+			ios, stdin, _, _ := iostreams.Test()
 			resp := &http.Response{StatusCode: 204}
 
 			inputFile := tt.inputFile
 			if tt.inputFile == "-" {
 				_, _ = stdin.Write(tt.inputContents)
 			} else {
-				f, err := ioutil.TempFile(tempDir, tt.inputFile)
+				f, err := os.CreateTemp(tempDir, tt.inputFile)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -816,11 +894,11 @@ func Test_apiRun_inputFile(t *testing.T) {
 				RequestInputFile: inputFile,
 				RawFields:        []string{"a=b", "c=d"},
 
-				IO: io,
+				IO: ios,
 				HttpClient: func() (*http.Client, error) {
 					var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 						var err error
-						if bodyBytes, err = ioutil.ReadAll(req.Body); err != nil {
+						if bodyBytes, err = io.ReadAll(req.Body); err != nil {
 							return nil, err
 						}
 						resp.Request = req
@@ -848,11 +926,11 @@ func Test_apiRun_inputFile(t *testing.T) {
 }
 
 func Test_apiRun_cache(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
+	ios, _, stdout, stderr := iostreams.Test()
 
 	requestCount := 0
 	options := ApiOptions{
-		IO: io,
+		IO: ios,
 		HttpClient: func() (*http.Client, error) {
 			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
 				requestCount++
@@ -881,156 +959,13 @@ func Test_apiRun_cache(t *testing.T) {
 	err = apiRun(&options)
 	assert.NoError(t, err)
 
-	assert.Equal(t, 1, requestCount)
+	assert.Equal(t, 2, requestCount)
 	assert.Equal(t, "", stdout.String(), "stdout")
 	assert.Equal(t, "", stderr.String(), "stderr")
 }
 
-func Test_parseFields(t *testing.T) {
-	io, stdin, _, _ := iostreams.Test()
-	fmt.Fprint(stdin, "pasted contents")
-
-	opts := ApiOptions{
-		IO: io,
-		RawFields: []string{
-			"robot=Hubot",
-			"destroyer=false",
-			"helper=true",
-			"location=@work",
-		},
-		MagicFields: []string{
-			"input=@-",
-			"enabled=true",
-			"victories=123",
-		},
-	}
-
-	params, err := parseFields(&opts)
-	if err != nil {
-		t.Fatalf("parseFields error: %v", err)
-	}
-
-	expect := map[string]interface{}{
-		"robot":     "Hubot",
-		"destroyer": "false",
-		"helper":    "true",
-		"location":  "@work",
-		"input":     []byte("pasted contents"),
-		"enabled":   true,
-		"victories": 123,
-	}
-	assert.Equal(t, expect, params)
-}
-
-func Test_magicFieldValue(t *testing.T) {
-	f, err := ioutil.TempFile(t.TempDir(), "gh-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-
-	fmt.Fprint(f, "file contents")
-
-	io, _, _, _ := iostreams.Test()
-
-	type args struct {
-		v    string
-		opts *ApiOptions
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    interface{}
-		wantErr bool
-	}{
-		{
-			name:    "string",
-			args:    args{v: "hello"},
-			want:    "hello",
-			wantErr: false,
-		},
-		{
-			name:    "bool true",
-			args:    args{v: "true"},
-			want:    true,
-			wantErr: false,
-		},
-		{
-			name:    "bool false",
-			args:    args{v: "false"},
-			want:    false,
-			wantErr: false,
-		},
-		{
-			name:    "null",
-			args:    args{v: "null"},
-			want:    nil,
-			wantErr: false,
-		},
-		{
-			name: "placeholder colon",
-			args: args{
-				v: ":owner",
-				opts: &ApiOptions{
-					IO: io,
-					BaseRepo: func() (ghrepo.Interface, error) {
-						return ghrepo.New("hubot", "robot-uprising"), nil
-					},
-				},
-			},
-			want:    "hubot",
-			wantErr: false,
-		},
-		{
-			name: "placeholder braces",
-			args: args{
-				v: "{owner}",
-				opts: &ApiOptions{
-					IO: io,
-					BaseRepo: func() (ghrepo.Interface, error) {
-						return ghrepo.New("hubot", "robot-uprising"), nil
-					},
-				},
-			},
-			want:    "hubot",
-			wantErr: false,
-		},
-		{
-			name: "file",
-			args: args{
-				v:    "@" + f.Name(),
-				opts: &ApiOptions{IO: io},
-			},
-			want:    []byte("file contents"),
-			wantErr: false,
-		},
-		{
-			name: "file error",
-			args: args{
-				v:    "@",
-				opts: &ApiOptions{IO: io},
-			},
-			want:    nil,
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := magicFieldValue(tt.args.v, tt.args.opts)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("magicFieldValue() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if tt.wantErr {
-				return
-			}
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
 func Test_openUserFile(t *testing.T) {
-	f, err := ioutil.TempFile(t.TempDir(), "gh-test")
+	f, err := os.CreateTemp(t.TempDir(), "gh-test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1044,7 +979,7 @@ func Test_openUserFile(t *testing.T) {
 	}
 	defer file.Close()
 
-	fb, err := ioutil.ReadAll(file)
+	fb, err := io.ReadAll(file)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1241,14 +1176,14 @@ func Test_previewNamesToMIMETypes(t *testing.T) {
 }
 
 func Test_processResponse_template(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
+	ios, _, stdout, stderr := iostreams.Test()
 
 	resp := http.Response{
 		StatusCode: 200,
 		Header: map[string][]string{
 			"Content-Type": {"application/json"},
 		},
-		Body: ioutil.NopCloser(strings.NewReader(`[
+		Body: io.NopCloser(strings.NewReader(`[
 			{
 				"title": "First title",
 				"labels": [{"name":"bug"}, {"name":"help wanted"}]
@@ -1264,14 +1199,16 @@ func Test_processResponse_template(t *testing.T) {
 	}
 
 	opts := ApiOptions{
-		IO:       io,
+		IO:       ios,
 		Template: `{{range .}}{{.title}} ({{.labels | pluck "name" | join ", " }}){{"\n"}}{{end}}`,
 	}
-	template := export.NewTemplate(io, opts.Template)
-	_, err := processResponse(&resp, &opts, ioutil.Discard, &template)
-	require.NoError(t, err)
 
-	err = template.End()
+	tmpl := template.New(ios.Out, ios.TerminalWidth(), ios.ColorEnabled())
+	err := tmpl.Parse(opts.Template)
+	require.NoError(t, err)
+	_, err = processResponse(&resp, &opts, ios.Out, io.Discard, &tmpl)
+	require.NoError(t, err)
+	err = tmpl.Flush()
 	require.NoError(t, err)
 
 	assert.Equal(t, heredoc.Doc(`
@@ -1280,4 +1217,86 @@ func Test_processResponse_template(t *testing.T) {
 		Alas, tis' the end (, feature)
 	`), stdout.String())
 	assert.Equal(t, "", stderr.String())
+}
+
+func Test_parseErrorResponse(t *testing.T) {
+	type args struct {
+		input      string
+		statusCode int
+	}
+	tests := []struct {
+		name       string
+		args       args
+		wantErrMsg string
+		wantErr    bool
+	}{
+		{
+			name: "no error",
+			args: args{
+				input:      `{}`,
+				statusCode: 500,
+			},
+			wantErrMsg: "",
+			wantErr:    false,
+		},
+		{
+			name: "nil errors",
+			args: args{
+				input:      `{"errors":null}`,
+				statusCode: 500,
+			},
+			wantErrMsg: "",
+			wantErr:    false,
+		},
+		{
+			name: "simple error",
+			args: args{
+				input:      `{"message": "OH NOES"}`,
+				statusCode: 500,
+			},
+			wantErrMsg: "OH NOES (HTTP 500)",
+			wantErr:    false,
+		},
+		{
+			name: "errors string",
+			args: args{
+				input:      `{"message": "Conflict", "errors": "Some description"}`,
+				statusCode: 409,
+			},
+			wantErrMsg: "Some description (Conflict)",
+			wantErr:    false,
+		},
+		{
+			name: "errors array of strings",
+			args: args{
+				input:      `{"errors": ["fail1", "asplode2"]}`,
+				statusCode: 500,
+			},
+			wantErrMsg: "fail1\nasplode2",
+			wantErr:    false,
+		},
+		{
+			name: "errors array of objects",
+			args: args{
+				input:      `{"errors": [{"message":"fail1"}, {"message":"asplode2"}]}`,
+				statusCode: 500,
+			},
+			wantErrMsg: "fail1\nasplode2",
+			wantErr:    false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1, err := parseErrorResponse(strings.NewReader(tt.args.input), tt.args.statusCode)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseErrorResponse() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if gotString, _ := io.ReadAll(got); tt.args.input != string(gotString) {
+				t.Errorf("parseErrorResponse() got = %q, want %q", string(gotString), tt.args.input)
+			}
+			if got1 != tt.wantErrMsg {
+				t.Errorf("parseErrorResponse() got1 = %q, want %q", got1, tt.wantErrMsg)
+			}
+		})
+	}
 }

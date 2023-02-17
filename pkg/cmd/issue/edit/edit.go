@@ -1,7 +1,6 @@
 package edit
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -12,7 +11,6 @@ import (
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
 
@@ -47,6 +45,12 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "edit {<number> | <url>}",
 		Short: "Edit an issue",
+		Long: heredoc.Doc(`
+			Edit an issue.
+
+			Editing an issue's projects requires authorization with the "project" scope.
+			To authorize, run "gh auth refresh -s project".
+		`),
 		Example: heredoc.Doc(`
 			$ gh issue edit 23 --title "I found a bug" --body "Nothing works"
 			$ gh issue edit 23 --add-label "bug,help wanted" --remove-label "core"
@@ -106,7 +110,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			}
 
 			if opts.Interactive && !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("field to edit flag required when not running interactively")}
+				return cmdutil.FlagErrorf("field to edit flag required when not running interactively")
 			}
 
 			if runF != nil {
@@ -136,19 +140,38 @@ func editRun(opts *EditOptions) error {
 	if err != nil {
 		return err
 	}
-	apiClient := api.NewClientFromHTTP(httpClient)
 
-	issue, repo, err := shared.IssueFromArg(apiClient, opts.BaseRepo, opts.SelectorArg)
+	editable := opts.Editable
+	lookupFields := []string{"id", "number", "title", "body", "url"}
+	if opts.Interactive || editable.Assignees.Edited {
+		lookupFields = append(lookupFields, "assignees")
+	}
+	if opts.Interactive || editable.Labels.Edited {
+		lookupFields = append(lookupFields, "labels")
+	}
+	if opts.Interactive || editable.Projects.Edited {
+		lookupFields = append(lookupFields, "projectCards")
+		lookupFields = append(lookupFields, "projectItems")
+	}
+	if opts.Interactive || editable.Milestone.Edited {
+		lookupFields = append(lookupFields, "milestone")
+	}
+
+	issue, repo, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, lookupFields)
 	if err != nil {
 		return err
 	}
 
-	editable := opts.Editable
 	editable.Title.Default = issue.Title
 	editable.Body.Default = issue.Body
 	editable.Assignees.Default = issue.Assignees.Logins()
 	editable.Labels.Default = issue.Labels.Names()
-	editable.Projects.Default = issue.ProjectCards.ProjectNames()
+	editable.Projects.Default = append(issue.ProjectCards.ProjectNames(), issue.ProjectItems.ProjectTitles()...)
+	projectItems := map[string]string{}
+	for _, n := range issue.ProjectItems.Nodes {
+		projectItems[n.Project.ID] = n.ID
+	}
+	editable.Projects.ProjectItems = projectItems
 	if issue.Milestone != nil {
 		editable.Milestone.Default = issue.Milestone.Title
 	}
@@ -160,6 +183,7 @@ func editRun(opts *EditOptions) error {
 		}
 	}
 
+	apiClient := api.NewClientFromHTTP(httpClient)
 	opts.IO.StartProgressIndicator()
 	err = opts.FetchOptions(apiClient, repo, &editable)
 	opts.IO.StopProgressIndicator()
@@ -179,7 +203,7 @@ func editRun(opts *EditOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
-	err = updateIssue(apiClient, repo, issue.ID, editable)
+	err = prShared.UpdateIssue(httpClient, repo, issue.ID, issue.IsPullRequest(), editable)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
@@ -188,65 +212,4 @@ func editRun(opts *EditOptions) error {
 	fmt.Fprintln(opts.IO.Out, issue.URL)
 
 	return nil
-}
-
-func updateIssue(client *api.Client, repo ghrepo.Interface, id string, options prShared.Editable) error {
-	var err error
-	params := githubv4.UpdateIssueInput{
-		ID:    id,
-		Title: ghString(options.TitleValue()),
-		Body:  ghString(options.BodyValue()),
-	}
-	assigneeIds, err := options.AssigneeIds(client, repo)
-	if err != nil {
-		return err
-	}
-	params.AssigneeIDs = ghIds(assigneeIds)
-	labelIds, err := options.LabelIds()
-	if err != nil {
-		return err
-	}
-	params.LabelIDs = ghIds(labelIds)
-	projectIds, err := options.ProjectIds()
-	if err != nil {
-		return err
-	}
-	params.ProjectIDs = ghIds(projectIds)
-	milestoneId, err := options.MilestoneId()
-	if err != nil {
-		return err
-	}
-	params.MilestoneID = ghId(milestoneId)
-	return api.IssueUpdate(client, repo, params)
-}
-
-func ghIds(s *[]string) *[]githubv4.ID {
-	if s == nil {
-		return nil
-	}
-	ids := make([]githubv4.ID, len(*s))
-	for i, v := range *s {
-		ids[i] = v
-	}
-	return &ids
-}
-
-func ghId(s *string) *githubv4.ID {
-	if s == nil {
-		return nil
-	}
-	if *s == "" {
-		r := githubv4.ID(nil)
-		return &r
-	}
-	r := githubv4.ID(*s)
-	return &r
-}
-
-func ghString(s *string) *githubv4.String {
-	if s == nil {
-		return nil
-	}
-	r := githubv4.String(*s)
-	return &r
 }

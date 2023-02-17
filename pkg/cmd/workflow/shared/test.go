@@ -15,6 +15,13 @@ var DisabledWorkflow = Workflow{
 	State: DisabledManually,
 }
 
+var DisabledInactivityWorkflow = Workflow{
+	Name:  "a disabled inactivity workflow",
+	ID:    1206,
+	Path:  ".github/workflows/disabledInactivity.yml",
+	State: DisabledInactivity,
+}
+
 var AnotherDisabledWorkflow = Workflow{
 	Name:  "a disabled workflow",
 	ID:    1213,

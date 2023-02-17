@@ -1,30 +1,28 @@
-package ghcs
+package codespace
 
 import (
 	"github.com/spf13/cobra"
 )
 
-var version = "DEV" // Replaced in the release build process (by GoReleaser or Homebrew) by the git tag version number.
-
 func NewRootCmd(app *App) *cobra.Command {
 	root := &cobra.Command{
-		Use:           "ghcs",
-		SilenceUsage:  true,  // don't print usage message after each error (see #80)
-		SilenceErrors: false, // print errors automatically so that main need not
-		Long: `Unofficial CLI tool to manage GitHub Codespaces.
-
-Running commands requires the GITHUB_TOKEN environment variable to be set to a
-token to access the GitHub API with.`,
-		Version: version,
+		Use:   "codespace",
+		Short: "Connect to and manage codespaces",
 	}
 
 	root.AddCommand(newCodeCmd(app))
 	root.AddCommand(newCreateCmd(app))
+	root.AddCommand(newEditCmd(app))
 	root.AddCommand(newDeleteCmd(app))
+	root.AddCommand(newJupyterCmd(app))
 	root.AddCommand(newListCmd(app))
 	root.AddCommand(newLogsCmd(app))
 	root.AddCommand(newPortsCmd(app))
 	root.AddCommand(newSSHCmd(app))
+	root.AddCommand(newCpCmd(app))
+	root.AddCommand(newStopCmd(app))
+	root.AddCommand(newSelectCmd(app))
+	root.AddCommand(newRebuildCmd(app))
 
 	return root
 }

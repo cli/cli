@@ -1,16 +1,17 @@
 package upload
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/release/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -80,7 +81,7 @@ func uploadRun(opts *UploadOptions) error {
 		return err
 	}
 
-	release, err := shared.FetchRelease(httpClient, baseRepo, opts.TagName)
+	release, err := shared.FetchRelease(context.Background(), httpClient, baseRepo, opts.TagName)
 	if err != nil {
 		return err
 	}
@@ -115,7 +116,7 @@ func uploadRun(opts *UploadOptions) error {
 	if opts.IO.IsStdoutTTY() {
 		iofmt := opts.IO.ColorScheme()
 		fmt.Fprintf(opts.IO.Out, "Successfully uploaded %s to %s\n",
-			utils.Pluralize(len(opts.Assets), "asset"),
+			text.Pluralize(len(opts.Assets), "asset"),
 			iofmt.Bold(release.TagName))
 	}
 

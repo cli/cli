@@ -1,12 +1,11 @@
 package api
 
 import (
-	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/shurcooL/githubv4"
 )
 
 type IssuesPayload struct {
@@ -22,23 +21,39 @@ type IssuesAndTotalCount struct {
 }
 
 type Issue struct {
-	ID             string
-	Number         int
-	Title          string
-	URL            string
-	State          string
-	Closed         bool
-	Body           string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	ClosedAt       *time.Time
-	Comments       Comments
-	Author         Author
-	Assignees      Assignees
-	Labels         Labels
-	ProjectCards   ProjectCards
-	Milestone      *Milestone
-	ReactionGroups ReactionGroups
+	Typename         string `json:"__typename"`
+	ID               string
+	Number           int
+	Title            string
+	URL              string
+	State            string
+	StateReason      string
+	Closed           bool
+	Body             string
+	ActiveLockReason string
+	Locked           bool
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	ClosedAt         *time.Time
+	Comments         Comments
+	Author           Author
+	Assignees        Assignees
+	Labels           Labels
+	ProjectCards     ProjectCards
+	ProjectItems     ProjectItems
+	Milestone        *Milestone
+	ReactionGroups   ReactionGroups
+	IsPinned         bool
+}
+
+// return values for Issue.Typename
+const (
+	TypeIssue       string = "Issue"
+	TypePullRequest string = "PullRequest"
+)
+
+func (i Issue) IsPullRequest() bool {
+	return i.Typename == TypePullRequest
 }
 
 type Assignees struct {
@@ -68,15 +83,29 @@ func (l Labels) Names() []string {
 }
 
 type ProjectCards struct {
-	Nodes []struct {
-		Project struct {
-			Name string `json:"name"`
-		} `json:"project"`
-		Column struct {
-			Name string `json:"name"`
-		} `json:"column"`
-	}
+	Nodes      []*ProjectInfo
 	TotalCount int
+}
+
+type ProjectItems struct {
+	Nodes []*ProjectV2Item
+}
+
+type ProjectInfo struct {
+	Project struct {
+		Name string `json:"name"`
+	} `json:"project"`
+	Column struct {
+		Name string `json:"name"`
+	} `json:"column"`
+}
+
+type ProjectV2Item struct {
+	ID      string `json:"id"`
+	Project struct {
+		ID    string `json:"id"`
+		Title string `json:"title"`
+	}
 }
 
 func (p ProjectCards) ProjectNames() []string {
@@ -85,6 +114,14 @@ func (p ProjectCards) ProjectNames() []string {
 		names[i] = c.Project.Name
 	}
 	return names
+}
+
+func (p ProjectItems) ProjectTitles() []string {
+	titles := make([]string, len(p.Nodes))
+	for i, c := range p.Nodes {
+		titles[i] = c.Project.Title
+	}
+	return titles
 }
 
 type Milestone struct {
@@ -105,10 +142,35 @@ type Owner struct {
 }
 
 type Author struct {
-	// adding these breaks generated GraphQL requests
-	//ID    string `json:"id,omitempty"`
-	//Name  string `json:"name,omitempty"`
+	ID    string
+	Name  string
+	Login string
+}
+
+func (author Author) MarshalJSON() ([]byte, error) {
+	if author.ID == "" {
+		return json.Marshal(map[string]interface{}{
+			"is_bot": true,
+			"login":  "app/" + author.Login,
+		})
+	}
+	return json.Marshal(map[string]interface{}{
+		"is_bot": false,
+		"login":  author.Login,
+		"id":     author.ID,
+		"name":   author.Name,
+	})
+}
+
+type CommentAuthor struct {
 	Login string `json:"login"`
+	// Unfortunately, there is no easy way to add "id" and "name" fields to this struct because it's being
+	// used in both shurcool-graphql type queries and string-based queries where the response gets parsed
+	// by an ordinary JSON decoder that doesn't understand "graphql" directives via struct tags.
+	//	User  *struct {
+	//		ID   string
+	//		Name string
+	//	} `graphql:"... on User"`
 }
 
 // IssueCreate creates an issue in a GitHub repository
@@ -117,6 +179,7 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 	mutation IssueCreate($input: CreateIssueInput!) {
 		createIssue(input: $input) {
 			issue {
+				id
 				url
 			}
 		}
@@ -126,7 +189,13 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 		"repositoryId": repo.ID,
 	}
 	for key, val := range params {
-		inputParams[key] = val
+		switch key {
+		case "assigneeIds", "body", "issueTemplate", "labelIds", "milestoneId", "projectIds", "repositoryId", "title":
+			inputParams[key] = val
+		case "projectV2Ids":
+		default:
+			return nil, fmt.Errorf("invalid IssueCreate mutation parameter %s", key)
+		}
 	}
 	variables := map[string]interface{}{
 		"input": inputParams,
@@ -142,8 +211,23 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 	if err != nil {
 		return nil, err
 	}
+	issue := &result.CreateIssue.Issue
 
-	return &result.CreateIssue.Issue, nil
+	// projectV2 parameters aren't supported in the `createIssue` mutation,
+	// so add them after the issue has been created.
+	projectV2Ids, ok := params["projectV2Ids"].([]string)
+	if ok {
+		projectItems := make(map[string]string, len(projectV2Ids))
+		for _, p := range projectV2Ids {
+			projectItems[p] = issue.ID
+		}
+		err = UpdateProjectV2Items(client, repo, projectItems, nil)
+		if err != nil {
+			return issue, err
+		}
+	}
+
+	return issue, nil
 }
 
 type IssueStatusOptions struct {
@@ -170,7 +254,7 @@ func IssueStatus(client *Client, repo ghrepo.Interface, options IssueStatusOptio
 		}
 	}
 
-	fragments := fmt.Sprintf("fragment issue on Issue{%s}", PullRequestGraphQL(options.Fields))
+	fragments := fmt.Sprintf("fragment issue on Issue{%s}", IssueGraphQL(options.Fields))
 	query := fragments + `
 	query IssueStatus($owner: String!, $repo: String!, $viewer: String!, $per_page: Int = 10) {
 		repository(owner: $owner, name: $repo) {
@@ -230,198 +314,14 @@ func IssueStatus(client *Client, repo ghrepo.Interface, options IssueStatusOptio
 	return &payload, nil
 }
 
-func IssueByNumber(client *Client, repo ghrepo.Interface, number int) (*Issue, error) {
-	type response struct {
-		Repository struct {
-			Issue            Issue
-			HasIssuesEnabled bool
-		}
-	}
-
-	query := `
-	query IssueByNumber($owner: String!, $repo: String!, $issue_number: Int!) {
-		repository(owner: $owner, name: $repo) {
-			hasIssuesEnabled
-			issue(number: $issue_number) {
-				id
-				title
-				state
-				body
-				author {
-					login
-				}
-				comments(last: 1) {
-					nodes {
-						author {
-							login
-						}
-						authorAssociation
-						body
-						createdAt
-						includesCreatedEdit
-						isMinimized
-						minimizedReason
-						reactionGroups {
-							content
-							users {
-								totalCount
-							}
-						}
-					}
-					totalCount
-				}
-				number
-				url
-				createdAt
-				assignees(first: 100) {
-					nodes {
-						id
-						name
-						login
-					}
-					totalCount
-				}
-				labels(first: 100) {
-					nodes {
-						id
-						name
-						description
-						color
-					}
-					totalCount
-				}
-				projectCards(first: 100) {
-					nodes {
-						project {
-							name
-						}
-						column {
-							name
-						}
-					}
-					totalCount
-				}
-				milestone {
-					number
-					title
-					description
-					dueOn
-				}
-				reactionGroups {
-					content
-					users {
-						totalCount
-					}
-				}
-			}
-		}
-	}`
-
-	variables := map[string]interface{}{
-		"owner":        repo.RepoOwner(),
-		"repo":         repo.RepoName(),
-		"issue_number": number,
-	}
-
-	var resp response
-	err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
-	if err != nil {
-		return nil, err
-	}
-
-	if !resp.Repository.HasIssuesEnabled {
-
-		return nil, &IssuesDisabledError{fmt.Errorf("the '%s' repository has disabled issues", ghrepo.FullName(repo))}
-	}
-
-	return &resp.Repository.Issue, nil
-}
-
-func IssueClose(client *Client, repo ghrepo.Interface, issue Issue) error {
-	var mutation struct {
-		CloseIssue struct {
-			Issue struct {
-				ID githubv4.ID
-			}
-		} `graphql:"closeIssue(input: $input)"`
-	}
-
-	variables := map[string]interface{}{
-		"input": githubv4.CloseIssueInput{
-			IssueID: issue.ID,
-		},
-	}
-
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "IssueClose", &mutation, variables)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func IssueReopen(client *Client, repo ghrepo.Interface, issue Issue) error {
-	var mutation struct {
-		ReopenIssue struct {
-			Issue struct {
-				ID githubv4.ID
-			}
-		} `graphql:"reopenIssue(input: $input)"`
-	}
-
-	variables := map[string]interface{}{
-		"input": githubv4.ReopenIssueInput{
-			IssueID: issue.ID,
-		},
-	}
-
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "IssueReopen", &mutation, variables)
-
-	return err
-}
-
-func IssueDelete(client *Client, repo ghrepo.Interface, issue Issue) error {
-	var mutation struct {
-		DeleteIssue struct {
-			Repository struct {
-				ID githubv4.ID
-			}
-		} `graphql:"deleteIssue(input: $input)"`
-	}
-
-	variables := map[string]interface{}{
-		"input": githubv4.DeleteIssueInput{
-			IssueID: issue.ID,
-		},
-	}
-
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "IssueDelete", &mutation, variables)
-
-	return err
-}
-
-func IssueUpdate(client *Client, repo ghrepo.Interface, params githubv4.UpdateIssueInput) error {
-	var mutation struct {
-		UpdateIssue struct {
-			Issue struct {
-				ID string
-			}
-		} `graphql:"updateIssue(input: $input)"`
-	}
-	variables := map[string]interface{}{"input": params}
-	gql := graphQLClient(client.http, repo.RepoHost())
-	err := gql.MutateNamed(context.Background(), "IssueUpdate", &mutation, variables)
-	return err
-}
-
 func (i Issue) Link() string {
 	return i.URL
 }
 
 func (i Issue) Identifier() string {
 	return i.ID
+}
+
+func (i Issue) CurrentUserComments() []Comment {
+	return i.Comments.CurrentUserComments()
 }

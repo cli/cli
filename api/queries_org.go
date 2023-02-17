@@ -1,13 +1,11 @@
 package api
 
 import (
-	"context"
-
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/shurcooL/githubv4"
 )
 
-// OrganizationProjects fetches all open projects for an organization
+// OrganizationProjects fetches all open projects for an organization.
 func OrganizationProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) {
 	type responseData struct {
 		Organization struct {
@@ -26,12 +24,10 @@ func OrganizationProjects(client *Client, repo ghrepo.Interface) ([]RepoProject,
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	gql := graphQLClient(client.http, repo.RepoHost())
-
 	var projects []RepoProject
 	for {
 		var query responseData
-		err := gql.QueryNamed(context.Background(), "OrganizationProjectList", &query, variables)
+		err := client.Query(repo.RepoHost(), "OrganizationProjectList", &query, variables)
 		if err != nil {
 			return nil, err
 		}
@@ -70,12 +66,10 @@ func OrganizationTeams(client *Client, repo ghrepo.Interface) ([]OrgTeam, error)
 		"endCursor": (*githubv4.String)(nil),
 	}
 
-	gql := graphQLClient(client.http, repo.RepoHost())
-
 	var teams []OrgTeam
 	for {
 		var query responseData
-		err := gql.QueryNamed(context.Background(), "OrganizationTeamList", &query, variables)
+		err := client.Query(repo.RepoHost(), "OrganizationTeamList", &query, variables)
 		if err != nil {
 			return nil, err
 		}

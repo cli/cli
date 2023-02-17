@@ -3,11 +3,12 @@ package edit
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -20,7 +21,7 @@ import (
 
 func TestNewCmdEdit(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "my-body.md")
-	err := ioutil.WriteFile(tmpFile, []byte("a body from file"), 0600)
+	err := os.WriteFile(tmpFile, []byte("a body from file"), 0600)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -164,9 +165,11 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: prShared.Editable{
-					Projects: prShared.EditableSlice{
-						Add:    []string{"Cleanup", "Roadmap"},
-						Edited: true,
+					Projects: prShared.EditableProjects{
+						EditableSlice: prShared.EditableSlice{
+							Add:    []string{"Cleanup", "Roadmap"},
+							Edited: true,
+						},
 					},
 				},
 			},
@@ -178,9 +181,11 @@ func TestNewCmdEdit(t *testing.T) {
 			output: EditOptions{
 				SelectorArg: "23",
 				Editable: prShared.Editable{
-					Projects: prShared.EditableSlice{
-						Remove: []string{"Cleanup", "Roadmap"},
-						Edited: true,
+					Projects: prShared.EditableProjects{
+						EditableSlice: prShared.EditableSlice{
+							Remove: []string{"Cleanup", "Roadmap"},
+							Edited: true,
+						},
 					},
 				},
 			},
@@ -203,17 +208,17 @@ func TestNewCmdEdit(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, _, _ := iostreams.Test()
-			io.SetStdoutTTY(true)
-			io.SetStdinTTY(true)
-			io.SetStderrTTY(true)
+			ios, stdin, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			ios.SetStdinTTY(true)
+			ios.SetStderrTTY(true)
 
 			if tt.stdin != "" {
 				_, _ = stdin.WriteString(tt.stdin)
 			}
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			argv, err := shlex.Split(tt.input)
@@ -277,22 +282,32 @@ func Test_editRun(t *testing.T) {
 						Remove: []string{"docs"},
 						Edited: true,
 					},
-					Projects: prShared.EditableSlice{
-						Add:    []string{"Cleanup", "Roadmap"},
-						Remove: []string{"Features"},
-						Edited: true,
+					Projects: prShared.EditableProjects{
+						EditableSlice: prShared.EditableSlice{
+							Add:    []string{"Cleanup", "CleanupV2"},
+							Remove: []string{"Roadmap", "RoadmapV2"},
+							Edited: true,
+						},
 					},
 					Milestone: prShared.EditableString{
 						Value:  "GA",
 						Edited: true,
+					},
+					Metadata: api.RepoMetadataResult{
+						Labels: []api.RepoLabel{
+							{Name: "docs", ID: "DOCSID"},
+						},
 					},
 				},
 				FetchOptions: prShared.FetchOptions,
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockIssueGet(t, reg)
+				mockIssueProjectItemsGet(t, reg)
 				mockRepoMetadata(t, reg)
 				mockIssueUpdate(t, reg)
+				mockIssueUpdateLabels(t, reg)
+				mockProjectV2ItemUpdate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
 		},
@@ -315,7 +330,9 @@ func Test_editRun(t *testing.T) {
 					eo.Body.Value = "new body"
 					eo.Assignees.Value = []string{"monalisa", "hubot"}
 					eo.Labels.Value = []string{"feature", "TODO", "bug"}
-					eo.Projects.Value = []string{"Cleanup", "Roadmap"}
+					eo.Labels.Add = []string{"feature", "TODO", "bug"}
+					eo.Labels.Remove = []string{"docs"}
+					eo.Projects.Value = []string{"Cleanup", "CleanupV2"}
 					eo.Milestone.Value = "GA"
 					return nil
 				},
@@ -324,17 +341,20 @@ func Test_editRun(t *testing.T) {
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				mockIssueGet(t, reg)
+				mockIssueProjectItemsGet(t, reg)
 				mockRepoMetadata(t, reg)
 				mockIssueUpdate(t, reg)
+				mockIssueUpdateLabels(t, reg)
+				mockProjectV2ItemUpdate(t, reg)
 			},
 			stdout: "https://github.com/OWNER/REPO/issue/123\n",
 		},
 	}
 	for _, tt := range tests {
-		io, _, stdout, stderr := iostreams.Test()
-		io.SetStdoutTTY(true)
-		io.SetStdinTTY(true)
-		io.SetStderrTTY(true)
+		ios, _, stdout, stderr := iostreams.Test()
+		ios.SetStdoutTTY(true)
+		ios.SetStdinTTY(true)
+		ios.SetStderrTTY(true)
 
 		reg := &httpmock.Registry{}
 		defer reg.Verify(t)
@@ -343,7 +363,7 @@ func Test_editRun(t *testing.T) {
 		httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
 		baseRepo := func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
 
-		tt.input.IO = io
+		tt.input.IO = ios
 		tt.input.HttpClient = httpClient
 		tt.input.BaseRepo = baseRepo
 
@@ -362,7 +382,31 @@ func mockIssueGet(_ *testing.T, reg *httpmock.Registry) {
 		httpmock.StringResponse(`
 			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
 				"number": 123,
-				"url": "https://github.com/OWNER/REPO/issue/123"
+				"url": "https://github.com/OWNER/REPO/issue/123",
+				"labels": {
+					"nodes": [
+						{ "id": "DOCSID", "name": "docs" }
+					], "totalCount": 1
+				},
+				"projectCards": {
+					"nodes": [
+						{ "project": { "name": "Roadmap" } }
+					], "totalCount": 1
+				}
+			} } } }`),
+	)
+}
+
+func mockIssueProjectItemsGet(_ *testing.T, reg *httpmock.Registry) {
+	reg.Register(
+		httpmock.GraphQL(`query IssueProjectItems\b`),
+		httpmock.StringResponse(`
+			{ "data": { "repository": { "issue": {
+				"projectItems": {
+					"nodes": [
+						{ "id": "ITEMID", "project": { "title": "RoadmapV2" } }
+					]
+				}
 			} } } }`),
 	)
 }
@@ -386,7 +430,8 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
 			"nodes": [
 				{ "name": "feature", "id": "FEATUREID" },
 				{ "name": "TODO", "id": "TODOID" },
-				{ "name": "bug", "id": "BUGID" }
+				{ "name": "bug", "id": "BUGID" },
+				{ "name": "docs", "id": "DOCSID" }
 			],
 			"pageInfo": { "hasNextPage": false }
 		} } } }
@@ -423,15 +468,68 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry) {
 			"pageInfo": { "hasNextPage": false }
 		} } } }
 		`))
+	reg.Register(
+		httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projectsV2": {
+			"nodes": [
+				{ "title": "CleanupV2", "id": "CLEANUPV2ID" },
+				{ "title": "RoadmapV2", "id": "ROADMAPV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	reg.Register(
+		httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "organization": { "projectsV2": {
+			"nodes": [
+				{ "title": "TriageV2", "id": "TRIAGEV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	reg.Register(
+		httpmock.GraphQL(`query UserProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "viewer": { "projectsV2": {
+			"nodes": [
+				{ "title": "MonalisaV2", "id": "MONALISAV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
 }
 
 func mockIssueUpdate(t *testing.T, reg *httpmock.Registry) {
 	reg.Register(
 		httpmock.GraphQL(`mutation IssueUpdate\b`),
 		httpmock.GraphQLMutation(`
-				{ "data": { "updateIssue": { "issue": {
-					"id": "123"
-				} } } }`,
+				{ "data": { "updateIssue": { "__typename": "" } } }`,
+			func(inputs map[string]interface{}) {}),
+	)
+}
+
+func mockIssueUpdateLabels(t *testing.T, reg *httpmock.Registry) {
+	reg.Register(
+		httpmock.GraphQL(`mutation LabelAdd\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "addLabelsToLabelable": { "__typename": "" } } }`,
+			func(inputs map[string]interface{}) {}),
+	)
+	reg.Register(
+		httpmock.GraphQL(`mutation LabelRemove\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "removeLabelsFromLabelable": { "__typename": "" } } }`,
+			func(inputs map[string]interface{}) {}),
+	)
+}
+
+func mockProjectV2ItemUpdate(t *testing.T, reg *httpmock.Registry) {
+	reg.Register(
+		httpmock.GraphQL(`mutation UpdateProjectV2Items\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "add_000": { "item": { "id": "1" } }, "delete_001": { "item": { "id": "2" } } } }`,
 			func(inputs map[string]interface{}) {}),
 	)
 }

@@ -2,9 +2,11 @@ package root
 
 import (
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/api"
 	codespacesAPI "github.com/cli/cli/v2/internal/codespaces/api"
 	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
 	aliasCmd "github.com/cli/cli/v2/pkg/cmd/alias"
@@ -12,20 +14,23 @@ import (
 	authCmd "github.com/cli/cli/v2/pkg/cmd/auth"
 	browseCmd "github.com/cli/cli/v2/pkg/cmd/browse"
 	codespaceCmd "github.com/cli/cli/v2/pkg/cmd/codespace"
-	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
 	completionCmd "github.com/cli/cli/v2/pkg/cmd/completion"
 	configCmd "github.com/cli/cli/v2/pkg/cmd/config"
 	extensionCmd "github.com/cli/cli/v2/pkg/cmd/extension"
 	"github.com/cli/cli/v2/pkg/cmd/factory"
 	gistCmd "github.com/cli/cli/v2/pkg/cmd/gist"
+	gpgKeyCmd "github.com/cli/cli/v2/pkg/cmd/gpg-key"
 	issueCmd "github.com/cli/cli/v2/pkg/cmd/issue"
+	labelCmd "github.com/cli/cli/v2/pkg/cmd/label"
 	prCmd "github.com/cli/cli/v2/pkg/cmd/pr"
 	releaseCmd "github.com/cli/cli/v2/pkg/cmd/release"
 	repoCmd "github.com/cli/cli/v2/pkg/cmd/repo"
 	creditsCmd "github.com/cli/cli/v2/pkg/cmd/repo/credits"
 	runCmd "github.com/cli/cli/v2/pkg/cmd/run"
+	searchCmd "github.com/cli/cli/v2/pkg/cmd/search"
 	secretCmd "github.com/cli/cli/v2/pkg/cmd/secret"
 	sshKeyCmd "github.com/cli/cli/v2/pkg/cmd/ssh-key"
+	statusCmd "github.com/cli/cli/v2/pkg/cmd/status"
 	versionCmd "github.com/cli/cli/v2/pkg/cmd/version"
 	workflowCmd "github.com/cli/cli/v2/pkg/cmd/workflow"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -38,37 +43,46 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 		Short: "GitHub CLI",
 		Long:  `Work seamlessly with GitHub from the command line.`,
 
-		SilenceErrors: true,
-		SilenceUsage:  true,
 		Example: heredoc.Doc(`
 			$ gh issue create
 			$ gh repo clone cli/cli
 			$ gh pr checkout 321
 		`),
 		Annotations: map[string]string{
-			"help:feedback": heredoc.Doc(`
-				Open an issue using 'gh issue create -R github.com/cli/cli'
-			`),
-			"help:environment": heredoc.Doc(`
-				See 'gh help environment' for the list of supported environment variables.
-			`),
+			"versionInfo": versionCmd.Format(version, buildDate),
 		},
 	}
 
-	cmd.SetOut(f.IOStreams.Out)
-	cmd.SetErr(f.IOStreams.ErrOut)
+	// cmd.SetOut(f.IOStreams.Out)    // can't use due to https://github.com/spf13/cobra/issues/1708
+	// cmd.SetErr(f.IOStreams.ErrOut) // just let it default to os.Stderr instead
 
 	cmd.PersistentFlags().Bool("help", false, "Show help for command")
-	cmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		rootHelpFunc(f, cmd, args)
-	})
-	cmd.SetUsageFunc(rootUsageFunc)
-	cmd.SetFlagErrorFunc(rootFlagErrorFunc)
 
-	formattedVersion := versionCmd.Format(version, buildDate)
-	cmd.SetVersionTemplate(formattedVersion)
-	cmd.Version = formattedVersion
-	cmd.Flags().Bool("version", false, "Show gh version")
+	// override Cobra's default behaviors unless an opt-out has been set
+	if os.Getenv("GH_COBRA") == "" {
+		cmd.SilenceErrors = true
+		cmd.SilenceUsage = true
+
+		// this --version flag is checked in rootHelpFunc
+		cmd.Flags().Bool("version", false, "Show gh version")
+
+		cmd.SetHelpFunc(func(c *cobra.Command, args []string) {
+			rootHelpFunc(f, c, args)
+		})
+		cmd.SetUsageFunc(func(c *cobra.Command) error {
+			return rootUsageFunc(f.IOStreams.ErrOut, c)
+		})
+		cmd.SetFlagErrorFunc(rootFlagErrorFunc)
+	}
+
+	cmd.AddGroup(&cobra.Group{
+		ID:    "core",
+		Title: "Core commands",
+	})
+	cmd.AddGroup(&cobra.Group{
+		ID:    "actions",
+		Title: "GitHub Actions commands",
+	})
 
 	// Child commands
 	cmd.AddCommand(versionCmd.NewCmdVersion(f, version, buildDate))
@@ -78,10 +92,13 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(configCmd.NewCmdConfig(f))
 	cmd.AddCommand(creditsCmd.NewCmdCredits(f, nil))
 	cmd.AddCommand(gistCmd.NewCmdGist(f))
+	cmd.AddCommand(gpgKeyCmd.NewCmdGPGKey(f))
 	cmd.AddCommand(completionCmd.NewCmdCompletion(f.IOStreams))
 	cmd.AddCommand(extensionCmd.NewCmdExtension(f))
+	cmd.AddCommand(searchCmd.NewCmdSearch(f))
 	cmd.AddCommand(secretCmd.NewCmdSecret(f))
 	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
+	cmd.AddCommand(statusCmd.NewCmdStatus(f, nil))
 	cmd.AddCommand(newCodespaceCmd(f))
 
 	// the `api` command should not inherit any extra HTTP headers
@@ -101,12 +118,14 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	cmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
 	cmd.AddCommand(runCmd.NewCmdRun(&repoResolvingCmdFactory))
 	cmd.AddCommand(workflowCmd.NewCmdWorkflow(&repoResolvingCmdFactory))
+	cmd.AddCommand(labelCmd.NewCmdLabel(&repoResolvingCmdFactory))
 
 	// Help topics
-	cmd.AddCommand(NewHelpTopic("environment"))
-	cmd.AddCommand(NewHelpTopic("formatting"))
-	cmd.AddCommand(NewHelpTopic("mintty"))
-	referenceCmd := NewHelpTopic("reference")
+	cmd.AddCommand(NewHelpTopic(f.IOStreams, "environment"))
+	cmd.AddCommand(NewHelpTopic(f.IOStreams, "formatting"))
+	cmd.AddCommand(NewHelpTopic(f.IOStreams, "mintty"))
+	cmd.AddCommand(NewHelpTopic(f.IOStreams, "exit-codes"))
+	referenceCmd := NewHelpTopic(f.IOStreams, "reference")
 	referenceCmd.SetHelpFunc(referenceHelpFn(f.IOStreams))
 	cmd.AddCommand(referenceCmd)
 
@@ -123,18 +142,37 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 		if err != nil {
 			return nil, err
 		}
-		return factory.NewHTTPClient(f.IOStreams, cfg, version, false)
+		opts := api.HTTPClientOptions{
+			AppVersion:        version,
+			Config:            cfg,
+			Log:               f.IOStreams.ErrOut,
+			LogColorize:       f.IOStreams.ColorEnabled(),
+			SkipAcceptHeaders: true,
+		}
+		return api.NewHTTPClient(opts)
 	}
 }
 
 func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
-	cmd := codespaceCmd.NewRootCmd(codespaceCmd.NewApp(
-		output.NewLogger(f.IOStreams.Out, f.IOStreams.ErrOut, !f.IOStreams.IsStdoutTTY()),
-		codespacesAPI.New("", &lazyLoadedHTTPClient{factory: f}),
-	))
+	serverURL := os.Getenv("GITHUB_SERVER_URL")
+	apiURL := os.Getenv("GITHUB_API_URL")
+	vscsURL := os.Getenv("INTERNAL_VSCS_TARGET_URL")
+	app := codespaceCmd.NewApp(
+		f.IOStreams,
+		f,
+		codespacesAPI.New(
+			serverURL,
+			apiURL,
+			vscsURL,
+			&lazyLoadedHTTPClient{factory: f},
+		),
+		f.Browser,
+		f.Remotes,
+	)
+	cmd := codespaceCmd.NewRootCmd(app)
 	cmd.Use = "codespace"
 	cmd.Aliases = []string{"cs"}
-	cmd.Hidden = true
+	cmd.GroupID = "core"
 	return cmd
 }
 

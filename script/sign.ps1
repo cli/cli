@@ -6,12 +6,7 @@ param (
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$thumbprint = "fb713a60a7fa79dfc03cb301ca05d4e8c1bdd431"
-$passwd = $env:GITHUB_CERT_PASSWORD
 $ProgramName = "GitHub CLI"
-
 $scriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 
-& $scriptPath\signtool.exe sign /d $ProgramName /f $Certificate /p $passwd `
-    /sha1 $thumbprint /fd sha256 /tr http://timestamp.digicert.com /td sha256 /v `
-    $Executable
+& $scriptPath\signtool.exe sign /d $ProgramName /f $Certificate /p $env:CERT_PASSWORD /fd sha256 /tr http://timestamp.digicert.com /v $Executable

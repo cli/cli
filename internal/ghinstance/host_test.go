@@ -20,6 +20,18 @@ func TestIsEnterprise(t *testing.T) {
 			want: false,
 		},
 		{
+			host: "github.localhost",
+			want: false,
+		},
+		{
+			host: "api.github.localhost",
+			want: false,
+		},
+		{
+			host: "garage.github.com",
+			want: false,
+		},
+		{
 			host: "ghe.io",
 			want: true,
 		},
@@ -59,6 +71,18 @@ func TestNormalizeHostname(t *testing.T) {
 			want: "github.com",
 		},
 		{
+			host: "GitHub.localhost",
+			want: "github.localhost",
+		},
+		{
+			host: "api.github.localhost",
+			want: "github.localhost",
+		},
+		{
+			host: "garage.github.com",
+			want: "github.com",
+		},
+		{
 			host: "GHE.IO",
 			want: "ghe.io",
 		},
@@ -79,7 +103,7 @@ func TestNormalizeHostname(t *testing.T) {
 func TestHostnameValidator(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    interface{}
+		input    string
 		wantsErr bool
 	}{
 		{
@@ -100,11 +124,6 @@ func TestHostnameValidator(t *testing.T) {
 		{
 			name:     "hostname with colon",
 			input:    "internal.instance:2205",
-			wantsErr: true,
-		},
-		{
-			name:     "non-string hostname",
-			input:    62,
 			wantsErr: true,
 		},
 	}
@@ -130,6 +149,14 @@ func TestGraphQLEndpoint(t *testing.T) {
 			want: "https://api.github.com/graphql",
 		},
 		{
+			host: "github.localhost",
+			want: "http://api.github.localhost/graphql",
+		},
+		{
+			host: "garage.github.com",
+			want: "https://garage.github.com/api/graphql",
+		},
+		{
 			host: "ghe.io",
 			want: "https://ghe.io/api/graphql",
 		},
@@ -151,6 +178,14 @@ func TestRESTPrefix(t *testing.T) {
 		{
 			host: "github.com",
 			want: "https://api.github.com/",
+		},
+		{
+			host: "github.localhost",
+			want: "http://api.github.localhost/",
+		},
+		{
+			host: "garage.github.com",
+			want: "https://garage.github.com/api/v3/",
 		},
 		{
 			host: "ghe.io",

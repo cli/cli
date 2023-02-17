@@ -40,7 +40,7 @@ func NewCmdEnable(f *cmdutil.Factory, runF func(*EnableOptions) error) *cobra.Co
 			if len(args) > 0 {
 				opts.Selector = args[0]
 			} else if !opts.IO.CanPrompt() {
-				return &cmdutil.FlagError{Err: errors.New("workflow ID or name required when not running interactively")}
+				return cmdutil.FlagErrorf("workflow ID or name required when not running interactively")
 			} else {
 				opts.Prompt = true
 			}
@@ -64,10 +64,10 @@ func runEnable(opts *EnableOptions) error {
 
 	repo, err := opts.BaseRepo()
 	if err != nil {
-		return fmt.Errorf("could not determine base repo: %w", err)
+		return err
 	}
 
-	states := []shared.WorkflowState{shared.DisabledManually}
+	states := []shared.WorkflowState{shared.DisabledManually, shared.DisabledInactivity}
 	workflow, err := shared.ResolveWorkflow(
 		opts.IO, client, repo, opts.Prompt, opts.Selector, states)
 	if err != nil {

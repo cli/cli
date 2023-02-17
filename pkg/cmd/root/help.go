@@ -3,33 +3,35 @@ package root
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"sort"
 	"strings"
 
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/text"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
-func rootUsageFunc(command *cobra.Command) error {
-	command.Printf("Usage:  %s", command.UseLine())
+func rootUsageFunc(w io.Writer, command *cobra.Command) error {
+	fmt.Fprintf(w, "Usage:  %s", command.UseLine())
 
 	subcommands := command.Commands()
 	if len(subcommands) > 0 {
-		command.Print("\n\nAvailable commands:\n")
+		fmt.Fprint(w, "\n\nAvailable commands:\n")
 		for _, c := range subcommands {
 			if c.Hidden {
 				continue
 			}
-			command.Printf("  %s\n", c.Name())
+			fmt.Fprintf(w, "  %s\n", c.Name())
 		}
 		return nil
 	}
 
 	flagUsages := command.LocalFlags().FlagUsages()
 	if flagUsages != "" {
-		command.Println("\n\nFlags:")
-		command.Print(text.Indent(dedent(flagUsages), "  "))
+		fmt.Fprintln(w, "\n\nFlags:")
+		fmt.Fprint(w, text.Indent(dedent(flagUsages), "  "))
 	}
 	return nil
 }
@@ -38,7 +40,7 @@ func rootFlagErrorFunc(cmd *cobra.Command, err error) error {
 	if err == pflag.ErrHelp {
 		return err
 	}
-	return &cmdutil.FlagError{Err: err}
+	return cmdutil.FlagErrorWrap(err)
 }
 
 var hasFailed bool
@@ -51,8 +53,8 @@ func HasFailed() bool {
 // Display helpful error message in case subcommand name was mistyped.
 // This matches Cobra's behavior for root command, which Cobra
 // confusingly doesn't apply to nested commands.
-func nestedSuggestFunc(command *cobra.Command, arg string) {
-	command.Printf("unknown command %q for %q\n", arg, command.CommandPath())
+func nestedSuggestFunc(w io.Writer, command *cobra.Command, arg string) {
+	fmt.Fprintf(w, "unknown command %q for %q\n", arg, command.CommandPath())
 
 	var candidates []string
 	if arg == "help" {
@@ -65,14 +67,14 @@ func nestedSuggestFunc(command *cobra.Command, arg string) {
 	}
 
 	if len(candidates) > 0 {
-		command.Print("\nDid you mean this?\n")
+		fmt.Fprint(w, "\nDid you mean this?\n")
 		for _, c := range candidates {
-			command.Printf("\t%s\n", c)
+			fmt.Fprintf(w, "\t%s\n", c)
 		}
 	}
 
-	command.Print("\n")
-	_ = rootUsageFunc(command)
+	fmt.Fprint(w, "\n")
+	_ = rootUsageFunc(w, command)
 }
 
 func isRootCmd(command *cobra.Command) bool {
@@ -80,40 +82,26 @@ func isRootCmd(command *cobra.Command) bool {
 }
 
 func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
+	if isRootCmd(command) {
+		if versionVal, err := command.Flags().GetBool("version"); err == nil && versionVal {
+			fmt.Fprint(f.IOStreams.Out, command.Annotations["versionInfo"])
+			return
+		} else if err != nil {
+			fmt.Fprintln(f.IOStreams.ErrOut, err)
+			hasFailed = true
+			return
+		}
+	}
+
 	cs := f.IOStreams.ColorScheme()
 
 	if isRootCmd(command.Parent()) && len(args) >= 2 && args[1] != "--help" && args[1] != "-h" {
-		nestedSuggestFunc(command, args[1])
+		nestedSuggestFunc(f.IOStreams.ErrOut, command, args[1])
 		hasFailed = true
 		return
 	}
 
-	coreCommands := []string{}
-	actionsCommands := []string{}
-	additionalCommands := []string{}
-	for _, c := range command.Commands() {
-		if c.Short == "" {
-			continue
-		}
-		if c.Hidden {
-			continue
-		}
-
-		s := rpad(c.Name()+":", c.NamePadding()) + c.Short
-		if _, ok := c.Annotations["IsCore"]; ok {
-			coreCommands = append(coreCommands, s)
-		} else if _, ok := c.Annotations["IsActions"]; ok {
-			actionsCommands = append(actionsCommands, s)
-		} else {
-			additionalCommands = append(additionalCommands, s)
-		}
-	}
-
-	// If there are no core commands, assume everything is a core command
-	if len(coreCommands) == 0 {
-		coreCommands = additionalCommands
-		additionalCommands = []string{}
-	}
+	namePadding := 12
 
 	type helpEntry struct {
 		Title string
@@ -134,18 +122,30 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 		helpEntries = append(helpEntries, helpEntry{"", longText})
 	}
 	helpEntries = append(helpEntries, helpEntry{"USAGE", command.UseLine()})
-	if len(coreCommands) > 0 {
-		helpEntries = append(helpEntries, helpEntry{"CORE COMMANDS", strings.Join(coreCommands, "\n")})
-	}
-	if len(actionsCommands) > 0 {
-		helpEntries = append(helpEntries, helpEntry{"ACTIONS COMMANDS", strings.Join(actionsCommands, "\n")})
-	}
-	if len(additionalCommands) > 0 {
-		helpEntries = append(helpEntries, helpEntry{"ADDITIONAL COMMANDS", strings.Join(additionalCommands, "\n")})
+
+	for _, g := range GroupedCommands(command) {
+		var names []string
+		for _, c := range g.Commands {
+			names = append(names, rpad(c.Name()+":", namePadding)+c.Short)
+		}
+		helpEntries = append(helpEntries, helpEntry{
+			Title: strings.ToUpper(g.Title),
+			Body:  strings.Join(names, "\n"),
+		})
 	}
 
 	if isRootCmd(command) {
-		if exts := f.ExtensionManager.List(false); len(exts) > 0 {
+		var helpTopics []string
+		if c := findCommand(command, "actions"); c != nil {
+			helpTopics = append(helpTopics, rpad(c.Name()+":", namePadding)+c.Short)
+		}
+		for topic, params := range HelpTopics {
+			helpTopics = append(helpTopics, rpad(topic+":", namePadding)+params["short"])
+		}
+		sort.Strings(helpTopics)
+		helpEntries = append(helpEntries, helpEntry{"HELP TOPICS", strings.Join(helpTopics, "\n")})
+
+		if exts := f.ExtensionManager.List(); len(exts) > 0 {
 			var names []string
 			for _, ext := range exts {
 				names = append(names, ext.Name())
@@ -174,11 +174,8 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 	helpEntries = append(helpEntries, helpEntry{"LEARN MORE", `
 Use 'gh <command> <subcommand> --help' for more information about a command.
 Read the manual at https://cli.github.com/manual`})
-	if _, ok := command.Annotations["help:feedback"]; ok {
-		helpEntries = append(helpEntries, helpEntry{"FEEDBACK", command.Annotations["help:feedback"]})
-	}
 
-	out := command.OutOrStdout()
+	out := f.IOStreams.Out
 	for _, e := range helpEntries {
 		if e.Title != "" {
 			// If there is a title, add indentation to each line in the body
@@ -190,6 +187,58 @@ Read the manual at https://cli.github.com/manual`})
 		}
 		fmt.Fprintln(out)
 	}
+}
+
+func findCommand(cmd *cobra.Command, name string) *cobra.Command {
+	for _, c := range cmd.Commands() {
+		if c.Name() == name {
+			return c
+		}
+	}
+	return nil
+}
+
+type CommandGroup struct {
+	Title    string
+	Commands []*cobra.Command
+}
+
+func GroupedCommands(cmd *cobra.Command) []CommandGroup {
+	var res []CommandGroup
+
+	for _, g := range cmd.Groups() {
+		var cmds []*cobra.Command
+		for _, c := range cmd.Commands() {
+			if c.GroupID == g.ID && c.IsAvailableCommand() {
+				cmds = append(cmds, c)
+			}
+		}
+		if len(cmds) > 0 {
+			res = append(res, CommandGroup{
+				Title:    g.Title,
+				Commands: cmds,
+			})
+		}
+	}
+
+	var cmds []*cobra.Command
+	for _, c := range cmd.Commands() {
+		if c.GroupID == "" && c.IsAvailableCommand() {
+			cmds = append(cmds, c)
+		}
+	}
+	if len(cmds) > 0 {
+		defaultGroupTitle := "Additional commands"
+		if len(cmd.Groups()) == 0 {
+			defaultGroupTitle = "Available commands"
+		}
+		res = append(res, CommandGroup{
+			Title:    defaultGroupTitle,
+			Commands: cmds,
+		})
+	}
+
+	return res
 }
 
 // rpad adds padding to the right of a string.

@@ -2,7 +2,7 @@ package download
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"path/filepath"
 	"testing"
@@ -69,16 +69,39 @@ func Test_NewCmdDownload(t *testing.T) {
 				DestinationDir: ".",
 			},
 		},
+		{
+			name:  "repo level with patterns",
+			args:  "-p o*e -p tw*",
+			isTTY: true,
+			want: DownloadOptions{
+				RunID:          "",
+				DoPrompt:       false,
+				FilePatterns:   []string{"o*e", "tw*"},
+				DestinationDir: ".",
+			},
+		},
+		{
+			name:  "repo level with names and patterns",
+			args:  "-p o*e -p tw* -n three -n four",
+			isTTY: true,
+			want: DownloadOptions{
+				RunID:          "",
+				DoPrompt:       false,
+				Names:          []string{"three", "four"},
+				FilePatterns:   []string{"o*e", "tw*"},
+				DestinationDir: ".",
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 				HttpClient: func() (*http.Client, error) {
 					return nil, nil
 				},
@@ -99,8 +122,8 @@ func Test_NewCmdDownload(t *testing.T) {
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {
@@ -112,6 +135,7 @@ func Test_NewCmdDownload(t *testing.T) {
 
 			assert.Equal(t, tt.want.RunID, opts.RunID)
 			assert.Equal(t, tt.want.Names, opts.Names)
+			assert.Equal(t, tt.want.FilePatterns, opts.FilePatterns)
 			assert.Equal(t, tt.want.DestinationDir, opts.DestinationDir)
 			assert.Equal(t, tt.want.DoPrompt, opts.DoPrompt)
 		})
@@ -179,7 +203,7 @@ func Test_runDownload(t *testing.T) {
 			wantErr: "no valid artifacts found to download",
 		},
 		{
-			name: "no matches",
+			name: "no name matches",
 			opts: DownloadOptions{
 				RunID:          "2345",
 				DestinationDir: ".",
@@ -199,7 +223,30 @@ func Test_runDownload(t *testing.T) {
 					},
 				}, nil)
 			},
-			wantErr: "no artifact matches any of the names provided",
+			wantErr: "no artifact matches any of the names or patterns provided",
+		},
+		{
+			name: "no pattern matches",
+			opts: DownloadOptions{
+				RunID:          "2345",
+				DestinationDir: ".",
+				FilePatterns:   []string{"artifiction-*"},
+			},
+			mockAPI: func(p *mockPlatform) {
+				p.On("List", "2345").Return([]shared.Artifact{
+					{
+						Name:        "artifact-1",
+						DownloadURL: "http://download.com/artifact1.zip",
+						Expired:     false,
+					},
+					{
+						Name:        "artifact-2",
+						DownloadURL: "http://download.com/artifact2.zip",
+						Expired:     false,
+					},
+				}, nil)
+			},
+			wantErr: "no artifact matches any of the names or patterns provided",
 		},
 		{
 			name: "prompt to select artifact",
@@ -247,8 +294,8 @@ func Test_runDownload(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			opts := &tt.opts
-			io, _, stdout, stderr := iostreams.Test()
-			opts.IO = io
+			ios, _, stdout, stderr := iostreams.Test()
+			opts.IO = ios
 			opts.Platform = newMockPlatform(t, tt.mockAPI)
 			opts.Prompter = newMockPrompter(t, tt.mockPrompt)
 

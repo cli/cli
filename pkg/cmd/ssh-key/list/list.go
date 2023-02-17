@@ -1,12 +1,12 @@
 package list
 
 import (
-	"errors"
-	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/utils"
@@ -27,9 +27,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "Lists SSH keys in your GitHub account",
-		Args:  cobra.ExactArgs(0),
+		Use:     "list",
+		Short:   "Lists SSH keys in your GitHub account",
+		Aliases: []string{"ls"},
+		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runF != nil {
 				return runF(opts)
@@ -52,40 +53,46 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
 	sshKeys, err := userKeys(apiClient, host, "")
 	if err != nil {
-		if errors.Is(err, scopesError) {
-			cs := opts.IO.ColorScheme()
-			fmt.Fprint(opts.IO.ErrOut, "Error: insufficient OAuth scopes to list SSH keys\n")
-			fmt.Fprintf(opts.IO.ErrOut, "Run the following to grant scopes: %s\n", cs.Bold("gh auth refresh -s read:public_key"))
-			return cmdutil.SilentError
-		}
 		return err
 	}
 
 	if len(sshKeys) == 0 {
-		fmt.Fprintln(opts.IO.ErrOut, "No SSH keys present in GitHub account.")
-		return cmdutil.SilentError
+		return cmdutil.NewNoResultsError("no SSH keys present in the GitHub account")
 	}
 
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	t := utils.NewTablePrinter(opts.IO)
 	cs := opts.IO.ColorScheme()
 	now := time.Now()
 
-	for _, sshKey := range sshKeys {
-		t.AddField(sshKey.Title, nil, nil)
-		t.AddField(sshKey.Key, truncateMiddle, nil)
+	if t.IsTTY() {
+		t.AddField("TITLE", nil, nil)
+		t.AddField("ID", nil, nil)
+		t.AddField("KEY", nil, nil)
+		t.AddField("ADDED", nil, nil)
+		t.EndRow()
+	}
 
+	for _, sshKey := range sshKeys {
+		id := strconv.Itoa(sshKey.ID)
 		createdAt := sshKey.CreatedAt.Format(time.RFC3339)
+
 		if t.IsTTY() {
-			createdAt = utils.FuzzyAgoAbbr(now, sshKey.CreatedAt)
+			t.AddField(sshKey.Title, nil, nil)
+			t.AddField(id, nil, nil)
+			t.AddField(sshKey.Key, truncateMiddle, nil)
+			t.AddField(text.FuzzyAgoAbbr(now, sshKey.CreatedAt), nil, cs.Gray)
+		} else {
+			t.AddField(sshKey.Title, nil, nil)
+			t.AddField(sshKey.Key, nil, nil)
+			t.AddField(createdAt, nil, nil)
+			t.AddField(id, nil, nil)
 		}
-		t.AddField(createdAt, nil, cs.Gray)
+
 		t.EndRow()
 	}
 

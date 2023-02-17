@@ -4,74 +4,93 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/liveshare"
 )
 
-type logger interface {
-	Print(v ...interface{}) (int, error)
-	Println(v ...interface{}) (int, error)
-}
-
 func connectionReady(codespace *api.Codespace) bool {
-	return codespace.Environment.Connection.SessionID != "" &&
-		codespace.Environment.Connection.SessionToken != "" &&
-		codespace.Environment.Connection.RelayEndpoint != "" &&
-		codespace.Environment.Connection.RelaySAS != "" &&
-		codespace.Environment.State == api.CodespaceEnvironmentStateAvailable
+	return codespace.Connection.SessionID != "" &&
+		codespace.Connection.SessionToken != "" &&
+		codespace.Connection.RelayEndpoint != "" &&
+		codespace.Connection.RelaySAS != "" &&
+		codespace.State == api.CodespaceStateAvailable
 }
 
 type apiClient interface {
-	GetCodespace(ctx context.Context, token, user, name string) (*api.Codespace, error)
-	GetCodespaceToken(ctx context.Context, user, codespace string) (string, error)
-	StartCodespace(ctx context.Context, token string, codespace *api.Codespace) error
+	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
+	StartCodespace(ctx context.Context, name string) error
+}
+
+type progressIndicator interface {
+	StartProgressIndicatorWithLabel(s string)
+	StopProgressIndicator()
+}
+
+type logger interface {
+	Println(v ...interface{})
+	Printf(f string, v ...interface{})
 }
 
 // ConnectToLiveshare waits for a Codespace to become running,
 // and connects to it using a Live Share session.
-func ConnectToLiveshare(ctx context.Context, log logger, apiClient apiClient, userLogin, token string, codespace *api.Codespace) (*liveshare.Session, error) {
-	var startedCodespace bool
-	if codespace.Environment.State != api.CodespaceEnvironmentStateAvailable {
-		startedCodespace = true
-		log.Print("Starting your codespace...")
-		if err := apiClient.StartCodespace(ctx, token, codespace); err != nil {
+func ConnectToLiveshare(ctx context.Context, progress progressIndicator, sessionLogger logger, apiClient apiClient, codespace *api.Codespace) (sess *liveshare.Session, err error) {
+	if codespace.State != api.CodespaceStateAvailable {
+		progress.StartProgressIndicatorWithLabel("Starting codespace")
+		defer progress.StopProgressIndicator()
+		if err := apiClient.StartCodespace(ctx, codespace.Name); err != nil {
 			return nil, fmt.Errorf("error starting codespace: %w", err)
 		}
 	}
+	expBackoff := backoff.NewExponentialBackOff()
+
+	expBackoff.Multiplier = 1.1
+	expBackoff.MaxInterval = 10 * time.Second
+	expBackoff.MaxElapsedTime = 5 * time.Minute
 
 	for retries := 0; !connectionReady(codespace); retries++ {
 		if retries > 1 {
-			if retries%2 == 0 {
-				log.Print(".")
-			}
-
-			time.Sleep(1 * time.Second)
+			duration := expBackoff.NextBackOff()
+			time.Sleep(duration)
 		}
 
-		if retries == 30 {
+		if expBackoff.GetElapsedTime() >= expBackoff.MaxElapsedTime {
 			return nil, errors.New("timed out while waiting for the codespace to start")
 		}
 
-		var err error
-		codespace, err = apiClient.GetCodespace(ctx, token, userLogin, codespace.Name)
+		codespace, err = apiClient.GetCodespace(ctx, codespace.Name, true)
 		if err != nil {
 			return nil, fmt.Errorf("error getting codespace: %w", err)
 		}
 	}
 
-	if startedCodespace {
-		fmt.Print("\n")
-	}
-
-	log.Println("Connecting to your codespace...")
+	progress.StartProgressIndicatorWithLabel("Connecting to codespace")
+	defer progress.StopProgressIndicator()
 
 	return liveshare.Connect(ctx, liveshare.Options{
-		SessionID:      codespace.Environment.Connection.SessionID,
-		SessionToken:   codespace.Environment.Connection.SessionToken,
-		RelaySAS:       codespace.Environment.Connection.RelaySAS,
-		RelayEndpoint:  codespace.Environment.Connection.RelayEndpoint,
-		HostPublicKeys: codespace.Environment.Connection.HostPublicKeys,
+		SessionID:      codespace.Connection.SessionID,
+		SessionToken:   codespace.Connection.SessionToken,
+		RelaySAS:       codespace.Connection.RelaySAS,
+		RelayEndpoint:  codespace.Connection.RelayEndpoint,
+		HostPublicKeys: codespace.Connection.HostPublicKeys,
+		Logger:         sessionLogger,
 	})
+}
+
+// ListenTCP starts a localhost tcp listener and returns the listener and bound port
+func ListenTCP(port int) (*net.TCPListener, int, error) {
+	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to build tcp address: %w", err)
+	}
+	listener, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to listen to local port over tcp: %w", err)
+	}
+	port = listener.Addr().(*net.TCPAddr).Port
+
+	return listener, port, nil
 }

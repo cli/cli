@@ -7,6 +7,7 @@ import (
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -24,31 +25,34 @@ type ListOptions struct {
 	HttpClient func() (*http.Client, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	PlainOutput bool
+	Exporter cmdutil.Exporter
 
 	Limit            int
 	WorkflowSelector string
+	Branch           string
+	Actor            string
+
+	now time.Time
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
 	opts := &ListOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		now:        time.Now(),
 	}
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List recent workflow runs",
-		Args:  cobra.NoArgs,
+		Use:     "list",
+		Short:   "List recent workflow runs",
+		Aliases: []string{"ls"},
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			terminal := opts.IO.IsStdoutTTY() && opts.IO.IsStdinTTY()
-			opts.PlainOutput = !terminal
-
 			if opts.Limit < 1 {
-				return &cmdutil.FlagError{Err: fmt.Errorf("invalid limit: %v", opts.Limit)}
+				return cmdutil.FlagErrorf("invalid limit: %v", opts.Limit)
 			}
 
 			if runF != nil {
@@ -61,6 +65,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", defaultLimit, "Maximum number of runs to fetch")
 	cmd.Flags().StringVarP(&opts.WorkflowSelector, "workflow", "w", "", "Filter runs by workflow")
+	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Filter runs by branch")
+	cmd.Flags().StringVarP(&opts.Actor, "user", "u", "", "Filter runs by user who triggered the run")
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.RunFields)
 
 	return cmd
 }
@@ -77,41 +84,49 @@ func listRun(opts *ListOptions) error {
 	}
 	client := api.NewClientFromHTTP(c)
 
-	var runs []shared.Run
-	var workflow *workflowShared.Workflow
+	filters := &shared.FilterOptions{
+		Branch: opts.Branch,
+		Actor:  opts.Actor,
+	}
 
 	opts.IO.StartProgressIndicator()
 	if opts.WorkflowSelector != "" {
 		states := []workflowShared.WorkflowState{workflowShared.Active}
-		workflow, err = workflowShared.ResolveWorkflow(
-			opts.IO, client, baseRepo, false, opts.WorkflowSelector, states)
-		if err == nil {
-			runs, err = shared.GetRunsByWorkflow(client, baseRepo, opts.Limit, workflow.ID)
+		if workflow, err := workflowShared.ResolveWorkflow(opts.IO, client, baseRepo, false, opts.WorkflowSelector, states); err == nil {
+			filters.WorkflowID = workflow.ID
+			filters.WorkflowName = workflow.Name
+		} else {
+			return err
 		}
-	} else {
-		runs, err = shared.GetRuns(client, baseRepo, opts.Limit)
 	}
+	runsResult, err := shared.GetRuns(client, baseRepo, filters, opts.Limit)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to get runs: %w", err)
 	}
+	runs := runsResult.WorkflowRuns
+	if len(runs) == 0 && opts.Exporter == nil {
+		return cmdutil.NewNoResultsError("no runs found")
+	}
 
+	if err := opts.IO.StartPager(); err == nil {
+		defer opts.IO.StopPager()
+	} else {
+		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
+	}
+
+	if opts.Exporter != nil {
+		return opts.Exporter.Write(opts.IO, runs)
+	}
+
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(opts.IO)
 
 	cs := opts.IO.ColorScheme()
 
-	if len(runs) == 0 {
-		if !opts.PlainOutput {
-			fmt.Fprintln(opts.IO.ErrOut, "No runs found")
-		}
-		return nil
-	}
-
-	out := opts.IO.Out
-
-	if !opts.PlainOutput {
+	if tp.IsTTY() {
 		tp.AddField("STATUS", nil, nil)
-		tp.AddField("NAME", nil, nil)
+		tp.AddField("TITLE", nil, nil)
 		tp.AddField("WORKFLOW", nil, nil)
 		tp.AddField("BRANCH", nil, nil)
 		tp.AddField("EVENT", nil, nil)
@@ -122,38 +137,29 @@ func listRun(opts *ListOptions) error {
 	}
 
 	for _, run := range runs {
-		if opts.PlainOutput {
-			tp.AddField(string(run.Status), nil, nil)
-			tp.AddField(string(run.Conclusion), nil, nil)
-		} else {
+		if tp.IsTTY() {
 			symbol, symbolColor := shared.Symbol(cs, run.Status, run.Conclusion)
 			tp.AddField(symbol, nil, symbolColor)
+		} else {
+			tp.AddField(string(run.Status), nil, nil)
+			tp.AddField(string(run.Conclusion), nil, nil)
 		}
 
-		tp.AddField(run.CommitMsg(), nil, cs.Bold)
+		tp.AddField(run.Title(), nil, cs.Bold)
 
-		tp.AddField(run.Name, nil, nil)
+		tp.AddField(run.WorkflowName(), nil, nil)
 		tp.AddField(run.HeadBranch, nil, cs.Bold)
 		tp.AddField(string(run.Event), nil, nil)
 		tp.AddField(fmt.Sprintf("%d", run.ID), nil, cs.Cyan)
 
-		elapsed := run.UpdatedAt.Sub(run.CreatedAt)
-		if elapsed < 0 {
-			elapsed = 0
-		}
-		tp.AddField(elapsed.String(), nil, nil)
-		tp.AddField(utils.FuzzyAgoAbbr(time.Now(), run.CreatedAt), nil, nil)
+		tp.AddField(run.Duration(opts.now).String(), nil, nil)
+		tp.AddField(text.FuzzyAgoAbbr(time.Now(), run.StartedTime()), nil, nil)
 		tp.EndRow()
 	}
 
 	err = tp.Render()
 	if err != nil {
 		return err
-	}
-
-	if !opts.PlainOutput {
-		fmt.Fprintln(out)
-		fmt.Fprintln(out, "For details on a run, try: gh run view <run-id>")
 	}
 
 	return nil

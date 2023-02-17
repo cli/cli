@@ -3,7 +3,7 @@ package list
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -47,13 +47,35 @@ func Test_NewCmdList(t *testing.T) {
 				EnvName: "Development",
 			},
 		},
+		{
+			name: "user",
+			cli:  "-u",
+			wants: ListOptions{
+				UserSecrets: true,
+			},
+		},
+		{
+			name: "Dependabot repo",
+			cli:  "--app Dependabot",
+			wants: ListOptions{
+				Application: "Dependabot",
+			},
+		},
+		{
+			name: "Dependabot org",
+			cli:  "--app Dependabot --org UmbrellaCorporation",
+			wants: ListOptions{
+				Application: "Dependabot",
+				OrgName:     "UmbrellaCorporation",
+			},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			ios, _, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			argv, err := shlex.Split(tt.cli)
@@ -153,6 +175,80 @@ func Test_listRun(t *testing.T) {
 				"SECRET_THREE\t1975-11-30",
 			},
 		},
+		{
+			name: "user tty",
+			tty:  true,
+			opts: &ListOptions{
+				UserSecrets: true,
+			},
+			wantOut: []string{
+				"SECRET_ONE.*Updated 1988-10-11.*Visible to 1 selected repository",
+				"SECRET_TWO.*Updated 2020-12-04.*Visible to 2 selected repositories",
+				"SECRET_THREE.*Updated 1975-11-30.*Visible to 3 selected repositories",
+			},
+		},
+		{
+			name: "user not tty",
+			tty:  false,
+			opts: &ListOptions{
+				UserSecrets: true,
+			},
+			wantOut: []string{
+				"SECRET_ONE\t1988-10-11\t",
+				"SECRET_TWO\t2020-12-04\t",
+				"SECRET_THREE\t1975-11-30\t",
+			},
+		},
+		{
+			name: "Dependabot repo tty",
+			tty:  true,
+			opts: &ListOptions{
+				Application: "Dependabot",
+			},
+			wantOut: []string{
+				"SECRET_ONE.*Updated 1988-10-11",
+				"SECRET_TWO.*Updated 2020-12-04",
+				"SECRET_THREE.*Updated 1975-11-30",
+			},
+		},
+		{
+			name: "Dependabot repo not tty",
+			tty:  false,
+			opts: &ListOptions{
+				Application: "Dependabot",
+			},
+			wantOut: []string{
+				"SECRET_ONE\t1988-10-11",
+				"SECRET_TWO\t2020-12-04",
+				"SECRET_THREE\t1975-11-30",
+			},
+		},
+		{
+			name: "Dependabot org tty",
+			tty:  true,
+			opts: &ListOptions{
+				Application: "Dependabot",
+				OrgName:     "UmbrellaCorporation",
+			},
+			wantOut: []string{
+				"SECRET_ONE.*Updated 1988-10-11.*Visible to all repositories",
+				"SECRET_TWO.*Updated 2020-12-04.*Visible to private repositories",
+				"SECRET_THREE.*Updated 1975-11-30.*Visible to 2 selected repositories",
+			},
+		},
+		{
+			name: "Dependabot org not tty",
+			tty:  false,
+			opts: &ListOptions{
+				Application: "Dependabot",
+				OrgName:     "UmbrellaCorporation",
+			},
+			wantOut: []string{
+				"SECRET_ONE\t1988-10-11\tALL",
+				"SECRET_TWO\t2020-12-04\tPRIVATE",
+				"SECRET_THREE\t1975-11-30\tSELECTED",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -203,20 +299,63 @@ func Test_listRun(t *testing.T) {
 				}
 				path = fmt.Sprintf("orgs/%s/actions/secrets", tt.opts.OrgName)
 
-				reg.Register(
-					httpmock.REST("GET", fmt.Sprintf("orgs/%s/actions/secrets/SECRET_THREE/repositories", tt.opts.OrgName)),
-					httpmock.JSONResponse(struct {
-						TotalCount int `json:"total_count"`
-					}{2}))
+				if tt.tty {
+					reg.Register(
+						httpmock.REST("GET", fmt.Sprintf("orgs/%s/actions/secrets/SECRET_THREE/repositories", tt.opts.OrgName)),
+						httpmock.JSONResponse(struct {
+							TotalCount int `json:"total_count"`
+						}{2}))
+				}
+			}
+
+			if tt.opts.UserSecrets {
+				payload.Secrets = []*Secret{
+					{
+						Name:             "SECRET_ONE",
+						UpdatedAt:        t0,
+						Visibility:       shared.Selected,
+						SelectedReposURL: "https://api.github.com/user/codespaces/secrets/SECRET_ONE/repositories",
+					},
+					{
+						Name:             "SECRET_TWO",
+						UpdatedAt:        t1,
+						Visibility:       shared.Selected,
+						SelectedReposURL: "https://api.github.com/user/codespaces/secrets/SECRET_TWO/repositories",
+					},
+					{
+						Name:             "SECRET_THREE",
+						UpdatedAt:        t2,
+						Visibility:       shared.Selected,
+						SelectedReposURL: "https://api.github.com/user/codespaces/secrets/SECRET_THREE/repositories",
+					},
+				}
+
+				path = "user/codespaces/secrets"
+				if tt.tty {
+					for i, secret := range payload.Secrets {
+						hostLen := len("https://api.github.com/")
+						path := secret.SelectedReposURL[hostLen:len(secret.SelectedReposURL)]
+						repositoryCount := i + 1
+						reg.Register(
+							httpmock.REST("GET", path),
+							httpmock.JSONResponse(struct {
+								TotalCount int `json:"total_count"`
+							}{repositoryCount}))
+					}
+				}
+			}
+
+			if tt.opts.Application == "Dependabot" {
+				path = strings.Replace(path, "actions", "dependabot", 1)
 			}
 
 			reg.Register(httpmock.REST("GET", path), httpmock.JSONResponse(payload))
 
-			io, _, stdout, _ := iostreams.Test()
+			ios, _, stdout, _ := iostreams.Test()
 
-			io.SetStdoutTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 
-			tt.opts.IO = io
+			tt.opts.IO = ios
 			tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 				return ghrepo.FromFullName("owner/repo")
 			}
@@ -248,7 +387,7 @@ func Test_getSecrets_pagination(t *testing.T) {
 		requests = append(requests, req)
 		return &http.Response{
 			Request: req,
-			Body:    ioutil.NopCloser(strings.NewReader(`{"secrets":[{},{}]}`)),
+			Body:    io.NopCloser(strings.NewReader(`{"secrets":[{},{}]}`)),
 			Header:  header,
 		}, nil
 	}

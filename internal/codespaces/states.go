@@ -5,11 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net"
-	"strings"
+	"io"
+	"log"
 	"time"
 
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/codespaces/rpc"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/liveshare"
 )
 
@@ -17,7 +19,7 @@ import (
 type PostCreateStateStatus string
 
 func (p PostCreateStateStatus) String() string {
-	return strings.Title(string(p))
+	return text.Title(string(p))
 }
 
 const (
@@ -36,15 +38,12 @@ type PostCreateState struct {
 // PollPostCreateStates watches for state changes in a codespace,
 // and calls the supplied poller for each batch of state changes.
 // It runs until it encounters an error, including cancellation of the context.
-func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, user *api.User, codespace *api.Codespace, poller func([]PostCreateState)) (err error) {
-	token, err := apiClient.GetCodespaceToken(ctx, user.Login, codespace.Name)
-	if err != nil {
-		return fmt.Errorf("getting codespace token: %w", err)
-	}
+func PollPostCreateStates(ctx context.Context, progress progressIndicator, apiClient apiClient, codespace *api.Codespace, poller func([]PostCreateState)) (err error) {
+	noopLogger := log.New(io.Discard, "", 0)
 
-	session, err := ConnectToLiveshare(ctx, log, apiClient, user.Login, token, codespace)
+	session, err := ConnectToLiveshare(ctx, progress, noopLogger, apiClient, codespace)
 	if err != nil {
-		return fmt.Errorf("connect to Live Share: %w", err)
+		return fmt.Errorf("connect to codespace: %w", err)
 	}
 	defer func() {
 		if closeErr := session.Close(); err == nil {
@@ -53,28 +52,35 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, 
 	}()
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
-	listen, err := net.Listen("tcp", ":0") // arbitrary port
+	listen, localPort, err := ListenTCP(0)
 	if err != nil {
 		return err
 	}
-	localPort := listen.Addr().(*net.TCPAddr).Port
 
-	log.Println("Fetching SSH Details...")
-	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
+	progress.StartProgressIndicatorWithLabel("Fetching SSH Details")
+	invoker, err := rpc.CreateInvoker(ctx, session)
+	if err != nil {
+		return err
+	}
+	defer safeClose(invoker, &err)
+
+	remoteSSHServerPort, sshUser, err := invoker.StartSSHServer(ctx)
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}
+	progress.StopProgressIndicator()
 
+	progress.StartProgressIndicatorWithLabel("Fetching status")
 	tunnelClosed := make(chan error, 1) // buffered to avoid sender stuckness
 	go func() {
-		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort)
+		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, false)
 		tunnelClosed <- fwd.ForwardToListener(ctx, listen) // error is non-nil
 	}()
 
 	t := time.NewTicker(1 * time.Second)
 	defer t.Stop()
 
-	for {
+	for ticks := 0; ; ticks++ {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -83,7 +89,14 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, 
 			return fmt.Errorf("connection failed: %w", err)
 
 		case <-t.C:
-			states, err := getPostCreateOutput(ctx, localPort, codespace, sshUser)
+			states, err := getPostCreateOutput(ctx, localPort, sshUser)
+			// There is an active progress indicator before the first tick
+			// to show that we are fetching statuses.
+			// Once the first tick happens, we stop the indicator and let
+			// the subsequent post create states manage their own progress.
+			if ticks == 0 {
+				progress.StopProgressIndicator()
+			}
 			if err != nil {
 				return fmt.Errorf("get post create output: %w", err)
 			}
@@ -93,7 +106,7 @@ func PollPostCreateStates(ctx context.Context, log logger, apiClient apiClient, 
 	}
 }
 
-func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Codespace, user string) ([]PostCreateState, error) {
+func getPostCreateOutput(ctx context.Context, tunnelPort int, user string) ([]PostCreateState, error) {
 	cmd, err := NewRemoteCommand(
 		ctx, tunnelPort, fmt.Sprintf("%s@localhost", user),
 		"cat /workspaces/.codespaces/shared/postCreateOutput.json",
@@ -115,4 +128,10 @@ func getPostCreateOutput(ctx context.Context, tunnelPort int, codespace *api.Cod
 	}
 
 	return output.Steps, nil
+}
+
+func safeClose(closer io.Closer, err *error) {
+	if closeErr := closer.Close(); *err == nil {
+		*err = closeErr
+	}
 }

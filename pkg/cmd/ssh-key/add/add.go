@@ -1,7 +1,6 @@
 package add
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -36,7 +35,7 @@ func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command 
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				if opts.IO.IsStdoutTTY() && opts.IO.IsStdinTTY() {
-					return &cmdutil.FlagError{Err: errors.New("public key file missing")}
+					return cmdutil.FlagErrorf("public key file missing")
 				}
 				opts.KeyFile = "-"
 			} else {
@@ -78,19 +77,10 @@ func runAdd(opts *AddOptions) error {
 		return err
 	}
 
-	hostname, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	hostname, _ := cfg.DefaultHost()
 
 	err = SSHKeyUpload(httpClient, hostname, keyReader, opts.Title)
 	if err != nil {
-		if errors.Is(err, scopesError) {
-			cs := opts.IO.ColorScheme()
-			fmt.Fprint(opts.IO.ErrOut, "Error: insufficient OAuth scopes to list SSH keys\n")
-			fmt.Fprintf(opts.IO.ErrOut, "Run the following to grant scopes: %s\n", cs.Bold("gh auth refresh -s write:public_key"))
-			return cmdutil.SilentError
-		}
 		return err
 	}
 

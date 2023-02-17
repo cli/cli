@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,12 +19,12 @@ func translate(in string) string {
 func TestGenManDoc(t *testing.T) {
 	header := &GenManHeader{
 		Title:   "Project",
-		Section: "2",
+		Section: "1",
 	}
 
 	// We generate on a subcommand so we have both subcommands and parents
 	buf := new(bytes.Buffer)
-	if err := GenMan(echoCmd, header, buf); err != nil {
+	if err := renderMan(echoCmd, header, buf); err != nil {
 		t.Fatal(err)
 	}
 	output := buf.String()
@@ -49,7 +48,7 @@ func TestGenManDoc(t *testing.T) {
 func TestGenManNoHiddenParents(t *testing.T) {
 	header := &GenManHeader{
 		Title:   "Project",
-		Section: "2",
+		Section: "1",
 	}
 
 	// We generate on a subcommand so we have both subcommands and parents
@@ -59,7 +58,7 @@ func TestGenManNoHiddenParents(t *testing.T) {
 		defer func() { f.Hidden = false }()
 	}
 	buf := new(bytes.Buffer)
-	if err := GenMan(echoCmd, header, buf); err != nil {
+	if err := renderMan(echoCmd, header, buf); err != nil {
 		t.Fatal(err)
 	}
 	output := buf.String()
@@ -90,19 +89,12 @@ func TestGenManSeeAlso(t *testing.T) {
 
 	buf := new(bytes.Buffer)
 	header := &GenManHeader{}
-	if err := GenMan(rootCmd, header, buf); err != nil {
+	if err := renderMan(rootCmd, header, buf); err != nil {
 		t.Fatal(err)
 	}
 	scanner := bufio.NewScanner(buf)
-
-	if err := assertLineFound(scanner, ".SH SEE ALSO"); err != nil {
-		t.Fatalf("Couldn't find SEE ALSO section header: %v", err)
-	}
-	if err := assertNextLineEquals(scanner, ".PP"); err != nil {
-		t.Fatalf("First line after SEE ALSO wasn't break-indent: %v", err)
-	}
-	if err := assertNextLineEquals(scanner, `\fBroot\-bbb(1)\fP, \fBroot\-ccc(1)\fP`); err != nil {
-		t.Fatalf("Second line after SEE ALSO wasn't correct: %v", err)
+	if err := assertLineFound(scanner, ".SH SEE ALSO"); err == nil {
+		t.Fatalf("Did not expect SEE ALSO section header")
 	}
 }
 
@@ -115,31 +107,26 @@ func TestManPrintFlagsHidesShortDeprecated(t *testing.T) {
 	manPrintFlags(buf, c.Flags())
 
 	got := buf.String()
-	expected := "**--foo**=\"default\"\n\tFoo flag\n\n"
+	expected := "`--foo` `<string>`\n:   Foo flag\n\n"
 	if got != expected {
-		t.Errorf("Expected %v, got %v", expected, got)
+		t.Errorf("Expected %q, got %q", expected, got)
 	}
 }
 
 func TestGenManTree(t *testing.T) {
 	c := &cobra.Command{Use: "do [OPTIONS] arg1 arg2"}
-	header := &GenManHeader{Section: "2"}
-	tmpdir, err := ioutil.TempDir("", "test-gen-man-tree")
+	tmpdir, err := os.MkdirTemp("", "test-gen-man-tree")
 	if err != nil {
 		t.Fatalf("Failed to create tmpdir: %s", err.Error())
 	}
 	defer os.RemoveAll(tmpdir)
 
-	if err := GenManTree(c, header, tmpdir); err != nil {
+	if err := GenManTree(c, tmpdir); err != nil {
 		t.Fatalf("GenManTree failed: %s", err.Error())
 	}
 
-	if _, err := os.Stat(filepath.Join(tmpdir, "do.2")); err != nil {
-		t.Fatalf("Expected file 'do.2' to exist")
-	}
-
-	if header.Title != "" {
-		t.Fatalf("Expected header.Title to be unmodified")
+	if _, err := os.Stat(filepath.Join(tmpdir, "do.1")); err != nil {
+		t.Fatalf("Expected file 'do.1' to exist")
 	}
 }
 
@@ -158,24 +145,8 @@ func assertLineFound(scanner *bufio.Scanner, expectedLine string) error {
 	return fmt.Errorf("hit EOF before finding %v", expectedLine)
 }
 
-func assertNextLineEquals(scanner *bufio.Scanner, expectedLine string) error {
-	if scanner.Scan() {
-		line := scanner.Text()
-		if line == expectedLine {
-			return nil
-		}
-		return fmt.Errorf("got %v, not %v", line, expectedLine)
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("scan failed: %v", err)
-	}
-
-	return fmt.Errorf("hit EOF before finding %v", expectedLine)
-}
-
 func BenchmarkGenManToFile(b *testing.B) {
-	file, err := ioutil.TempFile(b.TempDir(), "")
+	file, err := os.CreateTemp(b.TempDir(), "")
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -183,7 +154,7 @@ func BenchmarkGenManToFile(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if err := GenMan(rootCmd, nil, file); err != nil {
+		if err := renderMan(rootCmd, nil, file); err != nil {
 			b.Fatal(err)
 		}
 	}

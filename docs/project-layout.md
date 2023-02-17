@@ -60,14 +60,14 @@ and talk through which code gets run in order.
 
 ## How to add a new command
 
-0. First, check on our issue tracker to verify that our team had approved the plans for a new command.
-1. Create a package for the new command, e.g. for a new command `gh boom` create the following directory
+1. First, check on our issue tracker to verify that our team had approved the plans for a new command.
+2. Create a package for the new command, e.g. for a new command `gh boom` create the following directory
    structure: `pkg/cmd/boom/`
-2. The new package should expose a method, e.g. `NewCmdBoom()`, that accepts a `*cmdutil.Factory` type and
+3. The new package should expose a method, e.g. `NewCmdBoom()`, that accepts a `*cmdutil.Factory` type and
    returns a `*cobra.Command`.
    * Any logic specific to this command should be kept within the command's package and not added to any
      "global" packages like `api` or `utils`.
-3. Use the method from the previous step to generate the command and add it to the command tree, typically
+4. Use the method from the previous step to generate the command and add it to the command tree, typically
    somewhere in the `NewCmdRoot()` method.
 
 ## How to write tests

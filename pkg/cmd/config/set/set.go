@@ -59,15 +59,15 @@ func NewCmdConfigSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Co
 }
 
 func setRun(opts *SetOptions) error {
-	err := config.ValidateKey(opts.Key)
+	err := ValidateKey(opts.Key)
 	if err != nil {
 		warningIcon := opts.IO.ColorScheme().WarningIcon()
 		fmt.Fprintf(opts.IO.ErrOut, "%s warning: '%s' is not a known configuration key\n", warningIcon, opts.Key)
 	}
 
-	err = config.ValidateValue(opts.Key, opts.Value)
+	err = ValidateValue(opts.Key, opts.Value)
 	if err != nil {
-		var invalidValue *config.InvalidValueError
+		var invalidValue InvalidValueError
 		if errors.As(err, &invalidValue) {
 			var values []string
 			for _, v := range invalidValue.ValidValues {
@@ -77,14 +77,52 @@ func setRun(opts *SetOptions) error {
 		}
 	}
 
-	err = opts.Config.Set(opts.Hostname, opts.Key, opts.Value)
-	if err != nil {
-		return fmt.Errorf("failed to set %q to %q: %w", opts.Key, opts.Value, err)
-	}
+	opts.Config.Set(opts.Hostname, opts.Key, opts.Value)
 
 	err = opts.Config.Write()
 	if err != nil {
 		return fmt.Errorf("failed to write config to disk: %w", err)
 	}
 	return nil
+}
+
+func ValidateKey(key string) error {
+	for _, configKey := range config.ConfigOptions() {
+		if key == configKey.Key {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("invalid key")
+}
+
+type InvalidValueError struct {
+	ValidValues []string
+}
+
+func (e InvalidValueError) Error() string {
+	return "invalid value"
+}
+
+func ValidateValue(key, value string) error {
+	var validValues []string
+
+	for _, v := range config.ConfigOptions() {
+		if v.Key == key {
+			validValues = v.AllowedValues
+			break
+		}
+	}
+
+	if validValues == nil {
+		return nil
+	}
+
+	for _, v := range validValues {
+		if v == value {
+			return nil
+		}
+	}
+
+	return InvalidValueError{ValidValues: validValues}
 }

@@ -1,7 +1,6 @@
-package ghcs
+package codespace
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -12,11 +11,10 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces/api"
-	"github.com/cli/cli/v2/pkg/cmd/codespace/output"
+	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
 func TestDelete(t *testing.T) {
-	user := &api.User{Login: "hubot"}
 	now, _ := time.Parse(time.RFC3339, "2021-09-22T00:00:00Z")
 	daysAgo := func(n int) string {
 		return now.Add(time.Hour * -time.Duration(24*n)).Format(time.RFC3339)
@@ -44,6 +42,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			wantDeleted: []string{"hubot-robawt-abc"},
+			wantStdout:  "",
 		},
 		{
 			name: "by repo",
@@ -52,19 +51,26 @@ func TestDelete(t *testing.T) {
 			},
 			codespaces: []*api.Codespace{
 				{
-					Name:          "monalisa-spoonknife-123",
-					RepositoryNWO: "monalisa/Spoon-Knife",
+					Name: "monalisa-spoonknife-123",
+					Repository: api.Repository{
+						FullName: "monalisa/Spoon-Knife",
+					},
 				},
 				{
-					Name:          "hubot-robawt-abc",
-					RepositoryNWO: "hubot/ROBAWT",
+					Name: "hubot-robawt-abc",
+					Repository: api.Repository{
+						FullName: "hubot/ROBAWT",
+					},
 				},
 				{
-					Name:          "monalisa-spoonknife-c4f3",
-					RepositoryNWO: "monalisa/Spoon-Knife",
+					Name: "monalisa-spoonknife-c4f3",
+					Repository: api.Repository{
+						FullName: "monalisa/Spoon-Knife",
+					},
 				},
 			},
 			wantDeleted: []string{"monalisa-spoonknife-123", "monalisa-spoonknife-c4f3"},
+			wantStdout:  "",
 		},
 		{
 			name: "unused",
@@ -87,6 +93,7 @@ func TestDelete(t *testing.T) {
 				},
 			},
 			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-c4f3"},
+			wantStdout:  "",
 		},
 		{
 			name: "deletion failed",
@@ -119,27 +126,21 @@ func TestDelete(t *testing.T) {
 			codespaces: []*api.Codespace{
 				{
 					Name: "monalisa-spoonknife-123",
-					Environment: api.CodespaceEnvironment{
-						GitStatus: api.CodespaceEnvironmentGitStatus{
-							HasUnpushedChanges: true,
-						},
+					GitStatus: api.CodespaceGitStatus{
+						HasUnpushedChanges: true,
 					},
 				},
 				{
 					Name: "hubot-robawt-abc",
-					Environment: api.CodespaceEnvironment{
-						GitStatus: api.CodespaceEnvironmentGitStatus{
-							HasUncommitedChanges: true,
-						},
+					GitStatus: api.CodespaceGitStatus{
+						HasUncommittedChanges: true,
 					},
 				},
 				{
 					Name: "monalisa-spoonknife-c4f3",
-					Environment: api.CodespaceEnvironment{
-						GitStatus: api.CodespaceEnvironmentGitStatus{
-							HasUnpushedChanges:   false,
-							HasUncommitedChanges: false,
-						},
+					GitStatus: api.CodespaceGitStatus{
+						HasUnpushedChanges:    false,
+						HasUncommittedChanges: false,
 					},
 				},
 			},
@@ -148,18 +149,82 @@ func TestDelete(t *testing.T) {
 				"Codespace hubot-robawt-abc has unsaved changes. OK to delete?":        true,
 			},
 			wantDeleted: []string{"hubot-robawt-abc", "monalisa-spoonknife-c4f3"},
+			wantStdout:  "",
+		},
+		{
+			name: "deletion for org codespace by admin succeeds",
+			opts: deleteOptions{
+				deleteAll:     true,
+				orgName:       "bookish",
+				userName:      "monalisa",
+				codespaceName: "monalisa-spoonknife-123",
+			},
+			codespaces: []*api.Codespace{
+				{
+					Name:  "monalisa-spoonknife-123",
+					Owner: api.User{Login: "monalisa"},
+				},
+				{
+					Name:  "monalisa-spoonknife-123",
+					Owner: api.User{Login: "monalisa2"},
+				},
+				{
+					Name:  "dont-delete-abc",
+					Owner: api.User{Login: "monalisa"},
+				},
+			},
+			wantDeleted: []string{"monalisa-spoonknife-123"},
+			wantStdout:  "",
+		},
+		{
+			name: "deletion for org codespace by admin fails for codespace not found",
+			opts: deleteOptions{
+				deleteAll:     true,
+				orgName:       "bookish",
+				userName:      "johnDoe",
+				codespaceName: "monalisa-spoonknife-123",
+			},
+			codespaces: []*api.Codespace{
+				{
+					Name:  "monalisa-spoonknife-123",
+					Owner: api.User{Login: "monalisa"},
+				},
+				{
+					Name:  "monalisa-spoonknife-123",
+					Owner: api.User{Login: "monalisa2"},
+				},
+				{
+					Name:  "dont-delete-abc",
+					Owner: api.User{Login: "monalisa"},
+				},
+			},
+			wantDeleted: []string{},
+			wantStdout:  "",
+			wantErr:     true,
+		},
+		{
+			name: "deletion for org codespace succeeds without username",
+			opts: deleteOptions{
+				deleteAll: true,
+				orgName:   "bookish",
+			},
+			codespaces: []*api.Codespace{
+				{
+					Name:  "monalisa-spoonknife-123",
+					Owner: api.User{Login: "monalisa"},
+				},
+			},
+			wantDeleted: []string{"monalisa-spoonknife-123"},
+			wantStdout:  "",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			apiMock := &apiClientMock{
 				GetUserFunc: func(_ context.Context) (*api.User, error) {
-					return user, nil
+					return &api.User{Login: "monalisa"}, nil
 				},
-				DeleteCodespaceFunc: func(_ context.Context, userLogin, name string) error {
-					if userLogin != user.Login {
-						return fmt.Errorf("unexpected user %q", userLogin)
-					}
+				DeleteCodespaceFunc: func(_ context.Context, name string, orgName string, userName string) error {
 					if tt.deleteErr != nil {
 						return tt.deleteErr
 					}
@@ -167,24 +232,23 @@ func TestDelete(t *testing.T) {
 				},
 			}
 			if tt.opts.codespaceName == "" {
-				apiMock.ListCodespacesFunc = func(_ context.Context) ([]*api.Codespace, error) {
+				apiMock.ListCodespacesFunc = func(_ context.Context, _ api.ListCodespacesOptions) ([]*api.Codespace, error) {
 					return tt.codespaces, nil
 				}
 			} else {
-				apiMock.GetCodespaceTokenFunc = func(_ context.Context, userLogin, name string) (string, error) {
-					if userLogin != user.Login {
-						return "", fmt.Errorf("unexpected user %q", userLogin)
+				if tt.opts.orgName != "" {
+					apiMock.GetOrgMemberCodespaceFunc = func(_ context.Context, orgName string, userName string, name string) (*api.Codespace, error) {
+						for _, codespace := range tt.codespaces {
+							if codespace.Name == name && codespace.Owner.Login == userName {
+								return codespace, nil
+							}
+						}
+						return nil, fmt.Errorf("codespace not found for user %s with name %s", userName, name)
 					}
-					return "CS_TOKEN", nil
-				}
-				apiMock.GetCodespaceFunc = func(_ context.Context, token, userLogin, name string) (*api.Codespace, error) {
-					if userLogin != user.Login {
-						return nil, fmt.Errorf("unexpected user %q", userLogin)
+				} else {
+					apiMock.GetCodespaceFunc = func(_ context.Context, name string, includeConnection bool) (*api.Codespace, error) {
+						return tt.codespaces[0], nil
 					}
-					if token != "CS_TOKEN" {
-						return nil, fmt.Errorf("unexpected token %q", token)
-					}
-					return tt.codespaces[0], nil
 				}
 			}
 			opts := tt.opts
@@ -199,18 +263,18 @@ func TestDelete(t *testing.T) {
 				},
 			}
 
-			stdout := &bytes.Buffer{}
-			stderr := &bytes.Buffer{}
-			app := &App{
-				apiClient: apiMock,
-				logger:    output.NewLogger(stdout, stderr, false),
-			}
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdinTTY(true)
+			ios.SetStdoutTTY(true)
+			app := NewApp(ios, nil, apiMock, nil, nil)
 			err := app.Delete(context.Background(), opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("delete() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if n := len(apiMock.GetUserCalls()); n != 1 {
-				t.Errorf("GetUser invoked %d times, expected %d", n, 1)
+			for _, listArgs := range apiMock.ListCodespacesCalls() {
+				if listArgs.Opts.OrgName != "" && listArgs.Opts.UserName == "" {
+					t.Errorf("ListCodespaces() expected username option to be set")
+				}
 			}
 			var gotDeleted []string
 			for _, delArgs := range apiMock.DeleteCodespaceCalls() {

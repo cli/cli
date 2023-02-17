@@ -49,7 +49,7 @@ check your internet connection or https://githubstatus.com
 		{
 			name: "Cobra flag error",
 			args: args{
-				err:   &cmdutil.FlagError{Err: errors.New("unknown flag --foo")},
+				err:   cmdutil.FlagErrorf("unknown flag --foo"),
 				cmd:   cmd,
 				debug: false,
 			},

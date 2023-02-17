@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<?ifndef ProductVersion?>
+<?error ProductVersion property not defined?>
+<?endif?>
+
+<!-- Define a unique UpgradeCode per platform -->
+<?if $(var.Platform) = "x64"?>
+<?define InstallerVersion = "200"?>
+<?define UpgradeCode = "8CFB9531-B959-4E1B-AA2E-4AF0FFCC4AF4"?>
+<?define ProgramFilesFolder = "ProgramFiles64Folder"?>
+<?elseif $(var.Platform) = "x86"?>
+<?define InstallerVersion = "200"?>
+<?define UpgradeCode = "767EC5D2-C8F0-4912-9901-45E21F59A284"?>
+<?define ProgramFilesFolder = "ProgramFilesFolder"?>
+<?elseif $(var.Platform) = "arm64"?>
+<?define InstallerVersion = "500"?>
+<?define UpgradeCode = "5D15E95C-F979-41B0-826C-C33C8CB5A7EB"?>
+<?define ProgramFilesFolder = "ProgramFiles64Folder"?>
+<?elseif $(var.Platform) = "arm"?>
+<?define InstallerVersion = "500"?>
+<?define UpgradeCode = "DDDE52AA-42DA-404B-9238-77DC86117CFF"?>
+<?define ProgramFilesFolder = "ProgramFilesFolder"?>
+<?endif?>
+
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+    <Product Id="*" Name="GitHub CLI" Version="$(var.ProductVersion)" Language="1033" Manufacturer="GitHub, Inc." UpgradeCode="$(var.UpgradeCode)">
+        <Package Compressed="yes" InstallerVersion="$(var.InstallerVersion)" InstallScope="perMachine"/>
+        <MediaTemplate EmbedCab="yes"/>
+
+        <!-- Remove older product(s) early but within the transaction -->
+        <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="A newer version of !(bind.property.ProductName) is already installed."/>
+
+        <!-- Upgrade older x86 products -->
+        <Upgrade Id="7C0A5736-5B8E-4176-B350-613FA2D8A1B3">
+            <UpgradeVersion Maximum="$(var.ProductVersion)" Property="OLDERX86VERSIONDETECTED"/>
+        </Upgrade>
+
+        <Directory Id="TARGETDIR" Name="SourceDir">
+            <Directory Id="$(var.ProgramFilesFolder)" Name="Program Files">
+                <Directory Id="INSTALLDIR" Name="GitHub CLI"/>
+            </Directory>
+        </Directory>
+
+        <!-- Restore the INSTALLDIR if previously persisted to the registry -->
+        <Property Id="INSTALLDIR">
+            <RegistrySearch Id="InstallDir" Root="HKLM" Key="SOFTWARE\GitHub\CLI" Name="InstallDir" Type="directory"/>
+        </Property>
+
+        <Feature Id="DefaultFeature" ConfigurableDirectory="INSTALLDIR">
+            <!-- @Guid will be automatically and durably assigned based on key path -->
+            <Component Directory="INSTALLDIR">
+                <File Name="gh.exe"/>
+                <Environment Id="Path" Action="set" Name="PATH" Part="last" System="yes" Value="[INSTALLDIR]"/>
+            </Component>
+
+            <!-- Persist the INSTALLDIR and restore it in subsequent installs -->
+            <Component Directory="INSTALLDIR">
+                <RegistryValue Root="HKLM" Key="SOFTWARE\GitHub\CLI" Name="InstallDir" Type="string" Value="[INSTALLDIR]"/>
+            </Component>
+
+            <Component Id="OlderX86Env" Guid="50C15744-A674-404B-873C-6B58957E2A32" Directory="TARGETDIR" Win64="no">
+                <Condition><![CDATA[OLDERX86VERSIONDETECTED]]></Condition>
+
+                <!-- Clean up the old x86 package default directory from the user environment -->
+                <Environment Id="OlderX86Path" Action="remove" Name="PATH" Part="last" System="no" Value="[ProgramFilesFolder]GitHub CLI\"/>
+            </Component>
+        </Feature>
+
+        <!-- Broadcast environment variable changes -->
+        <CustomActionRef Id="WixBroadcastEnvironmentChange" />
+
+        <!-- Use customized WixUI_InstallDir that removes WixUI_LicenseAgreementDlg -->
+        <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR"/>
+        <UIRef Id="GitHubCLI_InstallDir"/>
+    </Product>
+</Wix>

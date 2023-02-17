@@ -2,12 +2,13 @@ package list
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
-	"regexp"
 	"testing"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/run"
@@ -21,13 +22,13 @@ import (
 )
 
 func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(isTTY)
-	io.SetStdinTTY(isTTY)
-	io.SetStderrTTY(isTTY)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(isTTY)
+	ios.SetStdinTTY(isTTY)
+	ios.SetStderrTTY(isTTY)
 
 	factory := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
@@ -39,7 +40,14 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 		},
 	}
 
-	cmd := NewCmdList(factory, nil)
+	fakeNow := func() time.Time {
+		return time.Date(2022, time.August, 25, 23, 50, 0, 0, time.UTC)
+	}
+
+	cmd := NewCmdList(factory, func(opts *ListOptions) error {
+		opts.Now = fakeNow
+		return listRun(opts)
+	})
 
 	argv, err := shlex.Split(cli)
 	if err != nil {
@@ -48,8 +56,8 @@ func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, err
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
@@ -92,18 +100,14 @@ func TestIssueList_tty(t *testing.T) {
 		t.Errorf("error running command `issue list`: %v", err)
 	}
 
-	out := output.String()
-	timeRE := regexp.MustCompile(`\d+ years`)
-	out = timeRE.ReplaceAllString(out, "X years")
-
 	assert.Equal(t, heredoc.Doc(`
 
 		Showing 3 of 3 open issues in OWNER/REPO
 
-		#1  number won   label  about X years ago
-		#2  number too   label  about X years ago
-		#4  number fore  label  about X years ago
-	`), out)
+		#1  number won   label  about 1 day ago
+		#2  number too   label  about 1 month ago
+		#4  number fore  label  about 2 years ago
+	`), output.String())
 	assert.Equal(t, ``, output.Stderr())
 }
 
@@ -121,29 +125,35 @@ func TestIssueList_tty_withFlags(t *testing.T) {
 			assert.Equal(t, "probablyCher", params["assignee"].(string))
 			assert.Equal(t, "foo", params["author"].(string))
 			assert.Equal(t, "me", params["mention"].(string))
-			assert.Equal(t, "12345", params["milestone"].(string))
 			assert.Equal(t, []interface{}{"OPEN"}, params["states"].([]interface{}))
 		}))
 
-	http.Register(
-		httpmock.GraphQL(`query RepositoryMilestoneList\b`),
-		httpmock.StringResponse(`
-		{ "data": { "repository": { "milestones": {
-			"nodes": [{ "title":"1.x", "id": "MDk6TWlsZXN0b25lMTIzNDU=" }],
-			"pageInfo": { "hasNextPage": false }
-		} } } }
-		`))
+	output, err := runCommand(http, true, "-a probablyCher -s open -A foo --mention me")
+	assert.EqualError(t, err, "no issues match your search in OWNER/REPO")
 
-	output, err := runCommand(http, true, "-a probablyCher -s open -A foo --mention me --milestone 1.x")
-	if err != nil {
-		t.Errorf("error running command `issue list`: %v", err)
-	}
-
+	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
-	assert.Equal(t, `
-No issues match your search in OWNER/REPO
+}
 
-`, output.String())
+func TestIssueList_tty_withAppFlag(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.Register(
+		httpmock.GraphQL(`query IssueList\b`),
+		httpmock.GraphQLQuery(`
+		{ "data": {	"repository": {
+			"hasIssuesEnabled": true,
+			"issues": { "nodes": [] }
+		} } }`, func(_ string, params map[string]interface{}) {
+			assert.Equal(t, "app/dependabot", params["author"].(string))
+		}))
+
+	output, err := runCommand(http, true, "--app dependabot")
+	assert.EqualError(t, err, "no issues match your search in OWNER/REPO")
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "", output.Stderr())
 }
 
 func TestIssueList_withInvalidLimitFlag(t *testing.T) {
@@ -176,10 +186,10 @@ func TestIssueList_disabledIssues(t *testing.T) {
 }
 
 func TestIssueList_web(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(true)
-	io.SetStderrTTY(true)
-	browser := &cmdutil.TestBrowser{}
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStderrTTY(true)
+	browser := &browser.Stub{}
 
 	reg := &httpmock.Registry{}
 	defer reg.Verify(t)
@@ -188,7 +198,7 @@ func TestIssueList_web(t *testing.T) {
 	defer cmdTeardown(t)
 
 	err := listRun(&ListOptions{
-		IO:      io,
+		IO:      ios,
 		Browser: browser,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: reg}, nil
@@ -211,7 +221,7 @@ func TestIssueList_web(t *testing.T) {
 
 	assert.Equal(t, "", stdout.String())
 	assert.Equal(t, "Opening github.com/OWNER/REPO/issues in your browser.\n", stderr.String())
-	browser.Verify(t, "https://github.com/OWNER/REPO/issues?q=is%3Aissue+assignee%3Apeter+label%3Abug+label%3Adocs+author%3Ajohn+mentions%3Afrank+milestone%3Av1.1")
+	browser.Verify(t, "https://github.com/OWNER/REPO/issues?q=assignee%3Apeter+author%3Ajohn+label%3Abug+label%3Adocs+mentions%3Afrank+milestone%3Av1.1+type%3Aissue")
 }
 
 func Test_issueList(t *testing.T) {
@@ -269,45 +279,7 @@ func Test_issueList(t *testing.T) {
 					httpmock.GraphQL(`query RepositoryMilestoneByNumber\b`),
 					httpmock.StringResponse(`
 					{ "data": { "repository": { "milestone": {
-						"id": "MDk6TWlsZXN0b25lMTIzNDU="
-					} } } }
-					`))
-				reg.Register(
-					httpmock.GraphQL(`query IssueList\b`),
-					httpmock.GraphQLQuery(`
-					{ "data": {	"repository": {
-						"hasIssuesEnabled": true,
-						"issues": { "nodes": [] }
-					} } }`, func(_ string, params map[string]interface{}) {
-						assert.Equal(t, map[string]interface{}{
-							"owner":     "OWNER",
-							"repo":      "REPO",
-							"limit":     float64(30),
-							"states":    []interface{}{"OPEN"},
-							"milestone": "12345",
-						}, params)
-					}))
-			},
-		},
-		{
-			name: "milestone by number with search",
-			args: args{
-				limit: 30,
-				repo:  ghrepo.New("OWNER", "REPO"),
-				filters: prShared.FilterOptions{
-					Entity:    "issue",
-					State:     "open",
-					Milestone: "13",
-					Search:    "auth bug",
-				},
-			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query RepositoryMilestoneByNumber\b`),
-					httpmock.StringResponse(`
-					{ "data": { "repository": { "milestone": {
-						"title": "Big 1.0",
-						"id": "MDk6TWlsZXN0b25lMTIzNDU="
+						"title": "1.x"
 					} } } }
 					`))
 				reg.Register(
@@ -324,40 +296,7 @@ func Test_issueList(t *testing.T) {
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
-							"query": "repo:OWNER/REPO is:issue is:open milestone:\"Big 1.0\" auth bug",
-							"type":  "ISSUE",
-						}, params)
-					}))
-			},
-		},
-		{
-			name: "milestone by title with search",
-			args: args{
-				limit: 30,
-				repo:  ghrepo.New("OWNER", "REPO"),
-				filters: prShared.FilterOptions{
-					Entity:    "issue",
-					State:     "open",
-					Milestone: "Big 1.0",
-					Search:    "auth bug",
-				},
-			},
-			httpStubs: func(reg *httpmock.Registry) {
-				reg.Register(
-					httpmock.GraphQL(`query IssueSearch\b`),
-					httpmock.GraphQLQuery(`
-					{ "data": {
-						"repository": { "hasIssuesEnabled": true },
-						"search": {
-							"issueCount": 0,
-							"nodes": []
-						}
-					} }`, func(_ string, params map[string]interface{}) {
-						assert.Equal(t, map[string]interface{}{
-							"owner": "OWNER",
-							"repo":  "REPO",
-							"limit": float64(30),
-							"query": "repo:OWNER/REPO is:issue is:open milestone:\"Big 1.0\" auth bug",
+							"query": "milestone:1.x repo:OWNER/REPO state:open type:issue",
 							"type":  "ISSUE",
 						}, params)
 					}))
@@ -376,26 +315,21 @@ func Test_issueList(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
-					httpmock.GraphQL(`query RepositoryMilestoneList\b`),
-					httpmock.StringResponse(`
-					{ "data": { "repository": { "milestones": {
-						"nodes": [{ "title":"1.x", "id": "MDk6TWlsZXN0b25lMTIzNDU=" }],
-						"pageInfo": { "hasNextPage": false }
-					} } } }
-					`))
-				reg.Register(
-					httpmock.GraphQL(`query IssueList\b`),
+					httpmock.GraphQL(`query IssueSearch\b`),
 					httpmock.GraphQLQuery(`
-					{ "data": {	"repository": {
-						"hasIssuesEnabled": true,
-						"issues": { "nodes": [] }
-					} } }`, func(_ string, params map[string]interface{}) {
+					{ "data": {
+						"repository": { "hasIssuesEnabled": true },
+						"search": {
+							"issueCount": 0,
+							"nodes": []
+						}
+					} }`, func(_ string, params map[string]interface{}) {
 						assert.Equal(t, map[string]interface{}{
-							"owner":     "OWNER",
-							"repo":      "REPO",
-							"limit":     float64(30),
-							"states":    []interface{}{"OPEN"},
-							"milestone": "12345",
+							"owner": "OWNER",
+							"repo":  "REPO",
+							"limit": float64(30),
+							"query": "milestone:1.x repo:OWNER/REPO state:open type:issue",
+							"type":  "ISSUE",
 						}, params)
 					}))
 			},
@@ -465,7 +399,7 @@ func Test_issueList(t *testing.T) {
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
-							"query": "repo:OWNER/REPO is:issue is:open assignee:@me author:@me mentions:@me auth bug",
+							"query": "auth bug assignee:@me author:@me mentions:@me repo:OWNER/REPO state:open type:issue",
 							"type":  "ISSUE",
 						}, params)
 					}))
@@ -497,7 +431,7 @@ func Test_issueList(t *testing.T) {
 							"owner": "OWNER",
 							"repo":  "REPO",
 							"limit": float64(30),
-							"query": `repo:OWNER/REPO is:issue is:open label:hello label:"one world"`,
+							"query": `label:"one world" label:hello repo:OWNER/REPO state:open type:issue`,
 							"type":  "ISSUE",
 						}, params)
 					}))
