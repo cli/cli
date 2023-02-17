@@ -357,7 +357,7 @@ func getVarFromRow(opts *SetOptions, client *api.Client, host string, row []stri
 	if rowLength < 2 {
 		return shared.VariablePayload{}, fmt.Errorf("less than 2 records in a row in file")
 	}
-	if rowLength > 3 && opts.OrgName == "" {
+	if rowLength > 2 && opts.OrgName == "" {
 		return shared.VariablePayload{}, fmt.Errorf("more than 3 vals in a row in file for non org variable %s", row[0])
 	}
 
