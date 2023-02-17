@@ -33,6 +33,7 @@ type SetOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
+	BaseRepoId int64
 
 	VariableName    string
 	OrgName         string
@@ -166,6 +167,14 @@ func setRun(opts *SetOptions) error {
 			return err
 		}
 		host = baseRepo.RepoHost()
+		baseRepoIdRes := getRepoIds(client, host, baseRepo.RepoOwner(), []string{baseRepo.RepoName()})
+		if baseRepoIdRes.Err != nil {
+			return baseRepoIdRes.Err
+		}
+		if len(baseRepoIdRes.Ids) == 0 {
+			return fmt.Errorf("could not find base repository id %s", ghrepo.FullName(baseRepo))
+		}
+		opts.BaseRepoId = baseRepoIdRes.Ids[0]
 	} else {
 		cfg, err := opts.Config()
 		if err != nil {
@@ -228,6 +237,9 @@ func setRun(opts *SetOptions) error {
 		if orgName == "" {
 			target = ghrepo.FullName(baseRepo)
 		}
+		if envName != "" {
+			target += " environment " + envName
+		}
 		fmt.Fprintf(opts.IO.Out, "%s Set %s variable %s for %s\n", cs.SuccessIcon(), "actions", result.key, target)
 	}
 	return err
@@ -253,9 +265,9 @@ func setVariable(opts *SetOptions, host string, client *api.Client, baseRepo ghr
 		}
 	case shared.Environment:
 		if !isUpdate {
-			err = postEnvVariable(client, baseRepo, envName, variableKey, variableValue)
+			err = postEnvVariable(client, baseRepo, envName, variableKey, variableValue, opts.BaseRepoId)
 		} else {
-			err = patchEnvVariable(client, baseRepo, envName, variableKey, variableKey, variableValue)
+			err = patchEnvVariable(client, baseRepo, envName, variableKey, variableKey, variableValue, opts.BaseRepoId)
 		}
 	default:
 		if !isUpdate {
@@ -275,17 +287,12 @@ func getVariablesFromOptions(opts *SetOptions, client *api.Client, host string) 
 	variables := make(map[string]shared.VariablePayload)
 	if opts.CsvFile != "" {
 		var r io.Reader
-		if opts.CsvFile == "-" {
-			defer opts.IO.In.Close()
-			r = opts.IO.In
-		} else {
-			f, err := os.Open(opts.CsvFile)
-			if err != nil {
-				return nil, fmt.Errorf("failed to open env file: %w", err)
-			}
-			defer f.Close()
-			r = f
+		f, err := os.Open(opts.CsvFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open csv file: %w", err)
 		}
+		defer f.Close()
+		r = f
 		csvReader := csv.NewReader(r)
 		csvReader.Comment = '#'
 		csvReader.FieldsPerRecord = -1
@@ -303,14 +310,15 @@ func getVariablesFromOptions(opts *SetOptions, client *api.Client, host string) 
 				return nil, err
 			}
 			currentVariablePtr, _ := shared.GetVariablesForList(&shared.ListOptions{HttpClient: opts.HttpClient,
-				IO:       opts.IO,
-				Config:   opts.Config,
-				BaseRepo: opts.BaseRepo,
-				OrgName:  opts.OrgName,
-				EnvName:  opts.EnvName,
-				Page:     0,
-				PerPage:  0,
-				Name:     variable.Name,
+				IO:         opts.IO,
+				Config:     opts.Config,
+				BaseRepo:   opts.BaseRepo,
+				BaseRepoId: opts.BaseRepoId,
+				OrgName:    opts.OrgName,
+				EnvName:    opts.EnvName,
+				Page:       0,
+				PerPage:    0,
+				Name:       variable.Name,
 			}, true)
 			variable.IsUpdate = currentVariablePtr != nil
 			variables[row[0]] = variable
@@ -319,14 +327,15 @@ func getVariablesFromOptions(opts *SetOptions, client *api.Client, host string) 
 	}
 
 	currentVariablePtr, _ := shared.GetVariablesForList(&shared.ListOptions{HttpClient: opts.HttpClient,
-		IO:       opts.IO,
-		Config:   opts.Config,
-		BaseRepo: opts.BaseRepo,
-		OrgName:  opts.OrgName,
-		EnvName:  opts.EnvName,
-		Page:     0,
-		PerPage:  0,
-		Name:     opts.VariableName,
+		IO:         opts.IO,
+		Config:     opts.Config,
+		BaseRepo:   opts.BaseRepo,
+		BaseRepoId: opts.BaseRepoId,
+		OrgName:    opts.OrgName,
+		EnvName:    opts.EnvName,
+		Page:       0,
+		PerPage:    0,
+		Name:       opts.VariableName,
 	}, true)
 
 	values, err := getBody(opts, client, host, currentVariablePtr)
@@ -358,7 +367,7 @@ func getVarFromRow(opts *SetOptions, client *api.Client, host string, row []stri
 		}
 		index++
 		if variable.Visibility == shared.Selected {
-			if rowLength < 5 {
+			if rowLength < 4 {
 				// do not exit here as repositoryNames in opts may have the info.
 				log.Printf("selected visibility with no repos mentioned for variable %s", row[0])
 			}

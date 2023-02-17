@@ -43,6 +43,7 @@ type ListOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
+	BaseRepoId int64
 
 	OrgName string
 	EnvName string
@@ -124,7 +125,7 @@ func GetVariablesForList(opts *ListOptions, getSelectedRepoInfo bool) ([]*Variab
 	case Repository:
 		variables, err = getRepoVariables(client, baseRepo, opts.Page, opts.PerPage, opts.Name)
 	case Environment:
-		variables, err = getEnvVariables(client, baseRepo, envName, opts.Page, opts.PerPage, opts.Name)
+		variables, err = getEnvVariables(client, baseRepo, envName, opts.Page, opts.PerPage, opts.Name, opts.BaseRepoId)
 	case Organization:
 		var cfg config.Config
 		var host string
@@ -144,7 +145,7 @@ func GetVariablesForList(opts *ListOptions, getSelectedRepoInfo bool) ([]*Variab
 }
 
 func getOrgVariables(client *http.Client, host, orgName string, getSelectedRepoInfo bool, page, perPage int, name string) ([]*Variable, error) {
-	variables, err := getVariables(client, host, fmt.Sprintf(`orgs/%s/%s/variables`, orgName, "actions"), page, perPage, name)
+	variables, err := getVariables(client, host, fmt.Sprintf(`orgs/%s/actions/variables`, orgName), page, perPage, name)
 	if err != nil {
 		return nil, err
 	}
@@ -158,14 +159,14 @@ func getOrgVariables(client *http.Client, host, orgName string, getSelectedRepoI
 	return variables, nil
 }
 
-func getEnvVariables(client *http.Client, repo ghrepo.Interface, envName string, page, perPage int, name string) ([]*Variable, error) {
-	path := fmt.Sprintf(`repositories/%s/environments/%s/variables`, ghrepo.FullName(repo), envName)
+func getEnvVariables(client *http.Client, repo ghrepo.Interface, envName string, page, perPage int, name string, repoId int64) ([]*Variable, error) {
+	path := fmt.Sprintf(`repositories/%d/environments/%s/variables`, repoId, envName)
 	return getVariables(client, repo.RepoHost(), path, page, perPage, name)
 }
 
 func getRepoVariables(client *http.Client, repo ghrepo.Interface, page, perPage int, name string) ([]*Variable, error) {
-	return getVariables(client, repo.RepoHost(), fmt.Sprintf(`repositories/%s/%s/variables`,
-		ghrepo.FullName(repo), "actions"), page, perPage, name)
+	return getVariables(client, repo.RepoHost(), fmt.Sprintf(`repos/%s/actions/variables`,
+		ghrepo.FullName(repo)), page, perPage, name)
 }
 
 func getVariables(client *http.Client, host, path string, page, perPage int, name string) ([]*Variable, error) {

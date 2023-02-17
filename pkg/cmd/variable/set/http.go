@@ -27,17 +27,17 @@ func postOrgVariable(client *api.Client, host string, orgName, visibility, varia
 		Repositories: repositoryIDs,
 		Visibility:   visibility,
 	}
-	path := fmt.Sprintf(`orgs/%s/%s/variables`, orgName, "actions")
+	path := fmt.Sprintf(`orgs/%s/actions/variables`, orgName)
 
 	return postVariable(client, host, path, payload)
 }
 
-func postEnvVariable(client *api.Client, repo ghrepo.Interface, envName string, variableName, Value string) error {
+func postEnvVariable(client *api.Client, repo ghrepo.Interface, envName string, variableName, Value string, baseRepoId int64) error {
 	payload := shared.VariablePayload{
 		Name:  variableName,
 		Value: Value,
 	}
-	path := fmt.Sprintf(`repositories/%s/environments/%s/variables`, ghrepo.FullName(repo), envName)
+	path := fmt.Sprintf(`repositories/%d/environments/%s/variables`, baseRepoId, envName)
 	return postVariable(client, repo.RepoHost(), path, payload)
 }
 
@@ -46,7 +46,7 @@ func postRepoVariable(client *api.Client, repo ghrepo.Interface, variableName, V
 		Name:  variableName,
 		Value: Value,
 	}
-	path := fmt.Sprintf(`repositories/%s/%s/variables`, ghrepo.FullName(repo), "actions")
+	path := fmt.Sprintf(`repos/%s/actions/variables`, ghrepo.FullName(repo))
 	return postVariable(client, repo.RepoHost(), path, payload)
 }
 
@@ -67,17 +67,17 @@ func patchOrgVariable(client *api.Client, host string, orgName, visibility, vari
 		Repositories: repositoryIDs,
 		Visibility:   visibility,
 	}
-	path := fmt.Sprintf(`orgs/%s/%s/variables/%s`, orgName, "actions", variableName)
+	path := fmt.Sprintf(`orgs/%s/actions/variables/%s`, orgName, variableName)
 
 	return patchVariable(client, host, path, payload)
 }
 
-func patchEnvVariable(client *api.Client, repo ghrepo.Interface, envName string, variableName, updatedVariableName, value string) error {
+func patchEnvVariable(client *api.Client, repo ghrepo.Interface, envName string, variableName, updatedVariableName, value string, baseRepoId int64) error {
 	payload := shared.VariablePayload{
 		Name:  updatedVariableName,
 		Value: value,
 	}
-	path := fmt.Sprintf(`repos/%s/environments/%s/variables/%s`, ghrepo.FullName(repo), envName, variableName)
+	path := fmt.Sprintf(`repositories/%d/environments/%s/variables/%s`, baseRepoId, envName, variableName)
 	return patchVariable(client, repo.RepoHost(), path, payload)
 }
 
@@ -86,6 +86,6 @@ func patchRepoVariable(client *api.Client, repo ghrepo.Interface, variableName, 
 		Name:  updatedVariableName,
 		Value: value,
 	}
-	path := fmt.Sprintf(`repos/%s/%s/variables/%s`, ghrepo.FullName(repo), "actions", variableName)
+	path := fmt.Sprintf(`repos/%s/actions/variables/%s`, ghrepo.FullName(repo), variableName)
 	return patchVariable(client, repo.RepoHost(), path, payload)
 }
