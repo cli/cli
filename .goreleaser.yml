@@ -7,7 +7,7 @@ release:
 
 before:
   hooks:
-    - go mod tidy
+    # - go mod tidy
     - make manpages GH_VERSION={{.Version}}
 
 builds:

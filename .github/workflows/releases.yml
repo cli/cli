@@ -21,7 +21,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v4
         with:
           version: "~1.13.1"
-          args: release --skip-publish --skip-validate --release-notes=hi
+          args: release --skip-publish --skip-validate --release-notes=README.md
         env:
           GORELEASER_CURRENT_TAG: ${{inputs.tagName}}
       - uses: actions/upload-artifact@v3
