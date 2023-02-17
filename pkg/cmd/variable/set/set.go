@@ -206,6 +206,9 @@ func setRun(opts *SetOptions) error {
 	setc := make(chan setResult)
 	for variableKey, variable := range variables {
 		go func(variableKey string, variable shared.VariablePayload) {
+			// no way to distinguish between empty and nil by encoding/json: https://github.com/golang/go/issues/22480
+			// therefore,for now, nil is not supported for repoIds thus empty and no value are treated same, replacing
+			// all selected visibilities with none on update.
 			repoIds := []int64{}
 			var visibility string
 			visibility = opts.Visibility
@@ -515,7 +518,7 @@ func mapRepoNamesToIDs(client *api.Client, host, defaultOwner string, repository
 func getRepoIds(client *api.Client, host, orgName string, repoNames []string) repoNamesResult {
 	repoNamesC := make(chan repoNamesResult, 1)
 	go func() {
-		if len(repoNames) == 0 {
+		if ( len(repoNames) == 0 || (len(repoNames) == 1 && repoNames[0] == "")) {
 			repoNamesC <- repoNamesResult{}
 			return
 		}
