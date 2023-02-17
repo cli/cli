@@ -39,22 +39,9 @@ func AddCodespaceSelector(cmd *cobra.Command, api apiClient) *codespaceSelector 
 	return cs
 }
 
-// AddDeprecatedRepoShorthand adds a -r parameter (deprecated shorthand for --repo)
-// which instructs the user to use -R instead.
+// AddDeprecatedRepoShorthand wraps addDeprecatedRepoShorthand to set the selector's parameters
 func (cs *codespaceSelector) AddDeprecatedRepoShorthand(cmd *cobra.Command) error {
-	cmd.Flags().StringVarP(&cs.repoName, "repo-deprecated", "r", "", "(Deprecated) Shorthand for --repo")
-
-	if err := cmd.Flags().MarkHidden("repo-deprecated"); err != nil {
-		return fmt.Errorf("error marking `-r` shorthand as hidden: %w", err)
-	}
-
-	if err := cmd.Flags().MarkShorthandDeprecated("repo-deprecated", "use `-R` instead"); err != nil {
-		return fmt.Errorf("error marking `-r` shorthand as deprecated: %w", err)
-	}
-
-	cmd.MarkFlagsMutuallyExclusive("codespace", "repo-deprecated")
-
-	return nil
+	return addDeprecatedRepoShorthand(cmd, &cs.repoName)
 }
 
 func (cs *codespaceSelector) Select(ctx context.Context) (codespace *api.Codespace, err error) {
@@ -64,7 +51,12 @@ func (cs *codespaceSelector) Select(ctx context.Context) (codespace *api.Codespa
 			return nil, fmt.Errorf("getting full codespace details: %w", err)
 		}
 	} else {
-		codespace, err = cs.fetchAndChooseCodespace(ctx)
+		codespaces, err := cs.fetchCodespaces(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		codespace, err = cs.chooseCodespace(ctx, codespaces)
 		if err != nil {
 			return nil, err
 		}
@@ -85,7 +77,12 @@ func (cs *codespaceSelector) SelectName(ctx context.Context) (string, error) {
 		return cs.codespaceName, nil
 	}
 
-	codespace, err := cs.fetchAndChooseCodespace(ctx)
+	codespaces, err := cs.fetchCodespaces(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	codespace, err := cs.chooseCodespace(ctx, codespaces)
 	if err != nil {
 		return "", err
 	}
@@ -93,8 +90,8 @@ func (cs *codespaceSelector) SelectName(ctx context.Context) (string, error) {
 	return codespace.Name, nil
 }
 
-func (cs *codespaceSelector) fetchAndChooseCodespace(ctx context.Context) (codespace *api.Codespace, err error) {
-	codespaces, err := cs.api.ListCodespaces(ctx, api.ListCodespacesOptions{})
+func (cs *codespaceSelector) fetchCodespaces(ctx context.Context) (codespaces []*api.Codespace, err error) {
+	codespaces, err = cs.api.ListCodespaces(ctx, api.ListCodespacesOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("error getting codespaces: %w", err)
 	}
@@ -103,24 +100,8 @@ func (cs *codespaceSelector) fetchAndChooseCodespace(ctx context.Context) (codes
 		return nil, errNoCodespaces
 	}
 
-	codespaces = cs.filterCodespacesToChoose(codespaces)
-	if len(codespaces) == 0 {
-		return nil, errNoFilteredCodespaces
-	}
-
-	skipPromptForSingleOption := cs.repoName != ""
-	codespace, err = chooseCodespaceFromList(ctx, codespaces, false, skipPromptForSingleOption)
-	if err != nil {
-		if err == errNoCodespaces {
-			return nil, err
-		}
-		return nil, fmt.Errorf("choosing codespace: %w", err)
-	}
-
-	return codespace, err
-}
-
-func (cs *codespaceSelector) filterCodespacesToChoose(codespaces []*api.Codespace) []*api.Codespace {
+	// Note that repo filtering done here can also be done in api.ListCodespaces.
+	// We do it here instead so that we can differentiate no codespaces in general vs. none after filtering.
 	if cs.repoName != "" {
 		var filteredCodespaces []*api.Codespace
 		for _, c := range codespaces {
@@ -134,5 +115,18 @@ func (cs *codespaceSelector) filterCodespacesToChoose(codespaces []*api.Codespac
 		codespaces = filteredCodespaces
 	}
 
-	return codespaces
+	return codespaces, err
+}
+
+func (cs *codespaceSelector) chooseCodespace(ctx context.Context, codespaces []*api.Codespace) (codespace *api.Codespace, err error) {
+	skipPromptForSingleOption := cs.repoName != ""
+	codespace, err = chooseCodespaceFromList(ctx, codespaces, false, skipPromptForSingleOption)
+	if err != nil {
+		if err == errNoCodespaces {
+			return nil, err
+		}
+		return nil, fmt.Errorf("choosing codespace: %w", err)
+	}
+
+	return codespace, nil
 }
