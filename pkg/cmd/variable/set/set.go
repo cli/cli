@@ -517,12 +517,24 @@ func mapRepoNamesToIDs(client *api.Client, host, defaultOwner string, repository
 
 func getRepoIds(client *api.Client, host, orgName string, repoNames []string) repoNamesResult {
 	repoNamesC := make(chan repoNamesResult, 1)
+	resetErr := len(repoNames) > 0
+	filteredRepoNames := make([]string, 0, len(repoNames))
+	for _, repoName := range repoNames {
+		if repoName != "" {
+			resetErr = false
+			filteredRepoNames = append(filteredRepoNames, repoName)
+		}
+	}
 	go func() {
-		if ( len(repoNames) == 0 || (len(repoNames) == 1 && repoNames[0] == "")) {
+		if len(filteredRepoNames) == 0 {
+			if resetErr {
+				repoNamesC <- repoNamesResult{Err: fmt.Errorf("resetting repos selected to zero is not supported")}
+				return
+			}
 			repoNamesC <- repoNamesResult{}
 			return
 		}
-		repositoryIDs, err := mapRepoNamesToIDs(client, host, orgName, repoNames)
+		repositoryIDs, err := mapRepoNamesToIDs(client, host, orgName, filteredRepoNames)
 		repoNamesC <- repoNamesResult{
 			Ids: repositoryIDs,
 			Err: err,
