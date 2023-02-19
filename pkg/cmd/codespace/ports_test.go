@@ -207,13 +207,16 @@ func runUpdateVisibilityTest(t *testing.T, portVisibilities []portVisibility, ev
 		portArgs = append(portArgs, fmt.Sprintf("%d:%s", pv.number, pv.visibility))
 	}
 
-	return a.UpdatePortVisibility(ctx, "codespace-name", portArgs)
+	selector := &CodespaceSelector{api: a.apiClient, codespaceName: "codespace-name"}
+
+	return a.UpdatePortVisibility(ctx, selector, portArgs)
 }
 
 func TestPendingOperationDisallowsListPorts(t *testing.T) {
 	app := testingPortsApp()
+	selector := &CodespaceSelector{api: app.apiClient, codespaceName: "disabledCodespace"}
 
-	if err := app.ListPorts(context.Background(), "disabledCodespace", nil); err != nil {
+	if err := app.ListPorts(context.Background(), selector, nil); err != nil {
 		if err.Error() != "codespace is disabled while it has a pending operation: Some pending operation" {
 			t.Errorf("expected pending operation error, but got: %v", err)
 		}
@@ -224,8 +227,9 @@ func TestPendingOperationDisallowsListPorts(t *testing.T) {
 
 func TestPendingOperationDisallowsUpdatePortVisability(t *testing.T) {
 	app := testingPortsApp()
+	selector := &CodespaceSelector{api: app.apiClient, codespaceName: "disabledCodespace"}
 
-	if err := app.UpdatePortVisibility(context.Background(), "disabledCodespace", nil); err != nil {
+	if err := app.UpdatePortVisibility(context.Background(), selector, nil); err != nil {
 		if err.Error() != "codespace is disabled while it has a pending operation: Some pending operation" {
 			t.Errorf("expected pending operation error, but got: %v", err)
 		}
@@ -236,8 +240,9 @@ func TestPendingOperationDisallowsUpdatePortVisability(t *testing.T) {
 
 func TestPendingOperationDisallowsForwardPorts(t *testing.T) {
 	app := testingPortsApp()
+	selector := &CodespaceSelector{api: app.apiClient, codespaceName: "disabledCodespace"}
 
-	if err := app.ForwardPorts(context.Background(), "disabledCodespace", nil); err != nil {
+	if err := app.ForwardPorts(context.Background(), selector, nil); err != nil {
 		if err.Error() != "codespace is disabled while it has a pending operation: Some pending operation" {
 			t.Errorf("expected pending operation error, but got: %v", err)
 		}
