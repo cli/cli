@@ -163,7 +163,7 @@ func (s *IOStreams) IsStdoutTTY() bool {
 		return true
 	}
 	stdout, ok := s.Out.(*os.File)
-	return ok && isCygwinTerminal(stdout.Fd())
+	return ok && IsCygwinTerminal(stdout.Fd())
 }
 
 func (s *IOStreams) SetStderrTTY(isTTY bool) {
@@ -466,10 +466,10 @@ func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 }
 
 func isTerminal(f *os.File) bool {
-	return ghTerm.IsTerminal(f) || isCygwinTerminal(f.Fd())
+	return ghTerm.IsTerminal(f) || IsCygwinTerminal(f.Fd())
 }
 
-func isCygwinTerminal(fd uintptr) bool {
+func IsCygwinTerminal(fd uintptr) bool {
 	return isatty.IsCygwinTerminal(fd)
 }
 

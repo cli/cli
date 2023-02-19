@@ -113,6 +113,11 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 func newGitClient(f *cmdutil.Factory) *git.Client {
 	io := f.IOStreams
 	ghPath := f.Executable()
+	stdout, ok := io.Out.(*os.File)
+	if ok && iostreams.IsCygwinTerminal(stdout.Fd()) {
+		// Don't set ghPath under Cygwin.
+		ghPath = ""
+	}
 	client := &git.Client{
 		GhPath: ghPath,
 		Stderr: io.ErrOut,
