@@ -6,6 +6,7 @@ import (
 
 	ghAuth "github.com/cli/go-gh/pkg/auth"
 	ghConfig "github.com/cli/go-gh/pkg/config"
+	"github.com/zalando/go-keyring"
 )
 
 const (
@@ -42,7 +43,15 @@ type cfg struct {
 }
 
 func (c *cfg) AuthToken(hostname string) (string, string) {
-	return ghAuth.TokenForHost(hostname)
+	token, source := ghAuth.TokenForHost(hostname)
+	if token == "" {
+		var err error
+		token, err = keyring.Get(hostname, "")
+		if err == nil {
+			source = "keyring"
+		}
+	}
+	return token, source
 }
 
 func (c *cfg) Get(hostname, key string) (string, error) {
@@ -82,6 +91,12 @@ func (c *cfg) Set(hostname, key, value string) {
 	if hostname == "" {
 		c.cfg.Set([]string{key}, value)
 		return
+	} else if key == "oauth_token" {
+		if err := keyring.Set(hostname, "", value); err == nil {
+			// clean up the previous oauth_token from the config file
+			_ = c.cfg.Remove([]string{hosts, hostname, "oauth_token"})
+			return
+		}
 	}
 	c.cfg.Set([]string{hosts, hostname, key}, value)
 }

@@ -1,12 +1,14 @@
 package get
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	ghConfig "github.com/cli/go-gh/pkg/config"
 	"github.com/spf13/cobra"
 )
 
@@ -55,6 +57,14 @@ func NewCmdConfigGet(f *cmdutil.Factory, runF func(*GetOptions) error) *cobra.Co
 func getRun(opts *GetOptions) error {
 	val, err := opts.Config.GetOrDefault(opts.Hostname, opts.Key)
 	if err != nil {
+		// when oauth_token was not found in YAML config, fall back to reading it from keyring
+		var keyError ghConfig.KeyNotFoundError
+		if errors.As(err, &keyError) && opts.Hostname != "" && opts.Key == "oauth_token" {
+			if token, _ := opts.Config.AuthToken(opts.Hostname); token != "" {
+				fmt.Fprintf(opts.IO.Out, "%s\n", token)
+				return nil
+			}
+		}
 		return err
 	}
 
