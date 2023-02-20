@@ -53,7 +53,7 @@ func NewFromString(cfgStr string) *ConfigMock {
 
 	}
 	mock.UnsetHostFunc = func(host string) {
-		cfg.UnsetHost(host)
+		_ = c.Remove([]string{hosts, host})
 	}
 	mock.HostsFunc = func() []string {
 		keys, _ := c.Keys([]string{"hosts"})

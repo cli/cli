@@ -152,6 +152,8 @@ func loginRun(opts *LoginOptions) error {
 
 	if opts.Token != "" {
 		cfg.Set(hostname, "oauth_token", opts.Token)
+		// adding a user key ensures that a nonempty host section gets written to the config file
+		cfg.Set(hostname, "user", "x-access-token")
 
 		if err := shared.HasMinimumScopes(httpClient, hostname, opts.Token); err != nil {
 			return fmt.Errorf("error validating token: %w", err)

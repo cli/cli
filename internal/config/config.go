@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -46,7 +47,7 @@ func (c *cfg) AuthToken(hostname string) (string, string) {
 	token, source := ghAuth.TokenFromEnvOrConfig(hostname)
 	if token == "" {
 		var err error
-		token, err = keyring.Get(hostname, "")
+		token, err = keyring.Get(keyringServiceName(hostname), "")
 		if err == nil {
 			source = "keyring"
 		}
@@ -92,7 +93,7 @@ func (c *cfg) Set(hostname, key, value string) {
 		c.cfg.Set([]string{key}, value)
 		return
 	} else if key == "oauth_token" {
-		if err := keyring.Set(hostname, "", value); err == nil {
+		if err := keyring.Set(keyringServiceName(hostname), "", value); err == nil {
 			// clean up the previous oauth_token from the config file
 			_ = c.cfg.Remove([]string{hosts, hostname, "oauth_token"})
 			return
@@ -104,6 +105,13 @@ func (c *cfg) Set(hostname, key, value string) {
 func (c *cfg) UnsetHost(hostname string) {
 	if hostname == "" {
 		return
+	}
+	if oldToken, _ := c.Get(hostname, "oauth_token"); oldToken == "" {
+		// token was not stored in the config file; try removing it from keyring
+		err := keyring.Delete(keyringServiceName(hostname), "")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
 	}
 	_ = c.cfg.Remove([]string{hosts, hostname})
 }
@@ -237,4 +245,8 @@ func DataDir() string {
 
 func ConfigDir() string {
 	return ghConfig.ConfigDir()
+}
+
+func keyringServiceName(hostname string) string {
+	return "gh:" + hostname
 }
