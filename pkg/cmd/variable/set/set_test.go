@@ -3,17 +3,15 @@ package set
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/variable/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -31,27 +29,27 @@ func TestNewCmdSet(t *testing.T) {
 		wantsErr bool
 	}{
 		{
-			name:     "invalid visibility",
+			name:     "invalid visibility type",
 			cli:      "cool_variable --org coolOrg -v'mistyVeil'",
 			wantsErr: true,
 		},
 		{
-			name:     "invalid visibility",
+			name:     "selected visibility with no repos selected",
 			cli:      "cool_variable --org coolOrg -v'selected'",
 			wantsErr: true,
 		},
 		{
-			name:     "repos with wrong vis",
+			name:     "private visibility with repos selected",
 			cli:      "cool_variable --org coolOrg -v'private' -rcoolRepo",
 			wantsErr: true,
 		},
 		{
-			name:     "no name",
+			name:     "no name specified",
 			cli:      "",
 			wantsErr: true,
 		},
 		{
-			name:     "multiple names",
+			name:     "multiple names specified",
 			cli:      "cool_variable good_variable",
 			wantsErr: true,
 		},
@@ -61,7 +59,7 @@ func TestNewCmdSet(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name: "repos without vis",
+			name: "repos without explicit visibility",
 			cli:  "cool_variable -bs --org coolOrg -rcoolRepo",
 			wants: SetOptions{
 				VariableName:    "cool_variable",
@@ -72,7 +70,7 @@ func TestNewCmdSet(t *testing.T) {
 			},
 		},
 		{
-			name: "org with selected repo",
+			name: "org with explicit visibility and selected repo",
 			cli:  "-ocoolOrg -bs -vselected -rcoolRepo cool_variable",
 			wants: SetOptions{
 				VariableName:    "cool_variable",
@@ -83,7 +81,7 @@ func TestNewCmdSet(t *testing.T) {
 			},
 		},
 		{
-			name: "org with selected repos",
+			name: "org with explicit visibility and selected repos",
 			cli:  `--org=coolOrg -bs -vselected -r="coolRepo,radRepo,goodRepo" cool_variable`,
 			wants: SetOptions{
 				VariableName:    "cool_variable",
@@ -115,7 +113,7 @@ func TestNewCmdSet(t *testing.T) {
 			},
 		},
 		{
-			name: "vis all",
+			name: "visibility all",
 			cli:  `cool_variable --org coolOrg -b"cool" -vall`,
 			wants: SetOptions{
 				VariableName: "cool_variable",
@@ -125,11 +123,11 @@ func TestNewCmdSet(t *testing.T) {
 			},
 		},
 		{
-			name: "no store",
-			cli:  `cool_variable`,
+			name: "env file",
+			cli:  `--env-file test.env`,
 			wants: SetOptions{
-				VariableName: "cool_variable",
-				Visibility:   shared.Private,
+				Visibility: shared.Private,
+				EnvFile:    "test.env",
 			},
 		},
 	}
@@ -168,6 +166,7 @@ func TestNewCmdSet(t *testing.T) {
 			assert.Equal(t, tt.wants.Visibility, gotOpts.Visibility)
 			assert.Equal(t, tt.wants.OrgName, gotOpts.OrgName)
 			assert.Equal(t, tt.wants.EnvName, gotOpts.EnvName)
+			assert.Equal(t, tt.wants.EnvFile, gotOpts.EnvFile)
 			assert.ElementsMatch(t, tt.wants.RepositoryNames, gotOpts.RepositoryNames)
 		})
 	}
@@ -175,25 +174,35 @@ func TestNewCmdSet(t *testing.T) {
 
 func Test_setRun_repo(t *testing.T) {
 	tests := []struct {
-		name    string
-		opts    *SetOptions
-		wantApp string
-		wantErr bool
+		name      string
+		httpStubs func(*httpmock.Registry)
+		wantErr   bool
 	}{
 		{
-			name:    "Actions",
-			opts:    &SetOptions{},
-			wantApp: "actions",
-			wantErr: false,
+			name: "create actions variable",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/owner/repo/actions/variables"),
+					httpmock.StatusStringResponse(201, `{}`))
+			},
+		},
+		{
+			name: "update actions variable",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "repos/owner/repo/actions/variables"),
+					httpmock.StatusStringResponse(409, `{}`))
+				reg.Register(httpmock.REST("PATCH", "repos/owner/repo/actions/variables/cool_variable"),
+					httpmock.StatusStringResponse(204, `{}`))
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
-
-			reg.Register(httpmock.REST("POST", fmt.Sprintf("repos/owner/repo/%s/variables", tt.wantApp)),
-				httpmock.StatusStringResponse(201, `{}`))
+			defer reg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
+			}
 
 			ios, _, _, _ := iostreams.Test()
 
@@ -218,12 +227,10 @@ func Test_setRun_repo(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
-			reg.Verify(t)
-
-			data, err := io.ReadAll(reg.Requests[0].Body)
+			data, err := io.ReadAll(reg.Requests[len(reg.Requests)-1].Body)
 			assert.NoError(t, err)
 
-			var payload shared.VariablePayload
+			var payload setPayload
 			err = json.Unmarshal(data, &payload)
 			assert.NoError(t, err)
 			assert.Equal(t, payload.Value, "a variable")
@@ -232,82 +239,151 @@ func Test_setRun_repo(t *testing.T) {
 }
 
 func Test_setRun_env(t *testing.T) {
-	reg := &httpmock.Registry{}
-
-	reg.Register(httpmock.REST("POST", "repositories/1/environments/development/variables"), httpmock.StatusStringResponse(201, `{}`))
-	reg.Register(httpmock.GraphQL(`query MapRepositoryNames\b`),
-		httpmock.StringResponse(`{"data":{"repo_0001":{"databaseId":1}}}`))
-
-	ios, _, _, _ := iostreams.Test()
-
-	opts := &SetOptions{
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		},
-		Config: func() (config.Config, error) { return config.NewBlankConfig(), nil },
-		BaseRepo: func() (ghrepo.Interface, error) {
-			return ghrepo.FromFullName("owner/repo")
-		},
-		EnvName:      "development",
-		IO:           ios,
-		VariableName: "cool_variable",
-		Body:         "a variable",
-	}
-
-	err := setRun(opts)
-	assert.NoError(t, err)
-
-	reg.Verify(t)
-
-	data, err := io.ReadAll(reg.Requests[1].Body)
-	assert.NoError(t, err)
-	var payload shared.VariablePayload
-	err = json.Unmarshal(data, &payload)
-	assert.NoError(t, err)
-	assert.Equal(t, payload.Value, "a variable")
-}
-
-func Test_setRun_org(t *testing.T) {
 	tests := []struct {
-		name             string
-		opts             *SetOptions
-		wantVisibility   shared.Visibility
-		wantRepositories []int64
-		wantApp          string
+		name      string
+		opts      *SetOptions
+		httpStubs func(*httpmock.Registry)
+		wantErr   bool
 	}{
 		{
-			name: "all vis",
-			opts: &SetOptions{
-				OrgName:    "UmbrellaCorporation",
-				Visibility: shared.All,
+			name: "create env variable",
+			opts: &SetOptions{},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.GraphQL(`query MapRepositoryNames\b`),
+					httpmock.StringResponse(`{"data":{"repo_0001":{"databaseId":1}}}`))
+				reg.Register(httpmock.REST("POST", "repositories/1/environments/release/variables"),
+					httpmock.StatusStringResponse(201, `{}`))
 			},
-			wantApp: "actions",
 		},
 		{
-			name: "selected visibility",
-			opts: &SetOptions{
-				OrgName:         "UmbrellaCorporation",
-				Visibility:      shared.Selected,
-				RepositoryNames: []string{"birkin", "UmbrellaCorporation/wesker"},
+			name: "update env variable",
+			opts: &SetOptions{},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.GraphQL(`query MapRepositoryNames\b`),
+					httpmock.StringResponse(`{"data":{"repo_0001":{"databaseId":1}}}`))
+				reg.Register(httpmock.REST("POST", "repositories/1/environments/release/variables"),
+					httpmock.StatusStringResponse(409, `{}`))
+				reg.Register(httpmock.REST("PATCH", "repositories/1/environments/release/variables/cool_variable"),
+					httpmock.StatusStringResponse(204, `{}`))
 			},
-			wantRepositories: []int64{1, 2},
-			wantApp:          "actions",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
+			}
 
-			orgName := tt.opts.OrgName
+			ios, _, _, _ := iostreams.Test()
 
-			reg.Register(httpmock.REST("POST",
-				fmt.Sprintf("orgs/%s/%s/variables", orgName, tt.wantApp)),
-				httpmock.StatusStringResponse(201, `{}`))
+			opts := &SetOptions{
+				HttpClient: func() (*http.Client, error) {
+					return &http.Client{Transport: reg}, nil
+				},
+				Config: func() (config.Config, error) { return config.NewBlankConfig(), nil },
+				BaseRepo: func() (ghrepo.Interface, error) {
+					return ghrepo.FromFullName("owner/repo")
+				},
+				IO:           ios,
+				VariableName: "cool_variable",
+				Body:         "a variable",
+				EnvName:      "release",
+			}
 
-			if len(tt.opts.RepositoryNames) > 0 {
+			err := setRun(opts)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			} else {
+				assert.NoError(t, err)
+			}
+
+			data, err := io.ReadAll(reg.Requests[len(reg.Requests)-1].Body)
+			assert.NoError(t, err)
+
+			var payload setPayload
+			err = json.Unmarshal(data, &payload)
+			assert.NoError(t, err)
+			assert.Equal(t, payload.Value, "a variable")
+		})
+	}
+}
+
+func Test_setRun_org(t *testing.T) {
+	tests := []struct {
+		name             string
+		opts             *SetOptions
+		httpStubs        func(*httpmock.Registry)
+		wantVisibility   shared.Visibility
+		wantRepositories []int64
+	}{
+		{
+			name: "create org variable",
+			opts: &SetOptions{
+				OrgName:    "UmbrellaCorporation",
+				Visibility: shared.All,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "orgs/UmbrellaCorporation/actions/variables"),
+					httpmock.StatusStringResponse(201, `{}`))
+			},
+		},
+		{
+			name: "update org variable",
+			opts: &SetOptions{
+				OrgName:    "UmbrellaCorporation",
+				Visibility: shared.All,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("POST", "orgs/UmbrellaCorporation/actions/variables"),
+					httpmock.StatusStringResponse(409, `{}`))
+				reg.Register(httpmock.REST("PATCH", "orgs/UmbrellaCorporation/actions/variables/cool_variable"),
+					httpmock.StatusStringResponse(204, `{}`))
+			},
+		},
+		{
+			name: "create org variable with selected visibility",
+			opts: &SetOptions{
+				OrgName:         "UmbrellaCorporation",
+				Visibility:      shared.Selected,
+				RepositoryNames: []string{"birkin", "UmbrellaCorporation/wesker"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.GraphQL(`query MapRepositoryNames\b`),
 					httpmock.StringResponse(`{"data":{"repo_0001":{"databaseId":1},"repo_0002":{"databaseId":2}}}`))
+				reg.Register(httpmock.REST("POST", "orgs/UmbrellaCorporation/actions/variables"),
+					httpmock.StatusStringResponse(201, `{}`))
+			},
+			wantRepositories: []int64{1, 2},
+		},
+		{
+			name: "update org variable with selected visibility",
+			opts: &SetOptions{
+				OrgName:         "UmbrellaCorporation",
+				Visibility:      shared.Selected,
+				RepositoryNames: []string{"birkin", "UmbrellaCorporation/wesker"},
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.GraphQL(`query MapRepositoryNames\b`),
+					httpmock.StringResponse(`{"data":{"repo_0001":{"databaseId":1},"repo_0002":{"databaseId":2}}}`))
+				reg.Register(httpmock.REST("POST", "orgs/UmbrellaCorporation/actions/variables"),
+					httpmock.StatusStringResponse(409, `{}`))
+				reg.Register(httpmock.REST("PATCH", "orgs/UmbrellaCorporation/actions/variables/cool_variable"),
+					httpmock.StatusStringResponse(204, `{}`))
+			},
+			wantRepositories: []int64{1, 2},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
 			}
 
 			ios, _, _, _ := iostreams.Test()
@@ -322,54 +398,39 @@ func Test_setRun_org(t *testing.T) {
 				return config.NewBlankConfig(), nil
 			}
 			tt.opts.IO = ios
-			tt.opts.VariableName = "org_variable"
+			tt.opts.VariableName = "cool_variable"
 			tt.opts.Body = "a variable"
 
 			err := setRun(tt.opts)
 			assert.NoError(t, err)
 
-			reg.Verify(t)
-
 			data, err := io.ReadAll(reg.Requests[len(reg.Requests)-1].Body)
 			assert.NoError(t, err)
-			var payload shared.VariablePayload
+			var payload setPayload
 			err = json.Unmarshal(data, &payload)
 			assert.NoError(t, err)
 			assert.Equal(t, payload.Value, "a variable")
-			assert.Equal(t, payload.Name, tt.opts.VariableName)
 			assert.Equal(t, payload.Visibility, tt.opts.Visibility)
 			assert.ElementsMatch(t, payload.Repositories, tt.wantRepositories)
 		})
 	}
 }
 
-func Test_getBodyPrompt(t *testing.T) {
+func Test_getBody_prompt(t *testing.T) {
 	ios, _, _, _ := iostreams.Test()
 	ios.SetStdinTTY(true)
 	ios.SetStdoutTTY(true)
-
-	reg := &httpmock.Registry{}
-	defer reg.Verify(t)
-
-	opts := &SetOptions{
-		HttpClient: func() (*http.Client, error) {
-			return &http.Client{Transport: reg}, nil
-		},
-		Config: func() (config.Config, error) {
-			return config.NewBlankConfig(), nil
-		},
-		BaseRepo: func() (ghrepo.Interface, error) {
-			return ghrepo.FromFullName("owner/repo")
-		},
-		IO:   ios,
-		Body: "a variable",
+	prompterMock := &prompter.PrompterMock{}
+	prompterMock.InputFunc = func(message, defaultValue string) (string, error) {
+		return "a variable", nil
 	}
-	httpClient, _ := opts.HttpClient()
-	apiClient := api.NewClientFromHTTP(httpClient)
-
-	body, err := getBody(opts, apiClient, "owner/repo", nil)
+	opts := &SetOptions{
+		IO:       ios,
+		Prompter: prompterMock,
+	}
+	body, err := getBody(opts)
 	assert.NoError(t, err)
-	assert.Equal(t, body.Value, "a variable")
+	assert.Equal(t, "a variable", body)
 }
 
 func Test_getBody(t *testing.T) {
@@ -399,35 +460,16 @@ func Test_getBody(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, stdin, _, _ := iostreams.Test()
-
 			ios.SetStdinTTY(false)
-
 			_, err := stdin.WriteString(tt.stdin)
 			assert.NoError(t, err)
-			reg := &httpmock.Registry{}
-			defer reg.Verify(t)
-
 			opts := &SetOptions{
-				HttpClient: func() (*http.Client, error) {
-					return &http.Client{Transport: reg}, nil
-				},
-				Config: func() (config.Config, error) {
-					return config.NewBlankConfig(), nil
-				},
-				BaseRepo: func() (ghrepo.Interface, error) {
-					return ghrepo.FromFullName("owner/repo")
-				},
-				IO:           ios,
-				VariableName: "VARNAME",
-				Body:         "a variable",
+				IO:   ios,
+				Body: tt.bodyArg,
 			}
-			httpClient, _ := opts.HttpClient()
-			apiClient := api.NewClientFromHTTP(httpClient)
-
-			body, err := getBody(opts, apiClient, "owner/repo", nil)
+			body, err := getBody(opts)
 			assert.NoError(t, err)
-
-			assert.Equal(t, tt.want, body.Value)
+			assert.Equal(t, tt.want, body)
 		})
 	}
 }
@@ -451,102 +493,50 @@ func Test_getVariablesFromOptions(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		opts       SetOptions
-		isTTY      bool
-		stdin      string
-		want       shared.VariablePayload
-		wantErr    bool
-		isUpdate   bool
-		currentVar shared.VariablePayload
+		name    string
+		opts    SetOptions
+		isTTY   bool
+		stdin   string
+		want    map[string]string
+		wantErr bool
 	}{
 		{
 			name: "variable from arg",
 			opts: SetOptions{
-				BaseRepo: func() (ghrepo.Interface, error) {
-					return ghrepo.FromFullName("owner/repo")
-				},
 				VariableName: "FOO",
 				Body:         "bar",
-				CsvFile:      "",
 			},
-			want: shared.VariablePayload{Name: "FOO",
-				Value: "bar"},
+			want: map[string]string{"FOO": "bar"},
+		},
+		{
+			name: "variable from stdin",
+			opts: SetOptions{
+				Body:    "",
+				EnvFile: "-",
+			},
+			stdin: `FOO=bar`,
+			want:  map[string]string{"FOO": "bar"},
 		},
 		{
 			name: "variables from file",
 			opts: SetOptions{
-				BaseRepo: func() (ghrepo.Interface, error) {
-					return ghrepo.FromFullName("owner/repo")
-				},
 				Body: "",
-				CsvFile: genFile(heredoc.Doc(`
-					FOO,bar
-					#IGNORED, true
+				EnvFile: genFile(heredoc.Doc(`
+					FOO=bar
+					QUOTED="my value"
+					#IGNORED=true
+					export SHELL=bash
 				`)),
 			},
-			want: shared.VariablePayload{Name: "FOO",
-				Value: "bar"},
-		},
-		{
-			name: "update repo variables from file",
-			opts: SetOptions{
-				BaseRepo: func() (ghrepo.Interface, error) {
-					return ghrepo.FromFullName("owner/repo")
-				},
-				Body: "",
-				CsvFile: genFile(heredoc.Doc(`
-					FOO,bar
-					#IGNORED, true
-				`)),
-			},
-			want: shared.VariablePayload{Name: "FOO",
-				Value: "bar"},
-			isUpdate: true,
-			currentVar: shared.VariablePayload{
-				Name:  "FOO",
-				Value: "abc",
-			},
-		},
-		{
-			name: "update org variable from arg",
-			opts: SetOptions{
-				OrgName:      "org",
-				VariableName: "FOO",
-				Body:         "bar, all",
-				CsvFile:      "",
-			},
-			isUpdate: true,
-			currentVar: shared.VariablePayload{
-				Name:  "FOO",
-				Value: "abc",
-			},
-			want: shared.VariablePayload{Name: "FOO",
-				Value:      "bar",
-				Visibility: shared.All},
-		},
-		{
-			name: "update org variables from file to selected repos",
-			opts: SetOptions{
-				OrgName: "org",
-				Body:    "",
-				CsvFile: genFile(heredoc.Doc(`
-					FOO,bar,selected,repo1,repo2
-					#IGNORED, true
-				`)),
-			},
-			want: shared.VariablePayload{Name: "FOO",
-				Value:        "bar",
-				Visibility:   shared.Selected,
-				Repositories: []int64{1, 2}},
-			isUpdate: true,
-			currentVar: shared.VariablePayload{
-				Name:       "FOO",
-				Value:      "abc",
-				Visibility: shared.Private,
+			stdin: `FOO=bar`,
+			want: map[string]string{
+				"FOO":    "bar",
+				"SHELL":  "bash",
+				"QUOTED": "my value",
 			},
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, stdin, _, _ := iostreams.Test()
@@ -555,72 +545,15 @@ func Test_getVariablesFromOptions(t *testing.T) {
 			stdin.WriteString(tt.stdin)
 			opts := tt.opts
 			opts.IO = ios
-			reg := &httpmock.Registry{}
-			defer reg.Verify(t)
-
-			apiClient := api.NewClientFromHTTP(&http.Client{Transport: reg})
-			var host string
-
-			if tt.opts.OrgName != "" {
-				host = "github.com"
-				opts.Config = func() (config.Config, error) {
-					return config.NewBlankConfig(), nil
-				}
-				if tt.isUpdate {
-					current, err := json.Marshal(tt.currentVar)
-					if err != nil {
-						reg.Register(httpmock.REST("GET", "orgs/org/actions/variables/FOO"),
-							httpmock.StatusStringResponse(200, string(current)))
-					}
-					if strings.Contains(tt.name, "selected repos") {
-						reg.Register(httpmock.GraphQL(`query MapRepositoryNames\b`),
-							httpmock.StatusStringResponse(200, `{"data":{"repo_0001":{"databaseId":1},"repo_0002":{"databaseId":2}}}`))
-					}
-				} else {
-					reg.Register(httpmock.REST("GET", "orgs/org/actions/variables/FOO"),
-						httpmock.StatusStringResponse(404, "Not Found"))
-				}
+			gotVariables, err := getVariablesFromOptions(&opts)
+			if tt.wantErr {
+				assert.Error(t, err)
 			} else {
-				host = "owner/repo"
-				if !tt.isUpdate {
-					reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/variables/FOO"),
-						httpmock.StatusStringResponse(404, "Not Found"))
-				} else {
-					current, err := json.Marshal(tt.currentVar)
-					if err != nil {
-						reg.Register(httpmock.REST("GET", "repos/owner/repo/actions/variables/FOO"),
-							httpmock.StatusStringResponse(200, string(current)))
-					}
-				}
+				assert.NoError(t, err)
 			}
-
-			opts.HttpClient = func() (*http.Client, error) {
-				return &http.Client{Transport: reg}, nil
-			}
-			gotVariables, err := getVariablesFromOptions(&opts, apiClient, host)
-			if err != nil {
-				if !tt.wantErr {
-					t.Fatalf("getVariablesFromOptions() error = %v, wantErr %v", err, tt.wantErr)
-				}
-			} else if tt.wantErr {
-				t.Fatalf("getVariablesFromOptions() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if len(gotVariables) != 1 {
-				t.Fatalf("getVariablesFromOptions() = got %d variables, want %d", len(gotVariables), 1)
-			}
-			if tt.want.Name != gotVariables["FOO"].Name {
-				t.Errorf("getVariablesFromOptions() got %q, want %q", gotVariables["FOO"].Name, tt.want.Name)
-			}
-			if tt.want.Value != gotVariables["FOO"].Value {
-				t.Errorf("getVariablesFromOptions() got %q, want %q", gotVariables["FOO"].Value, tt.want.Value)
-			}
-			if tt.want.Visibility != gotVariables["FOO"].Visibility {
-				t.Errorf("getVariablesFromOptions() got %q, want %q", gotVariables["FOO"].Visibility, tt.want.Visibility)
-			}
-			for i := range tt.want.Repositories {
-				if tt.want.Repositories[i] != gotVariables["FOO"].Repositories[i] {
-					t.Errorf("getVariablesFromOptions() got %q, want %q", gotVariables["FOO"].Repositories[i], tt.want.Repositories[i])
-				}
+			assert.Equal(t, len(tt.want), len(gotVariables))
+			for k, v := range gotVariables {
+				assert.Equal(t, tt.want[k], v)
 			}
 		})
 	}

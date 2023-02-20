@@ -2,13 +2,10 @@ package set
 
 import (
 	"bytes"
-	"encoding/csv"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
-	"sort"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -19,13 +16,12 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/hashicorp/go-multierror"
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 )
 
 type iprompter interface {
 	Input(string, string) (string, error)
-	Select(string, string, []string) (int, error)
-	Confirm(string, bool) (bool, error)
 }
 
 type SetOptions struct {
@@ -33,7 +29,7 @@ type SetOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
-	BaseRepoId int64
+	Prompter   iprompter
 
 	VariableName    string
 	OrgName         string
@@ -41,13 +37,7 @@ type SetOptions struct {
 	Body            string
 	Visibility      string
 	RepositoryNames []string
-	CsvFile         string
-	Prompter        iprompter
-}
-
-type repoNamesResult struct {
-	Ids []int64
-	Err error
+	EnvFile         string
 }
 
 func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command {
@@ -89,9 +79,8 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 			# Set organization-level variable visible to specific repositories
 			$ gh variable set MYVARIABLE --org myOrg --repos repo1,repo2,repo3
 
-			# Set multiple variables from the csv in the prescribed format(name, value, visibility(if org), repos(if visibility = selected))
-			$ gh variable set -f file.csv
-
+			# Set multiple variables imported from the ".env" file
+			$ gh variable set -f .env
 		`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -102,12 +91,12 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 				return err
 			}
 
-			if err := cmdutil.MutuallyExclusive("specify only one of `--body` or `--csv-file`", opts.Body != "", opts.CsvFile != ""); err != nil {
+			if err := cmdutil.MutuallyExclusive("specify only one of `--body` or `--env-file`", opts.Body != "", opts.EnvFile != ""); err != nil {
 				return err
 			}
 
 			if len(args) == 0 {
-				if opts.CsvFile == "" {
+				if opts.EnvFile == "" {
 					return cmdutil.FlagErrorf("must pass name argument")
 				}
 			} else {
@@ -145,17 +134,23 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 	cmdutil.StringEnumFlag(cmd, &opts.Visibility, "visibility", "v", shared.Private, []string{shared.All, shared.Private, shared.Selected}, "Set visibility for an organization variable")
 	cmd.Flags().StringSliceVarP(&opts.RepositoryNames, "repos", "r", []string{}, "List of `repositories` that can access an organization variable")
 	cmd.Flags().StringVarP(&opts.Body, "body", "b", "", "The value for the variable (reads from standard input if not specified)")
-	cmd.Flags().StringVarP(&opts.CsvFile, "csv-file", "f", "", "Load variable names and values from a csv-formatted `file`")
+	cmd.Flags().StringVarP(&opts.EnvFile, "env-file", "f", "", "Load variable names and values from a dotenv-formatted `file`")
 
 	return cmd
 }
 
 func setRun(opts *SetOptions) error {
+	variables, err := getVariablesFromOptions(opts)
+	if err != nil {
+		return err
+	}
+
 	c, err := opts.HttpClient()
 	if err != nil {
 		return fmt.Errorf("could not set http client: %w", err)
 	}
 	client := api.NewClientFromHTTP(c)
+
 	orgName := opts.OrgName
 	envName := opts.EnvName
 
@@ -167,16 +162,6 @@ func setRun(opts *SetOptions) error {
 			return err
 		}
 		host = baseRepo.RepoHost()
-		if opts.EnvName != "" {
-			baseRepoIdRes := getRepoIds(client, host, baseRepo.RepoOwner(), []string{baseRepo.RepoName()})
-			if baseRepoIdRes.Err != nil {
-				return baseRepoIdRes.Err
-			}
-			if len(baseRepoIdRes.Ids) == 0 {
-				return fmt.Errorf("could not find base repository id %s", ghrepo.FullName(baseRepo))
-			}
-			opts.BaseRepoId = baseRepoIdRes.Ids[0]
-		}
 	} else {
 		cfg, err := opts.Config()
 		if err != nil {
@@ -184,57 +169,44 @@ func setRun(opts *SetOptions) error {
 		}
 		host, _ = cfg.DefaultHost()
 	}
-	variables, err := getVariablesFromOptions(opts, client, host)
+
+	entity, err := shared.GetVariableEntity(orgName, envName)
 	if err != nil {
 		return err
 	}
 
-	variableEntity, err := shared.GetVariableEntity(orgName, envName)
+	opts.IO.StartProgressIndicator()
+	repositoryIDs, err := getRepoIds(client, host, opts.OrgName, opts.RepositoryNames)
+	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
-	}
-
-	if !shared.IsSupportedVariableEntity(variableEntity) {
-		return fmt.Errorf("%s variables are not supported", variableEntity)
-	}
-
-	repoIdRes := getRepoIds(client, host, opts.OrgName, opts.RepositoryNames)
-	if repoIdRes.Err != nil {
-		return repoIdRes.Err
 	}
 
 	setc := make(chan setResult)
-	for variableKey, variable := range variables {
-		go func(variableKey string, variable shared.VariablePayload) {
-			// no way to distinguish between empty and nil by encoding/json: https://github.com/golang/go/issues/22480
-			// therefore,for now, nil is not supported for repoIds thus empty and no value are treated same, replacing
-			// all selected visibilities with none on update.
-			repoIds := []int64{}
-			var visibility string
-			visibility = opts.Visibility
-			//cmd line opt overrides file
-			if len(repoIdRes.Ids) > 0 {
-				repoIds = repoIdRes.Ids
-			} else if variable.Visibility != "" {
-				visibility = variable.Visibility
-				if len(variable.Repositories) > 0 {
-					repoIds = variable.Repositories
-				}
+	for key, value := range variables {
+		k := key
+		v := value
+		go func() {
+			setOpts := setOptions{
+				Entity:        entity,
+				Environment:   envName,
+				Key:           k,
+				Organization:  orgName,
+				Repository:    baseRepo,
+				RepositoryIDs: repositoryIDs,
+				Value:         v,
+				Visibility:    opts.Visibility,
 			}
-			setc <- setVariable(opts, host, client, baseRepo, variableKey, variable.Value, visibility, repoIds, variableEntity, variable.IsUpdate)
-		}(variableKey, variable)
+			setc <- setVariable(client, host, setOpts)
+		}()
 	}
 
 	err = nil
 	cs := opts.IO.ColorScheme()
 	for i := 0; i < len(variables); i++ {
 		result := <-setc
-		if result.err != nil {
-			err = multierror.Append(err, result.err)
-			continue
-		}
-		if result.value != "" {
-			fmt.Fprintln(opts.IO.Out, result.value)
+		if result.Err != nil {
+			err = multierror.Append(err, result.Err)
 			continue
 		}
 		if !opts.IO.IsStdoutTTY() {
@@ -247,298 +219,99 @@ func setRun(opts *SetOptions) error {
 		if envName != "" {
 			target += " environment " + envName
 		}
-		fmt.Fprintf(opts.IO.Out, "%s Set %s variable %s for %s\n", cs.SuccessIcon(), "actions", result.key, target)
+		fmt.Fprintf(opts.IO.Out, "%s %s actions variable %s for %s\n", cs.SuccessIcon(), result.Operation, result.Key, target)
 	}
+
 	return err
 }
 
-type setResult struct {
-	key   string
-	value string
-	err   error
-}
+func getVariablesFromOptions(opts *SetOptions) (map[string]string, error) {
+	variables := make(map[string]string)
 
-func setVariable(opts *SetOptions, host string, client *api.Client, baseRepo ghrepo.Interface, variableKey, variableValue, visibility string, repositoryIDs []int64, entity shared.VariableEntity, isUpdate bool) (res setResult) {
-	orgName := opts.OrgName
-	envName := opts.EnvName
-	res.key = variableKey
-	var err error
-	switch entity {
-	case shared.Organization:
-		if !isUpdate {
-			err = postOrgVariable(client, host, orgName, visibility, variableKey, variableValue, repositoryIDs)
-		} else {
-			err = patchOrgVariable(client, host, orgName, visibility, variableKey, variableKey, variableValue, repositoryIDs)
-		}
-	case shared.Environment:
-		if !isUpdate {
-			err = postEnvVariable(client, baseRepo, envName, variableKey, variableValue, opts.BaseRepoId)
-		} else {
-			err = patchEnvVariable(client, baseRepo, envName, variableKey, variableKey, variableValue, opts.BaseRepoId)
-		}
-	default:
-		if !isUpdate {
-			err = postRepoVariable(client, baseRepo, variableKey, variableValue)
-		} else {
-			err = patchRepoVariable(client, baseRepo, variableKey, variableKey, variableValue)
-		}
-	}
-	if err != nil {
-		res.err = fmt.Errorf("failed to set variable %q: %w", variableKey, err)
-		return
-	}
-	return
-}
-
-func getVariablesFromOptions(opts *SetOptions, client *api.Client, host string) (map[string]shared.VariablePayload, error) {
-	variables := make(map[string]shared.VariablePayload)
-	if opts.CsvFile != "" {
+	if opts.EnvFile != "" {
 		var r io.Reader
-		f, err := os.Open(opts.CsvFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open csv file: %w", err)
+		if opts.EnvFile == "-" {
+			defer opts.IO.In.Close()
+			r = opts.IO.In
+		} else {
+			f, err := os.Open(opts.EnvFile)
+			if err != nil {
+				return nil, fmt.Errorf("failed to open env file: %w", err)
+			}
+			defer f.Close()
+			r = f
 		}
-		defer f.Close()
-		r = f
-		csvReader := csv.NewReader(r)
-		csvReader.Comment = '#'
-		csvReader.FieldsPerRecord = -1
-		csvReader.TrimLeadingSpace = true
-		records, err := csvReader.ReadAll()
+		envs, err := godotenv.Parse(r)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing csv file: %w", err)
+			return nil, fmt.Errorf("error parsing env file: %w", err)
 		}
-		if len(records) == 0 {
+		if len(envs) == 0 {
 			return nil, fmt.Errorf("no variables found in file")
 		}
-		for _, row := range records {
-			variable, err := getVarFromRow(opts, client, host, row)
-			if err != nil {
-				return nil, err
-			}
-			currentVariablePtr, _ := shared.GetVariablesForList(&shared.ListOptions{HttpClient: opts.HttpClient,
-				IO:         opts.IO,
-				Config:     opts.Config,
-				BaseRepo:   opts.BaseRepo,
-				BaseRepoId: opts.BaseRepoId,
-				OrgName:    opts.OrgName,
-				EnvName:    opts.EnvName,
-				Page:       0,
-				PerPage:    0,
-				Name:       variable.Name,
-			}, true)
-			variable.IsUpdate = currentVariablePtr != nil
-			variables[row[0]] = variable
+		for key, value := range envs {
+			variables[key] = value
 		}
 		return variables, nil
 	}
 
-	currentVariablePtr, _ := shared.GetVariablesForList(&shared.ListOptions{HttpClient: opts.HttpClient,
-		IO:         opts.IO,
-		Config:     opts.Config,
-		BaseRepo:   opts.BaseRepo,
-		BaseRepoId: opts.BaseRepoId,
-		OrgName:    opts.OrgName,
-		EnvName:    opts.EnvName,
-		Page:       0,
-		PerPage:    0,
-		Name:       opts.VariableName,
-	}, true)
-
-	values, err := getBody(opts, client, host, currentVariablePtr)
-	values.IsUpdate = currentVariablePtr != nil
+	body, err := getBody(opts)
 	if err != nil {
 		return nil, fmt.Errorf("did not understand variable body: %w", err)
 	}
-	variables[opts.VariableName] = values
+	variables[opts.VariableName] = body
+
 	return variables, nil
 }
 
-func getVarFromRow(opts *SetOptions, client *api.Client, host string, row []string) (shared.VariablePayload, error) {
-	rowLength := len(row)
-	index := 1
-	if rowLength < 2 {
-		return shared.VariablePayload{}, fmt.Errorf("less than 2 records in a row in file")
-	}
-	if rowLength > 2 && opts.OrgName == "" {
-		return shared.VariablePayload{}, fmt.Errorf("more than 3 vals in a row in file for non org variable %s", row[0])
-	}
-
-	var variable shared.VariablePayload
-	variable.Value = row[index]
-	index++
-	variable.Name = row[0]
-	if opts.OrgName != "" {
-		if rowLength >= 3 {
-			variable.Visibility = row[index]
-		}
-		index++
-		if variable.Visibility == shared.Selected {
-			if rowLength < 4 {
-				// do not exit here as repositoryNames in opts may have the info.
-				log.Printf("selected visibility with no repos mentioned for variable %s", row[0])
-			}
-			repoIdRes := getRepoIds(client, host, opts.OrgName, row[index:])
-			if repoIdRes.Err != nil {
-				return shared.VariablePayload{}, repoIdRes.Err
-			}
-			variable.Repositories = repoIdRes.Ids
-		}
-	}
-	return variable, nil
-}
-
-func trimSpaces(ss []string) {
-	for i := range ss {
-		ss[i] = strings.TrimSpace(ss[i])
-	}
-}
-
-func getBody(opts *SetOptions, client *api.Client, host string, currentVariablePtr []*shared.Variable) (shared.VariablePayload, error) {
-	isUpdate := len(currentVariablePtr) > 0
-
+func getBody(opts *SetOptions) (string, error) {
 	if opts.Body != "" {
-		ss := strings.Split(opts.VariableName+","+string(opts.Body), ",")
-		trimSpaces(ss)
-		return getVarFromRow(opts, client, host, ss)
+		return opts.Body, nil
 	}
 
-	values := make([]string, 0)
 	if opts.IO.CanPrompt() {
-		var currentVar shared.Variable
-		if isUpdate {
-			currentVar = *currentVariablePtr[0]
-		}
-		values = append(values, opts.VariableName)
-		data, err := opts.Prompter.Input("Value", currentVar.Value)
+		bodyInput, err := opts.Prompter.Input("Paste your variable", "")
 		if err != nil {
-			return shared.VariablePayload{}, err
+			return "", err
 		}
-		values = append(values, data)
-
-		if opts.OrgName != "" {
-			data, err = opts.Prompter.Input("Visibility", string(currentVar.Visibility))
-			if err != nil {
-				return shared.VariablePayload{}, err
-			}
-			values = append(values, data)
-
-			if data == shared.Selected {
-				data, err = opts.Prompter.Input("Repos(comma separated)", getCurrentSelectedRepos(client.HTTP(), currentVar.SelectedReposURL))
-				if err != nil {
-					return shared.VariablePayload{}, err
-				}
-				values = append(values, strings.Split(data, ",")...)
-			}
-		}
-
 		fmt.Fprintln(opts.IO.Out)
-		trimSpaces(values)
-		return getVarFromRow(opts, client, host, values)
+		return bodyInput, nil
 	}
 
 	body, err := io.ReadAll(opts.IO.In)
 	if err != nil {
-		return shared.VariablePayload{}, fmt.Errorf("failed to read from standard input: %w", err)
+		return "", fmt.Errorf("failed to read from standard input: %w", err)
 	}
-	ss := strings.Split(opts.VariableName+","+string(bytes.TrimRight(body, "\r\n")), ",")
-	trimSpaces(ss)
-	return getVarFromRow(opts, client, host, ss)
+
+	return string(bytes.TrimRight(body, "\r\n")), nil
 }
 
-// This does similar logic to `api.RepoNetwork`, but without the overfetching.
-func mapRepoToID(client *api.Client, host string, repositories []ghrepo.Interface) ([]int64, error) {
-	queries := make([]string, 0, len(repositories))
-	for i, repo := range repositories {
-		queries = append(queries, fmt.Sprintf(`
-			repo_%03d: repository(owner: %q, name: %q) {
-				databaseId
-			}
-		`, i, repo.RepoOwner(), repo.RepoName()))
+func getRepoIds(client *api.Client, host, owner string, repositoryNames []string) ([]int64, error) {
+	if len(repositoryNames) == 0 {
+		return nil, nil
 	}
-
-	query := fmt.Sprintf(`query MapRepositoryNames { %s }`, strings.Join(queries, ""))
-
-	graphqlResult := make(map[string]*struct {
-		DatabaseID int64 `json:"databaseId"`
-	})
-
-	if err := client.GraphQL(host, query, nil, &graphqlResult); err != nil {
-		return nil, fmt.Errorf("failed to look up repositories: %w", err)
-	}
-
-	repoKeys := make([]string, 0, len(repositories))
-	for k := range graphqlResult {
-		repoKeys = append(repoKeys, k)
-	}
-	sort.Strings(repoKeys)
-
-	result := make([]int64, len(repositories))
-	for i, k := range repoKeys {
-		result[i] = graphqlResult[k].DatabaseID
-	}
-	return result, nil
-}
-
-func getCurrentSelectedRepos(client *http.Client, url string) string {
-	var selectedRepositories shared.SelectedRepos
-	err := shared.ApiGet(client, url, &selectedRepositories)
-	if err != nil {
-		return ""
-	}
-	names := make([]string, 0)
-	for _, repo := range selectedRepositories.Repositories {
-		names = append(names, repo.Name)
-	}
-	return strings.Join(names, ",")
-}
-
-func mapRepoNamesToIDs(client *api.Client, host, defaultOwner string, repositoryNames []string) ([]int64, error) {
 	repos := make([]ghrepo.Interface, 0, len(repositoryNames))
 	for _, repositoryName := range repositoryNames {
+		if repositoryName == "" {
+			continue
+		}
 		var repo ghrepo.Interface
-		if strings.Contains(repositoryName, "/") || defaultOwner == "" {
+		if strings.Contains(repositoryName, "/") || owner == "" {
 			var err error
 			repo, err = ghrepo.FromFullNameWithHost(repositoryName, host)
 			if err != nil {
 				return nil, fmt.Errorf("invalid repository name")
 			}
 		} else {
-			repo = ghrepo.NewWithHost(defaultOwner, repositoryName, host)
+			repo = ghrepo.NewWithHost(owner, repositoryName, host)
 		}
 		repos = append(repos, repo)
 	}
-	repositoryIDs, err := mapRepoToID(client, host, repos)
+	if len(repos) == 0 {
+		return nil, fmt.Errorf("resetting repositories selected to zero is not supported")
+	}
+	repositoryIDs, err := api.MapReposToIDs(client, host, repos)
 	if err != nil {
 		return nil, fmt.Errorf("failed to look up IDs for repositories %v: %w", repositoryNames, err)
 	}
 	return repositoryIDs, nil
-}
-
-func getRepoIds(client *api.Client, host, orgName string, repoNames []string) repoNamesResult {
-	repoNamesC := make(chan repoNamesResult, 1)
-	resetErr := len(repoNames) > 0
-	filteredRepoNames := make([]string, 0, len(repoNames))
-	for _, repoName := range repoNames {
-		if repoName != "" {
-			resetErr = false
-			filteredRepoNames = append(filteredRepoNames, repoName)
-		}
-	}
-	go func() {
-		if len(filteredRepoNames) == 0 {
-			if resetErr {
-				repoNamesC <- repoNamesResult{Err: fmt.Errorf("resetting repos selected to zero is not supported")}
-				return
-			}
-			repoNamesC <- repoNamesResult{}
-			return
-		}
-		repositoryIDs, err := mapRepoNamesToIDs(client, host, orgName, filteredRepoNames)
-		repoNamesC <- repoNamesResult{
-			Ids: repositoryIDs,
-			Err: err,
-		}
-	}()
-	return <-repoNamesC
 }
