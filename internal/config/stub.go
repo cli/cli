@@ -45,7 +45,12 @@ func NewFromString(cfgStr string) *ConfigMock {
 		return cfg.GetOrDefault(host, key)
 	}
 	mock.SetFunc = func(host, key, value string) {
-		cfg.Set(host, key, value)
+		if host == "" {
+			cfg.Set("", key, value)
+		} else {
+			c.Set([]string{"hosts", host, key}, value)
+		}
+
 	}
 	mock.UnsetHostFunc = func(host string) {
 		cfg.UnsetHost(host)
