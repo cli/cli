@@ -43,7 +43,7 @@ type cfg struct {
 }
 
 func (c *cfg) AuthToken(hostname string) (string, string) {
-	token, source := ghAuth.TokenForHost(hostname)
+	token, source := ghAuth.TokenFromEnvOrConfig(hostname)
 	if token == "" {
 		var err error
 		token, err = keyring.Get(hostname, "")
