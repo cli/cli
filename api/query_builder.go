@@ -221,6 +221,7 @@ var IssueFields = []string{
 	"milestone",
 	"number",
 	"projectCards",
+	"projectItems",
 	"reactionGroups",
 	"state",
 	"title",

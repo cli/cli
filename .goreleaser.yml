@@ -18,7 +18,7 @@ builds:
         - -s -w -X github.com/cli/cli/v2/internal/build.Version={{.Version}} -X github.com/cli/cli/v2/internal/build.Date={{time "2006-01-02"}}
     id: macos
     goos: [darwin]
-    goarch: [amd64]
+    goarch: [amd64, arm64]
 
   - <<: *build_defaults
     id: linux

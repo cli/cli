@@ -235,6 +235,15 @@ func Test_createRun(t *testing.T) {
 						],
 						"pageInfo": { "hasNextPage": false }
 					} } } }`))
+				r.Register(
+					httpmock.GraphQL(`query UserProjectV2List\b`),
+					httpmock.StringResponse(`
+					{ "data": { "viewer": { "projectsV2": {
+						"nodes": [
+							{ "title": "Monalisa", "id": "MONALISAID", "resourcePath": "/users/MONALISA/projects/1"  }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }`))
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?body=&projects=OWNER%2FREPO%2F1",
 			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
@@ -647,6 +656,14 @@ func TestIssueCreate_metadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
+		httpmock.GraphQL(`query UserProjectV2List\b`),
+		httpmock.StringResponse(`
+		{	"data": { "viewer": { "projectsV2": {
+			"nodes": [],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
 		httpmock.GraphQL(`mutation IssueCreate\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "createIssue": { "issue": {
@@ -781,7 +798,17 @@ func TestIssueCreate_projectsV2(t *testing.T) {
 		httpmock.StringResponse(`
 		{ "data": { "organization": { "projectsV2": {
 			"nodes": [
-				{ "title": "TriageV2", "id": "TriageV2ID" }
+				{ "title": "TriageV2", "id": "TRIAGEV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query UserProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "viewer": { "projectsV2": {
+			"nodes": [
+				{ "title": "MonalisaV2", "id": "MONALISAV2ID" }
 			],
 			"pageInfo": { "hasNextPage": false }
 		} } } }
