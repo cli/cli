@@ -326,10 +326,7 @@ func forkRun(opts *ForkOptions) error {
 		if cloneDesired {
 			// Allow injecting alternative BackOff in tests.
 			if opts.BackOff == nil {
-				bo := backoff.NewExponentialBackOff()
-				bo.Multiplier = 1.1
-				bo.MaxInterval = 10 * time.Second
-				bo.MaxElapsedTime = 5 * time.Minute
+				bo := backoff.NewConstantBackOff(3 * time.Second)
 				opts.BackOff = bo
 			}
 
