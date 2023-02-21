@@ -14,7 +14,6 @@ type editOptions struct {
 	selector    *CodespaceSelector
 	displayName string
 	machine     string
-	repo        string
 }
 
 func newEditCmd(app *App) *cobra.Command {
