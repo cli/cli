@@ -3,7 +3,6 @@ package codespace
 import (
 	"context"
 	"fmt"
-	"net"
 
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/rpc"
@@ -50,12 +49,11 @@ func (a *App) Logs(ctx context.Context, selector *CodespaceSelector, follow bool
 	defer safeClose(session, &err)
 
 	// Ensure local port is listening before client (getPostCreateOutput) connects.
-	listen, err := net.Listen("tcp", "127.0.0.1:0") // arbitrary port
+	listen, localPort, err := codespaces.ListenTCP(0)
 	if err != nil {
 		return err
 	}
 	defer listen.Close()
-	localPort := listen.Addr().(*net.TCPAddr).Port
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
 	invoker, err := rpc.CreateInvoker(ctx, session)

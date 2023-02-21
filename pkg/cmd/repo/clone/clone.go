@@ -179,6 +179,10 @@ func cloneRun(opts *CloneOptions) error {
 		if err != nil {
 			return err
 		}
+
+		if err := gitClient.Fetch(ctx, upstreamName, "", git.WithRepoDir(cloneDir)); err != nil {
+			return err
+		}
 	}
 	return nil
 }

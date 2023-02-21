@@ -16,6 +16,33 @@ type portForwardingSession interface {
 	KeepAlive(string)
 }
 
+type ReadWriteHalfCloser interface {
+	io.ReadWriteCloser
+	CloseWrite() error
+}
+
+type combinedReadWriteHalfCloser struct {
+	io.ReadCloser
+	io.WriteCloser
+}
+
+func NewReadWriteHalfCloser(reader io.ReadCloser, writer io.WriteCloser) ReadWriteHalfCloser {
+	return &combinedReadWriteHalfCloser{reader, writer}
+}
+
+func (crwc *combinedReadWriteHalfCloser) Close() error {
+	werr := crwc.WriteCloser.Close()
+	rerr := crwc.ReadCloser.Close()
+	if werr != nil {
+		return werr
+	}
+	return rerr
+}
+
+func (crwc *combinedReadWriteHalfCloser) CloseWrite() error {
+	return crwc.WriteCloser.Close()
+}
+
 // A PortForwarder forwards TCP traffic over a Live Share session from a port on a remote
 // container to a local destination such as a network port or Go reader/writer.
 type PortForwarder struct {
@@ -48,7 +75,7 @@ func NewPortForwarder(session portForwardingSession, name string, remotePort int
 // until it encounters the first error, which may include context
 // cancellation. Its error result is always non-nil. The caller is
 // responsible for closing the listening port.
-func (fwd *PortForwarder) ForwardToListener(ctx context.Context, listen net.Listener) (err error) {
+func (fwd *PortForwarder) ForwardToListener(ctx context.Context, listen *net.TCPListener) (err error) {
 	id, err := fwd.shareRemotePort(ctx)
 	if err != nil {
 		return err
@@ -65,7 +92,7 @@ func (fwd *PortForwarder) ForwardToListener(ctx context.Context, listen net.List
 	}
 	go func() {
 		for {
-			conn, err := listen.Accept()
+			conn, err := listen.AcceptTCP()
 			if err != nil {
 				sendError(err)
 				return
@@ -84,7 +111,7 @@ func (fwd *PortForwarder) ForwardToListener(ctx context.Context, listen net.List
 
 // Forward forwards traffic between the container's remote port and
 // the specified read/write stream. On return, the stream is closed.
-func (fwd *PortForwarder) Forward(ctx context.Context, conn io.ReadWriteCloser) error {
+func (fwd *PortForwarder) Forward(ctx context.Context, conn ReadWriteHalfCloser) error {
 	id, err := fwd.shareRemotePort(ctx)
 	if err != nil {
 		conn.Close()
@@ -143,7 +170,7 @@ func (t *trafficMonitor) Read(p []byte) (n int, err error) {
 }
 
 // handleConnection handles forwarding for a single accepted connection, then closes it.
-func (fwd *PortForwarder) handleConnection(ctx context.Context, id ChannelID, conn io.ReadWriteCloser) (err error) {
+func (fwd *PortForwarder) handleConnection(ctx context.Context, id ChannelID, conn ReadWriteHalfCloser) (err error) {
 	span, ctx := opentracing.StartSpanFromContext(ctx, "PortForwarder.handleConnection")
 	defer span.Finish()
 
@@ -165,9 +192,12 @@ func (fwd *PortForwarder) handleConnection(ctx context.Context, id ChannelID, co
 
 	// bi-directional copy of data.
 	errs := make(chan error, 2)
-	copyConn := func(w io.Writer, r io.Reader) {
+	copyConn := func(w ReadWriteHalfCloser, r io.Reader) {
 		_, err := io.Copy(w, r)
 		errs <- err
+
+		// Ignore errors here, we call the full Close() later and catch that error
+		_ = w.CloseWrite()
 	}
 
 	var (

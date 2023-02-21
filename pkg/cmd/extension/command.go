@@ -3,6 +3,7 @@ package extension
 import (
 	"errors"
 	"fmt"
+	gio "io"
 	"os"
 	"strings"
 	"time"
@@ -24,6 +25,7 @@ import (
 func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 	m := f.ExtensionManager
 	io := f.IOStreams
+	gc := f.GitClient
 	prompter := f.Prompter
 	config := f.Config
 	browser := f.Browser
@@ -410,33 +412,25 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 		},
 		func() *cobra.Command {
 			var debug bool
+			var singleColumn bool
 			cmd := &cobra.Command{
 				Use:   "browse",
 				Short: "Enter a UI for browsing, adding, and removing extensions",
 				Long: heredoc.Doc(`
 					This command will take over your terminal and run a fully interactive
-					interface for browsing, adding, and removing gh extensions.
+					interface for browsing, adding, and removing gh extensions. A terminal
+					width greater than 100 columns is recommended.
 
-					The extension list is navigated with the arrow keys or with j/k.
-					Space and control+space (or control + j/k) page the list up and down.
-					Extension readmes can be scrolled with page up/page down keys
-					(fn + arrow up/down on a mac keyboard).
-
-					For highlighted extensions, you can press:
-
-					- w to open the extension in your web browser
-					- i to install the extension
-					- r to remove the extension
-
-					Press / to focus the filter input. Press enter to scroll the results.
-					Press Escape to clear the filter and return to the full list.
+					To learn how to control this interface, press ? after running to see
+					the help text.
 
 					Press q to quit.
 
-					The output of this command may be difficult to navigate for screen reader
-					users, users operating at high zoom and other users of assistive technology. It
-					is also not advised for automation scripts. We advise those users to use the
-					alternative command:
+					Running this command with --single-column should make this command
+					more intelligible for users who rely on assistive technology like screen
+					readers or high zoom.
+
+					For a more traditional way to discover extensions, see:
 
 						gh ext search
 
@@ -459,21 +453,25 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 
 					searcher := search.NewSearcher(api.NewCachedHTTPClient(client, time.Hour*24), host)
 
+					gc.Stderr = gio.Discard
+
 					opts := browse.ExtBrowseOpts{
-						Cmd:      cmd,
-						IO:       io,
-						Browser:  browser,
-						Searcher: searcher,
-						Em:       m,
-						Client:   client,
-						Cfg:      cfg,
-						Debug:    debug,
+						Cmd:          cmd,
+						IO:           io,
+						Browser:      browser,
+						Searcher:     searcher,
+						Em:           m,
+						Client:       client,
+						Cfg:          cfg,
+						Debug:        debug,
+						SingleColumn: singleColumn,
 					}
 
 					return browse.ExtBrowse(opts)
 				},
 			}
 			cmd.Flags().BoolVar(&debug, "debug", false, "log to /tmp/extBrowse-*")
+			cmd.Flags().BoolVarP(&singleColumn, "single-column", "s", false, "Render TUI with only one column of text")
 			return cmd
 		}(),
 		&cobra.Command{
@@ -564,9 +562,18 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					} else {
 						fullName = "gh-" + extName
 					}
+
+					cs := io.ColorScheme()
+
+					commitIcon := cs.SuccessIcon()
 					if err := m.Create(fullName, tmplType); err != nil {
-						return err
+						if errors.Is(err, ErrInitialCommitFailed) {
+							commitIcon = cs.FailureIcon()
+						} else {
+							return err
+						}
 					}
+
 					if !io.IsStdoutTTY() {
 						return nil
 					}
@@ -577,7 +584,6 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						"- run 'cd %[1]s; gh extension install .; gh %[2]s' to see your new extension in action",
 						fullName, extName)
 
-					cs := io.ColorScheme()
 					if tmplType == extensions.GoBinTemplateType {
 						goBinChecks = heredoc.Docf(`
 						%[1]s Downloaded Go dependencies
@@ -585,7 +591,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 						`, cs.SuccessIcon(), fullName)
 						steps = heredoc.Docf(`
 						- run 'cd %[1]s; gh extension install .; gh %[2]s' to see your new extension in action
-						- use 'go build && gh %[2]s' to see changes in your code as you develop`, fullName, extName)
+						- run 'go build && gh %[2]s' to see changes in your code as you develop`, fullName, extName)
 					} else if tmplType == extensions.OtherBinTemplateType {
 						steps = heredoc.Docf(`
 						- run 'cd %[1]s; gh extension install .' to install your extension locally
@@ -596,17 +602,18 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					out := heredoc.Docf(`
 						%[1]s Created directory %[2]s
 						%[1]s Initialized git repository
+						%[7]s Made initial commit
 						%[1]s Set up extension scaffolding
 						%[6]s
 						%[2]s is ready for development!
 
 						%[4]s
 						%[5]s
-						- commit and use 'gh repo create' to share your extension with others
+						- run 'gh repo create' to share your extension with others
 
 						For more information on writing extensions:
 						%[3]s
-					`, cs.SuccessIcon(), fullName, link, cs.Bold("Next Steps"), steps, goBinChecks)
+					`, cs.SuccessIcon(), fullName, link, cs.Bold("Next Steps"), steps, goBinChecks, commitIcon)
 					fmt.Fprint(io.Out, out)
 					return nil
 				},

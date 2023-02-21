@@ -10,6 +10,163 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestSearcherCommits(t *testing.T) {
+	query := Query{
+		Keywords: []string{"keyword"},
+		Kind:     "commits",
+		Limit:    30,
+		Order:    "desc",
+		Sort:     "committer-date",
+		Qualifiers: Qualifiers{
+			Author:        "foobar",
+			CommitterDate: ">2021-02-28",
+		},
+	}
+
+	values := url.Values{
+		"page":     []string{"1"},
+		"per_page": []string{"30"},
+		"order":    []string{"desc"},
+		"sort":     []string{"committer-date"},
+		"q":        []string{"keyword author:foobar committer-date:>2021-02-28"},
+	}
+
+	tests := []struct {
+		name      string
+		host      string
+		query     Query
+		result    CommitsResult
+		wantErr   bool
+		errMsg    string
+		httpStubs func(*httpmock.Registry)
+	}{
+		{
+			name:  "searches commits",
+			query: query,
+			result: CommitsResult{
+				IncompleteResults: false,
+				Items:             []Commit{{Sha: "abc"}},
+				Total:             1,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.QueryMatcher("GET", "search/commits", values),
+					httpmock.JSONResponse(CommitsResult{
+						IncompleteResults: false,
+						Items:             []Commit{{Sha: "abc"}},
+						Total:             1,
+					}),
+				)
+			},
+		},
+		{
+			name:  "searches commits for enterprise host",
+			host:  "enterprise.com",
+			query: query,
+			result: CommitsResult{
+				IncompleteResults: false,
+				Items:             []Commit{{Sha: "abc"}},
+				Total:             1,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.QueryMatcher("GET", "api/v3/search/commits", values),
+					httpmock.JSONResponse(CommitsResult{
+						IncompleteResults: false,
+						Items:             []Commit{{Sha: "abc"}},
+						Total:             1,
+					}),
+				)
+			},
+		},
+		{
+			name:  "paginates results",
+			query: query,
+			result: CommitsResult{
+				IncompleteResults: false,
+				Items:             []Commit{{Sha: "abc"}, {Sha: "def"}},
+				Total:             2,
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				firstReq := httpmock.QueryMatcher("GET", "search/commits", values)
+				firstRes := httpmock.JSONResponse(CommitsResult{
+					IncompleteResults: false,
+					Items:             []Commit{{Sha: "abc"}},
+					Total:             2,
+				},
+				)
+				firstRes = httpmock.WithHeader(firstRes, "Link", `<https://api.github.com/search/commits?page=2&per_page=100&q=org%3Agithub>; rel="next"`)
+				secondReq := httpmock.QueryMatcher("GET", "search/commits", url.Values{
+					"page":     []string{"2"},
+					"per_page": []string{"29"},
+					"order":    []string{"desc"},
+					"sort":     []string{"committer-date"},
+					"q":        []string{"keyword author:foobar committer-date:>2021-02-28"},
+				},
+				)
+				secondRes := httpmock.JSONResponse(CommitsResult{
+					IncompleteResults: false,
+					Items:             []Commit{{Sha: "def"}},
+					Total:             2,
+				},
+				)
+				reg.Register(firstReq, firstRes)
+				reg.Register(secondReq, secondRes)
+			},
+		},
+		{
+			name:    "handles search errors",
+			query:   query,
+			wantErr: true,
+			errMsg: heredoc.Doc(`
+        Invalid search query "keyword author:foobar committer-date:>2021-02-28".
+        "blah" is not a recognized date/time format. Please provide an ISO 8601 date/time value, such as YYYY-MM-DD.`),
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.QueryMatcher("GET", "search/commits", values),
+					httpmock.WithHeader(
+						httpmock.StatusStringResponse(422,
+							`{
+                "message":"Validation Failed",
+                "errors":[
+                  {
+                    "message":"\"blah\" is not a recognized date/time format. Please provide an ISO 8601 date/time value, such as YYYY-MM-DD.",
+                    "resource":"Search",
+                    "field":"q",
+                    "code":"invalid"
+                  }
+                ],
+                "documentation_url":"https://docs.github.com/v3/search/"
+              }`,
+						), "Content-Type", "application/json"),
+				)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			if tt.httpStubs != nil {
+				tt.httpStubs(reg)
+			}
+			client := &http.Client{Transport: reg}
+			if tt.host == "" {
+				tt.host = "github.com"
+			}
+			searcher := NewSearcher(client, tt.host)
+			result, err := searcher.Commits(tt.query)
+			if tt.wantErr {
+				assert.EqualError(t, err, tt.errMsg)
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.result, result)
+		})
+	}
+}
+
 func TestSearcherRepositories(t *testing.T) {
 	query := Query{
 		Keywords: []string{"keyword"},

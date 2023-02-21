@@ -167,6 +167,7 @@ func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
 			&lazyLoadedHTTPClient{factory: f},
 		),
 		f.Browser,
+		f.Remotes,
 	)
 	cmd := codespaceCmd.NewRootCmd(app)
 	cmd.Use = "codespace"

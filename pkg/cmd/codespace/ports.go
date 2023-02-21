@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -378,7 +377,7 @@ func (a *App) ForwardPorts(ctx context.Context, selector *CodespaceSelector, por
 	for _, pair := range portPairs {
 		pair := pair
 		group.Go(func() error {
-			listen, err := net.Listen("tcp", fmt.Sprintf(":%d", pair.local))
+			listen, _, err := codespaces.ListenTCP(pair.local)
 			if err != nil {
 				return err
 			}

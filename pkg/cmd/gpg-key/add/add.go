@@ -20,6 +20,7 @@ type AddOptions struct {
 	HTTPClient func() (*http.Client, error)
 
 	KeyFile string
+	Title   string
 }
 
 func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command {
@@ -50,6 +51,7 @@ func NewCmdAdd(f *cmdutil.Factory, runF func(*AddOptions) error) *cobra.Command 
 		},
 	}
 
+	cmd.Flags().StringVarP(&opts.Title, "title", "t", "", "Title for the new key")
 	return cmd
 }
 
@@ -79,7 +81,7 @@ func runAdd(opts *AddOptions) error {
 
 	hostname, _ := cfg.DefaultHost()
 
-	err = gpgKeyUpload(httpClient, hostname, keyReader)
+	err = gpgKeyUpload(httpClient, hostname, keyReader, opts.Title)
 	if err != nil {
 		cs := opts.IO.ColorScheme()
 		if errors.Is(err, errScopesMissing) {

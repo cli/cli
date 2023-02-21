@@ -13,6 +13,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	clicontext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
@@ -32,9 +33,10 @@ type App struct {
 	errLogger  *log.Logger
 	executable executable
 	browser    browser.Browser
+	remotes    func() (clicontext.Remotes, error)
 }
 
-func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browser browser.Browser) *App {
+func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browser browser.Browser, remotes func() (clicontext.Remotes, error)) *App {
 	errLogger := log.New(io.ErrOut, "", 0)
 
 	return &App{
@@ -43,6 +45,7 @@ func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browse
 		errLogger:  errLogger,
 		executable: exe,
 		browser:    browser,
+		remotes:    remotes,
 	}
 }
 
@@ -80,6 +83,7 @@ func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App
 
 //go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
 type apiClient interface {
+	GetUser(ctx context.Context) (*api.User, error)
 	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
 	GetOrgMemberCodespace(ctx context.Context, orgName string, userName string, codespaceName string) (*api.Codespace, error)
 	ListCodespaces(ctx context.Context, opts api.ListCodespacesOptions) ([]*api.Codespace, error)

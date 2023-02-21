@@ -16,6 +16,7 @@ import (
 	fd "github.com/cli/cli/v2/internal/featuredetection"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
@@ -36,6 +37,7 @@ const (
 	optionIssues            = "Issues"
 	optionMergeOptions      = "Merge Options"
 	optionProjects          = "Projects"
+	optionDiscussions       = "Discussions"
 	optionTemplateRepo      = "Template Repository"
 	optionTopics            = "Topics"
 	optionVisibility        = "Visibility"
@@ -51,6 +53,7 @@ type EditOptions struct {
 	RemoveTopics    []string
 	InteractiveMode bool
 	Detector        fd.Detector
+	Prompter        prompter.Prompter
 	// Cache of current repo topics to avoid retrieving them
 	// in multiple flows.
 	topicsCache []string
@@ -66,6 +69,7 @@ type EditRepositoryInput struct {
 	EnableIssues        *bool   `json:"has_issues,omitempty"`
 	EnableMergeCommit   *bool   `json:"allow_merge_commit,omitempty"`
 	EnableProjects      *bool   `json:"has_projects,omitempty"`
+	EnableDiscussions   *bool   `json:"has_discussions,omitempty"`
 	EnableRebaseMerge   *bool   `json:"allow_rebase_merge,omitempty"`
 	EnableSquashMerge   *bool   `json:"allow_squash_merge,omitempty"`
 	EnableWiki          *bool   `json:"has_wiki,omitempty"`
@@ -76,7 +80,8 @@ type EditRepositoryInput struct {
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobra.Command {
 	opts := &EditOptions{
-		IO: f.IOStreams,
+		IO:       f.IOStreams,
+		Prompter: f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -93,6 +98,8 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 			Edit repository settings.
 
 			To toggle a setting off, use the %[1]s--flag=false%[1]s syntax.
+
+			Note that changing repository visibility to private will cause loss of stars and watchers.
 		`, "`"),
 		Args: cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
@@ -146,6 +153,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(options *EditOptions) error) *cobr
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableIssues, "enable-issues", "", "Enable issues in the repository")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableProjects, "enable-projects", "", "Enable projects in the repository")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableWiki, "enable-wiki", "", "Enable wiki in the repository")
+	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableDiscussions, "enable-discussions", "", "Enable discussions in the repository")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableMergeCommit, "enable-merge-commit", "", "Enable merging pull requests via merge commit")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableSquashMerge, "enable-squash-merge", "", "Enable merging pull requests via squashed commit")
 	cmdutil.NilBoolFlag(cmd, &opts.Edits.EnableRebaseMerge, "enable-rebase-merge", "", "Enable merging pull requests via rebase")
@@ -181,13 +189,17 @@ func editRun(ctx context.Context, opts *EditOptions) error {
 			"hasIssuesEnabled",
 			"hasProjectsEnabled",
 			"hasWikiEnabled",
+			// TODO: GitHub Enterprise Server does not support has_discussions yet
+			// "hasDiscussionsEnabled",
 			"homepageUrl",
 			"isInOrganization",
 			"isTemplate",
 			"mergeCommitAllowed",
 			"rebaseMergeAllowed",
 			"repositoryTopics",
+			"stargazerCount",
 			"squashMergeAllowed",
+			"watchers",
 		}
 		if repoFeatures.VisibilityField {
 			fieldsToRetrieve = append(fieldsToRetrieve, "visibility")
@@ -275,6 +287,8 @@ func interactiveChoice(r *api.Repository) ([]string, error) {
 		optionIssues,
 		optionMergeOptions,
 		optionProjects,
+		// TODO: GitHub Enterprise Server does not support has_discussions yet
+		// optionDiscussions,
 		optionTemplateRepo,
 		optionTopics,
 		optionVisibility,
@@ -385,16 +399,35 @@ func interactiveRepoEdit(opts *EditOptions, r *api.Repository) error {
 			if err != nil {
 				return err
 			}
-		case optionVisibility:
-			opts.Edits.Visibility = &r.Visibility
+		case optionDiscussions:
+			opts.Edits.EnableDiscussions = &r.HasDiscussionsEnabled
 			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err = prompt.SurveyAskOne(&survey.Select{
-				Message: "Visibility",
-				Options: []string{"public", "private", "internal"},
-				Default: strings.ToLower(r.Visibility),
-			}, opts.Edits.Visibility)
+			err = prompt.SurveyAskOne(&survey.Confirm{
+				Message: "Enable Discussions?",
+				Default: r.HasDiscussionsEnabled,
+			}, opts.Edits.EnableDiscussions)
 			if err != nil {
 				return err
+			}
+		case optionVisibility:
+			opts.Edits.Visibility = &r.Visibility
+			visibilityOptions := []string{"public", "private", "internal"}
+			selected, err := opts.Prompter.Select("Visibility", strings.ToLower(r.Visibility), visibilityOptions)
+			if err != nil {
+				return err
+			}
+			confirmed := true
+			if visibilityOptions[selected] == "private" &&
+				(r.StargazerCount > 0 || r.Watchers.TotalCount > 0) {
+				cs := opts.IO.ColorScheme()
+				fmt.Fprintf(opts.IO.ErrOut, "%s Changing the repository visibility to private will cause permanent loss of stars and watchers.\n", cs.WarningIcon())
+				confirmed, err = opts.Prompter.Confirm("Do you want to change visibility to private?", false)
+				if err != nil {
+					return err
+				}
+			}
+			if confirmed {
+				opts.Edits.Visibility = &visibilityOptions[selected]
 			}
 		case optionMergeOptions:
 			var defaultMergeOptions []string

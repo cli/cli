@@ -20,6 +20,10 @@ import (
 
 var remoteRE = regexp.MustCompile(`(.+)\s+(.+)\s+\((push|fetch)\)`)
 
+type errWithExitCode interface {
+	ExitCode() int
+}
+
 type Client struct {
 	GhPath  string
 	RepoDir string
@@ -390,7 +394,10 @@ func (c *Client) revParse(ctx context.Context, args ...string) ([]byte, error) {
 // Below are commands that make network calls and need authentication credentials supplied from gh.
 
 func (c *Client) Fetch(ctx context.Context, remote string, refspec string, mods ...CommandModifier) error {
-	args := []string{"fetch", remote, refspec}
+	args := []string{"fetch", remote}
+	if refspec != "" {
+		args = append(args, refspec)
+	}
 	cmd, err := c.AuthenticatedCommand(ctx, args...)
 	if err != nil {
 		return err
@@ -458,8 +465,8 @@ func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBra
 	for _, branch := range trackingBranches {
 		args = append(args, "-t", branch)
 	}
-	args = append(args, "-f", name, urlStr)
-	cmd, err := c.AuthenticatedCommand(ctx, args...)
+	args = append(args, name, urlStr)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -489,21 +496,16 @@ func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBra
 	return remote, nil
 }
 
-func (c *Client) InGitDirectory(ctx context.Context) bool {
-	showCmd, err := c.Command(ctx, "rev-parse", "--is-inside-work-tree")
+func (c *Client) IsLocalGitRepo(ctx context.Context) (bool, error) {
+	_, err := c.GitDir(ctx)
 	if err != nil {
-		return false
+		var execError errWithExitCode
+		if errors.As(err, &execError) && execError.ExitCode() == 128 {
+			return false, nil
+		}
+		return false, err
 	}
-	out, err := showCmd.Output()
-	if err != nil {
-		return false
-	}
-
-	split := strings.Split(string(out), "\n")
-	if len(split) > 0 {
-		return split[0] == "true"
-	}
-	return false
+	return true, nil
 }
 
 func (c *Client) UnsetRemoteResolution(ctx context.Context, name string) error {
