@@ -83,6 +83,9 @@ var HelpTopics = map[string]map[string]string{
 			"$XDG_CONFIG_HOME/gh" or "$HOME/.config/gh".
 
 			GH_PROMPT_DISABLED: set to any value to disable interactive prompting in the terminal.
+
+			GH_PATH: set the path to the gh executable, useful for when gh can not properly determine
+			its own path such as in the cygwin terminal.
 		`),
 	},
 	"reference": {
