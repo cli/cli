@@ -256,7 +256,9 @@ func addDeprecatedRepoShorthand(cmd *cobra.Command, target *string) error {
 		return fmt.Errorf("error marking `-r` shorthand as deprecated: %w", err)
 	}
 
-	cmd.MarkFlagsMutuallyExclusive("codespace", "repo-deprecated")
+	if cmd.Flag("codespace") != nil {
+		cmd.MarkFlagsMutuallyExclusive("codespace", "repo-deprecated")
+	}
 
 	return nil
 }
