@@ -19,7 +19,7 @@ type CodespaceSelector struct {
 
 var errNoFilteredCodespaces = errors.New("you have no codespaces meeting the filter criteria")
 
-// AddCodespaceSelector add codespace filtering parameters to the give command and returns a CodespaceSelector which applies them
+// AddCodespaceSelector adds codespace filtering parameters to the given command and returns a CodespaceSelector which applies them
 func AddCodespaceSelector(cmd *cobra.Command, api apiClient) *CodespaceSelector {
 	cs := &CodespaceSelector{api: api}
 
@@ -100,6 +100,10 @@ func (cs *CodespaceSelector) fetchCodespaces(ctx context.Context) (codespaces []
 		}
 
 		codespaces = filteredCodespaces
+	}
+
+	if len(codespaces) == 0 {
+		return nil, errNoFilteredCodespaces
 	}
 
 	return codespaces, err
