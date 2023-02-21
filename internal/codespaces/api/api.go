@@ -40,6 +40,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
 	"github.com/opentracing/opentracing-go"
 )
@@ -1082,16 +1083,16 @@ func (a *API) setHeaders(req *http.Request) {
 
 // withRetry takes a generic function that sends an http request and retries
 // only when the returned response has a >=500 status code.
-func (a *API) withRetry(f func() (*http.Response, error)) (resp *http.Response, err error) {
-	for i := 0; i < 5; i++ {
-		resp, err = f()
+func (a *API) withRetry(f func() (*http.Response, error)) (*http.Response, error) {
+	bo := backoff.WithMaxRetries(backoff.NewConstantBackOff(a.retryBackoff), 4)
+	return backoff.RetryWithData(func() (*http.Response, error) {
+		resp, err := f()
 		if err != nil {
-			return nil, err
+			return nil, backoff.Permanent(err)
 		}
 		if resp.StatusCode < 500 {
-			break
+			return resp, backoff.Permanent(err)
 		}
-		time.Sleep(a.retryBackoff * (time.Duration(i) + 1))
-	}
-	return resp, err
+		return nil, errors.New("retry")
+	}, bo)
 }
