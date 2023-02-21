@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -68,20 +68,24 @@ func TestNewCmdUnarchive(t *testing.T) {
 func Test_UnarchiveRun(t *testing.T) {
 	queryResponse := `{ "data": { "repository": { "id": "THE-ID","isArchived": %s} } }`
 	tests := []struct {
-		name       string
-		opts       UnarchiveOptions
-		httpStubs  func(*httpmock.Registry)
-		askStubs   func(*prompt.AskStubber)
-		isTTY      bool
-		wantStdout string
-		wantStderr string
+		name          string
+		opts          UnarchiveOptions
+		httpStubs     func(*httpmock.Registry)
+		prompterStubs func(*prompter.PrompterMock)
+		isTTY         bool
+		wantStdout    string
+		wantStderr    string
 	}{
 		{
 			name:       "archived repo tty",
 			wantStdout: "✓ Unarchived repository OWNER/REPO\n",
-			askStubs: func(q *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
-				q.StubOne(true)
+			prompterStubs: func(pm *prompter.PrompterMock) {
+				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
+					if p == "Unarchive OWNER/REPO?" {
+						return true, nil
+					}
+					return false, prompter.NoSuchPromptErr(p)
+				}
 			},
 			isTTY: true,
 			opts:  UnarchiveOptions{RepoArg: "OWNER/REPO"},
@@ -98,9 +102,13 @@ func Test_UnarchiveRun(t *testing.T) {
 			name:       "infer base repo",
 			wantStdout: "✓ Unarchived repository OWNER/REPO\n",
 			opts:       UnarchiveOptions{},
-			askStubs: func(q *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
-				q.StubOne(true)
+			prompterStubs: func(pm *prompter.PrompterMock) {
+				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
+					if p == "Unarchive OWNER/REPO?" {
+						return true, nil
+					}
+					return false, prompter.NoSuchPromptErr(p)
+				}
 			},
 			isTTY: true,
 			httpStubs: func(reg *httpmock.Registry) {
@@ -140,12 +148,11 @@ func Test_UnarchiveRun(t *testing.T) {
 		ios, _, stdout, stderr := iostreams.Test()
 		tt.opts.IO = ios
 
-		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-		q, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(q)
+		pm := &prompter.PrompterMock{}
+		if tt.prompterStubs != nil {
+			tt.prompterStubs(pm)
 		}
+		tt.opts.Prompter = pm
 
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)
