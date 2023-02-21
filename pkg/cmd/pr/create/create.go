@@ -746,21 +746,20 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 			defer w.Flush()
 			gitClient := ctx.GitClient
 			ref := fmt.Sprintf("HEAD:%s", ctx.HeadBranch)
-			bo := backoff.WithMaxRetries(backoff.NewConstantBackOff(2*time.Second), 2)
+			bo := backoff.NewConstantBackOff(2 * time.Second)
+			ctx := context.Background()
 			return backoff.Retry(func() error {
-				err := gitClient.Push(context.Background(), headRemote.Name, ref, git.WithStderr(w))
+				err := gitClient.Push(ctx, headRemote.Name, ref, git.WithStderr(w))
 				if err != nil {
 					// Only retry if we have forked the repo else the push should succeed the first time.
 					if didForkRepo {
-						if bo.NextBackOff() != backoff.Stop {
-							fmt.Fprintf(opts.IO.ErrOut, "waiting 2 seconds before retrying...\n")
-						}
+						fmt.Fprintf(opts.IO.ErrOut, "waiting 2 seconds before retrying...\n")
 						return err
 					}
 					return backoff.Permanent(err)
 				}
 				return nil
-			}, bo)
+			}, backoff.WithContext(backoff.WithMaxRetries(bo, 3), ctx))
 		}
 
 		err := pushBranch()

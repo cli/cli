@@ -60,14 +60,15 @@ func ConnectToLiveshare(ctx context.Context, progress progressIndicator, session
 		if err != nil {
 			return backoff.Permanent(fmt.Errorf("error getting codespace: %w", err))
 		}
-		return fmt.Errorf("codespace not ready yet")
+		return errors.New("codespace not ready yet")
 	}, ctxBackoff)
 
 	if err != nil {
-		if ctxBackoff.NextBackOff() == backoff.Stop {
-			return nil, errors.New("timed out while waiting for the codespace to start")
+		var permErr *backoff.PermanentError
+		if errors.As(err, &permErr) {
+			return nil, err
 		}
-		return nil, err
+		return nil, errors.New("timed out while waiting for the codespace to start")
 	}
 
 	progress.StartProgressIndicatorWithLabel("Connecting to codespace")

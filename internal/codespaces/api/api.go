@@ -1084,7 +1084,7 @@ func (a *API) setHeaders(req *http.Request) {
 // withRetry takes a generic function that sends an http request and retries
 // only when the returned response has a >=500 status code.
 func (a *API) withRetry(f func() (*http.Response, error)) (*http.Response, error) {
-	bo := backoff.WithMaxRetries(backoff.NewConstantBackOff(a.retryBackoff), 4)
+	bo := backoff.NewConstantBackOff(a.retryBackoff)
 	return backoff.RetryWithData(func() (*http.Response, error) {
 		resp, err := f()
 		if err != nil {
@@ -1094,5 +1094,5 @@ func (a *API) withRetry(f func() (*http.Response, error)) (*http.Response, error
 			return resp, backoff.Permanent(err)
 		}
 		return nil, errors.New("retry")
-	}, bo)
+	}, backoff.WithMaxRetries(bo, 3))
 }
