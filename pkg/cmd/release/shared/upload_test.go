@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"testing"
-	"time"
 )
 
 func Test_typeForFilename(t *testing.T) {
@@ -77,7 +76,7 @@ func Test_typeForFilename(t *testing.T) {
 }
 
 func Test_uploadWithDelete_retry(t *testing.T) {
-	retryInterval = time.Millisecond
+	retryInterval = 0
 	ctx := context.Background()
 
 	tries := 0

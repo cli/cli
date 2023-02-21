@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
 	"golang.org/x/sync/errgroup"
 )
@@ -117,10 +118,6 @@ func ConcurrentUpload(httpClient httpDoer, uploadURL string, numWorkers int, ass
 	return g.Wait()
 }
 
-var retryInterval = time.Millisecond * 200
-
-const maxRetries = 3
-
 func shouldRetry(err error) bool {
 	var networkError errNetwork
 	if errors.As(err, &networkError) {
@@ -130,26 +127,23 @@ func shouldRetry(err error) bool {
 	return errors.As(err, &httpError) && httpError.StatusCode >= 500
 }
 
+// Allow injecting backoff interval in tests.
+var retryInterval = time.Millisecond * 200
+
 func uploadWithDelete(ctx context.Context, httpClient httpDoer, uploadURL string, a AssetForUpload) error {
 	if a.ExistingURL != "" {
 		if err := deleteAsset(ctx, httpClient, a.ExistingURL); err != nil {
 			return err
 		}
 	}
-
-	retries := 0
-	for {
+	bo := backoff.NewConstantBackOff(retryInterval)
+	return backoff.Retry(func() error {
 		_, err := uploadAsset(ctx, httpClient, uploadURL, a)
-		if err == nil || retries == maxRetries || !shouldRetry(err) {
+		if err == nil || shouldRetry(err) {
 			return err
 		}
-		retries++
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(time.Duration(retries) * retryInterval):
-		}
-	}
+		return backoff.Permanent(err)
+	}, backoff.WithContext(backoff.WithMaxRetries(bo, 3), ctx))
 }
 
 func uploadAsset(ctx context.Context, httpClient httpDoer, uploadURL string, asset AssetForUpload) (*ReleaseAsset, error) {
