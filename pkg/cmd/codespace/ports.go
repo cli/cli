@@ -29,30 +29,33 @@ const (
 // newPortsCmd returns a Cobra "ports" command that displays a table of available ports,
 // according to the specified flags.
 func newPortsCmd(app *App) *cobra.Command {
-	var codespace string
-	var exporter cmdutil.Exporter
+	var (
+		selector *CodespaceSelector
+		exporter cmdutil.Exporter
+	)
 
 	portsCmd := &cobra.Command{
 		Use:   "ports",
 		Short: "List ports in a codespace",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.ListPorts(cmd.Context(), codespace, exporter)
+			return app.ListPorts(cmd.Context(), selector, exporter)
 		},
 	}
 
-	portsCmd.PersistentFlags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
+	selector = AddCodespaceSelector(portsCmd, app.apiClient)
+
 	cmdutil.AddJSONFlags(portsCmd, &exporter, portFields)
 
-	portsCmd.AddCommand(newPortsForwardCmd(app))
-	portsCmd.AddCommand(newPortsVisibilityCmd(app))
+	portsCmd.AddCommand(newPortsForwardCmd(app, selector))
+	portsCmd.AddCommand(newPortsVisibilityCmd(app, selector))
 
 	return portsCmd
 }
 
 // ListPorts lists known ports in a codespace.
-func (a *App) ListPorts(ctx context.Context, codespaceName string, exporter cmdutil.Exporter) (err error) {
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
+func (a *App) ListPorts(ctx context.Context, selector *CodespaceSelector, exporter cmdutil.Exporter) (err error) {
+	codespace, err := selector.Select(ctx)
 	if err != nil {
 		return err
 	}
@@ -218,21 +221,14 @@ func getDevContainer(ctx context.Context, apiClient apiClient, codespace *api.Co
 	return ch
 }
 
-func newPortsVisibilityCmd(app *App) *cobra.Command {
+func newPortsVisibilityCmd(app *App, selector *CodespaceSelector) *cobra.Command {
 	return &cobra.Command{
 		Use:     "visibility <port>:{public|private|org}...",
 		Short:   "Change the visibility of the forwarded port",
 		Example: "gh codespace ports visibility 80:org 3000:private 8000:public",
 		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			codespace, err := cmd.Flags().GetString("codespace")
-			if err != nil {
-				// should only happen if flag is not defined
-				// or if the flag is not of string type
-				// since it's a persistent flag that we control it should never happen
-				return fmt.Errorf("get codespace flag: %w", err)
-			}
-			return app.UpdatePortVisibility(cmd.Context(), codespace, args)
+			return app.UpdatePortVisibility(cmd.Context(), selector, args)
 		},
 	}
 }
@@ -261,13 +257,13 @@ func (e *ErrUpdatingPortVisibility) Unwrap() error {
 
 var errUpdatePortVisibilityForbidden = errors.New("organization admin has forbidden this privacy setting")
 
-func (a *App) UpdatePortVisibility(ctx context.Context, codespaceName string, args []string) (err error) {
+func (a *App) UpdatePortVisibility(ctx context.Context, selector *CodespaceSelector, args []string) (err error) {
 	ports, err := a.parsePortVisibilities(args)
 	if err != nil {
 		return fmt.Errorf("error parsing port arguments: %w", err)
 	}
 
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
+	codespace, err := selector.Select(ctx)
 	if err != nil {
 		return err
 	}
@@ -347,32 +343,24 @@ func (a *App) parsePortVisibilities(args []string) ([]portVisibility, error) {
 
 // NewPortsForwardCmd returns a Cobra "ports forward" subcommand, which forwards a set of
 // port pairs from the codespace to localhost.
-func newPortsForwardCmd(app *App) *cobra.Command {
+func newPortsForwardCmd(app *App, selector *CodespaceSelector) *cobra.Command {
 	return &cobra.Command{
 		Use:   "forward <remote-port>:<local-port>...",
 		Short: "Forward ports",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			codespace, err := cmd.Flags().GetString("codespace")
-			if err != nil {
-				// should only happen if flag is not defined
-				// or if the flag is not of string type
-				// since it's a persistent flag that we control it should never happen
-				return fmt.Errorf("get codespace flag: %w", err)
-			}
-
-			return app.ForwardPorts(cmd.Context(), codespace, args)
+			return app.ForwardPorts(cmd.Context(), selector, args)
 		},
 	}
 }
 
-func (a *App) ForwardPorts(ctx context.Context, codespaceName string, ports []string) (err error) {
+func (a *App) ForwardPorts(ctx context.Context, selector *CodespaceSelector, ports []string) (err error) {
 	portPairs, err := getPortPairs(ports)
 	if err != nil {
 		return fmt.Errorf("get port pairs: %w", err)
 	}
 
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
+	codespace, err := selector.Select(ctx)
 	if err != nil {
 		return err
 	}
