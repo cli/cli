@@ -1338,7 +1338,7 @@ func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, 
 // MapReposToIDs retrieves a set of IDs for the given set of repositories.
 // This is similar logic to RepoNetwork, but only fetches databaseId and does not
 // discover parent repositories.
-func MapReposToIDs(client *Client, host string, repositories []ghrepo.Interface) ([]int64, error) {
+func GetRepoIDs(client *Client, host string, repositories []ghrepo.Interface) ([]int64, error) {
 	queries := make([]string, 0, len(repositories))
 	for i, repo := range repositories {
 		queries = append(queries, fmt.Sprintf(`

@@ -55,7 +55,7 @@ func setVariable(client *api.Client, host string, opts setOptions) setResult {
 		}
 	case shared.Environment:
 		var ids []int64
-		ids, err = api.MapReposToIDs(client, opts.Repository.RepoHost(), []ghrepo.Interface{opts.Repository})
+		ids, err = api.GetRepoIDs(client, opts.Repository.RepoHost(), []ghrepo.Interface{opts.Repository})
 		if err != nil || len(ids) != 1 {
 			err = fmt.Errorf("failed to look up repository %s: %w", ghrepo.FullName(opts.Repository), err)
 			break

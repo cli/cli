@@ -309,7 +309,7 @@ func getRepoIds(client *api.Client, host, owner string, repositoryNames []string
 	if len(repos) == 0 {
 		return nil, fmt.Errorf("resetting repositories selected to zero is not supported")
 	}
-	repositoryIDs, err := api.MapReposToIDs(client, host, repos)
+	repositoryIDs, err := api.GetRepoIDs(client, host, repos)
 	if err != nil {
 		return nil, fmt.Errorf("failed to look up IDs for repositories %v: %w", repositoryNames, err)
 	}
