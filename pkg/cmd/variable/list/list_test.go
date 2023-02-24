@@ -168,7 +168,7 @@ func Test_listRun(t *testing.T) {
 
 			path := "repos/owner/repo/actions/variables"
 			if tt.opts.EnvName != "" {
-				path = fmt.Sprintf("repos/owner/repo/environments/%s/variables", tt.opts.EnvName)
+				path = fmt.Sprintf("repositories/owner/repo/environments/%s/variables", tt.opts.EnvName)
 			}
 
 			t0, _ := time.Parse("2006-01-02", "1988-10-11")

@@ -205,7 +205,7 @@ func getOrgVariables(client httpClient, host, orgName string, showSelectedRepoIn
 }
 
 func getEnvVariables(client httpClient, repo ghrepo.Interface, envName string) ([]*Variable, error) {
-	path := fmt.Sprintf("repos/%s/environments/%s/variables", ghrepo.FullName(repo), envName)
+	path := fmt.Sprintf("repositories/%s/environments/%s/variables", ghrepo.FullName(repo), envName)
 	return getVariables(client, repo.RepoHost(), path)
 }
 
