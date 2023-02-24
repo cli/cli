@@ -132,7 +132,7 @@ func Test_removeRun_env(t *testing.T) {
 	reg := &httpmock.Registry{}
 
 	reg.Register(
-		httpmock.REST("DELETE", "repos/owner/repo/environments/development/variables/cool_variable"),
+		httpmock.REST("DELETE", "repositories/owner/repo/environments/development/variables/cool_variable"),
 		httpmock.StatusStringResponse(204, "No Content"))
 
 	ios, _, _, _ := iostreams.Test()
