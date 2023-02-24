@@ -71,12 +71,14 @@ func Test_BaseRepo(t *testing.T) {
 				},
 				getConfig: func() (config.Config, error) {
 					cfg := &config.ConfigMock{}
-					cfg.HostsFunc = func() []string {
+					cfg.AuthenticationFunc = func() *config.AuthConfig {
+						authCfg := &config.AuthConfig{}
 						hosts := []string{"nonsense.com"}
 						if tt.override != "" {
 							hosts = append([]string{tt.override}, hosts...)
 						}
-						return hosts
+						authCfg.SetHosts(hosts)
+						return authCfg
 					}
 					cfg.DefaultHostFunc = func() (string, string) {
 						if tt.override != "" {
@@ -214,12 +216,14 @@ func Test_SmartBaseRepo(t *testing.T) {
 					cfg.AuthTokenFunc = func(_ string) (string, string) {
 						return "", ""
 					}
-					cfg.HostsFunc = func() []string {
+					cfg.AuthenticationFunc = func() *config.AuthConfig {
+						authCfg := &config.AuthConfig{}
 						hosts := []string{"nonsense.com"}
 						if tt.override != "" {
 							hosts = append([]string{tt.override}, hosts...)
 						}
-						return hosts
+						authCfg.SetHosts(hosts)
+						return authCfg
 					}
 					cfg.DefaultHostFunc = func() (string, string) {
 						if tt.override != "" {

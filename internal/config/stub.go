@@ -34,10 +34,6 @@ func NewFromString(cfgStr string) *ConfigMock {
 	c := ghConfig.ReadFromString(cfgStr)
 	cfg := cfg{c}
 	mock := &ConfigMock{}
-	mock.AuthTokenFunc = func(host string) (string, string) {
-		token, _ := c.Get([]string{"hosts", host, "oauth_token"})
-		return token, "oauth_token"
-	}
 	mock.GetFunc = func(host, key string) (string, error) {
 		return cfg.Get(host, key)
 	}
@@ -47,21 +43,35 @@ func NewFromString(cfgStr string) *ConfigMock {
 	mock.SetFunc = func(host, key, value string) {
 		cfg.Set(host, key, value)
 	}
-	mock.UnsetHostFunc = func(host string) {
-		cfg.UnsetHost(host)
-	}
-	mock.HostsFunc = func() []string {
-		keys, _ := c.Keys([]string{"hosts"})
-		return keys
-	}
-	mock.DefaultHostFunc = func() (string, string) {
-		return "github.com", "default"
+	mock.WriteFunc = func() error {
+		return cfg.Write()
 	}
 	mock.AliasesFunc = func() *AliasConfig {
 		return &AliasConfig{cfg: c}
 	}
-	mock.WriteFunc = func() error {
-		return cfg.Write()
+	mock.AuthenticationFunc = func() *AuthConfig {
+		return &AuthConfig{
+			cfg: c,
+			hostsOverride: func() []string {
+				keys, _ := c.Keys([]string{"hosts"})
+				return keys
+			},
+			tokenOverride: func(hostname string) (string, string) {
+				token, _ := c.Get([]string{hosts, hostname, oauthToken})
+				return token, "oauth_token"
+			},
+		}
+	}
+	// This is deprecated and will be removed, do not use!
+	// Please use cfg.Authentication().Token()
+	mock.AuthTokenFunc = func(host string) (string, string) {
+		token, _ := c.Get([]string{"hosts", host, "oauth_token"})
+		return token, "oauth_token"
+	}
+	// This is deprecated and will be removed, do not use!
+	// Please use cfg.Authentication().DefaultHost()
+	mock.DefaultHostFunc = func() (string, string) {
+		return "github.com", "default"
 	}
 	return mock
 }

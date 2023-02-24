@@ -10,6 +10,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/authflow"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmd/ssh-key/add"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -19,9 +20,7 @@ import (
 const defaultSSHKeyTitle = "GitHub CLI"
 
 type iconfig interface {
-	Get(string, string) (string, error)
-	Set(string, string, string)
-	Write() error
+	Login(string, string, string, string, bool) error
 }
 
 type LoginOptions struct {
@@ -36,6 +35,7 @@ type LoginOptions struct {
 	Executable  string
 	GitProtocol string
 	Prompter    Prompt
+	Browser     browser.Browser
 
 	sshContext ssh.Context
 }
@@ -145,16 +145,15 @@ func Login(opts *LoginOptions) error {
 	}
 
 	var authToken string
-	userValidated := false
+	var username string
 
 	if authMode == 0 {
 		var err error
-		authToken, err = authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", append(opts.Scopes, additionalScopes...), opts.Interactive)
+		authToken, username, err = authflow.AuthFlow(hostname, opts.IO, "", append(opts.Scopes, additionalScopes...), opts.Interactive, opts.Browser)
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
 		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
-		userValidated = true
 	} else {
 		minimumScopes := append([]string{"repo", "read:org"}, additionalScopes...)
 		fmt.Fprint(opts.IO.ErrOut, heredoc.Docf(`
@@ -162,7 +161,8 @@ func Login(opts *LoginOptions) error {
 			The minimum required scopes are %s.
 		`, hostname, scopesSentence(minimumScopes, ghinstance.IsEnterprise(hostname))))
 
-		authToken, err := opts.Prompter.AuthToken()
+		var err error
+		authToken, err = opts.Prompter.AuthToken()
 		if err != nil {
 			return err
 		}
@@ -170,32 +170,23 @@ func Login(opts *LoginOptions) error {
 		if err := HasMinimumScopes(httpClient, hostname, authToken); err != nil {
 			return fmt.Errorf("error validating token: %w", err)
 		}
-
-		cfg.Set(hostname, "oauth_token", authToken)
 	}
 
-	var username string
-	if userValidated {
-		username, _ = cfg.Get(hostname, "user")
-	} else {
+	if username == "" {
 		apiClient := api.NewClientFromHTTP(httpClient)
 		var err error
 		username, err = api.CurrentLoginName(apiClient, hostname)
 		if err != nil {
 			return fmt.Errorf("error using api: %w", err)
 		}
-
-		cfg.Set(hostname, "user", username)
 	}
 
 	if gitProtocol != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "- gh config set -h %s git_protocol %s\n", hostname, gitProtocol)
-		cfg.Set(hostname, "git_protocol", gitProtocol)
 		fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", cs.SuccessIcon())
 	}
 
-	err := cfg.Write()
-	if err != nil {
+	if err := cfg.Login(hostname, username, authToken, gitProtocol, false); err != nil {
 		return err
 	}
 

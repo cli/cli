@@ -9,23 +9,29 @@ import (
 )
 
 const (
-	hosts   = "hosts"
-	aliases = "aliases"
+	aliases    = "aliases"
+	hosts      = "hosts"
+	oauthToken = "oauth_token"
 )
 
 // This interface describes interacting with some persistent configuration for gh.
 //
 //go:generate moq -rm -out config_mock.go . Config
 type Config interface {
-	AuthToken(string) (string, string)
 	Get(string, string) (string, error)
 	GetOrDefault(string, string) (string, error)
 	Set(string, string, string)
-	UnsetHost(string)
-	Hosts() []string
-	DefaultHost() (string, string)
-	Aliases() *AliasConfig
 	Write() error
+
+	Aliases() *AliasConfig
+	Authentication() *AuthConfig
+
+	// This is deprecated and will be removed, do not use!
+	// Please use cfg.Authentication().Token()
+	AuthToken(string) (string, string)
+	// This is deprecated and will be removed, do not use!
+	// Please use cfg.Authentication().DefaultHost()
+	DefaultHost() (string, string)
 }
 
 func NewConfig() (Config, error) {
@@ -39,10 +45,6 @@ func NewConfig() (Config, error) {
 // Implements Config interface
 type cfg struct {
 	cfg *ghConfig.Config
-}
-
-func (c *cfg) AuthToken(hostname string) (string, string) {
-	return ghAuth.TokenForHost(hostname)
 }
 
 func (c *cfg) Get(hostname, key string) (string, error) {
@@ -86,27 +88,26 @@ func (c *cfg) Set(hostname, key, value string) {
 	c.cfg.Set([]string{hosts, hostname, key}, value)
 }
 
-func (c *cfg) UnsetHost(hostname string) {
-	if hostname == "" {
-		return
-	}
-	_ = c.cfg.Remove([]string{hosts, hostname})
-}
-
-func (c *cfg) Hosts() []string {
-	return ghAuth.KnownHosts()
-}
-
-func (c *cfg) DefaultHost() (string, string) {
-	return ghAuth.DefaultHost()
+func (c *cfg) Write() error {
+	return ghConfig.Write(c.cfg)
 }
 
 func (c *cfg) Aliases() *AliasConfig {
 	return &AliasConfig{cfg: c.cfg}
 }
 
-func (c *cfg) Write() error {
-	return ghConfig.Write(c.cfg)
+func (c *cfg) Authentication() *AuthConfig {
+	return &AuthConfig{cfg: c.cfg}
+}
+
+// This is deprecated and will be removed, do not use.
+func (c *cfg) AuthToken(hostname string) (string, string) {
+	return c.Authentication().Token(hostname)
+}
+
+// This is deprecated and will be removed, do not use.
+func (c *cfg) DefaultHost() (string, string) {
+	return c.Authentication().DefaultHost()
 }
 
 func defaultFor(key string) string {
@@ -125,6 +126,94 @@ func defaultExists(key string) bool {
 		}
 	}
 	return false
+}
+
+// AuthConfig is used for interacting with some persistent configuration for gh,
+// with knowledge on how to access encrypted storage when neccesarry.
+// Behavior is scoped to authentication specific tasks.
+type AuthConfig struct {
+	cfg           *ghConfig.Config
+	hostsOverride func() []string
+	tokenOverride func(string) (string, string)
+}
+
+// Token will retrieve the auth token for the given hostname,
+// searching environment variables, plain text config, and
+// lastly encypted storage.
+func (c *AuthConfig) Token(hostname string) (string, string) {
+	if c.tokenOverride != nil {
+		return c.tokenOverride(hostname)
+	}
+	return ghAuth.TokenForHost(hostname)
+}
+
+// SetToken will override any token resolution and return the given
+// token and source for all calls to Token. Use for testing purposes only.
+func (c *AuthConfig) SetToken(token, source string) {
+	c.tokenOverride = func(_ string) (string, string) {
+		return token, source
+	}
+}
+
+// User will retrieve the username for the logged in user at the given hostname.
+func (c *AuthConfig) User(hostname string) (string, error) {
+	return c.cfg.Get([]string{hosts, hostname, "user"})
+}
+
+// GitProtocol will retrieve the git protocol for the logged in user at the given hostname.
+// If none is set it will return the default value.
+func (c *AuthConfig) GitProtocol(hostname string) (string, error) {
+	key := "git_protocol"
+	val, err := c.cfg.Get([]string{hosts, hostname, key})
+	if err == nil {
+		return val, err
+	}
+	return defaultFor(key), nil
+}
+
+func (c *AuthConfig) Hosts() []string {
+	if c.hostsOverride != nil {
+		return c.hostsOverride()
+	}
+	return ghAuth.KnownHosts()
+}
+
+// SetHosts will override any hosts resolution and return the given
+// hosts for all calls to Hosts. Use for testing purposes only.
+func (c *AuthConfig) SetHosts(hosts []string) {
+	c.hostsOverride = func() []string {
+		return hosts
+	}
+}
+
+func (c *AuthConfig) DefaultHost() (string, string) {
+	return ghAuth.DefaultHost()
+}
+
+// Login will set user, git protocol, and auth token for the given hostname.
+// If the encrypt option is specified it will first try to store the auth token
+// in encrypted storage and will fall back to the plain text config file.
+func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, encrypt bool) error {
+	if token != "" {
+		c.cfg.Set([]string{hosts, hostname, oauthToken}, token)
+	}
+	if username != "" {
+		c.cfg.Set([]string{hosts, hostname, "user"}, username)
+	}
+	if gitProtocol != "" {
+		c.cfg.Set([]string{hosts, hostname, "git_protocol"}, gitProtocol)
+	}
+	return ghConfig.Write(c.cfg)
+}
+
+// Logout will remove user, git protocol, and auth token for the given hostname.
+// It will remove the auth token from the encrypted storage if it exists there.
+func (c *AuthConfig) Logout(hostname string) error {
+	if hostname == "" {
+		return nil
+	}
+	_ = c.cfg.Remove([]string{hosts, hostname})
+	return ghConfig.Write(c.cfg)
 }
 
 type AliasConfig struct {
