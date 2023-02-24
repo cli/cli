@@ -24,18 +24,19 @@ type iconfig interface {
 }
 
 type LoginOptions struct {
-	IO          *iostreams.IOStreams
-	Config      iconfig
-	HTTPClient  *http.Client
-	GitClient   *git.Client
-	Hostname    string
-	Interactive bool
-	Web         bool
-	Scopes      []string
-	Executable  string
-	GitProtocol string
-	Prompter    Prompt
-	Browser     browser.Browser
+	IO            *iostreams.IOStreams
+	Config        iconfig
+	HTTPClient    *http.Client
+	GitClient     *git.Client
+	Hostname      string
+	Interactive   bool
+	Web           bool
+	Scopes        []string
+	Executable    string
+	GitProtocol   string
+	Prompter      Prompt
+	Browser       browser.Browser
+	SecureStorage bool
 
 	sshContext ssh.Context
 }
@@ -186,7 +187,7 @@ func Login(opts *LoginOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", cs.SuccessIcon())
 	}
 
-	if err := cfg.Login(hostname, username, authToken, gitProtocol, false); err != nil {
+	if err := cfg.Login(hostname, username, authToken, gitProtocol, opts.SecureStorage); err != nil {
 		return err
 	}
 

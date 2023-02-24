@@ -30,11 +30,12 @@ type LoginOptions struct {
 
 	Interactive bool
 
-	Hostname    string
-	Scopes      []string
-	Token       string
-	Web         bool
-	GitProtocol string
+	Hostname      string
+	Scopes        []string
+	Token         string
+	Web           bool
+	GitProtocol   string
+	SecureStorage bool
 }
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
@@ -123,6 +124,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	cmd.Flags().BoolVar(&tokenStdin, "with-token", false, "Read token from standard input")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a browser to authenticate")
 	cmdutil.StringEnumFlag(cmd, &opts.GitProtocol, "git-protocol", "p", "", []string{"ssh", "https"}, "The protocol to use for git operations")
+	cmd.Flags().BoolVarP(&opts.SecureStorage, "secure-storage", "", false, "Save authentication credentials in secure credential store")
 
 	return cmd
 }
@@ -133,6 +135,11 @@ func loginRun(opts *LoginOptions) error {
 		return err
 	}
 	authCfg := cfg.Authentication()
+
+	if opts.SecureStorage {
+		cs := opts.IO.ColorScheme()
+		fmt.Fprintf(opts.IO.ErrOut, "%s Using secure storage could break installed extensions\n", cs.WarningIcon())
+	}
 
 	hostname := opts.Hostname
 	if opts.Interactive && hostname == "" {
@@ -158,8 +165,8 @@ func loginRun(opts *LoginOptions) error {
 		if err := shared.HasMinimumScopes(httpClient, hostname, opts.Token); err != nil {
 			return fmt.Errorf("error validating token: %w", err)
 		}
-
-		return authCfg.Login(hostname, "", opts.Token, opts.GitProtocol, false)
+		// Adding a user key ensures that a nonempty host section gets written to the config file.
+		return authCfg.Login(hostname, "x-access-token", opts.Token, opts.GitProtocol, opts.SecureStorage)
 	}
 
 	existingToken, _ := authCfg.Token(hostname)
@@ -176,18 +183,19 @@ func loginRun(opts *LoginOptions) error {
 	}
 
 	return shared.Login(&shared.LoginOptions{
-		IO:          opts.IO,
-		Config:      authCfg,
-		HTTPClient:  httpClient,
-		Hostname:    hostname,
-		Interactive: opts.Interactive,
-		Web:         opts.Web,
-		Scopes:      opts.Scopes,
-		Executable:  opts.MainExecutable,
-		GitProtocol: opts.GitProtocol,
-		Prompter:    opts.Prompter,
-		GitClient:   opts.GitClient,
-		Browser:     opts.Browser,
+		IO:            opts.IO,
+		Config:        authCfg,
+		HTTPClient:    httpClient,
+		Hostname:      hostname,
+		Interactive:   opts.Interactive,
+		Web:           opts.Web,
+		Scopes:        opts.Scopes,
+		Executable:    opts.MainExecutable,
+		GitProtocol:   opts.GitProtocol,
+		Prompter:      opts.Prompter,
+		GitClient:     opts.GitClient,
+		Browser:       opts.Browser,
+		SecureStorage: opts.SecureStorage,
 	})
 }
 

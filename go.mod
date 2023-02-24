@@ -9,7 +9,7 @@ require (
 	github.com/cenkalti/backoff/v4 v4.2.0
 	github.com/charmbracelet/glamour v0.5.1-0.20220727184942-e70ff2d969da
 	github.com/charmbracelet/lipgloss v0.5.0
-	github.com/cli/go-gh v1.0.0
+	github.com/cli/go-gh v1.2.0
 	github.com/cli/oauth v1.0.1
 	github.com/cli/safeexec v1.0.1
 	github.com/cpuguy83/go-md2man/v2 v2.0.2
@@ -35,6 +35,7 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.5
+	github.com/zalando/go-keyring v0.2.2
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/sync v0.1.0
 	golang.org/x/term v0.5.0
@@ -46,13 +47,16 @@ require (
 
 require (
 	github.com/alecthomas/chroma v0.10.0 // indirect
+	github.com/alessio/shellescape v1.4.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/cli/browser v1.1.0 // indirect
 	github.com/cli/shurcooL-graphql v0.0.2 // indirect
+	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dlclark/regexp2 v1.4.0 // indirect
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/gdamore/encoding v1.0.0 // indirect
+	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
