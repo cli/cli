@@ -20,9 +20,6 @@ var _ Config = &ConfigMock{}
 //			AliasesFunc: func() *AliasConfig {
 //				panic("mock out the Aliases method")
 //			},
-//			AuthTokenFunc: func(s string) (string, string) {
-//				panic("mock out the AuthToken method")
-//			},
 //			AuthenticationFunc: func() *AuthConfig {
 //				panic("mock out the Authentication method")
 //			},
@@ -51,9 +48,6 @@ type ConfigMock struct {
 	// AliasesFunc mocks the Aliases method.
 	AliasesFunc func() *AliasConfig
 
-	// AuthTokenFunc mocks the AuthToken method.
-	AuthTokenFunc func(s string) (string, string)
-
 	// AuthenticationFunc mocks the Authentication method.
 	AuthenticationFunc func() *AuthConfig
 
@@ -76,11 +70,6 @@ type ConfigMock struct {
 	calls struct {
 		// Aliases holds details about calls to the Aliases method.
 		Aliases []struct {
-		}
-		// AuthToken holds details about calls to the AuthToken method.
-		AuthToken []struct {
-			// S is the s argument value.
-			S string
 		}
 		// Authentication holds details about calls to the Authentication method.
 		Authentication []struct {
@@ -116,7 +105,6 @@ type ConfigMock struct {
 		}
 	}
 	lockAliases        sync.RWMutex
-	lockAuthToken      sync.RWMutex
 	lockAuthentication sync.RWMutex
 	lockDefaultHost    sync.RWMutex
 	lockGet            sync.RWMutex
@@ -149,38 +137,6 @@ func (mock *ConfigMock) AliasesCalls() []struct {
 	mock.lockAliases.RLock()
 	calls = mock.calls.Aliases
 	mock.lockAliases.RUnlock()
-	return calls
-}
-
-// AuthToken calls AuthTokenFunc.
-func (mock *ConfigMock) AuthToken(s string) (string, string) {
-	if mock.AuthTokenFunc == nil {
-		panic("ConfigMock.AuthTokenFunc: method is nil but Config.AuthToken was just called")
-	}
-	callInfo := struct {
-		S string
-	}{
-		S: s,
-	}
-	mock.lockAuthToken.Lock()
-	mock.calls.AuthToken = append(mock.calls.AuthToken, callInfo)
-	mock.lockAuthToken.Unlock()
-	return mock.AuthTokenFunc(s)
-}
-
-// AuthTokenCalls gets all the calls that were made to AuthToken.
-// Check the length with:
-//
-//	len(mockedConfig.AuthTokenCalls())
-func (mock *ConfigMock) AuthTokenCalls() []struct {
-	S string
-} {
-	var calls []struct {
-		S string
-	}
-	mock.lockAuthToken.RLock()
-	calls = mock.calls.AuthToken
-	mock.lockAuthToken.RUnlock()
 	return calls
 }
 

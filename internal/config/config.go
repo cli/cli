@@ -28,9 +28,6 @@ type Config interface {
 	Authentication() *AuthConfig
 
 	// This is deprecated and will be removed, do not use!
-	// Please use cfg.Authentication().Token()
-	AuthToken(string) (string, string)
-	// This is deprecated and will be removed, do not use!
 	// Please use cfg.Authentication().DefaultHost()
 	DefaultHost() (string, string)
 }
@@ -99,11 +96,6 @@ func (c *cfg) Aliases() *AliasConfig {
 
 func (c *cfg) Authentication() *AuthConfig {
 	return &AuthConfig{cfg: c.cfg}
-}
-
-// This is deprecated and will be removed, do not use.
-func (c *cfg) AuthToken(hostname string) (string, string) {
-	return c.Authentication().Token(hostname)
 }
 
 // This is deprecated and will be removed, do not use.

@@ -63,12 +63,6 @@ func NewFromString(cfgStr string) *ConfigMock {
 		}
 	}
 	// This is deprecated and will be removed, do not use!
-	// Please use cfg.Authentication().Token()
-	mock.AuthTokenFunc = func(host string) (string, string) {
-		token, _ := c.Get([]string{"hosts", host, "oauth_token"})
-		return token, "oauth_token"
-	}
-	// This is deprecated and will be removed, do not use!
 	// Please use cfg.Authentication().DefaultHost()
 	mock.DefaultHostFunc = func() (string, string) {
 		return "github.com", "default"

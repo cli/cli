@@ -75,13 +75,11 @@ func Test_remoteResolver(t *testing.T) {
 				cfg.AuthenticationFunc = func() *config.AuthConfig {
 					authCfg := &config.AuthConfig{}
 					authCfg.SetHosts([]string{"example.com"})
+					authCfg.SetToken("", "")
 					return authCfg
 				}
 				cfg.DefaultHostFunc = func() (string, string) {
 					return "example.com", "hosts"
-				}
-				cfg.AuthTokenFunc = func(string) (string, string) {
-					return "", ""
 				}
 				return cfg
 			}(),
@@ -165,13 +163,11 @@ func Test_remoteResolver(t *testing.T) {
 				cfg.AuthenticationFunc = func() *config.AuthConfig {
 					authCfg := &config.AuthConfig{}
 					authCfg.SetHosts([]string{"example.com", "github.com"})
+					authCfg.SetToken("", "")
 					return authCfg
 				}
 				cfg.DefaultHostFunc = func() (string, string) {
 					return "github.com", "default"
-				}
-				cfg.AuthTokenFunc = func(string) (string, string) {
-					return "", ""
 				}
 				return cfg
 			}(),

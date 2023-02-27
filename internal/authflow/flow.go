@@ -106,16 +106,16 @@ func AuthFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 }
 
 type cfg struct {
-	authToken string
+	token string
 }
 
-func (c cfg) AuthToken(hostname string) (string, string) {
-	return c.authToken, "oauth_token"
+func (c cfg) Token(hostname string) (string, string) {
+	return c.token, "oauth_token"
 }
 
 func getViewer(hostname, token string, logWriter io.Writer) (string, error) {
 	opts := api.HTTPClientOptions{
-		Config: cfg{authToken: token},
+		Config: cfg{token: token},
 		Log:    logWriter,
 	}
 	client, err := api.NewHTTPClient(opts)
