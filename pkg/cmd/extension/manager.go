@@ -708,7 +708,7 @@ func (m *Manager) goBinScaffolding(name string) error {
 		return err
 	}
 
-	host, _ := m.config.DefaultHost()
+	host, _ := m.config.Authentication().DefaultHost()
 
 	currentUser, err := api.CurrentLoginName(api.NewClientFromHTTP(m.client), host)
 	if err != nil {

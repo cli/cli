@@ -76,7 +76,11 @@ func Test_getExtensionRepos(t *testing.T) {
 	}
 	cfg := config.NewBlankConfig()
 
-	cfg.DefaultHostFunc = func() (string, string) { return "github.com", "" }
+	cfg.AuthenticationFunc = func() *config.AuthConfig {
+		authCfg := &config.AuthConfig{}
+		authCfg.SetDefaultHost("github.com", "")
+		return authCfg
+	}
 
 	reg.Register(
 		httpmock.QueryMatcher("GET", "search/repositories", values),

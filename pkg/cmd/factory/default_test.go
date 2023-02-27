@@ -79,13 +79,11 @@ func Test_BaseRepo(t *testing.T) {
 						}
 						authCfg.SetHosts(hosts)
 						authCfg.SetToken("", "")
-						return authCfg
-					}
-					cfg.DefaultHostFunc = func() (string, string) {
+						authCfg.SetDefaultHost("nonsense.com", "hosts")
 						if tt.override != "" {
-							return tt.override, "GH_HOST"
+							authCfg.SetDefaultHost(tt.override, "GH_HOST")
 						}
-						return "nonsense.com", "hosts"
+						return authCfg
 					}
 					return cfg, nil
 				},
@@ -219,13 +217,11 @@ func Test_SmartBaseRepo(t *testing.T) {
 						}
 						authCfg.SetHosts(hosts)
 						authCfg.SetToken("", "")
-						return authCfg
-					}
-					cfg.DefaultHostFunc = func() (string, string) {
+						authCfg.SetDefaultHost("nonsense.com", "hosts")
 						if tt.override != "" {
-							return tt.override, "GH_HOST"
+							authCfg.SetDefaultHost(tt.override, "GH_HOST")
 						}
-						return "nonsense.com", "hosts"
+						return authCfg
 					}
 					return cfg, nil
 				},

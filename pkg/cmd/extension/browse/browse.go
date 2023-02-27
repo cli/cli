@@ -343,7 +343,7 @@ func getExtensions(opts ExtBrowseOpts) ([]extEntry, error) {
 		return extEntries, fmt.Errorf("failed to search for extensions: %w", err)
 	}
 
-	host, _ := opts.Cfg.DefaultHost()
+	host, _ := opts.Cfg.Authentication().DefaultHost()
 
 	for _, repo := range result.Items {
 		if !strings.HasPrefix(repo.Name, "gh-") {

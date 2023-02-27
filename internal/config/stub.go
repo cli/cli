@@ -52,6 +52,9 @@ func NewFromString(cfgStr string) *ConfigMock {
 	mock.AuthenticationFunc = func() *AuthConfig {
 		return &AuthConfig{
 			cfg: c,
+			defaultHostOverride: func() (string, string) {
+				return "github.com", "default"
+			},
 			hostsOverride: func() []string {
 				keys, _ := c.Keys([]string{"hosts"})
 				return keys
@@ -61,11 +64,6 @@ func NewFromString(cfgStr string) *ConfigMock {
 				return token, "oauth_token"
 			},
 		}
-	}
-	// This is deprecated and will be removed, do not use!
-	// Please use cfg.Authentication().DefaultHost()
-	mock.DefaultHostFunc = func() (string, string) {
-		return "github.com", "default"
 	}
 	return mock
 }

@@ -23,9 +23,6 @@ var _ Config = &ConfigMock{}
 //			AuthenticationFunc: func() *AuthConfig {
 //				panic("mock out the Authentication method")
 //			},
-//			DefaultHostFunc: func() (string, string) {
-//				panic("mock out the DefaultHost method")
-//			},
 //			GetFunc: func(s1 string, s2 string) (string, error) {
 //				panic("mock out the Get method")
 //			},
@@ -51,9 +48,6 @@ type ConfigMock struct {
 	// AuthenticationFunc mocks the Authentication method.
 	AuthenticationFunc func() *AuthConfig
 
-	// DefaultHostFunc mocks the DefaultHost method.
-	DefaultHostFunc func() (string, string)
-
 	// GetFunc mocks the Get method.
 	GetFunc func(s1 string, s2 string) (string, error)
 
@@ -73,9 +67,6 @@ type ConfigMock struct {
 		}
 		// Authentication holds details about calls to the Authentication method.
 		Authentication []struct {
-		}
-		// DefaultHost holds details about calls to the DefaultHost method.
-		DefaultHost []struct {
 		}
 		// Get holds details about calls to the Get method.
 		Get []struct {
@@ -106,7 +97,6 @@ type ConfigMock struct {
 	}
 	lockAliases        sync.RWMutex
 	lockAuthentication sync.RWMutex
-	lockDefaultHost    sync.RWMutex
 	lockGet            sync.RWMutex
 	lockGetOrDefault   sync.RWMutex
 	lockSet            sync.RWMutex
@@ -164,33 +154,6 @@ func (mock *ConfigMock) AuthenticationCalls() []struct {
 	mock.lockAuthentication.RLock()
 	calls = mock.calls.Authentication
 	mock.lockAuthentication.RUnlock()
-	return calls
-}
-
-// DefaultHost calls DefaultHostFunc.
-func (mock *ConfigMock) DefaultHost() (string, string) {
-	if mock.DefaultHostFunc == nil {
-		panic("ConfigMock.DefaultHostFunc: method is nil but Config.DefaultHost was just called")
-	}
-	callInfo := struct {
-	}{}
-	mock.lockDefaultHost.Lock()
-	mock.calls.DefaultHost = append(mock.calls.DefaultHost, callInfo)
-	mock.lockDefaultHost.Unlock()
-	return mock.DefaultHostFunc()
-}
-
-// DefaultHostCalls gets all the calls that were made to DefaultHost.
-// Check the length with:
-//
-//	len(mockedConfig.DefaultHostCalls())
-func (mock *ConfigMock) DefaultHostCalls() []struct {
-} {
-	var calls []struct {
-	}
-	mock.lockDefaultHost.RLock()
-	calls = mock.calls.DefaultHost
-	mock.lockDefaultHost.RUnlock()
 	return calls
 }
 

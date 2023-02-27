@@ -26,10 +26,6 @@ type Config interface {
 
 	Aliases() *AliasConfig
 	Authentication() *AuthConfig
-
-	// This is deprecated and will be removed, do not use!
-	// Please use cfg.Authentication().DefaultHost()
-	DefaultHost() (string, string)
 }
 
 func NewConfig() (Config, error) {
@@ -98,11 +94,6 @@ func (c *cfg) Authentication() *AuthConfig {
 	return &AuthConfig{cfg: c.cfg}
 }
 
-// This is deprecated and will be removed, do not use.
-func (c *cfg) DefaultHost() (string, string) {
-	return c.Authentication().DefaultHost()
-}
-
 func defaultFor(key string) string {
 	for _, co := range configOptions {
 		if co.Key == key {
@@ -125,9 +116,10 @@ func defaultExists(key string) bool {
 // with knowledge on how to access encrypted storage when neccesarry.
 // Behavior is scoped to authentication specific tasks.
 type AuthConfig struct {
-	cfg           *ghConfig.Config
-	hostsOverride func() []string
-	tokenOverride func(string) (string, string)
+	cfg                 *ghConfig.Config
+	defaultHostOverride func() (string, string)
+	hostsOverride       func() []string
+	tokenOverride       func(string) (string, string)
 }
 
 // Token will retrieve the auth token for the given hostname,
@@ -194,7 +186,18 @@ func (c *AuthConfig) SetHosts(hosts []string) {
 }
 
 func (c *AuthConfig) DefaultHost() (string, string) {
+	if c.defaultHostOverride != nil {
+		return c.defaultHostOverride()
+	}
 	return ghAuth.DefaultHost()
+}
+
+// SetDefaultHost will override any host resolution and return the given
+// host and source for all calls to DefaultHost. Use for testing purposes only.
+func (c *AuthConfig) SetDefaultHost(host, source string) {
+	c.defaultHostOverride = func() (string, string) {
+		return host, source
+	}
 }
 
 // Login will set user, git protocol, and auth token for the given hostname.

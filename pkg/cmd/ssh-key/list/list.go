@@ -53,7 +53,7 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	host, _ := cfg.DefaultHost()
+	host, _ := cfg.Authentication().DefaultHost()
 
 	sshKeys, err := userKeys(apiClient, host, "")
 	if err != nil {

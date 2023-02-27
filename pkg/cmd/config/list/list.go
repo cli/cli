@@ -51,7 +51,7 @@ func listRun(opts *ListOptions) error {
 	if opts.Hostname != "" {
 		host = opts.Hostname
 	} else {
-		host, _ = cfg.DefaultHost()
+		host, _ = cfg.Authentication().DefaultHost()
 	}
 
 	configOptions := config.ConfigOptions()
