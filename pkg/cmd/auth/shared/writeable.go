@@ -8,7 +8,7 @@ const (
 	oauthToken = "oauth_token"
 )
 
-func AuthTokenWriteable(cfg config.Config, hostname string) (string, bool) {
-	token, src := cfg.AuthToken(hostname)
+func AuthTokenWriteable(authCfg *config.AuthConfig, hostname string) (string, bool) {
+	token, src := authCfg.Token(hostname)
 	return src, (token == "" || src == oauthToken)
 }

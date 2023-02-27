@@ -23,7 +23,7 @@ func CheckAuth(cfg config.Config) bool {
 		return true
 	}
 
-	if len(cfg.Hosts()) > 0 {
+	if len(cfg.Authentication().Hosts()) > 0 {
 		return true
 	}
 

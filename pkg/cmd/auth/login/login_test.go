@@ -305,8 +305,10 @@ func Test_loginRun_nontty(t *testing.T) {
 				Token:    "abc456",
 			},
 			cfgStubs: func(c *config.ConfigMock) {
-				c.AuthTokenFunc = func(string) (string, string) {
-					return "value_from_env", "GH_TOKEN"
+				authCfg := c.Authentication()
+				authCfg.SetToken("value_from_env", "GH_TOKEN")
+				c.AuthenticationFunc = func() *config.AuthConfig {
+					return authCfg
 				}
 			},
 			wantErr: "SilentError",
@@ -322,8 +324,10 @@ func Test_loginRun_nontty(t *testing.T) {
 				Token:    "abc456",
 			},
 			cfgStubs: func(c *config.ConfigMock) {
-				c.AuthTokenFunc = func(string) (string, string) {
-					return "value_from_env", "GH_ENTERPRISE_TOKEN"
+				authCfg := c.Authentication()
+				authCfg.SetToken("value_from_env", "GH_ENTERPRISE_TOKEN")
+				c.AuthenticationFunc = func() *config.AuthConfig {
+					return authCfg
 				}
 			},
 			wantErr: "SilentError",
@@ -399,8 +403,10 @@ func Test_loginRun_Survey(t *testing.T) {
 				Interactive: true,
 			},
 			cfgStubs: func(c *config.ConfigMock) {
-				c.AuthTokenFunc = func(h string) (string, string) {
-					return "ghi789", "oauth_token"
+				authCfg := c.Authentication()
+				authCfg.SetToken("ghi789", "oauth_token")
+				c.AuthenticationFunc = func() *config.AuthConfig {
+					return authCfg
 				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {

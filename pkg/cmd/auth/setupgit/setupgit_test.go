@@ -38,8 +38,10 @@ func Test_setupGitRun(t *testing.T) {
 			opts: &SetupGitOptions{
 				Config: func() (config.Config, error) {
 					cfg := &config.ConfigMock{}
-					cfg.HostsFunc = func() []string {
-						return []string{}
+					cfg.AuthenticationFunc = func() *config.AuthConfig {
+						authCfg := &config.AuthConfig{}
+						authCfg.SetHosts([]string{})
+						return authCfg
 					}
 					return cfg, nil
 				},
@@ -53,8 +55,10 @@ func Test_setupGitRun(t *testing.T) {
 				Hostname: "foo",
 				Config: func() (config.Config, error) {
 					cfg := &config.ConfigMock{}
-					cfg.HostsFunc = func() []string {
-						return []string{"bar"}
+					cfg.AuthenticationFunc = func() *config.AuthConfig {
+						authCfg := &config.AuthConfig{}
+						authCfg.SetHosts([]string{"bar"})
+						return authCfg
 					}
 					return cfg, nil
 				},
@@ -70,8 +74,10 @@ func Test_setupGitRun(t *testing.T) {
 				},
 				Config: func() (config.Config, error) {
 					cfg := &config.ConfigMock{}
-					cfg.HostsFunc = func() []string {
-						return []string{"bar"}
+					cfg.AuthenticationFunc = func() *config.AuthConfig {
+						authCfg := &config.AuthConfig{}
+						authCfg.SetHosts([]string{"bar"})
+						return authCfg
 					}
 					return cfg, nil
 				},
@@ -85,8 +91,10 @@ func Test_setupGitRun(t *testing.T) {
 				gitConfigure: &mockGitConfigurer{},
 				Config: func() (config.Config, error) {
 					cfg := &config.ConfigMock{}
-					cfg.HostsFunc = func() []string {
-						return []string{"bar"}
+					cfg.AuthenticationFunc = func() *config.AuthConfig {
+						authCfg := &config.AuthConfig{}
+						authCfg.SetHosts([]string{"bar"})
+						return authCfg
 					}
 					return cfg, nil
 				},
@@ -99,8 +107,10 @@ func Test_setupGitRun(t *testing.T) {
 				gitConfigure: &mockGitConfigurer{},
 				Config: func() (config.Config, error) {
 					cfg := &config.ConfigMock{}
-					cfg.HostsFunc = func() []string {
-						return []string{"bar", "yes"}
+					cfg.AuthenticationFunc = func() *config.AuthConfig {
+						authCfg := &config.AuthConfig{}
+						authCfg.SetHosts([]string{"bar", "yes"})
+						return authCfg
 					}
 					return cfg, nil
 				},

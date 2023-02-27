@@ -32,8 +32,10 @@ func Test_remoteResolver(t *testing.T) {
 			},
 			config: func() config.Config {
 				cfg := &config.ConfigMock{}
-				cfg.HostsFunc = func() []string {
-					return []string{}
+				cfg.AuthenticationFunc = func() *config.AuthConfig {
+					authCfg := &config.AuthConfig{}
+					authCfg.SetHosts([]string{})
+					return authCfg
 				}
 				cfg.DefaultHostFunc = func() (string, string) {
 					return "github.com", "default"
@@ -49,8 +51,10 @@ func Test_remoteResolver(t *testing.T) {
 			},
 			config: func() config.Config {
 				cfg := &config.ConfigMock{}
-				cfg.HostsFunc = func() []string {
-					return []string{"example.com"}
+				cfg.AuthenticationFunc = func() *config.AuthConfig {
+					authCfg := &config.AuthConfig{}
+					authCfg.SetHosts([]string{"example.com"})
+					return authCfg
 				}
 				cfg.DefaultHostFunc = func() (string, string) {
 					return "example.com", "hosts"
@@ -68,8 +72,10 @@ func Test_remoteResolver(t *testing.T) {
 			},
 			config: func() config.Config {
 				cfg := &config.ConfigMock{}
-				cfg.HostsFunc = func() []string {
-					return []string{"example.com"}
+				cfg.AuthenticationFunc = func() *config.AuthConfig {
+					authCfg := &config.AuthConfig{}
+					authCfg.SetHosts([]string{"example.com"})
+					return authCfg
 				}
 				cfg.DefaultHostFunc = func() (string, string) {
 					return "example.com", "hosts"
@@ -90,8 +96,10 @@ func Test_remoteResolver(t *testing.T) {
 			},
 			config: func() config.Config {
 				cfg := &config.ConfigMock{}
-				cfg.HostsFunc = func() []string {
-					return []string{"example.com"}
+				cfg.AuthenticationFunc = func() *config.AuthConfig {
+					authCfg := &config.AuthConfig{}
+					authCfg.SetHosts([]string{"example.com"})
+					return authCfg
 				}
 				cfg.DefaultHostFunc = func() (string, string) {
 					return "example.com", "hosts"
@@ -109,8 +117,10 @@ func Test_remoteResolver(t *testing.T) {
 			},
 			config: func() config.Config {
 				cfg := &config.ConfigMock{}
-				cfg.HostsFunc = func() []string {
-					return []string{"example.com"}
+				cfg.AuthenticationFunc = func() *config.AuthConfig {
+					authCfg := &config.AuthConfig{}
+					authCfg.SetHosts([]string{"example.com"})
+					return authCfg
 				}
 				cfg.DefaultHostFunc = func() (string, string) {
 					return "example.com", "default"
@@ -131,8 +141,10 @@ func Test_remoteResolver(t *testing.T) {
 			},
 			config: func() config.Config {
 				cfg := &config.ConfigMock{}
-				cfg.HostsFunc = func() []string {
-					return []string{"example.com"}
+				cfg.AuthenticationFunc = func() *config.AuthConfig {
+					authCfg := &config.AuthConfig{}
+					authCfg.SetHosts([]string{"example.com"})
+					return authCfg
 				}
 				cfg.DefaultHostFunc = func() (string, string) {
 					return "example.com", "default"
@@ -150,8 +162,10 @@ func Test_remoteResolver(t *testing.T) {
 			},
 			config: func() config.Config {
 				cfg := &config.ConfigMock{}
-				cfg.HostsFunc = func() []string {
-					return []string{"example.com", "github.com"}
+				cfg.AuthenticationFunc = func() *config.AuthConfig {
+					authCfg := &config.AuthConfig{}
+					authCfg.SetHosts([]string{"example.com", "github.com"})
+					return authCfg
 				}
 				cfg.DefaultHostFunc = func() (string, string) {
 					return "github.com", "default"
@@ -173,8 +187,10 @@ func Test_remoteResolver(t *testing.T) {
 			},
 			config: func() config.Config {
 				cfg := &config.ConfigMock{}
-				cfg.HostsFunc = func() []string {
-					return []string{"example.com", "github.com"}
+				cfg.AuthenticationFunc = func() *config.AuthConfig {
+					authCfg := &config.AuthConfig{}
+					authCfg.SetHosts([]string{"example.com", "github.com"})
+					return authCfg
 				}
 				cfg.DefaultHostFunc = func() (string, string) {
 					return "github.com", "default"
@@ -196,8 +212,10 @@ func Test_remoteResolver(t *testing.T) {
 			},
 			config: func() config.Config {
 				cfg := &config.ConfigMock{}
-				cfg.HostsFunc = func() []string {
-					return []string{"example.com", "github.com"}
+				cfg.AuthenticationFunc = func() *config.AuthConfig {
+					authCfg := &config.AuthConfig{}
+					authCfg.SetHosts([]string{"example.com", "github.com"})
+					return authCfg
 				}
 				cfg.DefaultHostFunc = func() (string, string) {
 					return "github.com", "default"
@@ -215,8 +233,10 @@ func Test_remoteResolver(t *testing.T) {
 			},
 			config: func() config.Config {
 				cfg := &config.ConfigMock{}
-				cfg.HostsFunc = func() []string {
-					return []string{"example.com"}
+				cfg.AuthenticationFunc = func() *config.AuthConfig {
+					authCfg := &config.AuthConfig{}
+					authCfg.SetHosts([]string{"example.com"})
+					return authCfg
 				}
 				cfg.DefaultHostFunc = func() (string, string) {
 					return "test.com", "GH_HOST"
@@ -235,8 +255,10 @@ func Test_remoteResolver(t *testing.T) {
 			},
 			config: func() config.Config {
 				cfg := &config.ConfigMock{}
-				cfg.HostsFunc = func() []string {
-					return []string{"example.com"}
+				cfg.AuthenticationFunc = func() *config.AuthConfig {
+					authCfg := &config.AuthConfig{}
+					authCfg.SetHosts([]string{"example.com"})
+					return authCfg
 				}
 				cfg.DefaultHostFunc = func() (string, string) {
 					return "test.com", "GH_HOST"
@@ -256,8 +278,10 @@ func Test_remoteResolver(t *testing.T) {
 			},
 			config: func() config.Config {
 				cfg := &config.ConfigMock{}
-				cfg.HostsFunc = func() []string {
-					return []string{"example.com", "test.com"}
+				cfg.AuthenticationFunc = func() *config.AuthConfig {
+					authCfg := &config.AuthConfig{}
+					authCfg.SetHosts([]string{"example.com", "test.com"})
+					return authCfg
 				}
 				cfg.DefaultHostFunc = func() (string, string) {
 					return "test.com", "GH_HOST"
