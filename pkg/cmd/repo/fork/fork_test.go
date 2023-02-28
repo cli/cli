@@ -407,7 +407,7 @@ func TestRepoFork(t *testing.T) {
 				},
 			},
 			httpStubs:  forkPost,
-			wantErrOut: "someone/REPO already exists",
+			wantErrOut: "someone/REPO already exists\n",
 		},
 		{
 			name: "implicit nontty --remote",
@@ -560,7 +560,7 @@ func TestRepoFork(t *testing.T) {
 				},
 			},
 			httpStubs:  forkPost,
-			wantErrOut: "someone/REPO already exists",
+			wantErrOut: "someone/REPO already exists\n",
 		},
 		{
 			name: "repo arg nontty clone arg already exists",
@@ -577,7 +577,7 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
 			},
-			wantErrOut: "someone/REPO already exists",
+			wantErrOut: "someone/REPO already exists\n",
 		},
 		{
 			name: "repo arg nontty clone arg",
