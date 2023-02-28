@@ -137,7 +137,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					query.Keywords = args
 					query.Qualifiers = qualifiers
 
-					host, _ := cfg.DefaultHost()
+					host, _ := cfg.Authentication().DefaultHost()
 					searcher := search.NewSearcher(client, host)
 
 					if webMode {
@@ -445,7 +445,7 @@ func NewCmdExtension(f *cmdutil.Factory) *cobra.Command {
 					if err != nil {
 						return err
 					}
-					host, _ := cfg.DefaultHost()
+					host, _ := cfg.Authentication().DefaultHost()
 					client, err := f.HttpClient()
 					if err != nil {
 						return err

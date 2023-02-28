@@ -68,7 +68,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 				return err
 			}
 
-			opts.HostConfig = cfg
+			opts.HostConfig = cfg.Authentication()
 
 			if runF != nil {
 				return runF(opts)

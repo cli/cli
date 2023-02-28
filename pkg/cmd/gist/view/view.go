@@ -85,7 +85,7 @@ func viewRun(opts *ViewOptions) error {
 		return err
 	}
 
-	hostname, _ := cfg.DefaultHost()
+	hostname, _ := cfg.Authentication().DefaultHost()
 
 	cs := opts.IO.ColorScheme()
 	if gistID == "" {

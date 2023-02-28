@@ -79,7 +79,7 @@ func runAdd(opts *AddOptions) error {
 		return err
 	}
 
-	hostname, _ := cfg.DefaultHost()
+	hostname, _ := cfg.Authentication().DefaultHost()
 
 	err = gpgKeyUpload(httpClient, hostname, keyReader, opts.Title)
 	if err != nil {
