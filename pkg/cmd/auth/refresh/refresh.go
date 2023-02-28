@@ -26,21 +26,26 @@ type RefreshOptions struct {
 
 	Hostname string
 	Scopes   []string
-	AuthFlow func(*config.AuthConfig, *iostreams.IOStreams, string, []string, bool) error
+	AuthFlow func(*config.AuthConfig, *iostreams.IOStreams, string, []string, bool, bool) error
 
-	Interactive bool
+	Interactive   bool
+	SecureStorage bool
 }
 
 func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.Command {
 	opts := &RefreshOptions{
 		IO:     f.IOStreams,
 		Config: f.Config,
-		AuthFlow: func(authCfg *config.AuthConfig, io *iostreams.IOStreams, hostname string, scopes []string, interactive bool) error {
+		AuthFlow: func(authCfg *config.AuthConfig, io *iostreams.IOStreams, hostname string, scopes []string, interactive, secureStorage bool) error {
+			if secureStorage {
+				cs := io.ColorScheme()
+				fmt.Fprintf(io.ErrOut, "%s Using secure storage could break installed extensions", cs.WarningIcon())
+			}
 			token, username, err := authflow.AuthFlow(hostname, io, "", scopes, interactive, f.Browser)
 			if err != nil {
 				return err
 			}
-			return authCfg.Login(hostname, username, token, "", false)
+			return authCfg.Login(hostname, username, token, "", secureStorage)
 		},
 		HttpClient: &http.Client{},
 		GitClient:  f.GitClient,
@@ -80,6 +85,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The GitHub host to use for authentication")
 	cmd.Flags().StringSliceVarP(&opts.Scopes, "scopes", "s", nil, "Additional authentication scopes for gh to have")
+	cmd.Flags().BoolVarP(&opts.SecureStorage, "secure-storage", "", false, "Save authentication credentials in secure credential store")
 
 	return cmd
 }
@@ -152,7 +158,7 @@ func refreshRun(opts *RefreshOptions) error {
 		additionalScopes = append(additionalScopes, credentialFlow.Scopes()...)
 	}
 
-	if err := opts.AuthFlow(authCfg, opts.IO, hostname, append(opts.Scopes, additionalScopes...), opts.Interactive); err != nil {
+	if err := opts.AuthFlow(authCfg, opts.IO, hostname, append(opts.Scopes, additionalScopes...), opts.Interactive, opts.SecureStorage); err != nil {
 		return err
 	}
 

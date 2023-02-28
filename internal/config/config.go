@@ -6,6 +6,7 @@ import (
 
 	ghAuth "github.com/cli/go-gh/pkg/auth"
 	ghConfig "github.com/cli/go-gh/pkg/config"
+	"github.com/zalando/go-keyring"
 )
 
 const (
@@ -144,7 +145,15 @@ func (c *AuthConfig) Token(hostname string) (string, string) {
 	if c.tokenOverride != nil {
 		return c.tokenOverride(hostname)
 	}
-	return ghAuth.TokenForHost(hostname)
+	token, source := ghAuth.TokenFromEnvOrConfig(hostname)
+	if token == "" {
+		var err error
+		token, err = c.TokenFromKeyring(hostname)
+		if err == nil {
+			source = "keyring"
+		}
+	}
+	return token, source
 }
 
 // SetToken will override any token resolution and return the given
@@ -153,6 +162,12 @@ func (c *AuthConfig) SetToken(token, source string) {
 	c.tokenOverride = func(_ string) (string, string) {
 		return token, source
 	}
+}
+
+// TokenFromKeyring will retrieve the auth token for the given hostname,
+// only searching in encrypted storage.
+func (c *AuthConfig) TokenFromKeyring(hostname string) (string, error) {
+	return keyring.Get(keyringServiceName(hostname), "")
 }
 
 // User will retrieve the username for the logged in user at the given hostname.
@@ -193,8 +208,15 @@ func (c *AuthConfig) DefaultHost() (string, string) {
 // Login will set user, git protocol, and auth token for the given hostname.
 // If the encrypt option is specified it will first try to store the auth token
 // in encrypted storage and will fall back to the plain text config file.
-func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, encrypt bool) error {
-	if token != "" {
+func (c *AuthConfig) Login(hostname, username, token, gitProtocol string, secureStorage bool) error {
+	var setErr error
+	if secureStorage {
+		if setErr = keyring.Set(keyringServiceName(hostname), "", token); setErr == nil {
+			// Clean up the previous oauth_token from the config file.
+			_ = c.cfg.Remove([]string{hosts, hostname, oauthToken})
+		}
+	}
+	if !secureStorage || setErr != nil {
 		c.cfg.Set([]string{hosts, hostname, oauthToken}, token)
 	}
 	if username != "" {
@@ -213,7 +235,12 @@ func (c *AuthConfig) Logout(hostname string) error {
 		return nil
 	}
 	_ = c.cfg.Remove([]string{hosts, hostname})
+	_ = keyring.Delete(keyringServiceName(hostname), "")
 	return ghConfig.Write(c.cfg)
+}
+
+func keyringServiceName(hostname string) string {
+	return "gh:" + hostname
 }
 
 type AliasConfig struct {
