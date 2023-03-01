@@ -174,7 +174,7 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 		}
 	}
 
-	if isNumber(opts.SelectorArg) {
+	if !opts.CommitFlag && isNumber(opts.SelectorArg) {
 		return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
 	}
 

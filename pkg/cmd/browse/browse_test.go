@@ -123,6 +123,15 @@ func TestNewCmdBrowse(t *testing.T) {
 			},
 			wantsErr: false,
 		},
+		{
+			name: "commit hash flag",
+			cli:  "-c 123",
+			wants: BrowseOptions{
+				CommitFlag:  true,
+				SelectorArg: "123",
+			},
+			wantsErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -394,6 +403,17 @@ func Test_runBrowse(t *testing.T) {
 			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
 			wantsErr:    false,
 			expectedURL: "https://github.com/vilmibm/gh-user-status/tree/6f1a2405cace1633d89a79c74c65f22fe78f9659/main.go",
+		},
+		{
+			name: "open number only commit hash",
+			opts: BrowseOptions{
+				CommitFlag:  true,
+				SelectorArg: "1234567890",
+				GitClient:   &testGitClient{},
+			},
+			baseRepo:    ghrepo.New("yanskun", "ILoveGitHub"),
+			wantsErr:    false,
+			expectedURL: "https://github.com/yanskun/ILoveGitHub/commit/1234567890",
 		},
 		{
 			name: "relative path from browse_test.go",
