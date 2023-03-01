@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strings"
 
@@ -28,37 +27,7 @@ var (
 	jsonTypeRE = regexp.MustCompile(`[/+]json($|;)`)
 )
 
-type iconfig interface {
-	Get(string, string) (string, error)
-	Set(string, string, string)
-	Write() error
-}
-
-func AuthFlowWithConfig(cfg iconfig, IO *iostreams.IOStreams, hostname, notice string, additionalScopes []string, isInteractive bool) (string, error) {
-	// TODO this probably shouldn't live in this package. It should probably be in a new package that
-	// depends on both iostreams and config.
-
-	// FIXME: this duplicates `factory.browserLauncher()`
-	browserLauncher := os.Getenv("GH_BROWSER")
-	if browserLauncher == "" {
-		browserLauncher, _ = cfg.Get("", "browser")
-	}
-	if browserLauncher == "" {
-		browserLauncher = os.Getenv("BROWSER")
-	}
-
-	token, userLogin, err := authFlow(hostname, IO, notice, additionalScopes, isInteractive, browserLauncher)
-	if err != nil {
-		return "", err
-	}
-
-	cfg.Set(hostname, "user", userLogin)
-	cfg.Set(hostname, "oauth_token", token)
-
-	return token, cfg.Write()
-}
-
-func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string, isInteractive bool, browserLauncher string) (string, string, error) {
+func AuthFlow(oauthHost string, IO *iostreams.IOStreams, notice string, additionalScopes []string, isInteractive bool, b browser.Browser) (string, string, error) {
 	w := IO.ErrOut
 	cs := IO.ColorScheme()
 
@@ -106,7 +75,6 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 			fmt.Fprintf(w, "%s to open %s in your browser... ", cs.Bold("Press Enter"), oauthHost)
 			_ = waitForEnter(IO.In)
 
-			b := browser.New(browserLauncher, IO.Out, IO.ErrOut)
 			if err := b.Browse(authURL); err != nil {
 				fmt.Fprintf(w, "%s Failed opening a web browser at %s\n", cs.Red("!"), authURL)
 				fmt.Fprintf(w, "  %s\n", err)
@@ -138,16 +106,16 @@ func authFlow(oauthHost string, IO *iostreams.IOStreams, notice string, addition
 }
 
 type cfg struct {
-	authToken string
+	token string
 }
 
-func (c cfg) AuthToken(hostname string) (string, string) {
-	return c.authToken, "oauth_token"
+func (c cfg) Token(hostname string) (string, string) {
+	return c.token, "oauth_token"
 }
 
 func getViewer(hostname, token string, logWriter io.Writer) (string, error) {
 	opts := api.HTTPClientOptions{
-		Config: cfg{authToken: token},
+		Config: cfg{token: token},
 		Log:    logWriter,
 	}
 	client, err := api.NewHTTPClient(opts)

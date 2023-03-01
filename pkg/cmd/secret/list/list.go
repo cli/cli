@@ -123,7 +123,7 @@ func listRun(opts *ListOptions) error {
 			return err
 		}
 
-		host, _ = cfg.DefaultHost()
+		host, _ = cfg.Authentication().DefaultHost()
 
 		if secretEntity == shared.User {
 			secrets, err = getUserSecrets(client, host, showSelectedRepoInfo)

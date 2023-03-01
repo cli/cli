@@ -14,8 +14,8 @@ import (
 const tokenUser = "x-access-token"
 
 type config interface {
-	AuthToken(string) (string, string)
-	Get(string, string) (string, error)
+	Token(string) (string, string)
+	User(string) (string, error)
 }
 
 type CredentialOptions struct {
@@ -29,7 +29,11 @@ func NewCmdCredential(f *cmdutil.Factory, runF func(*CredentialOptions) error) *
 	opts := &CredentialOptions{
 		IO: f.IOStreams,
 		Config: func() (config, error) {
-			return f.Config()
+			cfg, err := f.Config()
+			if err != nil {
+				return nil, err
+			}
+			return cfg.Authentication(), nil
 		},
 	}
 
@@ -108,16 +112,16 @@ func helperRun(opts *CredentialOptions) error {
 
 	lookupHost := wants["host"]
 	var gotUser string
-	gotToken, source := cfg.AuthToken(lookupHost)
+	gotToken, source := cfg.Token(lookupHost)
 	if gotToken == "" && strings.HasPrefix(lookupHost, "gist.") {
 		lookupHost = strings.TrimPrefix(lookupHost, "gist.")
-		gotToken, source = cfg.AuthToken(lookupHost)
+		gotToken, source = cfg.Token(lookupHost)
 	}
 
 	if strings.HasSuffix(source, "_TOKEN") {
 		gotUser = tokenUser
 	} else {
-		gotUser, _ = cfg.Get(lookupHost, "user")
+		gotUser, _ = cfg.User(lookupHost)
 		if gotUser == "" {
 			gotUser = tokenUser
 		}

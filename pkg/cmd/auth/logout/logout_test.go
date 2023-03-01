@@ -2,6 +2,7 @@ package logout
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"regexp"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/zalando/go-keyring"
 )
 
 func Test_NewCmdLogout(t *testing.T) {
@@ -96,6 +98,7 @@ func Test_logoutRun_tty(t *testing.T) {
 		opts          *LogoutOptions
 		prompterStubs func(*prompter.PrompterMock)
 		cfgHosts      []string
+		secureStorage bool
 		wantHosts     string
 		wantErrOut    *regexp.Regexp
 		wantErr       string
@@ -133,14 +136,31 @@ func Test_logoutRun_tty(t *testing.T) {
 			wantHosts:  "github.com:\n    oauth_token: abc123\n",
 			wantErrOut: regexp.MustCompile(`Logged out of cheryl.mason account 'cybilb'`),
 		},
+		{
+			name:          "secure storage",
+			secureStorage: true,
+			opts: &LogoutOptions{
+				Hostname: "github.com",
+			},
+			cfgHosts:   []string{"github.com"},
+			wantHosts:  "{}\n",
+			wantErrOut: regexp.MustCompile(`Logged out of github.com account 'cybilb'`),
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			keyring.MockInit()
 			readConfigs := config.StubWriteConfig(t)
 			cfg := config.NewFromString("")
 			for _, hostname := range tt.cfgHosts {
-				cfg.Set(hostname, "oauth_token", "abc123")
+				if tt.secureStorage {
+					cfg.Set(hostname, "user", "monalisa")
+					_ = keyring.Set(fmt.Sprintf("gh:%s", hostname), "", "abc123")
+					cfg.Authentication().SetToken("abc123", "keyring")
+				} else {
+					cfg.Set(hostname, "oauth_token", "abc123")
+				}
 			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil
@@ -183,8 +203,10 @@ func Test_logoutRun_tty(t *testing.T) {
 			mainBuf := bytes.Buffer{}
 			hostsBuf := bytes.Buffer{}
 			readConfigs(&mainBuf, &hostsBuf)
+			secureToken, _ := cfg.Authentication().TokenFromKeyring(tt.opts.Hostname)
 
 			assert.Equal(t, tt.wantHosts, hostsBuf.String())
+			assert.Equal(t, "", secureToken)
 			reg.Verify(t)
 		})
 	}
@@ -192,12 +214,13 @@ func Test_logoutRun_tty(t *testing.T) {
 
 func Test_logoutRun_nontty(t *testing.T) {
 	tests := []struct {
-		name      string
-		opts      *LogoutOptions
-		cfgHosts  []string
-		wantHosts string
-		wantErr   string
-		ghtoken   string
+		name          string
+		opts          *LogoutOptions
+		cfgHosts      []string
+		secureStorage bool
+		ghtoken       string
+		wantHosts     string
+		wantErr       string
 	}{
 		{
 			name: "hostname, one host",
@@ -222,14 +245,30 @@ func Test_logoutRun_nontty(t *testing.T) {
 			},
 			wantErr: `not logged in to any hosts`,
 		},
+		{
+			name:          "secure storage",
+			secureStorage: true,
+			opts: &LogoutOptions{
+				Hostname: "harry.mason",
+			},
+			cfgHosts:  []string{"harry.mason"},
+			wantHosts: "{}\n",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			keyring.MockInit()
 			readConfigs := config.StubWriteConfig(t)
 			cfg := config.NewFromString("")
 			for _, hostname := range tt.cfgHosts {
-				cfg.Set(hostname, "oauth_token", "abc123")
+				if tt.secureStorage {
+					cfg.Set(hostname, "user", "monalisa")
+					_ = keyring.Set(fmt.Sprintf("gh:%s", hostname), "", "abc123")
+					cfg.Authentication().SetToken("abc123", "keyring")
+				} else {
+					cfg.Set(hostname, "oauth_token", "abc123")
+				}
 			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil
@@ -257,8 +296,10 @@ func Test_logoutRun_nontty(t *testing.T) {
 			mainBuf := bytes.Buffer{}
 			hostsBuf := bytes.Buffer{}
 			readConfigs(&mainBuf, &hostsBuf)
+			secureToken, _ := cfg.Authentication().TokenFromKeyring(tt.opts.Hostname)
 
 			assert.Equal(t, tt.wantHosts, hostsBuf.String())
+			assert.Equal(t, "", secureToken)
 			reg.Verify(t)
 		})
 	}

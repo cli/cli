@@ -10,7 +10,7 @@ import (
 
 func newCodeCmd(app *App) *cobra.Command {
 	var (
-		codespace   string
+		selector    *CodespaceSelector
 		useInsiders bool
 		useWeb      bool
 	)
@@ -20,11 +20,12 @@ func newCodeCmd(app *App) *cobra.Command {
 		Short: "Open a codespace in Visual Studio Code",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.VSCode(cmd.Context(), codespace, useInsiders, useWeb)
+			return app.VSCode(cmd.Context(), selector, useInsiders, useWeb)
 		},
 	}
 
-	codeCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
+	selector = AddCodespaceSelector(codeCmd, app.apiClient)
+
 	codeCmd.Flags().BoolVar(&useInsiders, "insiders", false, "Use the insiders version of Visual Studio Code")
 	codeCmd.Flags().BoolVarP(&useWeb, "web", "w", false, "Use the web version of Visual Studio Code")
 
@@ -32,8 +33,8 @@ func newCodeCmd(app *App) *cobra.Command {
 }
 
 // VSCode opens a codespace in the local VS VSCode application.
-func (a *App) VSCode(ctx context.Context, codespaceName string, useInsiders bool, useWeb bool) error {
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
+func (a *App) VSCode(ctx context.Context, selector *CodespaceSelector, useInsiders bool, useWeb bool) error {
+	codespace, err := selector.Select(ctx)
 	if err != nil {
 		return err
 	}

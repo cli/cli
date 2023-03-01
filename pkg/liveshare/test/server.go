@@ -242,16 +242,17 @@ func handleRequests(ctx context.Context, server *Server, channel ssh.Channel, re
 	errc := make(chan error, 1)
 	go func() {
 		for req := range reqs {
-			if req.WantReply {
-				if err := req.Reply(true, nil); err != nil {
+			r := req
+			if r.WantReply {
+				if err := r.Reply(true, nil); err != nil {
 					sendError(errc, fmt.Errorf("error replying to channel request: %w", err))
 					return
 				}
 			}
 
-			if strings.HasPrefix(req.Type, "stream-transport") {
+			if strings.HasPrefix(r.Type, "stream-transport") {
 				go func() {
-					if err := forwardStream(ctx, server, req.Type, channel); err != nil {
+					if err := forwardStream(ctx, server, r.Type, channel); err != nil {
 						sendError(errc, fmt.Errorf("failed to forward stream: %w", err))
 					}
 				}()

@@ -87,7 +87,7 @@ func archiveRun(opts *ArchiveOptions) error {
 				return err
 			}
 
-			hostname, _ := cfg.DefaultHost()
+			hostname, _ := cfg.Authentication().DefaultHost()
 
 			currentUser, err := api.CurrentLoginName(apiClient, hostname)
 			if err != nil {

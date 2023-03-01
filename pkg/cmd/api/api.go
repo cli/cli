@@ -309,7 +309,7 @@ func apiRun(opts *ApiOptions) error {
 		return err
 	}
 
-	host, _ := cfg.DefaultHost()
+	host, _ := cfg.Authentication().DefaultHost()
 
 	if opts.Hostname != "" {
 		host = opts.Hostname

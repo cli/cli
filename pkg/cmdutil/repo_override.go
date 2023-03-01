@@ -31,7 +31,7 @@ func EnableRepoOverride(cmd *cobra.Command, f *Factory) {
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
-		defaultHost, _ := config.DefaultHost()
+		defaultHost, _ := config.Authentication().DefaultHost()
 
 		var results []string
 		for _, remote := range remotes {

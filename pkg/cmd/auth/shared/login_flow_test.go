@@ -18,15 +18,10 @@ import (
 
 type tinyConfig map[string]string
 
-func (c tinyConfig) Get(host, key string) (string, error) {
-	return c[fmt.Sprintf("%s:%s", host, key)], nil
-}
-
-func (c tinyConfig) Set(host string, key string, value string) {
-	c[fmt.Sprintf("%s:%s", host, key)] = value
-}
-
-func (c tinyConfig) Write() error {
+func (c tinyConfig) Login(host, username, token, gitProtocol string, encrypt bool) error {
+	c[fmt.Sprintf("%s:%s", host, "user")] = username
+	c[fmt.Sprintf("%s:%s", host, "oauth_token")] = token
+	c[fmt.Sprintf("%s:%s", host, "git_protocol")] = gitProtocol
 	return nil
 }
 

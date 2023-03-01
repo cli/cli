@@ -18,12 +18,12 @@ func CheckAuth(cfg config.Config) bool {
 	// authentication tokens set for enterprise hosts.
 	// Any non-github.com hostname is fine here
 	dummyHostname := "example.com"
-	token, _ := cfg.AuthToken(dummyHostname)
+	token, _ := cfg.Authentication().Token(dummyHostname)
 	if token != "" {
 		return true
 	}
 
-	if len(cfg.Hosts()) > 0 {
+	if len(cfg.Authentication().Hosts()) > 0 {
 		return true
 	}
 

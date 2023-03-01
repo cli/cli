@@ -107,7 +107,7 @@ func editRun(opts *EditOptions) error {
 		return err
 	}
 
-	host, _ := cfg.DefaultHost()
+	host, _ := cfg.Authentication().DefaultHost()
 
 	gist, err := shared.GetGist(client, host, gistID)
 	if err != nil {
