@@ -185,8 +185,9 @@ func TestCreateCodespaces_Pending(t *testing.T) {
 	defer svr.Close()
 
 	api := API{
-		githubAPI: svr.URL,
-		client:    &http.Client{},
+		githubAPI:    svr.URL,
+		client:       &http.Client{},
+		retryBackoff: 0,
 	}
 
 	ctx := context.TODO()

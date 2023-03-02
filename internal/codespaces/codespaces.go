@@ -37,7 +37,7 @@ type logger interface {
 
 // ConnectToLiveshare waits for a Codespace to become running,
 // and connects to it using a Live Share session.
-func ConnectToLiveshare(ctx context.Context, progress progressIndicator, sessionLogger logger, apiClient apiClient, codespace *api.Codespace) (sess *liveshare.Session, err error) {
+func ConnectToLiveshare(ctx context.Context, progress progressIndicator, sessionLogger logger, apiClient apiClient, codespace *api.Codespace) (*liveshare.Session, error) {
 	if codespace.State != api.CodespaceStateAvailable {
 		progress.StartProgressIndicatorWithLabel("Starting codespace")
 		defer progress.StopProgressIndicator()
@@ -45,25 +45,33 @@ func ConnectToLiveshare(ctx context.Context, progress progressIndicator, session
 			return nil, fmt.Errorf("error starting codespace: %w", err)
 		}
 	}
-	expBackoff := backoff.NewExponentialBackOff()
 
-	expBackoff.Multiplier = 1.1
-	expBackoff.MaxInterval = 10 * time.Second
-	expBackoff.MaxElapsedTime = 5 * time.Minute
+	if !connectionReady(codespace) {
+		expBackoff := backoff.NewExponentialBackOff()
+		expBackoff.Multiplier = 1.1
+		expBackoff.MaxInterval = 10 * time.Second
+		expBackoff.MaxElapsedTime = 5 * time.Minute
 
-	for retries := 0; !connectionReady(codespace); retries++ {
-		if retries > 1 {
-			duration := expBackoff.NextBackOff()
-			time.Sleep(duration)
-		}
+		err := backoff.Retry(func() error {
+			var err error
+			codespace, err = apiClient.GetCodespace(ctx, codespace.Name, true)
+			if err != nil {
+				return backoff.Permanent(fmt.Errorf("error getting codespace: %w", err))
+			}
 
-		if expBackoff.GetElapsedTime() >= expBackoff.MaxElapsedTime {
-			return nil, errors.New("timed out while waiting for the codespace to start")
-		}
+			if connectionReady(codespace) {
+				return nil
+			}
 
-		codespace, err = apiClient.GetCodespace(ctx, codespace.Name, true)
+			return errors.New("codespace not ready yet")
+		}, backoff.WithContext(expBackoff, ctx))
 		if err != nil {
-			return nil, fmt.Errorf("error getting codespace: %w", err)
+			var permErr *backoff.PermanentError
+			if errors.As(err, &permErr) {
+				return nil, err
+			}
+
+			return nil, errors.New("timed out while waiting for the codespace to start")
 		}
 	}
 
