@@ -239,6 +239,27 @@ func Test_NewCmdApi(t *testing.T) {
 			wantsErr: false,
 		},
 		{
+			name: "with hostname containing https scheme",
+			cli:  "graphql --hostname https://tom.petty",
+			wants: ApiOptions{
+				Hostname:            "tom.petty",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "graphql",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
+			},
+			wantsErr: false,
+		},
+		{
 			name: "with cache",
 			cli:  "user --cache 5m",
 			wants: ApiOptions{

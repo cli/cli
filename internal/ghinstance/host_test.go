@@ -90,6 +90,10 @@ func TestNormalizeHostname(t *testing.T) {
 			host: "git.my.org",
 			want: "git.my.org",
 		},
+		{
+			host: "https://git.my.org",
+			want: "git.my.org",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.host, func(t *testing.T) {
@@ -109,6 +113,11 @@ func TestHostnameValidator(t *testing.T) {
 		{
 			name:     "valid hostname",
 			input:    "internal.instance",
+			wantsErr: false,
+		},
+		{
+			name:     "hostname with https",
+			input:    "https://internal.instance",
 			wantsErr: false,
 		},
 		{

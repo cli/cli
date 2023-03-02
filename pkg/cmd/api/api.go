@@ -193,6 +193,7 @@ func NewCmdApi(f *cmdutil.Factory, runF func(*ApiOptions) error) *cobra.Command 
 				if err := ghinstance.HostnameValidator(opts.Hostname); err != nil {
 					return cmdutil.FlagErrorf("error parsing `--hostname`: %w", err)
 				}
+				opts.Hostname = strings.TrimPrefix(opts.Hostname, "https://")
 			}
 
 			if opts.Paginate && !strings.EqualFold(opts.RequestMethod, "GET") && opts.RequestPath != "graphql" {
@@ -314,6 +315,8 @@ func apiRun(opts *ApiOptions) error {
 	if opts.Hostname != "" {
 		host = opts.Hostname
 	}
+
+	host = strings.TrimPrefix(host, "https://")
 
 	tmpl := template.New(bodyWriter, opts.IO.TerminalWidth(), opts.IO.ColorEnabled())
 	err = tmpl.Parse(opts.Template)

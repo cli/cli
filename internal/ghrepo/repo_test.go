@@ -190,6 +190,15 @@ func TestFromFullName(t *testing.T) {
 			wantName:     "REPO",
 			wantErr:      nil,
 		},
+		{
+			name:         "OWNER/REPO with default host override containing https scheme",
+			input:        "OWNER/REPO",
+			hostOverride: "https://override.com",
+			wantHost:     "override.com",
+			wantOwner:    "OWNER",
+			wantName:     "REPO",
+			wantErr:      nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -37,14 +37,14 @@ func NormalizeHostname(h string) string {
 		return localhost
 	}
 
-	return hostname
+	return strings.TrimPrefix(hostname, "https://")
 }
 
 func HostnameValidator(hostname string) error {
 	if len(strings.TrimSpace(hostname)) < 1 {
 		return errors.New("a value is required")
 	}
-	if strings.ContainsRune(hostname, '/') || strings.ContainsRune(hostname, ':') {
+	if (strings.ContainsRune(hostname, '/') || strings.ContainsRune(hostname, ':')) && !strings.HasPrefix(hostname, "https://") {
 		return errors.New("invalid hostname")
 	}
 	return nil
