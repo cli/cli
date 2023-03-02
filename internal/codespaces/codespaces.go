@@ -51,15 +51,18 @@ func ConnectToLiveshare(ctx context.Context, progress progressIndicator, session
 		expBackoff.Multiplier = 1.1
 		expBackoff.MaxInterval = 10 * time.Second
 		expBackoff.MaxElapsedTime = 5 * time.Minute
+
 		err := backoff.Retry(func() error {
 			var err error
 			codespace, err = apiClient.GetCodespace(ctx, codespace.Name, true)
 			if err != nil {
 				return backoff.Permanent(fmt.Errorf("error getting codespace: %w", err))
 			}
+
 			if connectionReady(codespace) {
 				return nil
 			}
+
 			return errors.New("codespace not ready yet")
 		}, backoff.WithContext(expBackoff, ctx))
 		if err != nil {
@@ -67,6 +70,7 @@ func ConnectToLiveshare(ctx context.Context, progress progressIndicator, session
 			if errors.As(err, &permErr) {
 				return nil, err
 			}
+
 			return nil, errors.New("timed out while waiting for the codespace to start")
 		}
 	}
