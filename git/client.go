@@ -142,6 +142,7 @@ func (c *Client) CurrentBranch(ctx context.Context) (string, error) {
 	if err != nil {
 		var gitErr *GitError
 		if ok := errors.As(err, &gitErr); ok && len(gitErr.Stderr) == 0 {
+			gitErr.err = ErrNotOnAnyBranch
 			gitErr.Stderr = "not on any branch"
 			return "", gitErr
 		}
