@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -20,8 +19,11 @@ import (
 )
 
 func TestAliasImports(t *testing.T) {
-	tmpFile := filepath.Join(t.TempDir(), "test.yml")
-	defer os.Remove(tmpFile)
+	tmpFile, err := os.CreateTemp(t.TempDir(), "aliases")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tmpFile.Close()
 
 	tests := []struct {
 		name             string
@@ -49,7 +51,7 @@ func TestAliasImports(t *testing.T) {
 		{
 			name:  "with no existing aliases",
 			isTTY: true,
-			input: tmpFile,
+			input: tmpFile.Name(),
 			fileContents: heredoc.Doc(`
                 co: pr checkout
                 igrep: '!gh issue list --label="$1" | grep "$2"'
@@ -65,7 +67,7 @@ func TestAliasImports(t *testing.T) {
 		{
 			name:  "with existing aliases",
 			isTTY: true,
-			input: tmpFile,
+			input: tmpFile.Name(),
 			fileContents: heredoc.Doc(`
                 users: |-
                     api graphql -F name="$1" -f query='
@@ -122,7 +124,7 @@ func TestAliasImports(t *testing.T) {
 		{
 			name:  "already taken aliases",
 			isTTY: true,
-			input: tmpFile,
+			input: tmpFile.Name(),
 			fileContents: heredoc.Doc(`
                 co: pr checkout -R cool/repo
                 igrep: '!gh issue list --label="$1" | grep "$2"'
@@ -148,7 +150,7 @@ func TestAliasImports(t *testing.T) {
 		{
 			name:  "override aliases",
 			isTTY: true,
-			input: "--clobber " + tmpFile,
+			input: "--clobber " + tmpFile.Name(),
 			fileContents: heredoc.Doc(`
                 co: pr checkout -R cool/repo
                 igrep: '!gh issue list --label="$1" | grep "$2"'
@@ -174,7 +176,7 @@ func TestAliasImports(t *testing.T) {
 		{
 			name:  "alias is a gh command",
 			isTTY: true,
-			input: tmpFile,
+			input: tmpFile.Name(),
 			fileContents: heredoc.Doc(`
                 pr: pr checkout
                 issue: issue list
@@ -186,7 +188,7 @@ func TestAliasImports(t *testing.T) {
 		{
 			name:  "invalid expansion",
 			isTTY: true,
-			input: tmpFile,
+			input: tmpFile.Name(),
 			fileContents: heredoc.Doc(`
                 alias1:
                 alias2: ps checkout
@@ -198,7 +200,7 @@ func TestAliasImports(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.NoError(t, os.WriteFile(tmpFile, []byte(tt.fileContents), 0600))
+			require.NoError(t, os.WriteFile(tmpFile.Name(), []byte(tt.fileContents), 0600))
 
 			readConfigs := config.StubWriteConfig(t)
 
