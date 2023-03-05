@@ -7,9 +7,9 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/pkg/cmd/alias/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/google/shlex"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -74,25 +74,7 @@ func NewCmdImports(f *cmdutil.Factory, runF func(*ImportsOptions) error) *cobra.
 				opts.Filename = args[0]
 			}
 
-			opts.validCommand = func(args string) bool {
-				split, err := shlex.Split(args)
-				if err != nil || len(split) == 0 {
-					return false
-				}
-
-				rootCmd := cmd.Root()
-				cmd, _, err := rootCmd.Traverse(split)
-				if err == nil && cmd != rootCmd {
-					return true
-				}
-
-				for _, ext := range f.ExtensionManager.List() {
-					if ext.Name() == split[0] {
-						return true
-					}
-				}
-				return false
-			}
+			opts.validCommand = shared.ValidCommandFunc(f, cmd)
 
 			if runF != nil {
 				return runF(opts)
