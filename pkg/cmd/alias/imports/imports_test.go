@@ -20,7 +20,7 @@ import (
 )
 
 func TestAliasImports(t *testing.T) {
-	tmpFile := filepath.Join(os.TempDir(), "test.yml")
+	tmpFile := filepath.Join(t.TempDir(), "test.yml")
 	defer os.Remove(tmpFile)
 
 	tests := []struct {
