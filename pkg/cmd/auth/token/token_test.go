@@ -125,6 +125,22 @@ func TestTokenRun(t *testing.T) {
 			wantErr:    true,
 			wantErrMsg: "no oauth token",
 		},
+		{
+			name: "uses default host when one is not provided",
+			opts: TokenOptions{
+				Config: func() (config.Config, error) {
+					cfg := config.NewBlankConfig()
+					cfg.AuthenticationFunc = func() *config.AuthConfig {
+						authCfg := &config.AuthConfig{}
+						authCfg.SetDefaultHost("github.mycompany.com", "GH_HOST")
+						authCfg.SetToken("gho_1234567", "default")
+						return authCfg
+					}
+					return cfg, nil
+				},
+			},
+			wantStdout: "gho_1234567\n",
+		},
 	}
 
 	for _, tt := range tests {

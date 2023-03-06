@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -45,16 +44,16 @@ func NewCmdToken(f *cmdutil.Factory, runF func(*TokenOptions) error) *cobra.Comm
 }
 
 func tokenRun(opts *TokenOptions) error {
-	hostname := opts.Hostname
-	if hostname == "" {
-		hostname = ghinstance.Default()
-	}
-
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
 	}
 	authCfg := cfg.Authentication()
+
+	hostname := opts.Hostname
+	if hostname == "" {
+		hostname, _ = authCfg.DefaultHost()
+	}
 
 	var val string
 	if opts.SecureStorage {
