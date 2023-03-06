@@ -28,7 +28,7 @@ func TestApp_VSCode(t *testing.T) {
 				useInsiders:   false,
 			},
 			wantErr: false,
-			wantURL: "vscode://github.codespaces/connect?name=monalisa-cli-cli-abcdef",
+			wantURL: "vscode://github.codespaces/connect?name=monalisa-cli-cli-abcdef&windowId=_blank",
 		},
 		{
 			name: "open VS Code Insiders",
@@ -37,7 +37,7 @@ func TestApp_VSCode(t *testing.T) {
 				useInsiders:   true,
 			},
 			wantErr: false,
-			wantURL: "vscode-insiders://github.codespaces/connect?name=monalisa-cli-cli-abcdef",
+			wantURL: "vscode-insiders://github.codespaces/connect?name=monalisa-cli-cli-abcdef&windowId=_blank",
 		},
 		{
 			name: "open VS Code web",

@@ -66,5 +66,5 @@ func vscodeProtocolURL(codespaceName string, useInsiders bool) string {
 	if useInsiders {
 		application = "vscode-insiders"
 	}
-	return fmt.Sprintf("%s://github.codespaces/connect?name=%s", application, url.QueryEscape(codespaceName))
+	return fmt.Sprintf("%s://github.codespaces/connect?name=%s&windowId=_blank", application, url.QueryEscape(codespaceName))
 }
