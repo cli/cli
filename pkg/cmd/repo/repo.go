@@ -2,6 +2,7 @@ package repo
 
 import (
 	"github.com/MakeNowJust/heredoc"
+	repoAddLicenseCmd "github.com/cli/cli/v2/pkg/cmd/repo/add-license"
 	repoArchiveCmd "github.com/cli/cli/v2/pkg/cmd/repo/archive"
 	repoCloneCmd "github.com/cli/cli/v2/pkg/cmd/repo/clone"
 	repoCreateCmd "github.com/cli/cli/v2/pkg/cmd/repo/create"
@@ -60,6 +61,7 @@ func NewCmdRepo(f *cmdutil.Factory) *cobra.Command {
 		repoDeleteCmd.NewCmdDelete(f, nil),
 		creditsCmd.NewCmdRepoCredits(f, nil),
 		gardenCmd.NewCmdGarden(f, nil),
+		repoAddLicenseCmd.NewCmdAddLicense(f, nil),
 	)
 
 	return cmd
