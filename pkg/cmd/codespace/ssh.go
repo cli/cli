@@ -172,15 +172,19 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	defer safeClose(session, &err)
 
 	remoteSSHServerPort, sshUser := 0, ""
-	err = a.RunWithProgress("Fetching SSH Details", func() error {
+	err = a.RunWithProgress("Fetching SSH Details", func() (err error) {
 		invoker, err := rpc.CreateInvoker(ctx, session)
 		if err != nil {
-			return err
+			return
 		}
-		defer safeClose(invoker, &err)
+
+		err = invoker.Close()
+		if err != nil {
+			return
+		}
 
 		remoteSSHServerPort, sshUser, err = invoker.StartSSHServerWithOptions(ctx, startSSHOptions)
-		return err
+		return
 	})
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
@@ -476,7 +480,7 @@ func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err erro
 	if opts.selector.codespaceName == "" {
 		err = a.RunWithProgress("Fetching codespaces", func() (err error) {
 			csList, err = a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{})
-			return err
+			return
 		})
 	} else {
 		var codespace *api.Codespace

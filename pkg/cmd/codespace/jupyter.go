@@ -46,15 +46,19 @@ func (a *App) Jupyter(ctx context.Context, selector *CodespaceSelector) (err err
 	defer safeClose(session, &err)
 
 	serverPort, serverUrl := 0, ""
-	err = a.RunWithProgress("Starting JupyterLab on codespace", func() error {
+	err = a.RunWithProgress("Starting JupyterLab on codespace", func() (err error) {
 		invoker, err := rpc.CreateInvoker(ctx, session)
 		if err != nil {
-			return err
+			return
 		}
-		defer safeClose(invoker, &err)
+
+		err = invoker.Close()
+		if err != nil {
+			return
+		}
 
 		serverPort, serverUrl, err = invoker.StartJupyterServer(ctx)
-		return err
+		return
 	})
 	if err != nil {
 		return err
