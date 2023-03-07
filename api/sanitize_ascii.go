@@ -67,7 +67,7 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 		window := buf[bufIndex : bufIndex+6]
 
 		// Replace C1 Control Characters
-		if window[0] == 194 {
+		if window[0] == 0xC2 {
 			repl, _ := mapC1ToCaret(window[:2])
 			for j := 0; j < len(repl); j++ {
 				if outIndex < outLen {
@@ -179,12 +179,12 @@ func mapC0ToCaret(b []byte) ([]byte, bool) {
 }
 
 // mapC1ToCaret maps C1 control sequences to caret notation.
-// C1 control sequences are two bytes and start with 194.
+// C1 control sequences are two bytes and start with 0xC2.
 func mapC1ToCaret(b []byte) ([]byte, bool) {
 	if len(b) != 2 {
 		return b, false
 	}
-	if b[0] != 194 {
+	if b[0] != 0xC2 {
 		return b, false
 	}
 	m := map[byte]string{
