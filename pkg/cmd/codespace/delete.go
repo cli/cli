@@ -89,17 +89,16 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 	var codespaces []*api.Codespace
 	nameFilter := opts.codespaceName
 	if nameFilter == "" {
-		var codespaces []*api.Codespace
-		err = a.RunWithProgress("Fetching codespaces", func() (err error) {
+		err = a.RunWithProgress("Fetching codespaces", func() (fetchErr error) {
 			userName := opts.userName
 			if userName == "" && opts.orgName != "" {
-				currentUser, err := a.apiClient.GetUser(ctx)
-				if err != nil {
-					return err
+				currentUser, fetchErr := a.apiClient.GetUser(ctx)
+				if fetchErr != nil {
+					return fetchErr
 				}
 				userName = currentUser.Login
 			}
-			codespaces, err = a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{OrgName: opts.orgName, UserName: userName})
+			codespaces, fetchErr = a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{OrgName: opts.orgName, UserName: userName})
 			return
 		})
 		if err != nil {
@@ -116,11 +115,11 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 		}
 	} else {
 		var codespace *api.Codespace
-		err := a.RunWithProgress("Fetching codespace", func() (err error) {
+		err := a.RunWithProgress("Fetching codespace", func() (fetchErr error) {
 			if opts.orgName == "" || opts.userName == "" {
-				codespace, err = a.apiClient.GetCodespace(ctx, nameFilter, false)
+				codespace, fetchErr = a.apiClient.GetCodespace(ctx, nameFilter, false)
 			} else {
-				codespace, err = a.apiClient.GetOrgMemberCodespace(ctx, opts.orgName, opts.userName, opts.codespaceName)
+				codespace, fetchErr = a.apiClient.GetOrgMemberCodespace(ctx, opts.orgName, opts.userName, opts.codespaceName)
 			}
 			return
 		})
@@ -170,7 +169,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 		progressLabel = "Deleting codespaces"
 	}
 
-	return a.RunWithProgress(progressLabel, func() (err error) {
+	return a.RunWithProgress(progressLabel, func() error {
 		var g errgroup.Group
 		for _, c := range codespacesToDelete {
 			codespaceName := c.Name
