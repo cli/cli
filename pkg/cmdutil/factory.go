@@ -34,6 +34,10 @@ type Factory struct {
 
 // Executable is the path to the currently invoked binary
 func (f *Factory) Executable() string {
+	ghPath := os.Getenv("GH_PATH")
+	if ghPath != "" {
+		return ghPath
+	}
 	if !strings.ContainsRune(f.ExecutableName, os.PathSeparator) {
 		f.ExecutableName = executable(f.ExecutableName)
 	}
