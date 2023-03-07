@@ -54,7 +54,7 @@ func (a *App) Edit(ctx context.Context, opts editOptions) error {
 		return fmt.Errorf("error choosing codespace: %w", err)
 	}
 
-	err := a.RunWithProgress("Editing codespace", func() (err error) {
+	err = a.RunWithProgress("Editing codespace", func() (err error) {
 		_, err = a.apiClient.EditCodespace(ctx, codespaceName, &api.EditCodespaceParams{
 			DisplayName: opts.displayName,
 			Machine:     opts.machine,
