@@ -69,8 +69,9 @@ func logoutRun(opts *LogoutOptions) error {
 	if err != nil {
 		return err
 	}
+	authCfg := cfg.Authentication()
 
-	candidates := cfg.Hosts()
+	candidates := authCfg.Hosts()
 	if len(candidates) == 0 {
 		return fmt.Errorf("not logged in to any hosts")
 	}
@@ -100,7 +101,7 @@ func logoutRun(opts *LogoutOptions) error {
 		}
 	}
 
-	if src, writeable := shared.AuthTokenWriteable(cfg, hostname); !writeable {
+	if src, writeable := shared.AuthTokenWriteable(authCfg, hostname); !writeable {
 		fmt.Fprintf(opts.IO.ErrOut, "The value of the %s environment variable is being used for authentication.\n", src)
 		fmt.Fprint(opts.IO.ErrOut, "To erase credentials stored in GitHub CLI, first clear the value from the environment.\n")
 		return cmdutil.SilentError
@@ -116,7 +117,7 @@ func logoutRun(opts *LogoutOptions) error {
 	if err != nil {
 		// suppressing; the user is trying to delete this token and it might be bad.
 		// we'll see if the username is in the config and fall back to that.
-		username, _ = cfg.Get(hostname, "user")
+		username, _ = authCfg.User(hostname)
 	}
 
 	usernameStr := ""
@@ -124,9 +125,7 @@ func logoutRun(opts *LogoutOptions) error {
 		usernameStr = fmt.Sprintf(" account '%s'", username)
 	}
 
-	cfg.UnsetHost(hostname)
-	err = cfg.Write()
-	if err != nil {
+	if err := authCfg.Logout(hostname); err != nil {
 		return fmt.Errorf("failed to write config, authentication configuration not updated: %w", err)
 	}
 

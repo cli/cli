@@ -1,45 +1,45 @@
-package archive
+package unarchive
 
 import (
 	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/prompt"
-
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
 
-type ArchiveOptions struct {
+type UnarchiveOptions struct {
 	HttpClient func() (*http.Client, error)
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	Confirmed  bool
 	IO         *iostreams.IOStreams
 	RepoArg    string
+	Prompter   prompter.Prompter
 }
 
-func NewCmdArchive(f *cmdutil.Factory, runF func(*ArchiveOptions) error) *cobra.Command {
-	opts := &ArchiveOptions{
+func NewCmdUnarchive(f *cmdutil.Factory, runF func(*UnarchiveOptions) error) *cobra.Command {
+	opts := &UnarchiveOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
 		BaseRepo:   f.BaseRepo,
+		Prompter:   f.Prompter,
 	}
 
 	cmd := &cobra.Command{
-		Use:   "archive [<repository>]",
-		Short: "Archive a repository",
-		Long: heredoc.Doc(`Archive a GitHub repository.
+		Use:   "unarchive [<repository>]",
+		Short: "Unarchive a repository",
+		Long: heredoc.Doc(`Unarchive a GitHub repository.
 
-With no argument, archives the current repository.`),
+With no argument, unarchives the current repository.`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
@@ -54,7 +54,7 @@ With no argument, archives the current repository.`),
 				return runF(opts)
 			}
 
-			return archiveRun(opts)
+			return unarchiveRun(opts)
 		},
 	}
 
@@ -64,7 +64,7 @@ With no argument, archives the current repository.`),
 	return cmd
 }
 
-func archiveRun(opts *ArchiveOptions) error {
+func unarchiveRun(opts *UnarchiveOptions) error {
 	cs := opts.IO.ColorScheme()
 	httpClient, err := opts.HttpClient()
 	if err != nil {
@@ -72,10 +72,10 @@ func archiveRun(opts *ArchiveOptions) error {
 	}
 	apiClient := api.NewClientFromHTTP(httpClient)
 
-	var toArchive ghrepo.Interface
+	var toUnarchive ghrepo.Interface
 
 	if opts.RepoArg == "" {
-		toArchive, err = opts.BaseRepo()
+		toUnarchive, err = opts.BaseRepo()
 		if err != nil {
 			return err
 		}
@@ -96,49 +96,41 @@ func archiveRun(opts *ArchiveOptions) error {
 			repoSelector = currentUser + "/" + repoSelector
 		}
 
-		toArchive, err = ghrepo.FromFullName(repoSelector)
+		toUnarchive, err = ghrepo.FromFullName(repoSelector)
 		if err != nil {
 			return err
 		}
 	}
 
 	fields := []string{"name", "owner", "isArchived", "id"}
-	repo, err := api.FetchRepository(apiClient, toArchive, fields)
+	repo, err := api.FetchRepository(apiClient, toUnarchive, fields)
 	if err != nil {
 		return err
 	}
 
-	fullName := ghrepo.FullName(toArchive)
-	if repo.IsArchived {
-		fmt.Fprintf(opts.IO.ErrOut, "%s Repository %s is already archived\n", cs.WarningIcon(), fullName)
+	fullName := ghrepo.FullName(toUnarchive)
+	if !repo.IsArchived {
+		fmt.Fprintf(opts.IO.ErrOut, "%s Repository %s is not archived\n", cs.WarningIcon(), fullName)
 		return nil
 	}
 
 	if !opts.Confirmed {
-		p := &survey.Confirm{
-			Message: fmt.Sprintf("Archive %s?", fullName),
-			Default: false,
-		}
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		err = prompt.SurveyAskOne(p, &opts.Confirmed)
+		confirmed, err := opts.Prompter.Confirm(fmt.Sprintf("Unarchive %s?", fullName), false)
 		if err != nil {
-			return fmt.Errorf("failed to prompt: %w", err)
+			return err
 		}
-		if !opts.Confirmed {
+		if !confirmed {
 			return cmdutil.CancelError
 		}
 	}
 
-	err = archiveRepo(httpClient, repo)
+	err = unarchiveRepo(httpClient, repo)
 	if err != nil {
 		return err
 	}
 
 	if opts.IO.IsStdoutTTY() {
-		fmt.Fprintf(opts.IO.Out,
-			"%s Archived repository %s\n",
-			cs.SuccessIcon(),
-			fullName)
+		fmt.Fprintf(opts.IO.Out, "%s Unarchived repository %s\n", cs.SuccessIcon(), fullName)
 	}
 
 	return nil

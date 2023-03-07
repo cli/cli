@@ -54,8 +54,9 @@ func setupGitRun(opts *SetupGitOptions) error {
 	if err != nil {
 		return err
 	}
+	authCfg := cfg.Authentication()
 
-	hostnames := cfg.Hosts()
+	hostnames := authCfg.Hosts()
 
 	stderr := opts.IO.ErrOut
 	cs := opts.IO.ColorScheme()

@@ -19,6 +19,14 @@ func (issue *Issue) ExportData(fields []string) map[string]interface{} {
 			data[f] = issue.Labels.Nodes
 		case "projectCards":
 			data[f] = issue.ProjectCards.Nodes
+		case "projectItems":
+			items := make([]map[string]interface{}, 0, len(issue.ProjectItems.Nodes))
+			for _, n := range issue.ProjectItems.Nodes {
+				items = append(items, map[string]interface{}{
+					"title": n.Project.Title,
+				})
+			}
+			data[f] = items
 		default:
 			sf := fieldByName(v, f)
 			data[f] = sf.Interface()
@@ -96,6 +104,14 @@ func (pr *PullRequest) ExportData(fields []string) map[string]interface{} {
 			data[f] = pr.Labels.Nodes
 		case "projectCards":
 			data[f] = pr.ProjectCards.Nodes
+		case "projectItems":
+			items := make([]map[string]interface{}, 0, len(pr.ProjectItems.Nodes))
+			for _, n := range pr.ProjectItems.Nodes {
+				items = append(items, map[string]interface{}{
+					"title": n.Project.Title,
+				})
+			}
+			data[f] = items
 		case "reviews":
 			data[f] = pr.Reviews.Nodes
 		case "latestReviews":

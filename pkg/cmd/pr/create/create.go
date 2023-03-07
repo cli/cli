@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
@@ -741,27 +742,23 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 	// automatically push the branch if it hasn't been pushed anywhere yet
 	if ctx.IsPushEnabled {
 		pushBranch := func() error {
-			pushTries := 0
-			maxPushTries := 3
-			for {
-				w := NewRegexpWriter(opts.IO.ErrOut, gitPushRegexp, "")
-				defer w.Flush()
-				gitClient := ctx.GitClient
-				ref := fmt.Sprintf("HEAD:%s", ctx.HeadBranch)
-				if err := gitClient.Push(context.Background(), headRemote.Name, ref, git.WithStderr(w)); err != nil {
-					if didForkRepo && pushTries < maxPushTries {
-						pushTries++
-						// first wait 2 seconds after forking, then 4s, then 6s
-						waitSeconds := 2 * pushTries
-						fmt.Fprintf(opts.IO.ErrOut, "waiting %s before retrying...\n", text.Pluralize(waitSeconds, "second"))
-						time.Sleep(time.Duration(waitSeconds) * time.Second)
-						continue
+			w := NewRegexpWriter(opts.IO.ErrOut, gitPushRegexp, "")
+			defer w.Flush()
+			gitClient := ctx.GitClient
+			ref := fmt.Sprintf("HEAD:%s", ctx.HeadBranch)
+			bo := backoff.NewConstantBackOff(2 * time.Second)
+			ctx := context.Background()
+			return backoff.Retry(func() error {
+				if err := gitClient.Push(ctx, headRemote.Name, ref, git.WithStderr(w)); err != nil {
+					// Only retry if we have forked the repo else the push should succeed the first time.
+					if didForkRepo {
+						fmt.Fprintf(opts.IO.ErrOut, "waiting 2 seconds before retrying...\n")
+						return err
 					}
-					return err
+					return backoff.Permanent(err)
 				}
-				break
-			}
-			return nil
+				return nil
+			}, backoff.WithContext(backoff.WithMaxRetries(bo, 3), ctx))
 		}
 
 		err := pushBranch()

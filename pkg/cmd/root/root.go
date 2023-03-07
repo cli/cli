@@ -144,7 +144,7 @@ func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, er
 		}
 		opts := api.HTTPClientOptions{
 			AppVersion:        version,
-			Config:            cfg,
+			Config:            cfg.Authentication(),
 			Log:               f.IOStreams.ErrOut,
 			LogColorize:       f.IOStreams.ColorEnabled(),
 			SkipAcceptHeaders: true,

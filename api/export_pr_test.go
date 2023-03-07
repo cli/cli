@@ -75,6 +75,30 @@ func TestIssue_ExportData(t *testing.T) {
 				}
 			`),
 		},
+		{
+			name:   "project items",
+			fields: []string{"projectItems"},
+			inputJSON: heredoc.Doc(`
+				{ "projectItems": { "nodes": [
+					{
+						"id": "PVTI_id",
+						"project": {
+							"id": "PVT_id",
+							"title": "Some Project"
+						}
+					}
+				] } }
+			`),
+			outputJSON: heredoc.Doc(`
+				{
+					"projectItems": [
+						{
+							"title": "Some Project"
+						}
+					]
+				}
+			`),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

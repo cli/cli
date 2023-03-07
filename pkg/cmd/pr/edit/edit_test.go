@@ -464,22 +464,21 @@ func Test_editRun(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		ios, _, stdout, stderr := iostreams.Test()
-		ios.SetStdoutTTY(true)
-		ios.SetStdinTTY(true)
-		ios.SetStderrTTY(true)
-
-		reg := &httpmock.Registry{}
-		defer reg.Verify(t)
-		tt.httpStubs(t, reg)
-
-		httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
-
-		tt.input.IO = ios
-		tt.input.HttpClient = httpClient
-
 		t.Run(tt.name, func(t *testing.T) {
-			fmt.Println(tt.name)
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			ios.SetStdinTTY(true)
+			ios.SetStderrTTY(true)
+
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			tt.httpStubs(t, reg)
+
+			httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
+
+			tt.input.IO = ios
+			tt.input.HttpClient = httpClient
+
 			err := editRun(tt.input)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.stdout, stdout.String())
@@ -562,6 +561,16 @@ func mockRepoMetadata(_ *testing.T, reg *httpmock.Registry, skipReviewers bool) 
 		{ "data": { "organization": { "projectsV2": {
 			"nodes": [
 				{ "title": "TriageV2", "id": "TRIAGEV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	reg.Register(
+		httpmock.GraphQL(`query UserProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "viewer": { "projectsV2": {
+			"nodes": [
+				{ "title": "MonalisaV2", "id": "MONALISAV2ID" }
 			],
 			"pageInfo": { "hasNextPage": false }
 		} } } }

@@ -20,6 +20,10 @@ import (
 	"github.com/shurcooL/githubv4"
 )
 
+const (
+	errorResolvingOrganization = "Could not resolve to an Organization"
+)
+
 // Repository contains information about a GitHub repo
 type Repository struct {
 	ID                       string
@@ -653,7 +657,7 @@ type RepoMetadataResult struct {
 	AssignableUsers []RepoAssignee
 	Labels          []RepoLabel
 	Projects        []RepoProject
-	ProjectsV2      []RepoProjectV2
+	ProjectsV2      []ProjectV2
 	Milestones      []RepoMilestone
 	Teams           []OrgTeam
 }
@@ -758,17 +762,17 @@ func (m *RepoMetadataResult) projectV2TitleToID(projectTitle string) (string, bo
 	return "", false
 }
 
-func ProjectsToPaths(projects []RepoProject, projectsV2 []RepoProjectV2, names []string) ([]string, error) {
+func ProjectsToPaths(projects []RepoProject, projectsV2 []ProjectV2, names []string) ([]string, error) {
 	var paths []string
 	for _, projectName := range names {
 		found := false
 		for _, p := range projects {
 			if strings.EqualFold(projectName, p.Name) {
-				// format of ResourcePath: /OWNER/REPO/projects/PROJECT_NUMBER or /orgs/ORG/projects/PROJECT_NUMBER
-				// required format of path: OWNER/REPO/PROJECT_NUMBER or ORG/PROJECT_NUMBER
+				// format of ResourcePath: /OWNER/REPO/projects/PROJECT_NUMBER or /orgs/ORG/projects/PROJECT_NUMBER or /users/USER/projects/PROJECT_NUBER
+				// required format of path: OWNER/REPO/PROJECT_NUMBER or ORG/PROJECT_NUMBER or USER/PROJECT_NUMBER
 				var path string
 				pathParts := strings.Split(p.ResourcePath, "/")
-				if pathParts[1] == "orgs" {
+				if pathParts[1] == "orgs" || pathParts[1] == "users" {
 					path = fmt.Sprintf("%s/%s", pathParts[2], pathParts[4])
 				} else {
 					path = fmt.Sprintf("%s/%s/%s", pathParts[1], pathParts[2], pathParts[4])
@@ -783,11 +787,11 @@ func ProjectsToPaths(projects []RepoProject, projectsV2 []RepoProjectV2, names [
 		}
 		for _, p := range projectsV2 {
 			if strings.EqualFold(projectName, p.Title) {
-				// format of ResourcePath: /OWNER/REPO/projects/PROJECT_NUMBER or /orgs/ORG/projects/PROJECT_NUMBER
-				// required format of path: OWNER/REPO/PROJECT_NUMBER or ORG/PROJECT_NUMBER
+				// format of ResourcePath: /OWNER/REPO/projects/PROJECT_NUMBER or /orgs/ORG/projects/PROJECT_NUMBER or /users/USER/projects/PROJECT_NUBER
+				// required format of path: OWNER/REPO/PROJECT_NUMBER or ORG/PROJECT_NUMBER or USER/PROJECT_NUMBER
 				var path string
 				pathParts := strings.Split(p.ResourcePath, "/")
-				if pathParts[1] == "orgs" {
+				if pathParts[1] == "orgs" || pathParts[1] == "users" {
 					path = fmt.Sprintf("%s/%s", pathParts[2], pathParts[4])
 				} else {
 					path = fmt.Sprintf("%s/%s/%s", pathParts[1], pathParts[2], pathParts[4])
@@ -845,100 +849,74 @@ type RepoMetadataInput struct {
 
 // RepoMetadata pre-fetches the metadata for attaching to issues and pull requests
 func RepoMetadata(client *Client, repo ghrepo.Interface, input RepoMetadataInput) (*RepoMetadataResult, error) {
-	result := RepoMetadataResult{}
-	errc := make(chan error)
-	count := 0
+	var result RepoMetadataResult
+	var g errgroup.Group
 
 	if input.Assignees || input.Reviewers {
-		count++
-		go func() {
+		g.Go(func() error {
 			users, err := RepoAssignableUsers(client, repo)
 			if err != nil {
 				err = fmt.Errorf("error fetching assignees: %w", err)
 			}
 			result.AssignableUsers = users
-			errc <- err
-		}()
+			return err
+		})
 	}
 	if input.Reviewers {
-		count++
-		go func() {
+		g.Go(func() error {
 			teams, err := OrganizationTeams(client, repo)
 			// TODO: better detection of non-org repos
-			if err != nil && !strings.Contains(err.Error(), "Could not resolve to an Organization") {
-				errc <- fmt.Errorf("error fetching organization teams: %w", err)
-				return
+			if err != nil && !strings.Contains(err.Error(), errorResolvingOrganization) {
+				err = fmt.Errorf("error fetching organization teams: %w", err)
+				return err
 			}
 			result.Teams = teams
-			errc <- nil
-		}()
+			return nil
+		})
 	}
 	if input.Reviewers {
-		count++
-		go func() {
+		g.Go(func() error {
 			login, err := CurrentLoginName(client, repo.RepoHost())
 			if err != nil {
 				err = fmt.Errorf("error fetching current login: %w", err)
 			}
 			result.CurrentLogin = login
-			errc <- err
-		}()
+			return err
+		})
 	}
 	if input.Labels {
-		count++
-		go func() {
+		g.Go(func() error {
 			labels, err := RepoLabels(client, repo)
 			if err != nil {
 				err = fmt.Errorf("error fetching labels: %w", err)
 			}
 			result.Labels = labels
-			errc <- err
-		}()
+			return err
+		})
 	}
 	if input.Projects {
-		count++
-		go func() {
-			projects, err := RepoAndOrgProjects(client, repo)
-			if err != nil {
-				errc <- err
-				return
-			}
-			result.Projects = projects
-			errc <- nil
-		}()
-	}
-	if input.Projects {
-		count++
-		go func() {
-			projectsV2, err := RepoAndOrgProjectsV2(client, repo)
-			if err != nil {
-				errc <- err
-				return
-			}
-			result.ProjectsV2 = projectsV2
-			errc <- nil
-		}()
+		g.Go(func() error {
+			var err error
+			result.Projects, result.ProjectsV2, err = relevantProjects(client, repo)
+			return err
+		})
 	}
 	if input.Milestones {
-		count++
-		go func() {
+		g.Go(func() error {
 			milestones, err := RepoMilestones(client, repo, "open")
 			if err != nil {
 				err = fmt.Errorf("error fetching milestones: %w", err)
 			}
 			result.Milestones = milestones
-			errc <- err
-		}()
+			return err
+		})
 	}
 
-	var err error
-	for i := 0; i < count; i++ {
-		if e := <-errc; e != nil {
-			err = e
-		}
+	if err := g.Wait(); err != nil {
+		return nil, err
 	}
 
-	return &result, err
+	return &result, nil
 }
 
 type RepoResolveInput struct {
@@ -1050,14 +1028,6 @@ type RepoProject struct {
 	ResourcePath string `json:"resourcePath"`
 }
 
-type RepoProjectV2 struct {
-	ID           string `json:"id"`
-	Title        string `json:"title"`
-	Number       int    `json:"number"`
-	ResourcePath string `json:"resourcePath"`
-	Closed       bool   `json:"closed"`
-}
-
 // RepoProjects fetches all open projects for a repository.
 func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) {
 	type responseData struct {
@@ -1094,87 +1064,6 @@ func RepoProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) 
 	}
 
 	return projects, nil
-}
-
-// RepoProjectsV2 fetches all open projectsV2 for a repository.
-func RepoProjectsV2(client *Client, repo ghrepo.Interface) ([]RepoProjectV2, error) {
-	type responseData struct {
-		Repository struct {
-			ProjectsV2 struct {
-				Nodes    []RepoProjectV2
-				PageInfo struct {
-					HasNextPage bool
-					EndCursor   string
-				}
-			} `graphql:"projectsV2(first: 100, orderBy: {field: TITLE, direction: ASC}, after: $endCursor, query: $query)"`
-		} `graphql:"repository(owner: $owner, name: $name)"`
-	}
-
-	variables := map[string]interface{}{
-		"owner":     githubv4.String(repo.RepoOwner()),
-		"name":      githubv4.String(repo.RepoName()),
-		"endCursor": (*githubv4.String)(nil),
-		"query":     githubv4.String("is:open"),
-	}
-
-	var projectsV2 []RepoProjectV2
-	for {
-		var query responseData
-		err := client.Query(repo.RepoHost(), "RepositoryProjectV2List", &query, variables)
-		if err != nil {
-			return nil, err
-		}
-
-		projectsV2 = append(projectsV2, query.Repository.ProjectsV2.Nodes...)
-
-		if !query.Repository.ProjectsV2.PageInfo.HasNextPage {
-			break
-		}
-		variables["endCursor"] = githubv4.String(query.Repository.ProjectsV2.PageInfo.EndCursor)
-	}
-
-	return projectsV2, nil
-}
-
-// RepoAndOrgProjects fetches all open projects for a repository and its organization.
-func RepoAndOrgProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) {
-	projects, err := RepoProjects(client, repo)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching projects: %w", err)
-	}
-
-	orgProjects, err := OrganizationProjects(client, repo)
-	// TODO: Better detection of non-org repos.
-	if err != nil && !strings.Contains(err.Error(), "Could not resolve to an Organization") {
-		return nil, fmt.Errorf("error fetching organization projects: %w", err)
-	}
-
-	projects = append(projects, orgProjects...)
-
-	return projects, nil
-}
-
-// RepoAndOrgProjectsV2 fetches all open projectsV2 for a repository and its organization.
-// Note: If the auth token does not have sufficient scopes or projectsV2 is not supported
-// on the host then those errors are swallowed and nil is returned.
-func RepoAndOrgProjectsV2(client *Client, repo ghrepo.Interface) ([]RepoProjectV2, error) {
-	projectsV2, err := RepoProjectsV2(client, repo)
-	if err != nil {
-		if ProjectsV2IgnorableError(err) {
-			return nil, nil
-		}
-
-		return nil, fmt.Errorf("error fetching projectsV2: %w", err)
-	}
-
-	orgProjectsV2, err := OrganizationProjectsV2(client, repo)
-	if err != nil && !strings.Contains(err.Error(), "Could not resolve to an Organization") {
-		return nil, fmt.Errorf("error fetching organization projectsV2: %w", err)
-	}
-
-	projectsV2 = append(projectsV2, orgProjectsV2...)
-
-	return projectsV2, nil
 }
 
 type RepoAssignee struct {
@@ -1329,27 +1218,100 @@ func RepoMilestones(client *Client, repo ghrepo.Interface, state string) ([]Repo
 }
 
 func ProjectNamesToPaths(client *Client, repo ghrepo.Interface, projectNames []string) ([]string, error) {
+	projects, projectsV2, err := relevantProjects(client, repo)
+	if err != nil {
+		return nil, err
+	}
+	return ProjectsToPaths(projects, projectsV2, projectNames)
+}
+
+// RelevantProjects retrieves set of Projects and ProjectsV2 relevant to given repository:
+// - Projects for repository
+// - Projects for repository organization, if it belongs to one
+// - ProjectsV2 owned by current user
+// - ProjectsV2 linked to repository
+// - ProjectsV2 owned by repository organization, if it belongs to one
+func relevantProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, []ProjectV2, error) {
+	var repoProjects []RepoProject
+	var orgProjects []RepoProject
+	var userProjectsV2 []ProjectV2
+	var repoProjectsV2 []ProjectV2
+	var orgProjectsV2 []ProjectV2
+
 	g, _ := errgroup.WithContext(context.Background())
-	var projects []RepoProject
-	var projectsV2 []RepoProjectV2
 
 	g.Go(func() error {
 		var err error
-		projects, err = RepoAndOrgProjects(client, repo)
+		repoProjects, err = RepoProjects(client, repo)
+		if err != nil {
+			err = fmt.Errorf("error fetching repo projects (classic): %w", err)
+		}
 		return err
 	})
-
 	g.Go(func() error {
 		var err error
-		projectsV2, err = RepoAndOrgProjectsV2(client, repo)
-		return err
+		orgProjects, err = OrganizationProjects(client, repo)
+		if err != nil && !strings.Contains(err.Error(), errorResolvingOrganization) {
+			err = fmt.Errorf("error fetching organization projects (classic): %w", err)
+			return err
+		}
+		return nil
+	})
+	g.Go(func() error {
+		var err error
+		userProjectsV2, err = CurrentUserProjectsV2(client, repo.RepoHost())
+		if err != nil && !ProjectsV2IgnorableError(err) {
+			err = fmt.Errorf("error fetching user projects: %w", err)
+			return err
+		}
+		return nil
+	})
+	g.Go(func() error {
+		var err error
+		repoProjectsV2, err = RepoProjectsV2(client, repo)
+		if err != nil && !ProjectsV2IgnorableError(err) {
+			err = fmt.Errorf("error fetching repo projects: %w", err)
+			return err
+		}
+		return nil
+	})
+	g.Go(func() error {
+		var err error
+		orgProjectsV2, err = OrganizationProjectsV2(client, repo)
+		if err != nil &&
+			!ProjectsV2IgnorableError(err) &&
+			!strings.Contains(err.Error(), errorResolvingOrganization) {
+			err = fmt.Errorf("error fetching organization projects: %w", err)
+			return err
+		}
+		return nil
 	})
 
 	if err := g.Wait(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return ProjectsToPaths(projects, projectsV2, projectNames)
+	projects := make([]RepoProject, 0, len(repoProjects)+len(orgProjects))
+	projects = append(projects, repoProjects...)
+	projects = append(projects, orgProjects...)
+
+	// ProjectV2 might appear across multiple queries so use a map to keep them deduplicated.
+	m := make(map[string]ProjectV2, len(userProjectsV2)+len(repoProjectsV2)+len(orgProjectsV2))
+	for _, p := range userProjectsV2 {
+		m[p.ID] = p
+	}
+	for _, p := range repoProjectsV2 {
+		m[p.ID] = p
+	}
+	for _, p := range orgProjectsV2 {
+		m[p.ID] = p
+	}
+	projectsV2 := make([]ProjectV2, 0, len(m))
+	for _, p := range m {
+		projectsV2 = append(projectsV2, p)
+	}
+
+	return projects, projectsV2, nil
 }
 
 func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, path string, body io.Reader) (*Repository, error) {

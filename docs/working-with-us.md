@@ -48,6 +48,8 @@ If after all of this consideration you think your feature should be merged, plea
 
 Once we've signed off, open up a pull request in [cli/cli](https://github.com/cli/cli) adding your command. Since we make use of `go-gh` within our code already, it shouldn't be too onerous to make your extension merge-able. Link to the issue you opened in step 3 so we have some context on the pull request.
 
+Keep in mind that our expectation of non-trivial commands that end up merged into `cli/cli` is that your team will continue to maintain what they merged over time. We can help redirect issues your way as part of our first responder rotation, but are unable to take on the full support burden for your new command.
+
 ## Other considerations
 
 - If you have a high need for secrecy until the point of release, let us know in [#cli on slack](https://github.slack.com/archives/CLLG3RMAR). We'll come up with a solution to work on merging your command in private.

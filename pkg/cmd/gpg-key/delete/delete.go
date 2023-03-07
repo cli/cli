@@ -65,7 +65,7 @@ func deleteRun(opts *DeleteOptions) error {
 		return err
 	}
 
-	host, _ := cfg.DefaultHost()
+	host, _ := cfg.Authentication().DefaultHost()
 	gpgKeys, err := getGPGKeys(httpClient, host)
 	if err != nil {
 		return err

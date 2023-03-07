@@ -61,6 +61,7 @@ func statusRun(opts *StatusOptions) error {
 	if err != nil {
 		return err
 	}
+	authCfg := cfg.Authentication()
 
 	// TODO check tty
 
@@ -70,7 +71,7 @@ func statusRun(opts *StatusOptions) error {
 
 	statusInfo := map[string][]string{}
 
-	hostnames := cfg.Hosts()
+	hostnames := authCfg.Hosts()
 	if len(hostnames) == 0 {
 		fmt.Fprintf(stderr,
 			"You are not logged into any GitHub hosts. Run %s to authenticate.\n", cs.Bold("gh auth login"))
@@ -91,13 +92,13 @@ func statusRun(opts *StatusOptions) error {
 		}
 		isHostnameFound = true
 
-		token, tokenSource := cfg.AuthToken(hostname)
+		token, tokenSource := authCfg.Token(hostname)
 		if tokenSource == "oauth_token" {
 			// The go-gh function TokenForHost returns this value as source for tokens read from the
 			// config file, but we want the file path instead. This attempts to reconstruct it.
 			tokenSource = filepath.Join(config.ConfigDir(), "hosts.yml")
 		}
-		_, tokenIsWriteable := shared.AuthTokenWriteable(cfg, hostname)
+		_, tokenIsWriteable := shared.AuthTokenWriteable(authCfg, hostname)
 
 		statusInfo[hostname] = []string{}
 		addMsg := func(x string, ys ...interface{}) {
@@ -138,7 +139,7 @@ func statusRun(opts *StatusOptions) error {
 			}
 
 			addMsg("%s Logged in to %s as %s (%s)", cs.SuccessIcon(), hostname, cs.Bold(username), tokenSource)
-			proto, _ := cfg.GetOrDefault(hostname, "git_protocol")
+			proto, _ := authCfg.GitProtocol(hostname)
 			if proto != "" {
 				addMsg("%s Git operations for %s configured to use %s protocol.",
 					cs.SuccessIcon(), hostname, cs.Bold(proto))

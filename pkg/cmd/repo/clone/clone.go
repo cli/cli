@@ -114,7 +114,7 @@ func cloneRun(opts *CloneOptions) error {
 		if repositoryIsFullName {
 			fullName = opts.Repository
 		} else {
-			host, _ := cfg.DefaultHost()
+			host, _ := cfg.Authentication().DefaultHost()
 			currentUser, err := api.CurrentLoginName(apiClient, host)
 			if err != nil {
 				return err

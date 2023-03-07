@@ -2,6 +2,7 @@ package fork
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
@@ -32,6 +34,7 @@ type ForkOptions struct {
 	BaseRepo   func() (ghrepo.Interface, error)
 	Remotes    func() (ghContext.Remotes, error)
 	Since      func(time.Time) time.Duration
+	BackOff    backoff.BackOff
 
 	GitArgs           []string
 	Repository        string
@@ -44,6 +47,10 @@ type ForkOptions struct {
 	ForkName          string
 	Rename            bool
 	DefaultBranchOnly bool
+}
+
+type errWithExitCode interface {
+	ExitCode() int
 }
 
 // TODO warn about useless flags (--remote, --remote-name) when running from outside a repository
@@ -202,7 +209,7 @@ func forkRun(opts *ForkOptions) error {
 				cs.Bold(ghrepo.FullName(forkedRepo)),
 				"already exists")
 		} else {
-			fmt.Fprintf(stderr, "%s already exists", ghrepo.FullName(forkedRepo))
+			fmt.Fprintf(stderr, "%s already exists\n", ghrepo.FullName(forkedRepo))
 		}
 	} else {
 		if connectedToTerminal {
@@ -317,8 +324,25 @@ func forkRun(opts *ForkOptions) error {
 			}
 		}
 		if cloneDesired {
-			forkedRepoURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
-			cloneDir, err := gitClient.Clone(ctx, forkedRepoURL, opts.GitArgs)
+			// Allow injecting alternative BackOff in tests.
+			if opts.BackOff == nil {
+				bo := backoff.NewConstantBackOff(2 * time.Second)
+				opts.BackOff = bo
+			}
+
+			cloneDir, err := backoff.RetryWithData(func() (string, error) {
+				forkedRepoURL := ghrepo.FormatRemoteURL(forkedRepo, protocol)
+				dir, err := gitClient.Clone(ctx, forkedRepoURL, opts.GitArgs)
+				if err == nil {
+					return dir, err
+				}
+				var execError errWithExitCode
+				if errors.As(err, &execError) && execError.ExitCode() == 128 {
+					return "", err
+				}
+				return "", backoff.Permanent(err)
+			}, backoff.WithContext(backoff.WithMaxRetries(opts.BackOff, 3), ctx))
+
 			if err != nil {
 				return fmt.Errorf("failed to clone fork: %w", err)
 			}

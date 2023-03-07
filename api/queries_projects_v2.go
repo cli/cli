@@ -10,11 +10,20 @@ import (
 
 const (
 	errorProjectsV2ReadScope         = "field requires one of the following scopes: ['read:project']"
+	errorProjectsV2UserField         = "Field 'projectsV2' doesn't exist on type 'User'"
 	errorProjectsV2RepositoryField   = "Field 'projectsV2' doesn't exist on type 'Repository'"
 	errorProjectsV2OrganizationField = "Field 'projectsV2' doesn't exist on type 'Organization'"
 	errorProjectsV2IssueField        = "Field 'projectItems' doesn't exist on type 'Issue'"
 	errorProjectsV2PullRequestField  = "Field 'projectItems' doesn't exist on type 'PullRequest'"
 )
+
+type ProjectV2 struct {
+	ID           string `json:"id"`
+	Title        string `json:"title"`
+	Number       int    `json:"number"`
+	ResourcePath string `json:"resourcePath"`
+	Closed       bool   `json:"closed"`
+}
 
 // UpdateProjectV2Items uses the addProjectV2ItemById and the deleteProjectV2Item mutations
 // to add and delete items from projects. The addProjectItems and deleteProjectItems arguments are
@@ -126,6 +135,123 @@ func ProjectsV2ItemsForPullRequest(client *Client, repo ghrepo.Interface, pr *Pu
 	return nil
 }
 
+// OrganizationProjectsV2 fetches all open projectsV2 for an organization.
+func OrganizationProjectsV2(client *Client, repo ghrepo.Interface) ([]ProjectV2, error) {
+	type responseData struct {
+		Organization struct {
+			ProjectsV2 struct {
+				Nodes    []ProjectV2
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			} `graphql:"projectsV2(first: 100, orderBy: {field: TITLE, direction: ASC}, after: $endCursor, query: $query)"`
+		} `graphql:"organization(login: $owner)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":     githubv4.String(repo.RepoOwner()),
+		"endCursor": (*githubv4.String)(nil),
+		"query":     githubv4.String("is:open"),
+	}
+
+	var projectsV2 []ProjectV2
+	for {
+		var query responseData
+		err := client.Query(repo.RepoHost(), "OrganizationProjectV2List", &query, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		projectsV2 = append(projectsV2, query.Organization.ProjectsV2.Nodes...)
+
+		if !query.Organization.ProjectsV2.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Organization.ProjectsV2.PageInfo.EndCursor)
+	}
+
+	return projectsV2, nil
+}
+
+// RepoProjectsV2 fetches all open projectsV2 for a repository.
+func RepoProjectsV2(client *Client, repo ghrepo.Interface) ([]ProjectV2, error) {
+	type responseData struct {
+		Repository struct {
+			ProjectsV2 struct {
+				Nodes    []ProjectV2
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			} `graphql:"projectsV2(first: 100, orderBy: {field: TITLE, direction: ASC}, after: $endCursor, query: $query)"`
+		} `graphql:"repository(owner: $owner, name: $name)"`
+	}
+
+	variables := map[string]interface{}{
+		"owner":     githubv4.String(repo.RepoOwner()),
+		"name":      githubv4.String(repo.RepoName()),
+		"endCursor": (*githubv4.String)(nil),
+		"query":     githubv4.String("is:open"),
+	}
+
+	var projectsV2 []ProjectV2
+	for {
+		var query responseData
+		err := client.Query(repo.RepoHost(), "RepositoryProjectV2List", &query, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		projectsV2 = append(projectsV2, query.Repository.ProjectsV2.Nodes...)
+
+		if !query.Repository.ProjectsV2.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Repository.ProjectsV2.PageInfo.EndCursor)
+	}
+
+	return projectsV2, nil
+}
+
+// CurrentUserProjectsV2 fetches all open projectsV2 for current user.
+func CurrentUserProjectsV2(client *Client, hostname string) ([]ProjectV2, error) {
+	type responseData struct {
+		Viewer struct {
+			ProjectsV2 struct {
+				Nodes    []ProjectV2
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
+				}
+			} `graphql:"projectsV2(first: 100, orderBy: {field: TITLE, direction: ASC}, after: $endCursor, query: $query)"`
+		} `graphql:"viewer"`
+	}
+
+	variables := map[string]interface{}{
+		"endCursor": (*githubv4.String)(nil),
+		"query":     githubv4.String("is:open"),
+	}
+
+	var projectsV2 []ProjectV2
+	for {
+		var query responseData
+		err := client.Query(hostname, "UserProjectV2List", &query, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		projectsV2 = append(projectsV2, query.Viewer.ProjectsV2.Nodes...)
+
+		if !query.Viewer.ProjectsV2.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.String(query.Viewer.ProjectsV2.PageInfo.EndCursor)
+	}
+
+	return projectsV2, nil
+}
+
 // When querying ProjectsV2 fields we generally dont want to show the user
 // scope errors and field does not exist errors. ProjectsV2IgnorableError
 // checks against known error strings to see if an error can be safely ignored.
@@ -134,6 +260,7 @@ func ProjectsV2ItemsForPullRequest(client *Client, repo ghrepo.Interface, pr *Pu
 func ProjectsV2IgnorableError(err error) bool {
 	msg := err.Error()
 	if strings.Contains(msg, errorProjectsV2ReadScope) ||
+		strings.Contains(msg, errorProjectsV2UserField) ||
 		strings.Contains(msg, errorProjectsV2RepositoryField) ||
 		strings.Contains(msg, errorProjectsV2OrganizationField) ||
 		strings.Contains(msg, errorProjectsV2IssueField) ||

@@ -20,11 +20,8 @@ var _ Config = &ConfigMock{}
 //			AliasesFunc: func() *AliasConfig {
 //				panic("mock out the Aliases method")
 //			},
-//			AuthTokenFunc: func(s string) (string, string) {
-//				panic("mock out the AuthToken method")
-//			},
-//			DefaultHostFunc: func() (string, string) {
-//				panic("mock out the DefaultHost method")
+//			AuthenticationFunc: func() *AuthConfig {
+//				panic("mock out the Authentication method")
 //			},
 //			GetFunc: func(s1 string, s2 string) (string, error) {
 //				panic("mock out the Get method")
@@ -32,14 +29,8 @@ var _ Config = &ConfigMock{}
 //			GetOrDefaultFunc: func(s1 string, s2 string) (string, error) {
 //				panic("mock out the GetOrDefault method")
 //			},
-//			HostsFunc: func() []string {
-//				panic("mock out the Hosts method")
-//			},
 //			SetFunc: func(s1 string, s2 string, s3 string)  {
 //				panic("mock out the Set method")
-//			},
-//			UnsetHostFunc: func(s string)  {
-//				panic("mock out the UnsetHost method")
 //			},
 //			WriteFunc: func() error {
 //				panic("mock out the Write method")
@@ -54,11 +45,8 @@ type ConfigMock struct {
 	// AliasesFunc mocks the Aliases method.
 	AliasesFunc func() *AliasConfig
 
-	// AuthTokenFunc mocks the AuthToken method.
-	AuthTokenFunc func(s string) (string, string)
-
-	// DefaultHostFunc mocks the DefaultHost method.
-	DefaultHostFunc func() (string, string)
+	// AuthenticationFunc mocks the Authentication method.
+	AuthenticationFunc func() *AuthConfig
 
 	// GetFunc mocks the Get method.
 	GetFunc func(s1 string, s2 string) (string, error)
@@ -66,14 +54,8 @@ type ConfigMock struct {
 	// GetOrDefaultFunc mocks the GetOrDefault method.
 	GetOrDefaultFunc func(s1 string, s2 string) (string, error)
 
-	// HostsFunc mocks the Hosts method.
-	HostsFunc func() []string
-
 	// SetFunc mocks the Set method.
 	SetFunc func(s1 string, s2 string, s3 string)
-
-	// UnsetHostFunc mocks the UnsetHost method.
-	UnsetHostFunc func(s string)
 
 	// WriteFunc mocks the Write method.
 	WriteFunc func() error
@@ -83,13 +65,8 @@ type ConfigMock struct {
 		// Aliases holds details about calls to the Aliases method.
 		Aliases []struct {
 		}
-		// AuthToken holds details about calls to the AuthToken method.
-		AuthToken []struct {
-			// S is the s argument value.
-			S string
-		}
-		// DefaultHost holds details about calls to the DefaultHost method.
-		DefaultHost []struct {
+		// Authentication holds details about calls to the Authentication method.
+		Authentication []struct {
 		}
 		// Get holds details about calls to the Get method.
 		Get []struct {
@@ -105,9 +82,6 @@ type ConfigMock struct {
 			// S2 is the s2 argument value.
 			S2 string
 		}
-		// Hosts holds details about calls to the Hosts method.
-		Hosts []struct {
-		}
 		// Set holds details about calls to the Set method.
 		Set []struct {
 			// S1 is the s1 argument value.
@@ -117,24 +91,16 @@ type ConfigMock struct {
 			// S3 is the s3 argument value.
 			S3 string
 		}
-		// UnsetHost holds details about calls to the UnsetHost method.
-		UnsetHost []struct {
-			// S is the s argument value.
-			S string
-		}
 		// Write holds details about calls to the Write method.
 		Write []struct {
 		}
 	}
-	lockAliases      sync.RWMutex
-	lockAuthToken    sync.RWMutex
-	lockDefaultHost  sync.RWMutex
-	lockGet          sync.RWMutex
-	lockGetOrDefault sync.RWMutex
-	lockHosts        sync.RWMutex
-	lockSet          sync.RWMutex
-	lockUnsetHost    sync.RWMutex
-	lockWrite        sync.RWMutex
+	lockAliases        sync.RWMutex
+	lockAuthentication sync.RWMutex
+	lockGet            sync.RWMutex
+	lockGetOrDefault   sync.RWMutex
+	lockSet            sync.RWMutex
+	lockWrite          sync.RWMutex
 }
 
 // Aliases calls AliasesFunc.
@@ -164,62 +130,30 @@ func (mock *ConfigMock) AliasesCalls() []struct {
 	return calls
 }
 
-// AuthToken calls AuthTokenFunc.
-func (mock *ConfigMock) AuthToken(s string) (string, string) {
-	if mock.AuthTokenFunc == nil {
-		panic("ConfigMock.AuthTokenFunc: method is nil but Config.AuthToken was just called")
-	}
-	callInfo := struct {
-		S string
-	}{
-		S: s,
-	}
-	mock.lockAuthToken.Lock()
-	mock.calls.AuthToken = append(mock.calls.AuthToken, callInfo)
-	mock.lockAuthToken.Unlock()
-	return mock.AuthTokenFunc(s)
-}
-
-// AuthTokenCalls gets all the calls that were made to AuthToken.
-// Check the length with:
-//
-//	len(mockedConfig.AuthTokenCalls())
-func (mock *ConfigMock) AuthTokenCalls() []struct {
-	S string
-} {
-	var calls []struct {
-		S string
-	}
-	mock.lockAuthToken.RLock()
-	calls = mock.calls.AuthToken
-	mock.lockAuthToken.RUnlock()
-	return calls
-}
-
-// DefaultHost calls DefaultHostFunc.
-func (mock *ConfigMock) DefaultHost() (string, string) {
-	if mock.DefaultHostFunc == nil {
-		panic("ConfigMock.DefaultHostFunc: method is nil but Config.DefaultHost was just called")
+// Authentication calls AuthenticationFunc.
+func (mock *ConfigMock) Authentication() *AuthConfig {
+	if mock.AuthenticationFunc == nil {
+		panic("ConfigMock.AuthenticationFunc: method is nil but Config.Authentication was just called")
 	}
 	callInfo := struct {
 	}{}
-	mock.lockDefaultHost.Lock()
-	mock.calls.DefaultHost = append(mock.calls.DefaultHost, callInfo)
-	mock.lockDefaultHost.Unlock()
-	return mock.DefaultHostFunc()
+	mock.lockAuthentication.Lock()
+	mock.calls.Authentication = append(mock.calls.Authentication, callInfo)
+	mock.lockAuthentication.Unlock()
+	return mock.AuthenticationFunc()
 }
 
-// DefaultHostCalls gets all the calls that were made to DefaultHost.
+// AuthenticationCalls gets all the calls that were made to Authentication.
 // Check the length with:
 //
-//	len(mockedConfig.DefaultHostCalls())
-func (mock *ConfigMock) DefaultHostCalls() []struct {
+//	len(mockedConfig.AuthenticationCalls())
+func (mock *ConfigMock) AuthenticationCalls() []struct {
 } {
 	var calls []struct {
 	}
-	mock.lockDefaultHost.RLock()
-	calls = mock.calls.DefaultHost
-	mock.lockDefaultHost.RUnlock()
+	mock.lockAuthentication.RLock()
+	calls = mock.calls.Authentication
+	mock.lockAuthentication.RUnlock()
 	return calls
 }
 
@@ -295,33 +229,6 @@ func (mock *ConfigMock) GetOrDefaultCalls() []struct {
 	return calls
 }
 
-// Hosts calls HostsFunc.
-func (mock *ConfigMock) Hosts() []string {
-	if mock.HostsFunc == nil {
-		panic("ConfigMock.HostsFunc: method is nil but Config.Hosts was just called")
-	}
-	callInfo := struct {
-	}{}
-	mock.lockHosts.Lock()
-	mock.calls.Hosts = append(mock.calls.Hosts, callInfo)
-	mock.lockHosts.Unlock()
-	return mock.HostsFunc()
-}
-
-// HostsCalls gets all the calls that were made to Hosts.
-// Check the length with:
-//
-//	len(mockedConfig.HostsCalls())
-func (mock *ConfigMock) HostsCalls() []struct {
-} {
-	var calls []struct {
-	}
-	mock.lockHosts.RLock()
-	calls = mock.calls.Hosts
-	mock.lockHosts.RUnlock()
-	return calls
-}
-
 // Set calls SetFunc.
 func (mock *ConfigMock) Set(s1 string, s2 string, s3 string) {
 	if mock.SetFunc == nil {
@@ -359,38 +266,6 @@ func (mock *ConfigMock) SetCalls() []struct {
 	mock.lockSet.RLock()
 	calls = mock.calls.Set
 	mock.lockSet.RUnlock()
-	return calls
-}
-
-// UnsetHost calls UnsetHostFunc.
-func (mock *ConfigMock) UnsetHost(s string) {
-	if mock.UnsetHostFunc == nil {
-		panic("ConfigMock.UnsetHostFunc: method is nil but Config.UnsetHost was just called")
-	}
-	callInfo := struct {
-		S string
-	}{
-		S: s,
-	}
-	mock.lockUnsetHost.Lock()
-	mock.calls.UnsetHost = append(mock.calls.UnsetHost, callInfo)
-	mock.lockUnsetHost.Unlock()
-	mock.UnsetHostFunc(s)
-}
-
-// UnsetHostCalls gets all the calls that were made to UnsetHost.
-// Check the length with:
-//
-//	len(mockedConfig.UnsetHostCalls())
-func (mock *ConfigMock) UnsetHostCalls() []struct {
-	S string
-} {
-	var calls []struct {
-		S string
-	}
-	mock.lockUnsetHost.RLock()
-	calls = mock.calls.UnsetHost
-	mock.lockUnsetHost.RUnlock()
 	return calls
 }
 

@@ -121,6 +121,16 @@ func Test_RepoMetadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
+		httpmock.GraphQL(`query UserProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "viewer": { "projectsV2": {
+			"nodes": [
+				{ "title": "MonalisaV2", "id": "MONALISAV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
 		httpmock.GraphQL(`query OrganizationTeamList\b`),
 		httpmock.StringResponse(`
 		{ "data": { "organization": { "teams": {
@@ -170,8 +180,8 @@ func Test_RepoMetadata(t *testing.T) {
 	}
 
 	expectedProjectIDs := []string{"TRIAGEID", "ROADMAPID"}
-	expectedProjectV2IDs := []string{"TRIAGEV2ID", "ROADMAPV2ID"}
-	projectIDs, projectV2IDs, err := result.ProjectsToIDs([]string{"triage", "roadmap", "triagev2", "roadmapv2"})
+	expectedProjectV2IDs := []string{"TRIAGEV2ID", "ROADMAPV2ID", "MONALISAV2ID"}
+	projectIDs, projectV2IDs, err := result.ProjectsToIDs([]string{"triage", "roadmap", "triagev2", "roadmapv2", "monalisav2"})
 	if err != nil {
 		t.Errorf("error resolving projects: %v", err)
 	}
@@ -204,7 +214,7 @@ func Test_ProjectsToPaths(t *testing.T) {
 		{ID: "id2", Name: "Org Project", ResourcePath: "/orgs/ORG/projects/PROJECT_NUMBER"},
 		{ID: "id3", Name: "Project", ResourcePath: "/orgs/ORG/projects/PROJECT_NUMBER_2"},
 	}
-	projectsV2 := []RepoProjectV2{
+	projectsV2 := []ProjectV2{
 		{ID: "id4", Title: "My Project V2", ResourcePath: "/OWNER/REPO/projects/PROJECT_NUMBER_2"},
 		{ID: "id5", Title: "Org Project V2", ResourcePath: "/orgs/ORG/projects/PROJECT_NUMBER_3"},
 	}
@@ -267,13 +277,23 @@ func Test_ProjectNamesToPaths(t *testing.T) {
 			"pageInfo": { "hasNextPage": false }
 		} } } }
 		`))
+	http.Register(
+		httpmock.GraphQL(`query UserProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "viewer": { "projectsV2": {
+			"nodes": [
+				{ "title": "MonalisaV2", "id": "MONALISAV2ID", "resourcePath": "/users/MONALISA/projects/5"  }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
 
-	projectPaths, err := ProjectNamesToPaths(client, repo, []string{"Triage", "Roadmap", "TriageV2", "RoadmapV2"})
+	projectPaths, err := ProjectNamesToPaths(client, repo, []string{"Triage", "Roadmap", "TriageV2", "RoadmapV2", "MonalisaV2"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	expectedProjectPaths := []string{"ORG/1", "OWNER/REPO/2", "ORG/2", "OWNER/REPO/4"}
+	expectedProjectPaths := []string{"ORG/1", "OWNER/REPO/2", "ORG/2", "OWNER/REPO/4", "MONALISA/5"}
 	if !sliceEqual(projectPaths, expectedProjectPaths) {
 		t.Errorf("expected projects paths %v, got %v", expectedProjectPaths, projectPaths)
 	}

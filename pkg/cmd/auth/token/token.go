@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -14,7 +13,8 @@ type TokenOptions struct {
 	IO     *iostreams.IOStreams
 	Config func() (config.Config, error)
 
-	Hostname string
+	Hostname      string
+	SecureStorage bool
 }
 
 func NewCmdToken(f *cmdutil.Factory, runF func(*TokenOptions) error) *cobra.Command {
@@ -37,22 +37,30 @@ func NewCmdToken(f *cmdutil.Factory, runF func(*TokenOptions) error) *cobra.Comm
 	}
 
 	cmd.Flags().StringVarP(&opts.Hostname, "hostname", "h", "", "The hostname of the GitHub instance authenticated with")
+	cmd.Flags().BoolVarP(&opts.SecureStorage, "secure-storage", "", false, "Search only secure credential store for authentication token")
+	_ = cmd.Flags().MarkHidden("secure-storeage")
 
 	return cmd
 }
 
 func tokenRun(opts *TokenOptions) error {
-	hostname := opts.Hostname
-	if hostname == "" {
-		hostname = ghinstance.Default()
-	}
-
 	cfg, err := opts.Config()
 	if err != nil {
 		return err
 	}
+	authCfg := cfg.Authentication()
 
-	val, _ := cfg.AuthToken(hostname)
+	hostname := opts.Hostname
+	if hostname == "" {
+		hostname, _ = authCfg.DefaultHost()
+	}
+
+	var val string
+	if opts.SecureStorage {
+		val, _ = authCfg.TokenFromKeyring(hostname)
+	} else {
+		val, _ = authCfg.Token(hostname)
+	}
 	if val == "" {
 		return fmt.Errorf("no oauth token")
 	}
