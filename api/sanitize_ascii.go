@@ -83,11 +83,11 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 
 		// Replace C0 Control Characters
 		if bytes.HasPrefix(window, []byte(`\u00`)) {
-			repl, _ := mapC0ToCaret(window)
-			if s.addEscape {
+			repl, found := mapC0ToCaret(window)
+			if s.addEscape && found {
 				repl = append([]byte{'\\'}, repl...)
-				s.addEscape = false
 			}
+			s.addEscape = false
 			for j := 0; j < len(repl); j++ {
 				if outIndex < outLen {
 					out[outIndex] = repl[j]
