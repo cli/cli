@@ -134,7 +134,7 @@ func refreshRun(opts *RefreshOptions) error {
 	}
 
 	var additionalScopes []string
-	if oldToken, _ := authCfg.Token(hostname); oldToken != "" {
+	if oldToken, source := authCfg.Token(hostname); oldToken != "" {
 		if oldScopes, err := shared.GetScopes(opts.HttpClient, hostname, oldToken); err == nil {
 			for _, s := range strings.Split(oldScopes, ",") {
 				s = strings.TrimSpace(s)
@@ -142,6 +142,13 @@ func refreshRun(opts *RefreshOptions) error {
 					additionalScopes = append(additionalScopes, s)
 				}
 			}
+		}
+
+		// If previous token was stored in secure storage assume
+		// user wants to continue storing it there even if not
+		// explicitly stated with the secure storage flag.
+		if source == "keyring" {
+			opts.SecureStorage = true
 		}
 	}
 

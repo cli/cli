@@ -146,6 +146,7 @@ func Test_refreshRun(t *testing.T) {
 		opts          *RefreshOptions
 		prompterStubs func(*prompter.PrompterMock)
 		cfgHosts      []string
+		config        config.Config
 		oldScopes     string
 		wantErr       string
 		nontty        bool
@@ -241,13 +242,34 @@ func Test_refreshRun(t *testing.T) {
 			},
 		},
 		{
-			name: "secure storage",
+			name: "explicit secure storage",
 			cfgHosts: []string{
 				"obed.morton",
 			},
 			opts: &RefreshOptions{
 				Hostname:      "obed.morton",
 				SecureStorage: true,
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "obed.morton",
+				scopes:        nil,
+				secureStorage: true,
+			},
+		},
+		{
+			name: "implicit secure storage",
+			config: func() config.Config {
+				cfg := config.NewFromString("")
+				authCfg := cfg.Authentication()
+				authCfg.SetHosts([]string{"obed.morton"})
+				authCfg.SetToken("abc123", "keyring")
+				cfg.AuthenticationFunc = func() *config.AuthConfig {
+					return authCfg
+				}
+				return cfg
+			}(),
+			opts: &RefreshOptions{
+				Hostname: "obed.morton",
 			},
 			wantAuthArgs: authArgs{
 				hostname:      "obed.morton",
@@ -267,9 +289,14 @@ func Test_refreshRun(t *testing.T) {
 				return nil
 			}
 
-			cfg := config.NewFromString("")
-			for _, hostname := range tt.cfgHosts {
-				cfg.Set(hostname, "oauth_token", "abc123")
+			var cfg config.Config
+			if tt.config != nil {
+				cfg = tt.config
+			} else {
+				cfg = config.NewFromString("")
+				for _, hostname := range tt.cfgHosts {
+					cfg.Set(hostname, "oauth_token", "abc123")
+				}
 			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil
