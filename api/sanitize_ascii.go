@@ -11,13 +11,15 @@ import (
 
 var jsonTypeRE = regexp.MustCompile(`[/+]json($|;)`)
 
-// GitHub servers return non-printable characters as their unicode code point values.
-// The values of \u0000 to \u001F represent C0 ASCII control characters and
-// the values of \u0080 to \u009F represent C1 ASCII control characters. These control
-// characters will be interpreted by the terminal, this behaviour can be used maliciously
-// as an attack vector, especially the control character \u001B. This function wraps
-// JSON response bodies in a ReadCloser that transforms C0 and C1 control characters
-// to their caret and hex notations respectively so that the terminal will not interpret them.
+// GitHub servers do not sanitize their API output for terminal display
+// and leave in unescaped ASCII control characters.
+// C0 control characters are represented in their unicode code point form ranging from \u0000 to \u001F.
+// C1 control characters are represented in two bytes, the first being 0xC2 and the second ranging from 0x80 to 0x9F.
+// These control characters will be interpreted by the terminal, this behaviour can be
+// used maliciously as an attack vector, especially the control characters \u001B and \u009B.
+// This function wraps JSON response bodies in a ReadCloser that transforms C0 and C1
+// control characters to their caret notations respectively so that the terminal will not
+// interpret them.
 func AddASCIISanitizer(rt http.RoundTripper) http.RoundTripper {
 	return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
 		res, err := rt.RoundTrip(req)
@@ -64,12 +66,28 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 	for bufIndex < bufLen-6 && outIndex < outLen {
 		window := buf[bufIndex : bufIndex+6]
 
-		if bytes.HasPrefix(window, []byte(`\u00`)) {
-			repl, _ := mapControlCharacterToCaret(window)
-			if s.addEscape {
-				repl = append([]byte{'\\'}, repl...)
-				s.addEscape = false
+		// Replace C1 Control Characters
+		if window[0] == 0xC2 {
+			repl, _ := mapC1ToCaret(window[:2])
+			for j := 0; j < len(repl); j++ {
+				if outIndex < outLen {
+					out[outIndex] = repl[j]
+					outIndex++
+				} else {
+					s.remainder = append(s.remainder, repl[j])
+				}
 			}
+			bufIndex += 2
+			continue
+		}
+
+		// Replace C0 Control Characters
+		if bytes.HasPrefix(window, []byte(`\u00`)) {
+			repl, found := mapC0ToCaret(window)
+			if s.addEscape && found {
+				repl = append([]byte{'\\'}, repl...)
+			}
+			s.addEscape = false
 			for j := 0; j < len(repl); j++ {
 				if outIndex < outLen {
 					out[outIndex] = repl[j]
@@ -118,10 +136,8 @@ func (s *sanitizeASCIIReadCloser) Read(out []byte) (int, error) {
 	return outIndex, readErr
 }
 
-// mapControlCharacterToCaret maps C0 control sequences to caret notation
-// and C1 control sequences to hex notation. C1 control sequences do not
-// have caret notation representation.
-func mapControlCharacterToCaret(b []byte) ([]byte, bool) {
+// mapC0ToCaret maps C0 control sequences to caret notation.
+func mapC0ToCaret(b []byte) ([]byte, bool) {
 	m := map[string]string{
 		`\u0000`: `^@`,
 		`\u0001`: `^A`,
@@ -155,40 +171,57 @@ func mapControlCharacterToCaret(b []byte) ([]byte, bool) {
 		`\u001d`: `^]`,
 		`\u001e`: `^^`,
 		`\u001f`: `^_`,
-		`\u0080`: `\\200`,
-		`\u0081`: `\\201`,
-		`\u0082`: `\\202`,
-		`\u0083`: `\\203`,
-		`\u0084`: `\\204`,
-		`\u0085`: `\\205`,
-		`\u0086`: `\\206`,
-		`\u0087`: `\\207`,
-		`\u0088`: `\\210`,
-		`\u0089`: `\\211`,
-		`\u008a`: `\\212`,
-		`\u008b`: `\\213`,
-		`\u008c`: `\\214`,
-		`\u008d`: `\\215`,
-		`\u008e`: `\\216`,
-		`\u008f`: `\\217`,
-		`\u0090`: `\\220`,
-		`\u0091`: `\\221`,
-		`\u0092`: `\\222`,
-		`\u0093`: `\\223`,
-		`\u0094`: `\\224`,
-		`\u0095`: `\\225`,
-		`\u0096`: `\\226`,
-		`\u0097`: `\\227`,
-		`\u0098`: `\\230`,
-		`\u0099`: `\\231`,
-		`\u009a`: `\\232`,
-		`\u009b`: `\\233`,
-		`\u009c`: `\\234`,
-		`\u009d`: `\\235`,
-		`\u009e`: `\\236`,
-		`\u009f`: `\\237`,
 	}
 	if c, ok := m[strings.ToLower(string(b))]; ok {
+		return []byte(c), true
+	}
+	return b, false
+}
+
+// mapC1ToCaret maps C1 control sequences to caret notation.
+// C1 control sequences are two bytes and start with 0xC2.
+func mapC1ToCaret(b []byte) ([]byte, bool) {
+	if len(b) != 2 {
+		return b, false
+	}
+	if b[0] != 0xC2 {
+		return b, false
+	}
+	m := map[byte]string{
+		128: `^@`,
+		129: `^A`,
+		130: `^B`,
+		131: `^C`,
+		132: `^D`,
+		133: `^E`,
+		134: `^F`,
+		135: `^G`,
+		136: `^H`,
+		137: `^I`,
+		138: `^J`,
+		139: `^K`,
+		140: `^L`,
+		141: `^M`,
+		142: `^N`,
+		143: `^O`,
+		144: `^P`,
+		145: `^Q`,
+		146: `^R`,
+		147: `^S`,
+		148: `^T`,
+		149: `^U`,
+		150: `^V`,
+		151: `^W`,
+		152: `^X`,
+		153: `^Y`,
+		154: `^Z`,
+		155: `^[`,
+		156: `^\\`,
+		157: `^]`,
+		158: `^^`,
+		159: `^_`,
+	}
+	if c, ok := m[b[1]]; ok {
 		return []byte(c), true
 	}
 	return b, false
