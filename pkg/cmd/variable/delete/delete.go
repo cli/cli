@@ -20,11 +20,10 @@ type DeleteOptions struct {
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	VariableName  string
-	OrgName       string
-	EnvName       string
-	UserVariables bool
-	Application   string
+	VariableName string
+	OrgName      string
+	EnvName      string
+	Application  string
 }
 
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
@@ -41,15 +40,14 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 			Delete a variable on one of the following levels:
 			- repository (default): available to Actions runs or Dependabot in a repository
 			- environment: available to Actions runs for a deployment environment in a repository
-			- organization: available to Actions runs, Dependabot, or Codespaces within an organization
-			- user: available to Codespaces for your user
+			- organization: available to Actions runs or Dependabot within an organization
 		`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			if err := cmdutil.MutuallyExclusive("specify only one of `--org`, `--env`, or `--user`", opts.OrgName != "", opts.EnvName != "", opts.UserVariables); err != nil {
+			if err := cmdutil.MutuallyExclusive("specify only one of `--org` or `--env`", opts.OrgName != "", opts.EnvName != ""); err != nil {
 				return err
 			}
 
@@ -67,7 +65,6 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 	}
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "Delete a variable for an organization")
 	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "Delete a variable for an environment")
-	cmd.Flags().BoolVarP(&opts.UserVariables, "user", "u", false, "Delete a variable for your user")
 
 	return cmd
 }
