@@ -154,17 +154,20 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		userInputs.Location = vscsLocation
 	}
 
-	a.StartProgressIndicatorWithLabel("Fetching repository")
-	repository, err := a.apiClient.GetRepository(ctx, userInputs.Repository)
-	a.StopProgressIndicator()
+	var repository *api.Repository
+	err := a.RunWithProgress("Fetching repository", func() (err error) {
+		repository, err = a.apiClient.GetRepository(ctx, userInputs.Repository)
+		return
+	})
 	if err != nil {
 		return fmt.Errorf("error getting repository: %w", err)
 	}
 
-	a.StartProgressIndicatorWithLabel("Validating repository for codespaces")
-	billableOwner, err := a.apiClient.GetCodespaceBillableOwner(ctx, userInputs.Repository)
-	a.StopProgressIndicator()
-
+	var billableOwner *api.User
+	err = a.RunWithProgress("Validating repository for codespaces", func() (err error) {
+		billableOwner, err = a.apiClient.GetCodespaceBillableOwner(ctx, userInputs.Repository)
+		return
+	})
 	if err != nil {
 		return fmt.Errorf("error checking codespace ownership: %w", err)
 	} else if billableOwner != nil && (billableOwner.Type == "Organization" || billableOwner.Type == "User") {
@@ -201,9 +204,11 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 
 	// now that we have repo+branch, we can list available devcontainer.json files (if any)
 	if opts.devContainerPath == "" {
-		a.StartProgressIndicatorWithLabel("Fetching devcontainer.json files")
-		devcontainers, err := a.apiClient.ListDevContainers(ctx, repository.ID, branch, 100)
-		a.StopProgressIndicator()
+		var devcontainers []api.DevContainerEntry
+		err = a.RunWithProgress("Fetching devcontainer.json files", func() (err error) {
+			devcontainers, err = a.apiClient.ListDevContainers(ctx, repository.ID, branch, 100)
+			return
+		})
 		if err != nil {
 			return fmt.Errorf("error getting devcontainer.json paths: %w", err)
 		}
@@ -266,9 +271,11 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		DisplayName:            opts.displayName,
 	}
 
-	a.StartProgressIndicatorWithLabel("Creating codespace")
-	codespace, err := a.apiClient.CreateCodespace(ctx, createParams)
-	a.StopProgressIndicator()
+	var codespace *api.Codespace
+	err = a.RunWithProgress("Creating codespace", func() (err error) {
+		codespace, err = a.apiClient.CreateCodespace(ctx, createParams)
+		return
+	})
 
 	if err != nil {
 		var aerr api.AcceptPermissionsRequiredError
@@ -355,9 +362,11 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 	// we can continue with the create opting out of the additional permissions
 	createParams.PermissionsOptOut = true
 
-	a.StartProgressIndicatorWithLabel("Creating codespace")
-	codespace, err := a.apiClient.CreateCodespace(ctx, createParams)
-	a.StopProgressIndicator()
+	var codespace *api.Codespace
+	err := a.RunWithProgress("Creating codespace", func() (err error) {
+		codespace, err = a.apiClient.CreateCodespace(ctx, createParams)
+		return
+	})
 
 	if err != nil {
 		return nil, fmt.Errorf("error creating codespace: %w", err)

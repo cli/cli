@@ -45,13 +45,15 @@ func (a *App) StopCodespace(ctx context.Context, opts *stopOptions) error {
 	)
 
 	if codespaceName == "" {
-		a.StartProgressIndicatorWithLabel("Fetching codespaces")
-		codespaces, err := a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{
-			RepoName: repoName,
-			OrgName:  opts.orgName,
-			UserName: ownerName,
+		var codespaces []*api.Codespace
+		err := a.RunWithProgress("Fetching codespaces", func() (err error) {
+			codespaces, err = a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{
+				RepoName: repoName,
+				OrgName:  opts.orgName,
+				UserName: ownerName,
+			})
+			return
 		})
-		a.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to list codespaces: %w", err)
 		}
@@ -76,29 +78,30 @@ func (a *App) StopCodespace(ctx context.Context, opts *stopOptions) error {
 		codespaceName = codespace.Name
 		ownerName = codespace.Owner.Login
 	} else {
-		a.StartProgressIndicatorWithLabel("Fetching codespace")
-
 		var c *api.Codespace
-		var err error
-
-		if opts.orgName == "" {
-			c, err = a.apiClient.GetCodespace(ctx, codespaceName, false)
-		} else {
-			c, err = a.apiClient.GetOrgMemberCodespace(ctx, opts.orgName, ownerName, codespaceName)
-		}
-		a.StopProgressIndicator()
+		err := a.RunWithProgress("Fetching codespace", func() (err error) {
+			if opts.orgName == "" {
+				c, err = a.apiClient.GetCodespace(ctx, codespaceName, false)
+			} else {
+				c, err = a.apiClient.GetOrgMemberCodespace(ctx, opts.orgName, ownerName, codespaceName)
+			}
+			return
+		})
 		if err != nil {
 			return fmt.Errorf("failed to get codespace: %q: %w", codespaceName, err)
 		}
+
 		cs := codespace{c}
 		if !cs.running() {
 			return fmt.Errorf("codespace %q is not running", codespaceName)
 		}
 	}
 
-	a.StartProgressIndicatorWithLabel("Stopping codespace")
-	defer a.StopProgressIndicator()
-	if err := a.apiClient.StopCodespace(ctx, codespaceName, opts.orgName, ownerName); err != nil {
+	err := a.RunWithProgress("Stoppping codespace", func() (err error) {
+		err = a.apiClient.StopCodespace(ctx, codespaceName, opts.orgName, ownerName)
+		return
+	})
+	if err != nil {
 		return fmt.Errorf("failed to stop codespace: %w", err)
 	}
 

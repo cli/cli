@@ -45,18 +45,24 @@ func (a *App) Jupyter(ctx context.Context, selector *CodespaceSelector) (err err
 	}
 	defer safeClose(session, &err)
 
-	a.StartProgressIndicatorWithLabel("Starting JupyterLab on codespace")
-	invoker, err := rpc.CreateInvoker(ctx, session)
+	serverPort, serverUrl := 0, ""
+	err = a.RunWithProgress("Starting JupyterLab on codespace", func() (err error) {
+		invoker, err := rpc.CreateInvoker(ctx, session)
+		if err != nil {
+			return
+		}
+
+		err = invoker.Close()
+		if err != nil {
+			return
+		}
+
+		serverPort, serverUrl, err = invoker.StartJupyterServer(ctx)
+		return
+	})
 	if err != nil {
 		return err
 	}
-	defer safeClose(invoker, &err)
-
-	serverPort, serverUrl, err := invoker.StartJupyterServer(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to start JupyterLab server: %w", err)
-	}
-	a.StopProgressIndicator()
 
 	// Pass 0 to pick a random port
 	listen, _, err := codespaces.ListenTCP(0)

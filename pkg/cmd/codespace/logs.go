@@ -55,15 +55,21 @@ func (a *App) Logs(ctx context.Context, selector *CodespaceSelector, follow bool
 	}
 	defer listen.Close()
 
-	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	invoker, err := rpc.CreateInvoker(ctx, session)
-	if err != nil {
-		return err
-	}
-	defer safeClose(invoker, &err)
+	remoteSSHServerPort, sshUser := 0, ""
+	err = a.RunWithProgress("Fetching SSH Details", func() (err error) {
+		invoker, err := rpc.CreateInvoker(ctx, session)
+		if err != nil {
+			return
+		}
 
-	remoteSSHServerPort, sshUser, err := invoker.StartSSHServer(ctx)
-	a.StopProgressIndicator()
+		err = invoker.Close()
+		if err != nil {
+			return
+		}
+
+		remoteSSHServerPort, sshUser, err = invoker.StartSSHServer(ctx)
+		return
+	})
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}

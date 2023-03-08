@@ -305,6 +305,13 @@ func (s *IOStreams) StopProgressIndicator() {
 	s.progressIndicator = nil
 }
 
+func (s *IOStreams) RunWithProgress(label string, run func() error) error {
+	s.StartProgressIndicatorWithLabel(label)
+	defer s.StopProgressIndicator()
+
+	return run()
+}
+
 func (s *IOStreams) StartAlternateScreenBuffer() {
 	if s.alternateScreenBufferEnabled {
 		s.alternateScreenBufferMu.Lock()
