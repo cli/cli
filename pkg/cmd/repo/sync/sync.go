@@ -256,7 +256,7 @@ func executeLocalRepoSync(srcRepo ghrepo.Interface, remote string, opts *SyncOpt
 	}
 	if currentBranch == branch {
 		if isDirty, err := git.IsDirty(); err == nil && isDirty {
-			return fmt.Errorf("can't sync because there are local changes; please stash them before trying again")
+			return fmt.Errorf("refusing to sync due to uncommitted or untracked local changes.\nCheck your local changes with `git status` and either commit them, or use `git stash --all` before retrying this `sync` and running `git stash pop` afterwards")
 		} else if err != nil {
 			return err
 		}
