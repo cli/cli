@@ -53,9 +53,9 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 		Short: "Set variables",
 		Long: heredoc.Doc(`
 			Set a value for a variable on one of the following levels:
-			- repository (default): available to Actions runs in a repository
+			- repository (default): available to Actions runs and Dependabot in a repository
 			- environment: available to Actions runs for a deployment environment in a repository
-			- organization: available to Actions runs within an organization
+			- organization: available to Actions runs and Dependabot within an organization
 
 			Organization variable can optionally be restricted to only be available to
 			specific repositories.
