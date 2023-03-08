@@ -10,6 +10,10 @@ import (
 )
 
 func deleteRepo(client *http.Client, repo ghrepo.Interface) error {
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+
 	url := fmt.Sprintf("%srepos/%s",
 		ghinstance.RESTPrefix(repo.RepoHost()),
 		ghrepo.FullName(repo))
