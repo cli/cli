@@ -26,10 +26,9 @@ type ListOptions struct {
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	OrgName       string
-	EnvName       string
-	UserVariables bool
-	Application   string
+	OrgName     string
+	EnvName     string
+	Application string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -46,8 +45,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			List variables on one of the following levels:
 			- repository (default): available to Actions runs or Dependabot in a repository
 			- environment: available to Actions runs for a deployment environment in a repository
-			- organization: available to Actions runs, Dependabot, or Codespaces within an organization
-			- user: available to Codespaces for your user
+			- organization: available to Actions runs and Dependabot within an organization
 		`),
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,
@@ -55,7 +53,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			if err := cmdutil.MutuallyExclusive("specify only one of `--org`, `--env`, or `--user`", opts.OrgName != "", opts.EnvName != "", opts.UserVariables); err != nil {
+			if err := cmdutil.MutuallyExclusive("specify only one of `--org` or `--env`", opts.OrgName != "", opts.EnvName != ""); err != nil {
 				return err
 			}
 
@@ -69,7 +67,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 
 	cmd.Flags().StringVarP(&opts.OrgName, "org", "o", "", "List variables for an organization")
 	cmd.Flags().StringVarP(&opts.EnvName, "env", "e", "", "List variables for an environment")
-	cmd.Flags().BoolVarP(&opts.UserVariables, "user", "u", false, "List a variable for your user")
 
 	return cmd
 }
@@ -84,7 +81,7 @@ func listRun(opts *ListOptions) error {
 	envName := opts.EnvName
 
 	var baseRepo ghrepo.Interface
-	if orgName == "" && !opts.UserVariables {
+	if orgName == "" {
 		baseRepo, err = opts.BaseRepo()
 		if err != nil {
 			return err

@@ -15,7 +15,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -45,13 +44,6 @@ func Test_NewCmdList(t *testing.T) {
 			cli:  "-eDevelopment",
 			wants: ListOptions{
 				EnvName: "Development",
-			},
-		},
-		{
-			name: "user",
-			cli:  "-u",
-			wants: ListOptions{
-				UserVariables: true,
 			},
 		},
 	}
@@ -97,9 +89,9 @@ func Test_listRun(t *testing.T) {
 			tty:  true,
 			opts: &ListOptions{},
 			wantOut: []string{
-				"VARIABLE_ONE.*one.*Updated 1988-10-11",
-				"VARIABLE_TWO.*two.*Updated 2020-12-04",
-				"VARIABLE_THREE.*three.*Updated 1975-11-30",
+				"VARIABLE_ONE    one    Updated 1988-10-11",
+				"VARIABLE_TWO    two    Updated 2020-12-04",
+				"VARIABLE_THREE  three  Updated 1975-11-30",
 			},
 		},
 		{
@@ -119,9 +111,9 @@ func Test_listRun(t *testing.T) {
 				OrgName: "UmbrellaCorporation",
 			},
 			wantOut: []string{
-				"VARIABLE_ONE.*org_one.*Updated 1988-10-11.*Visible to all repositories",
-				"VARIABLE_TWO.*org_two.*Updated 2020-12-04.*Visible to private repositories",
-				"VARIABLE_THREE.*org_three.*Updated 1975-11-30.*Visible to 2 selected repos",
+				"VARIABLE_ONE    org_one    Updated 1988-10-11  Visible to all repositories",
+				"VARIABLE_TWO    org_two    Updated 2020-12-04  Visible to private repositories",
+				"VARIABLE_THREE  org_three  Updated 1975-11-30  Visible to 2 selected reposito...",
 			},
 		},
 		{
@@ -143,9 +135,9 @@ func Test_listRun(t *testing.T) {
 				EnvName: "Development",
 			},
 			wantOut: []string{
-				"VARIABLE_ONE.*one.*Updated 1988-10-11",
-				"VARIABLE_TWO.*two.*Updated 2020-12-04",
-				"VARIABLE_THREE.*three.*Updated 1975-11-30",
+				"VARIABLE_ONE    one    Updated 1988-10-11",
+				"VARIABLE_TWO    two    Updated 2020-12-04",
+				"VARIABLE_THREE  three  Updated 1975-11-30",
 			},
 		},
 		{
@@ -246,9 +238,15 @@ func Test_listRun(t *testing.T) {
 			assert.NoError(t, err)
 
 			reg.Verify(t)
-
-			//nolint:staticcheck // prefer exact matchers over ExpectLines
-			test.ExpectLines(t, stdout.String(), tt.wantOut...)
+			outputLines := strings.Split(stdout.String(), "\n")
+			idx := 0
+			if strings.Contains(outputLines[0], "NAME") {
+				idx = 1
+			}
+			for _, l := range tt.wantOut {
+				assert.Equal(t, outputLines[idx], l)
+				idx++
+			}
 		})
 	}
 }
