@@ -87,11 +87,7 @@ func TestHTTPClientSanitizeASCIIControlCharactersC1(t *testing.T) {
 }
 
 func TestSanitizedReadCloser(t *testing.T) {
-	data := []byte(`"Assign},"L`)
-	var r io.Reader = bytes.NewReader(data)
-	r = sanitizedReadCloser(io.NopCloser(r))
-	r = iotest.OneByteReader(r)
-	out, err := io.ReadAll(r)
-	require.NoError(t, err)
-	assert.Equal(t, data, out)
+	data := []byte(`the quick brown fox\njumped over the lazy dog\t`)
+	rc := sanitizedReadCloser(io.NopCloser(bytes.NewReader(data)))
+	assert.NoError(t, iotest.TestReader(rc, data))
 }
