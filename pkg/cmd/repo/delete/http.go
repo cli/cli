@@ -10,8 +10,11 @@ import (
 )
 
 func deleteRepo(client *http.Client, repo ghrepo.Interface) error {
-	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-		return http.ErrUseLastResponse
+	noRedirectClient := &http.Client{
+		Transport: client.Transport,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
 
 	url := fmt.Sprintf("%srepos/%s",
@@ -23,7 +26,7 @@ func deleteRepo(client *http.Client, repo ghrepo.Interface) error {
 		return err
 	}
 
-	resp, err := client.Do(request)
+	resp, err := noRedirectClient.Do(request)
 	if err != nil {
 		return err
 	}
