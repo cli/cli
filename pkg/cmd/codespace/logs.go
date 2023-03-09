@@ -61,11 +61,7 @@ func (a *App) Logs(ctx context.Context, selector *CodespaceSelector, follow bool
 		if err != nil {
 			return
 		}
-
-		err = invoker.Close()
-		if err != nil {
-			return
-		}
+		defer safeClose(invoker, &err)
 
 		remoteSSHServerPort, sshUser, err = invoker.StartSSHServer(ctx)
 		return
