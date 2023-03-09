@@ -1,6 +1,8 @@
 package shared
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -174,9 +176,8 @@ func Login(opts *LoginOptions) error {
 	}
 
 	if username == "" {
-		apiClient := api.NewClientFromHTTP(httpClient)
 		var err error
-		username, err = api.CurrentLoginName(apiClient, hostname)
+		username, err = getCurrentLogin(httpClient, hostname, authToken)
 		if err != nil {
 			return fmt.Errorf("error using api: %w", err)
 		}
@@ -230,4 +231,35 @@ func sshKeyUpload(httpClient *http.Client, hostname, keyFile string, title strin
 	defer f.Close()
 
 	return add.SSHKeyUpload(httpClient, hostname, f, title)
+}
+
+func getCurrentLogin(httpClient httpClient, hostname, authToken string) (string, error) {
+	query := `query UserCurrent{viewer{login}}`
+	reqBody, err := json.Marshal(map[string]interface{}{"query": query})
+	if err != nil {
+		return "", err
+	}
+	result := struct {
+		Data struct{ Viewer struct{ Login string } }
+	}{}
+	apiEndpoint := ghinstance.GraphQLEndpoint(hostname)
+	req, err := http.NewRequest("POST", apiEndpoint, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "token "+authToken)
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+	if res.StatusCode > 299 {
+		return "", api.HandleHTTPError(res)
+	}
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(&result)
+	if err != nil {
+		return "", err
+	}
+	return result.Data.Viewer.Login, nil
 }
