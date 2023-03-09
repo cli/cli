@@ -51,11 +51,7 @@ func (a *App) Jupyter(ctx context.Context, selector *CodespaceSelector) (err err
 		if err != nil {
 			return
 		}
-
-		err = invoker.Close()
-		if err != nil {
-			return
-		}
+		defer safeClose(invoker, &err)
 
 		serverPort, serverUrl, err = invoker.StartJupyterServer(ctx)
 		return

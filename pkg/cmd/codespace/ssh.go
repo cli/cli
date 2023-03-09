@@ -177,11 +177,7 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 		if err != nil {
 			return
 		}
-
-		err = invoker.Close()
-		if err != nil {
-			return
-		}
+		defer safeClose(invoker, &err)
 
 		remoteSSHServerPort, sshUser, err = invoker.StartSSHServerWithOptions(ctx, startSSHOptions)
 		return
