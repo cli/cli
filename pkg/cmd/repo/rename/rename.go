@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	ghContext "github.com/cli/cli/v2/context"
@@ -14,14 +13,19 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/spf13/cobra"
 )
+
+type iprompter interface {
+	Input(string, string) (string, error)
+	Confirm(string, bool) (bool, error)
+}
 
 type RenameOptions struct {
 	HttpClient      func() (*http.Client, error)
 	GitClient       *git.Client
 	IO              *iostreams.IOStreams
+	Prompter        iprompter
 	Config          func() (config.Config, error)
 	BaseRepo        func() (ghrepo.Interface, error)
 	Remotes         func() (ghContext.Remotes, error)
@@ -37,6 +41,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 		GitClient:  f.GitClient,
 		Remotes:    f.Remotes,
 		Config:     f.Config,
+		Prompter:   f.Prompter,
 	}
 
 	var confirm bool
@@ -95,28 +100,17 @@ func renameRun(opts *RenameOptions) error {
 	}
 
 	if newRepoName == "" {
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		err = prompt.SurveyAskOne(
-			&survey.Input{
-				Message: fmt.Sprintf("Rename %s to: ", ghrepo.FullName(currRepo)),
-			},
-			&newRepoName,
-		)
-		if err != nil {
+		if newRepoName, err = opts.Prompter.Input(fmt.Sprintf(
+			"Rename %s to:", ghrepo.FullName(currRepo)), ""); err != nil {
 			return err
 		}
 	}
 
 	if opts.DoConfirm {
 		var confirmed bool
-		p := &survey.Confirm{
-			Message: fmt.Sprintf("Rename %s to %s?", ghrepo.FullName(currRepo), newRepoName),
-			Default: false,
-		}
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		err = prompt.SurveyAskOne(p, &confirmed)
-		if err != nil {
-			return fmt.Errorf("failed to prompt: %w", err)
+		if confirmed, err = opts.Prompter.Confirm(fmt.Sprintf(
+			"Rename %s to %s?", ghrepo.FullName(currRepo), newRepoName), false); err != nil {
+			return err
 		}
 		if !confirmed {
 			return nil
