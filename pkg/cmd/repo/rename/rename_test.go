@@ -9,11 +9,11 @@ import (
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -105,20 +105,21 @@ func TestNewCmdRename(t *testing.T) {
 
 func TestRenameRun(t *testing.T) {
 	testCases := []struct {
-		name      string
-		opts      RenameOptions
-		httpStubs func(*httpmock.Registry)
-		execStubs func(*run.CommandStubber)
-		askStubs  func(*prompt.AskStubber)
-		wantOut   string
-		tty       bool
+		name        string
+		opts        RenameOptions
+		httpStubs   func(*httpmock.Registry)
+		execStubs   func(*run.CommandStubber)
+		promptStubs func(*prompter.MockPrompter)
+		wantOut     string
+		tty         bool
 	}{
 		{
 			name:    "none argument",
 			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n✓ Updated the \"origin\" remote\n",
-			askStubs: func(q *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
-				q.StubOne("NEW_REPO")
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterInput("Rename OWNER/REPO to:", func(_, _ string) (string, error) {
+					return "NEW_REPO", nil
+				})
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -136,9 +137,10 @@ func TestRenameRun(t *testing.T) {
 				HasRepoOverride: true,
 			},
 			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n",
-			askStubs: func(q *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
-				q.StubOne("NEW_REPO")
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterInput("Rename OWNER/REPO to:", func(_, _ string) (string, error) {
+					return "NEW_REPO", nil
+				})
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -185,9 +187,10 @@ func TestRenameRun(t *testing.T) {
 				DoConfirm:       true,
 			},
 			wantOut: "✓ Renamed repository OWNER/NEW_REPO\n✓ Updated the \"origin\" remote\n",
-			askStubs: func(q *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
-				q.StubOne(true)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterConfirm("Rename OWNER/REPO to NEW_REPO?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
@@ -206,20 +209,20 @@ func TestRenameRun(t *testing.T) {
 				newRepoSelector: "NEW_REPO",
 				DoConfirm:       true,
 			},
-			askStubs: func(q *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
-				q.StubOne(false)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterConfirm("Rename OWNER/REPO to NEW_REPO?", func(_ string, _ bool) (bool, error) {
+					return false, nil
+				})
 			},
 			wantOut: "",
 		},
 	}
 
 	for _, tt := range testCases {
-		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-		q, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(q)
+		pm := prompter.NewMockPrompter(t)
+		tt.opts.Prompter = pm
+		if tt.promptStubs != nil {
+			tt.promptStubs(pm)
 		}
 
 		repo, _ := ghrepo.FromFullName("OWNER/REPO")

@@ -926,7 +926,7 @@ func Test_createRun_interactive(t *testing.T) {
 	tests := []struct {
 		name          string
 		httpStubs     func(*httpmock.Registry)
-		prompterStubs func(*testing.T, *prompter.PrompterMock)
+		prompterStubs func(*testing.T, *prompter.MockPrompter)
 		runStubs      func(*run.CommandStubber)
 		opts          *CreateOptions
 		wantParams    map[string]interface{}
@@ -936,37 +936,28 @@ func Test_createRun_interactive(t *testing.T) {
 		{
 			name: "create a release from existing tag",
 			opts: &CreateOptions{},
-			prompterStubs: func(t *testing.T, pm *prompter.PrompterMock) {
-				pm.SelectFunc = func(p, d string, opts []string) (int, error) {
-					switch p {
-					case "Choose a tag":
-						prompter.AssertOptions(t, []string{"v1.2.3", "v1.2.2", "v1.0.0", "v0.1.2", "Create a new tag"}, opts)
+			prompterStubs: func(t *testing.T, pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Choose a tag",
+					[]string{"v1.2.3", "v1.2.2", "v1.0.0", "v0.1.2", "Create a new tag"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "v1.2.3")
-					case "Release notes":
-						prompter.AssertOptions(t, []string{"Write my own", "Write using generated notes as template", "Leave blank"}, opts)
+					})
+				pm.RegisterSelect("Release notes",
+					[]string{"Write my own", "Write using generated notes as template", "Leave blank"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Leave blank")
-					case "Submit?":
-						prompter.AssertOptions(t, []string{"Publish release", "Save as draft", "Cancel"}, opts)
+					})
+				pm.RegisterSelect("Submit?",
+					[]string{"Publish release", "Save as draft", "Cancel"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Publish release")
-					default:
-						return -1, prompter.NoSuchPromptErr(p)
-					}
-				}
-				pm.InputFunc = func(p, d string) (string, error) {
-					if p == "Title (optional)" {
-						return d, nil
-					}
-
-					return "", prompter.NoSuchPromptErr(p)
-				}
-				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
-					switch p {
-					case "Is this a prerelease?":
-						return false, nil
-					default:
-						return false, prompter.NoSuchPromptErr(p)
-					}
-				}
+					})
+				pm.RegisterInput("Title (optional)", func(_, d string) (string, error) {
+					return d, nil
+				})
+				pm.RegisterConfirm("Is this a prerelease?", func(_ string, _ bool) (bool, error) {
+					return false, nil
+				})
 			},
 			runStubs: func(rs *run.CommandStubber) {
 				rs.Register(`git tag --list`, 1, "")
@@ -991,40 +982,31 @@ func Test_createRun_interactive(t *testing.T) {
 		{
 			name: "create a release from new tag",
 			opts: &CreateOptions{},
-			prompterStubs: func(t *testing.T, pm *prompter.PrompterMock) {
-				pm.SelectFunc = func(p, d string, opts []string) (int, error) {
-					switch p {
-					case "Choose a tag":
-						prompter.AssertOptions(t, []string{"v1.2.2", "v1.0.0", "v0.1.2", "Create a new tag"}, opts)
+			prompterStubs: func(t *testing.T, pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Choose a tag",
+					[]string{"v1.2.2", "v1.0.0", "v0.1.2", "Create a new tag"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Create a new tag")
-					case "Release notes":
-						prompter.AssertOptions(t, []string{"Write my own", "Write using generated notes as template", "Leave blank"}, opts)
+					})
+				pm.RegisterSelect("Release notes",
+					[]string{"Write my own", "Write using generated notes as template", "Leave blank"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Leave blank")
-					case "Submit?":
-						prompter.AssertOptions(t, []string{"Publish release", "Save as draft", "Cancel"}, opts)
+					})
+				pm.RegisterSelect("Submit?",
+					[]string{"Publish release", "Save as draft", "Cancel"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Publish release")
-					default:
-						return -1, prompter.NoSuchPromptErr(p)
-					}
-				}
-				pm.InputFunc = func(p, d string) (string, error) {
-					switch p {
-					case "Tag name":
-						return "v1.2.3", nil
-					case "Title (optional)":
-						return d, nil
-					default:
-						return "", prompter.NoSuchPromptErr(p)
-					}
-				}
-				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
-					switch p {
-					case "Is this a prerelease?":
-						return false, nil
-					default:
-						return false, prompter.NoSuchPromptErr(p)
-					}
-				}
+					})
+				pm.RegisterInput("Tag name", func(_, d string) (string, error) {
+					return "v1.2.3", nil
+				})
+				pm.RegisterInput("Title (optional)", func(_, d string) (string, error) {
+					return d, nil
+				})
+				pm.RegisterConfirm("Is this a prerelease?", func(_ string, _ bool) (bool, error) {
+					return false, nil
+				})
 			},
 			runStubs: func(rs *run.CommandStubber) {
 				rs.Register(`git tag --list`, 1, "")
@@ -1051,35 +1033,23 @@ func Test_createRun_interactive(t *testing.T) {
 			opts: &CreateOptions{
 				TagName: "v1.2.3",
 			},
-			prompterStubs: func(t *testing.T, pm *prompter.PrompterMock) {
-				pm.SelectFunc = func(p, d string, opts []string) (int, error) {
-					switch p {
-					case "Release notes":
-						prompter.AssertOptions(t, []string{"Write my own", "Write using generated notes as template", "Leave blank"}, opts)
+			prompterStubs: func(t *testing.T, pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Release notes",
+					[]string{"Write my own", "Write using generated notes as template", "Leave blank"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Write using generated notes as template")
-					case "Submit?":
-						prompter.AssertOptions(t, []string{"Publish release", "Save as draft", "Cancel"}, opts)
+					})
+				pm.RegisterSelect("Submit?",
+					[]string{"Publish release", "Save as draft", "Cancel"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Publish release")
-					default:
-						return -1, prompter.NoSuchPromptErr(p)
-					}
-				}
-				pm.InputFunc = func(p, d string) (string, error) {
-					switch p {
-					case "Title (optional)":
-						return d, nil
-					default:
-						return "", prompter.NoSuchPromptErr(p)
-					}
-				}
-				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
-					switch p {
-					case "Is this a prerelease?":
-						return false, nil
-					default:
-						return false, prompter.NoSuchPromptErr(p)
-					}
-				}
+					})
+				pm.RegisterInput("Title (optional)", func(_, d string) (string, error) {
+					return d, nil
+				})
+				pm.RegisterConfirm("Is this a prerelease?", func(_ string, _ bool) (bool, error) {
+					return false, nil
+				})
 			},
 			runStubs: func(rs *run.CommandStubber) {
 				rs.Register(`git tag --list`, 1, "")
@@ -1111,35 +1081,23 @@ func Test_createRun_interactive(t *testing.T) {
 			opts: &CreateOptions{
 				TagName: "v1.2.3",
 			},
-			prompterStubs: func(t *testing.T, pm *prompter.PrompterMock) {
-				pm.SelectFunc = func(p, d string, opts []string) (int, error) {
-					switch p {
-					case "Release notes":
-						prompter.AssertOptions(t, []string{"Write my own", "Write using commit log as template", "Leave blank"}, opts)
+			prompterStubs: func(t *testing.T, pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Release notes",
+					[]string{"Write my own", "Write using commit log as template", "Leave blank"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Write using commit log as template")
-					case "Submit?":
-						prompter.AssertOptions(t, []string{"Publish release", "Save as draft", "Cancel"}, opts)
+					})
+				pm.RegisterSelect("Submit?",
+					[]string{"Publish release", "Save as draft", "Cancel"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Publish release")
-					default:
-						return -1, prompter.NoSuchPromptErr(p)
-					}
-				}
-				pm.InputFunc = func(p, d string) (string, error) {
-					switch p {
-					case "Title (optional)":
-						return d, nil
-					default:
-						return "", prompter.NoSuchPromptErr(p)
-					}
-				}
-				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
-					switch p {
-					case "Is this a prerelease?":
-						return false, nil
-					default:
-						return false, prompter.NoSuchPromptErr(p)
-					}
-				}
+					})
+				pm.RegisterInput("Title (optional)", func(_, d string) (string, error) {
+					return d, nil
+				})
+				pm.RegisterConfirm("Is this a prerelease?", func(_ string, _ bool) (bool, error) {
+					return false, nil
+				})
 			},
 			runStubs: func(rs *run.CommandStubber) {
 				rs.Register(`git tag --list`, 1, "")
@@ -1169,35 +1127,23 @@ func Test_createRun_interactive(t *testing.T) {
 			opts: &CreateOptions{
 				TagName: "v1.2.3",
 			},
-			prompterStubs: func(t *testing.T, pm *prompter.PrompterMock) {
-				pm.SelectFunc = func(p, d string, opts []string) (int, error) {
-					switch p {
-					case "Release notes":
-						prompter.AssertOptions(t, []string{"Write my own", "Write using git tag message as template", "Leave blank"}, opts)
+			prompterStubs: func(t *testing.T, pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Release notes",
+					[]string{"Write my own", "Write using git tag message as template", "Leave blank"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Write using git tag message as template")
-					case "Submit?":
-						prompter.AssertOptions(t, []string{"Publish release", "Save as draft", "Cancel"}, opts)
+					})
+				pm.RegisterSelect("Submit?",
+					[]string{"Publish release", "Save as draft", "Cancel"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Publish release")
-					default:
-						return -1, prompter.NoSuchPromptErr(p)
-					}
-				}
-				pm.InputFunc = func(p, d string) (string, error) {
-					switch p {
-					case "Title (optional)":
-						return d, nil
-					default:
-						return "", prompter.NoSuchPromptErr(p)
-					}
-				}
-				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
-					switch p {
-					case "Is this a prerelease?":
-						return false, nil
-					default:
-						return false, prompter.NoSuchPromptErr(p)
-					}
-				}
+					})
+				pm.RegisterInput("Title (optional)", func(_, d string) (string, error) {
+					return d, nil
+				})
+				pm.RegisterConfirm("Is this a prerelease?", func(_ string, _ bool) (bool, error) {
+					return false, nil
+				})
 			},
 			runStubs: func(rs *run.CommandStubber) {
 				rs.Register(`git tag --list`, 0, "hello from annotated tag")
@@ -1243,35 +1189,23 @@ func Test_createRun_interactive(t *testing.T) {
 				TagName: "v1.2.3",
 				Target:  "main",
 			},
-			prompterStubs: func(t *testing.T, pm *prompter.PrompterMock) {
-				pm.SelectFunc = func(p, d string, opts []string) (int, error) {
-					switch p {
-					case "Release notes":
-						prompter.AssertOptions(t, []string{"Write my own", "Write using generated notes as template", "Write using git tag message as template", "Leave blank"}, opts)
+			prompterStubs: func(t *testing.T, pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Release notes",
+					[]string{"Write my own", "Write using generated notes as template", "Write using git tag message as template", "Leave blank"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Leave blank")
-					case "Submit?":
-						prompter.AssertOptions(t, []string{"Publish release", "Save as draft", "Cancel"}, opts)
+					})
+				pm.RegisterSelect("Submit?",
+					[]string{"Publish release", "Save as draft", "Cancel"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Publish release")
-					default:
-						return -1, prompter.NoSuchPromptErr(p)
-					}
-				}
-				pm.InputFunc = func(p, d string) (string, error) {
-					switch p {
-					case "Title (optional)":
-						return d, nil
-					default:
-						return "", prompter.NoSuchPromptErr(p)
-					}
-				}
-				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
-					switch p {
-					case "Is this a prerelease?":
-						return false, nil
-					default:
-						return false, prompter.NoSuchPromptErr(p)
-					}
-				}
+					})
+				pm.RegisterInput("Title (optional)", func(_, d string) (string, error) {
+					return d, nil
+				})
+				pm.RegisterConfirm("Is this a prerelease?", func(_ string, _ bool) (bool, error) {
+					return false, nil
+				})
 			},
 			runStubs: func(rs *run.CommandStubber) {
 				rs.Register(`git tag --list`, 0, "tag exists")
@@ -1303,35 +1237,23 @@ func Test_createRun_interactive(t *testing.T) {
 				TagName:       "v1.2.3",
 				NotesStartTag: "v1.1.0",
 			},
-			prompterStubs: func(t *testing.T, pm *prompter.PrompterMock) {
-				pm.SelectFunc = func(p, d string, opts []string) (int, error) {
-					switch p {
-					case "Release notes":
-						prompter.AssertOptions(t, []string{"Write my own", "Write using generated notes as template", "Leave blank"}, opts)
+			prompterStubs: func(t *testing.T, pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Release notes",
+					[]string{"Write my own", "Write using generated notes as template", "Leave blank"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Write using generated notes as template")
-					case "Submit?":
-						prompter.AssertOptions(t, []string{"Publish release", "Save as draft", "Cancel"}, opts)
+					})
+				pm.RegisterSelect("Submit?",
+					[]string{"Publish release", "Save as draft", "Cancel"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Publish release")
-					default:
-						return -1, prompter.NoSuchPromptErr(p)
-					}
-				}
-				pm.InputFunc = func(p, d string) (string, error) {
-					switch p {
-					case "Title (optional)":
-						return d, nil
-					default:
-						return "", prompter.NoSuchPromptErr(p)
-					}
-				}
-				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
-					switch p {
-					case "Is this a prerelease?":
-						return false, nil
-					default:
-						return false, prompter.NoSuchPromptErr(p)
-					}
-				}
+					})
+				pm.RegisterInput("Title (optional)", func(_, d string) (string, error) {
+					return d, nil
+				})
+				pm.RegisterConfirm("Is this a prerelease?", func(_ string, _ bool) (bool, error) {
+					return false, nil
+				})
 			},
 			runStubs: func(rs *run.CommandStubber) {
 				rs.Register(`git tag --list`, 1, "")
@@ -1369,35 +1291,23 @@ func Test_createRun_interactive(t *testing.T) {
 				TagName:       "v1.2.3",
 				NotesStartTag: "v1.1.0",
 			},
-			prompterStubs: func(t *testing.T, pm *prompter.PrompterMock) {
-				pm.SelectFunc = func(p, d string, opts []string) (int, error) {
-					switch p {
-					case "Release notes":
-						prompter.AssertOptions(t, []string{"Write my own", "Write using commit log as template", "Leave blank"}, opts)
+			prompterStubs: func(t *testing.T, pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Release notes",
+					[]string{"Write my own", "Write using commit log as template", "Leave blank"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Write using commit log as template")
-					case "Submit?":
-						prompter.AssertOptions(t, []string{"Publish release", "Save as draft", "Cancel"}, opts)
+					})
+				pm.RegisterSelect("Submit?",
+					[]string{"Publish release", "Save as draft", "Cancel"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Publish release")
-					default:
-						return -1, prompter.NoSuchPromptErr(p)
-					}
-				}
-				pm.InputFunc = func(p, d string) (string, error) {
-					switch p {
-					case "Title (optional)":
-						return d, nil
-					default:
-						return "", prompter.NoSuchPromptErr(p)
-					}
-				}
-				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
-					switch p {
-					case "Is this a prerelease?":
-						return false, nil
-					default:
-						return false, prompter.NoSuchPromptErr(p)
-					}
-				}
+					})
+				pm.RegisterInput("Title (optional)", func(_, d string) (string, error) {
+					return d, nil
+				})
+				pm.RegisterConfirm("Is this a prerelease?", func(_ string, _ bool) (bool, error) {
+					return false, nil
+				})
 			},
 			runStubs: func(rs *run.CommandStubber) {
 				rs.Register(`git tag --list`, 1, "")
@@ -1427,35 +1337,25 @@ func Test_createRun_interactive(t *testing.T) {
 				TagName:   "v1.2.3",
 				VerifyTag: true,
 			},
-			prompterStubs: func(t *testing.T, pm *prompter.PrompterMock) {
-				pm.SelectFunc = func(p, d string, opts []string) (int, error) {
-					switch p {
-					case "Release notes":
-						prompter.AssertOptions(t, []string{"Write my own", "Write using generated notes as template", "Write using git tag message as template", "Leave blank"}, opts)
+			prompterStubs: func(t *testing.T, pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Release notes",
+					[]string{"Write my own", "Write using generated notes as template", "Write using git tag message as template", "Leave blank"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Leave blank")
-					case "Submit?":
-						prompter.AssertOptions(t, []string{"Publish release", "Save as draft", "Cancel"}, opts)
+					})
+				pm.RegisterSelect("Submit?",
+					[]string{"Publish release", "Save as draft", "Cancel"},
+					func(_, _ string, opts []string) (int, error) {
 						return prompter.IndexFor(opts, "Publish release")
-					default:
-						return -1, prompter.NoSuchPromptErr(p)
-					}
-				}
-				pm.InputFunc = func(p, d string) (string, error) {
-					switch p {
-					case "Title (optional)":
-						return d, nil
-					default:
-						return "", prompter.NoSuchPromptErr(p)
-					}
-				}
-				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
-					switch p {
-					case "Is this a prerelease?":
-						return false, nil
-					default:
-						return false, prompter.NoSuchPromptErr(p)
-					}
-				}
+					})
+
+				pm.RegisterInput("Title (optional)", func(_, d string) (string, error) {
+					return d, nil
+				})
+
+				pm.RegisterConfirm("Is this a prerelease?", func(_ string, _ bool) (bool, error) {
+					return false, nil
+				})
 			},
 			runStubs: func(rs *run.CommandStubber) {
 				rs.Register(`git tag --list`, 0, "tag exists")
@@ -1524,7 +1424,7 @@ func Test_createRun_interactive(t *testing.T) {
 		tt.opts.GitClient = &git.Client{GitPath: "some/path/git"}
 
 		t.Run(tt.name, func(t *testing.T) {
-			pm := &prompter.PrompterMock{}
+			pm := prompter.NewMockPrompter(t)
 			if tt.prompterStubs != nil {
 				tt.prompterStubs(t, pm)
 			}

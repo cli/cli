@@ -13,7 +13,7 @@ import (
 //go:generate moq -rm -out prompter_mock.go . Prompter
 type Prompter interface {
 	Select(string, string, []string) (int, error)
-	MultiSelect(string, string, []string) (int, error)
+	MultiSelect(string, string, []string) ([]string, error)
 	Input(string, string) (string, error)
 	InputHostname() (string, error)
 	Password(string) (string, error)
@@ -72,7 +72,7 @@ func (p *surveyPrompter) Select(message, defaultValue string, options []string) 
 	return
 }
 
-func (p *surveyPrompter) MultiSelect(message, defaultValue string, options []string) (result int, err error) {
+func (p *surveyPrompter) MultiSelect(message, defaultValue string, options []string) (result []string, err error) {
 	q := &survey.MultiSelect{
 		Message:  message,
 		Options:  options,
