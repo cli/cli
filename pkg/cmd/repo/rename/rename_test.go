@@ -221,7 +221,6 @@ func TestRenameRun(t *testing.T) {
 	for _, tt := range testCases {
 		pm := prompter.NewMockPrompter(t)
 		tt.opts.Prompter = pm
-		defer pm.Verify()
 		if tt.promptStubs != nil {
 			tt.promptStubs(pm)
 		}

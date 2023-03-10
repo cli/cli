@@ -1429,7 +1429,6 @@ func Test_createRun_interactive(t *testing.T) {
 				tt.prompterStubs(t, pm)
 			}
 			tt.opts.Prompter = pm
-			defer pm.Verify()
 
 			rs, teardown := run.Stub()
 			defer teardown(t)

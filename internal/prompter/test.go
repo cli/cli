@@ -99,6 +99,8 @@ func NewMockPrompter(t *testing.T) *MockPrompter {
 		ConfirmDeletionStubs: []ConfirmDeletionStub{},
 	}
 
+	t.Cleanup(m.Verify)
+
 	m.SelectFunc = func(p, d string, opts []string) (int, error) {
 		var s SelectStub
 
