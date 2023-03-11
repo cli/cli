@@ -58,8 +58,14 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 		Short: "Refresh stored authentication credentials",
 		Long: heredoc.Doc(`Expand or fix the permission scopes for stored credentials.
 
-			The --scopes flag accepts a comma separated list of scopes you want your gh credentials to have. If
-			absent, this command ensures that gh has access to a minimum set of scopes.
+			The --scopes flag accepts a comma separated list of scopes you want
+			your gh credentials to have. If no scopes are provided, the command
+			maintains previously added scopes.
+
+			Note: the "refresh" command can only add additional scopes, but not
+			remove previously added scopes. To reset scopes to the default
+			minimum set of scopes, de-authorize github CLI altogether and start
+			afresh.
 		`),
 		Example: heredoc.Doc(`
 			$ gh auth refresh --scopes write:org,read:public_key
