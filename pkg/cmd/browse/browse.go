@@ -22,6 +22,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	emptyCommitFlag = "last"
+)
+
 type BrowseOptions struct {
 	BaseRepo         func() (ghrepo.Interface, error)
 	Browser          browser.Browser
@@ -33,7 +37,7 @@ type BrowseOptions struct {
 	SelectorArg string
 
 	Branch        string
-	CommitFlag    bool
+	Commit        string
 	ProjectsFlag  bool
 	ReleasesFlag  bool
 	SettingsFlag  bool
@@ -75,6 +79,9 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 
 			$ gh browse main.go --branch main
 			#=> Open main.go in the main branch
+
+			$ gh browse main.go --commit=77507cd94ccafcf568f8560cfecde965fcfa63
+			#=> Open main.go with the repository state as of the commit 7750
 		`),
 		Annotations: map[string]string{
 			"help:arguments": heredoc.Doc(`
@@ -97,7 +104,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			if err := cmdutil.MutuallyExclusive(
 				"specify only one of `--branch`, `--commit`, `--releases`, `--projects`, `--wiki`, or `--settings`",
 				opts.Branch != "",
-				opts.CommitFlag,
+				opts.Commit != "",
 				opts.WikiFlag,
 				opts.SettingsFlag,
 				opts.ProjectsFlag,
@@ -122,8 +129,12 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.WikiFlag, "wiki", "w", false, "Open repository wiki")
 	cmd.Flags().BoolVarP(&opts.SettingsFlag, "settings", "s", false, "Open repository settings")
 	cmd.Flags().BoolVarP(&opts.NoBrowserFlag, "no-browser", "n", false, "Print destination URL instead of opening the browser")
-	cmd.Flags().BoolVarP(&opts.CommitFlag, "commit", "c", false, "Open the last commit")
+	cmd.Flags().StringVarP(&opts.Commit, "commit", "c", "", "Select another commit by passing in the commit SHA, default is the last commit")
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Select another branch by passing in the branch name")
+
+	// To preserve backwards compatibility when commit flag used to be a
+	// boolean flag.
+	cmd.Flags().Lookup("commit").NoOptDefVal = emptyCommitFlag
 
 	return cmd
 }
@@ -134,12 +145,16 @@ func runBrowse(opts *BrowseOptions) error {
 		return fmt.Errorf("unable to determine base repository: %w", err)
 	}
 
-	if opts.CommitFlag {
-		commit, err := opts.GitClient.LastCommit()
-		if err != nil {
-			return err
+	if opts.Commit != "" {
+		if opts.Commit == emptyCommitFlag {
+			commit, err := opts.GitClient.LastCommit()
+			if err != nil {
+				return err
+			}
+			opts.Branch = commit.Sha
+		} else {
+			opts.Branch = opts.Commit
 		}
-		opts.Branch = commit.Sha
 	}
 
 	section, err := parseSection(baseRepo, opts)
@@ -174,7 +189,7 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 		}
 	}
 
-	if !opts.CommitFlag && isNumber(opts.SelectorArg) {
+	if opts.Commit == "" && isNumber(opts.SelectorArg) {
 		return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
 	}
 
