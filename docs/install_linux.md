@@ -107,7 +107,7 @@ There are [so many issues with Snap](https://github.com/casperdcl/cli/issues/7) 
 Arch Linux users can install from the [community repo][arch linux repo]:
 
 ```bash
-sudo pacman -S github-cli
+pacman -S github-cli
 ```
 
 Alternatively, use the [unofficial AUR package][arch linux aur] to build GitHub CLI from source.
