@@ -89,6 +89,7 @@ func Test_deleteRun(t *testing.T) {
 		httpStubs     func(*httpmock.Registry)
 		prompterStubs func(*prompter.PrompterMock)
 		wantStdout    string
+		wantStderr    string
 		wantErr       bool
 		errMsg        string
 	}{
@@ -155,6 +156,18 @@ func Test_deleteRun(t *testing.T) {
 					httpmock.StatusStringResponse(204, "{}"))
 			},
 		},
+		{
+			name:       "repo transfered ownership",
+			opts:       &DeleteOptions{RepoArg: "OWNER/REPO", Confirmed: true},
+			wantErr:    true,
+			errMsg:     "SilentError",
+			wantStderr: "X Failed to delete repository: OWNER/REPO has changed name or transfered ownership\n",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("DELETE", "repos/OWNER/REPO"),
+					httpmock.StatusStringResponse(307, "{}"))
+			},
+		},
 	}
 	for _, tt := range tests {
 		pm := &prompter.PrompterMock{}
@@ -175,7 +188,7 @@ func Test_deleteRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 
-		ios, _, stdout, _ := iostreams.Test()
+		ios, _, stdout, stderr := iostreams.Test()
 		ios.SetStdinTTY(tt.tty)
 		ios.SetStdoutTTY(tt.tty)
 		tt.opts.IO = ios
@@ -190,6 +203,7 @@ func Test_deleteRun(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantStdout, stdout.String())
+			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
 }

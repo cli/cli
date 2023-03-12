@@ -1,6 +1,7 @@
 package delete
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -106,6 +107,17 @@ func deleteRun(opts *DeleteOptions) error {
 
 	err = deleteRepo(httpClient, toDelete)
 	if err != nil {
+		var httpErr api.HTTPError
+		if errors.As(err, &httpErr) {
+			statusCode := httpErr.HTTPError.StatusCode
+			if statusCode == http.StatusMovedPermanently ||
+				statusCode == http.StatusTemporaryRedirect ||
+				statusCode == http.StatusPermanentRedirect {
+				cs := opts.IO.ColorScheme()
+				fmt.Fprintf(opts.IO.ErrOut, "%s Failed to delete repository: %s has changed name or transfered ownership\n", cs.FailureIcon(), fullName)
+				return cmdutil.SilentError
+			}
+		}
 		return err
 	}
 
