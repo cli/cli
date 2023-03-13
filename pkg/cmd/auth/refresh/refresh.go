@@ -62,10 +62,9 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			your gh credentials to have. If no scopes are provided, the command
 			maintains previously added scopes.
 
-			Note: the "refresh" command can only add additional scopes, but not
-			remove previously added scopes. To reset scopes to the default
-			minimum set of scopes, de-authorize github CLI altogether and start
-			afresh.
+			The command can only add additional scopes, but not remove previously
+			added ones. To reset scopes to the default minimum set of scopes, you
+			will need to create new credentials using the auth login command.
 		`),
 		Example: heredoc.Doc(`
 			$ gh auth refresh --scopes write:org,read:public_key
