@@ -53,9 +53,9 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 		Short: "Set variables",
 		Long: heredoc.Doc(`
 			Set a value for a variable on one of the following levels:
-			- repository (default): available to Actions runs and Dependabot in a repository
+			- repository (default): available to Actions runs or Dependabot in a repository
 			- environment: available to Actions runs for a deployment environment in a repository
-			- organization: available to Actions runs and Dependabot within an organization
+			- organization: available to Actions runs or Dependabot within an organization
 
 			Organization variable can optionally be restricted to only be available to
 			specific repositories.
@@ -167,7 +167,7 @@ func setRun(opts *SetOptions) error {
 		if err != nil {
 			return err
 		}
-		host, _ = cfg.DefaultHost()
+		host, _ = cfg.Authentication().DefaultHost()
 	}
 
 	entity, err := shared.GetVariableEntity(orgName, envName)
