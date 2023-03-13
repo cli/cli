@@ -82,7 +82,6 @@ func TestNewCmdDelete(t *testing.T) {
 			assert.Equal(t, tt.wants.EnvName, gotOpts.EnvName)
 		})
 	}
-
 }
 
 func Test_removeRun_repo(t *testing.T) {
@@ -199,8 +198,6 @@ func Test_removeRun_org(t *testing.T) {
 			assert.NoError(t, err)
 
 			reg.Verify(t)
-
 		})
 	}
-
 }

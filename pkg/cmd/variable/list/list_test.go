@@ -89,6 +89,7 @@ func Test_listRun(t *testing.T) {
 			tty:  true,
 			opts: &ListOptions{},
 			wantOut: []string{
+				"NAME            VALUE  UPDATED AT",
 				"VARIABLE_ONE    one    Updated 1988-10-11",
 				"VARIABLE_TWO    two    Updated 2020-12-04",
 				"VARIABLE_THREE  three  Updated 1975-11-30",
@@ -111,6 +112,7 @@ func Test_listRun(t *testing.T) {
 				OrgName: "UmbrellaCorporation",
 			},
 			wantOut: []string{
+				"NAME            VALUE      UPDATED AT          VISIBILITY",
 				"VARIABLE_ONE    org_one    Updated 1988-10-11  Visible to all repositories",
 				"VARIABLE_TWO    org_two    Updated 2020-12-04  Visible to private repositories",
 				"VARIABLE_THREE  org_three  Updated 1975-11-30  Visible to 2 selected reposito...",
@@ -135,6 +137,7 @@ func Test_listRun(t *testing.T) {
 				EnvName: "Development",
 			},
 			wantOut: []string{
+				"NAME            VALUE  UPDATED AT",
 				"VARIABLE_ONE    one    Updated 1988-10-11",
 				"VARIABLE_TWO    two    Updated 2020-12-04",
 				"VARIABLE_THREE  three  Updated 1975-11-30",
@@ -239,13 +242,8 @@ func Test_listRun(t *testing.T) {
 
 			reg.Verify(t)
 			outputLines := strings.Split(stdout.String(), "\n")
-			idx := 0
-			if strings.Contains(outputLines[0], "NAME") {
-				idx = 1
-			}
-			for _, l := range tt.wantOut {
-				assert.Equal(t, outputLines[idx], l)
-				idx++
+			for i, l := range tt.wantOut {
+				assert.Equal(t, outputLines[i], l)
 			}
 		})
 	}
