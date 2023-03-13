@@ -2,6 +2,7 @@ package variable
 
 import (
 	"github.com/MakeNowJust/heredoc"
+	cmdDelete "github.com/cli/cli/v2/pkg/cmd/variable/delete"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/variable/list"
 	cmdSet "github.com/cli/cli/v2/pkg/cmd/variable/set"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -22,5 +23,6 @@ func NewCmdVariable(f *cmdutil.Factory) *cobra.Command {
 
 	cmd.AddCommand(cmdSet.NewCmdSet(f, nil))
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
+	cmd.AddCommand(cmdDelete.NewCmdDelete(f, nil))
 	return cmd
 }
