@@ -116,6 +116,26 @@ func TestNewCmdBrowse(t *testing.T) {
 			wantsErr: true,
 		},
 		{
+			name:     "passed argument and projects flag",
+			cli:      "main.go --projects",
+			wantsErr: true,
+		},
+		{
+			name:     "passed argument and releases flag",
+			cli:      "main.go --releases",
+			wantsErr: true,
+		},
+		{
+			name:     "passed argument and settings flag",
+			cli:      "main.go --settings",
+			wantsErr: true,
+		},
+		{
+			name:     "passed argument and wiki flag",
+			cli:      "main.go --wiki",
+			wantsErr: true,
+		},
+		{
 			name: "empty commit flag",
 			cli:  "--commit",
 			wants: BrowseOptions{
@@ -373,7 +393,7 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("ken", "grc"),
 			wantsErr:    false,
-			expectedURL: "https://github.com/ken/grc/issues/217",
+			expectedURL: "https://github.com/ken/grc/tree/trunk/217",
 		},
 		{
 			name: "opening branch file with line number",

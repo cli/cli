@@ -77,11 +77,11 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			$ gh browse main.go:312
 			#=> Open main.go at line 312
 
-			$ gh browse main.go --branch main
-			#=> Open main.go in the main branch
+			$ gh browse main.go --branch bug-fix
+			#=> Open main.go with the repository at head of bug-fix branch
 
 			$ gh browse main.go --commit=77507cd94ccafcf568f8560cfecde965fcfa63
-			#=> Open main.go with the repository state as of the commit 7750
+			#=> Open main.go with the repository at commit 775007cd
 		`),
 		Annotations: map[string]string{
 			"help:arguments": heredoc.Doc(`
@@ -102,16 +102,28 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			}
 
 			if err := cmdutil.MutuallyExclusive(
-				"specify only one of `--branch`, `--commit`, `--releases`, `--projects`, `--wiki`, or `--settings`",
-				opts.Branch != "",
-				opts.Commit != "",
-				opts.WikiFlag,
-				opts.SettingsFlag,
+				"arguments not supported when using `--projects`, `--releases`, `--settings`, or `--wiki`",
+				opts.SelectorArg != "",
 				opts.ProjectsFlag,
 				opts.ReleasesFlag,
+				opts.SettingsFlag,
+				opts.WikiFlag,
 			); err != nil {
 				return err
 			}
+
+			if err := cmdutil.MutuallyExclusive(
+				"specify only one of `--branch`, `--commit`, `--projects`, `--releases`, `--settings`, or `--wiki`",
+				opts.Branch != "",
+				opts.Commit != "",
+				opts.ProjectsFlag,
+				opts.ReleasesFlag,
+				opts.SettingsFlag,
+				opts.WikiFlag,
+			); err != nil {
+				return err
+			}
+
 			if cmd.Flags().Changed("repo") {
 				opts.GitClient = &remoteGitClient{opts.BaseRepo, opts.HttpClient}
 			}
@@ -132,8 +144,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 	cmd.Flags().StringVarP(&opts.Commit, "commit", "c", "", "Select another commit by passing in the commit SHA, default is the last commit")
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Select another branch by passing in the branch name")
 
-	// To preserve backwards compatibility when commit flag used to be a
-	// boolean flag.
+	// Preserve backwards compatibility for when commit flag used to be a boolean flag.
 	cmd.Flags().Lookup("commit").NoOptDefVal = emptyCommitFlag
 
 	return cmd
@@ -151,9 +162,7 @@ func runBrowse(opts *BrowseOptions) error {
 			if err != nil {
 				return err
 			}
-			opts.Branch = commit.Sha
-		} else {
-			opts.Branch = opts.Commit
+			opts.Commit = commit.Sha
 		}
 	}
 
@@ -175,44 +184,48 @@ func runBrowse(opts *BrowseOptions) error {
 }
 
 func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error) {
-	if opts.SelectorArg == "" {
-		if opts.ProjectsFlag {
-			return "projects", nil
-		} else if opts.ReleasesFlag {
-			return "releases", nil
-		} else if opts.SettingsFlag {
-			return "settings", nil
-		} else if opts.WikiFlag {
-			return "wiki", nil
-		} else if opts.Branch == "" {
+	if opts.ProjectsFlag {
+		return "projects", nil
+	} else if opts.ReleasesFlag {
+		return "releases", nil
+	} else if opts.SettingsFlag {
+		return "settings", nil
+	} else if opts.WikiFlag {
+		return "wiki", nil
+	}
+
+	ref := opts.Branch
+	if opts.Commit != "" {
+		ref = opts.Commit
+	}
+
+	if ref == "" {
+		if opts.SelectorArg == "" {
 			return "", nil
+		}
+		if isNumber(opts.SelectorArg) {
+			return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
+		}
+		if isCommit(opts.SelectorArg) {
+			return fmt.Sprintf("commit/%s", opts.SelectorArg), nil
 		}
 	}
 
-	if opts.Commit == "" && isNumber(opts.SelectorArg) {
-		return fmt.Sprintf("issues/%s", strings.TrimPrefix(opts.SelectorArg, "#")), nil
-	}
-
-	if isCommit(opts.SelectorArg) {
-		return fmt.Sprintf("commit/%s", opts.SelectorArg), nil
-	}
-
-	filePath, rangeStart, rangeEnd, err := parseFile(*opts, opts.SelectorArg)
-	if err != nil {
-		return "", err
-	}
-
-	branchName := opts.Branch
-	if branchName == "" {
+	if ref == "" {
 		httpClient, err := opts.HttpClient()
 		if err != nil {
 			return "", err
 		}
 		apiClient := api.NewClientFromHTTP(httpClient)
-		branchName, err = api.RepoDefaultBranch(apiClient, baseRepo)
+		ref, err = api.RepoDefaultBranch(apiClient, baseRepo)
 		if err != nil {
 			return "", fmt.Errorf("error determining the default branch: %w", err)
 		}
+	}
+
+	filePath, rangeStart, rangeEnd, err := parseFile(*opts, opts.SelectorArg)
+	if err != nil {
+		return "", err
 	}
 
 	if rangeStart > 0 {
@@ -222,9 +235,10 @@ func parseSection(baseRepo ghrepo.Interface, opts *BrowseOptions) (string, error
 		} else {
 			rangeFragment = fmt.Sprintf("L%d", rangeStart)
 		}
-		return fmt.Sprintf("blob/%s/%s?plain=1#%s", escapePath(branchName), escapePath(filePath), rangeFragment), nil
+		return fmt.Sprintf("blob/%s/%s?plain=1#%s", escapePath(ref), escapePath(filePath), rangeFragment), nil
 	}
-	return strings.TrimSuffix(fmt.Sprintf("tree/%s/%s", escapePath(branchName), escapePath(filePath)), "/"), nil
+
+	return strings.TrimSuffix(fmt.Sprintf("tree/%s/%s", escapePath(ref), escapePath(filePath)), "/"), nil
 }
 
 // escapePath URL-encodes special characters but leaves slashes unchanged
