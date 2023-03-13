@@ -45,7 +45,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			List variables on one of the following levels:
 			- repository (default): available to Actions runs or Dependabot in a repository
 			- environment: available to Actions runs for a deployment environment in a repository
-			- organization: available to Actions runs and Dependabot within an organization
+			- organization: available to Actions runs or Dependabot within an organization
 		`),
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,
@@ -110,7 +110,7 @@ func listRun(opts *ListOptions) error {
 			return err
 		}
 
-		host, _ = cfg.DefaultHost()
+		host, _ = cfg.Authentication().DefaultHost()
 
 		variables, err = getOrgVariables(client, host, orgName, showSelectedRepoInfo)
 	}
