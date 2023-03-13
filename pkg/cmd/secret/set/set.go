@@ -407,7 +407,7 @@ func mapRepoNamesToIDs(client *api.Client, host, defaultOwner string, repository
 		}
 		repos = append(repos, repo)
 	}
-	repositoryIDs, err := mapRepoToID(client, host, repos)
+	repositoryIDs, err := api.GetRepoIDs(client, host, repos)
 	if err != nil {
 		return nil, fmt.Errorf("failed to look up IDs for repositories %v: %w", repositoryNames, err)
 	}

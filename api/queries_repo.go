@@ -1334,3 +1334,39 @@ func CreateRepoTransformToV4(apiClient *Client, hostname string, method string, 
 		IsPrivate: responsev3.Private,
 	}, nil
 }
+
+// MapReposToIDs retrieves a set of IDs for the given set of repositories.
+// This is similar logic to RepoNetwork, but only fetches databaseId and does not
+// discover parent repositories.
+func GetRepoIDs(client *Client, host string, repositories []ghrepo.Interface) ([]int64, error) {
+	queries := make([]string, 0, len(repositories))
+	for i, repo := range repositories {
+		queries = append(queries, fmt.Sprintf(`
+			repo_%03d: repository(owner: %q, name: %q) {
+				databaseId
+			}
+		`, i, repo.RepoOwner(), repo.RepoName()))
+	}
+
+	query := fmt.Sprintf(`query MapRepositoryNames { %s }`, strings.Join(queries, ""))
+
+	graphqlResult := make(map[string]*struct {
+		DatabaseID int64 `json:"databaseId"`
+	})
+
+	if err := client.GraphQL(host, query, nil, &graphqlResult); err != nil {
+		return nil, fmt.Errorf("failed to look up repositories: %w", err)
+	}
+
+	repoKeys := make([]string, 0, len(repositories))
+	for k := range graphqlResult {
+		repoKeys = append(repoKeys, k)
+	}
+	sort.Strings(repoKeys)
+
+	result := make([]int64, len(repositories))
+	for i, k := range repoKeys {
+		result[i] = graphqlResult[k].DatabaseID
+	}
+	return result, nil
+}
