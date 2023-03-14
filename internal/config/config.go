@@ -234,6 +234,20 @@ func (c *AuthConfig) Logout(hostname string) error {
 	return ghConfig.Write(c.cfg)
 }
 
+// IsEnterprise checks if there are any environment variable authentication
+// tokens set for enterprise hosts.
+func (c *AuthConfig) IsEnterprise() bool {
+	// Any non-github.com hostname is fine here
+	dummyHostname := "example.com"
+	var token = ""
+	if c.tokenOverride != nil {
+		token, _ = c.tokenOverride(dummyHostname)
+	} else {
+		token, _ = ghAuth.TokenFromEnvOrConfig(dummyHostname)
+	}
+	return token != ""
+}
+
 func keyringServiceName(hostname string) string {
 	return "gh:" + hostname
 }

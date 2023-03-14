@@ -2,7 +2,6 @@ package cmdutil
 
 import (
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/go-gh/pkg/auth"
 	"github.com/spf13/cobra"
 )
 
@@ -15,12 +14,7 @@ func DisableAuthCheck(cmd *cobra.Command) {
 }
 
 func CheckAuth(cfg config.Config) bool {
-	// This will check if there are any environment variable
-	// authentication tokens set for enterprise hosts.
-	// Any non-github.com hostname is fine here
-	dummyHostname := "example.com"
-	token, _ := auth.TokenFromEnvOrConfig(dummyHostname)
-	if token != "" {
+	if cfg.Authentication().IsEnterprise() {
 		return true
 	}
 
