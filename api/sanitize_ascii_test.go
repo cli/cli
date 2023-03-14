@@ -22,7 +22,7 @@ func TestHTTPClientSanitizeASCIIControlCharactersC0(t *testing.T) {
 			Author: Author{
 				ID:    "1",
 				Name:  "10\u0010 11\u0011 12\u0012 13\u0013 14\u0014 15\u0015 16\u0016 17\u0017 18\u0018 19\u0019 1A\u001a 1B\u001b 1C\u001c 1D\u001d 1E\u001e 1F\u001f",
-				Login: "monalisa",
+				Login: "monalisa \\u00\u001b",
 			},
 			ActiveLockReason: "Escaped \u001B \\u001B \\\u001B \\\\u001B",
 		}
@@ -47,7 +47,7 @@ func TestHTTPClientSanitizeASCIIControlCharactersC0(t *testing.T) {
 	assert.Equal(t, "^[[31mRed Title^[[0m", issue.Title)
 	assert.Equal(t, "1^A 2^B 3^C 4^D 5^E 6^F 7^G 8^H 9\t A\r\n B^K C^L D\r\n E^N F^O", issue.Body)
 	assert.Equal(t, "10^P 11^Q 12^R 13^S 14^T 15^U 16^V 17^W 18^X 19^Y 1A^Z 1B^[ 1C^\\ 1D^] 1E^^ 1F^_", issue.Author.Name)
-	assert.Equal(t, "monalisa", issue.Author.Login)
+	assert.Equal(t, "monalisa \\u00^[", issue.Author.Login)
 	assert.Equal(t, "Escaped ^[ \\^[ \\^[ \\\\^[", issue.ActiveLockReason)
 }
 
