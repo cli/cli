@@ -239,7 +239,7 @@ func (c *AuthConfig) Logout(hostname string) error {
 func (c *AuthConfig) IsEnterprise() bool {
 	// Any non-github.com hostname is fine here
 	dummyHostname := "example.com"
-	var token = ""
+	var token string
 	if c.tokenOverride != nil {
 		token, _ = c.tokenOverride(dummyHostname)
 	} else {
