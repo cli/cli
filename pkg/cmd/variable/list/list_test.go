@@ -3,8 +3,8 @@ package list
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_NewCmdList(t *testing.T) {
+func TestNewCmdList(t *testing.T) {
 	tests := []struct {
 		name  string
 		cli   string
@@ -89,7 +89,7 @@ func Test_listRun(t *testing.T) {
 			tty:  true,
 			opts: &ListOptions{},
 			wantOut: []string{
-				"NAME            VALUE  UPDATED AT",
+				"NAME            VALUE  UPDATED",
 				"VARIABLE_ONE    one    Updated 1988-10-11",
 				"VARIABLE_TWO    two    Updated 2020-12-04",
 				"VARIABLE_THREE  three  Updated 1975-11-30",
@@ -112,7 +112,7 @@ func Test_listRun(t *testing.T) {
 				OrgName: "UmbrellaCorporation",
 			},
 			wantOut: []string{
-				"NAME            VALUE      UPDATED AT          VISIBILITY",
+				"NAME            VALUE      UPDATED             VISIBILITY",
 				"VARIABLE_ONE    org_one    Updated 1988-10-11  Visible to all repositories",
 				"VARIABLE_TWO    org_two    Updated 2020-12-04  Visible to private repositories",
 				"VARIABLE_THREE  org_three  Updated 1975-11-30  Visible to 2 selected reposito...",
@@ -137,7 +137,7 @@ func Test_listRun(t *testing.T) {
 				EnvName: "Development",
 			},
 			wantOut: []string{
-				"NAME            VALUE  UPDATED AT",
+				"NAME            VALUE  UPDATED",
 				"VARIABLE_ONE    one    Updated 1988-10-11",
 				"VARIABLE_TWO    two    Updated 2020-12-04",
 				"VARIABLE_THREE  three  Updated 1975-11-30",
@@ -160,35 +160,41 @@ func Test_listRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
 
 			path := "repos/owner/repo/actions/variables"
 			if tt.opts.EnvName != "" {
 				path = fmt.Sprintf("repositories/owner/repo/environments/%s/variables", tt.opts.EnvName)
+			} else if tt.opts.OrgName != "" {
+				path = fmt.Sprintf("orgs/%s/actions/variables", tt.opts.OrgName)
 			}
 
 			t0, _ := time.Parse("2006-01-02", "1988-10-11")
 			t1, _ := time.Parse("2006-01-02", "2020-12-04")
 			t2, _ := time.Parse("2006-01-02", "1975-11-30")
-			payload := variablesPayload{}
-			payload.Variables = []*Variable{
-				{
-					Name:      "VARIABLE_ONE",
-					Value:     "one",
-					UpdatedAt: t0,
-				},
-				{
-					Name:      "VARIABLE_TWO",
-					Value:     "two",
-					UpdatedAt: t1,
-				},
-				{
-					Name:      "VARIABLE_THREE",
-					Value:     "three",
-					UpdatedAt: t2,
+			payload := struct {
+				Variables []Variable
+			}{
+				Variables: []Variable{
+					{
+						Name:      "VARIABLE_ONE",
+						Value:     "one",
+						UpdatedAt: t0,
+					},
+					{
+						Name:      "VARIABLE_TWO",
+						Value:     "two",
+						UpdatedAt: t1,
+					},
+					{
+						Name:      "VARIABLE_THREE",
+						Value:     "three",
+						UpdatedAt: t2,
+					},
 				},
 			}
 			if tt.opts.OrgName != "" {
-				payload.Variables = []*Variable{
+				payload.Variables = []Variable{
 					{
 						Name:       "VARIABLE_ONE",
 						Value:      "org_one",
@@ -209,8 +215,6 @@ func Test_listRun(t *testing.T) {
 						SelectedReposURL: fmt.Sprintf("https://api.github.com/orgs/%s/actions/variables/VARIABLE_THREE/repositories", tt.opts.OrgName),
 					},
 				}
-				path = fmt.Sprintf("orgs/%s/actions/variables", tt.opts.OrgName)
-
 				if tt.tty {
 					reg.Register(
 						httpmock.REST("GET", fmt.Sprintf("orgs/%s/actions/variables/VARIABLE_THREE/repositories", tt.opts.OrgName)),
@@ -240,40 +244,28 @@ func Test_listRun(t *testing.T) {
 			err := listRun(tt.opts)
 			assert.NoError(t, err)
 
-			reg.Verify(t)
-			outputLines := strings.Split(stdout.String(), "\n")
-			for i, l := range tt.wantOut {
-				assert.Equal(t, outputLines[i], l)
-			}
+			expected := fmt.Sprintf("%s\n", strings.Join(tt.wantOut, "\n"))
+			assert.Equal(t, expected, stdout.String())
 		})
 	}
 }
 
 func Test_getVariables_pagination(t *testing.T) {
-	var requests []*http.Request
-	var client testClient = func(req *http.Request) (*http.Response, error) {
-		header := make(map[string][]string)
-		if len(requests) == 0 {
-			header["Link"] = []string{`<http://example.com/page/0>; rel="previous", <http://example.com/page/2>; rel="next"`}
-		}
-		requests = append(requests, req)
-		return &http.Response{
-			Request: req,
-			Body:    io.NopCloser(strings.NewReader(`{"variables":[{},{}]}`)),
-			Header:  header,
-		}, nil
-	}
-
+	reg := &httpmock.Registry{}
+	defer reg.Verify(t)
+	reg.Register(
+		httpmock.QueryMatcher("GET", "path/to", url.Values{"per_page": []string{"100"}}),
+		httpmock.WithHeader(
+			httpmock.StringResponse(`{"variables":[{},{}]}`),
+			"Link",
+			`<http://example.com/page/0>; rel="previous", <http://example.com/page/2>; rel="next"`),
+	)
+	reg.Register(
+		httpmock.REST("GET", "page/2"),
+		httpmock.StringResponse(`{"variables":[{},{}]}`),
+	)
+	client := &http.Client{Transport: reg}
 	variables, err := getVariables(client, "github.com", "path/to")
 	assert.NoError(t, err)
-	assert.Equal(t, 2, len(requests))
 	assert.Equal(t, 4, len(variables))
-	assert.Equal(t, "https://api.github.com/path/to?per_page=100", requests[0].URL.String())
-	assert.Equal(t, "http://example.com/page/2", requests[1].URL.String())
-}
-
-type testClient func(*http.Request) (*http.Response, error)
-
-func (c testClient) Do(req *http.Request) (*http.Response, error) {
-	return c(req)
 }

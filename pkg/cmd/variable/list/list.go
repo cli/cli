@@ -1,17 +1,14 @@
 package list
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
-	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/variable/shared"
@@ -26,9 +23,8 @@ type ListOptions struct {
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 
-	OrgName     string
-	EnvName     string
-	Application string
+	OrgName string
+	EnvName string
 }
 
 func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
@@ -93,7 +89,7 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	var variables []*Variable
+	var variables []Variable
 	showSelectedRepoInfo := opts.IO.IsStdoutTTY()
 
 	switch variableEntity {
@@ -104,14 +100,11 @@ func listRun(opts *ListOptions) error {
 	case shared.Organization:
 		var cfg config.Config
 		var host string
-
 		cfg, err = opts.Config()
 		if err != nil {
 			return err
 		}
-
 		host, _ = cfg.Authentication().DefaultHost()
-
 		variables, err = getOrgVariables(client, host, orgName, showSelectedRepoInfo)
 	}
 
@@ -130,10 +123,10 @@ func listRun(opts *ListOptions) error {
 	}
 
 	table := tableprinter.New(opts.IO)
-	if opts.OrgName != "" {
-		table.HeaderRow("NAME", "VALUE", "UPDATED AT", "VISIBILITY")
+	if variableEntity == shared.Organization {
+		table.HeaderRow("Name", "Value", "Updated", "Visibility")
 	} else {
-		table.HeaderRow("NAME", "VALUE", "UPDATED AT")
+		table.HeaderRow("Name", "Value", "Updated")
 	}
 	for _, variable := range variables {
 		table.AddField(variable.Name)
@@ -145,9 +138,9 @@ func listRun(opts *ListOptions) error {
 		table.AddField(updatedAt)
 		if variable.Visibility != "" {
 			if showSelectedRepoInfo {
-				table.AddField(fmtVisibility(*variable))
+				table.AddField(fmtVisibility(variable))
 			} else {
-				table.AddField(strings.ToUpper(string(variable.Visibility)), nil, nil)
+				table.AddField(strings.ToUpper(string(variable.Visibility)))
 			}
 		}
 		table.EndRow()
@@ -186,14 +179,22 @@ func fmtVisibility(s Variable) string {
 	return ""
 }
 
-func getOrgVariables(client httpClient, host, orgName string, showSelectedRepoInfo bool) ([]*Variable, error) {
+func getRepoVariables(client *http.Client, repo ghrepo.Interface) ([]Variable, error) {
+	return getVariables(client, repo.RepoHost(), fmt.Sprintf("repos/%s/actions/variables", ghrepo.FullName(repo)))
+}
+
+func getEnvVariables(client *http.Client, repo ghrepo.Interface, envName string) ([]Variable, error) {
+	path := fmt.Sprintf("repositories/%s/environments/%s/variables", ghrepo.FullName(repo), envName)
+	return getVariables(client, repo.RepoHost(), path)
+}
+
+func getOrgVariables(client *http.Client, host, orgName string, showSelectedRepoInfo bool) ([]Variable, error) {
 	variables, err := getVariables(client, host, fmt.Sprintf("orgs/%s/actions/variables", orgName))
 	if err != nil {
 		return nil, err
 	}
-
 	if showSelectedRepoInfo {
-		err = getSelectedRepositoryInformation(client, variables)
+		err = populateSelectedRepositoryInformation(client, host, variables)
 		if err != nil {
 			return nil, err
 		}
@@ -201,96 +202,37 @@ func getOrgVariables(client httpClient, host, orgName string, showSelectedRepoIn
 	return variables, nil
 }
 
-func getEnvVariables(client httpClient, repo ghrepo.Interface, envName string) ([]*Variable, error) {
-	path := fmt.Sprintf("repositories/%s/environments/%s/variables", ghrepo.FullName(repo), envName)
-	return getVariables(client, repo.RepoHost(), path)
-}
-
-func getRepoVariables(client httpClient, repo ghrepo.Interface) ([]*Variable, error) {
-	return getVariables(client, repo.RepoHost(), fmt.Sprintf("repos/%s/actions/variables",
-		ghrepo.FullName(repo)))
-}
-
-type variablesPayload struct {
-	Variables []*Variable
-}
-
-type httpClient interface {
-	Do(*http.Request) (*http.Response, error)
-}
-
-func getVariables(client httpClient, host, path string) ([]*Variable, error) {
-	var results []*Variable
-	url := fmt.Sprintf("%s%s?per_page=100", ghinstance.RESTPrefix(host), path)
-
-	for {
-		var payload variablesPayload
-		nextURL, err := apiGet(client, url, &payload)
+func getVariables(client *http.Client, host, path string) ([]Variable, error) {
+	var results []Variable
+	apiClient := api.NewClientFromHTTP(client)
+	path = fmt.Sprintf("%s?per_page=100", path)
+	for path != "" {
+		response := struct {
+			Variables []Variable
+		}{}
+		var err error
+		path, err = apiClient.RESTWithNext(host, "GET", path, nil, &response)
 		if err != nil {
 			return nil, err
 		}
-		results = append(results, payload.Variables...)
-
-		if nextURL == "" {
-			break
-		}
-		url = nextURL
+		results = append(results, response.Variables...)
 	}
-
 	return results, nil
 }
 
-func apiGet(client httpClient, url string, data interface{}) (string, error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/json; charset=utf-8")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode > 299 {
-		return "", api.HandleHTTPError(resp)
-	}
-
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(data); err != nil {
-		return "", err
-	}
-
-	return findNextPage(resp.Header.Get("Link")), nil
-}
-
-var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
-
-func findNextPage(link string) string {
-	for _, m := range linkRE.FindAllStringSubmatch(link, -1) {
-		if len(m) > 2 && m[2] == "next" {
-			return m[1]
-		}
-	}
-	return ""
-}
-
-func getSelectedRepositoryInformation(client httpClient, variables []*Variable) error {
-	type responseData struct {
-		TotalCount int `json:"total_count"`
-	}
-
-	for _, variable := range variables {
+func populateSelectedRepositoryInformation(client *http.Client, host string, variables []Variable) error {
+	apiClient := api.NewClientFromHTTP(client)
+	for i, variable := range variables {
 		if variable.SelectedReposURL == "" {
 			continue
 		}
-		var result responseData
-		if _, err := apiGet(client, variable.SelectedReposURL, &result); err != nil {
+		response := struct {
+			TotalCount int `json:"total_count"`
+		}{}
+		if err := apiClient.REST(host, "GET", variable.SelectedReposURL, nil, &response); err != nil {
 			return fmt.Errorf("failed determining selected repositories for %s: %w", variable.Name, err)
 		}
-		variable.NumSelectedRepos = result.TotalCount
+		variables[i].NumSelectedRepos = response.TotalCount
 	}
-
 	return nil
 }
