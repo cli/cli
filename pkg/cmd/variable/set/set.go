@@ -50,7 +50,7 @@ func NewCmdSet(f *cmdutil.Factory, runF func(*SetOptions) error) *cobra.Command 
 
 	cmd := &cobra.Command{
 		Use:   "set <variable-name>",
-		Short: "Set variables",
+		Short: "Create or update variables",
 		Long: heredoc.Doc(`
 			Set a value for a variable on one of the following levels:
 			- repository (default): available to Actions runs or Dependabot in a repository
@@ -219,7 +219,7 @@ func setRun(opts *SetOptions) error {
 		if envName != "" {
 			target += " environment " + envName
 		}
-		fmt.Fprintf(opts.IO.Out, "%s %s actions variable %s for %s\n", cs.SuccessIcon(), result.Operation, result.Key, target)
+		fmt.Fprintf(opts.IO.Out, "%s %s Actions variable %s for %s\n", cs.SuccessIcon(), result.Operation, result.Key, target)
 	}
 
 	return err
