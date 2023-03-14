@@ -59,8 +59,7 @@ func (t *sanitizer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err 
 		window := src[nSrc : nSrc+6]
 
 		// Replace C1 Control Characters
-		if window[0] == 0xC2 {
-			repl, _ := mapC1ToCaret(window[:2])
+		if repl, found := mapC1ToCaret(window[:2]); found {
 			if len(repl)+nDst > lDst {
 				err = transform.ErrShortDst
 				return
@@ -74,9 +73,8 @@ func (t *sanitizer) Transform(dst, src []byte, atEOF bool) (nDst, nSrc int, err 
 		}
 
 		// Replace C0 Control Characters
-		if bytes.HasPrefix(window, []byte(`\u00`)) {
-			repl, found := mapC0ToCaret(window)
-			if t.addEscape && found {
+		if repl, found := mapC0ToCaret(window); found {
+			if t.addEscape {
 				repl = append([]byte{'\\'}, repl...)
 			}
 			if len(repl)+nDst > lDst {
@@ -129,6 +127,12 @@ func (t *sanitizer) Reset() {
 
 // mapC0ToCaret maps C0 control sequences to caret notation.
 func mapC0ToCaret(b []byte) ([]byte, bool) {
+	if len(b) != 6 {
+		return b, false
+	}
+	if !bytes.HasPrefix(b, []byte(`\u00`)) {
+		return b, false
+	}
 	m := map[string]string{
 		`\u0000`: `^@`,
 		`\u0001`: `^A`,
