@@ -140,6 +140,15 @@ func (c *AuthConfig) Token(hostname string) (string, string) {
 	return token, source
 }
 
+// TokenFromEnvOrConfig will retrieve the auth token for the given hostname,
+// searching environment variables, and plain text config.
+func (c *AuthConfig) TokenFromEnvOrConfig(hostname string) (string, string) {
+	if c.tokenOverride != nil {
+		return c.tokenOverride(hostname)
+	}
+	return ghAuth.TokenFromEnvOrConfig(hostname)
+}
+
 // SetToken will override any token resolution and return the given
 // token and source for all calls to Token. Use for testing purposes only.
 func (c *AuthConfig) SetToken(token, source string) {
@@ -232,20 +241,6 @@ func (c *AuthConfig) Logout(hostname string) error {
 	_ = c.cfg.Remove([]string{hosts, hostname})
 	_ = keyring.Delete(keyringServiceName(hostname), "")
 	return ghConfig.Write(c.cfg)
-}
-
-// IsEnterprise checks if there are any environment variable authentication
-// tokens set for enterprise hosts.
-func (c *AuthConfig) IsEnterprise() bool {
-	// Any non-github.com hostname is fine here
-	dummyHostname := "example.com"
-	var token string
-	if c.tokenOverride != nil {
-		token, _ = c.tokenOverride(dummyHostname)
-	} else {
-		token, _ = ghAuth.TokenFromEnvOrConfig(dummyHostname)
-	}
-	return token != ""
 }
 
 func keyringServiceName(hostname string) string {
