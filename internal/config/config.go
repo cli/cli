@@ -126,10 +126,7 @@ type AuthConfig struct {
 // searching environment variables, plain text config, and
 // lastly encypted storage.
 func (c *AuthConfig) Token(hostname string) (string, string) {
-	if c.tokenOverride != nil {
-		return c.tokenOverride(hostname)
-	}
-	token, source := ghAuth.TokenFromEnvOrConfig(hostname)
+	token, source := c.TokenFromEnvOrConfig(hostname)
 	if token == "" {
 		var err error
 		token, err = c.TokenFromKeyring(hostname)
