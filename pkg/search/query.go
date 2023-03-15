@@ -147,7 +147,12 @@ func formatQualifiers(qs Qualifiers) []string {
 
 func formatKeywords(ks []string) []string {
 	for i, k := range ks {
-		ks[i] = quote(k)
+		before, after, found := strings.Cut(k, ":")
+		if !found {
+			ks[i] = quote(k)
+		} else {
+			ks[i] = fmt.Sprintf("%s:%s", before, quote(after))
+		}
 	}
 	return ks
 }

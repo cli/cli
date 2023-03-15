@@ -47,7 +47,14 @@ func TestQueryString(t *testing.T) {
 			query: Query{
 				Keywords: []string{"quote keywords"},
 			},
-			out: "\"quote keywords\"",
+			out: `"quote keywords"`,
+		},
+		{
+			name: "quotes keywords that are qualifiers",
+			query: Query{
+				Keywords: []string{"quote:keywords", "quote:multiword keywords"},
+			},
+			out: `quote:keywords quote:"multiword keywords"`,
 		},
 		{
 			name: "quotes qualifiers",
@@ -56,7 +63,7 @@ func TestQueryString(t *testing.T) {
 					Topic: []string{"quote qualifier"},
 				},
 			},
-			out: "topic:\"quote qualifier\"",
+			out: `topic:"quote qualifier"`,
 		},
 	}
 	for _, tt := range tests {
