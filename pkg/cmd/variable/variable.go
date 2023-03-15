@@ -14,9 +14,9 @@ func NewCmdVariable(f *cmdutil.Factory) *cobra.Command {
 		Use:   "variable <command>",
 		Short: "Manage GitHub Actions variables",
 		Long: heredoc.Doc(`
-		Variables can be set at the repository, environment or organization level for use in GitHub Actions.
-		Run "gh help variable set" to learn how to get started.
-`),
+			Variables can be set at the repository, environment or organization level for use in
+			GitHub Actions or Dependabot. Run "gh help variable set" to learn how to get started.
+    `),
 	}
 
 	cmdutil.EnableRepoOverride(cmd, f)
@@ -24,5 +24,6 @@ func NewCmdVariable(f *cmdutil.Factory) *cobra.Command {
 	cmd.AddCommand(cmdSet.NewCmdSet(f, nil))
 	cmd.AddCommand(cmdList.NewCmdList(f, nil))
 	cmd.AddCommand(cmdDelete.NewCmdDelete(f, nil))
+
 	return cmd
 }

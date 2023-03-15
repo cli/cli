@@ -23,7 +23,6 @@ type DeleteOptions struct {
 	VariableName string
 	OrgName      string
 	EnvName      string
-	Application  string
 }
 
 func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
