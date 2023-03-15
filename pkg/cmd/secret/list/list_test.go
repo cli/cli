@@ -112,9 +112,9 @@ func Test_listRun(t *testing.T) {
 			opts: &ListOptions{},
 			wantOut: []string{
 				"NAME          UPDATED",
-				"SECRET_ONE    Updated 1988-10-11",
-				"SECRET_TWO    Updated 2020-12-04",
-				"SECRET_THREE  Updated 1975-11-30",
+				"SECRET_ONE    about 34 years ago",
+				"SECRET_TWO    about 2 years ago",
+				"SECRET_THREE  about 47 years ago",
 			},
 		},
 		{
@@ -122,9 +122,9 @@ func Test_listRun(t *testing.T) {
 			tty:  false,
 			opts: &ListOptions{},
 			wantOut: []string{
-				"SECRET_ONE\t1988-10-11",
-				"SECRET_TWO\t2020-12-04",
-				"SECRET_THREE\t1975-11-30",
+				"SECRET_ONE\t1988-10-11T00:00:00Z",
+				"SECRET_TWO\t2020-12-04T00:00:00Z",
+				"SECRET_THREE\t1975-11-30T00:00:00Z",
 			},
 		},
 		{
@@ -135,9 +135,9 @@ func Test_listRun(t *testing.T) {
 			},
 			wantOut: []string{
 				"NAME          UPDATED             VISIBILITY",
-				"SECRET_ONE    Updated 1988-10-11  Visible to all repositories",
-				"SECRET_TWO    Updated 2020-12-04  Visible to private repositories",
-				"SECRET_THREE  Updated 1975-11-30  Visible to 2 selected repositories",
+				"SECRET_ONE    about 34 years ago  Visible to all repositories",
+				"SECRET_TWO    about 2 years ago   Visible to private repositories",
+				"SECRET_THREE  about 47 years ago  Visible to 2 selected repositories",
 			},
 		},
 		{
@@ -147,9 +147,9 @@ func Test_listRun(t *testing.T) {
 				OrgName: "UmbrellaCorporation",
 			},
 			wantOut: []string{
-				"SECRET_ONE\t1988-10-11\tALL",
-				"SECRET_TWO\t2020-12-04\tPRIVATE",
-				"SECRET_THREE\t1975-11-30\tSELECTED",
+				"SECRET_ONE\t1988-10-11T00:00:00Z\tALL",
+				"SECRET_TWO\t2020-12-04T00:00:00Z\tPRIVATE",
+				"SECRET_THREE\t1975-11-30T00:00:00Z\tSELECTED",
 			},
 		},
 		{
@@ -160,9 +160,9 @@ func Test_listRun(t *testing.T) {
 			},
 			wantOut: []string{
 				"NAME          UPDATED",
-				"SECRET_ONE    Updated 1988-10-11",
-				"SECRET_TWO    Updated 2020-12-04",
-				"SECRET_THREE  Updated 1975-11-30",
+				"SECRET_ONE    about 34 years ago",
+				"SECRET_TWO    about 2 years ago",
+				"SECRET_THREE  about 47 years ago",
 			},
 		},
 		{
@@ -172,9 +172,9 @@ func Test_listRun(t *testing.T) {
 				EnvName: "Development",
 			},
 			wantOut: []string{
-				"SECRET_ONE\t1988-10-11",
-				"SECRET_TWO\t2020-12-04",
-				"SECRET_THREE\t1975-11-30",
+				"SECRET_ONE\t1988-10-11T00:00:00Z",
+				"SECRET_TWO\t2020-12-04T00:00:00Z",
+				"SECRET_THREE\t1975-11-30T00:00:00Z",
 			},
 		},
 		{
@@ -185,9 +185,9 @@ func Test_listRun(t *testing.T) {
 			},
 			wantOut: []string{
 				"NAME          UPDATED             VISIBILITY",
-				"SECRET_ONE    Updated 1988-10-11  Visible to 1 selected repository",
-				"SECRET_TWO    Updated 2020-12-04  Visible to 2 selected repositories",
-				"SECRET_THREE  Updated 1975-11-30  Visible to 3 selected repositories",
+				"SECRET_ONE    about 34 years ago  Visible to 1 selected repository",
+				"SECRET_TWO    about 2 years ago   Visible to 2 selected repositories",
+				"SECRET_THREE  about 47 years ago  Visible to 3 selected repositories",
 			},
 		},
 		{
@@ -197,9 +197,9 @@ func Test_listRun(t *testing.T) {
 				UserSecrets: true,
 			},
 			wantOut: []string{
-				"SECRET_ONE\t1988-10-11\tSELECTED",
-				"SECRET_TWO\t2020-12-04\tSELECTED",
-				"SECRET_THREE\t1975-11-30\tSELECTED",
+				"SECRET_ONE\t1988-10-11T00:00:00Z\tSELECTED",
+				"SECRET_TWO\t2020-12-04T00:00:00Z\tSELECTED",
+				"SECRET_THREE\t1975-11-30T00:00:00Z\tSELECTED",
 			},
 		},
 		{
@@ -210,9 +210,9 @@ func Test_listRun(t *testing.T) {
 			},
 			wantOut: []string{
 				"NAME          UPDATED",
-				"SECRET_ONE    Updated 1988-10-11",
-				"SECRET_TWO    Updated 2020-12-04",
-				"SECRET_THREE  Updated 1975-11-30",
+				"SECRET_ONE    about 34 years ago",
+				"SECRET_TWO    about 2 years ago",
+				"SECRET_THREE  about 47 years ago",
 			},
 		},
 		{
@@ -222,9 +222,9 @@ func Test_listRun(t *testing.T) {
 				Application: "Dependabot",
 			},
 			wantOut: []string{
-				"SECRET_ONE\t1988-10-11",
-				"SECRET_TWO\t2020-12-04",
-				"SECRET_THREE\t1975-11-30",
+				"SECRET_ONE\t1988-10-11T00:00:00Z",
+				"SECRET_TWO\t2020-12-04T00:00:00Z",
+				"SECRET_THREE\t1975-11-30T00:00:00Z",
 			},
 		},
 		{
@@ -236,9 +236,9 @@ func Test_listRun(t *testing.T) {
 			},
 			wantOut: []string{
 				"NAME          UPDATED             VISIBILITY",
-				"SECRET_ONE    Updated 1988-10-11  Visible to all repositories",
-				"SECRET_TWO    Updated 2020-12-04  Visible to private repositories",
-				"SECRET_THREE  Updated 1975-11-30  Visible to 2 selected repositories",
+				"SECRET_ONE    about 34 years ago  Visible to all repositories",
+				"SECRET_TWO    about 2 years ago   Visible to private repositories",
+				"SECRET_THREE  about 47 years ago  Visible to 2 selected repositories",
 			},
 		},
 		{
@@ -249,9 +249,9 @@ func Test_listRun(t *testing.T) {
 				OrgName:     "UmbrellaCorporation",
 			},
 			wantOut: []string{
-				"SECRET_ONE\t1988-10-11\tALL",
-				"SECRET_TWO\t2020-12-04\tPRIVATE",
-				"SECRET_THREE\t1975-11-30\tSELECTED",
+				"SECRET_ONE\t1988-10-11T00:00:00Z\tALL",
+				"SECRET_TWO\t2020-12-04T00:00:00Z\tPRIVATE",
+				"SECRET_THREE\t1975-11-30T00:00:00Z\tSELECTED",
 			},
 		},
 	}
@@ -374,6 +374,10 @@ func Test_listRun(t *testing.T) {
 			}
 			tt.opts.Config = func() (config.Config, error) {
 				return config.NewBlankConfig(), nil
+			}
+			tt.opts.Now = func() time.Time {
+				t, _ := time.Parse(time.RFC822, "15 Mar 23 00:00 UTC")
+				return t
 			}
 
 			err := listRun(tt.opts)

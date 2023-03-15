@@ -90,9 +90,9 @@ func Test_listRun(t *testing.T) {
 			opts: &ListOptions{},
 			wantOut: []string{
 				"NAME            VALUE  UPDATED",
-				"VARIABLE_ONE    one    Updated 1988-10-11",
-				"VARIABLE_TWO    two    Updated 2020-12-04",
-				"VARIABLE_THREE  three  Updated 1975-11-30",
+				"VARIABLE_ONE    one    about 34 years ago",
+				"VARIABLE_TWO    two    about 2 years ago",
+				"VARIABLE_THREE  three  about 47 years ago",
 			},
 		},
 		{
@@ -100,9 +100,9 @@ func Test_listRun(t *testing.T) {
 			tty:  false,
 			opts: &ListOptions{},
 			wantOut: []string{
-				"VARIABLE_ONE\tone\t1988-10-11",
-				"VARIABLE_TWO\ttwo\t2020-12-04",
-				"VARIABLE_THREE\tthree\t1975-11-30",
+				"VARIABLE_ONE\tone\t1988-10-11T00:00:00Z",
+				"VARIABLE_TWO\ttwo\t2020-12-04T00:00:00Z",
+				"VARIABLE_THREE\tthree\t1975-11-30T00:00:00Z",
 			},
 		},
 		{
@@ -113,9 +113,9 @@ func Test_listRun(t *testing.T) {
 			},
 			wantOut: []string{
 				"NAME            VALUE      UPDATED             VISIBILITY",
-				"VARIABLE_ONE    org_one    Updated 1988-10-11  Visible to all repositories",
-				"VARIABLE_TWO    org_two    Updated 2020-12-04  Visible to private repositories",
-				"VARIABLE_THREE  org_three  Updated 1975-11-30  Visible to 2 selected reposito...",
+				"VARIABLE_ONE    org_one    about 34 years ago  Visible to all repositories",
+				"VARIABLE_TWO    org_two    about 2 years ago   Visible to private repositories",
+				"VARIABLE_THREE  org_three  about 47 years ago  Visible to 2 selected reposito...",
 			},
 		},
 		{
@@ -125,9 +125,9 @@ func Test_listRun(t *testing.T) {
 				OrgName: "UmbrellaCorporation",
 			},
 			wantOut: []string{
-				"VARIABLE_ONE\torg_one\t1988-10-11\tALL",
-				"VARIABLE_TWO\torg_two\t2020-12-04\tPRIVATE",
-				"VARIABLE_THREE\torg_three\t1975-11-30\tSELECTED",
+				"VARIABLE_ONE\torg_one\t1988-10-11T00:00:00Z\tALL",
+				"VARIABLE_TWO\torg_two\t2020-12-04T00:00:00Z\tPRIVATE",
+				"VARIABLE_THREE\torg_three\t1975-11-30T00:00:00Z\tSELECTED",
 			},
 		},
 		{
@@ -138,9 +138,9 @@ func Test_listRun(t *testing.T) {
 			},
 			wantOut: []string{
 				"NAME            VALUE  UPDATED",
-				"VARIABLE_ONE    one    Updated 1988-10-11",
-				"VARIABLE_TWO    two    Updated 2020-12-04",
-				"VARIABLE_THREE  three  Updated 1975-11-30",
+				"VARIABLE_ONE    one    about 34 years ago",
+				"VARIABLE_TWO    two    about 2 years ago",
+				"VARIABLE_THREE  three  about 47 years ago",
 			},
 		},
 		{
@@ -150,9 +150,9 @@ func Test_listRun(t *testing.T) {
 				EnvName: "Development",
 			},
 			wantOut: []string{
-				"VARIABLE_ONE\tone\t1988-10-11",
-				"VARIABLE_TWO\ttwo\t2020-12-04",
-				"VARIABLE_THREE\tthree\t1975-11-30",
+				"VARIABLE_ONE\tone\t1988-10-11T00:00:00Z",
+				"VARIABLE_TWO\ttwo\t2020-12-04T00:00:00Z",
+				"VARIABLE_THREE\tthree\t1975-11-30T00:00:00Z",
 			},
 		},
 	}
@@ -239,6 +239,10 @@ func Test_listRun(t *testing.T) {
 			}
 			tt.opts.Config = func() (config.Config, error) {
 				return config.NewBlankConfig(), nil
+			}
+			tt.opts.Now = func() time.Time {
+				t, _ := time.Parse(time.RFC822, "15 Mar 23 00:00 UTC")
+				return t
 			}
 
 			err := listRun(tt.opts)

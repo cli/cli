@@ -22,6 +22,7 @@ type ListOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
+	Now        func() time.Time
 
 	OrgName     string
 	EnvName     string
@@ -34,6 +35,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		IO:         f.IOStreams,
 		Config:     f.Config,
 		HttpClient: f.HttpClient,
+		Now:        time.Now,
 	}
 
 	cmd := &cobra.Command{
@@ -151,11 +153,7 @@ func listRun(opts *ListOptions) error {
 	}
 	for _, secret := range secrets {
 		table.AddField(secret.Name)
-		updatedAt := secret.UpdatedAt.Format("2006-01-02")
-		if opts.IO.IsStdoutTTY() {
-			updatedAt = fmt.Sprintf("Updated %s", updatedAt)
-		}
-		table.AddField(updatedAt)
+		table.AddTimeField(opts.Now(), secret.UpdatedAt, nil)
 		if secret.Visibility != "" {
 			if showSelectedRepoInfo {
 				table.AddField(fmtVisibility(secret))
