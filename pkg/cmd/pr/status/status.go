@@ -135,19 +135,21 @@ func statusRun(opts *StatusOptions) error {
 	fmt.Fprintf(out, "Relevant pull requests in %s\n", ghrepo.FullName(baseRepo))
 	fmt.Fprintln(out, "")
 
-	shared.PrintHeader(opts.IO, "Current branch")
-	currentPR := prPayload.CurrentPR
-	if currentPR != nil && currentPR.State != "OPEN" && prPayload.DefaultBranch == currentBranch {
-		currentPR = nil
+	if !opts.HasRepoOverride {
+		shared.PrintHeader(opts.IO, "Current branch")
+		currentPR := prPayload.CurrentPR
+		if currentPR != nil && currentPR.State != "OPEN" && prPayload.DefaultBranch == currentBranch {
+			currentPR = nil
+		}
+		if currentPR != nil {
+			printPrs(opts.IO, 1, *currentPR)
+		} else if currentPRHeadRef == "" {
+			shared.PrintMessage(opts.IO, "  There is no current branch")
+		} else {
+			shared.PrintMessage(opts.IO, fmt.Sprintf("  There is no pull request associated with %s", cs.Cyan("["+currentPRHeadRef+"]")))
+		}
+		fmt.Fprintln(out)
 	}
-	if currentPR != nil {
-		printPrs(opts.IO, 1, *currentPR)
-	} else if currentPRHeadRef == "" {
-		shared.PrintMessage(opts.IO, "  There is no current branch")
-	} else {
-		shared.PrintMessage(opts.IO, fmt.Sprintf("  There is no pull request associated with %s", cs.Cyan("["+currentPRHeadRef+"]")))
-	}
-	fmt.Fprintln(out)
 
 	shared.PrintHeader(opts.IO, "Created by you")
 	if prPayload.ViewerCreated.TotalCount > 0 {
