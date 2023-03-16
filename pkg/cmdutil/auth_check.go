@@ -14,7 +14,7 @@ func DisableAuthCheck(cmd *cobra.Command) {
 }
 
 func CheckAuth(cfg config.Config) bool {
-	if cfg.Authentication().HasEnterpriseEnvToken() {
+	if cfg.Authentication().HasEnvOrConfigToken() {
 		return true
 	}
 
