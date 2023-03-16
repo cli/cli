@@ -126,7 +126,10 @@ type AuthConfig struct {
 // searching environment variables, plain text config, and
 // lastly encypted storage.
 func (c *AuthConfig) Token(hostname string) (string, string) {
-	token, source := c.TokenFromEnvOrConfig(hostname)
+	if c.tokenOverride != nil {
+		return c.tokenOverride(hostname)
+	}
+	token, source := ghAuth.TokenFromEnvOrConfig(hostname)
 	if token == "" {
 		var err error
 		token, err = c.TokenFromKeyring(hostname)
@@ -137,13 +140,10 @@ func (c *AuthConfig) Token(hostname string) (string, string) {
 	return token, source
 }
 
-// TokenFromEnvOrConfig will retrieve the auth token for the given hostname,
-// searching environment variables, and plain text config.
-func (c *AuthConfig) TokenFromEnvOrConfig(hostname string) (string, string) {
-	if c.tokenOverride != nil {
-		return c.tokenOverride(hostname)
-	}
-	return ghAuth.TokenFromEnvOrConfig(hostname)
+func (c *AuthConfig) HasEnterpriseEnvToken() bool {
+	token, source := ghAuth.TokenFromEnvOrConfig("")
+	isEnterpriseSource := (source == "GH_ENTERPRISE_TOKEN" || source == "GITHUB_ENTERPRISE_TOKEN")
+	return token != "" && isEnterpriseSource
 }
 
 // SetToken will override any token resolution and return the given
