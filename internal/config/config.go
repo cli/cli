@@ -140,6 +140,7 @@ func (c *AuthConfig) Token(hostname string) (string, string) {
 	return token, source
 }
 
+// HasEnterpriseEnvToken checks whether the current env or config contains an enterprise token
 func (c *AuthConfig) HasEnterpriseEnvToken() bool {
 	token, source := ghAuth.TokenFromEnvOrConfig("")
 	isEnterpriseSource := (source == "GH_ENTERPRISE_TOKEN" || source == "GITHUB_ENTERPRISE_TOKEN")
