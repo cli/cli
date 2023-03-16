@@ -143,6 +143,13 @@ func NewTemplateManager(httpClient *http.Client, repo ghrepo.Interface, p ipromp
 	}
 }
 
+func (m *templateManager) Templates() ([]Template, error) {
+	if err := m.fetch(); err != nil {
+		return []Template{}, err
+	}
+	return m.templates, nil
+}
+
 func (m *templateManager) hasAPI() (bool, error) {
 	if !m.isPR {
 		return true, nil

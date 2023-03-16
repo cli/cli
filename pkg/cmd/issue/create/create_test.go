@@ -92,6 +92,31 @@ func TestNewCmdCreate(t *testing.T) {
 				Interactive: false,
 			},
 		},
+		{
+			name:     "template from file name",
+			tty:      false,
+			cli:      "-t mytitle --template \"bug_report.md\"",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "mytitle",
+				Body:        "",
+				RecoverFile: "",
+				WebMode:     false,
+				Template:    "bug_fix.md",
+			},
+		},
+		{
+			name:     "template and body",
+			tty:      false,
+			cli:      "-t mytitle --template \"bug_report.md\" --body \"pr body\"",
+			wantsErr: true,
+		},
+		{
+			name:     "template and body file",
+			tty:      false,
+			cli:      "-t mytitle --template \"bug_report.md\" --body-file \"file\"",
+			wantsErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
