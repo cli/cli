@@ -140,8 +140,8 @@ func (c *AuthConfig) Token(hostname string) (string, string) {
 	return token, source
 }
 
-// HasEnvOrConfigToken checks whether the current env or config contains a token.
-func (c *AuthConfig) HasEnvOrConfigToken() bool {
+// HasEnvToken checks whether the current env or config contains a token
+func (c *AuthConfig) HasEnvToken() bool {
 	// This will check if there are any environment variable
 	// authentication tokens set for enterprise hosts.
 	// Any non-github.com hostname is fine here
