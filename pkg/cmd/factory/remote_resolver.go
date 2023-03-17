@@ -82,11 +82,9 @@ func (rr *remoteResolver) Resolver() func() (context.Remotes, error) {
 		}
 
 		if len(cachedRemotes) == 0 {
-			// Any non-github.com hostname is fine here
-			dummyHostname := "example.com"
 			if isHostEnv(src) {
 				return nil, fmt.Errorf("none of the git remotes configured for this repository correspond to the %s environment variable. Try adding a matching remote or unsetting the variable.", src)
-			} else if v, _ := cfg.Authentication().Token(dummyHostname); v != "" {
+			} else if cfg.Authentication().HasEnvToken() {
 				return nil, errors.New("set the GH_HOST environment variable to specify which GitHub host to use")
 			}
 			return nil, errors.New("none of the git remotes configured for this repository point to a known GitHub host. To tell gh about a new GitHub host, please use `gh auth login`")

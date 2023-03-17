@@ -36,6 +36,13 @@ func Test_CheckAuth(t *testing.T) {
 			},
 			expected: true,
 		},
+		{
+			name: "enterprise token",
+			cfgStubs: func(c *config.ConfigMock) {
+				t.Setenv("GH_ENTERPRISE_TOKEN", "token")
+			},
+			expected: true,
+		},
 	}
 
 	for _, tt := range tests {
