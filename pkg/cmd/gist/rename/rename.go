@@ -21,17 +21,10 @@ type RenameOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
-	Prompter   iprompter
-	DoConfirm  bool
 
 	Selector    string
 	OldFileName string
 	NewFileName string
-}
-
-type iprompter interface {
-	Input(string, string) (string, error)
-	Confirm(string, bool) (bool, error)
 }
 
 func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Command {
@@ -39,10 +32,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
-		Prompter:   f.Prompter,
 	}
-
-	var confirm bool
 
 	cmd := &cobra.Command{
 		Use:   "rename [<id> | <url>] <oldFilename> <newFilename>",
@@ -65,8 +55,6 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 			return renameRun(opts)
 		},
 	}
-
-	cmd.Flags().BoolVarP(&confirm, "yes", "y", false, "Skip the confirmation prompt")
 
 	return cmd
 }
