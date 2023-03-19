@@ -125,6 +125,41 @@ func TestNewCmdCreate(t *testing.T) {
 			cli:      `-t mytitle --template "bug report" --body-file "body_file.md"`,
 			wantsErr: true,
 		},
+		{
+			name:     "editor",
+			tty:      false,
+			cli:      "--editor",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "",
+				Body:        "",
+				RecoverFile: "",
+				WebMode:     false,
+				EditorMode:  true,
+				Interactive: false,
+			},
+		},
+		{
+			name:     "editor and template",
+			tty:      false,
+			cli:      `--editor --template "bug report"`,
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "",
+				Body:        "",
+				RecoverFile: "",
+				WebMode:     false,
+				EditorMode:  true,
+				Template:    "bug report",
+				Interactive: false,
+			},
+		},
+		{
+			name:     "editor and web",
+			tty:      false,
+			cli:      "--editor --web",
+			wantsErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -309,6 +344,72 @@ func Test_createRun(t *testing.T) {
 				Body:    strings.Repeat("A", 9216),
 			},
 			wantsErr: "cannot open in browser: maximum URL length exceeded",
+		},
+		{
+			name: "editor",
+			httpStubs: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"hasIssuesEnabled": true
+			} } }`))
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.GraphQLMutation(`
+		{ "data": { "createIssue": { "issue": {
+			"URL": "https://github.com/OWNER/REPO/issues/12"
+		} } } }
+	`, func(inputs map[string]interface{}) {
+						assert.Equal(t, "title", inputs["title"])
+						assert.Equal(t, "body", inputs["body"])
+					}))
+			},
+			opts: CreateOptions{
+				EditorMode:       true,
+				TitledEditSurvey: func(string, string) (string, string, error) { return "title", "body", nil },
+			},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
+		},
+		{
+			name: "editor and template",
+			httpStubs: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query RepositoryInfo\b`),
+					httpmock.StringResponse(`
+			{ "data": { "repository": {
+				"id": "REPOID",
+				"hasIssuesEnabled": true
+			} } }`))
+				r.Register(
+					httpmock.GraphQL(`query IssueTemplates\b`),
+					httpmock.StringResponse(`
+			{ "data": { "repository": { "issueTemplates": [
+				{ "name": "Bug report",
+				  "title": "bug: ",
+				  "body": "Does not work :((" }
+			] } } }`),
+				)
+				r.Register(
+					httpmock.GraphQL(`mutation IssueCreate\b`),
+					httpmock.GraphQLMutation(`
+		{ "data": { "createIssue": { "issue": {
+			"URL": "https://github.com/OWNER/REPO/issues/12"
+		} } } }
+	`, func(inputs map[string]interface{}) {
+						assert.Equal(t, "bug: ", inputs["title"])
+						assert.Equal(t, "Does not work :((", inputs["body"])
+					}))
+			},
+			opts: CreateOptions{
+				EditorMode:       true,
+				Template:         "Bug report",
+				TitledEditSurvey: func(title string, body string) (string, string, error) { return title, body, nil },
+			},
+			wantsStdout: "https://github.com/OWNER/REPO/issues/12\n",
+			wantsStderr: "\nCreating issue in OWNER/REPO\n\n",
 		},
 	}
 	for _, tt := range tests {
