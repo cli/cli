@@ -71,7 +71,7 @@ func Test_ArchiveRun(t *testing.T) {
 		name          string
 		opts          ArchiveOptions
 		httpStubs     func(*httpmock.Registry)
-		prompterStubs func(pm *prompter.PrompterMock)
+		prompterStubs func(pm *prompter.MockPrompter)
 		isTTY         bool
 		wantStdout    string
 		wantStderr    string
@@ -79,13 +79,10 @@ func Test_ArchiveRun(t *testing.T) {
 		{
 			name:       "unarchived repo tty",
 			wantStdout: "✓ Archived repository OWNER/REPO\n",
-			prompterStubs: func(pm *prompter.PrompterMock) {
-				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
-					if p == "Archive OWNER/REPO?" {
-						return true, nil
-					}
-					return false, prompter.NoSuchPromptErr(p)
-				}
+			prompterStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterConfirm("Archive OWNER/REPO?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
 			},
 			isTTY: true,
 			opts:  ArchiveOptions{RepoArg: "OWNER/REPO"},
@@ -102,13 +99,10 @@ func Test_ArchiveRun(t *testing.T) {
 			name:       "infer base repo",
 			wantStdout: "✓ Archived repository OWNER/REPO\n",
 			opts:       ArchiveOptions{},
-			prompterStubs: func(pm *prompter.PrompterMock) {
-				pm.ConfirmFunc = func(p string, d bool) (bool, error) {
-					if p == "Archive OWNER/REPO?" {
-						return true, nil
-					}
-					return false, prompter.NoSuchPromptErr(p)
-				}
+			prompterStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterConfirm("Archive OWNER/REPO?", func(_ string, _ bool) (bool, error) {
+					return true, nil
+				})
 			},
 			isTTY: true,
 			httpStubs: func(reg *httpmock.Registry) {
@@ -148,7 +142,7 @@ func Test_ArchiveRun(t *testing.T) {
 		ios, _, stdout, stderr := iostreams.Test()
 		tt.opts.IO = ios
 
-		pm := &prompter.PrompterMock{}
+		pm := prompter.NewMockPrompter(t)
 		if tt.prompterStubs != nil {
 			tt.prompterStubs(pm)
 		}
