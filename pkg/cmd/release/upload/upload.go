@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
@@ -93,9 +94,11 @@ func uploadRun(opts *UploadOptions) error {
 
 	var existingNames []string
 	for _, a := range opts.Assets {
+		sanitizedFileName := sanitizeFileName(a.Name)
 		for _, ea := range release.Assets {
-			if ea.Name == a.Name {
+			if ea.Name == sanitizedFileName {
 				a.ExistingURL = ea.APIURL
+				a.Name = ea.Name
 				existingNames = append(existingNames, ea.Name)
 				break
 			}
@@ -121,4 +124,29 @@ func uploadRun(opts *UploadOptions) error {
 	}
 
 	return nil
+}
+
+func sanitizeFileName(name string) string {
+
+	value := regexp.MustCompile("[[:^ascii:]]").ReplaceAllLiteralString(name, "")
+	// Stripped all non-ascii characters, provide default name.
+	if strings.HasPrefix(value, ".") {
+		value = "default" + value
+	}
+
+	// Replace special characters with the separator
+	value = regexp.MustCompile(`(?i)[^a-z0-9\-_\+@]+`).ReplaceAllLiteralString(value, ".")
+
+	// No more than one of the separator in a row.
+	value = regexp.MustCompile(`\.{2,}`).ReplaceAllLiteralString(value, ".")
+
+	// Remove leading/trailing separator.
+	value = regexp.MustCompile(`(?i)\A\.|\.\z`).ReplaceAllLiteralString(value, "")
+
+	// Just file extension left, add default name.
+	if name != value && !strings.Contains(value, ".") {
+		value = "default." + value
+	}
+
+	return value
 }
