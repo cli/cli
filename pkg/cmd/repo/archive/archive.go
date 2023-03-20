@@ -5,13 +5,12 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-	"github.com/cli/cli/v2/pkg/prompt"
 
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -24,6 +23,7 @@ type ArchiveOptions struct {
 	Confirmed  bool
 	IO         *iostreams.IOStreams
 	RepoArg    string
+	Prompter   prompter.Prompter
 }
 
 func NewCmdArchive(f *cmdutil.Factory, runF func(*ArchiveOptions) error) *cobra.Command {
@@ -32,6 +32,7 @@ func NewCmdArchive(f *cmdutil.Factory, runF func(*ArchiveOptions) error) *cobra.
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
 		BaseRepo:   f.BaseRepo,
+		Prompter:   f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -115,16 +116,11 @@ func archiveRun(opts *ArchiveOptions) error {
 	}
 
 	if !opts.Confirmed {
-		p := &survey.Confirm{
-			Message: fmt.Sprintf("Archive %s?", fullName),
-			Default: false,
-		}
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		err = prompt.SurveyAskOne(p, &opts.Confirmed)
+		confirmed, err := opts.Prompter.Confirm(fmt.Sprintf("Archive %s?", fullName), false)
 		if err != nil {
 			return fmt.Errorf("failed to prompt: %w", err)
 		}
-		if !opts.Confirmed {
+		if !confirmed {
 			return cmdutil.CancelError
 		}
 	}
