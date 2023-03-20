@@ -4,11 +4,11 @@
 
 ![screenshot of gh pr status](https://user-images.githubusercontent.com/98482/84171218-327e7a80-aa40-11ea-8cd1-5177fc2d0e72.png)
 
-GitHub CLI is available for repositories hosted on GitHub.com and GitHub Enterprise Server 2.20+, and to install on macOS, Windows, and Linux.
+GitHub CLI is available for repositories hosted on GitHub.com and GitHub Enterprise Server 2.20+, and to install on macOS, Windows, and Linux. [^1]
 
 ## Documentation
 
-For [installation options see below](#installation), for usage instructions [see the manual][manual].
+For [installation options see below](#installation), for usage instructions [see the manual][manual]. [^note]
 
 ## Contributing
 
@@ -131,3 +131,8 @@ tool. Check out our [more detailed explanation][gh-vs-hub] to learn more.
 [gh-vs-hub]: ./docs/gh-vs-hub.md
 [build from source]: ./docs/source.md
 [intake-doc]: ./docs/working-with-us.md
+
+### Comment 3.
+
+[^1]: Comment 1.
+[^note]: Comment 2.
