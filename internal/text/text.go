@@ -6,10 +6,14 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/cli/go-gh/pkg/text"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
+	"golang.org/x/text/runes"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
 )
 
 var whitespaceRE = regexp.MustCompile(`\s+`)
@@ -71,4 +75,13 @@ func DisplayURL(urlStr string) string {
 		return urlStr
 	}
 	return u.Hostname() + u.Path
+}
+
+func RemoveDiacritics(val string) string {
+	t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
+	normalized, _, err := transform.String(t, val)
+	if err != nil {
+		return val
+	}
+	return normalized
 }

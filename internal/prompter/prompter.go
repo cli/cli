@@ -7,6 +7,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/surveyext"
 )
 
@@ -49,11 +50,20 @@ type surveyPrompter struct {
 	stderr    io.Writer
 }
 
+func Filter(filter, value string, index int) bool {
+	filter = text.RemoveDiacritics(strings.ToLower(filter))
+	value = text.RemoveDiacritics(strings.ToLower(value))
+
+	// include this option if it matches
+	return strings.Contains(value, filter)
+}
+
 func (p *surveyPrompter) Select(message, defaultValue string, options []string) (result int, err error) {
 	q := &survey.Select{
 		Message:  message,
 		Options:  options,
 		PageSize: 20,
+		Filter:   Filter,
 	}
 
 	if defaultValue != "" {
@@ -77,6 +87,7 @@ func (p *surveyPrompter) MultiSelect(message, defaultValue string, options []str
 		Message:  message,
 		Options:  options,
 		PageSize: 20,
+		Filter:   Filter,
 	}
 
 	if defaultValue != "" {

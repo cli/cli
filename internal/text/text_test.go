@@ -54,3 +54,47 @@ func TestFuzzyAgoAbbr(t *testing.T) {
 		assert.Equal(t, expected, fuzzy)
 	}
 }
+
+func TestRemoveDiacritics(t *testing.T) {
+	tests := [][]string{
+		// no diacritics
+		{"e", "e"},
+
+		// unsupported characters remain untouched
+		{"ؤ", "و"},
+
+		// diacritics test sets
+
+		{"à", "a"},
+		{"é", "e"},
+		{"è", "e"},
+		{"ô", "o"},
+		{"ᾳ", "α"},
+		{"εͅ", "ε"},
+		{"ῃ", "η"},
+		{"ιͅ", "ι"},
+
+		{"ā", "a"},
+		{"č", "c"},
+		{"ģ", "g"},
+		{"ķ", "k"},
+		{"ņ", "n"},
+		{"š", "s"},
+		{"ž", "z"},
+
+		{"ŵ", "w"},
+		{"ŷ", "y"},
+		{"ä", "a"},
+		{"ÿ", "y"},
+		{"á", "a"},
+		{"ẁ", "w"},
+		{"ỳ", "y"},
+		{"ō", "o"},
+	}
+
+	for _, tt := range tests {
+		t.Run(RemoveDiacritics(tt[0]), func(t *testing.T) {
+			assert.Equal(t, tt[1], RemoveDiacritics(tt[0]))
+		})
+	}
+}
