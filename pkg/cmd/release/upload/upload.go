@@ -98,7 +98,6 @@ func uploadRun(opts *UploadOptions) error {
 		for _, ea := range release.Assets {
 			if ea.Name == sanitizedFileName {
 				a.ExistingURL = ea.APIURL
-				a.Name = ea.Name
 				existingNames = append(existingNames, ea.Name)
 				break
 			}
@@ -126,6 +125,9 @@ func uploadRun(opts *UploadOptions) error {
 	return nil
 }
 
+// this method attempts to mimic the same functionality on the client that the platform does on
+// uploaded assets in order to allow the --clobber logic work correctly, since that feature is
+// one that only exists in the client
 func sanitizeFileName(name string) string {
 
 	value := regexp.MustCompile("[[:^ascii:]]").ReplaceAllLiteralString(name, "")
@@ -141,7 +143,7 @@ func sanitizeFileName(name string) string {
 	value = regexp.MustCompile(`\.{2,}`).ReplaceAllLiteralString(value, ".")
 
 	// Remove leading/trailing separator.
-	value = regexp.MustCompile(`(?i)\A\.|\.\z`).ReplaceAllLiteralString(value, "")
+	value = strings.Trim(value, ".")
 
 	// Just file extension left, add default name.
 	if name != value && !strings.Contains(value, ".") {
