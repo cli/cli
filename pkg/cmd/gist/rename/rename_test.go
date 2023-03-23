@@ -26,19 +26,19 @@ func TestNewCmdRename(t *testing.T) {
 		{
 			name:    "no arguments",
 			input:   "",
-			errMsg:  "not enough arguments",
+			errMsg:  "accepts 3 arg(s), received 0",
 			wantErr: true,
 		},
 		{
 			name:    "missing old filename and new filename",
 			input:   "123",
-			errMsg:  "<oldFilename> and <newFilename> are missing",
+			errMsg:  "accepts 3 arg(s), received 1",
 			wantErr: true,
 		},
 		{
 			name:    "missing new filename",
 			input:   "123 old.txt",
-			errMsg:  "<newFilename> is missing",
+			errMsg:  "accepts 3 arg(s), received 2",
 			wantErr: true,
 		},
 		{
