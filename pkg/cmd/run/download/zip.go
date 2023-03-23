@@ -54,7 +54,7 @@ func extractZipFile(zf *zip.File, dest string) (extractErr error) {
 	}
 
 	defer func() {
-		if err := f.Close(); extractErr == nil && err != nil {
+		if err := df.Close(); extractErr == nil && err != nil {
 			extractErr = err
 		}
 	}()
