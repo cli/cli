@@ -40,17 +40,9 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 		Long:  heredoc.Doc(`Rename a file in the given gist ID / URL.`),
 		Args:  cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 3 {
-				opts.Selector = args[0]
-				opts.OldFileName = args[1]
-				opts.NewFileName = args[2]
-			} else if len(args) == 2 {
-				return cmdutil.FlagErrorf("<newFilename> is missing")
-			} else if len(args) == 1 {
-				return cmdutil.FlagErrorf("<oldFilename> and <newFilename> are missing")
-			} else {
-				return cmdutil.FlagErrorf("not enough arguments")
-			}
+			opts.Selector = args[0]
+			opts.OldFileName = args[1]
+			opts.NewFileName = args[2]
 
 			if runf != nil {
 				return runf(opts)
