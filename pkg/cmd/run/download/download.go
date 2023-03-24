@@ -151,7 +151,7 @@ func runDownload(opts *DownloadOptions) error {
 		if a.Expired {
 			continue
 		}
-		if downloaded.Contains(a.Name) {
+		if downloaded.Contains(a.DownloadURL) {
 			continue
 		}
 		if len(wantNames) > 0 || len(wantPatterns) > 0 {
@@ -167,7 +167,7 @@ func runDownload(opts *DownloadOptions) error {
 		if err != nil {
 			return fmt.Errorf("error downloading %s: %w", a.Name, err)
 		}
-		downloaded.Add(a.Name)
+		downloaded.Add(a.DownloadURL)
 	}
 
 	if downloaded.Len() == 0 {

@@ -280,6 +280,7 @@ func Test_runDownload(t *testing.T) {
 					},
 				}, nil)
 				p.On("Download", "http://download.com/artifact2.zip", ".").Return(nil)
+				p.On("Download", "http://download.com/artifact2.also.zip", ".").Return(nil)
 			},
 			mockPrompt: func(p *mockPrompter) {
 				p.On("Prompt", "Select artifacts to download:", []string{"artifact-1", "artifact-2"}, mock.AnythingOfType("*[]string")).
@@ -288,6 +289,46 @@ func Test_runDownload(t *testing.T) {
 						*result = []string{"artifact-2"}
 					}).
 					Return(nil)
+			},
+		},
+		{
+			name: "download all artifacts matching name",
+			opts: DownloadOptions{
+				RunID:          "",
+				DestinationDir: ".",
+				Names:          []string{"artifact-2"},
+			},
+			mockAPI: func(p *mockPlatform) {
+				p.On("List", "").Return([]shared.Artifact{
+					{
+						Name:        "artifact-1",
+						DownloadURL: "http://download.com/artifact1.zip",
+						Expired:     false,
+					},
+					{
+						Name:        "artifact-2",
+						DownloadURL: "http://download.com/1/artifact2.zip",
+						Expired:     true,
+					},
+					{
+						Name:        "artifact-2",
+						DownloadURL: "http://download.com/2/artifact2.zip",
+						Expired:     false,
+					},
+					{
+						Name:        "artifact-2",
+						DownloadURL: "http://download.com/3/artifact2.zip",
+						Expired:     false,
+					},
+					{
+						Name:        "artifact-2",
+						DownloadURL: "http://download.com/4/artifact2.zip",
+						Expired:     false,
+					},
+				}, nil)
+				p.On("Download", "http://download.com/2/artifact2.zip", ".").Return(nil)
+				p.On("Download", "http://download.com/3/artifact2.zip", ".").Return(nil)
+				p.On("Download", "http://download.com/4/artifact2.zip", ".").Return(nil)
 			},
 		},
 	}
