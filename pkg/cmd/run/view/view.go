@@ -74,6 +74,7 @@ type ViewOptions struct {
 	Log        bool
 	LogFailed  bool
 	Web        bool
+	Attempt    uint64
 
 	Prompt   bool
 	Exporter cmdutil.Exporter
@@ -93,13 +94,16 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd := &cobra.Command{
 		Use:   "view [<run-id>]",
 		Short: "View a summary of a workflow run",
-		Args:  cobra.MaximumNArgs(1),
+		Args:  cobra.MaximumNArgs(2),
 		Example: heredoc.Doc(`
 			# Interactively select a run to view, optionally selecting a single job
 			$ gh run view
 
 			# View a specific run
 			$ gh run view 12345
+
+			# View a specific run with specific attempt number
+			$ gh run view 12345 --attempt 3
 
 			# View a specific job within a run
 			$ gh run view --job 456789
@@ -153,6 +157,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.Log, "log", false, "View full log for either a run or specific job")
 	cmd.Flags().BoolVar(&opts.LogFailed, "log-failed", false, "View the log for any failed steps in a run or specific job")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open run in the browser")
+	cmd.Flags().Uint64VarP(&opts.Attempt, "attempt", "a", 0, "The attempt number of the workflow run")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.SingleRunFields)
 
 	return cmd
@@ -172,6 +177,7 @@ func runView(opts *ViewOptions) error {
 
 	jobID := opts.JobID
 	runID := opts.RunID
+	attempt := opts.Attempt
 	var selectedJob *shared.Job
 	var run *shared.Run
 	var jobs []shared.Job
@@ -206,7 +212,7 @@ func runView(opts *ViewOptions) error {
 	}
 
 	opts.IO.StartProgressIndicator()
-	run, err = shared.GetRun(client, repo, runID)
+	run, err = shared.GetRun(client, repo, runID, attempt)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to get run: %w", err)
