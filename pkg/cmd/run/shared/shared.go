@@ -464,6 +464,10 @@ func GetRun(client *api.Client, repo ghrepo.Interface, runID string, attempt uin
 		return nil, err
 	}
 
+	if attempt > 0 {
+		result.URL += fmt.Sprintf("/attempts/%d", attempt)
+	}
+
 	// Set name to workflow name
 	workflow, err := workflowShared.GetWorkflow(client, repo, result.WorkflowID)
 	if err != nil {
