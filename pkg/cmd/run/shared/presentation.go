@@ -13,15 +13,13 @@ func RenderRunHeader(cs *iostreams.ColorScheme, run Run, ago, prNumber string, a
 	symbol, symbolColor := Symbol(cs, run.Status, run.Conclusion)
 	id := cs.Cyanf("%d", run.ID)
 
-	var attemptLabel string
-	if attempt == 0 {
-		attemptLabel = "Latest Attempt"
-	} else {
-		attemptLabel = fmt.Sprintf("Attempt #%d", attempt)
+	attemptLabel := ""
+	if attempt > 0 {
+		attemptLabel = fmt.Sprintf(" (Attempt #%d)", attempt)
 	}
 
 	header := ""
-	header += fmt.Sprintf("%s %s · %s (%s)\n", symbolColor(symbol), title, id, attemptLabel)
+	header += fmt.Sprintf("%s %s · %s%s\n", symbolColor(symbol), title, id, attemptLabel)
 	header += fmt.Sprintf("Triggered via %s %s", run.Event, ago)
 
 	return header
