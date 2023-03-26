@@ -236,7 +236,7 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 		return nil, fmt.Errorf("failed to get annotations: %w", annotationErr)
 	}
 
-	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, text.FuzzyAgo(opts.Now(), run.StartedTime()), prNumber))
+	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, text.FuzzyAgo(opts.Now(), run.StartedTime()), prNumber, 0))
 	fmt.Fprintln(out)
 
 	if len(jobs) == 0 {
