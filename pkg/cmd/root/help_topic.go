@@ -80,10 +80,10 @@ var HelpTopics = map[string]map[string]string{
 			error if a newer version was found.
 
 			GH_CONFIG_DIR: the directory where gh will store configuration files. If not specified, 
-			the default value will be one of the following config paths (in order of precedence):
-			- "$XDG_CONFIG_HOME/gh" (if $XDG_CONFIG_HOME is set) or 
-			- "$AppData/GitHub CLI" (if $AppData is set and GOOS is Windows) or
-			- "$HOME/.config/gh".
+			the default value will be one of the following paths (in order of precedence):
+			  - "$XDG_CONFIG_HOME/gh" (if $XDG_CONFIG_HOME is set),
+			  - "$AppData/GitHub CLI" (on Windows if $AppData is set), or
+			  - "$HOME/.config/gh".
 
 			GH_PROMPT_DISABLED: set to any value to disable interactive prompting in the terminal.
 
