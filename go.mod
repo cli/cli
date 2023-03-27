@@ -87,3 +87,7 @@ require (
 replace golang.org/x/crypto => github.com/cli/crypto v0.0.0-20210929142629-6be313f59b03
 
 replace github.com/henvic/httpretty v0.0.6 => github.com/mislav/httpretty v0.1.1-0.20230202151216-d31343e0d884
+
+// DO NOT MERGE
+// temporary reference until PR for github.com/cli/go-gh is merged and a new version is available.
+replace github.com/cli/go-gh v1.2.1 => github.com/mjpieters/go-gh v1.2.2-0.20230404155430-ffc3dcce09dd

@@ -126,6 +126,7 @@ func Test_exportFormat_Write(t *testing.T) {
 		args     args
 		wantW    string
 		wantErr  bool
+		istty    bool
 	}{
 		{
 			name:     "regular JSON output",
@@ -135,6 +136,7 @@ func Test_exportFormat_Write(t *testing.T) {
 			},
 			wantW:   "{\"name\":\"hubot\"}\n",
 			wantErr: false,
+			istty:   false,
 		},
 		{
 			name:     "call ExportData",
@@ -144,6 +146,7 @@ func Test_exportFormat_Write(t *testing.T) {
 			},
 			wantW:   "{\"field1\":\"item1:field1\",\"field2\":\"item1:field2\"}\n",
 			wantErr: false,
+			istty:   false,
 		},
 		{
 			name:     "recursively call ExportData",
@@ -156,6 +159,7 @@ func Test_exportFormat_Write(t *testing.T) {
 			},
 			wantW:   "{\"s1\":[{\"f1\":\"i1:f1\",\"f2\":\"i1:f2\"},{\"f1\":\"i2:f1\",\"f2\":\"i2:f2\"}],\"s2\":[{\"f1\":\"i3:f1\",\"f2\":\"i3:f2\"}]}\n",
 			wantErr: false,
+			istty:   false,
 		},
 		{
 			name:     "with jq filter",
@@ -165,6 +169,17 @@ func Test_exportFormat_Write(t *testing.T) {
 			},
 			wantW:   "hubot\n",
 			wantErr: false,
+			istty:   false,
+		},
+		{
+			name:     "with jq filter pretty printing",
+			exporter: exportFormat{filter: "."},
+			args: args{
+				data: map[string]string{"name": "hubot"},
+			},
+			wantW:   "{\n  \"name\": \"hubot\"\n}\n",
+			wantErr: false,
+			istty:   true,
 		},
 		{
 			name:     "with Go template",
@@ -174,11 +189,13 @@ func Test_exportFormat_Write(t *testing.T) {
 			},
 			wantW:   "hubot",
 			wantErr: false,
+			istty:   false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			io, _, w, _ := iostreams.Test()
+			io.SetStdoutTTY(tt.istty)
 			if err := tt.exporter.Write(io, tt.args.data); (err != nil) != tt.wantErr {
 				t.Errorf("exportFormat.Write() error = %v, wantErr %v", err, tt.wantErr)
 				return
