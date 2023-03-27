@@ -155,12 +155,13 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				opts.Body = string(b)
 				opts.BodyProvided = true
 			}
-			if (opts.Template != "") && opts.BodyProvided {
-				return errors.New("`--template`is not supported with `--body` and `--body-file`")
+
+			if opts.Template != "" && opts.BodyProvided {
+				return errors.New("`--template` is not supported with `--body` or `--body-file`")
 			}
 
-			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.Autofill && (!opts.TitleProvided || (!opts.BodyProvided && opts.Template == "")) {
-				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--fill` or `--template <template name>`) when not running interactively")
+			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.Autofill && (!opts.TitleProvided || !opts.BodyProvided) {
+				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--fill`) when not running interactively")
 			}
 
 			if runF != nil {
@@ -186,7 +187,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	fl.StringVarP(&opts.Milestone, "milestone", "m", "", "Add the pull request to a milestone by `name`")
 	fl.Bool("no-maintainer-edit", false, "Disable maintainer's ability to modify pull request")
 	fl.StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
-	fl.StringVarP(&opts.Template, "template", "T", "", "Template name for the new PR")
+	fl.StringVarP(&opts.Template, "template", "T", "", "Template `file` to use as starting body text")
 
 	_ = cmd.RegisterFlagCompletionFunc("reviewer", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		results, err := requestableReviewersForCompletion(opts)
@@ -302,20 +303,9 @@ func createRun(opts *CreateOptions) (err error) {
 			var template shared.Template
 
 			if opts.Template != "" {
-				templates, err := tpl.Templates()
+				template, err = tpl.Select(opts.Template)
 				if err != nil {
-					return err
-				}
-
-				for _, t := range templates {
-					if t.Name() == opts.Template {
-						template = t
-						break
-					}
-				}
-
-				if template == nil {
-					return fmt.Errorf("template not found: %s", opts.Template)
+					return
 				}
 			} else {
 				template, err = tpl.Choose()

@@ -94,12 +94,13 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 
 			if opts.Template != "" && bodyProvided {
-				return errors.New("`--template` is not supported with `--body` and `--body-file`")
+				return errors.New("`--template` is not supported with `--body` or `--body-file`")
 			}
-			opts.Interactive = !(titleProvided && (bodyProvided || opts.Template != ""))
+
+			opts.Interactive = !(titleProvided && bodyProvided)
 
 			if opts.Interactive && !opts.IO.CanPrompt() {
-				return cmdutil.FlagErrorf("must provide `--title` and `--body` (or `--template <template name>` or `--blank-template`) when not running interactively")
+				return cmdutil.FlagErrorf("must provide `--title` and `--body` when not running interactively")
 			}
 
 			if runF != nil {
@@ -118,7 +119,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the issue to projects by `name`")
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Add the issue to a milestone by `name`")
 	cmd.Flags().StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
-	cmd.Flags().StringVarP(&opts.Template, "template", "T", "", "Template name for issue")
+	cmd.Flags().StringVarP(&opts.Template, "template", "T", "", "Template `name` to use as starting body text")
 
 	return cmd
 }
@@ -224,20 +225,9 @@ func createRun(opts *CreateOptions) (err error) {
 				var template shared.Template
 
 				if opts.Template != "" {
-					templates, err := tpl.Templates()
+					template, err = tpl.Select(opts.Template)
 					if err != nil {
-						return err
-					}
-
-					for _, t := range templates {
-						if t.Name() == opts.Template {
-							template = t
-							break
-						}
-					}
-
-					if template == nil {
-						return fmt.Errorf("template not found: %s", opts.Template)
+						return
 					}
 				} else {
 					template, err = tpl.Choose()
