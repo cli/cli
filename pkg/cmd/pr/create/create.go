@@ -157,7 +157,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 
 			if opts.Template != "" && opts.BodyProvided {
-				return errors.New("`--template` is not supported with `--body` or `--body-file`")
+				return errors.New("`--template` is not supported when using `--body` or `--body-file`")
 			}
 
 			if !opts.IO.CanPrompt() && !opts.WebMode && !opts.Autofill && (!opts.TitleProvided || !opts.BodyProvided) {

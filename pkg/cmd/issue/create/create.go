@@ -94,7 +94,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 
 			if opts.Template != "" && bodyProvided {
-				return errors.New("`--template` is not supported with `--body` or `--body-file`")
+				return errors.New("`--template` is not supported when using `--body` or `--body-file`")
 			}
 
 			opts.Interactive = !(titleProvided && bodyProvided)
