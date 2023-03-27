@@ -116,6 +116,7 @@ func TestNewCmdChecks(t *testing.T) {
 			assert.Equal(t, tt.wants.Watch, gotOpts.Watch)
 			assert.Equal(t, tt.wants.Interval, gotOpts.Interval)
 			assert.Equal(t, tt.wants.Required, gotOpts.Required)
+			assert.Equal(t, tt.wants.FailFast, gotOpts.FailFast)
 		})
 	}
 }
@@ -205,7 +206,7 @@ func Test_checksRun(t *testing.T) {
 			wantErr: "",
 		},
 		{
-			name:     "watch some failing with failFast",
+			name:     "watch some failing with fail fast",
 			tty:      true,
 			watch:    true,
 			failFast: true,
