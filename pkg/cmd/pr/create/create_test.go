@@ -130,6 +130,44 @@ func TestNewCmdCreate(t *testing.T) {
 				MaintainerCanModify: true,
 			},
 		},
+		{
+			name:     "template from file name tty",
+			tty:      true,
+			cli:      "-t mytitle --template bug_fix.md",
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:               "mytitle",
+				TitleProvided:       true,
+				Body:                "",
+				BodyProvided:        false,
+				Autofill:            false,
+				RecoverFile:         "",
+				WebMode:             false,
+				IsDraft:             false,
+				BaseBranch:          "",
+				HeadBranch:          "",
+				MaintainerCanModify: true,
+				Template:            "bug_fix.md",
+			},
+		},
+		{
+			name:     "template from file name non-tty",
+			tty:      false,
+			cli:      "-t mytitle --template bug_fix.md",
+			wantsErr: true,
+		},
+		{
+			name:     "template and body",
+			tty:      false,
+			cli:      `-t mytitle --template bug_fix.md --body "pr body"`,
+			wantsErr: true,
+		},
+		{
+			name:     "template and body file",
+			tty:      false,
+			cli:      "-t mytitle --template bug_fix.md --body-file body_file.md",
+			wantsErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -178,6 +216,7 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.wantsOpts.MaintainerCanModify, opts.MaintainerCanModify)
 			assert.Equal(t, tt.wantsOpts.BaseBranch, opts.BaseBranch)
 			assert.Equal(t, tt.wantsOpts.HeadBranch, opts.HeadBranch)
+			assert.Equal(t, tt.wantsOpts.Template, opts.Template)
 		})
 	}
 }
