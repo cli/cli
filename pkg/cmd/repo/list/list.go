@@ -154,6 +154,10 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
+	if listResult.Owner == "" {
+		return fmt.Errorf("owner / repo not found")
+	}
+
 	if err := opts.IO.StartPager(); err != nil {
 		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
@@ -207,8 +211,6 @@ func listHeader(owner string, matchCount, totalMatchCount int, hasFilters bool) 
 	if totalMatchCount == 0 {
 		if hasFilters {
 			return "No results match your search"
-		} else if owner != "" {
-			return "There are no repositories in @" + owner
 		}
 		return "No results"
 	}
