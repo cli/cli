@@ -211,6 +211,8 @@ func listHeader(owner string, matchCount, totalMatchCount int, hasFilters bool) 
 	if totalMatchCount == 0 {
 		if hasFilters {
 			return "No results match your search"
+		} else if owner != "" {
+			return "There are no repositories in @" + owner
 		}
 		return "No results"
 	}
