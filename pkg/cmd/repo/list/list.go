@@ -154,6 +154,10 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
+	if opts.Owner != "" && listResult.Owner == "" && !listResult.FromSearch {
+		return fmt.Errorf("the owner handle %q was not recognized as either a GitHub user or an organization", opts.Owner)
+	}
+
 	if err := opts.IO.StartPager(); err != nil {
 		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
