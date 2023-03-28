@@ -405,11 +405,11 @@ func TestRepoList_filtering(t *testing.T) {
 
 	output, err := runCommand(http, true, `--visibility=private --limit 2 `)
 	if err != nil {
-		t.Fatal(err)
+		assert.EqualError(t, err, "owner / repo not found")
+	} else {
+		assert.Equal(t, "", output.Stderr())
+		assert.Equal(t, "\nNo results match your search\n\n", output.String())
 	}
-
-	assert.Equal(t, "", output.Stderr())
-	assert.Equal(t, "\nNo results match your search\n\n", output.String())
 }
 
 func TestRepoList_noVisibilityField(t *testing.T) {
