@@ -449,14 +449,25 @@ func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 	return fmt.Sprintf("%d", runs[selected].ID), nil
 }
 
-func GetRun(client *api.Client, repo ghrepo.Interface, runID string) (*Run, error) {
+func GetRun(client *api.Client, repo ghrepo.Interface, runID string, attempt uint64) (*Run, error) {
 	var result Run
 
 	path := fmt.Sprintf("repos/%s/actions/runs/%s?exclude_pull_requests=true", ghrepo.FullName(repo), runID)
 
+	if attempt > 0 {
+		path = fmt.Sprintf("repos/%s/actions/runs/%s/attempts/%d?exclude_pull_requests=true", ghrepo.FullName(repo), runID, attempt)
+	}
+
 	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
 	if err != nil {
 		return nil, err
+	}
+
+	if attempt > 0 {
+		result.URL, err = url.JoinPath(result.URL, fmt.Sprintf("/attempts/%d", attempt))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Set name to workflow name
