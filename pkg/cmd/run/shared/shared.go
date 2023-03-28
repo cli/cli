@@ -451,11 +451,10 @@ func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 
 func GetRun(client *api.Client, repo ghrepo.Interface, runID string, attempt uint64) (*Run, error) {
 	var result Run
-	var path string
 
-	if attempt == 0 {
-		path = fmt.Sprintf("repos/%s/actions/runs/%s?exclude_pull_requests=true", ghrepo.FullName(repo), runID)
-	} else {
+	path := fmt.Sprintf("repos/%s/actions/runs/%s?exclude_pull_requests=true", ghrepo.FullName(repo), runID)
+
+	if attempt > 0 {
 		path = fmt.Sprintf("repos/%s/actions/runs/%s/attempts/%d?exclude_pull_requests=true", ghrepo.FullName(repo), runID, attempt)
 	}
 

@@ -436,11 +436,10 @@ func getRunLog(cache runLogCache, httpClient *http.Client, repo ghrepo.Interface
 	filepath := filepath.Join(os.TempDir(), "gh-cli-cache", filename)
 	if !cache.Exists(filepath) {
 		// Run log does not exist in cache so retrieve and store it
-		var logURL string
-		if attempt == 0 {
-			logURL = fmt.Sprintf("%srepos/%s/actions/runs/%d/logs",
-				ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), run.ID)
-		} else {
+		logURL := fmt.Sprintf("%srepos/%s/actions/runs/%d/logs",
+			ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), run.ID)
+
+		if attempt > 0 {
 			logURL = fmt.Sprintf("%srepos/%s/actions/runs/%d/attempts/%d/logs",
 				ghinstance.RESTPrefix(repo.RepoHost()), ghrepo.FullName(repo), run.ID, attempt)
 		}
