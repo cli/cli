@@ -464,7 +464,10 @@ func GetRun(client *api.Client, repo ghrepo.Interface, runID string, attempt uin
 	}
 
 	if attempt > 0 {
-		result.URL += fmt.Sprintf("/attempts/%d", attempt)
+		result.URL, err = url.JoinPath(result.URL, fmt.Sprintf("/attempts/%d", attempt))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Set name to workflow name
