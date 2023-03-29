@@ -1,7 +1,6 @@
 package add
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -79,14 +78,11 @@ func runAdd(opts *AddOptions) error {
 
 	hostname, _ := cfg.Authentication().DefaultHost()
 
-	err = SSHKeyUpload(httpClient, hostname, keyReader, opts.Title)
+	err = SSHKeyUpload(httpClient, hostname, keyReader, opts.Title, true, opts.IO)
 	if err != nil {
 		return err
 	}
 
-	if opts.IO.IsStdoutTTY() {
-		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.ErrOut, "%s Public key added to your account\n", cs.SuccessIcon())
-	}
+	// SSHKeyUpload prints the success message.
 	return nil
 }
