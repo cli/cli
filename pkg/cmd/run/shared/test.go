@@ -3,13 +3,19 @@ package shared
 import (
 	"fmt"
 	"time"
+
+	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 )
 
 var TestRunStartTime, _ = time.Parse("2006-01-02 15:04:05", "2021-02-23 04:51:00")
 
-func TestRun(name string, id int64, s Status, c Conclusion) Run {
+func TestRun(id int64, s Status, c Conclusion) Run {
+	return TestRunWithCommit(id, s, c, "cool commit")
+}
+
+func TestRunWithCommit(id int64, s Status, c Conclusion, commit string) Run {
 	return Run{
-		Name:       name,
+		WorkflowID: 123,
 		ID:         id,
 		CreatedAt:  TestRunStartTime,
 		UpdatedAt:  TestRunStartTime.Add(time.Minute*4 + time.Second*34),
@@ -19,7 +25,7 @@ func TestRun(name string, id int64, s Status, c Conclusion) Run {
 		HeadBranch: "trunk",
 		JobsURL:    fmt.Sprintf("https://api.github.com/runs/%d/jobs", id),
 		HeadCommit: Commit{
-			Message: "cool commit",
+			Message: commit,
 		},
 		HeadSha: "1234567890",
 		URL:     fmt.Sprintf("https://github.com/runs/%d", id),
@@ -30,24 +36,24 @@ func TestRun(name string, id int64, s Status, c Conclusion) Run {
 	}
 }
 
-var SuccessfulRun Run = TestRun("successful", 3, Completed, Success)
-var FailedRun Run = TestRun("failed", 1234, Completed, Failure)
+var SuccessfulRun Run = TestRun(3, Completed, Success)
+var FailedRun Run = TestRun(1234, Completed, Failure)
 
 var TestRuns []Run = []Run{
-	TestRun("timed out", 1, Completed, TimedOut),
-	TestRun("in progress", 2, InProgress, ""),
+	TestRun(1, Completed, TimedOut),
+	TestRun(2, InProgress, ""),
 	SuccessfulRun,
-	TestRun("cancelled", 4, Completed, Cancelled),
+	TestRun(4, Completed, Cancelled),
 	FailedRun,
-	TestRun("neutral", 6, Completed, Neutral),
-	TestRun("skipped", 7, Completed, Skipped),
-	TestRun("requested", 8, Requested, ""),
-	TestRun("queued", 9, Queued, ""),
-	TestRun("stale", 10, Completed, Stale),
+	TestRun(6, Completed, Neutral),
+	TestRun(7, Completed, Skipped),
+	TestRun(8, Requested, ""),
+	TestRun(9, Queued, ""),
+	TestRun(10, Completed, Stale),
 }
 
 var WorkflowRuns []Run = []Run{
-	TestRun("in progress", 2, InProgress, ""),
+	TestRun(2, InProgress, ""),
 	SuccessfulRun,
 	FailedRun,
 }
@@ -110,4 +116,9 @@ var FailedJobAnnotations []Annotation = []Annotation{
 		Level:     "failure",
 		StartLine: 420,
 	},
+}
+
+var TestWorkflow workflowShared.Workflow = workflowShared.Workflow{
+	Name: "CI",
+	ID:   123,
 }

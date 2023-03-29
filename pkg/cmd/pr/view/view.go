@@ -81,7 +81,7 @@ var defaultFields = []string{
 	"isDraft", "maintainerCanModify", "mergeable", "additions", "deletions", "commitsCount",
 	"baseRefName", "headRefName", "headRepositoryOwner", "headRepository", "isCrossRepository",
 	"reviewRequests", "reviews", "assignees", "labels", "projectCards", "milestone",
-	"comments", "reactionGroups", "createdAt",
+	"comments", "reactionGroups", "createdAt", "statusCheckRollup",
 }
 
 func viewRun(opts *ViewOptions) error {
@@ -171,16 +171,29 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 	// Header (Title and State)
 	fmt.Fprintf(out, "%s #%d\n", cs.Bold(pr.Title), pr.Number)
 	fmt.Fprintf(out,
-		"%s • %s wants to merge %s into %s from %s • %s • %s %s \n",
+		"%s • %s wants to merge %s into %s from %s • %s\n",
 		shared.StateTitleWithColor(cs, *pr),
 		pr.Author.Login,
 		text.Pluralize(pr.Commits.TotalCount, "commit"),
 		pr.BaseRefName,
 		pr.HeadRefName,
 		text.FuzzyAgo(opts.Now(), pr.CreatedAt),
+	)
+
+	// added/removed
+	fmt.Fprintf(out,
+		"%s %s",
 		cs.Green("+"+strconv.Itoa(pr.Additions)),
 		cs.Red("-"+strconv.Itoa(pr.Deletions)),
 	)
+
+	// checks
+	checks := pr.ChecksStatus()
+	if summary := shared.PrCheckStatusSummaryWithColor(cs, checks); summary != "" {
+		fmt.Fprintf(out, " • %s\n", summary)
+	} else {
+		fmt.Fprintln(out)
+	}
 
 	// Reactions
 	if reactions := shared.ReactionGroupList(pr.ReactionGroups); reactions != "" {

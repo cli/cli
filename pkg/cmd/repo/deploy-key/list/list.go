@@ -64,6 +64,7 @@ func listRun(opts *ListOptions) error {
 		return cmdutil.NewNoResultsError(fmt.Sprintf("no deploy keys found in %s", ghrepo.FullName(repo)))
 	}
 
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	t := utils.NewTablePrinter(opts.IO)
 	cs := opts.IO.ColorScheme()
 	now := time.Now()

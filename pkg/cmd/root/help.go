@@ -102,32 +102,6 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 	}
 
 	namePadding := 12
-	coreCommands := []string{}
-	actionsCommands := []string{}
-	additionalCommands := []string{}
-	for _, c := range command.Commands() {
-		if c.Short == "" {
-			continue
-		}
-		if c.Hidden {
-			continue
-		}
-
-		s := rpad(c.Name()+":", namePadding) + c.Short
-		if _, ok := c.Annotations["IsCore"]; ok {
-			coreCommands = append(coreCommands, s)
-		} else if _, ok := c.Annotations["IsActions"]; ok {
-			actionsCommands = append(actionsCommands, s)
-		} else {
-			additionalCommands = append(additionalCommands, s)
-		}
-	}
-
-	// If there are no core commands, assume everything is a core command
-	if len(coreCommands) == 0 {
-		coreCommands = additionalCommands
-		additionalCommands = []string{}
-	}
 
 	type helpEntry struct {
 		Title string
@@ -148,14 +122,16 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 		helpEntries = append(helpEntries, helpEntry{"", longText})
 	}
 	helpEntries = append(helpEntries, helpEntry{"USAGE", command.UseLine()})
-	if len(coreCommands) > 0 {
-		helpEntries = append(helpEntries, helpEntry{"CORE COMMANDS", strings.Join(coreCommands, "\n")})
-	}
-	if len(actionsCommands) > 0 {
-		helpEntries = append(helpEntries, helpEntry{"ACTIONS COMMANDS", strings.Join(actionsCommands, "\n")})
-	}
-	if len(additionalCommands) > 0 {
-		helpEntries = append(helpEntries, helpEntry{"ADDITIONAL COMMANDS", strings.Join(additionalCommands, "\n")})
+
+	for _, g := range GroupedCommands(command) {
+		var names []string
+		for _, c := range g.Commands {
+			names = append(names, rpad(c.Name()+":", namePadding)+c.Short)
+		}
+		helpEntries = append(helpEntries, helpEntry{
+			Title: strings.ToUpper(g.Title),
+			Body:  strings.Join(names, "\n"),
+		})
 	}
 
 	if isRootCmd(command) {
@@ -198,9 +174,6 @@ func rootHelpFunc(f *cmdutil.Factory, command *cobra.Command, args []string) {
 	helpEntries = append(helpEntries, helpEntry{"LEARN MORE", `
 Use 'gh <command> <subcommand> --help' for more information about a command.
 Read the manual at https://cli.github.com/manual`})
-	if _, ok := command.Annotations["help:feedback"]; ok {
-		helpEntries = append(helpEntries, helpEntry{"FEEDBACK", command.Annotations["help:feedback"]})
-	}
 
 	out := f.IOStreams.Out
 	for _, e := range helpEntries {
@@ -223,6 +196,49 @@ func findCommand(cmd *cobra.Command, name string) *cobra.Command {
 		}
 	}
 	return nil
+}
+
+type CommandGroup struct {
+	Title    string
+	Commands []*cobra.Command
+}
+
+func GroupedCommands(cmd *cobra.Command) []CommandGroup {
+	var res []CommandGroup
+
+	for _, g := range cmd.Groups() {
+		var cmds []*cobra.Command
+		for _, c := range cmd.Commands() {
+			if c.GroupID == g.ID && c.IsAvailableCommand() {
+				cmds = append(cmds, c)
+			}
+		}
+		if len(cmds) > 0 {
+			res = append(res, CommandGroup{
+				Title:    g.Title,
+				Commands: cmds,
+			})
+		}
+	}
+
+	var cmds []*cobra.Command
+	for _, c := range cmd.Commands() {
+		if c.GroupID == "" && c.IsAvailableCommand() {
+			cmds = append(cmds, c)
+		}
+	}
+	if len(cmds) > 0 {
+		defaultGroupTitle := "Additional commands"
+		if len(cmd.Groups()) == 0 {
+			defaultGroupTitle = "Available commands"
+		}
+		res = append(res, CommandGroup{
+			Title:    defaultGroupTitle,
+			Commands: cmds,
+		})
+	}
+
+	return res
 }
 
 // rpad adds padding to the right of a string.

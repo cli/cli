@@ -44,7 +44,11 @@ func newListCmd(app *App) *cobra.Command {
 	}
 
 	listCmd.Flags().IntVarP(&opts.limit, "limit", "L", 30, "Maximum number of codespaces to list")
-	listCmd.Flags().StringVarP(&opts.repo, "repo", "r", "", "Repository name with owner: user/repo")
+	listCmd.Flags().StringVarP(&opts.repo, "repo", "R", "", "Repository name with owner: user/repo")
+	if err := addDeprecatedRepoShorthand(listCmd, &opts.repo); err != nil {
+		fmt.Fprintf(app.io.ErrOut, "%v\n", err)
+	}
+
 	listCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "The `login` handle of the organization to list codespaces for (admin-only)")
 	listCmd.Flags().StringVarP(&opts.userName, "user", "u", "", "The `username` to list codespaces for (used with --org)")
 	cmdutil.AddJSONFlags(listCmd, &exporter, api.CodespaceFields)
@@ -58,9 +62,11 @@ func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Expo
 		return cmdutil.FlagErrorf("using `--org` or `--user` with `--repo` is not allowed")
 	}
 
-	a.StartProgressIndicatorWithLabel("Fetching codespaces")
-	codespaces, err := a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{Limit: opts.limit, RepoName: opts.repo, OrgName: opts.orgName, UserName: opts.userName})
-	a.StopProgressIndicator()
+	var codespaces []*api.Codespace
+	err := a.RunWithProgress("Fetching codespaces", func() (err error) {
+		codespaces, err = a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{Limit: opts.limit, RepoName: opts.repo, OrgName: opts.orgName, UserName: opts.userName})
+		return
+	})
 	if err != nil {
 		return fmt.Errorf("error getting codespaces: %w", err)
 	}
@@ -86,6 +92,7 @@ func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Expo
 		return cmdutil.NewNoResultsError("no codespaces found")
 	}
 
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(a.io)
 	if tp.IsTTY() {
 		tp.AddField("NAME", nil, nil)

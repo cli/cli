@@ -85,6 +85,14 @@ func Test_NewCmdRefresh(t *testing.T) {
 				Scopes: []string{"repo:invite", "read:public_key"},
 			},
 		},
+		{
+			name: "secure storage",
+			tty:  true,
+			cli:  "--secure-storage",
+			wants: RefreshOptions{
+				SecureStorage: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -126,8 +134,10 @@ func Test_NewCmdRefresh(t *testing.T) {
 }
 
 type authArgs struct {
-	hostname string
-	scopes   []string
+	hostname      string
+	scopes        []string
+	interactive   bool
+	secureStorage bool
 }
 
 func Test_refreshRun(t *testing.T) {
@@ -136,6 +146,7 @@ func Test_refreshRun(t *testing.T) {
 		opts          *RefreshOptions
 		prompterStubs func(*prompter.PrompterMock)
 		cfgHosts      []string
+		config        config.Config
 		oldScopes     string
 		wantErr       string
 		nontty        bool
@@ -230,20 +241,62 @@ func Test_refreshRun(t *testing.T) {
 				scopes:   []string{"repo:invite", "public_key:read", "delete_repo", "codespace"},
 			},
 		},
+		{
+			name: "explicit secure storage",
+			cfgHosts: []string{
+				"obed.morton",
+			},
+			opts: &RefreshOptions{
+				Hostname:      "obed.morton",
+				SecureStorage: true,
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "obed.morton",
+				scopes:        nil,
+				secureStorage: true,
+			},
+		},
+		{
+			name: "implicit secure storage",
+			config: func() config.Config {
+				cfg := config.NewFromString("")
+				authCfg := cfg.Authentication()
+				authCfg.SetHosts([]string{"obed.morton"})
+				authCfg.SetToken("abc123", "keyring")
+				cfg.AuthenticationFunc = func() *config.AuthConfig {
+					return authCfg
+				}
+				return cfg
+			}(),
+			opts: &RefreshOptions{
+				Hostname: "obed.morton",
+			},
+			wantAuthArgs: authArgs{
+				hostname:      "obed.morton",
+				scopes:        nil,
+				secureStorage: true,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			aa := authArgs{}
-			tt.opts.AuthFlow = func(_ config.Config, _ *iostreams.IOStreams, hostname string, scopes []string, interactive bool) error {
+			tt.opts.AuthFlow = func(_ *config.AuthConfig, _ *iostreams.IOStreams, hostname string, scopes []string, interactive, secureStorage bool) error {
 				aa.hostname = hostname
 				aa.scopes = scopes
+				aa.interactive = interactive
+				aa.secureStorage = secureStorage
 				return nil
 			}
 
-			_ = config.StubWriteConfig(t)
-			cfg := config.NewFromString("")
-			for _, hostname := range tt.cfgHosts {
-				cfg.Set(hostname, "oauth_token", "abc123")
+			var cfg config.Config
+			if tt.config != nil {
+				cfg = tt.config
+			} else {
+				cfg = config.NewFromString("")
+				for _, hostname := range tt.cfgHosts {
+					cfg.Set(hostname, "oauth_token", "abc123")
+				}
 			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil
@@ -272,7 +325,7 @@ func Test_refreshRun(t *testing.T) {
 					}, nil
 				},
 			)
-			tt.opts.httpClient = &http.Client{Transport: httpReg}
+			tt.opts.HttpClient = &http.Client{Transport: httpReg}
 
 			pm := &prompter.PrompterMock{}
 			if tt.prompterStubs != nil {
@@ -291,6 +344,8 @@ func Test_refreshRun(t *testing.T) {
 
 			assert.Equal(t, tt.wantAuthArgs.hostname, aa.hostname)
 			assert.Equal(t, tt.wantAuthArgs.scopes, aa.scopes)
+			assert.Equal(t, tt.wantAuthArgs.interactive, aa.interactive)
+			assert.Equal(t, tt.wantAuthArgs.secureStorage, aa.secureStorage)
 		})
 	}
 }

@@ -31,7 +31,7 @@ type ListOptions struct {
 	Fork        bool
 	Source      bool
 	Language    string
-	Topic       string
+	Topic       []string
 	Archived    bool
 	NonArchived bool
 
@@ -92,7 +92,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().BoolVar(&opts.Source, "source", false, "Show only non-forks")
 	cmd.Flags().BoolVar(&opts.Fork, "fork", false, "Show only forks")
 	cmd.Flags().StringVarP(&opts.Language, "language", "l", "", "Filter by primary coding language")
-	cmd.Flags().StringVar(&opts.Topic, "topic", "", "Filter by topic")
+	cmd.Flags().StringSliceVarP(&opts.Topic, "topic", "", nil, "Filter by topic")
 	cmdutil.StringEnumFlag(cmd, &opts.Visibility, "visibility", "", "", []string{"public", "private", "internal"}, "Filter by repository visibility")
 	cmd.Flags().BoolVar(&opts.Archived, "archived", false, "Show only archived repositories")
 	cmd.Flags().BoolVar(&opts.NonArchived, "no-archived", false, "Omit archived repositories")
@@ -119,7 +119,7 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	host, _ := cfg.DefaultHost()
+	host, _ := cfg.Authentication().DefaultHost()
 
 	if opts.Detector == nil {
 		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
@@ -154,6 +154,10 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
+	if opts.Owner != "" && listResult.Owner == "" && !listResult.FromSearch {
+		return fmt.Errorf("the owner handle %q was not recognized as either a GitHub user or an organization", opts.Owner)
+	}
+
 	if err := opts.IO.StartPager(); err != nil {
 		fmt.Fprintf(opts.IO.ErrOut, "error starting pager: %v\n", err)
 	}
@@ -164,6 +168,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	cs := opts.IO.ColorScheme()
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(opts.IO)
 
 	for _, repo := range listResult.Repositories {
@@ -194,7 +199,7 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
 	}
 	if opts.IO.IsStdoutTTY() {
-		hasFilters := filter.Visibility != "" || filter.Fork || filter.Source || filter.Language != "" || filter.Topic != ""
+		hasFilters := filter.Visibility != "" || filter.Fork || filter.Source || filter.Language != "" || len(filter.Topic) > 0
 		title := listHeader(listResult.Owner, len(listResult.Repositories), listResult.TotalCount, hasFilters)
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}

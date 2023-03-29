@@ -5,7 +5,7 @@ import (
 	"github.com/shurcooL/githubv4"
 )
 
-// OrganizationProjects fetches all open projects for an organization
+// OrganizationProjects fetches all open projects for an organization.
 func OrganizationProjects(client *Client, repo ghrepo.Interface) ([]RepoProject, error) {
 	type responseData struct {
 		Organization struct {

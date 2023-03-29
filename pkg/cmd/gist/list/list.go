@@ -76,7 +76,7 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	host, _ := cfg.DefaultHost()
+	host, _ := cfg.Authentication().DefaultHost()
 
 	gists, err := shared.ListGists(client, host, opts.Limit, opts.Visibility)
 	if err != nil {
@@ -95,6 +95,7 @@ func listRun(opts *ListOptions) error {
 
 	cs := opts.IO.ColorScheme()
 
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(opts.IO)
 
 	for _, gist := range gists {

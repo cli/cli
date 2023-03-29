@@ -40,6 +40,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/api"
 	"github.com/opentracing/opentracing-go"
 )
@@ -187,11 +188,11 @@ type Codespace struct {
 }
 
 type CodespaceGitStatus struct {
-	Ahead                int    `json:"ahead"`
-	Behind               int    `json:"behind"`
-	Ref                  string `json:"ref"`
-	HasUnpushedChanges   bool   `json:"has_unpushed_changes"`
-	HasUncommitedChanges bool   `json:"has_uncommited_changes"`
+	Ahead                 int    `json:"ahead"`
+	Behind                int    `json:"behind"`
+	Ref                   string `json:"ref"`
+	HasUnpushedChanges    bool   `json:"has_unpushed_changes"`
+	HasUncommittedChanges bool   `json:"has_uncommitted_changes"`
 }
 
 type CodespaceMachine struct {
@@ -210,6 +211,8 @@ const (
 	CodespaceStateShutdown = "Shutdown"
 	// CodespaceStateStarting is the state for a starting codespace environment.
 	CodespaceStateStarting = "Starting"
+	// CodespaceStateRebuilding is the state for a rebuilding codespace environment.
+	CodespaceStateRebuilding = "Rebuilding"
 )
 
 type CodespaceConnection struct {
@@ -248,9 +251,9 @@ func (c *Codespace) ExportData(fields []string) map[string]interface{} {
 			data[f] = c.Machine.Name
 		case "gitStatus":
 			data[f] = map[string]interface{}{
-				"ref":                  c.GitStatus.Ref,
-				"hasUnpushedChanges":   c.GitStatus.HasUnpushedChanges,
-				"hasUncommitedChanges": c.GitStatus.HasUncommitedChanges,
+				"ref":                   c.GitStatus.Ref,
+				"hasUnpushedChanges":    c.GitStatus.HasUnpushedChanges,
+				"hasUncommittedChanges": c.GitStatus.HasUncommittedChanges,
 			}
 		case "vscsTarget":
 			if c.VSCSTarget != "" && c.VSCSTarget != VSCSTargetProduction {
@@ -527,7 +530,7 @@ type Machine struct {
 }
 
 // GetCodespacesMachines returns the codespaces machines for the given repo, branch and location.
-func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, location string) ([]*Machine, error) {
+func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*Machine, error) {
 	reqURL := fmt.Sprintf("%s/repositories/%d/codespaces/machines", a.githubAPI, repoID)
 	req, err := http.NewRequest(http.MethodGet, reqURL, nil)
 	if err != nil {
@@ -537,6 +540,7 @@ func (a *API) GetCodespacesMachines(ctx context.Context, repoID int, branch, loc
 	q := req.URL.Query()
 	q.Add("location", location)
 	q.Add("ref", branch)
+	q.Add("devcontainer_path", devcontainerPath)
 	req.URL.RawQuery = q.Encode()
 
 	a.setHeaders(req)
@@ -699,6 +703,7 @@ type CreateCodespaceParams struct {
 	VSCSTarget             string
 	VSCSTargetURL          string
 	PermissionsOptOut      bool
+	DisplayName            string
 }
 
 // CreateCodespace creates a codespace with the given parameters and returns a non-nil error if it
@@ -749,6 +754,7 @@ type startCreateRequest struct {
 	VSCSTarget             string `json:"vscs_target,omitempty"`
 	VSCSTargetURL          string `json:"vscs_target_url,omitempty"`
 	PermissionsOptOut      bool   `json:"multi_repo_permissions_opt_out"`
+	DisplayName            string `json:"display_name"`
 }
 
 var errProvisioningInProgress = errors.New("provisioning in progress")
@@ -782,6 +788,7 @@ func (a *API) startCreate(ctx context.Context, params *CreateCodespaceParams) (*
 		VSCSTarget:             params.VSCSTarget,
 		VSCSTargetURL:          params.VSCSTargetURL,
 		PermissionsOptOut:      params.PermissionsOptOut,
+		DisplayName:            params.DisplayName,
 	})
 
 	if err != nil {
@@ -1076,16 +1083,16 @@ func (a *API) setHeaders(req *http.Request) {
 
 // withRetry takes a generic function that sends an http request and retries
 // only when the returned response has a >=500 status code.
-func (a *API) withRetry(f func() (*http.Response, error)) (resp *http.Response, err error) {
-	for i := 0; i < 5; i++ {
-		resp, err = f()
+func (a *API) withRetry(f func() (*http.Response, error)) (*http.Response, error) {
+	bo := backoff.NewConstantBackOff(a.retryBackoff)
+	return backoff.RetryWithData(func() (*http.Response, error) {
+		resp, err := f()
 		if err != nil {
-			return nil, err
+			return nil, backoff.Permanent(err)
 		}
 		if resp.StatusCode < 500 {
-			break
+			return resp, nil
 		}
-		time.Sleep(a.retryBackoff * (time.Duration(i) + 1))
-	}
-	return resp, err
+		return nil, errors.New("retry")
+	}, backoff.WithMaxRetries(bo, 3))
 }

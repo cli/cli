@@ -1,28 +1,34 @@
 package rename
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/context"
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/spf13/cobra"
 )
 
+type iprompter interface {
+	Input(string, string) (string, error)
+	Confirm(string, bool) (bool, error)
+}
+
 type RenameOptions struct {
 	HttpClient      func() (*http.Client, error)
+	GitClient       *git.Client
 	IO              *iostreams.IOStreams
+	Prompter        iprompter
 	Config          func() (config.Config, error)
 	BaseRepo        func() (ghrepo.Interface, error)
-	Remotes         func() (context.Remotes, error)
+	Remotes         func() (ghContext.Remotes, error)
 	DoConfirm       bool
 	HasRepoOverride bool
 	newRepoSelector string
@@ -32,8 +38,10 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 	opts := &RenameOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Remotes:    f.Remotes,
 		Config:     f.Config,
+		Prompter:   f.Prompter,
 	}
 
 	var confirm bool
@@ -57,7 +65,7 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 
 			if len(args) == 1 && !confirm && !opts.HasRepoOverride {
 				if !opts.IO.CanPrompt() {
-					return cmdutil.FlagErrorf("--confirm required when passing a single argument")
+					return cmdutil.FlagErrorf("--yes required when passing a single argument")
 				}
 				opts.DoConfirm = true
 			}
@@ -65,12 +73,15 @@ func NewCmdRename(f *cmdutil.Factory, runf func(*RenameOptions) error) *cobra.Co
 			if runf != nil {
 				return runf(opts)
 			}
+
 			return renameRun(opts)
 		},
 	}
 
 	cmdutil.EnableRepoOverride(cmd, f)
-	cmd.Flags().BoolVarP(&confirm, "confirm", "y", false, "skip confirmation prompt")
+	cmd.Flags().BoolVar(&confirm, "confirm", false, "Skip confirmation prompt")
+	_ = cmd.Flags().MarkDeprecated("confirm", "use `--yes` instead")
+	cmd.Flags().BoolVarP(&confirm, "yes", "y", false, "Skip the confirmation prompt")
 
 	return cmd
 }
@@ -89,28 +100,17 @@ func renameRun(opts *RenameOptions) error {
 	}
 
 	if newRepoName == "" {
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		err = prompt.SurveyAskOne(
-			&survey.Input{
-				Message: fmt.Sprintf("Rename %s to: ", ghrepo.FullName(currRepo)),
-			},
-			&newRepoName,
-		)
-		if err != nil {
+		if newRepoName, err = opts.Prompter.Input(fmt.Sprintf(
+			"Rename %s to:", ghrepo.FullName(currRepo)), ""); err != nil {
 			return err
 		}
 	}
 
 	if opts.DoConfirm {
 		var confirmed bool
-		p := &survey.Confirm{
-			Message: fmt.Sprintf("Rename %s to %s?", ghrepo.FullName(currRepo), newRepoName),
-			Default: false,
-		}
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		err = prompt.SurveyAskOne(p, &confirmed)
-		if err != nil {
-			return fmt.Errorf("failed to prompt: %w", err)
+		if confirmed, err = opts.Prompter.Confirm(fmt.Sprintf(
+			"Rename %s to %s?", ghrepo.FullName(currRepo), newRepoName), false); err != nil {
+			return err
 		}
 		if !confirmed {
 			return nil
@@ -145,7 +145,7 @@ func renameRun(opts *RenameOptions) error {
 	return nil
 }
 
-func updateRemote(repo ghrepo.Interface, renamed ghrepo.Interface, opts *RenameOptions) (*context.Remote, error) {
+func updateRemote(repo ghrepo.Interface, renamed ghrepo.Interface, opts *RenameOptions) (*ghContext.Remote, error) {
 	cfg, err := opts.Config()
 	if err != nil {
 		return nil, err
@@ -167,6 +167,7 @@ func updateRemote(repo ghrepo.Interface, renamed ghrepo.Interface, opts *RenameO
 	}
 
 	remoteURL := ghrepo.FormatRemoteURL(renamed, protocol)
-	err = git.UpdateRemoteURL(remote.Name, remoteURL)
+	err = opts.GitClient.UpdateRemoteURL(context.Background(), remote.Name, remoteURL)
+
 	return remote, err
 }

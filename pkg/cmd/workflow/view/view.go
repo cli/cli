@@ -84,7 +84,8 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open workflow in the browser")
 	cmd.Flags().BoolVarP(&opts.YAML, "yaml", "y", false, "View the workflow yaml file")
 	cmd.Flags().StringVarP(&opts.Ref, "ref", "r", "", "The branch or tag name which contains the version of the workflow file you'd like to view")
-	cmdutil.RegisterBranchCompletionFlags(cmd, "ref")
+
+	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "ref")
 
 	return cmd
 }
@@ -98,7 +99,7 @@ func runView(opts *ViewOptions) error {
 
 	repo, err := opts.BaseRepo()
 	if err != nil {
-		return fmt.Errorf("could not determine base repo: %w", err)
+		return err
 	}
 
 	var workflow *shared.Workflow
@@ -196,13 +197,17 @@ func viewWorkflowContent(opts *ViewOptions, client *api.Client, repo ghrepo.Inte
 }
 
 func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interface, workflow *shared.Workflow) error {
-	wr, err := getWorkflowRuns(client, repo, workflow)
+	wr, err := runShared.GetRuns(client, repo, &runShared.FilterOptions{
+		WorkflowID:   workflow.ID,
+		WorkflowName: workflow.Name,
+	}, 5)
 	if err != nil {
 		return fmt.Errorf("failed to get runs: %w", err)
 	}
 
 	out := opts.IO.Out
 	cs := opts.IO.ColorScheme()
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(opts.IO)
 
 	// Header
@@ -211,13 +216,13 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interfa
 	fmt.Fprintf(out, "ID: %s\n\n", cs.Cyanf("%d", workflow.ID))
 
 	// Runs
-	fmt.Fprintf(out, "Total runs %d\n", wr.Total)
+	fmt.Fprintf(out, "Total runs %d\n", wr.TotalCount)
 
-	if wr.Total != 0 {
+	if wr.TotalCount != 0 {
 		fmt.Fprintln(out, "Recent runs")
 	}
 
-	for _, run := range wr.Runs {
+	for _, run := range wr.WorkflowRuns {
 		if opts.Raw {
 			tp.AddField(string(run.Status), nil, nil)
 			tp.AddField(string(run.Conclusion), nil, nil)
@@ -226,9 +231,9 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interfa
 			tp.AddField(symbol, nil, symbolColor)
 		}
 
-		tp.AddField(run.CommitMsg(), nil, cs.Bold)
+		tp.AddField(run.Title(), nil, cs.Bold)
 
-		tp.AddField(run.Name, nil, nil)
+		tp.AddField(run.WorkflowName(), nil, nil)
 		tp.AddField(run.HeadBranch, nil, cs.Bold)
 		tp.AddField(string(run.Event), nil, nil)
 
@@ -249,7 +254,7 @@ func viewWorkflowInfo(opts *ViewOptions, client *api.Client, repo ghrepo.Interfa
 	fmt.Fprintln(out)
 
 	// Footer
-	if wr.Total != 0 {
+	if wr.TotalCount != 0 {
 		fmt.Fprintf(out, "To see more runs for this workflow, try: gh run list --workflow %s\n", filename)
 	}
 	fmt.Fprintf(out, "To see the YAML for this workflow, try: gh workflow view %s --yaml\n", filename)

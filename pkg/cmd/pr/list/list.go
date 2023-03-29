@@ -109,8 +109,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Assignee, "assignee", "a", "", "Filter by assignee")
 	cmd.Flags().StringVarP(&opts.Search, "search", "S", "", "Search pull requests with `query`")
 	cmdutil.NilBoolFlag(cmd, &opts.Draft, "draft", "d", "Filter by draft state")
-	cmdutil.RegisterBranchCompletionFlags(cmd, "base", "head")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.PullRequestFields)
+
+	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 
 	return cmd
 }
@@ -175,6 +176,9 @@ func listRun(opts *ListOptions) error {
 	if err != nil {
 		return err
 	}
+	if len(listResult.PullRequests) == 0 && opts.Exporter == nil {
+		return shared.ListNoResults(ghrepo.FullName(baseRepo), "pull request", !filters.IsDefault())
+	}
 
 	err = opts.IO.StartPager()
 	if err != nil {
@@ -189,15 +193,13 @@ func listRun(opts *ListOptions) error {
 	if listResult.SearchCapped {
 		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
 	}
-	if len(listResult.PullRequests) == 0 {
-		return shared.ListNoResults(ghrepo.FullName(baseRepo), "pull request", !filters.IsDefault())
-	}
 	if opts.IO.IsStdoutTTY() {
 		title := shared.ListHeader(ghrepo.FullName(baseRepo), "pull request", len(listResult.PullRequests), listResult.TotalCount, !filters.IsDefault())
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
 	cs := opts.IO.ColorScheme()
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	table := utils.NewTablePrinter(opts.IO)
 	for _, pr := range listResult.PullRequests {
 		prNum := strconv.Itoa(pr.Number)

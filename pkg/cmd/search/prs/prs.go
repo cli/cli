@@ -122,7 +122,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 	}
 
 	// Output flags
-	cmdutil.AddJSONFlags(cmd, &opts.Exporter, search.IssueFields)
+	cmdutil.AddJSONFlags(cmd, &opts.Exporter, search.PullRequestFields)
 	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "Open the search query in the web browser")
 
 	// Query parameter flags
@@ -183,7 +183,8 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 	cmd.Flags().StringVar(&requestedReviewer, "review-requested", "", "Filter on `user` or team requested to review")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.ReviewedBy, "reviewed-by", "", "Filter on `user` who reviewed")
 	cmdutil.StringEnumFlag(cmd, &opts.Query.Qualifiers.Status, "checks", "", "", []string{"pending", "success", "failure"}, "Filter based on status of the checks")
-	cmdutil.RegisterBranchCompletionFlags(cmd, "base", "head")
+
+	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
 
 	return cmd
 }

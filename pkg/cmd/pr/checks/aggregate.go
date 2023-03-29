@@ -24,20 +24,7 @@ type checkCounts struct {
 	Skipping int
 }
 
-func aggregateChecks(pr *api.PullRequest, requiredChecks bool) ([]check, checkCounts, error) {
-	checks := []check{}
-	counts := checkCounts{}
-
-	if len(pr.StatusCheckRollup.Nodes) == 0 {
-		return checks, counts, fmt.Errorf("no commit found on the pull request")
-	}
-
-	rollup := pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
-	if len(rollup) == 0 {
-		return checks, counts, fmt.Errorf("no checks reported on the '%s' branch", pr.HeadRefName)
-	}
-
-	checkContexts := pr.StatusCheckRollup.Nodes[0].Commit.StatusCheckRollup.Contexts.Nodes
+func aggregateChecks(checkContexts []api.CheckContext, requiredChecks bool) (checks []check, counts checkCounts) {
 	for _, c := range eliminateDuplicates(checkContexts) {
 		if requiredChecks && !c.IsRequired {
 			continue
@@ -86,12 +73,7 @@ func aggregateChecks(pr *api.PullRequest, requiredChecks bool) ([]check, checkCo
 
 		checks = append(checks, item)
 	}
-
-	if len(checks) == 0 && requiredChecks {
-		return checks, counts, fmt.Errorf("no required checks reported on the '%s' branch", pr.HeadRefName)
-	}
-
-	return checks, counts, nil
+	return
 }
 
 // eliminateDuplicates filters a set of checks to only the most recent ones if the set includes repeated runs

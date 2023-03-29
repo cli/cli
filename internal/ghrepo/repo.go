@@ -50,7 +50,7 @@ func FromFullName(nwo string) (Interface, error) {
 // FromFullNameWithHost is like FromFullName that defaults to a specific host for values that don't
 // explicitly include a hostname.
 func FromFullNameWithHost(nwo, fallbackHost string) (Interface, error) {
-	repo, err := repository.ParseWithHost(nwo, defaultHost())
+	repo, err := repository.ParseWithHost(nwo, fallbackHost)
 	if err != nil {
 		return nil, err
 	}

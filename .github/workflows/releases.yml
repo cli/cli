@@ -11,18 +11,20 @@ permissions:
 
 jobs:
   goreleaser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Set up Go 1.18
-        uses: actions/setup-go@v3
         with:
-          go-version: 1.18
+          fetch-depth: 0
+      - name: Set up Go 1.19
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.19
       - name: Generate changelog
         id: changelog
         run: |
-          echo "::set-output name=tag-name::${GITHUB_REF#refs/tags/}"
+          echo "tag-name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
           gh api repos/$GITHUB_REPOSITORY/releases/generate-notes \
             -f tag_name="${GITHUB_REF#refs/tags/}" \
             -f target_commitish=trunk \
@@ -39,9 +41,9 @@ jobs:
         env:
           CERT_CONTENTS: ${{ secrets.WINDOWS_CERT_PFX }}
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v3
+        uses: goreleaser/goreleaser-action@v4
         with:
-          version: v0.174.1
+          version: "~1.13.1"
           args: release --release-notes=CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
@@ -141,13 +143,13 @@ jobs:
         shell: bash
         run: |
           hub release download "${GITHUB_REF#refs/tags/}" -i '*windows_amd64*.zip'
-          printf "::set-output name=zip::%s\n" *.zip
+          printf "zip=%s\n" *.zip >> $GITHUB_OUTPUT
           unzip -o *.zip && rm -v *.zip
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Prepare PATH
         id: setupmsbuild
-        uses: microsoft/setup-msbuild@v1.0.3
+        uses: microsoft/setup-msbuild@v1.3.1
       - name: Build MSI
         id: buildmsi
         shell: bash
@@ -163,7 +165,7 @@ jobs:
         shell: bash
         run: |
           base64 -d <<<"$CERT_CONTENTS" > ./cert.pfx
-          printf "::set-output name=cert-file::%s\n" ".\\cert.pfx"
+          printf "cert-file=%s\n" ".\\cert.pfx" >> $GITHUB_OUTPUT
         env:
           CERT_CONTENTS: ${{ secrets.WINDOWS_CERT_PFX }}
       - name: Sign MSI
@@ -188,7 +190,7 @@ jobs:
           DISCUSSION_CATEGORY: General
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Bump homebrew-core formula
-        uses: mislav/bump-homebrew-formula-action@v1
+        uses: mislav/bump-homebrew-formula-action@v2
         if: "!contains(github.ref, '-')" # skip prereleases
         with:
           formula-name: gh

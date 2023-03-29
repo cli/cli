@@ -76,6 +76,7 @@ func printSummary(io *iostreams.IOStreams, counts checkCounts) {
 }
 
 func printTable(io *iostreams.IOStreams, checks []check) error {
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(io)
 
 	sort.Slice(checks, func(i, j int) bool {

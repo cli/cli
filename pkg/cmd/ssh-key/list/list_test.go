@@ -49,8 +49,9 @@ func TestListRun(t *testing.T) {
 			},
 			isTTY: true,
 			wantStdout: heredoc.Doc(`
-				Mac            ssh-rsa AAAABbBB123  1d
-				hubot@Windows  ssh-rsa EEEEEEEK247  1d
+				TITLE          ID    KEY                  ADDED
+				Mac            1234  ssh-rsa AAAABbBB123  1d
+				hubot@Windows  5678  ssh-rsa EEEEEEEK247  1d
 			`),
 			wantStderr: "",
 		},
@@ -82,8 +83,8 @@ func TestListRun(t *testing.T) {
 			},
 			isTTY: false,
 			wantStdout: heredoc.Doc(`
-				Mac	ssh-rsa AAAABbBB123	2020-08-31T15:44:24+02:00
-				hubot@Windows	ssh-rsa EEEEEEEK247	2020-08-31T15:44:24+02:00
+				Mac	ssh-rsa AAAABbBB123	2020-08-31T15:44:24+02:00	1234
+				hubot@Windows	ssh-rsa EEEEEEEK247	2020-08-31T15:44:24+02:00	5678
 			`),
 			wantStderr: "",
 		},
@@ -126,8 +127,8 @@ func TestListRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, stdout, stderr := iostreams.Test()
-			ios.SetStdoutTTY(tt.isTTY)
 			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStdoutTTY(tt.isTTY)
 			ios.SetStderrTTY(tt.isTTY)
 
 			opts := tt.opts

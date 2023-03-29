@@ -73,3 +73,21 @@ func ListHeader(repoName string, itemName string, matchCount int, totalMatchCoun
 
 	return fmt.Sprintf("Showing %d of %s in %s", matchCount, text.Pluralize(totalMatchCount, fmt.Sprintf("open %s", itemName)), repoName)
 }
+
+func PrCheckStatusSummaryWithColor(cs *iostreams.ColorScheme, checks api.PullRequestChecksStatus) string {
+	var summary = cs.Gray("No checks")
+	if checks.Total > 0 {
+		if checks.Failing > 0 {
+			if checks.Failing == checks.Total {
+				summary = cs.Red("× All checks failing")
+			} else {
+				summary = cs.Redf("× %d/%d checks failing", checks.Failing, checks.Total)
+			}
+		} else if checks.Pending > 0 {
+			summary = cs.Yellow("- Checks pending")
+		} else if checks.Passing == checks.Total {
+			summary = cs.Green("✓ Checks passing")
+		}
+	}
+	return summary
+}

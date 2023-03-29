@@ -68,7 +68,7 @@ func NewCmdStatus(f *cmdutil.Factory, runF func(*StatusOptions) error) *cobra.Co
 				return err
 			}
 
-			opts.HostConfig = cfg
+			opts.HostConfig = cfg.Authentication()
 
 			if runF != nil {
 				return runF(opts)
@@ -664,6 +664,7 @@ func statusRun(opts *StatusOptions) error {
 	section := func(header string, items []StatusItem, width, rowLimit int) (string, error) {
 		tableOut := &bytes.Buffer{}
 		fmt.Fprintln(tableOut, cs.Bold(header))
+		//nolint:staticcheck // SA1019: utils.NewTablePrinterWithOptions is deprecated: use internal/tableprinter
 		tp := utils.NewTablePrinterWithOptions(opts.IO, utils.TablePrinterOptions{
 			IsTTY:    opts.IO.IsStdoutTTY(),
 			MaxWidth: width,

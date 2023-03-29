@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/opentracing/opentracing-go"
 )
@@ -29,7 +28,6 @@ type logger interface {
 
 // An Options specifies Live Share connection parameters.
 type Options struct {
-	ClientName     string // ClientName is the name of the connecting client.
 	SessionID      string
 	SessionToken   string // token for SSH session
 	RelaySAS       string
@@ -41,9 +39,6 @@ type Options struct {
 
 // uri returns a websocket URL for the specified options.
 func (opts *Options) uri(action string) (string, error) {
-	if opts.ClientName == "" {
-		return "", errors.New("ClientName is required")
-	}
 	if opts.SessionID == "" {
 		return "", errors.New("SessionID is required")
 	}
@@ -112,11 +107,9 @@ func Connect(ctx context.Context, opts Options) (*Session, error) {
 	s := &Session{
 		ssh:             ssh,
 		rpc:             rpc,
-		clientName:      opts.ClientName,
 		keepAliveReason: make(chan string, 1),
 		logger:          opts.Logger,
 	}
-	go s.heartbeat(ctx, 1*time.Minute)
 
 	return s, nil
 }

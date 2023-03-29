@@ -2,6 +2,7 @@ package list
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/cli/cli/v2/internal/config"
@@ -52,7 +53,7 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	host, _ := cfg.DefaultHost()
+	host, _ := cfg.Authentication().DefaultHost()
 
 	sshKeys, err := userKeys(apiClient, host, "")
 	if err != nil {
@@ -63,19 +64,35 @@ func listRun(opts *ListOptions) error {
 		return cmdutil.NewNoResultsError("no SSH keys present in the GitHub account")
 	}
 
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	t := utils.NewTablePrinter(opts.IO)
 	cs := opts.IO.ColorScheme()
 	now := time.Now()
 
-	for _, sshKey := range sshKeys {
-		t.AddField(sshKey.Title, nil, nil)
-		t.AddField(sshKey.Key, truncateMiddle, nil)
+	if t.IsTTY() {
+		t.AddField("TITLE", nil, nil)
+		t.AddField("ID", nil, nil)
+		t.AddField("KEY", nil, nil)
+		t.AddField("ADDED", nil, nil)
+		t.EndRow()
+	}
 
+	for _, sshKey := range sshKeys {
+		id := strconv.Itoa(sshKey.ID)
 		createdAt := sshKey.CreatedAt.Format(time.RFC3339)
+
 		if t.IsTTY() {
-			createdAt = text.FuzzyAgoAbbr(now, sshKey.CreatedAt)
+			t.AddField(sshKey.Title, nil, nil)
+			t.AddField(id, nil, nil)
+			t.AddField(sshKey.Key, truncateMiddle, nil)
+			t.AddField(text.FuzzyAgoAbbr(now, sshKey.CreatedAt), nil, cs.Gray)
+		} else {
+			t.AddField(sshKey.Title, nil, nil)
+			t.AddField(sshKey.Key, nil, nil)
+			t.AddField(createdAt, nil, nil)
+			t.AddField(id, nil, nil)
 		}
-		t.AddField(createdAt, nil, cs.Gray)
+
 		t.EndRow()
 	}
 

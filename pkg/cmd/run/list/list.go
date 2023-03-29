@@ -68,7 +68,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Filter runs by branch")
 	cmd.Flags().StringVarP(&opts.Actor, "user", "u", "", "Filter runs by user who triggered the run")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.RunFields)
-	cmdutil.RegisterBranchCompletionFlags(cmd, "branch")
+
+	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "branch")
 
 	return cmd
 }
@@ -85,9 +86,6 @@ func listRun(opts *ListOptions) error {
 	}
 	client := api.NewClientFromHTTP(c)
 
-	var runs []shared.Run
-	var workflow *workflowShared.Workflow
-
 	filters := &shared.FilterOptions{
 		Branch: opts.Branch,
 		Actor:  opts.Actor,
@@ -96,17 +94,21 @@ func listRun(opts *ListOptions) error {
 	opts.IO.StartProgressIndicator()
 	if opts.WorkflowSelector != "" {
 		states := []workflowShared.WorkflowState{workflowShared.Active}
-		workflow, err = workflowShared.ResolveWorkflow(
-			opts.IO, client, baseRepo, false, opts.WorkflowSelector, states)
-		if err == nil {
-			runs, err = shared.GetRunsByWorkflow(client, baseRepo, filters, opts.Limit, workflow.ID)
+		if workflow, err := workflowShared.ResolveWorkflow(opts.IO, client, baseRepo, false, opts.WorkflowSelector, states); err == nil {
+			filters.WorkflowID = workflow.ID
+			filters.WorkflowName = workflow.Name
+		} else {
+			return err
 		}
-	} else {
-		runs, err = shared.GetRuns(client, baseRepo, filters, opts.Limit)
 	}
+	runsResult, err := shared.GetRuns(client, baseRepo, filters, opts.Limit)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("failed to get runs: %w", err)
+	}
+	runs := runsResult.WorkflowRuns
+	if len(runs) == 0 && opts.Exporter == nil {
+		return cmdutil.NewNoResultsError("no runs found")
 	}
 
 	if err := opts.IO.StartPager(); err == nil {
@@ -119,17 +121,14 @@ func listRun(opts *ListOptions) error {
 		return opts.Exporter.Write(opts.IO, runs)
 	}
 
-	if len(runs) == 0 {
-		return cmdutil.NewNoResultsError("no runs found")
-	}
-
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	tp := utils.NewTablePrinter(opts.IO)
 
 	cs := opts.IO.ColorScheme()
 
 	if tp.IsTTY() {
 		tp.AddField("STATUS", nil, nil)
-		tp.AddField("NAME", nil, nil)
+		tp.AddField("TITLE", nil, nil)
 		tp.AddField("WORKFLOW", nil, nil)
 		tp.AddField("BRANCH", nil, nil)
 		tp.AddField("EVENT", nil, nil)
@@ -148,9 +147,9 @@ func listRun(opts *ListOptions) error {
 			tp.AddField(string(run.Conclusion), nil, nil)
 		}
 
-		tp.AddField(run.CommitMsg(), nil, cs.Bold)
+		tp.AddField(run.Title(), nil, cs.Bold)
 
-		tp.AddField(run.Name, nil, nil)
+		tp.AddField(run.WorkflowName(), nil, nil)
 		tp.AddField(run.HeadBranch, nil, cs.Bold)
 		tp.AddField(string(run.Event), nil, nil)
 		tp.AddField(fmt.Sprintf("%d", run.ID), nil, cs.Cyan)

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -20,30 +21,39 @@ type IssuesAndTotalCount struct {
 }
 
 type Issue struct {
-	Typename       string `json:"__typename"`
-	ID             string
-	Number         int
-	Title          string
-	URL            string
-	State          string
-	StateReason    string
-	Closed         bool
-	Body           string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	ClosedAt       *time.Time
-	Comments       Comments
-	Author         Author
-	Assignees      Assignees
-	Labels         Labels
-	ProjectCards   ProjectCards
-	Milestone      *Milestone
-	ReactionGroups ReactionGroups
-	IsPinned       bool
+	Typename         string `json:"__typename"`
+	ID               string
+	Number           int
+	Title            string
+	URL              string
+	State            string
+	StateReason      string
+	Closed           bool
+	Body             string
+	ActiveLockReason string
+	Locked           bool
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	ClosedAt         *time.Time
+	Comments         Comments
+	Author           Author
+	Assignees        Assignees
+	Labels           Labels
+	ProjectCards     ProjectCards
+	ProjectItems     ProjectItems
+	Milestone        *Milestone
+	ReactionGroups   ReactionGroups
+	IsPinned         bool
 }
 
+// return values for Issue.Typename
+const (
+	TypeIssue       string = "Issue"
+	TypePullRequest string = "PullRequest"
+)
+
 func (i Issue) IsPullRequest() bool {
-	return i.Typename == "PullRequest"
+	return i.Typename == TypePullRequest
 }
 
 type Assignees struct {
@@ -77,6 +87,10 @@ type ProjectCards struct {
 	TotalCount int
 }
 
+type ProjectItems struct {
+	Nodes []*ProjectV2Item
+}
+
 type ProjectInfo struct {
 	Project struct {
 		Name string `json:"name"`
@@ -86,12 +100,28 @@ type ProjectInfo struct {
 	} `json:"column"`
 }
 
+type ProjectV2Item struct {
+	ID      string `json:"id"`
+	Project struct {
+		ID    string `json:"id"`
+		Title string `json:"title"`
+	}
+}
+
 func (p ProjectCards) ProjectNames() []string {
 	names := make([]string, len(p.Nodes))
 	for i, c := range p.Nodes {
 		names[i] = c.Project.Name
 	}
 	return names
+}
+
+func (p ProjectItems) ProjectTitles() []string {
+	titles := make([]string, len(p.Nodes))
+	for i, c := range p.Nodes {
+		titles[i] = c.Project.Title
+	}
+	return titles
 }
 
 type Milestone struct {
@@ -112,10 +142,35 @@ type Owner struct {
 }
 
 type Author struct {
-	// adding these breaks generated GraphQL requests
-	//ID    string `json:"id,omitempty"`
-	//Name  string `json:"name,omitempty"`
+	ID    string
+	Name  string
+	Login string
+}
+
+func (author Author) MarshalJSON() ([]byte, error) {
+	if author.ID == "" {
+		return json.Marshal(map[string]interface{}{
+			"is_bot": true,
+			"login":  "app/" + author.Login,
+		})
+	}
+	return json.Marshal(map[string]interface{}{
+		"is_bot": false,
+		"login":  author.Login,
+		"id":     author.ID,
+		"name":   author.Name,
+	})
+}
+
+type CommentAuthor struct {
 	Login string `json:"login"`
+	// Unfortunately, there is no easy way to add "id" and "name" fields to this struct because it's being
+	// used in both shurcool-graphql type queries and string-based queries where the response gets parsed
+	// by an ordinary JSON decoder that doesn't understand "graphql" directives via struct tags.
+	//	User  *struct {
+	//		ID   string
+	//		Name string
+	//	} `graphql:"... on User"`
 }
 
 // IssueCreate creates an issue in a GitHub repository
@@ -124,6 +179,7 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 	mutation IssueCreate($input: CreateIssueInput!) {
 		createIssue(input: $input) {
 			issue {
+				id
 				url
 			}
 		}
@@ -133,7 +189,13 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 		"repositoryId": repo.ID,
 	}
 	for key, val := range params {
-		inputParams[key] = val
+		switch key {
+		case "assigneeIds", "body", "issueTemplate", "labelIds", "milestoneId", "projectIds", "repositoryId", "title":
+			inputParams[key] = val
+		case "projectV2Ids":
+		default:
+			return nil, fmt.Errorf("invalid IssueCreate mutation parameter %s", key)
+		}
 	}
 	variables := map[string]interface{}{
 		"input": inputParams,
@@ -149,8 +211,23 @@ func IssueCreate(client *Client, repo *Repository, params map[string]interface{}
 	if err != nil {
 		return nil, err
 	}
+	issue := &result.CreateIssue.Issue
 
-	return &result.CreateIssue.Issue, nil
+	// projectV2 parameters aren't supported in the `createIssue` mutation,
+	// so add them after the issue has been created.
+	projectV2Ids, ok := params["projectV2Ids"].([]string)
+	if ok {
+		projectItems := make(map[string]string, len(projectV2Ids))
+		for _, p := range projectV2Ids {
+			projectItems[p] = issue.ID
+		}
+		err = UpdateProjectV2Items(client, repo, projectItems, nil)
+		if err != nil {
+			return issue, err
+		}
+	}
+
+	return issue, nil
 }
 
 type IssueStatusOptions struct {
@@ -243,4 +320,8 @@ func (i Issue) Link() string {
 
 func (i Issue) Identifier() string {
 	return i.ID
+}
+
+func (i Issue) CurrentUserComments() []Comment {
+	return i.Comments.CurrentUserComments()
 }

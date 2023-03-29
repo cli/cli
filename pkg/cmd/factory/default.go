@@ -1,6 +1,7 @@
 package factory
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -8,7 +9,7 @@ import (
 	"time"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/context"
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
@@ -25,17 +26,18 @@ var ssoURLRE = regexp.MustCompile(`\burl=([^;]+)`)
 func New(appVersion string) *cmdutil.Factory {
 	f := &cmdutil.Factory{
 		Config:         configFunc(), // No factory dependencies
-		Branch:         branchFunc(), // No factory dependencies
 		ExecutableName: "gh",
 	}
 
 	f.IOStreams = ioStreams(f)                   // Depends on Config
 	f.HttpClient = httpClientFunc(f, appVersion) // Depends on Config, IOStreams, and appVersion
-	f.Remotes = remotesFunc(f)                   // Depends on Config
+	f.GitClient = newGitClient(f)                // Depends on IOStreams, and Executable
+	f.Remotes = remotesFunc(f)                   // Depends on Config, and GitClient
 	f.BaseRepo = BaseRepoFunc(f)                 // Depends on Remotes
 	f.Prompter = newPrompter(f)                  // Depends on Config and IOStreams
 	f.Browser = newBrowser(f)                    // Depends on Config, and IOStreams
 	f.ExtensionManager = extensionManager(f)     // Depends on Config, HttpClient, and IOStreams
+	f.Branch = branchFunc(f)                     // Depends on GitClient
 
 	return f
 }
@@ -63,7 +65,7 @@ func SmartBaseRepoFunc(f *cmdutil.Factory) func() (ghrepo.Interface, error) {
 		if err != nil {
 			return nil, err
 		}
-		repoContext, err := context.ResolveRemotesToRepos(remotes, apiClient, "")
+		repoContext, err := ghContext.ResolveRemotesToRepos(remotes, apiClient, "")
 		if err != nil {
 			return nil, err
 		}
@@ -76,10 +78,12 @@ func SmartBaseRepoFunc(f *cmdutil.Factory) func() (ghrepo.Interface, error) {
 	}
 }
 
-func remotesFunc(f *cmdutil.Factory) func() (context.Remotes, error) {
+func remotesFunc(f *cmdutil.Factory) func() (ghContext.Remotes, error) {
 	rr := &remoteResolver{
-		readRemotes: git.Remotes,
-		getConfig:   f.Config,
+		readRemotes: func() (git.RemoteSet, error) {
+			return f.GitClient.Remotes(context.Background())
+		},
+		getConfig: f.Config,
 	}
 	return rr.Resolver()
 }
@@ -92,7 +96,7 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 			return nil, err
 		}
 		opts := api.HTTPClientOptions{
-			Config:      cfg,
+			Config:      cfg.Authentication(),
 			Log:         io.ErrOut,
 			LogColorize: io.ColorEnabled(),
 			AppVersion:  appVersion,
@@ -104,6 +108,18 @@ func httpClientFunc(f *cmdutil.Factory, appVersion string) func() (*http.Client,
 		client.Transport = api.ExtractHeader("X-GitHub-SSO", &ssoHeader)(client.Transport)
 		return client, nil
 	}
+}
+
+func newGitClient(f *cmdutil.Factory) *git.Client {
+	io := f.IOStreams
+	ghPath := f.Executable()
+	client := &git.Client{
+		GhPath: ghPath,
+		Stderr: io.ErrOut,
+		Stdin:  io.In,
+		Stdout: io.Out,
+	}
+	return client
 }
 
 func newBrowser(f *cmdutil.Factory) browser.Browser {
@@ -129,9 +145,9 @@ func configFunc() func() (config.Config, error) {
 	}
 }
 
-func branchFunc() func() (string, error) {
+func branchFunc(f *cmdutil.Factory) func() (string, error) {
 	return func() (string, error) {
-		currentBranch, err := git.CurrentBranch()
+		currentBranch, err := f.GitClient.CurrentBranch(context.Background())
 		if err != nil {
 			return "", fmt.Errorf("could not determine current branch: %w", err)
 		}
@@ -140,7 +156,7 @@ func branchFunc() func() (string, error) {
 }
 
 func extensionManager(f *cmdutil.Factory) *extension.Manager {
-	em := extension.NewManager(f.IOStreams)
+	em := extension.NewManager(f.IOStreams, f.GitClient)
 
 	cfg, err := f.Config()
 	if err != nil {

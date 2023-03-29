@@ -14,6 +14,7 @@ our release schedule.
 Install:
 
 ```bash
+type -p curl >/dev/null || (sudo apt update && sudo apt install curl -y)
 curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
 && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
 && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
@@ -51,6 +52,24 @@ Upgrade:
 
 ```bash
 sudo dnf update gh
+```
+
+### Amazon Linux 2 (yum)
+
+Install using our package repository for immediate access to latest releases:
+
+```bash
+sudo yum-config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+sudo yum install gh
+```
+
+> **Note**
+> We were recently forced to change our GPG signing key. If you've added the repository previously and now you're getting a GPG signing key error, disable the repository first with `sudo yum-config-manager --disable gh-cli` and add it again with `sudo yum-config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo`.
+
+Upgrade:
+
+```bash
+sudo yum update gh
 ```
 
 ### openSUSE/SUSE Linux (zypper)

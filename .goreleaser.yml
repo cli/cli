@@ -16,10 +16,9 @@ builds:
       main: ./cmd/gh
       ldflags:
         - -s -w -X github.com/cli/cli/v2/internal/build.Version={{.Version}} -X github.com/cli/cli/v2/internal/build.Date={{time "2006-01-02"}}
-        - -X main.updaterEnabled=cli/cli
     id: macos
     goos: [darwin]
-    goarch: [amd64]
+    goarch: [amd64, arm64]
 
   - <<: *build_defaults
     id: linux
@@ -34,7 +33,8 @@ builds:
     goarch: [386, amd64, arm64]
     hooks:
       post:
-        - ./script/sign-windows-executable.sh '{{ .Path }}'
+        - cmd: ./script/sign-windows-executable.sh '{{ .Path }}'
+          output: false
 
 archives:
   - id: nix
@@ -60,7 +60,7 @@ nfpms:
   - license: MIT
     maintainer: GitHub
     homepage: https://github.com/cli/cli
-    bindir: /usr/bin
+    bindir: /usr
     dependencies:
       - git
     description: GitHub’s official command line tool.

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -355,6 +356,20 @@ func Test_NewCmdApi(t *testing.T) {
 	}
 }
 
+func Test_NewCmdApi_WindowsAbsPath(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.SkipNow()
+	}
+
+	cmd := NewCmdApi(&cmdutil.Factory{}, func(opts *ApiOptions) error {
+		return nil
+	})
+
+	cmd.SetArgs([]string{`C:\users\repos`})
+	_, err := cmd.ExecuteC()
+	assert.EqualError(t, err, `invalid API endpoint: "C:\users\repos". Your shell might be rewriting URL paths as filesystem paths. To avoid this, omit the leading slash from the endpoint argument`)
+}
+
 func Test_apiRun(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -671,6 +686,7 @@ func Test_apiRun_paginationGraphQL(t *testing.T) {
 			return config.NewBlankConfig(), nil
 		},
 
+		RawFields:     []string{"foo=bar"},
 		RequestMethod: "POST",
 		RequestPath:   "graphql",
 		Paginate:      true,
@@ -764,6 +780,7 @@ func Test_apiRun_paginated_template(t *testing.T) {
 
 		RequestMethod: "POST",
 		RequestPath:   "graphql",
+		RawFields:     []string{"foo=bar"},
 		Paginate:      true,
 		// test that templates executed per page properly render a table.
 		Template: `{{range .data.nodes}}{{tablerow .page .caption}}{{end}}`,
@@ -796,6 +813,36 @@ func Test_apiRun_paginated_template(t *testing.T) {
 	endCursor, hasCursor := requestData.Variables["endCursor"].(string)
 	assert.Equal(t, true, hasCursor)
 	assert.Equal(t, "PAGE1_END", endCursor)
+}
+
+func Test_apiRun_DELETE(t *testing.T) {
+	ios, _, _, _ := iostreams.Test()
+
+	var gotRequest *http.Request
+	err := apiRun(&ApiOptions{
+		IO: ios,
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+		HttpClient: func() (*http.Client, error) {
+			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+				gotRequest = req
+				return &http.Response{StatusCode: 204, Request: req}, nil
+			}
+			return &http.Client{Transport: tr}, nil
+		},
+		MagicFields:         []string(nil),
+		RawFields:           []string(nil),
+		RequestMethod:       "DELETE",
+		RequestMethodPassed: true,
+	})
+	if err != nil {
+		t.Fatalf("got error %v", err)
+	}
+
+	if gotRequest.Body != nil {
+		t.Errorf("expected nil request body, got %T", gotRequest.Body)
+	}
 }
 
 func Test_apiRun_inputFile(t *testing.T) {
@@ -915,149 +962,6 @@ func Test_apiRun_cache(t *testing.T) {
 	assert.Equal(t, 2, requestCount)
 	assert.Equal(t, "", stdout.String(), "stdout")
 	assert.Equal(t, "", stderr.String(), "stderr")
-}
-
-func Test_parseFields(t *testing.T) {
-	ios, stdin, _, _ := iostreams.Test()
-	fmt.Fprint(stdin, "pasted contents")
-
-	opts := ApiOptions{
-		IO: ios,
-		RawFields: []string{
-			"robot=Hubot",
-			"destroyer=false",
-			"helper=true",
-			"location=@work",
-		},
-		MagicFields: []string{
-			"input=@-",
-			"enabled=true",
-			"victories=123",
-		},
-	}
-
-	params, err := parseFields(&opts)
-	if err != nil {
-		t.Fatalf("parseFields error: %v", err)
-	}
-
-	expect := map[string]interface{}{
-		"robot":     "Hubot",
-		"destroyer": "false",
-		"helper":    "true",
-		"location":  "@work",
-		"input":     []byte("pasted contents"),
-		"enabled":   true,
-		"victories": 123,
-	}
-	assert.Equal(t, expect, params)
-}
-
-func Test_magicFieldValue(t *testing.T) {
-	f, err := os.CreateTemp(t.TempDir(), "gh-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer f.Close()
-
-	fmt.Fprint(f, "file contents")
-
-	ios, _, _, _ := iostreams.Test()
-
-	type args struct {
-		v    string
-		opts *ApiOptions
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    interface{}
-		wantErr bool
-	}{
-		{
-			name:    "string",
-			args:    args{v: "hello"},
-			want:    "hello",
-			wantErr: false,
-		},
-		{
-			name:    "bool true",
-			args:    args{v: "true"},
-			want:    true,
-			wantErr: false,
-		},
-		{
-			name:    "bool false",
-			args:    args{v: "false"},
-			want:    false,
-			wantErr: false,
-		},
-		{
-			name:    "null",
-			args:    args{v: "null"},
-			want:    nil,
-			wantErr: false,
-		},
-		{
-			name: "placeholder colon",
-			args: args{
-				v: ":owner",
-				opts: &ApiOptions{
-					IO: ios,
-					BaseRepo: func() (ghrepo.Interface, error) {
-						return ghrepo.New("hubot", "robot-uprising"), nil
-					},
-				},
-			},
-			want:    "hubot",
-			wantErr: false,
-		},
-		{
-			name: "placeholder braces",
-			args: args{
-				v: "{owner}",
-				opts: &ApiOptions{
-					IO: ios,
-					BaseRepo: func() (ghrepo.Interface, error) {
-						return ghrepo.New("hubot", "robot-uprising"), nil
-					},
-				},
-			},
-			want:    "hubot",
-			wantErr: false,
-		},
-		{
-			name: "file",
-			args: args{
-				v:    "@" + f.Name(),
-				opts: &ApiOptions{IO: ios},
-			},
-			want:    []byte("file contents"),
-			wantErr: false,
-		},
-		{
-			name: "file error",
-			args: args{
-				v:    "@",
-				opts: &ApiOptions{IO: ios},
-			},
-			want:    nil,
-			wantErr: true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := magicFieldValue(tt.args.v, tt.args.opts)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("magicFieldValue() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if tt.wantErr {
-				return
-			}
-			assert.Equal(t, tt.want, got)
-		})
-	}
 }
 
 func Test_openUserFile(t *testing.T) {

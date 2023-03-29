@@ -13,7 +13,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 )
 
-var scopesError = errors.New("insufficient OAuth scopes")
+var errScopes = errors.New("insufficient OAuth scopes")
 
 type emails []email
 
@@ -30,7 +30,7 @@ func (es emails) String() string {
 }
 
 type gpgKey struct {
-	KeyId     string    `json:"key_id"`
+	KeyID     string    `json:"key_id"`
 	PublicKey string    `json:"public_key"`
 	Emails    emails    `json:"emails"`
 	CreatedAt time.Time `json:"created_at"`
@@ -55,7 +55,7 @@ func userKeys(httpClient *http.Client, host, userHandle string) ([]gpgKey, error
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 404 {
-		return nil, scopesError
+		return nil, errScopes
 	} else if resp.StatusCode > 299 {
 		return nil, api.HandleHTTPError(resp)
 	}

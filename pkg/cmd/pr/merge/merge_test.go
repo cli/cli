@@ -17,12 +17,12 @@ import (
 	"github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
@@ -55,6 +55,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				MergeStrategyEmpty:      true,
 				Body:                    "",
 				BodySet:                 false,
+				AuthorEmail:             "",
 			},
 		},
 		{
@@ -70,6 +71,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				MergeStrategyEmpty:      true,
 				Body:                    "",
 				BodySet:                 false,
+				AuthorEmail:             "",
 			},
 		},
 		{
@@ -85,6 +87,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				MergeStrategyEmpty:      true,
 				Body:                    "a body from file",
 				BodySet:                 true,
+				AuthorEmail:             "",
 			},
 		},
 		{
@@ -101,6 +104,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				MergeStrategyEmpty:      true,
 				Body:                    "this is on standard input",
 				BodySet:                 true,
+				AuthorEmail:             "",
 			},
 		},
 		{
@@ -116,6 +120,7 @@ func Test_NewCmdMerge(t *testing.T) {
 				MergeStrategyEmpty:      true,
 				Body:                    "cool",
 				BodySet:                 true,
+				AuthorEmail:             "",
 			},
 		},
 		{
@@ -132,6 +137,23 @@ func Test_NewCmdMerge(t *testing.T) {
 				Body:                    "",
 				BodySet:                 false,
 				MatchHeadCommit:         "555",
+				AuthorEmail:             "",
+			},
+		},
+		{
+			name:  "author email",
+			args:  "123 --author-email octocat@github.com",
+			isTTY: true,
+			want: MergeOptions{
+				SelectorArg:             "123",
+				DeleteBranch:            false,
+				IsDeleteBranchIndicated: false,
+				CanDeleteLocalBranch:    true,
+				MergeMethod:             PullRequestMergeMethodMerge,
+				MergeStrategyEmpty:      true,
+				Body:                    "",
+				BodySet:                 false,
+				AuthorEmail:             "octocat@github.com",
 			},
 		},
 		{
@@ -205,6 +227,7 @@ func Test_NewCmdMerge(t *testing.T) {
 			assert.Equal(t, tt.want.Body, opts.Body)
 			assert.Equal(t, tt.want.BodySet, opts.BodySet)
 			assert.Equal(t, tt.want.MatchHeadCommit, opts.MatchHeadCommit)
+			assert.Equal(t, tt.want.AuthorEmail, opts.AuthorEmail)
 		})
 	}
 }
@@ -223,7 +246,8 @@ func stubCommit(pr *api.PullRequest, oid string) {
 	})
 }
 
-func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
+// TODO port to new style tests
+func runCommand(rt http.RoundTripper, pm *prompter.PrompterMock, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
 	ios, _, stdout, stderr := iostreams.Test()
 	ios.SetStdoutTTY(isTTY)
 	ios.SetStdinTTY(isTTY)
@@ -247,6 +271,11 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 				},
 			}, nil
 		},
+		GitClient: &git.Client{
+			GhPath:  "some/path/gh",
+			GitPath: "some/path/git",
+		},
+		Prompter: pm,
 	}
 
 	cmd := NewCmdMerge(factory, nil)
@@ -303,7 +332,7 @@ func TestPrMerge(t *testing.T) {
 	defer cmdTeardown(t)
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "main", true, "pr merge 1 --merge")
+	output, err := runCommand(http, nil, "main", true, "pr merge 1 --merge")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -335,7 +364,7 @@ func TestPrMerge_blocked(t *testing.T) {
 	defer cmdTeardown(t)
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "main", true, "pr merge 1 --merge")
+	output, err := runCommand(http, nil, "main", true, "pr merge 1 --merge")
 	assert.EqualError(t, err, "SilentError")
 
 	assert.Equal(t, "", output.String())
@@ -368,7 +397,7 @@ func TestPrMerge_dirty(t *testing.T) {
 	defer cmdTeardown(t)
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "main", true, "pr merge 1 --merge")
+	output, err := runCommand(http, nil, "main", true, "pr merge 1 --merge")
 	assert.EqualError(t, err, "SilentError")
 
 	assert.Equal(t, "", output.String())
@@ -409,7 +438,7 @@ func TestPrMerge_nontty(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "main", false, "pr merge 1 --merge")
+	output, err := runCommand(http, nil, "main", false, "pr merge 1 --merge")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -448,7 +477,7 @@ func TestPrMerge_editMessage_nontty(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "main", false, "pr merge 1 --merge -t mytitle -b mybody")
+	output, err := runCommand(http, nil, "main", false, "pr merge 1 --merge -t mytitle -b mybody")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -484,7 +513,7 @@ func TestPrMerge_withRepoFlag(t *testing.T) {
 	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	output, err := runCommand(http, "main", true, "pr merge 1 --merge -R OWNER/REPO")
+	output, err := runCommand(http, nil, "main", true, "pr merge 1 --merge -R OWNER/REPO")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -525,7 +554,49 @@ func TestPrMerge_withMatchCommitHeadFlag(t *testing.T) {
 	defer cmdTeardown(t)
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "main", true, "pr merge 1 --merge --match-head-commit 285ed5ab740f53ff6b0b4b629c59a9df23b9c6db")
+	output, err := runCommand(http, nil, "main", true, "pr merge 1 --merge --match-head-commit 285ed5ab740f53ff6b0b4b629c59a9df23b9c6db")
+	if err != nil {
+		t.Fatalf("error running command `pr merge`: %v", err)
+	}
+
+	r := regexp.MustCompile(`Merged pull request #1 \(The title of the PR\)`)
+
+	if !r.MatchString(output.Stderr()) {
+		t.Fatalf("output did not match regexp /%s/\n> output\n%q\n", r, output.Stderr())
+	}
+}
+
+func TestPrMerge_withAuthorFlag(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           1,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "main"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "THE-ID", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.Equal(t, "octocat@github.com", input["authorEmail"].(string))
+			assert.NotContains(t, input, "commitHeadline")
+		}),
+	)
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+
+	output, err := runCommand(http, nil, "main", true, "pr merge 1 --merge --author-email octocat@github.com")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -575,7 +646,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
-	output, err := runCommand(http, "blueberries", true, `pr merge --merge --delete-branch`)
+	output, err := runCommand(http, nil, "blueberries", true, `pr merge --merge --delete-branch`)
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
@@ -625,7 +696,7 @@ func TestPrMerge_deleteBranch_nonDefault(t *testing.T) {
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
-	output, err := runCommand(http, "blueberries", true, `pr merge --merge --delete-branch`)
+	output, err := runCommand(http, nil, "blueberries", true, `pr merge --merge --delete-branch`)
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
@@ -675,7 +746,7 @@ func TestPrMerge_deleteBranch_checkoutNewBranch(t *testing.T) {
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
-	output, err := runCommand(http, "blueberries", true, `pr merge --merge --delete-branch`)
+	output, err := runCommand(http, nil, "blueberries", true, `pr merge --merge --delete-branch`)
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
@@ -721,7 +792,7 @@ func TestPrMerge_deleteNonCurrentBranch(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
 
-	output, err := runCommand(http, "main", true, `pr merge --merge --delete-branch blueberries`)
+	output, err := runCommand(http, nil, "main", true, `pr merge --merge --delete-branch blueberries`)
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
@@ -763,7 +834,7 @@ func Test_nonDivergingPullRequest(t *testing.T) {
 	cs.Register(`git .+ show .+ HEAD`, 0, "COMMITSHA1,title")
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "blueberries", true, "pr merge --merge")
+	output, err := runCommand(http, nil, "blueberries", true, "pr merge --merge")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -803,7 +874,7 @@ func Test_divergingPullRequestWarning(t *testing.T) {
 	cs.Register(`git .+ show .+ HEAD`, 0, "COMMITSHA2,title")
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "blueberries", true, "pr merge --merge")
+	output, err := runCommand(http, nil, "blueberries", true, "pr merge --merge")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -843,7 +914,7 @@ func Test_pullRequestWithoutCommits(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "blueberries", true, "pr merge --merge")
+	output, err := runCommand(http, nil, "blueberries", true, "pr merge --merge")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -882,7 +953,7 @@ func TestPrMerge_rebase(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "main", true, "pr merge 2 --rebase")
+	output, err := runCommand(http, nil, "main", true, "pr merge 2 --rebase")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -923,7 +994,7 @@ func TestPrMerge_squash(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "main", true, "pr merge 3 --squash")
+	output, err := runCommand(http, nil, "main", true, "pr merge 3 --squash")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -960,11 +1031,17 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
-	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-	as := prompt.NewAskStubber(t)
-	as.StubPrompt("Pull request #4 was already merged. Delete the branch locally?").AnswerWith(true)
+	pm := &prompter.PrompterMock{
+		ConfirmFunc: func(p string, d bool) (bool, error) {
+			if p == "Pull request #4 was already merged. Delete the branch locally?" {
+				return true, nil
+			} else {
+				return false, prompter.NoSuchPromptErr(p)
+			}
+		},
+	}
 
-	output, err := runCommand(http, "blueberries", true, "pr merge 4")
+	output, err := runCommand(http, pm, "blueberries", true, "pr merge 4")
 	assert.NoError(t, err)
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "✓ Deleted branch blueberries and switched to branch main\n", output.Stderr())
@@ -991,7 +1068,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "blueberries", false, "pr merge 4 --merge")
+	output, err := runCommand(http, nil, "blueberries", false, "pr merge 4 --merge")
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
@@ -1022,11 +1099,17 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_TTY(t *testing.T) {
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 	cs.Register(`git branch -D `, 0, "")
 
-	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-	as := prompt.NewAskStubber(t)
-	as.StubPrompt("Pull request #4 was already merged. Delete the branch locally?").AnswerWith(true)
+	pm := &prompter.PrompterMock{
+		ConfirmFunc: func(p string, d bool) (bool, error) {
+			if p == "Pull request #4 was already merged. Delete the branch locally?" {
+				return true, nil
+			} else {
+				return false, prompter.NoSuchPromptErr(p)
+			}
+		},
+	}
 
-	output, err := runCommand(http, "blueberries", true, "pr merge 4 --merge")
+	output, err := runCommand(http, pm, "blueberries", true, "pr merge 4 --merge")
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
@@ -1056,7 +1139,7 @@ func TestPrMerge_alreadyMerged_withMergeStrategy_crossRepo(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "blueberries", true, "pr merge 4 --merge")
+	output, err := runCommand(http, nil, "blueberries", true, "pr merge 4 --merge")
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
@@ -1102,13 +1185,27 @@ func TestPRMergeTTY(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 
-	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-	as := prompt.NewAskStubber(t)
-	as.StubPrompt("What merge method would you like to use?").AnswerDefault()
-	as.StubPrompt("Delete the branch locally and on GitHub?").AnswerDefault()
-	as.StubPrompt("What's next?").AnswerWith("Submit")
+	pm := &prompter.PrompterMock{
+		ConfirmFunc: func(p string, d bool) (bool, error) {
+			if p == "Delete the branch locally and on GitHub?" {
+				return d, nil
+			} else {
+				return false, prompter.NoSuchPromptErr(p)
+			}
+		},
+		SelectFunc: func(p, d string, opts []string) (int, error) {
+			switch p {
+			case "What's next?":
+				return prompter.IndexFor(opts, "Submit")
+			case "What merge method would you like to use?":
+				return 0, nil
+			default:
+				return -1, prompter.NoSuchPromptErr(p)
+			}
+		},
+	}
 
-	output, err := runCommand(http, "blueberries", true, "")
+	output, err := runCommand(http, pm, "blueberries", true, "")
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
@@ -1164,12 +1261,20 @@ func TestPRMergeTTY_withDeleteBranch(t *testing.T) {
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
-	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-	as := prompt.NewAskStubber(t)
-	as.StubPrompt("What merge method would you like to use?").AnswerDefault()
-	as.StubPrompt("What's next?").AnswerWith("Submit")
+	pm := &prompter.PrompterMock{
+		SelectFunc: func(p, d string, opts []string) (int, error) {
+			switch p {
+			case "What's next?":
+				return prompter.IndexFor(opts, "Submit")
+			case "What merge method would you like to use?":
+				return 0, nil
+			default:
+				return -1, prompter.NoSuchPromptErr(p)
+			}
+		},
+	}
 
-	output, err := runCommand(http, "blueberries", true, "-d")
+	output, err := runCommand(http, pm, "blueberries", true, "-d")
 	if err != nil {
 		t.Fatalf("Got unexpected error running `pr merge` %s", err)
 	}
@@ -1224,13 +1329,29 @@ func TestPRMergeTTY_squashEditCommitMsgAndSubject(t *testing.T) {
 	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-	as := prompt.NewAskStubber(t)
-	as.StubPrompt("What merge method would you like to use?").AnswerWith("Squash and merge")
-	as.StubPrompt("Delete the branch on GitHub?").AnswerDefault()
-	as.StubPrompt("What's next?").AnswerWith("Edit commit message")
-	as.StubPrompt("What's next?").AnswerWith("Edit commit subject")
-	as.StubPrompt("What's next?").AnswerWith("Submit")
+	selectCount := -1
+	answers := []string{"Edit commit message", "Edit commit subject", "Submit"}
+
+	pm := &prompter.PrompterMock{
+		ConfirmFunc: func(p string, d bool) (bool, error) {
+			if p == "Delete the branch on GitHub?" {
+				return d, nil
+			} else {
+				return false, prompter.NoSuchPromptErr(p)
+			}
+		},
+		SelectFunc: func(p, d string, opts []string) (int, error) {
+			switch p {
+			case "What's next?":
+				selectCount++
+				return prompter.IndexFor(opts, answers[selectCount])
+			case "What merge method would you like to use?":
+				return prompter.IndexFor(opts, "Squash and merge")
+			default:
+				return -1, prompter.NoSuchPromptErr(p)
+			}
+		},
+	}
 
 	err := mergeRun(&MergeOptions{
 		IO:     ios,
@@ -1238,6 +1359,7 @@ func TestPRMergeTTY_squashEditCommitMsgAndSubject(t *testing.T) {
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: tr}, nil
 		},
+		Prompter:           pm,
 		SelectorArg:        "https://github.com/OWNER/REPO/pull/123",
 		MergeStrategyEmpty: true,
 		Finder: shared.NewMockFinder(
@@ -1273,7 +1395,7 @@ func TestPRMergeEmptyStrategyNonTTY(t *testing.T) {
 	defer cmdTeardown(t)
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "blueberries", false, "pr merge 1")
+	output, err := runCommand(http, nil, "blueberries", false, "pr merge 1")
 	assert.EqualError(t, err, "--merge, --rebase, or --squash required when not running interactively")
 	assert.Equal(t, "", output.String())
 	assert.Equal(t, "", output.Stderr())
@@ -1303,13 +1425,27 @@ func TestPRTTY_cancelled(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-	as := prompt.NewAskStubber(t)
-	as.StubPrompt("What merge method would you like to use?").AnswerDefault()
-	as.StubPrompt("Delete the branch locally and on GitHub?").AnswerDefault()
-	as.StubPrompt("What's next?").AnswerWith("Cancel")
+	pm := &prompter.PrompterMock{
+		ConfirmFunc: func(p string, d bool) (bool, error) {
+			if p == "Delete the branch locally and on GitHub?" {
+				return d, nil
+			} else {
+				return false, prompter.NoSuchPromptErr(p)
+			}
+		},
+		SelectFunc: func(p, d string, opts []string) (int, error) {
+			switch p {
+			case "What's next?":
+				return prompter.IndexFor(opts, "Cancel")
+			case "What merge method would you like to use?":
+				return 0, nil
+			default:
+				return -1, prompter.NoSuchPromptErr(p)
+			}
+		},
+	}
 
-	output, err := runCommand(http, "blueberries", true, "")
+	output, err := runCommand(http, pm, "blueberries", true, "")
 	if !errors.Is(err, cmdutil.CancelError) {
 		t.Fatalf("got error %v", err)
 	}
@@ -1323,11 +1459,18 @@ func Test_mergeMethodSurvey(t *testing.T) {
 		RebaseMergeAllowed: true,
 		SquashMergeAllowed: true,
 	}
-	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-	as := prompt.NewAskStubber(t)
-	as.StubPrompt("What merge method would you like to use?").AnswerWith("Rebase and merge")
 
-	method, err := mergeMethodSurvey(repo)
+	pm := &prompter.PrompterMock{
+		SelectFunc: func(p, d string, opts []string) (int, error) {
+			if p == "What merge method would you like to use?" {
+				return prompter.IndexFor(opts, "Rebase and merge")
+			} else {
+				return -1, prompter.NoSuchPromptErr(p)
+			}
+		},
+	}
+
+	method, err := mergeMethodSurvey(pm, repo)
 	assert.Nil(t, err)
 	assert.Equal(t, PullRequestMergeMethodRebase, method)
 }
@@ -1464,7 +1607,7 @@ func TestPrInMergeQueue(t *testing.T) {
 	defer cmdTeardown(t)
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "blueberries", true, "pr merge 1")
+	output, err := runCommand(http, nil, "blueberries", true, "pr merge 1")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -1503,7 +1646,7 @@ func TestPrAddToMergeQueueWithMergeMethod(t *testing.T) {
 	defer cmdTeardown(t)
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "blueberries", true, "pr merge 1 --merge")
+	output, err := runCommand(http, nil, "blueberries", true, "pr merge 1 --merge")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -1542,7 +1685,7 @@ func TestPrAddToMergeQueueClean(t *testing.T) {
 	defer cmdTeardown(t)
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "blueberries", true, "pr merge 1")
+	output, err := runCommand(http, nil, "blueberries", true, "pr merge 1")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -1582,7 +1725,7 @@ func TestPrAddToMergeQueueBlocked(t *testing.T) {
 	defer cmdTeardown(t)
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "blueberries", true, "pr merge 1")
+	output, err := runCommand(http, nil, "blueberries", true, "pr merge 1")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -1631,13 +1774,27 @@ func TestPrAddToMergeQueueAdmin(t *testing.T) {
 	defer cmdTeardown(t)
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-	as := prompt.NewAskStubber(t)
-	as.StubPrompt("What merge method would you like to use?").AnswerDefault()
-	as.StubPrompt("Delete the branch locally and on GitHub?").AnswerDefault()
-	as.StubPrompt("What's next?").AnswerDefault()
+	pm := &prompter.PrompterMock{
+		ConfirmFunc: func(p string, d bool) (bool, error) {
+			if p == "Delete the branch locally and on GitHub?" {
+				return d, nil
+			} else {
+				return false, prompter.NoSuchPromptErr(p)
+			}
+		},
+		SelectFunc: func(p, d string, opts []string) (int, error) {
+			switch p {
+			case "What's next?":
+				return 0, nil
+			case "What merge method would you like to use?":
+				return 0, nil
+			default:
+				return -1, prompter.NoSuchPromptErr(p)
+			}
+		},
+	}
 
-	output, err := runCommand(http, "blueberries", true, "pr merge 1 --admin")
+	output, err := runCommand(http, pm, "blueberries", true, "pr merge 1 --admin")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}
@@ -1676,7 +1833,7 @@ func TestPrAddToMergeQueueAdminWithMergeStrategy(t *testing.T) {
 	defer cmdTeardown(t)
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
-	output, err := runCommand(http, "blueberries", true, "pr merge 1 --admin --merge")
+	output, err := runCommand(http, nil, "blueberries", true, "pr merge 1 --admin --merge")
 	if err != nil {
 		t.Fatalf("error running command `pr merge`: %v", err)
 	}

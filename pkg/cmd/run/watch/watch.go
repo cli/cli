@@ -114,14 +114,14 @@ func watchRun(opts *WatchOptions) error {
 			}
 		}
 	} else {
-		run, err = shared.GetRun(client, repo, runID)
+		run, err = shared.GetRun(client, repo, runID, 0)
 		if err != nil {
 			return fmt.Errorf("failed to get run: %w", err)
 		}
 	}
 
 	if run.Status == shared.Completed {
-		fmt.Fprintf(opts.IO.Out, "Run %s (%s) has already completed with '%s'\n", cs.Bold(run.Name), cs.Cyanf("%d", run.ID), run.Conclusion)
+		fmt.Fprintf(opts.IO.Out, "Run %s (%s) has already completed with '%s'\n", cs.Bold(run.WorkflowName()), cs.Cyanf("%d", run.ID), run.Conclusion)
 		if opts.ExitStatus && run.Conclusion != shared.Success {
 			return cmdutil.SilentError
 		}
@@ -186,7 +186,7 @@ func watchRun(opts *WatchOptions) error {
 
 	if opts.IO.IsStdoutTTY() {
 		fmt.Fprintln(opts.IO.Out)
-		fmt.Fprintf(opts.IO.Out, "%s Run %s (%s) completed with '%s'\n", symbolColor(symbol), cs.Bold(run.Name), id, run.Conclusion)
+		fmt.Fprintf(opts.IO.Out, "%s Run %s (%s) completed with '%s'\n", symbolColor(symbol), cs.Bold(run.WorkflowName()), id, run.Conclusion)
 	}
 
 	if opts.ExitStatus && run.Conclusion != shared.Success {
@@ -201,12 +201,12 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 
 	var err error
 
-	run, err = shared.GetRun(client, repo, fmt.Sprintf("%d", run.ID))
+	run, err = shared.GetRun(client, repo, fmt.Sprintf("%d", run.ID), 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get run: %w", err)
 	}
 
-	jobs, err := shared.GetJobs(client, repo, *run)
+	jobs, err := shared.GetJobs(client, repo, run)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get jobs: %w", err)
 	}
@@ -236,7 +236,7 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 		return nil, fmt.Errorf("failed to get annotations: %w", annotationErr)
 	}
 
-	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, text.FuzzyAgo(opts.Now(), run.StartedTime()), prNumber))
+	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, text.FuzzyAgo(opts.Now(), run.StartedTime()), prNumber, 0))
 	fmt.Fprintln(out)
 
 	if len(jobs) == 0 {

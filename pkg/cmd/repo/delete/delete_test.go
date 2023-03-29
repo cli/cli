@@ -30,11 +30,17 @@ func TestNewCmdDelete(t *testing.T) {
 			output: DeleteOptions{RepoArg: "OWNER/REPO", Confirmed: true},
 		},
 		{
+			name:   "yes flag",
+			tty:    true,
+			input:  "OWNER/REPO --yes",
+			output: DeleteOptions{RepoArg: "OWNER/REPO", Confirmed: true},
+		},
+		{
 			name:    "no confirmation notty",
 			input:   "OWNER/REPO",
 			output:  DeleteOptions{RepoArg: "OWNER/REPO"},
 			wantErr: true,
-			errMsg:  "--confirm required when not running interactively",
+			errMsg:  "--yes required when not running interactively",
 		},
 		{
 			name:   "base repo resolution",
@@ -83,6 +89,7 @@ func Test_deleteRun(t *testing.T) {
 		httpStubs     func(*httpmock.Registry)
 		prompterStubs func(*prompter.PrompterMock)
 		wantStdout    string
+		wantStderr    string
 		wantErr       bool
 		errMsg        string
 	}{
@@ -92,8 +99,8 @@ func Test_deleteRun(t *testing.T) {
 			opts:       &DeleteOptions{RepoArg: "OWNER/REPO"},
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
 			prompterStubs: func(p *prompter.PrompterMock) {
-				p.InputFunc = func(_, _ string) (string, error) {
-					return "OWNER/REPO", nil
+				p.ConfirmDeletionFunc = func(_ string) error {
+					return nil
 				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -108,8 +115,8 @@ func Test_deleteRun(t *testing.T) {
 			opts:       &DeleteOptions{},
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
 			prompterStubs: func(p *prompter.PrompterMock) {
-				p.InputFunc = func(_, _ string) (string, error) {
-					return "OWNER/REPO", nil
+				p.ConfirmDeletionFunc = func(_ string) error {
+					return nil
 				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -136,8 +143,8 @@ func Test_deleteRun(t *testing.T) {
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
 			tty:        true,
 			prompterStubs: func(p *prompter.PrompterMock) {
-				p.InputFunc = func(_, _ string) (string, error) {
-					return "OWNER/REPO", nil
+				p.ConfirmDeletionFunc = func(_ string) error {
+					return nil
 				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -147,6 +154,18 @@ func Test_deleteRun(t *testing.T) {
 				reg.Register(
 					httpmock.REST("DELETE", "repos/OWNER/REPO"),
 					httpmock.StatusStringResponse(204, "{}"))
+			},
+		},
+		{
+			name:       "repo transfered ownership",
+			opts:       &DeleteOptions{RepoArg: "OWNER/REPO", Confirmed: true},
+			wantErr:    true,
+			errMsg:     "SilentError",
+			wantStderr: "X Failed to delete repository: OWNER/REPO has changed name or transfered ownership\n",
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("DELETE", "repos/OWNER/REPO"),
+					httpmock.StatusStringResponse(307, "{}"))
 			},
 		},
 	}
@@ -169,7 +188,7 @@ func Test_deleteRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 
-		ios, _, stdout, _ := iostreams.Test()
+		ios, _, stdout, stderr := iostreams.Test()
 		ios.SetStdinTTY(tt.tty)
 		ios.SetStdoutTTY(tt.tty)
 		tt.opts.IO = ios
@@ -184,6 +203,7 @@ func Test_deleteRun(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantStdout, stdout.String())
+			assert.Equal(t, tt.wantStderr, stderr.String())
 		})
 	}
 }

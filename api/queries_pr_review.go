@@ -30,7 +30,8 @@ type PullRequestReviews struct {
 }
 
 type PullRequestReview struct {
-	Author              Author         `json:"author"`
+	ID                  string         `json:"id"`
+	Author              CommentAuthor  `json:"author"`
 	AuthorAssociation   string         `json:"authorAssociation"`
 	Body                string         `json:"body"`
 	SubmittedAt         *time.Time     `json:"submittedAt"`
@@ -38,6 +39,7 @@ type PullRequestReview struct {
 	ReactionGroups      ReactionGroups `json:"reactionGroups"`
 	State               string         `json:"state"`
 	URL                 string         `json:"url,omitempty"`
+	Commit              Commit         `json:"commit"`
 }
 
 func AddReview(client *Client, repo ghrepo.Interface, pr *PullRequest, input *PullRequestReviewInput) error {
@@ -65,6 +67,10 @@ func AddReview(client *Client, repo ghrepo.Interface, pr *PullRequest, input *Pu
 	}
 
 	return client.Mutate(repo.RepoHost(), "PullRequestReviewAdd", &mutation, variables)
+}
+
+func (prr PullRequestReview) Identifier() string {
+	return prr.ID
 }
 
 func (prr PullRequestReview) AuthorLogin() string {

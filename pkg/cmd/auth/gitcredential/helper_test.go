@@ -8,15 +8,14 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
-// why not just use the config stub argh
 type tinyConfig map[string]string
 
-func (c tinyConfig) AuthToken(host string) (string, string) {
+func (c tinyConfig) Token(host string) (string, string) {
 	return c[fmt.Sprintf("%s:%s", host, "oauth_token")], c["_source"]
 }
 
-func (c tinyConfig) Get(host, key string) (string, error) {
-	return c[fmt.Sprintf("%s:%s", host, key)], nil
+func (c tinyConfig) User(host string) (string, error) {
+	return c[fmt.Sprintf("%s:%s", host, "user")], nil
 }
 
 func Test_helperRun(t *testing.T) {
@@ -217,6 +216,25 @@ func Test_helperRun(t *testing.T) {
 				password=OTOKEN
 			`),
 			wantStderr: "",
+		},
+		{
+			name: "noop store operation",
+			opts: CredentialOptions{
+				Operation: "store",
+			},
+		},
+		{
+			name: "noop erase operation",
+			opts: CredentialOptions{
+				Operation: "erase",
+			},
+		},
+		{
+			name: "unknown operation",
+			opts: CredentialOptions{
+				Operation: "unknown",
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {

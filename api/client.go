@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,7 +20,7 @@ const (
 	authorization   = "Authorization"
 	cacheTTL        = "X-GH-CACHE-TTL"
 	graphqlFeatures = "GraphQL-Features"
-	mergeQueue      = "merge_queue"
+	features        = "merge_queue"
 	userAgent       = "User-Agent"
 )
 
@@ -51,11 +52,11 @@ func (err HTTPError) ScopesSuggestion() string {
 	return err.scopesSuggestion
 }
 
-// GraphQL performs a GraphQL request and parses the response. If there are errors in the response,
-// GraphQLError will be returned, but the data will also be parsed into the receiver.
+// GraphQL performs a GraphQL request using the query string and parses the response into data receiver. If there are errors in the response,
+// GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) GraphQL(hostname string, query string, variables map[string]interface{}, data interface{}) error {
 	opts := clientOptions(hostname, c.http.Transport)
-	opts.Headers[graphqlFeatures] = mergeQueue
+	opts.Headers[graphqlFeatures] = features
 	gqlClient, err := gh.GQLClient(&opts)
 	if err != nil {
 		return err
@@ -63,11 +64,11 @@ func (c Client) GraphQL(hostname string, query string, variables map[string]inte
 	return handleResponse(gqlClient.Do(query, variables, data))
 }
 
-// GraphQL performs a GraphQL mutation and parses the response. If there are errors in the response,
-// GraphQLError will be returned, but the data will also be parsed into the receiver.
+// Mutate performs a GraphQL mutation based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
+// GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) Mutate(hostname, name string, mutation interface{}, variables map[string]interface{}) error {
 	opts := clientOptions(hostname, c.http.Transport)
-	opts.Headers[graphqlFeatures] = mergeQueue
+	opts.Headers[graphqlFeatures] = features
 	gqlClient, err := gh.GQLClient(&opts)
 	if err != nil {
 		return err
@@ -75,16 +76,28 @@ func (c Client) Mutate(hostname, name string, mutation interface{}, variables ma
 	return handleResponse(gqlClient.Mutate(name, mutation, variables))
 }
 
-// GraphQL performs a GraphQL query and parses the response. If there are errors in the response,
-// GraphQLError will be returned, but the data will also be parsed into the receiver.
+// Query performs a GraphQL query based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
+// GraphQLError will be returned, but the receiver will also be partially populated.
 func (c Client) Query(hostname, name string, query interface{}, variables map[string]interface{}) error {
 	opts := clientOptions(hostname, c.http.Transport)
-	opts.Headers[graphqlFeatures] = mergeQueue
+	opts.Headers[graphqlFeatures] = features
 	gqlClient, err := gh.GQLClient(&opts)
 	if err != nil {
 		return err
 	}
 	return handleResponse(gqlClient.Query(name, query, variables))
+}
+
+// QueryWithContext performs a GraphQL query based on a struct and parses the response with the same struct as the receiver. If there are errors in the response,
+// GraphQLError will be returned, but the receiver will also be partially populated.
+func (c Client) QueryWithContext(ctx context.Context, hostname, name string, query interface{}, variables map[string]interface{}) error {
+	opts := clientOptions(hostname, c.http.Transport)
+	opts.Headers[graphqlFeatures] = features
+	gqlClient, err := gh.GQLClient(&opts)
+	if err != nil {
+		return err
+	}
+	return handleResponse(gqlClient.QueryWithContext(ctx, name, query, variables))
 }
 
 // REST performs a REST request and parses the response.

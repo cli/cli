@@ -33,7 +33,7 @@ func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.I
 		var err error
 		baseRepo, err = baseRepoFn()
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not determine base repo: %w", err)
+			return nil, nil, err
 		}
 	}
 
@@ -63,6 +63,22 @@ func issueMetadataFromURL(s string) (int, ghrepo.Interface) {
 	return issueNumber, repo
 }
 
+// Returns the issue number and repo if the issue URL is provided.
+// If only the issue number is provided, returns the number and nil repo.
+func IssueNumberAndRepoFromArg(arg string) (int, ghrepo.Interface, error) {
+	issueNumber, baseRepo := issueMetadataFromURL(arg)
+
+	if issueNumber == 0 {
+		var err error
+		issueNumber, err = strconv.Atoi(strings.TrimPrefix(arg, "#"))
+		if err != nil {
+			return 0, nil, fmt.Errorf("invalid issue format: %q", arg)
+		}
+	}
+
+	return issueNumber, baseRepo, nil
+}
+
 type PartialLoadError struct {
 	error
 }
@@ -81,6 +97,14 @@ func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 			fieldSet.Remove("stateReason")
 		}
 	}
+
+	var getProjectItems bool
+	if fieldSet.Contains("projectItems") {
+		getProjectItems = true
+		fieldSet.Remove("projectItems")
+		fieldSet.Add("number")
+	}
+
 	fields = fieldSet.ToSlice()
 
 	type response struct {
@@ -133,6 +157,14 @@ func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 
 	if resp.Repository.Issue == nil {
 		return nil, errors.New("issue was not found but GraphQL reported no error")
+	}
+
+	if getProjectItems {
+		apiClient := api.NewClientFromHTTP(httpClient)
+		err := api.ProjectsV2ItemsForIssue(apiClient, repo, resp.Repository.Issue)
+		if err != nil && !api.ProjectsV2IgnorableError(err) {
+			return nil, err
+		}
 	}
 
 	return resp.Repository.Issue, nil

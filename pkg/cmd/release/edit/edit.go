@@ -1,6 +1,7 @@
 package edit
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -24,6 +25,7 @@ type EditOptions struct {
 	DiscussionCategory *string
 	Draft              *bool
 	Prerelease         *bool
+	IsLatest           *bool
 }
 
 func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Command {
@@ -72,13 +74,15 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 	cmdutil.NilBoolFlag(cmd, &opts.Draft, "draft", "", "Save the release as a draft instead of publishing it")
 	cmdutil.NilBoolFlag(cmd, &opts.Prerelease, "prerelease", "", "Mark the release as a prerelease")
+	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Explicitly mark the release as \"Latest\"")
 	cmdutil.NilStringFlag(cmd, &opts.Body, "notes", "n", "Release notes")
 	cmdutil.NilStringFlag(cmd, &opts.Name, "title", "t", "Release title")
 	cmdutil.NilStringFlag(cmd, &opts.DiscussionCategory, "discussion-category", "", "Start a discussion in the specified category when publishing a draft")
 	cmd.Flags().StringVar(&opts.Target, "target", "", "Target `branch` or full commit SHA (default: main branch)")
 	cmd.Flags().StringVar(&opts.TagName, "tag", "", "The name of the tag")
 	cmd.Flags().StringVarP(&notesFile, "notes-file", "F", "", "Read release notes from `file` (use \"-\" to read from standard input)")
-	cmdutil.RegisterBranchCompletionFlags(cmd, "target")
+
+	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "target")
 
 	return cmd
 }
@@ -94,7 +98,7 @@ func editRun(tag string, opts *EditOptions) error {
 		return err
 	}
 
-	release, err := shared.FetchRelease(httpClient, baseRepo, tag)
+	release, err := shared.FetchRelease(context.Background(), httpClient, baseRepo, tag)
 	if err != nil {
 		return err
 	}
@@ -145,6 +149,11 @@ func getParams(opts *EditOptions) map[string]interface{} {
 
 	if opts.Target != "" {
 		params["target_commitish"] = opts.Target
+	}
+
+	if opts.IsLatest != nil {
+		// valid values: true/false/legacy
+		params["make_latest"] = fmt.Sprintf("%v", *opts.IsLatest)
 	}
 
 	return params

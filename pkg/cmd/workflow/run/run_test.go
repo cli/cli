@@ -471,6 +471,26 @@ jobs:
 			errOut:  "could not create workflow dispatch event: HTTP 422 (https://api.github.com/repos/OWNER/REPO/actions/workflows/12345/dispatches)",
 		},
 		{
+			name: "yaml file extension",
+			tty:  false,
+			opts: &RunOptions{
+				Selector: "workflow.yaml",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/workflow.yaml"),
+					httpmock.StatusStringResponse(200, `{"id": 12345}`))
+				reg.Register(
+					httpmock.REST("POST", "repos/OWNER/REPO/actions/workflows/12345/dispatches"),
+					httpmock.StatusStringResponse(204, ""))
+			},
+			wantBody: map[string]interface{}{
+				"inputs": map[string]interface{}{},
+				"ref":    "trunk",
+			},
+			wantErr: false,
+		},
+		{
 			// TODO this test is somewhat silly; it's more of a placeholder in case I decide to handle the API error more elegantly
 			name: "input fields, missing required",
 			opts: &RunOptions{

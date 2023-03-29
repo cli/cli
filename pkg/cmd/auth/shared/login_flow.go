@@ -1,6 +1,8 @@
 package shared
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -8,7 +10,9 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/authflow"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/pkg/cmd/ssh-key/add"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -18,22 +22,23 @@ import (
 const defaultSSHKeyTitle = "GitHub CLI"
 
 type iconfig interface {
-	Get(string, string) (string, error)
-	Set(string, string, string)
-	Write() error
+	Login(string, string, string, string, bool) error
 }
 
 type LoginOptions struct {
-	IO          *iostreams.IOStreams
-	Config      iconfig
-	HTTPClient  *http.Client
-	Hostname    string
-	Interactive bool
-	Web         bool
-	Scopes      []string
-	Executable  string
-	GitProtocol string
-	Prompter    Prompt
+	IO            *iostreams.IOStreams
+	Config        iconfig
+	HTTPClient    *http.Client
+	GitClient     *git.Client
+	Hostname      string
+	Interactive   bool
+	Web           bool
+	Scopes        []string
+	Executable    string
+	GitProtocol   string
+	Prompter      Prompt
+	Browser       browser.Browser
+	SecureStorage bool
 
 	sshContext ssh.Context
 }
@@ -63,7 +68,11 @@ func Login(opts *LoginOptions) error {
 
 	var additionalScopes []string
 
-	credentialFlow := &GitCredentialFlow{Executable: opts.Executable, Prompter: opts.Prompter}
+	credentialFlow := &GitCredentialFlow{
+		Executable: opts.Executable,
+		Prompter:   opts.Prompter,
+		GitClient:  opts.GitClient,
+	}
 	if opts.Interactive && gitProtocol == "https" {
 		if err := credentialFlow.Prompt(hostname); err != nil {
 			return err
@@ -139,16 +148,15 @@ func Login(opts *LoginOptions) error {
 	}
 
 	var authToken string
-	userValidated := false
+	var username string
 
 	if authMode == 0 {
 		var err error
-		authToken, err = authflow.AuthFlowWithConfig(cfg, opts.IO, hostname, "", append(opts.Scopes, additionalScopes...), opts.Interactive)
+		authToken, username, err = authflow.AuthFlow(hostname, opts.IO, "", append(opts.Scopes, additionalScopes...), opts.Interactive, opts.Browser)
 		if err != nil {
 			return fmt.Errorf("failed to authenticate via web browser: %w", err)
 		}
 		fmt.Fprintf(opts.IO.ErrOut, "%s Authentication complete.\n", cs.SuccessIcon())
-		userValidated = true
 	} else {
 		minimumScopes := append([]string{"repo", "read:org"}, additionalScopes...)
 		fmt.Fprint(opts.IO.ErrOut, heredoc.Docf(`
@@ -156,7 +164,8 @@ func Login(opts *LoginOptions) error {
 			The minimum required scopes are %s.
 		`, hostname, scopesSentence(minimumScopes, ghinstance.IsEnterprise(hostname))))
 
-		authToken, err := opts.Prompter.AuthToken()
+		var err error
+		authToken, err = opts.Prompter.AuthToken()
 		if err != nil {
 			return err
 		}
@@ -164,32 +173,22 @@ func Login(opts *LoginOptions) error {
 		if err := HasMinimumScopes(httpClient, hostname, authToken); err != nil {
 			return fmt.Errorf("error validating token: %w", err)
 		}
-
-		cfg.Set(hostname, "oauth_token", authToken)
 	}
 
-	var username string
-	if userValidated {
-		username, _ = cfg.Get(hostname, "user")
-	} else {
-		apiClient := api.NewClientFromHTTP(httpClient)
+	if username == "" {
 		var err error
-		username, err = api.CurrentLoginName(apiClient, hostname)
+		username, err = getCurrentLogin(httpClient, hostname, authToken)
 		if err != nil {
 			return fmt.Errorf("error using api: %w", err)
 		}
-
-		cfg.Set(hostname, "user", username)
 	}
 
 	if gitProtocol != "" {
 		fmt.Fprintf(opts.IO.ErrOut, "- gh config set -h %s git_protocol %s\n", hostname, gitProtocol)
-		cfg.Set(hostname, "git_protocol", gitProtocol)
 		fmt.Fprintf(opts.IO.ErrOut, "%s Configured git protocol\n", cs.SuccessIcon())
 	}
 
-	err := cfg.Write()
-	if err != nil {
+	if err := cfg.Login(hostname, username, authToken, gitProtocol, opts.SecureStorage); err != nil {
 		return err
 	}
 
@@ -232,4 +231,35 @@ func sshKeyUpload(httpClient *http.Client, hostname, keyFile string, title strin
 	defer f.Close()
 
 	return add.SSHKeyUpload(httpClient, hostname, f, title)
+}
+
+func getCurrentLogin(httpClient httpClient, hostname, authToken string) (string, error) {
+	query := `query UserCurrent{viewer{login}}`
+	reqBody, err := json.Marshal(map[string]interface{}{"query": query})
+	if err != nil {
+		return "", err
+	}
+	result := struct {
+		Data struct{ Viewer struct{ Login string } }
+	}{}
+	apiEndpoint := ghinstance.GraphQLEndpoint(hostname)
+	req, err := http.NewRequest("POST", apiEndpoint, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "token "+authToken)
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+	if res.StatusCode > 299 {
+		return "", api.HandleHTTPError(res)
+	}
+	decoder := json.NewDecoder(res.Body)
+	err = decoder.Decode(&result)
+	if err != nil {
+		return "", err
+	}
+	return result.Data.Viewer.Login, nil
 }

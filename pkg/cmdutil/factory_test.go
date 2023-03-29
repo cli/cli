@@ -48,12 +48,18 @@ func Test_executable(t *testing.T) {
 	}
 
 	oldPath := os.Getenv("PATH")
-	t.Cleanup(func() {
-		os.Setenv("PATH", oldPath)
-	})
-	os.Setenv("PATH", strings.Join([]string{bin1, bin2, bin3, oldPath}, string(os.PathListSeparator)))
+	t.Setenv("PATH", strings.Join([]string{bin1, bin2, bin3, oldPath}, string(os.PathListSeparator)))
 
 	if got := executable(""); got != bin2Exe {
 		t.Errorf("executable() = %q, want %q", got, bin2Exe)
+	}
+}
+
+func Test_Executable_override(t *testing.T) {
+	override := strings.Join([]string{"C:", "cygwin64", "home", "gh.exe"}, string(os.PathSeparator))
+	t.Setenv("GH_PATH", override)
+	f := Factory{}
+	if got := f.Executable(); got != override {
+		t.Errorf("executable() = %q, want %q", got, override)
 	}
 }

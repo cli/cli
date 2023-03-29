@@ -14,7 +14,7 @@ import (
 )
 
 type tokenGetter interface {
-	AuthToken(string) (string, string)
+	Token(string) (string, string)
 }
 
 type HTTPClientOptions struct {
@@ -64,6 +64,8 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		client.Transport = AddAuthTokenHeader(client.Transport, opts.Config)
 	}
 
+	client.Transport = AddASCIISanitizer(client.Transport)
+
 	return client, nil
 }
 
@@ -91,7 +93,7 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper
 		// If the header is already set in the request, don't overwrite it.
 		if req.Header.Get(authorization) == "" {
 			hostname := ghinstance.NormalizeHostname(getHost(req))
-			if token, _ := cfg.AuthToken(hostname); token != "" {
+			if token, _ := cfg.Token(hostname); token != "" {
 				req.Header.Set(authorization, fmt.Sprintf("token %s", token))
 			}
 		}

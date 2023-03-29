@@ -3,7 +3,6 @@ package codespace
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,8 +15,9 @@ import (
 
 func TestPendingOperationDisallowsSSH(t *testing.T) {
 	app := testingSSHApp()
+	selector := &CodespaceSelector{api: app.apiClient, codespaceName: "disabledCodespace"}
 
-	if err := app.SSH(context.Background(), []string{}, sshOptions{codespace: "disabledCodespace"}); err != nil {
+	if err := app.SSH(context.Background(), []string{}, sshOptions{selector: selector}); err != nil {
 		if err.Error() != "codespace is disabled while it has a pending operation: Some pending operation" {
 			t.Errorf("expected pending operation error, but got: %v", err)
 		}
@@ -103,7 +103,7 @@ func TestGenerateAutomaticSSHKeys(t *testing.T) {
 		}
 
 		// Check that no unexpected files are present
-		allExistingFiles, err := ioutil.ReadDir(dir)
+		allExistingFiles, err := os.ReadDir(dir)
 		if err != nil {
 			t.Errorf("Failed to list files in test directory: %v", err)
 		}
@@ -212,21 +212,21 @@ func TestSelectSSHKeys(t *testing.T) {
 			f.Close()
 		}
 
-		if tt.sshConfigKeys != nil {
-			configPath := filepath.Join(sshDir, "test-config")
+		configPath := filepath.Join(sshDir, "test-config")
 
-			configContent := ""
-			for _, key := range tt.sshConfigKeys {
-				configContent += fmt.Sprintf("IdentityFile %s\n", filepath.Join(sshDir, key))
-			}
+		// Seed the config with a non-existent key so that the default config won't apply
+		configContent := "IdentityFile dummy\n"
 
-			err := os.WriteFile(configPath, []byte(configContent), 0666)
-			if err != nil {
-				t.Fatalf("could not write test config %v", err)
-			}
-
-			tt.sshArgs = append(tt.sshArgs, "-F", configPath)
+		for _, key := range tt.sshConfigKeys {
+			configContent += fmt.Sprintf("IdentityFile %s\n", filepath.Join(sshDir, key))
 		}
+
+		err := os.WriteFile(configPath, []byte(configContent), 0666)
+		if err != nil {
+			t.Fatalf("could not write test config %v", err)
+		}
+
+		tt.sshArgs = append([]string{"-F", configPath}, tt.sshArgs...)
 
 		gotKeyPair, gotShouldAddArg, err := selectSSHKeys(context.Background(), sshContext, tt.sshArgs, sshOptions{profile: tt.profileOpt})
 
@@ -279,5 +279,5 @@ func testingSSHApp() *App {
 	}
 
 	ios, _, _, _ := iostreams.Test()
-	return NewApp(ios, nil, apiMock, nil)
+	return NewApp(ios, nil, apiMock, nil, nil)
 }

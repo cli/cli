@@ -15,6 +15,7 @@ import (
 
 func PrintIssues(io *iostreams.IOStreams, now time.Time, prefix string, totalCount int, issues []api.Issue) {
 	cs := io.ColorScheme()
+	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
 	table := utils.NewTablePrinter(io)
 	for _, issue := range issues {
 		issueNum := strconv.Itoa(issue.Number)

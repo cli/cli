@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -37,14 +37,14 @@ func TestNewCmdDelete(t *testing.T) {
 		},
 		{
 			name:   "confirm argument",
-			input:  "test --confirm",
+			input:  "test --yes",
 			output: deleteOptions{Name: "test", Confirmed: true},
 		},
 		{
 			name:       "confirm no tty",
 			input:      "test",
 			wantErr:    true,
-			wantErrMsg: "--confirm required when not running interactively",
+			wantErrMsg: "--yes required when not running interactively",
 		},
 	}
 
@@ -83,14 +83,14 @@ func TestNewCmdDelete(t *testing.T) {
 
 func TestDeleteRun(t *testing.T) {
 	tests := []struct {
-		name       string
-		tty        bool
-		opts       *deleteOptions
-		httpStubs  func(*httpmock.Registry)
-		askStubs   func(*prompt.AskStubber)
-		wantStdout string
-		wantErr    bool
-		errMsg     string
+		name          string
+		tty           bool
+		opts          *deleteOptions
+		httpStubs     func(*httpmock.Registry)
+		prompterStubs func(*prompter.PrompterMock)
+		wantStdout    string
+		wantErr       bool
+		errMsg        string
 	}{
 		{
 			name: "deletes label",
@@ -102,10 +102,10 @@ func TestDeleteRun(t *testing.T) {
 					httpmock.StatusStringResponse(204, "{}"),
 				)
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				// TODO: survey stubber doesn't have WithValidator support
-				// so this always passes regardless of prompt input
-				as.StubPrompt("Type test to confirm deletion:").AnswerWith("test")
+			prompterStubs: func(pm *prompter.PrompterMock) {
+				pm.ConfirmDeletionFunc = func(_ string) error {
+					return nil
+				}
 			},
 			wantStdout: "✓ Label \"test\" deleted from OWNER/REPO\n",
 		},
@@ -153,11 +153,11 @@ func TestDeleteRun(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 
-			//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-			as := prompt.NewAskStubber(t)
-			if tt.askStubs != nil {
-				tt.askStubs(as)
+			pm := &prompter.PrompterMock{}
+			if tt.prompterStubs != nil {
+				tt.prompterStubs(pm)
 			}
+			tt.opts.Prompter = pm
 
 			io, _, stdout, _ := iostreams.Test()
 			io.SetStdoutTTY(tt.tty)

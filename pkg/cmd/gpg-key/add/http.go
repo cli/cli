@@ -11,9 +11,11 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 )
 
-var scopesError = errors.New("insufficient OAuth scopes")
+var errScopesMissing = errors.New("insufficient OAuth scopes")
+var errDuplicateKey = errors.New("key already exists")
+var errWrongFormat = errors.New("key in wrong format")
 
-func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader) error {
+func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, title string) error {
 	url := ghinstance.RESTPrefix(hostname) + "user/gpg_keys"
 
 	keyBytes, err := io.ReadAll(keyFile)
@@ -23,6 +25,9 @@ func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader) e
 
 	payload := map[string]string{
 		"armored_public_key": string(keyBytes),
+	}
+	if title != "" {
+		payload["name"] = title
 	}
 
 	payloadBytes, err := json.Marshal(payload)
@@ -42,25 +47,27 @@ func gpgKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader) e
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 404 {
-		return scopesError
+		return errScopesMissing
 	} else if resp.StatusCode > 299 {
-		var httpError api.HTTPError
 		err := api.HandleHTTPError(resp)
-		if errors.As(err, &httpError) && isDuplicateError(&httpError) {
-			return nil
+		var httpError api.HTTPError
+		if errors.As(err, &httpError) {
+			for _, e := range httpError.Errors {
+				if resp.StatusCode == 422 && e.Field == "key_id" && e.Message == "key_id already exists" {
+					return errDuplicateKey
+				}
+			}
+		}
+		if resp.StatusCode == 422 && !isGpgKeyArmored(keyBytes) {
+			return errWrongFormat
 		}
 		return err
 	}
 
-	_, err = io.Copy(io.Discard, resp.Body)
-	if err != nil {
-		return err
-	}
-
+	_, _ = io.Copy(io.Discard, resp.Body)
 	return nil
 }
 
-func isDuplicateError(err *api.HTTPError) bool {
-	return err.StatusCode == 422 && len(err.Errors) == 1 &&
-		err.Errors[0].Field == "key" && err.Errors[0].Message == "key is already in use"
+func isGpgKeyArmored(keyBytes []byte) bool {
+	return bytes.Contains(keyBytes, []byte("-----BEGIN "))
 }

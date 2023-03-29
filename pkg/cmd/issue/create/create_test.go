@@ -15,12 +15,12 @@ import (
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/test"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
@@ -92,6 +92,38 @@ func TestNewCmdCreate(t *testing.T) {
 				Interactive: false,
 			},
 		},
+		{
+			name:     "template from name tty",
+			tty:      true,
+			cli:      `-t mytitle --template "bug report"`,
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "mytitle",
+				Body:        "",
+				RecoverFile: "",
+				WebMode:     false,
+				Template:    "bug report",
+				Interactive: true,
+			},
+		},
+		{
+			name:     "template from name non-tty",
+			tty:      false,
+			cli:      `-t mytitle --template "bug report"`,
+			wantsErr: true,
+		},
+		{
+			name:     "template and body",
+			tty:      false,
+			cli:      `-t mytitle --template "bug report" --body "issue body"`,
+			wantsErr: true,
+		},
+		{
+			name:     "template and body file",
+			tty:      false,
+			cli:      `-t mytitle --template "bug report" --body-file "body_file.md"`,
+			wantsErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -134,6 +166,7 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.wantsOpts.RecoverFile, opts.RecoverFile)
 			assert.Equal(t, tt.wantsOpts.WebMode, opts.WebMode)
 			assert.Equal(t, tt.wantsOpts.Interactive, opts.Interactive)
+			assert.Equal(t, tt.wantsOpts.Template, opts.Template)
 		})
 	}
 }
@@ -217,6 +250,33 @@ func Test_createRun(t *testing.T) {
 						],
 						"pageInfo": { "hasNextPage": false }
 					} } } }`))
+				r.Register(
+					httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "projectsV2": {
+						"nodes": [
+							{ "title": "CleanupV2", "id": "CLEANUPV2ID", "resourcePath": "/OWNER/REPO/projects/2" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }`))
+				r.Register(
+					httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+					httpmock.StringResponse(`
+					{ "data": { "organization": { "projectsV2": {
+						"nodes": [
+							{ "title": "Triage", "id": "TRIAGEID", "resourcePath": "/orgs/ORG/projects/2"  }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }`))
+				r.Register(
+					httpmock.GraphQL(`query UserProjectV2List\b`),
+					httpmock.StringResponse(`
+					{ "data": { "viewer": { "projectsV2": {
+						"nodes": [
+							{ "title": "Monalisa", "id": "MONALISAID", "resourcePath": "/users/MONALISA/projects/1"  }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }`))
 			},
 			wantsBrowse: "https://github.com/OWNER/REPO/issues/new?body=&projects=OWNER%2FREPO%2F1",
 			wantsStderr: "Opening github.com/OWNER/REPO/issues/new in your browser.\n",
@@ -288,11 +348,11 @@ func Test_createRun(t *testing.T) {
 
 /*** LEGACY TESTS ***/
 
-func runCommand(rt http.RoundTripper, isTTY bool, cli string) (*test.CmdOut, error) {
-	return runCommandWithRootDirOverridden(rt, isTTY, cli, "")
+func runCommand(rt http.RoundTripper, isTTY bool, cli string, pm *prompter.PrompterMock) (*test.CmdOut, error) {
+	return runCommandWithRootDirOverridden(rt, isTTY, cli, "", pm)
 }
 
-func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli string, rootDir string) (*test.CmdOut, error) {
+func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli string, rootDir string, pm *prompter.PrompterMock) (*test.CmdOut, error) {
 	ios, _, stdout, stderr := iostreams.Test()
 	ios.SetStdoutTTY(isTTY)
 	ios.SetStdinTTY(isTTY)
@@ -310,7 +370,8 @@ func runCommandWithRootDirOverridden(rt http.RoundTripper, isTTY bool, cli strin
 		BaseRepo: func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
 		},
-		Browser: browser,
+		Browser:  browser,
+		Prompter: pm,
 	}
 
 	cmd := NewCmdCreate(factory, func(opts *CreateOptions) error {
@@ -361,7 +422,7 @@ func TestIssueCreate(t *testing.T) {
 			}),
 	)
 
-	output, err := runCommand(http, true, `-t hello -b "cash rules everything around me"`)
+	output, err := runCommand(http, true, `-t hello -b "cash rules everything around me"`, nil)
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
@@ -403,12 +464,28 @@ func TestIssueCreate_recover(t *testing.T) {
 			assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
 		}))
 
-	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-	as := prompt.NewAskStubber(t)
-
-	as.StubPrompt("Title").AnswerDefault()
-	as.StubPrompt("Body").AnswerDefault()
-	as.StubPrompt("What's next?").AnswerWith("Submit")
+	pm := &prompter.PrompterMock{}
+	pm.InputFunc = func(p, d string) (string, error) {
+		if p == "Title" {
+			return d, nil
+		} else {
+			return "", prompter.NoSuchPromptErr(p)
+		}
+	}
+	pm.MarkdownEditorFunc = func(p, d string, ba bool) (string, error) {
+		if p == "Body" {
+			return d, nil
+		} else {
+			return "", prompter.NoSuchPromptErr(p)
+		}
+	}
+	pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+		if p == "What's next?" {
+			return prompter.IndexFor(opts, "Submit")
+		} else {
+			return -1, prompter.NoSuchPromptErr(p)
+		}
+	}
 
 	tmpfile, err := os.CreateTemp(t.TempDir(), "testrecover*")
 	assert.NoError(t, err)
@@ -428,7 +505,7 @@ func TestIssueCreate_recover(t *testing.T) {
 
 	args := fmt.Sprintf("--recover '%s'", tmpfile.Name())
 
-	output, err := runCommandWithRootDirOverridden(http, true, args, "")
+	output, err := runCommandWithRootDirOverridden(http, true, args, "", pm)
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
@@ -471,16 +548,26 @@ func TestIssueCreate_nonLegacyTemplate(t *testing.T) {
 			}),
 	)
 
-	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-	as := prompt.NewAskStubber(t)
+	pm := &prompter.PrompterMock{}
+	pm.MarkdownEditorFunc = func(p, d string, ba bool) (string, error) {
+		if p == "Body" {
+			return d, nil
+		} else {
+			return "", prompter.NoSuchPromptErr(p)
+		}
+	}
+	pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+		switch p {
+		case "What's next?":
+			return prompter.IndexFor(opts, "Submit")
+		case "Choose a template":
+			return prompter.IndexFor(opts, "Submit a request")
+		default:
+			return -1, prompter.NoSuchPromptErr(p)
+		}
+	}
 
-	as.StubPrompt("Choose a template").AnswerWith("Submit a request")
-	as.StubPrompt("Body").AnswerDefault()
-	as.StubPrompt("What's next?").
-		AssertOptions([]string{"Submit", "Continue in browser", "Cancel"}).
-		AnswerWith("Submit")
-
-	output, err := runCommandWithRootDirOverridden(http, true, `-t hello`, "./fixtures/repoWithNonLegacyIssueTemplates")
+	output, err := runCommandWithRootDirOverridden(http, true, `-t hello`, "./fixtures/repoWithNonLegacyIssueTemplates", pm)
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
@@ -502,16 +589,26 @@ func TestIssueCreate_continueInBrowser(t *testing.T) {
 			} } }`),
 	)
 
-	//nolint:staticcheck // SA1019: prompt.NewAskStubber is deprecated: use PrompterMock
-	as := prompt.NewAskStubber(t)
-
-	as.StubPrompt("Title").AnswerWith("hello")
-	as.StubPrompt("What's next?").AnswerWith("Continue in browser")
+	pm := &prompter.PrompterMock{}
+	pm.InputFunc = func(p, d string) (string, error) {
+		if p == "Title" {
+			return "hello", nil
+		} else {
+			return "", prompter.NoSuchPromptErr(p)
+		}
+	}
+	pm.SelectFunc = func(p, _ string, opts []string) (int, error) {
+		if p == "What's next?" {
+			return prompter.IndexFor(opts, "Continue in browser")
+		} else {
+			return -1, prompter.NoSuchPromptErr(p)
+		}
+	}
 
 	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
-	output, err := runCommand(http, true, `-b body`)
+	output, err := runCommand(http, true, `-b body`, pm)
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
@@ -576,6 +673,30 @@ func TestIssueCreate_metadata(t *testing.T) {
 		}
 		`))
 	http.Register(
+		httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projectsV2": {
+			"nodes": [],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+		httpmock.StringResponse(`
+		{	"data": { "organization": { "projectsV2": {
+			"nodes": [],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query UserProjectV2List\b`),
+		httpmock.StringResponse(`
+		{	"data": { "viewer": { "projectsV2": {
+			"nodes": [],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
 		httpmock.GraphQL(`mutation IssueCreate\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "createIssue": { "issue": {
@@ -588,15 +709,12 @@ func TestIssueCreate_metadata(t *testing.T) {
 			assert.Equal(t, []interface{}{"BUGID", "TODOID"}, inputs["labelIds"])
 			assert.Equal(t, []interface{}{"ROADMAPID"}, inputs["projectIds"])
 			assert.Equal(t, "BIGONEID", inputs["milestoneId"])
-			if v, ok := inputs["userIds"]; ok {
-				t.Errorf("did not expect userIds: %v", v)
-			}
-			if v, ok := inputs["teamIds"]; ok {
-				t.Errorf("did not expect teamIds: %v", v)
-			}
+			assert.NotContains(t, inputs, "userIds")
+			assert.NotContains(t, inputs, "teamIds")
+			assert.NotContains(t, inputs, "projectV2Ids")
 		}))
 
-	output, err := runCommand(http, true, `-t TITLE -b BODY -a monalisa -l bug -l todo -p roadmap -m 'big one.oh'`)
+	output, err := runCommand(http, true, `-t TITLE -b BODY -a monalisa -l bug -l todo -p roadmap -m 'big one.oh'`, nil)
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
@@ -617,7 +735,7 @@ func TestIssueCreate_disabledIssues(t *testing.T) {
 			} } }`),
 	)
 
-	_, err := runCommand(http, true, `-t heres -b johnny`)
+	_, err := runCommand(http, true, `-t heres -b johnny`, nil)
 	if err == nil || err.Error() != "the 'OWNER/REPO' repository has disabled issues" {
 		t.Errorf("error running command `issue create`: %v", err)
 	}
@@ -668,7 +786,95 @@ func TestIssueCreate_AtMeAssignee(t *testing.T) {
 			assert.Equal(t, []interface{}{"MONAID", "SOMEID"}, inputs["assigneeIds"])
 		}))
 
-	output, err := runCommand(http, true, `-a @me -a someoneelse -t hello -b "cash rules everything around me"`)
+	output, err := runCommand(http, true, `-a @me -a someoneelse -t hello -b "cash rules everything around me"`, nil)
+	if err != nil {
+		t.Errorf("error running command `issue create`: %v", err)
+	}
+
+	assert.Equal(t, "https://github.com/OWNER/REPO/issues/12\n", output.String())
+}
+
+func TestIssueCreate_projectsV2(t *testing.T) {
+	http := &httpmock.Registry{}
+	defer http.Verify(t)
+
+	http.StubRepoInfoResponse("OWNER", "REPO", "main")
+	http.Register(
+		httpmock.GraphQL(`query RepositoryProjectList\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projects": {
+			"nodes": [],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query OrganizationProjectList\b`),
+		httpmock.StringResponse(`
+		{	"data": { "organization": { "projects": {
+			"nodes": [],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query RepositoryProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "repository": { "projectsV2": {
+			"nodes": [
+				{ "title": "CleanupV2", "id": "CLEANUPV2ID" },
+				{ "title": "RoadmapV2", "id": "ROADMAPV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query OrganizationProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "organization": { "projectsV2": {
+			"nodes": [
+				{ "title": "TriageV2", "id": "TRIAGEV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query UserProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "viewer": { "projectsV2": {
+			"nodes": [
+				{ "title": "MonalisaV2", "id": "MONALISAV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`mutation IssueCreate\b`),
+		httpmock.GraphQLMutation(`
+		{ "data": { "createIssue": { "issue": {
+			"id": "Issue#1",
+			"URL": "https://github.com/OWNER/REPO/issues/12"
+		} } } }
+	`, func(inputs map[string]interface{}) {
+			assert.Equal(t, "TITLE", inputs["title"])
+			assert.Equal(t, "BODY", inputs["body"])
+			assert.Nil(t, inputs["projectIds"])
+			assert.NotContains(t, inputs, "projectV2Ids")
+		}))
+	http.Register(
+		httpmock.GraphQL(`mutation UpdateProjectV2Items\b`),
+		httpmock.GraphQLQuery(`
+			{ "data": { "add_000": { "item": {
+				"id": "1"
+			} } } }
+	`, func(mutations string, inputs map[string]interface{}) {
+			variables, err := json.Marshal(inputs)
+			assert.NoError(t, err)
+			expectedMutations := "mutation UpdateProjectV2Items($input_000: AddProjectV2ItemByIdInput!) {add_000: addProjectV2ItemById(input: $input_000) { item { id } }}"
+			expectedVariables := `{"input_000":{"contentId":"Issue#1","projectId":"ROADMAPV2ID"}}`
+			assert.Equal(t, expectedMutations, mutations)
+			assert.Equal(t, expectedVariables, string(variables))
+		}))
+
+	output, err := runCommand(http, true, `-t TITLE -b BODY -p roadmapv2`, nil)
 	if err != nil {
 		t.Errorf("error running command `issue create`: %v", err)
 	}

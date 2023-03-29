@@ -74,6 +74,7 @@ type PullRequest struct {
 	Assignees      Assignees
 	Labels         Labels
 	ProjectCards   ProjectCards
+	ProjectItems   ProjectItems
 	Milestone      *Milestone
 	Comments       Comments
 	ReactionGroups ReactionGroups
@@ -214,6 +215,10 @@ func (pr PullRequest) Identifier() string {
 	return pr.ID
 }
 
+func (pr PullRequest) CurrentUserComments() []Comment {
+	return pr.Comments.CurrentUserComments()
+}
+
 func (pr PullRequest) IsOpen() bool {
 	return pr.State == "OPEN"
 }
@@ -269,6 +274,7 @@ func (pr *PullRequest) ChecksStatus() (summary PullRequestChecksStatus) {
 		}
 		summary.Total++
 	}
+
 	return
 }
 
@@ -373,6 +379,19 @@ func CreatePullRequest(client *Client, repo *Repository, params map[string]inter
 		}
 	}
 
+	// projectsV2 are added in yet another mutation
+	projectV2Ids, ok := params["projectV2Ids"].([]string)
+	if ok {
+		projectItems := make(map[string]string, len(projectV2Ids))
+		for _, p := range projectV2Ids {
+			projectItems[p] = pr.ID
+		}
+		err = UpdateProjectV2Items(client, repo, projectItems, nil)
+		if err != nil {
+			return pr, err
+		}
+	}
+
 	return pr, nil
 }
 
@@ -454,6 +473,24 @@ func PullRequestReady(client *Client, repo ghrepo.Interface, pr *PullRequest) er
 	}
 
 	return client.Mutate(repo.RepoHost(), "PullRequestReadyForReview", &mutation, variables)
+}
+
+func ConvertPullRequestToDraft(client *Client, repo ghrepo.Interface, pr *PullRequest) error {
+	var mutation struct {
+		ConvertPullRequestToDraft struct {
+			PullRequest struct {
+				ID githubv4.ID
+			}
+		} `graphql:"convertPullRequestToDraft(input: $input)"`
+	}
+
+	variables := map[string]interface{}{
+		"input": githubv4.ConvertPullRequestToDraftInput{
+			PullRequestID: pr.ID,
+		},
+	}
+
+	return client.Mutate(repo.RepoHost(), "ConvertPullRequestToDraft", &mutation, variables)
 }
 
 func BranchDeleteRemote(client *Client, repo ghrepo.Interface, branch string) error {

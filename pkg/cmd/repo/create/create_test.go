@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/run"
@@ -231,6 +232,9 @@ func Test_createRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"someuser","organizations":{"nodes": []}}}}`))
+				reg.Register(
 					httpmock.REST("GET", "gitignore/templates"),
 					httpmock.StringResponse(`["Actionscript","Android","AppceleratorTitanium","Autotools","Bancha","C","C++","Go"]`))
 				reg.Register(
@@ -243,6 +247,75 @@ func Test_createRun(t *testing.T) {
 			},
 			execStubs: func(cs *run.CommandStubber) {
 				cs.Register(`git clone https://github.com/OWNER/REPO.git`, 0, "")
+			},
+		},
+		{
+			name:       "interactive create from scratch but with prompted owner",
+			opts:       &CreateOptions{Interactive: true},
+			tty:        true,
+			wantStdout: "✓ Created repository org1/REPO on GitHub\n",
+			promptStubs: func(p *prompter.PrompterMock) {
+				p.ConfirmFunc = func(message string, defaultValue bool) (bool, error) {
+					switch message {
+					case "Would you like to add a README file?":
+						return false, nil
+					case "Would you like to add a .gitignore?":
+						return false, nil
+					case "Would you like to add a license?":
+						return false, nil
+					case `This will create "org1/REPO" as a private repository on GitHub. Continue?`:
+						return true, nil
+					case "Clone the new repository locally?":
+						return false, nil
+					default:
+						return false, fmt.Errorf("unexpected confirm prompt: %s", message)
+					}
+				}
+				p.InputFunc = func(message, defaultValue string) (string, error) {
+					switch message {
+					case "Repository name":
+						return "REPO", nil
+					case "Description":
+						return "my new repo", nil
+					default:
+						return "", fmt.Errorf("unexpected input prompt: %s", message)
+					}
+				}
+				p.SelectFunc = func(message, defaultValue string, options []string) (int, error) {
+					switch message {
+					case "Repository owner":
+						return prompter.IndexFor(options, "org1")
+					case "What would you like to do?":
+						return prompter.IndexFor(options, "Create a new repository on GitHub from scratch")
+					case "Visibility":
+						return prompter.IndexFor(options, "Private")
+					default:
+						return 0, fmt.Errorf("unexpected select prompt: %s", message)
+					}
+				}
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"someuser","organizations":{"nodes": [{"login": "org1"}, {"login": "org2"}]}}}}`))
+				reg.Register(
+					httpmock.REST("GET", "users/org1"),
+					httpmock.StringResponse(`{"login":"org1","type":"Organization"}`))
+				reg.Register(
+					httpmock.GraphQL(`mutation RepositoryCreate\b`),
+					httpmock.StringResponse(`
+					{
+						"data": {
+							"createRepository": {
+								"repository": {
+									"id": "REPOID",
+									"name": "REPO",
+									"owner": {"login":"org1"},
+									"url": "https://github.com/org1/REPO"
+								}
+							}
+						}
+					}`))
 			},
 		},
 		{
@@ -285,6 +358,11 @@ func Test_createRun(t *testing.T) {
 					}
 				}
 			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"someuser","organizations":{"nodes": []}}}}`))
+			},
 			wantStdout: "",
 			wantErr:    true,
 			errMsg:     "CancelError",
@@ -326,6 +404,9 @@ func Test_createRun(t *testing.T) {
 				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"someuser","organizations":{"nodes": []}}}}`))
 				reg.Register(
 					httpmock.GraphQL(`mutation RepositoryCreate\b`),
 					httpmock.StringResponse(`
@@ -390,6 +471,9 @@ func Test_createRun(t *testing.T) {
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
+					httpmock.GraphQL(`query UserCurrent\b`),
+					httpmock.StringResponse(`{"data":{"viewer":{"login":"someuser","organizations":{"nodes": []}}}}`))
+				reg.Register(
 					httpmock.GraphQL(`mutation RepositoryCreate\b`),
 					httpmock.StringResponse(`
 					{
@@ -409,7 +493,7 @@ func Test_createRun(t *testing.T) {
 				cs.Register(`git -C . rev-parse --git-dir`, 0, ".git")
 				cs.Register(`git -C . rev-parse HEAD`, 0, "commithash")
 				cs.Register(`git -C . remote add origin https://github.com/OWNER/REPO`, 0, "")
-				cs.Register(`git -C . push -u origin HEAD`, 0, "")
+				cs.Register(`git -C . push --set-upstream origin HEAD`, 0, "")
 			},
 			wantStdout: "✓ Created repository OWNER/REPO on GitHub\n✓ Added remote https://github.com/OWNER/REPO.git\n✓ Pushed commits to https://github.com/OWNER/REPO.git\n",
 		},
@@ -492,10 +576,9 @@ func Test_createRun(t *testing.T) {
 			return config.NewBlankConfig(), nil
 		}
 
-		cs, restoreRun := run.Stub()
-		defer restoreRun(t)
-		if tt.execStubs != nil {
-			tt.execStubs(cs)
+		tt.opts.GitClient = &git.Client{
+			GhPath:  "some/path/gh",
+			GitPath: "some/path/git",
 		}
 
 		ios, _, stdout, stderr := iostreams.Test()
@@ -504,6 +587,12 @@ func Test_createRun(t *testing.T) {
 		tt.opts.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
+			cs, restoreRun := run.Stub()
+			defer restoreRun(t)
+			if tt.execStubs != nil {
+				tt.execStubs(cs)
+			}
+
 			defer reg.Verify(t)
 			err := createRun(tt.opts)
 			if tt.wantErr {

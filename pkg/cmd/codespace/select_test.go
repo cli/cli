@@ -47,9 +47,10 @@ func TestApp_Select(t *testing.T) {
 			ios, _, stdout, stderr := iostreams.Test()
 			ios.SetStdinTTY(true)
 			ios.SetStdoutTTY(true)
-			a := NewApp(ios, nil, testSelectApiMock(), nil)
+			a := NewApp(ios, nil, testSelectApiMock(), nil, nil)
 
 			opts := selectOptions{}
+
 			if tt.outputToFile {
 				file, err := os.CreateTemp("", "codespace-selection-test")
 				if err != nil {
@@ -61,7 +62,9 @@ func TestApp_Select(t *testing.T) {
 				opts = selectOptions{filePath: file.Name()}
 			}
 
-			if err := a.Select(context.Background(), tt.arg, opts); (err != nil) != tt.wantErr {
+			opts.selector = &CodespaceSelector{api: a.apiClient, codespaceName: tt.arg}
+
+			if err := a.Select(context.Background(), opts); (err != nil) != tt.wantErr {
 				t.Errorf("App.Select() error = %v, wantErr %v", err, tt.wantErr)
 			}
 

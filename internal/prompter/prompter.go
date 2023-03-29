@@ -3,6 +3,7 @@ package prompter
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/ghinstance"
@@ -12,12 +13,13 @@ import (
 //go:generate moq -rm -out prompter_mock.go . Prompter
 type Prompter interface {
 	Select(string, string, []string) (int, error)
-	MultiSelect(string, string, []string) (int, error)
+	MultiSelect(string, string, []string) ([]string, error)
 	Input(string, string) (string, error)
 	InputHostname() (string, error)
 	Password(string) (string, error)
 	AuthToken() (string, error)
 	Confirm(string, bool) (bool, error)
+	ConfirmDeletion(string) error
 	MarkdownEditor(string, string, bool) (string, error)
 }
 
@@ -55,7 +57,14 @@ func (p *surveyPrompter) Select(message, defaultValue string, options []string) 
 	}
 
 	if defaultValue != "" {
-		q.Default = defaultValue
+		// in some situations, defaultValue ends up not being a valid option; do
+		// not set default in that case as it will make survey panic
+		for _, o := range options {
+			if o == defaultValue {
+				q.Default = defaultValue
+				break
+			}
+		}
 	}
 
 	err = p.ask(q, &result)
@@ -63,7 +72,7 @@ func (p *surveyPrompter) Select(message, defaultValue string, options []string) 
 	return
 }
 
-func (p *surveyPrompter) MultiSelect(message, defaultValue string, options []string) (result int, err error) {
+func (p *surveyPrompter) MultiSelect(message, defaultValue string, options []string) (result []string, err error) {
 	q := &survey.MultiSelect{
 		Message:  message,
 		Options:  options,
@@ -95,6 +104,22 @@ func (p *surveyPrompter) Input(prompt, defaultValue string) (result string, err 
 	}, &result)
 
 	return
+}
+
+func (p *surveyPrompter) ConfirmDeletion(requiredValue string) error {
+	var result string
+	return p.ask(
+		&survey.Input{
+			Message: fmt.Sprintf("Type %s to confirm deletion:", requiredValue),
+		},
+		&result,
+		survey.WithValidator(
+			func(val interface{}) error {
+				if str := val.(string); !strings.EqualFold(str, requiredValue) {
+					return fmt.Errorf("You entered %s", str)
+				}
+				return nil
+			}))
 }
 
 func (p *surveyPrompter) InputHostname() (result string, err error) {

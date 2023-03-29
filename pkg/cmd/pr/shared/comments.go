@@ -13,6 +13,7 @@ import (
 )
 
 type Comment interface {
+	Identifier() string
 	AuthorLogin() string
 	Association() string
 	Content() string

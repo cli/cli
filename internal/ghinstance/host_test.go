@@ -28,6 +28,10 @@ func TestIsEnterprise(t *testing.T) {
 			want: false,
 		},
 		{
+			host: "garage.github.com",
+			want: false,
+		},
+		{
 			host: "ghe.io",
 			want: true,
 		},
@@ -73,6 +77,10 @@ func TestNormalizeHostname(t *testing.T) {
 		{
 			host: "api.github.localhost",
 			want: "github.localhost",
+		},
+		{
+			host: "garage.github.com",
+			want: "github.com",
 		},
 		{
 			host: "GHE.IO",
@@ -145,6 +153,10 @@ func TestGraphQLEndpoint(t *testing.T) {
 			want: "http://api.github.localhost/graphql",
 		},
 		{
+			host: "garage.github.com",
+			want: "https://garage.github.com/api/graphql",
+		},
+		{
 			host: "ghe.io",
 			want: "https://ghe.io/api/graphql",
 		},
@@ -170,6 +182,10 @@ func TestRESTPrefix(t *testing.T) {
 		{
 			host: "github.localhost",
 			want: "http://api.github.localhost/",
+		},
+		{
+			host: "garage.github.com",
+			want: "https://garage.github.com/api/v3/",
 		},
 		{
 			host: "ghe.io",

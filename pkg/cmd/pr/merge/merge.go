@@ -1,21 +1,20 @@
 package merge
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/context"
+	ghContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/cli/cli/v2/pkg/surveyext"
 	"github.com/spf13/cobra"
 )
@@ -26,9 +25,11 @@ type editor interface {
 
 type MergeOptions struct {
 	HttpClient func() (*http.Client, error)
+	GitClient  *git.Client
 	IO         *iostreams.IOStreams
 	Branch     func() (string, error)
-	Remotes    func() (context.Remotes, error)
+	Remotes    func() (ghContext.Remotes, error)
+	Prompter   shared.Prompt
 
 	Finder shared.PRFinder
 
@@ -38,6 +39,8 @@ type MergeOptions struct {
 
 	AutoMergeEnable  bool
 	AutoMergeDisable bool
+
+	AuthorEmail string
 
 	Body    string
 	BodySet bool
@@ -58,8 +61,10 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	opts := &MergeOptions{
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
+		GitClient:  f.GitClient,
 		Branch:     f.Branch,
 		Remotes:    f.Remotes,
+		Prompter:   f.Prompter,
 	}
 
 	var (
@@ -177,6 +182,7 @@ func NewCmdMerge(f *cmdutil.Factory, runF func(*MergeOptions) error) *cobra.Comm
 	cmd.Flags().BoolVar(&opts.AutoMergeEnable, "auto", false, "Automatically merge only after necessary requirements are met")
 	cmd.Flags().BoolVar(&opts.AutoMergeDisable, "disable-auto", false, "Disable auto-merge for this pull request")
 	cmd.Flags().StringVar(&opts.MatchHeadCommit, "match-head-commit", "", "Commit `SHA` that the pull request head must match to allow merge")
+	cmd.Flags().StringVarP(&opts.AuthorEmail, "author-email", "A", "", "Email `text` for merge commit author")
 	return cmd
 }
 
@@ -221,7 +227,7 @@ func (m *mergeContext) warnIfDiverged() {
 		return
 	}
 
-	localBranchLastCommit, err := git.LastCommit()
+	localBranchLastCommit, err := m.opts.GitClient.LastCommit(context.Background())
 	if err != nil {
 		return
 	}
@@ -280,6 +286,7 @@ func (m *mergeContext) merge() error {
 		commitBody:      m.opts.Body,
 		setCommitBody:   m.opts.BodySet,
 		expectedHeadOid: m.opts.MatchHeadCommit,
+		authorEmail:     m.opts.AuthorEmail,
 	}
 
 	if m.shouldAddToMergeQueue() {
@@ -302,7 +309,7 @@ func (m *mergeContext) merge() error {
 				return err
 			}
 
-			payload.method, err = mergeMethodSurvey(r)
+			payload.method, err = mergeMethodSurvey(m.opts.Prompter, r)
 			if err != nil {
 				return err
 			}
@@ -314,7 +321,7 @@ func (m *mergeContext) merge() error {
 
 			allowEditMsg := payload.method != PullRequestMergeMethodRebase
 			for {
-				action, err := confirmSurvey(allowEditMsg)
+				action, err := confirmSurvey(m.opts.Prompter, allowEditMsg)
 				if err != nil {
 					return fmt.Errorf("unable to confirm: %w", err)
 				}
@@ -368,16 +375,12 @@ func (m *mergeContext) deleteLocalBranch() error {
 	}
 
 	if m.merged {
-		// prompt for delete
 		if m.opts.IO.CanPrompt() && !m.opts.IsDeleteBranchIndicated {
-			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-			err := prompt.SurveyAskOne(&survey.Confirm{
-				Message: fmt.Sprintf("Pull request #%d was already merged. Delete the branch locally?", m.pr.Number),
-				Default: false,
-			}, &m.deleteBranch)
+			confirmed, err := m.opts.Prompter.Confirm(fmt.Sprintf("Pull request #%d was already merged. Delete the branch locally?", m.pr.Number), false)
 			if err != nil {
 				return fmt.Errorf("could not prompt: %w", err)
 			}
+			m.deleteBranch = confirmed
 		} else {
 			_ = m.warnf(fmt.Sprintf("%s Pull request #%d was already merged\n", m.cs.WarningIcon(), m.pr.Number))
 		}
@@ -392,6 +395,8 @@ func (m *mergeContext) deleteLocalBranch() error {
 		return err
 	}
 
+	ctx := context.Background()
+
 	// branch the command was run on is the same as the pull request branch
 	if currentBranch == m.pr.HeadRefName {
 		remotes, err := m.opts.Remotes()
@@ -405,24 +410,24 @@ func (m *mergeContext) deleteLocalBranch() error {
 		}
 
 		targetBranch := m.pr.BaseRefName
-		if git.HasLocalBranch(targetBranch) {
-			if err := git.CheckoutBranch(targetBranch); err != nil {
+		if m.opts.GitClient.HasLocalBranch(ctx, targetBranch) {
+			if err := m.opts.GitClient.CheckoutBranch(ctx, targetBranch); err != nil {
 				return err
 			}
 		} else {
-			if err := git.CheckoutNewBranch(baseRemote.Name, targetBranch); err != nil {
+			if err := m.opts.GitClient.CheckoutNewBranch(ctx, baseRemote.Name, targetBranch); err != nil {
 				return err
 			}
 		}
 
-		if err := git.Pull(baseRemote.Name, targetBranch); err != nil {
+		if err := m.opts.GitClient.Pull(ctx, baseRemote.Name, targetBranch); err != nil {
 			_ = m.warnf(fmt.Sprintf("%s warning: not possible to fast-forward to: %q\n", m.cs.WarningIcon(), targetBranch))
 		}
 
 		m.switchedToBranch = targetBranch
 	}
 
-	if err := git.DeleteLocalBranch(m.pr.HeadRefName); err != nil {
+	if err := m.opts.GitClient.DeleteLocalBranch(ctx, m.pr.HeadRefName); err != nil {
 		return fmt.Errorf("failed to delete local branch %s: %w", m.cs.Cyan(m.pr.HeadRefName), err)
 	}
 
@@ -499,7 +504,7 @@ func NewMergeContext(opts *MergeOptions) (*mergeContext, error) {
 		deleteBranch:       opts.DeleteBranch,
 		crossRepoPR:        pr.HeadRepositoryOwner.Login != baseRepo.RepoOwner(),
 		autoMerge:          opts.AutoMergeEnable && !isImmediatelyMergeable(pr.MergeStateStatus),
-		localBranchExists:  opts.CanDeleteLocalBranch && git.HasLocalBranch(pr.HeadRefName),
+		localBranchExists:  opts.CanDeleteLocalBranch && opts.GitClient.HasLocalBranch(context.Background(), pr.HeadRefName),
 		mergeQueueRequired: pr.IsMergeQueueEnabled,
 	}, nil
 }
@@ -541,7 +546,7 @@ func mergeRun(opts *MergeOptions) error {
 	return nil
 }
 
-func mergeMethodSurvey(baseRepo *api.Repository) (PullRequestMergeMethod, error) {
+func mergeMethodSurvey(p shared.Prompt, baseRepo *api.Repository) (PullRequestMergeMethod, error) {
 	type mergeOption struct {
 		title  string
 		method PullRequestMergeMethod
@@ -566,14 +571,8 @@ func mergeMethodSurvey(baseRepo *api.Repository) (PullRequestMergeMethod, error)
 		surveyOpts = append(surveyOpts, v.title)
 	}
 
-	mergeQuestion := &survey.Select{
-		Message: "What merge method would you like to use?",
-		Options: surveyOpts,
-	}
+	result, err := p.Select("What merge method would you like to use?", "", surveyOpts)
 
-	var result int
-	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-	err := prompt.SurveyAskOne(mergeQuestion, &result)
 	return mergeOpts[result].method, err
 }
 
@@ -586,20 +585,13 @@ func deleteBranchSurvey(opts *MergeOptions, crossRepoPR, localBranchExists bool)
 			message = "Delete the branch on GitHub?"
 		}
 
-		var result bool
-		submit := &survey.Confirm{
-			Message: message,
-			Default: false,
-		}
-		//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-		err := prompt.SurveyAskOne(submit, &result)
-		return result, err
+		return opts.Prompter.Confirm(message, false)
 	}
 
 	return opts.DeleteBranch, nil
 }
 
-func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
+func confirmSurvey(p shared.Prompt, allowEditMsg bool) (shared.Action, error) {
 	const (
 		submitLabel            = "Submit"
 		editCommitSubjectLabel = "Edit commit subject"
@@ -613,18 +605,12 @@ func confirmSurvey(allowEditMsg bool) (shared.Action, error) {
 	}
 	options = append(options, cancelLabel)
 
-	var result string
-	submit := &survey.Select{
-		Message: "What's next?",
-		Options: options,
-	}
-	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-	err := prompt.SurveyAskOne(submit, &result)
+	selected, err := p.Select("What's next?", "", options)
 	if err != nil {
 		return shared.CancelAction, fmt.Errorf("could not prompt: %w", err)
 	}
 
-	switch result {
+	switch options[selected] {
 	case submitLabel:
 		return shared.SubmitAction, nil
 	case editCommitSubjectLabel:
@@ -726,7 +712,7 @@ func allowsAdminOverride(status string) bool {
 	}
 }
 
-func remoteForMergeConflictResolution(baseRepo ghrepo.Interface, pr *api.PullRequest, opts *MergeOptions) *context.Remote {
+func remoteForMergeConflictResolution(baseRepo ghrepo.Interface, pr *api.PullRequest, opts *MergeOptions) *ghContext.Remote {
 	if !mergeConflictStatus(pr.MergeStateStatus) || !opts.CanDeleteLocalBranch {
 		return nil
 	}

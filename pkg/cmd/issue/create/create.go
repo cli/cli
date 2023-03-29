@@ -1,6 +1,7 @@
 package create
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -23,6 +24,7 @@ type CreateOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser.Browser
+	Prompter   prShared.Prompt
 
 	RootDirOverride string
 
@@ -38,6 +40,7 @@ type CreateOptions struct {
 	Labels    []string
 	Projects  []string
 	Milestone string
+	Template  string
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -46,6 +49,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
 		Browser:    f.Browser,
+		Prompter:   f.Prompter,
 	}
 
 	var bodyFile string
@@ -53,6 +57,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a new issue",
+		Long: heredoc.Doc(`
+			Create an issue on GitHub.
+
+			Adding an issue to projects requires authorization with the "project" scope.
+			To authorize, run "gh auth refresh -s project".
+		`),
 		Example: heredoc.Doc(`
 			$ gh issue create --title "I found a bug" --body "Nothing works"
 			$ gh issue create --label "bug,help wanted"
@@ -83,6 +93,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("`--recover` only supported when running interactively")
 			}
 
+			if opts.Template != "" && bodyProvided {
+				return errors.New("`--template` is not supported when using `--body` or `--body-file`")
+			}
+
 			opts.Interactive = !(titleProvided && bodyProvided)
 
 			if opts.Interactive && !opts.IO.CanPrompt() {
@@ -105,6 +119,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().StringSliceVarP(&opts.Projects, "project", "p", nil, "Add the issue to projects by `name`")
 	cmd.Flags().StringVarP(&opts.Milestone, "milestone", "m", "", "Add the issue to a milestone by `name`")
 	cmd.Flags().StringVar(&opts.RecoverFile, "recover", "", "Recover input from a failed run of create")
+	cmd.Flags().StringVarP(&opts.Template, "template", "T", "", "Template `name` to use as starting body text")
 
 	return cmd
 }
@@ -152,7 +167,7 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 	}
 
-	tpl := shared.NewTemplateManager(httpClient, baseRepo, opts.RootDirOverride, !opts.HasRepoOverride, false)
+	tpl := shared.NewTemplateManager(httpClient, baseRepo, opts.Prompter, opts.RootDirOverride, !opts.HasRepoOverride, false)
 
 	if opts.WebMode {
 		var openURL string
@@ -194,16 +209,10 @@ func createRun(opts *CreateOptions) (err error) {
 	var openURL string
 
 	if opts.Interactive {
-		var editorCommand string
-		editorCommand, err = cmdutil.DetermineEditor(opts.Config)
-		if err != nil {
-			return
-		}
-
 		defer prShared.PreserveInput(opts.IO, &tb, &err)()
 
 		if opts.Title == "" {
-			err = prShared.TitleSurvey(&tb)
+			err = prShared.TitleSurvey(opts.Prompter, &tb)
 			if err != nil {
 				return
 			}
@@ -214,9 +223,17 @@ func createRun(opts *CreateOptions) (err error) {
 
 			if opts.RecoverFile == "" {
 				var template shared.Template
-				template, err = tpl.Choose()
-				if err != nil {
-					return
+
+				if opts.Template != "" {
+					template, err = tpl.Select(opts.Template)
+					if err != nil {
+						return
+					}
+				} else {
+					template, err = tpl.Choose()
+					if err != nil {
+						return
+					}
 				}
 
 				if template != nil {
@@ -227,7 +244,7 @@ func createRun(opts *CreateOptions) (err error) {
 				}
 			}
 
-			err = prShared.BodySurvey(&tb, templateContent, editorCommand)
+			err = prShared.BodySurvey(opts.Prompter, &tb, templateContent)
 			if err != nil {
 				return
 			}
@@ -239,7 +256,7 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 
 		allowPreview := !tb.HasMetadata() && prShared.ValidURL(openURL)
-		action, err = prShared.ConfirmIssueSubmission(allowPreview, repo.ViewerCanTriage())
+		action, err = prShared.ConfirmIssueSubmission(opts.Prompter, allowPreview, repo.ViewerCanTriage())
 		if err != nil {
 			err = fmt.Errorf("unable to confirm: %w", err)
 			return
@@ -257,7 +274,7 @@ func createRun(opts *CreateOptions) (err error) {
 				return
 			}
 
-			action, err = prShared.ConfirmIssueSubmission(!tb.HasMetadata(), false)
+			action, err = prShared.ConfirmIssueSubmission(opts.Prompter, !tb.HasMetadata(), false)
 			if err != nil {
 				return
 			}

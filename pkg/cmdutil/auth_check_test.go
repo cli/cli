@@ -21,8 +21,10 @@ func Test_CheckAuth(t *testing.T) {
 		{
 			name: "no known hosts, env auth token",
 			cfgStubs: func(c *config.ConfigMock) {
-				c.AuthTokenFunc = func(string) (string, string) {
-					return "token", "GITHUB_TOKEN"
+				c.AuthenticationFunc = func() *config.AuthConfig {
+					authCfg := &config.AuthConfig{}
+					authCfg.SetToken("token", "GITHUB_TOKEN")
+					return authCfg
 				}
 			},
 			expected: true,
@@ -31,6 +33,13 @@ func Test_CheckAuth(t *testing.T) {
 			name: "known host",
 			cfgStubs: func(c *config.ConfigMock) {
 				c.Set("github.com", "oauth_token", "token")
+			},
+			expected: true,
+		},
+		{
+			name: "enterprise token",
+			cfgStubs: func(c *config.ConfigMock) {
+				t.Setenv("GH_ENTERPRISE_TOKEN", "token")
 			},
 			expected: true,
 		},

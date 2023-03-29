@@ -10,6 +10,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -67,6 +68,7 @@ type createOptions struct {
 	devContainerPath  string
 	idleTimeout       time.Duration
 	retentionPeriod   NullableDuration
+	displayName       string
 }
 
 func newCreateCmd(app *App) *cobra.Command {
@@ -81,7 +83,11 @@ func newCreateCmd(app *App) *cobra.Command {
 		},
 	}
 
-	createCmd.Flags().StringVarP(&opts.repo, "repo", "r", "", "repository name with owner: user/repo")
+	createCmd.Flags().StringVarP(&opts.repo, "repo", "R", "", "repository name with owner: user/repo")
+	if err := addDeprecatedRepoShorthand(createCmd, &opts.repo); err != nil {
+		fmt.Fprintf(app.io.ErrOut, "%v\n", err)
+	}
+
 	createCmd.Flags().StringVarP(&opts.branch, "branch", "b", "", "repository branch")
 	createCmd.Flags().StringVarP(&opts.location, "location", "l", "", "location: {EastUs|SouthEastAsia|WestEurope|WestUs2} (determined automatically if not provided)")
 	createCmd.Flags().StringVarP(&opts.machine, "machine", "m", "", "hardware specifications for the VM")
@@ -90,6 +96,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 0, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
 	createCmd.Flags().Var(&opts.retentionPeriod, "retention-period", "allowed time after shutting down before the codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
 	createCmd.Flags().StringVar(&opts.devContainerPath, "devcontainer-path", "", "path to the devcontainer.json file to use when creating codespace")
+	createCmd.Flags().StringVarP(&opts.displayName, "display-name", "d", "", "display name for the codespace")
 
 	return createCmd
 }
@@ -113,12 +120,24 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 
 	promptForRepoAndBranch := userInputs.Repository == ""
 	if promptForRepoAndBranch {
+		var defaultRepo string
+		if remotes, _ := a.remotes(); remotes != nil {
+			if defaultRemote, _ := remotes.ResolvedRemote(); defaultRemote != nil {
+				// this is a remote explicitly chosen via `repo set-default`
+				defaultRepo = ghrepo.FullName(defaultRemote)
+			} else if len(remotes) > 0 {
+				// as a fallback, just pick the first remote
+				defaultRepo = ghrepo.FullName(remotes[0])
+			}
+		}
+
 		repoQuestions := []*survey.Question{
 			{
 				Name: "repository",
 				Prompt: &survey.Input{
 					Message: "Repository:",
 					Help:    "Search for repos by name. To search within an org or user, or to see private repos, enter at least ':user/'.",
+					Default: defaultRepo,
 					Suggest: func(toComplete string) []string {
 						return getRepoSuggestions(ctx, a.apiClient, toComplete)
 					},
@@ -135,20 +154,23 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		userInputs.Location = vscsLocation
 	}
 
-	a.StartProgressIndicatorWithLabel("Fetching repository")
-	repository, err := a.apiClient.GetRepository(ctx, userInputs.Repository)
-	a.StopProgressIndicator()
+	var repository *api.Repository
+	err := a.RunWithProgress("Fetching repository", func() (err error) {
+		repository, err = a.apiClient.GetRepository(ctx, userInputs.Repository)
+		return
+	})
 	if err != nil {
 		return fmt.Errorf("error getting repository: %w", err)
 	}
 
-	a.StartProgressIndicatorWithLabel("Validating repository for codespaces")
-	billableOwner, err := a.apiClient.GetCodespaceBillableOwner(ctx, userInputs.Repository)
-	a.StopProgressIndicator()
-
+	var billableOwner *api.User
+	err = a.RunWithProgress("Validating repository for codespaces", func() (err error) {
+		billableOwner, err = a.apiClient.GetCodespaceBillableOwner(ctx, userInputs.Repository)
+		return
+	})
 	if err != nil {
 		return fmt.Errorf("error checking codespace ownership: %w", err)
-	} else if billableOwner != nil && billableOwner.Type == "Organization" {
+	} else if billableOwner != nil && (billableOwner.Type == "Organization" || billableOwner.Type == "User") {
 		cs := a.io.ColorScheme()
 		fmt.Fprintln(a.io.ErrOut, cs.Blue("  ✓ Codespaces usage for this repository is paid for by "+billableOwner.Login))
 	}
@@ -182,9 +204,11 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 
 	// now that we have repo+branch, we can list available devcontainer.json files (if any)
 	if opts.devContainerPath == "" {
-		a.StartProgressIndicatorWithLabel("Fetching devcontainer.json files")
-		devcontainers, err := a.apiClient.ListDevContainers(ctx, repository.ID, branch, 100)
-		a.StopProgressIndicator()
+		var devcontainers []api.DevContainerEntry
+		err = a.RunWithProgress("Fetching devcontainer.json files", func() (err error) {
+			devcontainers, err = a.apiClient.ListDevContainers(ctx, repository.ID, branch, 100)
+			return
+		})
 		if err != nil {
 			return fmt.Errorf("error getting devcontainer.json paths: %w", err)
 		}
@@ -225,7 +249,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		}
 	}
 
-	machine, err := getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, userInputs.Location)
+	machine, err := getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, userInputs.Location, devContainerPath)
 	if err != nil {
 		return fmt.Errorf("error getting machine type: %w", err)
 	}
@@ -244,11 +268,14 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		RetentionPeriodMinutes: opts.retentionPeriod.Minutes(),
 		DevContainerPath:       devContainerPath,
 		PermissionsOptOut:      opts.permissionsOptOut,
+		DisplayName:            opts.displayName,
 	}
 
-	a.StartProgressIndicatorWithLabel("Creating codespace")
-	codespace, err := a.apiClient.CreateCodespace(ctx, createParams)
-	a.StopProgressIndicator()
+	var codespace *api.Codespace
+	err = a.RunWithProgress("Creating codespace", func() (err error) {
+		codespace, err = a.apiClient.CreateCodespace(ctx, createParams)
+		return
+	})
 
 	if err != nil {
 		var aerr api.AcceptPermissionsRequiredError
@@ -335,9 +362,11 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 	// we can continue with the create opting out of the additional permissions
 	createParams.PermissionsOptOut = true
 
-	a.StartProgressIndicatorWithLabel("Creating codespace")
-	codespace, err := a.apiClient.CreateCodespace(ctx, createParams)
-	a.StopProgressIndicator()
+	var codespace *api.Codespace
+	err := a.RunWithProgress("Creating codespace", func() (err error) {
+		codespace, err = a.apiClient.CreateCodespace(ctx, createParams)
+		return
+	})
 
 	if err != nil {
 		return nil, fmt.Errorf("error creating codespace: %w", err)
@@ -411,8 +440,8 @@ func (a *App) showStatus(ctx context.Context, codespace *api.Codespace) error {
 }
 
 // getMachineName prompts the user to select the machine type, or validates the machine if non-empty.
-func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machine, branch, location string) (string, error) {
-	machines, err := apiClient.GetCodespacesMachines(ctx, repoID, branch, location)
+func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machine, branch, location string, devcontainerPath string) (string, error) {
+	machines, err := apiClient.GetCodespacesMachines(ctx, repoID, branch, location, devcontainerPath)
 	if err != nil {
 		return "", fmt.Errorf("error requesting machine instance types: %w", err)
 	}

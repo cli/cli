@@ -8,6 +8,10 @@ import (
 	"strings"
 )
 
+const (
+	gitAuthRE = `-c credential.helper= -c credential.helper=!"[^"]+" auth git-credential `
+)
+
 type T interface {
 	Helper()
 	Errorf(string, ...interface{})
@@ -71,6 +75,9 @@ func (cs *CommandStubber) Register(pattern string, exitStatus int, output string
 	if len(pattern) < 1 {
 		panic("cannot use empty regexp pattern")
 	}
+	if strings.HasPrefix(pattern, "git") {
+		pattern = addGitAuthentication(pattern)
+	}
 	cs.stubs = append(cs.stubs, &commandStub{
 		pattern:    regexp.MustCompile(pattern),
 		exitStatus: exitStatus,
@@ -99,18 +106,46 @@ type commandStub struct {
 	callbacks  []CommandCallback
 }
 
+type errWithExitCode struct {
+	message  string
+	exitCode int
+}
+
+func (e errWithExitCode) Error() string {
+	return e.message
+}
+
+func (e errWithExitCode) ExitCode() int {
+	return e.exitCode
+}
+
 // Run satisfies Runnable
 func (s *commandStub) Run() error {
 	if s.exitStatus != 0 {
-		return fmt.Errorf("%s exited with status %d", s.pattern, s.exitStatus)
+		// It's nontrivial to construct a fake `exec.ExitError` instance, so we return an error type
+		// that has the `ExitCode() int` method.
+		return errWithExitCode{
+			message:  fmt.Sprintf("%s exited with status %d", s.pattern, s.exitStatus),
+			exitCode: s.exitStatus,
+		}
 	}
 	return nil
 }
 
 // Output satisfies Runnable
 func (s *commandStub) Output() ([]byte, error) {
-	if s.exitStatus != 0 {
-		return []byte(nil), fmt.Errorf("%s exited with status %d", s.pattern, s.exitStatus)
+	if err := s.Run(); err != nil {
+		return []byte(nil), err
 	}
 	return []byte(s.stdout), nil
+}
+
+// Inject git authentication string for specific git commands.
+func addGitAuthentication(s string) string {
+	pattern := regexp.MustCompile(`( fetch | pull | push | clone | remote add.+-f | submodule )`)
+	loc := pattern.FindStringIndex(s)
+	if loc == nil {
+		return s
+	}
+	return s[:loc[0]+1] + gitAuthRE + s[loc[0]+1:]
 }

@@ -27,7 +27,7 @@ func AddJSONFlags(cmd *cobra.Command, exportTarget *Exporter, fields []string) {
 	f := cmd.Flags()
 	f.StringSlice("json", nil, "Output JSON with the specified `fields`")
 	f.StringP("jq", "q", "", "Filter JSON output using a jq `expression`")
-	f.StringP("template", "t", "", "Format JSON output using a Go template")
+	f.StringP("template", "t", "", "Format JSON output using a Go template; see \"gh help formatting\"")
 
 	_ = cmd.RegisterFlagCompletionFunc("json", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		var results []string
