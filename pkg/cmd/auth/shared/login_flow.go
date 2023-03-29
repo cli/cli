@@ -200,7 +200,7 @@ func Login(opts *LoginOptions) error {
 	}
 
 	if keyToUpload != "" {
-		err := sshKeyUpload(httpClient, hostname, keyToUpload, keyTitle)
+		err := sshKeyUpload(httpClient, hostname, keyToUpload, keyTitle, opts.IO)
 		if err != nil {
 			return err
 		}
@@ -223,14 +223,14 @@ func scopesSentence(scopes []string, isEnterprise bool) string {
 	return strings.Join(quoted, ", ")
 }
 
-func sshKeyUpload(httpClient *http.Client, hostname, keyFile string, title string) error {
+func sshKeyUpload(httpClient *http.Client, hostname, keyFile string, title string, ios *iostreams.IOStreams) error {
 	f, err := os.Open(keyFile)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	return add.SSHKeyUpload(httpClient, hostname, f, title)
+	return add.SSHKeyUpload(httpClient, hostname, f, title, false, ios)
 }
 
 func getCurrentLogin(httpClient httpClient, hostname, authToken string) (string, error) {
