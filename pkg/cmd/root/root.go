@@ -22,6 +22,7 @@ import (
 	gpgKeyCmd "github.com/cli/cli/v2/pkg/cmd/gpg-key"
 	issueCmd "github.com/cli/cli/v2/pkg/cmd/issue"
 	labelCmd "github.com/cli/cli/v2/pkg/cmd/label"
+	orgCmd "github.com/cli/cli/v2/pkg/cmd/org"
 	prCmd "github.com/cli/cli/v2/pkg/cmd/pr"
 	releaseCmd "github.com/cli/cli/v2/pkg/cmd/release"
 	repoCmd "github.com/cli/cli/v2/pkg/cmd/repo"
@@ -115,6 +116,7 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 
 	cmd.AddCommand(browseCmd.NewCmdBrowse(&repoResolvingCmdFactory, nil))
 	cmd.AddCommand(prCmd.NewCmdPR(&repoResolvingCmdFactory))
+	cmd.AddCommand(orgCmd.NewCmdOrg(&repoResolvingCmdFactory))
 	cmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory))
 	cmd.AddCommand(releaseCmd.NewCmdRelease(&repoResolvingCmdFactory))
 	cmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
