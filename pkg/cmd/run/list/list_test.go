@@ -69,6 +69,14 @@ func TestNewCmdList(t *testing.T) {
 				Actor: "bak1an",
 			},
 		},
+		{
+			name: "status",
+			cli:  "--status completed",
+			wants: ListOptions{
+				Limit:  defaultLimit,
+				Status: "completed",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -388,6 +396,23 @@ func TestListRun(t *testing.T) {
 				reg.Register(
 					httpmock.QueryMatcher("GET", "repos/OWNER/REPO/actions/runs", url.Values{
 						"actor": []string{"bak1an"},
+					}),
+					httpmock.JSONResponse(shared.RunsPayload{}),
+				)
+			},
+			wantErr: true,
+		},
+		{
+			name: "status filter applied",
+			opts: &ListOptions{
+				Limit:  defaultLimit,
+				Status: "queued",
+			},
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.QueryMatcher("GET", "repos/OWNER/REPO/actions/runs", url.Values{
+						"status": []string{"queued"},
 					}),
 					httpmock.JSONResponse(shared.RunsPayload{}),
 				)

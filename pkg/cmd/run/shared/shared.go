@@ -44,6 +44,23 @@ type Status string
 type Conclusion string
 type Level string
 
+var AllStatuses = []string{
+	"queued",
+	"completed",
+	"in_progress",
+	"requested",
+	"waiting",
+	"action_required",
+	"cancelled",
+	"failure",
+	"neutral",
+	"skipped",
+	"stale",
+	"startup_failure",
+	"success",
+	"timed_out",
+}
+
 var RunFields = []string{
 	"name",
 	"displayTitle",
@@ -284,6 +301,7 @@ type FilterOptions struct {
 	WorkflowID int64
 	// avoid loading workflow name separately and use the provided one
 	WorkflowName string
+	Status       string
 }
 
 // GetRunsWithFilter fetches 50 runs from the API and filters them in-memory
@@ -325,6 +343,9 @@ func GetRuns(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, lim
 		}
 		if opts.Actor != "" {
 			path += fmt.Sprintf("&actor=%s", url.QueryEscape(opts.Actor))
+		}
+		if opts.Status != "" {
+			path += fmt.Sprintf("&status=%s", url.QueryEscape(opts.Status))
 		}
 	}
 
