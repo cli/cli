@@ -177,6 +177,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmdutil.NilBoolFlag(cmd, &opts.IsLatest, "latest", "", "Mark this release as \"Latest\" (default: automatic based on date and version)")
 	cmd.Flags().BoolVarP(&opts.VerifyTag, "verify-tag", "", false, "Abort in case the git tag doesn't already exist in the remote repository")
 
+	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "target")
+
 	return cmd
 }
 

@@ -184,5 +184,7 @@ func NewCmdPrs(f *cmdutil.Factory, runF func(*shared.IssuesOptions) error) *cobr
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.ReviewedBy, "reviewed-by", "", "Filter on `user` who reviewed")
 	cmdutil.StringEnumFlag(cmd, &opts.Query.Qualifiers.Status, "checks", "", "", []string{"pending", "success", "failure"}, "Filter based on status of the checks")
 
+	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "base", "head")
+
 	return cmd
 }
