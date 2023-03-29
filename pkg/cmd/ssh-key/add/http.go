@@ -10,13 +10,8 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 )
 
-func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, title string) error {
+func SSHKeyUpload(httpClient *http.Client, hostname string, keyBytes []byte, title string) error {
 	url := ghinstance.RESTPrefix(hostname) + "user/keys"
-
-	keyBytes, err := io.ReadAll(keyFile)
-	if err != nil {
-		return err
-	}
 
 	payload := map[string]string{
 		"title": title,

@@ -230,7 +230,11 @@ func sshKeyUpload(httpClient *http.Client, hostname, keyFile string, title strin
 	}
 	defer f.Close()
 
-	return add.SSHKeyUpload(httpClient, hostname, f, title)
+	keyBytes, err := add.KeyBytes(f)
+	if err != nil {
+		return err
+	}
+	return add.SSHKeyUpload(httpClient, hostname, keyBytes, title)
 }
 
 func getCurrentLogin(httpClient httpClient, hostname, authToken string) (string, error) {

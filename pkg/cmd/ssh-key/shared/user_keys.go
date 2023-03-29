@@ -1,4 +1,4 @@
-package list
+package shared
 
 import (
 	"encoding/json"
@@ -18,7 +18,7 @@ type sshKey struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-func userKeys(httpClient *http.Client, host, userHandle string) ([]sshKey, error) {
+func UserKeys(httpClient *http.Client, host, userHandle string) ([]sshKey, error) {
 	resource := "user/keys"
 	if userHandle != "" {
 		resource = fmt.Sprintf("users/%s/keys", userHandle)
