@@ -587,7 +587,7 @@ func cloneWithRetry(opts *CreateOptions, remoteURL, branch string) error {
 		if errors.As(err, &execError) && execError.ExitCode() == 128 {
 			return err
 		} else {
-			io.Copy(opts.IO.ErrOut, stderr)
+			_, _ = io.Copy(opts.IO.ErrOut, stderr)
 		}
 
 		return backoff.Permanent(err)
