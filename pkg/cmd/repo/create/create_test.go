@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/prompter"
@@ -602,13 +603,14 @@ func Test_createRun(t *testing.T) {
 			wantStdout: "https://github.com/OWNER/REPO\n",
 		},
 		{
-			name: "noninteractive create from template",
+			name: "noninteractive create from template with retry",
 			opts: &CreateOptions{
 				Interactive: false,
 				Name:        "REPO",
 				Visibility:  "PRIVATE",
 				Clone:       true,
 				Template:    "mytemplate",
+				BackOff:     &backoff.ZeroBackOff{},
 			},
 			tty: false,
 			httpStubs: func(reg *httpmock.Registry) {
@@ -621,7 +623,10 @@ func Test_createRun(t *testing.T) {
 					httpmock.GraphQLQuery(`{
 						"data": {
 							"repository": {
-								"id": "REPOID"
+								"id": "REPOID",
+								"defaultBranchRef": {
+									"name": "main"
+								}
 							}
 						}
 					}`, func(s string, m map[string]interface{}) {
@@ -651,7 +656,9 @@ func Test_createRun(t *testing.T) {
 					}))
 			},
 			execStubs: func(cs *run.CommandStubber) {
-				cs.Register(`git clone https://github.com/OWNER/REPO`, 0, "")
+				// fatal: Remote branch main not found in upstream origin
+				cs.Register(`git clone --branch main https://github.com/OWNER/REPO`, 128, "")
+				cs.Register(`git clone --branch main https://github.com/OWNER/REPO`, 0, "")
 			},
 			wantStdout: "https://github.com/OWNER/REPO\n",
 		},

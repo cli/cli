@@ -1,9 +1,11 @@
 package create
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os/exec"
 	"path/filepath"
@@ -335,6 +337,7 @@ func createFromScratch(opts *CreateOptions) error {
 		InitReadme:         opts.AddReadme,
 	}
 
+	var templateRepoMainBranch string
 	if opts.Template != "" {
 		var templateRepo ghrepo.Interface
 		apiClient := api.NewClientFromHTTP(httpClient)
@@ -358,6 +361,7 @@ func createFromScratch(opts *CreateOptions) error {
 		}
 
 		input.TemplateRepositoryID = repo.ID
+		templateRepoMainBranch = repo.DefaultBranchRef.Name
 	}
 
 	repo, err := repoCreate(httpClient, repoToCreate.RepoHost(), input)
@@ -397,7 +401,7 @@ func createFromScratch(opts *CreateOptions) error {
 			if err := localInit(opts.GitClient, remoteURL, repo.RepoName()); err != nil {
 				return err
 			}
-		} else if err := cloneWithRetry(opts, remoteURL); err != nil {
+		} else if err := cloneWithRetry(opts, remoteURL, templateRepoMainBranch); err != nil {
 			return err
 		}
 	}
@@ -563,19 +567,27 @@ func createFromLocal(opts *CreateOptions) error {
 	return nil
 }
 
-func cloneWithRetry(opts *CreateOptions, remoteURL string) error {
+func cloneWithRetry(opts *CreateOptions, remoteURL, branch string) error {
 	// Allow injecting alternative BackOff in tests.
 	if opts.BackOff == nil {
 		opts.BackOff = backoff.NewConstantBackOff(3 * time.Second)
 	}
 
+	var args []string
+	if branch != "" {
+		args = append(args, "--branch", branch)
+	}
+
 	ctx := context.Background()
 	return backoff.Retry(func() error {
-		_, err := opts.GitClient.Clone(ctx, remoteURL, []string{})
+		stderr := &bytes.Buffer{}
+		_, err := opts.GitClient.Clone(ctx, remoteURL, args, git.WithStderr(stderr))
 
 		var execError errWithExitCode
 		if errors.As(err, &execError) && execError.ExitCode() == 128 {
 			return err
+		} else {
+			io.Copy(opts.IO.ErrOut, stderr)
 		}
 
 		return backoff.Permanent(err)
