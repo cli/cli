@@ -464,7 +464,7 @@ func SelectRun(p prompter.Prompter, cs *iostreams.ColorScheme, runs []Run) (stri
 	return fmt.Sprintf("%d", runs[selected].ID), nil
 }
 
-// Deprecated: use SelectRun
+// TODO: this should be deprecated in favor of SelectRun
 func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 	var selected int
 	now := time.Now()
