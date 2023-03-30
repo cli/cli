@@ -442,6 +442,7 @@ func GetJob(client *api.Client, repo ghrepo.Interface, jobID string) (*Job, erro
 	return &result, nil
 }
 
+// SelectRun prompts the user to select a run from a list of runs by using the recommended prompter interface
 func SelectRun(p prompter.Prompter, cs *iostreams.ColorScheme, runs []Run) (string, error) {
 	now := time.Now()
 
