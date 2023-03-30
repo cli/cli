@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	defaultLimit = 20
+	defaultRunGetLimit = 10
 )
 
 type DeleteOptions struct {
@@ -39,7 +39,7 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Co
 		Use:   "delete [<run-id>]",
 		Short: "Delete a workflow run",
 		Example: heredoc.Doc(`
-			# Interactively select a run to delete, optionally selecting a single job
+			# Interactively select a run to delete
 			$ gh run delete
 
 			# Delete a specific run
@@ -87,7 +87,7 @@ func runDelete(opts *DeleteOptions) error {
 	var run *shared.Run
 
 	if opts.Prompt {
-		payload, err := shared.GetRuns(client, repo, nil, defaultLimit)
+		payload, err := shared.GetRuns(client, repo, nil, defaultRunGetLimit)
 		if err != nil {
 			return fmt.Errorf("failed to get runs: %w", err)
 		}
@@ -134,7 +134,6 @@ func runDelete(opts *DeleteOptions) error {
 	}
 
 	fmt.Fprintf(opts.IO.Out, "%s Request to delete workflow submitted.\n", cs.SuccessIcon())
-
 	return nil
 }
 
