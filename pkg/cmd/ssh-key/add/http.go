@@ -24,14 +24,14 @@ func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 		return err
 	}
 
-	userKey := string(keyBytes)
-	splitKey := strings.Fields(userKey)
+	fullUserKey := string(keyBytes)
+	splitKey := strings.Fields(fullUserKey)
 	if len(splitKey) < 2 {
 		fmt.Fprintf(ios.ErrOut, "%s Error: provided key is not in a valid format\n", cs.FailureIcon())
 		return cmdutil.SilentError
 	}
 
-	userKey = splitKey[0] + " " + splitKey[1]
+	keyToCompare := splitKey[0] + " " + splitKey[1]
 
 	keys, err := shared.UserKeys(httpClient, hostname, "")
 	if err != nil {
@@ -39,8 +39,8 @@ func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 	}
 
 	for _, k := range keys {
-		if k.Key == userKey {
-			if printSuccessMsgs && ios.IsStdoutTTY() {
+		if k.Key == keyToCompare {
+			if printSuccessMsgs && ios.IsStderrTTY() {
 				fmt.Fprintf(ios.ErrOut, "%s Public key already exists on your account\n", cs.SuccessIcon())
 			}
 			return nil
@@ -49,7 +49,7 @@ func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 
 	payload := map[string]string{
 		"title": title,
-		"key":   string(keyBytes),
+		"key":   fullUserKey,
 	}
 
 	payloadBytes, err := json.Marshal(payload)
@@ -77,7 +77,7 @@ func SSHKeyUpload(httpClient *http.Client, hostname string, keyFile io.Reader, t
 		return err
 	}
 
-	if printSuccessMsgs {
+	if printSuccessMsgs && ios.IsStderrTTY() {
 		fmt.Fprintf(ios.ErrOut, "%s Public key added to your account\n", cs.SuccessIcon())
 	}
 	return nil
