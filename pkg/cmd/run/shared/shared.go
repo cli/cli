@@ -44,6 +44,23 @@ type Status string
 type Conclusion string
 type Level string
 
+var AllStatuses = []string{
+	"queued",
+	"completed",
+	"in_progress",
+	"requested",
+	"waiting",
+	"action_required",
+	"cancelled",
+	"failure",
+	"neutral",
+	"skipped",
+	"stale",
+	"startup_failure",
+	"success",
+	"timed_out",
+}
+
 var RunFields = []string{
 	"name",
 	"displayTitle",
@@ -284,6 +301,7 @@ type FilterOptions struct {
 	WorkflowID int64
 	// avoid loading workflow name separately and use the provided one
 	WorkflowName string
+	Status       string
 }
 
 // GetRunsWithFilter fetches 50 runs from the API and filters them in-memory
@@ -325,6 +343,9 @@ func GetRuns(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, lim
 		}
 		if opts.Actor != "" {
 			path += fmt.Sprintf("&actor=%s", url.QueryEscape(opts.Actor))
+		}
+		if opts.Status != "" {
+			path += fmt.Sprintf("&status=%s", url.QueryEscape(opts.Status))
 		}
 	}
 
@@ -449,14 +470,25 @@ func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
 	return fmt.Sprintf("%d", runs[selected].ID), nil
 }
 
-func GetRun(client *api.Client, repo ghrepo.Interface, runID string) (*Run, error) {
+func GetRun(client *api.Client, repo ghrepo.Interface, runID string, attempt uint64) (*Run, error) {
 	var result Run
 
 	path := fmt.Sprintf("repos/%s/actions/runs/%s?exclude_pull_requests=true", ghrepo.FullName(repo), runID)
 
+	if attempt > 0 {
+		path = fmt.Sprintf("repos/%s/actions/runs/%s/attempts/%d?exclude_pull_requests=true", ghrepo.FullName(repo), runID, attempt)
+	}
+
 	err := client.REST(repo.RepoHost(), "GET", path, nil, &result)
 	if err != nil {
 		return nil, err
+	}
+
+	if attempt > 0 {
+		result.URL, err = url.JoinPath(result.URL, fmt.Sprintf("/attempts/%d", attempt))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Set name to workflow name
