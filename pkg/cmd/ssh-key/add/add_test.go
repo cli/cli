@@ -62,8 +62,8 @@ func Test_runAdd(t *testing.T) {
 			name:       "invalid key format",
 			stdin:      "ssh-ed25519",
 			wantStdout: "",
-			wantStderr: "X Error: provided key is not in a valid format\n",
-			wantErrMsg: "SilentError",
+			wantStderr: "",
+			wantErrMsg: "provided key is not in a valid format",
 			opts:       AddOptions{KeyFile: "-"},
 		},
 	}

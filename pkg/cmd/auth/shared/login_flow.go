@@ -200,11 +200,16 @@ func Login(opts *LoginOptions) error {
 	}
 
 	if keyToUpload != "" {
-		err := sshKeyUpload(httpClient, hostname, keyToUpload, keyTitle, opts.IO)
+		uploaded, err := sshKeyUpload(httpClient, hostname, keyToUpload, keyTitle)
 		if err != nil {
 			return err
 		}
-		fmt.Fprintf(opts.IO.ErrOut, "%s Uploaded the SSH key to your GitHub account: %s\n", cs.SuccessIcon(), cs.Bold(keyToUpload))
+
+		if uploaded {
+			fmt.Fprintf(opts.IO.ErrOut, "%s Uploaded the SSH key to your GitHub account: %s\n", cs.SuccessIcon(), cs.Bold(keyToUpload))
+		} else {
+			fmt.Fprintf(opts.IO.ErrOut, "%s SSH key already existed on your GitHub account: %s\n", cs.SuccessIcon(), cs.Bold(keyToUpload))
+		}
 	}
 
 	fmt.Fprintf(opts.IO.ErrOut, "%s Logged in as %s\n", cs.SuccessIcon(), cs.Bold(username))
@@ -223,14 +228,14 @@ func scopesSentence(scopes []string, isEnterprise bool) string {
 	return strings.Join(quoted, ", ")
 }
 
-func sshKeyUpload(httpClient *http.Client, hostname, keyFile string, title string, ios *iostreams.IOStreams) error {
+func sshKeyUpload(httpClient *http.Client, hostname, keyFile string, title string) (bool, error) {
 	f, err := os.Open(keyFile)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer f.Close()
 
-	return add.SSHKeyUpload(httpClient, hostname, f, title, false, ios)
+	return add.SSHKeyUpload(httpClient, hostname, f, title)
 }
 
 func getCurrentLogin(httpClient httpClient, hostname, authToken string) (string, error) {
