@@ -77,11 +77,15 @@ func DisplayURL(urlStr string) string {
 	return u.Hostname() + u.Path
 }
 
-func RemoveDiacritics(val string) string {
+// RemoveDiacritics returns the input value without "diacritics", or accent marks
+func RemoveDiacritics(value string) string {
+	// 1/ Decompose the text into characters and diacritical marks,
+	// 2/ Remove the diacriticals marks (Mn = "Mark, nonspacing" unicode character category)
+	// 3/ Recompose the text
 	t := transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
-	normalized, _, err := transform.String(t, val)
+	normalized, _, err := transform.String(t, value)
 	if err != nil {
-		return val
+		return value
 	}
 	return normalized
 }
