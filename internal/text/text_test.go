@@ -93,6 +93,12 @@ func TestRemoveDiacritics(t *testing.T) {
 		{"ẁ", "w"},
 		{"ỳ", "y"},
 		{"ō", "o"},
+
+		// full words
+		{"Miķelis", "Mikelis"},
+		{"François", "Francois"},
+		{"žluťoučký", "zlutoucky"},
+		{"învățătorița", "invatatorita"},
 	}
 
 	for _, tt := range tests {
