@@ -50,7 +50,9 @@ type surveyPrompter struct {
 	stderr    io.Writer
 }
 
-func Filter(filter, value string, index int) bool {
+// LatinMatchingFilter returns whether the value matches the input filter.
+// The strings are compared normalized in case and diacritics.
+func LatinMatchingFilter(filter, value string, index int) bool {
 	filter = strings.ToLower(text.RemoveDiacritics(filter))
 	value = strings.ToLower(text.RemoveDiacritics(value))
 
@@ -63,7 +65,7 @@ func (p *surveyPrompter) Select(message, defaultValue string, options []string) 
 		Message:  message,
 		Options:  options,
 		PageSize: 20,
-		Filter:   Filter,
+		Filter:   LatinMatchingFilter,
 	}
 
 	if defaultValue != "" {
@@ -87,7 +89,7 @@ func (p *surveyPrompter) MultiSelect(message, defaultValue string, options []str
 		Message:  message,
 		Options:  options,
 		PageSize: 20,
-		Filter:   Filter,
+		Filter:   LatinMatchingFilter,
 	}
 
 	if defaultValue != "" {

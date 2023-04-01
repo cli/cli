@@ -396,7 +396,7 @@ func multiSelectSurvey(message string, defaults, options []string) ([]string, er
 		Message: message,
 		Options: options,
 		Default: defaults,
-		Filter:  prompter.Filter,
+		Filter:  prompter.LatinMatchingFilter,
 	}
 	err := survey.AskOne(q, &results)
 	return results, err

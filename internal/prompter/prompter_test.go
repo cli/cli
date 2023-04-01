@@ -77,7 +77,7 @@ func TestFilterDiacritics(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, Filter(tt.filter, tt.value, 0), tt.want)
+			assert.Equal(t, LatinMatchingFilter(tt.filter, tt.value, 0), tt.want)
 		})
 	}
 
