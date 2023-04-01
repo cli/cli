@@ -51,8 +51,8 @@ type surveyPrompter struct {
 }
 
 func Filter(filter, value string, index int) bool {
-	filter = text.RemoveDiacritics(strings.ToLower(filter))
-	value = text.RemoveDiacritics(strings.ToLower(value))
+	filter = strings.ToLower(text.RemoveDiacritics(filter))
+	value = strings.ToLower(text.RemoveDiacritics(value))
 
 	// include this option if it matches
 	return strings.Contains(value, filter)
