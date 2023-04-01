@@ -99,6 +99,7 @@ func TestRemoveDiacritics(t *testing.T) {
 		{"François", "Francois"},
 		{"žluťoučký", "zlutoucky"},
 		{"învățătorița", "invatatorita"},
+		{"Kękę przy łóżku", "Keke przy łozku"},
 	}
 
 	for _, tt := range tests {
