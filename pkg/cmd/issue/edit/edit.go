@@ -1,6 +1,7 @@
 package edit
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 type EditOptions struct {
@@ -24,8 +26,9 @@ type EditOptions struct {
 	EditFieldsSurvey   func(*prShared.Editable, string) error
 	FetchOptions       func(*api.Client, ghrepo.Interface, *prShared.Editable) error
 
-	SelectorArg string
-	Interactive bool
+	SelectorArgs []string
+	Interactive  bool
+	Workers      int
 
 	prShared.Editable
 }
@@ -43,12 +46,12 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 	var bodyFile string
 
 	cmd := &cobra.Command{
-		Use:   "edit {<number> | <url>}",
-		Short: "Edit an issue",
+		Use:   "edit {<numbers> | <urls>}",
+		Short: "Edit issues",
 		Long: heredoc.Doc(`
-			Edit an issue.
+			Edit one or more issues within the same repository.
 
-			Editing an issue's projects requires authorization with the "project" scope.
+			Editing issues' projects requires authorization with the "project" scope.
 			To authorize, run "gh auth refresh -s project".
 		`),
 		Example: heredoc.Doc(`
@@ -58,13 +61,14 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 			$ gh issue edit 23 --add-project "Roadmap" --remove-project v1,v2
 			$ gh issue edit 23 --milestone "Version 1"
 			$ gh issue edit 23 --body-file body.txt
+			$ gh issue edit 23 34 --add-label "help wanted"
 		`),
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
-			opts.SelectorArg = args[0]
+			opts.SelectorArgs = args
 
 			flags := cmd.Flags()
 
@@ -113,6 +117,10 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("field to edit flag required when not running interactively")
 			}
 
+			if opts.Interactive && len(opts.SelectorArgs) > 1 {
+				return cmdutil.FlagErrorf("multiple issues cannot be edited interactively")
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -141,7 +149,15 @@ func editRun(opts *EditOptions) error {
 		return err
 	}
 
+	// Prompt the user which fields they'd like to edit.
 	editable := opts.Editable
+	if opts.Interactive {
+		err = opts.FieldsToEditSurvey(&editable)
+		if err != nil {
+			return err
+		}
+	}
+
 	lookupFields := []string{"id", "number", "title", "body", "url"}
 	if opts.Interactive || editable.Assignees.Edited {
 		lookupFields = append(lookupFields, "assignees")
@@ -157,59 +173,98 @@ func editRun(opts *EditOptions) error {
 		lookupFields = append(lookupFields, "milestone")
 	}
 
-	issue, repo, err := shared.IssueFromArgWithFields(httpClient, opts.BaseRepo, opts.SelectorArg, lookupFields)
+	// Get all specified issues and make sure they are within the same repo.
+	issues, repo, err := shared.IssuesFromArgsWithFields(httpClient, opts.BaseRepo, opts.SelectorArgs, lookupFields)
 	if err != nil {
 		return err
 	}
 
-	editable.Title.Default = issue.Title
-	editable.Body.Default = issue.Body
-	editable.Assignees.Default = issue.Assignees.Logins()
-	editable.Labels.Default = issue.Labels.Names()
-	editable.Projects.Default = append(issue.ProjectCards.ProjectNames(), issue.ProjectItems.ProjectTitles()...)
-	projectItems := map[string]string{}
-	for _, n := range issue.ProjectItems.Nodes {
-		projectItems[n.Project.ID] = n.ID
-	}
-	editable.Projects.ProjectItems = projectItems
-	if issue.Milestone != nil {
-		editable.Milestone.Default = issue.Milestone.Title
-	}
-
-	if opts.Interactive {
-		err = opts.FieldsToEditSurvey(&editable)
-		if err != nil {
-			return err
-		}
-	}
-
+	// Fetch editable shared fields once for all issues.
 	apiClient := api.NewClientFromHTTP(httpClient)
-	opts.IO.StartProgressIndicator()
+	opts.IO.StartProgressIndicatorWithLabel("Fetching repository information")
 	err = opts.FetchOptions(apiClient, repo, &editable)
 	opts.IO.StopProgressIndicator()
 	if err != nil {
 		return err
 	}
 
-	if opts.Interactive {
-		editorCommand, err := opts.DetermineEditor()
-		if err != nil {
-			return err
-		}
-		err = opts.EditFieldsSurvey(&editable, editorCommand)
-		if err != nil {
-			return err
-		}
+	// Update all issues in parallel.
+	if opts.Workers == 0 {
+		opts.Workers = 10
 	}
+	g, ctx := errgroup.WithContext(context.Background())
+	g.SetLimit(opts.Workers)
 
-	opts.IO.StartProgressIndicator()
-	err = prShared.UpdateIssue(httpClient, repo, issue.ID, issue.IsPullRequest(), editable)
+	issueURLs := make([]string, 0, len(issues))
+	issuesChan := make(chan string)
+	doneCh := make(chan any)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				doneCh <- nil
+				return
+			case issueURL, ok := <-issuesChan:
+				if ok {
+					issueURLs = append(issueURLs, issueURL)
+				}
+			}
+		}
+	}()
+
+	opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Updating %d issues", len(issues)))
+	for _, issue := range issues {
+		issue := *issue
+		g.Go(func() error {
+			editable.Title.Default = issue.Title
+			editable.Body.Default = issue.Body
+			editable.Assignees.Default = issue.Assignees.Logins()
+			editable.Labels.Default = issue.Labels.Names()
+			editable.Projects.Default = append(issue.ProjectCards.ProjectNames(), issue.ProjectItems.ProjectTitles()...)
+			projectItems := map[string]string{}
+			for _, n := range issue.ProjectItems.Nodes {
+				projectItems[n.Project.ID] = n.ID
+			}
+			editable.Projects.ProjectItems = projectItems
+			if issue.Milestone != nil {
+				editable.Milestone.Default = issue.Milestone.Title
+			}
+
+			// Allow interactive prompts for one issue; failed earlier if multiple issues specified.
+			if opts.Interactive {
+				editorCommand, err := opts.DetermineEditor()
+				if err != nil {
+					return err
+				}
+				err = opts.EditFieldsSurvey(&editable, editorCommand)
+				if err != nil {
+					return err
+				}
+			}
+
+			err = prShared.UpdateIssue(httpClient, repo, issue.ID, issue.IsPullRequest(), editable)
+			if err != nil {
+				return err
+			}
+
+			issuesChan <- issue.URL
+			return nil
+		})
+	}
 	opts.IO.StopProgressIndicator()
+
+	err = g.Wait()
+	close(issuesChan)
+	<-doneCh
+	close(doneCh)
+
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintln(opts.IO.Out, issue.URL)
+	for _, issueURL := range issueURLs {
+		fmt.Fprintln(opts.IO.Out, issueURL)
+	}
 
 	return nil
 }
