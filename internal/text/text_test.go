@@ -59,12 +59,13 @@ func TestRemoveDiacritics(t *testing.T) {
 	tests := [][]string{
 		// no diacritics
 		{"e", "e"},
-
-		// unsupported characters remain untouched
-		{"ؤ", "و"},
+		{"و", "و"},
+		{"И", "И"},
+		{"ж", "ж"},
+		{"私", "私"},
+		{"万", "万"},
 
 		// diacritics test sets
-
 		{"à", "a"},
 		{"é", "e"},
 		{"è", "e"},
@@ -73,6 +74,8 @@ func TestRemoveDiacritics(t *testing.T) {
 		{"εͅ", "ε"},
 		{"ῃ", "η"},
 		{"ιͅ", "ι"},
+
+		{"ؤ", "و"},
 
 		{"ā", "a"},
 		{"č", "c"},
