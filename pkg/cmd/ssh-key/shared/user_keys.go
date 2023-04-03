@@ -11,6 +11,11 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 )
 
+const (
+	AuthenticationKey = "authentication"
+	SigningKey        = "signing"
+)
+
 type sshKey struct {
 	ID        int
 	Key       string
@@ -24,6 +29,33 @@ func UserKeys(httpClient *http.Client, host, userHandle string) ([]sshKey, error
 		resource = fmt.Sprintf("users/%s/keys", userHandle)
 	}
 	url := fmt.Sprintf("%s%s?per_page=%d", ghinstance.RESTPrefix(host), resource, 100)
+
+	keys, err := getUserKeys(httpClient, url)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return keys, nil
+}
+
+func UserSigningKeys(httpClient *http.Client, host, userHandle string) ([]sshKey, error) {
+	resource := "user/ssh_signing_keys"
+	if userHandle != "" {
+		resource = fmt.Sprintf("users/%s/ssh_signing_keys", userHandle)
+	}
+	url := fmt.Sprintf("%s%s?per_page=%d", ghinstance.RESTPrefix(host), resource, 100)
+
+	keys, err := getUserKeys(httpClient, url)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return keys, nil
+}
+
+func getUserKeys(httpClient *http.Client, url string) ([]sshKey, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
