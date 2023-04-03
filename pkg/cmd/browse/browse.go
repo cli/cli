@@ -113,7 +113,9 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			}
 
 			if err := cmdutil.MutuallyExclusive(
-				"specify only one of `--branch`, `--commit`, `--projects`, `--releases`, `--settings`, or `--wiki`",
+				"specify only one of `number arg`, `commit SHA arg`, `--branch`, `--commit`, `--projects`, `--releases`, `--settings`, or `--wiki`",
+				isNumber(opts.SelectorArg),
+				isCommit(opts.SelectorArg),
 				opts.Branch != "",
 				opts.Commit != "",
 				opts.ProjectsFlag,
