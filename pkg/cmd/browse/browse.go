@@ -87,8 +87,8 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			"help:arguments": heredoc.Doc(`
 				A browser location can be specified using arguments in the following format:
 				- by number for issue or pull request, e.g. "123"; or
-				- by commit SHA for commit page, e.g. "77507cd94ccafcf568f8560cfecde965fcfa63": or
-				- by path for opening folders and files, e.g. "cmd/gh/main.go"
+				- by path for opening folders and files, e.g. "cmd/gh/main.go"; or
+				- by commit SHA
 			`),
 			"help:environment": heredoc.Doc(`
 				To configure a web browser other than the default, use the BROWSER environment variable.
