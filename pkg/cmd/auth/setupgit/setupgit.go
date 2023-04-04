@@ -31,25 +31,23 @@ func NewCmdSetupGit(f *cmdutil.Factory, runF func(*SetupGitOptions) error) *cobr
 
 	cmd := &cobra.Command{
 		Use:   "setup-git",
-		Short: "Configure git to use GitHub CLI as a credential helper",
+		Short: "Setup git with GitHub CLI",
 		Long: heredoc.Docf(`
-			Configure git to use GitHub CLI as a credential helper.
+			This command configures git to use GitHub CLI as a credential helper.
+			For more information on git credential helpers please reference:
+			https://git-scm.com/docs/gitcredentials.
 
-			This command adds gh to the global git configuration file as a credential helper.
-			The config is used whenever performing git actions that need authentication with GitHub hosts, such as pulls and pushes.
-			If GitHub hosts have been configured for credential helper, the config for the hosts are overwritten.
+			By default, GitHub CLI will be set as the credential helper for all authenticated hosts.
+			If there is no authenticated hosts the command fails with an error.
 
-			By default, all GitHub hosts authenticated with are configured.
-			If there is no Github host authenticated with, the command fails with an error.
-
-			Alternatively, use %[1]s--hostname%[1]s flag to specify a GitHub host to be configured.
+			Alternatively, use the %[1]s--hostname%[1]s flag to specify a single host to be configured.
 			If the host is not authenticated with, the command fails with an error.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# Configure all GitHub hosts authenticated with to use GitHub CLI as a credential helper
+			# Configure git to use GitHub CLI as the credential helper for all authenticated hosts
 			$ gh auth setup-git
 
-			# Configure only one Github host authenticated with to use GitHub CLI as a credential helper
+			# Configure git to use GitHub CLI as the credential helper for enterprise.internal host
 			$ gh auth setup-git --hostname enterprise.internal
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
