@@ -125,6 +125,10 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 				return err
 			}
 
+			if (isNumber(opts.SelectorArg) || isCommit(opts.SelectorArg)) && (opts.Branch != "" || opts.Commit != "") {
+				return cmdutil.FlagErrorf("%q is an invalid argument when using `--branch` or `--commit`", opts.SelectorArg)
+			}
+
 			if cmd.Flags().Changed("repo") {
 				opts.GitClient = &remoteGitClient{opts.BaseRepo, opts.HttpClient}
 			}
