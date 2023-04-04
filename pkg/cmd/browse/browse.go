@@ -113,9 +113,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			}
 
 			if err := cmdutil.MutuallyExclusive(
-				"specify only one of `number arg`, `commit SHA arg`, `--branch`, `--commit`, `--projects`, `--releases`, `--settings`, or `--wiki`",
-				isNumber(opts.SelectorArg),
-				isCommit(opts.SelectorArg),
+				"specify only one of `--branch`, `--commit`, `--projects`, `--releases`, `--settings`, or `--wiki`",
 				opts.Branch != "",
 				opts.Commit != "",
 				opts.ProjectsFlag,
@@ -124,6 +122,10 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 				opts.WikiFlag,
 			); err != nil {
 				return err
+			}
+
+			if (isNumber(opts.SelectorArg) || isCommit(opts.SelectorArg)) && (opts.Branch != "" || opts.Commit != "") {
+				return cmdutil.FlagErrorf("%q is an invalid argument when using `--branch` or `--commit`", opts.SelectorArg)
 			}
 
 			if cmd.Flags().Changed("repo") {
