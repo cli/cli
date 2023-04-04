@@ -1,7 +1,6 @@
 package edit
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 
@@ -190,34 +189,18 @@ func editRun(opts *EditOptions) error {
 	}
 
 	// Update all issues in parallel.
+	issueURLs := make(chan string, len(issues))
 	if opts.workers == 0 {
 		opts.workers = 10
 	}
-	g, ctx := errgroup.WithContext(context.Background())
+	g := errgroup.Group{}
 	g.SetLimit(opts.workers)
 
-	issueURLs := make([]string, 0, len(issues))
-	issuesChan := make(chan string)
-	doneCh := make(chan any)
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				doneCh <- nil
-				return
-			case issueURL, ok := <-issuesChan:
-				if ok {
-					issueURLs = append(issueURLs, issueURL)
-				}
-			}
-		}
-	}()
-
 	opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Updating %d issues", len(issues)))
-	for _, issue := range issues {
+	for i := range issues {
 		// Copy variables to capture in the go routine below.
-		issue := *issue
-		editable := editable
+		issue := issues[i]
+		editable := editable.Clone()
 
 		g.Go(func() error {
 			editable.Title.Default = issue.Title
@@ -251,22 +234,20 @@ func editRun(opts *EditOptions) error {
 				return err
 			}
 
-			issuesChan <- issue.URL
+			issueURLs <- issue.URL
 			return nil
 		})
 	}
 	opts.IO.StopProgressIndicator()
 
 	err = g.Wait()
-	close(issuesChan)
-	<-doneCh
-	close(doneCh)
+	close(issueURLs)
 
 	if err != nil {
 		return err
 	}
 
-	for _, issueURL := range issueURLs {
+	for issueURL := range issueURLs {
 		fmt.Fprintln(opts.IO.Out, issueURL)
 	}
 

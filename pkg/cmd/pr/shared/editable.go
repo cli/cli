@@ -201,6 +201,57 @@ func (e Editable) MilestoneId() (*string, error) {
 	return &m, err
 }
 
+// Clone creates a mostly-shallow copy of Editable suitable for use in parallel
+// go routines. Fields that would be mutated will be copied.
+func (e Editable) Clone() Editable {
+	return Editable{
+		Title:     e.Title.clone(),
+		Body:      e.Body.clone(),
+		Base:      e.Base.clone(),
+		Reviewers: e.Reviewers.clone(),
+		Assignees: e.Assignees.clone(),
+		Labels:    e.Labels.clone(),
+		Projects:  e.Projects.clone(),
+		Milestone: e.Milestone.clone(),
+		// Shallow copy since no mutation.
+		Metadata: e.Metadata,
+	}
+}
+
+func (es *EditableString) clone() EditableString {
+	return EditableString{
+		Value:   es.Value,
+		Default: es.Default,
+		// Shallow copies since no mutation.
+		Options: es.Options,
+		Edited:  es.Edited,
+	}
+}
+
+func (es *EditableSlice) clone() EditableSlice {
+	cpy := EditableSlice{
+		// Shallow copies since no mutation.
+		Add:     es.Add,
+		Remove:  es.Remove,
+		Options: es.Options,
+		Edited:  es.Edited,
+		Allowed: es.Allowed,
+	}
+	copy(cpy.Value, es.Value)
+	copy(cpy.Default, es.Default)
+	return cpy
+}
+
+func (ep *EditableProjects) clone() EditableProjects {
+	cpy := EditableProjects{
+		EditableSlice: ep.EditableSlice.clone(),
+	}
+	for k, v := range ep.ProjectItems {
+		cpy.ProjectItems[k] = v
+	}
+	return cpy
+}
+
 func EditFieldsSurvey(editable *Editable, editorCommand string) error {
 	var err error
 	if editable.Title.Edited {
