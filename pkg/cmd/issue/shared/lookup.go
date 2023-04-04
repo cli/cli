@@ -19,13 +19,25 @@ import (
 // IssueFromArgWithFields loads an issue or pull request with the specified fields. If some of the fields
 // could not be fetched by GraphQL, this returns a non-nil issue and a *PartialLoadError.
 func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.Interface, error), arg string, fields []string) (*api.Issue, ghrepo.Interface, error) {
-	issues, baseRepo, err := IssuesFromArgsWithFields(httpClient, baseRepoFn, []string{arg}, fields)
-	var issue *api.Issue
-	if len(issues) == 1 {
-		issue = issues[0]
-	} else if len(issues) > 1 {
-		return nil, nil, fmt.Errorf("multiple issues not expected")
+	issueNumber, baseRepo := issueMetadataFromURL(arg)
+
+	if issueNumber == 0 {
+		var err error
+		issueNumber, err = strconv.Atoi(strings.TrimPrefix(arg, "#"))
+		if err != nil {
+			return nil, nil, fmt.Errorf("invalid issue format: %q", arg)
+		}
 	}
+
+	if baseRepo == nil {
+		var err error
+		baseRepo, err = baseRepoFn()
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	issue, err := findIssueOrPR(httpClient, baseRepo, issueNumber, fields)
 	return issue, baseRepo, err
 }
 
@@ -38,26 +50,13 @@ func IssuesFromArgsWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo
 
 	issues := make([]*api.Issue, 0, len(args))
 	var issuesRepo ghrepo.Interface
-	var err error
 
 	for _, arg := range args {
-		issueNumber, baseRepo := issueMetadataFromURL(arg)
-
-		if issueNumber == 0 {
-			issueNumber, err = strconv.Atoi(strings.TrimPrefix(arg, "#"))
-			if err != nil {
-				return nil, nil, fmt.Errorf("invalid issue format: %q", arg)
-			}
+		issue, baseRepo, err := IssueFromArgWithFields(httpClient, baseRepoFn, arg, fields)
+		if err != nil {
+			return nil, nil, err
 		}
 
-		if baseRepo == nil {
-			baseRepo, err = baseRepoFn()
-			if err != nil {
-				return nil, nil, err
-			}
-		}
-
-		// Make sure subsequent issues are all in the same repo as the first.
 		if issuesRepo == nil {
 			issuesRepo = baseRepo
 		} else if !ghrepo.IsSame(issuesRepo, baseRepo) {
@@ -68,12 +67,10 @@ func IssuesFromArgsWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo
 			)
 		}
 
-		var issue *api.Issue
-		issue, err = findIssueOrPR(httpClient, baseRepo, issueNumber, fields)
 		issues = append(issues, issue)
 	}
 
-	return issues, issuesRepo, err
+	return issues, issuesRepo, nil
 }
 
 var issueURLRE = regexp.MustCompile(`^/([^/]+)/([^/]+)/issues/(\d+)`)

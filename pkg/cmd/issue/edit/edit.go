@@ -28,7 +28,8 @@ type EditOptions struct {
 
 	SelectorArgs []string
 	Interactive  bool
-	Workers      int
+
+	workers int
 
 	prShared.Editable
 }
@@ -159,17 +160,17 @@ func editRun(opts *EditOptions) error {
 	}
 
 	lookupFields := []string{"id", "number", "title", "body", "url"}
-	if opts.Interactive || editable.Assignees.Edited {
+	if editable.Assignees.Edited {
 		lookupFields = append(lookupFields, "assignees")
 	}
-	if opts.Interactive || editable.Labels.Edited {
+	if editable.Labels.Edited {
 		lookupFields = append(lookupFields, "labels")
 	}
-	if opts.Interactive || editable.Projects.Edited {
+	if editable.Projects.Edited {
 		lookupFields = append(lookupFields, "projectCards")
 		lookupFields = append(lookupFields, "projectItems")
 	}
-	if opts.Interactive || editable.Milestone.Edited {
+	if editable.Milestone.Edited {
 		lookupFields = append(lookupFields, "milestone")
 	}
 
@@ -189,11 +190,11 @@ func editRun(opts *EditOptions) error {
 	}
 
 	// Update all issues in parallel.
-	if opts.Workers == 0 {
-		opts.Workers = 10
+	if opts.workers == 0 {
+		opts.workers = 10
 	}
 	g, ctx := errgroup.WithContext(context.Background())
-	g.SetLimit(opts.Workers)
+	g.SetLimit(opts.workers)
 
 	issueURLs := make([]string, 0, len(issues))
 	issuesChan := make(chan string)
@@ -214,7 +215,10 @@ func editRun(opts *EditOptions) error {
 
 	opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Updating %d issues", len(issues)))
 	for _, issue := range issues {
+		// Copy variables to capture in the go routine below.
 		issue := *issue
+		editable := editable
+
 		g.Go(func() error {
 			editable.Title.Default = issue.Title
 			editable.Body.Default = issue.Body

@@ -7,6 +7,7 @@ import (
 
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/pkg/httpmock"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestIssueFromArgWithFields(t *testing.T) {
@@ -208,10 +209,12 @@ func TestIssuesFromArgsWithFields(t *testing.T) {
 		wantIssues []int
 		wantRepo   string
 		wantErr    bool
+		wantErrMsg string
 	}{
 		{
-			name:    "no args",
-			wantErr: true,
+			name:       "no args",
+			wantErr:    true,
+			wantErrMsg: "missing required issue number",
 		},
 		{
 			name: "multiple repos",
@@ -221,7 +224,22 @@ func TestIssuesFromArgsWithFields(t *testing.T) {
 					return ghrepo.New("OWNER", "REPO"), nil
 				},
 			},
-			wantErr: true,
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{
+						"hasIssuesEnabled": true,
+						"issue":{"number":1}
+					}}}`))
+				r.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`{"data":{"repository":{
+							"hasIssuesEnabled": true,
+							"issue":{"number":2}
+					}}}`))
+			},
+			wantErr:    true,
+			wantErrMsg: `multiple issues must be in same repo: found "OWNER/OTHERREPO", expected "OWNER/REPO"`,
 		},
 		{
 			name: "multiple issues",
@@ -266,6 +284,12 @@ func TestIssuesFromArgsWithFields(t *testing.T) {
 					return
 				}
 			}
+			if tt.wantErr {
+				assert.Error(t, err)
+				assert.EqualError(t, err, tt.wantErrMsg)
+				return
+			}
+			assert.NoError(t, err)
 			for i, issue := range issues {
 				if issue.Number != tt.wantIssues[i] {
 					t.Errorf("want issue #%d, got #%d", tt.wantIssues[i], issue.Number)
