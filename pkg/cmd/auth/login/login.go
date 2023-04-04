@@ -30,12 +30,12 @@ type LoginOptions struct {
 
 	Interactive bool
 
-	Hostname      string
-	Scopes        []string
-	Token         string
-	Web           bool
-	GitProtocol   string
-	SecureStorage bool
+	Hostname        string
+	Scopes          []string
+	Token           string
+	Web             bool
+	GitProtocol     string
+	InsecureStorage bool
 }
 
 func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Command {
@@ -124,7 +124,13 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 	cmd.Flags().BoolVar(&tokenStdin, "with-token", false, "Read token from standard input")
 	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Open a browser to authenticate")
 	cmdutil.StringEnumFlag(cmd, &opts.GitProtocol, "git-protocol", "p", "", []string{"ssh", "https"}, "The protocol to use for git operations")
-	cmd.Flags().BoolVarP(&opts.SecureStorage, "secure-storage", "", false, "Save authentication credentials in secure credential store")
+
+	// secure storage became the default on 2023/4/04; this flag is left as a no-op for backwards compatibility
+	var secureStorage bool
+	cmd.Flags().BoolVar(&secureStorage, "secure-storage", false, "Save authentication credentials in secure credential store")
+	_ = cmd.Flags().MarkHidden("secure-storage")
+
+	cmd.Flags().BoolVar(&opts.InsecureStorage, "insecure-storage", false, "Save authentication credentials in plain text instead of credential store")
 
 	return cmd
 }
@@ -135,11 +141,6 @@ func loginRun(opts *LoginOptions) error {
 		return err
 	}
 	authCfg := cfg.Authentication()
-
-	if opts.SecureStorage {
-		cs := opts.IO.ColorScheme()
-		fmt.Fprintf(opts.IO.ErrOut, "%s Using secure storage could break installed extensions\n", cs.WarningIcon())
-	}
 
 	hostname := opts.Hostname
 	if opts.Interactive && hostname == "" {
@@ -166,7 +167,7 @@ func loginRun(opts *LoginOptions) error {
 			return fmt.Errorf("error validating token: %w", err)
 		}
 		// Adding a user key ensures that a nonempty host section gets written to the config file.
-		return authCfg.Login(hostname, "x-access-token", opts.Token, opts.GitProtocol, opts.SecureStorage)
+		return authCfg.Login(hostname, "x-access-token", opts.Token, opts.GitProtocol, !opts.InsecureStorage)
 	}
 
 	existingToken, _ := authCfg.Token(hostname)
@@ -195,7 +196,7 @@ func loginRun(opts *LoginOptions) error {
 		Prompter:      opts.Prompter,
 		GitClient:     opts.GitClient,
 		Browser:       opts.Browser,
-		SecureStorage: opts.SecureStorage,
+		SecureStorage: !opts.InsecureStorage,
 	})
 }
 
