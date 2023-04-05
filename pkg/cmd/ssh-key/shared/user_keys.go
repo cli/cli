@@ -20,6 +20,7 @@ type sshKey struct {
 	ID        int
 	Key       string
 	Title     string
+	Type      string
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -36,6 +37,10 @@ func UserKeys(httpClient *http.Client, host, userHandle string) ([]sshKey, error
 		return nil, err
 	}
 
+	for i := 0; i < len(keys); i++ {
+		keys[i].Type = AuthenticationKey
+	}
+
 	return keys, nil
 }
 
@@ -50,6 +55,10 @@ func UserSigningKeys(httpClient *http.Client, host, userHandle string) ([]sshKey
 
 	if err != nil {
 		return nil, err
+	}
+
+	for i := 0; i < len(keys); i++ {
+		keys[i].Type = SigningKey
 	}
 
 	return keys, nil
