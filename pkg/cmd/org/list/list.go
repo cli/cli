@@ -7,6 +7,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -78,9 +79,14 @@ func listRun(opts *ListOptions) error {
 	}
 	defer opts.IO.StopPager()
 
+	if opts.IO.IsStdoutTTY() {
+		header := listHeader(listResult.User, len(listResult.Organizations), listResult.TotalCount)
+		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", header)
+	}
+
 	table := tableprinter.New(opts.IO)
-	table.HeaderRow("Name")
-	for _, org := range *listResult {
+
+	for _, org := range listResult.Organizations {
 		table.AddField(org.Login)
 		table.EndRow()
 	}
@@ -91,4 +97,12 @@ func listRun(opts *ListOptions) error {
 	}
 
 	return nil
+}
+
+func listHeader(user string, resultCount, totalCount int) string {
+	if totalCount == 0 {
+		return "There are no organizations associated with @" + user
+	}
+
+	return fmt.Sprintf("Showing %d of %s", resultCount, text.Pluralize(totalCount, "organization"))
 }

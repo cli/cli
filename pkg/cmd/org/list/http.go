@@ -6,17 +6,24 @@ import (
 	"github.com/cli/cli/v2/api"
 )
 
+type OrganizationList struct {
+	Organizations []Organization
+	TotalCount    int
+	User          string
+}
+
 type Organization struct {
 	Login string
 }
 
-func listOrgs(httpClient *http.Client, hostname string, limit int) (*[]Organization, error) {
+func listOrgs(httpClient *http.Client, hostname string, limit int) (*OrganizationList, error) {
 	type response struct {
 		User struct {
 			Login         string
 			Organizations struct {
-				Nodes    []Organization
-				PageInfo struct {
+				TotalCount int
+				Nodes      []Organization
+				PageInfo   struct {
 					HasNextPage bool
 					EndCursor   string
 				}
@@ -28,6 +35,7 @@ func listOrgs(httpClient *http.Client, hostname string, limit int) (*[]Organizat
 		user(login: $user) {
 			login
 			organizations(first: $limit, after: $endCursor) {
+				totalCount
 				nodes {
 					login
 				}
@@ -46,7 +54,8 @@ func listOrgs(httpClient *http.Client, hostname string, limit int) (*[]Organizat
 		return nil, err
 	}
 
-	orgs := []Organization{}
+	listResult := OrganizationList{}
+	listResult.User = user
 	pageLimit := min(limit, 100)
 	variables := map[string]interface{}{
 		"user": user,
@@ -61,22 +70,24 @@ loop:
 			return nil, err
 		}
 
+		listResult.TotalCount = data.User.Organizations.TotalCount
+
 		for _, org := range data.User.Organizations.Nodes {
-			orgs = append(orgs, org)
-			if len(orgs) == limit {
+			listResult.Organizations = append(listResult.Organizations, org)
+			if len(listResult.Organizations) == limit {
 				break loop
 			}
 		}
 
 		if data.User.Organizations.PageInfo.HasNextPage {
 			variables["endCursor"] = data.User.Organizations.PageInfo.EndCursor
-			pageLimit = min(pageLimit, limit-len(orgs))
+			pageLimit = min(pageLimit, limit-len(listResult.Organizations))
 		} else {
 			break
 		}
 	}
 
-	return &orgs, nil
+	return &listResult, nil
 }
 
 func min(a, b int) int {
