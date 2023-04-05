@@ -1,6 +1,7 @@
 package cmdutil
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -42,6 +43,26 @@ func StringSliceEnumFlag(cmd *cobra.Command, p *[]string, name, shorthand string
 		return options, cobra.ShellCompDirectiveNoFileComp
 	})
 	return f
+}
+
+type gitClient interface {
+	TrackingBranchNames(context.Context, string) []string
+}
+
+// RegisterBranchCompletionFlags suggests and autocompletes known remote git branches for flags passed
+func RegisterBranchCompletionFlags(gitc gitClient, cmd *cobra.Command, flags ...string) error {
+	for _, flag := range flags {
+		err := cmd.RegisterFlagCompletionFunc(flag, func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if repoFlag := cmd.Flag("repo"); repoFlag != nil && repoFlag.Changed {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			return gitc.TrackingBranchNames(context.TODO(), toComplete), cobra.ShellCompDirectiveNoFileComp
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func formatValuesForUsageDocs(values []string) string {

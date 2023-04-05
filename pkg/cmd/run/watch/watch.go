@@ -114,7 +114,7 @@ func watchRun(opts *WatchOptions) error {
 			}
 		}
 	} else {
-		run, err = shared.GetRun(client, repo, runID)
+		run, err = shared.GetRun(client, repo, runID, 0)
 		if err != nil {
 			return fmt.Errorf("failed to get run: %w", err)
 		}
@@ -201,7 +201,7 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 
 	var err error
 
-	run, err = shared.GetRun(client, repo, fmt.Sprintf("%d", run.ID))
+	run, err = shared.GetRun(client, repo, fmt.Sprintf("%d", run.ID), 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get run: %w", err)
 	}
@@ -236,7 +236,7 @@ func renderRun(out io.Writer, opts WatchOptions, client *api.Client, repo ghrepo
 		return nil, fmt.Errorf("failed to get annotations: %w", annotationErr)
 	}
 
-	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, text.FuzzyAgo(opts.Now(), run.StartedTime()), prNumber))
+	fmt.Fprintln(out, shared.RenderRunHeader(cs, *run, text.FuzzyAgo(opts.Now(), run.StartedTime()), prNumber, 0))
 	fmt.Fprintln(out)
 
 	if len(jobs) == 0 {

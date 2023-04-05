@@ -59,7 +59,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Long:  "Open the GitHub repository in the web browser.",
 		Short: "Open the repository in the browser",
-		Use:   "browse [<number> | <path>]",
+		Use:   "browse [<number> | <path> | <commit-SHA>]",
 		Args:  cobra.MaximumNArgs(1),
 		Example: heredoc.Doc(`
 			$ gh browse
@@ -87,7 +87,8 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			"help:arguments": heredoc.Doc(`
 				A browser location can be specified using arguments in the following format:
 				- by number for issue or pull request, e.g. "123"; or
-				- by path for opening folders and files, e.g. "cmd/gh/main.go"
+				- by path for opening folders and files, e.g. "cmd/gh/main.go"; or
+				- by commit SHA
 			`),
 			"help:environment": heredoc.Doc(`
 				To configure a web browser other than the default, use the BROWSER environment variable.
@@ -124,6 +125,10 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 				return err
 			}
 
+			if (isNumber(opts.SelectorArg) || isCommit(opts.SelectorArg)) && (opts.Branch != "" || opts.Commit != "") {
+				return cmdutil.FlagErrorf("%q is an invalid argument when using `--branch` or `--commit`", opts.SelectorArg)
+			}
+
 			if cmd.Flags().Changed("repo") {
 				opts.GitClient = &remoteGitClient{opts.BaseRepo, opts.HttpClient}
 			}
@@ -143,6 +148,8 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.NoBrowserFlag, "no-browser", "n", false, "Print destination URL instead of opening the browser")
 	cmd.Flags().StringVarP(&opts.Commit, "commit", "c", "", "Select another commit by passing in the commit SHA, default is the last commit")
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Select another branch by passing in the branch name")
+
+	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "branch")
 
 	// Preserve backwards compatibility for when commit flag used to be a boolean flag.
 	cmd.Flags().Lookup("commit").NoOptDefVal = emptyCommitFlag
