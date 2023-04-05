@@ -2,11 +2,10 @@ package list
 
 import (
 	"bytes"
-	"fmt"
 	"net/http"
-	"strings"
 	"testing"
 
+	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
@@ -82,7 +81,7 @@ func TestListRun(t *testing.T) {
 		name    string
 		opts    ListOptions
 		isTTY   bool
-		wantOut []string
+		wantOut string
 	}{
 		{
 			name: "no organizations found",
@@ -97,7 +96,7 @@ func TestListRun(t *testing.T) {
 					httpmock.GraphQL(`query OrganizationList\b`),
 					httpmock.StringResponse(`
 						{ "data": { "user": {	
-							"organizations": { "nodes": []	}
+							"organizations": { "nodes": [], "totalCount": 0 }
 						} } }`,
 					),
 				)
@@ -105,9 +104,11 @@ func TestListRun(t *testing.T) {
 				return &http.Client{Transport: r}, nil
 			}},
 			isTTY: true,
-			wantOut: []string{
-				"NAME",
-			},
+			wantOut: heredoc.Doc(`
+
+There are no organizations associated with @octocat
+
+`),
 		},
 		{
 			name: "default behavior",
@@ -121,7 +122,9 @@ func TestListRun(t *testing.T) {
 				r.Register(
 					httpmock.GraphQL(`query OrganizationList\b`),
 					httpmock.StringResponse(`
-						{ "data": { "user": {	"organizations": { "nodes": [
+						{ "data": { "user": {	"organizations": {
+							"totalCount": 2,
+							"nodes": [
 							{
 								"login": "github"
 							},
@@ -135,11 +138,13 @@ func TestListRun(t *testing.T) {
 				return &http.Client{Transport: r}, nil
 			}},
 			isTTY: true,
-			wantOut: []string{
-				"NAME",
-				"github",
-				"cli",
-			},
+			wantOut: heredoc.Doc(`
+
+Showing 2 of 2 organizations
+
+github
+cli
+`),
 		},
 		{
 			name: "with limit",
@@ -153,7 +158,9 @@ func TestListRun(t *testing.T) {
 				r.Register(
 					httpmock.GraphQL(`query OrganizationList\b`),
 					httpmock.StringResponse(`
-						{ "data": { "user": {	"organizations": { "nodes": [
+						{ "data": { "user": {	"organizations": {
+							"totalCount": 2,
+							"nodes": [
 							{
 								"login": "github"
 							},
@@ -167,10 +174,12 @@ func TestListRun(t *testing.T) {
 				return &http.Client{Transport: r}, nil
 			}},
 			isTTY: true,
-			wantOut: []string{
-				"NAME",
-				"github",
-			},
+			wantOut: heredoc.Doc(`
+
+Showing 1 of 2 organizations
+
+github
+`),
 		},
 		{
 			name: "nontty output",
@@ -184,7 +193,9 @@ func TestListRun(t *testing.T) {
 				r.Register(
 					httpmock.GraphQL(`query OrganizationList\b`),
 					httpmock.StringResponse(`
-						{ "data": { "user": {	"organizations": { "nodes": [
+						{ "data": { "user": {	"organizations": {
+							"totalCount": 2,
+							"nodes": [
 							{
 								"login": "github"
 							},
@@ -197,10 +208,10 @@ func TestListRun(t *testing.T) {
 				return &http.Client{Transport: r}, nil
 			}},
 			isTTY: false,
-			wantOut: []string{
-				"github",
-				"cli",
-			},
+			wantOut: heredoc.Doc(`
+github
+cli
+`),
 		},
 	}
 
@@ -218,10 +229,9 @@ func TestListRun(t *testing.T) {
 			}
 
 			err := listRun(&tt.opts)
-			assert.NoError(t, err)
 
-			expected := fmt.Sprintf("%s\n", strings.Join(tt.wantOut, "\n"))
-			assert.Equal(t, expected, stdout.String())
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantOut, stdout.String())
 		})
 	}
 }
