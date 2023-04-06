@@ -171,17 +171,23 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 	defer safeClose(session, &err)
 
-	remoteSSHServerPort, sshUser := 0, ""
+	var (
+		invoker             rpc.Invoker
+		remoteSSHServerPort int
+		sshUser             string
+	)
 	err = a.RunWithProgress("Fetching SSH Details", func() (err error) {
-		invoker, err := rpc.CreateInvoker(ctx, session)
+		invoker, err = rpc.CreateInvoker(ctx, session)
 		if err != nil {
 			return
 		}
-		defer safeClose(invoker, &err)
 
 		remoteSSHServerPort, sshUser, err = invoker.StartSSHServerWithOptions(ctx, startSSHOptions)
 		return
 	})
+	if invoker != nil {
+		defer safeClose(invoker, &err)
+	}
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}
