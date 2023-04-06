@@ -155,7 +155,7 @@ func importsRun(opts *ImportsOptions) error {
 				)
 			} else {
 				msg.WriteString(
-					fmt.Sprintf("%s Could not import alias %s: already taken\n",
+					fmt.Sprintf("%s Could not import alias %s: name already taken\n",
 						cs.FailureIcon(),
 						cs.Bold(alias),
 					),
