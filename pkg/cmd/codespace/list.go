@@ -18,6 +18,7 @@ type listOptions struct {
 	repo     string
 	orgName  string
 	userName string
+	useWeb   bool
 }
 
 func newListCmd(app *App) *cobra.Command {
@@ -53,10 +54,20 @@ func newListCmd(app *App) *cobra.Command {
 	listCmd.Flags().StringVarP(&opts.userName, "user", "u", "", "The `username` to list codespaces for (used with --org)")
 	cmdutil.AddJSONFlags(listCmd, &exporter, api.CodespaceFields)
 
+	listCmd.Flags().BoolVarP(&opts.useWeb, "web", "w", false, "List codespaces in the web browser")
+
 	return listCmd
 }
 
 func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Exporter) error {
+	if opts.useWeb && (opts.orgName != "" || opts.userName != "") {
+		return cmdutil.FlagErrorf("using `--web` with `--org` or `--user` is not yet supported, please use with `--repo` instead")
+	}
+
+	if opts.useWeb && opts.repo == "" {
+		return a.browser.Browse("https://github.com/codespaces")
+	}
+
 	// if repo is provided, we don't accept orgName or userName
 	if opts.repo != "" && (opts.orgName != "" || opts.userName != "") {
 		return cmdutil.FlagErrorf("using `--org` or `--user` with `--repo` is not allowed")
@@ -90,6 +101,10 @@ func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Expo
 
 	if len(codespaces) == 0 {
 		return cmdutil.NewNoResultsError("no codespaces found")
+	}
+
+	if opts.useWeb && codespaces[0].Repository.ID > 0 {
+		return a.browser.Browse(fmt.Sprintf("https://github.com/codespaces?repository_id=%d", codespaces[0].Repository.ID))
 	}
 
 	//nolint:staticcheck // SA1019: utils.NewTablePrinter is deprecated: use internal/tableprinter
