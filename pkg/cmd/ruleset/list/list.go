@@ -3,11 +3,14 @@ package list
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
@@ -18,7 +21,10 @@ type ListOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
+	Browser    browser.Browser
 
+	Limit        int
+	WebMode      bool
 	Organization string
 }
 
@@ -40,6 +46,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			// support `-R, --repo` override
 			opts.BaseRepo = f.BaseRepo
 
+			// if opts.Limit < 1 {
+			// 	return cmdutil.FlagErrorf("invalid value for --limit: %v", opts.Limit)
+			// }
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -48,13 +58,21 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		},
 	}
 
+	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 30, "Maximum number of rules to list")
 	cmd.Flags().StringVarP(&opts.Organization, "org", "o", "", "List organization-wide rules")
+	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "List rules in the web browser")
 
 	return cmd
 }
 
 type Ruleset struct {
-	// TODO
+	Id          string `json:"id"`
+	Name        string `json:"name"`
+	Target      string `json:"target"`
+	SourceType  string `json:"source_type"`
+	Source      string `json:"source"`
+	Enforcement string `json:"enforcement"`
+	BypassMode  string `json:"bypass_mode"`
 }
 
 func listRun(opts *ListOptions) error {
@@ -62,36 +80,40 @@ func listRun(opts *ListOptions) error {
 	if err != nil {
 		return err
 	}
-	client := api.NewClientFromHTTP(httpClient)
 
 	repoI, err := opts.BaseRepo()
 	if err != nil {
 		return err
 	}
 
-	cfg, err := opts.Config()
+	if opts.WebMode {
+		rulesetURL := ghrepo.GenerateRepoURL(repoI, "settings/rules")
+		if opts.IO.IsStdoutTTY() {
+			fmt.Fprintf(opts.IO.Out, "Opening %s in your browser.\n", text.DisplayURL(rulesetURL))
+		}
+
+		return opts.Browser.Browse(rulesetURL)
+	}
+
+	result, err := listRepoRulesets(httpClient, repoI, opts.Limit)
 	if err != nil {
 		return err
 	}
 
-	endpoint := fmt.Sprintf("repos/%s/%s/rulesets",
-		repoI.RepoOwner(), repoI.RepoName())
-	hostname := repoI.RepoHost()
+	cs := opts.IO.ColorScheme()
 
-	if opts.Organization != "" {
-		endpoint = fmt.Sprintf("orgs/%s/rulesets", opts.Organization)
-		hostname, _ = cfg.DefaultHost()
+	tp := tableprinter.New(opts.IO)
+	tp.HeaderRow("ID", "NAME" /* "STATUS",*/, "TARGET")
+
+	for _, rs := range result.Rulesets {
+		tp.AddField(rs.Id)
+		tp.AddField(rs.Name, tableprinter.WithColor(cs.Bold))
+		// tp.AddField(strings.ToLower(rs.Enforcement))
+		tp.AddField(strings.ToLower(rs.Target))
+		tp.EndRow()
 	}
 
-	//var response []Ruleset
-	var response interface{}
-
-	err = client.REST(hostname, "GET", endpoint, nil, &response)
-	if err != nil {
-		return fmt.Errorf("failed to call '%s': %w", endpoint, err)
-	}
-
-	fmt.Printf("DBG %#v\n", response)
-
-	return nil
+	return tp.Render()
 }
+
+// func getRulesets()
