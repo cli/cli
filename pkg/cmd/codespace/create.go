@@ -69,6 +69,7 @@ type createOptions struct {
 	idleTimeout       time.Duration
 	retentionPeriod   NullableDuration
 	displayName       string
+	useWeb            bool
 }
 
 func newCreateCmd(app *App) *cobra.Command {
@@ -97,6 +98,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().Var(&opts.retentionPeriod, "retention-period", "allowed time after shutting down before the codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
 	createCmd.Flags().StringVar(&opts.devContainerPath, "devcontainer-path", "", "path to the devcontainer.json file to use when creating codespace")
 	createCmd.Flags().StringVarP(&opts.displayName, "display-name", "d", "", "display name for the codespace")
+	createCmd.Flags().BoolVarP(&opts.useWeb, "web", "w", false, "create codespace from browser, cannot be used with --display-name, --idle-timeout, or --retention-period")
 
 	return createCmd
 }
@@ -118,7 +120,15 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		Location:   opts.location,
 	}
 
-	promptForRepoAndBranch := userInputs.Repository == ""
+	if opts.useWeb && (opts.displayName != "" || opts.idleTimeout != 0 || opts.retentionPeriod.Duration != nil) {
+		return errors.New("using --web with --display-name, --idle-timeout, or --retention-period is not yet supported")
+	}
+
+	if opts.useWeb && userInputs.Repository == "" {
+		return a.browser.Browse("https://github.com/codespaces/new")
+	}
+
+	promptForRepoAndBranch := userInputs.Repository == "" && !opts.useWeb
 	if promptForRepoAndBranch {
 		var defaultRepo string
 		if remotes, _ := a.remotes(); remotes != nil {
@@ -249,7 +259,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		}
 	}
 
-	machine, err := getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, userInputs.Location, devContainerPath)
+	machine, err := getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, userInputs.Location, devContainerPath, opts.useWeb)
 	if err != nil {
 		return fmt.Errorf("error getting machine type: %w", err)
 	}
@@ -269,6 +279,10 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		DevContainerPath:       devContainerPath,
 		PermissionsOptOut:      opts.permissionsOptOut,
 		DisplayName:            opts.displayName,
+	}
+
+	if opts.useWeb {
+		return a.browser.Browse(fmt.Sprintf("https://github.com/codespaces/new?repo=%d&ref=%s&machine=%s&location=%s", createParams.RepositoryID, createParams.Branch, createParams.Machine, createParams.Location))
 	}
 
 	var codespace *api.Codespace
@@ -440,7 +454,7 @@ func (a *App) showStatus(ctx context.Context, codespace *api.Codespace) error {
 }
 
 // getMachineName prompts the user to select the machine type, or validates the machine if non-empty.
-func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machine, branch, location string, devcontainerPath string) (string, error) {
+func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machine, branch, location string, devcontainerPath string, useWeb bool) (string, error) {
 	machines, err := apiClient.GetCodespacesMachines(ctx, repoID, branch, location, devcontainerPath)
 	if err != nil {
 		return "", fmt.Errorf("error requesting machine instance types: %w", err)
@@ -467,6 +481,11 @@ func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machin
 
 	if len(machines) == 1 {
 		// VS Code does not prompt for machine if there is only one, this makes us consistent with that behavior
+		return machines[0].Name, nil
+	}
+
+	if useWeb {
+		// If we're using the web, we don't need to prompt for machine type
 		return machines[0].Name, nil
 	}
 
