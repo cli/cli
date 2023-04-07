@@ -112,7 +112,7 @@ func NewCmdCommits(f *cmdutil.Factory, runF func(*CommitsOptions) error) *cobra.
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Hash, "hash", "", "Filter by commit hash")
 	cmdutil.NilBoolFlag(cmd, &opts.Query.Qualifiers.Merge, "merge", "", "Filter on merge commits")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Parent, "parent", "", "Filter by parent hash")
-	cmd.Flags().StringSliceVar(&opts.Query.Qualifiers.Repo, "repo", nil, "Filter on repository")
+	cmd.Flags().StringSliceVarP(&opts.Query.Qualifiers.Repo, "repo", "R", nil, "Filter on repository")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.Tree, "tree", "", "Filter by tree hash")
 	cmd.Flags().StringVar(&opts.Query.Qualifiers.User, "owner", "", "Filter on repository owner")
 	cmdutil.StringSliceEnumFlag(cmd, &opts.Query.Qualifiers.Is, "visibility", "", nil, []string{"public", "private", "internal"}, "Filter based on repository visibility")
