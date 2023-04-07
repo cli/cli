@@ -12,11 +12,14 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
-	"github.com/cli/cli/v2/internal/prompter"
 	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/prompt"
 )
+
+type Prompter interface {
+	Select(string, string, []string) (int, error)
+}
 
 const (
 	// Run statuses
@@ -443,7 +446,7 @@ func GetJob(client *api.Client, repo ghrepo.Interface, jobID string) (*Job, erro
 }
 
 // SelectRun prompts the user to select a run from a list of runs by using the recommended prompter interface
-func SelectRun(p prompter.Prompter, cs *iostreams.ColorScheme, runs []Run) (string, error) {
+func SelectRun(p Prompter, cs *iostreams.ColorScheme, runs []Run) (string, error) {
 	now := time.Now()
 
 	candidates := []string{}

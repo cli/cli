@@ -12,12 +12,12 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -169,15 +169,15 @@ func TestNewCmdView(t *testing.T) {
 
 func TestViewRun(t *testing.T) {
 	tests := []struct {
-		name       string
-		httpStubs  func(*httpmock.Registry)
-		askStubs   func(*prompt.AskStubber)
-		opts       *ViewOptions
-		tty        bool
-		wantErr    bool
-		wantOut    string
-		browsedURL string
-		errMsg     string
+		name        string
+		httpStubs   func(*httpmock.Registry)
+		promptStubs func(*prompter.MockPrompter)
+		opts        *ViewOptions
+		tty         bool
+		wantErr     bool
+		wantOut     string
+		browsedURL  string
+		errMsg      string
 	}{
 		{
 			name: "associate with PR",
@@ -532,9 +532,12 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
 					httpmock.JSONResponse(shared.TestWorkflow))
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(2)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "✓ cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "✓ cool commit, CI (trunk) Feb 23, 2021")
+					})
 			},
 			opts: &ViewOptions{
 				Prompt: true,
@@ -579,11 +582,17 @@ func TestViewRun(t *testing.T) {
 						},
 					}))
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(2)
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(1)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "✓ cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "✓ cool commit, CI (trunk) Feb 23, 2021")
+					})
+				pm.RegisterSelect("View a specific job in this run?",
+					[]string{"View all jobs in this run", "✓ cool job", "X sad job"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "✓ cool job")
+					})
 			},
 			wantOut: coolJobRunLogOutput,
 		},
@@ -626,11 +635,17 @@ func TestViewRun(t *testing.T) {
 						},
 					}))
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(2)
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(1)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "✓ cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "✓ cool commit, CI (trunk) Feb 23, 2021")
+					})
+				pm.RegisterSelect("View a specific job in this run?",
+					[]string{"View all jobs in this run", "✓ cool job", "X sad job"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "✓ cool job")
+					})
 			},
 			wantOut: coolJobRunLogOutput,
 		},
@@ -717,11 +732,17 @@ func TestViewRun(t *testing.T) {
 						},
 					}))
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(2)
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(0)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "✓ cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "✓ cool commit, CI (trunk) Feb 23, 2021")
+					})
+				pm.RegisterSelect("View a specific job in this run?",
+					[]string{"View all jobs in this run", "✓ cool job", "X sad job"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "View all jobs in this run")
+					})
 			},
 			wantOut: expectedRunLogOutput,
 		},
@@ -791,11 +812,17 @@ func TestViewRun(t *testing.T) {
 						},
 					}))
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(4)
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(2)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "✓ cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return 4, nil
+					})
+				pm.RegisterSelect("View a specific job in this run?",
+					[]string{"View all jobs in this run", "✓ cool job", "X sad job"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "X sad job")
+					})
 			},
 			wantOut: quuxTheBarfLogOutput,
 		},
@@ -838,11 +865,17 @@ func TestViewRun(t *testing.T) {
 						},
 					}))
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(4)
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(2)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "✓ cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return 4, nil
+					})
+				pm.RegisterSelect("View a specific job in this run?",
+					[]string{"View all jobs in this run", "✓ cool job", "X sad job"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "X sad job")
+					})
 			},
 			wantOut: quuxTheBarfLogOutput,
 		},
@@ -906,11 +939,17 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
 					httpmock.JSONResponse(shared.TestWorkflow))
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(4)
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(0)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "✓ cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return 4, nil
+					})
+				pm.RegisterSelect("View a specific job in this run?",
+					[]string{"View all jobs in this run", "✓ cool job", "X sad job"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "View all jobs in this run")
+					})
 			},
 			wantOut: quuxTheBarfLogOutput,
 		},
@@ -1054,11 +1093,17 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
 					httpmock.JSONResponse(shared.TestWorkflow))
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(2)
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(0)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "✓ cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "✓ cool commit, CI (trunk) Feb 23, 2021")
+					})
+				pm.RegisterSelect("View a specific job in this run?",
+					[]string{"View all jobs in this run", "✓ cool job", "X sad job"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "View all jobs in this run")
+					})
 			},
 			wantOut: "\n✓ trunk CI · 3\nTriggered via push about 59 minutes ago\n\nJOBS\n✓ cool job in 4m34s (ID 10)\nX sad job in 4m34s (ID 20)\n  ✓ barf the quux\n  X quux the barf\n\nANNOTATIONS\nX the job is sad\nsad job: blaze.py#420\n\n\nFor more information about a job, try: gh run view --job=<job-id>\nView this run on GitHub: https://github.com/runs/3\n",
 		},
@@ -1099,11 +1144,17 @@ func TestViewRun(t *testing.T) {
 					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
 					httpmock.JSONResponse(shared.TestWorkflow))
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(2)
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(1)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"X cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "✓ cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "- cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "* cool commit, CI (trunk) Feb 23, 2021", "X cool commit, CI (trunk) Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "✓ cool commit, CI (trunk) Feb 23, 2021")
+					})
+				pm.RegisterSelect("View a specific job in this run?",
+					[]string{"View all jobs in this run", "✓ cool job", "X sad job"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "✓ cool job")
+					})
 			},
 			wantOut: "\n✓ trunk CI · 3\nTriggered via push about 59 minutes ago\n\n✓ cool job in 4m34s (ID 10)\n  ✓ fob the barz\n  ✓ barz the fob\n\nTo see the full job log, try: gh run view --log --job=10\nView this run on GitHub: https://github.com/runs/3\n",
 		},
@@ -1211,11 +1262,10 @@ func TestViewRun(t *testing.T) {
 			return ghrepo.FromFullName("OWNER/REPO")
 		}
 
-		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
+		pm := prompter.NewMockPrompter(t)
+		tt.opts.Prompter = pm
+		if tt.promptStubs != nil {
+			tt.promptStubs(pm)
 		}
 
 		browser := &browser.Stub{}
