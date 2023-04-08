@@ -9,10 +9,7 @@ before:
   hooks:
     - go mod tidy
     - make manpages GH_VERSION={{.Version}}
-    - mkdir -p ./share/bash-completion/completions ./share/fish/vendor_completions.d ./share/zsh/site-functions
-    - sh -c "go run ./cmd/gh completion -s bash > ./share/bash-completion/completions/gh"
-    - sh -c "go run ./cmd/gh completion -s fish > ./share/fish/vendor_completions.d/gh.fish"
-    - sh -c "go run ./cmd/gh completion -s zsh > ./share/zsh/site-functions/_gh"
+    - make completions
 
 builds:
   - <<: &build_defaults
