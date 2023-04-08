@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAliasImports(t *testing.T) {
+func TestAliasImport(t *testing.T) {
 	tests := []struct {
 		name             string
 		isTTY            bool
@@ -215,13 +215,13 @@ func TestAliasImports(t *testing.T) {
 	}
 }
 
-func TestAliasImports_no_filename(t *testing.T) {
+func TestAliasImport_no_filename(t *testing.T) {
 	cfg := config.NewFromString("")
 	_, err := runCommand(cfg, true, "", "")
 	require.EqualError(t, err, "no filename passed and nothing on STDIN")
 }
 
-func TestAliasImports_multiple_filenames(t *testing.T) {
+func TestAliasImport_multiple_filenames(t *testing.T) {
 	cfg := config.NewFromString("")
 	_, err := runCommand(cfg, true, "aliases1 aliases2", "")
 	require.EqualError(t, err, "too many arguments")
@@ -246,7 +246,7 @@ func runCommand(cfg config.Config, isTTY bool, cli, in string) (*test.CmdOut, er
 		},
 	}
 
-	cmd := NewCmdImports(factory, nil)
+	cmd := NewCmdImport(factory, nil)
 
 	// fake command nesting structure needed for validCommand
 	rootCmd := &cobra.Command{}
@@ -262,7 +262,7 @@ func runCommand(cfg config.Config, isTTY bool, cli, in string) (*test.CmdOut, er
 	apiCmd.AddCommand(&cobra.Command{Use: "graphql"})
 	rootCmd.AddCommand(apiCmd)
 
-	argv, err := shlex.Split("imports " + cli)
+	argv, err := shlex.Split("import " + cli)
 	if err != nil {
 		return nil, err
 	}

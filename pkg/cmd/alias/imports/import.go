@@ -14,7 +14,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type ImportsOptions struct {
+type ImportOptions struct {
 	Config func() (config.Config, error)
 	IO     *iostreams.IOStreams
 
@@ -24,14 +24,14 @@ type ImportsOptions struct {
 	validCommand func(string) bool
 }
 
-func NewCmdImports(f *cmdutil.Factory, runF func(*ImportsOptions) error) *cobra.Command {
-	opts := &ImportsOptions{
+func NewCmdImport(f *cmdutil.Factory, runF func(*ImportOptions) error) *cobra.Command {
+	opts := &ImportOptions{
 		IO:     f.IOStreams,
 		Config: f.Config,
 	}
 
 	cmd := &cobra.Command{
-		Use:   "imports [<filename> | -]",
+		Use:   "import [<filename> | -]",
 		Short: "Import aliases from a YAML file",
 		Long: heredoc.Doc(`
             Import aliases from the contents of a YAML file.
@@ -54,10 +54,10 @@ func NewCmdImports(f *cmdutil.Factory, runF func(*ImportsOptions) error) *cobra.
         `),
 		Example: heredoc.Doc(`
             # Import aliases from a file
-            $ gh alias imports aliases.yml
+            $ gh alias import aliases.yml
 
             # Import aliases from standard input
-            $ gh alias imports -
+            $ gh alias import -
         `),
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 1 {
@@ -79,7 +79,7 @@ func NewCmdImports(f *cmdutil.Factory, runF func(*ImportsOptions) error) *cobra.
 			if runF != nil {
 				return runF(opts)
 			}
-			return importsRun(opts)
+			return importRun(opts)
 		},
 	}
 
@@ -88,7 +88,7 @@ func NewCmdImports(f *cmdutil.Factory, runF func(*ImportsOptions) error) *cobra.
 	return cmd
 }
 
-func importsRun(opts *ImportsOptions) error {
+func importRun(opts *ImportOptions) error {
 	cs := opts.IO.ColorScheme()
 	cfg, err := opts.Config()
 	if err != nil {
