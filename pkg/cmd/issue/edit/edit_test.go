@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -286,6 +287,7 @@ func Test_editRun(t *testing.T) {
 		httpStubs func(*testing.T, *httpmock.Registry)
 		stdout    string
 		stderr    string
+		wantErr   bool
 	}{
 		{
 			name: "non-interactive",
@@ -343,7 +345,7 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "non-interactive multiple issues",
 			input: &EditOptions{
-				SelectorArgs: []string{"123", "456"},
+				SelectorArgs: []string{"456", "123"},
 				Interactive:  false,
 				Editable: prShared.Editable{
 					Assignees: prShared.EditableSlice{
@@ -369,7 +371,6 @@ func Test_editRun(t *testing.T) {
 					},
 				},
 				FetchOptions: prShared.FetchOptions,
-				workers:      1,
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
 				// Should only be one fetch of metadata.
@@ -390,6 +391,120 @@ func Test_editRun(t *testing.T) {
 				https://github.com/OWNER/REPO/issue/123
 				https://github.com/OWNER/REPO/issue/456
 			`),
+		},
+		{
+			name: "non-interactive multiple issues with fetch failures",
+			input: &EditOptions{
+				SelectorArgs: []string{"9999"},
+				Interactive:  false,
+				Editable: prShared.Editable{
+					Assignees: prShared.EditableSlice{
+						Add:    []string{"monalisa", "hubot"},
+						Remove: []string{"octocat"},
+						Edited: true,
+					},
+					Labels: prShared.EditableSlice{
+						Add:    []string{"feature", "TODO", "bug"},
+						Remove: []string{"docs"},
+						Edited: true,
+					},
+					Projects: prShared.EditableProjects{
+						EditableSlice: prShared.EditableSlice{
+							Add:    []string{"Cleanup", "CleanupV2"},
+							Remove: []string{"Roadmap", "RoadmapV2"},
+							Edited: true,
+						},
+					},
+					Milestone: prShared.EditableString{
+						Value:  "GA",
+						Edited: true,
+					},
+				},
+				FetchOptions: prShared.FetchOptions,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.GraphQL(`query IssueByNumber\b`),
+					httpmock.StringResponse(`
+						{ "errors": [
+							{
+								"type": "NOT_FOUND",
+								"message": "Could not resolve to an Issue with the number of 9999."
+							}
+						] }`),
+				)
+			},
+			wantErr: true,
+		},
+		{
+			name: "non-interactive multiple issues with update failures",
+			input: &EditOptions{
+				SelectorArgs: []string{"123", "456"},
+				Interactive:  false,
+				Editable: prShared.Editable{
+					Assignees: prShared.EditableSlice{
+						Add:    []string{"monalisa", "hubot"},
+						Remove: []string{"octocat"},
+						Edited: true,
+					},
+					Milestone: prShared.EditableString{
+						Value:  "GA",
+						Edited: true,
+					},
+				},
+				FetchOptions: prShared.FetchOptions,
+			},
+			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				// Should only be one fetch of metadata.
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryAssignableUsers\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "assignableUsers": {
+						"nodes": [
+							{ "login": "hubot", "id": "HUBOTID" },
+							{ "login": "MonaLisa", "id": "MONAID" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				reg.Register(
+					httpmock.GraphQL(`query RepositoryMilestoneList\b`),
+					httpmock.StringResponse(`
+					{ "data": { "repository": { "milestones": {
+						"nodes": [
+							{ "title": "GA", "id": "GAID" },
+							{ "title": "Big One.oh", "id": "BIGONEID" }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }
+					`))
+				// All other queries should be doubled.
+				mockIssueNumberGet(t, reg, 123)
+				mockIssueNumberGet(t, reg, 456)
+				// Updating 123 should succeed.
+				reg.Register(
+					httpmock.MatchGraphQLMutation(`mutation IssueUpdate\b`, func(m map[string]interface{}) bool {
+						return m["id"] == "123"
+					}),
+					httpmock.GraphQLMutation(`
+							{ "data": { "updateIssue": { "__typename": "" } } }`,
+						func(inputs map[string]interface{}) {}),
+				)
+				// Updating 456 should fail.
+				reg.Register(
+					httpmock.MatchGraphQLMutation(`mutation IssueUpdate\b`, func(m map[string]interface{}) bool {
+						return m["id"] == "456"
+					}),
+					httpmock.GraphQLMutation(`
+							{ "errors": [ { "message": "test error" } ] }`,
+						func(inputs map[string]interface{}) {}),
+				)
+			},
+			stdout: heredoc.Doc(`
+				https://github.com/OWNER/REPO/issue/123
+			`),
+			stderr:  `failed to update https://github.com/OWNER/REPO/issue/456:.*test error`,
+			wantErr: true,
 		},
 		{
 			name: "interactive",
@@ -431,27 +546,32 @@ func Test_editRun(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		ios, _, stdout, stderr := iostreams.Test()
-		ios.SetStdoutTTY(true)
-		ios.SetStdinTTY(true)
-		ios.SetStderrTTY(true)
-
-		reg := &httpmock.Registry{}
-		defer reg.Verify(t)
-		tt.httpStubs(t, reg)
-
-		httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
-		baseRepo := func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
-
-		tt.input.IO = ios
-		tt.input.HttpClient = httpClient
-		tt.input.BaseRepo = baseRepo
-
 		t.Run(tt.name, func(t *testing.T) {
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdoutTTY(true)
+			ios.SetStdinTTY(true)
+			ios.SetStderrTTY(true)
+
+			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
+			tt.httpStubs(t, reg)
+
+			httpClient := func() (*http.Client, error) { return &http.Client{Transport: reg}, nil }
+			baseRepo := func() (ghrepo.Interface, error) { return ghrepo.New("OWNER", "REPO"), nil }
+
+			tt.input.IO = ios
+			tt.input.HttpClient = httpClient
+			tt.input.BaseRepo = baseRepo
+
 			err := editRun(tt.input)
-			assert.NoError(t, err)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 			assert.Equal(t, tt.stdout, stdout.String())
-			assert.Equal(t, tt.stderr, stderr.String())
+			// Use regex match since mock errors and service errors will differ.
+			assert.Regexp(t, regexp.MustCompile(tt.stderr), stderr.String())
 		})
 	}
 }
@@ -465,6 +585,7 @@ func mockIssueNumberGet(_ *testing.T, reg *httpmock.Registry, number int) {
 		httpmock.GraphQL(`query IssueByNumber\b`),
 		httpmock.StringResponse(fmt.Sprintf(`
 			{ "data": { "repository": { "hasIssuesEnabled": true, "issue": {
+				"id": "%[1]d",
 				"number": %[1]d,
 				"url": "https://github.com/OWNER/REPO/issue/%[1]d",
 				"labels": {

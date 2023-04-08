@@ -3,6 +3,8 @@ package edit
 import (
 	"fmt"
 	"net/http"
+	"sort"
+	"sync"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
@@ -12,7 +14,6 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 )
 
 type EditOptions struct {
@@ -27,8 +28,6 @@ type EditOptions struct {
 
 	SelectorArgs []string
 	Interactive  bool
-
-	workers int
 
 	prShared.Editable
 }
@@ -189,66 +188,84 @@ func editRun(opts *EditOptions) error {
 	}
 
 	// Update all issues in parallel.
-	issueURLs := make(chan string, len(issues))
-	if opts.workers == 0 {
-		opts.workers = 10
-	}
-	g := errgroup.Group{}
-	g.SetLimit(opts.workers)
+	editedIssueChan := make(chan string, len(issues))
+	failedIssueChan := make(chan string, len(issues))
+	g := sync.WaitGroup{}
 
 	opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Updating %d issues", len(issues)))
-	for i := range issues {
+	for _, issue := range issues {
 		// Copy variables to capture in the go routine below.
-		issue := issues[i]
 		editable := editable.Clone()
 
-		g.Go(func() error {
-			editable.Title.Default = issue.Title
-			editable.Body.Default = issue.Body
-			editable.Assignees.Default = issue.Assignees.Logins()
-			editable.Labels.Default = issue.Labels.Names()
-			editable.Projects.Default = append(issue.ProjectCards.ProjectNames(), issue.ProjectItems.ProjectTitles()...)
-			projectItems := map[string]string{}
-			for _, n := range issue.ProjectItems.Nodes {
-				projectItems[n.Project.ID] = n.ID
-			}
-			editable.Projects.ProjectItems = projectItems
-			if issue.Milestone != nil {
-				editable.Milestone.Default = issue.Milestone.Title
-			}
+		editable.Title.Default = issue.Title
+		editable.Body.Default = issue.Body
+		editable.Assignees.Default = issue.Assignees.Logins()
+		editable.Labels.Default = issue.Labels.Names()
+		editable.Projects.Default = append(issue.ProjectCards.ProjectNames(), issue.ProjectItems.ProjectTitles()...)
+		projectItems := map[string]string{}
+		for _, n := range issue.ProjectItems.Nodes {
+			projectItems[n.Project.ID] = n.ID
+		}
+		editable.Projects.ProjectItems = projectItems
+		if issue.Milestone != nil {
+			editable.Milestone.Default = issue.Milestone.Title
+		}
 
-			// Allow interactive prompts for one issue; failed earlier if multiple issues specified.
-			if opts.Interactive {
-				editorCommand, err := opts.DetermineEditor()
-				if err != nil {
-					return err
-				}
-				err = opts.EditFieldsSurvey(&editable, editorCommand)
-				if err != nil {
-					return err
-				}
-			}
-
-			err = prShared.UpdateIssue(httpClient, repo, issue.ID, issue.IsPullRequest(), editable)
+		// Allow interactive prompts for one issue; failed earlier if multiple issues specified.
+		if opts.Interactive {
+			editorCommand, err := opts.DetermineEditor()
 			if err != nil {
 				return err
 			}
+			err = opts.EditFieldsSurvey(&editable, editorCommand)
+			if err != nil {
+				return err
+			}
+		}
 
-			issueURLs <- issue.URL
-			return nil
-		})
+		g.Add(1)
+		go func(issue *api.Issue) {
+			defer g.Done()
+
+			err := prShared.UpdateIssue(httpClient, repo, issue.ID, issue.IsPullRequest(), editable)
+			if err != nil {
+				failedIssueChan <- fmt.Sprintf("failed to update %s: %s", issue.URL, err)
+				return
+			}
+
+			editedIssueChan <- issue.URL
+		}(issue)
 	}
+
+	g.Wait()
 	opts.IO.StopProgressIndicator()
+	close(editedIssueChan)
+	close(failedIssueChan)
 
-	err = g.Wait()
-	close(issueURLs)
-
-	if err != nil {
-		return err
+	// Print a sorted list of successfully edited issue URLs to stdout.
+	editedIssueURLs := make([]string, 0, len(issues))
+	for editedIssueURL := range editedIssueChan {
+		editedIssueURLs = append(editedIssueURLs, editedIssueURL)
 	}
 
-	for issueURL := range issueURLs {
-		fmt.Fprintln(opts.IO.Out, issueURL)
+	sort.Strings(editedIssueURLs)
+	for _, editedIssueURL := range editedIssueURLs {
+		fmt.Fprintln(opts.IO.Out, editedIssueURL)
+	}
+
+	// Print a sorted list of failures to stderr.
+	failedIssueErrors := make([]string, 0, len(issues))
+	for failedIssueError := range failedIssueChan {
+		failedIssueErrors = append(failedIssueErrors, failedIssueError)
+	}
+
+	sort.Strings(failedIssueErrors)
+	for _, failedIssueError := range failedIssueErrors {
+		fmt.Fprintln(opts.IO.ErrOut, failedIssueError)
+	}
+
+	if len(failedIssueErrors) > 0 {
+		return fmt.Errorf("failed to update %d issue(s)", len(failedIssueErrors))
 	}
 
 	return nil

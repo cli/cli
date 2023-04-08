@@ -239,7 +239,7 @@ func TestIssuesFromArgsWithFields(t *testing.T) {
 					}}}`))
 			},
 			wantErr:    true,
-			wantErrMsg: `multiple issues must be in same repo: found "OWNER/OTHERREPO", expected "OWNER/REPO"`,
+			wantErrMsg: "multiple issues must be in same repo",
 		},
 		{
 			name: "multiple issues",
@@ -286,7 +286,7 @@ func TestIssuesFromArgsWithFields(t *testing.T) {
 			}
 			if tt.wantErr {
 				assert.Error(t, err)
-				assert.EqualError(t, err, tt.wantErrMsg)
+				assert.ErrorContains(t, err, tt.wantErrMsg)
 				return
 			}
 			assert.NoError(t, err)
