@@ -1,28 +1,32 @@
 # GitHub CLI project layout
 
 At a high level, these areas make up the `github.com/cli/cli` project:
-- [`cmd/`](../cmd) - `main` packages for building binaries such as the `gh` executable
-- [`pkg/`](../pkg) - most other packages, including the implementation for individual gh commands
-- [`docs/`](../docs) - documentation for maintainers and contributors
-- [`script/`](../script) - build and release scripts
-- [`internal/`](../internal) - Go packages highly specific to our needs and thus internal
-- [`go.mod`](../go.mod) - external Go dependencies for this project, automatically fetched by Go at build time
+
+-   [`cmd/`](../cmd) - `main` packages for building binaries such as the `gh` executable
+-   [`pkg/`](../pkg) - most other packages, including the implementation for individual gh commands
+-   [`docs/`](../docs) - documentation for maintainers and contributors
+-   [`script/`](../script) - build and release scripts
+-   [`internal/`](../internal) - Go packages highly specific to our needs and thus internal
+-   [`go.mod`](../go.mod) - external Go dependencies for this project, automatically fetched by Go at build time
 
 Some auxiliary Go packages are at the top level of the project for historical reasons:
-- [`api/`](../api) - main utilities for making requests to the GitHub API
-- [`context/`](../context) - DEPRECATED: use only for referencing git remotes
-- [`git/`](../git) - utilities to gather information from a local git repository
-- [`test/`](../test) - DEPRECATED: do not use
-- [`utils/`](../utils) - DEPRECATED: use only for printing table output
+
+-   [`api/`](../api) - main utilities for making requests to the GitHub API
+-   [`context/`](../context) - DEPRECATED: use only for referencing git remotes
+-   [`git/`](../git) - utilities to gather information from a local git repository
+-   [`test/`](../test) - DEPRECATED: do not use
+-   [`utils/`](../utils) - DEPRECATED: use only for printing table output
 
 ## Command-line help text
 
 Running `gh help issue list` displays help text for a topic. In this case, the topic is a specific command,
 and help text for every command is embedded in that command's source code. The naming convention for gh
 commands is:
+
 ```
 pkg/cmd/<command>/<subcommand>/<subcommand>.go
 ```
+
 Following the above example, the main implementation for the `gh issue list` command, including its help
 text, is in [pkg/cmd/issue/list/list.go](../pkg/cmd/issue/list/list.go)
 
@@ -65,8 +69,8 @@ and talk through which code gets run in order.
    structure: `pkg/cmd/boom/`
 3. The new package should expose a method, e.g. `NewCmdBoom()`, that accepts a `*cmdutil.Factory` type and
    returns a `*cobra.Command`.
-   * Any logic specific to this command should be kept within the command's package and not added to any
-     "global" packages like `api` or `utils`.
+    - Any logic specific to this command should be kept within the command's package and not added to any
+      "global" packages like `api` or `utils`.
 4. Use the method from the previous step to generate the command and add it to the command tree, typically
    somewhere in the `NewCmdRoot()` method.
 

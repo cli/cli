@@ -2,41 +2,45 @@
 
 1. Verify that you have Go 1.19+ installed
 
-   ```sh
-   $ go version
-   ```
+    ```sh
+    $ go version
+    ```
 
-   If `go` is not installed, follow instructions on [the Go website](https://golang.org/doc/install).
+    If `go` is not installed, follow instructions on [the Go website](https://golang.org/doc/install).
 
 2. Clone this repository
 
-   ```sh
-   $ git clone https://github.com/cli/cli.git gh-cli
-   $ cd gh-cli
-   ```
+    ```sh
+    $ git clone https://github.com/cli/cli.git gh-cli
+    $ cd gh-cli
+    ```
 
 3. Build and install
 
-   #### Unix-like systems
-   ```sh
-   # installs to '/usr/local' by default; sudo may be required, or sudo -E for configured go environments
-   $ make install
+    #### Unix-like systems
 
-   # or, install to a different location
-   $ make install prefix=/path/to/gh
-   ```
+    ```sh
+    # installs to '/usr/local' by default; sudo may be required, or sudo -E for configured go environments
+    $ make install
 
-   #### Windows
-   ```pwsh
-   # build the `bin\gh.exe` binary
-   > go run script\build.go
-   ```
-   There is no install step available on Windows.
+    # or, install to a different location
+    $ make install prefix=/path/to/gh
+    ```
+
+    #### Windows
+
+    ```pwsh
+    # build the `bin\gh.exe` binary
+    > go run script\build.go
+    ```
+
+    There is no install step available on Windows.
 
 4. Run `gh version` to check if it worked.
 
-   #### Windows
-   Run `bin\gh version` to check if it worked.
+    #### Windows
+
+    Run `bin\gh version` to check if it worked.
 
 ## Cross-compiling binaries for different platforms
 
@@ -44,10 +48,12 @@ You can use any platform with Go installed to build a binary that is intended fo
 or CPU architecture. This is achieved by setting environment variables such as GOOS and GOARCH.
 
 For example, to compile the `gh` binary for the 32-bit Raspberry Pi OS:
+
 ```sh
 # on a Unix-like system:
 $ GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0 make clean bin/gh
 ```
+
 ```pwsh
 # on Windows, pass environment variables as arguments to the build script:
 > go run script\build.go clean bin\gh GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=0

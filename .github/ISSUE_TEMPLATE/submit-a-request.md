@@ -1,10 +1,9 @@
 ---
 name: "⭐ Submit a request"
 about: Surface a feature or problem that you think should be solved
-title: ''
+title: ""
 labels: enhancement
-assignees: ''
-
+assignees: ""
 ---
 
 ### Describe the feature or problem you’d like to solve

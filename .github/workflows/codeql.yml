@@ -1,33 +1,39 @@
 name: Code Scanning
 
 on:
-  push:
-    branches: [trunk]
-  pull_request:
-    branches: [trunk]
-    paths-ignore:
-      - '**/*.md'
-  schedule:
-    - cron: "0 0 * * 0"
+    push:
+        branches:
+            [
+                trunk,
+            ]
+    pull_request:
+        branches:
+            [
+                trunk,
+            ]
+        paths-ignore:
+            - "**/*.md"
+    schedule:
+        - cron: "0 0 * * 0"
 
 permissions:
-  actions: read  # for github/codeql-action/init to get workflow details
-  contents: read  # for actions/checkout to fetch code
-  security-events: write  # for github/codeql-action/analyze to upload SARIF results
+    actions: read # for github/codeql-action/init to get workflow details
+    contents: read # for actions/checkout to fetch code
+    security-events: write # for github/codeql-action/analyze to upload SARIF results
 
 jobs:
-  CodeQL-Build:
-    runs-on: ubuntu-latest
+    CodeQL-Build:
+        runs-on: ubuntu-latest
 
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v3
+        steps:
+            - name: Check out code
+              uses: actions/checkout@v3
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
-        with:
-          languages: go
-          queries: security-and-quality
+            - name: Initialize CodeQL
+              uses: github/codeql-action/init@v2
+              with:
+                  languages: go
+                  queries: security-and-quality
 
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+            - name: Perform CodeQL Analysis
+              uses: github/codeql-action/analyze@v2

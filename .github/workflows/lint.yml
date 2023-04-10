@@ -1,66 +1,69 @@
 name: Lint
 on:
-  push:
-    paths:
-      - "**.go"
-      - go.mod
-      - go.sum
-  pull_request:
-    paths:
-      - "**.go"
-      - go.mod
-      - go.sum
+    push:
+        paths:
+            - "**.go"
+            - go.mod
+            - go.sum
+    pull_request:
+        paths:
+            - "**.go"
+            - go.mod
+            - go.sum
 
 permissions:
-  contents: read
+    contents: read
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
+    lint:
+        runs-on: ubuntu-latest
 
-    steps:
-      - name: Set up Go 1.19
-        uses: actions/setup-go@v4
-        with:
-          go-version: 1.19
+        steps:
+            - name: Set up Go 1.19
+              uses: actions/setup-go@v4
+              with:
+                  go-version: 1.19
 
-      - name: Check out code
-        uses: actions/checkout@v3
+            - name: Check out code
+              uses: actions/checkout@v3
 
-      - name: Restore Go modules cache
-        uses: actions/cache@v3
-        with:
-          path: ~/go/pkg/mod
-          key: go-${{ runner.os }}-${{ hashFiles('go.mod') }}
-          restore-keys: |
-            go-${{ runner.os }}-
+            - name: Restore Go modules cache
+              uses: actions/cache@v3
+              with:
+                  path: ~/go/pkg/mod
+                  key: go-${{ runner.os }}-${{ hashFiles('go.mod') }}
+                  restore-keys:
+                      |
+                      go-${{ runner.os }}-
 
-      - name: Verify dependencies
-        run: |
-          go mod verify
-          go mod download
+            - name: Verify dependencies
+              run:
+                  |
+                  go mod verify
+                  go mod download
 
-          LINT_VERSION=1.50.1
-          curl -fsSL https://github.com/golangci/golangci-lint/releases/download/v${LINT_VERSION}/golangci-lint-${LINT_VERSION}-linux-amd64.tar.gz | \
-            tar xz --strip-components 1 --wildcards \*/golangci-lint
-          mkdir -p bin && mv golangci-lint bin/
+                  LINT_VERSION=1.50.1
+                  curl -fsSL https://github.com/golangci/golangci-lint/releases/download/v${LINT_VERSION}/golangci-lint-${LINT_VERSION}-linux-amd64.tar.gz | \
+                    tar xz --strip-components 1 --wildcards \*/golangci-lint
+                  mkdir -p bin && mv golangci-lint bin/
 
-      - name: Run checks
-        run: |
-          STATUS=0
-          assert-nothing-changed() {
-            local diff
-            "$@" >/dev/null || return 1
-            if ! diff="$(git diff -U1 --color --exit-code)"; then
-              printf '\e[31mError: running `\e[1m%s\e[22m` results in modifications that you must check into version control:\e[0m\n%s\n\n' "$*" "$diff" >&2
-              git checkout -- .
-              STATUS=1
-            fi
-          }
+            - name: Run checks
+              run:
+                  |
+                  STATUS=0
+                  assert-nothing-changed() {
+                    local diff
+                    "$@" >/dev/null || return 1
+                    if ! diff="$(git diff -U1 --color --exit-code)"; then
+                      printf '\e[31mError: running `\e[1m%s\e[22m` results in modifications that you must check into version control:\e[0m\n%s\n\n' "$*" "$diff" >&2
+                      git checkout -- .
+                      STATUS=1
+                    fi
+                  }
 
-          assert-nothing-changed go fmt ./...
-          assert-nothing-changed go mod tidy
+                  assert-nothing-changed go fmt ./...
+                  assert-nothing-changed go mod tidy
 
-          bin/golangci-lint run --out-format=github-actions --timeout=3m || STATUS=$?
+                  bin/golangci-lint run --out-format=github-actions --timeout=3m || STATUS=$?
 
-          exit $STATUS
+                  exit $STATUS

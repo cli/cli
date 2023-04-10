@@ -1,8 +1,8 @@
 linters:
-  enable:
-  - gofmt
-  - nolintlint
+    enable:
+        - gofmt
+        - nolintlint
 
 issues:
-  max-issues-per-linter: 0
-  max-same-issues: 0
+    max-issues-per-linter: 0
+    max-same-issues: 0

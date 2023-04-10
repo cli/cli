@@ -30,15 +30,15 @@ Once we've signed off on the proposed UX on the issue opened in step 1, develop 
 
 With a beta in hand it's time to decide whether or not to mainline your extension into the `trunk` of `gh`. Some questions to consider:
 
-- How complex is the support burden for your feature?
+-   How complex is the support burden for your feature?
 
 If this feature requires extensive or specialized support, you will either need to release it as an extension or work with the CLI team to get maintainer access to `cli/cli`. The CLI team is very small and cannot promise any kind of SLA for supporting your work. For example, the `gh cs` command is sufficiently specialized and complex that we have given the `codespaces` team write access to the repository to maintain their own pull request review process. We have not put it in an extension as Codespaces are a core GitHub product with widespread use among our users.
 
-- What kind of release cadence do you want?
+-   What kind of release cadence do you want?
 
 We do a `gh` release roughly every other week, but if the changeset for a given week is light we may skip one. We make no official promise as to our cadence, and while we do have an on-call rotation there is no guarantee that you'll be able to get emergency fixes out within hours. If this is troubling, consider keeping your work in an extension.
 
-- What kind of audience are you trying to reach?
+-   What kind of audience are you trying to reach?
 
 Is this new feature intended for all GitHub users or just a few? If it's as applicable to your average GitHub user or customer as something like Codespaces or Pull Requests, that's a strong indication it should be merged into `trunk`. If not, consider keeping it an extension.
 
@@ -52,6 +52,6 @@ Keep in mind that our expectation of non-trivial commands that end up merged int
 
 ## Other considerations
 
-- If you have a high need for secrecy until the point of release, let us know in [#cli on slack](https://github.slack.com/archives/CLLG3RMAR). We'll come up with a solution to work on merging your command in private.
-- We are a highly asynchronous team due to wide timezone differences. The best way to get in touch with us is via issue and pull request comments to which we'll respond within 24 hours. You can ping us on Slack but that's generally not our preference.
-- We are happy to pair with you on extension authoring! Just let us know if we can provide guidance and we can schedule synchronous time to work together with you.
+-   If you have a high need for secrecy until the point of release, let us know in [#cli on slack](https://github.slack.com/archives/CLLG3RMAR). We'll come up with a solution to work on merging your command in private.
+-   We are a highly asynchronous team due to wide timezone differences. The best way to get in touch with us is via issue and pull request comments to which we'll respond within 24 hours. You can ping us on Slack but that's generally not our preference.
+-   We are happy to pair with you on extension authoring! Just let us know if we can provide guidance and we can schedule synchronous time to work together with you.

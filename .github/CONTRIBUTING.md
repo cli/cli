@@ -6,32 +6,35 @@ We accept pull requests for bug fixes and features where we've discussed the app
 
 Please do:
 
-* Check existing issues to verify that the [bug][bug issues] or [feature request][feature request issues] has not already been submitted.
-* Open an issue if things aren't working as expected.
-* Open an issue to propose a significant change.
-* Open a pull request to fix a bug.
-* Open a pull request to fix documentation about a command.
-* Open a pull request for any issue labelled [`help wanted`][hw] or [`good first issue`][gfi].
+-   Check existing issues to verify that the [bug][bug issues] or [feature request][feature request issues] has not already been submitted.
+-   Open an issue if things aren't working as expected.
+-   Open an issue to propose a significant change.
+-   Open a pull request to fix a bug.
+-   Open a pull request to fix documentation about a command.
+-   Open a pull request for any issue labelled [`help wanted`][hw] or [`good first issue`][gfi].
 
 Please avoid:
 
-* Opening pull requests for issues marked `needs-design`, `needs-investigation`, or `blocked`.
-* Adding installation instructions specifically for your OS/package manager.
-* Opening pull requests for any issue marked `core`. These issues require additional context from
-  the core CLI team at GitHub and any external pull requests will not be accepted.
+-   Opening pull requests for issues marked `needs-design`, `needs-investigation`, or `blocked`.
+-   Adding installation instructions specifically for your OS/package manager.
+-   Opening pull requests for any issue marked `core`. These issues require additional context from
+    the core CLI team at GitHub and any external pull requests will not be accepted.
 
 ## Building the project
 
 Prerequisites:
-- Go 1.16+
+
+-   Go 1.16+
 
 Build with:
-* Unix-like systems: `make`
-* Windows: `go run script/build.go`
+
+-   Unix-like systems: `make`
+-   Windows: `go run script/build.go`
 
 Run the new binary as:
-* Unix-like systems: `bin/gh`
-* Windows: `bin\gh`
+
+-   Unix-like systems: `bin/gh`
+-   Windows: `bin\gh`
 
 Run tests with: `go test ./...`
 
@@ -55,10 +58,9 @@ You may reference the [CLI Design System][] when suggesting features, and are we
 
 ## Resources
 
-- [How to Contribute to Open Source][]
-- [Using Pull Requests][]
-- [GitHub Help][]
-
+-   [How to Contribute to Open Source][]
+-   [Using Pull Requests][]
+-   [GitHub Help][]
 
 [bug issues]: https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue+label%3Abug
 [feature request issues]: https://github.com/cli/cli/issues?q=is%3Aopen+is%3Aissue+label%3Aenhancement

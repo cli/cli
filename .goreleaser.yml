@@ -1,72 +1,105 @@
 project_name: gh
 
 release:
-  prerelease: auto
-  draft: true # we only publish after the Windows MSI gets uploaded
-  name_template: "GitHub CLI {{.Version}}"
+    prerelease: auto
+    draft: true # we only publish after the Windows MSI gets uploaded
+    name_template: "GitHub CLI {{.Version}}"
 
 before:
-  hooks:
-    - go mod tidy
-    - make manpages GH_VERSION={{.Version}}
+    hooks:
+        - go mod tidy
+        - make manpages GH_VERSION={{.Version}}
 
 builds:
-  - <<: &build_defaults
-      binary: bin/gh
-      main: ./cmd/gh
-      ldflags:
-        - -s -w -X github.com/cli/cli/v2/internal/build.Version={{.Version}} -X github.com/cli/cli/v2/internal/build.Date={{time "2006-01-02"}}
-    id: macos
-    goos: [darwin]
-    goarch: [amd64, arm64]
+    - <<:
+          &build_defaults
+          binary: bin/gh
+          main: ./cmd/gh
+          ldflags:
+              - -s -w -X github.com/cli/cli/v2/internal/build.Version={{.Version}} -X github.com/cli/cli/v2/internal/build.Date={{time "2006-01-02"}}
+      id: macos
+      goos:
+          [
+              darwin,
+          ]
+      goarch:
+          [
+              amd64,
+              arm64,
+          ]
 
-  - <<: *build_defaults
-    id: linux
-    goos: [linux]
-    goarch: [386, arm, amd64, arm64]
-    env:
-      - CGO_ENABLED=0
+    - <<: *build_defaults
+      id: linux
+      goos:
+          [
+              linux,
+          ]
+      goarch:
+          [
+              386,
+              arm,
+              amd64,
+              arm64,
+          ]
+      env:
+          - CGO_ENABLED=0
 
-  - <<: *build_defaults
-    id: windows
-    goos: [windows]
-    goarch: [386, amd64, arm64]
-    hooks:
-      post:
-        - cmd: ./script/sign-windows-executable.sh '{{ .Path }}'
-          output: false
+    - <<: *build_defaults
+      id: windows
+      goos:
+          [
+              windows,
+          ]
+      goarch:
+          [
+              386,
+              amd64,
+              arm64,
+          ]
+      hooks:
+          post:
+              - cmd: ./script/sign-windows-executable.sh '{{ .Path }}'
+                output: false
 
 archives:
-  - id: nix
-    builds: [macos, linux]
-    <<: &archive_defaults
-      name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
-    wrap_in_directory: true
-    replacements:
-      darwin: macOS
-    format: tar.gz
-    files:
-      - LICENSE
-      - ./share/man/man1/gh*.1
-  - id: windows
-    builds: [windows]
-    <<: *archive_defaults
-    wrap_in_directory: false
-    format: zip
-    files:
-      - LICENSE
+    - id: nix
+      builds:
+          [
+              macos,
+              linux,
+          ]
+      <<:
+          &archive_defaults
+          name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+      wrap_in_directory: true
+      replacements:
+          darwin: macOS
+      format: tar.gz
+      files:
+          - LICENSE
+          - ./share/man/man1/gh*.1
+    - id: windows
+      builds:
+          [
+              windows,
+          ]
+      <<: *archive_defaults
+      wrap_in_directory: false
+      format: zip
+      files:
+          - LICENSE
 
 nfpms:
-  - license: MIT
-    maintainer: GitHub
-    homepage: https://github.com/cli/cli
-    bindir: /usr
-    dependencies:
-      - git
-    description: GitHub’s official command line tool.
-    formats:
-      - deb
-      - rpm
-    contents:
-      - src: "./share/man/man1/gh*.1"
-        dst: "/usr/share/man/man1"
+    - license: MIT
+      maintainer: GitHub
+      homepage: https://github.com/cli/cli
+      bindir: /usr
+      dependencies:
+          - git
+      description: GitHub’s official command line tool.
+      formats:
+          - deb
+          - rpm
+      contents:
+          - src: "./share/man/man1/gh*.1"
+            dst: "/usr/share/man/man1"

@@ -10,11 +10,11 @@ All incoming issues need either an `enhancement`, `bug`, or `docs` label.
 
 To be considered triaged, `enhancement` issues require at least one of the following additional labels:
 
-- `core`: reserved for the core CLI team
-- `help wanted`: signal that we are accepting contributions for this
-- `discuss`: add to our team's queue to discuss during a sync
-- `needs-investigation`: work that requires a mystery be solved by the core team before it can move forward
-- `needs-user-input`: we need more information from our users before the task can move forward
+-   `core`: reserved for the core CLI team
+-   `help wanted`: signal that we are accepting contributions for this
+-   `discuss`: add to our team's queue to discuss during a sync
+-   `needs-investigation`: work that requires a mystery be solved by the core team before it can move forward
+-   `needs-user-input`: we need more information from our users before the task can move forward
 
 To be considered triaged, `bug` issues require a severity label: one of `p1`, `p2`, or `p3`
 
@@ -26,29 +26,29 @@ the changeset is feasible and to allow the associated CI run for new contributor
 
 ## Issue triage flowchart
 
-- can this be closed outright?
-  - e.g. spam/junk
-  - close without comment
-- do we not want to do it?
-  - e.g. have already discussed not wanting to do or duplicate issue
-  - comment and close
-- are we ok with outside contribution for this?
-  - e.g. the task is relatively straightforward, but no people on our team have the bandwidth to take it on at the moment
-  - ensure that the thread contains all the context necessary for someone new to pick this up
-  - add `help wanted` label
-  - consider adding `good first issue` label
-- do we want to do it?
-  - comment acknowledging that
-  - add `core` label
-  - add to the project “TODO” column if this is something that should ship soon
-- is it intriguing, but requires discussion?
-  - label `discuss`
-  - label `needs-investigation` if engineering research is required before action can be taken
-- does it need more info from the issue author?
-  - ask the user for details
-  - add `needs-user-input` label
-- is it a usage/support question?
-  - consider converting the Issue to a Discussion
+-   can this be closed outright?
+    -   e.g. spam/junk
+    -   close without comment
+-   do we not want to do it?
+    -   e.g. have already discussed not wanting to do or duplicate issue
+    -   comment and close
+-   are we ok with outside contribution for this?
+    -   e.g. the task is relatively straightforward, but no people on our team have the bandwidth to take it on at the moment
+    -   ensure that the thread contains all the context necessary for someone new to pick this up
+    -   add `help wanted` label
+    -   consider adding `good first issue` label
+-   do we want to do it?
+    -   comment acknowledging that
+    -   add `core` label
+    -   add to the project “TODO” column if this is something that should ship soon
+-   is it intriguing, but requires discussion?
+    -   label `discuss`
+    -   label `needs-investigation` if engineering research is required before action can be taken
+-   does it need more info from the issue author?
+    -   ask the user for details
+    -   add `needs-user-input` label
+-   is it a usage/support question?
+    -   consider converting the Issue to a Discussion
 
 ## Weekly PR audit
 
@@ -59,9 +59,9 @@ helpful.
 
 For each PR, ask:
 
-- is this too stale (more than two months old or too many conflicts)? close with comment
-- is this really close but author is absent? push commits to finish, request review
-- is this waiting on triage? go through the PR triage flow
+-   is this too stale (more than two months old or too many conflicts)? close with comment
+-   is this really close but author is absent? push commits to finish, request review
+-   is this waiting on triage? go through the PR triage flow
 
 ## Useful aliases
 
@@ -74,9 +74,9 @@ https://gist.github.com/vilmibm/ee6ed8a783e4fef5b69b2ed42d743b1a
 We want our project to be a safe and encouraging open-source environment. Below are some examples
 of how to empathetically respond to or close an issue/PR:
 
-- [Closing a quality PR its scope is too large](https://github.com/cli/cli/pull/1161)
-- [Closing a stale PR](https://github.com/cli/cli/pull/557#issuecomment-639077269)
-- [Closing a PR that doesn't follow our CONTRIBUTING policy](https://github.com/cli/cli/pull/864)
-- [Responding to a bug report](https://github.com/desktop/desktop/issues/9195#issuecomment-592243129)
-- [Closing an issue that out of scope](https://github.com/cli/cli/issues/777#issuecomment-612926229)
-- [Closing an issue with a feature request](https://github.com/desktop/desktop/issues/9722#issuecomment-625461766)
+-   [Closing a quality PR its scope is too large](https://github.com/cli/cli/pull/1161)
+-   [Closing a stale PR](https://github.com/cli/cli/pull/557#issuecomment-639077269)
+-   [Closing a PR that doesn't follow our CONTRIBUTING policy](https://github.com/cli/cli/pull/864)
+-   [Responding to a bug report](https://github.com/desktop/desktop/issues/9195#issuecomment-592243129)
+-   [Closing an issue that out of scope](https://github.com/cli/cli/issues/777#issuecomment-612926229)
+-   [Closing an issue with a feature request](https://github.com/desktop/desktop/issues/9722#issuecomment-625461766)
