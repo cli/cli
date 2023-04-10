@@ -7,12 +7,12 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/run/shared"
 	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/httpmock"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
@@ -86,13 +86,13 @@ func TestRunCancel(t *testing.T) {
 	inProgressRun := shared.TestRun(1234, shared.InProgress, "")
 	completedRun := shared.TestRun(4567, shared.Completed, shared.Failure)
 	tests := []struct {
-		name      string
-		httpStubs func(*httpmock.Registry)
-		askStubs  func(*prompt.AskStubber)
-		opts      *CancelOptions
-		wantErr   bool
-		wantOut   string
-		errMsg    string
+		name        string
+		httpStubs   func(*httpmock.Registry)
+		promptStubs func(*prompter.MockPrompter)
+		opts        *CancelOptions
+		wantErr     bool
+		wantOut     string
+		errMsg      string
 	}{
 		{
 			name: "cancel run",
@@ -194,9 +194,12 @@ func TestRunCancel(t *testing.T) {
 					httpmock.REST("POST", "repos/OWNER/REPO/actions/runs/1234/cancel"),
 					httpmock.StatusStringResponse(202, "{}"))
 			},
-			askStubs: func(as *prompt.AskStubber) {
-				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
-				as.StubOne(0)
+			promptStubs: func(pm *prompter.MockPrompter) {
+				pm.RegisterSelect("Select a workflow run",
+					[]string{"* cool commit, CI (trunk) Feb 23, 2021"},
+					func(_, _ string, opts []string) (int, error) {
+						return prompter.IndexFor(opts, "* cool commit, CI (trunk) Feb 23, 2021")
+					})
 			},
 			wantOut: "✓ Request to cancel workflow submitted.\n",
 		},
@@ -217,11 +220,10 @@ func TestRunCancel(t *testing.T) {
 			return ghrepo.FromFullName("OWNER/REPO")
 		}
 
-		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
-		as, teardown := prompt.InitAskStubber()
-		defer teardown()
-		if tt.askStubs != nil {
-			tt.askStubs(as)
+		pm := prompter.NewMockPrompter(t)
+		tt.opts.Prompter = pm
+		if tt.promptStubs != nil {
+			tt.promptStubs(pm)
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
