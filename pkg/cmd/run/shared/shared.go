@@ -9,12 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	workflowShared "github.com/cli/cli/v2/pkg/cmd/workflow/shared"
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/cli/v2/pkg/prompt"
 )
 
 type Prompter interface {
@@ -459,36 +457,6 @@ func SelectRun(p Prompter, cs *iostreams.ColorScheme, runs []Run) (string, error
 	}
 
 	selected, err := p.Select("Select a workflow run", "", candidates)
-
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%d", runs[selected].ID), nil
-}
-
-// TODO: this should be deprecated in favor of SelectRun
-func PromptForRun(cs *iostreams.ColorScheme, runs []Run) (string, error) {
-	var selected int
-	now := time.Now()
-
-	candidates := []string{}
-
-	for _, run := range runs {
-		symbol, _ := Symbol(cs, run.Status, run.Conclusion)
-		candidates = append(candidates,
-			// TODO truncate commit message, long ones look terrible
-			fmt.Sprintf("%s %s, %s (%s) %s", symbol, run.Title(), run.WorkflowName(), run.HeadBranch, preciseAgo(now, run.StartedTime())))
-	}
-
-	// TODO consider custom filter so it's fuzzier. right now matches start anywhere in string but
-	// become contiguous
-	//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
-	err := prompt.SurveyAskOne(&survey.Select{
-		Message:  "Select a workflow run",
-		Options:  candidates,
-		PageSize: 10,
-	}, &selected)
 
 	if err != nil {
 		return "", err
