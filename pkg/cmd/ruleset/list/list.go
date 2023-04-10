@@ -65,16 +65,6 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	return cmd
 }
 
-type Ruleset struct {
-	Id          string `json:"id"`
-	Name        string `json:"name"`
-	Target      string `json:"target"`
-	SourceType  string `json:"source_type"`
-	Source      string `json:"source"`
-	Enforcement string `json:"enforcement"`
-	BypassMode  string `json:"bypass_mode"`
-}
-
 func listRun(opts *ListOptions) error {
 	httpClient, err := opts.HttpClient()
 	if err != nil {
@@ -95,7 +85,20 @@ func listRun(opts *ListOptions) error {
 		return opts.Browser.Browse(rulesetURL)
 	}
 
-	result, err := listRepoRulesets(httpClient, repoI, opts.Limit)
+	var result *RulesetList
+
+	if opts.Organization != "" {
+		var cfg config.Config
+		cfg, err = opts.Config()
+		if err != nil {
+			return err
+		}
+		hostname, _ := cfg.DefaultHost()
+		result, err = listOrgRulesets(httpClient, opts.Organization, opts.Limit, hostname)
+	} else {
+		result, err = listRepoRulesets(httpClient, repoI, opts.Limit)
+	}
+
 	if err != nil {
 		return err
 	}

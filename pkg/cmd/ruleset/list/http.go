@@ -7,7 +7,20 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 )
 
-type RepositoryRuleset struct {
+type RulesetResponse struct {
+	Level struct {
+		Rulesets struct {
+			TotalCount int
+			Nodes      []Ruleset
+			PageInfo   struct {
+				HasNextPage bool
+				EndCursor   string
+			}
+		}
+	}
+}
+
+type Ruleset struct {
 	Id     string
 	Name   string
 	Target string
@@ -24,71 +37,112 @@ type RepositoryRuleset struct {
 	}
 }
 
-type RepositoryRulesetList struct {
+type RulesetList struct {
 	TotalCount int
-	Rulesets   []RepositoryRuleset
+	Rulesets   []Ruleset
 }
 
-func listRepoRulesets(httpClient *http.Client, repo ghrepo.Interface, limit int) (*RepositoryRulesetList, error) {
-	type response struct {
-		Repository struct {
-			Rulesets struct {
-				TotalCount int
-				Nodes      []RepositoryRuleset
-			}
-		}
-	}
-
-	query := `
-		query RepositoryRulesetList(
-			$owner: String!,
-			$repo: String!,
-			$limit: Int!
-		) {
-			repository(owner: $owner, name: $repo) {
-				rulesets(first: $limit) {
-					totalCount
-					nodes {
-						id
-						name
-						target
-						conditions {
-							refName {
-								include
-								exclude
-							}
-							repositoryName {
-								include
-								exclude
-								protected
-							}
-						},
-						rules {
-							totalCount
-						}
-					}
-				}
-			}
-		}
-	`
-
+func listRepoRulesets(httpClient *http.Client, repo ghrepo.Interface, limit int) (*RulesetList, error) {
 	variables := map[string]interface{}{
 		"owner": repo.RepoOwner(),
 		"repo":  repo.RepoName(),
-		"limit": limit,
 	}
 
+	return listRulesets(httpClient, rulesetQuery(false), variables, limit, repo.RepoHost())
+}
+
+func listOrgRulesets(httpClient *http.Client, orgLogin string, limit int, host string) (*RulesetList, error) {
+	variables := map[string]interface{}{
+		"login": orgLogin,
+	}
+
+	return listRulesets(httpClient, rulesetQuery(true), variables, limit, host)
+}
+
+func listRulesets(httpClient *http.Client, query string, variables map[string]interface{}, limit int, host string) (*RulesetList, error) {
+	pageLimit := min(limit, 100)
+
+	res := RulesetList{
+		Rulesets: []Ruleset{},
+	}
 	client := api.NewClientFromHTTP(httpClient)
-	var res response
-	err := client.GraphQL(repo.RepoHost(), query, variables, &res)
-	if err != nil {
-		return nil, err
+
+	for {
+		variables["limit"] = pageLimit
+		var data RulesetResponse
+		err := client.GraphQL(host, query, variables, &data)
+		if err != nil {
+			return nil, err
+		}
+
+		res.TotalCount = data.Level.Rulesets.TotalCount
+		res.Rulesets = append(res.Rulesets, data.Level.Rulesets.Nodes...)
+
+		if len(res.Rulesets) >= limit {
+			break
+		}
+
+		if data.Level.Rulesets.PageInfo.HasNextPage {
+			variables["endCursor"] = data.Level.Rulesets.PageInfo.EndCursor
+			pageLimit = min(pageLimit, limit-len(res.Rulesets))
+		} else {
+			break
+		}
 	}
 
-	list := RepositoryRulesetList{
-		TotalCount: res.Repository.Rulesets.TotalCount,
-		Rulesets:   res.Repository.Rulesets.Nodes,
+	return &res, nil
+}
+
+func rulesetQuery(org bool) string {
+	var args string
+	var level string
+
+	if org {
+		args = "$login: String!"
+		level = "organization(login: $login)"
+	} else {
+		args = "$owner: String!, $repo: String!"
+		level = "repository(owner: $owner, name: $repo)"
 	}
 
-	return &list, nil
+	str := "query RulesetList($limit: Int!, $endCursor: String, " + args + ") { level: " + level + " {"
+
+	str += `
+		rulesets(first: $limit, after: $endCursor) {
+			totalCount
+			nodes {
+				id
+				#database_id
+				name
+				target
+				#enforcement
+				conditions {
+					refName {
+						include
+						exclude
+					}
+					repositoryName {
+						include
+						exclude
+						protected
+					}
+				}
+				rules {
+					totalCount
+				}
+			}
+			pageInfo {
+				hasNextPage
+				endCursor
+			}
+		}`
+
+	return str + "}}"
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
