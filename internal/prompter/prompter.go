@@ -81,7 +81,7 @@ func (p *surveyPrompter) MultiSelect(message string, defaultValue, options []str
 
 	// TODO will I regret this returning []string and not []int?
 
-	if defaultValue != nil && len(defaultValue) > 0 {
+	if len(defaultValue) > 0 {
 		// TODO I don't actually know that this is needed, just being extra cautious
 		validatedDefault := []string{}
 		for _, x := range defaultValue {
