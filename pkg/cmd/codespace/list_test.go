@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestListCmd(t *testing.T) {
+func TestListCmdFlagError(t *testing.T) {
 	tests := []struct {
 		name     string
 		args     string
