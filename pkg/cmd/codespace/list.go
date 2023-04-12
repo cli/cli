@@ -36,12 +36,13 @@ func newListCmd(app *App) *cobra.Command {
 		Aliases: []string{"ls"},
 		Args:    noArgsConstraint,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			// if repo is provided, we don't accept orgName or userName
-			if opts.repo != "" {
-				return cmdutil.MutuallyExclusive("using `--org` or `--user` with `--repo` is not allowed", opts.repo != "", opts.orgName != "" || opts.userName != "")
+			err := cmdutil.MutuallyExclusive("using `--org` or `--user` with `--repo` is not allowed", opts.repo != "", opts.orgName != "" || opts.userName != "")
+			if err != nil {
+				return err
 			}
-			if opts.useWeb {
-				return cmdutil.MutuallyExclusive("using `--web` with `--org` or `--user` is not supported, please use with `--repo` instead", opts.useWeb, opts.orgName != "" || opts.userName != "")
+			err = cmdutil.MutuallyExclusive("using `--web` with `--org` or `--user` is not supported, please use with `--repo` instead", opts.useWeb, opts.orgName != "" || opts.userName != "")
+			if err != nil {
+				return err
 			}
 			if opts.limit < 1 {
 				return cmdutil.FlagErrorf("invalid limit: %v", opts.limit)
