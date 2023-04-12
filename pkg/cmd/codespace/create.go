@@ -265,7 +265,7 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 	// web UI also provide a way to select machine type
 	// therefore we let the user choose from the web UI instead of prompting from CLI
 	if !(opts.useWeb && opts.machine == "") {
-		machine, err = getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, userInputs.Location, devContainerPath, opts.useWeb)
+		machine, err = getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, userInputs.Location, devContainerPath)
 		if err != nil {
 			return fmt.Errorf("error getting machine type: %w", err)
 		}
@@ -461,7 +461,7 @@ func (a *App) showStatus(ctx context.Context, codespace *api.Codespace) error {
 }
 
 // getMachineName prompts the user to select the machine type, or validates the machine if non-empty.
-func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machine, branch, location string, devcontainerPath string, useWeb bool) (string, error) {
+func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machine, branch, location string, devcontainerPath string) (string, error) {
 	machines, err := apiClient.GetCodespacesMachines(ctx, repoID, branch, location, devcontainerPath)
 	if err != nil {
 		return "", fmt.Errorf("error requesting machine instance types: %w", err)
@@ -488,11 +488,6 @@ func getMachineName(ctx context.Context, apiClient apiClient, repoID int, machin
 
 	if len(machines) == 1 {
 		// VS Code does not prompt for machine if there is only one, this makes us consistent with that behavior
-		return machines[0].Name, nil
-	}
-
-	if useWeb {
-		// If we're using the web, we don't need to prompt for machine type
 		return machines[0].Name, nil
 	}
 

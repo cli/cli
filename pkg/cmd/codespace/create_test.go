@@ -460,52 +460,6 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 			wantURL:    fmt.Sprintf("https://github.com/codespaces/new?repo=%d&ref=%s&machine=%s&location=%s", 123, "custom", "", "EastUS"),
 		},
 		{
-			name: "use first machine if theres more than 1 machine when using web flag and repo flag",
-			fields: fields{
-				apiClient: apiCreateDefaults(&apiClientMock{
-					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
-						if devcontainerPath == "" {
-							return []*api.Machine{
-								{
-									Name:        "GIGA",
-									DisplayName: "Gigabits of a machine",
-								},
-							}, nil
-						} else {
-							return []*api.Machine{
-								{
-									Name:        "GIGA",
-									DisplayName: "Primary Gigabits of a machine",
-								},
-								{
-									Name:        "GIGA2",
-									DisplayName: "Secondary Gigabits of a machine",
-								},
-							}, nil
-						}
-					},
-					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
-						return &api.Repository{
-							ID:            123,
-							DefaultBranch: "main",
-						}, nil
-					},
-					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
-						return &api.Codespace{
-							Name: "monalisa-dotfiles-abcd1234",
-						}, nil
-					},
-				}),
-			},
-			opts: createOptions{
-				repo:    "monalisa/dotfiles",
-				useWeb:  true,
-				machine: "GIGA",
-			},
-			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
-			wantURL:    fmt.Sprintf("https://github.com/codespaces/new?repo=%d&ref=%s&machine=%s&location=%s", 123, "main", "GIGA", ""),
-		},
-		{
 			name: "return correct url with correct params when using web flag and repo flag",
 			fields: fields{
 				apiClient: apiCreateDefaults(&apiClientMock{
