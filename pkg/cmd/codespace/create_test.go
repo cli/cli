@@ -15,16 +15,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateCmd(t *testing.T) {
+func TestCreateCmdFlagError(t *testing.T) {
 	tests := []struct {
-		name      string
-		args      string
-		wantsErr  error
-		wantsOpts createOptions
+		name     string
+		args     string
+		wantsErr error
 	}{
 		{
 			name:     "return error when using web flag with display-name, idle-timeout, or retention-period flags",
 			args:     "--web --display-name foo --idle-timeout 30m",
+			wantsErr: fmt.Errorf("using --web with --display-name, --idle-timeout, or --retention-period is not supported"),
+		},
+		{
+			name:     "return error when using web flag with one of display-name, idle-timeout or retention-period flags",
+			args:     "--web --idle-timeout 30m",
 			wantsErr: fmt.Errorf("using --web with --display-name, --idle-timeout, or --retention-period is not supported"),
 		},
 	}
@@ -45,11 +49,8 @@ func TestCreateCmd(t *testing.T) {
 
 			_, err := cmd.ExecuteC()
 
-			if tt.wantsErr != nil {
-				assert.Error(t, err)
-				assert.EqualError(t, err, tt.wantsErr.Error())
-				return
-			}
+			assert.Error(t, err)
+			assert.EqualError(t, err, tt.wantsErr.Error())
 		})
 	}
 }
