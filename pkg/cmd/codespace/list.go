@@ -21,7 +21,7 @@ type listOptions struct {
 	useWeb   bool
 }
 
-func newListCmd(app *App, runF func(*listOptions) error) *cobra.Command {
+func newListCmd(app *App) *cobra.Command {
 	opts := &listOptions{}
 	var exporter cmdutil.Exporter
 
@@ -49,10 +49,6 @@ func newListCmd(app *App, runF func(*listOptions) error) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if runF != nil {
-				return runF(opts)
-			}
-
 			return app.List(cmd.Context(), opts, exporter)
 		},
 	}

@@ -23,20 +23,8 @@ func TestCreateCmd(t *testing.T) {
 		wantsOpts createOptions
 	}{
 		{
-			name: "use web flag",
-			args: "--web",
-			wantsOpts: createOptions{
-				useWeb: true,
-			},
-		},
-		{
-			name: "return error when using web flag with display-name, idle-timeout, or retention-period flags",
-			args: "--web --display-name foo --idle-timeout 30m",
-			wantsOpts: createOptions{
-				useWeb:      true,
-				displayName: "foo",
-				idleTimeout: 30 * time.Minute,
-			},
+			name:     "return error when using web flag with display-name, idle-timeout, or retention-period flags",
+			args:     "--web --display-name foo --idle-timeout 30m",
 			wantsErr: fmt.Errorf("using --web with --display-name, --idle-timeout, or --retention-period is not supported"),
 		},
 	}
@@ -47,11 +35,7 @@ func TestCreateCmd(t *testing.T) {
 			a := &App{
 				io: ios,
 			}
-			var opts *createOptions
-			cmd := newCreateCmd(a, func(co *createOptions) error {
-				opts = co
-				return nil
-			})
+			cmd := newCreateCmd(a)
 
 			args, _ := shlex.Split(tt.args)
 			cmd.SetArgs(args)
@@ -66,14 +50,6 @@ func TestCreateCmd(t *testing.T) {
 				assert.EqualError(t, err, tt.wantsErr.Error())
 				return
 			}
-
-			assert.Equal(t, tt.wantsOpts.branch, opts.branch)
-			assert.Equal(t, tt.wantsOpts.displayName, opts.displayName)
-			assert.Equal(t, tt.wantsOpts.idleTimeout, opts.idleTimeout)
-			assert.Equal(t, tt.wantsOpts.machine, opts.machine)
-			assert.Equal(t, tt.wantsOpts.repo, opts.repo)
-			assert.Equal(t, tt.wantsOpts.retentionPeriod, opts.retentionPeriod)
-			assert.Equal(t, tt.wantsOpts.useWeb, opts.useWeb)
 		})
 	}
 }

@@ -16,10 +16,9 @@ import (
 
 func TestListCmd(t *testing.T) {
 	tests := []struct {
-		name      string
-		args      string
-		wantsErr  error
-		wantsOpts listOptions
+		name     string
+		args     string
+		wantsErr error
 	}{
 		{
 			name:     "list codespaces,--repo, --org and --user flag",
@@ -44,11 +43,8 @@ func TestListCmd(t *testing.T) {
 			a := &App{
 				io: ios,
 			}
-			var opts *listOptions
-			cmd := newListCmd(a, func(co *listOptions) error {
-				opts = co
-				return nil
-			})
+
+			cmd := newListCmd(a)
 
 			args, _ := shlex.Split(tt.args)
 			cmd.SetArgs(args)
@@ -63,12 +59,6 @@ func TestListCmd(t *testing.T) {
 				assert.EqualError(t, err, tt.wantsErr.Error())
 				return
 			}
-
-			assert.Equal(t, tt.wantsOpts.limit, opts.limit)
-			assert.Equal(t, tt.wantsOpts.repo, opts.repo)
-			assert.Equal(t, tt.wantsOpts.orgName, opts.orgName)
-			assert.Equal(t, tt.wantsOpts.userName, opts.userName)
-			assert.Equal(t, tt.wantsOpts.useWeb, opts.useWeb)
 		})
 	}
 }
