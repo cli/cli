@@ -11,7 +11,7 @@ func NewRootCmd(app *App) *cobra.Command {
 	}
 
 	root.AddCommand(newCodeCmd(app))
-	root.AddCommand(newCreateCmd(app))
+	root.AddCommand(newCreateCmd(app, nil))
 	root.AddCommand(newEditCmd(app))
 	root.AddCommand(newDeleteCmd(app))
 	root.AddCommand(newJupyterCmd(app))

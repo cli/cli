@@ -72,17 +72,26 @@ type createOptions struct {
 	useWeb            bool
 }
 
-func newCreateCmd(app *App) *cobra.Command {
+func newCreateCmd(app *App, runF func(*createOptions) error) *cobra.Command {
 	opts := createOptions{}
 
 	createCmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a codespace",
 		Args:  noArgsConstraint,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return cmdutil.MutuallyExclusive("using --web with --display-name, --idle-timeout, or --retention-period is not yet supported", opts.useWeb, opts.displayName != "", opts.idleTimeout != 0, opts.retentionPeriod.Duration != nil)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if runF != nil {
+				return runF(&opts)
+			}
+
 			return app.Create(cmd.Context(), opts)
 		},
 	}
+
+	createCmd.Flags().BoolVarP(&opts.useWeb, "web", "w", false, "create codespace from browser, cannot be used with --display-name, --idle-timeout, or --retention-period")
 
 	createCmd.Flags().StringVarP(&opts.repo, "repo", "R", "", "repository name with owner: user/repo")
 	if err := addDeprecatedRepoShorthand(createCmd, &opts.repo); err != nil {
@@ -98,7 +107,6 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().Var(&opts.retentionPeriod, "retention-period", "allowed time after shutting down before the codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
 	createCmd.Flags().StringVar(&opts.devContainerPath, "devcontainer-path", "", "path to the devcontainer.json file to use when creating codespace")
 	createCmd.Flags().StringVarP(&opts.displayName, "display-name", "d", "", "display name for the codespace")
-	createCmd.Flags().BoolVarP(&opts.useWeb, "web", "w", false, "create codespace from browser, cannot be used with --display-name, --idle-timeout, or --retention-period")
 
 	return createCmd
 }
@@ -118,10 +126,6 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		Repository: opts.repo,
 		Branch:     opts.branch,
 		Location:   opts.location,
-	}
-
-	if opts.useWeb && (opts.displayName != "" || opts.idleTimeout != 0 || opts.retentionPeriod.Duration != nil) {
-		return errors.New("using --web with --display-name, --idle-timeout, or --retention-period is not yet supported")
 	}
 
 	if opts.useWeb && userInputs.Repository == "" {

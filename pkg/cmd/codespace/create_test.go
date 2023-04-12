@@ -1,6 +1,7 @@
 package codespace
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"testing"
@@ -10,8 +11,72 @@ import (
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestCreateCmd(t *testing.T) {
+	tests := []struct {
+		name      string
+		args      string
+		wantsErr  error
+		wantsOpts createOptions
+	}{
+		{
+			name: "use web flag",
+			args: "--web",
+			wantsOpts: createOptions{
+				useWeb: true,
+			},
+		},
+		{
+			name: "return error when using web flag with display-name, idle-timeout, or retention-period flags",
+			args: "--web --display-name foo --idle-timeout 30m",
+			wantsOpts: createOptions{
+				useWeb:      true,
+				displayName: "foo",
+				idleTimeout: 30 * time.Minute,
+			},
+			wantsErr: fmt.Errorf("using --web with --display-name, --idle-timeout, or --retention-period is not yet supported"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			a := &App{
+				io: ios,
+			}
+			var opts *createOptions
+			cmd := newCreateCmd(a, func(co *createOptions) error {
+				opts = co
+				return nil
+			})
+
+			args, _ := shlex.Split(tt.args)
+			cmd.SetArgs(args)
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+
+			_, err := cmd.ExecuteC()
+
+			if tt.wantsErr != nil {
+				assert.Error(t, err)
+				assert.EqualError(t, err, tt.wantsErr.Error())
+				return
+			}
+
+			assert.Equal(t, tt.wantsOpts.branch, opts.branch)
+			assert.Equal(t, tt.wantsOpts.displayName, opts.displayName)
+			assert.Equal(t, tt.wantsOpts.idleTimeout, opts.idleTimeout)
+			assert.Equal(t, tt.wantsOpts.machine, opts.machine)
+			assert.Equal(t, tt.wantsOpts.repo, opts.repo)
+			assert.Equal(t, tt.wantsOpts.retentionPeriod, opts.retentionPeriod)
+			assert.Equal(t, tt.wantsOpts.useWeb, opts.useWeb)
+		})
+	}
+}
 
 func TestApp_Create(t *testing.T) {
 	type fields struct {
@@ -383,15 +448,6 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 				repo: "megacorp/private",
 			},
 			wantStdout: "megacorp-private-abcd1234\n",
-		},
-		{
-			name: "return error when using web flag with display-name, idle-timeout, or retention-period flags",
-			opts: createOptions{
-				useWeb:      true,
-				displayName: "my codespace",
-				idleTimeout: 30 * time.Minute,
-			},
-			wantErr: fmt.Errorf("using --web with --display-name, --idle-timeout, or --retention-period is not yet supported"),
 		},
 		{
 			name: "return default url when using web flag without other flags",
