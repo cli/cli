@@ -15,7 +15,7 @@ func NewRootCmd(app *App) *cobra.Command {
 	root.AddCommand(newEditCmd(app))
 	root.AddCommand(newDeleteCmd(app))
 	root.AddCommand(newJupyterCmd(app))
-	root.AddCommand(newListCmd(app))
+	root.AddCommand(newListCmd(app, nil))
 	root.AddCommand(newLogsCmd(app))
 	root.AddCommand(newPortsCmd(app))
 	root.AddCommand(newSSHCmd(app))

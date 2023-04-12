@@ -21,7 +21,7 @@ type listOptions struct {
 	useWeb   bool
 }
 
-func newListCmd(app *App) *cobra.Command {
+func newListCmd(app *App, runF func(*listOptions) error) *cobra.Command {
 	opts := &listOptions{}
 	var exporter cmdutil.Exporter
 
@@ -35,9 +35,22 @@ func newListCmd(app *App) *cobra.Command {
 		`),
 		Aliases: []string{"ls"},
 		Args:    noArgsConstraint,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			// if repo is provided, we don't accept orgName or userName
+			if opts.repo != "" {
+				return cmdutil.MutuallyExclusive("using `--org` or `--user` with `--repo` is not allowed", opts.repo != "", opts.orgName != "" || opts.userName != "")
+			}
+			if opts.useWeb {
+				return cmdutil.MutuallyExclusive("using `--web` with `--org` or `--user` is not supported, please use with `--repo` instead", opts.useWeb, opts.orgName != "" || opts.userName != "")
+			}
 			if opts.limit < 1 {
 				return cmdutil.FlagErrorf("invalid limit: %v", opts.limit)
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if runF != nil {
+				return runF(opts)
 			}
 
 			return app.List(cmd.Context(), opts, exporter)
@@ -60,17 +73,8 @@ func newListCmd(app *App) *cobra.Command {
 }
 
 func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Exporter) error {
-	if opts.useWeb && (opts.orgName != "" || opts.userName != "") {
-		return cmdutil.FlagErrorf("using `--web` with `--org` or `--user` is not supported, please use with `--repo` instead")
-	}
-
 	if opts.useWeb && opts.repo == "" {
 		return a.browser.Browse("https://github.com/codespaces")
-	}
-
-	// if repo is provided, we don't accept orgName or userName
-	if opts.repo != "" && (opts.orgName != "" || opts.userName != "") {
-		return cmdutil.FlagErrorf("using `--org` or `--user` with `--repo` is not allowed")
 	}
 
 	var codespaces []*api.Codespace

@@ -1,6 +1,7 @@
 package codespace
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"testing"
@@ -9,7 +10,68 @@ import (
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/google/shlex"
+	"github.com/stretchr/testify/assert"
 )
+
+func TestListCmd(t *testing.T) {
+	tests := []struct {
+		name      string
+		args      string
+		wantsErr  error
+		wantsOpts listOptions
+	}{
+		{
+			name:     "list codespaces,--repo, --org and --user flag",
+			args:     "--repo foo/bar --org github --user github",
+			wantsErr: fmt.Errorf("using `--org` or `--user` with `--repo` is not allowed"),
+		},
+		{
+			name:     "list codespaces,--web, --org and --user flag",
+			args:     "--web --org github --user github",
+			wantsErr: fmt.Errorf("using `--web` with `--org` or `--user` is not supported, please use with `--repo` instead"),
+		},
+		{
+			name:     "list codespaces, negative --limit flag",
+			args:     "--limit -1",
+			wantsErr: fmt.Errorf("invalid limit: -1"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			a := &App{
+				io: ios,
+			}
+			var opts *listOptions
+			cmd := newListCmd(a, func(co *listOptions) error {
+				opts = co
+				return nil
+			})
+
+			args, _ := shlex.Split(tt.args)
+			cmd.SetArgs(args)
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+
+			_, err := cmd.ExecuteC()
+
+			if tt.wantsErr != nil {
+				assert.Error(t, err)
+				assert.EqualError(t, err, tt.wantsErr.Error())
+				return
+			}
+
+			assert.Equal(t, tt.wantsOpts.limit, opts.limit)
+			assert.Equal(t, tt.wantsOpts.repo, opts.repo)
+			assert.Equal(t, tt.wantsOpts.orgName, opts.orgName)
+			assert.Equal(t, tt.wantsOpts.userName, opts.userName)
+			assert.Equal(t, tt.wantsOpts.useWeb, opts.useWeb)
+		})
+	}
+}
 
 func TestApp_List(t *testing.T) {
 	type fields struct {
@@ -115,24 +177,6 @@ func TestApp_List(t *testing.T) {
 			opts: &listOptions{
 				repo: "cli/cli",
 			},
-		},
-		{
-			name: "list codespaces,--repo, --org and --user flag",
-			opts: &listOptions{
-				repo:     "cli/cli",
-				orgName:  "TestOrg",
-				userName: "jimmy",
-			},
-			wantError: fmt.Errorf("using `--org` or `--user` with `--repo` is not allowed"),
-		},
-		{
-			name: "list codespaces,--web, --org and --user flag",
-			opts: &listOptions{
-				useWeb:   true,
-				orgName:  "TestOrg",
-				userName: "jimmy",
-			},
-			wantError: fmt.Errorf("using `--web` with `--org` or `--user` is not supported, please use with `--repo` instead"),
 		},
 		{
 			name: "list codespaces,--web",
