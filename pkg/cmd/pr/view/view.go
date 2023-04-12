@@ -77,7 +77,7 @@ func NewCmdView(f *cmdutil.Factory, runF func(*ViewOptions) error) *cobra.Comman
 }
 
 var defaultFields = []string{
-	"url", "number", "title", "state", "body", "author",
+	"url", "number", "title", "state", "body", "author", "autoMergeRequest",
 	"isDraft", "maintainerCanModify", "mergeable", "additions", "deletions", "commitsCount",
 	"baseRefName", "headRefName", "headRepositoryOwner", "headRepository", "isCrossRepository",
 	"reviewRequests", "reviews", "assignees", "labels", "projectCards", "milestone",
@@ -145,6 +145,15 @@ func printRawPrPreview(io *iostreams.IOStreams, pr *api.PullRequest) error {
 	fmt.Fprintf(out, "state:\t%s\n", prStateWithDraft(pr))
 	fmt.Fprintf(out, "author:\t%s\n", pr.Author.Login)
 	fmt.Fprintf(out, "labels:\t%s\n", labels)
+	var autoMerge string
+	if pr.AutoMergeRequest == nil {
+		autoMerge = "disabled"
+	} else {
+		autoMerge = fmt.Sprintf("enabled (%s, %s)",
+			pr.AutoMergeRequest.EnabledBy.Login,
+			strings.ToLower(pr.AutoMergeRequest.MergeMethod))
+	}
+	fmt.Fprintf(out, "auto-merge:\t%s\n", autoMerge)
 	fmt.Fprintf(out, "assignees:\t%s\n", assignees)
 	fmt.Fprintf(out, "reviewers:\t%s\n", reviewers)
 	fmt.Fprintf(out, "projects:\t%s\n", projects)
@@ -221,6 +230,30 @@ func printHumanPrPreview(opts *ViewOptions, pr *api.PullRequest) error {
 	if pr.Milestone != nil {
 		fmt.Fprint(out, cs.Bold("Milestone: "))
 		fmt.Fprintln(out, pr.Milestone.Title)
+	}
+
+	// Auto-Merge status
+	autoMerge := pr.AutoMergeRequest
+	if autoMerge != nil {
+		var mergeMethod string
+		switch autoMerge.MergeMethod {
+		case "MERGE":
+			mergeMethod = "creating a merge commit"
+		case "REBASE":
+			mergeMethod = "rebase and merge"
+		case "SQUASH":
+			mergeMethod = "squash and merge"
+		default:
+			mergeMethod = fmt.Sprintf("an unknown merge method (%s)", autoMerge.MergeMethod)
+		}
+		fmt.Fprintf(out,
+			"%s %s by %s, using %s • %s\n",
+			cs.Bold("Auto-merge:"),
+			cs.Green("enabled"),
+			autoMerge.EnabledBy.Login,
+			mergeMethod,
+			text.FuzzyAgo(opts.Now(), autoMerge.EnabledAt),
+		)
 	}
 
 	// Body
