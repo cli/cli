@@ -54,14 +54,14 @@ func newListCmd(app *App) *cobra.Command {
 	listCmd.Flags().StringVarP(&opts.userName, "user", "u", "", "The `username` to list codespaces for (used with --org)")
 	cmdutil.AddJSONFlags(listCmd, &exporter, api.CodespaceFields)
 
-	listCmd.Flags().BoolVarP(&opts.useWeb, "web", "w", false, "List codespaces in the web browser")
+	listCmd.Flags().BoolVarP(&opts.useWeb, "web", "w", false, "List codespaces in the web browser, can only be used with --repo flag")
 
 	return listCmd
 }
 
 func (a *App) List(ctx context.Context, opts *listOptions, exporter cmdutil.Exporter) error {
 	if opts.useWeb && (opts.orgName != "" || opts.userName != "") {
-		return cmdutil.FlagErrorf("using `--web` with `--org` or `--user` is not yet supported, please use with `--repo` instead")
+		return cmdutil.FlagErrorf("using `--web` with `--org` or `--user` is not supported, please use with `--repo` instead")
 	}
 
 	if opts.useWeb && opts.repo == "" {

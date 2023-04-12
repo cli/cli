@@ -37,7 +37,7 @@ func TestCreateCmd(t *testing.T) {
 				displayName: "foo",
 				idleTimeout: 30 * time.Minute,
 			},
-			wantsErr: fmt.Errorf("using --web with --display-name, --idle-timeout, or --retention-period is not yet supported"),
+			wantsErr: fmt.Errorf("using --web with --display-name, --idle-timeout, or --retention-period is not supported"),
 		},
 	}
 

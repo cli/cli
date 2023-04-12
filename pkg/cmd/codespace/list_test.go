@@ -132,7 +132,7 @@ func TestApp_List(t *testing.T) {
 				orgName:  "TestOrg",
 				userName: "jimmy",
 			},
-			wantError: fmt.Errorf("using `--web` with `--org` or `--user` is not yet supported, please use with `--repo` instead"),
+			wantError: fmt.Errorf("using `--web` with `--org` or `--user` is not supported, please use with `--repo` instead"),
 		},
 		{
 			name: "list codespaces,--web",
