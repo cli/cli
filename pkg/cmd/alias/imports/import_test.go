@@ -98,7 +98,7 @@ func TestNewCmdImport(t *testing.T) {
 
 func Test_importRun(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "aliases")
-	importFileMsg := fmt.Sprintf(`- Importing aliases from file "%s"`, tmpFile)
+	importFileMsg := fmt.Sprintf(`- Importing aliases from file %q`, tmpFile)
 	importStdinMsg := "- Importing aliases from standard input"
 
 	tests := []struct {
