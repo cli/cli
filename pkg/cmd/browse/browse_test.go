@@ -232,6 +232,7 @@ func Test_runBrowse(t *testing.T) {
 	tests := []struct {
 		name          string
 		opts          BrowseOptions
+		httpStub      func(*httpmock.Registry)
 		baseRepo      ghrepo.Interface
 		defaultBranch string
 		expectedURL   string
@@ -432,6 +433,12 @@ func Test_runBrowse(t *testing.T) {
 				SelectorArg:   "init.rb:6",
 				NoBrowserFlag: true,
 			},
+			httpStub: func(r *httpmock.Registry) {
+				r.Register(
+					httpmock.REST("HEAD", "repos/mislav/will_paginate"),
+					httpmock.StringResponse("{}"),
+				)
+			},
 			baseRepo:    ghrepo.New("mislav", "will_paginate"),
 			wantsErr:    false,
 			expectedURL: "https://github.com/mislav/will_paginate/blob/3-0-stable/init.rb?plain=1#L6",
@@ -554,6 +561,10 @@ func Test_runBrowse(t *testing.T) {
 			defer reg.Verify(t)
 			if tt.defaultBranch != "" {
 				reg.StubRepoInfoResponse(tt.baseRepo.RepoOwner(), tt.baseRepo.RepoName(), tt.defaultBranch)
+			}
+
+			if tt.httpStub != nil {
+				tt.httpStub(&reg)
 			}
 
 			opts := tt.opts

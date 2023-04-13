@@ -16,6 +16,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/go-gh/pkg/api"
 	ghAPI "github.com/cli/go-gh/pkg/api"
 	"github.com/shurcooL/githubv4"
 )
@@ -1369,4 +1370,23 @@ func GetRepoIDs(client *Client, host string, repositories []ghrepo.Interface) ([
 		result[i] = graphqlResult[k].DatabaseID
 	}
 	return result, nil
+}
+
+// RenameRepo renames the repository on GitHub and returns the renamed repository
+func RepoExists(client *Client, repo ghrepo.Interface) (bool, error) {
+	path := fmt.Sprintf("%srepos/%s/%s", ghinstance.RESTPrefix(repo.RepoHost()), repo.RepoOwner(), repo.RepoName())
+
+	resp, err := client.HTTP().Head(path)
+	if err != nil {
+		return false, err
+	}
+
+	switch resp.StatusCode {
+	case 200:
+		return true, nil
+	case 404:
+		return false, nil
+	default:
+		return false, api.HandleHTTPError(resp)
+	}
 }
