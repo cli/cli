@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/cli/cli/v2/api"
@@ -21,20 +20,14 @@ import (
 // IssueFromArgWithFields loads an issue or pull request with the specified fields. If some of the fields
 // could not be fetched by GraphQL, this returns a non-nil issue and a *PartialLoadError.
 func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.Interface, error), arg string, fields []string) (*api.Issue, ghrepo.Interface, error) {
-	issueNumber, baseRepo := issueMetadataFromURL(arg)
-
-	if issueNumber == 0 {
-		var err error
-		issueNumber, err = strconv.Atoi(strings.TrimPrefix(arg, "#"))
-		if err != nil {
-			return nil, nil, fmt.Errorf("invalid issue format: %q", arg)
-		}
+	issueNumber, baseRepo, err := IssueNumberAndRepoFromArg(arg)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	if baseRepo == nil {
 		var err error
-		baseRepo, err = baseRepoFn()
-		if err != nil {
+		if baseRepo, err = baseRepoFn(); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -46,42 +39,52 @@ func IssueFromArgWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.I
 // IssuesFromArgWithFields loads 1 or more issues or pull requests with the specified fields. If some of the fields
 // could not be fetched by GraphQL, this returns non-nil issues and a *PartialLoadError.
 func IssuesFromArgsWithFields(httpClient *http.Client, baseRepoFn func() (ghrepo.Interface, error), args []string, fields []string) ([]*api.Issue, ghrepo.Interface, error) {
-	if len(args) == 0 {
-		return nil, nil, fmt.Errorf("missing required issue number")
+	var issuesRepo ghrepo.Interface
+	issueNumbers := make([]int, 0, len(args))
+
+	for _, arg := range args {
+		issueNumber, baseRepo, err := IssueNumberAndRepoFromArg(arg)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		issueNumbers = append(issueNumbers, issueNumber)
+		if baseRepo == nil {
+			var err error
+			if baseRepo, err = baseRepoFn(); err != nil {
+				return nil, nil, err
+			}
+		}
+
+		if issuesRepo == nil {
+			issuesRepo = baseRepo
+			continue
+		}
+
+		if !ghrepo.IsSame(issuesRepo, baseRepo) {
+			return nil, nil, fmt.Errorf(
+				"multiple issues must be in same repo: found %q, expected %q",
+				ghrepo.FullName(baseRepo),
+				ghrepo.FullName(issuesRepo),
+			)
+		}
 	}
 
-	var issuesRepo ghrepo.Interface
 	issuesChan := make(chan *api.Issue, len(args))
-	mu := sync.Mutex{}
-
 	g := errgroup.Group{}
-	for i := range args {
-		// Copy variables to capture in the go routine below.
-		arg := args[i]
-
+	for _, num := range issueNumbers {
+		issueNumber := num
 		g.Go(func() error {
-			issue, baseRepo, err := IssueFromArgWithFields(httpClient, baseRepoFn, arg, fields)
+			issue, err := findIssueOrPR(httpClient, issuesRepo, issueNumber, fields)
 			if err != nil {
 				return err
-			}
-
-			mu.Lock()
-			defer mu.Unlock()
-
-			if issuesRepo == nil {
-				issuesRepo = baseRepo
-			} else if !ghrepo.IsSame(issuesRepo, baseRepo) {
-				return fmt.Errorf(
-					"multiple issues must be in same repo: found %q, expected %q",
-					ghrepo.FullName(baseRepo),
-					ghrepo.FullName(issuesRepo),
-				)
 			}
 
 			issuesChan <- issue
 			return nil
 		})
 	}
+
 	err := g.Wait()
 	close(issuesChan)
 

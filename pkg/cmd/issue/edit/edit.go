@@ -9,6 +9,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/internal/text"
 	shared "github.com/cli/cli/v2/pkg/cmd/issue/shared"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
@@ -192,7 +193,11 @@ func editRun(opts *EditOptions) error {
 	failedIssueChan := make(chan string, len(issues))
 	g := sync.WaitGroup{}
 
-	opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Updating %d issues", len(issues)))
+	// Only show progress if we will not prompt below or the survey will break up the progress indicator.
+	if !opts.Interactive {
+		opts.IO.StartProgressIndicatorWithLabel(fmt.Sprintf("Updating %d issues", len(issues)))
+	}
+
 	for _, issue := range issues {
 		// Copy variables to capture in the go routine below.
 		editable := editable.Clone()
@@ -238,9 +243,11 @@ func editRun(opts *EditOptions) error {
 	}
 
 	g.Wait()
-	opts.IO.StopProgressIndicator()
 	close(editedIssueChan)
 	close(failedIssueChan)
+
+	// Does nothing if progress was not started above.
+	opts.IO.StopProgressIndicator()
 
 	// Print a sorted list of successfully edited issue URLs to stdout.
 	editedIssueURLs := make([]string, 0, len(issues))
@@ -265,7 +272,7 @@ func editRun(opts *EditOptions) error {
 	}
 
 	if len(failedIssueErrors) > 0 {
-		return fmt.Errorf("failed to update %d issue(s)", len(failedIssueErrors))
+		return fmt.Errorf("failed to update %s", text.Pluralize(len(failedIssueErrors), "issue"))
 	}
 
 	return nil

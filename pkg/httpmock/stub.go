@@ -57,7 +57,7 @@ func GraphQL(q string) Matcher {
 	}
 }
 
-func MatchGraphQLMutation(q string, cb func(map[string]interface{}) bool) Matcher {
+func GraphQLMutationMatcher(q string, cb func(map[string]interface{}) bool) Matcher {
 	re := regexp.MustCompile(q)
 
 	return func(req *http.Request) bool {

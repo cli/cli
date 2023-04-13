@@ -212,11 +212,6 @@ func TestIssuesFromArgsWithFields(t *testing.T) {
 		wantErrMsg string
 	}{
 		{
-			name:       "no args",
-			wantErr:    true,
-			wantErrMsg: "missing required issue number",
-		},
-		{
 			name: "multiple repos",
 			args: args{
 				selectors: []string{"1", "https://github.com/OWNER/OTHERREPO/issues/2"},

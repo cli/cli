@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"regexp"
 	"testing"
 
 	"github.com/MakeNowJust/heredoc"
@@ -395,7 +394,7 @@ func Test_editRun(t *testing.T) {
 		{
 			name: "non-interactive multiple issues with fetch failures",
 			input: &EditOptions{
-				SelectorArgs: []string{"9999"},
+				SelectorArgs: []string{"123", "9999"},
 				Interactive:  false,
 				Editable: prShared.Editable{
 					Assignees: prShared.EditableSlice{
@@ -423,6 +422,7 @@ func Test_editRun(t *testing.T) {
 				FetchOptions: prShared.FetchOptions,
 			},
 			httpStubs: func(t *testing.T, reg *httpmock.Registry) {
+				mockIssueNumberGet(t, reg, 123)
 				reg.Register(
 					httpmock.GraphQL(`query IssueByNumber\b`),
 					httpmock.StringResponse(`
@@ -483,7 +483,7 @@ func Test_editRun(t *testing.T) {
 				mockIssueNumberGet(t, reg, 456)
 				// Updating 123 should succeed.
 				reg.Register(
-					httpmock.MatchGraphQLMutation(`mutation IssueUpdate\b`, func(m map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation IssueUpdate\b`, func(m map[string]interface{}) bool {
 						return m["id"] == "123"
 					}),
 					httpmock.GraphQLMutation(`
@@ -492,7 +492,7 @@ func Test_editRun(t *testing.T) {
 				)
 				// Updating 456 should fail.
 				reg.Register(
-					httpmock.MatchGraphQLMutation(`mutation IssueUpdate\b`, func(m map[string]interface{}) bool {
+					httpmock.GraphQLMutationMatcher(`mutation IssueUpdate\b`, func(m map[string]interface{}) bool {
 						return m["id"] == "456"
 					}),
 					httpmock.GraphQLMutation(`
@@ -571,7 +571,7 @@ func Test_editRun(t *testing.T) {
 			}
 			assert.Equal(t, tt.stdout, stdout.String())
 			// Use regex match since mock errors and service errors will differ.
-			assert.Regexp(t, regexp.MustCompile(tt.stderr), stderr.String())
+			assert.Regexp(t, tt.stderr, stderr.String())
 		})
 	}
 }
