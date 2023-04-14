@@ -1,0 +1,69 @@
+{
+  "data": {
+    "level": {
+      "rulesets": {
+        "totalCount": 3,
+        "nodes": [
+          {
+            "databaseId": 4,
+            "name": "test",
+            "target": "BRANCH",
+            "enforcement": "EVALUATE",
+            "conditions": {
+              "refName": {
+                "include": [
+                  "~DEFAULT_BRANCH"
+                ],
+                "exclude": []
+              },
+              "repositoryName": null
+            },
+            "rules": {
+              "totalCount": 1
+            }
+          },
+          {
+            "databaseId": 42,
+            "name": "asdf",
+            "target": "BRANCH",
+            "enforcement": "ACTIVE",
+            "conditions": {
+              "refName": {
+                "include": [
+                  "~DEFAULT_BRANCH"
+                ],
+                "exclude": []
+              },
+              "repositoryName": null
+            },
+            "rules": {
+              "totalCount": 2
+            }
+          },
+          {
+            "databaseId": 77,
+            "name": "foobar",
+            "target": "BRANCH",
+            "enforcement": "DISABLED",
+            "conditions": {
+              "refName": {
+                "include": [
+                  "~DEFAULT_BRANCH"
+                ],
+                "exclude": []
+              },
+              "repositoryName": null
+            },
+            "rules": {
+              "totalCount": 4
+            }
+          }
+        ],
+        "pageInfo": {
+          "hasNextPage": false,
+          "endCursor": "Y3Vyc29yOnYyOpHNA8E="
+        }
+      }
+    }
+  }
+}

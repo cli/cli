@@ -21,11 +21,11 @@ type RulesetResponse struct {
 }
 
 type Ruleset struct {
-	Id     string
-	Name   string
-	Target string
-	// Enforcement string
-	Conditions struct {
+	DatabaseId  int
+	Name        string
+	Target      string
+	Enforcement string
+	Conditions  struct {
 		RefName struct {
 			Include []string
 			Exclude []string
@@ -111,11 +111,10 @@ func rulesetQuery(org bool) string {
 		rulesets(first: $limit, after: $endCursor) {
 			totalCount
 			nodes {
-				id
-				#database_id
+				databaseId
 				name
 				target
-				#enforcement
+				enforcement
 				conditions {
 					refName {
 						include
