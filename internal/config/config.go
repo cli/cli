@@ -4,8 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
-	ghAuth "github.com/cli/go-gh/pkg/auth"
-	ghConfig "github.com/cli/go-gh/pkg/config"
+	ghAuth "github.com/cli/go-gh/v2/pkg/auth"
+	ghConfig "github.com/cli/go-gh/v2/pkg/config"
 	"github.com/zalando/go-keyring"
 )
 
