@@ -25,17 +25,36 @@ func TestNewCmdImport(t *testing.T) {
 	tests := []struct {
 		name       string
 		cli        string
+		tty        bool
 		wants      ImportOptions
 		wantsError string
 	}{
 		{
-			name: "no filename",
+			name: "no filename and stdin tty",
 			cli:  "",
+			tty:  true,
 			wants: ImportOptions{
 				Filename:          "",
 				OverwriteExisting: false,
 			},
 			wantsError: "no filename passed and nothing on STDIN",
+		},
+		{
+			name: "no filename and stdin is not tty",
+			cli:  "",
+			tty:  false,
+			wants: ImportOptions{
+				Filename:          "-",
+				OverwriteExisting: false,
+			},
+		},
+		{
+			name: "stdin arg",
+			cli:  "-",
+			wants: ImportOptions{
+				Filename:          "-",
+				OverwriteExisting: false,
+			},
 		},
 		{
 			name: "multiple filenames",
@@ -47,19 +66,11 @@ func TestNewCmdImport(t *testing.T) {
 			wantsError: "too many arguments",
 		},
 		{
-			name: "with flags",
+			name: "clobber flag",
 			cli:  "aliases --clobber",
 			wants: ImportOptions{
 				Filename:          "aliases",
 				OverwriteExisting: true,
-			},
-		},
-		{
-			name: "from stdin",
-			cli:  "-",
-			wants: ImportOptions{
-				Filename:          "-",
-				OverwriteExisting: false,
 			},
 		},
 	}
@@ -67,7 +78,7 @@ func TestNewCmdImport(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
-			ios.SetStdinTTY(true)
+			ios.SetStdinTTY(tt.tty)
 			f := &cmdutil.Factory{IOStreams: ios}
 
 			argv, err := shlex.Split(tt.cli)
@@ -85,7 +96,7 @@ func TestNewCmdImport(t *testing.T) {
 
 			_, err = cmd.ExecuteC()
 			if tt.wantsError != "" {
-				assert.Error(t, err)
+				assert.EqualError(t, err, tt.wantsError)
 				return
 			}
 			assert.NoError(t, err)
@@ -96,8 +107,8 @@ func TestNewCmdImport(t *testing.T) {
 	}
 }
 
-func Test_importRun(t *testing.T) {
-	tmpFile := filepath.Join(t.TempDir(), "aliases")
+func TestImportRun(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "aliases.yml")
 	importFileMsg := fmt.Sprintf(`- Importing aliases from file %q`, tmpFile)
 	importStdinMsg := "- Importing aliases from standard input"
 
@@ -275,61 +286,61 @@ func Test_importRun(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		err := os.WriteFile(tmpFile, []byte(tt.fileContents), 0600)
-		if err != nil {
-			t.Fatalf("could not write test file %v", err)
-		}
-		require.NoError(t, err)
-
-		ios, stdin, _, stderr := iostreams.Test()
-		ios.SetStdinTTY(true)
-		ios.SetStdoutTTY(true)
-		ios.SetStderrTTY(true)
-		tt.opts.IO = ios
-
-		readConfigs := config.StubWriteConfig(t)
-		cfg := config.NewFromString(tt.initConfig)
-		tt.opts.Config = func() (config.Config, error) {
-			return cfg, nil
-		}
-
-		f := &cmdutil.Factory{
-			IOStreams: ios,
-			Config: func() (config.Config, error) {
-				return cfg, nil
-			},
-			ExtensionManager: &extensions.ExtensionManagerMock{
-				ListFunc: func() []extensions.Extension {
-					return []extensions.Extension{}
-				},
-			},
-		}
-
-		rootCmd := &cobra.Command{}
-		prCmd := &cobra.Command{Use: "pr"}
-		prCmd.AddCommand(&cobra.Command{Use: "checkout"})
-		prCmd.AddCommand(&cobra.Command{Use: "status"})
-		rootCmd.AddCommand(prCmd)
-		issueCmd := &cobra.Command{Use: "issue"}
-		issueCmd.AddCommand(&cobra.Command{Use: "list"})
-		rootCmd.AddCommand(issueCmd)
-		apiCmd := &cobra.Command{Use: "api"}
-		apiCmd.AddCommand(&cobra.Command{Use: "graphql"})
-		rootCmd.AddCommand(apiCmd)
-
-		tt.opts.validCommand = shared.ValidCommandFunc(f, rootCmd)
-
 		t.Run(tt.name, func(t *testing.T) {
-			stdin.WriteString(tt.stdin)
+			if tt.fileContents != "" {
+				err := os.WriteFile(tmpFile, []byte(tt.fileContents), 0600)
+				require.NoError(t, err)
+			}
+
+			ios, stdin, _, stderr := iostreams.Test()
+			ios.SetStdinTTY(true)
+			ios.SetStdoutTTY(true)
+			ios.SetStderrTTY(true)
+			tt.opts.IO = ios
+
+			readConfigs := config.StubWriteConfig(t)
+			cfg := config.NewFromString(tt.initConfig)
+			tt.opts.Config = func() (config.Config, error) {
+				return cfg, nil
+			}
+
+			// Create fake command factory for testing.
+			f := &cmdutil.Factory{
+				IOStreams: ios,
+				ExtensionManager: &extensions.ExtensionManagerMock{
+					ListFunc: func() []extensions.Extension {
+						return []extensions.Extension{}
+					},
+				},
+			}
+
+			// Create fake command structure for testing.
+			rootCmd := &cobra.Command{}
+			prCmd := &cobra.Command{Use: "pr"}
+			prCmd.AddCommand(&cobra.Command{Use: "checkout"})
+			prCmd.AddCommand(&cobra.Command{Use: "status"})
+			rootCmd.AddCommand(prCmd)
+			issueCmd := &cobra.Command{Use: "issue"}
+			issueCmd.AddCommand(&cobra.Command{Use: "list"})
+			rootCmd.AddCommand(issueCmd)
+			apiCmd := &cobra.Command{Use: "api"}
+			apiCmd.AddCommand(&cobra.Command{Use: "graphql"})
+			rootCmd.AddCommand(apiCmd)
+
+			tt.opts.existingCommand = shared.ExistingCommandFunc(f, rootCmd)
+
+			if tt.stdin != "" {
+				stdin.WriteString(tt.stdin)
+			}
 
 			err := importRun(tt.opts)
 			require.NoError(t, err)
 
-			mainBuf := bytes.Buffer{}
-			readConfigs(&mainBuf, io.Discard)
+			configOut := bytes.Buffer{}
+			readConfigs(&configOut, io.Discard)
 
 			assert.Equal(t, tt.wantStderr, stderr.String())
-			assert.Equal(t, tt.wantConfig, mainBuf.String())
+			assert.Equal(t, tt.wantConfig, configOut.String())
 		})
 	}
 }

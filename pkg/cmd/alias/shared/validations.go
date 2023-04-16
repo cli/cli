@@ -6,7 +6,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func ValidCommandFunc(f *cmdutil.Factory, cmd *cobra.Command) func(string) bool {
+// ExistingCommandFunc returns a function that will check if the given string
+// corresponds to an existing command.
+func ExistingCommandFunc(f *cmdutil.Factory, cmd *cobra.Command) func(string) bool {
 	return func(args string) bool {
 		split, err := shlex.Split(args)
 		if err != nil || len(split) == 0 {
@@ -24,6 +26,7 @@ func ValidCommandFunc(f *cmdutil.Factory, cmd *cobra.Command) func(string) bool 
 				return true
 			}
 		}
+
 		return false
 	}
 }

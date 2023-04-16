@@ -21,7 +21,7 @@ type ImportOptions struct {
 	Filename          string
 	OverwriteExisting bool
 
-	validCommand func(string) bool
+	existingCommand func(string) bool
 }
 
 func NewCmdImport(f *cmdutil.Factory, runF func(*ImportOptions) error) *cobra.Command {
@@ -34,31 +34,31 @@ func NewCmdImport(f *cmdutil.Factory, runF func(*ImportOptions) error) *cobra.Co
 		Use:   "import [<filename> | -]",
 		Short: "Import aliases from a YAML file",
 		Long: heredoc.Doc(`
-            Import aliases from the contents of a YAML file.
+			Import aliases from the contents of a YAML file.
 
-            Aliases should be defined as a map in YAML, where the keys represent aliases and
-            the values represent the corresponding expansions. An example file should look like
-            the following:
+			Aliases should be defined as a map in YAML, where the keys represent aliases and
+			the values represent the corresponding expansions. An example file should look like
+			the following:
 
-                bugs: issue list --label=bug
-                igrep: '!gh issue list --label="$1" | grep "$2"'
-                features: |-
-                    issue list
-                    --label=enhancement
+			    bugs: issue list --label=bug
+			    igrep: '!gh issue list --label="$1" | grep "$2"'
+			    features: |-
+			        issue list
+			        --label=enhancement
 
-            Use "-" to read aliases (in YAML format) from standard input.
+			Use "-" to read aliases (in YAML format) from standard input.
 
-            The output from the gh command "alias list" can be used to produce a YAML file 
-            containing your aliases, which you can use to import them from one machine to
-            another. Run "gh help alias list" to learn more.
-        `),
+			The output from the gh command "alias list" can be used to produce a YAML file
+			containing your aliases, which you can use to import them from one machine to
+			another. Run "gh help alias list" to learn more.
+		`),
 		Example: heredoc.Doc(`
-            # Import aliases from a file
-            $ gh alias import aliases.yml
+			# Import aliases from a file
+			$ gh alias import aliases.yml
 
-            # Import aliases from standard input
-            $ gh alias import -
-        `),
+			# Import aliases from standard input
+			$ gh alias import -
+		`),
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 1 {
 				return cmdutil.FlagErrorf("too many arguments")
@@ -74,11 +74,12 @@ func NewCmdImport(f *cmdutil.Factory, runF func(*ImportOptions) error) *cobra.Co
 				opts.Filename = args[0]
 			}
 
-			opts.validCommand = shared.ValidCommandFunc(f, cmd)
+			opts.existingCommand = shared.ExistingCommandFunc(f, cmd)
 
 			if runF != nil {
 				return runF(opts)
 			}
+
 			return importRun(opts)
 		},
 	}
@@ -116,10 +117,10 @@ func importRun(opts *ImportOptions) error {
 		}
 	}
 
-	msg := strings.Builder{}
+	var msg strings.Builder
 
 	for _, alias := range getSortedKeys(aliasMap) {
-		if opts.validCommand(alias) {
+		if opts.existingCommand(alias) {
 			msg.WriteString(
 				fmt.Sprintf("%s Could not import alias %s: already a gh command\n",
 					cs.FailureIcon(),
@@ -132,7 +133,7 @@ func importRun(opts *ImportOptions) error {
 
 		expansion := aliasMap[alias]
 
-		if !(strings.HasPrefix(expansion, "!") || opts.validCommand(expansion)) {
+		if !(strings.HasPrefix(expansion, "!") || opts.existingCommand(expansion)) {
 			msg.WriteString(
 				fmt.Sprintf("%s Could not import alias %s: expansion does not correspond to a gh command\n",
 					cs.FailureIcon(),

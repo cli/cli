@@ -9,7 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestValidCommandFunc(t *testing.T) {
+func TestExistingCommandFunc(t *testing.T) {
+	// Create fake command factory for testing.
 	factory := &cmdutil.Factory{
 		ExtensionManager: &extensions.ExtensionManagerMock{
 			ListFunc: func() []extensions.Extension {
@@ -18,7 +19,7 @@ func TestValidCommandFunc(t *testing.T) {
 		},
 	}
 
-	// fake command nesting structure needed for validCommand
+	// Create fake command structure for testing.
 	issueCmd := &cobra.Command{Use: "issue"}
 	prCmd := &cobra.Command{Use: "pr"}
 	prCmd.AddCommand(&cobra.Command{Use: "checkout"})
@@ -27,7 +28,7 @@ func TestValidCommandFunc(t *testing.T) {
 	cmd.AddCommand(prCmd)
 	cmd.AddCommand(issueCmd)
 
-	f := ValidCommandFunc(factory, cmd)
+	f := ExistingCommandFunc(factory, cmd)
 
 	assert.True(t, f("pr"))
 	assert.True(t, f("pr checkout"))
@@ -35,5 +36,5 @@ func TestValidCommandFunc(t *testing.T) {
 
 	assert.False(t, f("ps"))
 	assert.False(t, f("checkout"))
-	assert.False(t, f("issu list"))
+	assert.False(t, f("repo list"))
 }
