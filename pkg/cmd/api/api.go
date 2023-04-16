@@ -23,8 +23,8 @@ import (
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/cli/v2/pkg/jsoncolor"
-	"github.com/cli/go-gh/pkg/jq"
-	"github.com/cli/go-gh/pkg/template"
+	"github.com/cli/go-gh/v2/pkg/jq"
+	"github.com/cli/go-gh/v2/pkg/template"
 	"github.com/spf13/cobra"
 )
 
@@ -328,7 +328,7 @@ func apiRun(opts *ApiOptions) error {
 			return err
 		}
 
-		endCursor, err := processResponse(resp, opts, bodyWriter, headersWriter, &tmpl)
+		endCursor, err := processResponse(resp, opts, bodyWriter, headersWriter, tmpl)
 		if err != nil {
 			return err
 		}

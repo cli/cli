@@ -3,12 +3,12 @@ package main
 import (
 	"fmt"
 
-	"github.com/cli/go-gh"
+	"github.com/cli/go-gh/v2/pkg/api"
 )
 
 func main() {
 	fmt.Println("hi world, this is the %s extension!")
-	client, err := gh.RESTClient(nil)
+	client, err := api.DefaultRESTClient()
 	if err != nil {
 		fmt.Println(err)
 		return

@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/cli/cli/v2/pkg/iostreams"
-	"github.com/cli/go-gh/pkg/tableprinter"
+	"github.com/cli/go-gh/v2/pkg/tableprinter"
 )
 
 type TablePrinter interface {
