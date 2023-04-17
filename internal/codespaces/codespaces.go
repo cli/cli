@@ -88,9 +88,9 @@ func ConnectToLiveshare(ctx context.Context, progress progressIndicator, session
 	})
 }
 
-// ListenTCP starts a localhost tcp listener and returns the listener and bound port
+// ListenTCP starts a localhost tcp listener on 127.0.0.1 and returns the listener and bound port
 func ListenTCP(port int) (*net.TCPListener, int, error) {
-	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf(":%d", port))
+	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to build tcp address: %w", err)
 	}
