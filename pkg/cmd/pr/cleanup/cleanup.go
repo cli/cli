@@ -166,118 +166,65 @@ func cleanupRun(opts *CleanupOptions) error {
 			return err
 		}
 		for _, pr := range prs {
-			if opts.MergedOnly && pr.State == "CLOSED" {
-				continue
-			}
-
 			branch := branchesByRemoteBranchName[pr.HeadRefName]
-			// First, check to see if the branch of the PR is at the PR's head.
-			if branch.Local.Hash == pr.HeadRefOid {
-				deletionCandidates[branch] = pr
-				continue
+			isCandidate, err := branchIsDeletionCandidate(opts, httpClient, repo, branch, pr)
+			if err != nil {
+				return err
 			}
-
-			// Otherwise, check if the branch of the PR is behind a PR's head. To do
-			// this, we try to find a merged PR whose history contains the branch's
-			// commit.
-			if !opts.UpToDateOnly {
-				pr, err := mergedPRAssociatedWithCommit(httpClient, repo, branch.Local.Hash)
-				if err == PRNotFound {
-					continue
-				}
-				if err != nil {
-					return err
-				}
+			if isCandidate {
 				deletionCandidates[branch] = pr
 			}
 		}
 
-		// Interactively confirm branch deletion.
-		cs := opts.IO.ColorScheme()
-		if len(deletionCandidates) == 0 {
-			fmt.Fprintf(opts.IO.Out, "%s No branches to be cleaned up!\n", cs.SuccessIcon())
-			return nil
+		return promptAndDeleteBranches(opts, deletionCandidates)
+	} else {
+		// Find the selected PR.
+		prStates := []string{"MERGED", "CLOSED"}
+		if opts.MergedOnly {
+			prStates = []string{"MERGED"}
 		}
-
-		var branchesInAlphaOrder []git.Branch
-		for branch := range deletionCandidates {
-			branchesInAlphaOrder = append(branchesInAlphaOrder, branch)
-		}
-		sort.Slice(branchesInAlphaOrder, func(i, j int) bool {
-			return branchesInAlphaOrder[i].Local.Name < branchesInAlphaOrder[j].Local.Name
+		pr, _, err := opts.Finder.Find(shared.FindOptions{
+			Selector: opts.SelectorArg,
+			Fields:   []string{"headRefOid", "headRefName", "title", "state"},
+			States:   prStates,
 		})
-
-		fmt.Fprintf(opts.IO.Out, "\nThe following branches can be cleaned up:\n\n")
-		table := tableprinter.New(opts.IO)
-		table.HeaderRow("Branch", "Status", "Pull Request")
-		for _, branch := range branchesInAlphaOrder {
-			pr := deletionCandidates[branch]
-
-			table.AddField(branch.Local.Name)
-
-			state := pr.State
-			if branch.Local.Hash != pr.HeadRefOid {
-				state = cs.WarningIcon() + " " + cs.Yellow(state)
-			}
-			if state == "MERGED" {
-				state = cs.SuccessIcon() + " " + cs.Green(state)
-			} else if state == "CLOSED" {
-				state = cs.SuccessIcon() + " " + cs.Red(state)
-			}
-			table.AddField(state)
-
-			table.AddField(
-				fmt.Sprintf(
-					"%s %s",
-					cs.Grayf("#%d", pr.Number),
-					pr.Title,
-				),
-			)
-
-			table.EndRow()
-		}
-		err = table.Render()
 		if err != nil {
 			return err
 		}
 
-		if !opts.UpToDateOnly {
-			fmt.Fprintf(opts.IO.Out, "\n%s indicates that a local branch is behind its remote.\n", cs.WarningIcon())
+		// Find the relevant local branch.
+		ctx := context.Background()
+		var localBranch *git.Branch
+		localBranches := opts.GitClient.LocalBranches(ctx)
+		for _, b := range localBranches {
+			if b.Upstream.BranchName == pr.HeadRefName {
+				localBranch = &b
+			}
 		}
-		fmt.Fprintf(opts.IO.Out, "\n")
-
-		confirmed := false
-		if opts.Yes {
-			confirmed = true
-		} else if opts.IO.CanPrompt() {
-			branchTypeStr := "merged or closed"
-			if opts.MergedOnly {
-				branchTypeStr = "merged"
-			}
-			confirmed, err = opts.Prompter.Confirm(
-				fmt.Sprintf("Delete all %d %s branches?", len(deletionCandidates), branchTypeStr),
-				false,
-			)
-			if err != nil {
-				return err
-			}
+		if localBranch == nil {
+			return errors.New("Could not find local branch for specified pull request.")
 		}
 
-		// Delete branches.
-		if confirmed {
-			for branch := range deletionCandidates {
-				err := opts.GitClient.DeleteLocalBranch(ctx, branch.Local.Name)
-				if err != nil {
-					return err
-				}
-			}
-			fmt.Fprintf(opts.IO.Out, "Deleted %d branches.\n", len(deletionCandidates))
-		} else {
-			fmt.Fprintf(opts.IO.Out, "Not deleting any branches.\n")
+		// Determine local branch candidacy.
+		deletionCandidates := make(map[git.Branch]*api.PullRequest)
+		httpClient, err := opts.HttpClient()
+		if err != nil {
+			return err
 		}
+		repo, err := opts.BaseRepo()
+		if err != nil {
+			return err
+		}
+		isCandidate, err := branchIsDeletionCandidate(opts, httpClient, repo, *localBranch, pr)
+		if err != nil {
+			return err
+		}
+		if isCandidate {
+			deletionCandidates[*localBranch] = pr
+		}
+
+		return promptAndDeleteBranches(opts, deletionCandidates)
 	}
-
-	return nil
 }
 
 var PRNotFound = errors.New("no merged pull requests found for commit")
@@ -336,4 +283,119 @@ func mergedPRAssociatedWithCommit(httpClient *http.Client, repo ghrepo.Interface
 	}
 
 	return nil, PRNotFound
+}
+
+func branchIsDeletionCandidate(opts *CleanupOptions, httpClient *http.Client, repo ghrepo.Interface, branch git.Branch, pr *api.PullRequest) (bool, error) {
+	if opts.MergedOnly && pr.State == "CLOSED" {
+		return false, nil
+	}
+
+	// First, check to see if the branch of the PR is at the PR's head.
+	if branch.Local.Hash == pr.HeadRefOid {
+		return true, nil
+	}
+
+	// Otherwise, check if the branch of the PR is behind a PR's head. To do
+	// this, we try to find a merged PR whose history contains the branch's
+	// commit.
+	if !opts.UpToDateOnly {
+		pr, err := mergedPRAssociatedWithCommit(httpClient, repo, branch.Local.Hash)
+		if err == PRNotFound {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return pr.State == "MERGED", nil
+	}
+
+	return false, nil
+}
+
+func promptAndDeleteBranches(opts *CleanupOptions, deletionCandidates map[git.Branch]*api.PullRequest) error {
+	// Interactively confirm branch deletion.
+	cs := opts.IO.ColorScheme()
+	if len(deletionCandidates) == 0 {
+		fmt.Fprintf(opts.IO.Out, "%s No branches to be cleaned up!\n", cs.SuccessIcon())
+		return nil
+	}
+
+	var branchesInAlphaOrder []git.Branch
+	for branch := range deletionCandidates {
+		branchesInAlphaOrder = append(branchesInAlphaOrder, branch)
+	}
+	sort.Slice(branchesInAlphaOrder, func(i, j int) bool {
+		return branchesInAlphaOrder[i].Local.Name < branchesInAlphaOrder[j].Local.Name
+	})
+
+	fmt.Fprintf(opts.IO.Out, "\nThe following branches can be cleaned up:\n\n")
+	table := tableprinter.New(opts.IO)
+	table.HeaderRow("Branch", "Status", "Pull Request")
+	for _, branch := range branchesInAlphaOrder {
+		pr := deletionCandidates[branch]
+
+		table.AddField(branch.Local.Name)
+
+		state := pr.State
+		if branch.Local.Hash != pr.HeadRefOid {
+			state = cs.WarningIcon() + " " + cs.Yellow(state)
+		}
+		if state == "MERGED" {
+			state = cs.SuccessIcon() + " " + cs.Green(state)
+		} else if state == "CLOSED" {
+			state = cs.SuccessIcon() + " " + cs.Red(state)
+		}
+		table.AddField(state)
+
+		table.AddField(
+			fmt.Sprintf(
+				"%s %s",
+				cs.Grayf("#%d", pr.Number),
+				pr.Title,
+			),
+		)
+
+		table.EndRow()
+	}
+	err := table.Render()
+	if err != nil {
+		return err
+	}
+
+	if !opts.UpToDateOnly {
+		fmt.Fprintf(opts.IO.Out, "\n%s indicates that a local branch is behind its remote.\n", cs.WarningIcon())
+	}
+	fmt.Fprintf(opts.IO.Out, "\n")
+
+	confirmed := false
+	if opts.Yes {
+		confirmed = true
+	} else if opts.IO.CanPrompt() {
+		branchTypeStr := "merged or closed"
+		if opts.MergedOnly {
+			branchTypeStr = "merged"
+		}
+		confirmed, err = opts.Prompter.Confirm(
+			fmt.Sprintf("Delete all %d %s branches?", len(deletionCandidates), branchTypeStr),
+			false,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	// Delete branches.
+	if confirmed {
+		ctx := context.Background()
+		for branch := range deletionCandidates {
+			err := opts.GitClient.DeleteLocalBranch(ctx, branch.Local.Name)
+			if err != nil {
+				return err
+			}
+		}
+		fmt.Fprintf(opts.IO.Out, "Deleted %d branches.\n", len(deletionCandidates))
+	} else {
+		fmt.Fprintf(opts.IO.Out, "Not deleting any branches.\n")
+	}
+
+	return nil
 }
