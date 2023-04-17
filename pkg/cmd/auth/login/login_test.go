@@ -17,6 +17,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/zalando/go-keyring"
 )
 
 func stubHomeDir(t *testing.T, dir string) {
@@ -172,6 +173,38 @@ func Test_NewCmdLogin(t *testing.T) {
 				Interactive: true,
 			},
 		},
+		{
+			name:     "tty secure-storage",
+			stdinTTY: true,
+			cli:      "--secure-storage",
+			wants: LoginOptions{
+				Interactive: true,
+			},
+		},
+		{
+			name: "nontty secure-storage",
+			cli:  "--secure-storage",
+			wants: LoginOptions{
+				Hostname: "github.com",
+			},
+		},
+		{
+			name:     "tty insecure-storage",
+			stdinTTY: true,
+			cli:      "--insecure-storage",
+			wants: LoginOptions{
+				Interactive:     true,
+				InsecureStorage: true,
+			},
+		},
+		{
+			name: "nontty insecure-storage",
+			cli:  "--insecure-storage",
+			wants: LoginOptions{
+				Hostname:        "github.com",
+				InsecureStorage: true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -223,47 +256,51 @@ func Test_NewCmdLogin(t *testing.T) {
 
 func Test_loginRun_nontty(t *testing.T) {
 	tests := []struct {
-		name       string
-		opts       *LoginOptions
-		httpStubs  func(*httpmock.Registry)
-		cfgStubs   func(*config.ConfigMock)
-		wantHosts  string
-		wantErr    string
-		wantStderr string
+		name            string
+		opts            *LoginOptions
+		httpStubs       func(*httpmock.Registry)
+		cfgStubs        func(*config.ConfigMock)
+		wantHosts       string
+		wantErr         string
+		wantStderr      string
+		wantSecureToken string
 	}{
 		{
-			name: "with token",
+			name: "insecure with token",
 			opts: &LoginOptions{
-				Hostname: "github.com",
-				Token:    "abc123",
+				Hostname:        "github.com",
+				Token:           "abc123",
+				InsecureStorage: true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
 			},
-			wantHosts: "github.com:\n    oauth_token: abc123\n",
+			wantHosts: "github.com:\n    oauth_token: abc123\n    user: x-access-token\n",
 		},
 		{
-			name: "with token and https git-protocol",
+			name: "insecure with token and https git-protocol",
 			opts: &LoginOptions{
-				Hostname:    "github.com",
-				Token:       "abc123",
-				GitProtocol: "https",
+				Hostname:        "github.com",
+				Token:           "abc123",
+				GitProtocol:     "https",
+				InsecureStorage: true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
 			},
-			wantHosts: "github.com:\n    oauth_token: abc123\n    git_protocol: https\n",
+			wantHosts: "github.com:\n    oauth_token: abc123\n    user: x-access-token\n    git_protocol: https\n",
 		},
 		{
 			name: "with token and non-default host",
 			opts: &LoginOptions{
-				Hostname: "albert.wesker",
-				Token:    "abc123",
+				Hostname:        "albert.wesker",
+				Token:           "abc123",
+				InsecureStorage: true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", "api/v3/"), httpmock.ScopesResponder("repo,read:org"))
 			},
-			wantHosts: "albert.wesker:\n    oauth_token: abc123\n",
+			wantHosts: "albert.wesker:\n    oauth_token: abc123\n    user: x-access-token\n",
 		},
 		{
 			name: "missing repo scope",
@@ -290,13 +327,14 @@ func Test_loginRun_nontty(t *testing.T) {
 		{
 			name: "has admin scope",
 			opts: &LoginOptions{
-				Hostname: "github.com",
-				Token:    "abc456",
+				Hostname:        "github.com",
+				Token:           "abc456",
+				InsecureStorage: true,
 			},
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,admin:org"))
 			},
-			wantHosts: "github.com:\n    oauth_token: abc456\n",
+			wantHosts: "github.com:\n    oauth_token: abc456\n    user: x-access-token\n",
 		},
 		{
 			name: "github.com token from environment",
@@ -305,8 +343,10 @@ func Test_loginRun_nontty(t *testing.T) {
 				Token:    "abc456",
 			},
 			cfgStubs: func(c *config.ConfigMock) {
-				c.AuthTokenFunc = func(string) (string, string) {
-					return "value_from_env", "GH_TOKEN"
+				authCfg := c.Authentication()
+				authCfg.SetToken("value_from_env", "GH_TOKEN")
+				c.AuthenticationFunc = func() *config.AuthConfig {
+					return authCfg
 				}
 			},
 			wantErr: "SilentError",
@@ -322,8 +362,10 @@ func Test_loginRun_nontty(t *testing.T) {
 				Token:    "abc456",
 			},
 			cfgStubs: func(c *config.ConfigMock) {
-				c.AuthTokenFunc = func(string) (string, string) {
-					return "value_from_env", "GH_ENTERPRISE_TOKEN"
+				authCfg := c.Authentication()
+				authCfg.SetToken("value_from_env", "GH_ENTERPRISE_TOKEN")
+				c.AuthenticationFunc = func() *config.AuthConfig {
+					return authCfg
 				}
 			},
 			wantErr: "SilentError",
@@ -332,15 +374,28 @@ func Test_loginRun_nontty(t *testing.T) {
 				To have GitHub CLI store credentials instead, first clear the value from the environment.
 			`),
 		},
+		{
+			name: "with token and secure storage",
+			opts: &LoginOptions{
+				Hostname: "github.com",
+				Token:    "abc123",
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(httpmock.REST("GET", ""), httpmock.ScopesResponder("repo,read:org"))
+			},
+			wantHosts:       "github.com:\n    user: x-access-token\n",
+			wantSecureToken: "abc123",
+		},
 	}
 
 	for _, tt := range tests {
-		ios, _, stdout, stderr := iostreams.Test()
-		ios.SetStdinTTY(false)
-		ios.SetStdoutTTY(false)
-		tt.opts.IO = ios
-
 		t.Run(tt.name, func(t *testing.T) {
+			ios, _, stdout, stderr := iostreams.Test()
+			ios.SetStdinTTY(false)
+			ios.SetStdoutTTY(false)
+			tt.opts.IO = ios
+
+			keyring.MockInit()
 			readConfigs := config.StubWriteConfig(t)
 			cfg := config.NewBlankConfig()
 			if tt.cfgStubs != nil {
@@ -351,6 +406,7 @@ func Test_loginRun_nontty(t *testing.T) {
 			}
 
 			reg := &httpmock.Registry{}
+			defer reg.Verify(t)
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
 			}
@@ -371,11 +427,12 @@ func Test_loginRun_nontty(t *testing.T) {
 			mainBuf := bytes.Buffer{}
 			hostsBuf := bytes.Buffer{}
 			readConfigs(&mainBuf, &hostsBuf)
+			secureToken, _ := cfg.Authentication().TokenFromKeyring(tt.opts.Hostname)
 
 			assert.Equal(t, "", stdout.String())
 			assert.Equal(t, tt.wantStderr, stderr.String())
 			assert.Equal(t, tt.wantHosts, hostsBuf.String())
-			reg.Verify(t)
+			assert.Equal(t, tt.wantSecureToken, secureToken)
 		})
 	}
 }
@@ -384,14 +441,15 @@ func Test_loginRun_Survey(t *testing.T) {
 	stubHomeDir(t, t.TempDir())
 
 	tests := []struct {
-		name          string
-		opts          *LoginOptions
-		httpStubs     func(*httpmock.Registry)
-		prompterStubs func(*prompter.PrompterMock)
-		runStubs      func(*run.CommandStubber)
-		wantHosts     string
-		wantErrOut    *regexp.Regexp
-		cfgStubs      func(*config.ConfigMock)
+		name            string
+		opts            *LoginOptions
+		httpStubs       func(*httpmock.Registry)
+		prompterStubs   func(*prompter.PrompterMock)
+		runStubs        func(*run.CommandStubber)
+		cfgStubs        func(*config.ConfigMock)
+		wantHosts       string
+		wantErrOut      *regexp.Regexp
+		wantSecureToken string
 	}{
 		{
 			name: "already authenticated",
@@ -399,8 +457,10 @@ func Test_loginRun_Survey(t *testing.T) {
 				Interactive: true,
 			},
 			cfgStubs: func(c *config.ConfigMock) {
-				c.AuthTokenFunc = func(h string) (string, string) {
-					return "ghi789", "oauth_token"
+				authCfg := c.Authentication()
+				authCfg.SetToken("ghi789", "oauth_token")
+				c.AuthenticationFunc = func() *config.AuthConfig {
+					return authCfg
 				}
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -420,8 +480,9 @@ func Test_loginRun_Survey(t *testing.T) {
 		{
 			name: "hostname set",
 			opts: &LoginOptions{
-				Hostname:    "rebecca.chambers",
-				Interactive: true,
+				Hostname:        "rebecca.chambers",
+				Interactive:     true,
+				InsecureStorage: true,
 			},
 			wantHosts: heredoc.Doc(`
 				rebecca.chambers:
@@ -461,7 +522,8 @@ func Test_loginRun_Survey(t *testing.T) {
 				    git_protocol: https
 			`),
 			opts: &LoginOptions{
-				Interactive: true,
+				Interactive:     true,
+				InsecureStorage: true,
 			},
 			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
@@ -500,7 +562,8 @@ func Test_loginRun_Survey(t *testing.T) {
 				    git_protocol: https
 			`),
 			opts: &LoginOptions{
-				Interactive: true,
+				Interactive:     true,
+				InsecureStorage: true,
 			},
 			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
@@ -530,7 +593,8 @@ func Test_loginRun_Survey(t *testing.T) {
 				    git_protocol: ssh
 			`),
 			opts: &LoginOptions{
-				Interactive: true,
+				Interactive:     true,
+				InsecureStorage: true,
 			},
 			prompterStubs: func(pm *prompter.PrompterMock) {
 				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
@@ -547,32 +611,61 @@ func Test_loginRun_Survey(t *testing.T) {
 			},
 			wantErrOut: regexp.MustCompile("Tip: you can generate a Personal Access Token here https://github.com/settings/tokens"),
 		},
-		// TODO how to test browser auth?
+		{
+			name: "secure storage",
+			opts: &LoginOptions{
+				Hostname:    "github.com",
+				Interactive: true,
+			},
+			prompterStubs: func(pm *prompter.PrompterMock) {
+				pm.SelectFunc = func(prompt, _ string, opts []string) (int, error) {
+					switch prompt {
+					case "What is your preferred protocol for Git operations?":
+						return prompter.IndexFor(opts, "HTTPS")
+					case "How would you like to authenticate GitHub CLI?":
+						return prompter.IndexFor(opts, "Paste an authentication token")
+					}
+					return -1, prompter.NoSuchPromptErr(prompt)
+				}
+			},
+			runStubs: func(rs *run.CommandStubber) {
+				rs.Register(`git config credential\.https:/`, 1, "")
+				rs.Register(`git config credential\.helper`, 1, "")
+			},
+			wantHosts: heredoc.Doc(`
+				github.com:
+				    user: jillv
+				    git_protocol: https
+			`),
+			wantErrOut:      regexp.MustCompile("Logged in as jillv"),
+			wantSecureToken: "def456",
+		},
 	}
 
 	for _, tt := range tests {
-		if tt.opts == nil {
-			tt.opts = &LoginOptions{}
-		}
-		ios, _, _, stderr := iostreams.Test()
-
-		ios.SetStdinTTY(true)
-		ios.SetStderrTTY(true)
-		ios.SetStdoutTTY(true)
-
-		tt.opts.IO = ios
-
-		readConfigs := config.StubWriteConfig(t)
-
-		cfg := config.NewBlankConfig()
-		if tt.cfgStubs != nil {
-			tt.cfgStubs(cfg)
-		}
-		tt.opts.Config = func() (config.Config, error) {
-			return cfg, nil
-		}
-
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.opts == nil {
+				tt.opts = &LoginOptions{}
+			}
+			ios, _, _, stderr := iostreams.Test()
+
+			ios.SetStdinTTY(true)
+			ios.SetStderrTTY(true)
+			ios.SetStdoutTTY(true)
+
+			tt.opts.IO = ios
+
+			keyring.MockInit()
+			readConfigs := config.StubWriteConfig(t)
+
+			cfg := config.NewBlankConfig()
+			if tt.cfgStubs != nil {
+				tt.cfgStubs(cfg)
+			}
+			tt.opts.Config = func() (config.Config, error) {
+				return cfg, nil
+			}
+
 			reg := &httpmock.Registry{}
 			tt.opts.HttpClient = func() (*http.Client, error) {
 				return &http.Client{Transport: reg}, nil
@@ -614,8 +707,10 @@ func Test_loginRun_Survey(t *testing.T) {
 			mainBuf := bytes.Buffer{}
 			hostsBuf := bytes.Buffer{}
 			readConfigs(&mainBuf, &hostsBuf)
+			secureToken, _ := cfg.Authentication().TokenFromKeyring(tt.opts.Hostname)
 
 			assert.Equal(t, tt.wantHosts, hostsBuf.String())
+			assert.Equal(t, tt.wantSecureToken, secureToken)
 			if tt.wantErrOut == nil {
 				assert.Equal(t, "", stderr.String())
 			} else {

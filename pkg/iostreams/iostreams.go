@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
-	ghTerm "github.com/cli/go-gh/pkg/term"
+	ghTerm "github.com/cli/go-gh/v2/pkg/term"
 	"github.com/cli/safeexec"
 	"github.com/google/shlex"
 	"github.com/mattn/go-colorable"
@@ -303,6 +303,13 @@ func (s *IOStreams) StopProgressIndicator() {
 	}
 	s.progressIndicator.Stop()
 	s.progressIndicator = nil
+}
+
+func (s *IOStreams) RunWithProgress(label string, run func() error) error {
+	s.StartProgressIndicatorWithLabel(label)
+	defer s.StopProgressIndicator()
+
+	return run()
 }
 
 func (s *IOStreams) StartAlternateScreenBuffer() {

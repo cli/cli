@@ -285,6 +285,31 @@ Requesting a code review from you
 	}
 }
 
+func TestPRStatus_blankSlateRepoOverride(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+	http.Register(httpmock.GraphQL(`query PullRequestStatus\b`), httpmock.StringResponse(`{"data": {}}`))
+
+	output, err := runCommand(http, "blueberries", true, "--repo OWNER/REPO")
+	if err != nil {
+		t.Errorf("error running command `pr status`: %v", err)
+	}
+
+	expected := `
+Relevant pull requests in OWNER/REPO
+
+Created by you
+  You have no open pull requests
+
+Requesting a code review from you
+  You have no pull requests to review
+
+`
+	if output.String() != expected {
+		t.Errorf("expected %q, got %q", expected, output.String())
+	}
+}
+
 func TestPRStatus_detachedHead(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)

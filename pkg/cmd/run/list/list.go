@@ -31,6 +31,7 @@ type ListOptions struct {
 	WorkflowSelector string
 	Branch           string
 	Actor            string
+	Status           string
 
 	now time.Time
 }
@@ -67,7 +68,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.WorkflowSelector, "workflow", "w", "", "Filter runs by workflow")
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Filter runs by branch")
 	cmd.Flags().StringVarP(&opts.Actor, "user", "u", "", "Filter runs by user who triggered the run")
+	cmdutil.StringEnumFlag(cmd, &opts.Status, "status", "s", "", shared.AllStatuses, "Filter runs by status")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.RunFields)
+
+	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "branch")
 
 	return cmd
 }
@@ -87,6 +91,7 @@ func listRun(opts *ListOptions) error {
 	filters := &shared.FilterOptions{
 		Branch: opts.Branch,
 		Actor:  opts.Actor,
+		Status: opts.Status,
 	}
 
 	opts.IO.StartProgressIndicator()

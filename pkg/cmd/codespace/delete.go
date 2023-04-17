@@ -41,6 +41,8 @@ func newDeleteCmd(app *App) *cobra.Command {
 		prompter:      &surveyPrompter{},
 	}
 
+	var selector *CodespaceSelector
+
 	deleteCmd := &cobra.Command{
 		Use:   "delete",
 		Short: "Delete codespaces",
@@ -54,6 +56,11 @@ func newDeleteCmd(app *App) *cobra.Command {
 		`),
 		Args: noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// TODO: ideally we would use the selector directly, but the logic here is too intertwined with other flags to do so elegantly
+			// After the admin subcommand is added (see https://github.com/cli/cli/pull/6944#issuecomment-1419553639) we can revisit this.
+			opts.codespaceName = selector.codespaceName
+			opts.repoFilter = selector.repoName
+
 			if opts.deleteAll && opts.repoFilter != "" {
 				return cmdutil.FlagErrorf("both `--all` and `--repo` is not supported")
 			}
@@ -64,13 +71,12 @@ func newDeleteCmd(app *App) *cobra.Command {
 		},
 	}
 
-	deleteCmd.Flags().StringVarP(&opts.codespaceName, "codespace", "c", "", "Name of the codespace")
-	deleteCmd.Flags().BoolVar(&opts.deleteAll, "all", false, "Delete all codespaces")
-	deleteCmd.Flags().StringVarP(&opts.repoFilter, "repo", "R", "", "Delete codespaces for a `repository`")
-	if err := addDeprecatedRepoShorthand(deleteCmd, &opts.repoFilter); err != nil {
+	selector = AddCodespaceSelector(deleteCmd, app.apiClient)
+	if err := addDeprecatedRepoShorthand(deleteCmd, &selector.repoName); err != nil {
 		fmt.Fprintf(app.io.ErrOut, "%v\n", err)
 	}
 
+	deleteCmd.Flags().BoolVar(&opts.deleteAll, "all", false, "Delete all codespaces")
 	deleteCmd.Flags().BoolVarP(&opts.skipConfirm, "force", "f", false, "Skip confirmation for codespaces that contain unsaved changes")
 	deleteCmd.Flags().Uint16Var(&opts.keepDays, "days", 0, "Delete codespaces older than `N` days")
 	deleteCmd.Flags().StringVarP(&opts.orgName, "org", "o", "", "The `login` handle of the organization (admin-only)")
@@ -83,33 +89,40 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 	var codespaces []*api.Codespace
 	nameFilter := opts.codespaceName
 	if nameFilter == "" {
-		a.StartProgressIndicatorWithLabel("Fetching codespaces")
-		codespaces, err = a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{OrgName: opts.orgName, UserName: opts.userName})
-		a.StopProgressIndicator()
+		err = a.RunWithProgress("Fetching codespaces", func() (fetchErr error) {
+			userName := opts.userName
+			if userName == "" && opts.orgName != "" {
+				currentUser, fetchErr := a.apiClient.GetUser(ctx)
+				if fetchErr != nil {
+					return fetchErr
+				}
+				userName = currentUser.Login
+			}
+			codespaces, fetchErr = a.apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{OrgName: opts.orgName, UserName: userName})
+			return
+		})
 		if err != nil {
 			return fmt.Errorf("error getting codespaces: %w", err)
 		}
 
 		if !opts.deleteAll && opts.repoFilter == "" {
 			includeUsername := opts.orgName != ""
-			c, err := chooseCodespaceFromList(ctx, codespaces, includeUsername)
+			c, err := chooseCodespaceFromList(ctx, codespaces, includeUsername, false)
 			if err != nil {
 				return fmt.Errorf("error choosing codespace: %w", err)
 			}
 			nameFilter = c.Name
 		}
 	} else {
-		a.StartProgressIndicatorWithLabel("Fetching codespace")
-
 		var codespace *api.Codespace
-		var err error
-
-		if opts.orgName == "" || opts.userName == "" {
-			codespace, err = a.apiClient.GetCodespace(ctx, nameFilter, false)
-		} else {
-			codespace, err = a.apiClient.GetOrgMemberCodespace(ctx, opts.orgName, opts.userName, opts.codespaceName)
-		}
-		a.StopProgressIndicator()
+		err := a.RunWithProgress("Fetching codespace", func() (fetchErr error) {
+			if opts.orgName == "" || opts.userName == "" {
+				codespace, fetchErr = a.apiClient.GetCodespace(ctx, nameFilter, false)
+			} else {
+				codespace, fetchErr = a.apiClient.GetOrgMemberCodespace(ctx, opts.orgName, opts.userName, opts.codespaceName)
+			}
+			return
+		})
 		if err != nil {
 			return fmt.Errorf("error fetching codespace information: %w", err)
 		}
@@ -155,25 +168,25 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 	if len(codespacesToDelete) > 1 {
 		progressLabel = "Deleting codespaces"
 	}
-	a.StartProgressIndicatorWithLabel(progressLabel)
-	defer a.StopProgressIndicator()
 
-	var g errgroup.Group
-	for _, c := range codespacesToDelete {
-		codespaceName := c.Name
-		g.Go(func() error {
-			if err := a.apiClient.DeleteCodespace(ctx, codespaceName, opts.orgName, opts.userName); err != nil {
-				a.errLogger.Printf("error deleting codespace %q: %v\n", codespaceName, err)
-				return err
-			}
-			return nil
-		})
-	}
+	return a.RunWithProgress(progressLabel, func() error {
+		var g errgroup.Group
+		for _, c := range codespacesToDelete {
+			codespaceName := c.Name
+			g.Go(func() error {
+				if err := a.apiClient.DeleteCodespace(ctx, codespaceName, opts.orgName, opts.userName); err != nil {
+					a.errLogger.Printf("error deleting codespace %q: %v\n", codespaceName, err)
+					return err
+				}
+				return nil
+			})
+		}
 
-	if err := g.Wait(); err != nil {
-		return errors.New("some codespaces failed to delete")
-	}
-	return nil
+		if err := g.Wait(); err != nil {
+			return errors.New("some codespaces failed to delete")
+		}
+		return nil
+	})
 }
 
 func confirmDeletion(p prompter, apiCodespace *api.Codespace, isInteractive bool) (bool, error) {

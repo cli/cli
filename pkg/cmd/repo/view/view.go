@@ -68,6 +68,8 @@ With '--branch', view a specific branch of the repository.`,
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "View a specific branch of the repository")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, api.RepositoryFields)
 
+	_ = cmdutil.RegisterBranchCompletionFlags(f.GitClient, cmd, "branch")
+
 	return cmd
 }
 
@@ -94,7 +96,7 @@ func viewRun(opts *ViewOptions) error {
 			if err != nil {
 				return err
 			}
-			hostname, _ := cfg.DefaultHost()
+			hostname, _ := cfg.Authentication().DefaultHost()
 			currentUser, err := api.CurrentLoginName(apiClient, hostname)
 			if err != nil {
 				return err

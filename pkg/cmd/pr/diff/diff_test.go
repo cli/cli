@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/browser"
@@ -387,4 +388,14 @@ func stubDiffRequest(reg *httpmock.Registry, accept, diff string) {
 				Body:       io.NopCloser(strings.NewReader(diff)),
 			}, nil
 		})
+}
+
+func Test_sanitizedReader(t *testing.T) {
+	input := strings.NewReader("\t hello \x1B[m world! ăѣ𝔠ծề\r\n")
+	expected := "\t hello \\u{1b}[m world! ăѣ𝔠ծề\r\n"
+
+	err := iotest.TestReader(sanitizedReader(input), []byte(expected))
+	if err != nil {
+		t.Error(err)
+	}
 }

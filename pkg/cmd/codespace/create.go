@@ -10,6 +10,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
@@ -68,6 +69,7 @@ type createOptions struct {
 	idleTimeout       time.Duration
 	retentionPeriod   NullableDuration
 	displayName       string
+	useWeb            bool
 }
 
 func newCreateCmd(app *App) *cobra.Command {
@@ -77,10 +79,19 @@ func newCreateCmd(app *App) *cobra.Command {
 		Use:   "create",
 		Short: "Create a codespace",
 		Args:  noArgsConstraint,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return cmdutil.MutuallyExclusive(
+				"using --web with --display-name, --idle-timeout, or --retention-period is not supported",
+				opts.useWeb,
+				opts.displayName != "" || opts.idleTimeout != 0 || opts.retentionPeriod.Duration != nil,
+			)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.Create(cmd.Context(), opts)
 		},
 	}
+
+	createCmd.Flags().BoolVarP(&opts.useWeb, "web", "w", false, "create codespace from browser, cannot be used with --display-name, --idle-timeout, or --retention-period")
 
 	createCmd.Flags().StringVarP(&opts.repo, "repo", "R", "", "repository name with owner: user/repo")
 	if err := addDeprecatedRepoShorthand(createCmd, &opts.repo); err != nil {
@@ -117,14 +128,30 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		Location:   opts.location,
 	}
 
-	promptForRepoAndBranch := userInputs.Repository == ""
+	if opts.useWeb && userInputs.Repository == "" {
+		return a.browser.Browse("https://github.com/codespaces/new")
+	}
+
+	promptForRepoAndBranch := userInputs.Repository == "" && !opts.useWeb
 	if promptForRepoAndBranch {
+		var defaultRepo string
+		if remotes, _ := a.remotes(); remotes != nil {
+			if defaultRemote, _ := remotes.ResolvedRemote(); defaultRemote != nil {
+				// this is a remote explicitly chosen via `repo set-default`
+				defaultRepo = ghrepo.FullName(defaultRemote)
+			} else if len(remotes) > 0 {
+				// as a fallback, just pick the first remote
+				defaultRepo = ghrepo.FullName(remotes[0])
+			}
+		}
+
 		repoQuestions := []*survey.Question{
 			{
 				Name: "repository",
 				Prompt: &survey.Input{
 					Message: "Repository:",
 					Help:    "Search for repos by name. To search within an org or user, or to see private repos, enter at least ':user/'.",
+					Default: defaultRepo,
 					Suggest: func(toComplete string) []string {
 						return getRepoSuggestions(ctx, a.apiClient, toComplete)
 					},
@@ -141,17 +168,20 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		userInputs.Location = vscsLocation
 	}
 
-	a.StartProgressIndicatorWithLabel("Fetching repository")
-	repository, err := a.apiClient.GetRepository(ctx, userInputs.Repository)
-	a.StopProgressIndicator()
+	var repository *api.Repository
+	err := a.RunWithProgress("Fetching repository", func() (err error) {
+		repository, err = a.apiClient.GetRepository(ctx, userInputs.Repository)
+		return
+	})
 	if err != nil {
 		return fmt.Errorf("error getting repository: %w", err)
 	}
 
-	a.StartProgressIndicatorWithLabel("Validating repository for codespaces")
-	billableOwner, err := a.apiClient.GetCodespaceBillableOwner(ctx, userInputs.Repository)
-	a.StopProgressIndicator()
-
+	var billableOwner *api.User
+	err = a.RunWithProgress("Validating repository for codespaces", func() (err error) {
+		billableOwner, err = a.apiClient.GetCodespaceBillableOwner(ctx, userInputs.Repository)
+		return
+	})
 	if err != nil {
 		return fmt.Errorf("error checking codespace ownership: %w", err)
 	} else if billableOwner != nil && (billableOwner.Type == "Organization" || billableOwner.Type == "User") {
@@ -188,9 +218,11 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 
 	// now that we have repo+branch, we can list available devcontainer.json files (if any)
 	if opts.devContainerPath == "" {
-		a.StartProgressIndicatorWithLabel("Fetching devcontainer.json files")
-		devcontainers, err := a.apiClient.ListDevContainers(ctx, repository.ID, branch, 100)
-		a.StopProgressIndicator()
+		var devcontainers []api.DevContainerEntry
+		err = a.RunWithProgress("Fetching devcontainer.json files", func() (err error) {
+			devcontainers, err = a.apiClient.ListDevContainers(ctx, repository.ID, branch, 100)
+			return
+		})
 		if err != nil {
 			return fmt.Errorf("error getting devcontainer.json paths: %w", err)
 		}
@@ -231,12 +263,19 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		}
 	}
 
-	machine, err := getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, userInputs.Location, devContainerPath)
-	if err != nil {
-		return fmt.Errorf("error getting machine type: %w", err)
-	}
-	if machine == "" {
-		return errors.New("there are no available machine types for this repository")
+	machine := opts.machine
+	// skip this if we have useWeb and no machine name provided,
+	// because web UI will select default machine type if none is provided
+	// web UI also provide a way to select machine type
+	// therefore we let the user choose from the web UI instead of prompting from CLI
+	if !(opts.useWeb && opts.machine == "") {
+		machine, err = getMachineName(ctx, a.apiClient, repository.ID, opts.machine, branch, userInputs.Location, devContainerPath)
+		if err != nil {
+			return fmt.Errorf("error getting machine type: %w", err)
+		}
+		if machine == "" {
+			return errors.New("there are no available machine types for this repository")
+		}
 	}
 
 	createParams := &api.CreateCodespaceParams{
@@ -253,9 +292,15 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		DisplayName:            opts.displayName,
 	}
 
-	a.StartProgressIndicatorWithLabel("Creating codespace")
-	codespace, err := a.apiClient.CreateCodespace(ctx, createParams)
-	a.StopProgressIndicator()
+	if opts.useWeb {
+		return a.browser.Browse(fmt.Sprintf("https://github.com/codespaces/new?repo=%d&ref=%s&machine=%s&location=%s", createParams.RepositoryID, createParams.Branch, createParams.Machine, createParams.Location))
+	}
+
+	var codespace *api.Codespace
+	err = a.RunWithProgress("Creating codespace", func() (err error) {
+		codespace, err = a.apiClient.CreateCodespace(ctx, createParams)
+		return
+	})
 
 	if err != nil {
 		var aerr api.AcceptPermissionsRequiredError
@@ -342,9 +387,11 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 	// we can continue with the create opting out of the additional permissions
 	createParams.PermissionsOptOut = true
 
-	a.StartProgressIndicatorWithLabel("Creating codespace")
-	codespace, err := a.apiClient.CreateCodespace(ctx, createParams)
-	a.StopProgressIndicator()
+	var codespace *api.Codespace
+	err := a.RunWithProgress("Creating codespace", func() (err error) {
+		codespace, err = a.apiClient.CreateCodespace(ctx, createParams)
+		return
+	})
 
 	if err != nil {
 		return nil, fmt.Errorf("error creating codespace: %w", err)

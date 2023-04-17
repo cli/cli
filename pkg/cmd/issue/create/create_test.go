@@ -92,6 +92,38 @@ func TestNewCmdCreate(t *testing.T) {
 				Interactive: false,
 			},
 		},
+		{
+			name:     "template from name tty",
+			tty:      true,
+			cli:      `-t mytitle --template "bug report"`,
+			wantsErr: false,
+			wantsOpts: CreateOptions{
+				Title:       "mytitle",
+				Body:        "",
+				RecoverFile: "",
+				WebMode:     false,
+				Template:    "bug report",
+				Interactive: true,
+			},
+		},
+		{
+			name:     "template from name non-tty",
+			tty:      false,
+			cli:      `-t mytitle --template "bug report"`,
+			wantsErr: true,
+		},
+		{
+			name:     "template and body",
+			tty:      false,
+			cli:      `-t mytitle --template "bug report" --body "issue body"`,
+			wantsErr: true,
+		},
+		{
+			name:     "template and body file",
+			tty:      false,
+			cli:      `-t mytitle --template "bug report" --body-file "body_file.md"`,
+			wantsErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -134,6 +166,7 @@ func TestNewCmdCreate(t *testing.T) {
 			assert.Equal(t, tt.wantsOpts.RecoverFile, opts.RecoverFile)
 			assert.Equal(t, tt.wantsOpts.WebMode, opts.WebMode)
 			assert.Equal(t, tt.wantsOpts.Interactive, opts.Interactive)
+			assert.Equal(t, tt.wantsOpts.Template, opts.Template)
 		})
 	}
 }
@@ -232,6 +265,15 @@ func Test_createRun(t *testing.T) {
 					{ "data": { "organization": { "projectsV2": {
 						"nodes": [
 							{ "title": "Triage", "id": "TRIAGEID", "resourcePath": "/orgs/ORG/projects/2"  }
+						],
+						"pageInfo": { "hasNextPage": false }
+					} } } }`))
+				r.Register(
+					httpmock.GraphQL(`query UserProjectV2List\b`),
+					httpmock.StringResponse(`
+					{ "data": { "viewer": { "projectsV2": {
+						"nodes": [
+							{ "title": "Monalisa", "id": "MONALISAID", "resourcePath": "/users/MONALISA/projects/1"  }
 						],
 						"pageInfo": { "hasNextPage": false }
 					} } } }`))
@@ -647,6 +689,14 @@ func TestIssueCreate_metadata(t *testing.T) {
 		} } } }
 		`))
 	http.Register(
+		httpmock.GraphQL(`query UserProjectV2List\b`),
+		httpmock.StringResponse(`
+		{	"data": { "viewer": { "projectsV2": {
+			"nodes": [],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
 		httpmock.GraphQL(`mutation IssueCreate\b`),
 		httpmock.GraphQLMutation(`
 		{ "data": { "createIssue": { "issue": {
@@ -781,7 +831,17 @@ func TestIssueCreate_projectsV2(t *testing.T) {
 		httpmock.StringResponse(`
 		{ "data": { "organization": { "projectsV2": {
 			"nodes": [
-				{ "title": "TriageV2", "id": "TriageV2ID" }
+				{ "title": "TriageV2", "id": "TRIAGEV2ID" }
+			],
+			"pageInfo": { "hasNextPage": false }
+		} } } }
+		`))
+	http.Register(
+		httpmock.GraphQL(`query UserProjectV2List\b`),
+		httpmock.StringResponse(`
+		{ "data": { "viewer": { "projectsV2": {
+			"nodes": [
+				{ "title": "MonalisaV2", "id": "MONALISAV2ID" }
 			],
 			"pageInfo": { "hasNextPage": false }
 		} } } }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	clicontext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
@@ -32,9 +33,10 @@ type App struct {
 	errLogger  *log.Logger
 	executable executable
 	browser    browser.Browser
+	remotes    func() (clicontext.Remotes, error)
 }
 
-func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browser browser.Browser) *App {
+func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browser browser.Browser, remotes func() (clicontext.Remotes, error)) *App {
 	errLogger := log.New(io.ErrOut, "", 0)
 
 	return &App{
@@ -43,6 +45,7 @@ func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browse
 		errLogger:  errLogger,
 		executable: exe,
 		browser:    browser,
+		remotes:    remotes,
 	}
 }
 
@@ -54,6 +57,10 @@ func (a *App) StartProgressIndicatorWithLabel(s string) {
 // StopProgressIndicator stops the progress indicator.
 func (a *App) StopProgressIndicator() {
 	a.io.StopProgressIndicator()
+}
+
+func (a *App) RunWithProgress(label string, run func() error) error {
+	return a.io.RunWithProgress(label, run)
 }
 
 // Connects to a codespace using Live Share and returns that session
@@ -80,6 +87,7 @@ func startLiveShareSession(ctx context.Context, codespace *api.Codespace, a *App
 
 //go:generate moq -fmt goimports -rm -skip-ensure -out mock_api.go . apiClient
 type apiClient interface {
+	GetUser(ctx context.Context) (*api.User, error)
 	GetCodespace(ctx context.Context, name string, includeConnection bool) (*api.Codespace, error)
 	GetOrgMemberCodespace(ctx context.Context, orgName string, userName string, codespaceName string) (*api.Codespace, error)
 	ListCodespaces(ctx context.Context, opts api.ListCodespacesOptions) ([]*api.Codespace, error)
@@ -98,19 +106,15 @@ type apiClient interface {
 
 var errNoCodespaces = errors.New("you have no codespaces")
 
-func chooseCodespace(ctx context.Context, apiClient apiClient) (*api.Codespace, error) {
-	codespaces, err := apiClient.ListCodespaces(ctx, api.ListCodespacesOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("error getting codespaces: %w", err)
-	}
-	return chooseCodespaceFromList(ctx, codespaces, false)
-}
-
 // chooseCodespaceFromList returns the codespace that the user has interactively selected from the list, or
 // an error if there are no codespaces.
-func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace, includeOwner bool) (*api.Codespace, error) {
+func chooseCodespaceFromList(ctx context.Context, codespaces []*api.Codespace, includeOwner bool, skipPromptForSingleOption bool) (*api.Codespace, error) {
 	if len(codespaces) == 0 {
 		return nil, errNoCodespaces
+	}
+
+	if skipPromptForSingleOption && len(codespaces) == 1 {
+		return codespaces[0], nil
 	}
 
 	sortedCodespaces := codespaces
@@ -148,35 +152,6 @@ func formatCodespacesForSelect(codespaces []*api.Codespace, includeOwner bool) [
 	}
 
 	return names
-}
-
-// getOrChooseCodespace prompts the user to choose a codespace if the codespaceName is empty.
-// It then fetches the codespace record with full connection details.
-// TODO(josebalius): accept a progress indicator or *App and show progress when fetching.
-func getOrChooseCodespace(ctx context.Context, apiClient apiClient, codespaceName string) (codespace *api.Codespace, err error) {
-	if codespaceName == "" {
-		codespace, err = chooseCodespace(ctx, apiClient)
-		if err != nil {
-			if err == errNoCodespaces {
-				return nil, err
-			}
-			return nil, fmt.Errorf("choosing codespace: %w", err)
-		}
-	} else {
-		codespace, err = apiClient.GetCodespace(ctx, codespaceName, true)
-		if err != nil {
-			return nil, fmt.Errorf("getting full codespace details: %w", err)
-		}
-	}
-
-	if codespace.PendingOperation {
-		return nil, fmt.Errorf(
-			"codespace is disabled while it has a pending operation: %s",
-			codespace.PendingOperationDisabledReason,
-		)
-	}
-
-	return codespace, nil
 }
 
 func safeClose(closer io.Closer, err *error) {
@@ -283,6 +258,10 @@ func addDeprecatedRepoShorthand(cmd *cobra.Command, target *string) error {
 
 	if err := cmd.Flags().MarkShorthandDeprecated("repo-deprecated", "use `-R` instead"); err != nil {
 		return fmt.Errorf("error marking `-r` shorthand as deprecated: %w", err)
+	}
+
+	if cmd.Flag("codespace") != nil {
+		cmd.MarkFlagsMutuallyExclusive("codespace", "repo-deprecated")
 	}
 
 	return nil

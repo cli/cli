@@ -69,6 +69,14 @@ func TestNewCmdList(t *testing.T) {
 				Actor: "bak1an",
 			},
 		},
+		{
+			name: "status",
+			cli:  "--status completed",
+			wants: ListOptions{
+				Limit:  defaultLimit,
+				Status: "completed",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -115,6 +123,7 @@ func TestListRun(t *testing.T) {
 		wantErr    bool
 		wantOut    string
 		wantErrOut string
+		wantErrMsg string
 		stubs      func(*httpmock.Registry)
 		isTTY      bool
 	}{
@@ -335,7 +344,8 @@ func TestListRun(t *testing.T) {
 					httpmock.JSONResponse(shared.RunsPayload{}),
 				)
 			},
-			wantErr: true,
+			wantErr:    true,
+			wantErrMsg: "no runs found",
 		},
 		{
 			name: "workflow selector",
@@ -376,7 +386,8 @@ func TestListRun(t *testing.T) {
 					httpmock.JSONResponse(shared.RunsPayload{}),
 				)
 			},
-			wantErr: true,
+			wantErr:    true,
+			wantErrMsg: "no runs found",
 		},
 		{
 			name: "actor filter applied",
@@ -392,7 +403,26 @@ func TestListRun(t *testing.T) {
 					httpmock.JSONResponse(shared.RunsPayload{}),
 				)
 			},
-			wantErr: true,
+			wantErr:    true,
+			wantErrMsg: "no runs found",
+		},
+		{
+			name: "status filter applied",
+			opts: &ListOptions{
+				Limit:  defaultLimit,
+				Status: "queued",
+			},
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.QueryMatcher("GET", "repos/OWNER/REPO/actions/runs", url.Values{
+						"status": []string{"queued"},
+					}),
+					httpmock.JSONResponse(shared.RunsPayload{}),
+				)
+			},
+			wantErr:    true,
+			wantErrMsg: "no runs found",
 		},
 	}
 
@@ -416,6 +446,7 @@ func TestListRun(t *testing.T) {
 			err := listRun(tt.opts)
 			if tt.wantErr {
 				assert.Error(t, err)
+				assert.Equal(t, tt.wantErrMsg, err.Error())
 			} else {
 				assert.NoError(t, err)
 			}

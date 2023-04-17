@@ -114,7 +114,7 @@ func cloneRun(opts *CloneOptions) error {
 		if repositoryIsFullName {
 			fullName = opts.Repository
 		} else {
-			host, _ := cfg.DefaultHost()
+			host, _ := cfg.Authentication().DefaultHost()
 			currentUser, err := api.CurrentLoginName(apiClient, host)
 			if err != nil {
 				return err
@@ -177,6 +177,10 @@ func cloneRun(opts *CloneOptions) error {
 
 		_, err = gitClient.AddRemote(ctx, upstreamName, upstreamURL, []string{canonicalRepo.Parent.DefaultBranchRef.Name}, git.WithRepoDir(cloneDir))
 		if err != nil {
+			return err
+		}
+
+		if err := gitClient.Fetch(ctx, upstreamName, "", git.WithRepoDir(cloneDir)); err != nil {
 			return err
 		}
 	}

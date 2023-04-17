@@ -9,12 +9,11 @@ import (
 
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/utils"
-	"github.com/cli/go-gh"
-	ghAPI "github.com/cli/go-gh/pkg/api"
+	ghAPI "github.com/cli/go-gh/v2/pkg/api"
 )
 
 type tokenGetter interface {
-	AuthToken(string) (string, string)
+	Token(string) (string, string)
 }
 
 type HTTPClientOptions struct {
@@ -55,7 +54,7 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 		clientOpts.CacheTTL = opts.CacheTTL
 	}
 
-	client, err := gh.HTTPClient(&clientOpts)
+	client, err := ghAPI.NewHTTPClient(clientOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +92,7 @@ func AddAuthTokenHeader(rt http.RoundTripper, cfg tokenGetter) http.RoundTripper
 		// If the header is already set in the request, don't overwrite it.
 		if req.Header.Get(authorization) == "" {
 			hostname := ghinstance.NormalizeHostname(getHost(req))
-			if token, _ := cfg.AuthToken(hostname); token != "" {
+			if token, _ := cfg.Token(hostname); token != "" {
 				req.Header.Set(authorization, fmt.Sprintf("token %s", token))
 			}
 		}

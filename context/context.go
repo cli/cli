@@ -11,9 +11,9 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 )
 
-// cap the number of git remotes looked up, since the user might have an
-// unusually large number of git remotes
-const maxRemotesForLookup = 5
+// Cap the number of git remotes to look up, since the user might have an
+// unusually large number of git remotes.
+const defaultRemotesForLookup = 5
 
 func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (*ResolvedRemotes, error) {
 	sort.Stable(remotes)
@@ -36,11 +36,11 @@ func ResolveRemotesToRepos(remotes Remotes, client *api.Client, base string) (*R
 	return result, nil
 }
 
-func resolveNetwork(result *ResolvedRemotes) error {
+func resolveNetwork(result *ResolvedRemotes, remotesForLookup int) error {
 	var repos []ghrepo.Interface
 	for _, r := range result.remotes {
 		repos = append(repos, r)
-		if len(repos) == maxRemotesForLookup {
+		if len(repos) == remotesForLookup {
 			break
 		}
 	}
@@ -84,7 +84,7 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, e
 		return r.remotes[0], nil
 	}
 
-	repos, err := r.NetworkRepos()
+	repos, err := r.NetworkRepos(defaultRemotesForLookup)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (r *ResolvedRemotes) BaseRepo(io *iostreams.IOStreams) (ghrepo.Interface, e
 
 func (r *ResolvedRemotes) HeadRepos() ([]*api.Repository, error) {
 	if r.network == nil {
-		err := resolveNetwork(r)
+		err := resolveNetwork(r, defaultRemotesForLookup)
 		if err != nil {
 			return nil, err
 		}
@@ -124,9 +124,11 @@ func (r *ResolvedRemotes) HeadRepos() ([]*api.Repository, error) {
 	return results, nil
 }
 
-func (r *ResolvedRemotes) NetworkRepos() ([]*api.Repository, error) {
+// NetworkRepos fetches info about remotes for the network of repos.
+// Pass a value of 0 to fetch info on all remotes.
+func (r *ResolvedRemotes) NetworkRepos(remotesForLookup int) ([]*api.Repository, error) {
 	if r.network == nil {
-		err := resolveNetwork(r)
+		err := resolveNetwork(r, remotesForLookup)
 		if err != nil {
 			return nil, err
 		}

@@ -142,6 +142,7 @@ func (c *Client) CurrentBranch(ctx context.Context) (string, error) {
 	if err != nil {
 		var gitErr *GitError
 		if ok := errors.As(err, &gitErr); ok && len(gitErr.Stderr) == 0 {
+			gitErr.err = ErrNotOnAnyBranch
 			gitErr.Stderr = "not on any branch"
 			return "", gitErr
 		}
@@ -353,6 +354,22 @@ func (c *Client) HasLocalBranch(ctx context.Context, branch string) bool {
 	return err == nil
 }
 
+func (c *Client) TrackingBranchNames(ctx context.Context, prefix string) []string {
+	args := []string{"branch", "-r", "--format", "%(refname:strip=3)"}
+	if prefix != "" {
+		args = append(args, "--list", fmt.Sprintf("*/%s*", escapeGlob(prefix)))
+	}
+	cmd, err := c.Command(ctx, args...)
+	if err != nil {
+		return nil
+	}
+	output, err := cmd.Output()
+	if err != nil {
+		return nil
+	}
+	return strings.Split(string(output), "\n")
+}
+
 // ToplevelDir returns the top-level directory path of the current repository.
 func (c *Client) ToplevelDir(ctx context.Context) (string, error) {
 	out, err := c.revParse(ctx, "--show-toplevel")
@@ -394,7 +411,10 @@ func (c *Client) revParse(ctx context.Context, args ...string) ([]byte, error) {
 // Below are commands that make network calls and need authentication credentials supplied from gh.
 
 func (c *Client) Fetch(ctx context.Context, remote string, refspec string, mods ...CommandModifier) error {
-	args := []string{"fetch", remote, refspec}
+	args := []string{"fetch", remote}
+	if refspec != "" {
+		args = append(args, refspec)
+	}
 	cmd, err := c.AuthenticatedCommand(ctx, args...)
 	if err != nil {
 		return err
@@ -462,8 +482,8 @@ func (c *Client) AddRemote(ctx context.Context, name, urlStr string, trackingBra
 	for _, branch := range trackingBranches {
 		args = append(args, "-t", branch)
 	}
-	args = append(args, "-f", name, urlStr)
-	cmd, err := c.AuthenticatedCommand(ctx, args...)
+	args = append(args, name, urlStr)
+	cmd, err := c.Command(ctx, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -618,4 +638,17 @@ func populateResolvedRemotes(remotes RemoteSet, resolved []string) {
 			}
 		}
 	}
+}
+
+var globReplacer = strings.NewReplacer(
+	"*", `\*`,
+	"?", `\?`,
+	"[", `\[`,
+	"]", `\]`,
+	"{", `\{`,
+	"}", `\}`,
+)
+
+func escapeGlob(p string) string {
+	return globReplacer.Replace(p)
 }

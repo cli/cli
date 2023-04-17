@@ -23,9 +23,9 @@ func TestEdit(t *testing.T) {
 		{
 			name: "edit codespace display name",
 			opts: editOptions{
-				codespaceName: "hubot",
-				displayName:   "hubot-changed",
-				machine:       "",
+				selector:    &CodespaceSelector{codespaceName: "hubot"},
+				displayName: "hubot-changed",
+				machine:     "",
 			},
 			wantEdits: &api.EditCodespaceParams{
 				DisplayName: "hubot-changed",
@@ -54,9 +54,9 @@ func TestEdit(t *testing.T) {
 		{
 			name: "edit codespace machine",
 			opts: editOptions{
-				codespaceName: "hubot",
-				displayName:   "",
-				machine:       "machine",
+				selector:    &CodespaceSelector{codespaceName: "hubot"},
+				displayName: "",
+				machine:     "machine",
 			},
 			wantEdits: &api.EditCodespaceParams{
 				Machine: "machine",
@@ -88,10 +88,15 @@ func TestEdit(t *testing.T) {
 			}
 
 			ios, _, stdout, stderr := iostreams.Test()
-			a := NewApp(ios, nil, apiMock, nil)
+			a := NewApp(ios, nil, apiMock, nil, nil)
 
 			var err error
 			if tt.cliArgs == nil {
+				if tt.opts.selector == nil {
+					t.Fatalf("selector must be set in opts if cliArgs are not provided")
+				}
+
+				tt.opts.selector.api = apiMock
 				err = a.Edit(context.Background(), tt.opts)
 			} else {
 				cmd := newEditCmd(a)

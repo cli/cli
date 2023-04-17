@@ -102,6 +102,7 @@ func findIssueOrPR(httpClient *http.Client, repo ghrepo.Interface, number int, f
 	if fieldSet.Contains("projectItems") {
 		getProjectItems = true
 		fieldSet.Remove("projectItems")
+		fieldSet.Add("number")
 	}
 
 	fields = fieldSet.ToSlice()

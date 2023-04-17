@@ -15,8 +15,9 @@ import (
 
 func TestPendingOperationDisallowsSSH(t *testing.T) {
 	app := testingSSHApp()
+	selector := &CodespaceSelector{api: app.apiClient, codespaceName: "disabledCodespace"}
 
-	if err := app.SSH(context.Background(), []string{}, sshOptions{codespace: "disabledCodespace"}); err != nil {
+	if err := app.SSH(context.Background(), []string{}, sshOptions{selector: selector}); err != nil {
 		if err.Error() != "codespace is disabled while it has a pending operation: Some pending operation" {
 			t.Errorf("expected pending operation error, but got: %v", err)
 		}
@@ -278,5 +279,5 @@ func testingSSHApp() *App {
 	}
 
 	ios, _, _, _ := iostreams.Test()
-	return NewApp(ios, nil, apiMock, nil)
+	return NewApp(ios, nil, apiMock, nil, nil)
 }

@@ -10,8 +10,9 @@ import (
 
 func TestPendingOperationDisallowsLogs(t *testing.T) {
 	app := testingLogsApp()
+	selector := &CodespaceSelector{api: app.apiClient, codespaceName: "disabledCodespace"}
 
-	if err := app.Logs(context.Background(), "disabledCodespace", false); err != nil {
+	if err := app.Logs(context.Background(), selector, false); err != nil {
 		if err.Error() != "codespace is disabled while it has a pending operation: Some pending operation" {
 			t.Errorf("expected pending operation error, but got: %v", err)
 		}
@@ -36,5 +37,5 @@ func testingLogsApp() *App {
 	}
 
 	ios, _, _, _ := iostreams.Test()
-	return NewApp(ios, nil, apiMock, nil)
+	return NewApp(ios, nil, apiMock, nil, nil)
 }

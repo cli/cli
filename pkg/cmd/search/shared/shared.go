@@ -42,7 +42,7 @@ func Searcher(f *cmdutil.Factory) (search.Searcher, error) {
 	if err != nil {
 		return nil, err
 	}
-	host, _ := cfg.DefaultHost()
+	host, _ := cfg.Authentication().DefaultHost()
 	client, err := f.HttpClient()
 	if err != nil {
 		return nil, err

@@ -12,8 +12,8 @@ import (
 
 func newLogsCmd(app *App) *cobra.Command {
 	var (
-		codespace string
-		follow    bool
+		selector *CodespaceSelector
+		follow   bool
 	)
 
 	logsCmd := &cobra.Command{
@@ -21,22 +21,23 @@ func newLogsCmd(app *App) *cobra.Command {
 		Short: "Access codespace logs",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.Logs(cmd.Context(), codespace, follow)
+			return app.Logs(cmd.Context(), selector, follow)
 		},
 	}
 
-	logsCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
+	selector = AddCodespaceSelector(logsCmd, app.apiClient)
+
 	logsCmd.Flags().BoolVarP(&follow, "follow", "f", false, "Tail and follow the logs")
 
 	return logsCmd
 }
 
-func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err error) {
+func (a *App) Logs(ctx context.Context, selector *CodespaceSelector, follow bool) (err error) {
 	// Ensure all child tasks (port forwarding, remote exec) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
+	codespace, err := selector.Select(ctx)
 	if err != nil {
 		return err
 	}
@@ -54,15 +55,17 @@ func (a *App) Logs(ctx context.Context, codespaceName string, follow bool) (err 
 	}
 	defer listen.Close()
 
-	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
-	invoker, err := rpc.CreateInvoker(ctx, session)
-	if err != nil {
-		return err
-	}
-	defer safeClose(invoker, &err)
+	remoteSSHServerPort, sshUser := 0, ""
+	err = a.RunWithProgress("Fetching SSH Details", func() (err error) {
+		invoker, err := rpc.CreateInvoker(ctx, session)
+		if err != nil {
+			return
+		}
+		defer safeClose(invoker, &err)
 
-	remoteSSHServerPort, sshUser, err := invoker.StartSSHServer(ctx)
-	a.StopProgressIndicator()
+		remoteSSHServerPort, sshUser, err = invoker.StartSSHServer(ctx)
+		return
+	})
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
 	}

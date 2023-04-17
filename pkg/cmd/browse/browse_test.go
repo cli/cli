@@ -48,6 +48,14 @@ func TestNewCmdBrowse(t *testing.T) {
 			wantsErr: false,
 		},
 		{
+			name: "releases flag",
+			cli:  "--releases",
+			wants: BrowseOptions{
+				ReleasesFlag: true,
+			},
+			wantsErr: false,
+		},
+		{
 			name: "wiki flag",
 			cli:  "--wiki",
 			wants: BrowseOptions{
@@ -108,12 +116,74 @@ func TestNewCmdBrowse(t *testing.T) {
 			wantsErr: true,
 		},
 		{
-			name: "last commit flag",
-			cli:  "-c",
+			name:     "passed argument and projects flag",
+			cli:      "main.go --projects",
+			wantsErr: true,
+		},
+		{
+			name:     "passed argument and releases flag",
+			cli:      "main.go --releases",
+			wantsErr: true,
+		},
+		{
+			name:     "passed argument and settings flag",
+			cli:      "main.go --settings",
+			wantsErr: true,
+		},
+		{
+			name:     "passed argument and wiki flag",
+			cli:      "main.go --wiki",
+			wantsErr: true,
+		},
+		{
+			name: "empty commit flag",
+			cli:  "--commit",
 			wants: BrowseOptions{
-				CommitFlag: true,
+				Commit: emptyCommitFlag,
 			},
 			wantsErr: false,
+		},
+		{
+			name: "commit flag with a hash",
+			cli:  "--commit=12a4",
+			wants: BrowseOptions{
+				Commit: "12a4",
+			},
+			wantsErr: false,
+		},
+		{
+			name: "commit flag with a hash and a file selector",
+			cli:  "main.go --commit=12a4",
+			wants: BrowseOptions{
+				Commit:      "12a4",
+				SelectorArg: "main.go",
+			},
+			wantsErr: false,
+		},
+		{
+			name:     "passed both branch and commit flags",
+			cli:      "main.go --branch main --commit=12a4",
+			wantsErr: true,
+		},
+		{
+			name:     "passed both number arg and branch flag",
+			cli:      "1 --branch trunk",
+			wantsErr: true,
+		},
+		{
+			name:     "passed both number arg and commit flag",
+			cli:      "1 --commit=12a4",
+			wantsErr: true,
+		},
+		{
+			name:     "passed both commit SHA arg and branch flag",
+			cli:      "de07febc26e19000f8c9e821207f3bc34a3c8038 --branch trunk",
+			wantsErr: true,
+		},
+		{
+			name:     "passed both commit SHA arg and commit flag",
+			cli:      "de07febc26e19000f8c9e821207f3bc34a3c8038 --commit=12a4",
+			wantsErr: true,
 		},
 	}
 	for _, tt := range tests {
@@ -141,10 +211,11 @@ func TestNewCmdBrowse(t *testing.T) {
 			assert.Equal(t, tt.wants.Branch, opts.Branch)
 			assert.Equal(t, tt.wants.SelectorArg, opts.SelectorArg)
 			assert.Equal(t, tt.wants.ProjectsFlag, opts.ProjectsFlag)
+			assert.Equal(t, tt.wants.ReleasesFlag, opts.ReleasesFlag)
 			assert.Equal(t, tt.wants.WikiFlag, opts.WikiFlag)
 			assert.Equal(t, tt.wants.NoBrowserFlag, opts.NoBrowserFlag)
 			assert.Equal(t, tt.wants.SettingsFlag, opts.SettingsFlag)
-			assert.Equal(t, tt.wants.CommitFlag, opts.CommitFlag)
+			assert.Equal(t, tt.wants.Commit, opts.Commit)
 		})
 	}
 }
@@ -189,6 +260,14 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("ttran112", "7ate9"),
 			expectedURL: "https://github.com/ttran112/7ate9/projects",
+		},
+		{
+			name: "releases flag",
+			opts: BrowseOptions{
+				ReleasesFlag: true,
+			},
+			baseRepo:    ghrepo.New("ttran112", "7ate9"),
+			expectedURL: "https://github.com/ttran112/7ate9/releases",
 		},
 		{
 			name: "wiki flag",
@@ -334,7 +413,7 @@ func Test_runBrowse(t *testing.T) {
 			},
 			baseRepo:    ghrepo.New("ken", "grc"),
 			wantsErr:    false,
-			expectedURL: "https://github.com/ken/grc/issues/217",
+			expectedURL: "https://github.com/ken/grc/tree/trunk/217",
 		},
 		{
 			name: "opening branch file with line number",
@@ -360,8 +439,8 @@ func Test_runBrowse(t *testing.T) {
 		{
 			name: "open last commit",
 			opts: BrowseOptions{
-				CommitFlag: true,
-				GitClient:  &testGitClient{},
+				Commit:    emptyCommitFlag,
+				GitClient: &testGitClient{},
 			},
 			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
 			wantsErr:    false,
@@ -370,13 +449,34 @@ func Test_runBrowse(t *testing.T) {
 		{
 			name: "open last commit with a file",
 			opts: BrowseOptions{
-				CommitFlag:  true,
+				Commit:      emptyCommitFlag,
 				SelectorArg: "main.go",
 				GitClient:   &testGitClient{},
 			},
 			baseRepo:    ghrepo.New("vilmibm", "gh-user-status"),
 			wantsErr:    false,
 			expectedURL: "https://github.com/vilmibm/gh-user-status/tree/6f1a2405cace1633d89a79c74c65f22fe78f9659/main.go",
+		},
+		{
+			name: "open number only commit hash",
+			opts: BrowseOptions{
+				Commit:    "1234567890",
+				GitClient: &testGitClient{},
+			},
+			baseRepo:    ghrepo.New("yanskun", "ILoveGitHub"),
+			wantsErr:    false,
+			expectedURL: "https://github.com/yanskun/ILoveGitHub/tree/1234567890",
+		},
+		{
+			name: "open file with the repository state at a commit hash",
+			opts: BrowseOptions{
+				Commit:      "12a4",
+				SelectorArg: "main.go",
+				GitClient:   &testGitClient{},
+			},
+			baseRepo:    ghrepo.New("yanskun", "ILoveGitHub"),
+			wantsErr:    false,
+			expectedURL: "https://github.com/yanskun/ILoveGitHub/tree/12a4/main.go",
 		},
 		{
 			name: "relative path from browse_test.go",

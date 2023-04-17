@@ -13,28 +13,28 @@ import (
 )
 
 func newJupyterCmd(app *App) *cobra.Command {
-	var codespace string
+	var selector *CodespaceSelector
 
 	jupyterCmd := &cobra.Command{
 		Use:   "jupyter",
 		Short: "Open a codespace in JupyterLab",
 		Args:  noArgsConstraint,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.Jupyter(cmd.Context(), codespace)
+			return app.Jupyter(cmd.Context(), selector)
 		},
 	}
 
-	jupyterCmd.Flags().StringVarP(&codespace, "codespace", "c", "", "Name of the codespace")
+	selector = AddCodespaceSelector(jupyterCmd, app.apiClient)
 
 	return jupyterCmd
 }
 
-func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
+func (a *App) Jupyter(ctx context.Context, selector *CodespaceSelector) (err error) {
 	// Ensure all child tasks (e.g. port forwarding) terminate before return.
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	codespace, err := getOrChooseCodespace(ctx, a.apiClient, codespaceName)
+	codespace, err := selector.Select(ctx)
 	if err != nil {
 		return err
 	}
@@ -45,18 +45,26 @@ func (a *App) Jupyter(ctx context.Context, codespaceName string) (err error) {
 	}
 	defer safeClose(session, &err)
 
-	a.StartProgressIndicatorWithLabel("Starting JupyterLab on codespace")
-	invoker, err := rpc.CreateInvoker(ctx, session)
+	var (
+		invoker    rpc.Invoker
+		serverPort int
+		serverUrl  string
+	)
+	err = a.RunWithProgress("Starting JupyterLab on codespace", func() (err error) {
+		invoker, err = rpc.CreateInvoker(ctx, session)
+		if err != nil {
+			return
+		}
+
+		serverPort, serverUrl, err = invoker.StartJupyterServer(ctx)
+		return
+	})
+	if invoker != nil {
+		defer safeClose(invoker, &err)
+	}
 	if err != nil {
 		return err
 	}
-	defer safeClose(invoker, &err)
-
-	serverPort, serverUrl, err := invoker.StartJupyterServer(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to start JupyterLab server: %w", err)
-	}
-	a.StopProgressIndicator()
 
 	// Pass 0 to pick a random port
 	listen, _, err := codespaces.ListenTCP(0)

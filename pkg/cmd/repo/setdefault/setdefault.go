@@ -160,7 +160,7 @@ func setDefaultRun(opts *SetDefaultOptions) error {
 		return err
 	}
 
-	knownRepos, err := resolvedRemotes.NetworkRepos()
+	knownRepos, err := resolvedRemotes.NetworkRepos(0)
 	if err != nil {
 		return err
 	}

@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
@@ -124,38 +122,4 @@ func putRepoSecret(client *api.Client, pk *PubKey, repo ghrepo.Interface, secret
 	}
 	path := fmt.Sprintf("repos/%s/%s/secrets/%s", ghrepo.FullName(repo), app, secretName)
 	return putSecret(client, repo.RepoHost(), path, payload)
-}
-
-// This does similar logic to `api.RepoNetwork`, but without the overfetching.
-func mapRepoToID(client *api.Client, host string, repositories []ghrepo.Interface) ([]int64, error) {
-	queries := make([]string, 0, len(repositories))
-	for i, repo := range repositories {
-		queries = append(queries, fmt.Sprintf(`
-			repo_%03d: repository(owner: %q, name: %q) {
-				databaseId
-			}
-		`, i, repo.RepoOwner(), repo.RepoName()))
-	}
-
-	query := fmt.Sprintf(`query MapRepositoryNames { %s }`, strings.Join(queries, ""))
-
-	graphqlResult := make(map[string]*struct {
-		DatabaseID int64 `json:"databaseId"`
-	})
-
-	if err := client.GraphQL(host, query, nil, &graphqlResult); err != nil {
-		return nil, fmt.Errorf("failed to look up repositories: %w", err)
-	}
-
-	repoKeys := make([]string, 0, len(repositories))
-	for k := range graphqlResult {
-		repoKeys = append(repoKeys, k)
-	}
-	sort.Strings(repoKeys)
-
-	result := make([]int64, len(repositories))
-	for i, k := range repoKeys {
-		result[i] = graphqlResult[k].DatabaseID
-	}
-	return result, nil
 }

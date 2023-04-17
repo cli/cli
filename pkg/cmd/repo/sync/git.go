@@ -71,7 +71,7 @@ func (g *gitExecuter) CurrentBranch() (string, error) {
 
 func (g *gitExecuter) Fetch(remote, ref string) error {
 	args := []string{"fetch", "-q", remote, ref}
-	cmd, err := g.client.Command(context.Background(), args...)
+	cmd, err := g.client.AuthenticatedCommand(context.Background(), args...)
 	if err != nil {
 		return err
 	}

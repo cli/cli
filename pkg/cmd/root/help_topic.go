@@ -79,10 +79,16 @@ var HelpTopics = map[string]map[string]string{
 			checks for new releases once every 24 hours and displays an upgrade notice on standard
 			error if a newer version was found.
 
-			GH_CONFIG_DIR: the directory where gh will store configuration files. Default:
-			"$XDG_CONFIG_HOME/gh" or "$HOME/.config/gh".
+			GH_CONFIG_DIR: the directory where gh will store configuration files. If not specified, 
+			the default value will be one of the following paths (in order of precedence):
+			  - "$XDG_CONFIG_HOME/gh" (if $XDG_CONFIG_HOME is set),
+			  - "$AppData/GitHub CLI" (on Windows if $AppData is set), or
+			  - "$HOME/.config/gh".
 
 			GH_PROMPT_DISABLED: set to any value to disable interactive prompting in the terminal.
+
+			GH_PATH: set the path to the gh executable, useful for when gh can not properly determine
+			its own path such as in the cygwin terminal.
 		`),
 	},
 	"reference": {
