@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
-	"time"
 
 	"github.com/cli/cli/v2/api"
 	cliContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/cli/v2/pkg/cmd/pr/shared"
@@ -24,6 +24,7 @@ type CleanupOptions struct {
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
 	Config     func() (config.Config, error)
+	BaseRepo   func() (ghrepo.Interface, error)
 	IO         *iostreams.IOStreams
 	Remotes    func() (cliContext.Remotes, error)
 	Branch     func() (string, error)
@@ -45,6 +46,7 @@ func NewCmdCleanup(f *cmdutil.Factory, runF func(*CleanupOptions) error) *cobra.
 		HttpClient: f.HttpClient,
 		GitClient:  f.GitClient,
 		Config:     f.Config,
+		BaseRepo:   f.BaseRepo,
 		Remotes:    f.Remotes,
 		Branch:     f.Branch,
 		Prompter:   f.Prompter,
@@ -104,33 +106,28 @@ func cleanupRun(opts *CleanupOptions) error {
 			branchesWithUpstream = append(branchesWithUpstream, localBranch)
 		}
 
-		timeWarning := ".."
-		if len(branchesWithUpstream) > 60 {
-			timeWarning = " This might take a few minutes..."
-		} else if len(branchesWithUpstream) > 30 {
-			timeWarning = " This might take a minute..."
-		} else if len(branchesWithUpstream) > 10 {
-			timeWarning = " This might take a few seconds..."
-		}
+		// Get PRs associated with upstream branches.
 		opts.IO.StartProgressIndicatorWithLabel(
 			fmt.Sprintf(
-				"Loading PRs for %d local branches with upstreams.%s\n",
+				"Loading PRs for %d local branches with upstreams. This can take a minute if you have many branches...\n",
 				len(branchesWithUpstream),
-				timeWarning,
 			),
 		)
 
-		// Get PRs associated with upstream branches.
 		var prs []*api.PullRequest
-		// TODO: Can these be loaded in parallel?
+		prStates := []string{"MERGED", "CLOSED"}
+		if opts.MergedOnly {
+			prStates = []string{"MERGED"}
+		}
 		for _, branch := range branchesWithUpstream {
+			// TODO: Can these be loaded in parallel?
 			// TODO: This causes the progress indicator to "reset" very frequently.
 			// Should the Finder itself have a progress indicator? Perhaps we should
 			// invert that so consumers have control of the indicator instead.
 			pr, _, err := opts.Finder.Find(shared.FindOptions{
 				Selector: branch.Upstream.BranchName,
-				Fields:   []string{"commits", "headRefOid", "title"},
-				States:   []string{"MERGED", "CLOSED"},
+				Fields:   []string{"headRefOid", "headRefName", "title", "state"},
+				States:   prStates,
 			})
 			if _, ok := err.(*shared.NotFoundError); ok {
 				continue
@@ -139,21 +136,14 @@ func cleanupRun(opts *CleanupOptions) error {
 				return err
 			} else {
 				prs = append(prs, pr)
-
-				// Avoid rate limit. Since rate-limiting is based on count of nodes
-				// loaded, we only need to worry about it in the case where finding a PR
-				// succeeded (because no nodes are loaded in the not-found case).
-				//
-				// TODO: Intelligently retry on rate limiting instead.
-				time.Sleep(time.Second)
 			}
 		}
 		opts.IO.StopProgressIndicator()
 
-		// Reorganize branches by their HEAD commits for fast lookup.
-		branchesByCommit := make(map[string][]git.Branch)
+		// Reorganize branches for fast lookup.
+		branchesByRemoteBranchName := make(map[string]git.Branch)
 		for _, branch := range branchesWithUpstream {
-			branchesByCommit[branch.Local.Hash] = append(branchesByCommit[branch.Local.Hash], branch)
+			branchesByRemoteBranchName[branch.Upstream.BranchName] = branch
 		}
 
 		// Get the list of candidate branch deletions.
@@ -167,23 +157,38 @@ func cleanupRun(opts *CleanupOptions) error {
 		// * --exclude-behind: the local branch's head ref must be the PR's head ref.
 		// * --exclude-closed: closed PRs are not considered.
 		deletionCandidates := make(map[git.Branch]*api.PullRequest)
+		httpClient, err := opts.HttpClient()
+		if err != nil {
+			return err
+		}
+		repo, err := opts.BaseRepo()
+		if err != nil {
+			return err
+		}
 		for _, pr := range prs {
 			if opts.MergedOnly && pr.State == "CLOSED" {
 				continue
 			}
 
-			if opts.UpToDateOnly {
-				candidates := branchesByCommit[pr.HeadRefOid]
-				for _, candidate := range candidates {
-					deletionCandidates[candidate] = pr
+			branch := branchesByRemoteBranchName[pr.HeadRefName]
+			// First, check to see if the branch of the PR is at the PR's head.
+			if branch.Local.Hash == pr.HeadRefOid {
+				deletionCandidates[branch] = pr
+				continue
+			}
+
+			// Otherwise, check if the branch of the PR is behind a PR's head. To do
+			// this, we try to find a merged PR whose history contains the branch's
+			// commit.
+			if !opts.UpToDateOnly {
+				pr, err := mergedPRAssociatedWithCommit(httpClient, repo, branch.Local.Hash)
+				if err == PRNotFound {
+					continue
 				}
-			} else {
-				for _, commit := range pr.Commits.Nodes {
-					candidates := branchesByCommit[commit.Commit.OID]
-					for _, candidate := range candidates {
-						deletionCandidates[candidate] = pr
-					}
+				if err != nil {
+					return err
 				}
+				deletionCandidates[branch] = pr
 			}
 		}
 
@@ -231,7 +236,7 @@ func cleanupRun(opts *CleanupOptions) error {
 
 			table.EndRow()
 		}
-		err := table.Render()
+		err = table.Render()
 		if err != nil {
 			return err
 		}
@@ -273,4 +278,62 @@ func cleanupRun(opts *CleanupOptions) error {
 	}
 
 	return nil
+}
+
+var PRNotFound = errors.New("no merged pull requests found for commit")
+
+func mergedPRAssociatedWithCommit(httpClient *http.Client, repo ghrepo.Interface, commit string) (*api.PullRequest, error) {
+	type response struct {
+		Repository struct {
+			Object struct {
+				AssociatedPullRequests struct {
+					Nodes []api.PullRequest
+				}
+			}
+		}
+	}
+
+	query := `
+	query PullRequestForCommit($owner: String!, $repo: String!, $commitOid: GitObjectID!) {
+		repository(owner: $owner, name: $repo) {
+			object(oid: $commitOid) {
+				... on Commit {
+					associatedPullRequests(first: 30, orderBy: { field: CREATED_AT, direction: DESC }) {
+						nodes {
+							number
+							state
+							title
+							headRefOid
+						}
+					}
+				}
+			}
+		}
+	}`
+
+	variables := map[string]interface{}{
+		"owner":     repo.RepoOwner(),
+		"repo":      repo.RepoName(),
+		"commitOid": commit,
+	}
+
+	var resp response
+	client := api.NewClientFromHTTP(httpClient)
+	err := client.GraphQL(repo.RepoHost(), query, variables, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	prs := resp.Repository.Object.AssociatedPullRequests.Nodes
+	sort.SliceStable(prs, func(a, b int) bool {
+		return prs[a].State == "MERGED" && prs[b].State != "MERGED"
+	})
+
+	for _, pr := range prs {
+		if pr.State == "MERGED" {
+			return &pr, nil
+		}
+	}
+
+	return nil, PRNotFound
 }
