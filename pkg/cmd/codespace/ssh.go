@@ -56,8 +56,14 @@ func newSSHCmd(app *App) *cobra.Command {
 			The 'ssh' command is used to SSH into a codespace. In its simplest form, you can
 			run 'gh cs ssh', select a codespace interactively, and connect.
 			
-			By default, the 'ssh' command will create a public/private ssh key pair to  
-			authenticate with the codespace inside the ~/.ssh directory.
+			The 'ssh' command will automatically create a public/private ssh key pair in the
+			~/.ssh directory if you do not have an existing valid key pair. When selecting the
+			key pair to use, the preferred order is:
+			  
+			1. Key specified by -i in <ssh-flags>
+			2. Automatic key, if it already exists
+			3. First valid key pair in ssh config (according to ssh -G)
+			4. Automatic key, newly created
 
 			The 'ssh' command also supports deeper integration with OpenSSH using a '--config'
 			option that generates per-codespace ssh configuration in OpenSSH format.
