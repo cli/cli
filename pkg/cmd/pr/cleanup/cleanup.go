@@ -8,9 +8,7 @@ import (
 	"sort"
 
 	"github.com/cli/cli/v2/api"
-	cliContext "github.com/cli/cli/v2/context"
 	"github.com/cli/cli/v2/git"
-	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/internal/tableprinter"
@@ -23,11 +21,8 @@ import (
 type CleanupOptions struct {
 	HttpClient func() (*http.Client, error)
 	GitClient  *git.Client
-	Config     func() (config.Config, error)
 	BaseRepo   func() (ghrepo.Interface, error)
 	IO         *iostreams.IOStreams
-	Remotes    func() (cliContext.Remotes, error)
-	Branch     func() (string, error)
 	Prompter   prompter.Prompter
 
 	Finder shared.PRFinder
@@ -45,10 +40,7 @@ func NewCmdCleanup(f *cmdutil.Factory, runF func(*CleanupOptions) error) *cobra.
 		IO:         f.IOStreams,
 		HttpClient: f.HttpClient,
 		GitClient:  f.GitClient,
-		Config:     f.Config,
 		BaseRepo:   f.BaseRepo,
-		Remotes:    f.Remotes,
-		Branch:     f.Branch,
 		Prompter:   f.Prompter,
 	}
 
