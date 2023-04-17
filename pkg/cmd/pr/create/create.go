@@ -750,7 +750,26 @@ func handlePush(opts CreateOptions, ctx CreateContext) error {
 
 		// TODO: prevent clashes with another remote of a same name
 		gitClient := ctx.GitClient
-		gitRemote, err := gitClient.AddRemote(context.Background(), "fork", headRepoURL, []string{})
+
+		remoteName := "origin"
+		remotes, err := opts.Remotes()
+		if err != nil {
+			return err
+		}
+
+		if _, err := remotes.FindByName(remoteName); err == nil {
+			renameTarget := "upstream"
+			renameCmd, err := gitClient.Command(context.Background(), "remote", "rename", remoteName, renameTarget)
+			if err != nil {
+				return err
+			}
+			_, err = renameCmd.Output()
+			if err != nil {
+				return err
+			}
+		}
+
+		gitRemote, err := gitClient.AddRemote(context.Background(), remoteName, headRepoURL, []string{})
 		if err != nil {
 			return fmt.Errorf("error adding remote: %w", err)
 		}
