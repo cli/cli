@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -380,7 +379,7 @@ func (a *App) ForwardPorts(ctx context.Context, selector *CodespaceSelector, por
 	for _, pair := range portPairs {
 		pair := pair
 		group.Go(func() error {
-			listen, _, err := startPortForwardingTCPListener(pair.local)
+			listen, _, err := codespaces.ListenTCP(pair.local, true)
 			if err != nil {
 				return err
 			}
@@ -428,22 +427,4 @@ func getPortPairs(ports []string) ([]portPair, error) {
 func normalizeJSON(j []byte) []byte {
 	// remove trailing commas
 	return bytes.ReplaceAll(j, []byte("},}"), []byte("}}"))
-}
-
-// startPortForwardingTCPListener starts a localhost tcp listener and returns the listener and bound port
-// Note: this is a re-implementation of `codespaces.ListenTCP` except that it allows all interfaces instead of just 127.0.0.1
-func startPortForwardingTCPListener(port int) (*net.TCPListener, int, error) {
-	addr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf(":%d", port))
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to build tcp address: %w", err)
-	}
-
-	listener, err := net.ListenTCP("tcp", addr)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to listen to local port over tcp: %w", err)
-	}
-
-	port = listener.Addr().(*net.TCPAddr).Port
-
-	return listener, port, nil
 }
