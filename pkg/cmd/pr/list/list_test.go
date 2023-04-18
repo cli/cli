@@ -270,6 +270,53 @@ func TestPRList_filteringAuthor(t *testing.T) {
 	}
 }
 
+func TestPRList_filteringAutoMerge(t *testing.T) {
+	tests := []struct {
+		name           string
+		cli            string
+		expectedOutput string
+	}{
+		{
+			name: "only prs with auto-merge enabled",
+			cli:  "--auto-merge enabled",
+			expectedOutput: heredoc.Doc(`
+
+				Showing 2 of 2 pull requests in OWNER/REPO that match your search
+
+				#29  Fixed bad bug          hubot:bug-fix  about 1 month ago
+				#28  Improve documentation  docs           about 2 years ago
+			`),
+		},
+		{
+			name: "only prs with auto-merge disabled",
+			cli:  "--auto-merge disabled",
+			expectedOutput: heredoc.Doc(`
+
+				Showing 1 of 1 pull request in OWNER/REPO that matches your search
+
+				#32  New feature  feature  about 3 hours ago
+			`),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			http := initFakeHTTP()
+			defer http.Verify(t)
+
+			http.Register(httpmock.GraphQL(`query PullRequestList\b`), httpmock.FileResponse("./fixtures/prList.json"))
+
+			output, err := runCommand(http, true, test.cli)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			assert.Equal(t, test.expectedOutput, output.String())
+			assert.Equal(t, ``, output.Stderr())
+
+		})
+	}
+}
 func TestPRList_withInvalidLimitFlag(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)

@@ -203,7 +203,7 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintln(opts.IO.ErrOut, "warning: this query uses the Search API which is capped at 1000 results maximum")
 	}
 	if isTerminal {
-		title := prShared.ListHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, !filterOptions.IsDefault())
+		title := prShared.ListHeader(ghrepo.FullName(baseRepo), "issue", len(listResult.Issues), listResult.TotalCount, false, !filterOptions.IsDefault())
 		fmt.Fprintf(opts.IO.Out, "\n%s\n\n", title)
 	}
 
