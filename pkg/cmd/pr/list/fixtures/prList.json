@@ -11,7 +11,8 @@
             "createdAt": "2022-08-24T20:01:12Z",
             "headRefName": "feature",
             "state": "OPEN",
-            "isDraft": true
+            "isDraft": true,
+            "autoMergeRequest": null
           },
           {
             "number": 29,
@@ -24,7 +25,8 @@
             "isCrossRepository": true,
             "headRepositoryOwner": {
               "login": "hubot"
-            }
+            },
+            "autoMergeRequest": {}
           },
           {
             "number": 28,
@@ -33,7 +35,8 @@
             "title": "Improve documentation",
             "createdAt": "2020-01-26T19:01:12Z",
             "url": "https://github.com/monalisa/hello/pull/28",
-            "headRefName": "docs"
+            "headRefName": "docs",
+            "autoMergeRequest": {}
           }
         ],
         "pageInfo": {

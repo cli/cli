@@ -7,6 +7,7 @@ import (
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
 	prShared "github.com/cli/cli/v2/pkg/cmd/pr/shared"
+	"github.com/cli/cli/v2/pkg/set"
 )
 
 func shouldUseSearch(filters prShared.FilterOptions) bool {
@@ -26,11 +27,16 @@ type requester interface {
 }
 
 // Fetch pull requests, handling GraphQL pagination and limits
-func fetchPullRequests(r requester, limit int) (*api.PullRequestAndTotalCount, error) {
-	pageLimit := min(limit, 100)
+func fetchPullRequests(r requester, limit int, autoMergeStatus *bool) (*api.PullRequestAndTotalCount, error) {
+	pageLimit := 100
+	if autoMergeStatus == nil {
+		// Only fetch what is needed, but only if we are not filtering locally
+		pageLimit = min(100, limit)
+	}
 	var endCursor *string = nil
-	res := api.PullRequestAndTotalCount{}
+	res := api.PullRequestAndTotalCount{TotalCount: -1}
 	var check = make(map[int]struct{})
+	removed := 0
 
 loop:
 	for {
@@ -46,20 +52,40 @@ loop:
 			}
 			check[pr.Number] = struct{}{}
 
-			res.PullRequests = append(res.PullRequests, pr)
-			if len(res.PullRequests) == limit {
+			if autoMergeStatus != nil && (*autoMergeStatus == (pr.AutoMergeRequest == nil)) {
+				// If there are multiple pages but a limit that's lower than the
+				// total, then the total count is at best an upper bound. We
+				// can't know how many PRs would be filtered on unloaded pages.
+				removed += 1
+				res.TotalCountIsUpperBound = true
+				continue
+			}
+
+			if len(res.PullRequests) < limit {
+				res.PullRequests = append(res.PullRequests, pr)
+			}
+			if len(res.PullRequests) == limit && autoMergeStatus == nil {
 				break loop
 			}
 		}
 
-		if prData.PageInfo.HasNextPage {
-			endCursor = &prData.PageInfo.EndCursor
-			pageLimit = min(pageLimit, limit-len(res.PullRequests))
-		} else {
+		if !prData.PageInfo.HasNextPage {
+			// If we paged through all results, we know that the total count is the actual
+			// count after local filtering.
+			res.TotalCountIsUpperBound = false
 			break
+		} else if len(res.PullRequests) == limit {
+			break
+		} else {
+			endCursor = &prData.PageInfo.EndCursor
+			if autoMergeStatus == nil {
+				// fetch fewer if close to the limit, but only if we are not filtering locally
+				pageLimit = min(pageLimit, limit-len(res.PullRequests))
+			}
 		}
 	}
 
+	res.TotalCount -= removed
 	return &res, nil
 }
 
@@ -97,6 +123,13 @@ func (r *listRequester) Request(limit int, endCursor *string) (*responsePage, er
 }
 
 func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters prShared.FilterOptions, limit int) (*api.PullRequestAndTotalCount, error) {
+	fields := set.NewStringSet()
+	fields.AddValues(filters.Fields)
+	if filters.AutoMergeStatus != nil {
+		fields.Add("autoMergeRequest")
+		filters.Fields = fields.ToSlice()
+	}
+
 	if shouldUseSearch(filters) {
 		return searchPullRequests(httpClient, repo, filters, limit)
 	}
@@ -164,7 +197,7 @@ func listPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters pr
 		variables: variables,
 		query:     query,
 	}
-	return fetchPullRequests(r, limit)
+	return fetchPullRequests(r, limit, filters.AutoMergeStatus)
 }
 
 type searchResponse struct {
@@ -234,7 +267,7 @@ func searchPullRequests(httpClient *http.Client, repo ghrepo.Interface, filters 
 		variables: variables,
 		query:     query,
 	}
-	res, err := fetchPullRequests(r, limit)
+	res, err := fetchPullRequests(r, limit, filters.AutoMergeStatus)
 	if err != nil {
 		return nil, err
 	}
