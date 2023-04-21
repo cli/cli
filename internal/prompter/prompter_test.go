@@ -38,7 +38,7 @@ func TestFilterDiacritics(t *testing.T) {
 			want:   true,
 		},
 		{
-			name:   "exact match diacritics in filter",
+			name:   "exact match diacritics in value",
 			filter: "Mikelis",
 			value:  "Miķelis",
 			want:   true,
@@ -46,18 +46,6 @@ func TestFilterDiacritics(t *testing.T) {
 		{
 			name:   "partial match diacritics in filter",
 			filter: "Miķe",
-			value:  "Mikelis",
-			want:   true,
-		},
-		{
-			name:   "exact match diacritics in value",
-			filter: "Miķelis",
-			value:  "Mikelis",
-			want:   true,
-		},
-		{
-			name:   "partial match diacritics in filter",
-			filter: "Mike",
 			value:  "Miķelis",
 			want:   true,
 		},
@@ -71,6 +59,12 @@ func TestFilterDiacritics(t *testing.T) {
 			name:   "no match when removing diacritics in value",
 			filter: "Mikelis",
 			value:  "Mielis",
+			want:   false,
+		},
+		{
+			name:   "no match diacritics in filter",
+			filter: "Miķelis",
+			value:  "Mikelis",
 			want:   false,
 		},
 	}

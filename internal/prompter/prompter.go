@@ -51,13 +51,15 @@ type surveyPrompter struct {
 }
 
 // LatinMatchingFilter returns whether the value matches the input filter.
-// The strings are compared normalized in case and diacritics.
+// The strings are compared normalized in case.
+// The filter's diactritics are kept as-is, but the value's are normalized,
+// so that a missing diactritic in the filter still returns a result.
 func LatinMatchingFilter(filter, value string, index int) bool {
-	filter = strings.ToLower(text.RemoveDiacritics(filter))
-	value = strings.ToLower(text.RemoveDiacritics(value))
+	filter = strings.ToLower(filter)
+	value = strings.ToLower(value)
 
-	// include this option if it matches
-	return strings.Contains(value, filter)
+	// include this option if it matches.
+	return strings.Contains(value, filter) || strings.Contains(text.RemoveDiacritics(value), filter)
 }
 
 func (p *surveyPrompter) Select(message, defaultValue string, options []string) (result int, err error) {
