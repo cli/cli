@@ -6,6 +6,15 @@ import (
 	"time"
 )
 
+var CodeFields = []string{
+	"name",
+	"path",
+	"repository",
+	"sha",
+	"textMatches",
+	"url",
+}
+
 var CommitFields = []string{
 	"author",
 	"commit",
@@ -72,6 +81,12 @@ var PullRequestFields = append(IssueFields,
 	"isDraft",
 )
 
+type CodeResult struct {
+	IncompleteResults bool   `json:"incomplete_results"`
+	Items             []Code `json:"items"`
+	Total             int    `json:"total_count"`
+}
+
 type CommitsResult struct {
 	IncompleteResults bool     `json:"incomplete_results"`
 	Items             []Commit `json:"items"`
@@ -88,6 +103,28 @@ type IssuesResult struct {
 	IncompleteResults bool    `json:"incomplete_results"`
 	Items             []Issue `json:"items"`
 	Total             int     `json:"total_count"`
+}
+
+type Code struct {
+	Name        string      `json:"name"`
+	Path        string      `json:"path"`
+	Repo        Repository  `json:"repository"`
+	Sha         string      `json:"sha"`
+	TextMatches []TextMatch `json:"text_matches"`
+	URL         string      `json:"html_url"`
+}
+
+type TextMatch struct {
+	Fragment   string  `json:"fragment"`
+	Matches    []Match `json:"matches"`
+	ObjectURL  string  `json:"object_url"`
+	ObjectType string  `json:"object_type"`
+	Property   string  `json:"property"`
+}
+
+type Match struct {
+	Indices []int  `json:"indices"`
+	Text    string `json:"text"`
 }
 
 type Commit struct {
@@ -228,6 +265,21 @@ func (u User) ExportData() map[string]interface{} {
 		"url":    u.URL,
 		"is_bot": isBot,
 	}
+}
+
+func (code Code) ExportData(fields []string) map[string]interface{} {
+	v := reflect.ValueOf(code)
+	data := map[string]interface{}{}
+	for _, f := range fields {
+		switch f {
+		case "repository":
+			data[f] = code.Repo.ExportData(RepositoryFields)
+		default:
+			sf := fieldByName(v, f)
+			data[f] = sf.Interface()
+		}
+	}
+	return data
 }
 
 func (commit Commit) ExportData(fields []string) map[string]interface{} {

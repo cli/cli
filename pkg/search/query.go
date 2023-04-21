@@ -10,6 +10,7 @@ import (
 
 const (
 	KindRepositories = "repositories"
+	KindCode         = "code"
 	KindIssues       = "issues"
 	KindCommits      = "commits"
 )
@@ -22,6 +23,7 @@ type Query struct {
 	Page       int
 	Qualifiers Qualifiers
 	Sort       string
+	TextMatch  bool
 }
 
 type Qualifiers struct {
@@ -41,6 +43,8 @@ type Qualifiers struct {
 	CommitterName       string
 	Created             string
 	Draft               *bool
+	Extension           string
+	Filename            string
 	Followers           string
 	Fork                string
 	Forks               string
