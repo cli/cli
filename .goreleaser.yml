@@ -9,6 +9,7 @@ before:
   hooks:
     - go mod tidy
     - make manpages GH_VERSION={{.Version}}
+    - make completions
 
 builds:
   - <<: &build_defaults
@@ -70,3 +71,9 @@ nfpms:
     contents:
       - src: "./share/man/man1/gh*.1"
         dst: "/usr/share/man/man1"
+      - src: "./share/bash-completion/completions/gh"
+        dst: "/usr/share/bash-completion/completions/gh"
+      - src: "./share/fish/vendor_completions.d/gh.fish"
+        dst: "/usr/share/fish/vendor_completions.d/gh.fish"
+      - src: "./share/zsh/site-functions/_gh"
+        dst: "/usr/share/zsh/site-functions/_gh"
