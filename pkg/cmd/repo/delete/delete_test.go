@@ -157,11 +157,11 @@ func Test_deleteRun(t *testing.T) {
 			},
 		},
 		{
-			name:       "repo transfered ownership",
+			name:       "repo transferred ownership",
 			opts:       &DeleteOptions{RepoArg: "OWNER/REPO", Confirmed: true},
 			wantErr:    true,
 			errMsg:     "SilentError",
-			wantStderr: "X Failed to delete repository: OWNER/REPO has changed name or transfered ownership\n",
+			wantStderr: "X Failed to delete repository: OWNER/REPO has changed name or transferred ownership\n",
 			httpStubs: func(reg *httpmock.Registry) {
 				reg.Register(
 					httpmock.REST("DELETE", "repos/OWNER/REPO"),
