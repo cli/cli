@@ -33,6 +33,10 @@ type ListOptions struct {
 	Actor            string
 	Status           string
 	Event            string
+	After            string
+	Before           string
+	// do not set via user input
+	Created string
 
 	now time.Time
 }
@@ -57,6 +61,34 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 				return cmdutil.FlagErrorf("invalid limit: %v", opts.Limit)
 			}
 
+			createdOptFormat := cmdutil.CreatedFilterOptFormat
+			var after time.Time
+			if opts.After != "" {
+				parsed, err := cmdutil.ParseTime(opts.After)
+				if err != nil {
+					return cmdutil.FlagErrorf("unable to parse `--after` datetime: %s", opts.After)
+				}
+				after = parsed
+				opts.Created = fmt.Sprintf(">%s", after.Format(createdOptFormat))
+			}
+
+			var before time.Time
+			if opts.Before != "" {
+				parsed, err := cmdutil.ParseTime(opts.Before)
+				if err != nil {
+					return cmdutil.FlagErrorf("unable to parse `--before` datetime: %s", opts.Before)
+				}
+				before = parsed
+				opts.Created = fmt.Sprintf("<%s", before.Format(createdOptFormat))
+			}
+
+			if opts.After != "" && opts.Before != "" {
+				if before.After(after) {
+					return cmdutil.FlagErrorf("invalid filter range: %s (`--before`) must come some time after %s (`--after`)", opts.Before, opts.After)
+				}
+				opts.Created = fmt.Sprintf("%s..%s", after.Format(createdOptFormat), before.Format(createdOptFormat))
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -70,6 +102,8 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Branch, "branch", "b", "", "Filter runs by branch")
 	cmd.Flags().StringVarP(&opts.Actor, "user", "u", "", "Filter runs by user who triggered the run")
 	cmd.Flags().StringVarP(&opts.Event, "event", "e", "", "Filter runs by which `event` triggered the run")
+	cmd.Flags().StringVarP(&opts.After, "after", "A", "", "Filter runs by whether they were created after this time")
+	cmd.Flags().StringVarP(&opts.After, "before", "B", "", "Filter runs by whether they were created before the time")
 	cmdutil.StringEnumFlag(cmd, &opts.Status, "status", "s", "", shared.AllStatuses, "Filter runs by status")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.RunFields)
 
@@ -91,10 +125,11 @@ func listRun(opts *ListOptions) error {
 	client := api.NewClientFromHTTP(c)
 
 	filters := &shared.FilterOptions{
-		Branch: opts.Branch,
-		Actor:  opts.Actor,
-		Status: opts.Status,
-		Event:  opts.Event,
+		Branch:  opts.Branch,
+		Actor:   opts.Actor,
+		Status:  opts.Status,
+		Event:   opts.Event,
+		Created: opts.Created,
 	}
 
 	opts.IO.StartProgressIndicator()
