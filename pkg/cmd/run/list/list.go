@@ -83,7 +83,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 			}
 
 			if opts.After != "" && opts.Before != "" {
-				if before.After(after) {
+				if !before.After(after) {
 					return cmdutil.FlagErrorf("invalid filter range: %s (`--before`) must come some time after %s (`--after`)", opts.Before, opts.After)
 				}
 				opts.Created = fmt.Sprintf("%s..%s", after.Format(createdOptFormat), before.Format(createdOptFormat))
