@@ -103,7 +103,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().StringVarP(&opts.Actor, "user", "u", "", "Filter runs by user who triggered the run")
 	cmd.Flags().StringVarP(&opts.Event, "event", "e", "", "Filter runs by which `event` triggered the run")
 	cmd.Flags().StringVarP(&opts.After, "after", "A", "", "Filter runs by whether they were created after this time")
-	cmd.Flags().StringVarP(&opts.After, "before", "B", "", "Filter runs by whether they were created before the time")
+	cmd.Flags().StringVarP(&opts.Before, "before", "B", "", "Filter runs by whether they were created before the time")
 	cmdutil.StringEnumFlag(cmd, &opts.Status, "status", "s", "", shared.AllStatuses, "Filter runs by status")
 	cmdutil.AddJSONFlags(cmd, &opts.Exporter, shared.RunFields)
 
