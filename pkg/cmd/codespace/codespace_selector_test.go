@@ -48,68 +48,94 @@ func TestSelectNameWithCodespaceName(t *testing.T) {
 
 func TestFetchCodespaces(t *testing.T) {
 	var (
-		repoA1 = &api.Codespace{Name: "1", Repository: api.Repository{FullName: "mock/A"}}
-		repoA2 = &api.Codespace{Name: "2", Repository: api.Repository{FullName: "mock/A"}}
+		octocatOwner = api.RepositoryOwner{Login: "octocat"}
+		cliOwner     = api.RepositoryOwner{Login: "cli"}
+		repoA1       = &api.Codespace{
+			Name:       "1",
+			Repository: api.Repository{FullName: "mock/A", Owner: octocatOwner},
+		}
+		repoA2 = &api.Codespace{
+			Name:       "2",
+			Repository: api.Repository{FullName: "mock/A", Owner: cliOwner},
+		}
 
-		repoB1 = &api.Codespace{Name: "1", Repository: api.Repository{FullName: "mock/B"}}
+		repoB1 = &api.Codespace{
+			Name:       "1",
+			Repository: api.Repository{FullName: "mock/B", Owner: octocatOwner},
+		}
 	)
 
 	tests := []struct {
 		tName          string
 		apiCodespaces  []*api.Codespace
 		repoName       string
+		repoOwner      string
 		wantCodespaces []*api.Codespace
 		wantErr        error
 	}{
 		// Empty case
 		{
-			"empty", nil, "", nil, errNoCodespaces,
+			tName:          "empty",
+			apiCodespaces:  nil,
+			wantCodespaces: nil,
+			wantErr:        errNoCodespaces,
 		},
 
 		// Tests with no filtering
 		{
-			"no filtering, single codespace",
-			[]*api.Codespace{repoA1},
-			"",
-			[]*api.Codespace{repoA1},
-			nil,
+			tName:          "no filtering, single codespaces",
+			apiCodespaces:  []*api.Codespace{repoA1},
+			wantCodespaces: []*api.Codespace{repoA1},
+			wantErr:        nil,
 		},
 		{
-			"no filtering, multiple codespaces",
-			[]*api.Codespace{repoA1, repoA2, repoB1},
-			"",
-			[]*api.Codespace{repoA1, repoA2, repoB1},
-			nil,
+			tName:          "no filtering, single codespace",
+			apiCodespaces:  []*api.Codespace{repoA1, repoA2, repoB1},
+			wantCodespaces: []*api.Codespace{repoA1, repoA2, repoB1},
 		},
 
 		// Test repo filtering
 		{
-			"repo filtering, single codespace",
-			[]*api.Codespace{repoA1},
-			"mock/A",
-			[]*api.Codespace{repoA1},
-			nil,
+			tName:          "repo filtering, single codespace",
+			apiCodespaces:  []*api.Codespace{repoA1},
+			repoName:       "mock/A",
+			wantCodespaces: []*api.Codespace{repoA1},
+			wantErr:        nil,
 		},
 		{
-			"repo filtering, multiple codespaces",
-			[]*api.Codespace{repoA1, repoA2, repoB1},
-			"mock/A",
-			[]*api.Codespace{repoA1, repoA2},
-			nil,
+			tName:          "repo filtering, multiple codespace",
+			apiCodespaces:  []*api.Codespace{repoA1, repoA2, repoB1},
+			repoName:       "mock/A",
+			wantCodespaces: []*api.Codespace{repoA1, repoA2},
+			wantErr:        nil,
 		},
 		{
-			"repo filtering, multiple codespaces 2",
-			[]*api.Codespace{repoA1, repoA2, repoB1},
-			"mock/B",
-			[]*api.Codespace{repoB1},
-			nil,
+			tName:          "repo filtering, multiple codespace 2",
+			apiCodespaces:  []*api.Codespace{repoA1, repoA2, repoB1},
+			repoName:       "mock/B",
+			wantCodespaces: []*api.Codespace{repoB1},
+			wantErr:        nil,
 		},
 		{
-			"repo filtering, no matches",
-			[]*api.Codespace{repoA1, repoA2, repoB1},
-			"mock/C",
-			nil,
-			errNoFilteredCodespaces,
+			tName:          "repo filtering, no matches",
+			apiCodespaces:  []*api.Codespace{repoA1, repoA2, repoB1},
+			repoName:       "mock/C",
+			wantCodespaces: nil,
+			wantErr:        errNoFilteredCodespaces,
+		},
+		{
+			tName:          "repo filtering, match with repo owner",
+			apiCodespaces:  []*api.Codespace{repoA1, repoA2, repoB1},
+			repoOwner:      "octocat",
+			wantCodespaces: []*api.Codespace{repoA1, repoB1},
+			wantErr:        nil,
+		},
+		{
+			tName:          "repo filtering, no match with repo owner",
+			apiCodespaces:  []*api.Codespace{repoA1, repoA2, repoB1},
+			repoOwner:      "unknown",
+			wantCodespaces: []*api.Codespace{},
+			wantErr:        errNoFilteredCodespaces,
 		},
 	}
 
@@ -121,7 +147,7 @@ func TestFetchCodespaces(t *testing.T) {
 				},
 			}
 
-			cs := &CodespaceSelector{api: api, repoName: tt.repoName}
+			cs := &CodespaceSelector{api: api, repoName: tt.repoName, repoOwner: tt.repoOwner}
 
 			codespaces, err := cs.fetchCodespaces(context.Background())
 
