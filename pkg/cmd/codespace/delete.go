@@ -176,7 +176,8 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 		progressLabel = "Deleting codespaces"
 	}
 
-	return a.RunWithProgress(progressLabel, func() error {
+	var deletedCodespaces []string
+	err = a.RunWithProgress(progressLabel, func() error {
 		var g errgroup.Group
 		for _, c := range codespacesToDelete {
 			codespaceName := c.Name
@@ -185,6 +186,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 					a.errLogger.Printf("error deleting codespace %q: %v\n", codespaceName, err)
 					return err
 				}
+				deletedCodespaces = append(deletedCodespaces, codespaceName)
 				return nil
 			})
 		}
@@ -194,6 +196,17 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 		}
 		return nil
 	})
+
+	if a.io.IsStdoutTTY() && len(deletedCodespaces) > 0 {
+		cs := a.io.ColorScheme()
+		successMsg := fmt.Sprintf("%s Successfully deleted %d codespaces\n", cs.SuccessIcon(), len(deletedCodespaces))
+		if len(codespacesToDelete) == 1 {
+			successMsg = fmt.Sprintf("%s Successfully deleted %s\n", cs.SuccessIcon(), deletedCodespaces[0])
+		}
+		fmt.Fprint(a.io.Out, successMsg)
+	}
+
+	return err
 }
 
 func confirmDeletion(p prompter, apiCodespace *api.Codespace, isInteractive bool) (bool, error) {
