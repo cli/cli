@@ -81,7 +81,7 @@ func mainRun() exitCode {
 			switch style {
 			case "white":
 				if cmdFactory.IOStreams.ColorSupport256() {
-					return fmt.Sprintf("\x1b[%d;5;%dm", 38, 242)
+					return fmt.Sprintf("\x1b[%dm", 38)
 				}
 				return ansi.ColorCode("default")
 			default:
