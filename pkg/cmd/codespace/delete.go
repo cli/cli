@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -176,7 +177,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 		progressLabel = "Deleting codespaces"
 	}
 
-	var deletedCodespaces []string
+	var deletedCodespaces uint32
 	err = a.RunWithProgress(progressLabel, func() error {
 		var g errgroup.Group
 		for _, c := range codespacesToDelete {
@@ -186,7 +187,7 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 					a.errLogger.Printf("error deleting codespace %q: %v\n", codespaceName, err)
 					return err
 				}
-				deletedCodespaces = append(deletedCodespaces, codespaceName)
+				atomic.AddUint32(&deletedCodespaces, 1)
 				return nil
 			})
 		}
@@ -197,11 +198,11 @@ func (a *App) Delete(ctx context.Context, opts deleteOptions) (err error) {
 		return nil
 	})
 
-	if a.io.IsStdoutTTY() && len(deletedCodespaces) > 0 {
+	if a.io.IsStdoutTTY() && deletedCodespaces > 0 {
 		cs := a.io.ColorScheme()
-		successMsg := fmt.Sprintf("%s Successfully deleted %d codespaces\n", cs.SuccessIcon(), len(deletedCodespaces))
+		successMsg := fmt.Sprintf("%s Successfully deleted %d codespaces\n", cs.SuccessIcon(), deletedCodespaces)
 		if len(codespacesToDelete) == 1 {
-			successMsg = fmt.Sprintf("%s Successfully deleted %s\n", cs.SuccessIcon(), deletedCodespaces[0])
+			successMsg = fmt.Sprintf("%s Successfully deleted %s\n", cs.SuccessIcon(), codespacesToDelete[0].Name)
 		}
 		fmt.Fprint(a.io.Out, successMsg)
 	}
