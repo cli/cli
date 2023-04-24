@@ -26,7 +26,7 @@ func AddCodespaceSelector(cmd *cobra.Command, api apiClient) *CodespaceSelector 
 
 	cmd.PersistentFlags().StringVarP(&cs.codespaceName, "codespace", "c", "", "Name of the codespace")
 	cmd.PersistentFlags().StringVarP(&cs.repoName, "repo", "R", "", "Filter codespace selection by repository name (user/repo)")
-	cmd.PersistentFlags().StringVar(&cs.repoOwner, "repo-owner", "", "To filter by the `username` of the repository owner")
+	cmd.PersistentFlags().StringVar(&cs.repoOwner, "repo-owner", "", "Filter codespace selection by repository owner (username or org)")
 
 	cmd.MarkFlagsMutuallyExclusive("codespace", "repo")
 
