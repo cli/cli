@@ -11,7 +11,6 @@ import (
 	"github.com/cli/cli/v2/internal/ghrepo"
 	"github.com/cli/cli/v2/internal/text"
 	"github.com/cli/cli/v2/pkg/cmdutil"
-
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/spf13/cobra"
 )
@@ -36,24 +35,30 @@ type AddLicenseOptions struct {
 	LicenseTemplate string
 	Interactive     bool
 	Info            bool
+	Web             bool
 	IO              *iostreams.IOStreams
+
+	Git    gitClient
+	Branch string
+	Force  bool
 }
 
 func NewCmdAddLicense(f *cmdutil.Factory, runF func(*AddLicenseOptions) error) *cobra.Command {
 	opts := &AddLicenseOptions{
 		IO:         f.IOStreams,
-		HttpClient: f.HttpClient,
+		HttpClient: &f.HttpClient,
 		Config:     f.Config,
 		BaseRepo:   f.BaseRepo,
 		Prompter:   f.Prompter,
 		Browser:    f.Browser,
+		Git:        &gitExecuter{client: f.GitClient},
 	}
 	cmd := &cobra.Command{
 		Use:   "add-license [<repository>]",
 		Short: "Add a license to an existing repository",
 		Long: heredoc.Doc(`Add a license to an existing GitHub repository.
 
-With no argument, archives the current repository.`),
+To add a license to the current repository interactively, use %[1]sgh repo create%[1]s with no arguments.`),
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opts.List {
@@ -89,14 +94,18 @@ With no argument, archives the current repository.`),
 
 	cmd.Flags().BoolVarP(&opts.List, "list", "l", false, "List license templates")
 	cmd.Flags().BoolVarP(&opts.Info, "info", "i", false, "View license information in the browser")
+	cmd.Flags().BoolVarP(&opts.Web, "web", "w", false, "Add a license in the browser")
 
 	return cmd
 }
 
 func addLicenseRun(opts *AddLicenseOptions) error {
-	httpClient, err := opts.HttpClient()
-	if err != nil {
-		return err
+	if opts.Web {
+		httpClient, err := opts.HttpClient()
+		if err != nil {
+			return err
+		}
+
 	}
 
 	cfg, err := opts.Config()
