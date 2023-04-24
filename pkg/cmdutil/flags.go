@@ -2,11 +2,9 @@ package cmdutil
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -66,29 +64,6 @@ func RegisterBranchCompletionFlags(gitc gitClient, cmd *cobra.Command, flags ...
 	}
 	return nil
 }
-
-func ParseTime(input string) (time.Time, error) {
-	validFormats := []string{
-		"2006-01-02",
-		"2006-01-02T15:04:05-07:00",
-		"2006-01-02T15:04:05Z",
-		"2006-01-02T15:04:05",
-		"2006-01-02T15:04-07:00",
-		"2006-01-02T15:04Z",
-		"2006-01-02T15:04",
-	}
-
-	for _, format := range validFormats {
-		t, err := time.Parse(format, input)
-		if err == nil {
-			return t, nil
-		}
-	}
-
-	return time.Time{}, errors.New("unknown or invalid format")
-}
-
-const CreatedFilterOptFormat = "2006-01-02T15:04:05-07:00"
 
 func formatValuesForUsageDocs(values []string) string {
 	return fmt.Sprintf("{%s}", strings.Join(values, "|"))
