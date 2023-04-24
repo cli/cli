@@ -50,24 +50,31 @@ func TestFetchCodespaces(t *testing.T) {
 	var (
 		octocatOwner = api.RepositoryOwner{Login: "octocat"}
 		cliOwner     = api.RepositoryOwner{Login: "cli"}
-		repoA1       = &api.Codespace{
+		octocatA     = &api.Codespace{
 			Name:       "1",
-			Repository: api.Repository{FullName: "mock/A", Owner: octocatOwner},
-		}
-		repoA2 = &api.Codespace{
-			Name:       "2",
-			Repository: api.Repository{FullName: "mock/A", Owner: cliOwner},
+			Repository: api.Repository{FullName: "octocat/A", Owner: octocatOwner},
 		}
 
-		repoB1 = &api.Codespace{
-			Name:       "1",
-			Repository: api.Repository{FullName: "mock/B", Owner: octocatOwner},
+		octocatA2 = &api.Codespace{
+			Name:       "2",
+			Repository: api.Repository{FullName: "octocat/A", Owner: octocatOwner},
+		}
+
+		cliA = &api.Codespace{
+			Name:       "3",
+			Repository: api.Repository{FullName: "cli/A", Owner: cliOwner},
+		}
+
+		octocatB = &api.Codespace{
+			Name:       "4",
+			Repository: api.Repository{FullName: "octocat/B", Owner: octocatOwner},
 		}
 	)
 
 	tests := []struct {
 		tName          string
 		apiCodespaces  []*api.Codespace
+		codespaceName  string
 		repoName       string
 		repoOwner      string
 		wantCodespaces []*api.Codespace
@@ -84,55 +91,55 @@ func TestFetchCodespaces(t *testing.T) {
 		// Tests with no filtering
 		{
 			tName:          "no filtering, single codespaces",
-			apiCodespaces:  []*api.Codespace{repoA1},
-			wantCodespaces: []*api.Codespace{repoA1},
+			apiCodespaces:  []*api.Codespace{octocatA},
+			wantCodespaces: []*api.Codespace{octocatA},
 			wantErr:        nil,
 		},
 		{
-			tName:          "no filtering, single codespace",
-			apiCodespaces:  []*api.Codespace{repoA1, repoA2, repoB1},
-			wantCodespaces: []*api.Codespace{repoA1, repoA2, repoB1},
+			tName:          "no filtering, multiple codespace",
+			apiCodespaces:  []*api.Codespace{octocatA, cliA, octocatB},
+			wantCodespaces: []*api.Codespace{octocatA, cliA, octocatB},
 		},
 
 		// Test repo filtering
 		{
-			tName:          "repo filtering, single codespace",
-			apiCodespaces:  []*api.Codespace{repoA1},
-			repoName:       "mock/A",
-			wantCodespaces: []*api.Codespace{repoA1},
+			tName:          "repo name filtering, single codespace",
+			apiCodespaces:  []*api.Codespace{octocatA},
+			repoName:       "octocat/A",
+			wantCodespaces: []*api.Codespace{octocatA},
 			wantErr:        nil,
 		},
 		{
-			tName:          "repo filtering, multiple codespace",
-			apiCodespaces:  []*api.Codespace{repoA1, repoA2, repoB1},
-			repoName:       "mock/A",
-			wantCodespaces: []*api.Codespace{repoA1, repoA2},
+			tName:          "repo name filtering, multiple codespace",
+			apiCodespaces:  []*api.Codespace{octocatA, octocatA2, cliA, octocatB},
+			repoName:       "octocat/A",
+			wantCodespaces: []*api.Codespace{octocatA, octocatA2},
 			wantErr:        nil,
 		},
 		{
-			tName:          "repo filtering, multiple codespace 2",
-			apiCodespaces:  []*api.Codespace{repoA1, repoA2, repoB1},
-			repoName:       "mock/B",
-			wantCodespaces: []*api.Codespace{repoB1},
+			tName:          "repo name filtering, multiple codespace 2",
+			apiCodespaces:  []*api.Codespace{octocatA, cliA, octocatB},
+			repoName:       "octocat/B",
+			wantCodespaces: []*api.Codespace{octocatB},
 			wantErr:        nil,
 		},
 		{
-			tName:          "repo filtering, no matches",
-			apiCodespaces:  []*api.Codespace{repoA1, repoA2, repoB1},
-			repoName:       "mock/C",
+			tName:          "repo name filtering, no matches",
+			apiCodespaces:  []*api.Codespace{octocatA, cliA, octocatB},
+			repoName:       "Unknown/unknown",
 			wantCodespaces: nil,
 			wantErr:        errNoFilteredCodespaces,
 		},
 		{
 			tName:          "repo filtering, match with repo owner",
-			apiCodespaces:  []*api.Codespace{repoA1, repoA2, repoB1},
+			apiCodespaces:  []*api.Codespace{octocatA, octocatA2, cliA, octocatB},
 			repoOwner:      "octocat",
-			wantCodespaces: []*api.Codespace{repoA1, repoB1},
+			wantCodespaces: []*api.Codespace{octocatA, octocatA2, octocatB},
 			wantErr:        nil,
 		},
 		{
 			tName:          "repo filtering, no match with repo owner",
-			apiCodespaces:  []*api.Codespace{repoA1, repoA2, repoB1},
+			apiCodespaces:  []*api.Codespace{octocatA, cliA, octocatB},
 			repoOwner:      "unknown",
 			wantCodespaces: []*api.Codespace{},
 			wantErr:        errNoFilteredCodespaces,
@@ -147,7 +154,11 @@ func TestFetchCodespaces(t *testing.T) {
 				},
 			}
 
-			cs := &CodespaceSelector{api: api, repoName: tt.repoName, repoOwner: tt.repoOwner}
+			cs := &CodespaceSelector{
+				api:       api,
+				repoName:  tt.repoName,
+				repoOwner: tt.repoOwner,
+			}
 
 			codespaces, err := cs.fetchCodespaces(context.Background())
 
