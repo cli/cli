@@ -303,6 +303,7 @@ type FilterOptions struct {
 	// avoid loading workflow name separately and use the provided one
 	WorkflowName string
 	Status       string
+	Event        string
 }
 
 // GetRunsWithFilter fetches 50 runs from the API and filters them in-memory
@@ -347,6 +348,9 @@ func GetRuns(client *api.Client, repo ghrepo.Interface, opts *FilterOptions, lim
 		}
 		if opts.Status != "" {
 			path += fmt.Sprintf("&status=%s", url.QueryEscape(opts.Status))
+		}
+		if opts.Event != "" {
+			path += fmt.Sprintf("&event=%s", url.QueryEscape(opts.Event))
 		}
 	}
 
