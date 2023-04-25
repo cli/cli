@@ -6,10 +6,10 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.3.6
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/briandowns/spinner v1.18.1
-	github.com/cenkalti/backoff/v4 v4.2.0
+	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/charmbracelet/glamour v0.5.1-0.20220727184942-e70ff2d969da
 	github.com/charmbracelet/lipgloss v0.5.0
-	github.com/cli/go-gh v1.2.1
+	github.com/cli/go-gh/v2 v2.0.0
 	github.com/cli/oauth v1.0.1
 	github.com/cli/safeexec v1.0.1
 	github.com/cpuguy83/go-md2man/v2 v2.0.2
@@ -50,7 +50,7 @@ require (
 	github.com/alessio/shellescape v1.4.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/cli/browser v1.1.0 // indirect
-	github.com/cli/shurcooL-graphql v0.0.2 // indirect
+	github.com/cli/shurcooL-graphql v0.0.3 // indirect
 	github.com/danieljoos/wincred v1.1.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dlclark/regexp2 v1.4.0 // indirect
@@ -87,7 +87,3 @@ require (
 replace golang.org/x/crypto => github.com/cli/crypto v0.0.0-20210929142629-6be313f59b03
 
 replace github.com/henvic/httpretty v0.0.6 => github.com/mislav/httpretty v0.1.1-0.20230202151216-d31343e0d884
-
-// DO NOT MERGE
-// temporary reference until PR for github.com/cli/go-gh is merged and a new version is available.
-replace github.com/cli/go-gh v1.2.1 => github.com/mjpieters/go-gh v1.2.2-0.20230404155430-ffc3dcce09dd

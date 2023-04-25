@@ -1,16 +1,59 @@
 package codespace
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestCreateCmdFlagError(t *testing.T) {
+	tests := []struct {
+		name     string
+		args     string
+		wantsErr error
+	}{
+		{
+			name:     "return error when using web flag with display-name, idle-timeout, or retention-period flags",
+			args:     "--web --display-name foo --idle-timeout 30m",
+			wantsErr: fmt.Errorf("using --web with --display-name, --idle-timeout, or --retention-period is not supported"),
+		},
+		{
+			name:     "return error when using web flag with one of display-name, idle-timeout or retention-period flags",
+			args:     "--web --idle-timeout 30m",
+			wantsErr: fmt.Errorf("using --web with --display-name, --idle-timeout, or --retention-period is not supported"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			a := &App{
+				io: ios,
+			}
+			cmd := newCreateCmd(a)
+
+			args, _ := shlex.Split(tt.args)
+			cmd.SetArgs(args)
+			cmd.SetIn(&bytes.Buffer{})
+			cmd.SetOut(&bytes.Buffer{})
+			cmd.SetErr(&bytes.Buffer{})
+
+			_, err := cmd.ExecuteC()
+
+			assert.Error(t, err)
+			assert.EqualError(t, err, tt.wantsErr.Error())
+		})
+	}
+}
 
 func TestApp_Create(t *testing.T) {
 	type fields struct {
@@ -23,6 +66,7 @@ func TestApp_Create(t *testing.T) {
 		wantErr    error
 		wantStdout string
 		wantStderr string
+		wantURL    string
 		isTTY      bool
 	}{
 		{
@@ -114,6 +158,31 @@ func TestApp_Create(t *testing.T) {
 			},
 			wantStdout: "monalisa-dotfiles-abcd1234\n",
 			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
+		},
+		{
+			name: "create codespace with nonexistent machine results in error",
+			fields: fields{
+				apiClient: apiCreateDefaults(&apiClientMock{
+					GetCodespacesMachinesFunc: func(ctx context.Context, repoID int, branch, location string, devcontainerPath string) ([]*api.Machine, error) {
+						return []*api.Machine{
+							{
+								Name:        "GIGA",
+								DisplayName: "Gigabits of a machine",
+							},
+							{
+								Name:        "TERA",
+								DisplayName: "Terabits of a machine",
+							},
+						}, nil
+					},
+				}),
+			},
+			opts: createOptions{
+				repo:    "monalisa/dotfiles",
+				machine: "MEGA",
+			},
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
+			wantErr:    fmt.Errorf("error getting machine type: there is no such machine for the repository: %s\nAvailable machines: %v", "MEGA", []string{"GIGA", "TERA"}),
 		},
 		{
 			name: "create codespace with devcontainer path results in selecting the correct machine type",
@@ -382,7 +451,95 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 			},
 			wantStdout: "megacorp-private-abcd1234\n",
 		},
+		{
+			name: "return default url when using web flag without other flags",
+			opts: createOptions{
+				useWeb: true,
+			},
+			wantURL: "https://github.com/codespaces/new",
+		},
+		{
+			name: "skip machine check when using web flag and no machine provided",
+			fields: fields{
+				apiClient: apiCreateDefaults(&apiClientMock{
+					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+						return &api.Repository{
+							ID:            123,
+							DefaultBranch: "main",
+						}, nil
+					},
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						return &api.Codespace{
+							Name: "monalisa-dotfiles-abcd1234",
+						}, nil
+					},
+				}),
+			},
+			opts: createOptions{
+				repo:     "monalisa/dotfiles",
+				useWeb:   true,
+				branch:   "custom",
+				location: "EastUS",
+			},
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
+			wantURL:    fmt.Sprintf("https://github.com/codespaces/new?repo=%d&ref=%s&machine=%s&location=%s", 123, "custom", "", "EastUS"),
+		},
+		{
+			name: "return correct url with correct params when using web flag and repo flag",
+			fields: fields{
+				apiClient: apiCreateDefaults(&apiClientMock{
+					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+						return &api.Repository{
+							ID:            123,
+							DefaultBranch: "main",
+						}, nil
+					},
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						return &api.Codespace{
+							Name: "monalisa-dotfiles-abcd1234",
+						}, nil
+					},
+				}),
+			},
+			opts: createOptions{
+				repo:   "monalisa/dotfiles",
+				useWeb: true,
+			},
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
+			wantURL:    fmt.Sprintf("https://github.com/codespaces/new?repo=%d&ref=%s&machine=%s&location=%s", 123, "main", "", ""),
+		},
+		{
+			name: "return correct url with correct params when using web flag, repo, branch, location, machine flag",
+			fields: fields{
+				apiClient: apiCreateDefaults(&apiClientMock{
+					GetRepositoryFunc: func(ctx context.Context, nwo string) (*api.Repository, error) {
+						return &api.Repository{
+							ID:            123,
+							DefaultBranch: "main",
+						}, nil
+					},
+					CreateCodespaceFunc: func(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error) {
+						return &api.Codespace{
+							Name:    "monalisa-dotfiles-abcd1234",
+							Machine: api.CodespaceMachine{Name: "GIGA"},
+						}, nil
+					},
+				}),
+			},
+			opts: createOptions{
+				repo:     "monalisa/dotfiles",
+				machine:  "GIGA",
+				branch:   "custom",
+				location: "EastUS",
+				useWeb:   true,
+			},
+			wantStderr: "  ✓ Codespaces usage for this repository is paid for by monalisa\n",
+			wantURL:    fmt.Sprintf("https://github.com/codespaces/new?repo=%d&ref=%s&machine=%s&location=%s", 123, "custom", "GIGA", "EastUS"),
+		},
 	}
+	var a *App
+	var b *browser.Stub
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, stdout, stderr := iostreams.Test()
@@ -390,9 +547,18 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 			ios.SetStdinTTY(tt.isTTY)
 			ios.SetStderrTTY(tt.isTTY)
 
-			a := &App{
-				io:        ios,
-				apiClient: tt.fields.apiClient,
+			if tt.opts.useWeb {
+				b = &browser.Stub{}
+				a = &App{
+					io:        ios,
+					apiClient: tt.fields.apiClient,
+					browser:   b,
+				}
+			} else {
+				a = &App{
+					io:        ios,
+					apiClient: tt.fields.apiClient,
+				}
 			}
 
 			err := a.Create(context.Background(), tt.opts)
@@ -409,6 +575,10 @@ Alternatively, you can run "create" with the "--default-permissions" option to c
 			if got := stderr.String(); got != tt.wantStderr {
 				t.Logf(t.Name())
 				t.Errorf("  stderr = %v, want %v", got, tt.wantStderr)
+			}
+
+			if tt.opts.useWeb {
+				b.Verify(t, tt.wantURL)
 			}
 		})
 	}
