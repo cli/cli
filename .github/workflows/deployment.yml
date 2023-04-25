@@ -282,10 +282,18 @@ jobs:
           shasum -a 256 gh_* > checksums.txt
           mv checksums.txt gh_${TAG_NAME#v}_checksums.txt
           popd
-          prerelease=
-          [[ $TAG_NAME != *-* ]] || prerelease="--prerelease"
-          gh release create $prerelease "$TAG_NAME" --target "$GITHUB_SHA" \
-            --generate-notes --discussion-category "General" dist/gh_*
+          release_args=(
+            "$TAG_NAME"
+            --title "GitHub CLI ${TAG_NAME#v}"
+            --target "$GITHUB_SHA"
+            --generate-notes
+          )
+          if [[ $TAG_NAME == *-* ]]; then
+            release_args+=( --prerelease )
+          else
+            release_args+=( --discussion-category "General" )
+          fi
+          gh release create "${release_args[@]}" -- dist/gh_*
       - name: Publish site
         env:
           TAG_NAME: ${{ inputs.tag_name }}
@@ -308,5 +316,6 @@ jobs:
         if: ${{ !contains(inputs.tag_name, '-') }}
         with:
           formula-name: gh
+          tag-name: ${{ inputs.tag_name }}
         env:
           COMMITTER_TOKEN: ${{ secrets.UPLOAD_GITHUB_TOKEN }}
