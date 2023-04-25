@@ -6,7 +6,6 @@ import (
 
 	"github.com/cli/cli/v2/pkg/cmdutil"
 
-	"github.com/cli/browser"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 
@@ -69,7 +68,7 @@ gh project list --org github --closed
 			}
 
 			URLOpener := func(url string) error {
-				return browser.OpenURL(url)
+				return f.Browser.Browse(url)
 			}
 			t := tableprinter.New(f.IOStreams)
 			config := listConfig{
