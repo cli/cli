@@ -77,6 +77,14 @@ func TestNewCmdList(t *testing.T) {
 				Status: "completed",
 			},
 		},
+		{
+			name: "event",
+			cli:  "--event push",
+			wants: ListOptions{
+				Limit: defaultLimit,
+				Event: "push",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -112,6 +120,8 @@ func TestNewCmdList(t *testing.T) {
 			assert.Equal(t, tt.wants.WorkflowSelector, gotOpts.WorkflowSelector)
 			assert.Equal(t, tt.wants.Branch, gotOpts.Branch)
 			assert.Equal(t, tt.wants.Actor, gotOpts.Actor)
+			assert.Equal(t, tt.wants.Status, gotOpts.Status)
+			assert.Equal(t, tt.wants.Event, gotOpts.Event)
 		})
 	}
 }
@@ -417,6 +427,24 @@ func TestListRun(t *testing.T) {
 				reg.Register(
 					httpmock.QueryMatcher("GET", "repos/OWNER/REPO/actions/runs", url.Values{
 						"status": []string{"queued"},
+					}),
+					httpmock.JSONResponse(shared.RunsPayload{}),
+				)
+			},
+			wantErr:    true,
+			wantErrMsg: "no runs found",
+		},
+		{
+			name: "event filter applied",
+			opts: &ListOptions{
+				Limit: defaultLimit,
+				Event: "push",
+			},
+			isTTY: true,
+			stubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.QueryMatcher("GET", "repos/OWNER/REPO/actions/runs", url.Values{
+						"event": []string{"push"},
 					}),
 					httpmock.JSONResponse(shared.RunsPayload{}),
 				)
