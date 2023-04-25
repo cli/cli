@@ -76,9 +76,12 @@ install: bin/gh manpages completions
 	install -m755 bin/gh ${DESTDIR}${bindir}/
 	install -d ${DESTDIR}${mandir}/man1
 	install -m644 ./share/man/man1/* ${DESTDIR}${mandir}/man1/
-	install -DT -m644 ./share/bash-completion/completions/gh ${DESTDIR}${datadir}/bash-completion/completions/gh
-	install -DT -m644 ./share/fish/vendor_completions.d/gh.fish ${DESTDIR}${datadir}/fish/vendor_completions.d/gh.fish
-	install -DT -m644 ./share/zsh/site-functions/_gh ${DESTDIR}${datadir}/zsh/site-functions/_gh
+	install -d ${DESTDIR}${datadir}/bash-completion/completions
+	install -m644 ./share/bash-completion/completions/gh ${DESTDIR}${datadir}/bash-completion/completions/gh
+	install -d ${DESTDIR}${datadir}/fish/vendor_completions.d
+	install -m644 ./share/fish/vendor_completions.d/gh.fish ${DESTDIR}${datadir}/fish/vendor_completions.d/gh.fish
+	install -d ${DESTDIR}${datadir}/zsh/site-functions
+	install -m644 ./share/zsh/site-functions/_gh ${DESTDIR}${datadir}/zsh/site-functions/_gh
 
 .PHONY: uninstall
 uninstall:
