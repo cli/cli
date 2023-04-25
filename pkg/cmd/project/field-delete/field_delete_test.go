@@ -1,11 +1,11 @@
 package fielddelete
 
 import (
-	"bytes"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/api"
-	"github.com/cli/go-gh/v2/pkg/tableprinter"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -32,9 +32,9 @@ func TestRunDeleteField(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := deleteFieldConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: deleteFieldOpts{
 			fieldID: "an ID",
 		},
@@ -46,5 +46,5 @@ func TestRunDeleteField(t *testing.T) {
 	assert.Equal(
 		t,
 		"Deleted field\n",
-		buf.String())
+		stdout.String())
 }

@@ -1,11 +1,11 @@
 package itemcreate
 
 import (
-	"bytes"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/api"
-	"github.com/cli/go-gh/v2/pkg/tableprinter"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -76,9 +76,9 @@ func TestRunCreateItem_Draft_User(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := createItemConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: createItemOpts{
 			title:     "a title",
 			userOwner: "monalisa",
@@ -92,7 +92,7 @@ func TestRunCreateItem_Draft_User(t *testing.T) {
 	assert.Equal(
 		t,
 		"Created item\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunCreateItem_Draft_Org(t *testing.T) {
@@ -161,9 +161,9 @@ func TestRunCreateItem_Draft_Org(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := createItemConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: createItemOpts{
 			title:    "a title",
 			orgOwner: "github",
@@ -177,7 +177,7 @@ func TestRunCreateItem_Draft_Org(t *testing.T) {
 	assert.Equal(
 		t,
 		"Created item\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunCreateItem_Draft_Me(t *testing.T) {
@@ -242,9 +242,9 @@ func TestRunCreateItem_Draft_Me(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := createItemConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: createItemOpts{
 			title:     "a title",
 			userOwner: "@me",
@@ -259,5 +259,5 @@ func TestRunCreateItem_Draft_Me(t *testing.T) {
 	assert.Equal(
 		t,
 		"Created item\n",
-		buf.String())
+		stdout.String())
 }

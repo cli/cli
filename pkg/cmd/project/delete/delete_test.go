@@ -1,11 +1,11 @@
 package delete
 
 import (
-	"bytes"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/api"
-	"github.com/cli/go-gh/v2/pkg/tableprinter"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -77,9 +77,9 @@ func TestRunDelete_User(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := deleteConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: deleteOpts{
 			userOwner: "monalisa",
 			number:    1,
@@ -92,7 +92,7 @@ func TestRunDelete_User(t *testing.T) {
 	assert.Equal(
 		t,
 		"Deleted project\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunDelete_Org(t *testing.T) {
@@ -162,9 +162,9 @@ func TestRunDelete_Org(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := deleteConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: deleteOpts{
 			orgOwner: "github",
 			number:   1,
@@ -177,7 +177,7 @@ func TestRunDelete_Org(t *testing.T) {
 	assert.Equal(
 		t,
 		"Deleted project\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunDelete_Me(t *testing.T) {
@@ -243,9 +243,9 @@ func TestRunDelete_Me(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := deleteConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: deleteOpts{
 			userOwner: "@me",
 			number:    1,
@@ -258,5 +258,5 @@ func TestRunDelete_Me(t *testing.T) {
 	assert.Equal(
 		t,
 		"Deleted project\n",
-		buf.String())
+		stdout.String())
 }

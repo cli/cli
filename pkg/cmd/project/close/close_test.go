@@ -1,11 +1,11 @@
 package close
 
 import (
-	"bytes"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/api"
-	"github.com/cli/go-gh/v2/pkg/tableprinter"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -81,9 +81,9 @@ func TestRunClose_User(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := closeConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: closeOpts{
 			number:    1,
 			userOwner: "monalisa",
@@ -96,7 +96,7 @@ func TestRunClose_User(t *testing.T) {
 	assert.Equal(
 		t,
 		"Closed project http://a-url.com\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunClose_Org(t *testing.T) {
@@ -170,9 +170,9 @@ func TestRunClose_Org(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := closeConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: closeOpts{
 			number:   1,
 			orgOwner: "github",
@@ -185,7 +185,7 @@ func TestRunClose_Org(t *testing.T) {
 	assert.Equal(
 		t,
 		"Closed project http://a-url.com\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunClose_Me(t *testing.T) {
@@ -255,9 +255,9 @@ func TestRunClose_Me(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := closeConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: closeOpts{
 			number:    1,
 			userOwner: "@me",
@@ -270,7 +270,7 @@ func TestRunClose_Me(t *testing.T) {
 	assert.Equal(
 		t,
 		"Closed project http://a-url.com\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunClose_Reopen(t *testing.T) {
@@ -344,9 +344,9 @@ func TestRunClose_Reopen(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := closeConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: closeOpts{
 			number:    1,
 			userOwner: "monalisa",
@@ -360,5 +360,5 @@ func TestRunClose_Reopen(t *testing.T) {
 	assert.Equal(
 		t,
 		"Reopened project http://a-url.com\n",
-		buf.String())
+		stdout.String())
 }

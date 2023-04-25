@@ -1,11 +1,11 @@
 package create
 
 import (
-	"bytes"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/api"
-	"github.com/cli/go-gh/v2/pkg/tableprinter"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -56,9 +56,9 @@ func TestRunCreate_User(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := createConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: createOpts{
 			title:     "a title",
 			userOwner: "monalisa",
@@ -71,7 +71,7 @@ func TestRunCreate_User(t *testing.T) {
 	assert.Equal(
 		t,
 		"Created project 'a title'\nhttp://a-url.com\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunCreate_Org(t *testing.T) {
@@ -118,9 +118,9 @@ func TestRunCreate_Org(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := createConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: createOpts{
 			title:    "a title",
 			orgOwner: "github",
@@ -133,7 +133,7 @@ func TestRunCreate_Org(t *testing.T) {
 	assert.Equal(
 		t,
 		"Created project 'a title'\nhttp://a-url.com\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunCreate_Me(t *testing.T) {
@@ -177,9 +177,9 @@ func TestRunCreate_Me(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := createConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: createOpts{
 			title:     "a title",
 			userOwner: "@me",
@@ -192,5 +192,5 @@ func TestRunCreate_Me(t *testing.T) {
 	assert.Equal(
 		t,
 		"Created project 'a title'\nhttp://a-url.com\n",
-		buf.String())
+		stdout.String())
 }

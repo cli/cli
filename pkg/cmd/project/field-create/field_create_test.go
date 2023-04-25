@@ -1,11 +1,11 @@
 package fieldcreate
 
 import (
-	"bytes"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/api"
-	"github.com/cli/go-gh/v2/pkg/tableprinter"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -77,9 +77,9 @@ func TestRunCreateField_User(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := createFieldConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
 			name:      "a name",
 			userOwner: "monalisa",
@@ -94,7 +94,7 @@ func TestRunCreateField_User(t *testing.T) {
 	assert.Equal(
 		t,
 		"Created field\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunCreateField_Org(t *testing.T) {
@@ -164,9 +164,9 @@ func TestRunCreateField_Org(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := createFieldConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
 			name:     "a name",
 			orgOwner: "github",
@@ -181,7 +181,7 @@ func TestRunCreateField_Org(t *testing.T) {
 	assert.Equal(
 		t,
 		"Created field\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunCreateField_Me(t *testing.T) {
@@ -246,9 +246,9 @@ func TestRunCreateField_Me(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := createFieldConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
 			userOwner: "@me",
 			number:    1,
@@ -263,7 +263,7 @@ func TestRunCreateField_Me(t *testing.T) {
 	assert.Equal(
 		t,
 		"Created field\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunCreateField_TEXT(t *testing.T) {
@@ -328,9 +328,9 @@ func TestRunCreateField_TEXT(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := createFieldConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
 			userOwner: "@me",
 			number:    1,
@@ -345,7 +345,7 @@ func TestRunCreateField_TEXT(t *testing.T) {
 	assert.Equal(
 		t,
 		"Created field\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunCreateField_DATE(t *testing.T) {
@@ -410,9 +410,9 @@ func TestRunCreateField_DATE(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := createFieldConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
 			userOwner: "@me",
 			number:    1,
@@ -427,7 +427,7 @@ func TestRunCreateField_DATE(t *testing.T) {
 	assert.Equal(
 		t,
 		"Created field\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunCreateField_NUMBER(t *testing.T) {
@@ -492,9 +492,9 @@ func TestRunCreateField_NUMBER(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := createFieldConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
 			userOwner: "@me",
 			number:    1,
@@ -509,13 +509,13 @@ func TestRunCreateField_NUMBER(t *testing.T) {
 	assert.Equal(
 		t,
 		"Created field\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunCreateField_SingleSelectNoOptions(t *testing.T) {
-	buf := bytes.Buffer{}
+	ios, _, _, _ := iostreams.Test()
 	config := createFieldConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: createFieldOpts{
 			name:      "a name",
 			userOwner: "@me",

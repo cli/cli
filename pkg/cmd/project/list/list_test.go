@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/api"
-	"github.com/cli/go-gh/v2/pkg/tableprinter"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -93,9 +94,9 @@ func TestRunList(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: listOpts{
 			userOwner: "monalisa",
 		},
@@ -107,7 +108,7 @@ func TestRunList(t *testing.T) {
 	assert.Equal(
 		t,
 		"Title\tDescription\tURL\tID\nProject 1\tShort description 1\turl1\t1\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunList_Me(t *testing.T) {
@@ -135,9 +136,9 @@ func TestRunList_Me(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: listOpts{
 			userOwner: "@me",
 		},
@@ -149,7 +150,7 @@ func TestRunList_Me(t *testing.T) {
 	assert.Equal(
 		t,
 		"Title\tDescription\tURL\tID\nProject 1\tShort description 1\turl1\t1\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunListViewer(t *testing.T) {
@@ -177,9 +178,9 @@ func TestRunListViewer(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp:     tableprinter.New(&buf, false, 0),
+		tp:     tableprinter.New(ios),
 		opts:   listOpts{},
 		client: client,
 	}
@@ -189,7 +190,7 @@ func TestRunListViewer(t *testing.T) {
 	assert.Equal(
 		t,
 		"Title\tDescription\tURL\tID\nProject 1\tShort description 1\turl1\t1\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunListOrg(t *testing.T) {
@@ -217,9 +218,9 @@ func TestRunListOrg(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: listOpts{
 			orgOwner: "github",
 		},
@@ -231,7 +232,7 @@ func TestRunListOrg(t *testing.T) {
 	assert.Equal(
 		t,
 		"Title\tDescription\tURL\tID\nProject 1\tShort description 1\turl1\t1\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunListEmpty(t *testing.T) {
@@ -256,9 +257,9 @@ func TestRunListEmpty(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp:     tableprinter.New(&buf, false, 0),
+		tp:     tableprinter.New(ios),
 		opts:   listOpts{},
 		client: client,
 	}
@@ -268,7 +269,7 @@ func TestRunListEmpty(t *testing.T) {
 	assert.Equal(
 		t,
 		"No projects found for me\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunListWithClosed(t *testing.T) {
@@ -296,9 +297,9 @@ func TestRunListWithClosed(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: listOpts{
 			userOwner: "monalisa",
 			closed:    true,
@@ -311,7 +312,7 @@ func TestRunListWithClosed(t *testing.T) {
 	assert.Equal(
 		t,
 		"Title\tDescription\tURL\tState\tID\nProject 1\tShort description 1\turl1\topen\t1\nProject 2\t - \turl2\tclosed\t2\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunListWeb(t *testing.T) {

@@ -1,11 +1,11 @@
 package itemedit
 
 import (
-	"bytes"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/api"
-	"github.com/cli/go-gh/v2/pkg/tableprinter"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -33,9 +33,9 @@ func TestRunItemEdit_Draft(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			title:  "a title",
 			body:   "a new body",
@@ -49,7 +49,7 @@ func TestRunItemEdit_Draft(t *testing.T) {
 	assert.Equal(
 		t,
 		"Title\tBody\na title\ta new body\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunItemEdit_Text(t *testing.T) {
@@ -83,9 +83,9 @@ func TestRunItemEdit_Text(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			text:      "item text",
 			itemID:    "item_id",
@@ -100,7 +100,7 @@ func TestRunItemEdit_Text(t *testing.T) {
 	assert.Equal(
 		t,
 		"Type\tTitle\tNumber\tRepository\tID\nIssue\ttitle\t1\tmy-repo\titem_id\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunItemEdit_Number(t *testing.T) {
@@ -134,9 +134,9 @@ func TestRunItemEdit_Number(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			number:    2,
 			itemID:    "item_id",
@@ -151,7 +151,7 @@ func TestRunItemEdit_Number(t *testing.T) {
 	assert.Equal(
 		t,
 		"Type\tTitle\tNumber\tRepository\tID\nIssue\ttitle\t1\tmy-repo\titem_id\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunItemEdit_Date(t *testing.T) {
@@ -185,9 +185,9 @@ func TestRunItemEdit_Date(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			date:      "2023-01-01",
 			itemID:    "item_id",
@@ -202,7 +202,7 @@ func TestRunItemEdit_Date(t *testing.T) {
 	assert.Equal(
 		t,
 		"Type\tTitle\tNumber\tRepository\tID\nIssue\ttitle\t1\tmy-repo\titem_id\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunItemEdit_SingleSelect(t *testing.T) {
@@ -236,9 +236,9 @@ func TestRunItemEdit_SingleSelect(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			singleSelectOptionID: "option_id",
 			itemID:               "item_id",
@@ -253,7 +253,7 @@ func TestRunItemEdit_SingleSelect(t *testing.T) {
 	assert.Equal(
 		t,
 		"Type\tTitle\tNumber\tRepository\tID\nIssue\ttitle\t1\tmy-repo\titem_id\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunItemEdit_Iteration(t *testing.T) {
@@ -287,9 +287,9 @@ func TestRunItemEdit_Iteration(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			iterationID: "option_id",
 			itemID:      "item_id",
@@ -304,7 +304,7 @@ func TestRunItemEdit_Iteration(t *testing.T) {
 	assert.Equal(
 		t,
 		"Type\tTitle\tNumber\tRepository\tID\nIssue\ttitle\t1\tmy-repo\titem_id\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunItemEdit_NoChanges(t *testing.T) {
@@ -314,9 +314,9 @@ func TestRunItemEdit_NoChanges(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := editItemConfig{
-		tp:     tableprinter.New(&buf, false, 0),
+		tp:     tableprinter.New(ios),
 		opts:   editItemOpts{},
 		client: client,
 	}
@@ -326,7 +326,7 @@ func TestRunItemEdit_NoChanges(t *testing.T) {
 	assert.Equal(
 		t,
 		"No changes to make",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunItemEdit_InvalidID(t *testing.T) {
@@ -336,9 +336,9 @@ func TestRunItemEdit_InvalidID(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, _, _ := iostreams.Test()
 	config := editItemConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: editItemOpts{
 			title:  "a title",
 			body:   "a new body",

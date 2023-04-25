@@ -1,11 +1,11 @@
 package fieldlist
 
 import (
-	"bytes"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/api"
-	"github.com/cli/go-gh/v2/pkg/tableprinter"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -79,9 +79,9 @@ func TestRunList_User(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: listOpts{
 			number:    1,
 			userOwner: "monalisa",
@@ -94,7 +94,7 @@ func TestRunList_User(t *testing.T) {
 	assert.Equal(
 		t,
 		"Name\tDataType\tID\nFieldTitle\tProjectV2Field\tfield ID\nStatus\tProjectV2SingleSelectField\tstatus ID\nIterations\tProjectV2IterationField\titeration ID\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunList_Org(t *testing.T) {
@@ -165,9 +165,9 @@ func TestRunList_Org(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: listOpts{
 			number:   1,
 			orgOwner: "github",
@@ -180,7 +180,7 @@ func TestRunList_Org(t *testing.T) {
 	assert.Equal(
 		t,
 		"Name\tDataType\tID\nFieldTitle\tProjectV2Field\tfield ID\nStatus\tProjectV2SingleSelectField\tstatus ID\nIterations\tProjectV2IterationField\titeration ID\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunList_Me(t *testing.T) {
@@ -248,9 +248,9 @@ func TestRunList_Me(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: listOpts{
 			number:    1,
 			userOwner: "@me",
@@ -263,7 +263,7 @@ func TestRunList_Me(t *testing.T) {
 	assert.Equal(
 		t,
 		"Name\tDataType\tID\nFieldTitle\tProjectV2Field\tfield ID\nStatus\tProjectV2SingleSelectField\tstatus ID\nIterations\tProjectV2IterationField\titeration ID\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunList_Empty(t *testing.T) {
@@ -315,9 +315,9 @@ func TestRunList_Empty(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := listConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: listOpts{
 			number:    1,
 			userOwner: "@me",
@@ -330,5 +330,5 @@ func TestRunList_Empty(t *testing.T) {
 	assert.Equal(
 		t,
 		"Project 1 for login @me has no fields\n",
-		buf.String())
+		stdout.String())
 }

@@ -1,11 +1,11 @@
 package edit
 
 import (
-	"bytes"
 	"testing"
 
+	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/api"
-	"github.com/cli/go-gh/v2/pkg/tableprinter"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -81,9 +81,9 @@ func TestRunUpdate_User(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := editConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: editOpts{
 			number:           1,
 			userOwner:        "monalisa",
@@ -100,7 +100,7 @@ func TestRunUpdate_User(t *testing.T) {
 	assert.Equal(
 		t,
 		"Updated project http://a-url.com\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunUpdate_Org(t *testing.T) {
@@ -173,9 +173,9 @@ func TestRunUpdate_Org(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := editConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: editOpts{
 			number:           1,
 			orgOwner:         "github",
@@ -192,7 +192,7 @@ func TestRunUpdate_Org(t *testing.T) {
 	assert.Equal(
 		t,
 		"Updated project http://a-url.com\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunUpdate_Me(t *testing.T) {
@@ -261,9 +261,9 @@ func TestRunUpdate_Me(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := editConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: editOpts{
 			number:           1,
 			userOwner:        "@me",
@@ -280,7 +280,7 @@ func TestRunUpdate_Me(t *testing.T) {
 	assert.Equal(
 		t,
 		"Updated project http://a-url.com\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunUpdate_OmitParams(t *testing.T) {
@@ -353,9 +353,9 @@ func TestRunUpdate_OmitParams(t *testing.T) {
 	client, err := api.NewGraphQLClient(api.ClientOptions{AuthToken: "token"})
 	assert.NoError(t, err)
 
-	buf := bytes.Buffer{}
+	ios, _, stdout, _ := iostreams.Test()
 	config := editConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: editOpts{
 			number:    1,
 			userOwner: "monalisa",
@@ -369,13 +369,13 @@ func TestRunUpdate_OmitParams(t *testing.T) {
 	assert.Equal(
 		t,
 		"Updated project http://a-url.com\n",
-		buf.String())
+		stdout.String())
 }
 
 func TestRunUpdate_EmptyUpdateParams(t *testing.T) {
-	buf := bytes.Buffer{}
+	ios, _, _, _ := iostreams.Test()
 	config := editConfig{
-		tp: tableprinter.New(&buf, false, 0),
+		tp: tableprinter.New(ios),
 		opts: editOpts{
 			number:    1,
 			userOwner: "monalisa",

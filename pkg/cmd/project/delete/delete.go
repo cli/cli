@@ -9,9 +9,8 @@ import (
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/format"
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
 
+	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/go-gh/v2/pkg/api"
-	"github.com/cli/go-gh/v2/pkg/tableprinter"
-	"github.com/cli/go-gh/v2/pkg/term"
 	"github.com/shurcooL/githubv4"
 	"github.com/spf13/cobra"
 )
@@ -25,7 +24,7 @@ type deleteOpts struct {
 }
 
 type deleteConfig struct {
-	tp     tableprinter.TablePrinter
+	tp     *tableprinter.TablePrinter
 	client *api.GraphQLClient
 	opts   deleteOpts
 }
@@ -67,14 +66,7 @@ gh project delete 1 --org github
 				}
 			}
 
-			terminal := term.FromEnv()
-			termWidth, _, err := terminal.Size()
-			if err != nil {
-				// set a static width in case of error
-				termWidth = 80
-			}
-			t := tableprinter.New(terminal.Out(), terminal.IsTerminalOutput(), termWidth)
-
+			t := tableprinter.New(f.IOStreams)
 			config := deleteConfig{
 				tp:     t,
 				client: client,
