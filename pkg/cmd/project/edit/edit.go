@@ -50,13 +50,13 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(config editConfig) error) *cobra.C
 		Use:   "edit [number]",
 		Example: `
 # edit user monalisa's project 1 to have the new title "New title"
-gh projects edit 1 --user monalisa --title "New title"
+gh project edit 1 --user monalisa --title "New title"
 
 # edit org github's project 1 to have the new title "New title"
-gh projects edit 1 --org github --title "New title"
+gh project edit 1 --org github --title "New title"
 
 # edit org github's project 1 to have visibility public
-gh projects edit 1 --org github --visibility PUBLIC
+gh project edit 1 --org github --visibility PUBLIC
 
 # add --format=json to output in JSON format
 `,

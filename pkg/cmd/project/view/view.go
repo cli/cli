@@ -40,13 +40,13 @@ func NewCmdView(f *cmdutil.Factory, runF func(config viewConfig) error) *cobra.C
 		Use:   "view [number]",
 		Example: `
 # view the current user's project 1
-gh projects view 1
+gh project view 1
 
 # open user monalisa's project 1 in the browser
-gh projects view 1 --user monalisa --web
+gh project view 1 --user monalisa --web
 
 # view org github's project 1 including closed projects
-gh projects view 1 --org github --closed
+gh project view 1 --org github --closed
 
 # add --format=json to output in JSON format
 `,

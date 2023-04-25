@@ -50,13 +50,13 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 		Use:   "field-list number",
 		Example: `
 # list the fields in the current user's project number 1
-gh projects field-list 1 --user "@me"
+gh project field-list 1 --user "@me"
 
 # list the fields in user monalisa's project number 1
-gh projects field-list 1 --user monalisa
+gh project field-list 1 --user monalisa
 
 # list the first 30 fields in org github's project number 1
-gh projects field-list 1 --org github --limit 30
+gh project field-list 1 --org github --limit 30
 
 # add --format=json to output in JSON format
 `,

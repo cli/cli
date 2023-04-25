@@ -53,13 +53,13 @@ func NewCmdList(f *cmdutil.Factory, runF func(config listConfig) error) *cobra.C
 		Use:   "list",
 		Example: `
 # list the current user's projects
-gh projects list
+gh project list
 
 # open projects for user monalisa in the browser
-gh projects list --user monalisa --web
+gh project list --user monalisa --web
 
 # list the projects for org github including closed projects
-gh projects list --org github --closed
+gh project list --org github --closed
 
 # add --format=json to output in JSON format
 `,

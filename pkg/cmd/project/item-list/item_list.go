@@ -53,13 +53,13 @@ The default output is a column format with a subset of system defined fields.
 To list all of the fields, use the --format directive.
 
 # list the items in the current users's project number 1
-gh projects item-list 1 --user "@me"
+gh project item-list 1 --user "@me"
 
 # list the items in user monalisa's project number 1
-gh projects item-list 1 --user monalisa
+gh project item-list 1 --user monalisa
 
 # list the items in org github's project number 1
-gh projects item-list 1 --org github
+gh project item-list 1 --org github
 
 # add --format=json to output in JSON format
 `,

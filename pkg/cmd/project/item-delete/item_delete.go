@@ -42,13 +42,13 @@ func NewCmdDeleteItem(f *cmdutil.Factory, runF func(config deleteItemConfig) err
 		Use:   "item-delete [number]",
 		Example: `
 # delete an item in the current user's project 1
-gh projects item-delete 1 --user "@me" --id ID
+gh project item-delete 1 --user "@me" --id ID
 
 # delete an item in the monalisa user project 1
-gh projects item-delete 1 --user monalisa --id ID
+gh project item-delete 1 --user monalisa --id ID
 
 # delete an item in the github org project 1
-gh projects item-delete 1 --org github --id ID
+gh project item-delete 1 --org github --id ID
 
 # add --format=json to output in JSON format
 `,

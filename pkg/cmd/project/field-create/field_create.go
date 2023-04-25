@@ -46,16 +46,16 @@ func NewCmdCreateField(f *cmdutil.Factory, runF func(config createFieldConfig) e
 		Use:   "field-create [number]",
 		Example: `
 # create a field in the current user's project 1 with title "new item" and dataType "text"
-gh projects field-create 1 --user "@me" --name "new field" --data-type "text"
+gh project field-create 1 --user "@me" --name "new field" --data-type "text"
 
 # create a field in user monalisa's project 1 with title "new item" and dataType "text"
-gh projects field-create 1 --user monalisa --name "new field" --data-type "text"
+gh project field-create 1 --user monalisa --name "new field" --data-type "text"
 
 # create a field in org github's' project 1 with title "new item" and dataType "text"
-gh projects field-create 1 --org github --name "new field" --data-type "text"
+gh project field-create 1 --org github --name "new field" --data-type "text"
 
 # create a field with single select options
-gh projects field-create 1 --user monalisa --name "new field" --data-type "SINGLE_SELECT" --single-select-options "one,two,three"
+gh project field-create 1 --user monalisa --name "new field" --data-type "SINGLE_SELECT" --single-select-options "one,two,three"
 
 # add --format=json to output in JSON format
 `,

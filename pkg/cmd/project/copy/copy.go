@@ -47,13 +47,13 @@ func NewCmdCopy(f *cmdutil.Factory, runF func(config copyConfig) error) *cobra.C
 		Use:   "copy [number]",
 		Example: `
 # copy project 1 owned by user monalisa to org github with title "a new project"
-gh projects copy 1 --source-user monalisa --title "a new project" --target-org github
+gh project copy 1 --source-user monalisa --title "a new project" --target-org github
 
 # copy project 1 owned by the org github to current user with title "a new project"
-gh projects copy 1 --source-org github --title "a new project" --target-me
+gh project copy 1 --source-org github --title "a new project" --target-me
 
 # copy project 1 owned by the org github to user monalisa with title "a new project" and include draft issues
-gh projects copy 1 --source-org github --title "a new project" --target-user monalisa --drafts
+gh project copy 1 --source-org github --title "a new project" --target-user monalisa --drafts
 
 # add --format=json to output in JSON format
 `,

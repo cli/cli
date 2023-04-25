@@ -43,13 +43,13 @@ func NewCmdDelete(f *cmdutil.Factory, runF func(config deleteConfig) error) *cob
 		Use:   "delete [number]",
 		Example: `
 # delete the current user's project 1
-gh projects delete 1 --user "@me"
+gh project delete 1 --user "@me"
 
 # delete user monalisa's project 1
-gh projects delete 1 --user monalisa
+gh project delete 1 --user monalisa
 
 # delete org github's project 1
-gh projects delete 1 --org github
+gh project delete 1 --org github
 
 # add --format=json to output in JSON format
 `,

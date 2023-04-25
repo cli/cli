@@ -42,13 +42,13 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(config createConfig) error) *cob
 		Use:   "create",
 		Example: `
 # create a new project owned by user monalisa with title "a new project"
-gh projects create --user monalisa --title "a new project"
+gh project create --user monalisa --title "a new project"
 
 # create a new project owned by org github with title "a new project"
-gh projects create --org github --title "a new project"
+gh project create --org github --title "a new project"
 
 # create a new project owned by the current user with title "a new project"
-gh projects create --user '@me' --title "a new project"
+gh project create --user '@me' --title "a new project"
 
 # add --format=json to output in JSON format
 `,

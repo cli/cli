@@ -45,13 +45,13 @@ func NewCmdAddItem(f *cmdutil.Factory, runF func(config addItemConfig) error) *c
 		Use:   "item-add [number]",
 		Example: `
 # add an item to the current user's project 1
-gh projects item-add 1 --user "@me" --url https://github.com/cli/go-gh/issues/1
+gh project item-add 1 --user "@me" --url https://github.com/cli/go-gh/issues/1
 
 # add an item to user monalisa's project 1
-gh projects item-add 1 --user monalisa --url https://github.com/cli/go-gh/issues/1
+gh project item-add 1 --user monalisa --url https://github.com/cli/go-gh/issues/1
 
 # add an item to the org github's project 1
-gh projects item-add 1 --org github --url https://github.com/cli/go-gh/issues/1
+gh project item-add 1 --org github --url https://github.com/cli/go-gh/issues/1
 
 # add --format=json to output in JSON format
 `,

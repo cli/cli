@@ -45,13 +45,13 @@ func NewCmdCreateItem(f *cmdutil.Factory, runF func(config createItemConfig) err
 		Use:   "item-create [number]",
 		Example: `
 # create a draft issue in the current user's project 1 with title "new item" and body "new item body"
-gh projects item-create 1 --user "@me" --title "new item" --body "new item body"
+gh project item-create 1 --user "@me" --title "new item" --body "new item body"
 
 # create a draft issue in user monalisa's project 1 with title "new item" and body "new item body"
-gh projects item-create 1 --user monalisa --title "new item" --body "new item body"
+gh project item-create 1 --user monalisa --title "new item" --body "new item body"
 
 # create a draft issue in org github's project 1 with title "new item" and body "new item body"
-gh projects item-create 1 --org github --title "new item" --body "new item body"
+gh project item-create 1 --org github --title "new item" --body "new item body"
 
 # add --format=json to output in JSON format
 `,

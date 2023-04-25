@@ -44,13 +44,13 @@ func NewCmdClose(f *cmdutil.Factory, runF func(config closeConfig) error) *cobra
 		Use:   "close [number]",
 		Example: `
 # close project 1 owned by user monalisa
-gh projects close 1 --user monalisa
+gh project close 1 --user monalisa
 
 # close project 1 owned by org github
-gh projects close 1 --org github
+gh project close 1 --org github
 
 # reopen closed project 1 owned by org github
-gh projects close 1 --org github --undo
+gh project close 1 --org github --undo
 
 # add --format=json to output in JSON format
 `,

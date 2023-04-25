@@ -51,16 +51,16 @@ func NewCmdArchiveItem(f *cmdutil.Factory, runF func(config archiveItemConfig) e
 		Use:   "item-archive [number]",
 		Example: `
 # archive an item in the current user's project 1
-gh projects item-archive 1 --user "@me" --id ID
+gh project item-archive 1 --user "@me" --id ID
 
 # archive an item in the monalisa user's project 1
-gh projects item-archive 1 --user monalisa --id ID
+gh project item-archive 1 --user monalisa --id ID
 
 # archive an item in the org github's project 1
-gh projects item-archive 1 --org github --id ID
+gh project item-archive 1 --org github --id ID
 
 # unarchive an item
-gh projects item-archive 1 --user "@me" --id ID --undo
+gh project item-archive 1 --user "@me" --id ID --undo
 
 # add --format=json to output in JSON format
 `,
