@@ -111,8 +111,9 @@ var HelpTopics = map[string]map[string]string{
 			The %[1]s--jq%[1]s flag requires a string argument in jq query syntax, and will only print
 			those JSON values which match the query. jq queries can be used to select elements from an
 			array, fields from an object, create a new array, and more. The jq utility does not need
-			to be installed on the system to use this formatting directive.
-			To learn about jq query syntax, see: <https://stedolan.github.io/jq/manual/v1.6/>
+			to be installed on the system to use this formatting directive. When connected to a terminal,
+			the output is automatically pretty-printed. To learn about jq query syntax, see:
+			<https://stedolan.github.io/jq/manual/v1.6/>
 
 			The %[1]s--template%[1]s flag requires a string argument in Go template syntax, and will only print
 			those JSON values which match the query.
@@ -174,7 +175,38 @@ var HelpTopics = map[string]map[string]string{
 			codercat
 			cli-maintainer
 
-
+			# --jq can be used to implement more complex filtering and output changes:
+			$ bin/gh issue list --json number,title,labels --jq \
+			  'map(select((.labels | length) > 0))    # must have labels
+			  | map(.labels = (.labels | map(.name))) # show only the label names
+			  | .[:3]                                 # select the first 3 results'
+			  [
+				{
+				  "labels": [
+					"enhancement",
+					"needs triage"
+				  ],
+				  "number": 123,
+				  "title": "A helpful contribution"
+				},
+				{
+				  "labels": [
+					"help wanted",
+					"docs",
+					"good first issue"
+				  ],
+				  "number": 125,
+				  "title": "Improve the docs"
+				},
+				{
+				  "labels": [
+					"enhancement",
+				  ],
+				  "number": 7221,
+				  "title": "An exciting new feature"
+				}
+			  ]
+			  
 			# using the --template flag with the hyperlink helper
 			gh issue list --json title,url --template '{{range .}}{{hyperlink .url .title}}{{"\n"}}{{end}}'
 
