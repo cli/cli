@@ -372,6 +372,7 @@ var RepositoryFields = []string{
 	"isInOrganization",
 	"isMirror",
 	"isPrivate",
+	"visibility",
 	"isTemplate",
 	"isUserConfigurationRepository",
 	"licenseInfo",
