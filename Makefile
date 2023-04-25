@@ -6,7 +6,7 @@ CGO_LDFLAGS ?= $(filter -g -L% -l% -O%,${LDFLAGS})
 export CGO_LDFLAGS
 
 EXE =
-ifeq ($(GOOS),windows)
+ifeq ($(shell go env GOOS),windows)
 EXE = .exe
 endif
 
@@ -16,23 +16,27 @@ endif
 bin/gh$(EXE): script/build
 	@script/build $@
 
-script/build: script/build.go
+script/build$(EXE): script/build.go
+ifeq ($(EXE),)
 	GOOS= GOARCH= GOARM= GOFLAGS= CGO_ENABLED= go build -o $@ $<
+else
+	go build -o $@ $<
+endif
 
 .PHONY: clean
-clean: script/build
-	@script/build $@
+clean: script/build$(EXE)
+	@$< $@
 
 .PHONY: manpages
-manpages: script/build
-	@script/build $@
+manpages: script/build$(EXE)
+	@$< $@
 
 .PHONY: completions
-completions:
+completions: bin/gh$(EXE)
 	mkdir -p ./share/bash-completion/completions ./share/fish/vendor_completions.d ./share/zsh/site-functions
-	go run ./cmd/gh completion -s bash > ./share/bash-completion/completions/gh
-	go run ./cmd/gh completion -s fish > ./share/fish/vendor_completions.d/gh.fish
-	go run ./cmd/gh completion -s zsh > ./share/zsh/site-functions/_gh
+	bin/gh$(EXE) completion -s bash > ./share/bash-completion/completions/gh
+	bin/gh$(EXE) completion -s fish > ./share/fish/vendor_completions.d/gh.fish
+	bin/gh$(EXE) completion -s zsh > ./share/zsh/site-functions/_gh
 
 # just a convenience task around `go test`
 .PHONY: test
