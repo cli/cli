@@ -1,17 +1,19 @@
 package list
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
 	"github.com/cli/cli/v2/internal/ghrepo"
+	"github.com/cli/cli/v2/pkg/cmd/ruleset/shared"
 )
 
 type RulesetResponse struct {
 	Level struct {
 		Rulesets struct {
 			TotalCount int
-			Nodes      []Ruleset
+			Nodes      []shared.Ruleset
 			PageInfo   struct {
 				HasNextPage bool
 				EndCursor   string
@@ -20,26 +22,9 @@ type RulesetResponse struct {
 	}
 }
 
-type Ruleset struct {
-	DatabaseId  int
-	Name        string
-	Target      string
-	Enforcement string
-	Conditions  struct {
-		RefName struct {
-			Include []string
-			Exclude []string
-		}
-		RepositoryName struct {
-			Include []string
-			Exclude []string
-		}
-	}
-}
-
 type RulesetList struct {
 	TotalCount int
-	Rulesets   []Ruleset
+	Rulesets   []shared.Ruleset
 }
 
 func listRepoRulesets(httpClient *http.Client, repo ghrepo.Interface, limit int) (*RulesetList, error) {
@@ -48,7 +33,7 @@ func listRepoRulesets(httpClient *http.Client, repo ghrepo.Interface, limit int)
 		"repo":  repo.RepoName(),
 	}
 
-	return listRulesets(httpClient, rulesetQuery(false), variables, limit, repo.RepoHost())
+	return listRulesets(httpClient, rulesetsQuery(false), variables, limit, repo.RepoHost())
 }
 
 func listOrgRulesets(httpClient *http.Client, orgLogin string, limit int, host string) (*RulesetList, error) {
@@ -56,14 +41,14 @@ func listOrgRulesets(httpClient *http.Client, orgLogin string, limit int, host s
 		"login": orgLogin,
 	}
 
-	return listRulesets(httpClient, rulesetQuery(true), variables, limit, host)
+	return listRulesets(httpClient, rulesetsQuery(true), variables, limit, host)
 }
 
 func listRulesets(httpClient *http.Client, query string, variables map[string]interface{}, limit int, host string) (*RulesetList, error) {
 	pageLimit := min(limit, 100)
 
 	res := RulesetList{
-		Rulesets: []Ruleset{},
+		Rulesets: []shared.Ruleset{},
 	}
 	client := api.NewClientFromHTTP(httpClient)
 
@@ -93,7 +78,7 @@ func listRulesets(httpClient *http.Client, query string, variables map[string]in
 	return &res, nil
 }
 
-func rulesetQuery(org bool) string {
+func rulesetsQuery(org bool) string {
 	var args string
 	var level string
 
@@ -105,28 +90,28 @@ func rulesetQuery(org bool) string {
 		level = "repository(owner: $owner, name: $repo)"
 	}
 
-	str := "query RulesetList($limit: Int!, $endCursor: String, " + args + ") { level: " + level + " {"
+	str := fmt.Sprintf("query RulesetList($limit: Int!, $endCursor: String, %s) { level: %s {", args, level)
 
-	str += `
+	return str + `
 		rulesets(first: $limit, after: $endCursor) {
 			totalCount
 			nodes {
-				databaseId
+				id: databaseId
 				name
 				target
 				enforcement
-				conditions {
-					refName {
-						include
-						exclude
-					}
-					repositoryName {
-						include
-						exclude
-						protected
-					}
-				}
-				rules {
+				# conditions {
+				# 	refName {
+				# 		include
+				# 		exclude
+				# 	}
+				# 	repositoryName {
+				# 		include
+				# 		exclude
+				# 		protected
+				# 	}
+				# }
+				rulesGql: rules {
 					totalCount
 				}
 			}
@@ -134,9 +119,8 @@ func rulesetQuery(org bool) string {
 				hasNextPage
 				endCursor
 			}
-		}`
-
-	return str + "}}"
+		}
+	}}`
 }
 
 func min(a, b int) int {

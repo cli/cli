@@ -61,9 +61,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 30, "Maximum number of rules to list")
-	cmd.Flags().StringVarP(&opts.Organization, "org", "o", "", "List organization-wide rules")
-	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "List rules in the web browser")
+	cmd.Flags().IntVarP(&opts.Limit, "limit", "L", 30, "Maximum number of rulesets to list")
+	cmd.Flags().StringVarP(&opts.Organization, "org", "o", "", "List organization-wide rulesets")
+	cmd.Flags().BoolVarP(&opts.WebMode, "web", "w", false, "List rulesets in the web browser")
 
 	return cmd
 }
@@ -125,6 +125,7 @@ func listRun(opts *ListOptions) error {
 		return cmdutil.NewNoResultsError(msg)
 	}
 
+	opts.IO.DetectTerminalTheme()
 	if err := opts.IO.StartPager(); err == nil {
 		defer opts.IO.StopPager()
 	} else {
@@ -141,7 +142,7 @@ func listRun(opts *ListOptions) error {
 	tp.HeaderRow("ID", "NAME", "STATUS", "TARGET")
 
 	for _, rs := range result.Rulesets {
-		tp.AddField(strconv.Itoa(rs.DatabaseId))
+		tp.AddField(strconv.Itoa(rs.Id))
 		tp.AddField(rs.Name, tableprinter.WithColor(cs.Bold))
 		tp.AddField(strings.ToLower(rs.Enforcement))
 		tp.AddField(strings.ToLower(rs.Target))
