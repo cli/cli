@@ -1,11 +1,7 @@
-package main
+package project
 
 import (
-	"fmt"
-	"os"
-	"strings"
-
-	"github.com/cli/cli/v2/pkg/cmd/factory"
+	"github.com/MakeNowJust/heredoc"
 	cmdClose "github.com/cli/cli/v2/pkg/cmd/project/close"
 	cmdCopy "github.com/cli/cli/v2/pkg/cmd/project/copy"
 	cmdCreate "github.com/cli/cli/v2/pkg/cmd/project/create"
@@ -22,47 +18,45 @@ import (
 	cmdItemList "github.com/cli/cli/v2/pkg/cmd/project/item-list"
 	cmdList "github.com/cli/cli/v2/pkg/cmd/project/list"
 	cmdView "github.com/cli/cli/v2/pkg/cmd/project/view"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/spf13/cobra"
 )
 
-// analogous to cli/pkg/cmd/pr.go in cli/cli
-func main() {
-	var rootCmd = &cobra.Command{
-		Use:           "project",
-		Short:         "Work with GitHub Projects.",
-		Long:          "Work with GitHub Projects. Note that the token you are using must have 'project' scope, which is not set by default. You can verify your token scope by running 'gh auth status' and add the project scope by running 'gh auth refresh -s project'.",
-		SilenceErrors: true,
+func NewCmdProject(f *cmdutil.Factory) *cobra.Command {
+	var cmd = &cobra.Command{
+		Aliases: []string{"projects"},
+		Use:     "project <command> [flags]",
+		Short:   "Work with GitHub Projects.",
+		Long:    "Work with GitHub Projects. Note that the token you are using must have 'project' scope, which is not set by default. You can verify your token scope by running 'gh auth status' and add the project scope by running 'gh auth refresh -s project'.",
+		Example: heredoc.Doc(`
+			$ gh project create --user monalisa --title "Roadmap"
+			$ gh project view 1 --org cli --web
+			$ gh project field-list 1 --org cli
+			$ gh project item-list 1 --org cli
+		`),
+		GroupID: "core",
 	}
 
-	cmdFactory := factory.New("0.1.0") // will be replaced by buildVersion := build.Version
-
-	rootCmd.AddCommand(cmdList.NewCmdList(cmdFactory, nil))
-	rootCmd.AddCommand(cmdCreate.NewCmdCreate(cmdFactory, nil))
-	rootCmd.AddCommand(cmdCopy.NewCmdCopy(cmdFactory, nil))
-	rootCmd.AddCommand(cmdClose.NewCmdClose(cmdFactory, nil))
-	rootCmd.AddCommand(cmdDelete.NewCmdDelete(cmdFactory, nil))
-	rootCmd.AddCommand(cmdEdit.NewCmdEdit(cmdFactory, nil))
-	rootCmd.AddCommand(cmdView.NewCmdView(cmdFactory, nil))
+	cmd.AddCommand(cmdList.NewCmdList(f, nil))
+	cmd.AddCommand(cmdCreate.NewCmdCreate(f, nil))
+	cmd.AddCommand(cmdCopy.NewCmdCopy(f, nil))
+	cmd.AddCommand(cmdClose.NewCmdClose(f, nil))
+	cmd.AddCommand(cmdDelete.NewCmdDelete(f, nil))
+	cmd.AddCommand(cmdEdit.NewCmdEdit(f, nil))
+	cmd.AddCommand(cmdView.NewCmdView(f, nil))
 
 	// items
-	rootCmd.AddCommand(cmdItemList.NewCmdList(cmdFactory, nil))
-	rootCmd.AddCommand(cmdItemCreate.NewCmdCreateItem(cmdFactory, nil))
-	rootCmd.AddCommand(cmdItemAdd.NewCmdAddItem(cmdFactory, nil))
-	rootCmd.AddCommand(cmdItemEdit.NewCmdEditItem(cmdFactory, nil))
-	rootCmd.AddCommand(cmdItemArchive.NewCmdArchiveItem(cmdFactory, nil))
-	rootCmd.AddCommand(cmdItemDelete.NewCmdDeleteItem(cmdFactory, nil))
+	cmd.AddCommand(cmdItemList.NewCmdList(f, nil))
+	cmd.AddCommand(cmdItemCreate.NewCmdCreateItem(f, nil))
+	cmd.AddCommand(cmdItemAdd.NewCmdAddItem(f, nil))
+	cmd.AddCommand(cmdItemEdit.NewCmdEditItem(f, nil))
+	cmd.AddCommand(cmdItemArchive.NewCmdArchiveItem(f, nil))
+	cmd.AddCommand(cmdItemDelete.NewCmdDeleteItem(f, nil))
 
 	// fields
-	rootCmd.AddCommand(cmdFieldList.NewCmdList(cmdFactory, nil))
-	rootCmd.AddCommand(cmdFieldCreate.NewCmdCreateField(cmdFactory, nil))
-	rootCmd.AddCommand(cmdFieldDelete.NewCmdDeleteField(cmdFactory, nil))
+	cmd.AddCommand(cmdFieldList.NewCmdList(f, nil))
+	cmd.AddCommand(cmdFieldCreate.NewCmdCreateField(f, nil))
+	cmd.AddCommand(cmdFieldDelete.NewCmdDeleteField(f, nil))
 
-	if err := rootCmd.Execute(); err != nil {
-		if strings.HasPrefix(err.Error(), "Message: Your token has not been granted the required scopes to execute this query") {
-			fmt.Println("Your token has not been granted the required scopes to execute this query.\nRun 'gh auth refresh -s project' to add the 'project' scope.\nRun 'gh auth status' to see your current token scopes.")
-			os.Exit(1)
-		}
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	return cmd
 }

@@ -24,6 +24,7 @@ import (
 	labelCmd "github.com/cli/cli/v2/pkg/cmd/label"
 	orgCmd "github.com/cli/cli/v2/pkg/cmd/org"
 	prCmd "github.com/cli/cli/v2/pkg/cmd/pr"
+	projectCmd "github.com/cli/cli/v2/pkg/cmd/project"
 	releaseCmd "github.com/cli/cli/v2/pkg/cmd/release"
 	repoCmd "github.com/cli/cli/v2/pkg/cmd/repo"
 	creditsCmd "github.com/cli/cli/v2/pkg/cmd/repo/credits"
@@ -109,6 +110,8 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) *cobra.Command {
 	bareHTTPCmdFactory.HttpClient = bareHTTPClient(f, version)
 
 	cmd.AddCommand(apiCmd.NewCmdApi(&bareHTTPCmdFactory, nil))
+
+	cmd.AddCommand(projectCmd.NewCmdProject(f))
 
 	// below here at the commands that require the "intelligent" BaseRepo resolver
 	repoResolvingCmdFactory := *f
