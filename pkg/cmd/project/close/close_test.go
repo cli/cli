@@ -1,6 +1,7 @@
 package close
 
 import (
+	"os"
 	"testing"
 
 	"github.com/cli/cli/v2/internal/tableprinter"
@@ -68,6 +69,10 @@ func TestNewCmdClose(t *testing.T) {
 			},
 		},
 	}
+
+	os.Setenv("GH_TOKEN", "auth-token")
+	defer os.Unsetenv("GH_TOKEN")
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()

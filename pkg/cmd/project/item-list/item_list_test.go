@@ -1,6 +1,7 @@
 package itemlist
 
 import (
+	"os"
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
@@ -70,6 +71,10 @@ func TestNewCmdList(t *testing.T) {
 			},
 		},
 	}
+
+	os.Setenv("GH_TOKEN", "auth-token")
+	defer os.Unsetenv("GH_TOKEN")
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ios, _, _, _ := iostreams.Test()
