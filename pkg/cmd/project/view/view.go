@@ -62,7 +62,7 @@ gh project view 1 --org github --closed
 			if len(args) == 1 {
 				opts.number, err = strconv.Atoi(args[0])
 				if err != nil {
-					return err
+					return fmt.Errorf("invalid number: %v", args[0])
 				}
 			}
 
@@ -72,6 +72,11 @@ gh project view 1 --org github --closed
 				client:    client,
 				opts:      opts,
 				URLOpener: URLOpener,
+			}
+
+			// allow testing of the command without actually running it
+			if runF != nil {
+				return runF(config)
 			}
 			return runView(config)
 		},

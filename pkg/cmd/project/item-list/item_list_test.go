@@ -4,13 +4,105 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/pkg/cmd/project/shared/queries"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/google/shlex"
 
 	"github.com/cli/cli/v2/internal/tableprinter"
 	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
+
+func TestNewCmdList(t *testing.T) {
+	tests := []struct {
+		name        string
+		cli         string
+		wants       listOpts
+		wantsErr    bool
+		wantsErrMsg string
+	}{
+		{
+			name:        "user-and-org",
+			cli:         "1 --user monalisa --org github",
+			wantsErr:    true,
+			wantsErrMsg: "if any flags in the group [user org] are set none of the others can be; [org user] were all set",
+		},
+		{
+			name:        "not-a-number",
+			cli:         "x",
+			wantsErr:    true,
+			wantsErrMsg: "invalid number: x",
+		},
+		{
+			name: "number",
+			cli:  "123",
+			wants: listOpts{
+				number: 123,
+			},
+		},
+		{
+			name: "user",
+			cli:  "--user monalisa",
+			wants: listOpts{
+				userOwner: "monalisa",
+			},
+		},
+		{
+			name: "org",
+			cli:  "--org github",
+			wants: listOpts{
+				orgOwner: "github",
+			},
+		},
+		{
+			name: "limit",
+			cli:  "--limit all",
+			wants: listOpts{
+				limit: "all",
+			},
+		},
+		{
+			name: "json",
+			cli:  "--format json",
+			wants: listOpts{
+				format: "json",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			f := &cmdutil.Factory{
+				IOStreams: ios,
+			}
+
+			argv, err := shlex.Split(tt.cli)
+			assert.NoError(t, err)
+
+			var gotOpts listOpts
+			cmd := NewCmdList(f, func(config listConfig) error {
+				gotOpts = config.opts
+				return nil
+			})
+
+			cmd.SetArgs(argv)
+			_, err = cmd.ExecuteC()
+			if tt.wantsErr {
+				assert.Error(t, err)
+				assert.Equal(t, tt.wantsErrMsg, err.Error())
+				return
+			}
+			assert.NoError(t, err)
+
+			assert.Equal(t, tt.wants.number, gotOpts.number)
+			assert.Equal(t, tt.wants.userOwner, gotOpts.userOwner)
+			assert.Equal(t, tt.wants.orgOwner, gotOpts.orgOwner)
+			assert.Equal(t, tt.wants.format, gotOpts.format)
+			assert.Equal(t, tt.wants.limit, gotOpts.limit)
+		})
+	}
+}
 
 func TestRunList_User(t *testing.T) {
 	defer gock.Off()

@@ -4,11 +4,143 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/api"
+	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
+
+func TestNewCmdEdit(t *testing.T) {
+	tests := []struct {
+		name        string
+		cli         string
+		wants       editOpts
+		wantsErr    bool
+		wantsErrMsg string
+	}{
+		{
+			name:        "user-and-org",
+			cli:         "--user monalisa --org github",
+			wantsErr:    true,
+			wantsErrMsg: "if any flags in the group [user org] are set none of the others can be; [org user] were all set",
+		},
+		{
+			name:        "not-a-number",
+			cli:         "x",
+			wantsErr:    true,
+			wantsErrMsg: "invalid number: x",
+		},
+		{
+			name:        "visibility-error",
+			cli:         "--visibility v",
+			wantsErr:    true,
+			wantsErrMsg: "visibility must match either PUBLIC or PRIVATE",
+		},
+		{
+			name:        "no-args",
+			cli:         "",
+			wantsErr:    true,
+			wantsErrMsg: "no fields to edit",
+		},
+		{
+			name: "title",
+			cli:  "--title t",
+			wants: editOpts{
+				title: "t",
+			},
+		},
+		{
+			name: "number",
+			cli:  "123 --title t",
+			wants: editOpts{
+				number: 123,
+				title:  "t",
+			},
+		},
+		{
+			name: "user",
+			cli:  "--user monalisa --title t",
+			wants: editOpts{
+				userOwner: "monalisa",
+				title:     "t",
+			},
+		},
+		{
+			name: "org",
+			cli:  "--org github --title t",
+			wants: editOpts{
+				orgOwner: "github",
+				title:    "t",
+			},
+		},
+		{
+			name: "readme",
+			cli:  "--readme r",
+			wants: editOpts{
+				readme: "r",
+			},
+		},
+		{
+			name: "description",
+			cli:  "--description d",
+			wants: editOpts{
+				shortDescription: "d",
+			},
+		},
+		{
+			name: "visibility",
+			cli:  "--visibility PUBLIC",
+			wants: editOpts{
+				visibility: "PUBLIC",
+			},
+		},
+		{
+			name: "json",
+			cli:  "--format json --title t",
+			wants: editOpts{
+				format: "json",
+				title:  "t",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			f := &cmdutil.Factory{
+				IOStreams: ios,
+			}
+
+			argv, err := shlex.Split(tt.cli)
+			assert.NoError(t, err)
+
+			var gotOpts editOpts
+			cmd := NewCmdEdit(f, func(config editConfig) error {
+				gotOpts = config.opts
+				return nil
+			})
+
+			cmd.SetArgs(argv)
+			_, err = cmd.ExecuteC()
+			if tt.wantsErr {
+				assert.Error(t, err)
+				assert.Equal(t, tt.wantsErrMsg, err.Error())
+				return
+			}
+			assert.NoError(t, err)
+
+			assert.Equal(t, tt.wants.number, gotOpts.number)
+			assert.Equal(t, tt.wants.userOwner, gotOpts.userOwner)
+			assert.Equal(t, tt.wants.orgOwner, gotOpts.orgOwner)
+			assert.Equal(t, tt.wants.visibility, gotOpts.visibility)
+			assert.Equal(t, tt.wants.title, gotOpts.title)
+			assert.Equal(t, tt.wants.readme, gotOpts.readme)
+			assert.Equal(t, tt.wants.shortDescription, gotOpts.shortDescription)
+			assert.Equal(t, tt.wants.format, gotOpts.format)
+		})
+	}
+}
 
 func TestRunUpdate_User(t *testing.T) {
 	defer gock.Off()
@@ -370,18 +502,4 @@ func TestRunUpdate_OmitParams(t *testing.T) {
 		t,
 		"Updated project http://a-url.com\n",
 		stdout.String())
-}
-
-func TestRunUpdate_EmptyUpdateParams(t *testing.T) {
-	ios, _, _, _ := iostreams.Test()
-	config := editConfig{
-		tp: tableprinter.New(ios),
-		opts: editOpts{
-			number:    1,
-			userOwner: "monalisa",
-		},
-	}
-
-	err := runEdit(config)
-	assert.Error(t, err, "no fields to edit")
 }

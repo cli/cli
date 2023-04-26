@@ -63,6 +63,11 @@ gh project create --user '@me' --title "a new project"
 				client: client,
 				opts:   opts,
 			}
+
+			// allow testing of the command without actually running it
+			if runF != nil {
+				return runF(config)
+			}
 			return runCreate(config)
 		},
 	}

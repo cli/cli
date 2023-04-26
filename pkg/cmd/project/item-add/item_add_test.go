@@ -4,11 +4,113 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/api"
+	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
+
+func TestNewCmdaddItem(t *testing.T) {
+	tests := []struct {
+		name        string
+		cli         string
+		wants       addItemOpts
+		wantsErr    bool
+		wantsErrMsg string
+	}{
+		{
+			name:        "missing-url",
+			cli:         "",
+			wantsErr:    true,
+			wantsErrMsg: "required flag(s) \"url\" not set",
+		},
+		{
+			name:        "user-and-org",
+			cli:         "--user monalisa --org github --url github.com/cli/cli",
+			wantsErr:    true,
+			wantsErrMsg: "if any flags in the group [user org] are set none of the others can be; [org user] were all set",
+		},
+		{
+			name:        "not-a-number",
+			cli:         "x --url github.com/cli/cli",
+			wantsErr:    true,
+			wantsErrMsg: "invalid number: x",
+		},
+		{
+			name: "url",
+			cli:  "--url github.com/cli/cli",
+			wants: addItemOpts{
+				itemURL: "github.com/cli/cli",
+			},
+		},
+		{
+			name: "number",
+			cli:  "123 --url github.com/cli/cli",
+			wants: addItemOpts{
+				number:  123,
+				itemURL: "github.com/cli/cli",
+			},
+		},
+		{
+			name: "user",
+			cli:  "--user monalisa --url github.com/cli/cli",
+			wants: addItemOpts{
+				userOwner: "monalisa",
+				itemURL:   "github.com/cli/cli",
+			},
+		},
+		{
+			name: "org",
+			cli:  "--org github --url github.com/cli/cli",
+			wants: addItemOpts{
+				orgOwner: "github",
+				itemURL:  "github.com/cli/cli",
+			},
+		},
+		{
+			name: "json",
+			cli:  "--format json --url github.com/cli/cli",
+			wants: addItemOpts{
+				format:  "json",
+				itemURL: "github.com/cli/cli",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			f := &cmdutil.Factory{
+				IOStreams: ios,
+			}
+
+			argv, err := shlex.Split(tt.cli)
+			assert.NoError(t, err)
+
+			var gotOpts addItemOpts
+			cmd := NewCmdAddItem(f, func(config addItemConfig) error {
+				gotOpts = config.opts
+				return nil
+			})
+
+			cmd.SetArgs(argv)
+			_, err = cmd.ExecuteC()
+			if tt.wantsErr {
+				assert.Error(t, err)
+				assert.Equal(t, tt.wantsErrMsg, err.Error())
+				return
+			}
+			assert.NoError(t, err)
+
+			assert.Equal(t, tt.wants.number, gotOpts.number)
+			assert.Equal(t, tt.wants.userOwner, gotOpts.userOwner)
+			assert.Equal(t, tt.wants.orgOwner, gotOpts.orgOwner)
+			assert.Equal(t, tt.wants.itemURL, gotOpts.itemURL)
+			assert.Equal(t, tt.wants.format, gotOpts.format)
+		})
+	}
+}
 
 func TestRunAddItem_User(t *testing.T) {
 	defer gock.Off()

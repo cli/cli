@@ -64,7 +64,7 @@ gh project item-add 1 --org github --url https://github.com/cli/go-gh/issues/1
 			if len(args) == 1 {
 				opts.number, err = strconv.Atoi(args[0])
 				if err != nil {
-					return err
+					return fmt.Errorf("invalid number: %v", args[0])
 				}
 			}
 
@@ -73,6 +73,11 @@ gh project item-add 1 --org github --url https://github.com/cli/go-gh/issues/1
 				tp:     t,
 				client: client,
 				opts:   opts,
+			}
+
+			// allow testing of the command without actually running it
+			if runF != nil {
+				return runF(config)
 			}
 			return runAddItem(config)
 		},

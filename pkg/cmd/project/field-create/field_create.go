@@ -68,7 +68,7 @@ gh project field-create 1 --user monalisa --name "new field" --data-type "SINGLE
 			if len(args) == 1 {
 				opts.number, err = strconv.Atoi(args[0])
 				if err != nil {
-					return err
+					return fmt.Errorf("invalid number: %v", args[0])
 				}
 			}
 
@@ -77,6 +77,15 @@ gh project field-create 1 --user monalisa --name "new field" --data-type "SINGLE
 				tp:     t,
 				client: client,
 				opts:   opts,
+			}
+
+			if config.opts.dataType == "SINGLE_SELECT" && len(config.opts.singleSelectOptions) == 0 {
+				return fmt.Errorf("at least one single select options is required with data type is SINGLE_SELECT")
+			}
+
+			// allow testing of the command without actually running it
+			if runF != nil {
+				return runF(config)
 			}
 			return runCreateField(config)
 		},
@@ -97,10 +106,6 @@ gh project field-create 1 --user monalisa --name "new field" --data-type "SINGLE
 }
 
 func runCreateField(config createFieldConfig) error {
-	if config.opts.dataType == "SINGLE_SELECT" && len(config.opts.singleSelectOptions) == 0 {
-		return fmt.Errorf("at least one single select options is required with data type is SINGLE_SELECT")
-	}
-
 	if config.opts.format != "" && config.opts.format != "json" {
 		return fmt.Errorf("format must be 'json'")
 	}

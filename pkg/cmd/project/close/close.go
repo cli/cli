@@ -63,7 +63,7 @@ gh project close 1 --org github --undo
 			if len(args) == 1 {
 				opts.number, err = strconv.Atoi(args[0])
 				if err != nil {
-					return err
+					return fmt.Errorf("invalid number: %v", args[0])
 				}
 			}
 
@@ -72,6 +72,11 @@ gh project close 1 --org github --undo
 				tp:     t,
 				client: client,
 				opts:   opts,
+			}
+
+			// allow testing of the command without actually running it
+			if runF != nil {
+				return runF(config)
 			}
 			return runClose(config)
 		},

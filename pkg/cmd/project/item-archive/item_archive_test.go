@@ -4,11 +4,122 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/api"
+	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
+
+func TestNewCmdarchiveItem(t *testing.T) {
+	tests := []struct {
+		name        string
+		cli         string
+		wants       archiveItemOpts
+		wantsErr    bool
+		wantsErrMsg string
+	}{
+		{
+			name:        "missing-id",
+			cli:         "",
+			wantsErr:    true,
+			wantsErrMsg: "required flag(s) \"id\" not set",
+		},
+		{
+			name:        "user-and-org",
+			cli:         "--user monalisa --org github --id 123",
+			wantsErr:    true,
+			wantsErrMsg: "if any flags in the group [user org] are set none of the others can be; [org user] were all set",
+		},
+		{
+			name:        "not-a-number",
+			cli:         "x --id 123",
+			wantsErr:    true,
+			wantsErrMsg: "invalid number: x",
+		},
+		{
+			name: "id",
+			cli:  "--id 123",
+			wants: archiveItemOpts{
+				itemID: "123",
+			},
+		},
+		{
+			name: "number",
+			cli:  "456 --id 123",
+			wants: archiveItemOpts{
+				number: 456,
+				itemID: "123",
+			},
+		},
+		{
+			name: "user",
+			cli:  "--user monalisa --id 123",
+			wants: archiveItemOpts{
+				userOwner: "monalisa",
+				itemID:    "123",
+			},
+		},
+		{
+			name: "org",
+			cli:  "--org github  --id 123",
+			wants: archiveItemOpts{
+				orgOwner: "github",
+				itemID:   "123",
+			},
+		},
+		{
+			name: "undo",
+			cli:  "--undo  --id 123",
+			wants: archiveItemOpts{
+				undo:   true,
+				itemID: "123",
+			},
+		},
+		{
+			name: "json",
+			cli:  "--format json --id 123",
+			wants: archiveItemOpts{
+				format: "json",
+				itemID: "123",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			f := &cmdutil.Factory{
+				IOStreams: ios,
+			}
+
+			argv, err := shlex.Split(tt.cli)
+			assert.NoError(t, err)
+
+			var gotOpts archiveItemOpts
+			cmd := NewCmdArchiveItem(f, func(config archiveItemConfig) error {
+				gotOpts = config.opts
+				return nil
+			})
+
+			cmd.SetArgs(argv)
+			_, err = cmd.ExecuteC()
+			if tt.wantsErr {
+				assert.Error(t, err)
+				assert.Equal(t, tt.wantsErrMsg, err.Error())
+				return
+			}
+			assert.NoError(t, err)
+
+			assert.Equal(t, tt.wants.number, gotOpts.number)
+			assert.Equal(t, tt.wants.userOwner, gotOpts.userOwner)
+			assert.Equal(t, tt.wants.orgOwner, gotOpts.orgOwner)
+			assert.Equal(t, tt.wants.itemID, gotOpts.itemID)
+			assert.Equal(t, tt.wants.undo, gotOpts.undo)
+			assert.Equal(t, tt.wants.format, gotOpts.format)
+		})
+	}
+}
 
 func TestRunArchive_User(t *testing.T) {
 	defer gock.Off()

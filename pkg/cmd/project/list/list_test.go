@@ -5,11 +5,105 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/api"
+	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
+
+func TestNewCmdlist(t *testing.T) {
+	tests := []struct {
+		name        string
+		cli         string
+		wants       listOpts
+		wantsErr    bool
+		wantsErrMsg string
+	}{
+		{
+			name:        "user-and-org",
+			cli:         "--user monalisa --org github",
+			wantsErr:    true,
+			wantsErrMsg: "if any flags in the group [user org] are set none of the others can be; [org user] were all set",
+		},
+		{
+			name: "user",
+			cli:  "--user monalisa",
+			wants: listOpts{
+				userOwner: "monalisa",
+			},
+		},
+		{
+			name: "org",
+			cli:  "--org github",
+			wants: listOpts{
+				orgOwner: "github",
+			},
+		},
+		{
+			name: "closed",
+			cli:  "--closed",
+			wants: listOpts{
+				closed: true,
+			},
+		},
+		{
+			name: "web",
+			cli:  "--web",
+			wants: listOpts{
+				web: true,
+			},
+		},
+		{
+			name: "limit",
+			cli:  "--limit all",
+			wants: listOpts{
+				limit: "all",
+			},
+		},
+		{
+			name: "json",
+			cli:  "--format json",
+			wants: listOpts{
+				format: "json",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			f := &cmdutil.Factory{
+				IOStreams: ios,
+			}
+
+			argv, err := shlex.Split(tt.cli)
+			assert.NoError(t, err)
+
+			var gotOpts listOpts
+			cmd := NewCmdList(f, func(config listConfig) error {
+				gotOpts = config.opts
+				return nil
+			})
+
+			cmd.SetArgs(argv)
+			_, err = cmd.ExecuteC()
+			if tt.wantsErr {
+				assert.Error(t, err)
+				assert.Equal(t, tt.wantsErrMsg, err.Error())
+				return
+			}
+			assert.NoError(t, err)
+
+			assert.Equal(t, tt.wants.userOwner, gotOpts.userOwner)
+			assert.Equal(t, tt.wants.orgOwner, gotOpts.orgOwner)
+			assert.Equal(t, tt.wants.closed, gotOpts.closed)
+			assert.Equal(t, tt.wants.web, gotOpts.web)
+			assert.Equal(t, tt.wants.limit, gotOpts.limit)
+			assert.Equal(t, tt.wants.format, gotOpts.format)
+		})
+	}
+}
 
 func TestBuildURLViewer(t *testing.T) {
 	defer gock.Off()

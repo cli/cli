@@ -77,6 +77,11 @@ gh project list --org github --closed
 				opts:      opts,
 				URLOpener: URLOpener,
 			}
+
+			// allow testing of the command without actually running it
+			if runF != nil {
+				return runF(config)
+			}
 			return runList(config)
 		},
 	}

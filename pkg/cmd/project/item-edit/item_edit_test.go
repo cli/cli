@@ -4,11 +4,139 @@ import (
 	"testing"
 
 	"github.com/cli/cli/v2/internal/tableprinter"
+	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/cli/go-gh/v2/pkg/api"
+	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/h2non/gock.v1"
 )
+
+func TestNewCmdeditItem(t *testing.T) {
+	tests := []struct {
+		name        string
+		cli         string
+		wants       editItemOpts
+		wantsErr    bool
+		wantsErrMsg string
+	}{
+		{
+			name:        "missing-id",
+			cli:         "",
+			wantsErr:    true,
+			wantsErrMsg: "required flag(s) \"id\" not set",
+		},
+		{
+			name: "item-id",
+			cli:  "--id 123",
+			wants: editItemOpts{
+				itemID: "123",
+			},
+		},
+		{
+			name: "number",
+			cli:  "--number 456 --id 123",
+			wants: editItemOpts{
+				number: 456,
+				itemID: "123",
+			},
+		},
+		{
+			name: "field-id",
+			cli:  "--field-id FIELD_ID --id 123",
+			wants: editItemOpts{
+				fieldID: "FIELD_ID",
+				itemID:  "123",
+			},
+		},
+		{
+			name: "project-id",
+			cli:  "--project-id PROJECT_ID --id 123",
+			wants: editItemOpts{
+				projectID: "PROJECT_ID",
+				itemID:    "123",
+			},
+		},
+		{
+			name: "text",
+			cli:  "--text t --id 123",
+			wants: editItemOpts{
+				text:   "t",
+				itemID: "123",
+			},
+		},
+		{
+			name: "date",
+			cli:  "--date 2023-01-01 --id 123",
+			wants: editItemOpts{
+				date:   "2023-01-01",
+				itemID: "123",
+			},
+		},
+		{
+			name: "single-select-option-id",
+			cli:  "--single-select-option-id OPTION_ID --id 123",
+			wants: editItemOpts{
+				singleSelectOptionID: "OPTION_ID",
+				itemID:               "123",
+			},
+		},
+		{
+			name: "iteration-id",
+			cli:  "--iteration-id ITERATION_ID --id 123",
+			wants: editItemOpts{
+				iterationID: "ITERATION_ID",
+				itemID:      "123",
+			},
+		},
+		{
+			name: "json",
+			cli:  "--format json --id 123",
+			wants: editItemOpts{
+				format: "json",
+				itemID: "123",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ios, _, _, _ := iostreams.Test()
+			f := &cmdutil.Factory{
+				IOStreams: ios,
+			}
+
+			argv, err := shlex.Split(tt.cli)
+			assert.NoError(t, err)
+
+			var gotOpts editItemOpts
+			cmd := NewCmdEditItem(f, func(config editItemConfig) error {
+				gotOpts = config.opts
+				return nil
+			})
+
+			cmd.SetArgs(argv)
+			_, err = cmd.ExecuteC()
+			if tt.wantsErr {
+				assert.Error(t, err)
+				assert.Equal(t, tt.wantsErrMsg, err.Error())
+				return
+			}
+			assert.NoError(t, err)
+
+			assert.Equal(t, tt.wants.number, gotOpts.number)
+			assert.Equal(t, tt.wants.itemID, gotOpts.itemID)
+			assert.Equal(t, tt.wants.format, gotOpts.format)
+			assert.Equal(t, tt.wants.title, gotOpts.title)
+			assert.Equal(t, tt.wants.fieldID, gotOpts.fieldID)
+			assert.Equal(t, tt.wants.projectID, gotOpts.projectID)
+			assert.Equal(t, tt.wants.text, gotOpts.text)
+			assert.Equal(t, tt.wants.number, gotOpts.number)
+			assert.Equal(t, tt.wants.date, gotOpts.date)
+			assert.Equal(t, tt.wants.singleSelectOptionID, gotOpts.singleSelectOptionID)
+			assert.Equal(t, tt.wants.iterationID, gotOpts.iterationID)
+		})
+	}
+}
 
 func TestRunItemEdit_Draft(t *testing.T) {
 	defer gock.Off()

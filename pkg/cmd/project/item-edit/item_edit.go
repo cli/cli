@@ -93,6 +93,11 @@ gh project item-edit --id ITEM_ID --field-id FIELD_ID --project-id PROJECT_ID --
 				client: client,
 				opts:   opts,
 			}
+
+			// allow testing of the command without actually running it
+			if runF != nil {
+				return runF(config)
+			}
 			return runEditItem(config)
 		},
 	}

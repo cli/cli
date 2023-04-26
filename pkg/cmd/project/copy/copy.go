@@ -66,7 +66,7 @@ gh project copy 1 --source-org github --title "a new project" --target-user mona
 			if len(args) == 1 {
 				opts.number, err = strconv.Atoi(args[0])
 				if err != nil {
-					return err
+					return fmt.Errorf("invalid number: %v", args[0])
 				}
 			}
 
@@ -75,6 +75,11 @@ gh project copy 1 --source-org github --title "a new project" --target-user mona
 				tp:     t,
 				client: client,
 				opts:   opts,
+			}
+
+			// allow testing of the command without actually running it
+			if runF != nil {
+				return runF(config)
 			}
 			return runCopy(config)
 		},

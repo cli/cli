@@ -69,7 +69,7 @@ gh project edit 1 --org github --visibility PUBLIC
 			if len(args) == 1 {
 				opts.number, err = strconv.Atoi(args[0])
 				if err != nil {
-					return err
+					return fmt.Errorf("invalid number: %v", args[0])
 				}
 			}
 
@@ -78,6 +78,18 @@ gh project edit 1 --org github --visibility PUBLIC
 				tp:     t,
 				client: client,
 				opts:   opts,
+			}
+
+			if config.opts.visibility != "" && config.opts.visibility != projectVisibilityPublic && config.opts.visibility != projectVisibilityPrivate {
+				return fmt.Errorf("visibility must match either PUBLIC or PRIVATE")
+			}
+
+			if config.opts.title == "" && config.opts.shortDescription == "" && config.opts.readme == "" && config.opts.visibility == "" {
+				return fmt.Errorf("no fields to edit")
+			}
+			// allow testing of the command without actually running it
+			if runF != nil {
+				return runF(config)
 			}
 			return runEdit(config)
 		},
@@ -97,14 +109,6 @@ gh project edit 1 --org github --visibility PUBLIC
 }
 
 func runEdit(config editConfig) error {
-	if config.opts.visibility != "" && config.opts.visibility != projectVisibilityPublic && config.opts.visibility != projectVisibilityPrivate {
-		return fmt.Errorf("visibility must match either PUBLIC or PRIVATE")
-	}
-
-	if config.opts.title == "" && config.opts.shortDescription == "" && config.opts.readme == "" && config.opts.visibility == "" {
-		return fmt.Errorf("no fields to edit")
-	}
-
 	if config.opts.format != "" && config.opts.format != "json" {
 		return fmt.Errorf("format must be 'json'")
 	}

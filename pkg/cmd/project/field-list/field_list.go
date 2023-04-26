@@ -69,7 +69,7 @@ gh project field-list 1 --org github --limit 30
 			if len(args) == 1 {
 				opts.number, err = strconv.Atoi(args[0])
 				if err != nil {
-					return err
+					return fmt.Errorf("invalid number: %v", args[0])
 				}
 			}
 
@@ -78,6 +78,11 @@ gh project field-list 1 --org github --limit 30
 				tp:     t,
 				client: client,
 				opts:   opts,
+			}
+
+			// allow testing of the command without actually running it
+			if runF != nil {
+				return runF(config)
 			}
 			return runList(config)
 		},
